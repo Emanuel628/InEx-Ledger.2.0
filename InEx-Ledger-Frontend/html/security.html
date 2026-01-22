@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>InEx Ledger — Security</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/security.css">
+</head>
+
+<body>
+  <header>
+    <h1>InEx Ledger</h1>
+    <nav>
+      <a href="transactions.html">Transactions</a> |
+      <a href="accounts.html">Accounts</a> |
+      <a href="categories.html">Categories</a> |
+      <a href="receipts.html">Receipts</a> |
+      <a href="mileage.html">Mileage</a> |
+      <a href="exports.html">Exports</a> |
+      <a href="settings.html">Settings</a>
+    </nav>
+  </header>
+
+  <div id="trialBanner" class="trial-banner"></div>
+
+  <main>
+    <section>
+      <h2>Security</h2>
+
+      <p>
+        Manage how you protect access to your account.
+      </p>
+
+      <form method="post">
+        <fieldset>
+          <legend>Change password</legend>
+
+          <div>
+            <label for="current-password">Current password</label><br />
+            <input
+              type="password"
+              id="current-password"
+              name="current_password"
+              required
+              autocomplete="current-password"
+              data-security-password
+            />
+          </div>
+
+          <br />
+
+          <div>
+            <label for="new-password">New password</label><br />
+            <input
+              type="password"
+              id="new-password"
+              name="new_password"
+              required
+              autocomplete="new-password"
+              data-security-password
+            />
+          </div>
+
+          <br />
+
+          <div>
+            <label for="confirm-new-password">Confirm new password</label><br />
+            <input
+              type="password"
+              id="confirm-new-password"
+              name="confirm_new_password"
+              required
+              autocomplete="new-password"
+              data-security-password
+            />
+          </div>
+
+          <br />
+
+          <div class="show-password-wrap">
+            <label class="show-password-label">
+              <input type="checkbox" id="showPasswordToggle" />
+              Show passwords
+            </label>
+          </div>
+
+          <div>
+            <button type="submit">Update password</button>
+          </div>
+        </fieldset>
+      </form>
+    </section>
+
+    <section>
+      <h3>Session</h3>
+
+      <form method="post">
+        <button type="submit" data-action="logout" data-logout>Sign out of all sessions</button>
+      </form>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; InEx Ledger</p>
+  </footer>
+<script src="../js/global.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/trial.js"></script>
+<script src="../js/security.js"></script>
+</body>
+</html>

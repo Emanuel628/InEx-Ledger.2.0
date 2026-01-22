@@ -1,0 +1,114 @@
+main {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.mileage-hero {
+  margin-bottom: 16px;
+}
+
+.mileage-section {
+  background: var(--card-bg);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-soft, 0 10px 25px rgba(0, 0, 0, 0.08));
+}
+
+.mileage-field {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mileage-field label {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.optional-label {
+  color: var(--text-muted, rgba(255, 255, 255, 0.6));
+  font-size: 0.85rem;
+}
+
+.mileage-field input {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.button-row {
+  margin-top: 10px;
+}
+
+.button-row button {
+  width: 100%;
+}
+
+.mileage-table-wrapper {
+  margin-top: 16px;
+}
+
+#mileageTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+#mileageTable th,
+#mileageTable td {
+  padding: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+#mileageTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.mileage-table-wrapper button {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.small-note {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.error-text {
+  color: #f87171;
+  font-size: 13px;
+  min-height: 18px;
+  margin-top: 6px;
+}
+
+@media (max-width: 768px) {
+  main {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .mileage-section {
+    padding: 16px;
+  }
+
+  #mileageTable th,
+  #mileageTable td {
+    font-size: 0.85rem;
+  }
+
+  .mileage-table-wrapper {
+    overflow-x: auto;
+  }
+}

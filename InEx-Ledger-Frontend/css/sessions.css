@@ -1,0 +1,13 @@
+/* =========================
+   Settings & Account Pages
+   ========================= */
+
+/* Keep settings calmer & narrower */
+main {
+  max-width: 720px;
+}
+
+/* Stack sections more clearly */
+section + section {
+  margin-top: 22px;
+}

@@ -1,0 +1,60 @@
+/* =========================
+   Settings & Account Pages
+   ========================= */
+
+/* Keep settings calmer & narrower */
+main {
+  max-width: 720px;
+}
+
+/* Stack sections more clearly */
+section + section {
+  margin-top: 22px;
+}
+
+.tax-identifiers-section {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+  background: var(--card-bg);
+}
+
+.tax-identifiers-section legend {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.tax-identifiers-section .section-hint {
+  margin-top: 0;
+  margin-bottom: 18px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.tax-identifiers-section .form-row {
+  margin-bottom: 12px;
+}
+
+.tax-identifiers-section .form-row label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.tax-identifiers-section input[type="password"] {
+  width: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.tax-identifiers-section .theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-top: 8px;
+}

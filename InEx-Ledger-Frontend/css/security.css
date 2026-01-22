@@ -1,0 +1,31 @@
+/* =========================
+   Settings & Account Pages
+   ========================= */
+
+/* Keep settings calmer & narrower */
+main {
+  max-width: 720px;
+}
+
+/* Stack sections more clearly */
+section + section {
+  margin-top: 22px;
+}
+
+.show-password-wrap {
+  margin-bottom: 16px;
+}
+
+.show-password-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.show-password-label input {
+  width: auto;
+  height: auto;
+}

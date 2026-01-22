@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>InEx Ledger — Business Profile</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/business-profile.css">
+</head>
+
+<body>
+  <header>
+    <h1>InEx Ledger</h1>
+    <nav>
+      <a href="transactions.html">Transactions</a> |
+      <a href="accounts.html">Accounts</a> |
+      <a href="categories.html">Categories</a> |
+      <a href="receipts.html">Receipts</a> |
+      <a href="mileage.html">Mileage</a> |
+      <a href="exports.html">Exports</a> |
+      <a href="settings.html">Settings</a>
+    </nav>
+  </header>
+
+  <div id="trialBanner" class="trial-banner"></div>
+
+  <main>
+    <section>
+      <h2>Business profile</h2>
+
+      <p>
+        This information appears on exports and shared records.
+      </p>
+
+     <form method="post">
+        <fieldset class="tax-identifiers-section">
+          <legend>Tax identifiers</legend>
+          <p class="section-hint">
+            Provide the identifier that matches the region you operate in.
+          </p>
+
+          <div class="form-row tax-region-field" data-region="us">
+            <label for="businessEin">EIN (USA)</label>
+            <input
+              type="password"
+              id="businessEin"
+              name="business_ein"
+              autocomplete="off"
+              data-business-id
+            />
+          </div>
+
+          <div class="form-row tax-region-field" data-region="ca" hidden>
+            <label for="businessBn">Business Number (Canada)</label>
+            <input
+              type="password"
+              id="businessBn"
+              name="business_bn"
+              autocomplete="off"
+              data-business-id
+            />
+          </div>
+
+          <label class="theme-toggle">
+            <input type="checkbox" id="showIdentifiersToggle" />
+            <span class="toggle-slider" aria-hidden="true"></span>
+            <span>Show identifiers</span>
+          </label>
+        </fieldset>
+
+        <div>
+          <label for="business-name">Business name</label><br />
+          <input
+            type="text"
+            id="business-name"
+            name="business_name"
+            required
+          />
+        </div>
+
+        <br />
+
+        <div>
+          <label for="business-type">Business type</label><br />
+          <input
+            type="text"
+            id="business-type"
+            name="business_type"
+          />
+        </div>
+
+        <br />
+
+        <div>
+          <label for="business-address">Business address</label><br />
+          <textarea
+            id="business-address"
+            name="business_address"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <br />
+
+        <div>
+          <label for="fiscal-year">Fiscal year start</label><br />
+          <input
+            type="date"
+            id="fiscal-year"
+            name="fiscal_year_start"
+          />
+        </div>
+
+        <br />
+
+        <div>
+          <button type="submit">Save changes</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; InEx Ledger</p>
+  </footer>
+<script src="../js/global.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/trial.js"></script>
+<script src="../js/business-profile.js"></script>
+</body>
+</html>

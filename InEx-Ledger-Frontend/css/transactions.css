@@ -1,0 +1,408 @@
+#addTxToggle {
+  background: var(--card-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.tx-actions button,
+.tx-action {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.25));
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.tx-action {
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+#txDrawer {
+  margin-top: 12px;
+}
+
+.stats-bar {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin-bottom: 18px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.stats-bar .stat-card {
+  flex: 1;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px 20px;
+  text-align: center;
+  box-shadow: var(--shadow, 0 12px 28px rgba(0, 0, 0, 0.35));
+}
+
+.stats-bar .stat-card span {
+  display: block;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.stats-bar .stat-card strong {
+  font-size: 1.9rem;
+  color: var(--text-primary);
+  display: block;
+}
+
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+}
+
+section {
+  margin-bottom: 20px;
+}
+
+form {
+  margin-top: 20px;
+}
+
+.tx-card {
+  background: var(--card-bg);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-soft, 0 10px 25px rgba(0, 0, 0, 0.08));
+}
+
+.tx-card-title {
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+
+.tx-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tx-actions {
+  margin-top: 16px;
+  display: flex;
+}
+
+.tx-actions button {
+  width: 100%;
+}
+
+.tx-card label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.tx-card select,
+.tx-card input {
+  width: 100%;
+  margin-bottom: 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 10px;
+  color: var(--text-primary);
+}
+
+.tx-card select option {
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+#txType {
+  margin-bottom: 18px;
+  font-weight: 600;
+}
+
+.tx-field {
+  margin-bottom: 12px;
+}
+
+.tx-submit {
+  margin-top: 18px;
+}
+
+.tx-submit button {
+  width: 100%;
+}
+
+.transaction-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.transaction-modal.hidden {
+  display: none;
+}
+
+.transaction-modal-content {
+  background: var(--card-bg);
+  border-radius: 14px;
+  padding: 20px;
+  width: min(360px, 90%);
+  box-shadow: var(--shadow);
+}
+
+.transaction-modal-content textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  padding: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+}
+
+.modal-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tx-type-pill,
+.tx-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  margin-right: 8px;
+  opacity: 0.85;
+}
+
+.tx-income {
+  border-left: 3px solid rgba(34, 197, 94, 0.35);
+  background: transparent;
+}
+
+.tx-expense {
+  border-left: 3px solid rgba(248, 113, 113, 0.35);
+  background: transparent;
+}
+
+.tx-income .tx-type-pill,
+.tx-income .tx-pill {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #065f46;
+}
+
+.tx-expense .tx-type-pill,
+.tx-expense .tx-pill {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #7f1d1d;
+}
+
+.tx-clip {
+  margin-left: 6px;
+  opacity: 0.8;
+}
+
+.tx-type-row {
+  display: flex;
+  gap: 18px;
+  margin: 12px 0;
+}
+
+.tx-type-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.tx-type-row input {
+  accent-color: var(--accent, #2563eb);
+}
+
+.tx-note-indicator {
+  margin-left: 6px;
+  font-size: 0.95rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+table th,
+table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+}
+
+tbody tr:last-child {
+  border-bottom: none;
+}
+
+.small-note {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 6px;
+}
+
+.error-text {
+  color: #f87171;
+  font-size: 12px;
+  min-height: 18px;
+  margin-top: 8px;
+}
+
+.placeholder {
+  text-align: center;
+  opacity: 0.7;
+}
+
+.tax-hero {
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding: 22px;
+}
+
+.tax-amount {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 8px 0;
+}
+
+.tax-subline {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.tax-hero.upsell button {
+  margin-top: 12px;
+}
+
+.ytd-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ytd-card {
+  background: var(--bg-card, rgba(255, 255, 255, 0.02));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding: 16px;
+}
+
+@media (max-width: 768px) {
+  main {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  section {
+    padding: 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  .tx-card {
+    padding: 16px;
+  }
+
+  button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  header h1 {
+    font-size: 16px;
+  }
+
+  nav a {
+    font-size: 13px;
+    padding: 5px 6px;
+  }
+
+  section {
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  form > * {
+    margin-bottom: 14px;
+  }
+
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  thead,
+  tbody,
+  tr {
+    width: max-content;
+  }
+
+  input[type="date"] {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  form,
+  fieldset,
+  div {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .stats-bar {
+    flex-direction: column;
+  }
+
+  .stats-bar .stat-card {
+    width: 100%;
+  }
+}

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>InEx Ledger — Sign In</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/login.css">
+</head>
+
+<body>
+  <header>
+    <h1>InEx Ledger</h1>
+  </header>
+
+  <div id="canadaTestBanner" class="trial-banner" style="display:none;"></div>
+
+  <main>
+    <section>
+      <h2>Sign in</h2>
+
+      <form method="post">
+        <div>
+          <label for="email" data-i18n="login_email_label">Email address</label><br />
+          <input
+            type="email"
+            id="email"
+            name="email"
+            required
+            autocomplete="email"
+          />
+        </div>
+
+        <br />
+
+        <div>
+          <label for="password" data-i18n="login_password_label">Password</label><br />
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            autocomplete="current-password"
+          />
+        </div>
+
+        <label class="show-password-toggle" data-i18n="login_toggle_show_password">
+          <input type="checkbox" id="togglePassword" />
+          Show password
+        </label>
+
+        <br />
+
+        <div>
+          <button type="submit" data-i18n="login_submit">Sign in</button>
+        </div>
+      </form>
+
+      <p>
+        <span data-i18n="login_need_account">Don’t have an account?</span>
+        <a href="register.html" data-i18n="login_create_account">Create one</a>
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      <a href="subscription.html" data-i18n="nav_pricing">Pricing</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </p>
+    <p>&copy; InEx Ledger</p>
+  </footer>
+<script src="../js/global.js"></script>
+<script src="../js/i18n.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/login.js"></script>
+</body>
+</html>

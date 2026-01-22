@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang= en>
+<head>
+  <meta charset=UTF-8>
+  <title>InEx Ledger — Verify Email</title>
+  <meta name=viewport content=width=device-width initial-scale=1.0>
+
+  <!-- Global + Page CSS -->
+  <link rel=stylesheet href=../css/global.css>
+  <link rel=stylesheet href=../css/verify-email.css>
+</head>
+
+<body>
+  <header>
+    <h1>InEx Ledger</h1>
+  </header>
+
+  <main>
+    <section>
+      <h2>Verify your email</h2>
+
+      <p>
+        We''ve sent a verification link to your email address.
+        Please check your inbox and click the link to continue.
+      </p>
+
+      <p>
+        If you''t see the email, check your spam folder or request a new link.
+      </p>
+
+      <p id=verificationStatus class=verification-status aria-live=polite></p>
+      <p id=verificationLink class=verification-link></p>
+
+      <form method=post>
+        <button id=resendVerificationButton type=submit>Resend verification email</button>
+      </form>
+
+      <form action=login.html method=get>
+        <button id=continueToLoginButton type=submit>Continue to Login</button>
+      </form>
+
+      <p class=resend-link>
+        <a href=# id=resendVerificationLink>Send verification again</a>
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; InEx Ledger</p>
+  </footer>
+<script src=../js/global.js></script>
+<script src=../js/verify-email.js></script>
+</body>
+</html>

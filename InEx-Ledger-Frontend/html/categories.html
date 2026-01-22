@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>InEx Ledger ƒ?" Categories</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="../css/global.css" />
+  <link rel="stylesheet" href="../css/categories.css" />
+</head>
+
+<body>
+  <header>
+    <h1>InEx Ledger</h1>
+    <nav>
+      <a data-i18n="nav_transactions" href="transactions.html">Transactions</a> |
+      <a data-i18n="nav_accounts" href="accounts.html">Accounts</a> |
+      <a data-i18n="nav_categories" href="categories.html">Categories</a> |
+      <a data-i18n="nav_receipts" href="receipts.html">Receipts</a> |
+      <a href="mileage.html">Mileage</a> |
+      <a data-i18n="nav_exports" href="exports.html">Exports</a> |
+      <a data-i18n="nav_settings" href="settings.html">Settings</a>
+    </nav>
+  </header>
+
+  <div id="trialBanner" class="trial-banner"></div>
+
+  <main>
+    <section>
+      <div class="account-actions">
+        <div>
+          <h2 data-i18n="categories_title">Categories</h2>
+          <p data-i18n="categories_description">
+            Organize transactions into income or expense groups for export accuracy.
+          </p>
+        </div>
+        <button id="showCategoryForm" type="button" data-i18n="categories_add">Add category</button>
+      </div>
+      <div id="categoryFormContainer">
+        <form id="categoryForm">
+          <div>
+            <label for="category-name" data-i18n="categories_label_name">Category name</label><br />
+            <input type="text" id="category-name" name="category-name" required />
+          </div>
+
+          <br />
+
+          <div>
+            <label for="category-type" data-i18n="categories_label_type">Type</label><br />
+            <select id="category-type" name="category-type" required>
+              <option value="">Select type</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+          </div>
+
+          <div class="tax-label-field">
+            <label id="taxLabelLabel" for="taxLabelSelect">Map to Schedule C</label><br />
+            <select id="taxLabelSelect">
+              <option value="">(Optional) Map to Schedule C</option>
+            </select>
+            <p id="taxRegionNote" class="small-note" hidden>This mapping is from the other region.</p>
+          </div>
+
+          <br />
+
+          <div>
+            <button type="submit" data-i18n="categories_button_save">Save category</button>
+          </div>
+        </form>
+        <p id="categoryFormMessage" class="error-text"></p>
+      </div>
+    </section>
+
+    <section>
+      <h3 data-i18n="categories_income_title">Income categories</h3>
+      <div id="incomeCategories" class="category-grid"></div>
+    </section>
+
+    <section>
+      <h3 data-i18n="categories_expense_title">Expense categories</h3>
+      <div id="expenseCategories" class="category-grid"></div>
+    </section>
+
+    <p id="categoryMessage" class="error-text"></p>
+  </main>
+
+  <footer>
+    <p>
+      <a href="subscription.html">Pricing</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </p>
+    <p>&copy; InEx Ledger</p>
+  </footer>
+
+  <script src="../js/global.js"></script>
+  <script src="../js/i18n.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/trial.js"></script>
+  <script src="../js/categories.js"></script>
+</body>
+</html>
