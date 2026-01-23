@@ -122,12 +122,9 @@ function buildIdentityPage(data) {
     11
   );
   y -= 18;
-  canvas.text(
-    40,
-    y,
-    `${labels.reporting_period}: ${startDate} – ${endDate}`,
-    11
-  );
+  canvas.text(40, y, `${labels.reporting_period}:`, 11);
+  y -= 14;
+  canvas.text(60, y, `${startDate} – ${endDate}`, 11);
   y -= 18;
   canvas.text(40, y, `${labels.currency}: ${currency}`, 11);
 
