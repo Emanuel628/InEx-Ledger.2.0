@@ -18,28 +18,27 @@ const SECURITY_REQUIREMENT_RULES = {
   uppercase: (value) => /[A-Z]/.test(value),
   special: (value) => /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)
 };
-console.log("Settings JS loaded");
-let securityState = {};
 
+let securityState = {};
+console.log("Settings JS loaded");
 document.addEventListener("DOMContentLoaded", async () => {
   if (typeof requireAuth === "function") requireAuth();
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
   
-  // SIGN OUT BUTTON WIRING (matches your HTML)
-const signOutBtn = document.querySelector("[data-logout]");
+  const signOutBtn = document.querySelector("[data-logout]");
+console.log("Sign out button found:", signOutBtn);
 
 if (signOutBtn) {
   signOutBtn.addEventListener("click", () => {
-    // Clear auth tokens
+    console.log("Sign out clicked");
+
     localStorage.removeItem("auth_token");
     localStorage.removeItem("lb_token");
     localStorage.removeItem("lb_user");
 
-    // Clear any session data
     sessionStorage.clear();
 
-    // Redirect to login
     window.location.href = "login.html";
   });
 }
