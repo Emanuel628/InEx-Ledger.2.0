@@ -25,7 +25,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof requireAuth === "function") requireAuth();
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
+  
+    const signOutBtn = document.getElementById("signOutBtn");
 
+  if (signOutBtn) {
+    signOutBtn.addEventListener("click", () => {
+      // Clear auth tokens
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("lb_token");
+      localStorage.removeItem("lb_user");
+
+      // Optional: clear anything else auth-related
+      sessionStorage.clear();
+
+      // Redirect to login
+      window.location.href = "login.html";
+    });
+  }
+  
   const regionSelect = document.getElementById("regionSelectSettings");
   const languageSelect = document.getElementById("languageSelectSettings");
   const darkModeToggle = document.getElementById("darkModeToggle");
