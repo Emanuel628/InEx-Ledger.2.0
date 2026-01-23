@@ -129,7 +129,9 @@ function verifyPassword(password, stored) {
 router.post("/register", async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
-
+  
+  console.log("🧭 REGISTER USING DB:", process.env.DATABASE_URL);
+  
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
