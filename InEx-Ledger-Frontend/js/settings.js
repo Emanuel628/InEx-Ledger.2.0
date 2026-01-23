@@ -26,22 +26,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
   
-    const signOutBtn = document.getElementById("signOutBtn");
+  // SIGN OUT BUTTON WIRING (matches your HTML)
+const signOutBtn = document.querySelector("[data-logout]");
 
-  if (signOutBtn) {
-    signOutBtn.addEventListener("click", () => {
-      // Clear auth tokens
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("lb_token");
-      localStorage.removeItem("lb_user");
+if (signOutBtn) {
+  signOutBtn.addEventListener("click", () => {
+    // Clear auth tokens
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("lb_token");
+    localStorage.removeItem("lb_user");
 
-      // Optional: clear anything else auth-related
-      sessionStorage.clear();
+    // Clear any session data
+    sessionStorage.clear();
 
-      // Redirect to login
-      window.location.href = "login.html";
-    });
-  }
+    // Redirect to login
+    window.location.href = "login.html";
+  });
+}
   
   const regionSelect = document.getElementById("regionSelectSettings");
   const languageSelect = document.getElementById("languageSelectSettings");
