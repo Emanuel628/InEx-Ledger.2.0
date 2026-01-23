@@ -1,3 +1,5 @@
+/** * Section: Configuration & Constants 
+ */
 const ACCOUNTS_STORAGE_KEY = "lb_accounts";
 const TRANSACTIONS_STORAGE_KEY = "lb_transactions";
 
@@ -6,6 +8,9 @@ let accountFormState = null;
 let accountFormSubmitDefault = "Save account";
 const ACCOUNT_FORM_UPDATE_LABEL = "Update account";
 
+/** * Section: Initialization 
+ * Runs when the DOM is ready.
+ */
 document.addEventListener("DOMContentLoaded", () => {
   if (typeof requireAuth === "function") requireAuth();
   if (typeof enforceTrial === "function") enforceTrial();
@@ -15,6 +20,9 @@ document.addEventListener("DOMContentLoaded", () => {
   renderAccountList();
 });
 
+/** * Section: Form Setup (Wiring)
+ * Attaches listeners and initializes form state.
+ */
 function wireAccountForm() {
   const showButton = document.getElementById("showAccountForm");
   const formContainer = document.getElementById("accountFormContainer");
@@ -33,56 +41,23 @@ function wireAccountForm() {
     nameInput,
     submitButton
   };
-  
-  function wireAccountForm() {
-  // ... all your form wiring code ...
 
+  // Capture default button text
   if (submitButton) {
-    accountFormSubmitDefault =
-      submitButton.textContent || accountFormSubmitDefault;
+    accountFormSubmitDefault = submitButton.textContent || accountFormSubmitDefault;
   }
 
+  // Populate the dropdown
   populateAccountTypes(typeSelect);
 
-  // ... rest of wireAccountForm ...
-}
+  // Toggle Visibility
+  if (showButton) {
+    showButton.addEventListener("click", () => {
+      formContainer.classList.toggle("visible");
+    });
+  }
 
-// TOP-LEVEL — NOT INSIDE wireAccountForm
-function populateAccountTypes(selectElement) {
-  if (!selectElement) return;
-
-  const types = [
-    { value: "checking", label: "Checking" },
-    { value: "savings", label: "Savings" },
-    { value: "credit", label: "Credit Card" },
-    { value: "cash", label: "Cash" },
-    { value: "loan", label: "Loan" },
-    { value: "other", label: "Other" }
-  ];
-
-  // MISSING LOGIC: Loop through the array and add options to the select element
-  selectElement.innerHTML = ''; // Clear existing
-  types.forEach(type => {
-    const opt = document.createElement('option');
-    opt.value = type.value;
-    opt.textContent = type.label;
-    selectElement.appendChild(opt);
-  });
-} // MISSING BRACE: Added to close the function
-
-  
-  ];
-
-  selectElement.innerHTML = '<option value="">Select type</option>';
-
-  types.forEach((type) => {
-    const option = document.createElement("option");
-    option.value = type.value;
-    option.textContent = type.label;
-    selectElement.appendChild(option);
-  });
-}
-
+  // Cancel logic
   if (cancelButton) {
     cancelButton.addEventListener("click", () => {
       if (formContainer) {
@@ -92,25 +67,21 @@ function populateAccountTypes(selectElement) {
     });
   }
 
+  // Submit handling
   if (form) {
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      const nameInput = document.getElementById("account-name");
-      const typeInput = document.getElementById("account-type");
-
       const name = nameInput.value.trim();
-      const type = typeInput.value;
+      const type = typeSelect.value;
 
       if (!name || !type) {
-        if (message) {
-          message.textContent = "Enter a name and select a type.";
-        }
+        if (message) message.textContent = "Enter a name and select a type.";
         return;
       }
 
       const accounts = getAccounts();
       if (editingAccountId) {
-        const index = accounts.findIndex((account) => account.id === editingAccountId);
+        const index = accounts.findIndex((a) => a.id === editingAccountId);
         if (index >= 0) {
           accounts[index] = { ...accounts[index], name, type };
         }
@@ -126,185 +97,27 @@ function populateAccountTypes(selectElement) {
 
       saveAccounts(accounts);
       window.dispatchEvent(new Event("accountsUpdated"));
-
-      if (message) {
-        message.textContent = "";
-      }
-
       resetAccountForm();
       renderAccountList();
     });
   }
 }
 
-function resetAccountForm() {
-  editingAccountId = null;
-  if (!accountFormState) {
-    return;
-  }
-  const { form, nameInput, typeSelect, submitButton, message } = accountFormState;
-  if (form) {
-    form.reset();
-  }
-  if (nameInput) {
-    nameInput.value = "";
-  }
-  if (typeSelect) {
-    typeSelect.value = "";
-  }
-  if (submitButton) {
-    submitButton.textContent = accountFormSubmitDefault;
-  }
-  if (message) {
-    message.textContent = "";
-  }
-}
-
-function startEditingAccount(account) {
-  if (!accountFormState) {
-    return;
-  }
-  const { formContainer, nameInput, typeSelect, submitButton } = accountFormState;
-  editingAccountId = account.id;
-  if (formContainer) {
-    formContainer.classList.add("visible");
-  }
-  if (nameInput) {
-    nameInput.value = account.name;
-  }
-  if (typeSelect) {
-    typeSelect.value = account.type;
-  }
-  if (submitButton) {
-    submitButton.textContent = ACCOUNT_FORM_UPDATE_LABEL;
-  }
-}
-
-function renderAccountList() {
-  const container = document.getElementById("accountsList");
-  const message = document.getElementById("accountMessage");
-  const accounts = getAccounts();
-  if (message) {
-    message.textContent = "";
-  }
-  if (!container) {
-    return;
-  }
-
-  container.innerHTML = "";
-
-  if (accounts.length === 0) {
-    const message =
-      typeof t === "function"
-        ? t("accounts_no_accounts")
-        : "No accounts yet. Add one to get started.";
-    container.innerHTML = `<p class="small-note">${message}</p>`;
-    return;
-  }
-
-  accounts.forEach((account) => {
-    const card = document.createElement("div");
-    card.className = "account-card";
-
-    const left = document.createElement("div");
-    const name = document.createElement("h3");
-    name.textContent = account.name;
-    left.appendChild(name);
-
-    const meta = document.createElement("p");
-    meta.className = "account-meta";
-    const typeLabel = formatAccountType(account.type);
-    meta.textContent = `${typeLabel} - Created ${formatDate(
-      account.createdAt
-    )}`;
-    left.appendChild(meta);
-
-    const used = document.createElement("p");
-    used.className = "account-meta";
-    used.textContent = account.used
-      ? "In use by transactions"
-      : "Not used yet";
-    left.appendChild(used);
-
-    const right = document.createElement("div");
-    const editButton = document.createElement("button");
-    editButton.textContent = "Edit";
-    editButton.type = "button";
-    editButton.addEventListener("click", () => {
-      startEditingAccount(account);
-    });
-    const deleteButton = document.createElement("button");
-    deleteButton.textContent = "Delete";
-    deleteButton.addEventListener("click", () => {
-      handleAccountDelete(account.id, message);
-    });
-    right.appendChild(editButton);
-    right.appendChild(deleteButton);
-
-    card.appendChild(left);
-    card.appendChild(right);
-    container.appendChild(card);
-  });
-}
-
-function handleAccountDelete(accountId, messageContainer) {
-  const accounts = getAccounts();
-  const target = accounts.find((account) => account.id === accountId);
-  if (!target) {
-    return;
-  }
-
-  const used = isAccountUsed(accountId);
-  if (used) {
-    const warning =
-      typeof t === "function"
-        ? t("accounts_delete_warning") || `This account is used by transactions. Type DELETE to remove it.`
-        : `This account is used by transactions. Type DELETE to remove it.`;
-    const confirmation = window.prompt(warning);
-    if (confirmation !== "DELETE") {
-      if (messageContainer) {
-        messageContainer.textContent =
-          typeof t === "function"
-            ? t("accounts_delete_confirm_required") || "Type DELETE to confirm deletion."
-            : "Type DELETE to confirm deletion.";
-      }
-      return;
-    }
-  } else {
-    const confirmMessage =
-      typeof t === "function"
-        ? t("accounts_delete_confirm") || `Delete ${target.name}?`
-        : `Delete ${target.name}?`;
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
-  }
-
-  const transactions = getTransactions();
-  const updatedTransactions = transactions.map((txn) => {
-    if (txn.accountId === accountId) {
-      return { ...txn, accountName: target.name, accountDeleted: true };
-    }
-    return txn;
-  });
-  if (JSON.stringify(transactions) !== JSON.stringify(updatedTransactions)) {
-    saveTransactions(updatedTransactions);
-  }
-
-  const filtered = accounts.filter((account) => account.id !== accountId);
-  saveAccounts(filtered);
-
-  if (messageContainer) {
-    messageContainer.textContent = "";
-  }
-
-  window.dispatchEvent(new Event("accountsUpdated"));
-  renderAccountList();
-}
-
+/** * Section: UI Helpers
+ * Populates dropdowns and resets the form state.
+ */
 function populateAccountTypes(selectElement) {
-  const types = window.LUNA_DEFAULTS?.accountTypes || [];
-  if (!selectElement || types.length === 0) return;
+  if (!selectElement) return;
+
+  // Use LUNA_DEFAULTS if they exist, otherwise use fallback list
+  const types = window.LUNA_DEFAULTS?.accountTypes || [
+    { value: "checking", label: "Checking" },
+    { value: "savings", label: "Savings" },
+    { value: "credit", label: "Credit Card" },
+    { value: "cash", label: "Cash" },
+    { value: "loan", label: "Loan" },
+    { value: "other", label: "Other" }
+  ];
 
   selectElement.innerHTML = '<option value="">Select type</option>';
   types.forEach((type) => {
@@ -315,47 +128,122 @@ function populateAccountTypes(selectElement) {
   });
 }
 
+function resetAccountForm() {
+  editingAccountId = null;
+  if (!accountFormState) return;
+  const { form, nameInput, typeSelect, submitButton, message } = accountFormState;
+  
+  if (form) form.reset();
+  if (nameInput) nameInput.value = "";
+  if (typeSelect) typeSelect.value = "";
+  if (submitButton) submitButton.textContent = accountFormSubmitDefault;
+  if (message) message.textContent = "";
+}
+
+function startEditingAccount(account) {
+  if (!accountFormState) return;
+  const { formContainer, nameInput, typeSelect, submitButton } = accountFormState;
+  
+  editingAccountId = account.id;
+  if (formContainer) formContainer.classList.add("visible");
+  if (nameInput) nameInput.value = account.name;
+  if (typeSelect) typeSelect.value = account.type;
+  if (submitButton) submitButton.textContent = ACCOUNT_FORM_UPDATE_LABEL;
+}
+
+/** * Section: Rendering
+ * Handles displaying the list of accounts.
+ */
+function renderAccountList() {
+  const container = document.getElementById("accountsList");
+  const message = document.getElementById("accountMessage");
+  const accounts = getAccounts();
+  
+  if (message) message.textContent = "";
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  if (accounts.length === 0) {
+    container.innerHTML = `<p class="small-note">No accounts yet. Add one to get started.</p>`;
+    return;
+  }
+
+  accounts.forEach((account) => {
+    const card = document.createElement("div");
+    card.className = "account-card";
+
+    const left = document.createElement("div");
+    left.innerHTML = `
+      <h3>${account.name}</h3>
+      <p class="account-meta">${formatAccountType(account.type)} - Created ${formatDate(account.createdAt)}</p>
+      <p class="account-meta">${isAccountUsed(account.id) ? "In use" : "Not used"}</p>
+    `;
+
+    const right = document.createElement("div");
+    const editBtn = document.createElement("button");
+    editBtn.textContent = "Edit";
+    editBtn.onclick = () => startEditingAccount(account);
+    
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "Delete";
+    delBtn.onclick = () => handleAccountDelete(account.id, message);
+
+    right.appendChild(editBtn);
+    right.appendChild(delBtn);
+    card.appendChild(left);
+    card.appendChild(right);
+    container.appendChild(card);
+  });
+}
+
+/** * Section: Data Logic
+ * Handles storage, deletion, and formatting.
+ */
+function handleAccountDelete(accountId, messageContainer) {
+  const accounts = getAccounts();
+  const target = accounts.find((a) => a.id === accountId);
+  if (!target) return;
+
+  if (isAccountUsed(accountId)) {
+    if (window.prompt("Account in use by transactions. Type DELETE to confirm.") !== "DELETE") {
+      if (messageContainer) messageContainer.textContent = "Type DELETE to confirm.";
+      return;
+    }
+  } else if (!window.confirm(`Delete ${target.name}?`)) {
+    return;
+  }
+
+  const filtered = accounts.filter((a) => a.id !== accountId);
+  saveAccounts(filtered);
+  window.dispatchEvent(new Event("accountsUpdated"));
+  renderAccountList();
+}
+
 function getAccounts() {
   const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
+  try { return raw ? JSON.parse(raw) : []; } catch { return []; }
 }
 
 function saveAccounts(accounts) {
   localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
 }
 
-function getTransactions() {
-  const raw = localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
 function isAccountUsed(accountId) {
-  const transactions = getTransactions();
-  return transactions.some((txn) => txn.accountId === accountId);
+  const raw = localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
+  try {
+    const transactions = raw ? JSON.parse(raw) : [];
+    return transactions.some((txn) => txn.accountId === accountId);
+  } catch { return false; }
 }
 
 function formatAccountType(type) {
-  const match =
-    window.LUNA_DEFAULTS?.accountTypes?.find((item) => item.value === type) ||
-    {};
-  return match.label || type;
+  const types = window.LUNA_DEFAULTS?.accountTypes || [];
+  const match = types.find((item) => item.value === type);
+  return match ? match.label : type;
 }
 
 function formatDate(value) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString();
+  return isNaN(date.getTime()) ? value : date.toLocaleDateString();
 }
-
-
-
