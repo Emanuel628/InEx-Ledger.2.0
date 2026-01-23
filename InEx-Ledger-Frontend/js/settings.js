@@ -18,7 +18,7 @@ const SECURITY_REQUIREMENT_RULES = {
   uppercase: (value) => /[A-Z]/.test(value),
   special: (value) => /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)
 };
-
+console.log("Settings JS loaded");
 let securityState = {};
 
 document.addEventListener("DOMContentLoaded", async () => {
