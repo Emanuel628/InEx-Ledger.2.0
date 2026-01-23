@@ -1,21 +1,20 @@
 import express from "express";
 import routes from "./routes/index.js";
-import { initSchema } from "./db.js"; // Import the helper
+import { initDatabase } from "./db.js"; 
 
 const app = express();
 
-app.use(express.json());
+// Title: Initialize Database
+// This will now find the file in /db/migrations/
+initDatabase();
 
-// Title: Initialize Database on Startup
-initSchema();
+app.use(express.json());
 
 // Title: API Routes
 app.use("/api", routes);
 
-// Simple health check
-app.get("/", (req, res) => res.send("Luna Business API is Live"));
-
-const PORT = process.env.PORT || 4000;
+// Standard Railway Port
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`API running on port ${PORT}`);
+  console.log(`🚀 API is live on port ${PORT}`);
 });
