@@ -38,16 +38,27 @@ function wireAccountForm() {
     accountFormSubmitDefault = submitButton.textContent || accountFormSubmitDefault;
   }
 
-  populateAccountTypes(typeSelect);
+  function populateAccountTypes(selectElement) {
+  if (!selectElement) return;
 
-  if (showButton && formContainer) {
-    showButton.addEventListener("click", () => {
-      formContainer.classList.toggle("visible");
-      if (!formContainer.classList.contains("visible")) {
-        resetAccountForm();
-      }
-    });
-  }
+  const types = [
+    { value: "checking", label: "Checking" },
+    { value: "savings", label: "Savings" },
+    { value: "credit", label: "Credit Card" },
+    { value: "cash", label: "Cash" },
+    { value: "loan", label: "Loan" },
+    { value: "other", label: "Other" }
+  ];
+
+  selectElement.innerHTML = '<option value="">Select type</option>';
+
+  types.forEach((type) => {
+    const option = document.createElement("option");
+    option.value = type.value;
+    option.textContent = type.label;
+    selectElement.appendChild(option);
+  });
+}
 
   if (cancelButton) {
     cancelButton.addEventListener("click", () => {
