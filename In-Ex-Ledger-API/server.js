@@ -4,17 +4,19 @@ import { initDatabase } from "./db.js";
 
 const app = express();
 
-// Title: Initialize Database
-// This will now find the file in /db/migrations/
 initDatabase();
 
 app.use(express.json());
 
-// Title: API Routes
+// Title: Request Logger Middleware
+app.use((req, res, next) => {
+  console.log(`Incoming: ${req.method} ${req.url} - Body Keys: ${Object.keys(req.body)}`);
+  next();
+});
+
 app.use("/api", routes);
 
-// Standard Railway Port
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-  console.log(`🚀 API is live on port ${PORT}`);
+  console.log(`🚀 API active on port ${PORT}`);
 });
