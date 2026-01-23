@@ -34,11 +34,21 @@ function wireAccountForm() {
     submitButton
   };
 
+  function wireAccountForm() {
+  // ... all your form wiring code ...
+
   if (submitButton) {
-    accountFormSubmitDefault = submitButton.textContent || accountFormSubmitDefault;
+    accountFormSubmitDefault =
+      submitButton.textContent || accountFormSubmitDefault;
   }
 
-  function populateAccountTypes(selectElement) {
+  populateAccountTypes(typeSelect);
+
+  // ... rest of wireAccountForm ...
+}
+
+// TOP-LEVEL — NOT INSIDE wireAccountForm
+function populateAccountTypes(selectElement) {
   if (!selectElement) return;
 
   const types = [
