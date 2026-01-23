@@ -132,7 +132,7 @@ function buildIdentityPage(data) {
   canvas.text(40, y, `${labels.currency}: ${currency}`, 11);
 
   let summaryY = 680;
-  const summaryX = 360;
+  const summaryX = 400;
   canvas.text(
     summaryX,
     summaryY,
