@@ -33,7 +33,7 @@ function wireAccountForm() {
     nameInput,
     submitButton
   };
-
+  
   function wireAccountForm() {
   // ... all your form wiring code ...
 
@@ -58,6 +58,19 @@ function populateAccountTypes(selectElement) {
     { value: "cash", label: "Cash" },
     { value: "loan", label: "Loan" },
     { value: "other", label: "Other" }
+  ];
+
+  // MISSING LOGIC: Loop through the array and add options to the select element
+  selectElement.innerHTML = ''; // Clear existing
+  types.forEach(type => {
+    const opt = document.createElement('option');
+    opt.value = type.value;
+    opt.textContent = type.label;
+    selectElement.appendChild(opt);
+  });
+} // MISSING BRACE: Added to close the function
+
+  
   ];
 
   selectElement.innerHTML = '<option value="">Select type</option>';
