@@ -1,7 +1,7 @@
 import express from "express";
 import crypto from "node:crypto";
 import { signToken } from "../middleware/auth.middleware.js";
-import pool from "../server/db.js";
+import pool from "../db.js";
 
 const router = express.Router();
 const usersByEmail = new Map();
