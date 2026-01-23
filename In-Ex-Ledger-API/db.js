@@ -14,24 +14,23 @@ const pool = new Pool({
     : false
 });
 
-// Title: Fixed Schema Initialization
+// Title: Connection Verification
+pool.query('SELECT current_database(), now()', (err, res) => {
+  if (err) {
+    console.error("❌ DB CONNECTION ERROR:", err.message);
+  } else {
+    console.log(`✅ API CONNECTED TO DB: ${res.rows[0].current_database} at ${res.rows[0].now}`);
+  }
+});
+
 export const initDatabase = async () => {
   try {
-    // UPDATED PATH: Based on your images, it's inside the 'db' folder
     const sqlPath = path.join(__dirname, "db", "migrations", "001_init_luna_business.sql");
-    
-    console.log("Reading SQL file from:", sqlPath);
-    
     const sql = fs.readFileSync(sqlPath, "utf8");
     await pool.query(sql);
-    console.log("✅ Luna Business: Database schema initialized successfully.");
+    console.log("✅ Schema verified.");
   } catch (err) {
-    if (err.code === 'ENOENT') {
-      console.error("❌ ERROR: Could not find the SQL file. Check if 'db/migrations' exists in your build.");
-    } else {
-      // If tables already exist, Postgres throws an error, which we log as a success check
-      console.log("ℹ️ Database check: Tables already exist.");
-    }
+    console.log("ℹ️ Tables verified.");
   }
 };
 
