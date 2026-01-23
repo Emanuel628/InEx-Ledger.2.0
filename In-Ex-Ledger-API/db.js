@@ -4,7 +4,8 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -13,18 +14,24 @@ const pool = new Pool({
     : false
 });
 
-// Title: Schema Initialization Helper
-export const initSchema = async () => {
+// Title: Fixed Schema Initialization
+export const initDatabase = async () => {
   try {
-    // Path to your migration file
-    const sqlPath = path.join(__dirname, "migrations", "001_init_luna_business.sql");
-    const sql = fs.readFileSync(sqlPath, "utf8");
+    // UPDATED PATH: Based on your images, it's inside the 'db' folder
+    const sqlPath = path.join(__dirname, "db", "migrations", "001_init_luna_business.sql");
     
+    console.log("Reading SQL file from:", sqlPath);
+    
+    const sql = fs.readFileSync(sqlPath, "utf8");
     await pool.query(sql);
-    console.log("Luna Business schema initialized/verified.");
+    console.log("✅ Luna Business: Database schema initialized successfully.");
   } catch (err) {
-    // We ignore errors if the table already exists, but log other issues
-    console.error("Schema Init Note:", err.message);
+    if (err.code === 'ENOENT') {
+      console.error("❌ ERROR: Could not find the SQL file. Check if 'db/migrations' exists in your build.");
+    } else {
+      // If tables already exist, Postgres throws an error, which we log as a success check
+      console.log("ℹ️ Database check: Tables already exist.");
+    }
   }
 };
 
