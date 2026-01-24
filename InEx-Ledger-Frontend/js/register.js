@@ -3,9 +3,10 @@
    ========================================================= */
 
 const API_BASE = "https://inex-ledger20-production.up.railway.app";
+let form = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("registerForm");
+  form = document.getElementById("registerForm");
   if (!form) {
     console.warn("Register form not found.");
     return;
