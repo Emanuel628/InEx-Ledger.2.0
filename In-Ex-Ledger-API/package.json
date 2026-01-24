@@ -4,7 +4,9 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "migrate": "node migrate.js",
+    "server": "node server.js",
+    "start": "npm run migrate && npm run server",
     "dev": "nodemon server.js"
   },
   "dependencies": {
