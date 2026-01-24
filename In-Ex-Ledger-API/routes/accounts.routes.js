@@ -6,18 +6,18 @@ import { requireAuth } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 /**
- * GET all accounts for logged-in user
+ * GET all accounts for logged-in business
  */
 router.get("/", requireAuth, async (req, res) => {
   console.log("🔐 AUTH USER:", req.user);
   try {
     const result = await pool.query(
-      "SELECT id, name, type, balance, currency, created_at FROM accounts WHERE user_id = $1 ORDER BY created_at DESC",
-      [req.user.id]
+      "SELECT * FROM accounts WHERE business_id = $1 ORDER BY created_at DESC",
+      [req.user.business_id]
     );
     res.json(result.rows);
   } catch (err) {
-    console.error("❌ GET accounts error:", err.message);
+    console.error("✗ GET accounts error:", err.message);
     res.status(500).json({ error: "Failed to retrieve accounts from DB." });
   }
 });
@@ -41,12 +41,12 @@ router.post("/", requireAuth, async (req, res) => {
     console.log("POST /accounts DB:", dbCheck.rows[0]);
 
     const result = await pool.query(
-      `INSERT INTO accounts (id, user_id, name, type, balance, currency)
+      `INSERT INTO accounts (id, business_id, name, type, balance, currency)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
       [
         crypto.randomUUID(),
-        req.user.id,
+        req.user.business_id,
         name,
         type,
         parseFloat(balance) || 0,
@@ -56,7 +56,7 @@ router.post("/", requireAuth, async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("❌ POST account error:", err.message);
+    console.error("✗ POST account error:", err.message);
     res.status(500).json({ error: "Failed to save account to DB." });
   }
 });
@@ -67,8 +67,8 @@ router.post("/", requireAuth, async (req, res) => {
 router.delete("/:id", requireAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      "DELETE FROM accounts WHERE id = $1 AND user_id = $2",
-      [req.params.id, req.user.id]
+      "DELETE FROM accounts WHERE id = $1 AND business_id = $2",
+      [req.params.id, req.user.business_id]
     );
 
     if (result.rowCount === 0) {
@@ -77,7 +77,7 @@ router.delete("/:id", requireAuth, async (req, res) => {
 
     res.json({ message: "Account deleted successfully." });
   } catch (err) {
-    console.error("❌ DELETE account error:", err.message);
+    console.error("✗ DELETE account error:", err.message);
     res.status(500).json({ error: "Delete failed." });
   }
 });
