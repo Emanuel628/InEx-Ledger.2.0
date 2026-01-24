@@ -5,7 +5,10 @@ import { initDatabase } from "./db.js";
 
 const app = express();
 
-// Enable CORS so your frontend can talk to this API
+// Title: Port Discovery
+const PORT = process.env.PORT || 8080;
+console.log(`SYSTEM_INFO: Railway requested Port ${process.env.PORT}`);
+
 app.use(cors());
 app.use(express.json());
 
@@ -15,13 +18,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// Mount all routes under /api
+// Title: Mandatory Root Handler
+app.get("/", (req, res) => res.status(200).send("API_UP"));
+
+// Title: API Routing
 app.use("/api", routes);
 
-// Health check to verify the server is live
-app.get("/", (req, res) => res.send("In-Ex Ledger API is Online"));
-
-const PORT = process.env.PORT || 8080;
+// Title: The Watchdog Distractor
+setInterval(() => {
+  // keep the event loop warm
+}, 1000 * 60 * 10);
 
 const startServer = async () => {
   try {
@@ -36,5 +42,3 @@ const startServer = async () => {
 };
 
 startServer();
-
-// Trigger Redeploy 2026
