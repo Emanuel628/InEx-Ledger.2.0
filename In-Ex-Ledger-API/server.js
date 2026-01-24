@@ -38,19 +38,17 @@ setInterval(() => {
   // keep the event loop warm
 }, 1000 * 60 * 10);
 
-const startServer = async () => {
+;(async () => {
   try {
     await initDatabase();
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`API running on port ${PORT}`);
     });
   } catch (err) {
-    console.error("Failed to start server:", err.message);
+    console.error("Startup failed:", err);
     process.exit(1);
   }
-};
-
-startServer();
+})();
 
 process.on("SIGTERM", () => {
   console.log("Railway sent SIGTERM — process still alive");
