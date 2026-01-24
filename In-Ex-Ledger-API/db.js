@@ -25,20 +25,22 @@ try {
   console.error("Failed to parse DATABASE_URL variable.");
 }
 
-// Title: Hard Identity Check
-pool.query('SELECT current_database(), current_schema(), inet_server_addr(), inet_server_port()', (err, res) => {
-  if (err) {
-    console.error("DB IDENTITY ERROR:", err.message);
-  } else {
+export async function logDbIdentity() {
+  try {
+    const res = await pool.query(
+      'SELECT current_database(), current_schema(), inet_server_addr(), inet_server_port()'
+    );
     const row = res.rows[0];
     console.log("=== DB PHYSICAL IDENTITY ===");
     console.log("DB NAME:", row.current_database);
     console.log("SCHEMA:", row.current_schema);
     console.log("SERVER IP:", row.inet_server_addr);
-    console.log("SERVER PORT:", row.inet_server_port);
+    console.log("DB PORT:", row.inet_server_port);
     console.log("===============================");
+  } catch (err) {
+    console.error("DB IDENTITY ERROR:", err.message);
   }
-});
+}
 
 // Title: Transparent Migration Runner
 export const initDatabase = async () => {
