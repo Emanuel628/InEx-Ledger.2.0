@@ -1,3 +1,4 @@
+const API_BASE = "https://inex-ledger20-production.up.railway.app";
 let editingAccountId = null;
 let accountFormState = null;
 let accountFormSubmitDefault = "Save account";
@@ -71,7 +72,7 @@ function wireAccountForm() {
 
       const token = localStorage.getItem("token");
 
-      const res = await fetch("/api/accounts", {
+      const res = await fetch(`${API_BASE}/api/accounts`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -143,7 +144,7 @@ async function renderAccountList() {
 
   const token = localStorage.getItem("token");
 
-  const res = await fetch("/api/accounts", {
+  const res = await fetch(`${API_BASE}/api/accounts`, {
     headers: {
       Authorization: `Bearer ${token}`
     }
@@ -193,7 +194,7 @@ async function renderAccountList() {
 async function deleteAccount(accountId) {
   const token = localStorage.getItem("token");
 
-  const res = await fetch(`/api/accounts/${accountId}`, {
+  const res = await fetch(`${API_BASE}/api/accounts/${accountId}`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`
