@@ -4,6 +4,8 @@ import routes from "./routes/index.js";
 
 const app = express();
 
+console.log("🔥 DOCKER FINGERPRINT: CLEAN_BUILD_2026_01_24");
+
 const PORT = process.env.PORT || 8080;
 console.log(`SYSTEM_INFO: Railway requested Port ${process.env.PORT}`);
 console.log("JWT_SECRET present:", !!process.env.JWT_SECRET);
