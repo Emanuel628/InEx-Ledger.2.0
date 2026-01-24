@@ -12,6 +12,15 @@ console.log(`SYSTEM_INFO: Railway requested Port ${process.env.PORT}`);
 app.use(cors());
 app.use(express.json());
 
+// Basic health check for Railway
+app.get("/", (req, res) => {
+  res.status(200).send("API_UP");
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
+
 // Title: Request Logger Middleware
 app.use((req, res, next) => {
   console.log(`Incoming: ${req.method} ${req.url} - Body Keys: ${Object.keys(req.body)}`);
