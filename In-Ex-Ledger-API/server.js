@@ -24,7 +24,7 @@ const PORT = process.env.PORT || 8080;
 
 const startServer = async () => {
   try {
-    app.listen(PORT, () => {
+    app.listen(PORT, "0.0.0.0", () => {
       console.log(`API running on port ${PORT}`);
     });
   } catch (err) {
@@ -34,3 +34,5 @@ const startServer = async () => {
 };
 
 startServer();
+
+// Trigger Redeploy 2026
