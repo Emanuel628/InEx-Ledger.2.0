@@ -8,6 +8,20 @@ let privacySettings = {
   consentGiven: false
 };
 
+const DEFAULT_THEME = "light";
+const THEME_VERSION = "2";
+
+function resolveSavedTheme() {
+  const storedVersion = localStorage.getItem("lb_theme_version");
+  if (storedVersion !== THEME_VERSION) {
+    localStorage.setItem("lb_theme", DEFAULT_THEME);
+    localStorage.setItem("lb_theme_version", THEME_VERSION);
+    return DEFAULT_THEME;
+  }
+
+  return localStorage.getItem("lb_theme") || DEFAULT_THEME;
+}
+
 let saveBarElement = null;
 let saveButtonElement = null;
 let hasPendingChanges = false;
@@ -57,7 +71,7 @@ if (signOutBtn) {
   saveBarElement = saveBar;
   saveButtonElement = saveButton;
   const savedRegion = localStorage.getItem("lb_region") || "us";
-  const savedTheme = localStorage.getItem("lb_theme") || "light";
+  const savedTheme = resolveSavedTheme();
   const savedMetric = localStorage.getItem("lb_unit_metric") === "true";
 
   document.documentElement.setAttribute("data-theme", savedTheme);
@@ -141,6 +155,7 @@ async function handleSave({
   if (darkModeToggle) {
     const theme = darkModeToggle.checked ? "dark" : "light";
     localStorage.setItem("lb_theme", theme);
+    localStorage.setItem("lb_theme_version", THEME_VERSION);
     document.documentElement.setAttribute("data-theme", theme);
   }
 
