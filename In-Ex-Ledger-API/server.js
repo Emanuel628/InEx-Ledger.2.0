@@ -66,3 +66,7 @@ setInterval(() => {
 process.on("SIGTERM", () => {
   console.log("Railway sent SIGTERM — process still alive");
 });
+
+setInterval(() => {
+  console.log("❤️ HEARTBEAT: server still alive");
+}, 30000);
