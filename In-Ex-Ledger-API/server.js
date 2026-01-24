@@ -1,13 +1,19 @@
 import express from "express";
 import cors from "cors";
-import { initDatabase } from "./db.js";
 import routes from "./routes/index.js";
+import { initDatabase } from "./db.js";
 
 const app = express();
 
 // Enable CORS so your frontend can talk to this API
 app.use(cors());
 app.use(express.json());
+
+// Title: Request Logger Middleware
+app.use((req, res, next) => {
+  console.log(`Incoming: ${req.method} ${req.url} - Body Keys: ${Object.keys(req.body)}`);
+  next();
+});
 
 // Mount all routes under /api
 app.use("/api", routes);

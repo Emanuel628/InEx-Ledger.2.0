@@ -43,7 +43,7 @@ pool.query('SELECT current_database(), current_schema(), inet_server_addr(), ine
 // Title: Transparent Migration Runner
 export const initDatabase = async () => {
   const sqlPath = path.join(__dirname, "db", "migrations", "001_init_luna_business.sql");
-
+  
   if (!fs.existsSync(sqlPath)) {
     console.warn("Migration file missing at:", sqlPath);
     console.log("Skipping auto-migration. Ensure tables are created manually or add the file.");
@@ -51,16 +51,17 @@ export const initDatabase = async () => {
   }
 
   const sql = fs.readFileSync(sqlPath, "utf8");
-
+  
   try {
     await pool.query(sql);
     console.log("DATABASE SCHEMA APPLIED SUCCESSFULLY.");
   } catch (err) {
+    // If it's just a "relation already exists" error, that's fine.
     if (err.code === '42P07') {
       console.log("Tables already exist. Skipping creation.");
     } else {
       console.error("SCHEMA MIGRATION FAILED:", err.message);
-      throw err;
+      throw err; // Don't hide real errors
     }
   }
 };

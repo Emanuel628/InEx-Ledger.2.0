@@ -45,6 +45,20 @@ function redirectIfAuthenticated() {
   }
 }
 
+// SIGN OUT (uses auth.js)
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-logout]");
+  if (!btn) return;
+
+  if (typeof signOut === "function") {
+    signOut();
+  } else {
+    // Fallback
+    localStorage.removeItem("token");
+    window.location.href = "landing.html";
+  }
+});
+
 function signOut() {
   clearToken();
   window.location.href = "landing.html";
