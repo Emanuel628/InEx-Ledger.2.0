@@ -1,8 +1,13 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import routes from "./routes/index.js";
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendDir = path.join(__dirname, "..", "InEx-Ledger-Frontend");
 
 console.log("🔥 DOCKER FINGERPRINT: CLEAN_BUILD_2026_01_24");
 
@@ -10,7 +15,17 @@ const PORT = process.env.PORT || 8080;
 console.log(`SYSTEM_INFO: Railway requested Port ${process.env.PORT}`);
 console.log("JWT_SECRET present:", !!process.env.JWT_SECRET);
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    "https://lunafinance.org",
+    "https://www.lunafinance.org",
+    "http://localhost:5173",
+    "http://localhost:3000"
+  ],
+  credentials: true
+}));
+
+app.use(express.static(frontendDir));
 app.use(express.json());
 
 app.get("/", (req, res) => {
