@@ -3,6 +3,7 @@
    ========================================================= */
 
 const API_BASE = "https://inex-ledger20-production.up.railway.app";
+console.log("🔥 API_BASE:", API_BASE);
 let form = null;
 
 document.addEventListener("DOMContentLoaded", () => {
