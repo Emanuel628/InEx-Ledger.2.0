@@ -42,3 +42,7 @@ const startServer = async () => {
 };
 
 startServer();
+
+process.on("SIGTERM", () => {
+  console.log("Railway sent SIGTERM — process still alive");
+});
