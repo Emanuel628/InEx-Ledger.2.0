@@ -57,7 +57,7 @@ if (signOutBtn) {
   saveBarElement = saveBar;
   saveButtonElement = saveButton;
   const savedRegion = localStorage.getItem("lb_region") || "us";
-  const savedTheme = localStorage.getItem("lb_theme") || "dark";
+  const savedTheme = localStorage.getItem("lb_theme") || "light";
   const savedMetric = localStorage.getItem("lb_unit_metric") === "true";
 
   document.documentElement.setAttribute("data-theme", savedTheme);

@@ -1,7 +1,7 @@
 /* Global helpers shared across pages */
 
 function applyGlobalTheme() {
-  const savedTheme = localStorage.getItem("lb_theme") || "dark";
+  const savedTheme = localStorage.getItem("lb_theme") || "light";
   document.documentElement.setAttribute("data-theme", savedTheme);
   document.body.classList.remove("dark", "light");
   document.body.classList.add(savedTheme);
