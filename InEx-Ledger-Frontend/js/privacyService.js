@@ -6,7 +6,7 @@
     "lb_recurring"
   ];
   let apiReady;
-  const API_BASE = "https://luna-finance-production.up.railway.app";
+  const API_BASE = "https://inex-ledger20-production.up.railway.app/api";
   const buildApiUrl = (path) => {
     if (typeof path !== "string") return API_BASE;
     return path.startsWith("/") ? `${API_BASE}${path}` : `${API_BASE}/${path}`;
