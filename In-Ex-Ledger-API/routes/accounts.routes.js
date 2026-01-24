@@ -27,6 +27,7 @@ router.get("/", requireAuth, async (req, res) => {
  */
 router.post("/", requireAuth, async (req, res) => {
   console.log("🔐 AUTH USER:", req.user);
+  console.log("POST /accounts BODY:", req.body);
   const { name, type, balance, currency } = req.body;
 
   if (!name || !type) {
@@ -34,6 +35,11 @@ router.post("/", requireAuth, async (req, res) => {
   }
 
   try {
+    const dbCheck = await pool.query(
+      "SELECT current_database(), current_schema()"
+    );
+    console.log("POST /accounts DB:", dbCheck.rows[0]);
+
     const result = await pool.query(
       `INSERT INTO accounts (id, user_id, name, type, balance, currency)
        VALUES ($1, $2, $3, $4, $5, $6)
