@@ -26,6 +26,10 @@ app.use(cors({
 }));
 
 app.use(express.static(frontendDir));
+app.get("/css/:name", (req, res) => {
+  const target = `https://inex-ledger20-production.up.railway.app/css/${req.params.name}`;
+  res.redirect(target);
+});
 app.use(express.json());
 
 app.get("/", (req, res) => {
