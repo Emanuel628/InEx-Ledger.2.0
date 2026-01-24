@@ -226,10 +226,10 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Note: If you don't have email_verified in your SQL, this can be commented out
-    if (user.email_verified === false) {
-      return res.status(403).json({ error: "Email address not verified" });
-    }
+    // NOTE: Temporarily skip email verification gate
+    // if (user.email_verified === false) {
+    //   return res.status(403).json({ error: "Email address not verified" });
+    // }
 
     const token = signToken({
       id: user.id,
