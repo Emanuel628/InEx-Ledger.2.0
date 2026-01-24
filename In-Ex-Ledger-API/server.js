@@ -10,15 +10,6 @@ const PORT = process.env.PORT || 8080;
 console.log(`SYSTEM_INFO: Railway requested Port ${process.env.PORT}`);
 const shouldAutoInitDb = process.env.AUTO_INIT_DB !== "false";
 
-const runMigrations = async () => {
-  try {
-    await initDatabase();
-    console.log("DATABASE SCHEMA APPLIED SUCCESSFULLY.");
-  } catch (err) {
-    console.error("Schema initialization failed:", err);
-  }
-};
-
 app.use(cors());
 app.use(express.json());
 
@@ -51,11 +42,12 @@ setInterval(() => {
       console.log(`API running on port ${PORT}`);
     });
 
-    if (shouldAutoInitDb) {
-      runMigrations();
-    } else {
-      console.log("AUTO_INIT_DB=false → skipping startup migrations.");
-    }
+    // TEMPORARILY DISABLED FOR STABILITY – migrations turned off
+    // if (shouldAutoInitDb) {
+    //   runMigrations();
+    // } else {
+    //   console.log("AUTO_INIT_DB=false → skipping startup migrations.");
+    // }
   } catch (err) {
     console.error("Startup failed:", err);
     process.exit(1);
