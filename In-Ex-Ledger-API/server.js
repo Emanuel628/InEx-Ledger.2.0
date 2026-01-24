@@ -21,6 +21,16 @@ app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
 
+// TEMP: Catch Railway's broken health probe
+app.get("/Health Check Path: /", (req, res) => {
+  res.status(200).send("OK");
+});
+
+// Also catch the URL-encoded version just in case
+app.get("/Health%20Check%20Path:%20/", (req, res) => {
+  res.status(200).send("OK");
+});
+
 app.use((req, res, next) => {
   console.log(`Incoming: ${req.method} ${req.url} - Body Keys: ${Object.keys(req.body)}`);
   next();
