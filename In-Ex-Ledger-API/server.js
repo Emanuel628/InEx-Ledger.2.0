@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import routes from "./routes/index.js";
+import { initDatabase } from "./db.js";
 
 const app = express();
 
@@ -24,6 +25,7 @@ const PORT = process.env.PORT || 8080;
 
 const startServer = async () => {
   try {
+    await initDatabase();
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`API running on port ${PORT}`);
     });
