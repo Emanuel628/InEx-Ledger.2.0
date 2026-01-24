@@ -9,6 +9,7 @@ const router = express.Router();
  * GET all accounts for logged-in user
  */
 router.get("/", requireAuth, async (req, res) => {
+  console.log("🔐 AUTH USER:", req.user);
   try {
     const result = await pool.query(
       "SELECT id, name, type, balance, currency, created_at FROM accounts WHERE user_id = $1 ORDER BY created_at DESC",
@@ -25,6 +26,7 @@ router.get("/", requireAuth, async (req, res) => {
  * CREATE new account
  */
 router.post("/", requireAuth, async (req, res) => {
+  console.log("🔐 AUTH USER:", req.user);
   const { name, type, balance, currency } = req.body;
 
   if (!name || !type) {

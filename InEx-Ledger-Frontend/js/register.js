@@ -2,159 +2,43 @@
    Register Page JS — FINAL (ONE AND DONE)
    ========================================================= */
 
-let form;
-let tosConsentCheckbox;
-let tosConsentMessage;
-let regionSelect;
-let languageSelect;
+const API_BASE = "https://inex-ledger20-production.up.railway.app";
 
-document.addEventListener("DOMContentLoaded", initRegister);
-
-function initRegister() {
-  if (typeof redirectIfAuthenticated === "function") {
-    redirectIfAuthenticated();
-  }
-
-  form = document.querySelector("form");
-  tosConsentCheckbox = document.getElementById("tosConsent");
-  tosConsentMessage = document.getElementById("tosConsentMessage");
-  regionSelect = document.getElementById("regionSelectRegister");
-  languageSelect = document.getElementById("languageSelectRegister");
-
-  const savedRegionPreference = localStorage.getItem("lb_region") || "us";
-  if (regionSelect) {
-    regionSelect.value = savedRegionPreference;
-  }
-
-  if (languageSelect && typeof populateLanguageOptions === "function") {
-    populateLanguageOptions(languageSelect);
-  } else if (languageSelect) {
-    legacyPopulateLanguageOptions();
-  }
-
-  if (languageSelect && typeof getCurrentLanguage === "function") {
-    languageSelect.value = getCurrentLanguage();
-    languageSelect.addEventListener("change", () => {
-      if (typeof setCurrentLanguage === "function") {
-        setCurrentLanguage(languageSelect.value);
-      } else if (typeof applyTranslations === "function") {
-        applyTranslations(languageSelect.value);
-      }
-    });
-  }
-
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("registerForm");
   if (!form) {
     console.warn("Register form not found.");
     return;
   }
 
-  if (tosConsentCheckbox) {
-    tosConsentCheckbox.addEventListener("change", () => {
-      if (tosConsentMessage) {
-        tosConsentMessage.textContent = "";
-      }
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const email = document.getElementById("email")?.value.trim() || "";
+    const password = document.getElementById("password")?.value || "";
+
+    if (!email || !password) {
+      alert("Enter an email and password.");
+      return;
+    }
+
+    const res = await fetch(`${API_BASE}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
     });
-  }
 
-  const passwordInput = form.querySelector("#password");
-  const confirmInput = form.querySelector("#confirm-password");
-  const togglePassword = document.getElementById("togglePassword");
+    const data = await res.json();
 
-  if (togglePassword && passwordInput) {
-    togglePassword.addEventListener("change", () => {
-      const type = togglePassword.checked ? "text" : "password";
-      passwordInput.type = type;
-      if (confirmInput) {
-        confirmInput.type = type;
-      }
-    });
-  }
+    if (!res.ok) {
+      alert(data.error || "Registration failed");
+      return;
+    }
 
-  if (passwordInput) {
-    passwordInput.addEventListener("input", () => {
-      updateStrengthMeter();
-      updateMatchMessage();
-    });
-  }
-
-  if (confirmInput) {
-    confirmInput.addEventListener("input", updateMatchMessage);
-  }
-
-  form.addEventListener("submit", onRegisterSubmit);
-
-  updateStrengthMeter();
-  updateMatchMessage();
-
-  console.log("[register] wired match + language");
-}
-
-async function onRegisterSubmit(event) {
-  event.preventDefault();
-
-  const inputs = form.querySelectorAll("input");
-
-  let email = "";
-  let password = "";
-  let confirm = "";
-
-  inputs.forEach((input) => {
-    if (input.type === "email") email = input.value.trim();
-    if (input.type === "password" && !password) password = input.value;
-    else if (input.type === "password") confirm = input.value;
+    alert("Registration successful. You can now log in.");
+    window.location.href = "login.html";
   });
-
-  if (!email || !password || !confirm) {
-    alert(t("register_alert_fill_fields"));
-    return;
-  }
-
-  if (!isValidEmail(email)) {
-    alert(t("register_alert_valid_email"));
-    return;
-  }
-
-  if (password.length < 8) {
-    alert(t("register_alert_password_length"));
-    return;
-  }
-
-  const strengthScore = calculatePasswordScore(password);
-  const strengthLabel = getStrengthLabel(strengthScore);
-
-  if (strengthLabel !== "Strong" || password !== confirm) {
-    alert(
-      t("register_alert_password_strength")
-    );
-    return;
-  }
-
-  if (!ensureConsent()) {
-    return;
-  }
-
-  const sessionToken = "session-token-" + Date.now();
-
-  if (typeof setToken === "function") {
-    setToken(sessionToken);
-  } else {
-    localStorage.setItem("token", sessionToken);
-  }
-
-  if (typeof startTrial === "function") {
-    startTrial();
-  }
-
-  await persistConsent();
-  persistRegionAndLanguage();
-
-  localStorage.setItem("pendingVerificationEmail", email);
-  localStorage.removeItem("pendingVerificationToken");
-  localStorage.removeItem("pendingVerificationLink");
-  localStorage.removeItem("pendingVerificationExpires");
-
-  window.location.href = "verify-email.html";
-}
+});
 
 function calculatePasswordScore(password) {
   let score = 0;

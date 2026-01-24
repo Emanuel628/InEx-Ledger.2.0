@@ -2,72 +2,50 @@
    Login Page JS
    ========================================================= */
 
-// If already logged in, skip login
+const API_BASE = "https://inex-ledger20-production.up.railway.app";
+
 redirectIfAuthenticated();
 
-(async () => {
-  const region = localStorage.getItem("region") || (await detectRegion());
-  const banner = document.getElementById("canadaTestBanner");
-
-  if (banner && region === "CA") {
-    banner.textContent = "Hi, Kimberly in Canada 👋";
-    banner.style.display = "block";
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("loginForm");
+  if (!form) {
+    console.warn("Login form not found.");
+    return;
   }
-})();
 
-// Grab the form
-const form = document.querySelector("form");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-if (!form) {
-  console.warn("Login form not found.");
-} else {
-  const passwordInput = form.querySelector('input[type="password"]');
-  const togglePassword = document.getElementById("togglePassword");
+    const email = document.getElementById("email")?.value.trim() || "";
+    const password = document.getElementById("password")?.value || "";
 
-  if (passwordInput && togglePassword) {
-    togglePassword.addEventListener("change", () => {
-      passwordInput.type = togglePassword.checked ? "text" : "password";
+    if (!email || !password) {
+      alert("Please enter your email and password.");
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
     });
-  }
 
-  form.addEventListener("submit", onLoginSubmit);
-}
+    const data = await res.json();
 
-function onLoginSubmit(event) {
-  event.preventDefault();
+    if (!res.ok) {
+      alert(data.error || "Login failed");
+      return;
+    }
 
-  const emailInput = form.querySelector('input[type="email"]');
-  const passwordInput = form.querySelector('input[type="password"]');
-
-  const email = emailInput ? emailInput.value.trim() : "";
-  const password = passwordInput ? passwordInput.value : "";
-
-  // Basic validation
-  if (!email || !password) {
-    alert("Please enter your email and password.");
-    return;
-  }
-
-  if (!isValidEmail(email)) {
-    alert("Please enter a valid email address.");
-    return;
-  }
-
-  // -------------------------------------------------
-  // Client stand-in: simulate login success
-  // -------------------------------------------------
-  // Replace with apiFetch("/auth/login") once the backend is wired.
-  const sessionToken = "session-token-" + Date.now();
-
-  setToken(sessionToken);
-
-  // Redirect to main dashboard
-  window.location.href = "transactions.html";
-}
-
-/* -------------------------
-   Helpers
-   ------------------------- */
+    localStorage.setItem("token", data.token);
+    window.location.href = "transactions.html";
+  });
+});
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
