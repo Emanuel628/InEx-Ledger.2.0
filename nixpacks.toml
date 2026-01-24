@@ -5,4 +5,4 @@ nixPkgs = ["nodejs"]
 cmds = ["cd In-Ex-Ledger-API && npm install"]
 
 [start]
-cmd = "cd In-Ex-Ledger-API && node server.js"
+cmd = "cd In-Ex-Ledger-API && npm start"
