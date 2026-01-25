@@ -28,6 +28,9 @@ app.use(cors({
 }));
 
 app.use(express.static(repoRoot));
+app.use("/html", express.static(path.join(frontendDir, "html")));
+app.use("/css", express.static(path.join(frontendDir, "css")));
+app.use("/js", express.static(path.join(frontendDir, "js")));
 app.get("/css/:name", (req, res) => {
   const target = `https://inex-ledger20-production.up.railway.app/css/${req.params.name}`;
   res.redirect(target);
