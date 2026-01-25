@@ -57,10 +57,15 @@ document.addEventListener("DOMContentLoaded", () => {
 function wireShowPasswordToggle(container = document) {
   const toggles = container.querySelectorAll(".show-password-toggle input[type=\"checkbox\"]");
   toggles.forEach((toggle) => {
+    const section = toggle.closest("section") || container;
+    const passwordInputs = section.querySelectorAll('input[type="password"]');
+    passwordInputs.forEach((input) => {
+      input.dataset.passwordField = "true";
+    });
+
     toggle.addEventListener("change", () => {
-      const section = toggle.closest("section") || container;
-      const passwordInputs = section.querySelectorAll('input[type="password"]');
-      passwordInputs.forEach((input) => {
+      const targets = section.querySelectorAll('input[data-password-field="true"]');
+      targets.forEach((input) => {
         input.type = toggle.checked ? "text" : "password";
       });
     });
