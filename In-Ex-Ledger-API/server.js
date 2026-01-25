@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendDir = path.join(__dirname, "..", "InEx-Ledger-Frontend");
 const publicDir = path.join(__dirname, "..", "public");
+const repoRoot = path.join(__dirname, "..");
 
 console.log("🔥 DOCKER FINGERPRINT: CLEAN_BUILD_2026_01_24");
 
@@ -26,8 +27,7 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.static(frontendDir));
-app.use(express.static(publicDir));
+app.use(express.static(repoRoot));
 app.get("/css/:name", (req, res) => {
   const target = `https://inex-ledger20-production.up.railway.app/css/${req.params.name}`;
   res.redirect(target);
