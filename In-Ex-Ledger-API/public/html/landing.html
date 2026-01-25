@@ -10,20 +10,106 @@
   <link rel="stylesheet" href="../css/landing.css" />
   <link rel="stylesheet" href="https://inex-ledger20-production.up.railway.app/css/global.css" />
   <link rel="stylesheet" href="https://inex-ledger20-production.up.railway.app/css/landing.css" />
+  <style>
+    .landing-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem 2rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      position: sticky;
+      top: 0;
+      background: rgba(5, 10, 25, 0.9);
+      z-index: 5;
+    }
+
+    .landing-header .brand {
+      font-family: "Space Grotesk", sans-serif;
+      font-weight: 600;
+      font-size: 1.4rem;
+      color: #fff;
+    }
+
+    .sign-in-trigger {
+      border: none;
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+      padding: 0.6rem 1.4rem;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      font-size: 0.95rem;
+    }
+
+    .sign-in-trigger:hover {
+      background: rgba(255, 255, 255, 0.35);
+    }
+
+    .sign-in-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 10;
+    }
+
+    .sign-in-modal.visible {
+      display: flex;
+    }
+
+    .sign-in-modal .modal-card {
+      background: #0b1020;
+      border-radius: 1rem;
+      padding: 2rem;
+      width: min(420px, 100%);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      text-align: center;
+      color: #fff;
+      position: relative;
+    }
+
+    .sign-in-modal .close-btn {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 1.6rem;
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      cursor: pointer;
+    }
+
+    .sign-in-modal .modal-actions a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem 1.5rem;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #fff;
+      text-decoration: none;
+      margin-top: 1rem;
+      font-weight: 600;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .sign-in-modal .modal-actions a:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+  </style>
 </head>
 <body>
 
-<header>
-  <!--<h1>InEx Ledger Sheets</h1>-->
-  <nav>
-    <a data-i18n="nav_transactions" href="transactions.html">Transactions</a>
-    <a data-i18n="nav_accounts" href="accounts.html">Accounts</a>
-    <a data-i18n="nav_categories" href="categories.html">Categories</a>
-    <a data-i18n="nav_receipts" href="receipts.html">Receipts</a>
-    <a href="mileage.html">Mileage</a>
-    <a data-i18n="nav_exports" href="exports.html">Exports</a>
-    <a data-i18n="nav_settings" href="settings.html">Settings</a>
-  </nav>
+<header class="landing-header">
+  <div class="brand">InEx Ledger</div>
+  <button class="sign-in-trigger" id="landingSignInTrigger">Sign in</button>
 </header>
 
 <main>
@@ -98,7 +184,39 @@
   <p>&copy; InEx Ledger</p>
 </footer>
 
+<div class="sign-in-modal" id="landingSignInModal">
+  <div class="modal-card">
+    <button class="close-btn" id="landingSignInClose">&times;</button>
+    <h3>Welcome back</h3>
+    <p>Jump straight into your ledger with a secure sign in.</p>
+    <div class="modal-actions">
+      <a href="https://inex-ledger20-production.up.railway.app/html/login.html">Sign in</a>
+    </div>
+  </div>
+</div>
+
 <script src="../js/global.js"></script>
 <script src="../js/i18n.js"></script>
+<script>
+  const modal = document.getElementById("landingSignInModal");
+  const trigger = document.getElementById("landingSignInTrigger");
+  const closeBtn = document.getElementById("landingSignInClose");
+
+  function openModal() {
+    modal?.classList.add("visible");
+  }
+
+  function closeModal() {
+    modal?.classList.remove("visible");
+  }
+
+  trigger?.addEventListener("click", openModal);
+  closeBtn?.addEventListener("click", closeModal);
+  modal?.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      closeModal();
+    }
+  });
+</script>
 </body>
 </html>
