@@ -1,8 +1,9 @@
 const STORAGE_KEYS = {
   accounts: "lb_accounts",
-  categories: "lb_categories",
-  transactions: "lb_transactions"
+  categories: "lb_categories"
 };
+
+const API_BASE = "https://inex-ledger20-production.up.railway.app";
 
 const ledgerState = {
   transactions: []
@@ -108,7 +109,7 @@ function wireTransactionForm() {
     });
   }
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const dateInput = document.getElementById("date");
@@ -132,52 +133,54 @@ function wireTransactionForm() {
       return;
     }
 
-    const categoriesById = mapById(getCategories());
-    const taxLabel = categoriesById[categoryId]?.taxLabel || "";
-
-    const transactionPayload = {
-      date,
-      description,
+    const payload = {
+      account_id: accountId,
+      category_id: categoryId,
       amount,
-      accountId,
-      categoryId,
       type,
-      taxLabel
+      description,
+      date,
+      note: ""
     };
 
-    const transactions = getTransactions();
-    if (editingTransactionId) {
-      const idx = transactions.findIndex((txn) => txn.id === editingTransactionId);
-      if (idx >= 0) {
-        const existing = transactions[idx];
-        transactions[idx] = {
-          ...existing,
-          ...transactionPayload
-        };
-      }
-    } else {
-      transactions.push({
-        ...transactionPayload,
-        id: `txn_${Date.now()}`,
-        receiptId: "",
-        note: ""
+    const token = localStorage.getItem("token");
+
+    try {
+      const response = await fetch(`${API_BASE}/api/transactions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
       });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        if (message) {
+          message.textContent = error?.error || "Failed to save transaction.";
+        }
+        return;
+      }
+
+      await loadTransactions();
+      markAccountAsUsed(accountId);
+      populateAccountsFromStorage();
+      populateCategoriesFromStorage();
+      applyFilters();
+      renderTotals();
+
+      form.reset();
+      if (message) {
+        message.textContent = "";
+      }
+      closeTransactionDrawer();
+    } catch (err) {
+      console.error("Submit transaction failed:", err);
+      if (message) {
+        message.textContent = "Failed to save transaction.";
+      }
     }
-    saveTransactions(transactions);
-
-    markAccountAsUsed(accountId);
-    ledgerState.transactions = transactions;
-
-    populateAccountsFromStorage();
-    populateCategoriesFromStorage();
-    applyFilters();
-    renderTotals();
-
-    form.reset();
-    if (message) {
-      message.textContent = "";
-    }
-    closeTransactionDrawer();
   });
 }
 
@@ -241,8 +244,23 @@ function updateHelpText(accountHelp, categoryHelp) {
   }
 }
 
-function loadTransactions() {
-  ledgerState.transactions = getTransactions();
+async function loadTransactions() {
+  try {
+    const token = localStorage.getItem("token");
+    const response = await fetch(`${API_BASE}/api/transactions`, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    if (response.ok) {
+      ledgerState.transactions = await response.json();
+    } else {
+      ledgerState.transactions = [];
+    }
+  } catch (err) {
+    console.error("Failed to load transactions:", err);
+    ledgerState.transactions = [];
+  }
 
   renderAccountOptions();
   renderCategoryOptions();
@@ -355,23 +373,18 @@ function closeTransactionModal() {
 }
 
 function updateTransactionNote(transactionId, note) {
-  const transactions = getTransactions();
-  const updated = transactions.map((txn) => {
+  const updated = ledgerState.transactions.map((txn) => {
     if (txn.id === transactionId) {
       return { ...txn, note };
     }
     return txn;
   });
   ledgerState.transactions = updated;
-  saveTransactions(updated);
   applyFilters();
 }
 
 function handleEditEntry(transactionId) {
-  const transactions = ledgerState.transactions.length
-    ? ledgerState.transactions
-    : getTransactions();
-  const transaction = transactions.find((txn) => txn.id === transactionId);
+  const transaction = (ledgerState.transactions || []).find((txn) => txn.id === transactionId);
   if (!transaction) {
     return;
   }
@@ -459,7 +472,6 @@ function handleTransactionDelete(transactionId) {
   const current = ledgerState.transactions || [];
   const updated = current.filter((txn) => txn.id !== transactionId);
   ledgerState.transactions = updated;
-  saveTransactions(updated);
   if (editingTransactionId === transactionId) {
     editingTransactionId = null;
     setEditingMode(false);
@@ -671,10 +683,6 @@ function getCategories() {
   return categories;
 }
 
-function getTransactions() {
-  return readStorageArray(STORAGE_KEYS.transactions);
-}
-
 function markAccountAsUsed(accountId) {
   const accounts = readStorageArray(STORAGE_KEYS.accounts);
   const updated = accounts.map((account) => {
@@ -696,10 +704,6 @@ function readStorageArray(key) {
   } catch {
     return [];
   }
-}
-
-function saveTransactions(transactions) {
-  localStorage.setItem(STORAGE_KEYS.transactions, JSON.stringify(transactions));
 }
 
 function seedDefaultCategories() {
