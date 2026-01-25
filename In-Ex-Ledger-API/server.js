@@ -1,13 +1,10 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
-import { fileURLToPath } from "url";
 import routes from "./routes/index.js";
 
 const app = express();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const frontendDir = path.join(__dirname, "..", "InEx-Ledger-Frontend");
+const publicDir = path.join(process.cwd(), "public");
 
 console.log("🔥 DOCKER FINGERPRINT: CLEAN_BUILD_2026_01_24");
 
@@ -25,46 +22,19 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.static(frontendDir));
+app.use(express.static(publicDir));
+
 app.get("/", (req, res) => {
-  res.sendFile(path.join(frontendDir, "html", "landing.html"));
+  res.sendFile(path.join(publicDir, "html", "landing.html"));
 });
+
 app.use(express.json());
 
 app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
 
-// TEMP: Catch Railway's broken health probe
-app.get("/Health Check Path: /", (req, res) => {
-  res.status(200).send("OK");
-});
-
-// Also catch the URL-encoded version just in case
-app.get("/Health%20Check%20Path:%20/", (req, res) => {
-  res.status(200).send("OK");
-});
-
-app.use((req, res, next) => {
-  console.log(`Incoming: ${req.method} ${req.url} - Body Keys: ${Object.keys(req.body)}`);
-  next();
-});
-
 app.use("/api", routes);
-
-setInterval(() => {
-  // keep the event loop busy
-}, 1000 * 60 * 10);
-
-// TEMPORARILY DISABLED – database initialization removed for stability
-// const runMigrations = async () => {
-//   try {
-//     await initDatabase();
-//     console.log("DATABASE SCHEMA APPLIED SUCCESSFULLY.");
-//   } catch (err) {
-//     console.error("Schema initialization failed:", err);
-//   }
-// };
 
 ;(async () => {
   try {
@@ -80,7 +50,3 @@ setInterval(() => {
 process.on("SIGTERM", () => {
   console.log("Railway sent SIGTERM — process still alive");
 });
-
-setInterval(() => {
-  console.log("❤️ HEARTBEAT: server still alive");
-}, 30000);

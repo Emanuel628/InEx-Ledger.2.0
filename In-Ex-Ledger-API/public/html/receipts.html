@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>InEx Ledger — Receipts</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/receipts.css">
+</head>
+
+<body>
+  <header>
+    <h1>InEx Ledger</h1>
+    <nav>
+      <a data-i18n="nav_transactions" href="transactions.html">Transactions</a> |
+      <a data-i18n="nav_accounts" href="accounts.html">Accounts</a> |
+      <a data-i18n="nav_categories" href="categories.html">Categories</a> |
+      <a data-i18n="nav_receipts" href="receipts.html">Receipts</a> |
+      <a href="mileage.html">Mileage</a> |
+      <a data-i18n="nav_exports" href="exports.html">Exports</a> |
+      <a data-i18n="nav_settings" href="settings.html">Settings</a>
+    </nav>
+  </header>
+
+  <div id="trialBanner" class="trial-banner"></div>
+
+  <main>
+    <section>
+      <h2 data-i18n="receipts_title">Receipts</h2>
+
+      <p data-i18n="receipts_description">
+        Receipts can be uploaded and attached to transactions.
+      </p>
+
+      <div id="receiptTierNotice" class="tier-notice" style="display:none;">
+        <p data-i18n="receipts_tier_notice_title">You need InEx Ledger V1 to upload receipts.</p>
+        <a href="subscription.html" data-i18n="receipts_tier_notice_cta">Upgrade now</a>
+      </div>
+
+      <form method="post" enctype="multipart/form-data">
+        <fieldset>
+          <legend data-i18n="receipts_upload_legend">Upload receipt</legend>
+
+          <div>
+            <label for="receipt-file" data-i18n="receipts_label_file">Receipt file</label><br />
+            <input
+              type="file"
+              id="receipt-file"
+              name="receipt_file"
+              accept="image/*,application/pdf"
+              required
+            />
+          </div>
+
+          <br />
+
+          <div>
+            <label for="receipt-notes" data-i18n="receipts_label_notes">Notes (optional)</label><br />
+            <input
+              type="text"
+              id="receipt-notes"
+              name="receipt_notes"
+            />
+          </div>
+
+          <br />
+
+          <div>
+            <button type="submit" data-i18n="receipts_button_upload">Upload receipt</button>
+          </div>
+        </fieldset>
+      </form>
+    </section>
+
+      <section>
+        <h3 data-i18n="receipts_uploaded_title">Uploaded receipts</h3>
+
+      <p data-i18n="receipts_uploaded_blurb">
+        Uploaded receipts are listed here and can be attached to transactions.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th data-i18n="receipts_table_filename">Filename</th>
+            <th data-i18n="receipts_table_uploaded">Uploaded date</th>
+            <th data-i18n="receipts_table_attached">Attached to transaction</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Receipts will be listed here -->
+        </tbody>
+      </table>
+      <div class="empty-state">
+        <h3 data-i18n="receipts_empty_title">No receipts yet</h3>
+        <p data-i18n="receipts_empty_body">
+          Upload a receipt and link it to a transaction.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; InEx Ledger</p>
+  </footer>
+<script src="../js/global.js"></script>
+<script src="../js/i18n.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/trial.js"></script>
+<script src="../js/receipts.js"></script>
+</body>
+</html>

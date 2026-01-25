@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>InEx Ledger — Exports</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/exports.css">
+</head>
+
+<body>
+  <header>
+    <h1>InEx Ledger</h1>
+    <nav>
+      <a data-i18n="nav_transactions" href="transactions.html">Transactions</a> |
+      <a data-i18n="nav_accounts" href="accounts.html">Accounts</a> |
+      <a data-i18n="nav_categories" href="categories.html">Categories</a> |
+      <a data-i18n="nav_receipts" href="receipts.html">Receipts</a> |
+      <a href="mileage.html">Mileage</a> |
+      <a data-i18n="nav_exports" href="exports.html">Exports</a> |
+      <a data-i18n="nav_settings" href="settings.html">Settings</a>
+    </nav>
+  </header>
+
+  <div id="trialBanner" class="trial-banner"></div>
+
+  <main>
+    <section>
+      <h2 data-i18n="exports_title">Exports</h2>
+
+      <p data-i18n="exports_description">
+        Export your business records for review, filing, or sharing with a CPA.
+      </p>
+
+      <form id="exportForm">
+        <div class="form-row">
+          <label for="exportAccountFilter">Account filter (optional)</label>
+          <select id="exportAccountFilter">
+            <option value="">All accounts</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="exportLanguage">Export language</label>
+          <select id="exportLanguage">
+            <option value="en">English</option>
+            <option value="es">Español</option>
+            <option value="fr">Français</option>
+          </select>
+          <p class="help-text">This only changes the wording on the PDF export.</p>
+        </div>
+
+        <div class="form-row">
+          <label for="exportCategoryFilter">Category filter (optional)</label>
+          <select id="exportCategoryFilter">
+            <option value="">All categories</option>
+          </select>
+        </div>
+
+        <fieldset>
+          <legend data-i18n="exports_form_legend">Select reporting period</legend>
+
+          <div class="form-row">
+            <label for="period-start" data-i18n="exports_label_start">Start date</label>
+            <input
+              type="date"
+              id="period-start"
+              name="period_start"
+              required
+            />
+          </div>
+
+          <div class="form-row">
+            <label for="period-end" data-i18n="exports_label_end">End date</label>
+            <input
+              type="date"
+              id="period-end"
+              name="period_end"
+              required
+            />
+          </div>
+        </fieldset>
+
+        <div class="error-text" id="exportFormMessage"></div>
+
+        <div class="button-row export-action-row">
+          <button type="submit" data-i18n="exports_button_csv">Export CSV</button>
+          <button type="button" id="exportPdfBtn">Export PDF</button>
+        </div>
+        <p id="exportPdfNote" class="small-note">PDF export is included in InEx Ledger V1.</p>
+      </form>
+    </section>
+
+    <section>
+      <h3 data-i18n="exports_history_title">Export history</h3>
+
+      <p data-i18n="exports_history_blurb">
+        Generated exports for the selected business appear here.
+      </p>
+
+      <div class="history-dropdown">
+        <label class="history-dropdown-label" for="exportHistoryDropdown">Past exports</label>
+        <select id="exportHistoryDropdown" aria-label="Export history"></select>
+        <p id="exportHistoryPlaceholder" class="small-note" data-i18n="exports_no_history">
+          No exports yet.
+        </p>
+        <div id="exportHistoryDetails" class="history-details"></div>
+      </div>
+    </section>
+  </main>
+
+<footer>
+  <p>&copy; InEx Ledger</p>
+</footer>
+<script src="../js/global.js"></script>
+<script src="../js/i18n.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/trial.js"></script>
+<script src="../js/pdf_labels.js"></script>
+<script src="../js/pdf_export.js"></script>
+<script src="../js/exports.js"></script>
+</body>
+</html>

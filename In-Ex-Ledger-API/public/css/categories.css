@@ -1,0 +1,83 @@
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+}
+
+section {
+  margin-bottom: 24px;
+}
+
+.account-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.category-card {
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  padding: 14px;
+  background: var(--bg-card, rgba(255, 255, 255, 0.02));
+}
+
+.category-card button {
+  margin-top: 10px;
+}
+
+#categoryFormContainer {
+  margin-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 16px;
+  display: none;
+}
+
+.tax-label-field {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tax-label-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.tax-label-field[hidden] {
+  display: none !important;
+}
+
+.category-grid form > div {
+  margin-bottom: 12px;
+}
+
+.category-grid button,
+#categoryFormContainer button {
+  margin-top: 10px;
+}
+
+.category-note {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 8px;
+}
+
+#categoryFormContainer.visible {
+  display: block;
+}
+
+.error-text {
+  color: #f87171;
+  font-size: 12px;
+  min-height: 18px;
+  margin-top: 8px;
+}

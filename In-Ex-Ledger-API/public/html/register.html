@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>InEx Ledger — Create Account</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/register.css">
+</head>
+
+<body>
+  <header>
+    <h1>InEx Ledger</h1>
+  </header>
+
+  <main>
+    <section>
+      <h2 data-i18n="register_title">Create your account</h2>
+
+      <form method="post">
+        <div>
+          <label for="email" data-i18n="register_email_label">Email address</label><br />
+          <input
+            type="email"
+            id="email"
+            name="email"
+            required
+            autocomplete="email"
+          />
+        </div>
+
+        <br />
+
+        <div>
+          <label for="password" data-i18n="register_password_label">Password</label><br />
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            autocomplete="new-password"
+          />
+        </div>
+
+        <br />
+
+        <div>
+          <label for="confirm-password" data-i18n="register_confirm_password_label">Confirm password</label><br />
+          <input
+            type="password"
+            id="confirm-password"
+            name="confirm_password"
+            required
+            autocomplete="new-password"
+          />
+        </div>
+
+        <p id="passwordMatchMessage" class="password-match-message"></p>
+
+        <div class="password-meter">
+          <div class="meter-bar" id="passwordMeter"></div>
+        </div>
+
+        <p id="passwordStrengthText" class="password-strength-text">Weak</p>
+
+        <label class="show-password-toggle" data-i18n="register_show_password">
+          <input type="checkbox" id="togglePassword" />
+          Show password
+        </label>
+
+        <br />
+
+        <div class="consent-field">
+          <input type="checkbox" id="tosConsent" />
+          <label for="tosConsent">
+            <span data-i18n="register_consent_prefix">I agree to the </span>
+            <a href="terms.html" data-i18n="register_consent_terms">Terms</a>
+            <span data-i18n="register_consent_and"> and </span>
+            <a href="privacy.html" data-i18n="register_consent_privacy">Privacy Policy</a>
+            <span data-i18n="register_consent_suffix">.</span>
+          </label>
+        </div>
+
+        <br />
+
+        <div class="language-field">
+          <label for="languageSelectRegister" data-i18n="register_language_label">Language</label>
+          <select id="languageSelectRegister" name="language" data-language-select></select>
+        </div>
+
+        <br />
+
+        <p id="tosConsentMessage" class="consent-error" aria-live="polite"></p>
+
+        <br />
+        <div>
+          <button type="submit" data-i18n="register_submit">Create account</button>
+        </div>
+      </form>
+
+        <p>
+          <span data-i18n="register_existing_account">Already have an account?</span>
+          <a href="login.html" data-i18n="register_sign_in">Sign in</a>
+        </p>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      <a href="subscription.html" data-i18n="nav_pricing">Pricing</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </p>
+    <p>&copy; InEx Ledger</p>
+  </footer>
+<script src="../js/global.js"></script>
+<script src="../js/i18n.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/privacyService.js"></script>
+<script src="../js/register.js"></script>
+</body>
+</html>

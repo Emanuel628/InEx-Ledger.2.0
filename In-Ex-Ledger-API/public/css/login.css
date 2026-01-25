@@ -1,0 +1,33 @@
+/* =========================
+   Auth Pages — Overrides
+   ========================= */
+
+header nav {
+  display: none;
+}
+
+main {
+  max-width: 420px;
+  padding-top: 48px;
+}
+
+section {
+  margin-top: 32px;
+}
+
+footer {
+  margin-top: 40px;
+}
+
+.show-password-toggle {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+.show-password-toggle input {
+  margin-right: 6px;
+}

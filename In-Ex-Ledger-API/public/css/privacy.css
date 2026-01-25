@@ -1,0 +1,18 @@
+/* =========================
+   Legal & Policy Pages
+   ========================= */
+
+/* Reading-friendly width */
+main {
+  max-width: 760px;
+}
+
+/* Increase paragraph spacing for readability */
+p {
+  line-height: 1.6;
+}
+
+/* De-emphasize navigation visually */
+nav {
+  opacity: 0.85;
+}

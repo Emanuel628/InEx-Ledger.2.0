@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>InEx Ledger ƒ?" Mileage</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="../css/global.css" />
+  <link rel="stylesheet" href="../css/mileage.css" />
+</head>
+
+<body>
+  <header>
+    <h1>InEx Ledger</h1>
+    <nav>
+      <a data-i18n="nav_transactions" href="transactions.html">Transactions</a> |
+      <a data-i18n="nav_accounts" href="accounts.html">Accounts</a> |
+      <a data-i18n="nav_categories" href="categories.html">Categories</a> |
+      <a data-i18n="nav_receipts" href="receipts.html">Receipts</a> |
+      <a href="mileage.html">Mileage</a> |
+      <a data-i18n="nav_exports" href="exports.html">Exports</a> |
+      <a data-i18n="nav_settings" href="settings.html">Settings</a>
+    </nav>
+  </header>
+
+  <div id="trialBanner" class="trial-banner"></div>
+
+  <main>
+    <section class="mileage-hero">
+      <h2>Track business mileage</h2>
+      <p id="mileageHeroDescription">Keep a simple log for US tax reporting.</p>
+    </section>
+
+    <section class="mileage-section">
+      <h3 data-i18n="mileage_title">Record a trip</h3>
+      <p id="mileageUnitNote" class="help-text"></p>
+      <form id="mileageForm">
+        <div id="mileage-us-fields">
+          <div class="mileage-field">
+            <label for="mileageDateUs" data-i18n="mileage_label_date">Date</label>
+            <input type="date" id="mileageDateUs" />
+          </div>
+          <div class="mileage-field">
+            <label for="mileagePurposeUs" data-i18n="mileage_label_purpose">Purpose</label>
+            <input type="text" id="mileagePurposeUs" />
+          </div>
+          <div class="mileage-field">
+            <label class="optional-label" for="mileageDestinationUs" data-i18n="mileage_label_destination_optional">Destination (optional)</label>
+            <input type="text" id="mileageDestinationUs" />
+          </div>
+          <div class="mileage-field">
+            <label for="mileageMiles" data-i18n="mileage_label_miles">Miles</label>
+            <input type="number" id="mileageMiles" min="0" step="0.1" />
+          </div>
+        </div>
+        <div id="mileage-ca-fields" hidden>
+          <div class="mileage-field">
+            <label for="mileageDateCa" data-i18n="mileage_label_date">Date</label>
+            <input type="date" id="mileageDateCa" />
+          </div>
+          <div class="mileage-field">
+            <label for="mileagePurposeCa" data-i18n="mileage_label_purpose">Purpose</label>
+            <input type="text" id="mileagePurposeCa" />
+          </div>
+          <div class="mileage-field">
+            <label for="mileageOdometerStart" data-i18n="mileage_label_odo_start">Odometer start</label>
+            <input type="number" id="mileageOdometerStart" min="0" step="0.1" />
+          </div>
+          <div class="mileage-field">
+            <label for="mileageOdometerEnd" data-i18n="mileage_label_odo_end">Odometer end</label>
+            <input type="number" id="mileageOdometerEnd" min="0" step="0.1" />
+          </div>
+          <div class="mileage-field">
+            <label class="optional-label" for="mileageDestinationCa" data-i18n="mileage_label_destination_optional">Destination (optional)</label>
+            <input type="text" id="mileageDestinationCa" />
+          </div>
+          <p id="mileageCalcNote" class="small-note"></p>
+        </div>
+        <div class="button-row">
+          <button type="submit" data-i18n="mileage_button_add">Add mileage</button>
+        </div>
+        <p id="mileageFormMessage" class="error-text"></p>
+      </form>
+    </section>
+
+    <section class="mileage-section">
+      <h3>Logged mileage</h3>
+      <div class="mileage-table-wrapper">
+        <table id="mileageTable">
+          <thead></thead>
+          <tbody id="mileageTableBody"></tbody>
+        </table>
+        <p id="mileageEmpty" class="small-note" data-i18n="mileage_empty">No mileage logged yet.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; InEx Ledger</p>
+  </footer>
+
+  <script src="../js/global.js"></script>
+  <script src="../js/i18n.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/trial.js"></script>
+  <script src="../js/mileage.js"></script>
+</body>
+</html>

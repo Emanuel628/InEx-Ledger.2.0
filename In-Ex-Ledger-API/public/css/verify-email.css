@@ -1,0 +1,35 @@
+/* =========================
+   Auth Pages — Overrides
+   ========================= */
+
+header nav {
+  display: none;
+}
+
+main {
+  max-width: 420px;
+  padding-top: 48px;
+}
+
+section {
+  margin-top: 32px;
+}
+
+footer {
+  margin-top: 40px;
+}
+
+.verification-status,
+.verification-link {
+  margin-top: 12px;
+  font-size: 14px;
+}
+
+.verification-link a {
+  color: var(--link-color, #3b82f6);
+  text-decoration: underline;
+}
+
+.verification-status.error {
+  color: #dc2626;
+}

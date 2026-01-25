@@ -1,0 +1,141 @@
+/* =========================
+   Core Ledger Pages
+   ========================= */
+
+/* Slightly widen working area */
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+}
+
+section {
+  margin-bottom: 24px;
+}
+
+form {
+  margin-top: 18px;
+}
+
+.error-text {
+  color: #f87171;
+  min-height: 18px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+form > div,
+form label + input,
+form label + select {
+  margin-bottom: 12px;
+}
+
+button {
+  margin-top: 10px;
+}
+
+.export-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+#exportPdfBtn {
+  min-width: 150px;
+}
+
+#exportPdfNote {
+  margin-top: 6px;
+}
+
+#exportLanguage {
+  background: var(--form-control-bg);
+  color: var(--form-control-text);
+  border: 1px solid var(--border-subtle);
+}
+
+.help-text {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.history-dropdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-dropdown-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+#exportHistoryDropdown {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--form-control-bg);
+  color: var(--form-control-text);
+  padding: 10px;
+}
+
+.history-details {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-details.active {
+  display: flex;
+}
+
+.history-replay {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: var(--text-primary);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.history-replay:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history-record {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.history-record p {
+  margin: 0;
+}
+
+.history-link {
+  color: #60a5fa;
+  text-decoration: underline;
+}
+
+.small-note {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
