@@ -880,4 +880,18 @@ const TRANSLATIONS = {
     upgrade_footer_note: 'InEx Ledger - V1 Beta - 2026',
     subscription_title: 'Abonnement'
   }
-};
+};document.addEventListener('DOMContentLoaded', () => {
+  applyTranslations();
+  const languageSelectors = document.querySelectorAll('[data-language-select]');
+  languageSelectors.forEach((select) => {
+    if (typeof populateLanguageOptions === 'function') {
+      populateLanguageOptions(select);
+    }
+    select.value = getCurrentLanguage();
+    select.addEventListener('change', (event) => {
+      if (typeof setCurrentLanguage === 'function') {
+        setCurrentLanguage(event.target.value);
+      }
+    });
+  });
+});
