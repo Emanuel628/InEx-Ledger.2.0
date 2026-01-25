@@ -209,4 +209,5 @@ async function deleteAccount(accountId) {
   }
 
   renderAccountList();
+  window.dispatchEvent(new CustomEvent("accountsUpdated"));
 }
