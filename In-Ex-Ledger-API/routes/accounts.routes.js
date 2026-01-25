@@ -3,6 +3,34 @@ import pool from "../db.js";
 import crypto from "node:crypto";
 import { requireAuth } from "../middleware/auth.middleware.js";
 
+async function resolveBusinessIdForUser(user) {
+  if (user.business_id) {
+    return user.business_id;
+  }
+
+  const result = await pool.query(
+    "SELECT id FROM businesses WHERE user_id = $1 LIMIT 1",
+    [user.id]
+  );
+
+  if (result.rowCount) {
+    user.business_id = result.rows[0].id;
+    return user.business_id;
+  }
+
+  const businessId = crypto.randomUUID();
+  const businessName = `${user.email.split("@")[0]}'s Business`;
+
+  await pool.query(
+    `INSERT INTO businesses (id, user_id, name, region, language)
+     VALUES ($1, $2, $3, 'US', 'en')`,
+    [businessId, user.id, businessName]
+  );
+
+  user.business_id = businessId;
+  return businessId;
+}
+
 const router = express.Router();
 
 /**
@@ -11,9 +39,10 @@ const router = express.Router();
 router.get("/", requireAuth, async (req, res) => {
   console.log("🔐 AUTH USER:", req.user);
   try {
+    const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
       "SELECT * FROM accounts WHERE business_id = $1 ORDER BY created_at DESC",
-      [req.user.business_id]
+      [businessId]
     );
     res.json(result.rows);
   } catch (err) {
@@ -39,6 +68,7 @@ router.post("/", requireAuth, async (req, res) => {
       "SELECT current_database(), current_schema()"
     );
     console.log("POST /accounts DB:", dbCheck.rows[0]);
+    const businessId = await resolveBusinessIdForUser(req.user);
 
     const result = await pool.query(
       `INSERT INTO accounts (id, business_id, name, type, balance, currency)
@@ -46,7 +76,7 @@ router.post("/", requireAuth, async (req, res) => {
        RETURNING *`,
       [
         crypto.randomUUID(),
-        req.user.business_id,
+        businessId,
         name,
         type,
         parseFloat(balance) || 0,
