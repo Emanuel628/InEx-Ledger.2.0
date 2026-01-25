@@ -45,8 +45,25 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem("token", data.token);
     window.location.href = "transactions.html";
   });
+
+  wireShowPasswordToggle(document);
 });
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function wireShowPasswordToggle(container = document) {
+  const toggle = container.querySelector(".show-password-toggle input[type=\"checkbox\"]");
+  if (!toggle) {
+    return;
+  }
+
+  toggle.addEventListener("change", () => {
+    const passwordField = container.querySelector('input[type="password"]');
+    if (!passwordField) {
+      return;
+    }
+    passwordField.type = toggle.checked ? "text" : "password";
+  });
 }

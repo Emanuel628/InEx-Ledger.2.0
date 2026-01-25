@@ -40,7 +40,21 @@ document.addEventListener("DOMContentLoaded", () => {
     alert("Registration successful. You can now log in.");
     window.location.href = "/html/login.html";
   });
+  wireShowPasswordToggle(document);
 });
+
+function wireShowPasswordToggle(container = document) {
+  const toggles = container.querySelectorAll(".show-password-toggle input[type=\"checkbox\"]");
+  toggles.forEach((toggle) => {
+    toggle.addEventListener("change", () => {
+      const section = toggle.closest("section") || container;
+      const passwordInputs = section.querySelectorAll('input[type="password"]');
+      passwordInputs.forEach((input) => {
+        input.type = toggle.checked ? "text" : "password";
+      });
+    });
+  });
+}
 
 function calculatePasswordScore(password) {
   let score = 0;
