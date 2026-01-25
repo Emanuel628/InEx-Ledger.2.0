@@ -102,6 +102,10 @@ if (signOutBtn) {
     darkModeToggle.addEventListener("change", (event) => {
       const nextTheme = event.target.checked ? "dark" : "light";
       document.documentElement.setAttribute("data-theme", nextTheme);
+      document.body.classList.remove("dark", "light");
+      document.body.classList.add(nextTheme);
+      localStorage.setItem("lb_theme", nextTheme);
+      localStorage.setItem("lb_theme_version", THEME_VERSION);
       markDirty();
     });
   }
