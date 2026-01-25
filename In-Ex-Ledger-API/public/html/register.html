@@ -69,6 +69,27 @@
           Show password
         </label>
 
+        <button type="button" id="openShowPasswordModal" class="show-password-btn">
+          Show passwords
+        </button>
+
+        <div id="showPasswordModal" class="modal hidden">
+          <div class="modal-backdrop"></div>
+          <div class="modal-card">
+            <h3>Show passwords?</h3>
+            <p>Your passwords will be visible on screen.</p>
+
+            <label class="modal-switch-row">
+              <input type="checkbox" id="modalTogglePasswords" />
+              <span>Reveal both password fields</span>
+            </label>
+
+            <div class="modal-actions">
+              <button type="button" id="closeShowPasswordModal">Done</button>
+            </div>
+          </div>
+        </div>
+
         <br />
 
         <div class="consent-field">
