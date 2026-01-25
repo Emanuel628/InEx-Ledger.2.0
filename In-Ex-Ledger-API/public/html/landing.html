@@ -40,71 +40,14 @@
       background: rgba(0, 0, 0, 0.05);
     }
 
-    .sign-in-modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-      z-index: 10;
-    }
-
-    .sign-in-modal.visible {
-      display: flex;
-    }
-
-    .sign-in-modal .modal-card {
-      background: #fff;
-      border-radius: 1rem;
-      padding: 2rem;
-      width: min(420px, 100%);
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-      text-align: center;
-      color: #111;
-      position: relative;
-    }
-
-    .sign-in-modal .close-btn {
-      background: none;
-      border: none;
-      color: #111;
-      font-size: 1.6rem;
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      cursor: pointer;
-    }
-
-    .sign-in-modal .modal-actions a {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0.75rem 1.5rem;
-      border-radius: 999px;
-      border: 1px solid rgba(0, 0, 0, 0.2);
-      color: #111;
-      text-decoration: none;
-      margin-top: 1rem;
-      font-weight: 600;
-      transition: background 0.2s ease, border-color 0.2s ease;
-    }
-
-    .sign-in-modal .modal-actions a:hover {
-      background: rgba(0, 0, 0, 0.05);
-      border-color: rgba(0, 0, 0, 0.35);
-    }
+    /* Modal styles removed */
   </style>
 </head>
 <body>
 
 <header class="landing-header">
   <div class="brand">InEx Ledger</div>
-  <button class="sign-in-trigger" id="landingSignInTrigger">Sign in</button>
+  <a class="sign-in-trigger" href="https://inex-ledger20-production.up.railway.app/html/login.html">Sign in</a>
 </header>
 
 <main>
@@ -179,39 +122,7 @@
   <p>&copy; InEx Ledger</p>
 </footer>
 
-<div class="sign-in-modal" id="landingSignInModal">
-  <div class="modal-card">
-    <button class="close-btn" id="landingSignInClose">&times;</button>
-    <h3>Welcome back</h3>
-    <p>Jump straight into your ledger with a secure sign in.</p>
-    <div class="modal-actions">
-      <a href="https://inex-ledger20-production.up.railway.app/html/login.html">Sign in</a>
-    </div>
-  </div>
-</div>
-
 <script src="../js/global.js"></script>
 <script src="../js/i18n.js"></script>
-<script>
-  const modal = document.getElementById("landingSignInModal");
-  const trigger = document.getElementById("landingSignInTrigger");
-  const closeBtn = document.getElementById("landingSignInClose");
-
-  function openModal() {
-    modal?.classList.add("visible");
-  }
-
-  function closeModal() {
-    modal?.classList.remove("visible");
-  }
-
-  trigger?.addEventListener("click", openModal);
-  closeBtn?.addEventListener("click", closeModal);
-  modal?.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      closeModal();
-    }
-  });
-</script>
 </body>
 </html>
