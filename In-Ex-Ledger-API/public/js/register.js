@@ -75,42 +75,6 @@ function wireShowPasswordToggle(container = document) {
   updateFieldTypes();
 }
 
-const wireModalToggle = () => {
-  const openModalBtn = document.getElementById("openShowPasswordModal");
-  const modal = document.getElementById("showPasswordModal");
-  const closeModalBtn = document.getElementById("closeShowPasswordModal");
-  const modalToggle = document.getElementById("modalTogglePasswords");
-  const password = document.getElementById("password");
-  const confirm = document.getElementById("confirm-password");
-
-  if (!openModalBtn || !modal || !modalToggle || !password || !confirm) {
-    console.error("Show password modal wiring failed", {
-      openModalBtn,
-      modal,
-      modalToggle,
-      password,
-      confirm
-    });
-    return;
-  }
-
-  openModalBtn.addEventListener("click", () => {
-    modal.classList.remove("hidden");
-  });
-
-  closeModalBtn.addEventListener("click", () => {
-    modal.classList.add("hidden");
-  });
-
-  modalToggle.addEventListener("change", () => {
-    const type = modalToggle.checked ? "text" : "password";
-    password.type = type;
-    confirm.type = type;
-  });
-};
-
-wireModalToggle();
-
 function calculatePasswordScore(password) {
   let score = 0;
 
