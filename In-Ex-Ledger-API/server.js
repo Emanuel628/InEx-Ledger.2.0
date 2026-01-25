@@ -8,7 +8,6 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const frontendDir = path.join(__dirname, "..", "InEx-Ledger-Frontend");
-const publicDir = path.join(__dirname, "..", "public");
 
 console.log("🔥 DOCKER FINGERPRINT: CLEAN_BUILD_2026_01_24");
 
@@ -26,21 +25,11 @@ app.use(cors({
   credentials: true
 }));
 
-app.use("/html", express.static(path.join(frontendDir, "html")));
-app.use("/css", express.static(path.join(frontendDir, "css")));
-app.use("/js", express.static(path.join(frontendDir, "js")));
+app.use(express.static(frontendDir));
 app.get("/", (req, res) => {
   res.sendFile(path.join(frontendDir, "html", "landing.html"));
 });
-app.get("/css/:name", (req, res) => {
-  const target = `https://inex-ledger20-production.up.railway.app/css/${req.params.name}`;
-  res.redirect(target);
-});
 app.use(express.json());
-
-app.get("/", (req, res) => {
-  res.status(200).send("API_UP");
-});
 
 app.get("/health", (req, res) => {
   res.status(200).send("OK");
