@@ -157,6 +157,8 @@ async function renderAccountList() {
 
   const accounts = await res.json();
   container.innerHTML = "";
+  localStorage.setItem("lb_accounts", JSON.stringify(accounts));
+  window.dispatchEvent(new CustomEvent("accountsUpdated"));
 
   if (!accounts.length) {
     container.innerHTML =

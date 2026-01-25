@@ -91,11 +91,21 @@ function wireTransactionForm() {
   const accountHelp = document.getElementById("accountHelp");
   const categoryHelp = document.getElementById("categoryHelp");
   const message = document.getElementById("transactionFormMessage");
+  const dateInput = document.getElementById("date");
+  const dateFieldWrapper = dateInput?.closest(".tx-field");
 
   updateHelpText(accountHelp, categoryHelp);
 
   if (!form) {
     return;
+  }
+
+  if (dateFieldWrapper && dateInput) {
+    dateFieldWrapper.classList.add("date-field-clickable");
+    dateFieldWrapper.addEventListener("click", () => {
+      dateInput.focus();
+      dateInput.showPicker?.();
+    });
   }
 
   form.addEventListener("submit", (event) => {

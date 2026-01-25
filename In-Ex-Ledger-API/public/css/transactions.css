@@ -391,6 +391,14 @@ tbody tr:last-child {
     appearance: none;
   }
 
+  .tx-field.date-field-clickable {
+    cursor: pointer;
+  }
+
+  .tx-field.date-field-clickable input[type="date"] {
+    pointer-events: auto;
+  }
+
   form,
   fieldset,
   div {
