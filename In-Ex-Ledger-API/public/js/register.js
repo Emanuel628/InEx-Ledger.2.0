@@ -41,6 +41,17 @@ document.addEventListener("DOMContentLoaded", () => {
     window.location.href = "/html/login.html";
   });
   wireShowPasswordToggle(document);
+  const passwordInput = form.querySelector("#password");
+  const confirmInput = form.querySelector("#confirm-password");
+
+  const runStrengthUpdate = () => {
+    updateStrengthMeter();
+    updateMatchMessage();
+  };
+
+  passwordInput?.addEventListener("input", runStrengthUpdate);
+  confirmInput?.addEventListener("input", updateMatchMessage);
+  runStrengthUpdate();
 });
 
 function wireShowPasswordToggle(container = document) {
