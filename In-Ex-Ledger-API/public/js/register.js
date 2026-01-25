@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     alert("Registration successful. You can now log in.");
-    window.location.href = "login.html";
+    window.location.href = "/html/login.html";
   });
 });
 
