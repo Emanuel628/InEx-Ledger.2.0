@@ -23,6 +23,7 @@ app.use(cors({
 }));
 
 app.use(express.static(publicDir));
+app.use(express.static(path.join(publicDir, "html")));
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(publicDir, "html", "landing.html"));
