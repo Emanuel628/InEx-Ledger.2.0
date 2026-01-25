@@ -34,6 +34,8 @@ const SECURITY_REQUIREMENT_RULES = {
 };
 
 let securityState = {};
+const API_BASE = "https://inex-ledger20-production.up.railway.app/api";
+const DELETE_CONFIRM_TEXT = "delete my account";
 console.log("Settings JS loaded");
 document.addEventListener("DOMContentLoaded", async () => {
   if (typeof requireAuth === "function") requireAuth();
@@ -134,6 +136,7 @@ if (signOutBtn) {
   }
 
   wireSecuritySection();
+  wireAccountDeletion();
 });
 
 async function handleSave({
@@ -331,6 +334,70 @@ function getStrengthLabel(score) {
   }
 
   return "Weak";
+}
+
+function wireAccountDeletion() {
+  const trigger = document.getElementById("deleteAccountTrigger");
+  const confirmSection = document.getElementById("deleteAccountConfirm");
+  const confirmInput = document.getElementById("deleteAccountConfirmInput");
+  const confirmBtn = document.getElementById("deleteAccountConfirmBtn");
+  const cancelBtn = document.getElementById("deleteAccountCancelBtn");
+  const status = document.getElementById("deleteAccountStatus");
+
+  const resetSection = () => {
+    if (confirmSection) {
+      confirmSection.setAttribute("hidden", "");
+    }
+    if (confirmInput) {
+      confirmInput.value = "";
+    }
+    if (status) {
+      status.textContent = "";
+    }
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+    }
+  };
+
+  trigger?.addEventListener("click", () => {
+    confirmSection?.removeAttribute("hidden");
+  });
+
+  cancelBtn?.addEventListener("click", resetSection);
+
+  confirmBtn?.addEventListener("click", async () => {
+    if (!confirmInput || !confirmBtn) return;
+    if (confirmInput.value.trim().toLowerCase() !== DELETE_CONFIRM_TEXT) {
+      status.textContent = `Type “${DELETE_CONFIRM_TEXT}” to confirm.`;
+      return;
+    }
+
+    confirmBtn.disabled = true;
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE}/me`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        status.textContent = error?.error || "Unable to delete account.";
+        confirmBtn.disabled = false;
+        return;
+      }
+
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = "/html/login.html";
+    } catch (err) {
+      console.error("Account deletion failed:", err);
+      status.textContent = "Unable to delete account.";
+      confirmBtn.disabled = false;
+    }
+  });
 }
 
 function wireSecuritySection() {

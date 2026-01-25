@@ -164,6 +164,34 @@
     <p>&copy; InEx Ledger</p>
   </footer>
 
+  <section class="danger-zone" id="accountDangerZone">
+    <h2 data-i18n="settings_danger_zone_title">Danger Zone</h2>
+    <p class="danger-description">
+      Permanently delete your account and all related data. This cannot be undone.
+    </p>
+    <button id="deleteAccountTrigger" type="button" class="danger-btn">
+      Delete my account
+    </button>
+    <div id="deleteAccountConfirm" class="danger-confirm" hidden>
+      <p>Type “delete my account” to confirm.</p>
+      <input
+        type="text"
+        id="deleteAccountConfirmInput"
+        placeholder="delete my account"
+        autocomplete="off"
+      />
+      <div class="danger-buttons">
+        <button id="deleteAccountConfirmBtn" type="button" class="danger-btn danger-btn--confirm">
+          Confirm deletion
+        </button>
+        <button id="deleteAccountCancelBtn" type="button" class="danger-btn danger-btn--cancel">
+          Cancel
+        </button>
+      </div>
+      <p id="deleteAccountStatus" class="danger-status"></p>
+    </div>
+  </section>
+
   <script src="../js/global.js"></script>
   <script src="../js/i18n.js"></script>
   <script src="../js/auth.js"></script>
