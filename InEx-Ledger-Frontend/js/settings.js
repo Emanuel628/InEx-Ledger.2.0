@@ -65,7 +65,6 @@ if (signOutBtn) {
   const saveBar = document.getElementById("settingsSaveBar");
   const saveButton = document.getElementById("globalSaveBtn");
   const downloadBtn = document.getElementById("downloadMyDataBtn");
-  const deleteBtn = document.getElementById("deleteMyDataBtn");
   const consentStatus = document.getElementById("consentStatus");
 
   saveBarElement = saveBar;
@@ -111,7 +110,7 @@ if (signOutBtn) {
     unitToggle.addEventListener("change", markDirty);
   }
 
-  await initPrivacyControls(optOutToggle, consentStatus, downloadBtn, deleteBtn);
+  await initPrivacyControls(optOutToggle, consentStatus, downloadBtn);
 
   if (optOutToggle) {
     optOutToggle.addEventListener("change", markDirty);
@@ -200,8 +199,7 @@ function clearDirty() {
 async function initPrivacyControls(
   optOutToggle,
   consentStatus,
-  downloadBtn,
-  deleteBtn
+  downloadBtn
 ) {
   let settings = {
     dataSharingOptOut: false,
@@ -245,22 +243,6 @@ async function initPrivacyControls(
     });
   }
 
-  if (deleteBtn) {
-    deleteBtn.addEventListener("click", async () => {
-      const confirmed = window.confirm(t("settings_delete_confirmation"));
-      if (!confirmed) {
-        return;
-      }
-
-      if (
-        typeof privacyService === "object" &&
-        typeof privacyService.deleteBusinessData === "function"
-      ) {
-        await privacyService.deleteBusinessData();
-        window.alert(t("settings_delete_success"));
-      }
-    });
-  }
 }
 
 async function syncPrivacySettings(optOutValue) {
