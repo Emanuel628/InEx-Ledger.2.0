@@ -9,12 +9,6 @@ async function resolveBusinessIdForUser(user) {
     return user.business_id;
   }
 
-  console.log(
-    "Resolve business for user:",
-    user.id,
-    user.email
-  );
-
   const result = await pool.query(
     "SELECT id FROM businesses WHERE user_id = $1 LIMIT 1",
     [user.id]
@@ -53,7 +47,6 @@ const router = express.Router();
  * GET all accounts for logged-in business
  */
 router.get("/", requireAuth, async (req, res) => {
-  console.log("🔐 AUTH USER:", req.user);
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
@@ -71,8 +64,6 @@ router.get("/", requireAuth, async (req, res) => {
  * CREATE new account
  */
 router.post("/", requireAuth, async (req, res) => {
-  console.log("🔐 AUTH USER:", req.user);
-  console.log("POST /accounts BODY:", req.body);
   const { name, type } = req.body;
 
   if (!name || !type) {
@@ -83,7 +74,6 @@ router.post("/", requireAuth, async (req, res) => {
     const dbCheck = await pool.query(
       "SELECT current_database(), current_schema()"
     );
-    console.log("POST /accounts DB:", dbCheck.rows[0]);
     const businessId = await resolveBusinessIdForUser(req.user);
 
     const result = await pool.query(
