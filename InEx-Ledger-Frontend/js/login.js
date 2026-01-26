@@ -42,11 +42,16 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    console.log("LOGIN SUCCESS RESPONSE:", data);
+    console.log("TOKEN BEFORE setToken:", data.token);
+
     if (!data.token) {
       alert("Login failed: missing token");
       return;
     }
     setToken(data.token);
+    console.log("TOKEN AFTER setToken:", localStorage.getItem("token"));
+
     window.location.href = "transactions.html";
   });
 });

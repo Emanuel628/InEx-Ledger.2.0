@@ -29,7 +29,9 @@ function authHeader() {
 }
 
 async function requireValidSessionOrRedirect({ redirectOnFailure = true } = {}) {
+  console.log("requireValidSessionOrRedirect() running");
   const token = getToken();
+  console.log("Token at guard start:", token);
 
   if (!token) {
     if (redirectOnFailure) {
@@ -39,6 +41,7 @@ async function requireValidSessionOrRedirect({ redirectOnFailure = true } = {}) 
   }
 
   try {
+    console.log("Calling /api/me with header:", authHeader());
     const response = await fetch("/api/me", {
       method: "GET",
       headers: {
@@ -47,10 +50,13 @@ async function requireValidSessionOrRedirect({ redirectOnFailure = true } = {}) 
       }
     });
 
+    console.log("/api/me status:", response.status);
     if (response.ok) {
       return true;
     }
 
+    const text = await response.text();
+    console.log("/api/me body:", text);
     clearToken();
     if (redirectOnFailure) {
       window.location.href = LOGIN_PAGE;
