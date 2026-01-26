@@ -44,7 +44,7 @@ function validateTransactionPayload(payload) {
   return { valid: true };
 }
 
-router.get("/transactions", requireAuth, async (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessId(req.user.id);
     if (!businessId) {
@@ -75,7 +75,7 @@ router.get("/transactions", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/transactions", requireAuth, async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   const validation = validateTransactionPayload(req.body);
   if (!validation.valid) {
     return res.status(400).json({ error: validation.message });
