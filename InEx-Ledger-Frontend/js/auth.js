@@ -3,11 +3,18 @@ const TIER_KEY = "tier";
 const TRIAL_EXPIRED_KEY = "luna_trial_expired";
 const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const LOGIN_PAGE = "/html/login.html";
-const API_BASE = "https://inex-ledger20-production.up.railway.app";
+const DEFAULT_API_BASE = "https://inex-ledger20-production.up.railway.app";
+
+window.API_BASE = window.API_BASE || DEFAULT_API_BASE;
+
+function getApiBase() {
+  return window.API_BASE;
+}
 
 function buildApiUrl(pathOrUrl = "") {
+  const base = getApiBase();
   if (!pathOrUrl) {
-    return API_BASE;
+    return base;
   }
 
   if (/^https?:\/\//i.test(pathOrUrl)) {
@@ -15,10 +22,10 @@ function buildApiUrl(pathOrUrl = "") {
   }
 
   if (pathOrUrl.startsWith("/")) {
-    return `${API_BASE}${pathOrUrl}`;
+    return `${base}${pathOrUrl}`;
   }
 
-  return `${API_BASE}/${pathOrUrl}`;
+  return `${base}/${pathOrUrl}`;
 }
 
 function clearAppState() {
