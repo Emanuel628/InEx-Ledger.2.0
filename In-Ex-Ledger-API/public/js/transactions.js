@@ -256,15 +256,18 @@ async function loadTransactions() {
   try {
     const response = await apiFetch(`${API_BASE}/api/transactions`);
     if (!response) {
+      showTransactionsError("Could not reach the transactions service.");
       ledgerState.transactions = [];
     } else if (!response.ok) {
       console.error("Failed to load transactions:", response.status);
+      showTransactionsError("Unable to load transactions (status " + response.status + ").");
       ledgerState.transactions = [];
     } else {
       ledgerState.transactions = await response.json();
     }
   } catch (err) {
     console.error("Failed to load transactions:", err);
+    showTransactionsError("Error loading transactions.");
     ledgerState.transactions = [];
   }
 
@@ -651,6 +654,13 @@ function renderTotals() {
   } else if (taxLabel && setAsideLabel) {
     taxLabel.textContent = formatCurrency(0);
     setAsideLabel.textContent = formatCurrency(0);
+  }
+}
+
+function showTransactionsError(message) {
+  const list = document.getElementById("transactionList");
+  if (list) {
+    list.innerHTML = `<p class="error-message">${message}</p>`;
   }
 }
 

@@ -146,14 +146,15 @@ async function renderAccountList() {
 
   const response = await apiFetch(`${API_BASE}/api/accounts`);
   if (!response) {
-    container.innerHTML = "<p>Failed to load accounts.</p>";
+    console.error("Failed to load accounts: no response");
+    showAccountsError("Could not reach the account service.");
     localStorage.removeItem("lb_accounts");
     return;
   }
 
   if (!response.ok) {
     console.error("Failed to load accounts:", response.status);
-    container.innerHTML = "<p>Failed to load accounts.</p>";
+    showAccountsError("Unable to load accounts (status " + response.status + ").");
     localStorage.removeItem("lb_accounts");
     return;
   }
@@ -210,4 +211,11 @@ async function deleteAccount(accountId) {
   }
 
   renderAccountList();
+}
+
+function showAccountsError(message) {
+  const container = document.getElementById("accountsList");
+  if (container) {
+    container.innerHTML = `<p class="error-message">${message}</p>`;
+  }
 }
