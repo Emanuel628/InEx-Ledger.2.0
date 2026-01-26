@@ -602,6 +602,14 @@ function renderTransactionList(filteredTransactions) {
       <td>
         <button
           type="button"
+          class="tx-action tx-upload"
+          data-action="upload-receipt"
+          data-id="${txn.id}"
+        >
+          Upload receipt
+        </button>
+        <button
+          type="button"
           class="tx-action"
           data-action="edit-transaction"
           data-id="${txn.id}"
@@ -611,6 +619,13 @@ function renderTransactionList(filteredTransactions) {
       </td>
     `;
     tbody.appendChild(row);
+    const uploadButton = row.querySelector('[data-action="upload-receipt"]');
+    if (uploadButton) {
+      uploadButton.addEventListener("click", () => {
+        triggerReceiptUpload(txn.id);
+      });
+    }
+
     const editButton = row.querySelector('[data-action="edit-transaction"]');
     if (editButton) {
       editButton.addEventListener("click", () => {
@@ -751,6 +766,66 @@ function validateTransactionForm({ date, description, amount, accountId, categor
     return "Choose a transaction type.";
   }
   return null;
+}
+
+let receiptInputElement = null;
+
+function initReceiptInput() {
+  if (receiptInputElement) {
+    return;
+  }
+
+  receiptInputElement = document.createElement("input");
+  receiptInputElement.type = "file";
+  receiptInputElement.accept = "image/*,application/pdf";
+  receiptInputElement.style.display = "none";
+  receiptInputElement.addEventListener("change", async () => {
+    const transactionId = receiptInputElement.dataset.transactionId;
+    const file = receiptInputElement.files?.[0];
+    if (file && transactionId) {
+      await uploadReceipt(transactionId, file);
+    }
+    receiptInputElement.value = "";
+  });
+  document.body.appendChild(receiptInputElement);
+}
+
+function triggerReceiptUpload(transactionId) {
+  initReceiptInput();
+  if (!receiptInputElement) {
+    return;
+  }
+
+  receiptInputElement.dataset.transactionId = transactionId;
+  receiptInputElement.click();
+}
+
+async function uploadReceipt(transactionId, file) {
+  setTransactionFormMessage("Uploading receipt...");
+  const formData = new FormData();
+  formData.append("receipt", file);
+  formData.append("transaction_id", transactionId);
+
+  try {
+    const response = await fetch(buildApiUrl("/api/receipts"), {
+      method: "POST",
+      headers: {
+        ...authHeader()
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      setTransactionFormMessage(error?.error || "Receipt upload failed.");
+      return;
+    }
+
+    setTransactionFormMessage("Receipt uploaded.");
+  } catch (err) {
+    console.error("Receipt upload error:", err);
+    setTransactionFormMessage("Receipt upload failed.");
+  }
 }
 
 function seedDefaultCategories() {
