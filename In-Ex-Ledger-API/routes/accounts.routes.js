@@ -2,6 +2,7 @@ import express from "express";
 import pool from "../db.js";
 import crypto from "node:crypto";
 import { requireAuth } from "../middleware/auth.middleware.js";
+import { seedDefaultsForBusiness } from "../api/utils/seedDefaultsForBusiness.js";
 
 async function resolveBusinessIdForUser(user) {
   if (user.business_id) {
@@ -26,6 +27,15 @@ async function resolveBusinessIdForUser(user) {
      VALUES ($1, $2, $3, 'US', 'en')`,
     [businessId, user.id, businessName]
   );
+
+  const { rows: existingAccounts } = await pool.query(
+    "SELECT 1 FROM accounts WHERE business_id = $1 LIMIT 1",
+    [businessId]
+  );
+
+  if (existingAccounts.length === 0) {
+    await seedDefaultsForBusiness(pool, businessId);
+  }
 
   user.business_id = businessId;
   return businessId;
