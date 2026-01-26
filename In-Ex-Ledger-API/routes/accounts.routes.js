@@ -9,6 +9,12 @@ async function resolveBusinessIdForUser(user) {
     return user.business_id;
   }
 
+  console.log(
+    "Resolve business for user:",
+    user.id,
+    user.email
+  );
+
   const result = await pool.query(
     "SELECT id FROM businesses WHERE user_id = $1 LIMIT 1",
     [user.id]

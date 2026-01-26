@@ -59,6 +59,7 @@ export function requireAuth(req, res, next) {
   const token = authHeader.slice("Bearer ".length).trim();
   try {
     req.user = verifyToken(token);
+    console.log("AUTH user.id:", req.user.id, "email:", req.user.email);
   } catch (err) {
     return res.status(401).json({ error: "Authentication required" });
   }
