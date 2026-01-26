@@ -73,7 +73,7 @@ router.get("/", requireAuth, async (req, res) => {
 router.post("/", requireAuth, async (req, res) => {
   console.log("🔐 AUTH USER:", req.user);
   console.log("POST /accounts BODY:", req.body);
-  const { name, type, balance, currency } = req.body;
+  const { name, type } = req.body;
 
   if (!name || !type) {
     return res.status(400).json({ error: "Account name and type are required." });
@@ -87,17 +87,10 @@ router.post("/", requireAuth, async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     const result = await pool.query(
-      `INSERT INTO accounts (id, business_id, name, type, balance, currency)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO accounts (id, business_id, name, type)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [
-        crypto.randomUUID(),
-        businessId,
-        name,
-        type,
-        parseFloat(balance) || 0,
-        currency || "USD"
-      ]
+      [crypto.randomUUID(), businessId, name, type]
     );
 
     res.status(201).json(result.rows[0]);
