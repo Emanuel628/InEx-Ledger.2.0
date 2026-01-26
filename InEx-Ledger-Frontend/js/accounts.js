@@ -70,26 +70,40 @@ function wireAccountForm() {
         return;
       }
 
-      const response = await apiFetch(`${API_BASE}/api/accounts`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ name, type })
-      });
-
-      if (!response) {
-        if (message) message.textContent = "Failed to save account.";
-        return;
+      if (submitButton) {
+        submitButton.disabled = true;
+      }
+      if (message) {
+        message.textContent = "";
       }
 
-      if (!response.ok) {
-        if (message) message.textContent = "Failed to save account.";
-        return;
-      }
+      try {
+        const response = await apiFetch(`${API_BASE}/api/accounts`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ name, type })
+        });
 
-      resetAccountForm();
-      renderAccountList();
+        if (!response) {
+          if (message) message.textContent = "Failed to save account.";
+          return;
+        }
+
+        if (!response.ok) {
+          const errorText = await getApiErrorText(response, "Failed to save account.");
+          if (message) message.textContent = errorText;
+          return;
+        }
+
+        resetAccountForm();
+        await renderAccountList();
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+        }
+      }
     });
   }
 }
@@ -218,4 +232,22 @@ function showAccountsError(message) {
   if (container) {
     container.innerHTML = `<p class="error-message">${message}</p>`;
   }
+}
+
+async function getApiErrorText(response, fallback) {
+  fallback = fallback || "An error occurred.";
+  try {
+    const payload = await response.json();
+    if (payload?.error) {
+      return payload.error;
+    }
+  } catch (err) {
+    // ignore
+  }
+
+  if (response.status === 409) {
+    return "An account with this name already exists.";
+  }
+
+  return fallback;
 }
