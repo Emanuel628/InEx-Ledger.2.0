@@ -1,45 +1,6 @@
 import express from "express";
-import pool from "../db.js";
-import crypto from "node:crypto";
 import { requireAuth } from "../middleware/auth.middleware.js";
-import { seedDefaultsForBusiness } from "../api/utils/seedDefaultsForBusiness.js";
-
-async function resolveBusinessIdForUser(user) {
-  if (user.business_id) {
-    return user.business_id;
-  }
-
-  const result = await pool.query(
-    "SELECT id FROM businesses WHERE user_id = $1 LIMIT 1",
-    [user.id]
-  );
-
-  if (result.rowCount) {
-    user.business_id = result.rows[0].id;
-    return user.business_id;
-  }
-
-  const businessId = crypto.randomUUID();
-  const businessName = `${user.email.split("@")[0]}'s Business`;
-
-  await pool.query(
-    `INSERT INTO businesses (id, user_id, name, region, language)
-     VALUES ($1, $2, $3, 'US', 'en')`,
-    [businessId, user.id, businessName]
-  );
-
-  const { rows: existingAccounts } = await pool.query(
-    "SELECT 1 FROM accounts WHERE business_id = $1 LIMIT 1",
-    [businessId]
-  );
-
-  if (existingAccounts.length === 0) {
-    await seedDefaultsForBusiness(pool, businessId);
-  }
-
-  user.business_id = businessId;
-  return businessId;
-}
+import { resolveBusinessIdForUser } from "../api/utils/resolveBusinessIdForUser.js";
 
 const router = express.Router();
 

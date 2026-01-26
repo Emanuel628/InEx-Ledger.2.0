@@ -1,18 +1,10 @@
 import express from "express";
 import crypto from "node:crypto";
-import pool from "../db.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
+import { resolveBusinessIdForUser } from "../api/utils/resolveBusinessIdForUser.js";
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
-
-async function resolveBusinessId(userId) {
-  const result = await pool.query(
-    "SELECT id FROM businesses WHERE user_id = $1 LIMIT 1",
-    [userId]
-  );
-  return result.rows[0]?.id ?? null;
-}
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -103,10 +95,7 @@ function validateTransactionPayload(payload) {
 
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const businessId = await resolveBusinessId(req.user.id);
-    if (!businessId) {
-      return res.status(404).json({ error: "Business not found" });
-    }
+    const businessId = await resolveBusinessIdForUser(req.user);
 
     const result = await pool.query(
       `SELECT id,
@@ -139,10 +128,7 @@ router.post("/", requireAuth, async (req, res) => {
   }
 
   try {
-    const businessId = await resolveBusinessId(req.user.id);
-    if (!businessId) {
-      return res.status(404).json({ error: "Business not found" });
-    }
+    const businessId = await resolveBusinessIdForUser(req.user);
 
     const { account_id, category_id, amount, type, description, date, note } =
       req.body;
