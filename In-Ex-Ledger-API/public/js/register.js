@@ -2,9 +2,8 @@
    Register Page JS — FINAL (ONE AND DONE)
    ========================================================= */
 
-const API_BASE = "https://inex-ledger20-production.up.railway.app";
-console.log("🔥 API_BASE:", API_BASE);
 let form = null;
+let registerErrorElement = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   form = document.getElementById("registerForm");
@@ -13,18 +12,22 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
+  registerErrorElement = document.getElementById("registerError");
+  hideRegisterError();
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    hideRegisterError();
 
     const email = document.getElementById("email")?.value.trim() || "";
     const password = document.getElementById("password")?.value || "";
 
     if (!email || !password) {
-      alert("Enter an email and password.");
+      showRegisterError("Enter an email and password.");
       return;
     }
 
-    const res = await fetch(`${API_BASE}/api/auth/register`, {
+    const res = await fetch(buildApiUrl("/api/auth/register"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
@@ -33,12 +36,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const data = await res.json();
 
     if (!res.ok) {
-      alert(data.error || "Registration failed");
+      showRegisterError(data.error || "Registration failed");
       return;
     }
 
-    alert("Registration successful. You can now log in.");
-    window.location.href = "/html/login.html";
+    const loginRes = await fetch(buildApiUrl("/api/auth/login"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    const loginData = await loginRes.json();
+
+    if (!loginRes.ok || !loginData.token) {
+      showRegisterError(
+        "Account created, but we could not log you in automatically. Please sign in."
+      );
+      return;
+    }
+
+    setToken(loginData.token);
+    window.location.href = "transactions.html";
   });
   wireShowPasswordToggle(document);
   const passwordInput = form.querySelector("#password");
@@ -73,6 +91,19 @@ function wireShowPasswordToggle(container = document) {
 
   checkbox.addEventListener("change", updateFieldTypes);
   updateFieldTypes();
+}
+
+function showRegisterError(message) {
+  if (!registerErrorElement) {
+    return;
+  }
+
+  registerErrorElement.textContent = message;
+  registerErrorElement.style.display = message ? "block" : "none";
+}
+
+function hideRegisterError() {
+  showRegisterError("");
 }
 
 function calculatePasswordScore(password) {
