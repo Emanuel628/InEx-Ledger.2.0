@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import routes from "./routes/index.js";
+import transactionsRouter from "./routes/transactions.routes.js";
 
 const app = express();
 const publicDir = path.join(process.cwd(), "public");
@@ -35,6 +36,8 @@ app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
 
+app.use("/api/transactions", transactionsRouter);
+console.log("Mounted /api/transactions");
 app.use("/api", routes);
 
 ;(async () => {
