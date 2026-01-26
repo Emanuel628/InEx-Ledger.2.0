@@ -96,9 +96,8 @@ async function requireValidSessionOrRedirect({ redirectOnFailure = true } = {}) 
   }
 }
 
-async function redirectIfAuthenticated() {
-  const isValid = await requireValidSessionOrRedirect({ redirectOnFailure: false });
-  if (isValid) {
+function redirectIfAuthenticated() {
+  if (isAuthenticated()) {
     window.location.href = "transactions.html";
   }
 }

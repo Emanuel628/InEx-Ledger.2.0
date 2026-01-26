@@ -4,7 +4,7 @@
 
 const API_BASE = "https://inex-ledger20-production.up.railway.app";
 
-redirectIfAuthenticated().catch(() => {});
+redirectIfAuthenticated();
 
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("loginForm");
