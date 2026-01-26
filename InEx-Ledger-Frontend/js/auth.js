@@ -3,6 +3,23 @@ const TIER_KEY = "tier";
 const TRIAL_EXPIRED_KEY = "luna_trial_expired";
 const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const LOGIN_PAGE = "/html/login.html";
+const API_BASE = "https://inex-ledger20-production.up.railway.app";
+
+function buildApiUrl(pathOrUrl = "") {
+  if (!pathOrUrl) {
+    return API_BASE;
+  }
+
+  if (/^https?:\/\//i.test(pathOrUrl)) {
+    return pathOrUrl;
+  }
+
+  if (pathOrUrl.startsWith("/")) {
+    return `${API_BASE}${pathOrUrl}`;
+  }
+
+  return `${API_BASE}/${pathOrUrl}`;
+}
 
 function clearAppState() {
   ["lb_accounts", "lb_categories", "lb_transactions", "lb_transactions_upsell_hidden"].forEach(
@@ -42,7 +59,7 @@ async function requireValidSessionOrRedirect({ redirectOnFailure = true } = {}) 
 
   try {
     console.log("Calling /api/me with header:", authHeader());
-    const response = await fetch("/api/me", {
+    const response = await fetch(buildApiUrl("/api/me"), {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -80,8 +97,9 @@ async function redirectIfAuthenticated() {
 }
 
 async function apiFetch(url, options = {}) {
+  const apiUrl = buildApiUrl(url);
   const headers = { ...(options.headers || {}), ...authHeader() };
-  const response = await fetch(url, { ...options, headers });
+  const response = await fetch(apiUrl, { ...options, headers });
 
   if (response.status === 401) {
     clearToken();
