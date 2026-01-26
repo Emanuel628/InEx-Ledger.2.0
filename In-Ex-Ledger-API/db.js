@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false

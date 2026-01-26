@@ -1,4 +1,5 @@
 import express from "express";
+import { pool } from "../db.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { resolveBusinessIdForUser } from "../api/utils/resolveBusinessIdForUser.js";
 

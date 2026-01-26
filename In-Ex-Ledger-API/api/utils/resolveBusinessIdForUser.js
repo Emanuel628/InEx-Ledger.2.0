@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import pool from "../../db.js";
+import { pool } from "../../db.js";
 import { seedDefaultsForBusiness } from "./seedDefaultsForBusiness.js";
 
 function buildBusinessName(user) {
