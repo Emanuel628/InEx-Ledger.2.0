@@ -14,6 +14,63 @@ async function resolveBusinessId(userId) {
   return result.rows[0]?.id ?? null;
 }
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function deriveCategoryKindFromSlug(slug) {
+  const normalized = String(slug ?? "").trim().toLowerCase();
+  const parts = normalized.split("_");
+  const candidate = parts[1];
+  if (candidate === "income" || candidate === "expense") {
+    return candidate;
+  }
+  return null;
+}
+
+function deriveCategoryNameFromSlug(slug) {
+  const normalized = String(slug ?? "").trim();
+  const parts = normalized.split("_");
+  if (parts.length > 2) {
+    const name = parts.slice(2).join(" ").replace(/-/g, " ");
+    if (name.trim()) {
+      return name.trim();
+    }
+  }
+  return normalized;
+}
+
+async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
+  const raw = String(categoryRef ?? "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  if (UUID_REGEX.test(raw)) {
+    return raw;
+  }
+
+  const kind = deriveCategoryKindFromSlug(raw) || fallbackKind || "expense";
+  const name = deriveCategoryNameFromSlug(raw);
+
+  const existing = await pool.query(
+    "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
+    [businessId, name]
+  );
+
+  if (existing.rowCount) {
+    return existing.rows[0].id;
+  }
+
+  const inserted = await pool.query(
+    `INSERT INTO categories (id, business_id, name, kind, created_at)
+     VALUES (uuid_generate_v4(), $1, $2, $3, now())
+     RETURNING id`,
+    [businessId, name, kind]
+  );
+
+  return inserted.rows[0].id;
+}
+
 function validateTransactionPayload(payload) {
   const { account_id, category_id, amount, date, type } = payload ?? {};
 
@@ -89,6 +146,15 @@ router.post("/", requireAuth, async (req, res) => {
 
     const { account_id, category_id, amount, type, description, date, note } =
       req.body;
+    const mappedCategoryId = await resolveCategoryId(
+      businessId,
+      category_id,
+      type
+    );
+
+    if (!mappedCategoryId) {
+      return res.status(400).json({ error: "category_id is invalid" });
+    }
 
     const result = await pool.query(
       `INSERT INTO transactions
@@ -99,7 +165,7 @@ router.post("/", requireAuth, async (req, res) => {
         crypto.randomUUID(),
         businessId,
         account_id,
-        category_id,
+        mappedCategoryId,
         amount,
         type,
         description || null,
