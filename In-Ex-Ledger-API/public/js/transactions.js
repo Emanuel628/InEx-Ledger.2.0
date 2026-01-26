@@ -22,6 +22,7 @@ let transactionModalElement = null;
 let transactionModalNoteInput = null;
 let activeModalTransactionId = null;
 let editingTransactionId = null;
+let transactionsLoading = false;
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-US", {
@@ -128,12 +129,22 @@ function wireTransactionForm() {
     const categoryId = categorySelect.value;
     const type = typeSelect?.value === "income" ? "income" : "expense";
 
-    if (!date || !description || Number.isNaN(amount) || !accountId || !categoryId || !typeSelect?.value) {
-      if (message) {
-        message.textContent = "Complete every field before saving the transaction.";
-      }
+    const typeValue = typeSelect?.value;
+    const validationError = validateTransactionForm({
+      date,
+      description,
+      amount,
+      accountId,
+      categoryId,
+      typeValue
+    });
+
+    if (validationError) {
+      setTransactionFormMessage(validationError);
       return;
     }
+
+    setTransactionFormMessage("");
 
     const payload = {
       account_id: accountId,
@@ -145,31 +156,30 @@ function wireTransactionForm() {
       note: ""
     };
 
-    const token = localStorage.getItem("token");
+    const submitButton = document.querySelector(".tx-actions button");
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
 
     try {
-    const response = await apiFetch(`${API_BASE}/api/transactions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
+      const response = await apiFetch(buildApiUrl("/api/transactions"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
 
-    if (!response) {
-      if (message) {
-        message.textContent = "Failed to save transaction.";
+      if (!response) {
+        setTransactionFormMessage("Failed to save transaction.");
+        return;
       }
-      return;
-    }
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => null);
-      if (message) {
-        message.textContent = error?.error || "Failed to save transaction.";
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        setTransactionFormMessage(error?.error || "Failed to save transaction.");
+        return;
       }
-      return;
-    }
 
       await loadTransactions();
       markAccountAsUsed(accountId);
@@ -179,14 +189,13 @@ function wireTransactionForm() {
       renderTotals();
 
       form.reset();
-      if (message) {
-        message.textContent = "";
-      }
       closeTransactionDrawer();
     } catch (err) {
       console.error("Submit transaction failed:", err);
-      if (message) {
-        message.textContent = "Failed to save transaction.";
+      setTransactionFormMessage("Failed to save transaction.");
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
       }
     }
   });
@@ -253,6 +262,8 @@ function updateHelpText(accountHelp, categoryHelp) {
 }
 
 async function loadTransactions() {
+  setTransactionsLoading(true);
+
   try {
     const response = await apiFetch(`${API_BASE}/api/transactions`);
     if (!response) {
@@ -269,11 +280,12 @@ async function loadTransactions() {
     console.error("Failed to load transactions:", err);
     showTransactionsError("Error loading transactions.");
     ledgerState.transactions = [];
+  } finally {
+    setTransactionsLoading(false);
   }
 
   renderAccountOptions();
   renderCategoryOptions();
-  renderTransactionList();
   renderTotals();
 }
 
@@ -564,6 +576,11 @@ function renderTransactionList(filteredTransactions) {
 
   if (!tbody) return;
 
+  if (transactionsLoading && filteredTransactions === undefined) {
+    tbody.innerHTML = `<tr><td colspan="6" class="placeholder">Loading transactions...</td></tr>`;
+    return;
+  }
+
   if (transactions.length === 0) {
     const emptyText =
       isFilteredView && ledgerState.transactions.length > 0
@@ -571,7 +588,7 @@ function renderTransactionList(filteredTransactions) {
         : typeof t === "function"
         ? t("transactions_empty")
         : "No transactions yet.";
-    tbody.innerHTML = `<tr><td colspan="5" class="placeholder">${emptyText}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="placeholder">${emptyText}</td></tr>`;
     return;
   }
 
@@ -662,6 +679,46 @@ function showTransactionsError(message) {
   if (list) {
     list.innerHTML = `<p class="error-message">${message}</p>`;
   }
+}
+
+function setTransactionsLoading(isLoading) {
+  transactionsLoading = isLoading;
+  renderTransactionList();
+}
+
+function setTransactionFormMessage(text) {
+  const message = document.getElementById("transactionFormMessage");
+  if (message) {
+    message.textContent = text || "";
+  }
+}
+
+function validateTransactionForm({ date, description, amount, accountId, categoryId, typeValue }) {
+  if (!date) {
+    return "Choose a date for the transaction.";
+  }
+
+  if (!description) {
+    return "Describe the transaction.";
+  }
+
+  if (Number.isNaN(amount) || amount <= 0) {
+    return "Amount must be greater than zero.";
+  }
+
+  if (!accountId) {
+    return "Select an account.";
+  }
+
+  if (!categoryId) {
+    return "Select a category.";
+  }
+
+  if (!typeValue) {
+    return "Choose a transaction type.";
+  }
+
+  return null;
 }
 
 function calculateTotals() {

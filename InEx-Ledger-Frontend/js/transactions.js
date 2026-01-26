@@ -21,6 +21,7 @@ let transactionModalElement = null;
 let transactionModalNoteInput = null;
 let activeModalTransactionId = null;
 let editingTransactionId = null;
+let transactionsLoading = false;
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-US", {
@@ -117,59 +118,76 @@ function wireTransactionForm() {
     const categoryId = categorySelect.value;
     const type = typeSelect?.value === "income" ? "income" : "expense";
 
-    if (!date || !description || Number.isNaN(amount) || !accountId || !categoryId || !typeSelect?.value) {
-      if (message) {
-        message.textContent = "Complete every field before saving the transaction.";
-      }
-      return;
-    }
-
-    const categoriesById = mapById(getCategories());
-    const taxLabel = categoriesById[categoryId]?.taxLabel || "";
-
-    const transactionPayload = {
+    const validationError = validateTransactionForm({
       date,
       description,
       amount,
       accountId,
       categoryId,
-      type,
-      taxLabel
-    };
+      type
+    });
 
-    const transactions = getTransactions();
-    if (editingTransactionId) {
-      const idx = transactions.findIndex((txn) => txn.id === editingTransactionId);
-      if (idx >= 0) {
-        const existing = transactions[idx];
-        transactions[idx] = {
-          ...existing,
-          ...transactionPayload
-        };
+    if (validationError) {
+      setTransactionFormMessage(validationError);
+      return;
+    }
+
+    setTransactionFormMessage("");
+
+    const submitButton = document.querySelector(".tx-actions button");
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+
+    try {
+      const categoriesById = mapById(getCategories());
+      const taxLabel = categoriesById[categoryId]?.taxLabel || "";
+
+      const transactionPayload = {
+        date,
+        description,
+        amount,
+        accountId,
+        categoryId,
+        type,
+        taxLabel
+      };
+
+      const transactions = getTransactions();
+      if (editingTransactionId) {
+        const idx = transactions.findIndex((txn) => txn.id === editingTransactionId);
+        if (idx >= 0) {
+          const existing = transactions[idx];
+          transactions[idx] = {
+            ...existing,
+            ...transactionPayload
+          };
+        }
+      } else {
+        transactions.push({
+          ...transactionPayload,
+          id: `txn_${Date.now()}`,
+          receiptId: "",
+          note: ""
+        });
       }
-    } else {
-      transactions.push({
-        ...transactionPayload,
-        id: `txn_${Date.now()}`,
-        receiptId: "",
-        note: ""
-      });
+      saveTransactions(transactions);
+
+      markAccountAsUsed(accountId);
+      ledgerState.transactions = transactions;
+
+      populateAccountsFromStorage();
+      populateCategoriesFromStorage();
+      applyFilters();
+      renderTotals();
+
+      form.reset();
+      closeTransactionDrawer();
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+      }
     }
-    saveTransactions(transactions);
-
-    markAccountAsUsed(accountId);
-    ledgerState.transactions = transactions;
-
-    populateAccountsFromStorage();
-    populateCategoriesFromStorage();
-    applyFilters();
-    renderTotals();
-
-    form.reset();
-    if (message) {
-      message.textContent = "";
-    }
-    closeTransactionDrawer();
   });
 }
 
@@ -234,12 +252,14 @@ function updateHelpText(accountHelp, categoryHelp) {
 }
 
 function loadTransactions() {
+  setTransactionsLoading(true);
   ledgerState.transactions = getTransactions();
 
   renderAccountOptions();
   renderCategoryOptions();
-  renderTransactionList();
   renderTotals();
+
+  setTransactionsLoading(false);
 }
 
 function renderAccountOptions() {
@@ -535,6 +555,11 @@ function renderTransactionList(filteredTransactions) {
 
   if (!tbody) return;
 
+  if (transactionsLoading && filteredTransactions === undefined) {
+    tbody.innerHTML = `<tr><td colspan="6" class="placeholder">Loading transactions...</td></tr>`;
+    return;
+  }
+
   if (transactions.length === 0) {
     const emptyText =
       isFilteredView && ledgerState.transactions.length > 0
@@ -542,7 +567,7 @@ function renderTransactionList(filteredTransactions) {
         : typeof t === "function"
         ? t("transactions_empty")
         : "No transactions yet.";
-    tbody.innerHTML = `<tr><td colspan="5" class="placeholder">${emptyText}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="placeholder">${emptyText}</td></tr>`;
     return;
   }
 
@@ -692,6 +717,40 @@ function readStorageArray(key) {
 
 function saveTransactions(transactions) {
   localStorage.setItem(STORAGE_KEYS.transactions, JSON.stringify(transactions));
+}
+
+function setTransactionsLoading(isLoading) {
+  transactionsLoading = isLoading;
+  renderTransactionList();
+}
+
+function setTransactionFormMessage(text) {
+  const message = document.getElementById("transactionFormMessage");
+  if (message) {
+    message.textContent = text || "";
+  }
+}
+
+function validateTransactionForm({ date, description, amount, accountId, categoryId, type }) {
+  if (!date) {
+    return "Choose a date for the transaction.";
+  }
+  if (!description) {
+    return "Describe the transaction.";
+  }
+  if (Number.isNaN(amount) || amount <= 0) {
+    return "Amount must be greater than zero.";
+  }
+  if (!accountId) {
+    return "Select an account.";
+  }
+  if (!categoryId) {
+    return "Select a category.";
+  }
+  if (!type) {
+    return "Choose a transaction type.";
+  }
+  return null;
 }
 
 function seedDefaultCategories() {
