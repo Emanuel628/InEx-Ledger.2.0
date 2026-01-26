@@ -7,8 +7,8 @@ const ACCOUNT_FORM_UPDATE_LABEL = "Update account";
 /** ================================
  * Initialization
  * ================================ */
-document.addEventListener("DOMContentLoaded", () => {
-  if (typeof requireAuth === "function") requireAuth();
+document.addEventListener("DOMContentLoaded", async () => {
+  await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
@@ -70,18 +70,20 @@ function wireAccountForm() {
         return;
       }
 
-      const token = localStorage.getItem("token");
-
-      const res = await fetch(`${API_BASE}/api/accounts`, {
+      const response = await apiFetch(`${API_BASE}/api/accounts`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({ name, type })
       });
 
-      if (!res.ok) {
+      if (!response) {
+        if (message) message.textContent = "Failed to save account.";
+        return;
+      }
+
+      if (!response.ok) {
         if (message) message.textContent = "Failed to save account.";
         return;
       }
@@ -142,20 +144,21 @@ async function renderAccountList() {
   const container = document.getElementById("accountsList");
   if (!container) return;
 
-  const token = localStorage.getItem("token");
-
-  const res = await fetch(`${API_BASE}/api/accounts`, {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
-
-  if (!res.ok) {
+  const response = await apiFetch(`${API_BASE}/api/accounts`);
+  if (!response) {
     container.innerHTML = "<p>Failed to load accounts.</p>";
+    localStorage.removeItem("lb_accounts");
     return;
   }
 
-  const accounts = await res.json();
+  if (!response.ok) {
+    console.error("Failed to load accounts:", response.status);
+    container.innerHTML = "<p>Failed to load accounts.</p>";
+    localStorage.removeItem("lb_accounts");
+    return;
+  }
+
+  const accounts = await response.json();
   container.innerHTML = "";
 
   if (!accounts.length) {
@@ -192,16 +195,16 @@ async function renderAccountList() {
  * Delete Account (POSTGRES)
  * ================================ */
 async function deleteAccount(accountId) {
-  const token = localStorage.getItem("token");
-
-  const res = await fetch(`${API_BASE}/api/accounts/${accountId}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
+  const response = await apiFetch(`${API_BASE}/api/accounts/${accountId}`, {
+    method: "DELETE"
   });
 
-  if (!res.ok) {
+  if (!response) {
+    alert("Failed to delete account.");
+    return;
+  }
+
+  if (!response.ok) {
     alert("Failed to delete account.");
     return;
   }

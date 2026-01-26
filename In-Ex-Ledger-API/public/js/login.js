@@ -4,7 +4,7 @@
 
 const API_BASE = "https://inex-ledger20-production.up.railway.app";
 
-redirectIfAuthenticated();
+redirectIfAuthenticated().catch(() => {});
 
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("loginForm");
@@ -42,7 +42,11 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    localStorage.setItem("token", data.token);
+    if (!data.token) {
+      alert("Login failed: missing token");
+      return;
+    }
+    setToken(data.token);
     window.location.href = "transactions.html";
   });
 

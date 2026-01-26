@@ -36,26 +36,28 @@ const SECURITY_REQUIREMENT_RULES = {
 let securityState = {};
 console.log("Settings JS loaded");
 document.addEventListener("DOMContentLoaded", async () => {
-  if (typeof requireAuth === "function") requireAuth();
+  await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
   
   const signOutBtn = document.querySelector("[data-logout]");
 console.log("Sign out button found:", signOutBtn);
 
-if (signOutBtn) {
-  signOutBtn.addEventListener("click", () => {
-    console.log("Sign out clicked");
+  if (signOutBtn) {
+    signOutBtn.addEventListener("click", () => {
+      console.log("Sign out clicked");
 
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("lb_token");
-    localStorage.removeItem("lb_user");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("lb_token");
+      localStorage.removeItem("lb_user");
 
-    sessionStorage.clear();
+      sessionStorage.clear();
 
-    window.location.href = "login.html";
-  });
-}
+      clearToken();
+
+      window.location.href = "login.html";
+    });
+  }
   
   const regionSelect = document.getElementById("regionSelectSettings");
   const languageSelect = document.getElementById("languageSelectSettings");

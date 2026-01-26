@@ -112,9 +112,10 @@ router.post("/", requireAuth, async (req, res) => {
  */
 router.delete("/:id", requireAuth, async (req, res) => {
   try {
+    const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
       "DELETE FROM accounts WHERE id = $1 AND business_id = $2",
-      [req.params.id, req.user.business_id]
+      [req.params.id, businessId]
     );
 
     if (result.rowCount === 0) {

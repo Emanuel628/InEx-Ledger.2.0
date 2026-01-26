@@ -29,9 +29,11 @@ function formatCurrency(value) {
   }).format(value);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  if (typeof requireAuth === "function") {
-    requireAuth();
+document.addEventListener("DOMContentLoaded", async () => {
+  await requireValidSessionOrRedirect();
+
+  if (typeof enforceTrial === "function") {
+    enforceTrial();
   }
 
   if (typeof enforceTrial === "function") {

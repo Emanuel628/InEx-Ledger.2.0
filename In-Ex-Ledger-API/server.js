@@ -33,7 +33,10 @@ app.get("/", (req, res) => {
 app.use(express.json());
 
 app.get("/health", (req, res) => {
-  res.status(200).send("OK");
+  res.status(200).json({
+    ok: true,
+    commit: process.env.RAILWAY_GIT_COMMIT_SHA || "unknown"
+  });
 });
 
 app.use("/api/transactions", transactionsRouter);

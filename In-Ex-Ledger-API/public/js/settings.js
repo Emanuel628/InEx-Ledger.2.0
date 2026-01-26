@@ -38,7 +38,7 @@ const API_BASE = "https://inex-ledger20-production.up.railway.app/api";
 const DELETE_CONFIRM_TEXT = "delete my account";
 console.log("Settings JS loaded");
 document.addEventListener("DOMContentLoaded", async () => {
-  if (typeof requireAuth === "function") requireAuth();
+  await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
   
@@ -52,6 +52,7 @@ if (signOutBtn) {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("lb_token");
     localStorage.removeItem("lb_user");
+    clearToken();
 
     sessionStorage.clear();
 
@@ -372,31 +373,33 @@ function wireAccountDeletion() {
       return;
     }
 
-    confirmBtn.disabled = true;
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE}/me`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`
+      confirmBtn.disabled = true;
+      try {
+        const response = await apiFetch(`${API_BASE}/me`, {
+          method: "DELETE"
+        });
+
+        if (!response) {
+          status.textContent = "Unable to delete account.";
+          confirmBtn.disabled = false;
+          return;
         }
-      });
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        status.textContent = error?.error || "Unable to delete account.";
+        if (!response.ok) {
+          const error = await response.json().catch(() => null);
+          status.textContent = error?.error || "Unable to delete account.";
+          confirmBtn.disabled = false;
+          return;
+        }
+
+        clearToken();
+        sessionStorage.clear();
+        window.location.href = "/html/login.html";
+      } catch (err) {
+        console.error("Account deletion failed:", err);
+        status.textContent = "Unable to delete account.";
         confirmBtn.disabled = false;
-        return;
       }
-
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.href = "/html/login.html";
-    } catch (err) {
-      console.error("Account deletion failed:", err);
-      status.textContent = "Unable to delete account.";
-      confirmBtn.disabled = false;
-    }
   });
 }
 

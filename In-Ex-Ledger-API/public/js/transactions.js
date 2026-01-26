@@ -30,9 +30,11 @@ function formatCurrency(value) {
   }).format(value);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  if (typeof requireAuth === "function") {
-    requireAuth();
+document.addEventListener("DOMContentLoaded", async () => {
+  await requireValidSessionOrRedirect();
+
+  if (typeof enforceTrial === "function") {
+    enforceTrial();
   }
 
   if (typeof enforceTrial === "function") {
@@ -146,22 +148,28 @@ function wireTransactionForm() {
     const token = localStorage.getItem("token");
 
     try {
-      const response = await fetch(`${API_BASE}/api/transactions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
+    const response = await apiFetch(`${API_BASE}/api/transactions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        if (message) {
-          message.textContent = error?.error || "Failed to save transaction.";
-        }
-        return;
+    if (!response) {
+      if (message) {
+        message.textContent = "Failed to save transaction.";
       }
+      return;
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      if (message) {
+        message.textContent = error?.error || "Failed to save transaction.";
+      }
+      return;
+    }
 
       await loadTransactions();
       markAccountAsUsed(accountId);
@@ -246,16 +254,14 @@ function updateHelpText(accountHelp, categoryHelp) {
 
 async function loadTransactions() {
   try {
-    const token = localStorage.getItem("token");
-    const response = await fetch(`${API_BASE}/api/transactions`, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-    if (response.ok) {
-      ledgerState.transactions = await response.json();
-    } else {
+    const response = await apiFetch(`${API_BASE}/api/transactions`);
+    if (!response) {
       ledgerState.transactions = [];
+    } else if (!response.ok) {
+      console.error("Failed to load transactions:", response.status);
+      ledgerState.transactions = [];
+    } else {
+      ledgerState.transactions = await response.json();
     }
   } catch (err) {
     console.error("Failed to load transactions:", err);
