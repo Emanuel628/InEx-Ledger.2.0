@@ -48,6 +48,11 @@ router.post("/", requireAuth, async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error("✗ POST account error:", err.message);
+    if (err.code === "23505") {
+      return res.status(409).json({
+        error: "An account with this name already exists."
+      });
+    }
     res.status(500).json({ error: "Failed to save account to DB." });
   }
 });
