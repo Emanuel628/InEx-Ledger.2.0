@@ -3,6 +3,7 @@ import cors from "cors";
 import path from "path";
 import routes from "./routes/index.js";
 import transactionsRouter from "./routes/transactions.routes.js";
+import { requireAuth } from "./middleware/auth.middleware.js";
 
 const app = express();
 const publicDir = path.join(process.cwd(), "public");
@@ -42,6 +43,10 @@ app.get("/health", (req, res) => {
 app.use("/api/transactions", transactionsRouter);
 console.log("Mounted /api/transactions");
 app.use("/api", routes);
+
+app.get("/api/me", requireAuth, (req, res) => {
+  res.json(req.user);
+});
 
 ;(async () => {
   try {
