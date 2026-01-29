@@ -58,12 +58,16 @@ async function handleLoginSubmit(event) {
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
-      showLoginError(data?.error || "Invalid credentials.");
+      if (response.status === 401) {
+        showLoginError("Invalid email or password.");
+      } else {
+        showLoginError(data?.error || "Login failed. Please try again.");
+      }
       return;
     }
 
     if (!data?.token) {
-      showLoginError("Login failed: missing token.");
+      showLoginError("Login failed. Please try again.");
       return;
     }
 
@@ -71,7 +75,7 @@ async function handleLoginSubmit(event) {
     window.location.href = "transactions.html";
   } catch (err) {
     console.error("Login request failed:", err);
-    showLoginError("Login failed. Please try again.");
+    showLoginError("Network error. Please try again.");
   } finally {
     submitButton?.removeAttribute("disabled");
     isSubmittingLogin = false;

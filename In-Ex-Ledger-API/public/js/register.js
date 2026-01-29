@@ -42,41 +42,56 @@ document.addEventListener("DOMContentLoaded", () => {
     submitButton?.setAttribute("disabled", "true");
 
     try {
-      const res = await fetch(buildApiUrl("/api/auth/register"), {
+      const regResponse = await fetch(buildApiUrl("/api/auth/register"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
       });
 
-      const data = await res.json().catch(() => null);
+      const regBody = await regResponse.json().catch(() => null);
 
-      if (!res.ok) {
-        showRegisterError(data?.error || "Registration failed.");
+      if (!regResponse.ok) {
+        if (regResponse.status === 409) {
+          showRegisterError("An account with this email already exists.");
+        } else {
+          showRegisterError(
+            regBody?.error || "Please check your information and try again."
+          );
+        }
         return;
       }
 
-      const loginRes = await fetch(buildApiUrl("/api/auth/login"), {
+      const loginResponse = await fetch(buildApiUrl("/api/auth/login"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
       });
 
-      const loginData = await loginRes.json().catch(() => null);
-
-      if (!loginRes.ok || !loginData?.token) {
+      if (!loginResponse.ok) {
         showRegisterError(
-          "Account created, but we could not log you in automatically. Please sign in."
+          "Account created, but automatic login failed. Please sign in."
         );
+        window.location.href = "login.html";
         return;
       }
 
-      setToken(loginData.token);
+      const loginBody = await loginResponse.json().catch(() => null);
+
+      if (!loginBody?.token) {
+        showRegisterError(
+          "Account created, but no session was returned. Please sign in."
+        );
+        window.location.href = "login.html";
+        return;
+      }
+
+      setToken(loginBody.token);
       window.location.href = "transactions.html";
     } catch (err) {
       console.error("Register request failed:", err);
-      showRegisterError("Registration failed. Please try again.");
+      showRegisterError("Network error. Please try again.");
     } finally {
       finish();
     }
