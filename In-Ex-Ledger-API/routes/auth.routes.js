@@ -13,7 +13,7 @@ const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECON
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
+  sameSite: "none",
   path: "/"
 };
 
@@ -22,6 +22,9 @@ const COOKIE_OPTIONS = {
  */
 const verificationTokens = new Map();
 const VERIFICATION_TOKEN_TTL = 15 * 60 * 1000; // 15 minutes
+
+const passwordResetTokens = new Map();
+const PASSWORD_RESET_TTL = 20 * 60 * 1000; // 20 minutes
 
 function normalizeEmail(email) {
   return String(email ?? "").trim().toLowerCase();
@@ -64,10 +67,53 @@ function consumeVerificationToken(token) {
   return entry.email;
 }
 
+function cleanupPasswordResetTokens() {
+  const now = Date.now();
+  for (const [token, meta] of passwordResetTokens.entries()) {
+    if (meta.expiresAt <= now) {
+      passwordResetTokens.delete(token);
+    }
+  }
+}
+
+function removePasswordResetTokensForEmail(email) {
+  for (const [token, meta] of passwordResetTokens.entries()) {
+    if (meta.email === email) {
+      passwordResetTokens.delete(token);
+    }
+  }
+}
+
+function createPasswordResetToken(email) {
+  cleanupPasswordResetTokens();
+  removePasswordResetTokensForEmail(email);
+  const token = crypto.randomUUID();
+  const expiresAt = Date.now() + PASSWORD_RESET_TTL;
+  passwordResetTokens.set(token, { email, expiresAt });
+  return { token, expiresAt };
+}
+
+function consumePasswordResetToken(token) {
+  cleanupPasswordResetTokens();
+  const entry = passwordResetTokens.get(token);
+  if (!entry || entry.expiresAt <= Date.now()) {
+    passwordResetTokens.delete(token);
+    return null;
+  }
+  passwordResetTokens.delete(token);
+  return entry.email;
+}
+
 function buildVerificationLink(req, token) {
   const protocol = req.protocol;
   const host = req.get("host");
   return `${protocol}://${host}/api/auth/verify-email?token=${token}`;
+}
+
+function buildPasswordResetLink(req, token) {
+  const protocol = req.protocol;
+  const host = req.get("host");
+  return `${protocol}://${host}/reset-password.html?token=${token}`;
 }
 
 function hashPassword(password) {
@@ -345,7 +391,69 @@ router.get("/verify-email", async (req, res) => {
   }
 });
 
-router.post("/forgot-password", (req, res) => res.status(501).json({ message: "Not implemented" }));
-router.post("/reset-password", (req, res) => res.status(501).json({ message: "Not implemented" }));
+router.post("/forgot-password", async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+
+  try {
+    const userResult = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+    if (userResult.rowCount === 0) {
+      return res.status(200).json({
+        message: "If the email is registered, a password reset link will be sent."
+      });
+    }
+
+    const { token, expiresAt } = createPasswordResetToken(email);
+    const resetLink = buildPasswordResetLink(req, token);
+
+    return res.status(200).json({
+      message: "Password reset link created.",
+      resetLink,
+      expiresAt: new Date(expiresAt).toISOString()
+    });
+  } catch (err) {
+    console.error("Forgot password error:", err);
+    res.status(500).json({ error: "Failed to generate reset link." });
+  }
+});
+
+router.post("/reset-password", async (req, res) => {
+  const token = req.body?.token;
+  const password = req.body?.password;
+  const confirmPassword = req.body?.confirmPassword;
+
+  if (!token || !password || !confirmPassword) {
+    return res.status(400).json({ error: "Token and passwords are required." });
+  }
+
+  if (password !== confirmPassword) {
+    return res.status(400).json({ error: "Passwords do not match." });
+  }
+
+  const email = consumePasswordResetToken(token);
+  if (!email) {
+    return res.status(400).json({ error: "Reset token is invalid or expired." });
+  }
+
+  const hashedPassword = hashPassword(password);
+
+  try {
+    const result = await pool.query(
+      "UPDATE users SET password_hash = $1 WHERE email = $2 RETURNING id",
+      [hashedPassword, email]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    return res.status(200).json({ message: "Password updated successfully." });
+  } catch (err) {
+    console.error("Reset password error:", err);
+    res.status(500).json({ error: "Could not update password." });
+  }
+});
 
 export default router;
