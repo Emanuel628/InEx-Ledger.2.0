@@ -19,7 +19,7 @@
     <section>
       <h2>Sign in</h2>
 
-      <form method="post">
+      <form id="loginForm" method="post">
         <div>
           <label for="email" data-i18n="login_email_label">Email address</label><br />
           <input
@@ -55,6 +55,8 @@
           <button type="submit" data-i18n="login_submit">Sign in</button>
         </div>
       </form>
+
+      <p id="loginError" class="auth-error" role="alert" aria-live="polite" hidden></p>
 
       <p class="forgot-password">
         <a href="forgot-password.html" data-i18n="login_forgot_password">

@@ -2,63 +2,93 @@
    Login Page JS
    ========================================================= */
 
-const API_BASE = "https://inex-ledger20-production.up.railway.app";
+let loginForm = null;
+let loginErrorElement = null;
+let isSubmittingLogin = false;
 
 redirectIfAuthenticated();
 
 document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("loginForm");
-  if (!form) {
+  loginForm = document.getElementById("loginForm");
+  loginErrorElement = document.getElementById("loginError");
+
+  if (!loginForm) {
     console.warn("Login form not found.");
     return;
   }
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const email = document.getElementById("email")?.value.trim() || "";
-    const password = document.getElementById("password")?.value || "";
-
-    if (!email || !password) {
-      alert("Please enter your email and password.");
-      return;
-    }
-
-    if (!isValidEmail(email)) {
-      alert("Please enter a valid email address.");
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.error || "Login failed");
-        return;
-      }
-
-      if (!data.token) {
-        alert("Login failed: missing token");
-        return;
-      }
-
-      setToken(data.token);
-      window.location.href = "transactions.html";
-    } catch (err) {
-      console.error("Login request failed:", err);
-      alert("Login failed. Please try again.");
-    }
-  });
-
+  loginForm.addEventListener("submit", handleLoginSubmit);
   wireShowPasswordToggle(document);
 });
+
+async function handleLoginSubmit(event) {
+  event.preventDefault();
+  if (!loginForm || isSubmittingLogin) {
+    return;
+  }
+
+  const submitButton = loginForm.querySelector("button[type=\"submit\"]");
+
+  const email = document.getElementById("email")?.value.trim() || "";
+  const password = document.getElementById("password")?.value || "";
+
+  clearLoginError();
+
+  if (!email || !password) {
+    showLoginError("Enter your email and password.");
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    showLoginError("Please enter a valid email address.");
+    return;
+  }
+
+  isSubmittingLogin = true;
+  submitButton?.setAttribute("disabled", "true");
+
+  try {
+    const response = await fetch(buildApiUrl("/api/auth/login"), {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      showLoginError(data?.error || "Invalid credentials.");
+      return;
+    }
+
+    if (!data?.token) {
+      showLoginError("Login failed: missing token.");
+      return;
+    }
+
+    setToken(data.token);
+    window.location.href = "transactions.html";
+  } catch (err) {
+    console.error("Login request failed:", err);
+    showLoginError("Login failed. Please try again.");
+  } finally {
+    submitButton?.removeAttribute("disabled");
+    isSubmittingLogin = false;
+  }
+}
+
+function showLoginError(message) {
+  if (!loginErrorElement) {
+    return;
+  }
+  loginErrorElement.textContent = message || "";
+  loginErrorElement.hidden = !message;
+}
+
+function clearLoginError() {
+  showLoginError("");
+}
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

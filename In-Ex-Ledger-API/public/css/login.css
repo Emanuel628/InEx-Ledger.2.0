@@ -31,3 +31,14 @@ footer {
 .show-password-toggle input {
   margin-right: 6px;
 }
+
+.auth-error {
+  margin-top: 16px;
+  font-size: 13px;
+  color: #ef4444;
+  line-height: 1.4;
+}
+
+.auth-error[hidden] {
+  display: none;
+}

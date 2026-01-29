@@ -3,10 +3,9 @@ const TIER_KEY = "tier";
 const TRIAL_EXPIRED_KEY = "luna_trial_expired";
 const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const LOGIN_PAGE = "/html/login.html";
-const DEFAULT_API_BASE = "https://inex-ledger20-production.up.railway.app";
 
 if (!window.API_BASE) {
-  window.API_BASE = DEFAULT_API_BASE;
+  window.API_BASE = "https://inex-ledger20-production.up.railway.app";
 }
 
 if (!window.__AUTH_GUARD_STATE__) {

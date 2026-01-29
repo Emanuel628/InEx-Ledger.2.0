@@ -4,6 +4,7 @@
 
 let form = null;
 let registerErrorElement = null;
+let isSubmittingRegister = false;
 
 document.addEventListener("DOMContentLoaded", () => {
   form = document.getElementById("registerForm");
@@ -17,6 +18,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (isSubmittingRegister) {
+      return;
+    }
+
+    const submitButton = form.querySelector("button[type=\"submit\"]");
+    const finish = () => {
+      submitButton?.removeAttribute("disabled");
+      isSubmittingRegister = false;
+    };
+
     hideRegisterError();
 
     const email = document.getElementById("email")?.value.trim() || "";
@@ -27,38 +38,48 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const res = await fetch(buildApiUrl("/api/auth/register"), {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
+    isSubmittingRegister = true;
+    submitButton?.setAttribute("disabled", "true");
 
-    const data = await res.json();
+    try {
+      const res = await fetch(buildApiUrl("/api/auth/register"), {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
 
-    if (!res.ok) {
-      showRegisterError(data.error || "Registration failed");
-      return;
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        showRegisterError(data?.error || "Registration failed.");
+        return;
+      }
+
+      const loginRes = await fetch(buildApiUrl("/api/auth/login"), {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+
+      const loginData = await loginRes.json().catch(() => null);
+
+      if (!loginRes.ok || !loginData?.token) {
+        showRegisterError(
+          "Account created, but we could not log you in automatically. Please sign in."
+        );
+        return;
+      }
+
+      setToken(loginData.token);
+      window.location.href = "transactions.html";
+    } catch (err) {
+      console.error("Register request failed:", err);
+      showRegisterError("Registration failed. Please try again.");
+    } finally {
+      finish();
     }
-
-    const loginRes = await fetch(buildApiUrl("/api/auth/login"), {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
-
-    const loginData = await loginRes.json();
-
-    if (!loginRes.ok || !loginData.token) {
-      showRegisterError(
-        "Account created, but we could not log you in automatically. Please sign in."
-      );
-      return;
-    }
-
-    setToken(loginData.token);
-    window.location.href = "transactions.html";
   });
   wireShowPasswordToggle(document);
   const passwordInput = form.querySelector("#password");
