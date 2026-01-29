@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import routes from "./routes/index.js";
+import cookieParser from "cookie-parser";
 import transactionsRouter from "./routes/transactions.routes.js";
 import { requireAuth } from "./middleware/auth.middleware.js";
 
@@ -32,6 +33,7 @@ app.get("/", (req, res) => {
 });
 
 app.use(express.json());
+app.use(cookieParser());
 
 app.get("/health", (req, res) => {
   res.status(200).json({

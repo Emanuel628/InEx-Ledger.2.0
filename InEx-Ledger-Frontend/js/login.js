@@ -29,33 +29,52 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      alert(data.error || "Login failed");
-      return;
+      if (!res.ok) {
+        alert(data.error || "Login failed");
+        return;
+      }
+
+      if (!data.token) {
+        alert("Login failed: missing token");
+        return;
+      }
+
+      setToken(data.token);
+      window.location.href = "transactions.html";
+    } catch (err) {
+      console.error("Login request failed:", err);
+      alert("Login failed. Please try again.");
     }
-
-    console.log("LOGIN SUCCESS RESPONSE:", data);
-    console.log("TOKEN BEFORE setToken:", data.token);
-
-    if (!data.token) {
-      alert("Login failed: missing token");
-      return;
-    }
-    setToken(data.token);
-    console.log("TOKEN AFTER setToken:", localStorage.getItem("token"));
-
-    window.location.href = "transactions.html";
   });
+
+  wireShowPasswordToggle(document);
 });
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function wireShowPasswordToggle(container = document) {
+  const toggle = container.querySelector(".show-password-toggle input[type=\"checkbox\"]");
+  if (!toggle) {
+    return;
+  }
+
+  toggle.addEventListener("change", () => {
+    const passwordField = container.querySelector('input[type="password"]');
+    if (!passwordField) {
+      return;
+    }
+    passwordField.type = toggle.checked ? "text" : "password";
+  });
 }

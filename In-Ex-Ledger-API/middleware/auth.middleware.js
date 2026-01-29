@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET;
+const DEFAULT_JWT_EXPIRY_SECONDS = Number(process.env.JWT_EXPIRY_SECONDS) || 15 * 60;
 
 if (!JWT_SECRET) {
   throw new Error(
@@ -22,9 +23,17 @@ function signWithSecret(message) {
   return crypto.createHmac("sha256", JWT_SECRET).update(message).digest("base64url");
 }
 
-export function signToken(payload) {
+export function signToken(payload, expiresInSeconds = DEFAULT_JWT_EXPIRY_SECONDS) {
   const header = encodeSegment({ alg: "HS256", typ: "JWT" });
-  const body = encodeSegment(payload);
+  const now = Math.floor(Date.now() / 1000);
+  const bodyPayload = {
+    ...payload,
+    iat: now,
+    ...(typeof expiresInSeconds === "number" && expiresInSeconds > 0
+      ? { exp: now + expiresInSeconds }
+      : {})
+  };
+  const body = encodeSegment(bodyPayload);
   const signature = signWithSecret(`${header}.${body}`);
   return `${header}.${body}.${signature}`;
 }
@@ -47,6 +56,11 @@ export function verifyToken(token) {
   }
 
   const decoded = JSON.parse(decodeSegment(body));
+  const now = Math.floor(Date.now() / 1000);
+  if (typeof decoded.exp === "number" && decoded.exp <= now) {
+    throw new Error("Token expired");
+  }
+
   return decoded;
 }
 
@@ -59,7 +73,6 @@ export function requireAuth(req, res, next) {
   const token = authHeader.slice("Bearer ".length).trim();
   try {
     req.user = verifyToken(token);
-    console.log("AUTH user.id:", req.user.id, "email:", req.user.email);
   } catch (err) {
     return res.status(401).json({ error: "Authentication required" });
   }

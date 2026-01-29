@@ -1,22 +1,9 @@
 /* =========================================================
-   Register Page JS — FINAL (ONE AND DONE)
+   Register Page JS � FINAL (ONE AND DONE)
    ========================================================= */
 
 let form = null;
 let registerErrorElement = null;
-
-function showRegisterError(message) {
-  if (!registerErrorElement) {
-    return;
-  }
-
-  registerErrorElement.textContent = message;
-  registerErrorElement.style.display = message ? "block" : "none";
-}
-
-function hideRegisterError() {
-  showRegisterError("");
-}
 
 document.addEventListener("DOMContentLoaded", () => {
   form = document.getElementById("registerForm");
@@ -42,6 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const res = await fetch(buildApiUrl("/api/auth/register"), {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });
@@ -55,6 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const loginRes = await fetch(buildApiUrl("/api/auth/login"), {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });
@@ -71,7 +60,53 @@ document.addEventListener("DOMContentLoaded", () => {
     setToken(loginData.token);
     window.location.href = "transactions.html";
   });
+  wireShowPasswordToggle(document);
+  const passwordInput = form.querySelector("#password");
+  const confirmInput = form.querySelector("#confirm-password");
+
+  const runStrengthUpdate = () => {
+    updateStrengthMeter();
+    updateMatchMessage();
+  };
+
+  passwordInput?.addEventListener("input", runStrengthUpdate);
+  confirmInput?.addEventListener("input", updateMatchMessage);
+  runStrengthUpdate();
 });
+
+function wireShowPasswordToggle(container = document) {
+  const checkbox = container.querySelector("#togglePassword");
+  if (!checkbox) {
+    return;
+  }
+
+  const passwordInputs = [
+    container.querySelector("#password"),
+    container.querySelector("#confirm-password")
+  ].filter(Boolean);
+
+  const updateFieldTypes = () => {
+    passwordInputs.forEach((input) => {
+      input.type = checkbox.checked ? "text" : "password";
+    });
+  };
+
+  checkbox.addEventListener("change", updateFieldTypes);
+  updateFieldTypes();
+}
+
+function showRegisterError(message) {
+  if (!registerErrorElement) {
+    return;
+  }
+
+  registerErrorElement.textContent = message;
+  registerErrorElement.style.display = message ? "block" : "none";
+}
+
+function hideRegisterError() {
+  showRegisterError("");
+}
 
 function calculatePasswordScore(password) {
   let score = 0;

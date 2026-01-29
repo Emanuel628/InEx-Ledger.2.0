@@ -1,5 +1,5 @@
 /* =========================================================
-   Register Page JS — FINAL (ONE AND DONE)
+   Register Page JS � FINAL (ONE AND DONE)
    ========================================================= */
 
 let form = null;
@@ -29,6 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const res = await fetch(buildApiUrl("/api/auth/register"), {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });
@@ -42,6 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const loginRes = await fetch(buildApiUrl("/api/auth/login"), {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });

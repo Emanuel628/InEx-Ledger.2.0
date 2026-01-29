@@ -52,12 +52,41 @@ function authHeader() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function requireValidSessionOrRedirect({ redirectOnFailure = true } = {}) {
-  console.log("requireValidSessionOrRedirect() running");
-  const token = getToken();
-  console.log("Token at guard start:", token);
+async function tryRefreshToken() {
+  try {
+    const response = await fetch(buildApiUrl("/api/auth/refresh"), {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
 
-  if (!token) {
+    if (!response.ok) {
+      return false;
+    }
+
+    const data = await response.json();
+    if (!data?.token) {
+      return false;
+    }
+
+    setToken(data.token);
+    return true;
+  } catch (err) {
+    console.error("Refresh token failed:", err);
+    return false;
+  }
+}
+
+async function requireValidSessionOrRedirect({ redirectOnFailure = true, alreadyRefreshed = false } = {}) {
+  let hasToken = Boolean(getToken());
+  if (!hasToken) {
+    hasToken = await tryRefreshToken();
+  }
+
+  if (!hasToken) {
+    clearToken();
     if (redirectOnFailure) {
       window.location.href = LOGIN_PAGE;
     }
@@ -65,9 +94,12 @@ async function requireValidSessionOrRedirect({ redirectOnFailure = true } = {}) 
   }
 
   try {
+    console.log("requireValidSessionOrRedirect() running");
+    console.log("Token at guard start:", getToken());
     console.log("Calling /api/me with header:", authHeader());
     const response = await fetch(buildApiUrl("/api/me"), {
       method: "GET",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...authHeader()
@@ -77,6 +109,13 @@ async function requireValidSessionOrRedirect({ redirectOnFailure = true } = {}) 
     console.log("/api/me status:", response.status);
     if (response.ok) {
       return true;
+    }
+
+    if (response.status === 401 && !alreadyRefreshed) {
+      const refreshed = await tryRefreshToken();
+      if (refreshed) {
+        return requireValidSessionOrRedirect({ redirectOnFailure, alreadyRefreshed: true });
+      }
     }
 
     const text = await response.text();
@@ -99,16 +138,33 @@ async function requireValidSessionOrRedirect({ redirectOnFailure = true } = {}) 
 function redirectIfAuthenticated() {
   if (isAuthenticated()) {
     window.location.href = "transactions.html";
+    return;
   }
+
+  tryRefreshToken().then((ok) => {
+    if (ok) {
+      window.location.href = "transactions.html";
+    }
+  });
 }
 
-async function apiFetch(url, options = {}) {
+async function apiFetch(url, options = {}, { retry = true } = {}) {
   const apiUrl = buildApiUrl(url);
   const headers = { ...(options.headers || {}), ...authHeader() };
-  const response = await fetch(apiUrl, { ...options, headers });
+  const response = await fetch(apiUrl, {
+    ...options,
+    credentials: "include",
+    headers
+  });
 
   if (response.status === 401) {
     clearToken();
+    if (retry) {
+      const refreshed = await tryRefreshToken();
+      if (refreshed) {
+        return apiFetch(url, options, { retry: false });
+      }
+    }
     window.location.href = LOGIN_PAGE;
     return null;
   }
@@ -140,8 +196,16 @@ function requireAuth() {
   }
 }
 
-function signOut() {
+async function signOut() {
   clearToken();
+  try {
+    await fetch(buildApiUrl("/api/auth/logout"), {
+      method: "POST",
+      credentials: "include"
+    });
+  } catch (err) {
+    console.error("Logout error:", err);
+  }
   window.location.href = "landing.html";
 }
 

@@ -8,12 +8,13 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "pg": "^8.11.5",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "jsonwebtoken": "^9.0.2",
     "dotenv": "^16.4.5",
-    "multer": "1.4.5-lts.1"
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "1.4.5-lts.1",
+    "pg": "^8.11.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

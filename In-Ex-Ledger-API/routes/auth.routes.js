@@ -1,31 +1,32 @@
 import express from "express";
 import crypto from "node:crypto";
-import { signToken } from "../middleware/auth.middleware.js";
+import { signToken, requireAuth } from "../middleware/auth.middleware.js";
 import pool from "../db.js";
 
 const router = express.Router();
 
-/** * Title: Temporary Token Storage
- * These stay in memory because they expire quickly (15 mins) and 
- * don't need to clutter your permanent database.
+const REFRESH_TOKEN_COOKIE = "refresh_token";
+const REFRESH_TOKEN_EXPIRY_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
+const REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+const REFRESH_TOKEN_BYTE_LENGTH = 48;
+const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 15 * 60;
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  path: "/"
+};
+
+/**
+ * Temporary verification tokens for email flows (in-memory because they expire quickly).
  */
 const verificationTokens = new Map();
 const VERIFICATION_TOKEN_TTL = 15 * 60 * 1000; // 15 minutes
 
-// --- UTILITY FUNCTIONS ---
-
-/**
- * Title: Email Normalization
- * Ensures emails are consistent (lowercase/trimmed) to prevent duplicate accounts.
- */
 function normalizeEmail(email) {
   return String(email ?? "").trim().toLowerCase();
 }
 
-/**
- * Title: Token Cleanup
- * Removes expired tokens from the memory map to prevent memory leaks.
- */
 function cleanupVerificationTokens() {
   const now = Date.now();
   for (const [token, meta] of verificationTokens.entries()) {
@@ -35,10 +36,6 @@ function cleanupVerificationTokens() {
   }
 }
 
-/**
- * Title: Specific Token Removal
- * Clears existing tokens for an email before generating a new one.
- */
 function removeTokensForEmail(email) {
   for (const [token, meta] of verificationTokens.entries()) {
     if (meta.email === email) {
@@ -47,10 +44,6 @@ function removeTokensForEmail(email) {
   }
 }
 
-/**
- * Title: Token Generation
- * Creates a unique UUID for email verification links.
- */
 function createVerificationToken(email) {
   cleanupVerificationTokens();
   removeTokensForEmail(email);
@@ -60,10 +53,6 @@ function createVerificationToken(email) {
   return { token, expiresAt };
 }
 
-/**
- * Title: Token Consumption
- * Validates and deletes a token once it has been used.
- */
 function consumeVerificationToken(token) {
   cleanupVerificationTokens();
   const entry = verificationTokens.get(token);
@@ -75,30 +64,18 @@ function consumeVerificationToken(token) {
   return entry.email;
 }
 
-/**
- * Title: Link Builder
- * Constructs the URL sent to users via email.
- */
 function buildVerificationLink(req, token) {
   const protocol = req.protocol;
   const host = req.get("host");
   return `${protocol}://${host}/api/auth/verify-email?token=${token}`;
 }
 
-/**
- * Title: Password Hashing (scrypt)
- * Uses a unique salt for every user to ensure high security.
- */
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
   const derived = crypto.scryptSync(password, salt, 64).toString("hex");
   return `${salt}$${derived}`;
 }
 
-/**
- * Title: Password Verification
- * Uses timing-safe comparison to prevent side-channel attacks.
- */
 function verifyPassword(password, stored) {
   if (!stored || typeof stored !== "string") {
     return false;
@@ -120,25 +97,50 @@ function verifyPassword(password, stored) {
   return crypto.timingSafeEqual(hashBuffer, derivedBuffer);
 }
 
-// --- AUTHENTICATION ROUTES ---
+function setRefreshCookie(res, token, expiresAt) {
+  res.cookie(REFRESH_TOKEN_COOKIE, token, {
+    ...COOKIE_OPTIONS,
+    expires: expiresAt
+  });
+}
 
-/**
- * Title: User Registration
- * Writes new user data to the PostgreSQL 'users' table.
- */
+function clearRefreshCookie(res) {
+  res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
+}
+
+function hashRefreshToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+async function createRefreshToken(userId) {
+  const token = crypto.randomBytes(REFRESH_TOKEN_BYTE_LENGTH).toString("hex");
+  const hashed = hashRefreshToken(token);
+  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
+  await pool.query(
+    `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [crypto.randomUUID(), userId, hashed, expiresAt]
+  );
+  return { token, expiresAt };
+}
+
+async function revokeRefreshTokenByHash(tokenHash) {
+  await pool.query("UPDATE refresh_tokens SET revoked = true WHERE token_hash = $1", [tokenHash]);
+}
+
 router.post("/register", async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
-  
-  console.log("🧭 REGISTER USING DB:", process.env.DATABASE_URL);
-  
+
+  console.log("?? REGISTER USING DB:", process.env.DATABASE_URL);
+
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
 
   const hashedPassword = hashPassword(password);
   const client = await pool.connect();
-  
+
   try {
     const existing = await client.query(
       "SELECT id FROM users WHERE email = $1",
@@ -157,7 +159,7 @@ router.post("/register", async (req, res) => {
     );
 
     const user = result.rows[0];
-    console.log("✅ Database Update Success:", user.email);
+    console.log("?? Database Update Success:", user.email);
 
     return res.status(201).json({
       success: true,
@@ -171,10 +173,6 @@ router.post("/register", async (req, res) => {
   }
 });
 
-/**
- * Title: Send Verification Email
- * Generates a verification token for an existing user.
- */
 router.post("/send-verification", async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!email) {
@@ -202,14 +200,11 @@ router.post("/send-verification", async (req, res) => {
       verificationLink
     });
   } catch (err) {
+    console.error("Send verification error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-/**
- * Title: User Login
- * Validates credentials against the database and issues a JWT.
- */
 router.post("/login", async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
@@ -226,28 +221,82 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // NOTE: Temporarily skip email verification gate
-    // if (user.email_verified === false) {
-    //   return res.status(403).json({ error: "Email address not verified" });
-    // }
+    const token = signToken(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role || "user",
+        email_verified: !!user.email_verified
+      },
+      ACCESS_TOKEN_EXPIRY_SECONDS
+    );
 
-    const token = signToken({
-      id: user.id,
-      email: user.email,
-      role: user.role || 'user',
-      email_verified: !!user.email_verified
-    });
+    const { token: refreshToken, expiresAt } = await createRefreshToken(user.id);
+    setRefreshCookie(res, refreshToken, expiresAt);
 
     res.status(200).json({ token });
   } catch (err) {
+    console.error("Login error:", err);
     res.status(500).json({ error: "Login failed" });
   }
 });
 
-/**
- * Title: Email Verification (POST)
- * API-based verification for mobile or frontend apps.
- */
+router.post("/refresh", async (req, res) => {
+  const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
+  if (!rawToken) {
+    clearRefreshCookie(res);
+    return res.status(401).json({ error: "Missing refresh token" });
+  }
+
+  const hashed = hashRefreshToken(rawToken);
+
+  try {
+    const result = await pool.query(
+      `SELECT rt.id, rt.user_id, u.email, u.role, u.email_verified
+       FROM refresh_tokens rt
+       JOIN users u ON u.id = rt.user_id
+       WHERE rt.token_hash = $1 AND rt.revoked = false AND rt.expires_at > NOW()
+       LIMIT 1`,
+      [hashed]
+    );
+
+    if (!result.rowCount) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: "Invalid refresh token" });
+    }
+
+    await revokeRefreshTokenByHash(hashed);
+    const refreshData = await createRefreshToken(result.rows[0].user_id);
+    setRefreshCookie(res, refreshData.token, refreshData.expiresAt);
+
+    const token = signToken(
+      {
+        id: result.rows[0].user_id,
+        email: result.rows[0].email,
+        role: result.rows[0].role || "user",
+        email_verified: !!result.rows[0].email_verified
+      },
+      ACCESS_TOKEN_EXPIRY_SECONDS
+    );
+
+    res.status(200).json({ token });
+  } catch (err) {
+    console.error("Refresh token error:", err);
+    clearRefreshCookie(res);
+    res.status(500).json({ error: "Failed to refresh token" });
+  }
+});
+
+router.post("/logout", requireAuth, async (req, res) => {
+  const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
+  if (rawToken) {
+    const hashed = hashRefreshToken(rawToken);
+    await revokeRefreshTokenByHash(hashed);
+  }
+  clearRefreshCookie(res);
+  res.status(204).end();
+});
+
 router.post("/verify-email", async (req, res) => {
   const token = req.body?.token;
   if (!token) {
@@ -263,14 +312,11 @@ router.post("/verify-email", async (req, res) => {
     await pool.query("UPDATE users SET email_verified = true WHERE email = $1", [email]);
     res.status(200).json({ message: "Email verified" });
   } catch (err) {
+    console.error("Verification error:", err);
     res.status(500).json({ error: "Database update failed" });
   }
 });
 
-/**
- * Title: Email Verification (GET)
- * Direct link verification for browser access.
- */
 router.get("/verify-email", async (req, res) => {
   const token = req.query?.token;
   if (!token) {
@@ -287,19 +333,18 @@ router.get("/verify-email", async (req, res) => {
       "UPDATE users SET email_verified = true WHERE email = $1 RETURNING id",
       [email]
     );
-    
+
     if (result.rowCount === 0) {
       return res.status(404).send("User not found.");
     }
 
     return res.status(200).send("Email verified successfully. You can now log in.");
   } catch (err) {
+    console.error("Verification link error:", err);
     return res.status(500).send("Internal server error.");
   }
 });
 
-// Title: Placeholders for Future Implementation
-router.post("/logout", (req, res) => res.status(501).json({ message: "Not implemented" }));
 router.post("/forgot-password", (req, res) => res.status(501).json({ message: "Not implemented" }));
 router.post("/reset-password", (req, res) => res.status(501).json({ message: "Not implemented" }));
 
