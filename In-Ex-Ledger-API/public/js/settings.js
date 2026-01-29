@@ -10,6 +10,7 @@ let privacySettings = {
 
 const DEFAULT_THEME = "light";
 const THEME_VERSION = "2";
+console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
 function resolveSavedTheme() {
   const storedVersion = localStorage.getItem("lb_theme_version");

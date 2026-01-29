@@ -23,6 +23,7 @@ let transactionModalNoteInput = null;
 let activeModalTransactionId = null;
 let editingTransactionId = null;
 let transactionsLoading = false;
+console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("en-US", {

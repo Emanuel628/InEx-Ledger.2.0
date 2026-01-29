@@ -5,27 +5,24 @@ const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const LOGIN_PAGE = "/html/login.html";
 const DEFAULT_API_BASE = "https://inex-ledger20-production.up.railway.app";
 
-window.API_BASE = window.API_BASE || DEFAULT_API_BASE;
+if (!window.API_BASE) {
+  window.API_BASE = DEFAULT_API_BASE;
+}
+
+if (!window.__AUTH_GUARD_STATE__) {
+  window.__AUTH_GUARD_STATE__ = { running: false, count: 0 };
+}
 
 function getApiBase() {
+  console.log("[AUTH] API_BASE =", window.API_BASE);
   return window.API_BASE;
 }
 
-function buildApiUrl(pathOrUrl = "") {
+function buildApiUrl(path = "") {
   const base = getApiBase();
-  if (!pathOrUrl) {
-    return base;
-  }
-
-  if (/^https?:\/\//i.test(pathOrUrl)) {
-    return pathOrUrl;
-  }
-
-  if (pathOrUrl.startsWith("/")) {
-    return `${base}${pathOrUrl}`;
-  }
-
-  return `${base}/${pathOrUrl}`;
+  const url = /^https?:\/\//i.test(path) && path ? path : `${base}${path}`;
+  console.log("[AUTH] buildApiUrl:", url);
+  return url;
 }
 
 function clearAppState() {
@@ -39,10 +36,12 @@ function getToken() {
 }
 
 function setToken(token) {
+  console.log("[AUTH] setToken length =", token ? token.length : 0);
   localStorage.setItem(TOKEN_KEY, token);
 }
 
 function clearToken() {
+  console.log("[AUTH] clearToken called");
   localStorage.removeItem(TOKEN_KEY);
   clearAppState();
 }
@@ -52,52 +51,30 @@ function authHeader() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function tryRefreshToken() {
-  try {
-    const response = await fetch(buildApiUrl("/api/auth/refresh"), {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json"
-      }
-    });
-
-    if (!response.ok) {
-      return false;
-    }
-
-    const data = await response.json();
-    if (!data?.token) {
-      return false;
-    }
-
-    setToken(data.token);
-    return true;
-  } catch (err) {
-    console.error("Refresh token failed:", err);
-    return false;
-  }
-}
-
-async function requireValidSessionOrRedirect({ redirectOnFailure = true, alreadyRefreshed = false } = {}) {
-  let hasToken = Boolean(getToken());
-  if (!hasToken) {
-    hasToken = await tryRefreshToken();
+async function requireValidSessionOrRedirect() {
+  if (window.__AUTH_GUARD_STATE__.running) {
+    console.log("[AUTH] Guard already running, skipping");
+    return;
   }
 
-  if (!hasToken) {
-    clearToken();
-    if (redirectOnFailure) {
-      window.location.href = LOGIN_PAGE;
-    }
-    return false;
+  window.__AUTH_GUARD_STATE__.running = true;
+  window.__AUTH_GUARD_STATE__.count += 1;
+
+  const token = getToken();
+  console.log("[AUTH] Guard start. token exists =", !!token);
+
+  if (!token) {
+    console.log("[AUTH] No token -> redirect to login");
+    window.__AUTH_GUARD_STATE__.running = false;
+    window.location.href = LOGIN_PAGE;
+    return;
   }
 
   try {
-    console.log("requireValidSessionOrRedirect() running");
-    console.log("Token at guard start:", getToken());
-    console.log("Calling /api/me with header:", authHeader());
-    const response = await fetch(buildApiUrl("/api/me"), {
+    const meUrl = buildApiUrl("/api/me");
+    console.log("[AUTH] /api/me url:", meUrl);
+    console.log("[AUTH] Calling /api/me with header:", authHeader());
+    const response = await fetch(meUrl, {
       method: "GET",
       credentials: "include",
       headers: {
@@ -106,49 +83,52 @@ async function requireValidSessionOrRedirect({ redirectOnFailure = true, already
       }
     });
 
-    console.log("/api/me status:", response.status);
-    if (response.ok) {
+    console.log("[AUTH] /api/me status =", response.status);
+
+    if (response.status === 200) {
+      console.log("[AUTH] Session valid");
+      window.__AUTH_GUARD_STATE__.running = false;
       return true;
     }
 
-    if (response.status === 401 && !alreadyRefreshed) {
-      const refreshed = await tryRefreshToken();
-      if (refreshed) {
-        return requireValidSessionOrRedirect({ redirectOnFailure, alreadyRefreshed: true });
-      }
+    if (response.status === 401) {
+      console.log("[AUTH] Session invalid -> clearToken + redirect");
+      clearToken();
+      window.__AUTH_GUARD_STATE__.running = false;
+      window.location.href = LOGIN_PAGE;
+      return;
     }
 
-    const text = await response.text();
-    console.log("/api/me body:", text);
-    clearToken();
-    if (redirectOnFailure) {
-      window.location.href = LOGIN_PAGE;
-    }
-    return false;
+    console.log("[AUTH] Unexpected /api/me status =", response.status);
+    window.__AUTH_GUARD_STATE__.running = false;
   } catch (err) {
-    console.error("Session validation failed:", err);
+    console.error("[AUTH] Session validation failed:", err);
     clearToken();
-    if (redirectOnFailure) {
-      window.location.href = LOGIN_PAGE;
-    }
-    return false;
+    window.__AUTH_GUARD_STATE__.running = false;
+    window.location.href = LOGIN_PAGE;
   }
 }
 
-function redirectIfAuthenticated() {
-  if (isAuthenticated()) {
-    window.location.href = "transactions.html";
-    return;
-  }
-
-  tryRefreshToken().then((ok) => {
-    if (ok) {
+async function redirectIfAuthenticated() {
+  try {
+    const response = await fetch(buildApiUrl("/api/me"), {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeader()
+      }
+    });
+    console.log("[AUTH] redirectIfAuthenticated /api/me status =", response.status);
+    if (response.status === 200) {
       window.location.href = "transactions.html";
     }
-  });
+  } catch (err) {
+    console.error("[AUTH] redirectIfAuthenticated failed:", err);
+  }
 }
 
-async function apiFetch(url, options = {}, { retry = true } = {}) {
+async function apiFetch(url, options = {}) {
   const apiUrl = buildApiUrl(url);
   const headers = { ...(options.headers || {}), ...authHeader() };
   const response = await fetch(apiUrl, {
@@ -158,13 +138,8 @@ async function apiFetch(url, options = {}, { retry = true } = {}) {
   });
 
   if (response.status === 401) {
+    console.log("[AUTH] apiFetch 401 -> clearing token + redirect");
     clearToken();
-    if (retry) {
-      const refreshed = await tryRefreshToken();
-      if (refreshed) {
-        return apiFetch(url, options, { retry: false });
-      }
-    }
     window.location.href = LOGIN_PAGE;
     return null;
   }
