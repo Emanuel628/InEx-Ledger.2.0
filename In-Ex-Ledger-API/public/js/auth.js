@@ -19,7 +19,7 @@ if (!window.API_BASE) {
 }
 
 if (!window.__AUTH_GUARD_STATE__) {
-  window.__AUTH_GUARD_STATE__ = { running: false, count: 0 };
+  window.__AUTH_GUARD_STATE__ = { running: false, count: 0, lastError: null };
 }
 
 function getApiBase() {
@@ -53,11 +53,28 @@ function clearToken() {
   console.log("[AUTH] clearToken called");
   localStorage.removeItem(TOKEN_KEY);
   clearAppState();
+  if (window.__AUTH_GUARD_STATE__) {
+    window.__AUTH_GUARD_STATE__.lastError = null;
+  }
 }
 
 function authHeader() {
   const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function mapAuthError(status, apiError) {
+  const errorMessage = typeof apiError === "string" ? apiError : apiError?.error;
+  if (status === 401) {
+    return "Invalid email or password.";
+  }
+  if (status === 409) {
+    return "An account with this email already exists.";
+  }
+  if (status === 429) {
+    return errorMessage || "Too many attempts. Try again later.";
+  }
+  return errorMessage || "Something went wrong. Please try again.";
 }
 
 async function requireValidSessionOrRedirect() {
@@ -82,7 +99,6 @@ async function requireValidSessionOrRedirect() {
   try {
     const meUrl = buildApiUrl("/api/me");
     console.log("[AUTH] /api/me url:", meUrl);
-    console.log("[AUTH] Calling /api/me with header:", authHeader());
     const response = await fetch(meUrl, {
       method: "GET",
       credentials: "include",
@@ -97,6 +113,7 @@ async function requireValidSessionOrRedirect() {
     if (response.status === 200) {
       console.log("[AUTH] Session valid");
       window.__AUTH_GUARD_STATE__.running = false;
+      window.__AUTH_GUARD_STATE__.lastError = null;
       return true;
     }
 
@@ -104,17 +121,20 @@ async function requireValidSessionOrRedirect() {
       console.log("[AUTH] Session invalid -> clearToken + redirect");
       clearToken();
       window.__AUTH_GUARD_STATE__.running = false;
-      window.location.href = LOGIN_PAGE;
+      window.__AUTH_GUARD_STATE__.lastError = "expired";
+      window.location.href = `${LOGIN_PAGE}?reason=expired`;
       return;
     }
 
     console.log("[AUTH] Unexpected /api/me status =", response.status);
     window.__AUTH_GUARD_STATE__.running = false;
+    window.__AUTH_GUARD_STATE__.lastError = `me_${response.status}`;
   } catch (err) {
     console.error("[AUTH] Session validation failed:", err);
     clearToken();
     window.__AUTH_GUARD_STATE__.running = false;
-    window.location.href = LOGIN_PAGE;
+    window.__AUTH_GUARD_STATE__.lastError = "network";
+    window.location.href = `${LOGIN_PAGE}?reason=network`;
   }
 }
 

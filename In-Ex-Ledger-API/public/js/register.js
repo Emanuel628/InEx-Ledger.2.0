@@ -1,10 +1,21 @@
+/**
+ * SHARED AUTH CONTRACT
+ * This file MUST remain identical in:
+ * - InEx-Ledger-Frontend
+ * - In-Ex-Ledger-API/public
+ *
+ * Do NOT edit in only one bundle.
+ * Always apply changes to BOTH.
+ */
+
 /* =========================================================
-   Register Page JS � FINAL (ONE AND DONE)
+   Register Page JS — FINAL (ONE AND DONE)
    ========================================================= */
 
 let form = null;
 let registerErrorElement = null;
 let isSubmittingRegister = false;
+const OFFLINE_ERROR_MESSAGE = "Unable to reach server. Check your connection and try again.";
 
 document.addEventListener("DOMContentLoaded", () => {
   form = document.getElementById("registerForm");
@@ -16,87 +27,9 @@ document.addEventListener("DOMContentLoaded", () => {
   registerErrorElement = document.getElementById("registerError");
   hideRegisterError();
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    if (isSubmittingRegister) {
-      return;
-    }
-
-    const submitButton = form.querySelector("button[type=\"submit\"]");
-    const finish = () => {
-      submitButton?.removeAttribute("disabled");
-      isSubmittingRegister = false;
-    };
-
-    hideRegisterError();
-
-    const email = document.getElementById("email")?.value.trim() || "";
-    const password = document.getElementById("password")?.value || "";
-
-    if (!email || !password) {
-      showRegisterError("Enter an email and password.");
-      return;
-    }
-
-    isSubmittingRegister = true;
-    submitButton?.setAttribute("disabled", "true");
-
-    try {
-      const regResponse = await fetch(buildApiUrl("/api/auth/register"), {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
-
-      const regBody = await regResponse.json().catch(() => null);
-
-      if (!regResponse.ok) {
-        if (regResponse.status === 409) {
-          showRegisterError("An account with this email already exists.");
-        } else {
-          showRegisterError(
-            regBody?.error || "Please check your information and try again."
-          );
-        }
-        return;
-      }
-
-      const loginResponse = await fetch(buildApiUrl("/api/auth/login"), {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
-      });
-
-      if (!loginResponse.ok) {
-        showRegisterError(
-          "Account created, but automatic login failed. Please sign in."
-        );
-        window.location.href = "login.html";
-        return;
-      }
-
-      const loginBody = await loginResponse.json().catch(() => null);
-
-      if (!loginBody?.token) {
-        showRegisterError(
-          "Account created, but no session was returned. Please sign in."
-        );
-        window.location.href = "login.html";
-        return;
-      }
-
-      setToken(loginBody.token);
-      window.location.href = "transactions.html";
-    } catch (err) {
-      console.error("Register request failed:", err);
-      showRegisterError("Network error. Please try again.");
-    } finally {
-      finish();
-    }
-  });
+  form.addEventListener("submit", handleRegisterSubmit);
   wireShowPasswordToggle(document);
+
   const passwordInput = form.querySelector("#password");
   const confirmInput = form.querySelector("#confirm-password");
 
@@ -109,6 +42,73 @@ document.addEventListener("DOMContentLoaded", () => {
   confirmInput?.addEventListener("input", updateMatchMessage);
   runStrengthUpdate();
 });
+
+async function handleRegisterSubmit(event) {
+  event.preventDefault();
+  if (!form || isSubmittingRegister) {
+    return;
+  }
+
+  const submitButton = form.querySelector("button[type=\"submit\"]");
+  const email = document.getElementById("email")?.value.trim() || "";
+  const password = document.getElementById("password")?.value || "";
+
+  hideRegisterError();
+
+  if (!email || !password) {
+    showRegisterError("Enter an email and password.");
+    return;
+  }
+
+  isSubmittingRegister = true;
+  submitButton?.setAttribute("disabled", "true");
+
+  try {
+    const regResponse = await fetch(buildApiUrl("/api/auth/register"), {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    const regBody = await regResponse.json().catch(() => null);
+
+    if (!regResponse.ok) {
+      showRegisterError(mapAuthError(regResponse.status, regBody));
+      return;
+    }
+
+    const loginResponse = await fetch(buildApiUrl("/api/auth/login"), {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+
+    const loginBody = await loginResponse.json().catch(() => null);
+
+    if (!loginResponse.ok) {
+      showRegisterError("Account created, but automatic login failed. Please sign in.");
+      window.location.href = "login.html";
+      return;
+    }
+
+    if (!loginBody?.token) {
+      showRegisterError("Account created, but no session was returned. Please sign in.");
+      window.location.href = "login.html";
+      return;
+    }
+
+    setToken(loginBody.token);
+    window.location.href = "transactions.html";
+  } catch (err) {
+    console.error("Register request failed:", err);
+    showRegisterError(OFFLINE_ERROR_MESSAGE);
+  } finally {
+    submitButton?.removeAttribute("disabled");
+    isSubmittingRegister = false;
+  }
+}
 
 function wireShowPasswordToggle(container = document) {
   const checkbox = container.querySelector("#togglePassword");
@@ -235,8 +235,8 @@ function legacyPopulateLanguageOptions() {
     window.LUNA_LANGUAGE_LABELS ||
     {
       en: 'English',
-      es: 'Espa�ol',
-      fr: 'Fran�ais'
+      es: 'EspaÃ±ol',
+      fr: 'FranÃ§ais'
     };
   const languages =
     (window.LUNA_I18N && window.LUNA_I18N.LANGUAGES) ||
@@ -311,12 +311,3 @@ async function persistConsent() {
     });
   }
 }
-/**
- * SHARED AUTH CONTRACT
- * This file MUST remain identical in:
- * - InEx-Ledger-Frontend
- * - In-Ex-Ledger-API/public
- *
- * Do NOT edit in only one bundle.
- * Always apply changes to BOTH.
- */

@@ -15,6 +15,8 @@
 let loginForm = null;
 let loginErrorElement = null;
 let isSubmittingLogin = false;
+const OFFLINE_ERROR_MESSAGE = "Unable to reach server. Check your connection and try again.";
+const EXPIRED_SESSION_MESSAGE = "Your session expired. Please log in again.";
 
 redirectIfAuthenticated();
 
@@ -29,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loginForm.addEventListener("submit", handleLoginSubmit);
   wireShowPasswordToggle(document);
+  showLoginReasonMessage();
 });
 
 async function handleLoginSubmit(event) {
@@ -38,7 +41,6 @@ async function handleLoginSubmit(event) {
   }
 
   const submitButton = loginForm.querySelector("button[type=\"submit\"]");
-
   const email = document.getElementById("email")?.value.trim() || "";
   const password = document.getElementById("password")?.value || "";
 
@@ -68,11 +70,7 @@ async function handleLoginSubmit(event) {
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
-      if (response.status === 401) {
-        showLoginError("Invalid email or password.");
-      } else {
-        showLoginError(data?.error || "Login failed. Please try again.");
-      }
+      showLoginError(mapAuthError(response.status, data));
       return;
     }
 
@@ -85,10 +83,21 @@ async function handleLoginSubmit(event) {
     window.location.href = "transactions.html";
   } catch (err) {
     console.error("Login request failed:", err);
-    showLoginError("Network error. Please try again.");
+    showLoginError(OFFLINE_ERROR_MESSAGE);
   } finally {
     submitButton?.removeAttribute("disabled");
     isSubmittingLogin = false;
+  }
+}
+
+function showLoginReasonMessage() {
+  const params = new URLSearchParams(window.location.search);
+  const reason = params.get("reason");
+
+  if (reason === "expired") {
+    showLoginError(EXPIRED_SESSION_MESSAGE);
+  } else if (reason === "network") {
+    showLoginError(OFFLINE_ERROR_MESSAGE);
   }
 }
 
