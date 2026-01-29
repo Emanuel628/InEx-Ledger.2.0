@@ -8,6 +8,13 @@ import { requireAuth } from "./middleware/auth.middleware.js";
 
 const app = express();
 const publicDir = path.join(process.cwd(), "public");
+const ALLOWED_ORIGINS = [
+  "https://lunafinance.org",
+  "https://www.lunafinance.org",
+  "https://inex-ledger20-production.up.railway.app",
+  "http://localhost:5173",
+  "http://localhost:3000"
+];
 
 console.log("🔥 DOCKER FINGERPRINT: CLEAN_BUILD_2026_01_24");
 
@@ -16,17 +23,16 @@ console.log(`SYSTEM_INFO: Railway requested Port ${process.env.PORT}`);
 console.log("JWT_SECRET present:", !!process.env.JWT_SECRET);
 
 app.use(cors({
-  origin: [
-    "https://lunafinance.org",
-    "https://www.lunafinance.org",
-    "http://localhost:5173",
-    "http://localhost:3000"
-  ],
+  origin: ALLOWED_ORIGINS,
   credentials: true
 }));
 
 app.use(express.static(publicDir));
 app.use(express.static(path.join(publicDir, "html")));
+
+app.get("/favicon.ico", (req, res) => {
+  res.status(204).end();
+});
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(publicDir, "html", "landing.html"));
