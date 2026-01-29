@@ -31,3 +31,17 @@ footer {
 .show-password-toggle input {
   margin-right: 6px;
 }
+
+.forgot-password {
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+.forgot-password a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.forgot-password a:hover {
+  text-decoration: underline;
+}
