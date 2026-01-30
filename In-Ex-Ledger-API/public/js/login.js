@@ -18,7 +18,10 @@ let isSubmittingLogin = false;
 const OFFLINE_ERROR_MESSAGE = "Unable to reach server. Check your connection and try again.";
 const EXPIRED_SESSION_MESSAGE = "Your session expired. Please log in again.";
 
-redirectIfAuthenticated();
+// Ensure we aren't already logged in
+if (typeof redirectIfAuthenticated === "function") {
+  redirectIfAuthenticated();
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   loginForm = document.getElementById("loginForm");
@@ -70,16 +73,24 @@ async function handleLoginSubmit(event) {
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
-      showLoginError(mapAuthError(response.status, data));
+      // Use mapAuthError helper from auth.js if it exists
+      const msg = (typeof mapAuthError === "function") 
+        ? mapAuthError(response.status, data) 
+        : (data?.message || "Login failed.");
+      showLoginError(msg);
       return;
     }
 
-    if (!data?.token) {
-      showLoginError("Login failed. Please try again.");
+    // Check for token in standard locations
+    const token = data?.token || data?.accessToken;
+
+    if (!token) {
+      console.error("Login successful but no token received", data);
+      showLoginError("Login failed. No session token received.");
       return;
     }
 
-    setToken(data.token);
+    setToken(token);
     window.location.href = "transactions.html";
   } catch (err) {
     console.error("Login request failed:", err);
@@ -107,6 +118,8 @@ function showLoginError(message) {
   }
   loginErrorElement.textContent = message || "";
   loginErrorElement.hidden = !message;
+  // Ensure visibility if it uses classes
+  loginErrorElement.style.display = message ? "block" : "none";
 }
 
 function clearLoginError() {
@@ -118,16 +131,15 @@ function isValidEmail(email) {
 }
 
 function wireShowPasswordToggle(container = document) {
-  const toggle = container.querySelector(".show-password-toggle input[type=\"checkbox\"]");
-  if (!toggle) {
+  const checkbox = container.querySelector("#togglePassword");
+  if (!checkbox) {
     return;
   }
 
-  toggle.addEventListener("change", () => {
-    const passwordField = container.querySelector('input[type="password"]');
-    if (!passwordField) {
-      return;
+  checkbox.addEventListener("change", () => {
+    const passwordField = container.querySelector("#password");
+    if (passwordField) {
+      passwordField.type = checkbox.checked ? "text" : "password";
     }
-    passwordField.type = toggle.checked ? "text" : "password";
   });
 }
