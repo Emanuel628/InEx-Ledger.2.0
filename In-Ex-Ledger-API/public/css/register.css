@@ -49,6 +49,7 @@ footer {
   background: #e5e7eb;
   transition: background 0.2s ease;
   margin-right: 6px;
+  pointer-events: none;
 }
 
 .show-password-switch .switch::after {
@@ -134,4 +135,16 @@ footer {
 .language-field label {
   display: block;
   margin-bottom: 4px;
+}
+
+.show-password-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.show-password-toggle {
+  cursor: pointer;
+  user-select: none;
 }
