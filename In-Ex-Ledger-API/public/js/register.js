@@ -49,27 +49,27 @@ async function handleRegisterSubmit(event) {
     return;
   }
 
-  const submitButton = form.querySelector("button[type=\"submit\"]");
-  const email = document.getElementById("email")?.value.trim() || "";
-  const password = document.getElementById("password")?.value || "";
-  const confirmPassword = document.getElementByID("password")?.value || "";
+  const submitButton = form.querySelector('button[type="submit"]');
+const email = document.getElementById("email")?.value.trim() || "";
+const password = document.getElementById("password")?.value || "";
+const confirmPassword = document.getElementById("confirm-password")?.value || "";
 
-  hideRegisterError();
+hideRegisterError();
 
-  if (!email || !password) {
-    showRegisterError("Enter an email and password.");
-    return;
-  }
-  
-  if (password !== confirmPassword) {
+if (!email || !password) {
+  showRegisterError("Enter an email and password.");
+  return;
+}
+
+if (password !== confirmPassword) {
   showRegisterError("Passwords do not match.");
   return;
-  }
-  
-  if (!isValidEmail(email)) {
+}
+
+if (!isValidEmail(email)) {
   showRegisterError("Enter a valid email address.");
   return;
-  }
+}
 
   isSubmittingRegister = true;
   submitButton?.setAttribute("disabled", "true");
