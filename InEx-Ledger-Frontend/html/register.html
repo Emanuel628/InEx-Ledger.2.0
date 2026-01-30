@@ -17,7 +17,7 @@
     <section>
       <h2 data-i18n="register_title">Create your account</h2>
 
-      <form method="post">
+      <form id="registerForm" method="post">
         <div>
           <label for="email" data-i18n="register_email_label">Email address</label><br />
           <input
@@ -63,8 +63,9 @@
 
         <p id="passwordStrengthText" class="password-strength-text">Weak</p>
 
-        <label class="show-password-toggle" data-i18n="register_show_password">
+        <label class="show-password-toggle show-password-switch" data-i18n="register_show_password">
           <input type="checkbox" id="togglePassword" />
+          <span class="switch"></span>
           Show password
         </label>
 
@@ -92,7 +93,7 @@
 
         <p id="tosConsentMessage" class="consent-error" aria-live="polite"></p>
 
-        <p id="registerError" class="consent-error" role="alert" aria-live="polite" style="display:none"></p>
+        <p id="registerError" class="auth-error" role="alert" aria-live="polite" hidden></p>
 
         <br />
         <div>
