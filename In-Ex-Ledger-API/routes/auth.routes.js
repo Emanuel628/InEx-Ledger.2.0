@@ -250,8 +250,7 @@ router.post("/register", async (req, res) => {
 
     return res.status(201).json({ success: true, message: "Account created. Check your email!" });
   } catch (err) {
-
-});
+  });
 
 /**
  * POST /send-verification
