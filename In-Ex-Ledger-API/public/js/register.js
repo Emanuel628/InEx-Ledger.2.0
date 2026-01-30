@@ -50,31 +50,32 @@ async function handleRegisterSubmit(event) {
   }
 
   const submitButton = form.querySelector('button[type="submit"]');
-const email = document.getElementById("email")?.value.trim() || "";
-const password = document.getElementById("password")?.value || "";
-const confirmPassword = document.getElementById("confirm-password")?.value || "";
+  const email = document.getElementById("email")?.value.trim() || "";
+  const password = document.getElementById("password")?.value || "";
+  const confirmPassword = document.getElementById("confirm-password")?.value || "";
 
-hideRegisterError();
+  hideRegisterError();
 
-if (!email || !password) {
-  showRegisterError("Enter an email and password.");
-  return;
-}
+  if (!email || !password) {
+    showRegisterError("Enter an email and password.");
+    return;
+  }
 
-if (password !== confirmPassword) {
-  showRegisterError("Passwords do not match.");
-  return;
-}
+  if (password !== confirmPassword) {
+    showRegisterError("Passwords do not match.");
+    return;
+  }
 
-if (!isValidEmail(email)) {
-  showRegisterError("Enter a valid email address.");
-  return;
-}
+  if (!isValidEmail(email)) {
+    showRegisterError("Enter a valid email address.");
+    return;
+  }
 
   isSubmittingRegister = true;
   submitButton?.setAttribute("disabled", "true");
 
   try {
+    // 1. Register the user
     const regResponse = await fetch(buildApiUrl("/api/auth/register"), {
       method: "POST",
       credentials: "include",
@@ -89,6 +90,11 @@ if (!isValidEmail(email)) {
       return;
     }
 
+    // 2. Persist preferences and consent
+    persistRegionAndLanguage();
+    await persistConsent();
+
+    // 3. Perform automatic login
     const loginResponse = await fetch(buildApiUrl("/api/auth/login"), {
       method: "POST",
       credentials: "include",
@@ -157,24 +163,16 @@ function hideRegisterError() {
 
 function calculatePasswordScore(password) {
   let score = 0;
-
   if (password.length >= 8) score++;
   if (/[A-Z]/.test(password)) score++;
   if (/\d/.test(password)) score++;
   if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) score++;
-
   return score;
 }
 
 function getStrengthLabel(score) {
-  if (score >= 4) {
-    return "Strong";
-  }
-
-  if (score >= 2) {
-    return "Good";
-  }
-
+  if (score >= 4) return "Strong";
+  if (score >= 2) return "Good";
   return "Weak";
 }
 
@@ -199,13 +197,12 @@ function updateStrengthMeter() {
 
   strengthMeter.style.width = `${score * 25}%`;
   strengthMeter.style.backgroundColor = color;
-  const labelKey =
-    label === "Strong"
-      ? "register_strength_label_strong"
-      : label === "Good"
-      ? "register_strength_label_good"
-      : "register_strength_label_weak";
-  strengthText.textContent = t(labelKey);
+  
+  const labelKey = label === "Strong" ? "register_strength_label_strong" : 
+                   label === "Good" ? "register_strength_label_good" : 
+                   "register_strength_label_weak";
+                   
+  strengthText.textContent = typeof t === "function" ? t(labelKey) : label;
   strengthText.style.color = color;
 }
 
@@ -230,8 +227,8 @@ function updateMatchMessage() {
 
   const match = password === confirm;
   matchMessage.textContent = match
-    ? t("register_password_match_success")
-    : t("register_password_match_error");
+    ? (typeof t === "function" ? t("register_password_match_success") : "Passwords match")
+    : (typeof t === "function" ? t("register_password_match_error") : "Passwords do not match");
   matchMessage.classList.add(match ? "is-ok" : "is-bad");
 }
 
@@ -239,80 +236,23 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function legacyPopulateLanguageOptions() {
-  if (!languageSelect) return;
-
-  const labels =
-    window.LUNA_LANGUAGE_LABELS ||
-    {
-      en: 'English',
-      es: 'EspaÃ±ol',
-      fr: 'FranÃ§ais'
-    };
-  const languages =
-    (window.LUNA_I18N && window.LUNA_I18N.LANGUAGES) ||
-    Object.keys(labels);
-  const savedLanguage = window.LUNA_LANGUAGE || 'en';
-
-  languageSelect.innerHTML = '';
-  languages.forEach((code) => {
-    if (!labels[code]) return;
-    const option = document.createElement('option');
-    option.value = code;
-    option.textContent = labels[code];
-    if (code === savedLanguage) {
-      option.selected = true;
-    }
-    languageSelect.appendChild(option);
-  });
-}
-
 function persistRegionAndLanguage() {
-  const selectedRegion = regionSelect && regionSelect.value ? regionSelect.value : "us";
-  const selectedLanguage =
-    (languageSelect && languageSelect.value) ||
-    (typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en");
+  const selectedRegion = localStorage.getItem("lb_region") || "us";
+  const selectedLanguage = localStorage.getItem("lb_language") || "en";
 
   localStorage.setItem("lb_region", selectedRegion);
   window.LUNA_REGION = selectedRegion;
-  const fallbackRegion = selectedRegion === "ca" ? "CA" : "US";
-  localStorage.setItem("region", fallbackRegion);
-
+  
   if (typeof setCurrentLanguage === "function") {
     setCurrentLanguage(selectedLanguage);
   } else {
     localStorage.setItem("lb_language", selectedLanguage);
     window.LUNA_LANGUAGE = selectedLanguage;
-    if (typeof applyTranslations === "function") {
-      applyTranslations();
-    }
   }
-}
-
-function ensureConsent() {
-  if (!tosConsentCheckbox) {
-    return true;
-  }
-
-  if (!tosConsentCheckbox.checked) {
-    if (tosConsentMessage) {
-      tosConsentMessage.textContent = t("register_consent_error");
-    }
-    return false;
-  }
-
-  if (tosConsentMessage) {
-    tosConsentMessage.textContent = "";
-  }
-
-  return true;
 }
 
 async function persistConsent() {
-  if (
-    typeof privacyService === "object" &&
-    typeof privacyService.setPrivacySettings === "function"
-  ) {
+  if (typeof privacyService === "object" && typeof privacyService.setPrivacySettings === "function") {
     await privacyService.setPrivacySettings({
       consentGiven: true,
       consentAt: new Date().toISOString(),
