@@ -4,8 +4,29 @@
   <meta charset="UTF-8" />
   <title>InEx Ledger — Create Account</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<link rel="stylesheet" href="../css/global.css">
-<link rel="stylesheet" href="../css/register.css">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/register.css">
+  <style>
+    /* Fix underline and styling for links */
+    .consent-field a, p a {
+      text-decoration: none !important;
+      color: #2563eb;
+      font-weight: 500;
+    }
+    .consent-field a:hover, p a:hover {
+      text-decoration: underline !important;
+    }
+    .auth-error {
+      color: #ef4444;
+      margin-top: 10px;
+      display: none;
+    }
+    .success-message {
+      color: #22c55e;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 
 <body>
@@ -63,22 +84,21 @@
 
         <p id="passwordStrengthText" class="password-strength-text">Weak</p>
 
-        <label class="show-password-toggle show-password-switch" data-i18n="register_show_password">
+        <label class="show-password-toggle show-password-switch">
           <input type="checkbox" id="togglePassword" />
           <span class="switch"></span>
-          Show password
+          <span data-i18n="register_show_password">Show password</span>
         </label>
 
         <br />
 
         <div class="consent-field">
-          <input type="checkbox" id="tosConsent" />
+          <input type="checkbox" id="tosConsent" required />
           <label for="tosConsent">
             <span data-i18n="register_consent_prefix">I agree to the </span>
-            <a href="terms.html" data-i18n="register_consent_terms">Terms</a>
+            <a href="terms.html">Terms</a>
             <span data-i18n="register_consent_and"> and </span>
-            <a href="privacy.html" data-i18n="register_consent_privacy">Privacy Policy</a>
-            <span data-i18n="register_consent_suffix">.</span>
+            <a href="privacy.html">Privacy Policy</a>
           </label>
         </div>
 
@@ -91,13 +111,12 @@
 
         <br />
 
-        <p id="tosConsentMessage" class="consent-error" aria-live="polite"></p>
-
         <p id="registerError" class="auth-error" role="alert" aria-live="polite"></p>
+        <p id="registerSuccess" class="success-message" role="alert" aria-live="polite"></p>
 
         <br />
         <div>
-          <button type="submit" data-i18n="register_submit">Create account</button>
+          <button type="submit" id="registerSubmitBtn" data-i18n="register_submit">Create account</button>
         </div>
       </form>
 
