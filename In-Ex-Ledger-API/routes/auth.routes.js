@@ -228,7 +228,7 @@ router.post("/register", async (req, res) => {
       [crypto.randomUUID(), email, hashedPassword]
     );
 
-        console.log("?? Account Created:", result.rows[0].email);
+            console.log("?? Account Created:", result.rows[0].email);
 
     // --- START OF EMAIL LOGIC ---
     try {
@@ -244,13 +244,18 @@ router.post("/register", async (req, res) => {
       console.log("?? Verification Email Sent via Resend API");
     } catch (emailErr) {
       console.error("?? Email failed to send, but account was created:", emailErr);
-      // We don't return 500 here because the account WAS created successfully
     }
     // --- END OF EMAIL LOGIC ---
 
     return res.status(201).json({ success: true, message: "Account created. Check your email!" });
   } catch (err) {
-  });
+    console.error("Register error:", err);
+    return res.status(500).json({ error: "Registration failed" });
+  } finally {
+    client.release();
+  }
+}); 
+
 
 /**
  * POST /send-verification
