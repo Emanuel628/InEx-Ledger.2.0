@@ -3,9 +3,6 @@
  * This file MUST remain identical in:
  * - InEx-Ledger-Frontend
  * - In-Ex-Ledger-API/public
- *
- * Do NOT edit in only one bundle.
- * Always apply changes to BOTH.
  */
 
 /* =========================================================
@@ -18,7 +15,6 @@ let isSubmittingLogin = false;
 const OFFLINE_ERROR_MESSAGE = "Unable to reach server. Check your connection and try again.";
 const EXPIRED_SESSION_MESSAGE = "Your session expired. Please log in again.";
 
-// Ensure we aren't already logged in
 if (typeof redirectIfAuthenticated === "function") {
   redirectIfAuthenticated();
 }
@@ -39,9 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 async function handleLoginSubmit(event) {
   event.preventDefault();
-  if (!loginForm || isSubmittingLogin) {
-    return;
-  }
+  if (!loginForm || isSubmittingLogin) return;
 
   const submitButton = loginForm.querySelector("button[type=\"submit\"]");
   const email = document.getElementById("email")?.value.trim() || "";
@@ -73,19 +67,12 @@ async function handleLoginSubmit(event) {
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
-      // Use mapAuthError helper from auth.js if it exists
-      const msg = (typeof mapAuthError === "function") 
-        ? mapAuthError(response.status, data) 
-        : (data?.message || "Login failed.");
-      showLoginError(msg);
+      showLoginError(mapAuthError(response.status, data));
       return;
     }
 
-    // Check for token in standard locations
     const token = data?.token || data?.accessToken;
-
     if (!token) {
-      console.error("Login successful but no token received", data);
       showLoginError("Login failed. No session token received.");
       return;
     }
@@ -104,21 +91,14 @@ async function handleLoginSubmit(event) {
 function showLoginReasonMessage() {
   const params = new URLSearchParams(window.location.search);
   const reason = params.get("reason");
-
-  if (reason === "expired") {
-    showLoginError(EXPIRED_SESSION_MESSAGE);
-  } else if (reason === "network") {
-    showLoginError(OFFLINE_ERROR_MESSAGE);
-  }
+  if (reason === "expired") showLoginError(EXPIRED_SESSION_MESSAGE);
+  else if (reason === "network") showLoginError(OFFLINE_ERROR_MESSAGE);
 }
 
 function showLoginError(message) {
-  if (!loginErrorElement) {
-    return;
-  }
+  if (!loginErrorElement) return;
   loginErrorElement.textContent = message || "";
   loginErrorElement.hidden = !message;
-  // Ensure visibility if it uses classes
   loginErrorElement.style.display = message ? "block" : "none";
 }
 
@@ -131,15 +111,11 @@ function isValidEmail(email) {
 }
 
 function wireShowPasswordToggle(container = document) {
-  const checkbox = container.querySelector("#togglePassword");
-  if (!checkbox) {
-    return;
-  }
+  const toggle = container.querySelector("#togglePassword");
+  if (!toggle) return;
 
-  checkbox.addEventListener("change", () => {
-    const passwordField = container.querySelector("#password");
-    if (passwordField) {
-      passwordField.type = checkbox.checked ? "text" : "password";
-    }
+  toggle.addEventListener("change", () => {
+    const passwordField = container.querySelector('input[name="password"]');
+    if (passwordField) passwordField.type = toggle.checked ? "text" : "password";
   });
 }
