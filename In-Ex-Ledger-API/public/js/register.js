@@ -60,6 +60,16 @@ async function handleRegisterSubmit(event) {
     showRegisterError("Enter an email and password.");
     return;
   }
+  
+  if (password !== confirmPassword) {
+  showRegisterError("Passwords do not match.");
+  return;
+  }
+  
+  if (!isValidEmail(email)) {
+  showRegisterError("Enter a valid email address.");
+  return;
+  }
 
   isSubmittingRegister = true;
   submitButton?.setAttribute("disabled", "true");
