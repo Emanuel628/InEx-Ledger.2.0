@@ -1,15 +1,46 @@
+/**
+ * AUTH ROUTES - FULL PRODUCTION VERSION
+ * Handles registration, real email verification, login, and password resets.
+ */
+
 import express from "express";
 import crypto from "node:crypto";
+import nodemailer from "nodemailer";
 import { signToken, requireAuth } from "../middleware/auth.middleware.js";
 import pool from "../db.js";
 
 const router = express.Router();
 
+/* =========================================================
+   1. EMAIL TRANSPORT CONFIGURATION
+   ========================================================= */
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: process.env.SMTP_SECURE === "true",
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+transporter.verify((error) => {
+  if (error) {
+    console.error("?? SMTP Configuration Error:", error);
+  } else {
+    console.log("?? SMTP Server is authenticated and ready.");
+  }
+});
+
+/* =========================================================
+   2. CONSTANTS & COOKIE CONFIGURATION
+   ========================================================= */
 const REFRESH_TOKEN_COOKIE = "refresh_token";
 const REFRESH_TOKEN_EXPIRY_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
 const REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 const REFRESH_TOKEN_BYTE_LENGTH = 48;
 const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 15 * 60;
+
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
@@ -17,14 +48,14 @@ const COOKIE_OPTIONS = {
   path: "/"
 };
 
-/**
- * Temporary verification tokens for email flows (in-memory because they expire quickly).
- */
+/* =========================================================
+   3. IN-MEMORY TOKEN MANAGEMENT
+   ========================================================= */
 const verificationTokens = new Map();
-const VERIFICATION_TOKEN_TTL = 15 * 60 * 1000; // 15 minutes
+const VERIFICATION_TOKEN_TTL = 15 * 60 * 1000; 
 
 const passwordResetTokens = new Map();
-const PASSWORD_RESET_TTL = 20 * 60 * 1000; // 20 minutes
+const PASSWORD_RESET_TTL = 20 * 60 * 1000;
 
 function normalizeEmail(email) {
   return String(email ?? "").trim().toLowerCase();
@@ -67,6 +98,9 @@ function consumeVerificationToken(token) {
   return entry.email;
 }
 
+/* =========================================================
+   4. PASSWORD RESET UTILITIES
+   ========================================================= */
 function cleanupPasswordResetTokens() {
   const now = Date.now();
   for (const [token, meta] of passwordResetTokens.entries()) {
@@ -104,6 +138,9 @@ function consumePasswordResetToken(token) {
   return entry.email;
 }
 
+/* =========================================================
+   5. LINK BUILDERS
+   ========================================================= */
 function buildVerificationLink(req, token) {
   const protocol = req.protocol;
   const host = req.get("host");
@@ -116,6 +153,9 @@ function buildPasswordResetLink(req, token) {
   return `${protocol}://${host}/reset-password.html?token=${token}`;
 }
 
+/* =========================================================
+   6. CRYPTOGRAPHY & SECURITY
+   ========================================================= */
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
   const derived = crypto.scryptSync(password, salt, 64).toString("hex");
@@ -123,23 +163,13 @@ function hashPassword(password) {
 }
 
 function verifyPassword(password, stored) {
-  if (!stored || typeof stored !== "string") {
-    return false;
-  }
-
+  if (!stored || typeof stored !== "string") return false;
   const [salt, hash] = stored.split("$");
-  if (!salt || !hash) {
-    return false;
-  }
-
+  if (!salt || !hash) return false;
   const derived = crypto.scryptSync(password, salt, 64).toString("hex");
   const derivedBuffer = Buffer.from(derived, "hex");
   const hashBuffer = Buffer.from(hash, "hex");
-
-  if (hashBuffer.length !== derivedBuffer.length) {
-    return false;
-  }
-
+  if (hashBuffer.length !== derivedBuffer.length) return false;
   return crypto.timingSafeEqual(hashBuffer, derivedBuffer);
 }
 
@@ -174,11 +204,18 @@ async function revokeRefreshTokenByHash(tokenHash) {
   await pool.query("UPDATE refresh_tokens SET revoked = true WHERE token_hash = $1", [tokenHash]);
 }
 
+/* =========================================================
+   7. ROUTES
+   ========================================================= */
+
+/**
+ * POST /register
+ */
 router.post("/register", async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
 
-  console.log("?? REGISTER USING DB:", process.env.DATABASE_URL);
+  console.log("?? Registration Attempt:", email);
 
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
@@ -188,11 +225,7 @@ router.post("/register", async (req, res) => {
   const client = await pool.connect();
 
   try {
-    const existing = await client.query(
-      "SELECT id FROM users WHERE email = $1",
-      [email]
-    );
-
+    const existing = await client.query("SELECT id FROM users WHERE email = $1", [email]);
     if (existing.rowCount > 0) {
       return res.status(409).json({ error: "Email already registered" });
     }
@@ -204,13 +237,8 @@ router.post("/register", async (req, res) => {
       [crypto.randomUUID(), email, hashedPassword]
     );
 
-    const user = result.rows[0];
-    console.log("?? Database Update Success:", user.email);
-
-    return res.status(201).json({
-      success: true,
-      user
-    });
+    console.log("?? Account Created:", result.rows[0].email);
+    return res.status(201).json({ success: true, user: result.rows[0] });
   } catch (err) {
     console.error("Register error:", err);
     return res.status(500).json({ error: "Registration failed" });
@@ -219,38 +247,51 @@ router.post("/register", async (req, res) => {
   }
 });
 
+/**
+ * POST /send-verification
+ * Now sends a REAL email via SMTP.
+ */
 router.post("/send-verification", async (req, res) => {
   const email = normalizeEmail(req.body?.email);
-  if (!email) {
-    return res.status(400).json({ error: "Email is required" });
-  }
+  if (!email) return res.status(400).json({ error: "Email is required" });
 
   try {
     const result = await pool.query("SELECT email, email_verified FROM users WHERE email = $1", [email]);
     const user = result.rows[0];
 
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    if (user.email_verified) {
-      return res.status(200).json({ message: "Email already verified" });
-    }
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (user.email_verified) return res.status(200).json({ message: "Email already verified" });
 
     const { token, expiresAt } = createVerificationToken(email);
     const verificationLink = buildVerificationLink(req, token);
 
-    res.status(200).json({
-      token,
-      expiresAt,
-      verificationLink
+    // REAL SMTP SENDING
+    await transporter.sendMail({
+      from: `"InEx Ledger" <${process.env.SMTP_USER}>`,
+      to: email,
+      subject: "Verify Your InEx Ledger Account",
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px;">
+          <h2>Welcome to InEx Ledger</h2>
+          <p>Please click the button below to verify your email address. This link will expire in 15 minutes.</p>
+          <a href="${verificationLink}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 4px;">Verify Email</a>
+          <p style="margin-top: 20px; font-size: 12px; color: #666;">If you didn't create an account, you can safely ignore this email.</p>
+        </div>
+      `
     });
+
+    console.log("?? Verification Email Sent to:", email);
+    res.status(200).json({ message: "Verification link sent to your email." });
   } catch (err) {
     console.error("Send verification error:", err);
-    res.status(500).json({ error: "Internal server error" });
+    res.status(500).json({ error: "Failed to send verification email." });
   }
 });
 
+/**
+ * POST /login
+ * Added strict check for email_verified status.
+ */
 router.post("/login", async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
@@ -267,12 +308,17 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    // BLOCK LOGIN IF NOT VERIFIED
+    if (!user.email_verified) {
+      return res.status(401).json({ error: "Please verify your email address before logging in." });
+    }
+
     const token = signToken(
       {
         id: user.id,
         email: user.email,
         role: user.role || "user",
-        email_verified: !!user.email_verified
+        email_verified: true
       },
       ACCESS_TOKEN_EXPIRY_SECONDS
     );
@@ -287,6 +333,9 @@ router.post("/login", async (req, res) => {
   }
 });
 
+/**
+ * POST /refresh
+ */
 router.post("/refresh", async (req, res) => {
   const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (!rawToken) {
@@ -298,7 +347,7 @@ router.post("/refresh", async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT rt.id, rt.user_id, u.email, u.role, u.email_verified
+      `SELECT rt.user_id, u.email, u.role, u.email_verified
        FROM refresh_tokens rt
        JOIN users u ON u.id = rt.user_id
        WHERE rt.token_hash = $1 AND rt.revoked = false AND rt.expires_at > NOW()
@@ -333,6 +382,9 @@ router.post("/refresh", async (req, res) => {
   }
 });
 
+/**
+ * POST /logout
+ */
 router.post("/logout", requireAuth, async (req, res) => {
   const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (rawToken) {
@@ -343,36 +395,16 @@ router.post("/logout", requireAuth, async (req, res) => {
   res.status(204).end();
 });
 
-router.post("/verify-email", async (req, res) => {
-  const token = req.body?.token;
-  if (!token) {
-    return res.status(400).json({ error: "Token is required" });
-  }
-
-  const email = consumeVerificationToken(token);
-  if (!email) {
-    return res.status(400).json({ error: "Verification token is invalid or expired" });
-  }
-
-  try {
-    await pool.query("UPDATE users SET email_verified = true WHERE email = $1", [email]);
-    res.status(200).json({ message: "Email verified" });
-  } catch (err) {
-    console.error("Verification error:", err);
-    res.status(500).json({ error: "Database update failed" });
-  }
-});
-
+/**
+ * GET /verify-email
+ * The link clicked by the user in their email.
+ */
 router.get("/verify-email", async (req, res) => {
   const token = req.query?.token;
-  if (!token) {
-    return res.status(400).send("Verification token is required.");
-  }
+  if (!token) return res.status(400).send("Token is required.");
 
   const email = consumeVerificationToken(token);
-  if (!email) {
-    return res.status(400).send("The verification link is invalid or has expired.");
-  }
+  if (!email) return res.status(400).send("Invalid or expired link.");
 
   try {
     const result = await pool.query(
@@ -380,79 +412,64 @@ router.get("/verify-email", async (req, res) => {
       [email]
     );
 
-    if (result.rowCount === 0) {
-      return res.status(404).send("User not found.");
-    }
+    if (result.rowCount === 0) return res.status(404).send("User not found.");
 
-    return res.status(200).send("Email verified successfully. You can now log in.");
+    // Redirect to login with a success parameter
+    return res.redirect("/html/login.html?verified=true");
   } catch (err) {
-    console.error("Verification link error:", err);
-    return res.status(500).send("Internal server error.");
+    console.error("Verification error:", err);
+    return res.status(500).send("Verification failed.");
   }
 });
 
+/**
+ * POST /forgot-password
+ */
 router.post("/forgot-password", async (req, res) => {
   const email = normalizeEmail(req.body?.email);
-  if (!email) {
-    return res.status(400).json({ error: "Email is required" });
-  }
+  if (!email) return res.status(400).json({ error: "Email is required" });
 
   try {
     const userResult = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
-    if (userResult.rowCount === 0) {
-      return res.status(200).json({
-        message: "If the email is registered, a password reset link will be sent."
+    if (userResult.rowCount > 0) {
+      const { token } = createPasswordResetToken(email);
+      const resetLink = buildPasswordResetLink(req, token);
+
+      await transporter.sendMail({
+        from: `"InEx Ledger" <${process.env.SMTP_USER}>`,
+        to: email,
+        subject: "Password Reset Request",
+        html: `<p>Click here to reset your password:</p><a href="${resetLink}">${resetLink}</a>`
       });
     }
-
-    const { token, expiresAt } = createPasswordResetToken(email);
-    const resetLink = buildPasswordResetLink(req, token);
-
-    return res.status(200).json({
-      message: "Password reset link created.",
-      resetLink,
-      expiresAt: new Date(expiresAt).toISOString()
-    });
+    // Always return 200 for security reasons (don't leak which emails exist)
+    return res.status(200).json({ message: "If the email is registered, a reset link was sent." });
   } catch (err) {
     console.error("Forgot password error:", err);
-    res.status(500).json({ error: "Failed to generate reset link." });
+    res.status(500).json({ error: "Internal server error." });
   }
 });
 
+/**
+ * POST /reset-password
+ */
 router.post("/reset-password", async (req, res) => {
-  const token = req.body?.token;
-  const password = req.body?.password;
-  const confirmPassword = req.body?.confirmPassword;
+  const { token, password, confirmPassword } = req.body;
 
-  if (!token || !password || !confirmPassword) {
-    return res.status(400).json({ error: "Token and passwords are required." });
-  }
-
-  if (password !== confirmPassword) {
-    return res.status(400).json({ error: "Passwords do not match." });
+  if (!token || !password || password !== confirmPassword) {
+    return res.status(400).json({ error: "Invalid input or passwords do not match." });
   }
 
   const email = consumePasswordResetToken(token);
-  if (!email) {
-    return res.status(400).json({ error: "Reset token is invalid or expired." });
-  }
-
-  const hashedPassword = hashPassword(password);
+  if (!email) return res.status(400).json({ error: "Token expired or invalid." });
 
   try {
-    const result = await pool.query(
-      "UPDATE users SET password_hash = $1 WHERE email = $2 RETURNING id",
-      [hashedPassword, email]
-    );
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "User not found." });
-    }
-
+    const hashedPassword = hashPassword(password);
+    await pool.query("UPDATE users SET password_hash = $1 WHERE email = $2", [hashedPassword, email]);
     return res.status(200).json({ message: "Password updated successfully." });
   } catch (err) {
     console.error("Reset password error:", err);
-    res.status(500).json({ error: "Could not update password." });
+    res.status(500).json({ error: "Failed to reset password." });
   }
 });
 
