@@ -228,14 +228,29 @@ router.post("/register", async (req, res) => {
       [crypto.randomUUID(), email, hashedPassword]
     );
 
-    console.log("?? Account Created:", result.rows[0].email);
-    return res.status(201).json({ success: true, user: result.rows[0] });
+        console.log("?? Account Created:", result.rows[0].email);
+
+    // --- START OF EMAIL LOGIC ---
+    try {
+      const { token } = createVerificationToken(email);
+      const verificationLink = buildVerificationLink(req, token);
+
+      await resend.emails.send({
+        from: "InEx Ledger <onboarding@resend.dev>",
+        to: [email],
+        subject: "Verify Your InEx Ledger Account",
+        html: `<p>Welcome! Click <a href="${verificationLink}">here</a> to verify your account.</p>`
+      });
+      console.log("?? Verification Email Sent via Resend API");
+    } catch (emailErr) {
+      console.error("?? Email failed to send, but account was created:", emailErr);
+      // We don't return 500 here because the account WAS created successfully
+    }
+    // --- END OF EMAIL LOGIC ---
+
+    return res.status(201).json({ success: true, message: "Account created. Check your email!" });
   } catch (err) {
-    console.error("Register error:", err);
-    return res.status(500).json({ error: "Registration failed" });
-  } finally {
-    client.release();
-  }
+
 });
 
 /**
