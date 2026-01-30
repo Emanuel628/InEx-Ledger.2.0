@@ -3,9 +3,6 @@
  * This file MUST remain identical in:
  * - InEx-Ledger-Frontend
  * - In-Ex-Ledger-API/public
- *
- * Do NOT edit in only one bundle.
- * Always apply changes to BOTH.
  */
 
 /* =========================================================
@@ -75,7 +72,6 @@ async function handleRegisterSubmit(event) {
   submitButton?.setAttribute("disabled", "true");
 
   try {
-    // 1. Register the user
     const regResponse = await fetch(buildApiUrl("/api/auth/register"), {
       method: "POST",
       credentials: "include",
@@ -90,11 +86,10 @@ async function handleRegisterSubmit(event) {
       return;
     }
 
-    // 2. Persist preferences and consent
+    // Initialize session state
     persistRegionAndLanguage();
     await persistConsent();
 
-    // 3. Perform automatic login
     const loginResponse = await fetch(buildApiUrl("/api/auth/login"), {
       method: "POST",
       credentials: "include",
@@ -110,13 +105,14 @@ async function handleRegisterSubmit(event) {
       return;
     }
 
-    if (!loginBody?.token) {
+    const token = loginBody?.token || loginBody?.accessToken;
+    if (!token) {
       showRegisterError("Account created, but no session was returned. Please sign in.");
       window.location.href = "login.html";
       return;
     }
 
-    setToken(loginBody.token);
+    setToken(token);
     window.location.href = "transactions.html";
   } catch (err) {
     console.error("Register request failed:", err);
@@ -129,9 +125,7 @@ async function handleRegisterSubmit(event) {
 
 function wireShowPasswordToggle(container = document) {
   const checkbox = container.querySelector("#togglePassword");
-  if (!checkbox) {
-    return;
-  }
+  if (!checkbox) return;
 
   const passwordInputs = [
     container.querySelector("#password"),
@@ -145,14 +139,10 @@ function wireShowPasswordToggle(container = document) {
   };
 
   checkbox.addEventListener("change", updateFieldTypes);
-  updateFieldTypes();
 }
 
 function showRegisterError(message) {
-  if (!registerErrorElement) {
-    return;
-  }
-
+  if (!registerErrorElement) return;
   registerErrorElement.textContent = message;
   registerErrorElement.style.display = message ? "block" : "none";
 }
@@ -181,28 +171,22 @@ function updateStrengthMeter() {
   const strengthMeter = document.getElementById("passwordMeter");
   const strengthText = document.getElementById("passwordStrengthText");
 
-  if (!passwordInput || !strengthMeter || !strengthText) {
-    return;
-  }
+  if (!passwordInput || !strengthMeter || !strengthText) return;
 
   const score = calculatePasswordScore(passwordInput.value);
   const label = getStrengthLabel(score);
   let color = "#ef4444";
 
-  if (label === "Good") {
-    color = "#f97316";
-  } else if (label === "Strong") {
-    color = "#22c55e";
-  }
+  if (label === "Good") color = "#f97316";
+  else if (label === "Strong") color = "#22c55e";
 
   strengthMeter.style.width = `${score * 25}%`;
   strengthMeter.style.backgroundColor = color;
   
   const labelKey = label === "Strong" ? "register_strength_label_strong" : 
-                   label === "Good" ? "register_strength_label_good" : 
-                   "register_strength_label_weak";
-                   
-  strengthText.textContent = typeof t === "function" ? t(labelKey) : label;
+                   label === "Good" ? "register_strength_label_good" : "register_strength_label_weak";
+  
+  strengthText.textContent = (typeof t === "function") ? t(labelKey) : label;
   strengthText.style.color = color;
 }
 
@@ -211,24 +195,21 @@ function updateMatchMessage() {
   const confirmInput = form.querySelector("#confirm-password");
   const matchMessage = document.getElementById("passwordMatchMessage");
 
-  if (!passwordInput || !confirmInput || !matchMessage) {
-    return;
-  }
+  if (!passwordInput || !confirmInput || !matchMessage) return;
 
   const password = passwordInput.value;
   const confirm = confirmInput.value;
 
   matchMessage.classList.remove("is-ok", "is-bad");
-
   if (!password || !confirm) {
     matchMessage.textContent = "";
     return;
   }
 
   const match = password === confirm;
-  matchMessage.textContent = match
-    ? (typeof t === "function" ? t("register_password_match_success") : "Passwords match")
-    : (typeof t === "function" ? t("register_password_match_error") : "Passwords do not match");
+  matchMessage.textContent = match 
+    ? (typeof t === "function" ? t("register_password_match_success") : "Match") 
+    : (typeof t === "function" ? t("register_password_match_error") : "No match");
   matchMessage.classList.add(match ? "is-ok" : "is-bad");
 }
 
@@ -237,18 +218,10 @@ function isValidEmail(email) {
 }
 
 function persistRegionAndLanguage() {
-  const selectedRegion = localStorage.getItem("lb_region") || "us";
-  const selectedLanguage = localStorage.getItem("lb_language") || "en";
-
-  localStorage.setItem("lb_region", selectedRegion);
-  window.LUNA_REGION = selectedRegion;
-  
-  if (typeof setCurrentLanguage === "function") {
-    setCurrentLanguage(selectedLanguage);
-  } else {
-    localStorage.setItem("lb_language", selectedLanguage);
-    window.LUNA_LANGUAGE = selectedLanguage;
-  }
+  const reg = localStorage.getItem("lb_region") || "us";
+  const lang = localStorage.getItem("lb_language") || "en";
+  localStorage.setItem("lb_region", reg);
+  localStorage.setItem("lb_language", lang);
 }
 
 async function persistConsent() {
@@ -257,8 +230,7 @@ async function persistConsent() {
       consentGiven: true,
       consentAt: new Date().toISOString(),
       termsVersion: "v1",
-      privacyVersion: "v1",
-      dataSharingOptOut: false
+      privacyVersion: "v1"
     });
   }
 }
