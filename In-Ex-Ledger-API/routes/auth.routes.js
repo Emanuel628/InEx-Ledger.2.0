@@ -5,32 +5,23 @@
 
 import express from "express";
 import crypto from "node:crypto";
-import nodemailer from "nodemailer";
+// 1. CHANGE: Switch from nodemailer to resend
+import { Resend } from "resend"; 
 import { signToken, requireAuth } from "../middleware/auth.middleware.js";
 import pool from "../db.js";
 
 const router = express.Router();
 
 /* =========================================================
-   1. EMAIL TRANSPORT CONFIGURATION
+   1. EMAIL API CONFIGURATION (Replaces SMTP)
    ========================================================= */
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: process.env.SMTP_SECURE === "true",
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+// 2. CHANGE: Initialize Resend with your API Key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-transporter.verify((error) => {
-  if (error) {
-    console.error("?? SMTP Configuration Error:", error);
-  } else {
-    console.log("?? SMTP Server is authenticated and ready.");
-  }
-});
+// 3. CHANGE: We no longer need transporter.verify() because 
+// API connections don't "stay open" like SMTP. 
+console.log("?? Resend Email Engine Initialized");
+
 
 /* =========================================================
    2. CONSTANTS & COOKIE CONFIGURATION
