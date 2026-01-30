@@ -8,27 +8,58 @@ import { requireAuth } from "./middleware/auth.middleware.js";
 
 const app = express();
 const publicDir = path.join(process.cwd(), "public");
+
+/* =========================================================
+   CORS & SECURITY CONFIGURATION
+   ========================================================= */
 const ALLOWED_ORIGINS = [
-  "https://lunafinance.org",
-  "https://www.lunafinance.org",
+  "https://inexledger.com",
+  "https://www.inexledger.com",
   "https://inex-ledger20-production.up.railway.app",
   "http://localhost:5173",
   "http://localhost:3000"
 ];
 
-console.log("🔥 DOCKER FINGERPRINT: CLEAN_BUILD_2026_01_24");
+console.log("🔥 SYSTEM START: INEX_LEDGER_PROD_2026");
 
 const PORT = process.env.PORT || 8080;
-console.log(`SYSTEM_INFO: Railway requested Port ${process.env.PORT}`);
-console.log("JWT_SECRET present:", !!process.env.JWT_SECRET);
+console.log(`📡 NETWORK: Port assigned: ${PORT}`);
+console.log("🔑 SECURITY: JWT_SECRET detected:", !!process.env.JWT_SECRET);
 
 app.use(cors({
-  origin: ALLOWED_ORIGINS,
+  origin: (origin, callback) => {
+    // Allow server-to-server or local testing with no origin
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`⚠️  CORS: Blocked request from ${origin}`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true
 }));
 
+/* =========================================================
+   MIDDLEWARE STACK
+   ========================================================= */
 app.use(express.static(publicDir));
 app.use(express.static(path.join(publicDir, "html")));
+app.use(express.json());
+app.use(cookieParser());
+
+/* =========================================================
+   SYSTEM ROUTES (HEALTH & STATIC)
+   ========================================================= */
+
+// Railway Deployment Healthcheck
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "healthy",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
 
 app.get("/favicon.ico", (req, res) => {
   res.status(204).end();
@@ -38,35 +69,39 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(publicDir, "html", "landing.html"));
 });
 
-app.use(express.json());
-app.use(cookieParser());
+/* =========================================================
+   API ROUTES
+   ========================================================= */
 
-app.get("/health", (req, res) => {
-  res.status(200).json({
-    ok: true,
-    commit: process.env.RAILWAY_GIT_COMMIT_SHA || "unknown"
-  });
-});
-
+// Transaction management
 app.use("/api/transactions", transactionsRouter);
-console.log("Mounted /api/transactions");
-app.use("/api", routes);
+console.log("✅ MOUNTED: /api/transactions");
 
+// Core auth and index routes
+app.use("/api", routes);
+console.log("✅ MOUNTED: /api (Core Routes)");
+
+// User identity endpoint
 app.get("/api/me", requireAuth, (req, res) => {
   res.json(req.user);
 });
 
-;(async () => {
-  try {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`API running on port ${PORT}`);
-    });
-  } catch (err) {
-    console.error("Startup failed:", err);
-    process.exit(1);
-  }
-})();
+/* =========================================================
+   SERVER INITIALIZATION
+   ========================================================= */
+
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 READY: InEx Ledger API live on port ${PORT}`);
+});
+
+/* =========================================================
+   GRACEFUL SHUTDOWN
+   ========================================================= */
 
 process.on("SIGTERM", () => {
-  console.log("Railway sent SIGTERM — process still alive");
+  console.log("🛑 SIGTERM: Shutdown signal received.");
+  server.close(() => {
+    console.log("💨 Server closed safely. Goodbye!");
+    process.exit(0);
+  });
 });
