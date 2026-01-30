@@ -1,57 +1,38 @@
 /**
- * SHARED AUTH CONTRACT
- * This file MUST remain identical in:
- * - InEx-Ledger-Frontend
- * - In-Ex-Ledger-API/public
+ * LOGIN PAGE LOGIC
+ * Authenticates existing users.
  */
-
-/* =========================================================
-   Login Page JS
-   ========================================================= */
 
 let loginForm = null;
 let loginErrorElement = null;
 let isSubmittingLogin = false;
-const OFFLINE_ERROR_MESSAGE = "Unable to reach server. Check your connection and try again.";
-const EXPIRED_SESSION_MESSAGE = "Your session expired. Please log in again.";
-
-if (typeof redirectIfAuthenticated === "function") {
-  redirectIfAuthenticated();
-}
 
 document.addEventListener("DOMContentLoaded", () => {
   loginForm = document.getElementById("loginForm");
   loginErrorElement = document.getElementById("loginError");
 
-  if (!loginForm) {
-    console.warn("Login form not found.");
-    return;
-  }
+  if (!loginForm) return;
 
   loginForm.addEventListener("submit", handleLoginSubmit);
   wireShowPasswordToggle(document);
-  showLoginReasonMessage();
+  
+  // Show specialized messages if redirected from Register
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("reason") === "created") {
+    showLoginError("Account created! Please sign in to verify your session.");
+    loginErrorElement.style.color = "#22c55e"; // Green for success
+  }
 });
 
 async function handleLoginSubmit(event) {
   event.preventDefault();
-  if (!loginForm || isSubmittingLogin) return;
+  if (isSubmittingLogin) return;
 
-  const submitButton = loginForm.querySelector("button[type=\"submit\"]");
-  const email = document.getElementById("email")?.value.trim() || "";
-  const password = document.getElementById("password")?.value || "";
+  const email = document.getElementById("email")?.value.trim();
+  const password = document.getElementById("password")?.value;
+  const submitButton = loginForm.querySelector('button[type="submit"]');
 
-  clearLoginError();
-
-  if (!email || !password) {
-    showLoginError("Enter your email and password.");
-    return;
-  }
-
-  if (!isValidEmail(email)) {
-    showLoginError("Please enter a valid email address.");
-    return;
-  }
+  showLoginError("");
 
   isSubmittingLogin = true;
   submitButton?.setAttribute("disabled", "true");
@@ -59,7 +40,6 @@ async function handleLoginSubmit(event) {
   try {
     const response = await fetch(buildApiUrl("/api/auth/login"), {
       method: "POST",
-      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });
@@ -71,51 +51,36 @@ async function handleLoginSubmit(event) {
       return;
     }
 
+    // Check for token OR accessToken
     const token = data?.token || data?.accessToken;
+
     if (!token) {
-      showLoginError("Login failed. No session token received.");
+      showLoginError("Server didn't provide a session. Contact support.");
       return;
     }
 
     setToken(token);
     window.location.href = "transactions.html";
   } catch (err) {
-    console.error("Login request failed:", err);
-    showLoginError(OFFLINE_ERROR_MESSAGE);
+    showLoginError("Connection failed. Please check your internet.");
   } finally {
-    submitButton?.removeAttribute("disabled");
     isSubmittingLogin = false;
+    submitButton?.removeAttribute("disabled");
   }
 }
 
-function showLoginReasonMessage() {
-  const params = new URLSearchParams(window.location.search);
-  const reason = params.get("reason");
-  if (reason === "expired") showLoginError(EXPIRED_SESSION_MESSAGE);
-  else if (reason === "network") showLoginError(OFFLINE_ERROR_MESSAGE);
-}
-
-function showLoginError(message) {
+function showLoginError(msg) {
   if (!loginErrorElement) return;
-  loginErrorElement.textContent = message || "";
-  loginErrorElement.hidden = !message;
-  loginErrorElement.style.display = message ? "block" : "none";
+  loginErrorElement.textContent = msg;
+  loginErrorElement.hidden = !msg;
+  loginErrorElement.style.display = msg ? "block" : "none";
 }
 
-function clearLoginError() {
-  showLoginError("");
-}
-
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function wireShowPasswordToggle(container = document) {
+function wireShowPasswordToggle(container) {
   const toggle = container.querySelector("#togglePassword");
   if (!toggle) return;
-
   toggle.addEventListener("change", () => {
-    const passwordField = container.querySelector('input[name="password"]');
-    if (passwordField) passwordField.type = toggle.checked ? "text" : "password";
+    const pw = container.querySelector("#password");
+    if (pw) pw.type = toggle.checked ? "text" : "password";
   });
 }
