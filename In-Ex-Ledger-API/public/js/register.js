@@ -9,7 +9,7 @@
  */
 
 /* =========================================================
-   Register Page JS — FINAL (ONE AND DONE)
+   Register Page JS
    ========================================================= */
 
 let form = null;
@@ -52,6 +52,7 @@ async function handleRegisterSubmit(event) {
   const submitButton = form.querySelector("button[type=\"submit\"]");
   const email = document.getElementById("email")?.value.trim() || "";
   const password = document.getElementById("password")?.value || "";
+  const confirmPassword = document.getElementByID("password")?.value || "";
 
   hideRegisterError();
 
