@@ -10,10 +10,6 @@ jobs:
   enforce-export-guardrails:
     name: Enforce export guardrails
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: In-Ex-Ledger-API
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,14 +21,24 @@ jobs:
           cache: "npm"
           cache-dependency-path: In-Ex-Ledger-API/package-lock.json
 
+      - name: Debug repo structure
+        run: |
+          pwd
+          ls -la
+          ls -la In-Ex-Ledger-API
+
       - name: Install dependencies
+        working-directory: In-Ex-Ledger-API
         run: npm install
 
       - name: Run export grant guard
+        working-directory: In-Ex-Ledger-API
         run: npm run test:export-grant
 
       - name: Run log scan
+        working-directory: In-Ex-Ledger-API
         run: npm run log_scan
 
       - name: Verify redacted export storage
+        working-directory: In-Ex-Ledger-API
         run: npm run verify:redacted-storage
