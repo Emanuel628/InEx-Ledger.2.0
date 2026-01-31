@@ -1,0 +1,31 @@
+name: Phase 7 Guardrails
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  enforce-export-guardrails:
+    name: Enforce export guardrails
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run export grant guard
+        run: npm run test:export-grant
+
+      - name: Verify redacted export storage
+        run: npm run verify:redacted-storage
