@@ -7,6 +7,30 @@ import { dispatchPdfJob } from "../services/pdfWorkerClient.js";
 import { saveRedactedPdf, buildRedactedStream } from "../services/exportStorage.js";
 import { pool } from "../db.js";
 
+const SENSITIVE_KEYS = new Set(["taxId", "taxId_jwe", "ein", "bn", "tax_id", "taxid"]);
+
+function sanitizeExportPayload(payload = {}) {
+  if (!payload || typeof payload !== "object") return {};
+
+  const sanitized = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (SENSITIVE_KEYS.has(key)) {
+      sanitized[key] = "[REDACTED]";
+      continue;
+    }
+    if (typeof value === "string") {
+      sanitized[key] = value;
+    } else if (Array.isArray(value)) {
+      sanitized[key] = value.slice(0, 5);
+    } else if (typeof value === "object" && value !== null) {
+      sanitized[key] = sanitizeExportPayload(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
 const router = express.Router();
 router.use(requireAuth);
 
@@ -21,6 +45,7 @@ function validateDateRange(range) {
 }
 
 router.post("/exports/request-grant", async (req, res) => {
+  const sanitizedBody = sanitizeExportPayload(req.body);
   try {
     const user = req.user;
     const businessId = user.business_id || (await resolveBusinessIdForUser(user));
@@ -56,7 +81,7 @@ router.post("/exports/request-grant", async (req, res) => {
       expiresAt: new Date(grant.expiresAt).toISOString()
     });
   } catch (err) {
-    console.error("Export grant error:", err.message);
+    console.error("Export grant error:", sanitizedBody, err.message);
     return res.status(500).json({ error: "Unable to issue export grant." });
   }
 });
@@ -68,6 +93,7 @@ router.post("/exports/generate", async (req, res) => {
   }
 
   let grantPayload;
+  const sanitizedBody = sanitizeExportPayload(req.body);
   try {
     grantPayload = verifyExportGrant(token);
   } catch (err) {
@@ -146,7 +172,7 @@ router.post("/exports/generate", async (req, res) => {
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
     return res.send(workerResult.fullPdfBuffer);
   } catch (err) {
-    console.error("Export generation error:", err.message);
+    console.error("Export generation error:", sanitizedBody, err.message);
     return res.status(500).json({ error: "Failed to generate export." });
   }
 });
@@ -165,7 +191,12 @@ router.get("/exports/history", async (req, res) => {
        LIMIT 50`,
       [businessId]
     );
-    return res.json(result.rows);
+    const history = result.rows.map((entry) => ({
+      ...entry,
+      storage_type: "redacted-only",
+      full_version_available: true
+    }));
+    return res.json(history);
   } catch (err) {
     console.error("Export history error:", err.message);
     return res.status(500).json({ error: "Unable to load export history." });
