@@ -24,6 +24,9 @@
 - Recreate a grant and ensure reused `jti` fails (401).
 - To automate that, run `npm run test:export-grant` from `In-Ex-Ledger-API`; it issues a grant, verifies one-time use, waits for the TTL, and confirms expired tokens are rejected.
 
+# Phase 7 (DRM / Ephemeral Delivery)
+- Run `npm run verify:redacted-storage` after exports run to confirm the backend stores only `.redacted.pdf` artifacts and never persists full PDFs.
+
 ## 5. Ongoing checks
 - Periodically grep logs for `taxId` or `taxId_jwe`. Use a monitoring job that fails if either string appears anywhere in `logs/*.log`.
 - Ensure CSV exports continue to block `includeTaxId`.
