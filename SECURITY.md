@@ -18,6 +18,8 @@
 - **Phase 5 (Egress lockdown)** – Run `pdf-worker` in a subnet without NAT or Internet Gateway, exposing only a private VPC endpoint to the API and the provider’s attestation/KMS services. Rotate `PDF_WORKER_SECRET` and release a new worker image whenever you rotate `EXPORT_GRANT_SECRET`.
 - Reference `pdf-worker/DEPLOYMENT.md` for the exact configuration needed to keep the worker fully isolated (no egress, attestation-only key retrieval, private endpoint access).
 - **Phase 6 (Immune logging)** – Never log `taxId`, `taxId_jwe`, `ein`, `bn`, or any `*_tax_id` field in API/worker/edge logs. Disable request mirroring for `/api/exports/*`, and always sanitize job IDs before logging.
+- Add a monitoring job (grep/alert) that scans recent logs for those sensitive keywords hourly and fails if any appear.
+- You can use `node scripts/log_scan.js LOG_DIR=/var/log/inex-ledger` (or the provided wrapper) on a schedule to enforce this.
 - **Phase 7 (DRM/ephemeral delivery)** – Stream the full PDF immediately from the worker response. If you must expose a signed URL, keep it ephemeral (minutes) and never persist full-tax-id versions anywhere in storage.
 
 ## Operational guidance

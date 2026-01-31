@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import { importJWK, compactDecrypt } from "jose";
+import { logInfo, logError } from "./logger.js";
 
 dotenv.config();
 
@@ -53,6 +54,7 @@ app.use(express.json({ limit: "1mb" }));
 app.use((req, res, next) => {
   const token = req.headers["x-worker-token"];
   if (token !== WORKER_SECRET) {
+    logError("Unauthorized worker request", new Error("Invalid token"), { path: req.path });
     return res.status(401).json({ error: "Unauthorized" });
   }
   next();
@@ -66,6 +68,8 @@ app.post("/generate", async (req, res) => {
     const fullPdfBuffer = buildPdfContent(job, taxId, false);
     const redactedPdfBuffer = buildPdfContent(job, taxId, true);
 
+    logInfo("Worker generated PDFs", { jobId: job.jobId, includeTaxId });
+
     res.json({
       jobId: job.jobId,
       fullPdf: encodeBase64(fullPdfBuffer),
@@ -78,11 +82,11 @@ app.post("/generate", async (req, res) => {
       }
     });
   } catch (err) {
-    console.error("Worker failed:", err?.message || err);
+    logError("Worker failed", err, { jobId: job.jobId });
     res.status(500).json({ error: "Failed to generate PDF." });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`pdf-worker listening on port ${PORT}`);
+  logInfo("Worker ready", { port: PORT });
 });
