@@ -9,6 +9,7 @@
 ## 2. Grant token attestation health
 - Check that the environment variable `EXPORT_GRANT_SECRET` was rotated when the key rotation occurs (token invalidation time should be coordinated).
 - Monitor the `/api/exports/request-grant` logs to ensure only metadata is stored and no body fields contain plaintext tax IDs.
+- After deploying a new worker image, verify `pdf-worker` attestation and ensure it successfully decrypts `taxId_jwe` (see `pdf-worker/README.md` for local testing notes).
 
 ## 3. Worker key retrieval
 - Start the TEE worker and perform remote attestation against the cloud provider’s attestation service (e.g., AWS Nitro, Azure Confidential Computing).
