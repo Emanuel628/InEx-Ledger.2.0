@@ -3,25 +3,27 @@
 -- =========================================
 
 -- Remove duplicate accounts for the same business/name (keep lowest UUID)
-DELETE FROM accounts a
-USING (
-  SELECT business_id, name, MIN(id) AS keep_id, COUNT(*) as cnt
+WITH duplicate_accounts AS (
+  SELECT business_id, name, MIN(id) AS keep_id
   FROM accounts
   GROUP BY business_id, name
   HAVING COUNT(*) > 1
-) d
+)
+DELETE FROM accounts a
+USING duplicate_accounts d
 WHERE a.business_id = d.business_id
   AND a.name = d.name
   AND a.id <> d.keep_id;
 
 -- Remove duplicate categories for the same business/name (keep lowest UUID)
-DELETE FROM categories c
-USING (
-  SELECT business_id, name, MIN(id) AS keep_id, COUNT(*) as cnt
+WITH duplicate_categories AS (
+  SELECT business_id, name, MIN(id) AS keep_id
   FROM categories
   GROUP BY business_id, name
   HAVING COUNT(*) > 1
-) d
+)
+DELETE FROM categories c
+USING duplicate_categories d
 WHERE c.business_id = d.business_id
   AND c.name = d.name
   AND c.id <> d.keep_id;
