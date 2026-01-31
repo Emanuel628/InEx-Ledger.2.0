@@ -8,19 +8,21 @@ let privacySettings = {
   consentGiven: false
 };
 
-const DEFAULT_THEME = "light";
-const THEME_VERSION = "2";
+const SETTINGS_DEFAULT_THEME =
+  typeof DEFAULT_THEME !== "undefined" ? DEFAULT_THEME : "light";
+const SETTINGS_THEME_VERSION =
+  typeof THEME_VERSION !== "undefined" ? THEME_VERSION : "2";
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
 function resolveSavedTheme() {
   const storedVersion = localStorage.getItem("lb_theme_version");
-  if (storedVersion !== THEME_VERSION) {
-    localStorage.setItem("lb_theme", DEFAULT_THEME);
-    localStorage.setItem("lb_theme_version", THEME_VERSION);
-    return DEFAULT_THEME;
+  if (storedVersion !== SETTINGS_THEME_VERSION) {
+    localStorage.setItem("lb_theme", SETTINGS_DEFAULT_THEME);
+    localStorage.setItem("lb_theme_version", SETTINGS_THEME_VERSION);
+    return SETTINGS_DEFAULT_THEME;
   }
 
-  return localStorage.getItem("lb_theme") || DEFAULT_THEME;
+  return localStorage.getItem("lb_theme") || SETTINGS_DEFAULT_THEME;
 }
 
 let saveBarElement = null;
