@@ -1,32 +1,22 @@
--- =========================================
+﻿-- =========================================
 -- Remove duplicate accounts and categories then enforce uniqueness by business_id + name
 -- =========================================
 
 -- Remove duplicate accounts for the same business/name (keep lowest UUID)
-WITH duplicate_accounts AS (
-  SELECT business_id, name, MIN(id) AS keep_id
+WITH ranked_accounts AS (
+  SELECT id, ROW_NUMBER() OVER (PARTITION BY business_id, name ORDER BY id) AS rn
   FROM accounts
-  GROUP BY business_id, name
-  HAVING COUNT(*) > 1
 )
-DELETE FROM accounts a
-USING duplicate_accounts d
-WHERE a.business_id = d.business_id
-  AND a.name = d.name
-  AND a.id <> d.keep_id;
+DELETE FROM accounts
+WHERE id IN (SELECT id FROM ranked_accounts WHERE rn > 1);
 
 -- Remove duplicate categories for the same business/name (keep lowest UUID)
-WITH duplicate_categories AS (
-  SELECT business_id, name, MIN(id) AS keep_id
+WITH ranked_categories AS (
+  SELECT id, ROW_NUMBER() OVER (PARTITION BY business_id, name ORDER BY id) AS rn
   FROM categories
-  GROUP BY business_id, name
-  HAVING COUNT(*) > 1
 )
-DELETE FROM categories c
-USING duplicate_categories d
-WHERE c.business_id = d.business_id
-  AND c.name = d.name
-  AND c.id <> d.keep_id;
+DELETE FROM categories
+WHERE id IN (SELECT id FROM ranked_categories WHERE rn > 1);
 
 -- Enforce unique names per business
 CREATE UNIQUE INDEX IF NOT EXISTS accounts_business_name_unique
