@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import ipaddr from "ipaddr.js";
 import { importJWK, compactDecrypt } from "jose";
 import { logInfo, logError } from "./logger.js";
 
@@ -8,6 +9,41 @@ dotenv.config();
 const PORT = Number(process.env.PORT || 9080);
 const WORKER_SECRET = process.env.PDF_WORKER_SECRET;
 const PRIVATE_KEY_JWK = process.env.PDF_WORKER_PRIVATE_KEY_JWK;
+const ALLOWED_CIDRS = (process.env.PDF_WORKER_ALLOWED_CIDRS || "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16")
+  .split(",")
+  .map((cidr) => cidr.trim())
+  .filter(Boolean);
+
+if (ALLOWED_CIDRS.length === 0) {
+  throw new Error("PDF_WORKER_ALLOWED_CIDRS must include at least one CIDR range.");
+}
+
+const parsedCidrs = ALLOWED_CIDRS.map((cidr) => {
+  try {
+    return ipaddr.parseCIDR(cidr);
+  } catch (err) {
+    throw new Error(`Invalid CIDR in PDF_WORKER_ALLOWED_CIDRS: ${cidr}`);
+  }
+});
+
+function getRemoteIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.socket.remoteAddress || "";
+}
+
+function isIpAllowed(ipValue) {
+  if (!ipValue) return false;
+  let parsed;
+  try {
+    parsed = ipaddr.parse(ipValue);
+  } catch {
+    return false;
+  }
+  return parsedCidrs.some(([network, prefix]) => parsed.kind() === network.kind() && parsed.match(network, prefix));
+}
 
 if (!WORKER_SECRET) {
   throw new Error("Missing PDF_WORKER_SECRET (shared secret for API traffic).");
@@ -50,6 +86,18 @@ function buildPdfContent(job, taxId, redact = false) {
 
 const app = express();
 app.use(express.json({ limit: "1mb" }));
+
+app.use((req, res, next) => {
+  const remoteIp = getRemoteIp(req);
+  if (!isIpAllowed(remoteIp)) {
+    logError("Blocked worker request from unauthorized IP", new Error("Unauthorized IP"), {
+      path: req.path,
+      ip: remoteIp
+    });
+    return res.status(403).json({ error: "Access denied" });
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   const token = req.headers["x-worker-token"];

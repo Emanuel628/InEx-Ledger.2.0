@@ -16,6 +16,7 @@
 ## Phase 4–7 checklist
 - **Phase 4 (Redacted history)** – Store only the redacted PDF (`storage/redacted-exports`) and keep `full_version_available=true` in the metadata. History downloads must call `/api/exports/history/:id/redacted`. UI should always request a new grant before attempting to fetch a full version.
 - **Phase 5 (Egress lockdown)** – Run `pdf-worker` in a subnet without NAT or Internet Gateway, exposing only a private VPC endpoint to the API and the provider’s attestation/KMS services. Rotate `PDF_WORKER_SECRET` and release a new worker image whenever you rotate `EXPORT_GRANT_SECRET`.
+- Ensure `PDF_WORKER_ALLOWED_CIDRS` lists only the approved private CIDR(s) so the worker enforces inbound traffic restrictions at the application layer.
 - Reference `pdf-worker/DEPLOYMENT.md` for the exact configuration needed to keep the worker fully isolated (no egress, attestation-only key retrieval, private endpoint access).
 - **Phase 6 (Immune logging)** – Never log `taxId`, `taxId_jwe`, `ein`, `bn`, or any `*_tax_id` field in API/worker/edge logs. Disable request mirroring for `/api/exports/*`, and always sanitize job IDs before logging.
 - Add a monitoring job (grep/alert) that scans recent logs for those sensitive keywords hourly and fails if any appear.
@@ -29,3 +30,4 @@
 - Apply strict egress controls on the worker (no NAT, only private endpoints to the API and KMS).
 - When rotating keys, publish the new public `kid` via `/api/crypto/export-public-key` and retire old `kid` values once caches expire.
 - Use the runbook (`RUNBOOK.md`) for step-by-step rotation and attestation checks.
+

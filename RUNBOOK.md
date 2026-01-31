@@ -16,6 +16,7 @@
 - Once attested, have the worker authenticate to the Key Vault/KMS and unwrap the private RSA key inside the enclave.
 - The worker must not expose this key outside RAM. Use the attestation ID + sealed storage handshake defined in the architecture team’s runbook.
 - While spinning up a new worker, follow `pdf-worker/DEPLOYMENT.md` to enforce Phase 5 networking constraints (no NAT/IGW, private endpoint, attestation-only KMS access) and rotate `PDF_WORKER_SECRET` along with `EXPORT_GRANT_SECRET`.
+- Confirm `PDF_WORKER_ALLOWED_CIDRS` covers only the API-private subnet so the worker enforces the inbound-only policy at the application level.
 
 ## 4. Export validation
 - Trigger a PDF export with `includeTaxId=true` to ensure the worker receives the `taxId_jwe`. Verify API logs do not contain `taxId` or `taxId_jwe`.

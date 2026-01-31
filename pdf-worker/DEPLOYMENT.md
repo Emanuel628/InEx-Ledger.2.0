@@ -7,6 +7,7 @@ This checklist covers the secure deployment of pdf-worker inside a Trusted Execu
 2. Only allow inbound traffic from the API service via a private VPC endpoint or service mesh connection.
 3. Allow outbound traffic only to the cloud provider's attestation/KMS endpoints used to unwrap PDF_WORKER_PRIVATE_KEY_JWK.
 4. Block all other outbound access (use provider-private DNS resolvers if necessary).
+5. Define `PDF_WORKER_ALLOWED_CIDRS` so the worker itself enforces exactly which CIDR ranges may connect; include the API subnet and private endpoints only.
 
 ## Worker Configuration
 1. Provision the worker inside the TEE (AWS Nitro enclave, Azure Confidential VM, etc.).

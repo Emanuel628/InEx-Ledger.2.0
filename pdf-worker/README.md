@@ -9,6 +9,7 @@ This service is built to run inside a trusted execution environment (TEE) such a
 | `PORT` | Port for the worker listener (default `9080`). |
 | `PDF_WORKER_SECRET` | Shared header token (`X-Worker-Token`) to authenticate the API. Rotate alongside `EXPORT_GRANT_SECRET`. |
 | `PDF_WORKER_PRIVATE_KEY_JWK` | RSA-OAEP-256 private key in JWK format. Fetch it only after enclave attestation; the key must never leave RAM. |
+| `PDF_WORKER_ALLOWED_CIDRS` | Comma-separated CIDR ranges that are allowed to call the worker (e.g., the API-private subnet). Defaults to `10.0.0.0/8,172.16.0.0/12,192.168.0.0/16`. |
 
 ## Local development
 
