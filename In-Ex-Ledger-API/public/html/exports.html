@@ -88,6 +88,26 @@
           <button type="button" id="exportPdfBtn">Export PDF</button>
         </div>
         <p id="exportPdfNote" class="small-note">PDF export is included in InEx Ledger V1.</p>
+        <div class="tax-id-section">
+          <label class="tax-id-checkbox">
+            <input type="checkbox" id="exportIncludeTaxId" />
+            <span>Include tax ID (EIN / Business Number)</span>
+          </label>
+          <div id="exportTaxIdRow" class="tax-id-input-row" hidden>
+            <label for="exportTaxId">Tax ID</label>
+            <input
+              type="password"
+              id="exportTaxId"
+              inputmode="numeric"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              spellcheck="false"
+              maxlength="20"
+            />
+            <p class="help-text">This value is encrypted locally and never stored in the database.</p>
+          </div>
+        </div>
       </form>
     </section>
 
@@ -118,6 +138,7 @@
 <script src="../js/trial.js"></script>
 <script src="../js/pdf_labels.js"></script>
 <script src="../js/pdf_export.js"></script>
+<script src="../js/jwe-utils.js"></script>
 <script src="../js/exports.js"></script>
 </body>
 </html>

@@ -8,6 +8,7 @@ import exportsRoutes from "./exports.routes.js";
 import businessRoutes from "./business.routes.js";
 import systemRoutes from "./system.routes.js";
 import meRoutes from "./me.routes.js";
+import cryptoRoutes from "./crypto.routes.js";
 
 const router = express.Router();
 
@@ -19,5 +20,6 @@ router.use("/exports", exportsRoutes);
 router.use("/business", businessRoutes);
 router.use("/system", systemRoutes);
 router.use("/me", meRoutes);
+router.use("/crypto", cryptoRoutes);
 
 export default router;
