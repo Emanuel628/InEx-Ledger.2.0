@@ -5,6 +5,7 @@
 
 import express from "express";
 import crypto from "node:crypto";
+import bcrypt from "bcrypt";
 // 1. CHANGE: Switch from nodemailer to resend
 import { Resend } from "resend"; 
 import { signToken, requireAuth } from "../middleware/auth.middleware.js";
@@ -31,6 +32,7 @@ const REFRESH_TOKEN_EXPIRY_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRY_DAYS) 
 const REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 const REFRESH_TOKEN_BYTE_LENGTH = 48;
 const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 15 * 60;
+const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -147,21 +149,36 @@ function buildPasswordResetLink(req, token) {
 /* =========================================================
    6. CRYPTOGRAPHY & SECURITY
    ========================================================= */
-function hashPassword(password) {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const derived = crypto.scryptSync(password, salt, 64).toString("hex");
-  return `${salt}$${derived}`;
+async function hashPassword(password) {
+  return bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 }
 
-function verifyPassword(password, stored) {
-  if (!stored || typeof stored !== "string") return false;
-  const [salt, hash] = stored.split("$");
-  if (!salt || !hash) return false;
-  const derived = crypto.scryptSync(password, salt, 64).toString("hex");
-  const derivedBuffer = Buffer.from(derived, "hex");
-  const hashBuffer = Buffer.from(hash, "hex");
-  if (hashBuffer.length !== derivedBuffer.length) return false;
-  return crypto.timingSafeEqual(hashBuffer, derivedBuffer);
+function isLegacyScryptHash(stored) {
+  return typeof stored === "string" && stored.includes("$") && stored.split("$").length === 2;
+}
+
+async function verifyPassword(password, stored) {
+  if (!stored || typeof stored !== "string") {
+    return { match: false, legacy: false };
+  }
+
+  if (isLegacyScryptHash(stored)) {
+    const [salt, hash] = stored.split("$");
+    if (!salt || !hash) {
+      return { match: false, legacy: true };
+    }
+    const derived = crypto.scryptSync(password, salt, 64).toString("hex");
+    const derivedBuffer = Buffer.from(derived, "hex");
+    const hashBuffer = Buffer.from(hash, "hex");
+    if (hashBuffer.length !== derivedBuffer.length) {
+      return { match: false, legacy: true };
+    }
+    const matched = crypto.timingSafeEqual(hashBuffer, derivedBuffer);
+    return { match: matched, legacy: matched };
+  }
+
+  const match = await bcrypt.compare(password, stored);
+  return { match, legacy: false };
 }
 
 function setRefreshCookie(res, token, expiresAt) {
@@ -212,7 +229,7 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ error: "Email and password are required" });
   }
 
-  const hashedPassword = hashPassword(password);
+  const hashedPassword = await hashPassword(password);
   const client = await pool.connect();
 
   try {
@@ -314,21 +331,35 @@ router.post("/login", async (req, res) => {
     const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     const user = result.rows[0];
 
-    if (!user || !verifyPassword(password, user.password_hash)) {
+    if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // BLOCK LOGIN IF NOT VERIFIED
-    if (!user.email_verified) {
-      return res.status(401).json({ error: "Please verify your email address before logging in." });
+    const { match, legacy } = await verifyPassword(password, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "Invalid credentials" });
     }
+
+    if (legacy) {
+      try {
+        const migratedHash = await hashPassword(password);
+        await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [
+          migratedHash,
+          user.id
+        ]);
+      } catch (migrationErr) {
+        console.error("Legacy password migration failed:", migrationErr);
+      }
+    }
+
+    const verified = Boolean(user.email_verified);
 
     const token = signToken(
       {
         id: user.id,
         email: user.email,
         role: user.role || "user",
-        email_verified: true
+        email_verified: verified
       },
       ACCESS_TOKEN_EXPIRY_SECONDS
     );
@@ -336,7 +367,11 @@ router.post("/login", async (req, res) => {
     const { token: refreshToken, expiresAt } = await createRefreshToken(user.id);
     setRefreshCookie(res, refreshToken, expiresAt);
 
-    res.status(200).json({ token });
+    res.status(200).json({
+      token,
+      email_verified: verified,
+      message: verified ? undefined : "Please verify your email before requesting exports."
+    });
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Login failed" });
@@ -474,7 +509,7 @@ router.post("/reset-password", async (req, res) => {
   if (!email) return res.status(400).json({ error: "Token expired or invalid." });
 
   try {
-    const hashedPassword = hashPassword(password);
+    const hashedPassword = await hashPassword(password);
     await pool.query("UPDATE users SET password_hash = $1 WHERE email = $2", [hashedPassword, email]);
     return res.status(200).json({ message: "Password updated successfully." });
   } catch (err) {
