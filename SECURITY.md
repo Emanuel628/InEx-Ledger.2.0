@@ -22,6 +22,9 @@
 - You can use `node scripts/log_scan.js LOG_DIR=/var/log/inex-ledger` (or the provided wrapper) on a schedule to enforce this.
 - **Phase 7 (DRM/ephemeral delivery)** – Stream the full PDF immediately from the worker response. If you must expose a signed URL, keep it ephemeral (minutes) and never persist full-tax-id versions anywhere in storage.
 
+## Testing guard rails
+ - Run `npm run test:export-grant` inside `In-Ex-Ledger-API` whenever you rotate `EXPORT_GRANT_SECRET`/`PDF_WORKER_SECRET` to verify one-time grant usage and expiration behavior.
+
 ## Operational guidance
 - Apply strict egress controls on the worker (no NAT, only private endpoints to the API and KMS).
 - When rotating keys, publish the new public `kid` via `/api/crypto/export-public-key` and retire old `kid` values once caches expire.

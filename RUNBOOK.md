@@ -21,6 +21,7 @@
 - Trigger a PDF export with `includeTaxId=true` to ensure the worker receives the `taxId_jwe`. Verify API logs do not contain `taxId` or `taxId_jwe`.
 - Confirm the worker returns both `fullPdf` (streamed immediately) and `redactedPdf` (stored in history). Download the redacted history entry and confirm the tax ID is masked.
 - Recreate a grant and ensure reused `jti` fails (401).
+- To automate that, run `npm run test:export-grant` from `In-Ex-Ledger-API`; it issues a grant, verifies one-time use, waits for the TTL, and confirms expired tokens are rejected.
 
 ## 5. Ongoing checks
 - Periodically grep logs for `taxId` or `taxId_jwe`. Use a monitoring job that fails if either string appears anywhere in `logs/*.log`.
