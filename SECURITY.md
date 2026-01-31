@@ -16,6 +16,7 @@
 ## Phase 4–7 checklist
 - **Phase 4 (Redacted history)** – Store only the redacted PDF (`storage/redacted-exports`) and keep `full_version_available=true` in the metadata. History downloads must call `/api/exports/history/:id/redacted`. UI should always request a new grant before attempting to fetch a full version.
 - **Phase 5 (Egress lockdown)** – Run `pdf-worker` in a subnet without NAT or Internet Gateway, exposing only a private VPC endpoint to the API and the provider’s attestation/KMS services. Rotate `PDF_WORKER_SECRET` and release a new worker image whenever you rotate `EXPORT_GRANT_SECRET`.
+- Reference `pdf-worker/DEPLOYMENT.md` for the exact configuration needed to keep the worker fully isolated (no egress, attestation-only key retrieval, private endpoint access).
 - **Phase 6 (Immune logging)** – Never log `taxId`, `taxId_jwe`, `ein`, `bn`, or any `*_tax_id` field in API/worker/edge logs. Disable request mirroring for `/api/exports/*`, and always sanitize job IDs before logging.
 - **Phase 7 (DRM/ephemeral delivery)** – Stream the full PDF immediately from the worker response. If you must expose a signed URL, keep it ephemeral (minutes) and never persist full-tax-id versions anywhere in storage.
 
