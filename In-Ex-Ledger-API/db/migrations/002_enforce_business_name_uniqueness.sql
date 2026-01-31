@@ -1,4 +1,4 @@
-﻿-- =========================================
+-- =========================================
 -- Remove duplicate accounts and categories then enforce uniqueness by business_id + name
 -- =========================================
 
