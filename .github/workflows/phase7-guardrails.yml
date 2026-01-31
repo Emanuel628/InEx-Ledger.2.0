@@ -10,6 +10,9 @@ jobs:
   enforce-export-guardrails:
     name: Enforce export guardrails
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: In-Ex-Ledger-API
 
     steps:
       - name: Checkout repository
@@ -26,6 +29,9 @@ jobs:
 
       - name: Run export grant guard
         run: npm run test:export-grant
+
+      - name: Run log scan
+        run: npm run log_scan
 
       - name: Verify redacted export storage
         run: npm run verify:redacted-storage

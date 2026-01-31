@@ -21,6 +21,7 @@
 - **Phase 6 (Immune logging)** – Never log `taxId`, `taxId_jwe`, `ein`, `bn`, or any `*_tax_id` field in API/worker/edge logs. Disable request mirroring for `/api/exports/*`, and always sanitize job IDs before logging.
 - Add a monitoring job (grep/alert) that scans recent logs for those sensitive keywords hourly and fails if any appear.
 - You can use `node scripts/log_scan.js LOG_DIR=/var/log/inex-ledger` (or the provided wrapper) on a schedule to enforce this.
+- Run `npm run log_scan` locally whenever you rotate logging tiers. The CI workflow already executes it on every push/PR, so any sensitive pattern will fail the guardrails job immediately.
 - **Phase 7 (DRM/ephemeral delivery)** – Stream the full PDF immediately from the worker response. If you must expose a signed URL, keep it ephemeral (minutes) and never persist full-tax-id versions anywhere in storage.
 - Run `npm run verify:redacted-storage` (from `In-Ex-Ledger-API`) regularly to ensure only `.redacted.pdf` files remain in `storage/exports`.
 
