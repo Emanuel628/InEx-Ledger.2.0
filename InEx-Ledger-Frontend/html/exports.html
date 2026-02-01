@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <title>InEx Ledger — Exports</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<link rel="stylesheet" href="/css/app.css">
-<link rel="stylesheet" href="/css/pages/exports.css">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/pages/exports.css">
 </head>
 
 <body>
@@ -24,103 +24,105 @@
 
   <div id="trialBanner" class="trial-banner"></div>
 
-  <main class="exports-page">
-    <section>
-      <div class="section-header">
-        <h2 data-i18n="exports_title">Exports</h2>
-
-        <p data-i18n="exports_description">
-        Export your business records for review, filing, or sharing with a CPA.
-      </p>
-      </div>
-
-      <form id="exportForm">
-        <div class="form-row">
-          <label for="exportAccountFilter">Account filter (optional)</label>
-          <select id="exportAccountFilter">
-            <option value="">All accounts</option>
-          </select>
+  <main>
+    <div class="app-page exports-page">
+      <section class="exports-header-card">
+        <div class="exports-header-text">
+          <h1 data-i18n="exports_title">Exports</h1>
+          <p data-i18n="exports_description">
+            Export your business records for review, filing, or sharing with a CPA.
+          </p>
         </div>
-
-        <div class="form-row">
-          <label for="exportLanguage">Export language</label>
-          <select id="exportLanguage">
-            <option value="en">English</option>
-            <option value="es">Español</option>
-            <option value="fr">Français</option>
-          </select>
-          <p class="help-text">This only changes the wording on the PDF export.</p>
+        <div class="exports-header-actions">
+          <button class="btn-primary-pill" id="exportCsvBtn">
+            Export CSV
+          </button>
+          <button class="btn-primary-pill secondary-action" id="exportPdfBtn">
+            Export PDF
+          </button>
         </div>
+      </section>
 
-        <div class="form-row">
-          <label for="exportCategoryFilter">Category filter (optional)</label>
-          <select id="exportCategoryFilter">
-            <option value="">All categories</option>
-          </select>
-        </div>
-
-        <fieldset>
-          <legend data-i18n="exports_form_legend">Select reporting period</legend>
-
-          <div class="form-row">
-            <label for="period-start" data-i18n="exports_label_start">Start date</label>
-            <input
-              type="date"
-              id="period-start"
-              name="period_start"
-              required
-            />
+      <section class="export-config-card">
+        <div class="export-config-grid">
+          <div>
+            <label for="exportAccountFilter">Account filter (optional)</label>
+            <select id="exportAccountFilter">
+              <option value="">All accounts</option>
+            </select>
           </div>
-
-          <div class="form-row">
-            <label for="period-end" data-i18n="exports_label_end">End date</label>
-            <input
-              type="date"
-              id="period-end"
-              name="period_end"
-              required
-            />
+          <div>
+            <label for="exportLanguage">Export language</label>
+            <select id="exportLanguage">
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+            </select>
+            <p class="help-text">This only changes the wording on the PDF export.</p>
           </div>
-        </fieldset>
-
+          <div>
+            <label for="exportCategoryFilter">Category filter (optional)</label>
+            <select id="exportCategoryFilter">
+              <option value="">All categories</option>
+            </select>
+          </div>
+        </div>
+        <div class="export-date-card">
+          <label for="period-start" data-i18n="exports_label_start">Start date</label>
+          <input type="date" id="period-start" name="period_start" required />
+          <label for="period-end" data-i18n="exports_label_end">End date</label>
+          <input type="date" id="period-end" name="period_end" required />
+        </div>
+        <div class="export-tax-card">
+          <label for="exportTaxId">Tax ID (optional)</label>
+          <input type="text" id="exportTaxId" />
+          <div class="tax-toggle">
+            <input type="checkbox" id="exportSecureToggle" />
+            <label for="exportSecureToggle">
+              Encrypt exports with business tax ID
+            </label>
+          </div>
+        </div>
         <div class="error-text" id="exportFormMessage"></div>
-
-        <div class="button-row export-action-row">
-          <button type="submit" data-i18n="exports_button_csv">Export CSV</button>
-          <button type="button" id="exportPdfBtn">Export PDF</button>
-        </div>
         <p id="exportPdfNote" class="small-note">PDF export is included in InEx Ledger V1.</p>
-      </form>
-    </section>
+      </section>
 
-    <section>
-      <h3 data-i18n="exports_history_title">Export history</h3>
-
-      <p data-i18n="exports_history_blurb">
-        Generated exports for the selected business appear here.
-      </p>
-
-      <div class="history-dropdown">
-        <label class="history-dropdown-label" for="exportHistoryDropdown">Past exports</label>
-        <select id="exportHistoryDropdown" aria-label="Export history"></select>
-        <p id="exportHistoryPlaceholder" class="small-note" data-i18n="exports_no_history">
-          No exports yet.
+      <section class="export-history-card">
+        <h3 data-i18n="exports_history_title">Export history</h3>
+        <p data-i18n="exports_history_blurb">
+          Generated exports for the selected business appear here.
         </p>
-        <div id="exportHistoryDetails" class="history-details"></div>
-      </div>
-    </section>
+        <div class="history-dropdown">
+          <label class="history-dropdown-label" for="exportHistoryDropdown">Past exports</label>
+          <select id="exportHistoryDropdown" aria-label="Export history"></select>
+          <p id="exportHistoryPlaceholder" class="small-note" data-i18n="exports_no_history">
+            No exports yet.
+          </p>
+          <div id="exportHistoryDetails" class="history-details"></div>
+        </div>
+        <div class="empty-export-state">
+          <h3>No exports yet</h3>
+          <p>Run an export to generate downloadable files.</p>
+        </div>
+      </section>
+    </div>
   </main>
 
-<footer>
-  <p>&copy; InEx Ledger</p>
-</footer>
-<script src="../js/global.js"></script>
-<script src="../js/i18n.js"></script>
-<script src="../js/auth.js"></script>
-<script src="../js/trial.js"></script>
-<script src="../js/pdf_labels.js"></script>
-<script src="../js/pdf_export.js"></script>
-<script src="../js/exports.js"></script>
+  <footer>
+    <p>
+      <a href="subscription.html">Pricing</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </p>
+    <p>&copy; InEx Ledger</p>
+  </footer>
+
+  <script src="../js/global.js"></script>
+  <script src="../js/i18n.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/trial.js"></script>
+  <script src="../js/pdf_labels.js"></script>
+  <script src="../js/pdf_export.js"></script>
+  <script src="../js/exports.js"></script>
 </body>
 </html>
-

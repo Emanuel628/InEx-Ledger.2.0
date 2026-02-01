@@ -1,141 +1,152 @@
-/* =========================
-   Core Ledger Pages
-   ========================= */
-
-/* Slightly widen working area */
-main {
-  max-width: 960px;
+.exports-page {
+  max-width: 1100px;
   margin: 0 auto;
-  padding-bottom: 40px;
-}
-
-section {
-  margin-bottom: 24px;
-}
-
-form {
-  margin-top: 18px;
-}
-
-.error-text {
-  color: #f87171;
-  min-height: 18px;
-  margin-bottom: 10px;
-  font-size: 12px;
-}
-
-form > div,
-form label + input,
-form label + select {
-  margin-bottom: 12px;
-}
-
-button {
-  margin-top: 10px;
-}
-
-.export-action-row {
+  padding: 32px 24px 64px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.exports-header-card {
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 28px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+
+.exports-header-text h1 {
+  margin: 0;
+  font-size: clamp(2rem, 3vw, 2.4rem);
+}
+
+.exports-header-text p {
+  margin-top: 6px;
+  color: var(--text-muted);
+}
+
+.exports-header-actions {
+  display: flex;
   gap: 12px;
+}
+
+.secondary-action {
+  opacity: 0.9;
+}
+
+.export-config-card {
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.export-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 24px;
+}
+
+@media (max-width: 768px) {
+  .export-config-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.export-date-card,
+.export-tax-card {
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+}
+
+.export-date-card {
+  background: var(--bg-surface);
+}
+
+.export-tax-card {
+  background: rgba(99, 102, 241, 0.04);
+}
+
+.export-tax-card input {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  background: var(--input-bg);
+  font-size: 0.95rem;
+}
+
+.tax-toggle {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
   align-items: center;
 }
 
-#exportPdfBtn {
-  min-width: 150px;
+.export-history-card {
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
-#exportPdfNote {
-  margin-top: 6px;
+.export-history-card table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-#exportLanguage {
-  background: var(--form-control-bg);
-  color: var(--form-control-text);
-  border: 1px solid var(--border-subtle);
-}
-
-.help-text {
-  margin-top: 6px;
-  font-size: 13px;
+.export-history-card th,
+.export-history-card td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
   color: var(--text-secondary);
+  font-size: 0.95rem;
+  text-align: left;
+}
+
+.export-history-card th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 2px solid var(--border);
+  color: var(--text-muted);
+}
+
+.empty-export-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
 }
 
 .history-dropdown {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.history-dropdown-label {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-#exportHistoryDropdown {
-  width: 100%;
+.history-dropdown select {
   border-radius: 10px;
-  border: 1px solid var(--border-subtle);
-  background: var(--form-control-bg);
-  color: var(--form-control-text);
-  padding: 10px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  padding: 10px 12px;
+  font-size: 0.95rem;
 }
 
-.history-details {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.02);
-  display: none;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.history-details.active {
-  display: flex;
-}
-
-.history-replay {
-  align-self: flex-start;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  color: var(--text-primary);
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.history-replay:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.history-record {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.history-record p {
+.error-text {
+  color: #f87171;
+  font-size: 12px;
+  min-height: 18px;
   margin: 0;
-}
-
-.history-link {
-  color: #60a5fa;
-  text-decoration: underline;
-}
-
-.small-note {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
 }
