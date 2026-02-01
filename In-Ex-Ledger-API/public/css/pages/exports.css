@@ -92,6 +92,11 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: nowrap;
+}
+
+.tax-toggle label {
+  white-space: nowrap;
 }
 
 .export-history-card {
