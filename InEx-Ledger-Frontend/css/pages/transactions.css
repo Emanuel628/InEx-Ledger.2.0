@@ -399,6 +399,25 @@ form {
   color: var(--text-primary);
 }
 
+.slot-spin {
+  animation: slotSpin var(--slot-duration, 0.5s) ease-in-out forwards;
+}
+
+@keyframes slotSpin {
+  0% {
+    transform: translateY(80%) scaleY(0.4);
+    opacity: 0;
+  }
+  55% {
+    transform: translateY(-15%) scaleY(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scaleY(1);
+    opacity: 1;
+  }
+}
+
 .modal-actions {
   margin-top: 12px;
   display: flex;
@@ -664,20 +683,20 @@ tbody tr:last-child {
     rgba(99, 102, 241, 0.02) 100%
   );
   border-radius: 22px;
-  padding: 8px 24px 10px;
+  padding: 6px 22px 8px;
 }
 
 .txn-card-header {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 2px;
   margin-bottom: 0;
 }
 
 .entry-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 6px;
+  gap: 2px 4px;
   margin-top: 0;
 }
 

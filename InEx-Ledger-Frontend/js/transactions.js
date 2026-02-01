@@ -22,6 +22,8 @@ let transactionModalNoteInput = null;
 let activeModalTransactionId = null;
 let editingTransactionId = null;
 let transactionsLoading = false;
+const SLOT_ANIMATION_KEY = "lb_transactions_slot_played";
+let slotAnimationPlayed = false;
 const missingAccountWarnings = new Set();
 const missingCategoryWarnings = new Set();
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
@@ -670,6 +672,7 @@ function renderTotals() {
     taxLabel.textContent = formatCurrency(0);
     setAsideLabel.textContent = formatCurrency(0);
   }
+  maybePlaySlotAnimation();
 }
 
 function calculateTotals() {
@@ -865,6 +868,47 @@ function seedDefaultCategories() {
 
 function slugify(value) {
   return value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
+
+function maybePlaySlotAnimation() {
+  if (slotAnimationPlayed) {
+    return;
+  }
+  try {
+    if (sessionStorage.getItem(SLOT_ANIMATION_KEY)) {
+      slotAnimationPlayed = true;
+      return;
+    }
+  } catch (error) {
+    console.warn("[Transactions] Cannot access sessionStorage", error);
+  }
+
+  const elements = ["incomeYTD", "expensesYTD", "netProfitYTD"]
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+  if (!elements.length) {
+    return;
+  }
+
+  elements.forEach((el) => {
+    const duration = 0.35 + Math.random() * 0.35;
+    el.style.setProperty("--slot-duration", `${duration}s`);
+    el.classList.add("slot-spin");
+  });
+
+  setTimeout(() => {
+    elements.forEach((el) => {
+      el.classList.remove("slot-spin");
+      el.style.removeProperty("--slot-duration");
+    });
+  }, 900);
+
+  slotAnimationPlayed = true;
+  try {
+    sessionStorage.setItem(SLOT_ANIMATION_KEY, "true");
+  } catch (error) {
+    // ignore
+  }
 }
 function wireTransactionIntentButtons() {
   const buttons = document.querySelectorAll('.txn-intent-btn');
