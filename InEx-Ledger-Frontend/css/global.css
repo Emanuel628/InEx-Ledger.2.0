@@ -255,6 +255,14 @@ textarea:focus {
   margin-top: var(--space-md);
 }
 
+.section + .section {
+  margin-top: 48px;
+}
+
+.form-group + .form-group {
+  margin-top: 20px;
+}
+
 :root[data-theme="light"] {
   --bg-light: #f8fafc;
   --card-bg-light: #ffffff;
@@ -317,17 +325,6 @@ textarea {
 }
 
 input:focus,
-select:focus,
-textarea:focus {
-  border-color: rgba(59,130,246,0.55);
-  box-shadow: 0 0 0 4px rgba(59,130,246,0.12);
-}
-
-select option {
-  background: var(--bg-section);
-  color: var(--text-primary);
-}
-
 fieldset {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
