@@ -723,6 +723,7 @@ tbody tr:last-child {
 .txn-entry-selector {
   display: flex;
   gap: 12px;
+  margin-bottom: 16px;
 }
 
 .txn-intent-btn {
