@@ -1,161 +1,176 @@
-<!DOCTYPE html>
-<html lang="en">
+﻿<!DOCTYPE html>
+<html lang= en>
 <head>
-  <meta charset="UTF-8" />
+  <meta charset=UTF-8 />
   <title>InEx Ledger - Settings</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="/css/app.css">
-  <link rel="stylesheet" href="/css/pages/settings.css">
+  <meta name=viewport content=width=device-width initial-scale=1.0 />
+  <link rel=stylesheet href=/css/app.css>
+  <link rel=stylesheet href=/css/pages/settings.css>
 </head>
 
 <body>
-  <div id="trialBanner" class="trial-banner settings-trial-banner"></div>
+  <div id=trialBanner class=trial-banner settings-trial-banner></div>
 
-  <header class="settings-header">
-    <div class="header-content">
+  <header class=settings-header>
+    <div class=header-content>
       <h1>InEx Ledger</h1>
       <nav>
-        <a data-i18n="nav_transactions" href="transactions.html">Transactions</a> |
-        <a data-i18n="nav_accounts" href="accounts.html">Accounts</a> |
-        <a data-i18n="nav_categories" href="categories.html">Categories</a> |
-        <a data-i18n="nav_receipts" href="receipts.html">Receipts</a> |
-        <a href="mileage.html">Mileage</a> |
-        <a data-i18n="nav_exports" href="exports.html">Exports</a> |
-        <a data-i18n="nav_settings" href="settings.html">Settings</a>
+        <a data-i18n=nav_transactions href=transactions.html>Transactions</a> |
+        <a data-i18n=nav_accounts href=accounts.html>Accounts</a> |
+        <a data-i18n=nav_categories href=categories.html>Categories</a> |
+        <a data-i18n=nav_receipts href=receipts.html>Receipts</a> |
+        <a href=mileage.html>Mileage</a> |
+        <a data-i18n=nav_exports href=exports.html>Exports</a> |
+        <a data-i18n=nav_settings href=settings.html>Settings</a>
       </nav>
     </div>
     <button
-      type="button"
-      class="sign-out-btn"
+      type=button
+      class=sign-out-btn
       data-logout
-      data-action="logout"
-      data-i18n="settings_sign_out"
+      data-action=logout
+      data-i18n=settings_sign_out
     >
       Sign out
     </button>
   </header>
 
-  <main>
-    <section class="settings-section business-section">
-      <div class="section-heading">
-        <h2 data-i18n="settings_business_title">Business</h2>
-        <p data-i18n="settings_intro">
-          Manage your business information, security, and preferences.
-        </p>
+  <div class=settings-shell>
+    <aside class=settings-sidebar aria-label=Settings navigation>
+      <div class=settings-sidebar-card>
+        <div class=settings-sidebar-title>Settings</div>
+        <nav class=settings-nav>
+          <button class=settings-nav-item is-active type=button>Business</button>
+          <button class=settings-nav-item type=button>Language &amp; Region</button>
+          <button class=settings-nav-item type=button>Appearance</button>
+          <button class=settings-nav-item type=button>Privacy</button>
+          <button class=settings-nav-item settings-nav-danger type=button>Danger zone</button>
+        </nav>
       </div>
+    </aside>
 
-      <div class="nav-list">
-        <div class="nav-list-item">
-          <a class="nav-link" href="business-profile.html">
-            <span class="nav-link-label" data-i18n="settings_link_business_profile">Business profile</span>
-            <span class="chevron" aria-hidden="true">&rsaquo;</span>
+    <main class=settings-main>
+      <section class=settings-section business-section>
+        <div class=section-heading>
+          <h2 data-i18n=settings_business_title>Business</h2>
+          <p data-i18n=settings_intro>
+            Manage your business information, security, and preferences.
+          </p>
+        </div>
+
+        <div class=nav-list>
+          <div class=nav-list-item>
+            <a class=nav-link href=business-profile.html>
+              <span class=nav-link-label data-i18n=settings_link_business_profile>Business profile</span>
+              <span class=chevron aria-hidden=true>&rsaquo;</span>
+            </a>
+          </div>
+          <div class=nav-link-break aria-hidden=true></div>
+          <a class=nav-link href=security.html>
+            <span class=nav-link-label data-i18n=settings_link_security>Security</span>
+            <span class=chevron aria-hidden=true>&rsaquo;</span>
+          </a>
+          <a class=nav-link href=legal.html>
+            <span class=nav-link-label data-i18n=settings_link_legal>Legal &amp; policies</span>
+            <span class=chevron aria-hidden=true>&rsaquo;</span>
           </a>
         </div>
-        <div class="nav-link-break" aria-hidden="true"></div>
-        <a class="nav-link" href="security.html">
-          <span class="nav-link-label" data-i18n="settings_link_security">Security</span>
-          <span class="chevron" aria-hidden="true">&rsaquo;</span>
-        </a>
-        <a class="nav-link" href="legal.html">
-          <span class="nav-link-label" data-i18n="settings_link_legal">Legal &amp; policies</span>
-          <span class="chevron" aria-hidden="true">&rsaquo;</span>
-        </a>
-      </div>
-    </section>
+      </section>
 
-    <section class="settings-section region-section">
-      <div class="section-heading">
-        <h2 data-i18n="settings_region_language_title">Language &amp; Region</h2>
-      </div>
-      <div class="split-grid">
-        <div class="form-row">
-          <label for="regionSelectSettings" data-i18n="settings_region_label">Region</label>
-          <select id="regionSelectSettings">
-            <option value="us" data-i18n="region_us">United States</option>
-            <option value="ca" data-i18n="region_ca">Canada</option>
-          </select>
+      <section class=settings-section region-section>
+        <div class=section-heading>
+          <h2 data-i18n=settings_region_language_title>Language &amp; Region</h2>
         </div>
-        <div class="form-row">
-          <label for="languageSelectSettings" data-i18n="settings_language_label">Language</label>
-          <select id="languageSelectSettings" data-language-select>
-            <option value="en">English</option>
-            <option value="es">Espa&ntilde;ol</option>
-            <option value="fr">Fran&ccedil;ais</option>
-          </select>
+        <div class=split-grid>
+          <div class=form-row>
+            <label for=regionSelectSettings data-i18n=settings_region_label>Region</label>
+            <select id=regionSelectSettings>
+              <option value=us data-i18n=region_us>United States</option>
+              <option value=ca data-i18n=region_ca>Canada</option>
+            </select>
+          </div>
+          <div class=form-row>
+            <label for=languageSelectSettings data-i18n=settings_language_label>Language</label>
+            <select id=languageSelectSettings data-language-select>
+              <option value=en>English</option>
+              <option value=es>Espa&ntilde;ol</option>
+              <option value=fr>Fran&ccedil;ais</option>
+            </select>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="settings-section appearance-section">
-      <div class="section-heading">
-        <h2 data-i18n="appearance_title">Appearance</h2>
-      </div>
-      <div class="toggle-row">
-        <label class="theme-toggle theme-toggle-row">
-          <input type="checkbox" id="darkModeToggle" />
-          <span class="toggle-slider" aria-hidden="true"></span>
-          <span data-i18n="settings_dark_mode_label">Dark mode</span>
-        </label>
-      </div>
-      <div class="units-block">
-        <span class="form-label" data-i18n="settings_units_label">Units</span>
-        <div class="units-switch">
-          <label class="theme-toggle units-toggle">
-            <input type="checkbox" id="unitMetricToggle" />
-            <span class="toggle-slider" aria-hidden="true"></span>
-            <span class="toggle-label" data-i18n="settings_units_toggle_label">Metric (km) / Imperial (mi)</span>
+      <section class=settings-section appearance-section>
+        <div class=section-heading>
+          <h2 data-i18n=appearance_title>Appearance</h2>
+        </div>
+        <div class=toggle-row>
+          <label class=theme-toggle theme-toggle-row>
+            <input type=checkbox id=darkModeToggle />
+            <span class=toggle-slider aria-hidden=true></span>
+            <span data-i18n=settings_dark_mode_label>Dark mode</span>
           </label>
         </div>
-      </div>
-    </section>
+        <div class=units-block>
+          <span class=form-label data-i18n=settings_units_label>Units</span>
+          <div class=units-switch>
+            <label class=theme-toggle units-toggle>
+              <input type=checkbox id=unitMetricToggle />
+              <span class=toggle-slider aria-hidden=true></span>
+              <span class=toggle-label data-i18n=settings_units_toggle_label>Metric (km) / Imperial (mi)</span>
+            </label>
+          </div>
+        </div>
+      </section>
 
-    <section class="settings-section privacy-section">
-      <div class="section-heading">
-        <h2 data-i18n="privacy_title">Privacy</h2>
-      </div>
-      <div class="privacy-toggle-row">
-        <label class="privacy-toggle theme-toggle theme-toggle-row">
-          <input type="checkbox" id="optOutToggle" />
-          <span class="toggle-slider" aria-hidden="true"></span>
-          <span data-i18n="privacy_opt_out_label">Opt out of data sharing</span>
-        </label>
-      </div>
-      <div class="privacy-actions">
-        <button
-          type="button"
-          id="downloadMyDataBtn"
-          class="safe-action"
-          data-i18n="privacy_download_button"
-        >
-          Download my data
-        </button>
-        <p class="consent-status">
-          <span data-i18n="privacy_terms_accepted">Terms accepted:</span>
-          <span id="consentStatus">No</span>
+      <section class=settings-section privacy-section>
+        <div class=section-heading>
+          <h2 data-i18n=privacy_title>Privacy</h2>
+        </div>
+        <div class=privacy-toggle-row>
+          <label class=privacy-toggle theme-toggle theme-toggle-row>
+            <input type=checkbox id=optOutToggle />
+            <span class=toggle-slider aria-hidden=true></span>
+            <span data-i18n=privacy_opt_out_label>Opt out of data sharing</span>
+          </label>
+        </div>
+        <div class=privacy-actions>
+          <button
+            type=button
+            id=downloadMyDataBtn
+            class=safe-action
+            data-i18n=privacy_download_button
+          >
+            Download my data
+          </button>
+          <p class=consent-status>
+            <span data-i18n=privacy_terms_accepted>Terms accepted:</span>
+            <span id=consentStatus>No</span>
+          </p>
+        </div>
+      </section>
+
+      <section class=settings-section danger-zone-section>
+        <div class=section-heading>
+          <h3 data-i18n=settings_danger_zone_title>Danger zone</h3>
+        </div>
+        <p class=danger-description data-i18n=privacy_delete_note>
+          This deletes your transactions, receipts, and recurring data but keeps your account.
         </p>
-      </div>
-    </section>
+        <button
+          type=button
+          id=deleteMyDataBtn
+          class=danger-action
+          data-i18n=privacy_delete_button
+        >
+          Delete my business data
+        </button>
+      </section>
+    </main>
+  </div>
 
-    <section class="settings-section danger-zone-section">
-      <div class="section-heading">
-        <h3 data-i18n="settings_danger_zone_title">Danger zone</h3>
-      </div>
-      <p class="danger-description" data-i18n="privacy_delete_note">
-        This deletes your transactions, receipts, and recurring data but keeps your account.
-      </p>
-      <button
-        type="button"
-        id="deleteMyDataBtn"
-        class="danger-action"
-        data-i18n="privacy_delete_button"
-      >
-        Delete my business data
-      </button>
-    </section>
-  </main>
-
-  <div id="settingsSaveBar" class="settings-save-bar hidden">
-    <button type="button" id="globalSaveBtn" class="primary-btn" data-i18n="settings_save_changes">
+  <div id=settingsSaveBar class=settings-save-bar hidden>
+    <button type=button id=globalSaveBtn class=primary-btn data-i18n=settings_save_changes>
       Save changes
     </button>
   </div>
@@ -164,40 +179,37 @@
     <p>&copy; InEx Ledger</p>
   </footer>
 
-  <section class="danger-zone" id="accountDangerZone">
-    <h2 data-i18n="settings_danger_zone_title">Danger Zone</h2>
-    <p class="danger-description">
+  <section class=danger-zone id=accountDangerZone>
+    <h2 data-i18n=settings_danger_zone_title>Danger Zone</h2>
+    <p class=danger-description>
       Permanently delete your account and all related data. This cannot be undone.
     </p>
-    <button id="deleteAccountTrigger" type="button" class="danger-btn">
+    <button id=deleteAccountTrigger type=button class=danger-btn>
       Delete my account
     </button>
-    <div id="deleteAccountConfirm" class="danger-confirm" hidden>
-      <p>Type “delete my account” to confirm.</p>
+    <div id=deleteAccountConfirm class=danger-confirm hidden>
+      <p>Type delete my account to confirm.</p>
       <input
-        type="text"
-        id="deleteAccountConfirmInput"
-        placeholder="delete my account"
-        autocomplete="off"
+        type=text
+        id=deleteAccountConfirmInput
+        placeholder=delete my account
+        autocomplete=off
       />
-      <div class="danger-buttons">
-        <button id="deleteAccountConfirmBtn" type="button" class="danger-btn danger-btn--confirm">
+      <div class=danger-buttons>
+        <button id=deleteAccountConfirmBtn type=button class=danger-btn danger-btn--confirm>
           Confirm deletion
         </button>
-        <button id="deleteAccountCancelBtn" type="button" class="danger-btn danger-btn--cancel">
+        <button id=deleteAccountCancelBtn type=button class=danger-btn danger-btn--cancel>
           Cancel
         </button>
       </div>
-      <p id="deleteAccountStatus" class="danger-status"></p>
+      <p id=deleteAccountStatus class=danger-status></p>
     </div>
   </section>
 
-  <script src="../js/global.js"></script>
-  <script src="../js/i18n.js"></script>
-  <script src="../js/auth.js"></script>
-  <script src="../js/trial.js"></script>
-  <script src="../js/privacyService.js"></script>
-  <script src="../js/settings.js"></script>
-</body>
-</html>
-
+  <script src=../js/global.js></script>
+  <script src=../js/i18n.js></script>
+  <script src=../js/auth.js></script>
+  <script src=../js/trial.js></script>
+  <script src=../js/privacyService.js></script>
+  <script src=../js/settings.js></script>
