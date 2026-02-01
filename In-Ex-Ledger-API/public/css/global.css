@@ -8,37 +8,42 @@
    Design Tokens
    ------------------------- */
 :root {
-  /* Backgrounds */
-  --bg-app: #0b1220;
-  --bg-header: #0f1a2d;
-  --bg-section: #101b30;
-  --bg-secondary: #101b30;
-  --card-bg: rgba(255, 255, 255, 0.02);
-  --input-bg: rgba(244, 246, 255, 0.7);
-  --form-control-bg: rgba(15, 26, 45, 0.9);
-  --form-control-border: rgba(255, 255, 255, 0.16);
-  --form-control-text: #f9fafb;
+  /* Canvas & cards */
+  --canvas-bg: #f8fafc;
+  --card-bg: #ffffff;
+  --bg-app: var(--canvas-bg);
+  --bg-header: #ffffff;
+  --bg-section: var(--card-bg);
+  --bg-secondary: #f1f5f9;
+  --input-bg: rgba(15, 23, 42, 0.05);
+  --form-control-bg: #ffffff;
+  --form-control-border: #e2e8f0;
+  --form-control-text: #0f172a;
 
   /* Text */
-  --text-primary: #e8eefc;
-  --text-secondary: #b8c4e6;
-  --text-muted: #8fa1cf;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
 
-  /* Accent (KeyVa blue) */
-  --accent: #3b82f6;
-  --accent-hover: #60a5fa;
+  /* Accent */
+  --accent: #1e293b;
+  --accent-primary: #1e293b;
+  --accent-success: #10b981;
+  --accent-hover: #2563eb;
 
   /* Borders */
-  --border: rgba(255, 255, 255, 0.10);
-  --border-soft: rgba(255, 255, 255, 0.06);
-  --border-subtle: rgba(255, 255, 255, 0.18);
+  --border: rgba(30, 41, 59, 0.1);
+  --border-soft: rgba(226, 232, 240, 0.6);
+  --border-subtle: #e2e8f0;
 
   /* Effects */
-  --shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  --shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.12);
+  --shadow-soft: 0 10px 15px -3px rgba(15, 23, 42, 0.12);
 
   /* Radius & spacing */
-  --radius-sm: 10px;
-  --radius-lg: 14px;
+  --radius-sm: 12px;
+  --radius-lg: 16px;
+  --radius-modern: 12px;
   --space-xs: 6px;
   --space-sm: 10px;
   --space-md: 16px;
@@ -230,22 +235,22 @@ select {
 }
 
 :root[data-theme="light"] {
-  --bg-light: #FAF6F1;
-  --card-bg-light: #FFFFFF;
-  --card-border-light: #E6E2DC;
-  --border-subtle-light: #E3DFD8;
+  --bg-light: #f8fafc;
+  --card-bg-light: #ffffff;
+  --card-border-light: #e2e8f0;
+  --border-subtle-light: #e2e8f0;
 
-  --primary-light: #2F3A4A;
-  --primary-muted-light: #6B7A8C;
+  --primary-light: #1e293b;
+  --primary-muted-light: #475569;
 
-  --text-primary-light: #1F2933;
-  --text-secondary-light: #4B5563;
+  --text-primary-light: #0f172a;
+  --text-secondary-light: #475569;
 
-  --input-bg-light: #FFFFFF;
-  --input-border-light: #E0DCD6;
+  --input-bg-light: #ffffff;
+  --input-border-light: #e2e8f0;
 
-  --shadow-card-light: 0 6px 16px rgba(0,0,0,0.06);
-  --shadow-button-light: 0 3px 8px rgba(0,0,0,0.08);
+  --shadow-card-light: 0 6px 16px rgba(15, 23, 42, 0.08);
+  --shadow-button-light: 0 3px 8px rgba(15, 23, 42, 0.08);
 }
 
 [data-theme="light"] select {

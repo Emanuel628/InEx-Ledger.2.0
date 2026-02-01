@@ -254,22 +254,22 @@ select {
 }
 
 :root[data-theme="light"] {
-  --bg-light: #FAF6F1;
-  --card-bg-light: #FFFFFF;
-  --card-border-light: #E6E2DC;
-  --border-subtle-light: #E3DFD8;
+  --bg-light: #f8fafc;
+  --card-bg-light: #ffffff;
+  --card-border-light: #e2e8f0;
+  --border-subtle-light: #e2e8f0;
 
-  --primary-light: #2F3A4A;
-  --primary-muted-light: #6B7A8C;
+  --primary-light: #1e293b;
+  --primary-muted-light: #475569;
 
-  --text-primary-light: #1F2933;
-  --text-secondary-light: #4B5563;
+  --text-primary-light: #0f172a;
+  --text-secondary-light: #475569;
 
-  --input-bg-light: #FFFFFF;
-  --input-border-light: #E0DCD6;
+  --input-bg-light: #ffffff;
+  --input-border-light: #e2e8f0;
 
-  --shadow-card-light: 0 6px 16px rgba(0,0,0,0.06);
-  --shadow-button-light: 0 3px 8px rgba(0,0,0,0.08);
+  --shadow-card-light: 0 6px 16px rgba(15, 23, 42, 0.08);
+  --shadow-button-light: 0 3px 8px rgba(15, 23, 42, 0.08);
 }
 
 [data-theme="light"] select {
