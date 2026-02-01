@@ -35,6 +35,23 @@ label {
   margin-bottom: 6px;
 }
 
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--field-label-gap);
+}
+
+.form-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.form-control {
+  width: 100%;
+}
+
 input,
 select,
 textarea {
@@ -171,4 +188,33 @@ a {
 
 a:hover {
   color: #312e81;
+}
+
+.section-header {
+  margin-bottom: 12px !important;
+}
+
+.surface-card,
+.transactions-card,
+.transaction-entry-card {
+  padding-top: 16px !important;
+  padding-bottom: 24px !important;
+}
+
+.categories-page,
+.mileage-page,
+.exports-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px !important;
+}
+
+h2 {
+  margin-top: 0 !important;
+  margin-bottom: 4px !important;
+}
+
+h2 + p {
+  margin-top: 0 !important;
+  margin-bottom: 12px !important;
 }

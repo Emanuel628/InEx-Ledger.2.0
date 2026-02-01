@@ -24,14 +24,16 @@
 
   <div id="trialBanner" class="trial-banner"></div>
 
-  <main>
-    <section class="mileage-hero">
+  <main class="mileage-page">
+    <section class="mileage-hero section-header">
       <h2>Track business mileage</h2>
       <p id="mileageHeroDescription">Keep a simple log for US tax reporting.</p>
     </section>
 
     <section class="mileage-section">
-      <h3 data-i18n="mileage_title">Record a trip</h3>
+      <div class="section-header">
+        <h3 data-i18n="mileage_title">Record a trip</h3>
+      </div>
       <p id="mileageUnitNote" class="help-text"></p>
       <form id="mileageForm">
         <div id="mileage-us-fields">
@@ -83,7 +85,9 @@
     </section>
 
     <section class="mileage-section">
-      <h3>Logged mileage</h3>
+      <div class="section-header">
+        <h3>Logged mileage</h3>
+      </div>
       <div class="mileage-table-wrapper">
         <table id="mileageTable">
           <thead></thead>

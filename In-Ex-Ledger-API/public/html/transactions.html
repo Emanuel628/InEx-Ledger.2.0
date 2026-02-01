@@ -69,7 +69,7 @@
       </section>
 
       <section class="transactions-card ledger-section">
-        <div class="ledger-header">
+        <div class="ledger-header section-header">
           <div>
             <h2 data-i18n="transactions_section_title">Transactions</h2>
           </div>
@@ -132,58 +132,53 @@
             <option value="income" data-i18n="opt_income">Income</option>
           </select>
           <div class="tx-fields entry-grid">
-
-                <div class="tx-field">
-                  <label for="date" data-i18n="transaction_label_date">Date</label><br />
-                  <input
-                    type="date"
-                    id="date"
-                    name="date"
-                    required
-                  />
-                </div>
-
-                <div class="tx-field">
-                  <label for="description" data-i18n="transaction_label_description">Description</label><br />
-                  <input
-                    type="text"
-                    id="description"
-                    name="description"
-                    required
-                  />
-                </div>
-
-                <div class="tx-field">
-                  <label for="account" data-i18n="transaction_label_account">Account</label><br />
-                  <select id="account" name="account" required>
-                    <option value="">Select account</option>
-                  </select>
-                </div>
-
-                <p id="accountHelp" class="small-note"></p>
-
-                <div class="tx-field">
-                  <label for="category" data-i18n="transaction_label_category">Category</label><br />
-                  <select id="category" name="category" required>
-                    <option value="">Select category</option>
-                  </select>
-                </div>
-
-                <p id="categoryHelp" class="small-note"></p>
-
-                <div class="tx-field">
-                  <label for="amount" data-i18n="transaction_label_amount">Amount</label><br />
-                  <input
-                    type="number"
-                    id="amount"
-                    name="amount"
-                    step="0.01"
-                    required
-                  />
-                </div>
-
-                <p id="transactionFormMessage" class="error-text"></p>
-              </div>
+            <div class="tx-field form-field">
+              <label for="date" class="form-label" data-i18n="transaction_label_date">Date</label>
+              <input
+                class="form-control"
+                type="date"
+                id="date"
+                name="date"
+                required
+              />
+            </div>
+            <div class="tx-field form-field">
+              <label for="description" class="form-label" data-i18n="transaction_label_description">Description</label>
+              <input
+                class="form-control"
+                type="text"
+                id="description"
+                name="description"
+                required
+              />
+            </div>
+            <div class="tx-field form-field">
+              <label for="account" class="form-label" data-i18n="transaction_label_account">Account</label>
+              <select id="account" class="form-control" name="account" required>
+                <option value="">Select account</option>
+              </select>
+            </div>
+            <p id="accountHelp" class="small-note"></p>
+            <div class="tx-field form-field">
+              <label for="category" class="form-label" data-i18n="transaction_label_category">Category</label>
+              <select id="category" class="form-control" name="category" required>
+                <option value="">Select category</option>
+              </select>
+            </div>
+            <p id="categoryHelp" class="small-note"></p>
+            <div class="tx-field form-field">
+              <label for="amount" class="form-label" data-i18n="transaction_label_amount">Amount</label>
+              <input
+                class="form-control"
+                type="number"
+                id="amount"
+                name="amount"
+                step="0.01"
+                required
+              />
+            </div>
+            <p id="transactionFormMessage" class="error-text"></p>
+          </div>
 
               <div class="tx-actions">
                 <button type="submit" data-i18n="transaction_button_save">Save transaction</button>
