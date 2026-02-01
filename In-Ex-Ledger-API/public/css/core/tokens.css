@@ -67,13 +67,27 @@
   border-color: var(--input-border-light);
 }
 
-[data-theme="dark"] select {
-  background: var(--input-bg);
-  color: var(--text-primary);
-}
-
 [data-theme="dark"] {
-  --input-bg: rgba(15, 26, 45, 0.9);
+  --bg-app: #0B1220;
+  --bg-surface: #0F172A;
+  --card-bg: #111827;
+
+  --text-main: #E5E7EB;
+  --text-muted: #9CA3AF;
+
+  --border: #1F2937;
+
+  --input-bg: #0B1220;
+
+  --primary: #6366F1;
+  --primary-soft: rgba(99,102,241,0.15);
+
+  --success: #34D399;
+  --danger: #F87171;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.5);
+  --shadow-lg: 0 20px 40px rgba(0,0,0,0.5);
 }
 
 [data-theme="light"] {
