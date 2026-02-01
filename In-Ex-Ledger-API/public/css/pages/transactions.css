@@ -306,7 +306,7 @@ form {
 .tx-fields {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
 }
 
 .tx-actions {
@@ -315,12 +315,12 @@ form {
 }
 
 .tx-actions button {
-  width: 100%;
+  width: auto;
 }
 
 .tx-card label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 0;
   font-size: 0.9rem;
   color: var(--text-secondary);
 }
@@ -328,7 +328,6 @@ form {
 .tx-card select,
 .tx-card input {
   width: 100%;
-  margin-bottom: 12px;
   background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -340,6 +339,67 @@ form {
 .tx-card select option {
   background: var(--input-bg);
   color: var(--text-primary);
+}
+
+.transactions-page .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px !important;
+}
+
+.transactions-page .entry-grid {
+  row-gap: 6px !important;
+}
+
+.transactions-page .tx-card {
+  gap: 8px !important;
+}
+
+.transactions-page label,
+.transactions-page .form-label {
+  margin-bottom: 0 !important;
+  line-height: 1.1 !important;
+}
+
+.transactions-page .form-control,
+.transactions-page input,
+.transactions-page select {
+  margin-top: 0 !important;
+}
+
+.transactions-page .form-field {
+  margin-bottom: 0 !important;
+}
+
+.transactions-page label + input,
+.transactions-page label + select,
+.transactions-page label + textarea {
+  margin-top: 0 !important;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.form-control {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 12px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  font-size: 1rem;
 }
 
 .transactions-card input:focus,
@@ -357,7 +417,7 @@ form {
 }
 
 .tx-field {
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .tx-submit {
@@ -385,9 +445,15 @@ form {
 .transaction-modal-content {
   background: var(--card-bg);
   border-radius: 14px;
-  padding: 20px;
-  width: min(320px, 90%);
+  padding: 24px;
+  width: min(360px, 90%);
+  max-width: 380px;
   box-shadow: var(--shadow);
+}
+
+.transaction-modal-content h3 {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
 }
 
 .transaction-modal-content textarea {
@@ -683,7 +749,7 @@ tbody tr:last-child {
     rgba(99, 102, 241, 0.02) 100%
   );
   border-radius: 22px;
-  padding: 6px 22px 8px;
+  padding: 24px 28px;
 }
 
 .txn-card-header {
@@ -696,7 +762,8 @@ tbody tr:last-child {
 .entry-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px 4px;
+  row-gap: 12px;
+  column-gap: 14px;
   margin-top: 0;
 }
 
