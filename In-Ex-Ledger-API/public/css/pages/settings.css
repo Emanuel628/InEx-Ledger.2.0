@@ -320,33 +320,6 @@ main {
   border-color: var(--accent);
 }
 
-.danger-zone-section {
-  margin-top: 10px;
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 18px;
-}
-
-.danger-description {
-  margin-top: 8px;
-  margin-bottom: 12px;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.danger-action {
-  background: transparent;
-  border: 1px solid rgba(239, 68, 68, 0.7);
-  color: #ef4444;
-  padding: 10px 18px;
-  border-radius: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.danger-action:hover {
-  background: rgba(239, 68, 68, 0.08);
-}
-
 .settings-save-bar {
   position: fixed;
   left: 50%;
@@ -490,69 +463,6 @@ main {
   color: var(--text-primary);
   font-weight: 600;
   cursor: pointer;
-}
-
-.danger-zone {
-  border: 1px solid var(--border);
-  padding: 1.25rem;
-  border-radius: 0.75rem;
-  background: rgba(255, 59, 48, 0.08);
-  margin-top: 1.5rem;
-}
-
-.danger-zone h2 {
-  color: #b91c1c;
-}
-
-.danger-description {
-  margin-bottom: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.danger-confirm {
-  margin-top: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.danger-confirm input {
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.35rem;
-  border: 1px solid var(--border);
-  background: var(--panel);
-  color: var(--text);
-}
-
-.danger-buttons {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.danger-btn {
-  border: 0;
-  padding: 0.7rem 1.25rem;
-  border-radius: 0.45rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.danger-btn--confirm {
-  background: #dc2626;
-  color: white;
-}
-
-.danger-btn--cancel {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border);
-}
-
-.danger-status {
-  color: #dc2626;
-  font-weight: 600;
-  min-height: 1.25rem;
 }
 
 

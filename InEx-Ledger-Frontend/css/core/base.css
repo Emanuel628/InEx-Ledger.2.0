@@ -1,0 +1,21 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  background: var(--bg-app);
+  line-height: 1.45;
+}
+
+p {
+  margin: 10px 0 0 0;
+  color: var(--text-muted);
+}
