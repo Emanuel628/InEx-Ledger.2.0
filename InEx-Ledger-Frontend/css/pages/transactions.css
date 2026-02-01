@@ -341,6 +341,32 @@ form {
   color: var(--text-primary);
 }
 
+.transactions-page .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px !important;
+}
+
+.transactions-page .entry-grid {
+  row-gap: 6px !important;
+}
+
+.transactions-page .tx-card {
+  gap: 8px !important;
+}
+
+.transactions-page label,
+.transactions-page .form-label {
+  margin-bottom: 0 !important;
+  line-height: 1.1 !important;
+}
+
+.transactions-page .form-control,
+.transactions-page input,
+.transactions-page select {
+  margin-top: 0 !important;
+}
+
 .form-field {
   display: flex;
   flex-direction: column;
