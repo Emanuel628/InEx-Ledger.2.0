@@ -727,7 +727,8 @@ tbody tr:last-child {
 }
 
 .txn-intent-btn {
-  flex: 1;
+  flex: none;
+  min-width: 160px;
   border-radius: 999px;
   padding: 14px 22px;
   font-weight: 600;
