@@ -20,6 +20,8 @@
   --border: #E2E8F0;
   --border-soft: rgba(226, 232, 240, 0.6);
 
+  --input-bg: #ffffff;
+
   --success: #10B981;
   --danger: #EF4444;
 
@@ -69,7 +71,9 @@
 
 [data-theme="dark"] {
   --bg-app: #0B1220;
-  --bg-surface: #0F172A;
+  --bg-header: #111827;
+  --bg-section: #111827;
+  --bg-secondary: #0B1220;
   --card-bg: #111827;
 
   --text-main: #E5E7EB;
