@@ -25,48 +25,57 @@
   <div id="trialBanner" class="trial-banner"></div>
 
   <main>
-    <section class="panel">
-      <div class="account-actions">
-        <div>
-          <h2 data-i18n="accounts_title">Accounts</h2>
-          <p data-i18n="accounts_description">
-            Add your business bank accounts, credit cards, and cash so InEx Ledger can track balances, link transactions, and generate accurate reports.
-          </p>
+    <div class="app-page accounts-page">
+      <section class="panel surface-card">
+        <div class="accounts-header">
+          <div class="accounts-header-left">
+            <h2 data-i18n="accounts_title">Accounts</h2>
+            <p data-i18n="accounts_description">
+              Add your business bank accounts, credit cards, and cash so InEx Ledger can track balances, link transactions, and generate accurate reports.
+            </p>
+          </div>
+          <div class="accounts-header-right">
+            <button
+              id="showAccountForm"
+              type="button"
+              class="btn-primary-indigo"
+              data-i18n="accounts_add"
+            >
+              Add account
+            </button>
+          </div>
         </div>
-        <button id="showAccountForm" type="button" data-i18n="accounts_add">Add account</button>
-      </div>
 
-      <div id="accountFormContainer">
-        <form id="accountForm">
-          <div>
-            <label for="account-name" data-i18n="accounts_label_name">Account name</label><br />
-            <input type="text" id="account-name" name="account-name" required />
-          </div>
+        <div id="accountFormContainer">
+          <form id="accountForm">
+            <div class="form-field">
+              <label for="account-name" data-i18n="accounts_label_name">Account name</label><br />
+              <input type="text" id="account-name" name="account-name" required />
+            </div>
 
-          <br />
+            <div class="form-field">
+              <label for="account-type" data-i18n="accounts_label_type">Account type</label><br />
+              <select id="account-type" name="account-type" required>
+                <option value="">Select type</option>
+              </select>
+            </div>
 
-          <div>
-            <label for="account-type" data-i18n="accounts_label_type">Account type</label><br />
-            <select id="account-type" name="account-type" required>
-              <option value="">Select type</option>
-            </select>
-          </div>
+            <div class="form-actions">
+              <button type="submit" class="btn-primary-indigo" data-i18n="accounts_button_save">Save account</button>
+              <button type="button" id="cancelAccountEdit" class="btn-ghost">Cancel</button>
+            </div>
+          </form>
+          <p id="accountFormMessage" class="error-text"></p>
+        </div>
+      </section>
 
-          <br />
-
-          <div class="form-actions">
-            <button type="submit" data-i18n="accounts_button_save">Save account</button>
-            <button type="button" id="cancelAccountEdit">Cancel</button>
-          </div>
-        </form>
-        <p id="accountFormMessage" class="error-text"></p>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div id="accountsList"></div>
-      <p id="accountMessage" class="error-text"></p>
-    </section>
+      <section class="panel surface-card">
+        <div class="surface-card-content">
+          <div id="accountsList"></div>
+          <p id="accountMessage" class="error-text"></p>
+        </div>
+      </section>
+    </div>
   </main>
 
   <footer>
