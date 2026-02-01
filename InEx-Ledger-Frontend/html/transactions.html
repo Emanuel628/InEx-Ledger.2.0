@@ -74,24 +74,26 @@
             <h2 data-i18n="transactions_section_title">Transactions</h2>
           </div>
           <div class="ledger-toolbar">
-            <input
-              type="search"
-              id="transactionSearch"
-              placeholder="Search transactions"
-              data-i18n-placeholder="transactions_search_placeholder"
-            />
-            <select id="transactionCategoryFilter">
-              <option value="" data-i18n="transactions_filter_all_categories">All categories</option>
-            </select>
-            <button
-              id="addTxToggle"
-              class="btn-primary-pill"
-              type="button"
-              aria-expanded="false"
-              data-i18n="transactions_add_transaction_button"
-            >
-              + Add New
-            </button>
+            <div class="transactions-controls">
+              <input
+                type="search"
+                id="transactionSearch"
+                placeholder="Search transactions"
+                data-i18n-placeholder="transactions_search_placeholder"
+              />
+              <select id="transactionCategoryFilter">
+                <option value="" data-i18n="transactions_filter_all_categories">All categories</option>
+              </select>
+              <button
+                id="addTxToggle"
+                class="btn-primary-pill"
+                type="button"
+                aria-expanded="false"
+                data-i18n="transactions_add_transaction_button"
+              >
+                + Add New
+              </button>
+            </div>
           </div>
         </div>
         <div id="txDrawer" hidden>
