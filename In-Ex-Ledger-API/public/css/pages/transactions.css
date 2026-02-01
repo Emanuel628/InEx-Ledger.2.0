@@ -386,7 +386,7 @@ form {
   background: var(--card-bg);
   border-radius: 14px;
   padding: 20px;
-  width: min(360px, 90%);
+  width: min(320px, 90%);
   box-shadow: var(--shadow);
 }
 
