@@ -550,7 +550,7 @@ main {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 26px;
 }
 
 @media (max-width: 920px) {
@@ -610,4 +610,8 @@ main {
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
+}
+
+.settings-panel + .settings-panel {
+  margin-top: 6px;
 }
