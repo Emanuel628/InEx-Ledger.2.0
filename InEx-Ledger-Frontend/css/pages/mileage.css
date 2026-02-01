@@ -16,10 +16,6 @@ main {
   padding: 18px;
   margin-bottom: 24px;
   box-shadow: var(--shadow-soft, 0 10px 25px rgba(0, 0, 0, 0.08));
-  width: min(360px, 90%);
-  max-width: 380px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .mileage-field {
