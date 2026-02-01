@@ -40,11 +40,41 @@
       <div class=settings-sidebar-card>
         <div class=settings-sidebar-title>Settings</div>
         <nav class=settings-nav>
-          <button class=settings-nav-item is-active type=button>Business</button>
-          <button class=settings-nav-item type=button>Language &amp; Region</button>
-          <button class=settings-nav-item type=button>Appearance</button>
-          <button class=settings-nav-item type=button>Privacy</button>
-          <button class=settings-nav-item settings-nav-danger type=button>Danger zone</button>
+          <button
+            class=settings-nav-item is-active
+            type=button
+            onclick="document.getElementById('settings-business').scrollIntoView({behavior:'smooth'})"
+          >
+            Business
+          </button>
+          <button
+            class=settings-nav-item
+            type=button
+            onclick="document.getElementById('settings-preferences').scrollIntoView({behavior:'smooth'})"
+          >
+            Language &amp; Region
+          </button>
+          <button
+            class=settings-nav-item
+            type=button
+            onclick="document.getElementById('settings-appearance').scrollIntoView({behavior:'smooth'})"
+          >
+            Appearance
+          </button>
+          <button
+            class=settings-nav-item
+            type=button
+            onclick="document.getElementById('settings-privacy').scrollIntoView({behavior:'smooth'})"
+          >
+            Privacy
+          </button>
+          <button
+            class=settings-nav-item settings-nav-danger
+            type=button
+            onclick="document.getElementById('settings-danger').scrollIntoView({behavior:'smooth'})"
+          >
+            Danger zone
+          </button>
         </nav>
       </div>
     </aside>
@@ -80,7 +110,8 @@
         </div>
       </section>
 
-      <section class=settings-section region-section>
+      <div id=settings-preferences>
+        <section class=settings-section region-section>
         <div id=settings-language class=settings-panel>
           <div class=settings-panel-header>
             <h2 class=settings-panel-title data-i18n=settings_region_language_title>Language &amp; Region</h2>
@@ -105,9 +136,9 @@
             </div>
           </div>
         </div>
-      </section>
+        </section>
 
-      <section class=settings-section appearance-section>
+        <section class=settings-section appearance-section>
         <div id=settings-appearance class=settings-panel>
           <div class=settings-panel-header>
             <h2 class=settings-panel-title data-i18n=appearance_title>Appearance</h2>
@@ -132,7 +163,8 @@
             </div>
           </div>
         </div>
-      </section>
+        </section>
+      </div>
 
       <section class=settings-section privacy-section>
         <div id=settings-privacy class=settings-panel>
