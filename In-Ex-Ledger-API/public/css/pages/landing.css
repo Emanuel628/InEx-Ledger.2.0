@@ -1,6 +1,5 @@
 :root {
-  --landing-gradient: radial-gradient(circle at top, rgba(16, 185, 129, 0.18), transparent 45%),
-                    radial-gradient(circle at 20% 20%, rgba(15, 23, 42, 0.03), transparent 40%),
+  --landing-gradient: radial-gradient(circle at 20% 20%, rgba(15, 23, 42, 0.03), transparent 40%),
                     #f8fafc;
 }
 
