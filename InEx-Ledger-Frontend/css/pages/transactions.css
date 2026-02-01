@@ -112,6 +112,50 @@ body {
   padding: 18px;
 }
 
+.transactions-table td .table-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.status-tag {
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+
+.status-income {
+  background: rgba(52, 211, 153, 0.15);
+  color: var(--success);
+}
+
+.status-expense {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--danger);
+}
+
+.table-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-table-secondary {
+  background: var(--bg-surface, var(--card-bg));
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.table-actions button {
+  min-width: 110px;
+}
 .ledger-header {
   display: flex;
   justify-content: space-between;
