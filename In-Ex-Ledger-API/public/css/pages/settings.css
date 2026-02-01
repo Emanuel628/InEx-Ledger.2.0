@@ -595,3 +595,12 @@ main {
 .settings-panel-body {
   padding: 20px 24px 24px;
 }
+
+.settings-panel-danger {
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: linear-gradient(
+    180deg,
+    rgba(239, 68, 68, 0.05),
+    rgba(239, 68, 68, 0.02)
+  );
+}

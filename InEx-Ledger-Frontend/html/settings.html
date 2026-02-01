@@ -164,6 +164,56 @@
           </div>
         </div>
       </section>
+
+      <section class=settings-section danger-zone-section>
+        <div id=settings-danger class=settings-panel settings-panel-danger>
+          <div class=settings-panel-header>
+            <h2 class=settings-panel-title data-i18n=settings_danger_zone_title>Danger zone</h2>
+            <p class=settings-panel-subtitle data-i18n=privacy_delete_note>
+              This deletes your transactions, receipts, and recurring data but keeps your account.
+            </p>
+          </div>
+          <div class=settings-panel-body>
+            <div class=danger-actions>
+              <button
+                type=button
+                id=deleteMyDataBtn
+                class=danger-action
+                data-i18n=privacy_delete_button
+              >
+                Delete my business data
+              </button>
+            </div>
+            <section class=danger-zone id=accountDangerZone>
+              <h3 data-i18n=settings_danger_zone_title>Danger Zone</h3>
+              <p class=danger-description>
+                Permanently delete your account and all related data. This cannot be undone.
+              </p>
+              <button id=deleteAccountTrigger type=button class=danger-btn>
+                Delete my account
+              </button>
+              <div id=deleteAccountConfirm class=danger-confirm hidden>
+                <p>Type “delete my account” to confirm.</p>
+                <input
+                  type=text
+                  id=deleteAccountConfirmInput
+                  placeholder=delete my account
+                  autocomplete=off
+                />
+                <div class=danger-buttons>
+                  <button id=deleteAccountConfirmBtn type=button class=danger-btn danger-btn--confirm>
+                    Confirm deletion
+                  </button>
+                  <button id=deleteAccountCancelBtn type=button class=danger-btn danger-btn--cancel>
+                    Cancel
+                  </button>
+                </div>
+                <p id=deleteAccountStatus class=danger-status></p>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
