@@ -71,6 +71,11 @@
   background: var(--bg-surface);
 }
 
+.export-date-card label {
+  display: block;
+  cursor: pointer;
+}
+
 .export-tax-card {
   background: rgba(99, 102, 241, 0.04);
   display: flex;
