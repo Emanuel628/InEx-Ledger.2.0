@@ -1,9 +1,8 @@
 const STORAGE_KEYS = {
   accounts: "lb_accounts",
-  categories: "lb_categories"
+  categories: "lb_categories",
+  transactions: "lb_transactions"
 };
-
-const API_BASE = "https://inex-ledger20-production.up.railway.app";
 
 const ledgerState = {
   transactions: []
@@ -23,6 +22,8 @@ let transactionModalNoteInput = null;
 let activeModalTransactionId = null;
 let editingTransactionId = null;
 let transactionsLoading = false;
+const missingAccountWarnings = new Set();
+const missingCategoryWarnings = new Set();
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
 function formatCurrency(value) {
@@ -48,6 +49,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   setupTransactionDrawer();
+  wireTransactionIntentButtons();
 
   seedDefaultCategories();
   wireTransactionForm();
@@ -96,8 +98,6 @@ function wireTransactionForm() {
   const accountHelp = document.getElementById("accountHelp");
   const categoryHelp = document.getElementById("categoryHelp");
   const message = document.getElementById("transactionFormMessage");
-  const dateInput = document.getElementById("date");
-  const dateFieldWrapper = dateInput?.closest(".tx-field");
 
   updateHelpText(accountHelp, categoryHelp);
 
@@ -105,15 +105,7 @@ function wireTransactionForm() {
     return;
   }
 
-  if (dateFieldWrapper && dateInput) {
-    dateFieldWrapper.classList.add("date-field-clickable");
-    dateFieldWrapper.addEventListener("click", () => {
-      dateInput.focus();
-      dateInput.showPicker?.();
-    });
-  }
-
-  form.addEventListener("submit", async (event) => {
+  form.addEventListener("submit", (event) => {
     event.preventDefault();
 
     const dateInput = document.getElementById("date");
@@ -130,14 +122,13 @@ function wireTransactionForm() {
     const categoryId = categorySelect.value;
     const type = typeSelect?.value === "income" ? "income" : "expense";
 
-    const typeValue = typeSelect?.value;
     const validationError = validateTransactionForm({
       date,
       description,
       amount,
       accountId,
       categoryId,
-      typeValue
+      type
     });
 
     if (validationError) {
@@ -147,43 +138,48 @@ function wireTransactionForm() {
 
     setTransactionFormMessage("");
 
-    const payload = {
-      account_id: accountId,
-      category_id: categoryId,
-      amount,
-      type,
-      description,
-      date,
-      note: ""
-    };
-
     const submitButton = document.querySelector(".tx-actions button");
     if (submitButton) {
       submitButton.disabled = true;
     }
 
     try {
-      const response = await apiFetch(buildApiUrl("/api/transactions"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
+      const categoriesById = mapById(getCategories());
+      const taxLabel = categoriesById[categoryId]?.taxLabel || "";
 
-      if (!response) {
-        setTransactionFormMessage("Failed to save transaction.");
-        return;
+      const transactionPayload = {
+        date,
+        description,
+        amount,
+        accountId,
+        categoryId,
+        type,
+        taxLabel
+      };
+
+      const transactions = getTransactions();
+      if (editingTransactionId) {
+        const idx = transactions.findIndex((txn) => txn.id === editingTransactionId);
+        if (idx >= 0) {
+          const existing = transactions[idx];
+          transactions[idx] = {
+            ...existing,
+            ...transactionPayload
+          };
+        }
+      } else {
+        transactions.push({
+          ...transactionPayload,
+          id: `txn_${Date.now()}`,
+          receiptId: "",
+          note: ""
+        });
       }
+      saveTransactions(transactions);
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        setTransactionFormMessage(error?.error || "Failed to save transaction.");
-        return;
-      }
-
-      await loadTransactions();
       markAccountAsUsed(accountId);
+      ledgerState.transactions = transactions;
+
       populateAccountsFromStorage();
       populateCategoriesFromStorage();
       applyFilters();
@@ -191,9 +187,6 @@ function wireTransactionForm() {
 
       form.reset();
       closeTransactionDrawer();
-    } catch (err) {
-      console.error("Submit transaction failed:", err);
-      setTransactionFormMessage("Failed to save transaction.");
     } finally {
       if (submitButton) {
         submitButton.disabled = false;
@@ -262,32 +255,15 @@ function updateHelpText(accountHelp, categoryHelp) {
   }
 }
 
-async function loadTransactions() {
+function loadTransactions() {
   setTransactionsLoading(true);
-
-  try {
-    const response = await apiFetch(`${API_BASE}/api/transactions`);
-    if (!response) {
-      showTransactionsError("Could not reach the transactions service.");
-      ledgerState.transactions = [];
-    } else if (!response.ok) {
-      console.error("Failed to load transactions:", response.status);
-      showTransactionsError("Unable to load transactions (status " + response.status + ").");
-      ledgerState.transactions = [];
-    } else {
-      ledgerState.transactions = await response.json();
-    }
-  } catch (err) {
-    console.error("Failed to load transactions:", err);
-    showTransactionsError("Error loading transactions.");
-    ledgerState.transactions = [];
-  } finally {
-    setTransactionsLoading(false);
-  }
+  ledgerState.transactions = getTransactions();
 
   renderAccountOptions();
   renderCategoryOptions();
   renderTotals();
+
+  setTransactionsLoading(false);
 }
 
 function renderAccountOptions() {
@@ -395,18 +371,23 @@ function closeTransactionModal() {
 }
 
 function updateTransactionNote(transactionId, note) {
-  const updated = ledgerState.transactions.map((txn) => {
+  const transactions = getTransactions();
+  const updated = transactions.map((txn) => {
     if (txn.id === transactionId) {
       return { ...txn, note };
     }
     return txn;
   });
   ledgerState.transactions = updated;
+  saveTransactions(updated);
   applyFilters();
 }
 
 function handleEditEntry(transactionId) {
-  const transaction = (ledgerState.transactions || []).find((txn) => txn.id === transactionId);
+  const transactions = ledgerState.transactions.length
+    ? ledgerState.transactions
+    : getTransactions();
+  const transaction = transactions.find((txn) => txn.id === transactionId);
   if (!transaction) {
     return;
   }
@@ -494,6 +475,7 @@ function handleTransactionDelete(transactionId) {
   const current = ledgerState.transactions || [];
   const updated = current.filter((txn) => txn.id !== transactionId);
   ledgerState.transactions = updated;
+  saveTransactions(updated);
   if (editingTransactionId === transactionId) {
     editingTransactionId = null;
     setEditingMode(false);
@@ -690,11 +672,104 @@ function renderTotals() {
   }
 }
 
-function showTransactionsError(message) {
-  const list = document.getElementById("transactionList");
-  if (list) {
-    list.innerHTML = `<p class="error-message">${message}</p>`;
+function calculateTotals() {
+  let income = 0;
+  let expenses = 0;
+
+  ledgerState.transactions.forEach((txn) => {
+    const amount = Math.abs(Number(txn.amount) || 0);
+    if (txn.type === "income") {
+      income += amount;
+    } else {
+      expenses += amount;
+    }
+  });
+
+  return { income, expenses };
+}
+
+function mapById(items) {
+  return items.reduce((acc, item) => {
+    acc[item.id] = item;
+    return acc;
+  }, {});
+}
+
+function getAccounts() {
+  return readStorageArray(STORAGE_KEYS.accounts);
+}
+
+function getCategories() {
+  const categories = readStorageArray(STORAGE_KEYS.categories);
+  if (categories.length === 0) {
+    return seedDefaultCategories();
   }
+  return categories;
+}
+
+function getTransactions() {
+  return readStorageArray(STORAGE_KEYS.transactions);
+}
+
+function markAccountAsUsed(accountId) {
+  const accounts = readStorageArray(STORAGE_KEYS.accounts);
+  const updated = accounts.map((account) => {
+    if (account.id === accountId) {
+      return { ...account, used: true };
+    }
+    return account;
+  });
+  localStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(updated));
+}
+
+function readStorageArray(key) {
+  const raw = localStorage.getItem(key);
+  if (!raw) {
+    return [];
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function saveTransactions(transactions) {
+  localStorage.setItem(STORAGE_KEYS.transactions, JSON.stringify(transactions));
+}
+
+function setTransactionsLoading(isLoading) {
+  transactionsLoading = isLoading;
+  renderTransactionList();
+}
+
+function setTransactionFormMessage(text) {
+  const message = document.getElementById("transactionFormMessage");
+  if (message) {
+    message.textContent = text || "";
+  }
+}
+
+function validateTransactionForm({ date, description, amount, accountId, categoryId, type }) {
+  if (!date) {
+    return "Choose a date for the transaction.";
+  }
+  if (!description) {
+    return "Describe the transaction.";
+  }
+  if (Number.isNaN(amount) || amount <= 0) {
+    return "Amount must be greater than zero.";
+  }
+  if (!accountId) {
+    return "Select an account.";
+  }
+  if (!categoryId) {
+    return "Select a category.";
+  }
+  if (!type) {
+    return "Choose a transaction type.";
+  }
+  return null;
 }
 
 let receiptInputElement = null;
@@ -757,104 +832,6 @@ async function uploadReceipt(transactionId, file) {
   }
 }
 
-function setTransactionsLoading(isLoading) {
-  transactionsLoading = isLoading;
-  renderTransactionList();
-}
-
-function setTransactionFormMessage(text) {
-  const message = document.getElementById("transactionFormMessage");
-  if (message) {
-    message.textContent = text || "";
-  }
-}
-
-function validateTransactionForm({ date, description, amount, accountId, categoryId, typeValue }) {
-  if (!date) {
-    return "Choose a date for the transaction.";
-  }
-
-  if (!description) {
-    return "Describe the transaction.";
-  }
-
-  if (Number.isNaN(amount) || amount <= 0) {
-    return "Amount must be greater than zero.";
-  }
-
-  if (!accountId) {
-    return "Select an account.";
-  }
-
-  if (!categoryId) {
-    return "Select a category.";
-  }
-
-  if (!typeValue) {
-    return "Choose a transaction type.";
-  }
-
-  return null;
-}
-
-function calculateTotals() {
-  let income = 0;
-  let expenses = 0;
-
-  ledgerState.transactions.forEach((txn) => {
-    const amount = Math.abs(Number(txn.amount) || 0);
-    if (txn.type === "income") {
-      income += amount;
-    } else {
-      expenses += amount;
-    }
-  });
-
-  return { income, expenses };
-}
-
-function mapById(items) {
-  return items.reduce((acc, item) => {
-    acc[item.id] = item;
-    return acc;
-  }, {});
-}
-
-function getAccounts() {
-  return readStorageArray(STORAGE_KEYS.accounts);
-}
-
-function getCategories() {
-  const categories = readStorageArray(STORAGE_KEYS.categories);
-  if (categories.length === 0) {
-    return seedDefaultCategories();
-  }
-  return categories;
-}
-
-function markAccountAsUsed(accountId) {
-  const accounts = readStorageArray(STORAGE_KEYS.accounts);
-  const updated = accounts.map((account) => {
-    if (account.id === accountId) {
-      return { ...account, used: true };
-    }
-    return account;
-  });
-  localStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(updated));
-}
-
-function readStorageArray(key) {
-  const raw = localStorage.getItem(key);
-  if (!raw) {
-    return [];
-  }
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
 function seedDefaultCategories() {
   const existing = JSON.parse(localStorage.getItem(STORAGE_KEYS.categories) || "[]");
   if (existing.length > 0) {
@@ -888,4 +865,50 @@ function seedDefaultCategories() {
 
 function slugify(value) {
   return value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
+function wireTransactionIntentButtons() {
+  const buttons = document.querySelectorAll('.txn-intent-btn');
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const intent = button.dataset.intent === 'income' ? 'income' : 'expense';
+      setTransactionType(intent);
+      openTransactionDrawer();
+    });
+  });
+}
+
+function setTransactionType(intent) {
+  const typeSelect = document.getElementById('txType');
+  if (typeSelect) {
+    typeSelect.value = intent;
+  }
+}
+function resolveTransactionAccountName(transaction, accountsById) {
+  if (transaction.account_name) {
+    return transaction.account_name;
+  }
+  if (transaction.accountId && accountsById && accountsById[transaction.accountId]) {
+    return accountsById[transaction.accountId].name;
+  }
+  const key = transaction.id || `${transaction.date || "unknown"}-${transaction.amount || "0"}`;
+  if (!missingAccountWarnings.has(key)) {
+    console.warn(`[Transactions] transaction ${key} missing account_name`);
+    missingAccountWarnings.add(key);
+  }
+  return "-";
+}
+
+function resolveTransactionCategoryName(transaction, categoriesById) {
+  if (transaction.category_name) {
+    return transaction.category_name;
+  }
+  if (transaction.categoryId && categoriesById && categoriesById[transaction.categoryId]) {
+    return categoriesById[transaction.categoryId].name;
+  }
+  const key = transaction.id || `${transaction.date || "unknown"}-${transaction.amount || "0"}`;
+  if (!missingCategoryWarnings.has(key)) {
+    console.warn(`[Transactions] transaction ${key} missing category_name`);
+    missingCategoryWarnings.add(key);
+  }
+  return "-";
 }

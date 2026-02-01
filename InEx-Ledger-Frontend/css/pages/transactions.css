@@ -113,7 +113,7 @@
 }
 
 .transactions-table td {
-  padding: 18px 16px;
+  padding: 14px 16px;
 }
 
 .transactions-table td .table-status {
@@ -165,7 +165,7 @@
   border-radius: 999px;
   padding: 6px 14px;
   font-weight: 600;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .ledger-header {
@@ -267,14 +267,6 @@
   font-size: 0.72rem;
 }
 
-.btn-table-secondary {
-  background: var(--bg-surface, var(--card-bg));
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 14px;
-  font-weight: 600;
-  font-size: 0.82rem;
-}
 main {
   max-width: 1100px;
   margin: 0 auto;
@@ -621,5 +613,77 @@ tbody tr:last-child {
 
   .stats-bar .stat-card {
     width: 100%;
+  }
+}
+.txn-entry-selector {
+  display: flex;
+  gap: 12px;
+}
+
+.txn-intent-btn {
+  flex: 1;
+  border-radius: 999px;
+  padding: 14px 22px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+
+.income-intent {
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: white;
+}
+
+.expense-intent {
+  background: linear-gradient(135deg, #6366F1, #4338CA);
+  color: white;
+}
+
+.btn-add-transaction-primary {
+  background: linear-gradient(135deg, var(--primary), #4338CA);
+  border-radius: 999px;
+  padding: 14px 26px;
+  font-size: 0.95rem;
+  box-shadow: var(--shadow-md);
+}
+
+.transaction-entry-card {
+  background: linear-gradient(
+    180deg,
+    var(--card-bg) 0%,
+    rgba(99, 102, 241, 0.02) 100%
+  );
+  border-radius: 22px;
+  padding: 36px;
+}
+
+.entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.txn-type-select {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  height: 0;
+  width: 0;
+  overflow: hidden;
+}
+
+.txn-type-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+@media (max-width: 900px) {
+  .entry-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -22,6 +22,8 @@ let transactionModalNoteInput = null;
 let activeModalTransactionId = null;
 let editingTransactionId = null;
 let transactionsLoading = false;
+const missingAccountWarnings = new Set();
+const missingCategoryWarnings = new Set();
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
 function formatCurrency(value) {
@@ -47,6 +49,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   setupTransactionDrawer();
+  wireTransactionIntentButtons();
 
   seedDefaultCategories();
   wireTransactionForm();
@@ -862,4 +865,50 @@ function seedDefaultCategories() {
 
 function slugify(value) {
   return value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
+function wireTransactionIntentButtons() {
+  const buttons = document.querySelectorAll('.txn-intent-btn');
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const intent = button.dataset.intent === 'income' ? 'income' : 'expense';
+      setTransactionType(intent);
+      openTransactionDrawer();
+    });
+  });
+}
+
+function setTransactionType(intent) {
+  const typeSelect = document.getElementById('txType');
+  if (typeSelect) {
+    typeSelect.value = intent;
+  }
+}
+function resolveTransactionAccountName(transaction, accountsById) {
+  if (transaction.account_name) {
+    return transaction.account_name;
+  }
+  if (transaction.accountId && accountsById && accountsById[transaction.accountId]) {
+    return accountsById[transaction.accountId].name;
+  }
+  const key = transaction.id || `${transaction.date || "unknown"}-${transaction.amount || "0"}`;
+  if (!missingAccountWarnings.has(key)) {
+    console.warn(`[Transactions] transaction ${key} missing account_name`);
+    missingAccountWarnings.add(key);
+  }
+  return "-";
+}
+
+function resolveTransactionCategoryName(transaction, categoriesById) {
+  if (transaction.category_name) {
+    return transaction.category_name;
+  }
+  if (transaction.categoryId && categoriesById && categoriesById[transaction.categoryId]) {
+    return categoriesById[transaction.categoryId].name;
+  }
+  const key = transaction.id || `${transaction.date || "unknown"}-${transaction.amount || "0"}`;
+  if (!missingCategoryWarnings.has(key)) {
+    console.warn(`[Transactions] transaction ${key} missing category_name`);
+    missingCategoryWarnings.add(key);
+  }
+  return "-";
 }

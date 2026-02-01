@@ -84,13 +84,13 @@
               <select id="transactionCategoryFilter">
                 <option value="" data-i18n="transactions_filter_all_categories">All categories</option>
               </select>
-              <button
-                id="addTxToggle"
-                class="btn-primary-pill"
-                type="button"
-                aria-expanded="false"
-                data-i18n="transactions_add_transaction_button"
-              >
+            <button
+              id="addTxToggle"
+              class="btn-primary-pill btn-add-transaction-primary"
+              type="button"
+              aria-expanded="false"
+              data-i18n="transactions_add_transaction_button"
+            >
                 + Add New
               </button>
             </div>
@@ -98,14 +98,40 @@
         </div>
         <div id="txDrawer" hidden>
           <form method="post">
-            <div class="tx-card">
-              <h2 class="tx-card-title" data-i18n="title_record_tx">Record a Transaction</h2>
-              <div class="tx-fields">
-                <label for="txType" data-i18n="label_tx_type">Transaction type</label>
-                <select id="txType" required>
-                  <option value="expense" data-i18n="opt_expense">Expense</option>
-                  <option value="income" data-i18n="opt_income">Income</option>
-                </select>
+            <div class="tx-card transaction-entry-card">
+          <div class="txn-card-header">
+            <h2 class="tx-card-title" data-i18n="title_record_tx">Record a Transaction</h2>
+            <div class="txn-entry-selector">
+              <button
+                type="button"
+                class="txn-intent-btn income-intent"
+                data-intent="income"
+                data-i18n="transactions_intent_income"
+              >
+                + Add Income
+              </button>
+              <button
+                type="button"
+                class="txn-intent-btn expense-intent"
+                data-intent="expense"
+                data-i18n="transactions_intent_expense"
+              >
+                + Add Expense
+              </button>
+            </div>
+          </div>
+          <label
+            for="txType"
+            class="txn-type-label"
+            data-i18n="label_tx_type"
+          >
+            Transaction type
+          </label>
+          <select id="txType" required class="txn-type-select">
+            <option value="expense" data-i18n="opt_expense">Expense</option>
+            <option value="income" data-i18n="opt_income">Income</option>
+          </select>
+          <div class="tx-fields entry-grid">
 
                 <div class="tx-field">
                   <label for="date" data-i18n="transaction_label_date">Date</label><br />

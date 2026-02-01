@@ -232,6 +232,8 @@ const TRANSLATIONS = {
     transactions_search_placeholder: 'Search transactions',
     transactions_filter_all_categories: 'All categories',
     transactions_add_transaction_button: '+ Add New',
+    transactions_intent_income: '+ Add Income',
+    transactions_intent_expense: '+ Add Expense',
     transactions_empty: 'No transactions yet.',
     receipts_title: 'Receipts',
     receipts_description:
@@ -486,6 +488,8 @@ const TRANSLATIONS = {
     transactions_search_placeholder: 'Buscar transacciones',
     transactions_filter_all_categories: 'Todas las categorías',
     transactions_add_transaction_button: '+ Agregar transacción',
+    transactions_intent_income: '+ Agregar ingreso',
+    transactions_intent_expense: '+ Agregar gasto',
     transactions_empty: 'AÃºn no hay transacciones.',
     receipts_title: 'Recibos',
     receipts_description:
@@ -740,6 +744,8 @@ const TRANSLATIONS = {
     transactions_search_placeholder: 'Rechercher des transactions',
     transactions_filter_all_categories: 'Toutes les catégories',
     transactions_add_transaction_button: '+ Ajouter une transaction',
+    transactions_intent_income: '+ Ajouter un revenu',
+    transactions_intent_expense: '+ Ajouter une dépense',
     transactions_empty: 'Aucune transaction pour le moment.',
     receipts_title: 'ReÃ§us',
     receipts_description:
