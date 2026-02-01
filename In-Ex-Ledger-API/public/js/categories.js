@@ -68,6 +68,7 @@ function wireCategoryForm() {
   const message = document.getElementById("categoryFormMessage");
   const nameInput = document.getElementById("category-name");
   const typeInput = document.getElementById("category-type");
+  const typeButtons = document.querySelectorAll(".category-type-pills .type-pill");
 
   const openModal = () => {
     modal?.classList.remove("hidden");
@@ -76,6 +77,16 @@ function wireCategoryForm() {
 
   const closeModal = () => {
     modal?.classList.add("hidden");
+  };
+
+  const updateTypeButtons = (value) => {
+    typeButtons.forEach((btn) => {
+      const btnType = btn.getAttribute("data-type");
+      btn.classList.toggle("active", btnType === value);
+    });
+    if (typeInput) {
+      typeInput.value = value;
+    }
   };
 
   if (showButton) {
@@ -118,10 +129,20 @@ function wireCategoryForm() {
       }
 
       form.reset();
+      updateTypeButtons("income");
       renderCategoryLists();
       closeModal();
     });
   }
+
+  typeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const value = button.getAttribute("data-type") ?? "income";
+      typeInput.value = value;
+      typeButtons.forEach((btn) => btn.classList.remove("active"));
+      button.classList.add("active");
+    });
+  });
 }
 
 function renderCategoryLists() {

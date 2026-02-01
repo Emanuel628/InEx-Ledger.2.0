@@ -97,6 +97,28 @@
   margin: 0;
 }
 
+.category-type-pills {
+  display: inline-flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.type-pill {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 6px 18px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  transition: background 0.2s ease;
+}
+
+.type-pill.active {
+  background: linear-gradient(135deg, var(--primary), #4338CA);
+  color: white;
+}
+
 .actions-row {
   display: flex;
   justify-content: flex-end;

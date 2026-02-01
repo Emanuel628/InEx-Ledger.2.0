@@ -68,6 +68,11 @@
       </div>
       <div class="modal-body">
         <form id="categoryForm">
+          <div class="category-type-pills">
+            <button type="button" class="type-pill active" data-type="income" data-i18n="categories_type_income">Income</button>
+            <button type="button" class="type-pill" data-type="expense" data-i18n="categories_type_expense">Expense</button>
+          </div>
+          <input type="hidden" id="category-type" name="category-type" value="income" required />
           <div class="form-field">
             <label for="category-name" data-i18n="categories_label_name">Category name</label><br />
             <input type="text" id="category-name" name="category-name" required />
