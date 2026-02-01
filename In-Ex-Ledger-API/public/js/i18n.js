@@ -245,6 +245,7 @@ const TRANSLATIONS = {
     receipts_label_file: 'Receipt file',
     receipts_label_notes: 'Notes (optional)',
     receipts_button_upload: 'Upload receipt',
+    receipts_dropzone_message: 'Drag & drop receipt file or click to upload',
     receipts_uploaded_title: 'Uploaded receipts',
     receipts_uploaded_blurb:
       'Uploaded receipts are listed here and can be attached to transactions.',
@@ -503,6 +504,7 @@ const TRANSLATIONS = {
     receipts_label_file: 'Archivo del recibo',
     receipts_label_notes: 'Notas (opcional)',
     receipts_button_upload: 'Subir recibo',
+    receipts_dropzone_message: 'Arrastra y suelta el archivo del recibo o haz clic para subirlo',
     receipts_uploaded_title: 'Recibos subidos',
     receipts_uploaded_blurb:
       'Los recibos subidos aparecen aquÃ­ y pueden vincularse a transacciones.',
@@ -761,6 +763,7 @@ const TRANSLATIONS = {
     receipts_label_file: 'Fichier du reÃ§u',
     receipts_label_notes: 'Notes (facultatif)',
     receipts_button_upload: 'TÃ©lÃ©verser un reÃ§u',
+    receipts_dropzone_message: 'Faites glisser le fichier du reçu ou cliquez pour le téléverser',
     receipts_uploaded_title: 'ReÃ§us tÃ©lÃ©versÃ©s',
     receipts_uploaded_blurb:
       'Les reÃ§us tÃ©lÃ©versÃ©s sont listÃ©s ici et peuvent Ãªtre liÃ©s Ã  des transactions.',

@@ -102,3 +102,37 @@ function wireReceiptActions() {
 }
 
 wireReceiptActions();
+
+function wireReceiptModal() {
+  const modal = document.getElementById("uploadReceiptModal");
+  const openButton = document.getElementById("openUploadReceiptModal");
+  const closeTriggers = modal?.querySelectorAll("[data-modal-close]");
+
+  const openModal = () => {
+    modal?.classList.remove("hidden");
+  };
+
+  const closeModal = () => {
+    modal?.classList.add("hidden");
+  };
+
+  if (openButton) {
+    openButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (!ensureV1Tier()) return;
+      openModal();
+    });
+  }
+
+  closeTriggers?.forEach((trigger) =>
+    trigger.addEventListener("click", closeModal)
+  );
+
+  modal?.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      closeModal();
+    }
+  });
+}
+
+wireReceiptModal();

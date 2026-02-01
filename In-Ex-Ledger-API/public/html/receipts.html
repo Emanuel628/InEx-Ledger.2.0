@@ -25,80 +25,92 @@
   <div id="trialBanner" class="trial-banner"></div>
 
   <main>
-    <section>
-      <h2 data-i18n="receipts_title">Receipts</h2>
-
-      <p data-i18n="receipts_description">
-        Receipts can be uploaded and attached to transactions.
-      </p>
+    <div class="app-page receipts-page">
+      <section class="receipts-header-card">
+        <div class="receipts-header-text">
+          <h1 data-i18n="receipts_title">Receipts</h1>
+          <p data-i18n="receipts_description">
+            Receipts can be uploaded and attached to transactions.
+          </p>
+        </div>
+        <div class="receipts-header-actions">
+          <button
+            type="button"
+            class="btn-primary-pill"
+            id="openUploadReceiptModal"
+            data-i18n="receipts_button_upload"
+          >
+            Upload receipt
+          </button>
+        </div>
+      </section>
 
       <div id="receiptTierNotice" class="tier-notice" style="display:none;">
         <p data-i18n="receipts_tier_notice_title">You need InEx Ledger V1 to upload receipts.</p>
         <a href="subscription.html" data-i18n="receipts_tier_notice_cta">Upgrade now</a>
       </div>
 
-      <form method="post" enctype="multipart/form-data">
-        <fieldset>
-          <legend data-i18n="receipts_upload_legend">Upload receipt</legend>
-
-          <div>
-            <label for="receipt-file" data-i18n="receipts_label_file">Receipt file</label><br />
-            <input
-              type="file"
-              id="receipt-file"
-              name="receipt_file"
-              accept="image/*,application/pdf"
-              required
-            />
-          </div>
-
-          <br />
-
-          <div>
-            <label for="receipt-notes" data-i18n="receipts_label_notes">Notes (optional)</label><br />
-            <input
-              type="text"
-              id="receipt-notes"
-              name="receipt_notes"
-            />
-          </div>
-
-          <br />
-
-          <div>
-            <button type="submit" data-i18n="receipts_button_upload">Upload receipt</button>
-          </div>
-        </fieldset>
-      </form>
-    </section>
-
-      <section>
+      <section class="receipts-history-card">
         <h3 data-i18n="receipts_uploaded_title">Uploaded receipts</h3>
-
-      <p data-i18n="receipts_uploaded_blurb">
-        Uploaded receipts are listed here and can be attached to transactions.
-      </p>
-
-      <table>
-        <thead>
-          <tr>
-            <th data-i18n="receipts_table_filename">Filename</th>
-            <th data-i18n="receipts_table_uploaded">Uploaded date</th>
-            <th data-i18n="receipts_table_attached">Attached to transaction</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Receipts will be listed here -->
-        </tbody>
-      </table>
-      <div class="empty-state">
-        <h3 data-i18n="receipts_empty_title">No receipts yet</h3>
-        <p data-i18n="receipts_empty_body">
-          Upload a receipt and link it to a transaction.
+        <p data-i18n="receipts_uploaded_blurb">
+          Uploaded receipts are listed here and can be attached to transactions.
         </p>
-      </div>
-    </section>
+        <table>
+          <thead>
+            <tr>
+              <th data-i18n="receipts_table_filename">Filename</th>
+              <th data-i18n="receipts_table_uploaded">Uploaded date</th>
+              <th data-i18n="receipts_table_attached">Attached to transaction</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Receipts will be listed here -->
+          </tbody>
+        </table>
+        <div class="empty-receipts-state">
+          <h3 data-i18n="receipts_empty_title">No receipts yet</h3>
+          <p data-i18n="receipts_empty_body">
+            Upload a receipt and link it to a transaction.
+          </p>
+        </div>
+      </section>
+    </div>
   </main>
+
+  <div class="modal upload-receipt-modal hidden" id="uploadReceiptModal">
+    <div class="modal-backdrop" data-modal-close></div>
+    <div class="modal-content receipt-modal-content">
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">×</button>
+      <h2 data-i18n="receipts_button_upload">Upload Receipt</h2>
+      <form method="post" enctype="multipart/form-data">
+        <div class="upload-dropzone">
+          <p data-i18n="receipts_dropzone_message">Drag & drop receipt file or click to upload</p>
+          <input
+            type="file"
+            id="receipt-file"
+            name="receipt_file"
+            accept="image/*,application/pdf"
+            required
+          />
+        </div>
+        <div class="modal-form-section">
+          <label for="receipt-notes" data-i18n="receipts_label_notes">Notes (optional)</label>
+          <input
+            type="text"
+            id="receipt-notes"
+            name="receipt_notes"
+          />
+        </div>
+        <button
+          type="submit"
+          class="btn-primary-pill modal-upload-btn"
+          data-i18n="receipts_button_upload"
+        >
+          Upload receipt
+        </button>
+      </form>
+    </div>
+  </div>
 
   <footer>
     <p>&copy; InEx Ledger</p>
