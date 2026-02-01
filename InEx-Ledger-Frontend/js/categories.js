@@ -61,24 +61,35 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function wireCategoryForm() {
   const showButton = document.getElementById("showCategoryForm");
-  const formContainer = document.getElementById("categoryFormContainer");
+  const modal = document.getElementById("categoryModal");
+  const modalBackdrop = modal?.querySelector("[data-modal-close]");
+  const modalClose = document.getElementById("categoryModalClose");
   const form = document.getElementById("categoryForm");
   const message = document.getElementById("categoryFormMessage");
+  const nameInput = document.getElementById("category-name");
+  const typeInput = document.getElementById("category-type");
 
-  if (showButton && formContainer) {
-    showButton.addEventListener("click", () => {
-      formContainer.classList.toggle("visible");
-    });
+  const openModal = () => {
+    modal?.classList.remove("hidden");
+    nameInput?.focus();
+  };
+
+  const closeModal = () => {
+    modal?.classList.add("hidden");
+  };
+
+  if (showButton) {
+    showButton.addEventListener("click", openModal);
   }
+
+  modalBackdrop?.addEventListener("click", closeModal);
+  modalClose?.addEventListener("click", closeModal);
 
   if (form) {
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      const nameInput = document.getElementById("category-name");
-      const typeInput = document.getElementById("category-type");
-
-      const name = nameInput.value.trim();
-      const type = typeInput.value;
+      const name = nameInput?.value.trim() ?? "";
+      const type = typeInput?.value ?? "";
       const taxLabelInput = getTaxLabelInputForRegion();
       const taxLabel = taxLabelInput?.value?.trim() ?? "";
 
@@ -108,6 +119,7 @@ function wireCategoryForm() {
 
       form.reset();
       renderCategoryLists();
+      closeModal();
     });
   }
 }
@@ -157,7 +169,7 @@ function renderCategoryLists() {
 
 function buildCategoryCard(category) {
   const card = document.createElement("div");
-  card.className = "category-card";
+  card.className = "category-row category-card";
   const title = document.createElement("h4");
   title.textContent = category.name;
   const button = document.createElement("button");

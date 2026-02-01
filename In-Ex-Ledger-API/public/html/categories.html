@@ -25,26 +25,55 @@
   <div id="trialBanner" class="trial-banner"></div>
 
   <main>
-    <section>
-      <div class="account-actions">
-        <div>
+    <div class="app-page categories-page">
+      <section class="categories-hero surface-card">
+        <div class="categories-hero-left">
           <h2 data-i18n="categories_title">Categories</h2>
           <p data-i18n="categories_description">
             Organize transactions into income or expense groups for export accuracy.
           </p>
         </div>
-        <button id="showCategoryForm" type="button" data-i18n="categories_add">Add category</button>
+        <div class="categories-hero-right">
+          <button
+            id="showCategoryForm"
+            type="button"
+            class="btn-primary-indigo"
+            data-i18n="categories_add"
+          >
+            Add category
+          </button>
+        </div>
+      </section>
+
+      <section class="surface-card category-surface">
+        <h3 data-i18n="categories_income_title">Income categories</h3>
+        <div id="incomeCategories" class="category-grid"></div>
+      </section>
+
+      <section class="surface-card category-surface">
+        <h3 data-i18n="categories_expense_title">Expense categories</h3>
+        <div id="expenseCategories" class="category-grid"></div>
+      </section>
+
+      <p id="categoryMessage" class="error-text"></p>
+    </div>
+  </main>
+
+  <div id="categoryModal" class="app-modal hidden">
+    <div class="app-modal-backdrop" data-modal-close></div>
+    <div class="app-modal-panel surface-card">
+      <div class="modal-header">
+        <h3 data-i18n="categories_button_save">Add category</h3>
+        <button type="button" class="modal-close" id="categoryModalClose" aria-label="Close">×</button>
       </div>
-      <div id="categoryFormContainer">
+      <div class="modal-body">
         <form id="categoryForm">
-          <div>
+          <div class="form-field">
             <label for="category-name" data-i18n="categories_label_name">Category name</label><br />
             <input type="text" id="category-name" name="category-name" required />
           </div>
 
-          <br />
-
-          <div>
+          <div class="form-field">
             <label for="category-type" data-i18n="categories_label_type">Type</label><br />
             <select id="category-type" name="category-type" required>
               <option value="">Select type</option>
@@ -53,7 +82,7 @@
             </select>
           </div>
 
-          <div class="tax-label-field">
+          <div class="form-field tax-label-field">
             <label id="taxLabelLabel" for="taxLabelSelect">Map to Schedule C</label><br />
             <select id="taxLabelSelect">
               <option value="">(Optional) Map to Schedule C</option>
@@ -61,28 +90,16 @@
             <p id="taxRegionNote" class="small-note" hidden>This mapping is from the other region.</p>
           </div>
 
-          <br />
-
-          <div>
-            <button type="submit" data-i18n="categories_button_save">Save category</button>
+          <div class="form-actions">
+            <button type="submit" class="btn-primary-indigo" data-i18n="categories_button_save">
+              Save category
+            </button>
           </div>
         </form>
         <p id="categoryFormMessage" class="error-text"></p>
       </div>
-    </section>
-
-    <section>
-      <h3 data-i18n="categories_income_title">Income categories</h3>
-      <div id="incomeCategories" class="category-grid"></div>
-    </section>
-
-    <section>
-      <h3 data-i18n="categories_expense_title">Expense categories</h3>
-      <div id="expenseCategories" class="category-grid"></div>
-    </section>
-
-    <p id="categoryMessage" class="error-text"></p>
-  </main>
+    </div>
+  </div>
 
   <footer>
     <p>
