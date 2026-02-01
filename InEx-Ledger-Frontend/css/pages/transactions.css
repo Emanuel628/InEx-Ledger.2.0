@@ -367,6 +367,16 @@ form {
   margin-top: 0 !important;
 }
 
+.transactions-page .form-field {
+  margin-bottom: 0 !important;
+}
+
+.transactions-page label + input,
+.transactions-page label + select,
+.transactions-page label + textarea {
+  margin-top: 0 !important;
+}
+
 .form-field {
   display: flex;
   flex-direction: column;
