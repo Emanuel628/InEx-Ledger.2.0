@@ -82,9 +82,20 @@ main {
 
 .hero-actions {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.hero-actions .button.primary {
+  width: min(360px, 90vw);
+  text-align: center;
+}
+
+.hero-actions .button.secondary {
+  width: min(220px, 70vw);
 }
 
 .button {
