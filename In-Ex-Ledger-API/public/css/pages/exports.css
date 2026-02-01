@@ -73,6 +73,9 @@
 
 .export-tax-card {
   background: rgba(99, 102, 241, 0.04);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .export-tax-card input {
