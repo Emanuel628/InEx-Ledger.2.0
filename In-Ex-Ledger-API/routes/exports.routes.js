@@ -12,6 +12,15 @@ import { sanitizePayload } from "../utils/logSanitizer.js";
 const router = express.Router();
 router.use(requireAuth);
 
+function requireEmailVerified(req, res, next) {
+  if (!req.user?.email_verified) {
+    return res.status(403).json({ error: "Verify your email before requesting exports." });
+  }
+  next();
+}
+
+router.use(requireEmailVerified);
+
 const EXPORT_TTL_MS = Number(process.env.EXPORT_GRANT_TTL_MS || 60_000);
 
 function validateDateRange(range) {

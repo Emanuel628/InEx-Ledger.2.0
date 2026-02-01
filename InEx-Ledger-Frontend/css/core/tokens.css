@@ -29,6 +29,9 @@
   --shadow-md: 0 8px 20px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 20px 40px rgba(15, 23, 42, 0.10);
   --shadow-soft: 0 12px 20px -4px rgba(0, 0, 0, 0.10);
+  --field-label-gap: 6px;
+  --field-grid-row-gap: 18px;
+  --field-grid-col-gap: 20px;
 
   --radius-sm: 8px;
   --radius-md: 12px;
