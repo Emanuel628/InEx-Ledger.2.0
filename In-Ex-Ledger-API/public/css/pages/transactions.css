@@ -112,6 +112,66 @@ body {
   padding: 18px;
 }
 
+.ledger-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ledger-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ledger-toolbar input,
+.ledger-toolbar select {
+  min-width: 220px;
+  flex: 1;
+}
+
+.table-wrapper {
+  margin-top: 20px;
+}
+
+.table-wrapper h3 {
+  margin-bottom: 16px;
+  font-size: 1.2rem;
+  color: var(--text-main);
+}
+
+.transactions-table th {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+}
+
+.transactions-table tbody tr {
+  border-bottom: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.transactions-table tbody tr:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.transactions-table td {
+  border: none;
+  background: transparent;
+}
+
+.badge-wrap {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
 .badge-income {
   background: rgba(52, 211, 153, 0.15);
   color: var(--success);
