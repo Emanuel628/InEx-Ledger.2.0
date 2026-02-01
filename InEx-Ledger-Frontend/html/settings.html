@@ -51,102 +51,117 @@
 
     <main class=settings-main>
       <section class=settings-section business-section>
-        <div class=section-heading>
-          <h2 data-i18n=settings_business_title>Business</h2>
-          <p data-i18n=settings_intro>
-            Manage your business information, security, and preferences.
-          </p>
-        </div>
-
-        <div class=nav-list>
-          <div class=nav-list-item>
-            <a class=nav-link href=business-profile.html>
-              <span class=nav-link-label data-i18n=settings_link_business_profile>Business profile</span>
-              <span class=chevron aria-hidden=true>&rsaquo;</span>
-            </a>
+        <div id=settings-business class=settings-panel>
+          <div class=settings-panel-header>
+            <h2 class=settings-panel-title data-i18n=settings_business_title>Business</h2>
+            <p class=settings-panel-subtitle data-i18n=settings_intro>
+              Manage your business information, security, and preferences.
+            </p>
           </div>
-          <div class=nav-link-break aria-hidden=true></div>
-          <a class=nav-link href=security.html>
-            <span class=nav-link-label data-i18n=settings_link_security>Security</span>
-            <span class=chevron aria-hidden=true>&rsaquo;</span>
-          </a>
-          <a class=nav-link href=legal.html>
-            <span class=nav-link-label data-i18n=settings_link_legal>Legal &amp; policies</span>
-            <span class=chevron aria-hidden=true>&rsaquo;</span>
-          </a>
+          <div class=settings-panel-body>
+            <div class=nav-list>
+              <div class=nav-list-item>
+                <a class=nav-link href=business-profile.html>
+                  <span class=nav-link-label data-i18n=settings_link_business_profile>Business profile</span>
+                  <span class=chevron aria-hidden=true>&rsaquo;</span>
+                </a>
+              </div>
+              <div class=nav-link-break aria-hidden=true></div>
+              <a class=nav-link href=security.html>
+                <span class=nav-link-label data-i18n=settings_link_security>Security</span>
+                <span class=chevron aria-hidden=true>&rsaquo;</span>
+              </a>
+              <a class=nav-link href=legal.html>
+                <span class=nav-link-label data-i18n=settings_link_legal>Legal &amp; policies</span>
+                <span class=chevron aria-hidden=true>&rsaquo;</span>
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
       <section class=settings-section region-section>
-        <div class=section-heading>
-          <h2 data-i18n=settings_region_language_title>Language &amp; Region</h2>
-        </div>
-        <div class=split-grid>
-          <div class=form-row>
-            <label for=regionSelectSettings data-i18n=settings_region_label>Region</label>
-            <select id=regionSelectSettings>
-              <option value=us data-i18n=region_us>United States</option>
-              <option value=ca data-i18n=region_ca>Canada</option>
-            </select>
+        <div id=settings-language class=settings-panel>
+          <div class=settings-panel-header>
+            <h2 class=settings-panel-title data-i18n=settings_region_language_title>Language &amp; Region</h2>
           </div>
-          <div class=form-row>
-            <label for=languageSelectSettings data-i18n=settings_language_label>Language</label>
-            <select id=languageSelectSettings data-language-select>
-              <option value=en>English</option>
-              <option value=es>Espa&ntilde;ol</option>
-              <option value=fr>Fran&ccedil;ais</option>
-            </select>
+          <div class=settings-panel-body>
+            <div class=split-grid>
+              <div class=form-row>
+                <label for=regionSelectSettings data-i18n=settings_region_label>Region</label>
+                <select id=regionSelectSettings>
+                  <option value=us data-i18n=region_us>United States</option>
+                  <option value=ca data-i18n=region_ca>Canada</option>
+                </select>
+              </div>
+              <div class=form-row>
+                <label for=languageSelectSettings data-i18n=settings_language_label>Language</label>
+                <select id=languageSelectSettings data-language-select>
+                  <option value=en>English</option>
+                  <option value=es>Espa&ntilde;ol</option>
+                  <option value=fr>Fran&ccedil;ais</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       <section class=settings-section appearance-section>
-        <div class=section-heading>
-          <h2 data-i18n=appearance_title>Appearance</h2>
-        </div>
-        <div class=toggle-row>
-          <label class=theme-toggle theme-toggle-row>
-            <input type=checkbox id=darkModeToggle />
-            <span class=toggle-slider aria-hidden=true></span>
-            <span data-i18n=settings_dark_mode_label>Dark mode</span>
-          </label>
-        </div>
-        <div class=units-block>
-          <span class=form-label data-i18n=settings_units_label>Units</span>
-          <div class=units-switch>
-            <label class=theme-toggle units-toggle>
-              <input type=checkbox id=unitMetricToggle />
-              <span class=toggle-slider aria-hidden=true></span>
-              <span class=toggle-label data-i18n=settings_units_toggle_label>Metric (km) / Imperial (mi)</span>
-            </label>
+        <div id=settings-appearance class=settings-panel>
+          <div class=settings-panel-header>
+            <h2 class=settings-panel-title data-i18n=appearance_title>Appearance</h2>
+          </div>
+          <div class=settings-panel-body>
+            <div class=toggle-row>
+              <label class=theme-toggle theme-toggle-row>
+                <input type=checkbox id=darkModeToggle />
+                <span class=toggle-slider aria-hidden=true></span>
+                <span data-i18n=settings_dark_mode_label>Dark mode</span>
+              </label>
+            </div>
+            <div class=units-block>
+              <span class=form-label data-i18n=settings_units_label>Units</span>
+              <div class=units-switch>
+                <label class=theme-toggle units-toggle>
+                  <input type=checkbox id=unitMetricToggle />
+                  <span class=toggle-slider aria-hidden=true></span>
+                  <span class=toggle-label data-i18n=settings_units_toggle_label>Metric (km) / Imperial (mi)</span>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       <section class=settings-section privacy-section>
-        <div class=section-heading>
-          <h2 data-i18n=privacy_title>Privacy</h2>
-        </div>
-        <div class=privacy-toggle-row>
-          <label class=privacy-toggle theme-toggle theme-toggle-row>
-            <input type=checkbox id=optOutToggle />
-            <span class=toggle-slider aria-hidden=true></span>
-            <span data-i18n=privacy_opt_out_label>Opt out of data sharing</span>
-          </label>
-        </div>
-        <div class=privacy-actions>
-          <button
-            type=button
-            id=downloadMyDataBtn
-            class=safe-action
-            data-i18n=privacy_download_button
-          >
-            Download my data
-          </button>
-          <p class=consent-status>
-            <span data-i18n=privacy_terms_accepted>Terms accepted:</span>
-            <span id=consentStatus>No</span>
-          </p>
+        <div id=settings-privacy class=settings-panel>
+          <div class=settings-panel-header>
+            <h2 class=settings-panel-title data-i18n=privacy_title>Privacy</h2>
+          </div>
+          <div class=settings-panel-body>
+            <div class=privacy-toggle-row>
+              <label class=privacy-toggle theme-toggle theme-toggle-row>
+                <input type=checkbox id=optOutToggle />
+                <span class=toggle-slider aria-hidden=true></span>
+                <span data-i18n=privacy_opt_out_label>Opt out of data sharing</span>
+              </label>
+            </div>
+            <div class=privacy-actions>
+              <button
+                type=button
+                id=downloadMyDataBtn
+                class=safe-action
+                data-i18n=privacy_download_button
+              >
+                Download my data
+              </button>
+              <p class=consent-status>
+                <span data-i18n=privacy_terms_accepted>Terms accepted:</span>
+                <span id=consentStatus>No</span>
+              </p>
+            </div>
+          </div>
         </div>
       </section>
     </main>

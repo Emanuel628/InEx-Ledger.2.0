@@ -563,3 +563,35 @@ main {
     top: auto;
   }
 }
+
+/* =========================
+   Settings Panel Surface System (Step 2)
+   ========================= */
+
+.settings-panel {
+  background: var(--card-bg);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.settings-panel-header {
+  padding: 20px 24px 12px;
+}
+
+.settings-panel-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.settings-panel-subtitle {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.settings-panel-body {
+  padding: 20px 24px 24px;
+}
