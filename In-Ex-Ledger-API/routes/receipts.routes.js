@@ -16,73 +16,102 @@ const storageDir = path.join(process.cwd(), "storage", "receipts");
 fs.mkdirSync(storageDir, { recursive: true });
 
 /* =========================================================
-   MIME Allowlist (Receipt Only)
+   Receipt Upload Guards
    ========================================================= */
 
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
   "image/jpeg",
   "image/png",
+  "image/webp",
   "image/heic",
-  "image/heif",
-  "image/webp"
+  "image/heif"
 ]);
 
+const ALLOWED_EXTENSIONS = new Set([
+  ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".heic",
+  ".heif"
+]);
+
+const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
+
 /* =========================================================
-   Multer Upload Config
+   Multer Config (Disk + UUID)
    ========================================================= */
 
 const upload = multer({
   storage: multer.diskStorage({
     destination: storageDir,
     filename(_req, file, cb) {
-      const ext = path.extname(file.originalname);
+      const ext = path.extname(file.originalname).toLowerCase();
       cb(null, `${crypto.randomUUID()}${ext}`);
     }
   }),
+
   fileFilter(_req, file, cb) {
-    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+    const ext = path.extname(file.originalname).toLowerCase();
+
+    // Mobile browsers sometimes send blank/odd mimetype; allow extension fallback
+    const okByMime = ALLOWED_MIME_TYPES.has(file.mimetype);
+    const okByExt = ALLOWED_EXTENSIONS.has(ext);
+
+    if (!okByMime && !okByExt) {
       return cb(
         new Error("Unsupported file type. Only receipt images or PDFs are allowed.")
       );
     }
+
     cb(null, true);
   },
+
   limits: {
-    fileSize: 10 * 1024 * 1024
+    fileSize: MAX_RECEIPT_BYTES
   }
 });
 
 /* =========================================================
-   Helper: Streaming SHA-256 (memory safe)
+   Helpers
    ========================================================= */
 
-function sha256File(storagePath) {
-  return new Promise((resolve, reject) => {
+async function sha256File(storagePath) {
+  return await new Promise((resolve, reject) => {
     const hash = crypto.createHash("sha256");
     const stream = fs.createReadStream(storagePath);
 
     stream.on("data", (chunk) => hash.update(chunk));
     stream.on("end", () => resolve(hash.digest("hex")));
-    stream.on("error", (err) => reject(err));
+    stream.on("error", reject);
   });
 }
 
+function safeUnlink(filePath) {
+  if (!filePath) return;
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch (err) {
+    console.error("Failed to delete file:", filePath, err);
+  }
+}
+
 /* =========================================================
-   GET /receipts — List Receipts (for UI table)
+   GET /receipts — List Receipts (Newest First)
    ========================================================= */
 
 router.get("/receipts", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
-    // Assumes receipts table has created_at; if not, ORDER BY will still work if you change it to filename/id.
     const result = await pool.query(
       `SELECT
          id,
+         transaction_id,
          filename,
          mime_type,
-         transaction_id,
          created_at,
          file_hash
        FROM receipts
@@ -91,17 +120,7 @@ router.get("/receipts", async (req, res) => {
       [businessId]
     );
 
-    const receipts = result.rows.map((r) => ({
-      id: r.id,
-      filename: r.filename,
-      mime_type: r.mime_type,
-      transaction_id: r.transaction_id,
-      created_at: r.created_at,
-      file_hash: r.file_hash,
-      url: `/api/receipts/${r.id}`
-    }));
-
-    return res.json({ receipts });
+    return res.json({ receipts: result.rows });
   } catch (err) {
     console.error("GET /receipts error:", err);
     return res.status(500).json({ error: "Failed to load receipts." });
@@ -119,7 +138,10 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+
+    // optional
     const transactionId = req.body.transaction_id || null;
+
     const receiptId = crypto.randomUUID();
     const storagePath = req.file.path;
 
@@ -128,7 +150,7 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
     await pool.query(
       `INSERT INTO receipts
         (id, business_id, transaction_id, filename, mime_type, storage_path, file_hash)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
       [
         receiptId,
         businessId,
@@ -150,40 +172,47 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
   } catch (err) {
     console.error("POST /receipts error:", err);
 
-    // Orphan file cleanup
-    if (req.file?.path && fs.existsSync(req.file.path)) {
-      try {
-        fs.unlinkSync(req.file.path);
-        console.warn("Orphan receipt file deleted:", req.file.path);
-      } catch (cleanupErr) {
-        console.error("Failed to cleanup orphan receipt file:", cleanupErr);
-      }
-    }
+    // Orphan cleanup
+    safeUnlink(req.file?.path);
 
     return res.status(500).json({ error: "Failed to save receipt." });
   }
 });
 
 /* =========================================================
-   PATCH /receipts/:id/attach — Attach/Unattach to Transaction
-   Body: { "transaction_id": "<uuid>" } or { "transaction_id": null }
+   PATCH /receipts/:id/attach — Attach/Detach to Transaction
    ========================================================= */
 
 router.patch("/receipts/:id/attach", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const receiptId = req.params.id;
-    const transactionId =
-      Object.prototype.hasOwnProperty.call(req.body || {}, "transaction_id")
-        ? req.body.transaction_id
-        : undefined;
 
-    if (transactionId === undefined) {
-      return res.status(400).json({ error: "transaction_id is required (uuid or null)." });
+    if (!("transaction_id" in (req.body || {}))) {
+      return res.status(400).json({
+        error: "transaction_id must be provided (uuid or null)."
+      });
     }
 
-    // NOTE: We do not validate transaction ownership here because schemas vary.
-    // If your transactions table includes business_id, we can hard-enforce it later.
+    const transactionId = req.body.transaction_id;
+
+    // If attaching to a transaction → verify ownership
+    if (transactionId !== null) {
+      const txCheck = await pool.query(
+        `SELECT id
+         FROM transactions
+         WHERE id = $1 AND business_id = $2
+         LIMIT 1`,
+        [transactionId, businessId]
+      );
+
+      if (!txCheck.rowCount) {
+        return res.status(404).json({
+          error: "Transaction not found or does not belong to this business."
+        });
+      }
+    }
+
     const result = await pool.query(
       `UPDATE receipts
        SET transaction_id = $1
@@ -196,69 +225,12 @@ router.patch("/receipts/:id/attach", async (req, res) => {
       return res.status(404).json({ error: "Receipt not found." });
     }
 
-    return res.json({
-      id: result.rows[0].id,
-      transaction_id: result.rows[0].transaction_id
-    });
+    return res.json(result.rows[0]);
   } catch (err) {
     console.error("PATCH /receipts/:id/attach error:", err);
-    return res.status(500).json({ error: "Failed to update receipt attachment." });
-  }
-});
-
-/* =========================================================
-   DELETE /receipts/:id — Delete Receipt (DB + File)
-   ========================================================= */
-
-router.delete("/receipts/:id", async (req, res) => {
-  const client = await pool.connect();
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const receiptId = req.params.id;
-
-    await client.query("BEGIN");
-
-    const found = await client.query(
-      `SELECT storage_path FROM receipts
-       WHERE id = $1 AND business_id = $2
-       LIMIT 1`,
-      [receiptId, businessId]
-    );
-
-    if (!found.rowCount) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({ error: "Receipt not found." });
-    }
-
-    const storagePath = found.rows[0].storage_path;
-
-    await client.query(
-      `DELETE FROM receipts
-       WHERE id = $1 AND business_id = $2`,
-      [receiptId, businessId]
-    );
-
-    await client.query("COMMIT");
-
-    // Best-effort delete file AFTER DB commit
-    if (storagePath && fs.existsSync(storagePath)) {
-      try {
-        fs.unlinkSync(storagePath);
-      } catch (fileErr) {
-        console.error("DELETE receipt file failed:", fileErr);
-        // We do not fail the request because DB is already correct.
-      }
-    }
-
-    return res.json({ ok: true });
-  } catch (err) {
-    try {
-      await client.query("ROLLBACK");
-    } catch {}
-    console.error("DELETE /receipts/:id error:", err);
-    return res.status(500).json({ error: "Failed to delete receipt." });
-  } finally {
-    client.release();
+    return res.status(500).json({
+      error: "Failed to update receipt attachment."
+    });
   }
 });
 
@@ -271,7 +243,8 @@ router.get("/receipts/:id", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     const result = await pool.query(
-      `SELECT filename, mime_type, storage_path FROM receipts
+      `SELECT filename, mime_type, storage_path
+       FROM receipts
        WHERE id = $1 AND business_id = $2
        LIMIT 1`,
       [req.params.id, businessId]
@@ -297,8 +270,49 @@ router.get("/receipts/:id", async (req, res) => {
 
     return res.sendFile(storage_path);
   } catch (err) {
-    console.error("GET /receipts error:", err);
+    console.error("GET /receipts/:id error:", err);
     return res.status(500).json({ error: "Failed to load receipt." });
+  }
+});
+
+/* =========================================================
+   DELETE /receipts/:id — Delete Receipt (DB + Disk)
+   ========================================================= */
+
+router.delete("/receipts/:id", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const receiptId = req.params.id;
+
+    // Get file path first (so we can delete disk after DB delete)
+    const found = await pool.query(
+      `SELECT storage_path
+       FROM receipts
+       WHERE id = $1 AND business_id = $2
+       LIMIT 1`,
+      [receiptId, businessId]
+    );
+
+    if (!found.rowCount) {
+      return res.status(404).json({ error: "Receipt not found." });
+    }
+
+    const storagePath = found.rows[0]?.storage_path || null;
+
+    // Delete DB row
+    await pool.query(
+      `DELETE FROM receipts
+       WHERE id = $1 AND business_id = $2`,
+      [receiptId, businessId]
+    );
+
+    // Delete disk file
+    safeUnlink(storagePath);
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /receipts/:id error:", err);
+    return res.status(500).json({ error: "Failed to delete receipt." });
   }
 });
 
