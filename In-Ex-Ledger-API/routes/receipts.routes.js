@@ -69,6 +69,46 @@ function sha256File(storagePath) {
 }
 
 /* =========================================================
+   GET /receipts — List Receipts (for UI table)
+   ========================================================= */
+
+router.get("/receipts", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+
+    // Assumes receipts table has created_at; if not, ORDER BY will still work if you change it to filename/id.
+    const result = await pool.query(
+      `SELECT
+         id,
+         filename,
+         mime_type,
+         transaction_id,
+         created_at,
+         file_hash
+       FROM receipts
+       WHERE business_id = $1
+       ORDER BY created_at DESC NULLS LAST`,
+      [businessId]
+    );
+
+    const receipts = result.rows.map((r) => ({
+      id: r.id,
+      filename: r.filename,
+      mime_type: r.mime_type,
+      transaction_id: r.transaction_id,
+      created_at: r.created_at,
+      file_hash: r.file_hash,
+      url: `/api/receipts/${r.id}`
+    }));
+
+    return res.json({ receipts });
+  } catch (err) {
+    console.error("GET /receipts error:", err);
+    return res.status(500).json({ error: "Failed to load receipts." });
+  }
+});
+
+/* =========================================================
    POST /receipts — Upload Receipt
    ========================================================= */
 
@@ -83,7 +123,6 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
     const receiptId = crypto.randomUUID();
     const storagePath = req.file.path;
 
-    // Streaming hash to avoid memory spikes
     const fileHash = await sha256File(storagePath);
 
     await pool.query(
@@ -111,10 +150,7 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
   } catch (err) {
     console.error("POST /receipts error:", err);
 
-    /* =========================================================
-       Orphan File Cleanup (Critical Integrity Layer)
-       ========================================================= */
-
+    // Orphan file cleanup
     if (req.file?.path && fs.existsSync(req.file.path)) {
       try {
         fs.unlinkSync(req.file.path);
@@ -125,6 +161,104 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
     }
 
     return res.status(500).json({ error: "Failed to save receipt." });
+  }
+});
+
+/* =========================================================
+   PATCH /receipts/:id/attach — Attach/Unattach to Transaction
+   Body: { "transaction_id": "<uuid>" } or { "transaction_id": null }
+   ========================================================= */
+
+router.patch("/receipts/:id/attach", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const receiptId = req.params.id;
+    const transactionId =
+      Object.prototype.hasOwnProperty.call(req.body || {}, "transaction_id")
+        ? req.body.transaction_id
+        : undefined;
+
+    if (transactionId === undefined) {
+      return res.status(400).json({ error: "transaction_id is required (uuid or null)." });
+    }
+
+    // NOTE: We do not validate transaction ownership here because schemas vary.
+    // If your transactions table includes business_id, we can hard-enforce it later.
+    const result = await pool.query(
+      `UPDATE receipts
+       SET transaction_id = $1
+       WHERE id = $2 AND business_id = $3
+       RETURNING id, transaction_id`,
+      [transactionId, receiptId, businessId]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ error: "Receipt not found." });
+    }
+
+    return res.json({
+      id: result.rows[0].id,
+      transaction_id: result.rows[0].transaction_id
+    });
+  } catch (err) {
+    console.error("PATCH /receipts/:id/attach error:", err);
+    return res.status(500).json({ error: "Failed to update receipt attachment." });
+  }
+});
+
+/* =========================================================
+   DELETE /receipts/:id — Delete Receipt (DB + File)
+   ========================================================= */
+
+router.delete("/receipts/:id", async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const receiptId = req.params.id;
+
+    await client.query("BEGIN");
+
+    const found = await client.query(
+      `SELECT storage_path FROM receipts
+       WHERE id = $1 AND business_id = $2
+       LIMIT 1`,
+      [receiptId, businessId]
+    );
+
+    if (!found.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Receipt not found." });
+    }
+
+    const storagePath = found.rows[0].storage_path;
+
+    await client.query(
+      `DELETE FROM receipts
+       WHERE id = $1 AND business_id = $2`,
+      [receiptId, businessId]
+    );
+
+    await client.query("COMMIT");
+
+    // Best-effort delete file AFTER DB commit
+    if (storagePath && fs.existsSync(storagePath)) {
+      try {
+        fs.unlinkSync(storagePath);
+      } catch (fileErr) {
+        console.error("DELETE receipt file failed:", fileErr);
+        // We do not fail the request because DB is already correct.
+      }
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {}
+    console.error("DELETE /receipts/:id error:", err);
+    return res.status(500).json({ error: "Failed to delete receipt." });
+  } finally {
+    client.release();
   }
 });
 
@@ -153,10 +287,7 @@ router.get("/receipts/:id", async (req, res) => {
       return res.status(404).json({ error: "Receipt file missing." });
     }
 
-    /* =========================================================
-       Zero Trust Cache Protection
-       ========================================================= */
-
+    // Zero trust cache protection
     res.setHeader("Cache-Control", "private, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
