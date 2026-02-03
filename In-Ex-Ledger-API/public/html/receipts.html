@@ -85,15 +85,20 @@
       <form method="post" enctype="multipart/form-data">
 
         <div class="upload-dropzone">
-          <p data-i18n="receipts_dropzone_message">Drag & drop receipt file or click to upload</p>
-          <input
-            type="file"
-            id="receiptFileInput"
-            name="receipt"
-            accept="image/*,application/pdf"
-            required
-          />
-        </div>
+  <p data-i18n="receipts_dropzone_message">
+    Drag & drop receipt file or click to upload
+  </p>
+
+  <div class="upload-input-wrapper">
+    <input
+      type="file"
+      id="receiptFileInput"
+      name="receipt"
+      accept="image/*,application/pdf"
+      required
+    />
+  </div>
+</div>
 
         <div class="modal-form-section">
           <label for="receipt-notes" data-i18n="receipts_label_notes">Notes (optional)</label>
