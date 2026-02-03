@@ -83,7 +83,6 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
     storagePath,
     fileHash
   ]
-);
     );
 
     res.status(201).json({
