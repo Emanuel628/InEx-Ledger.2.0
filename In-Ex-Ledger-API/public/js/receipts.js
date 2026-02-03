@@ -15,34 +15,60 @@ function init() {
 
   handleTierNotice();
 
-  // Pending future logic
-  // loadReceipts();
+  // NOW REAL
+  loadReceipts();
 }
 
 /* -------------------------
-   Future hooks (preliminary)
+   Receipts Load + Render
    ------------------------- */
 
 async function loadReceipts() {
   try {
     const data = await apiFetch("/receipts");
-    console.log("Receipts loaded:", data);
-    // renderReceipts(data);
+    renderReceipts(data || []);
   } catch (err) {
     console.error("Failed to load receipts:", err);
   }
 }
 
 function renderReceipts(receipts) {
-  // Will render receipt rows/cards in a future release
+  const tbody = document.querySelector(".receipts-history-card tbody");
+  const emptyState = document.querySelector(".empty-receipts-state");
+
+  if (!tbody) return;
+
+  tbody.innerHTML = "";
+
+  if (!receipts || receipts.length === 0) {
+    if (emptyState) emptyState.style.display = "block";
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = "none";
+
+  receipts.forEach((r) => {
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${r.filename || "-"}</td>
+      <td>${r.created_at ? new Date(r.created_at).toLocaleDateString() : "-"}</td>
+      <td>${r.transaction_id || "-"}</td>
+    `;
+
+    tbody.appendChild(tr);
+  });
 }
+
+/* -------------------------
+   Tier Logic (UNCHANGED)
+   ------------------------- */
 
 function ensureV1Tier() {
   if (effectiveTier() !== "v1") {
     showTierNotice();
     return false;
   }
-
   return true;
 }
 
@@ -56,23 +82,17 @@ function handleTierNotice() {
     return;
   }
 
-  if (notice) {
-    notice.style.display = "block";
-  }
-  if (form) {
-    form.classList.add("tier-locked");
-  }
+  if (notice) notice.style.display = "block";
+  if (form) form.classList.add("tier-locked");
 }
 
 function showTierNotice() {
   const notice = document.getElementById("receiptTierNotice");
-  if (notice) {
-    notice.style.display = "block";
-  }
+  if (notice) notice.style.display = "block";
 }
 
 /* =========================================================
-   REAL Upload Wiring (Replaces Mock Upload Only)
+   REAL Upload Wiring (UNCHANGED LOGIC — ONLY LOAD REFRESH)
    ========================================================= */
 
 function wireReceiptActions() {
@@ -154,9 +174,8 @@ function wireReceiptActions() {
 
         if (fileInput) fileInput.value = "";
 
-        if (typeof loadReceipts === "function") {
-          await loadReceipts();
-        }
+        // NEW: refresh table after upload
+        await loadReceipts();
 
         alert("Receipt uploaded successfully.");
 
@@ -196,13 +215,8 @@ function wireReceiptModal() {
   const openButton = document.getElementById("openUploadReceiptModal");
   const closeTriggers = modal?.querySelectorAll("[data-modal-close]");
 
-  const openModal = () => {
-    modal?.classList.remove("hidden");
-  };
-
-  const closeModal = () => {
-    modal?.classList.add("hidden");
-  };
+  const openModal = () => modal?.classList.remove("hidden");
+  const closeModal = () => modal?.classList.add("hidden");
 
   if (openButton) {
     openButton.addEventListener("click", (event) => {
@@ -217,9 +231,7 @@ function wireReceiptModal() {
   );
 
   modal?.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      closeModal();
-    }
+    if (event.target === modal) closeModal();
   });
 }
 
