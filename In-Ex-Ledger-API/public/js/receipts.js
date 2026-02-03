@@ -71,16 +71,100 @@ function showTierNotice() {
   }
 }
 
+/* =========================================================
+   REAL Upload Wiring (Replaces Mock Upload Only)
+   ========================================================= */
+
 function wireReceiptActions() {
   const uploadButton = document.querySelector("[data-receipt-upload]");
   const deleteButtons = document.querySelectorAll("[data-receipt-delete]");
   const attachButtons = document.querySelectorAll("[data-receipt-attach]");
 
+  const fileInput = document.getElementById("receiptFileInput");
+  const retentionAck = document.getElementById("receiptRetentionAck");
+  const statusEl = document.getElementById("receiptUploadStatus");
+
+  const allowedMimeTypes = new Set([
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/heic",
+    "image/heif",
+    "image/webp"
+  ]);
+
+  const MAX_BYTES = 10 * 1024 * 1024;
+
   if (uploadButton) {
-    uploadButton.addEventListener("click", (e) => {
+    uploadButton.addEventListener("click", async (e) => {
       e.preventDefault();
+
       if (!ensureV1Tier()) return;
-      console.log("Uploading receipt...");
+
+      try {
+        if (statusEl) statusEl.textContent = "";
+
+        if (!retentionAck?.checked) {
+          alert("Please confirm you will retain original receipts for tax/audit purposes.");
+          return;
+        }
+
+        const file = fileInput?.files?.[0];
+        if (!file) {
+          alert("Please select a receipt file.");
+          return;
+        }
+
+        if (!allowedMimeTypes.has(file.type)) {
+          alert("Unsupported file type. Upload PDF or receipt image.");
+          return;
+        }
+
+        if (file.size > MAX_BYTES) {
+          alert("Receipt too large. Max size is 10MB.");
+          return;
+        }
+
+        const token = localStorage.getItem("token");
+        if (!token) {
+          alert("Session expired. Please sign in again.");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("receipt", file);
+
+        if (statusEl) statusEl.textContent = "Uploading receipt…";
+
+        const response = await fetch("/api/receipts", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: formData
+        });
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(payload?.error || "Upload failed.");
+        }
+
+        if (statusEl) statusEl.textContent = "Upload complete.";
+
+        if (fileInput) fileInput.value = "";
+
+        if (typeof loadReceipts === "function") {
+          await loadReceipts();
+        }
+
+        alert("Receipt uploaded successfully.");
+
+      } catch (err) {
+        console.error("Receipt upload error:", err);
+        if (statusEl) statusEl.textContent = "";
+        alert(err.message || "Failed to upload receipt.");
+      }
     });
   }
 
@@ -102,6 +186,10 @@ function wireReceiptActions() {
 }
 
 wireReceiptActions();
+
+/* =========================================================
+   Modal Wiring (UNCHANGED)
+   ========================================================= */
 
 function wireReceiptModal() {
   const modal = document.getElementById("uploadReceiptModal");
