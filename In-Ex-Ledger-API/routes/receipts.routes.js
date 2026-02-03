@@ -60,30 +60,55 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
     return res.status(400).json({ error: "Receipt file is required." });
   }
 
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const transactionId = req.body.transaction_id || null;
-    const receiptId = crypto.randomUUID();
-    const storagePath = req.file.path;
-    const fileBuffer = fs.readFileSync(storagePath);
-    const fileHash = crypto
-      .createHash("sha256")
-      .update(fileBuffer)
-      .digest("hex");
+  /* =========================================================
+   POST /receipts — Performance Optimized Upload
+   ========================================================= */
 
-    await pool.query(`INSERT INTO receipts
-    (id, business_id, transaction_id, filename, mime_type, storage_path, file_hash)
-  VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-  [
-    receiptId,
-    businessId,
-    transactionId,
-    req.file.originalname,
-    req.file.mimetype,
-    storagePath,
-    fileHash
-  ]
-    );
+try {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const transactionId = req.body.transaction_id || null;
+  const receiptId = crypto.randomUUID();
+  const storagePath = req.file.path;
+
+  // 1. STREAMING HASH: This replaces fs.readFileSync and the old hashing logic
+  // It processes the file in tiny chunks to prevent server crashes
+  const fileHash = await new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(storagePath);
+    
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("hex")));
+    stream.on("error", (err) => reject(err));
+  });
+
+  // 2. DATABASE INSERTION
+  await pool.query(
+    `INSERT INTO receipts
+      (id, business_id, transaction_id, filename, mime_type, storage_path, file_hash)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      receiptId,
+      businessId,
+      transactionId,
+      req.file.originalname,
+      req.file.mimetype,
+      storagePath,
+      fileHash
+    ]
+  );
+
+  // 3. SUCCESS RESPONSE
+  res.status(201).json({
+    id: receiptId,
+    filename: req.file.originalname,
+    mime_type: req.file.mimetype,
+    transaction_id: transactionId,
+    url: `/api/receipts/${receiptId}`
+  });
+
+} catch (err) {
+  // ... rest of your catch block
+
 
     res.status(201).json({
       id: receiptId,
