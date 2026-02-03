@@ -42,7 +42,9 @@ const upload = multer({
   }),
   fileFilter(_req, file, cb) {
     if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      return cb(new Error("Unsupported file type. Only receipt images or PDFs are allowed."));
+      return cb(
+        new Error("Unsupported file type. Only receipt images or PDFs are allowed.")
+      );
     }
     cb(null, true);
   },
@@ -50,6 +52,21 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024
   }
 });
+
+/* =========================================================
+   Helper: Streaming SHA-256 (memory safe)
+   ========================================================= */
+
+function sha256File(storagePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(storagePath);
+
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("hex")));
+    stream.on("error", (err) => reject(err));
+  });
+}
 
 /* =========================================================
    POST /receipts — Upload Receipt
@@ -60,64 +77,37 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
     return res.status(400).json({ error: "Receipt file is required." });
   }
 
-  /* =========================================================
-   POST /receipts — Performance Optimized Upload
-   ========================================================= */
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const transactionId = req.body.transaction_id || null;
+    const receiptId = crypto.randomUUID();
+    const storagePath = req.file.path;
 
-try {
-  const businessId = await resolveBusinessIdForUser(req.user);
-  const transactionId = req.body.transaction_id || null;
-  const receiptId = crypto.randomUUID();
-  const storagePath = req.file.path;
+    // Streaming hash to avoid memory spikes
+    const fileHash = await sha256File(storagePath);
 
-  // 1. STREAMING HASH: This replaces fs.readFileSync and the old hashing logic
-  // It processes the file in tiny chunks to prevent server crashes
-  const fileHash = await new Promise((resolve, reject) => {
-    const hash = crypto.createHash("sha256");
-    const stream = fs.createReadStream(storagePath);
-    
-    stream.on("data", (chunk) => hash.update(chunk));
-    stream.on("end", () => resolve(hash.digest("hex")));
-    stream.on("error", (err) => reject(err));
-  });
+    await pool.query(
+      `INSERT INTO receipts
+        (id, business_id, transaction_id, filename, mime_type, storage_path, file_hash)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        receiptId,
+        businessId,
+        transactionId,
+        req.file.originalname,
+        req.file.mimetype,
+        storagePath,
+        fileHash
+      ]
+    );
 
-  // 2. DATABASE INSERTION
-  await pool.query(
-    `INSERT INTO receipts
-      (id, business_id, transaction_id, filename, mime_type, storage_path, file_hash)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [
-      receiptId,
-      businessId,
-      transactionId,
-      req.file.originalname,
-      req.file.mimetype,
-      storagePath,
-      fileHash
-    ]
-  );
-
-  // 3. SUCCESS RESPONSE
-  res.status(201).json({
-    id: receiptId,
-    filename: req.file.originalname,
-    mime_type: req.file.mimetype,
-    transaction_id: transactionId,
-    url: `/api/receipts/${receiptId}`
-  });
-
-} catch (err) {
-  // ... rest of your catch block
-
-
-    res.status(201).json({
+    return res.status(201).json({
       id: receiptId,
       filename: req.file.originalname,
       mime_type: req.file.mimetype,
       transaction_id: transactionId,
       url: `/api/receipts/${receiptId}`
     });
-
   } catch (err) {
     console.error("POST /receipts error:", err);
 
@@ -134,7 +124,7 @@ try {
       }
     }
 
-    res.status(500).json({ error: "Failed to save receipt." });
+    return res.status(500).json({ error: "Failed to save receipt." });
   }
 });
 
@@ -174,11 +164,10 @@ router.get("/receipts/:id", async (req, res) => {
     res.setHeader("Content-Type", mime_type || "application/octet-stream");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-    res.sendFile(storage_path);
-
+    return res.sendFile(storage_path);
   } catch (err) {
     console.error("GET /receipts error:", err);
-    res.status(500).json({ error: "Failed to load receipt." });
+    return res.status(500).json({ error: "Failed to load receipt." });
   }
 });
 
