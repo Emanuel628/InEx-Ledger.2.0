@@ -15,6 +15,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const storageDir = path.join(process.cwd(), "storage", "receipts");
 fs.mkdirSync(storageDir, { recursive: true });
 
+/* =========================================================
+   MIME Allowlist (Receipt Only)
+   ========================================================= */
+
+const ALLOWED_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/heic",
+  "image/heif",
+  "image/webp"
+]);
+
+/* =========================================================
+   Multer Upload Config
+   ========================================================= */
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: storageDir,
@@ -23,10 +40,20 @@ const upload = multer({
       cb(null, `${crypto.randomUUID()}${ext}`);
     }
   }),
+  fileFilter(_req, file, cb) {
+    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      return cb(new Error("Unsupported file type. Only receipt images or PDFs are allowed."));
+    }
+    cb(null, true);
+  },
   limits: {
     fileSize: 10 * 1024 * 1024
   }
 });
+
+/* =========================================================
+   POST /receipts — Upload Receipt
+   ========================================================= */
 
 router.post("/receipts", upload.single("receipt"), async (req, res) => {
   if (!req.file) {
@@ -60,15 +87,35 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
       transaction_id: transactionId,
       url: `/api/receipts/${receiptId}`
     });
+
   } catch (err) {
     console.error("POST /receipts error:", err);
+
+    /* =========================================================
+       Orphan File Cleanup (Critical Integrity Layer)
+       ========================================================= */
+
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      try {
+        fs.unlinkSync(req.file.path);
+        console.warn("Orphan receipt file deleted:", req.file.path);
+      } catch (cleanupErr) {
+        console.error("Failed to cleanup orphan receipt file:", cleanupErr);
+      }
+    }
+
     res.status(500).json({ error: "Failed to save receipt." });
   }
 });
 
+/* =========================================================
+   GET /receipts/:id — Secure Download
+   ========================================================= */
+
 router.get("/receipts/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+
     const result = await pool.query(
       `SELECT filename, mime_type, storage_path FROM receipts
        WHERE id = $1 AND business_id = $2
@@ -81,13 +128,24 @@ router.get("/receipts/:id", async (req, res) => {
     }
 
     const { filename, mime_type, storage_path } = result.rows[0];
+
     if (!storage_path || !fs.existsSync(storage_path)) {
       return res.status(404).json({ error: "Receipt file missing." });
     }
 
+    /* =========================================================
+       Zero Trust Cache Protection
+       ========================================================= */
+
+    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+
     res.setHeader("Content-Type", mime_type || "application/octet-stream");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
     res.sendFile(storage_path);
+
   } catch (err) {
     console.error("GET /receipts error:", err);
     res.status(500).json({ error: "Failed to load receipt." });
