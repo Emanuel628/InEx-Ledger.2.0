@@ -71,19 +71,19 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
       .update(fileBuffer)
       .digest("hex");
 
-    await pool.query(
-      `INSERT INTO receipts
-        (id, business_id, transaction_id, filename, mime_type, storage_path, file_hash)
-      VALUES ($1, $2, $3, $4, $5, $6)`,
-      [
-        receiptId,
-        businessId,
-        transactionId,
-        req.file.originalname,
-        req.file.mimetype,
-        storagePath
-        fileHash
-      ]
+    await pool.query(`INSERT INTO receipts
+    (id, business_id, transaction_id, filename, mime_type, storage_path, file_hash)
+  VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+  [
+    receiptId,
+    businessId,
+    transactionId,
+    req.file.originalname,
+    req.file.mimetype,
+    storagePath,
+    fileHash
+  ]
+);
     );
 
     res.status(201).json({
