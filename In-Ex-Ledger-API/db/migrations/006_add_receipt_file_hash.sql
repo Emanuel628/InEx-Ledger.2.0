@@ -4,3 +4,4 @@
 
 ALTER TABLE receipts
 ADD COLUMN IF NOT EXISTS file_hash TEXT;
+
