@@ -65,6 +65,11 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
     const transactionId = req.body.transaction_id || null;
     const receiptId = crypto.randomUUID();
     const storagePath = req.file.path;
+    const fileBuffer = fs.readFileSync(storagePath);
+    const fileHash = crypto
+      .createHash("sha256")
+      .update(fileBuffer)
+      .digest("hex");
 
     await pool.query(
       `INSERT INTO receipts
