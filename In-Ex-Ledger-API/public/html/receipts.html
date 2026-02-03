@@ -83,16 +83,18 @@
       <button type="button" class="modal-close" data-modal-close aria-label="Close">×</button>
       <h2 data-i18n="receipts_button_upload">Upload Receipt</h2>
       <form method="post" enctype="multipart/form-data">
+
         <div class="upload-dropzone">
           <p data-i18n="receipts_dropzone_message">Drag & drop receipt file or click to upload</p>
           <input
             type="file"
-            id="receipt-file"
-            name="receipt_file"
+            id="receiptFileInput"
+            name="receipt"
             accept="image/*,application/pdf"
             required
           />
         </div>
+
         <div class="modal-form-section">
           <label for="receipt-notes" data-i18n="receipts_label_notes">Notes (optional)</label>
           <input
@@ -101,13 +103,31 @@
             name="receipt_notes"
           />
         </div>
+
+        <!-- Compliance Checkbox -->
+        <label class="receipt-retention">
+          <input id="receiptRetentionAck" type="checkbox" required />
+          I understand I must keep original receipts for tax and audit purposes.
+        </label>
+
+        <!-- HEIC Notice -->
+        <p class="receipt-format-note">
+          HEIC (iPhone) files are stored securely but may not preview in browser.
+          Download to view. For best results, scan receipts to PDF.
+        </p>
+
+        <!-- Upload Status -->
+        <div id="receiptUploadStatus" class="receipt-status"></div>
+
         <button
-          type="submit"
+          type="button"
           class="btn-primary-pill modal-upload-btn"
+          data-receipt-upload
           data-i18n="receipts_button_upload"
         >
           Upload receipt
         </button>
+
       </form>
     </div>
   </div>
@@ -115,6 +135,7 @@
   <footer>
     <p>&copy; InEx Ledger</p>
   </footer>
+
 <script src="../js/global.js"></script>
 <script src="../js/i18n.js"></script>
 <script src="../js/auth.js"></script>
@@ -122,4 +143,3 @@
 <script src="../js/receipts.js"></script>
 </body>
 </html>
-
