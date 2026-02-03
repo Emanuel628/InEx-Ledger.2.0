@@ -776,6 +776,8 @@ function validateTransactionForm({ date, description, amount, accountId, categor
 }
 
 let receiptInputElement = null;
+const TRANSACTION_ID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function initReceiptInput() {
   if (receiptInputElement) {
@@ -787,7 +789,7 @@ function initReceiptInput() {
   receiptInputElement.accept = "image/*,application/pdf";
   receiptInputElement.style.display = "none";
   receiptInputElement.addEventListener("change", async () => {
-    const transactionId = receiptInputElement.dataset.transactionId;
+    const transactionId = receiptInputElement.dataset.transactionId || "";
     const file = receiptInputElement.files?.[0];
     if (file && transactionId) {
       await uploadReceipt(transactionId, file);
@@ -811,7 +813,9 @@ async function uploadReceipt(transactionId, file) {
   setTransactionFormMessage("Uploading receipt...");
   const formData = new FormData();
   formData.append("receipt", file);
-  formData.append("transaction_id", transactionId);
+  if (TRANSACTION_ID_REGEX.test(transactionId || "")) {
+    formData.append("transaction_id", transactionId);
+  }
 
   try {
     const response = await fetch(buildApiUrl("/api/receipts"), {
