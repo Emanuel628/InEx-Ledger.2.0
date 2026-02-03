@@ -15,8 +15,7 @@ function init() {
 
   handleTierNotice();
 
-  // Pending future logic
-  // loadReceipts();
+  loadReceipts();
 }
 
 /* -------------------------
@@ -25,16 +24,50 @@ function init() {
 
 async function loadReceipts() {
   try {
-    const data = await apiFetch("/receipts");
-    console.log("Receipts loaded:", data);
-    // renderReceipts(data);
+    const response = await apiFetch("/api/receipts");
+    if (!response) {
+      return;
+    }
+
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => null);
+      throw new Error(errorPayload?.error || "Failed to load receipts.");
+    }
+
+    const payload = await response.json().catch(() => null);
+    const receipts = Array.isArray(payload?.receipts) ? payload.receipts : [];
+    renderReceipts(receipts);
   } catch (err) {
     console.error("Failed to load receipts:", err);
   }
 }
 
 function renderReceipts(receipts) {
-  // Will render receipt rows/cards in a future release
+  const tbody = document.querySelector(".receipts-history-card tbody");
+  const emptyState = document.querySelector(".empty-receipts-state");
+
+  if (!tbody) return;
+
+  tbody.innerHTML = "";
+
+  if (!receipts || receipts.length === 0) {
+    if (emptyState) emptyState.style.display = "block";
+    return;
+  }
+
+  if (emptyState) emptyState.style.display = "none";
+
+  receipts.forEach((r) => {
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${r.filename || "-"}</td>
+      <td>${r.created_at ? new Date(r.created_at).toLocaleDateString() : "-"}</td>
+      <td>${r.transaction_id || "-"}</td>
+    `;
+
+    tbody.appendChild(tr);
+  });
 }
 
 function ensureV1Tier() {
