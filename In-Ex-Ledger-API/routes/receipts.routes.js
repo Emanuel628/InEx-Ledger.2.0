@@ -73,7 +73,7 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
 
     await pool.query(
       `INSERT INTO receipts
-        (id, business_id, transaction_id, filename, mime_type, storage_path)
+        (id, business_id, transaction_id, filename, mime_type, storage_path, file_hash)
       VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         receiptId,
@@ -82,6 +82,7 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
         req.file.originalname,
         req.file.mimetype,
         storagePath
+        fileHash
       ]
     );
 
