@@ -25,8 +25,19 @@ function init() {
 
 async function loadReceipts() {
   try {
-    const data = await apiFetch("/receipts");
-    renderReceipts(data || []);
+    const response = await apiFetch("/api/receipts");
+    if (!response) {
+      return;
+    }
+
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => null);
+      throw new Error(errorPayload?.error || "Failed to load receipts.");
+    }
+
+    const payload = await response.json().catch(() => null);
+    const receipts = Array.isArray(payload?.receipts) ? payload.receipts : [];
+    renderReceipts(receipts);
   } catch (err) {
     console.error("Failed to load receipts:", err);
   }
