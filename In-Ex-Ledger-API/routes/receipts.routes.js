@@ -102,7 +102,7 @@ function safeUnlink(filePath) {
    GET /receipts — List Receipts (Newest First)
    ========================================================= */
 
-router.get("/receipts", async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
@@ -131,7 +131,7 @@ router.get("/receipts", async (req, res) => {
    POST /receipts — Upload Receipt
    ========================================================= */
 
-router.post("/receipts", upload.single("receipt"), async (req, res) => {
+router.post("/", upload.single("receipt"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "Receipt file is required." });
   }
@@ -183,7 +183,7 @@ router.post("/receipts", upload.single("receipt"), async (req, res) => {
    PATCH /receipts/:id/attach — Attach/Detach to Transaction
    ========================================================= */
 
-router.patch("/receipts/:id/attach", async (req, res) => {
+router.patch("/:id/attach", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const receiptId = req.params.id;
@@ -238,7 +238,7 @@ router.patch("/receipts/:id/attach", async (req, res) => {
    GET /receipts/:id — Secure Download
    ========================================================= */
 
-router.get("/receipts/:id", async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
@@ -279,7 +279,7 @@ router.get("/receipts/:id", async (req, res) => {
    DELETE /receipts/:id — Delete Receipt (DB + Disk)
    ========================================================= */
 
-router.delete("/receipts/:id", async (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const receiptId = req.params.id;
