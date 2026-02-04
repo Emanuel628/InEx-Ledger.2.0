@@ -106,20 +106,19 @@ router.get("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
-    const result = await pool.query(
-      `SELECT
-         id,
-         transaction_id,
-         file_url AS filename,
-         NULL::text AS mime_type,
-         storage_path,
-         created_at,
-         file_hash
-       FROM receipts
-       WHERE business_id = $1
-       ORDER BY created_at DESC NULLS LAST`,
-      [businessId]
-    );
+    const sql = `
+      SELECT
+        id,
+        transaction_id,
+        file_url AS filename,
+        storage_path,
+        created_at,
+        file_hash
+      FROM receipts
+      WHERE business_id = $1
+      ORDER BY created_at DESC NULLS LAST
+    `;
+    const result = await pool.query(sql, [businessId]);
 
     return res.json({ receipts: result.rows });
   } catch (err) {
