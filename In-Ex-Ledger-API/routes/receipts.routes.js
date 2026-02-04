@@ -110,8 +110,9 @@ router.get("/", async (req, res) => {
       `SELECT
          id,
          transaction_id,
-         filename,
-         mime_type,
+         file_url AS filename,
+         NULL::text AS mime_type,
+         storage_path,
          created_at,
          file_hash
        FROM receipts
