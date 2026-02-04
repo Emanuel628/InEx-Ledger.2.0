@@ -97,6 +97,7 @@ function wireReceiptDownloadButtons() {
         await downloadReceipt(receiptId, filename, mimeType);
       } catch (err) {
         console.error("Receipt download failed:", err);
+        alert("Receipt download failed: " + err.message);
       }
     });
   });
