@@ -65,13 +65,18 @@ function renderReceipts(receipts) {
   receipts.forEach((r) => {
     const tr = document.createElement("tr");
     const name = r.filename || "Download receipt";
-    const link = buildApiUrl(`/api/receipts/${r.id}`);
 
     tr.innerHTML = `
       <td>
-        <a href="${link}" target="_blank" rel="noreferrer">
+        <button
+          type="button"
+          class="receipt-download"
+          data-id="${r.id}"
+          data-name="${name}"
+          data-mime="${r.mime_type || "application/octet-stream"}"
+        >
           ${name}
-        </a>
+        </button>
       </td>
       <td>${r.created_at ? new Date(r.created_at).toLocaleDateString() : "-"}</td>
       <td>${r.transaction_id || "-"}</td>
@@ -79,6 +84,54 @@ function renderReceipts(receipts) {
 
     tbody.appendChild(tr);
   });
+
+  wireReceiptDownloadButtons();
+}
+
+function wireReceiptDownloadButtons() {
+  const buttons = document.querySelectorAll(".receipt-download");
+  buttons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      const receiptId = button.dataset.id;
+      const filename = button.dataset.name || "receipt";
+      const mimeType = button.dataset.mime || "application/octet-stream";
+
+      try {
+        await downloadReceipt(receiptId, filename, mimeType);
+      } catch (err) {
+        console.error("Receipt download failed:", err);
+      }
+    });
+  });
+}
+
+async function downloadReceipt(receiptId, filename, mimeType) {
+  if (!receiptId) {
+    throw new Error("Missing receipt id");
+  }
+
+  const response = await fetch(buildApiUrl(`/api/receipts/${receiptId}`), {
+    method: "GET",
+    credentials: "include",
+    headers: {
+      ...authHeader()
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to download receipt.");
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener noreferrer";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /* -------------------------
