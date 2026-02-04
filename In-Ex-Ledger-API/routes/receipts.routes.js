@@ -103,8 +103,7 @@ function safeUnlink(filePath) {
 
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const businessId =
-      req.user?.business_id || req.user?.businessId || null;
+    const businessId = await resolveBusinessIdForUser(req.user);
 
     if (!businessId) {
       return res.status(400).json({
