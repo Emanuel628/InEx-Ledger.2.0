@@ -36,7 +36,11 @@ async function loadReceipts() {
     }
 
     const payload = await response.json().catch(() => null);
-    const receipts = Array.isArray(payload?.receipts) ? payload.receipts : [];
+    const receipts = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.receipts)
+      ? payload.receipts
+      : [];
     renderReceipts(receipts);
   } catch (err) {
     console.error("Failed to load receipts:", err);
