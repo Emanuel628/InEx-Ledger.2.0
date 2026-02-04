@@ -9,7 +9,6 @@ import { resolveBusinessIdForUser } from "../api/utils/resolveBusinessIdForUser.
 import { pool } from "../db.js";
 
 const router = express.Router();
-router.use(requireAuth);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const storageDir = path.join(process.cwd(), "storage", "receipts");
@@ -102,9 +101,16 @@ function safeUnlink(filePath) {
    GET /receipts — List Receipts (Newest First)
    ========================================================= */
 
-router.get("/", async (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    const businessId =
+      req.user?.business_id || req.user?.businessId || null;
+
+    if (!businessId) {
+      return res.status(400).json({
+        error: "Missing business context"
+      });
+    }
 
     const sql = `
       SELECT
@@ -120,10 +126,12 @@ router.get("/", async (req, res) => {
     `;
     const result = await pool.query(sql, [businessId]);
 
-    return res.json({ receipts: result.rows });
+    return res.status(200).json(result.rows || []);
   } catch (err) {
-    console.error("GET /receipts error:", err);
-    return res.status(500).json({ error: "Failed to load receipts." });
+    console.error("Receipts load error:", err);
+    return res.status(500).json({
+      error: "Failed to load receipts"
+    });
   }
 });
 
@@ -131,7 +139,7 @@ router.get("/", async (req, res) => {
    POST /receipts — Upload Receipt
    ========================================================= */
 
-router.post("/", upload.single("receipt"), async (req, res) => {
+router.post("/", requireAuth, upload.single("receipt"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "Receipt file is required." });
   }
@@ -183,7 +191,7 @@ router.post("/", upload.single("receipt"), async (req, res) => {
    PATCH /receipts/:id/attach — Attach/Detach to Transaction
    ========================================================= */
 
-router.patch("/:id/attach", async (req, res) => {
+router.patch("/:id/attach", requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const receiptId = req.params.id;
@@ -238,7 +246,7 @@ router.patch("/:id/attach", async (req, res) => {
    GET /receipts/:id — Secure Download
    ========================================================= */
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
@@ -279,7 +287,7 @@ router.get("/:id", async (req, res) => {
    DELETE /receipts/:id — Delete Receipt (DB + Disk)
    ========================================================= */
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const receiptId = req.params.id;
