@@ -115,7 +115,8 @@ router.get("/", requireAuth, async (req, res) => {
       SELECT
         id,
         transaction_id,
-        file_url AS filename,
+        filename,
+        mime_type,
         storage_path,
         created_at,
         file_hash

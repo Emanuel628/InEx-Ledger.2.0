@@ -64,9 +64,15 @@ function renderReceipts(receipts) {
 
   receipts.forEach((r) => {
     const tr = document.createElement("tr");
+    const name = r.filename || "Download receipt";
+    const link = buildApiUrl(`/api/receipts/${r.id}`);
 
     tr.innerHTML = `
-      <td>${r.filename || "-"}</td>
+      <td>
+        <a href="${link}" target="_blank" rel="noreferrer">
+          ${name}
+        </a>
+      </td>
       <td>${r.created_at ? new Date(r.created_at).toLocaleDateString() : "-"}</td>
       <td>${r.transaction_id || "-"}</td>
     `;
