@@ -54,12 +54,13 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
     return existing.rows[0].id;
   }
 
-  const inserted = await pool.query(
-    `INSERT INTO categories (id, business_id, name, kind, created_at)
-     VALUES (uuid_generate_v4(), $1, $2, $3, now())
-     RETURNING id`,
-    [businessId, name, kind]
-  );
+      const inserted = await pool.query(
+      `INSERT INTO categories (id, business_id, name, kind, created_at)
+       VALUES ($1, $2, $3, $4, now())
+       RETURNING id`,
+      [crypto.randomUUID(), businessId, name, kind]
+    );
+
 
   return inserted.rows[0].id;
 }
