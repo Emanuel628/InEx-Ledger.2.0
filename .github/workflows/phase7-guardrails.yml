@@ -25,7 +25,7 @@ jobs:
         ports:
           - 5432:5432
     env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/inex_ledger_ci
+      DATABASE_URL: ${{ secrets.DATABASE_URL != '' && secrets.DATABASE_URL || 'postgresql://postgres:postgres@127.0.0.1:5432/inex_ledger_ci' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
