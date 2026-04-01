@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import cors from "cors";
 import path from "path";
 import routes from "./routes/index.js";
@@ -81,11 +81,6 @@ console.log("âœ… MOUNTED: /api/transactions");
 // Core auth and index routes
 app.use("/api", routes);
 console.log("âœ… MOUNTED: /api (Core Routes)");
-
-// User identity endpoint
-app.get("/api/me", requireAuth, (req, res) => {
-  res.json(req.user);
-});
 
 /* =========================================================
    SERVER INITIALIZATION
