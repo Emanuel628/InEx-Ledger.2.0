@@ -481,12 +481,13 @@ router.post("/forgot-password", async (req, res) => {
       const { token } = createPasswordResetToken(email);
       const resetLink = buildPasswordResetLink(req, token);
 
-      await transporter.sendMail({
-        from: `"InEx Ledger" <${process.env.SMTP_USER}>`,
-        to: email,
+      await resend.emails.send({
+        from: "InEx Ledger <onboarding@resend.dev>",
+        to: [email],
         subject: "Password Reset Request",
         html: `<p>Click here to reset your password:</p><a href="${resetLink}">${resetLink}</a>`
       });
+
     }
     // Always return 200 for security reasons (don't leak which emails exist)
     return res.status(200).json({ message: "If the email is registered, a reset link was sent." });
