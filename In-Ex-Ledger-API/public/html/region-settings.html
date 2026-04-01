@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>InEx Ledger ƒ?" Region Settings</title>
+  <title>InEx Ledger — Region Settings</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="stylesheet" href="/css/app.css">
 <link rel="stylesheet" href="/css/pages/region-settings.css">
@@ -19,6 +19,27 @@
       <label>
         <input type="radio" name="region" value="CA" /> Canada
       </label><br /><br />
+
+      <div id="provinceField" hidden>
+        <label for="province">Province</label><br />
+        <select id="province" name="province">
+          <option value="">Select province</option>
+          <option value="AB">Alberta</option>
+          <option value="BC">British Columbia</option>
+          <option value="MB">Manitoba</option>
+          <option value="NB">New Brunswick</option>
+          <option value="NL">Newfoundland and Labrador</option>
+          <option value="NS">Nova Scotia</option>
+          <option value="NT">Northwest Territories</option>
+          <option value="NU">Nunavut</option>
+          <option value="ON">Ontario</option>
+          <option value="PE">Prince Edward Island</option>
+          <option value="QC">Quebec</option>
+          <option value="SK">Saskatchewan</option>
+          <option value="YT">Yukon</option>
+        </select><br /><br />
+      </div>
+
       <button type="submit">Save region</button>
     </form>
   </main>

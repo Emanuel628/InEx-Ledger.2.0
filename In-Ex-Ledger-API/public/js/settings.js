@@ -378,7 +378,7 @@ function wireAccountDeletion() {
 
       confirmBtn.disabled = true;
       try {
-        const response = await apiFetch(`${API_BASE}/me`, {
+        const response = await apiFetch("/api/me", {
           method: "DELETE"
         });
 

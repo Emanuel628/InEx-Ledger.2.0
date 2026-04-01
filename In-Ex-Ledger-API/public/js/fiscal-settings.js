@@ -2,45 +2,61 @@
    Fiscal Settings Page JS
    ========================================================= */
 
-// Fiscal Settings is a protected page
 requireAuth();
-
-/* -------------------------
-   Page boot
-   ------------------------- */
 
 init();
 
 function init() {
-  console.log("Fiscal settings page loaded.");
-
+  loadFiscalSettings();
   wireForm();
 }
 
-/* -------------------------
-   Form handling (preliminary)
-   ------------------------- */
+async function loadFiscalSettings() {
+  try {
+    const response = await apiFetch("/api/business");
+    if (!response || !response.ok) return;
+    const business = await response.json();
+    const dateInput = document.querySelector('input[type="date"]');
+    if (dateInput && business.fiscal_year_start) {
+      const currentYear = new Date().getFullYear();
+      dateInput.value = `${currentYear}-${business.fiscal_year_start}`;
+    }
+  } catch (err) {
+    console.error("Failed to load fiscal settings:", err);
+  }
+}
 
 function wireForm() {
   const form = document.querySelector("form");
-
-  if (!form) {
-    console.warn("Fiscal settings form not found.");
-    return;
-  }
-
-  form.addEventListener("submit", (e) => {
+  if (!form) return;
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    saveFiscalSettings();
+    await saveFiscalSettings(form);
   });
 }
 
-/* -------------------------
-   Future hooks
-   ------------------------- */
+async function saveFiscalSettings(form) {
+  const dateInput = form.querySelector('input[type="date"]');
+  const value = dateInput?.value || "";
+  // Store as MM-DD from full date
+  const fiscal_year_start = value ? value.slice(5) : null;
 
-function saveFiscalSettings() {
-  // Future: apiFetch("/settings/fiscal", { method: "POST", body: ... })
-  console.log("Saving fiscal settings (preliminary).");
-  alert("Fiscal settings saved.");
+  const submitBtn = form.querySelector('button[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    const response = await apiFetch("/api/business", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fiscal_year_start })
+    });
+
+    if (response && response.ok) {
+      alert("Fiscal settings saved.");
+    } else {
+      alert("Failed to save fiscal settings.");
+    }
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
 }

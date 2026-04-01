@@ -9,6 +9,9 @@ import businessRoutes from "./business.routes.js";
 import systemRoutes from "./system.routes.js";
 import meRoutes from "./me.routes.js";
 import cryptoRoutes from "./crypto.routes.js";
+import privacyRoutes from "./privacy.routes.js";
+import mileageRoutes from "./mileage.routes.js";
+import sessionsRoutes from "./sessions.routes.js";
 
 const router = express.Router();
 
@@ -21,5 +24,8 @@ router.use("/business", businessRoutes);
 router.use("/system", systemRoutes);
 router.use("/me", meRoutes);
 router.use("/crypto", cryptoRoutes);
+router.use("/privacy", privacyRoutes);
+router.use("/mileage", mileageRoutes);
+router.use("/sessions", sessionsRoutes);
 
 export default router;

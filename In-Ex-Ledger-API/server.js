@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import path from "path";
 import routes from "./routes/index.js";
 import cookieParser from "cookie-parser";
@@ -27,6 +28,9 @@ const PORT = process.env.PORT || 8080;
 console.log(`ðŸ“¡ NETWORK: Port assigned: ${PORT}`);
 console.log("ðŸ”‘ SECURITY: JWT_SECRET detected:", !!process.env.JWT_SECRET);
 
+app.use(helmet({
+  contentSecurityPolicy: false  // disabled to allow inline scripts in the existing frontend
+}));
 app.use(cors({
   origin: (origin, callback) => {
     // Allow server-to-server or local testing with no origin
@@ -64,7 +68,11 @@ app.get("/health", (req, res) => {
 });
 
 app.get("/favicon.ico", (req, res) => {
-  res.status(204).end();
+  res.redirect(301, "/favicon.svg");
+});
+
+app.get("/favicon.svg", (req, res) => {
+  res.sendFile(path.join(publicDir, "favicon.svg"));
 });
 
 app.get("/", (req, res) => {

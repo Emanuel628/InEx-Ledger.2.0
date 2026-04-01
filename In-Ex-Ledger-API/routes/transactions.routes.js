@@ -99,6 +99,9 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
     const result = await pool.query(
       `SELECT id,
               business_id,
@@ -112,11 +115,22 @@ router.get("/", requireAuth, async (req, res) => {
               created_at
        FROM transactions
        WHERE business_id = $1
-       ORDER BY created_at DESC`,
+       ORDER BY date DESC, created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [businessId, limit, offset]
+    );
+
+    const countResult = await pool.query(
+      "SELECT COUNT(*) FROM transactions WHERE business_id = $1",
       [businessId]
     );
 
-    res.status(200).json(result.rows);
+    res.status(200).json({
+      data: result.rows,
+      total: parseInt(countResult.rows[0].count),
+      limit,
+      offset
+    });
   } catch (err) {
     console.error("GET /transactions error:", err);
     res.status(500).json({ error: "Failed to load transactions." });
@@ -134,6 +148,15 @@ router.post("/", requireAuth, async (req, res) => {
 
     const { account_id, category_id, amount, type, description, date, note } =
       req.body;
+
+    const accountCheck = await pool.query(
+      "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
+      [account_id, businessId]
+    );
+    if (accountCheck.rowCount === 0) {
+      return res.status(400).json({ error: "account_id does not belong to your business" });
+    }
+
     const mappedCategoryId = await resolveCategoryId(
       businessId,
       category_id,
@@ -166,6 +189,69 @@ router.post("/", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("POST /transactions error:", err);
     res.status(500).json({ error: "Failed to save transaction." });
+  }
+});
+
+router.put("/:id", requireAuth, async (req, res) => {
+  const validation = validateTransactionPayload(req.body);
+  if (!validation.valid) {
+    return res.status(400).json({ error: validation.message });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const { account_id, category_id, amount, type, description, date, note } = req.body;
+
+    const accountCheck = await pool.query(
+      "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
+      [account_id, businessId]
+    );
+    if (accountCheck.rowCount === 0) {
+      return res.status(400).json({ error: "account_id does not belong to your business" });
+    }
+
+    const mappedCategoryId = await resolveCategoryId(businessId, category_id, type);
+    if (!mappedCategoryId) {
+      return res.status(400).json({ error: "category_id is invalid" });
+    }
+
+    const result = await pool.query(
+      `UPDATE transactions
+       SET account_id = $1, category_id = $2, amount = $3, type = $4,
+           description = $5, date = $6, note = $7
+       WHERE id = $8 AND business_id = $9
+       RETURNING *`,
+      [account_id, mappedCategoryId, amount, type, description || null, date, note || null,
+       req.params.id, businessId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Transaction not found." });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("PUT /transactions/:id error:", err);
+    res.status(500).json({ error: "Failed to update transaction." });
+  }
+});
+
+router.delete("/:id", requireAuth, async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const result = await pool.query(
+      "DELETE FROM transactions WHERE id = $1 AND business_id = $2",
+      [req.params.id, businessId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Transaction not found." });
+    }
+
+    res.json({ message: "Transaction deleted." });
+  } catch (err) {
+    console.error("DELETE /transactions/:id error:", err);
+    res.status(500).json({ error: "Failed to delete transaction." });
   }
 });
 
