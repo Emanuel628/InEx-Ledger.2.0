@@ -35,10 +35,10 @@ console.log("Running export grant regression script");
 console.log("EXPORT_GRANT_SECRET:", EXPORT_SECRET);
 console.log("EXPORT_GRANT_TTL_MS:", TTL_OVERRIDE_MS);
 
-const grant = issueExportGrant(testContext);
+const grant = await issueExportGrant(testContext);
 console.log("Issued grant:", { tokenLength: grant.token.length, expiresAt: grant.expiresAt });
 
-const payload = verifyExportGrant(grant.token);
+const payload = await verifyExportGrant(grant.token);
 console.log("Verified grant payload:", {
   action: payload.action,
   includeTaxId: payload.includeTaxId,
