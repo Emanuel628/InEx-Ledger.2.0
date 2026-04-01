@@ -10,6 +10,22 @@ jobs:
   enforce-export-guardrails:
     name: Enforce export guardrails
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: inex_ledger_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d inex_ledger_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/inex_ledger_ci
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,6 +46,11 @@ jobs:
       - name: Install dependencies
         working-directory: In-Ex-Ledger-API
         run: npm install
+
+      - name: Initialize export grant schema
+        working-directory: In-Ex-Ledger-API
+        run: |
+          node --input-type=module -e "import { pool } from './db.js'; await pool.query('CREATE TABLE IF NOT EXISTS export_grant_jtis (jti UUID PRIMARY KEY, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())'); await pool.query('CREATE INDEX IF NOT EXISTS idx_export_grant_jtis_expires ON export_grant_jtis(expires_at)'); await pool.end();"
 
       - name: Run export grant guard
         working-directory: In-Ex-Ledger-API
