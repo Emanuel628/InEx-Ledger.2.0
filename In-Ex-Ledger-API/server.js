@@ -5,7 +5,6 @@ import path from "path";
 import routes from "./routes/index.js";
 import cookieParser from "cookie-parser";
 import transactionsRouter from "./routes/transactions.routes.js";
-import { requireAuth } from "./middleware/auth.middleware.js";
 import { initDatabase } from "./db.js";
 
 const app = express();
@@ -22,23 +21,27 @@ const ALLOWED_ORIGINS = [
   "http://localhost:3000"
 ];
 
-console.log("ðŸ”¥ SYSTEM START: INEX_LEDGER_PROD_2026");
+console.log("SYSTEM START: INEX_LEDGER_PROD_2026");
 
 const PORT = process.env.PORT || 8080;
-console.log(`ðŸ“¡ NETWORK: Port assigned: ${PORT}`);
-console.log("ðŸ”‘ SECURITY: JWT_SECRET detected:", !!process.env.JWT_SECRET);
+const DB_RETRY_DELAY_MS = Number(process.env.DB_RETRY_DELAY_MS || 15000);
+console.log(`NETWORK: Port assigned: ${PORT}`);
+console.log("SECURITY: JWT_SECRET detected:", !!process.env.JWT_SECRET);
+
+let dbState = "starting";
+let dbLastError = null;
+let dbInitPromise = null;
 
 app.use(helmet({
-  contentSecurityPolicy: false  // disabled to allow inline scripts in the existing frontend
+  contentSecurityPolicy: false
 }));
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow server-to-server or local testing with no origin
     if (!origin) return callback(null, true);
     if (ALLOWED_ORIGINS.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.warn(`âš ï¸  CORS: Blocked request from ${origin}`);
+      console.warn(`CORS: Blocked request from ${origin}`);
       callback(new Error("Not allowed by CORS"));
     }
   },
@@ -58,10 +61,13 @@ app.use(cookieParser());
    SYSTEM ROUTES (HEALTH & STATIC)
    ========================================================= */
 
-// Railway Deployment Healthcheck
 app.get("/health", (req, res) => {
   res.status(200).json({
-    status: "healthy",
+    status: dbState === "ready" ? "healthy" : "starting",
+    database: {
+      state: dbState,
+      lastError: dbLastError
+    },
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
@@ -83,13 +89,11 @@ app.get("/", (req, res) => {
    API ROUTES
    ========================================================= */
 
-// Transaction management
 app.use("/api/transactions", transactionsRouter);
-console.log("âœ… MOUNTED: /api/transactions");
+console.log("MOUNTED: /api/transactions");
 
-// Core auth and index routes
 app.use("/api", routes);
-console.log("âœ… MOUNTED: /api (Core Routes)");
+console.log("MOUNTED: /api (Core Routes)");
 
 /* =========================================================
    SERVER INITIALIZATION
@@ -97,29 +101,47 @@ console.log("âœ… MOUNTED: /api (Core Routes)");
 
 let server;
 
-async function start() {
-  try {
-    await initDatabase();
-  } catch (err) {
-    console.error("Database initialization failed:", err);
-    process.exit(1);
-  }
+async function initializeDatabaseWithRetry() {
+  if (dbInitPromise) return dbInitPromise;
 
-  server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`ðŸš€ READY: InEx Ledger API live on port ${PORT}`);
-  });
+  dbInitPromise = (async () => {
+    while (true) {
+      try {
+        await initDatabase();
+        dbState = "ready";
+        dbLastError = null;
+        console.log("Database initialization completed.");
+        return;
+      } catch (err) {
+        dbState = "retrying";
+        dbLastError = err?.message || String(err);
+        console.error("Database initialization failed:", err);
+        console.log(`Retrying database initialization in ${DB_RETRY_DELAY_MS}ms.`);
+        await new Promise((resolve) => setTimeout(resolve, DB_RETRY_DELAY_MS));
+      }
+    }
+  })();
 
-  /* =========================================================
-     GRACEFUL SHUTDOWN
-     ========================================================= */
+  return dbInitPromise;
+}
 
+function registerShutdownHandlers() {
   process.on("SIGTERM", () => {
-    console.log("ðŸ›‘ SIGTERM: Shutdown signal received.");
+    console.log("SIGTERM: Shutdown signal received.");
     server.close(() => {
-      console.log("ðŸ’¨ Server closed safely. Goodbye!");
+      console.log("Server closed safely. Goodbye!");
       process.exit(0);
     });
   });
+}
+
+async function start() {
+  server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`READY: InEx Ledger API live on port ${PORT}`);
+  });
+
+  registerShutdownHandlers();
+  void initializeDatabaseWithRetry();
 }
 
 start();
