@@ -274,7 +274,8 @@ router.get("/:id", requireAuth, async (req, res) => {
     res.setHeader("Expires", "0");
 
     res.setHeader("Content-Type", mime_type || "application/octet-stream");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+
 
     return res.sendFile(storage_path);
   } catch (err) {
