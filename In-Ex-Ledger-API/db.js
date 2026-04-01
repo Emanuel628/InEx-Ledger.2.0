@@ -13,17 +13,19 @@ export const pool = new Pool({
   }
 });
 
-// Title: Database Identity & URL Parsing
-try {
-  const dbUrl = new URL(process.env.DATABASE_URL);
-  console.log("=== DB URL PARSED ===");
-  console.log("HOST:", dbUrl.host);
-  console.log("USER:", dbUrl.username);
-  console.log("DB NAME:", dbUrl.pathname.replace('/', ''));
-  console.log("========================");
-} catch (e) {
-  console.error("Failed to parse DATABASE_URL variable.");
+if (process.env.NODE_ENV !== "production") {
+  try {
+    const dbUrl = new URL(process.env.DATABASE_URL);
+    console.log("=== DB URL PARSED ===");
+    console.log("HOST:", dbUrl.host);
+    console.log("USER:", dbUrl.username);
+    console.log("DB NAME:", dbUrl.pathname.replace('/', ''));
+    console.log("========================");
+  } catch (e) {
+    console.error("Failed to parse DATABASE_URL variable.");
+  }
 }
+
 
 export async function logDbIdentity() {
   try {
