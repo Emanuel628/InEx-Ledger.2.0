@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import pool from "../../db.js";
 
 const defaultAccounts = [
@@ -26,9 +27,9 @@ export async function seedDefaultsForBusiness(db = pool, businessId) {
     await targetDb.query(
       `
       INSERT INTO accounts (id, business_id, name, type, created_at)
-      VALUES (uuid_generate_v4(), $1, $2, $3, now())
+      VALUES ($1, $2, $3, $4, now())
       `,
-      [businessId, account.name, account.type]
+      [crypto.randomUUID(), businessId, account.name, account.type]
     );
   }
 
@@ -36,9 +37,9 @@ export async function seedDefaultsForBusiness(db = pool, businessId) {
     await targetDb.query(
       `
       INSERT INTO categories (id, business_id, name, kind, created_at)
-      VALUES (uuid_generate_v4(), $1, $2, $3, now())
+      VALUES ($1, $2, $3, $4, now())
       `,
-      [businessId, category.name, category.kind]
+      [crypto.randomUUID(), businessId, category.name, category.kind]
     );
   }
 }
