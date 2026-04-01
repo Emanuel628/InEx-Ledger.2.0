@@ -30,6 +30,15 @@ document.addEventListener("DOMContentLoaded", () => {
   form.addEventListener("submit", handleRegisterSubmit);
   wireShowPasswordToggle(document);
 
+  // Show PIPEDA consent checkbox for Canadian users
+  const region = localStorage.getItem("lb_region");
+  if (region && region.toLowerCase() === "ca") {
+    const pipedaField = document.getElementById("pipedaConsentField");
+    const pipedaInput = document.getElementById("pipedaConsent");
+    if (pipedaField) pipedaField.removeAttribute("hidden");
+    if (pipedaInput) pipedaInput.required = true;
+  }
+
   const passwordInput = form.querySelector("#password");
   const confirmInput = form.querySelector("#confirm-password");
 

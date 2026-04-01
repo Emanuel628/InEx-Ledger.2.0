@@ -37,7 +37,7 @@ const SECURITY_REQUIREMENT_RULES = {
 };
 
 let securityState = {};
-const API_BASE = "https://inex-ledger20-production.up.railway.app/api";
+const API_BASE = "";
 const DELETE_CONFIRM_TEXT = "delete my account";
 console.log("Settings JS loaded");
 document.addEventListener("DOMContentLoaded", async () => {
@@ -378,7 +378,7 @@ function wireAccountDeletion() {
 
       confirmBtn.disabled = true;
       try {
-        const response = await apiFetch(`${API_BASE}/me`, {
+        const response = await apiFetch("/api/me", {
           method: "DELETE"
         });
 

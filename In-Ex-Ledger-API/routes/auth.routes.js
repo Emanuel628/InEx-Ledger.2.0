@@ -6,8 +6,8 @@
 import express from "express";
 import crypto from "node:crypto";
 import bcrypt from "bcrypt";
-// 1. CHANGE: Switch from nodemailer to resend
-import { Resend } from "resend"; 
+import { Resend } from "resend";
+import rateLimit from "express-rate-limit";
 import { signToken, requireAuth } from "../middleware/auth.middleware.js";
 import pool from "../db.js";
 
@@ -25,7 +25,26 @@ console.log("?? Resend Email Engine Initialized");
 
 
 /* =========================================================
-   2. CONSTANTS & COOKIE CONFIGURATION
+   2. RATE LIMITERS
+   ========================================================= */
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." }
+});
+
+const passwordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many password reset attempts, please try again later." }
+});
+
+/* =========================================================
+   3. CONSTANTS & COOKIE CONFIGURATION
    ========================================================= */
 const REFRESH_TOKEN_COOKIE = "refresh_token";
 const REFRESH_TOKEN_EXPIRY_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
@@ -43,93 +62,56 @@ const COOKIE_OPTIONS = {
 
 
 /* =========================================================
-   3. IN-MEMORY TOKEN MANAGEMENT
+   3. TOKEN MANAGEMENT (DB-backed)
    ========================================================= */
-const verificationTokens = new Map();
-const VERIFICATION_TOKEN_TTL = 15 * 60 * 1000; 
-
-const passwordResetTokens = new Map();
-const PASSWORD_RESET_TTL = 20 * 60 * 1000;
+const VERIFICATION_TOKEN_TTL_MS = 15 * 60 * 1000;
+const PASSWORD_RESET_TTL_MS = 20 * 60 * 1000;
 
 function normalizeEmail(email) {
   return String(email ?? "").trim().toLowerCase();
 }
 
-function cleanupVerificationTokens() {
-  const now = Date.now();
-  for (const [token, meta] of verificationTokens.entries()) {
-    if (meta.expiresAt <= now) {
-      verificationTokens.delete(token);
-    }
-  }
-}
-
-function removeTokensForEmail(email) {
-  for (const [token, meta] of verificationTokens.entries()) {
-    if (meta.email === email) {
-      verificationTokens.delete(token);
-    }
-  }
-}
-
-function createVerificationToken(email) {
-  cleanupVerificationTokens();
-  removeTokensForEmail(email);
+async function createVerificationToken(email) {
   const token = crypto.randomUUID();
-  const expiresAt = Date.now() + VERIFICATION_TOKEN_TTL;
-  verificationTokens.set(token, { email, expiresAt });
+  const expiresAt = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
+  await pool.query("DELETE FROM verification_tokens WHERE email = $1", [email]);
+  await pool.query(
+    "INSERT INTO verification_tokens (token, email, expires_at) VALUES ($1, $2, $3)",
+    [token, email, expiresAt]
+  );
   return { token, expiresAt };
 }
 
-function consumeVerificationToken(token) {
-  cleanupVerificationTokens();
-  const entry = verificationTokens.get(token);
-  if (!entry || entry.expiresAt <= Date.now()) {
-    verificationTokens.delete(token);
-    return null;
-  }
-  verificationTokens.delete(token);
-  return entry.email;
+async function consumeVerificationToken(token) {
+  await pool.query("DELETE FROM verification_tokens WHERE expires_at <= NOW()");
+  const result = await pool.query(
+    "DELETE FROM verification_tokens WHERE token = $1 AND expires_at > NOW() RETURNING email",
+    [token]
+  );
+  return result.rows[0]?.email ?? null;
 }
 
 /* =========================================================
-   4. PASSWORD RESET UTILITIES
+   4. PASSWORD RESET UTILITIES (DB-backed)
    ========================================================= */
-function cleanupPasswordResetTokens() {
-  const now = Date.now();
-  for (const [token, meta] of passwordResetTokens.entries()) {
-    if (meta.expiresAt <= now) {
-      passwordResetTokens.delete(token);
-    }
-  }
-}
-
-function removePasswordResetTokensForEmail(email) {
-  for (const [token, meta] of passwordResetTokens.entries()) {
-    if (meta.email === email) {
-      passwordResetTokens.delete(token);
-    }
-  }
-}
-
-function createPasswordResetToken(email) {
-  cleanupPasswordResetTokens();
-  removePasswordResetTokensForEmail(email);
+async function createPasswordResetToken(email) {
   const token = crypto.randomUUID();
-  const expiresAt = Date.now() + PASSWORD_RESET_TTL;
-  passwordResetTokens.set(token, { email, expiresAt });
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+  await pool.query("DELETE FROM password_reset_tokens WHERE email = $1", [email]);
+  await pool.query(
+    "INSERT INTO password_reset_tokens (token, email, expires_at) VALUES ($1, $2, $3)",
+    [token, email, expiresAt]
+  );
   return { token, expiresAt };
 }
 
-function consumePasswordResetToken(token) {
-  cleanupPasswordResetTokens();
-  const entry = passwordResetTokens.get(token);
-  if (!entry || entry.expiresAt <= Date.now()) {
-    passwordResetTokens.delete(token);
-    return null;
-  }
-  passwordResetTokens.delete(token);
-  return entry.email;
+async function consumePasswordResetToken(token) {
+  await pool.query("DELETE FROM password_reset_tokens WHERE expires_at <= NOW()");
+  const result = await pool.query(
+    "DELETE FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW() RETURNING email",
+    [token]
+  );
+  return result.rows[0]?.email ?? null;
 }
 
 /* =========================================================
@@ -220,7 +202,7 @@ async function revokeRefreshTokenByHash(tokenHash) {
 /**
  * POST /register
  */
-router.post("/register", async (req, res) => {
+router.post("/register", authLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
 
@@ -228,6 +210,10 @@ router.post("/register", async (req, res) => {
 
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters" });
   }
 
   const hashedPassword = await hashPassword(password);
@@ -320,7 +306,7 @@ router.post("/send-verification", async (req, res) => {
  * POST /login
  * Added strict check for email_verified status.
  */
-router.post("/login", async (req, res) => {
+router.post("/login", authLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
 
@@ -449,7 +435,7 @@ router.get("/verify-email", async (req, res) => {
   const token = req.query?.token;
   if (!token) return res.status(400).send("Token is required.");
 
-  const email = consumeVerificationToken(token);
+  const email = await consumeVerificationToken(token);
   if (!email) return res.status(400).send("Invalid or expired link.");
 
   try {
@@ -471,7 +457,7 @@ router.get("/verify-email", async (req, res) => {
 /**
  * POST /forgot-password
  */
-router.post("/forgot-password", async (req, res) => {
+router.post("/forgot-password", passwordLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!email) return res.status(400).json({ error: "Email is required" });
 
@@ -500,14 +486,18 @@ router.post("/forgot-password", async (req, res) => {
 /**
  * POST /reset-password
  */
-router.post("/reset-password", async (req, res) => {
+router.post("/reset-password", passwordLimiter, async (req, res) => {
   const { token, password, confirmPassword } = req.body;
 
   if (!token || !password || password !== confirmPassword) {
     return res.status(400).json({ error: "Invalid input or passwords do not match." });
   }
 
-  const email = consumePasswordResetToken(token);
+  if (password.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters" });
+  }
+
+  const email = await consumePasswordResetToken(token);
   if (!email) return res.status(400).json({ error: "Token expired or invalid." });
 
   try {
@@ -517,6 +507,80 @@ router.post("/reset-password", async (req, res) => {
   } catch (err) {
     console.error("Reset password error:", err);
     res.status(500).json({ error: "Failed to reset password." });
+  }
+});
+
+/**
+ * POST /request-email-change
+ * Initiates email change: verifies current password, sends link to new address.
+ */
+router.post("/request-email-change", requireAuth, authLimiter, async (req, res) => {
+  const { newEmail, currentPassword } = req.body ?? {};
+  const email = normalizeEmail(newEmail);
+
+  if (!email || !currentPassword) {
+    return res.status(400).json({ error: "newEmail and currentPassword are required" });
+  }
+
+  try {
+    const result = await pool.query("SELECT * FROM users WHERE id = $1", [req.user.id]);
+    const user = result.rows[0];
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const { match } = await verifyPassword(currentPassword, user.password_hash);
+    if (!match) return res.status(401).json({ error: "Current password is incorrect" });
+
+    const existing = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+    if (existing.rowCount > 0) {
+      return res.status(409).json({ error: "Email already in use" });
+    }
+
+    const token = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    await pool.query("DELETE FROM email_change_requests WHERE user_id = $1", [req.user.id]);
+    await pool.query(
+      "INSERT INTO email_change_requests (token, user_id, new_email, expires_at) VALUES ($1, $2, $3, $4)",
+      [token, req.user.id, email, expiresAt]
+    );
+
+    const confirmLink = `${req.protocol}://${req.get("host")}/api/auth/confirm-email-change?token=${token}`;
+    await resend.emails.send({
+      from: "InEx Ledger <onboarding@resend.dev>",
+      to: [email],
+      subject: "Confirm your new email address",
+      html: `<p>Click to confirm your new email address: <a href="${confirmLink}">${confirmLink}</a></p>`
+    });
+
+    res.json({ message: "Confirmation email sent to your new address." });
+  } catch (err) {
+    console.error("Request email change error:", err);
+    res.status(500).json({ error: "Failed to initiate email change." });
+  }
+});
+
+/**
+ * GET /confirm-email-change
+ */
+router.get("/confirm-email-change", async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).send("Token is required.");
+
+  try {
+    await pool.query("DELETE FROM email_change_requests WHERE expires_at <= NOW()");
+    const result = await pool.query(
+      "DELETE FROM email_change_requests WHERE token = $1 AND expires_at > NOW() RETURNING user_id, new_email",
+      [token]
+    );
+
+    if (result.rowCount === 0) return res.status(400).send("Invalid or expired link.");
+
+    const { user_id, new_email } = result.rows[0];
+    await pool.query("UPDATE users SET email = $1 WHERE id = $2", [new_email, user_id]);
+
+    return res.redirect("/html/login.html?email_changed=true");
+  } catch (err) {
+    console.error("Confirm email change error:", err);
+    res.status(500).send("Email change failed.");
   }
 });
 

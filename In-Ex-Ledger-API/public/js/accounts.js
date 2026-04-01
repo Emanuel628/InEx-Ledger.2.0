@@ -1,4 +1,4 @@
-const API_BASE = "https://inex-ledger20-production.up.railway.app";
+const API_BASE = "";
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 let editingAccountId = null;
 let accountFormState = null;

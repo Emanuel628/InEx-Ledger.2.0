@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
+import { pool } from "../db.js";
 
 const EXPORT_GRANT_SECRET = process.env.EXPORT_GRANT_SECRET;
 const EXPORT_GRANT_TTL_MS = Number(process.env.EXPORT_GRANT_TTL_MS || 60_000);
@@ -10,22 +11,13 @@ if (!EXPORT_GRANT_SECRET) {
   console.warn("EXPORT_GRANT_SECRET is not configured; export grants cannot be issued.");
 }
 
-const activeJtis = new Map();
-
-function scheduleCleanup(jti, expiresAt) {
-  const delay = Math.max(0, expiresAt - Date.now());
-  setTimeout(() => {
-    activeJtis.delete(jti);
-  }, delay + 1000);
-}
-
 function ensureSecret() {
   if (!EXPORT_GRANT_SECRET) {
     throw new Error("EXPORT_GRANT_SECRET environment variable is required.");
   }
 }
 
-export function issueExportGrant({ businessId, userId, exportType = "pdf", includeTaxId = false, dateRange, metadata = {} }) {
+export async function issueExportGrant({ businessId, userId, exportType = "pdf", includeTaxId = false, dateRange, metadata = {} }) {
   ensureSecret();
   const now = Date.now();
   const expiresAt = now + EXPORT_GRANT_TTL_MS;
@@ -47,13 +39,15 @@ export function issueExportGrant({ businessId, userId, exportType = "pdf", inclu
     algorithm: JWT_ALGORITHM
   });
 
-  activeJtis.set(jti, expiresAt);
-  scheduleCleanup(jti, expiresAt);
+  await pool.query(
+    "INSERT INTO export_grant_jtis (jti, expires_at) VALUES ($1, $2)",
+    [jti, new Date(expiresAt)]
+  );
 
   return { token, expiresAt, jti };
 }
 
-export function verifyExportGrant(token) {
+export async function verifyExportGrant(token) {
   ensureSecret();
   const payload = jwt.verify(token, EXPORT_GRANT_SECRET, {
     algorithms: [JWT_ALGORITHM]
@@ -63,15 +57,15 @@ export function verifyExportGrant(token) {
     throw new Error("Grant token action is not supported.");
   }
 
-  const storedExpiry = activeJtis.get(payload.jti);
-  if (!storedExpiry) {
+  // Atomically consume the JTI — if it was already used or expired, rowCount will be 0
+  await pool.query("DELETE FROM export_grant_jtis WHERE expires_at <= NOW()");
+  const result = await pool.query(
+    "DELETE FROM export_grant_jtis WHERE jti = $1 AND expires_at > NOW() RETURNING jti",
+    [payload.jti]
+  );
+
+  if (result.rowCount === 0) {
     throw new Error("Grant token has already been used or expired.");
-  }
-
-  activeJtis.delete(payload.jti);
-
-  if (storedExpiry < Date.now()) {
-    throw new Error("Grant token has expired.");
   }
 
   return payload;
