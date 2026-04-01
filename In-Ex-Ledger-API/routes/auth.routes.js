@@ -293,10 +293,9 @@ router.post("/send-verification", async (req, res) => {
     const { token, expiresAt } = createVerificationToken(email);
     const verificationLink = buildVerificationLink(req, token);
 
-    // REAL SMTP SENDING
-    await transporter.sendMail({
-      from: `"InEx Ledger" <${process.env.SMTP_USER}>`,
-      to: email,
+        await resend.emails.send({
+      from: "InEx Ledger <onboarding@resend.dev>",
+      to: [email],
       subject: "Verify Your InEx Ledger Account",
       html: `
         <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px;">
@@ -307,6 +306,7 @@ router.post("/send-verification", async (req, res) => {
         </div>
       `
     });
+
 
     console.log("?? Verification Email Sent to:", email);
     res.status(200).json({ message: "Verification link sent to your email." });
