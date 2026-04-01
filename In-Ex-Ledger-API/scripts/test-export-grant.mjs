@@ -47,7 +47,7 @@ console.log("Verified grant payload:", {
 
 let reuseError = null;
 try {
-  verifyExportGrant(grant.token);
+  await verifyExportGrant(grant.token);
 } catch (err) {
   reuseError = err.message;
 }
@@ -58,7 +58,7 @@ assert(
 );
 console.log("One-time use enforcement confirmed");
 
-const expiringGrant = issueExportGrant(testContext);
+const await expiringGrant = issueExportGrant(testContext);
 console.log("Issued expiring grant, waiting for TTL to pass...");
 await wait(Number(TTL_OVERRIDE_MS) + 50);
 
