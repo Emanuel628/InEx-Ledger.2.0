@@ -25,7 +25,7 @@ function maskString(value) {
   return redacted;
 }
 
-export function sanitizePayload(payload) {
+function sanitizePayload(payload) {
   if (!payload || typeof payload !== "object") {
     return maskString(payload);
   }
@@ -53,3 +53,5 @@ export function sanitizePayload(payload) {
   }
   return sanitized;
 }
+
+module.exports = { sanitizePayload };
