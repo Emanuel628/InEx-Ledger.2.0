@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL
-    ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false" }
+    ? { rejectUnauthorized: false }
     : false
 });
 
@@ -25,7 +25,6 @@ if (process.env.NODE_ENV !== "production") {
     console.error("Failed to parse DATABASE_URL variable.");
   }
 }
-
 
 export async function logDbIdentity() {
   try {
