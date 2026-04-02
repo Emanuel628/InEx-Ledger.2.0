@@ -35,19 +35,22 @@ console.log("Running export grant regression script");
 console.log("EXPORT_GRANT_SECRET:", EXPORT_SECRET);
 console.log("EXPORT_GRANT_TTL_MS:", TTL_OVERRIDE_MS);
 
-const grant = issueExportGrant(testContext);
+// 1. Initial Issuance
+const grant = await issueExportGrant(testContext);
 console.log("Issued grant:", { tokenLength: grant.token.length, expiresAt: grant.expiresAt });
 
-const payload = verifyExportGrant(grant.token);
+// 2. Verification
+const payload = await verifyExportGrant(grant.token);
 console.log("Verified grant payload:", {
   action: payload.action,
   includeTaxId: payload.includeTaxId,
   jti: payload.jti
 });
 
+// 3. One-time use test
 let reuseError = null;
 try {
-  verifyExportGrant(grant.token);
+  await verifyExportGrant(grant.token);
 } catch (err) {
   reuseError = err.message;
 }
@@ -58,13 +61,15 @@ assert(
 );
 console.log("One-time use enforcement confirmed");
 
-const expiringGrant = issueExportGrant(testContext);
+// 4. Expiration test issuance
+const expiringGrant = await issueExportGrant(testContext);
 console.log("Issued expiring grant, waiting for TTL to pass...");
 await wait(Number(TTL_OVERRIDE_MS) + 50);
 
+// 5. Expiration verification
 let expiredError = null;
 try {
-  verifyExportGrant(expiringGrant.token);
+  await verifyExportGrant(expiringGrant.token);
 } catch (err) {
   expiredError = err.message;
 }
