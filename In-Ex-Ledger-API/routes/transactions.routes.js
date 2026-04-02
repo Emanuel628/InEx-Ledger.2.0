@@ -1,4 +1,5 @@
 const express = require('express');
+const router = express.Router();
 const crypto = require('node:crypto');
 const { pool } = require('../db.js');
 const { requireAuth } = require('../middleware/auth.middleware.js');
