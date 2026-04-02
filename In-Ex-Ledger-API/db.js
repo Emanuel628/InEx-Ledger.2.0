@@ -1,75 +1,72 @@
-import pg from 'pg';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+const pg = require('pg');
+const path = require('path');
+const fs = require('fs');
 
 const { Pool } = pg;
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-export const pool = new Pool({
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL
     ? { rejectUnauthorized: false }
     : false
 });
 
-if (process.env.NODE_ENV !== "production") {
+if (process.env.NODE_ENV !== 'production') {
   try {
     const dbUrl = new URL(process.env.DATABASE_URL);
-    console.log("=== DB URL PARSED ===");
-    console.log("HOST:", dbUrl.host);
-    console.log("USER:", dbUrl.username);
-    console.log("DB NAME:", dbUrl.pathname.replace('/', ''));
-    console.log("========================");
+    console.log('=== DB URL PARSED ===');
+    console.log('HOST:', dbUrl.host);
+    console.log('USER:', dbUrl.username);
+    console.log('DB NAME:', dbUrl.pathname.replace('/', ''));
+    console.log('========================');
   } catch (e) {
-    console.error("Failed to parse DATABASE_URL variable.");
+    console.error('Failed to parse DATABASE_URL variable.');
   }
 }
 
-export async function logDbIdentity() {
+async function logDbIdentity() {
   try {
     const res = await pool.query(
       'SELECT current_database(), current_schema(), inet_server_addr(), inet_server_port()'
     );
     const row = res.rows[0];
-    console.log("=== DB PHYSICAL IDENTITY ===");
-    console.log("DB NAME:", row.current_database);
-    console.log("SCHEMA:", row.current_schema);
-    console.log("SERVER IP:", row.inet_server_addr);
-    console.log("DB PORT:", row.inet_server_port);
-    console.log("===============================");
+    console.log('=== DB PHYSICAL IDENTITY ===');
+    console.log('DB NAME:', row.current_database);
+    console.log('SCHEMA:', row.current_schema);
+    console.log('SERVER IP:', row.inet_server_addr);
+    console.log('DB PORT:', row.inet_server_port);
+    console.log('===============================');
   } catch (err) {
-    console.error("DB IDENTITY ERROR:", err.message);
+    console.error('DB IDENTITY ERROR:', err.message);
   }
 }
 
-// Title: Transparent Migration Runner
-export const initDatabase = async () => {
-  const migrationsDir = path.join(__dirname, "db", "migrations");
+// Transparent Migration Runner
+async function initDatabase() {
+  const migrationsDir = path.join(__dirname, 'db', 'migrations');
 
   if (!fs.existsSync(migrationsDir)) {
-    console.warn("Migrations directory missing at:", migrationsDir);
+    console.warn('Migrations directory missing at:', migrationsDir);
     return;
   }
 
   const migrationFiles = fs
     .readdirSync(migrationsDir)
-    .filter((file) => file.endsWith(".sql"))
+    .filter((file) => file.endsWith('.sql'))
     .sort();
 
   if (!migrationFiles.length) {
-    console.warn("No migration files found under:", migrationsDir);
+    console.warn('No migration files found under:', migrationsDir);
     return;
   }
 
   for (const filename of migrationFiles) {
     const filePath = path.join(migrationsDir, filename);
-    const sql = fs.readFileSync(filePath, "utf8");
+    const sql = fs.readFileSync(filePath, 'utf8');
     try {
       await pool.query(sql);
       console.log(`Migration applied: ${filename}`);
     } catch (err) {
-      if (err.code === "42P07" || err.code === "42710") {
+      if (err.code === '42P07' || err.code === '42710') {
         console.log(`Migration already applied (ignored): ${filename}`);
         continue;
       }
@@ -77,6 +74,10 @@ export const initDatabase = async () => {
       throw err;
     }
   }
-};
+}
 
-export default pool;
+module.exports = {
+  pool,
+  logDbIdentity,
+  initDatabase
+};
