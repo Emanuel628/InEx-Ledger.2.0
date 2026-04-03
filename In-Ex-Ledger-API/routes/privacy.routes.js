@@ -1,7 +1,7 @@
-import express from "express";
-import { pool } from "../db.js";
-import { requireAuth } from "../middleware/auth.middleware.js";
-import { resolveBusinessIdForUser } from "../api/utils/resolveBusinessIdForUser.js";
+const express = require("express");
+const { pool } = require("../db.js");
+const { requireAuth } = require("../middleware/auth.middleware.js");
+const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -74,4 +74,4 @@ router.post("/delete", async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

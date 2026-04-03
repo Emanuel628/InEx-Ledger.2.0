@@ -1,6 +1,6 @@
-import crypto from "node:crypto";
-import jwt from "jsonwebtoken";
-import { pool } from "../db.js";
+const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
+const { pool } = require("../db.js");
 
 const EXPORT_GRANT_SECRET = process.env.EXPORT_GRANT_SECRET;
 const EXPORT_GRANT_TTL_MS = Number(process.env.EXPORT_GRANT_TTL_MS || 60_000);
@@ -17,7 +17,7 @@ function ensureSecret() {
   }
 }
 
-export async function issueExportGrant({ businessId, userId, exportType = "pdf", includeTaxId = false, dateRange, metadata = {} }) {
+async function issueExportGrant({ businessId, userId, exportType = "pdf", includeTaxId = false, dateRange, metadata = {} }) {
   ensureSecret();
   const now = Date.now();
   const expiresAt = now + EXPORT_GRANT_TTL_MS;
@@ -47,7 +47,7 @@ export async function issueExportGrant({ businessId, userId, exportType = "pdf",
   return { token, expiresAt, jti };
 }
 
-export async function verifyExportGrant(token) {
+async function verifyExportGrant(token) {
   ensureSecret();
   const payload = jwt.verify(token, EXPORT_GRANT_SECRET, {
     algorithms: [JWT_ALGORITHM]
@@ -70,3 +70,5 @@ export async function verifyExportGrant(token) {
 
   return payload;
 }
+
+module.exports = { issueExportGrant, verifyExportGrant };

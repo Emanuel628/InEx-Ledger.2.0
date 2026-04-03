@@ -1,16 +1,13 @@
-import fs from "node:fs";
-import path from "node:path";
-import crypto from "node:crypto";
-import express from "express";
-import multer from "multer";
-import { fileURLToPath } from "node:url";
-import { requireAuth } from "../middleware/auth.middleware.js";
-import { resolveBusinessIdForUser } from "../api/utils/resolveBusinessIdForUser.js";
-import { pool } from "../db.js";
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
+const express = require("express");
+const multer = require("multer");
+const { requireAuth } = require("../middleware/auth.middleware.js");
+const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { pool } = require("../db.js");
 
 const router = express.Router();
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const storageDir = path.join(process.cwd(), "storage", "receipts");
 fs.mkdirSync(storageDir, { recursive: true });
 
@@ -325,4 +322,4 @@ router.delete("/:id", requireAuth, async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

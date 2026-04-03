@@ -1,4 +1,4 @@
-import crypto from "node:crypto";
+const crypto = require("crypto");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const DEFAULT_JWT_EXPIRY_SECONDS = Number(process.env.JWT_EXPIRY_SECONDS) || 15 * 60;
@@ -23,7 +23,7 @@ function signWithSecret(message) {
   return crypto.createHmac("sha256", JWT_SECRET).update(message).digest("base64url");
 }
 
-export function signToken(payload, expiresInSeconds = DEFAULT_JWT_EXPIRY_SECONDS) {
+function signToken(payload, expiresInSeconds = DEFAULT_JWT_EXPIRY_SECONDS) {
   const header = encodeSegment({ alg: "HS256", typ: "JWT" });
   const now = Math.floor(Date.now() / 1000);
   const bodyPayload = {
@@ -38,7 +38,7 @@ export function signToken(payload, expiresInSeconds = DEFAULT_JWT_EXPIRY_SECONDS
   return `${header}.${body}.${signature}`;
 }
 
-export function verifyToken(token) {
+function verifyToken(token) {
   const parts = token.split(".");
   if (parts.length !== 3) {
     throw new Error("Invalid token format");
@@ -64,7 +64,7 @@ export function verifyToken(token) {
   return decoded;
 }
 
-export function requireAuth(req, res, next) {
+function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Authentication required" });
@@ -80,7 +80,7 @@ export function requireAuth(req, res, next) {
   next();
 }
 
-export function optionalAuth(req, res, next) {
+function optionalAuth(req, res, next) {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith("Bearer ")) {
     try {
@@ -92,3 +92,5 @@ export function optionalAuth(req, res, next) {
 
   next();
 }
+
+module.exports = { signToken, verifyToken, requireAuth, optionalAuth };

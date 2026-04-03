@@ -1,11 +1,30 @@
 const express = require('express');
 const router = express.Router();
-// Import your controllers or other modules using require
-// Example:
-// const userController = require('./controllers/userController');
 
-// Define your routes here
-// Example:
-// router.get('/users', userController.getAllUsers);
+const authRoutes = require('./auth.routes.js');
+const accountsRoutes = require('./accounts.routes.js');
+const receiptsRoutes = require('./receipts.routes.js');
+const categoriesRoutes = require('./categories.routes.js');
+const exportsRoutes = require('./exports.routes.js');
+const businessRoutes = require('./business.routes.js');
+const systemRoutes = require('./system.routes.js');
+const meRoutes = require('./me.routes.js');
+const cryptoRoutes = require('./crypto.routes.js');
+const privacyRoutes = require('./privacy.routes.js');
+const mileageRoutes = require('./mileage.routes.js');
+const sessionsRoutes = require('./sessions.routes.js');
+
+router.use('/auth', authRoutes);
+router.use('/accounts', accountsRoutes);
+router.use('/receipts', receiptsRoutes);
+router.use('/categories', categoriesRoutes);
+router.use('/exports', exportsRoutes);
+router.use('/business', businessRoutes);
+router.use('/system', systemRoutes);
+router.use('/me', meRoutes);
+router.use('/crypto', cryptoRoutes);
+router.use('/privacy', privacyRoutes);
+router.use('/mileage', mileageRoutes);
+router.use('/sessions', sessionsRoutes);
 
 module.exports = router;
