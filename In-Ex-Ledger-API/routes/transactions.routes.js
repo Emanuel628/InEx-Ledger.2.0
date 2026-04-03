@@ -1,8 +1,8 @@
-import express from "express";
-import crypto from "node:crypto";
-import { pool } from "../db.js";
-import { requireAuth } from "../middleware/auth.middleware.js";
-import { resolveBusinessIdForUser } from "../api/utils/resolveBusinessIdForUser.js";
+const express = require("express");
+const crypto = require("crypto");
+const { pool } = require("../db.js");
+const { requireAuth } = require("../middleware/auth.middleware.js");
+const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -255,4 +255,4 @@ router.delete("/:id", requireAuth, async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

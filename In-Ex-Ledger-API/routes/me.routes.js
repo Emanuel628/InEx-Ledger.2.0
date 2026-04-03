@@ -1,6 +1,6 @@
-import express from "express";
-import pool from "../db.js";
-import { requireAuth } from "../middleware/auth.middleware.js";
+const express = require("express");
+const { pool } = require("../db.js");
+const { requireAuth } = require("../middleware/auth.middleware.js");
 
 const router = express.Router();
 
@@ -47,4 +47,4 @@ router.delete("/", requireAuth, async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

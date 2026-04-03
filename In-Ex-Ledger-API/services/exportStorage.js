@@ -1,6 +1,6 @@
-import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 
 const EXPORT_STORAGE_DIR = path.resolve(process.cwd(), "storage", "exports");
 
@@ -10,7 +10,7 @@ function ensureStorageDir() {
   }
 }
 
-export async function saveRedactedPdf(jobId, buffer) {
+async function saveRedactedPdf(jobId, buffer) {
   ensureStorageDir();
   const safeJobId = jobId.replace(/[^a-zA-Z0-9-_]/g, "") || crypto.randomUUID();
   const filename = `${safeJobId}.redacted.pdf`;
@@ -20,7 +20,7 @@ export async function saveRedactedPdf(jobId, buffer) {
   return { filePath, hash };
 }
 
-export function buildRedactedStream(res, filePath) {
+function buildRedactedStream(res, filePath) {
   if (!fs.existsSync(filePath)) {
     throw new Error("Redacted export not found.");
   }
@@ -36,3 +36,5 @@ export function buildRedactedStream(res, filePath) {
   });
   stream.pipe(res);
 }
+
+module.exports = { saveRedactedPdf, buildRedactedStream };

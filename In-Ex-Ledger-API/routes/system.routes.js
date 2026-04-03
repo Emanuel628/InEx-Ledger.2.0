@@ -1,4 +1,4 @@
-import express from "express";
+const express = require("express");
 const router = express.Router();
 
 router.get("/health", (req, res) => {
@@ -19,4 +19,4 @@ router.get("/links", (req, res) => {
   });
 });
 
-export default router;
+module.exports = router;

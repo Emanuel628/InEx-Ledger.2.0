@@ -1,13 +1,13 @@
-import express from "express";
-import crypto from "node:crypto";
-import { requireAuth } from "../middleware/auth.middleware.js";
-import { resolveBusinessIdForUser } from "../api/utils/resolveBusinessIdForUser.js";
-import { issueExportGrant, verifyExportGrant } from "../services/exportGrantService.js";
-import { dispatchPdfJob } from "../services/pdfWorkerClient.js";
-import { saveRedactedPdf, buildRedactedStream } from "../services/exportStorage.js";
-import { pool } from "../db.js";
-import { logError } from "../utils/logger.js";
-import { sanitizePayload } from "../utils/logSanitizer.js";
+const express = require("express");
+const crypto = require("crypto");
+const { requireAuth } = require("../middleware/auth.middleware.js");
+const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { issueExportGrant, verifyExportGrant } = require("../services/exportGrantService.js");
+const { dispatchPdfJob } = require("../services/pdfWorkerClient.js");
+const { saveRedactedPdf, buildRedactedStream } = require("../services/exportStorage.js");
+const { pool } = require("../db.js");
+const { logError } = require("../utils/logger.js");
+const { sanitizePayload } = require("../utils/logSanitizer.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -213,4 +213,4 @@ router.get("/exports/history/:id/redacted", async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

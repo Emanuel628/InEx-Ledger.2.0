@@ -39,7 +39,7 @@ console.log("EXPORT_GRANT_TTL_MS:", TTL_OVERRIDE_MS);
 const grant = await issueExportGrant(testContext);
 console.log("Issued grant:", { tokenLength: grant.token.length, expiresAt: grant.expiresAt });
 
-// 2. Verification
+// 2. Initial Verification
 const payload = await verifyExportGrant(grant.token);
 console.log("Verified grant payload:", {
   action: payload.action,

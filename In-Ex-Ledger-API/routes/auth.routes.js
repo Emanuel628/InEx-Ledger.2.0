@@ -3,13 +3,13 @@
  * Handles registration, real email verification, login, and password resets.
  */
 
-import express from "express";
-import crypto from "node:crypto";
-import bcrypt from "bcrypt";
-import { Resend } from "resend";
-import rateLimit from "express-rate-limit";
-import { signToken, requireAuth } from "../middleware/auth.middleware.js";
-import pool from "../db.js";
+const express = require("express");
+const crypto = require("crypto");
+const bcrypt = require("bcrypt");
+const { Resend } = require("resend");
+const rateLimit = require("express-rate-limit");
+const { signToken, requireAuth } = require("../middleware/auth.middleware.js");
+const { pool } = require("../db.js");
 
 const router = express.Router();
 
@@ -19,8 +19,8 @@ const router = express.Router();
 // 2. CHANGE: Initialize Resend with your API Key
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// 3. CHANGE: We no longer need transporter.verify() because 
-// API connections don't "stay open" like SMTP. 
+// 3. CHANGE: We no longer need transporter.verify() because
+// API connections don't "stay open" like SMTP.
 console.log("?? Resend Email Engine Initialized");
 
 
@@ -258,7 +258,7 @@ router.post("/register", authLimiter, async (req, res) => {
   } finally {
     client.release();
   }
-}); 
+});
 
 
 /**
@@ -584,4 +584,4 @@ router.get("/confirm-email-change", async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;
