@@ -236,7 +236,7 @@ router.post("/register", authLimiter, async (req, res) => {
 
     // --- START OF EMAIL LOGIC ---
     try {
-      const { token } = createVerificationToken(email);
+      const { token } = await createVerificationToken(email);
       const verificationLink = buildVerificationLink(req, token);
 
       await resend.emails.send({

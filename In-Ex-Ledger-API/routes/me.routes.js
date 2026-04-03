@@ -4,7 +4,7 @@ import { requireAuth } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-router.get("/me", requireAuth, (req, res) => {
+router.get("/", requireAuth, (req, res) => {
   res.status(200).json(req.user);
 });
 
@@ -12,7 +12,7 @@ router.get("/me", requireAuth, (req, res) => {
  * PUT /api/me
  * Update user profile (full_name, display_name).
  */
-router.put("/me", requireAuth, async (req, res) => {
+router.put("/", requireAuth, async (req, res) => {
   const { full_name, display_name } = req.body ?? {};
   try {
     const result = await pool.query(
@@ -30,7 +30,7 @@ router.put("/me", requireAuth, async (req, res) => {
   }
 });
 
-router.delete("/me", requireAuth, async (req, res) => {
+router.delete("/", requireAuth, async (req, res) => {
   try {
     const result = await pool.query("DELETE FROM users WHERE id = $1", [
       req.user.id
