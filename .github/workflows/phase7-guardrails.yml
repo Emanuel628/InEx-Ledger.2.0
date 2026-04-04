@@ -9,6 +9,8 @@ on:
 jobs:
   guardrails:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     services:
       postgres:

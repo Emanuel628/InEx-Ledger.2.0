@@ -7,10 +7,7 @@ const { Pool } = pg;
 // Validate SSL configuration explicitly
 const isProduction = process.env.NODE_ENV === 'production';
 const sslConfig = isProduction
-  ? {
-      rejectUnauthorized:
-        process.env.DB_SSL_REJECT_UNAUTHORIZED === 'false' ? false : true
-    }
+  ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' }
   : false;
 
 const pool = new Pool({
@@ -52,9 +49,11 @@ async function logDbIdentity() {
   }
 }
 
+// Transient PostgreSQL/TCP error codes that warrant a retry
+const TRANSIENT_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', '57P03', '08006']);
+
 // Retry a database operation on transient connection errors
 async function withRetry(fn, retries = 3, delayMs = 500) {
-  const TRANSIENT_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', '57P03', '08006']);
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       return await fn();

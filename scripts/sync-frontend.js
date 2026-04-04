@@ -46,7 +46,7 @@ function copyRecursive(src, dest) {
 
 if (!fs.existsSync(SRC)) {
   console.error(`Source directory not found: ${SRC}`);
-  console.error('Make sure the InEx-Ledger-Frontend directory exists at the repo root.');
+  console.error(`Make sure the ${path.basename(SRC)} directory exists at the repo root.`);
   process.exit(1);
 }
 
