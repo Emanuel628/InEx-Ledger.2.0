@@ -1,4 +1,4 @@
-import { sanitizePayload } from "./logSanitizer.js";
+const { sanitizePayload } = require("./logSanitizer.js");
 
 function formatContext(context) {
   if (!context) return "";
@@ -10,17 +10,19 @@ function formatContext(context) {
   }
 }
 
-export function logInfo(message, context) {
+function logInfo(message, context) {
   const payload = formatContext(context);
   console.info(`[InEx][INFO] ${message}${payload ? ` ${payload}` : ""}`);
 }
 
-export function logWarn(message, context) {
+function logWarn(message, context) {
   const payload = formatContext(context);
   console.warn(`[InEx][WARN] ${message}${payload ? ` ${payload}` : ""}`);
 }
 
-export function logError(message, context) {
+function logError(message, context) {
   const payload = formatContext(context);
   console.error(`[InEx][ERROR] ${message}${payload ? ` ${payload}` : ""}`);
 }
+
+module.exports = { logInfo, logWarn, logError };

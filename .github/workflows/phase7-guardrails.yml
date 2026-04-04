@@ -54,6 +54,10 @@ jobs:
         working-directory: In-Ex-Ledger-API
         run: npm install
 
+      - name: Run database migrations
+        working-directory: In-Ex-Ledger-API
+        run: node -e "const { initDatabase } = require('./db.js'); initDatabase().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });"
+
       - name: Run export grant guard
         working-directory: In-Ex-Ledger-API
         run: npm run test:export-grant

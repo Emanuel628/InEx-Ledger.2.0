@@ -1,6 +1,6 @@
 const SENSITIVE_PATTERNS = [/taxId/i, /tax_id/i, /taxid/i, /taxId_jwe/i, /ein/i, /bn/i];
 
-export function safeLog(label, payload) {
+function safeLog(label, payload) {
   const contents = JSON.stringify(payload, (key, value) => {
     if (typeof value === "string") {
       for (const pattern of SENSITIVE_PATTERNS) {
@@ -14,7 +14,7 @@ export function safeLog(label, payload) {
   console.log(`${label}: ${contents}`);
 }
 
-export function safeError(label, err, context = {}) {
+function safeError(label, err, context = {}) {
   const sanitizedContext = {};
   for (const [key, value] of Object.entries(context)) {
     const stringValue = typeof value === "string" ? value : JSON.stringify(value);
@@ -24,3 +24,5 @@ export function safeError(label, err, context = {}) {
   }
   console.error(`${label}:`, err?.message || err, "context:", sanitizedContext);
 }
+
+module.exports = { safeLog, safeError };

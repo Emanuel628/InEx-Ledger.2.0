@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import fs from "node:fs";
-import path from "node:path";
+const fs = require("fs");
+const path = require("path");
 
 const LOG_DIR = process.env.LOG_DIR || "./logs";
 const SENSITIVE_PATTERNS = [/taxId/i, /tax_id/i, /taxid/i, /taxId_jwe/i, /ein/i, /bn/i];

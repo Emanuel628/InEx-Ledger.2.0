@@ -1,6 +1,6 @@
-import crypto from "node:crypto";
-import { pool } from "../../db.js";
-import { seedDefaultsForBusiness } from "./seedDefaultsForBusiness.js";
+const crypto = require("crypto");
+const { pool } = require("../../db.js");
+const { seedDefaultsForBusiness } = require("./seedDefaultsForBusiness.js");
 
 function buildBusinessName(user) {
   const email = typeof user?.email === "string" ? user.email.trim() : "";
@@ -18,7 +18,7 @@ function buildBusinessName(user) {
   return "User's Business";
 }
 
-export async function resolveBusinessIdForUser(user) {
+async function resolveBusinessIdForUser(user) {
   if (!user?.id) {
     throw new Error("User is required to resolve business");
   }
@@ -55,3 +55,5 @@ export async function resolveBusinessIdForUser(user) {
   user.business_id = businessId;
   return businessId;
 }
+
+module.exports = { resolveBusinessIdForUser };
