@@ -3,14 +3,23 @@ const path = require('path');
 const fs = require('fs');
 
 const { Pool } = pg;
+
+// Validate SSL configuration explicitly
+const isProduction = process.env.NODE_ENV === 'production';
+const sslConfig = isProduction
+  ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' }
+  : false;
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production"
-    ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false" }
-    : false
+  ssl: sslConfig
 });
 
-if (process.env.NODE_ENV !== 'production') {
+pool.on('error', (err) => {
+  console.error('Unexpected database pool error:', err.message);
+});
+
+if (!isProduction) {
   try {
     const dbUrl = new URL(process.env.DATABASE_URL);
     console.log('=== DB URL PARSED ===');
@@ -40,6 +49,23 @@ async function logDbIdentity() {
   }
 }
 
+// Transient PostgreSQL/TCP error codes that warrant a retry
+const TRANSIENT_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', '57P03', '08006']);
+
+// Retry a database operation on transient connection errors
+async function withRetry(fn, retries = 3, delayMs = 500) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isTransient = TRANSIENT_CODES.has(err.code);
+      if (!isTransient || attempt === retries) throw err;
+      console.warn(`DB transient error (attempt ${attempt}/${retries}): ${err.message}. Retrying in ${delayMs}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 // Transparent Migration Runner
 async function initDatabase() {
   const migrationsDir = path.join(__dirname, 'db', 'migrations');
@@ -63,14 +89,14 @@ async function initDatabase() {
     const filePath = path.join(migrationsDir, filename);
     const sql = fs.readFileSync(filePath, 'utf8');
     try {
-      await pool.query(sql);
+      await withRetry(() => pool.query(sql));
       console.log(`Migration applied: ${filename}`);
     } catch (err) {
       if (err.code === '42P07' || err.code === '42710') {
         console.log(`Migration already applied (ignored): ${filename}`);
         continue;
       }
-      console.error(`Migration failed (${filename}):`, err.message);
+      console.error(`Migration failed (${filename}): [${err.code}] ${err.message}`);
       throw err;
     }
   }
@@ -79,5 +105,6 @@ async function initDatabase() {
 module.exports = {
   pool,
   logDbIdentity,
-  initDatabase
+  initDatabase,
+  withRetry
 };

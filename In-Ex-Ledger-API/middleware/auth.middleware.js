@@ -74,6 +74,7 @@ function requireAuth(req, res, next) {
   try {
     req.user = verifyToken(token);
   } catch (err) {
+    console.warn(`Auth rejected [${req.method} ${req.path}]: ${err.message}`);
     return res.status(401).json({ error: "Authentication required" });
   }
 
