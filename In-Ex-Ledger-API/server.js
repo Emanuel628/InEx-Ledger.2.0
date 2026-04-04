@@ -17,7 +17,6 @@ const publicDir = path.join(process.cwd(), 'public');
 const ALLOWED_ORIGINS = [
   'https://inexledger.com',
   'https://www.inexledger.com',
-  'https://inex-ledger20-production.up.railway.app',
   'http://localhost:5173',
   'http://localhost:3000',
   null
@@ -30,7 +29,18 @@ console.log(`📡 NETWORK: Port assigned: ${PORT}`);
 console.log('🔒 SECURITY: JWT_SECRET detected:', !!process.env.JWT_SECRET);
 
 app.use(helmet({
-  contentSecurityPolicy: false  // disabled to allow inline scripts in the existing frontend
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'", 'data:'],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"]
+    }
+  }
 }));
 app.use(cors({
   origin: (origin, callback) => {
@@ -51,8 +61,8 @@ app.use(cors({
    ========================================================= */
 app.use(express.static(publicDir));
 app.use(express.static(path.join(publicDir, 'html')));
-app.use(express.json({ limit: '100kb' }));
-app.use(express.urlencoded({ extended: false, limit: '100kb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(cookieParser());
 
 /* =========================================================
