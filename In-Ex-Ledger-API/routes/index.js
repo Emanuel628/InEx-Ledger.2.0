@@ -13,6 +13,7 @@ const cryptoRoutes = require('./crypto.routes.js');
 const privacyRoutes = require('./privacy.routes.js');
 const mileageRoutes = require('./mileage.routes.js');
 const sessionsRoutes = require('./sessions.routes.js');
+const billingRoutes = require('./billing.routes.js');
 
 router.use('/auth', authRoutes);
 router.use('/accounts', accountsRoutes);
@@ -26,5 +27,6 @@ router.use('/crypto', cryptoRoutes);
 router.use('/privacy', privacyRoutes);
 router.use('/mileage', mileageRoutes);
 router.use('/sessions', sessionsRoutes);
+router.use('/billing', billingRoutes);
 
 module.exports = router;

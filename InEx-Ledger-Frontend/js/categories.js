@@ -1,268 +1,150 @@
-const CATEGORIES_STORAGE_KEY = "lb_categories";
+﻿const CATEGORIES_STORAGE_KEY = "lb_categories";
 const TRANSACTIONS_STORAGE_KEY = "lb_transactions";
+const CATEGORIES_TOAST_MS = 3000;
 
-const US_SCHEDULE_C_OPTIONS = [
-  "Advertising",
-  "Car and truck expenses",
-  "Commissions and fees",
-  "Contract labor",
-  "Depletion",
-  "Depreciation (Line 13)",
-  "Employee benefit programs",
-  "Insurance (other than health)",
-  "Interest — Mortgage (Line 16a)",
-  "Interest — Other (Line 16b)",
-  "Legal and professional services",
-  "Office expense",
-  "Pension / profit-sharing plans",
-  "Rent — Vehicles, machines, equipment (Line 20a)",
-  "Rent — Other business property (Line 20b)",
-  "Repairs and maintenance",
-  "Supplies",
-  "Taxes and licenses",
-  "Travel and meals",
-  "Deductible meals (Line 24b)",
-  "Utilities",
-  "Wages",
-  "Other expenses"
-];
+let categoriesToastTimer = null;
 
-const CA_T2125_OPTIONS = [
-  "Advertising",
-  "Bad debts",
-  "Business taxes, licences, and memberships",
-  "Insurance",
-  "Interest and bank charges",
-  "Maintenance and repairs",
-  "Meals and entertainment",
-  "Motor vehicle expenses",
-  "Office expenses",
-  "Legal, accounting, and other professional fees",
-  "Management and administration fees",
-  "Rent",
-  "Property taxes",
-  "Salaries, wages, and benefits",
-  "Supplies",
-  "Travel",
-  "Utilities",
-  "Other expenses"
-];
-
-document.addEventListener("DOMContentLoaded", () => {
-  if (typeof requireAuth === "function") requireAuth();
+document.addEventListener("DOMContentLoaded", async () => {
+  await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
-  setupTaxLabelControls();
   ensureDefaultCategories();
-  wireCategoryForm();
+  wireCategoryModal();
   renderCategoryLists();
+  updateReceiptsDot();
 });
 
-function wireCategoryForm() {
-  const showButton = document.getElementById("showCategoryForm");
+function wireCategoryModal() {
   const modal = document.getElementById("categoryModal");
-  const modalBackdrop = modal?.querySelector("[data-modal-close]");
-  const modalClose = document.getElementById("categoryModalClose");
+  const openButton = document.getElementById("showCategoryModal");
+  const cancelButton = document.getElementById("cancelCategoryModal");
+  const backdrop = modal?.querySelector("[data-modal-close]");
   const form = document.getElementById("categoryForm");
-  const message = document.getElementById("categoryFormMessage");
-  const nameInput = document.getElementById("category-name");
-  const typeInput = document.getElementById("category-type");
-  const typeButtons = document.querySelectorAll(".category-type-pills .type-pill");
+  const colorInput = document.getElementById("category-color");
 
-  const openModal = () => {
-    modal?.classList.remove("hidden");
-    nameInput?.focus();
-  };
+  openButton?.addEventListener("click", () => modal?.classList.remove("hidden"));
+  cancelButton?.addEventListener("click", () => closeCategoryModal());
+  backdrop?.addEventListener("click", () => closeCategoryModal());
 
-  const closeModal = () => {
-    modal?.classList.add("hidden");
-  };
-
-  if (showButton) {
-    showButton.addEventListener("click", openModal);
-  }
-
-  modalBackdrop?.addEventListener("click", closeModal);
-  modalClose?.addEventListener("click", closeModal);
-
-  const updateTypeButtons = (value) => {
-    typeButtons.forEach((btn) => {
-      const btnType = btn.getAttribute("data-type");
-      btn.classList.toggle("active", btnType === value);
-    });
-    if (typeInput) {
-      typeInput.value = value;
-    }
-  };
-
-  if (form) {
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const name = nameInput?.value.trim() ?? "";
-      const type = typeInput?.value ?? "";
-      const taxLabelInput = getTaxLabelInputForRegion();
-      const taxLabel = taxLabelInput?.value?.trim() ?? "";
-
-      if (!name || !type) {
-        if (message) {
-          message.textContent = "Provide a name and choose a type.";
-        }
-        return;
-      }
-
-      const categories = getCategories();
-      const newCategory = {
-        id: `cat_${type}_${slugify(name)}`,
-        name,
-        type,
-        taxLabel
-      };
-
-      categories.push(newCategory);
-      saveCategories(categories);
-
-      window.dispatchEvent(new Event("categoriesUpdated"));
-
-      if (message) {
-        message.textContent = "";
-      }
-
-      form.reset();
-      renderCategoryLists();
-      updateTypeButtons("income");
-      closeModal();
-    });
-  }
-
-  typeButtons.forEach((button) => {
+  document.querySelectorAll(".color-swatch").forEach((button) => {
     button.addEventListener("click", () => {
-      const value = button.getAttribute("data-type") ?? "income";
-      typeInput.value = value;
-      typeButtons.forEach((btn) => btn.classList.remove("active"));
-      button.classList.add("active");
+      document.querySelectorAll(".color-swatch").forEach((item) => item.classList.remove("is-active"));
+      button.classList.add("is-active");
+      if (colorInput) {
+        colorInput.value = button.dataset.color || "blue";
+      }
     });
+  });
+
+  form?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = document.getElementById("category-name")?.value.trim() || "";
+    const type = document.getElementById("category-type")?.value || "income";
+    const color = colorInput?.value || "blue";
+    const message = document.getElementById("categoryFormMessage");
+
+    if (!name) {
+      if (message) {
+        message.textContent = "Enter a category name.";
+      }
+      return;
+    }
+
+    const categories = getCategories();
+    categories.push({
+      id: `cat_${type}_${slugify(name)}_${Date.now()}`,
+      name,
+      type,
+      color
+    });
+    saveCategories(categories);
+    window.dispatchEvent(new Event("categoriesUpdated"));
+    closeCategoryModal();
+    renderCategoryLists();
+    showCategoriesToast("Category added");
   });
 }
 
-function renderCategoryLists() {
-  const incomeContainer = document.getElementById("incomeCategories");
-  const expenseContainer = document.getElementById("expenseCategories");
-  const categories = getCategories();
-
-  const message = document.getElementById("categoryMessage");
+function closeCategoryModal() {
+  const modal = document.getElementById("categoryModal");
+  const form = document.getElementById("categoryForm");
+  const message = document.getElementById("categoryFormMessage");
+  modal?.classList.add("hidden");
+  form?.reset();
   if (message) {
     message.textContent = "";
   }
-
-  if (incomeContainer) {
-    incomeContainer.innerHTML = "";
-    const income = categories.filter((item) => item.type === "income");
-    if (income.length === 0) {
-      const message =
-        typeof t === "function"
-          ? t("categories_no_income")
-          : "No income categories yet.";
-      incomeContainer.innerHTML = `<p class='category-note'>${message}</p>`;
-    } else {
-      income.forEach((category) => {
-        incomeContainer.appendChild(buildCategoryCard(category));
-      });
-    }
-  }
-
-  if (expenseContainer) {
-    expenseContainer.innerHTML = "";
-    const expense = categories.filter((item) => item.type === "expense");
-    if (expense.length === 0) {
-      const message =
-        typeof t === "function"
-          ? t("categories_no_expense")
-          : "No expense categories yet.";
-      expenseContainer.innerHTML = `<p class='category-note'>${message}</p>`;
-    } else {
-      expense.forEach((category) => {
-        expenseContainer.appendChild(buildCategoryCard(category));
-      });
-    }
-  }
+  document.getElementById("category-color").value = "blue";
+  document.querySelectorAll(".color-swatch").forEach((item) => item.classList.remove("is-active"));
+  document.querySelector('.color-swatch[data-color="blue"]')?.classList.add("is-active");
 }
 
-function buildCategoryCard(category) {
-  const card = document.createElement("div");
-  card.className = "category-row category-card";
-  const title = document.createElement("h4");
-  title.textContent = category.name;
-  const button = document.createElement("button");
-  button.textContent = "Delete";
-  button.addEventListener("click", () => {
-    handleCategoryDelete(category.id);
+function renderCategoryLists() {
+  renderCategoryGroup("incomeCategories", "income", "No income categories yet.");
+  renderCategoryGroup("expenseCategories", "expense", "No expense categories yet.");
+}
+
+function renderCategoryGroup(containerId, type, emptyText) {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    return;
+  }
+
+  const categories = getCategories().filter((item) => item.type === type);
+  if (!categories.length) {
+    container.innerHTML = `<div class="category-empty"><p>${emptyText}</p><button type="button" class="empty-add-btn" data-empty-add="${type}">+ Add ${type} category</button></div>`;
+    container.querySelector("[data-empty-add]")?.addEventListener("click", () => {
+      document.getElementById("category-type").value = type;
+      document.getElementById("showCategoryModal")?.click();
+    });
+    return;
+  }
+
+  container.innerHTML = categories.map((category) => `
+    <div class="category-item">
+      <span class="category-pill pill-${escapeHtml(category.color || defaultColorForType(type))}">${escapeHtml(category.name)}</span>
+      <button type="button" class="category-delete" data-category-delete="${escapeHtml(category.id)}">Delete</button>
+    </div>
+  `).join("");
+
+  container.querySelectorAll("[data-category-delete]").forEach((button) => {
+    button.addEventListener("click", () => handleCategoryDelete(button.getAttribute("data-category-delete") || ""));
   });
-  card.appendChild(title);
-  card.appendChild(button);
-  return card;
 }
 
 function handleCategoryDelete(categoryId) {
+  const message = document.getElementById("categoryMessage");
   if (isCategoryUsed(categoryId)) {
-    const message = document.getElementById("categoryMessage");
     if (message) {
-      message.textContent =
-        typeof t === "function"
-          ? t("categories_in_use")
-          : "This category cannot be deleted because it is in use.";
+      message.textContent = "This category cannot be deleted because it is in use.";
     }
     return;
   }
 
-  const categories = getCategories().filter((item) => item.id !== categoryId);
-  saveCategories(categories);
-  window.dispatchEvent(new Event("categoriesUpdated"));
-  const message = document.getElementById("categoryMessage");
+  saveCategories(getCategories().filter((item) => item.id !== categoryId));
   if (message) {
     message.textContent = "";
   }
   renderCategoryLists();
+  showCategoriesToast("Category deleted");
 }
 
 function ensureDefaultCategories() {
   const existing = getCategories();
-  if (existing.length > 0) {
-    return existing;
+  if (existing.length) {
+    return;
   }
-
   const defaults = window.LUNA_DEFAULTS?.categories || {};
-  const income = defaults.income || [];
-  const expense = defaults.expense || [];
   const seeded = [];
-
-  income.forEach((name) => {
-    seeded.push({
-      id: `cat_income_${slugify(name)}`,
-      name,
-      type: "income",
-      taxLabel: ""
-    });
-  });
-
-  expense.forEach((name) => {
-    seeded.push({
-      id: `cat_expense_${slugify(name)}`,
-      name,
-      type: "expense",
-      taxLabel: ""
-    });
-  });
-
+  (defaults.income || []).forEach((name) => seeded.push({ id: `cat_income_${slugify(name)}`, name, type: "income", color: "green" }));
+  (defaults.expense || []).forEach((name) => seeded.push({ id: `cat_expense_${slugify(name)}`, name, type: "expense", color: "blue" }));
   saveCategories(seeded);
-  return seeded;
 }
 
 function getCategories() {
-  const raw = localStorage.getItem(CATEGORIES_STORAGE_KEY);
-  if (!raw) return [];
   try {
-    return JSON.parse(raw);
+    return JSON.parse(localStorage.getItem(CATEGORIES_STORAGE_KEY) || "[]");
   } catch {
     return [];
   }
@@ -272,100 +154,44 @@ function saveCategories(categories) {
   localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
 }
 
-function getTransactions() {
-  const raw = localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
 function isCategoryUsed(categoryId) {
-  const transactions = getTransactions();
-  return transactions.some((txn) => txn.categoryId === categoryId);
-}
-
-function setupTaxLabelControls() {
-  refreshTaxLabelControls();
-  window.addEventListener("storage", (event) => {
-    if (event.key === "lb_region") {
-      refreshTaxLabelControls();
-    }
-  });
-}
-
-function refreshTaxLabelControls() {
-  const region = getCurrentRegion();
-  const label = document.getElementById("taxLabelLabel");
-  if (label) {
-    label.textContent = region === "ca" ? "Map to CRA T2125" : "Map to Schedule C";
-  }
-  populateTaxLabelOptions(region);
-  updateRegionMappingNote(region);
-}
-
-function populateTaxLabelOptions(region) {
-  const select = document.getElementById("taxLabelSelect");
-  if (!select) return;
-  const previousValue = select.value;
-  select.innerHTML = "";
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent =
-    region === "ca" ? "(Optional) Map to T2125" : "(Optional) Map to Schedule C";
-  select.appendChild(placeholder);
-  const options = getTaxOptionsForRegion(region);
-  options.forEach((optionValue) => {
-    const option = document.createElement("option");
-    option.value = optionValue;
-    option.textContent = optionValue;
-    select.appendChild(option);
-  });
-  if (previousValue) {
-    const match = options.find(
-      (optionValue) => optionValue.toLowerCase() === previousValue.toLowerCase()
-    );
-    if (match) {
-      select.value = match;
-    }
+  try {
+    const transactions = JSON.parse(localStorage.getItem(TRANSACTIONS_STORAGE_KEY) || "[]");
+    return transactions.some((transaction) => transaction.categoryId === categoryId);
+  } catch {
+    return false;
   }
 }
 
-function updateRegionMappingNote(region) {
-  const note = document.getElementById("taxRegionNote");
-  if (!note) return;
-  const options = getTaxOptionsForRegion(region).map((option) =>
-    option.toLowerCase()
-  );
-  const hasMismatch = getCategories().some((category) => {
-    if (!category.taxLabel) {
-      return false;
-    }
-    return !options.includes(category.taxLabel.toLowerCase());
-  });
-  if (hasMismatch) {
-    note.removeAttribute("hidden");
-  } else {
-    note.setAttribute("hidden", "");
+function updateReceiptsDot() {
+  const dot = document.getElementById("receiptsDot");
+  if (!dot) return;
+  try {
+    const receipts = JSON.parse(localStorage.getItem("lb_receipts") || "[]");
+    dot.hidden = !receipts.some((receipt) => !receipt.transactionId && !receipt.transaction_id);
+  } catch {
+    dot.hidden = true;
   }
 }
 
-function getTaxOptionsForRegion(region) {
-  const target = region || getCurrentRegion();
-  return target === "ca" ? CA_T2125_OPTIONS : US_SCHEDULE_C_OPTIONS;
+function defaultColorForType(type) {
+  return type === "income" ? "green" : "blue";
 }
 
-function getCurrentRegion() {
-  const stored = window.LUNA_REGION || localStorage.getItem("lb_region");
-  return stored && stored.toLowerCase() === "ca" ? "ca" : "us";
-}
-
-function getTaxLabelInputForRegion() {
-  return document.getElementById("taxLabelSelect");
+function showCategoriesToast(message) {
+  const toast = document.getElementById("categoriesToast");
+  const messageNode = document.getElementById("categoriesToastMessage");
+  if (!toast || !messageNode) return;
+  messageNode.textContent = message;
+  toast.classList.remove("hidden");
+  if (categoriesToastTimer) clearTimeout(categoriesToastTimer);
+  categoriesToastTimer = window.setTimeout(() => toast.classList.add("hidden"), CATEGORIES_TOAST_MS);
 }
 
 function slugify(value) {
   return value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
+
+function escapeHtml(value) {
+  return `${value ?? ""}`.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }

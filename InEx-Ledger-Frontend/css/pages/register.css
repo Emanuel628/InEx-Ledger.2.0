@@ -2,96 +2,87 @@
    Auth Pages — Overrides
    ========================= */
 
-header nav {
-  display: none;
-}
-
-main {
-  max-width: 420px;
-  padding-top: 48px;
-}
-
-section {
-  margin-top: 32px;
-}
-
-footer {
-  margin-top: 40px;
-}
-
-.show-password-toggle {
-  display: inline-flex;
-  align-items: center;
-  margin-top: 10px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.3;
-}
-
-.show-password-toggle input {
-  margin-right: 6px;
-}
+@import url("/css/pages/login.css");
 
 .password-meter {
-  margin-top: 10px;
-  width: 100%;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
-  overflow: hidden;
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  margin-bottom: 8px;
 }
 
-.meter-bar {
-  width: 0;
-  height: 100%;
-  background: #ef4444;
-  border-radius: 6px;
-  transition: width 0.15s ease, background 0.15s ease;
+.meter-segment {
+  height: 3px;
+  flex: 1;
+  border-radius: 2px;
+  background: var(--border2);
+}
+
+.meter-segment.is-weak {
+  background: var(--red);
+}
+
+.meter-segment.is-fair {
+  background: var(--amber);
+}
+
+.meter-segment.is-strong {
+  background: var(--green);
 }
 
 .password-strength-text {
-  margin-top: 6px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 500;
+  margin-top: 0;
 }
 
 .password-match-message {
-  margin-top: 6px;
-  font-size: 13px;
+  margin-top: 2px;
+  font-size: 12px;
   min-height: 18px;
-  opacity: 0.95;
 }
 
 .password-match-message.is-ok {
-  color: #22c55e;
+  color: var(--green);
 }
 
 .password-match-message.is-bad {
-  color: #ef4444;
-}
-
-.consent-field {
-  margin-top: 16px;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.consent-field input {
-  margin-right: 6px;
-}
-
-.consent-error {
-  margin-top: 4px;
-  min-height: 18px;
-  font-size: 12px;
-  color: #ef4444;
+  color: var(--red);
 }
 
 .language-field {
-  margin-top: 12px;
+  margin-top: 2px;
 }
 
-.language-field label {
-  display: block;
-  margin-bottom: 4px;
+.consent-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink2);
+}
+
+.consent-field label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--ink2);
+  margin-bottom: 0;
+}
+
+.consent-checkbox {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+
+.consent-error {
+  min-height: 18px;
+  margin-top: -6px;
+  font-size: 12px;
+  color: var(--red);
 }

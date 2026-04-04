@@ -1,33 +1,44 @@
-* {
+*, *::before, *::after {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
-  margin: 0;
-  font-family: var(--font-sans);
-  color: var(--text-primary);
-  background: var(--bg-app);
-  line-height: 1.45;
+  font-family: var(--font);
+  background: var(--surface2);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-p {
-  margin: 10px 0 0 0;
-  color: var(--text-muted);
-}
-
-body,
-.card,
-button,
 input,
 select,
-textarea {
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease;
+textarea,
+button {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+a {
+  color: var(--accent2);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+  height: auto;
 }

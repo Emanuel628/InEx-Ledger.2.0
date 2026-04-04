@@ -13,12 +13,13 @@ const transactionFilters = {
   category: ""
 };
 
-const DRAWER_OPEN_LABEL = "+ Add New";
+const DRAWER_OPEN_LABEL = "+ Add new";
 const DRAWER_CLOSE_LABEL = "Close";
+const TAX_RATE = 0.24;
 let transactionDrawerElement = null;
 let transactionToggleElement = null;
+let transactionPageToggleElement = null;
 let transactionModalElement = null;
-let transactionModalNoteInput = null;
 let activeModalTransactionId = null;
 let editingTransactionId = null;
 let transactionsLoading = false;
@@ -63,20 +64,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireTransactionModal();
   window.addEventListener("accountsUpdated", () => {
     populateAccountsFromStorage();
-    renderTransactionList();
+    renderTransactionsTable();
   });
 
   const tier = effectiveTier();
   const cockpit = document.getElementById("tax-cockpit");
   const upsell = document.getElementById("tax-upsell");
   const upsellDismissed = localStorage.getItem("lb_transactions_upsell_hidden") === "true";
+  const hasTransactions = (ledgerState.transactions || []).length > 0;
 
   if (cockpit) {
-    cockpit.style.display = tier === "free" ? "none" : "block";
+    cockpit.style.display = tier === "free" || !hasTransactions ? "none" : "flex";
   }
 
   if (upsell) {
-    const shouldShowUpsell = tier === "free" && !upsellDismissed;
+    const shouldShowUpsell = tier === "free" && hasTransactions && !upsellDismissed;
     upsell.style.display = shouldShowUpsell ? "block" : "none";
     const dismissButton = upsell.querySelector(".upsell-dismiss");
     if (dismissButton) {
@@ -200,43 +202,56 @@ function wireTransactionForm() {
 function setupTransactionDrawer() {
   transactionDrawerElement = document.getElementById("txDrawer");
   transactionToggleElement = document.getElementById("addTxToggle");
+  transactionPageToggleElement = document.getElementById("addTxTogglePage");
 
-  if (!transactionDrawerElement || !transactionToggleElement) {
+  if (!transactionDrawerElement) {
     return;
   }
 
-  transactionToggleElement.addEventListener("click", () => {
-    if (transactionDrawerElement.hasAttribute("hidden")) {
-      openTransactionDrawer();
-    } else {
-      closeTransactionDrawer();
-    }
+  [transactionToggleElement, transactionPageToggleElement].filter(Boolean).forEach((button) => {
+    button.addEventListener("click", () => {
+      if (transactionDrawerElement.hasAttribute("hidden")) {
+        openTransactionDrawer();
+      } else {
+        closeTransactionDrawer();
+      }
+    });
   });
 
   closeTransactionDrawer();
 }
 
 function openTransactionDrawer() {
-  if (!transactionDrawerElement || !transactionToggleElement) {
+  if (!transactionDrawerElement) {
     return;
   }
 
   transactionDrawerElement.removeAttribute("hidden");
-  transactionToggleElement.textContent = DRAWER_CLOSE_LABEL;
-  transactionToggleElement.setAttribute("aria-expanded", "true");
+  if (transactionToggleElement) {
+    transactionToggleElement.textContent = DRAWER_CLOSE_LABEL;
+    transactionToggleElement.setAttribute("aria-expanded", "true");
+  }
+  if (transactionPageToggleElement) {
+    transactionPageToggleElement.textContent = "Close";
+  }
   setTimeout(() => {
     document.getElementById("txType")?.focus();
   }, 0);
 }
 
 function closeTransactionDrawer() {
-  if (!transactionDrawerElement || !transactionToggleElement) {
+  if (!transactionDrawerElement) {
     return;
   }
 
   transactionDrawerElement.setAttribute("hidden", "");
-  transactionToggleElement.textContent = DRAWER_OPEN_LABEL;
-  transactionToggleElement.setAttribute("aria-expanded", "false");
+  if (transactionToggleElement) {
+    transactionToggleElement.textContent = DRAWER_OPEN_LABEL;
+    transactionToggleElement.setAttribute("aria-expanded", "false");
+  }
+  if (transactionPageToggleElement) {
+    transactionPageToggleElement.textContent = "+ Add transaction";
+  }
   resetTransactionForm();
 }
 
@@ -314,30 +329,12 @@ function wireTransactionCategoryFilter() {
 
 function wireTransactionModal() {
   transactionModalElement = document.getElementById("transactionModal");
-  transactionModalNoteInput = document.getElementById("transactionModalNote");
-  const saveNoteButton = document.getElementById("transactionModalSaveNote");
-  const editEntryButton = document.getElementById("transactionModalEditEntry");
   const deleteButton = document.getElementById("transactionModalDelete");
   const closeButton = document.getElementById("transactionModalClose");
 
   if (!transactionModalElement) {
     return;
   }
-
-  saveNoteButton?.addEventListener("click", () => {
-    if (!activeModalTransactionId) {
-      return;
-    }
-    const note = transactionModalNoteInput?.value || "";
-    updateTransactionNote(activeModalTransactionId, note);
-  });
-
-  editEntryButton?.addEventListener("click", () => {
-    if (!activeModalTransactionId) {
-      return;
-    }
-    handleEditEntry(activeModalTransactionId);
-  });
 
   deleteButton?.addEventListener("click", () => {
     if (!activeModalTransactionId) {
@@ -354,9 +351,14 @@ function openTransactionModal(transactionId) {
   if (!transaction || !transactionModalElement) {
     return;
   }
+  const title = document.getElementById("transactionModalTitle");
+  const body = document.getElementById("transactionModalBody");
   activeModalTransactionId = transactionId;
-  if (transactionModalNoteInput) {
-    transactionModalNoteInput.value = transaction.note || "";
+  if (title) {
+    title.textContent = "Delete this transaction?";
+  }
+  if (body) {
+    body.textContent = `This will permanently remove "${transaction.description || "this transaction"}" from your ledger.`;
   }
   transactionModalElement.classList.remove("hidden");
 }
@@ -367,9 +369,6 @@ function closeTransactionModal() {
   }
   transactionModalElement.classList.add("hidden");
   activeModalTransactionId = null;
-  if (transactionModalNoteInput) {
-    transactionModalNoteInput.value = "";
-  }
 }
 
 function updateTransactionNote(transactionId, note) {
@@ -470,7 +469,7 @@ function applyFilters() {
   if (transactionFilters.category) {
     filtered = filtered.filter((tx) => tx.categoryId === transactionFilters.category);
   }
-  renderTransactionList(filtered);
+  renderTransactionsTable(filtered);
 }
 
 function handleTransactionDelete(transactionId) {
@@ -562,7 +561,7 @@ function renderTransactionList(filteredTransactions) {
   if (!tbody) return;
 
   if (transactionsLoading && filteredTransactions === undefined) {
-    tbody.innerHTML = `<tr><td colspan="6" class="placeholder">Loading transactions...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">Loading transactions...</td></tr>`;
     return;
   }
 
@@ -573,7 +572,7 @@ function renderTransactionList(filteredTransactions) {
         : typeof t === "function"
         ? t("transactions_empty")
         : "No transactions yet.";
-    tbody.innerHTML = `<tr><td colspan="6" class="placeholder">${emptyText}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">${emptyText}</td></tr>`;
     return;
   }
 
@@ -641,6 +640,67 @@ function renderTransactionList(filteredTransactions) {
   });
 }
 
+function renderTransactionsTable(filteredTransactions) {
+  const tbody = document.querySelector("tbody");
+  const transactions =
+    filteredTransactions !== undefined ? filteredTransactions : ledgerState.transactions || [];
+  const isFilteredView = filteredTransactions !== undefined;
+
+  if (!tbody) return;
+
+  if (transactionsLoading && filteredTransactions === undefined) {
+    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">Loading transactions...</td></tr>`;
+    return;
+  }
+
+  if (transactions.length === 0) {
+    const emptyText =
+      isFilteredView && ledgerState.transactions.length > 0
+        ? "No matching transactions."
+        : typeof t === "function"
+        ? t("transactions_empty")
+        : "No transactions yet.";
+    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">${emptyText}</td></tr>`;
+    return;
+  }
+
+  const accountsById = mapById(getAccounts());
+  const categoriesById = mapById(getCategories());
+  tbody.innerHTML = "";
+
+  transactions.forEach((txn) => {
+    const row = document.createElement("tr");
+    const categoryName = categoriesById[txn.categoryId]?.name || "-";
+    const descriptionSub = txn.note || categoryName || "";
+    const amountClass = txn.type === "income" ? "amount-positive" : "amount-negative";
+    const amountPrefix = txn.type === "income" ? "+" : "-";
+    const receiptMarkup = txn.receiptId
+      ? '<span class="receipt-status attached"><span class="receipt-dot"></span><span>Attached</span></span>'
+      : '<span class="receipt-status none"><span class="receipt-dot"></span><span>None</span></span>';
+
+    row.innerHTML = `
+      <td><span class="date-cell">${formatDisplayDate(txn.date)}</span></td>
+      <td><div class="description-primary">${txn.description || "-"}</div><div class="description-sub">${descriptionSub}</div></td>
+      <td><span class="account-tag">${accountsById[txn.accountId]?.name || "-"}</span></td>
+      <td><span class="category-pill ${getCategoryToneClass(categoryName)}">${categoryName}</span></td>
+      <td>${receiptMarkup}</td>
+      <td class="amount-cell"><span class="${amountClass}">${amountPrefix}${formatCurrency(Math.abs(Number(txn.amount) || 0))}</span></td>
+      <td class="actions-cell">
+        <button type="button" class="action-button" data-action="edit-transaction" data-id="${txn.id}">Edit</button>
+        <button type="button" class="action-button delete" data-action="delete-transaction" data-id="${txn.id}">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+
+    row.querySelector('[data-action="edit-transaction"]')?.addEventListener("click", () => {
+      handleEditEntry(txn.id);
+    });
+    row.querySelector('[data-action="delete-transaction"]')?.addEventListener("click", () => {
+      openTransactionModal(txn.id);
+    });
+  });
+}
+
 
 function renderTotals() {
   const incomeLabel = document.getElementById("incomeYTD");
@@ -648,8 +708,16 @@ function renderTotals() {
   const netLabel = document.getElementById("netProfitYTD");
   const taxLabel = document.getElementById("taxOwed");
   const setAsideLabel = document.getElementById("monthlySetAside");
+  const incomeDelta = document.getElementById("incomeDelta");
+  const expensesDelta = document.getElementById("expensesDelta");
+  const transactionCountValue = document.getElementById("transactionCountValue");
+  const transactionCountDelta = document.getElementById("transactionCountDelta");
+  const cockpit = document.getElementById("tax-cockpit");
+  const upsell = document.getElementById("tax-upsell");
 
   const totals = calculateTotals();
+  const comparison = calculateYearComparisons();
+  const transactionsCount = (ledgerState.transactions || []).length;
   if (incomeLabel) {
     incomeLabel.textContent = formatCurrency(totals.income);
   }
@@ -659,12 +727,24 @@ function renderTotals() {
   if (netLabel) {
     netLabel.textContent = formatCurrency(totals.income - totals.expenses);
   }
+  if (incomeDelta) {
+    incomeDelta.innerHTML = `<span class="stat-delta-positive">${formatPercentChange(comparison.income)}</span> vs last year`;
+  }
+  if (expensesDelta) {
+    expensesDelta.innerHTML = `<span class="stat-delta-positive">${formatPercentChange(comparison.expenses)}</span> vs last year`;
+  }
+  if (transactionCountValue) {
+    transactionCountValue.textContent = String(transactionsCount);
+  }
+  if (transactionCountDelta) {
+    transactionCountDelta.textContent = `${countTransactionsThisMonth()} this month`;
+  }
 
   const tier = effectiveTier();
+  const hasTransactions = transactionsCount > 0;
   if (tier !== "free" && taxLabel && setAsideLabel) {
     const taxableIncome = Math.max(0, totals.income - totals.expenses);
-    const EST_RATE = 0.25;
-    const estimatedTax = taxableIncome * EST_RATE;
+    const estimatedTax = taxableIncome * TAX_RATE;
     const monthlySetAside = estimatedTax / 12;
     taxLabel.textContent = formatCurrency(estimatedTax);
     setAsideLabel.textContent = formatCurrency(monthlySetAside);
@@ -672,6 +752,14 @@ function renderTotals() {
     taxLabel.textContent = formatCurrency(0);
     setAsideLabel.textContent = formatCurrency(0);
   }
+  if (cockpit) {
+    cockpit.style.display = tier === "free" || !hasTransactions ? "none" : "flex";
+  }
+  if (upsell) {
+    const upsellDismissed = localStorage.getItem("lb_transactions_upsell_hidden") === "true";
+    upsell.style.display = tier === "free" && hasTransactions && !upsellDismissed ? "block" : "none";
+  }
+  updateReceiptsDot();
   maybePlaySlotAnimation();
 }
 
@@ -689,6 +777,88 @@ function calculateTotals() {
   });
 
   return { income, expenses };
+}
+
+function formatDisplayDate(value) {
+  if (!value) {
+    return "-";
+  }
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function getCategoryToneClass(name) {
+  const value = String(name || "").toLowerCase();
+  if (value.includes("consult")) return "tone-consulting";
+  if (value.includes("income") || value.includes("software")) return "tone-green";
+  if (value.includes("travel")) return "tone-travel";
+  if (value.includes("office")) return "tone-office";
+  if (value.includes("marketing")) return "tone-marketing";
+  return "tone-default";
+}
+
+function calculateYearComparisons() {
+  const currentYear = new Date().getFullYear();
+  const previousYear = currentYear - 1;
+  let currentIncome = 0;
+  let previousIncome = 0;
+  let currentExpenses = 0;
+  let previousExpenses = 0;
+
+  (ledgerState.transactions || []).forEach((txn) => {
+    const year = Number(String(txn.date || "").slice(0, 4));
+    const amount = Math.abs(Number(txn.amount) || 0);
+    if (txn.type === "income") {
+      if (year === currentYear) currentIncome += amount;
+      if (year === previousYear) previousIncome += amount;
+    } else {
+      if (year === currentYear) currentExpenses += amount;
+      if (year === previousYear) previousExpenses += amount;
+    }
+  });
+
+  return {
+    income: computePercentDelta(currentIncome, previousIncome),
+    expenses: computePercentDelta(currentExpenses, previousExpenses)
+  };
+}
+
+function computePercentDelta(currentValue, previousValue) {
+  if (!previousValue && !currentValue) {
+    return 0;
+  }
+  if (!previousValue) {
+    return 100;
+  }
+  return ((currentValue - previousValue) / previousValue) * 100;
+}
+
+function formatPercentChange(value) {
+  const sign = value >= 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}%`;
+}
+
+function countTransactionsThisMonth() {
+  const now = new Date();
+  return (ledgerState.transactions || []).filter((txn) => {
+    const parsed = new Date(`${txn.date}T00:00:00`);
+    return parsed.getFullYear() === now.getFullYear() && parsed.getMonth() === now.getMonth();
+  }).length;
+}
+
+function updateReceiptsDot() {
+  const dot = document.getElementById("receiptsDot");
+  if (!dot) {
+    return;
+  }
+  dot.hidden = !(ledgerState.transactions || []).some((txn) => !txn.receiptId);
 }
 
 function mapById(items) {
@@ -743,7 +913,7 @@ function saveTransactions(transactions) {
 
 function setTransactionsLoading(isLoading) {
   transactionsLoading = isLoading;
-  renderTransactionList();
+  renderTransactionsTable();
 }
 
 function setTransactionFormMessage(text) {
@@ -927,9 +1097,14 @@ function wireTransactionIntentButtons() {
 
 function setTransactionType(intent) {
   const typeSelect = document.getElementById('txType');
+  const buttons = document.querySelectorAll(".txn-intent-btn");
   if (typeSelect) {
     typeSelect.value = intent;
   }
+  buttons.forEach((button) => {
+    const matches = (button.dataset.intent === "income" ? "income" : "expense") === intent;
+    button.classList.toggle("is-active", matches);
+  });
 }
 function resolveTransactionAccountName(transaction, accountsById) {
   if (transaction.account_name) {

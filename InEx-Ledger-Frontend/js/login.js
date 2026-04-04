@@ -80,6 +80,9 @@ async function handleLoginSubmit(event) {
     }
 
     setToken(data.token);
+    if (data?.subscription && typeof applySubscriptionState === "function") {
+      applySubscriptionState(data.subscription);
+    }
     window.location.href = "transactions.html";
   } catch (err) {
     console.error("Login request failed:", err);

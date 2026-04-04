@@ -12,10 +12,11 @@ const TOKEN_KEY = "token";
 const TIER_KEY = "tier";
 const TRIAL_EXPIRED_KEY = "luna_trial_expired";
 const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
+const SUBSCRIPTION_KEY = "lb_subscription";
 const LOGIN_PAGE = "/html/login.html";
 
 if (!window.API_BASE) {
-  window.API_BASE = " ";
+  window.API_BASE = "";
 }
 
 if (!window.__AUTH_GUARD_STATE__) {
@@ -40,6 +41,46 @@ function clearAppState() {
   );
 }
 
+function applySubscriptionState(subscription) {
+  if (!subscription || typeof subscription !== "object") {
+    return;
+  }
+
+  localStorage.setItem(SUBSCRIPTION_KEY, JSON.stringify(subscription));
+
+  if (subscription.trialEndsAt) {
+    localStorage.setItem(TRIAL_ENDS_AT_KEY, String(new Date(subscription.trialEndsAt).getTime()));
+  } else {
+    localStorage.removeItem(TRIAL_ENDS_AT_KEY);
+  }
+
+  if (subscription.effectiveStatus === "trialing") {
+    localStorage.setItem(TIER_KEY, "trial");
+    localStorage.setItem(TRIAL_EXPIRED_KEY, "false");
+    return;
+  }
+
+  if (subscription.effectiveTier === "v1") {
+    localStorage.setItem(TIER_KEY, "v1");
+    localStorage.setItem(TRIAL_EXPIRED_KEY, "false");
+    return;
+  }
+
+  localStorage.setItem(TIER_KEY, "free");
+  if (subscription.effectiveStatus === "trial_expired") {
+    localStorage.setItem(TRIAL_EXPIRED_KEY, "true");
+  } else {
+    localStorage.removeItem(TRIAL_EXPIRED_KEY);
+  }
+}
+
+function clearSubscriptionState() {
+  localStorage.removeItem(SUBSCRIPTION_KEY);
+  localStorage.removeItem(TIER_KEY);
+  localStorage.removeItem(TRIAL_EXPIRED_KEY);
+  localStorage.removeItem(TRIAL_ENDS_AT_KEY);
+}
+
 function getToken() {
   return localStorage.getItem(TOKEN_KEY) || "";
 }
@@ -52,6 +93,7 @@ function setToken(token) {
 function clearToken() {
   console.log("[AUTH] clearToken called");
   localStorage.removeItem(TOKEN_KEY);
+  clearSubscriptionState();
   clearAppState();
   if (window.__AUTH_GUARD_STATE__) {
     window.__AUTH_GUARD_STATE__.lastError = null;
@@ -111,6 +153,10 @@ async function requireValidSessionOrRedirect() {
     console.log("[AUTH] /api/me status =", response.status);
 
     if (response.status === 200) {
+      const payload = await response.json().catch(() => null);
+      if (payload?.subscription) {
+        applySubscriptionState(payload.subscription);
+      }
       console.log("[AUTH] Session valid");
       window.__AUTH_GUARD_STATE__.running = false;
       window.__AUTH_GUARD_STATE__.lastError = null;
@@ -150,6 +196,10 @@ async function redirectIfAuthenticated() {
     });
     console.log("[AUTH] redirectIfAuthenticated /api/me status =", response.status);
     if (response.status === 200) {
+      const payload = await response.json().catch(() => null);
+      if (payload?.subscription) {
+        applySubscriptionState(payload.subscription);
+      }
       window.location.href = "transactions.html";
     }
   } catch (err) {

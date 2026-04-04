@@ -1,132 +1,113 @@
-const API_BASE = " ";
-console.log("[AUTH] Protected page loaded:", window.location.pathname);
-let editingAccountId = null;
-let accountFormState = null;
-let accountFormSubmitDefault = "Save account";
-const ACCOUNT_FORM_UPDATE_LABEL = "Update account";
+﻿const ACCOUNT_TYPES = [
+  { value: "checking", label: "Checking" },
+  { value: "savings", label: "Savings" },
+  { value: "credit_card", label: "Credit card" },
+  { value: "loan", label: "Loan" },
+  { value: "cash", label: "Cash" }
+];
+const ACCOUNTS_TOAST_MS = 3000;
 
-/** ================================
- * Initialization
- * ================================ */
+let accountsToastTimer = null;
+
+console.log("[AUTH] Protected page loaded:", window.location.pathname);
+
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
   wireAccountForm();
-  renderAccountList();
+  await renderAccountList();
+  updateReceiptsDot();
 });
 
-/** ================================
- * Form Wiring
- * ================================ */
 function wireAccountForm() {
   const showButton = document.getElementById("showAccountForm");
   const formContainer = document.getElementById("accountFormContainer");
   const form = document.getElementById("accountForm");
   const typeSelect = document.getElementById("account-type");
-  const message = document.getElementById("accountFormMessage");
   const nameInput = document.getElementById("account-name");
   const cancelButton = document.getElementById("cancelAccountEdit");
+  const message = document.getElementById("accountFormMessage");
   const submitButton = form?.querySelector('button[type="submit"]');
-
-  accountFormState = {
-    form,
-    formContainer,
-    typeSelect,
-    message,
-    nameInput,
-    submitButton
-  };
-
-  if (submitButton) {
-    accountFormSubmitDefault =
-      submitButton.textContent || accountFormSubmitDefault;
-  }
 
   populateAccountTypes(typeSelect);
 
-  if (showButton) {
-    showButton.addEventListener("click", () => {
-      formContainer.classList.toggle("visible");
-    });
-  }
+  showButton?.addEventListener("click", () => {
+    formContainer.hidden = !formContainer.hidden;
+    if (!formContainer.hidden) {
+      nameInput?.focus();
+    }
+  });
 
-  if (cancelButton) {
-    cancelButton.addEventListener("click", () => {
-      formContainer.classList.remove("visible");
-      resetAccountForm();
-    });
-  }
+  cancelButton?.addEventListener("click", () => {
+    formContainer.hidden = true;
+    form?.reset();
+    if (message) {
+      message.textContent = "";
+    }
+  });
 
-  if (form) {
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
 
-      const name = nameInput.value.trim();
-      const type = typeSelect.value;
+    const name = nameInput?.value.trim() || "";
+    const type = typeSelect?.value || "";
 
-      if (!name || !type) {
-        if (message) message.textContent = "Enter a name and select a type.";
-        return;
-      }
-
-      if (submitButton) {
-        submitButton.disabled = true;
-      }
+    if (!name || !type) {
       if (message) {
-        message.textContent = "";
+        message.textContent = "Enter a name and select a type.";
+      }
+      return;
+    }
+
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+    if (message) {
+      message.textContent = "";
+    }
+
+    try {
+      const response = await apiFetch("/api/accounts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ name, type })
+      });
+
+      if (!response) {
+        throw new Error("Failed to save account.");
       }
 
-      try {
-        const response = await apiFetch(`${API_BASE}/api/accounts`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ name, type })
-        });
-
-        if (!response) {
-          if (message) message.textContent = "Failed to save account.";
-          return;
-        }
-
-        if (!response.ok) {
-          const errorText = await getApiErrorText(response, "Failed to save account.");
-          if (message) message.textContent = errorText;
-          return;
-        }
-
-        resetAccountForm();
-        await renderAccountList();
-      } finally {
-        if (submitButton) {
-          submitButton.disabled = false;
-        }
+      if (!response.ok) {
+        throw new Error(await getApiErrorText(response, "Failed to save account."));
       }
-    });
-  }
+
+      form.reset();
+      formContainer.hidden = true;
+      showAccountsToast("Account added");
+      await renderAccountList();
+    } catch (error) {
+      if (message) {
+        message.textContent = error.message || "Failed to save account.";
+      }
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+      }
+    }
+  });
 }
 
-/** ================================
- * Dropdown
- * ================================ */
 function populateAccountTypes(selectElement) {
-  if (!selectElement) return;
-
-  const types = window.LUNA_DEFAULTS?.accountTypes || [
-    { value: "checking", label: "Checking" },
-    { value: "savings", label: "Savings" },
-    { value: "credit", label: "Credit Card" },
-    { value: "cash", label: "Cash" },
-    { value: "loan", label: "Loan" },
-    { value: "other", label: "Other" }
-  ];
+  if (!selectElement) {
+    return;
+  }
 
   selectElement.innerHTML = '<option value="">Select type</option>';
-
-  types.forEach((type) => {
+  ACCOUNT_TYPES.forEach((type) => {
     const option = document.createElement("option");
     option.value = type.value;
     option.textContent = type.label;
@@ -134,121 +115,126 @@ function populateAccountTypes(selectElement) {
   });
 }
 
-/** ================================
- * Reset Form
- * ================================ */
-function resetAccountForm() {
-  editingAccountId = null;
-  if (!accountFormState) return;
-
-  const { form, nameInput, typeSelect, submitButton, message } =
-    accountFormState;
-
-  if (form) form.reset();
-  if (nameInput) nameInput.value = "";
-  if (typeSelect) typeSelect.value = "";
-  if (submitButton)
-    submitButton.textContent = accountFormSubmitDefault;
-  if (message) message.textContent = "";
-}
-
-/** ================================
- * Render Accounts (POSTGRES)
- * ================================ */
 async function renderAccountList() {
   const container = document.getElementById("accountsList");
-  if (!container) return;
-
-  const response = await apiFetch(`${API_BASE}/api/accounts`);
-  if (!response) {
-    console.error("Failed to load accounts: no response");
-    showAccountsError("Could not reach the account service.");
-    localStorage.removeItem("lb_accounts");
+  const message = document.getElementById("accountMessage");
+  if (!container) {
     return;
   }
 
-  if (!response.ok) {
-    console.error("Failed to load accounts:", response.status);
-    showAccountsError("Unable to load accounts (status " + response.status + ").");
-    localStorage.removeItem("lb_accounts");
-    return;
+  if (message) {
+    message.textContent = "";
   }
 
-  const accounts = await response.json();
-  container.innerHTML = "";
+  try {
+    const response = await apiFetch("/api/accounts");
+    if (!response) {
+      throw new Error("Could not reach the account service.");
+    }
 
-  if (!accounts.length) {
-    container.innerHTML =
-      `<p class="small-note">No accounts yet. Add one to get started.</p>`;
-    return;
-  }
+    if (!response.ok) {
+      throw new Error("Unable to load accounts.");
+    }
 
-  accounts.forEach((account) => {
-    const card = document.createElement("div");
-    card.className = "account-card";
+    const accounts = await response.json();
+    if (!Array.isArray(accounts) || accounts.length === 0) {
+      container.innerHTML = '<div class="accounts-empty">No accounts yet. Add one to get started.</div>';
+      return;
+    }
 
-    card.innerHTML = `
-      <div>
-        <h3>${account.name}</h3>
-        <p class="account-meta">${account.type}</p>
-      </div>
-      <div>
-        <button data-id="${account.id}" class="delete-account">Delete</button>
-      </div>
-    `;
+    container.innerHTML = accounts.map((account) => `
+      <article class="account-card">
+        <div>
+          <div class="account-name">${escapeHtml(account.name || "Account")}</div>
+          <div class="account-type">${escapeHtml(formatAccountType(account.type))}</div>
+        </div>
+        <button type="button" class="account-delete-btn" data-account-delete="${escapeHtml(account.id || "")}">Delete</button>
+      </article>
+    `).join("");
 
-    card
-      .querySelector(".delete-account")
-      .addEventListener("click", () => {
-        deleteAccount(account.id);
+    container.querySelectorAll("[data-account-delete]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const accountId = button.getAttribute("data-account-delete") || "";
+        if (!accountId) {
+          return;
+        }
+        await deleteAccount(accountId);
       });
-
-    container.appendChild(card);
-  });
+    });
+  } catch (error) {
+    container.innerHTML = "";
+    if (message) {
+      message.textContent = error.message || "Unable to load accounts.";
+    }
+  }
 }
 
-/** ================================
- * Delete Account (POSTGRES)
- * ================================ */
 async function deleteAccount(accountId) {
-  const response = await apiFetch(`${API_BASE}/api/accounts/${accountId}`, {
+  const response = await apiFetch(`/api/accounts/${accountId}`, {
     method: "DELETE"
   });
 
-  if (!response) {
-    alert("Failed to delete account.");
+  if (!response || !response.ok) {
+    showAccountsToast("Failed to delete account");
     return;
   }
 
-  if (!response.ok) {
-    alert("Failed to delete account.");
-    return;
-  }
-
-  renderAccountList();
+  showAccountsToast("Account deleted");
+  await renderAccountList();
 }
 
-function showAccountsError(message) {
-  const container = document.getElementById("accountsList");
-  if (container) {
-    container.innerHTML = `<p class="error-message">${message}</p>`;
+function formatAccountType(value) {
+  const type = ACCOUNT_TYPES.find((item) => item.value === value);
+  return type?.label || value || "Account";
+}
+
+function updateReceiptsDot() {
+  const dot = document.getElementById("receiptsDot");
+  if (!dot) {
+    return;
   }
+
+  try {
+    const receipts = JSON.parse(localStorage.getItem("lb_receipts") || "[]");
+    dot.hidden = !receipts.some((receipt) => !receipt.transactionId && !receipt.transaction_id);
+  } catch {
+    dot.hidden = true;
+  }
+}
+
+function showAccountsToast(message) {
+  const toast = document.getElementById("accountsToast");
+  const messageNode = document.getElementById("accountsToastMessage");
+  if (!toast || !messageNode) {
+    return;
+  }
+
+  messageNode.textContent = message;
+  toast.classList.remove("hidden");
+  if (accountsToastTimer) {
+    clearTimeout(accountsToastTimer);
+  }
+  accountsToastTimer = window.setTimeout(() => {
+    toast.classList.add("hidden");
+  }, ACCOUNTS_TOAST_MS);
+}
+
+function escapeHtml(value) {
+  return `${value ?? ""}`
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 async function getApiErrorText(response, fallback) {
-  fallback = fallback || "An error occurred.";
   try {
     const payload = await response.json();
     if (payload?.error) {
       return payload.error;
     }
-  } catch (err) {
-    // ignore
+  } catch {
   }
-
-  if (response.status === 409) {
-    return "An account with this name already exists.";
-  }
-
-  return fallback;
+  return fallback || "An error occurred.";
 }

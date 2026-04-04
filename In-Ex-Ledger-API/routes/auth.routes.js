@@ -10,6 +10,8 @@ const { Resend } = require("resend");
 const rateLimit = require("express-rate-limit");
 const { signToken, requireAuth } = require("../middleware/auth.middleware.js");
 const { pool } = require("../db.js");
+const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 
 const router = express.Router();
 
@@ -346,13 +348,16 @@ router.post("/login", authLimiter, async (req, res) => {
     }
 
     const verified = Boolean(user.email_verified);
+    const businessId = await resolveBusinessIdForUser(user);
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
 
     const token = signToken(
       {
         id: user.id,
         email: user.email,
         role: user.role || "user",
-        email_verified: verified
+        email_verified: verified,
+        business_id: businessId
       },
       ACCESS_TOKEN_EXPIRY_SECONDS
     );
@@ -363,6 +368,7 @@ router.post("/login", authLimiter, async (req, res) => {
     res.status(200).json({
       token,
       email_verified: verified,
+      subscription,
       message: verified ? undefined : "Please verify your email before requesting exports."
     });
   } catch (err) {
@@ -402,17 +408,25 @@ router.post("/refresh", async (req, res) => {
     const refreshData = await createRefreshToken(result.rows[0].user_id);
     setRefreshCookie(res, refreshData.token, refreshData.expiresAt);
 
+    const businessId = await resolveBusinessIdForUser({
+      id: result.rows[0].user_id,
+      email: result.rows[0].email,
+      business_id: req.user?.business_id
+    });
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+
     const token = signToken(
       {
         id: result.rows[0].user_id,
         email: result.rows[0].email,
         role: result.rows[0].role || "user",
-        email_verified: !!result.rows[0].email_verified
+        email_verified: !!result.rows[0].email_verified,
+        business_id: businessId
       },
       ACCESS_TOKEN_EXPIRY_SECONDS
     );
 
-    res.status(200).json({ token });
+    res.status(200).json({ token, subscription });
   } catch (err) {
     console.error("Refresh token error:", err);
     clearRefreshCookie(res);

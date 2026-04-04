@@ -1,62 +1,87 @@
-/* ============================================
-   Subscription Page JS — V1 (MOCK for testing)
-   No HTML changes required
-   ============================================ */
-
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const buttons = Array.from(document.querySelectorAll("button"));
+  const starterBtn = buttons.find((btn) => btn.textContent.toLowerCase().includes("starter"));
+  const proBtn = buttons.find((btn) => btn.textContent.toLowerCase().includes("pro"));
 
-  const starterBtn = buttons.find(btn =>
-    btn.textContent.toLowerCase().includes("starter")
-  );
+  if (!starterBtn || !proBtn) {
+    return;
+  }
 
-  const proBtn = buttons.find(btn =>
-    btn.textContent.toLowerCase().includes("pro")
-  );
-
-  // Read current tier
-  const currentTier = localStorage.getItem("tier") || "free";
-
-  // Update button states for clarity
-  if (starterBtn && currentTier === "free") {
+  if (!isAuthenticated()) {
+    proBtn.addEventListener("click", () => {
+      window.location.href = "register.html";
+    });
     starterBtn.disabled = true;
     starterBtn.textContent = "Current Plan";
+    return;
   }
 
-  if (proBtn && currentTier === "v1") {
-    proBtn.disabled = true;
-    proBtn.textContent = "Current Plan";
+  try {
+    const response = await apiFetch("/api/billing/subscription");
+    if (!response) {
+      return;
+    }
+    const payload = await response.json().catch(() => null);
+    const subscription = payload?.subscription || null;
+
+    if (subscription && typeof applySubscriptionState === "function") {
+      applySubscriptionState(subscription);
+    }
+
+    if (subscription?.effectiveTier === "v1") {
+      proBtn.disabled = true;
+      proBtn.textContent = "Current Plan";
+      starterBtn.textContent = "Manage Billing";
+      starterBtn.addEventListener("click", openCustomerPortal);
+      return;
+    }
+
+    starterBtn.disabled = true;
+    starterBtn.textContent = "Current Plan";
+    proBtn.addEventListener("click", startCheckout);
+  } catch (err) {
+    console.error("[Subscription] Failed to load subscription:", err);
   }
-
-  // Stay on Starter (Free)
-  if (starterBtn) {
-    starterBtn.addEventListener("click", () => {
-      localStorage.setItem("tier", "free");
-
-      // Optional: reset trial
-      localStorage.removeItem("luna_trial_expired");
-      localStorage.removeItem("luna_trial_ends_at");
-
-      alert("You are now on the Starter plan.");
-
-      window.location.href = "transactions.html";
-    });
-  }
-
-  // Upgrade to Pro (V1)
-  if (proBtn) {
-    proBtn.addEventListener("click", () => {
-      // MOCK upgrade
-      localStorage.setItem("tier", "v1");
-
-      // End trial + mark as paid
-      localStorage.setItem("luna_trial_expired", "false");
-
-      alert("Mock upgrade successful! You are now on Pro (V1).");
-
-      window.location.href = "transactions.html";
-    });
-  }
-
-  console.log("[Subscription] Mock subscription system active");
 });
+
+async function startCheckout() {
+  try {
+    const response = await apiFetch("/api/billing/checkout-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    if (!response) {
+      return;
+    }
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(payload?.error || "Unable to start checkout.");
+    }
+    if (payload?.url) {
+      window.location.href = payload.url;
+    }
+  } catch (err) {
+    alert(err.message || "Unable to start checkout.");
+  }
+}
+
+async function openCustomerPortal() {
+  try {
+    const response = await apiFetch("/api/billing/customer-portal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    if (!response) {
+      return;
+    }
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(payload?.error || "Unable to open billing portal.");
+    }
+    if (payload?.url) {
+      window.location.href = payload.url;
+    }
+  } catch (err) {
+    alert(err.message || "Unable to open billing portal.");
+  }
+}

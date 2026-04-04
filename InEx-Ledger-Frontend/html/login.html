@@ -1,51 +1,47 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>InEx Ledger — Sign In</title>
+  <title>InEx Ledger - Sign In</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="stylesheet" href="/css/app.css">
 <link rel="stylesheet" href="/css/pages/login.css">
 </head>
 
 <body>
-  <header>
-  <p class="site-logo">InEx Ledger</p>
-  <nav>
-    <a href="/html/login.html">Sign In</a>
-    <a href="/html/subscription.html">Pricing</a>
-  </nav>
-</header>
+  <header class="marketing-header auth-header">
+    <a class="brand" href="/html/landing.html" aria-label="InEx Ledger home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
+          <rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+          <rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+          <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".35"></rect>
+        </svg>
+      </span>
+      <span class="brand-text">InEx Ledger</span>
+    </a>
+    <nav>
+      <a href="/html/login.html">Sign in</a>
+      <a href="/html/subscription.html">Pricing</a>
+    </nav>
+  </header>
 
   <div id="canadaTestBanner" class="trial-banner" style="display:none;"></div>
 
   <main>
-    <section>
+    <section class="auth-card">
       <h2>Sign in</h2>
 
-      <form id="loginForm" method="post">
-        <div>
-          <label for="email" data-i18n="login_email_label">Email address</label><br />
-          <input
-            type="email"
-            id="email"
-            name="email"
-            required
-            autocomplete="email"
-          />
+      <form id="loginForm" method="post" class="auth-form">
+        <div class="form-field">
+          <label for="email" data-i18n="login_email_label">Email address</label>
+          <input type="email" id="email" name="email" required autocomplete="email" />
         </div>
 
-        <br />
-
-        <div>
-          <label for="password" data-i18n="login_password_label">Password</label><br />
-          <input
-            type="password"
-            id="password"
-            name="password"
-            required
-            autocomplete="current-password"
-          />
+        <div class="form-field">
+          <label for="password" data-i18n="login_password_label">Password</label>
+          <input type="password" id="password" name="password" required autocomplete="current-password" />
         </div>
 
         <label class="show-password-toggle" data-i18n="login_toggle_show_password">
@@ -53,11 +49,7 @@
           Show password
         </label>
 
-        <br />
-
-        <div>
-          <button type="submit" data-i18n="login_submit">Sign in</button>
-        </div>
+        <button type="submit" class="auth-submit" data-i18n="login_submit">Sign in</button>
       </form>
 
       <p id="loginError" class="auth-error" role="alert" aria-live="polite" hidden></p>
@@ -69,7 +61,7 @@
       </p>
 
       <p>
-        <span data-i18n="login_need_account">Don’t have an account?</span>
+        <span data-i18n="login_need_account">Don't have an account?</span>
         <a href="register.html" data-i18n="login_create_account">Create one</a>
       </p>
     </section>
@@ -89,4 +81,5 @@
 <script src="../js/login.js"></script>
 </body>
 </html>
+
 

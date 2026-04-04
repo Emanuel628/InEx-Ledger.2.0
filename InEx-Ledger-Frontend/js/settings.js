@@ -3,16 +3,38 @@ const REGION_DISPLAY = {
   ca: "Canada"
 };
 
+const SETTINGS_DEFAULT_THEME = typeof DEFAULT_THEME !== "undefined" ? DEFAULT_THEME : "light";
+const SETTINGS_THEME_VERSION = typeof THEME_VERSION !== "undefined" ? THEME_VERSION : "2";
+const BUSINESS_PROFILE_KEY = "lb_business_profile";
+const SETTINGS_TOAST_MS = 3000;
+const SETTINGS_PASSWORD_RULES = {
+  length: (value) => value.length >= 8,
+  number: (value) => /\d/.test(value),
+  uppercase: (value) => /[A-Z]/.test(value),
+  special: (value) => /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)
+};
+
 let privacySettings = {
   dataSharingOptOut: false,
   consentGiven: false
 };
 
-const SETTINGS_DEFAULT_THEME =
-  typeof DEFAULT_THEME !== "undefined" ? DEFAULT_THEME : "light";
-const SETTINGS_THEME_VERSION =
-  typeof THEME_VERSION !== "undefined" ? THEME_VERSION : "2";
+let toastTimer = null;
+let dangerAction = null;
+
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
+
+document.addEventListener("DOMContentLoaded", async () => {
+  await requireValidSessionOrRedirect();
+  if (typeof enforceTrial === "function") enforceTrial();
+  if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
+
+  wireSignOutButtons();
+  initBusinessProfileForm();
+  await initPreferences();
+  initSecurityForm();
+  initDangerZone();
+});
 
 function resolveSavedTheme() {
   const storedVersion = localStorage.getItem("lb_theme_version");
@@ -21,491 +43,325 @@ function resolveSavedTheme() {
     localStorage.setItem("lb_theme_version", SETTINGS_THEME_VERSION);
     return SETTINGS_DEFAULT_THEME;
   }
-
   return localStorage.getItem("lb_theme") || SETTINGS_DEFAULT_THEME;
 }
 
-let saveBarElement = null;
-let saveButtonElement = null;
-let hasPendingChanges = false;
-let activeRegion = "us";
-const SECURITY_REQUIREMENT_RULES = {
-  length: (value) => value.length >= 8,
-  number: (value) => /\d/.test(value),
-  uppercase: (value) => /[A-Z]/.test(value),
-  special: (value) => /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)
-};
-
-let securityState = {};
-console.log("Settings JS loaded");
-document.addEventListener("DOMContentLoaded", async () => {
-  await requireValidSessionOrRedirect();
-  if (typeof enforceTrial === "function") enforceTrial();
-  if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
-  
-  const signOutBtn = document.querySelector("[data-logout]");
-console.log("Sign out button found:", signOutBtn);
-
-  if (signOutBtn) {
-    signOutBtn.addEventListener("click", () => {
-      console.log("Sign out clicked");
-
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("lb_token");
-      localStorage.removeItem("lb_user");
-
-      sessionStorage.clear();
-
+function wireSignOutButtons() {
+  document.querySelectorAll("[data-logout]").forEach((button) => {
+    button.addEventListener("click", () => {
       clearToken();
-
+      sessionStorage.clear();
       window.location.href = "login.html";
     });
+  });
+}
+
+function getBusinessProfile() {
+  try {
+    return JSON.parse(localStorage.getItem(BUSINESS_PROFILE_KEY) || "null") || {};
+  } catch {
+    return {};
   }
-  
+}
+
+function saveBusinessProfile(profile) {
+  localStorage.setItem(BUSINESS_PROFILE_KEY, JSON.stringify(profile));
+}
+
+function initBusinessProfileForm() {
+  const form = document.getElementById("businessProfileForm");
+  if (!form) return;
+
+  const profile = getBusinessProfile();
+  document.getElementById("business-name").value = profile.name || "";
+  document.getElementById("business-type-select").value = profile.type || "sole_proprietor";
+  document.getElementById("businessEin").value = profile.ein || "";
+  document.getElementById("fiscal-year").value = profile.fiscalYearStart || "";
+  document.getElementById("business-address").value = profile.address || "";
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveBusinessProfile({
+      name: document.getElementById("business-name").value.trim(),
+      type: document.getElementById("business-type-select").value,
+      ein: document.getElementById("businessEin").value.trim(),
+      fiscalYearStart: document.getElementById("fiscal-year").value,
+      address: document.getElementById("business-address").value.trim()
+    });
+    showSettingsToast("Business profile saved");
+  });
+}
+
+async function initPreferences() {
   const regionSelect = document.getElementById("regionSelectSettings");
   const languageSelect = document.getElementById("languageSelectSettings");
   const darkModeToggle = document.getElementById("darkModeToggle");
-  const unitToggle = document.getElementById("unitMetricToggle");
+  const distanceSelect = document.getElementById("distanceSelect");
   const optOutToggle = document.getElementById("optOutToggle");
-  const saveBar = document.getElementById("settingsSaveBar");
-  const saveButton = document.getElementById("globalSaveBtn");
-  const downloadBtn = document.getElementById("downloadMyDataBtn");
   const consentStatus = document.getElementById("consentStatus");
+  const downloadBtn = document.getElementById("downloadMyDataBtn");
 
-  saveBarElement = saveBar;
-  saveButtonElement = saveButton;
   const savedRegion = localStorage.getItem("lb_region") || "us";
   const savedTheme = resolveSavedTheme();
-  const savedMetric = localStorage.getItem("lb_unit_metric") === "true";
-
-  document.documentElement.setAttribute("data-theme", savedTheme);
+  const savedDistance = localStorage.getItem("lb_unit_metric") === "true" ? "km" : "mi";
 
   if (regionSelect) {
     regionSelect.value = savedRegion;
-    updateRegionFields(savedRegion);
     regionSelect.addEventListener("change", () => {
-      const nextRegion = regionSelect.value === "ca" ? "ca" : "us";
-      updateRegionFields(nextRegion);
-      markDirty();
+      const normalized = regionSelect.value === "ca" ? "ca" : "us";
+      localStorage.setItem("lb_region", normalized);
+      localStorage.setItem("region", normalized === "ca" ? "CA" : "US");
+      window.LUNA_REGION = normalized;
+      showSettingsToast(`Region updated to ${REGION_DISPLAY[normalized]}`);
     });
   }
 
   if (languageSelect && typeof populateLanguageOptions === "function") {
     populateLanguageOptions(languageSelect);
-    languageSelect.value = getCurrentLanguage();
+    languageSelect.value = typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en";
     languageSelect.addEventListener("change", () => {
       if (typeof setCurrentLanguage === "function") {
         setCurrentLanguage(languageSelect.value);
       }
-      markDirty();
+      showSettingsToast("Language updated");
     });
   }
 
   if (darkModeToggle) {
     darkModeToggle.checked = savedTheme === "dark";
-    darkModeToggle.addEventListener("change", (event) => {
-      const nextTheme = event.target.checked ? "dark" : "light";
+    darkModeToggle.addEventListener("change", () => {
+      const nextTheme = darkModeToggle.checked ? "dark" : "light";
+      localStorage.setItem("lb_theme", nextTheme);
+      localStorage.setItem("lb_theme_version", SETTINGS_THEME_VERSION);
       document.documentElement.setAttribute("data-theme", nextTheme);
-      markDirty();
+      showSettingsToast("Appearance updated");
     });
   }
 
-  if (unitToggle) {
-    unitToggle.checked = savedMetric;
-    unitToggle.addEventListener("change", markDirty);
+  if (distanceSelect) {
+    distanceSelect.value = savedDistance;
+    distanceSelect.addEventListener("change", () => {
+      localStorage.setItem("lb_unit_metric", String(distanceSelect.value === "km"));
+      showSettingsToast("Distance unit updated");
+    });
   }
 
-  await initPrivacyControls(optOutToggle, consentStatus, downloadBtn);
-
+  privacySettings = await getPrivacySettingsSafe();
   if (optOutToggle) {
-    optOutToggle.addEventListener("change", markDirty);
-  }
-
-  if (saveButton) {
-    saveButton.addEventListener("click", async () => {
-    await handleSave({
-      regionSelect,
-      languageSelect,
-      darkModeToggle,
-      unitToggle,
-      optOutToggle
+    optOutToggle.checked = !!privacySettings.dataSharingOptOut;
+    optOutToggle.addEventListener("change", async () => {
+      await setPrivacySettingsSafe({ dataSharingOptOut: !!optOutToggle.checked });
+      showSettingsToast("Privacy preference updated");
     });
-    });
-  }
-
-  wireSecuritySection();
-});
-
-async function handleSave({
-  regionSelect,
-  languageSelect,
-  darkModeToggle,
-  unitToggle,
-  optOutToggle
-}) {
-  if (saveButtonElement) {
-    saveButtonElement.disabled = true;
-  }
-
-  const newRegion =
-    regionSelect && regionSelect.value === "ca" ? "ca" : "us";
-  persistRegionSelection(newRegion);
-  updateRegionFields(newRegion);
-
-  if (languageSelect && typeof setCurrentLanguage === "function") {
-    setCurrentLanguage(languageSelect.value);
-  }
-
-  if (darkModeToggle) {
-    const theme = darkModeToggle.checked ? "dark" : "light";
-    localStorage.setItem("lb_theme", theme);
-    localStorage.setItem("lb_theme_version", THEME_VERSION);
-    document.documentElement.setAttribute("data-theme", theme);
-  }
-
-  if (unitToggle) {
-    localStorage.setItem("lb_unit_metric", String(unitToggle.checked));
-  }
-
-  await syncPrivacySettings(optOutToggle?.checked);
-
-  if (typeof t === "function") {
-    window.alert(t("settings_changes_saved") || "Settings saved");
-  } else {
-    window.alert("Settings saved");
-  }
-
-  clearDirty();
-
-  if (saveButtonElement) {
-    saveButtonElement.disabled = false;
-  }
-}
-
-function markDirty() {
-  if (!saveBarElement || hasPendingChanges) {
-    return;
-  }
-  hasPendingChanges = true;
-  saveBarElement.classList.remove("hidden");
-  if (saveButtonElement) {
-    saveButtonElement.disabled = false;
-  }
-}
-
-function clearDirty() {
-  if (!saveBarElement) {
-    return;
-  }
-  hasPendingChanges = false;
-  saveBarElement.classList.add("hidden");
-}
-
-async function initPrivacyControls(
-  optOutToggle,
-  consentStatus,
-  downloadBtn
-) {
-  let settings = {
-    dataSharingOptOut: false,
-    consentGiven: false
-  };
-
-  if (
-    typeof privacyService === "object" &&
-    typeof privacyService.getPrivacySettings === "function"
-  ) {
-    try {
-      const fetched = await privacyService.getPrivacySettings();
-      if (fetched) {
-        settings = fetched;
-      }
-    } catch (error) {
-      console.error("Failed to load privacy settings", error);
-    }
-  }
-
-  privacySettings = settings;
-
-  if (optOutToggle) {
-    optOutToggle.checked = !!settings.dataSharingOptOut;
   }
 
   if (consentStatus) {
-    consentStatus.textContent = settings.consentGiven
-      ? t("status_yes")
-      : t("status_no");
+    consentStatus.textContent = privacySettings.consentGiven ? "Yes" : "No";
   }
 
   if (downloadBtn) {
     downloadBtn.addEventListener("click", async () => {
-      if (
-        typeof privacyService === "object" &&
-        typeof privacyService.exportMyData === "function"
-      ) {
+      if (typeof privacyService === "object" && typeof privacyService.exportMyData === "function") {
         await privacyService.exportMyData();
       }
+      showSettingsToast("Data export started");
     });
   }
-
 }
 
-async function syncPrivacySettings(optOutValue) {
-  const normalized = !!optOutValue;
-  if (
-    typeof privacyService === "object" &&
-    typeof privacyService.setPrivacySettings === "function"
-  ) {
+async function getPrivacySettingsSafe() {
+  if (typeof privacyService === "object" && typeof privacyService.getPrivacySettings === "function") {
     try {
-      await privacyService.setPrivacySettings({
-        dataSharingOptOut: normalized
-      });
-      privacySettings.dataSharingOptOut = normalized;
+      const result = await privacyService.getPrivacySettings();
+      return result || privacySettings;
+    } catch (error) {
+      console.error("Failed to load privacy settings", error);
+    }
+  }
+  return privacySettings;
+}
+
+async function setPrivacySettingsSafe(nextSettings) {
+  privacySettings = { ...privacySettings, ...nextSettings };
+  if (typeof privacyService === "object" && typeof privacyService.setPrivacySettings === "function") {
+    try {
+      await privacyService.setPrivacySettings(nextSettings);
     } catch (error) {
       console.error("Failed to save privacy settings", error);
     }
-  } else {
-    privacySettings.dataSharingOptOut = normalized;
   }
 }
 
-function persistRegionSelection(region) {
-  const normalized = region === "ca" ? "ca" : "us";
-  localStorage.setItem("lb_region", normalized);
-  localStorage.setItem("region", normalized === "ca" ? "CA" : "US");
-  localStorage.setItem("lb_region_override", "true");
-  window.LUNA_REGION = normalized;
-  const label = document.getElementById("detectedRegion");
-  if (label) {
-    label.textContent = REGION_DISPLAY[normalized] || "United States";
-  }
-}
-
-function updateRegionFields(region) {
-  const normalized = region === "ca" ? "ca" : "us";
-  activeRegion = normalized;
-  document.querySelectorAll("[data-region]").forEach((node) => {
-    if (node.getAttribute("data-region") === normalized) {
-      node.removeAttribute("hidden");
-    } else {
-      node.setAttribute("hidden", "");
-    }
-  });
-}
-
-function calculatePasswordScore(password) {
-  let score = 0;
-
-  if (password.length >= 8) score++;
-  if (/[A-Z]/.test(password)) score++;
-  if (/\d/.test(password)) score++;
-  if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) score++;
-
-  return score;
-}
-
-function getStrengthLabel(score) {
-  if (score >= 4) {
-    return "Strong";
-  }
-
-  if (score >= 2) {
-    return "Good";
-  }
-
-  return "Weak";
-}
-
-function wireSecuritySection() {
+function initSecurityForm() {
   const form = document.getElementById("securityForm");
-  if (!form) {
-    return;
-  }
+  if (!form) return;
 
-  const showToggle = document.getElementById("securityShowPasswordToggle");
-  const newPasswordInput = document.getElementById("security-new-password");
-  const confirmInput = document.getElementById("security-confirm-password");
   const currentInput = document.getElementById("security-current-password");
+  const newInput = document.getElementById("security-new-password");
+  const confirmInput = document.getElementById("security-confirm-password");
+  const showToggle = document.getElementById("securityShowPasswordToggle");
   const strengthMeter = document.getElementById("securityPasswordMeter");
   const strengthText = document.getElementById("securityPasswordStrengthText");
-  const requirementItems = document.querySelectorAll(".password-requirements li");
   const matchMessage = document.getElementById("securityPasswordMatchMessage");
+  const requirementItems = document.querySelectorAll(".password-requirements li");
   const submitButton = document.getElementById("securitySaveButton");
-  const changeEmailBtn = document.getElementById("changeEmailBtn");
 
-  securityState = {
-    form,
-    showToggle,
-    newPasswordInput,
-    confirmInput,
-    currentInput,
-    strengthMeter,
-    strengthText,
-    requirementItems,
-    matchMessage,
-    submitButton
+  const updateStrength = () => {
+    const password = newInput.value;
+    const score = getPasswordScore(password);
+    const label = getStrengthLabel(score);
+    let color = "#b91c1c";
+    if (label === "Good") color = "#92600a";
+    if (label === "Strong") color = "#1a7a4a";
+    strengthMeter.style.width = `${score * 25}%`;
+    strengthMeter.style.backgroundColor = color;
+    strengthText.textContent = `${label} password`;
+    strengthText.style.color = color;
   };
 
-  showToggle?.addEventListener("change", () => {
-    const inputs = form.querySelectorAll('input[name="current-password"], input[name="new-password"], input[name="confirm-password"]');
-    inputs.forEach((input) => {
-      input.type = showToggle.checked ? "text" : "password";
+  const updateRequirements = () => {
+    requirementItems.forEach((item) => {
+      const key = item.dataset.requirement;
+      const rule = SETTINGS_PASSWORD_RULES[key];
+      item.classList.toggle("is-met", rule ? rule(newInput.value) : false);
+    });
+  };
+
+  const updateMatch = () => {
+    if (!newInput.value || !confirmInput.value) {
+      matchMessage.textContent = "";
+      return;
+    }
+    if (newInput.value !== confirmInput.value) {
+      matchMessage.textContent = "Passwords do not match";
+      matchMessage.style.color = "#b91c1c";
+    } else {
+      matchMessage.textContent = "";
+    }
+  };
+
+  const updateSubmitState = () => {
+    const matches = newInput.value && confirmInput.value && newInput.value === confirmInput.value;
+    const meetsRules = Object.values(SETTINGS_PASSWORD_RULES).every((rule) => rule(newInput.value));
+    submitButton.disabled = !(matches && meetsRules && currentInput.value.trim());
+  };
+
+  [currentInput, newInput, confirmInput].forEach((input) => {
+    input.addEventListener("input", () => {
+      updateStrength();
+      updateRequirements();
+      updateMatch();
+      updateSubmitState();
     });
   });
 
-  newPasswordInput?.addEventListener("input", () => {
-    updateSecurityStrength();
-    updateSecurityRequirements();
-    updateSecurityMatch();
-    updateSecuritySubmitState();
-  });
-
-  confirmInput?.addEventListener("input", () => {
-    updateSecurityMatch();
-    updateSecuritySubmitState();
+  showToggle?.addEventListener("change", () => {
+    const type = showToggle.checked ? "text" : "password";
+    [currentInput, newInput, confirmInput].forEach((input) => {
+      input.type = type;
+    });
   });
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
-    handleSecuritySubmit();
+    showSettingsToast("Password updated");
+    form.reset();
+    updateStrength();
+    updateRequirements();
+    updateMatch();
+    updateSubmitState();
   });
 
-  changeEmailBtn?.addEventListener("click", () => {
-    window.location.href = "change-email.html";
-  });
-
-  updateSecurityStrength();
-  updateSecurityRequirements();
-  updateSecurityMatch();
-  updateSecuritySubmitState();
+  updateStrength();
+  updateRequirements();
+  updateMatch();
+  updateSubmitState();
 }
 
-function handleSecuritySubmit() {
-  const {
-    currentInput,
-    newPasswordInput,
-    confirmInput
-  } = securityState;
-
-  const submitButton = securityState.submitButton;
-  if (!currentInput || !newPasswordInput || !confirmInput || !submitButton) {
-    return;
-  }
-
-  const currentVal = currentInput.value.trim();
-  const newVal = newPasswordInput.value;
-  const confirmVal = confirmInput.value;
-
-  if (!currentVal || !newVal || !confirmVal) {
-    window.alert("Please complete all password fields.");
-    return;
-  }
-
-  if (!areSecurityRequirementsMet(newVal)) {
-    window.alert("New password does not meet all requirements.");
-    return;
-  }
-
-  if (newVal !== confirmVal) {
-    window.alert("Passwords do not match.");
-    return;
-  }
-
-  console.log("Security password change requested.");
-  window.alert("Password updated.");
-  submitButton.disabled = true;
-}
-
-function updateSecurityStrength() {
-  const { newPasswordInput, strengthMeter, strengthText } = securityState;
-  if (!newPasswordInput || !strengthMeter || !strengthText) return;
-
-  const score = calculatePasswordScore(newPasswordInput.value);
-  const label = getStrengthLabel(score);
-  let color = "#ef4444";
-
-  if (label === "Good") color = "#f97316";
-  if (label === "Strong") color = "#22c55e";
-
-  strengthMeter.style.width = `${score * 25}%`;
-  strengthMeter.style.backgroundColor = color;
-  const labelKey =
-    label === "Strong"
-      ? "register_strength_label_strong"
-      : label === "Good"
-      ? "register_strength_label_good"
-      : "register_strength_label_weak";
-  strengthText.textContent = `${t(labelKey)} password`;
-  strengthText.style.color = color;
-}
-
-function updateSecurityRequirements() {
-  const { newPasswordInput, requirementItems } = securityState;
-  if (!newPasswordInput) return;
-  requirementItems.forEach((item) => {
-    const key = item.dataset.requirement;
-    const rule = SECURITY_REQUIREMENT_RULES[key];
-    if (!rule) return;
-    item.classList.toggle("is-met", rule(newPasswordInput.value));
-  });
-}
-
-function updateSecurityMatch() {
-  const { newPasswordInput, confirmInput, matchMessage } = securityState;
-  if (!newPasswordInput || !confirmInput || !matchMessage) return;
-  const password = newPasswordInput.value;
-  const confirm = confirmInput.value;
-  if (!password || !confirm) {
-    matchMessage.textContent = "";
-    matchMessage.classList.remove("is-bad");
-    return;
-  }
-  if (password !== confirm) {
-    matchMessage.textContent = "Passwords do not match";
-    matchMessage.classList.add("is-bad");
-  } else {
-    matchMessage.textContent = "";
-    matchMessage.classList.remove("is-bad");
-  }
-}
-
-function updateSecuritySubmitState() {
-  const {
-    newPasswordInput,
-    confirmInput,
-    submitButton
-  } = securityState;
-  if (!newPasswordInput || !confirmInput || !submitButton) return;
-  const matches =
-    newPasswordInput.value &&
-    confirmInput.value &&
-    newPasswordInput.value === confirmInput.value;
-  submitButton.disabled = !(matches && areSecurityRequirementsMet(newPasswordInput.value));
-}
-
-function areSecurityRequirementsMet(password) {
-  return Object.values(SECURITY_REQUIREMENT_RULES).every((rule) => rule(password));
-}
-
-function calculatePasswordScore(password) {
+function getPasswordScore(password) {
   let score = 0;
-
   if (password.length >= 8) score++;
   if (/[A-Z]/.test(password)) score++;
   if (/\d/.test(password)) score++;
   if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) score++;
-
   return score;
 }
 
 function getStrengthLabel(score) {
-  if (score >= 4) {
-    return "Strong";
-  }
-
-  if (score >= 2) {
-    return "Good";
-  }
-
+  if (score >= 4) return "Strong";
+  if (score >= 2) return "Good";
   return "Weak";
+}
+
+function initDangerZone() {
+  const modal = document.getElementById("dangerModal");
+  const title = document.getElementById("dangerModalTitle");
+  const body = document.getElementById("dangerModalBody");
+  const confirmWrap = document.getElementById("dangerModalConfirmWrap");
+  const confirmInput = document.getElementById("dangerModalConfirmInput");
+  const confirmButton = document.getElementById("dangerModalConfirm");
+  const cancelButton = document.getElementById("dangerModalCancel");
+  const deleteDataButton = document.getElementById("deleteMyDataBtn");
+  const deleteAccountButton = document.getElementById("deleteAccountTrigger");
+
+  if (!modal) return;
+
+  const closeModal = () => {
+    modal.classList.add("hidden");
+    dangerAction = null;
+    confirmInput.value = "";
+    confirmWrap.classList.add("hidden");
+    confirmButton.disabled = false;
+  };
+
+  const openModal = (action) => {
+    dangerAction = action;
+    if (action === "delete_account") {
+      title.textContent = "Delete account permanently?";
+      body.textContent = "This permanently removes your account and all associated data. This cannot be undone.";
+      confirmWrap.classList.remove("hidden");
+      confirmButton.disabled = true;
+    } else {
+      title.textContent = "Delete business data?";
+      body.textContent = "This removes transactions, receipts, and mileage records. Your account and settings are kept.";
+      confirmWrap.classList.add("hidden");
+      confirmButton.disabled = false;
+    }
+    modal.classList.remove("hidden");
+  };
+
+  deleteDataButton?.addEventListener("click", () => openModal("delete_data"));
+  deleteAccountButton?.addEventListener("click", () => openModal("delete_account"));
+  cancelButton?.addEventListener("click", closeModal);
+
+  confirmInput?.addEventListener("input", () => {
+    confirmButton.disabled = confirmInput.value !== "DELETE";
+  });
+
+  confirmButton?.addEventListener("click", () => {
+    if (dangerAction === "delete_data") {
+      ["lb_transactions", "lb_accounts", "lb_categories", "lb_transactions_upsell_hidden"].forEach((key) => localStorage.removeItem(key));
+      showSettingsToast("Business data deleted");
+    } else if (dangerAction === "delete_account") {
+      clearToken();
+      showSettingsToast("Account deletion requested");
+      setTimeout(() => {
+        window.location.href = "landing.html";
+      }, 600);
+    }
+    closeModal();
+  });
+}
+
+function showSettingsToast(message) {
+  const toast = document.getElementById("settingsToast");
+  const messageNode = document.getElementById("settingsToastMessage");
+  if (!toast || !messageNode) return;
+
+  messageNode.textContent = message;
+  toast.classList.remove("hidden");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toast.classList.add("hidden");
+  }, SETTINGS_TOAST_MS);
 }

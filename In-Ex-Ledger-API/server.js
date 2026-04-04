@@ -60,6 +60,7 @@ app.use(cors({
 /* =========================================================
    MIDDLEWARE STACK
    ========================================================= */
+app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use(express.static(publicDir));
 app.use(express.static(path.join(publicDir, 'html')));
 app.use(express.json({ limit: '100kb' }));

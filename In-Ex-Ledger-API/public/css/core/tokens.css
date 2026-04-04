@@ -1,115 +1,25 @@
 :root {
-  --bg-app: #F8FAFC;
-  --card-bg: #FFFFFF;
-  --bg-header: #FFFFFF;
-  --bg-section: #FFFFFF;
-  --bg-secondary: #F1F5F9;
-
-  --primary: #4338CA;
-  --primary-soft: #EEF2FF;
-  --accent-primary: #4338CA;
-  --accent-success: #10B981;
-
-  --text-main: #0F172A;
-  --text-muted: #64748B;
-  --text-primary: var(--text-main);
-  --text-secondary: var(--text-muted);
-
-  --canvas-bg: var(--bg-app);
-
-  --border: #E2E8F0;
-  --border-soft: rgba(226, 232, 240, 0.6);
-
-  --input-bg: #ffffff;
-
-  --success: #10B981;
-  --danger: #EF4444;
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 8px 20px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 20px 40px rgba(15, 23, 42, 0.10);
-  --shadow-soft: 0 12px 20px -4px rgba(0, 0, 0, 0.10);
-  --field-label-gap: 6px;
-  --field-grid-row-gap: 18px;
-  --field-grid-col-gap: 20px;
-
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-modern: 12px;
-
-  --space-xs: 6px;
-  --space-sm: 12px;
-  --space-md: 20px;
-  --space-lg: 32px;
-
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI",
-               Roboto, Helvetica, Arial, sans-serif;
-}
-
-:root[data-theme="light"] {
-  --bg-light: #f8fafc;
-  --card-bg-light: #ffffff;
-  --card-border-light: #e2e8f0;
-  --border-subtle-light: #e2e8f0;
-
-  --primary-light: #1e293b;
-  --primary-muted-light: #475569;
-
-  --text-primary-light: #0f172a;
-  --text-secondary-light: #475569;
-
-  --input-bg-light: #ffffff;
-  --input-border-light: #e2e8f0;
-
-  --shadow-card-light: 0 6px 16px rgba(15, 23, 42, 0.08);
-  --shadow-button-light: 0 3px 8px rgba(15, 23, 42, 0.08);
-}
-
-[data-theme="light"] select {
-  background: var(--input-bg-light);
-  color: var(--text-primary-light);
-  border-color: var(--input-border-light);
-}
-
-[data-theme="dark"] {
-  --bg-app: #0B1220;
-  --bg-header: #111827;
-  --bg-section: #111827;
-  --bg-secondary: #0B1220;
-  --card-bg: #111827;
-
-  --text-main: #E5E7EB;
-  --text-muted: #9CA3AF;
-
-  --border: #1F2937;
-
-  --input-bg: #0B1220;
-
-  --primary: #6366F1;
-  --primary-soft: rgba(99,102,241,0.15);
-
-  --success: #34D399;
-  --danger: #F87171;
-
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
-  --shadow-md: 0 8px 24px rgba(0,0,0,0.5);
-  --shadow-lg: 0 20px 40px rgba(0,0,0,0.5);
-}
-
-[data-theme="light"] {
-  --bg-app: var(--bg-light);
-  --bg-header: var(--card-bg-light);
-  --bg-section: var(--card-bg-light);
-  --bg-secondary: var(--card-bg-light);
-  --card-bg: var(--card-bg-light);
-  --border: var(--border-subtle-light);
-  --border-soft: var(--border-subtle-light);
-  --text-primary: var(--text-primary-light);
-  --text-secondary: var(--text-secondary-light);
-  --text-muted: var(--text-secondary-light);
-  --primary: var(--primary-light);
-  --shadow-sm: var(--shadow-card-light);
-  --shadow-md: var(--shadow-card-light);
-  --shadow-lg: var(--shadow-card-light);
+  --ink: #0f1923;
+  --ink2: #4a5568;
+  --ink3: #8a96a3;
+  --surface: #ffffff;
+  --surface2: #f7f8fa;
+  --surface3: #eef0f4;
+  --accent: #1a3a5c;
+  --accent2: #2563a8;
+  --accent-light: #e8f0fb;
+  --green: #1a7a4a;
+  --green-bg: #eaf5ef;
+  --red: #b91c1c;
+  --red-bg: #fef2f2;
+  --red-border: #fca5a5;
+  --amber: #92600a;
+  --amber-bg: #fefce8;
+  --border: rgba(15, 25, 35, 0.09);
+  --border2: rgba(15, 25, 35, 0.16);
+  --radius: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+  --shadow-card: 0 1px 3px rgba(15, 25, 35, 0.06), 0 1px 2px rgba(15, 25, 35, 0.04);
 }

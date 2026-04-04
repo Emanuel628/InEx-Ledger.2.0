@@ -6,6 +6,10 @@ const multer = require("multer");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { pool } = require("../db.js");
+const {
+  getSubscriptionSnapshotForBusiness,
+  hasFeatureAccess
+} = require("../services/subscriptionService.js");
 
 const router = express.Router();
 const storageDir = path.join(process.cwd(), "storage", "receipts");
@@ -143,6 +147,11 @@ router.post("/", requireAuth, upload.single("receipt"), async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    if (!hasFeatureAccess(subscription, "receipts")) {
+      safeUnlink(req.file?.path);
+      return res.status(402).json({ error: "Receipt uploads require an active InEx Ledger V1 plan." });
+    }
 
     // optional
     const transactionId = req.body.transaction_id || null;

@@ -8,6 +8,10 @@ const { saveRedactedPdf, buildRedactedStream } = require("../services/exportStor
 const { pool } = require("../db.js");
 const { logError } = require("../utils/logger.js");
 const { sanitizePayload } = require("../utils/logSanitizer.js");
+const {
+  getSubscriptionSnapshotForBusiness,
+  hasFeatureAccess
+} = require("../services/subscriptionService.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -39,9 +43,14 @@ router.post("/exports/request-grant", async (req, res) => {
     const exportType = (req.body?.exportType || "pdf").toLowerCase();
     const includeTaxId = Boolean(req.body?.includeTaxId);
     const dateRange = validateDateRange(req.body?.dateRange);
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
 
     if (!dateRange) {
       return res.status(400).json({ error: "Valid startDate and endDate are required." });
+    }
+
+    if (exportType === "pdf" && !hasFeatureAccess(subscription, "pdf_exports")) {
+      return res.status(402).json({ error: "PDF exports require an active InEx Ledger V1 plan." });
     }
 
     if (includeTaxId && exportType !== "pdf") {
@@ -168,6 +177,10 @@ router.get("/exports/history", async (req, res) => {
   try {
     const user = req.user;
     const businessId = user.business_id || (await resolveBusinessIdForUser(user));
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    if (!hasFeatureAccess(subscription, "pdf_exports")) {
+      return res.status(402).json({ error: "Export history requires an active InEx Ledger V1 plan." });
+    }
     const result = await pool.query(
       `SELECT e.id, e.start_date, e.end_date, e.created_at, e.export_type, e.include_tax_id,
               e.content_hash, e.file_path, m.language, m.currency, m.page_count
@@ -194,6 +207,10 @@ router.get("/exports/history/:id/redacted", async (req, res) => {
   try {
     const user = req.user;
     const businessId = user.business_id || (await resolveBusinessIdForUser(user));
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    if (!hasFeatureAccess(subscription, "pdf_exports")) {
+      return res.status(402).json({ error: "Export history requires an active InEx Ledger V1 plan." });
+    }
     const { id } = req.params;
     const { rows } = await pool.query(
       `SELECT file_path FROM exports WHERE id = $1 AND business_id = $2 LIMIT 1`,

@@ -126,20 +126,19 @@ function calculatePasswordScore(password) {
   let score = 0;
 
   if (password.length >= 8) score++;
-  if (/[A-Z]/.test(password)) score++;
-  if (/\d/.test(password)) score++;
-  if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) score++;
+  if (/[\d\W_]/.test(password)) score++;
+  if (password.length >= 12 && /[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
 
   return score;
 }
 
 function getStrengthLabel(score) {
-  if (score >= 4) {
+  if (score >= 3) {
     return "Strong";
   }
 
   if (score >= 2) {
-    return "Good";
+    return "Fair";
   }
 
   return "Weak";
@@ -147,29 +146,36 @@ function getStrengthLabel(score) {
 
 function updateStrengthMeter() {
   const passwordInput = form.querySelector("#password");
-  const strengthMeter = document.getElementById("passwordMeter");
+  const strengthSegments = Array.from(document.querySelectorAll(".meter-segment"));
   const strengthText = document.getElementById("passwordStrengthText");
 
-  if (!passwordInput || !strengthMeter || !strengthText) {
+  if (!passwordInput || !strengthSegments.length || !strengthText) {
     return;
   }
 
   const score = calculatePasswordScore(passwordInput.value);
   const label = getStrengthLabel(score);
-  let color = "#ef4444";
+  let color = "#b91c1c";
+  let segmentClass = "is-weak";
 
-  if (label === "Good") {
-    color = "#f97316";
+  if (label === "Fair") {
+    color = "#92600a";
+    segmentClass = "is-fair";
   } else if (label === "Strong") {
-    color = "#22c55e";
+    color = "#1a7a4a";
+    segmentClass = "is-strong";
   }
 
-  strengthMeter.style.width = `${score * 25}%`;
-  strengthMeter.style.backgroundColor = color;
+  strengthSegments.forEach((segment, index) => {
+    segment.classList.remove("is-weak", "is-fair", "is-strong");
+    if (index < score) {
+      segment.classList.add(segmentClass);
+    }
+  });
   const labelKey =
     label === "Strong"
       ? "register_strength_label_strong"
-      : label === "Good"
+      : label === "Fair"
       ? "register_strength_label_good"
       : "register_strength_label_weak";
   strengthText.textContent = t(labelKey);
@@ -213,8 +219,8 @@ function legacyPopulateLanguageOptions() {
     window.LUNA_LANGUAGE_LABELS ||
     {
       en: 'English',
-      es: 'EspaÃ±ol',
-      fr: 'FranÃ§ais'
+      es: 'Español',
+      fr: 'Français'
     };
   const languages =
     (window.LUNA_I18N && window.LUNA_I18N.LANGUAGES) ||

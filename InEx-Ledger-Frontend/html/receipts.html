@@ -1,125 +1,115 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>InEx Ledger — Receipts</title>
+  <title>InEx Ledger - Receipts</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<link rel="stylesheet" href="/css/app.css">
-<link rel="stylesheet" href="/css/pages/receipts.css">
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/pages/receipts.css" />
 </head>
-
 <body>
-  <header>
-    <h1>InEx Ledger</h1>
-    <nav>
-      <a data-i18n="nav_transactions" href="transactions.html">Transactions</a> |
-      <a data-i18n="nav_accounts" href="accounts.html">Accounts</a> |
-      <a data-i18n="nav_categories" href="categories.html">Categories</a> |
-      <a data-i18n="nav_receipts" href="receipts.html">Receipts</a> |
-      <a href="mileage.html">Mileage</a> |
-      <a data-i18n="nav_exports" href="exports.html">Exports</a> |
-      <a data-i18n="nav_settings" href="settings.html">Settings</a>
-    </nav>
-  </header>
-
   <div id="trialBanner" class="trial-banner"></div>
 
-  <main>
-    <div class="app-page receipts-page">
-      <section class="receipts-header-card">
-        <div class="receipts-header-text">
-          <h1 data-i18n="receipts_title">Receipts</h1>
-          <p data-i18n="receipts_description">
-            Receipts can be uploaded and attached to transactions.
-          </p>
+  <header class="app-topbar receipts-topbar">
+    <div class="topbar-left">
+      <a class="topbar-brand" href="transactions.html" aria-label="InEx Ledger home">
+        <span class="brand-mark brand-mark-topbar" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
+            <rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+            <rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+            <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".35"></rect>
+          </svg>
+        </span>
+        <span class="topbar-brand-text">InEx Ledger</span>
+      </a>
+      <nav class="topbar-nav" aria-label="Primary">
+        <a data-i18n="nav_transactions" href="transactions.html"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>Transactions</span></a>
+        <a data-i18n="nav_accounts" href="accounts.html"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg></span><span>Accounts</span></a>
+        <a data-i18n="nav_categories" href="categories.html"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg></span><span>Categories</span></a>
+        <a data-i18n="nav_receipts" class="is-active" href="receipts.html"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span>Receipts</span></a>
+        <a href="mileage.html"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span>Mileage</span></a>
+        <a data-i18n="nav_exports" href="exports.html"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Exports</span></a>
+        <a data-i18n="nav_settings" href="settings.html"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg></span><span>Settings</span></a>
+      </nav>
+    </div>
+    <div class="user-pill">
+      <span class="user-avatar">IL</span>
+      <span class="user-name">InEx Ledger</span>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <aside class="app-sidebar" aria-label="Sidebar">
+      <div class="sidebar-section-label">Overview</div>
+      <nav class="sidebar-nav">
+        <a href="transactions.html" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>All transactions</span></a>
+        <a href="transactions.html?type=income" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg></span><span>Income</span></a>
+        <a href="transactions.html?type=expense" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 5v6M5 8l3 3 3-3"></path></svg></span><span>Expenses</span></a>
+      </nav>
+      <div class="sidebar-section-label">Tools</div>
+      <nav class="sidebar-nav">
+        <a href="receipts.html" class="sidebar-link is-active"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span>Receipts</span><span id="receiptsDot" class="sidebar-dot" hidden></span></a>
+        <a href="mileage.html" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span>Mileage</span></a>
+        <a href="exports.html" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Exports</span></a>
+      </nav>
+    </aside>
+
+    <div class="app-content receipts-content">
+      <section class="receipts-page-header">
+        <div>
+          <h1 class="receipts-page-title">Receipts</h1>
+          <p class="receipts-page-subtitle">Upload and attach receipts to transactions.</p>
         </div>
-        <div class="receipts-header-actions">
-          <button
-            type="button"
-            class="btn-primary-pill"
-            id="openUploadReceiptModal"
-            data-i18n="receipts_button_upload"
-          >
-            Upload receipt
-          </button>
+        <div>
+          <input type="file" id="receiptUploadInput" class="hidden-upload-input" accept="image/*,.pdf" />
+          <button type="button" class="upload-btn" id="receiptUploadButton">Upload receipt</button>
         </div>
       </section>
 
-      <div id="receiptTierNotice" class="tier-notice" style="display:none;">
-        <p data-i18n="receipts_tier_notice_title">You need InEx Ledger V1 to upload receipts.</p>
-        <a href="subscription.html" data-i18n="receipts_tier_notice_cta">Upgrade now</a>
+      <div id="receiptTierNotice" class="receipt-tier-notice" hidden>
+        <p>You need InEx Ledger V1 to upload receipts.</p>
+        <a href="subscription.html">Upgrade now</a>
       </div>
 
-      <section class="receipts-history-card">
-        <h3 data-i18n="receipts_uploaded_title">Uploaded receipts</h3>
-        <p data-i18n="receipts_uploaded_blurb">
-          Uploaded receipts are listed here and can be attached to transactions.
-        </p>
-        <table>
+      <section class="receipts-card">
+        <div class="receipts-card-head">
+          <div>
+            <h2>Uploaded receipts</h2>
+            <p>Uploaded receipts are listed here and can be attached to transactions.</p>
+          </div>
+        </div>
+
+        <table class="receipts-table">
           <thead>
             <tr>
-              <th data-i18n="receipts_table_filename">Filename</th>
-              <th data-i18n="receipts_table_uploaded">Uploaded date</th>
-              <th data-i18n="receipts_table_attached">Attached to transaction</th>
+              <th style="width: 260px;">Filename</th>
+              <th style="width: 140px;">Uploaded date</th>
+              <th>Attached to transaction</th>
             </tr>
           </thead>
-          <tbody>
-            <!-- Receipts will be listed here -->
-          </tbody>
+          <tbody id="receiptsTableBody"></tbody>
         </table>
-        <div class="empty-receipts-state">
-          <h3 data-i18n="receipts_empty_title">No receipts yet</h3>
-          <p data-i18n="receipts_empty_body">
-            Upload a receipt and link it to a transaction.
-          </p>
+
+        <div id="receiptsEmptyState" class="receipts-empty-state">
+          <h3>No receipts yet</h3>
+          <p>Upload a receipt and link it to a transaction.</p>
         </div>
       </section>
     </div>
   </main>
 
-  <div class="modal upload-receipt-modal hidden" id="uploadReceiptModal">
-    <div class="modal-backdrop" data-modal-close></div>
-    <div class="modal-content receipt-modal-content">
-      <button type="button" class="modal-close" data-modal-close aria-label="Close">×</button>
-      <h2 data-i18n="receipts_button_upload">Upload Receipt</h2>
-      <form method="post" enctype="multipart/form-data">
-        <div class="upload-dropzone">
-          <p data-i18n="receipts_dropzone_message">Drag & drop receipt file or click to upload</p>
-          <input
-            type="file"
-            id="receipt-file"
-            name="receipt_file"
-            accept="image/*,application/pdf"
-            required
-          />
-        </div>
-        <div class="modal-form-section">
-          <label for="receipt-notes" data-i18n="receipts_label_notes">Notes (optional)</label>
-          <input
-            type="text"
-            id="receipt-notes"
-            name="receipt_notes"
-          />
-        </div>
-        <button
-          type="submit"
-          class="btn-primary-pill modal-upload-btn"
-          data-i18n="receipts_button_upload"
-        >
-          Upload receipt
-        </button>
-      </form>
-    </div>
+  <div id="receiptsToast" class="receipts-toast hidden" role="status" aria-live="polite">
+    <span class="toast-check" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="none"><polyline points="2 8 6 12 14 4"></polyline></svg>
+    </span>
+    <span id="receiptsToastMessage">Receipt uploaded</span>
   </div>
 
-  <footer>
-    <p>&copy; 2026 InEx Ledger</p>
-  </footer>
-<script src="../js/global.js"></script>
-<script src="../js/i18n.js"></script>
-<script src="../js/auth.js"></script>
-<script src="../js/trial.js"></script>
-<script src="../js/receipts.js"></script>
+  <script src="../js/global.js"></script>
+  <script src="../js/i18n.js"></script>
+  <script src="../js/auth.js"></script>
+  <script src="../js/trial.js"></script>
+  <script src="../js/receipts.js"></script>
 </body>
 </html>
-
