@@ -81,6 +81,53 @@ function clearSubscriptionState() {
   localStorage.removeItem(TRIAL_ENDS_AT_KEY);
 }
 
+function getUserDisplayName(profile = {}) {
+  const preferred = profile.display_name || profile.full_name || "";
+  if (preferred && String(preferred).trim()) {
+    return String(preferred).trim();
+  }
+
+  const email = String(profile.email || "").trim();
+  if (!email) {
+    return "User";
+  }
+
+  return email.split("@")[0] || "User";
+}
+
+function getUserInitials(profile = {}) {
+  const preferred = String(profile.display_name || profile.full_name || "").trim();
+  if (preferred) {
+    const parts = preferred.split(/\s+/).filter(Boolean);
+    const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase() || "").join("");
+    if (initials) {
+      return initials;
+    }
+  }
+
+  const email = String(profile.email || "").trim();
+  if (email) {
+    const local = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "");
+    return (local.slice(0, 2) || "U").toUpperCase();
+  }
+
+  return "U";
+}
+
+function updateAuthenticatedChrome(profile = {}) {
+  const displayName = getUserDisplayName(profile);
+  const initials = getUserInitials(profile);
+
+  document.querySelectorAll(".user-name").forEach((node) => {
+    node.textContent = displayName;
+  });
+
+  document.querySelectorAll(".user-avatar").forEach((node) => {
+    node.textContent = initials;
+    node.setAttribute("aria-label", `${displayName} initials`);
+  });
+}
+
 function getToken() {
   return localStorage.getItem(TOKEN_KEY) || "";
 }
@@ -157,6 +204,9 @@ async function requireValidSessionOrRedirect() {
       if (payload?.subscription) {
         applySubscriptionState(payload.subscription);
       }
+      if (payload) {
+        updateAuthenticatedChrome(payload);
+      }
       console.log("[AUTH] Session valid");
       window.__AUTH_GUARD_STATE__.running = false;
       window.__AUTH_GUARD_STATE__.lastError = null;
@@ -199,6 +249,9 @@ async function redirectIfAuthenticated() {
       const payload = await response.json().catch(() => null);
       if (payload?.subscription) {
         applySubscriptionState(payload.subscription);
+      }
+      if (payload) {
+        updateAuthenticatedChrome(payload);
       }
       window.location.href = "transactions.html";
     }

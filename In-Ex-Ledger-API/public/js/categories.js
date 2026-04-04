@@ -5,32 +5,71 @@ const CATEGORIES_TOAST_MS = 3000;
 const CATEGORY_TAX_OPTIONS = {
   US: {
     income: [
-      { value: "schedule_c_income", label: "Business income (Schedule C / T2125)" },
+      { value: "gross_receipts_sales", label: "Gross receipts or sales" },
+      { value: "returns_allowances", label: "Returns and allowances" },
+      { value: "other_business_income", label: "Other business income" },
       { value: "interest_income", label: "Interest income" },
+      { value: "refunds_credits", label: "Refunds and tax credits" },
       { value: "other_income", label: "Other income" }
     ],
     expense: [
-      { value: "advertising", label: "Advertising / marketing" },
+      { value: "advertising", label: "Advertising" },
+      { value: "car_truck", label: "Car and truck expenses" },
+      { value: "commissions_fees", label: "Commissions and fees" },
+      { value: "contract_labor", label: "Contract labor" },
+      { value: "depletion", label: "Depletion" },
+      { value: "depreciation_section179", label: "Depreciation and Section 179" },
+      { value: "employee_benefit_programs", label: "Employee benefit programs" },
+      { value: "insurance_other_than_health", label: "Insurance (other than health)" },
+      { value: "interest_mortgage", label: "Interest: mortgage" },
+      { value: "interest_other", label: "Interest: other" },
+      { value: "legal_professional", label: "Legal and professional services" },
       { value: "office_expense", label: "Office expense" },
-      { value: "software_tools", label: "Software / tools" },
-      { value: "travel_meals", label: "Travel / meals" },
-      { value: "vehicle_mileage", label: "Vehicle / mileage" },
-      { value: "professional_fees", label: "Professional fees" },
+      { value: "pension_profit_sharing", label: "Pension and profit-sharing plans" },
+      { value: "rent_lease_vehicles", label: "Rent or lease: vehicles, machinery, equipment" },
+      { value: "rent_lease_other", label: "Rent or lease: other business property" },
+      { value: "repairs_maintenance", label: "Repairs and maintenance" },
+      { value: "supplies", label: "Supplies" },
+      { value: "taxes_licenses", label: "Taxes and licenses" },
+      { value: "travel", label: "Travel" },
+      { value: "meals", label: "Meals" },
+      { value: "utilities", label: "Utilities" },
+      { value: "wages", label: "Wages" },
+      { value: "home_office", label: "Business use of home" },
+      { value: "bank_fees", label: "Bank and payment processing fees" },
+      { value: "software_subscriptions", label: "Software and subscriptions" },
       { value: "other_expense", label: "Other expense" }
     ]
   },
   CA: {
     income: [
-      { value: "t2125_income", label: "Business income (T2125)" },
+      { value: "sales", label: "Sales" },
+      { value: "commissions_fees", label: "Commissions and fees" },
       { value: "gst_hst_collected", label: "GST/HST/PST/QST collected" },
+      { value: "bad_debts_recovered", label: "Bad debts recovered" },
+      { value: "subsidies_grants", label: "Subsidies and grants" },
       { value: "other_income", label: "Other income" }
     ],
     expense: [
       { value: "advertising", label: "Advertising" },
-      { value: "office_expense", label: "Office expense" },
-      { value: "software_tools", label: "Software / tools" },
-      { value: "travel_meals", label: "Travel / meals" },
+      { value: "meals_entertainment", label: "Meals and entertainment" },
+      { value: "insurance", label: "Insurance" },
+      { value: "interest_bank_charges", label: "Interest and bank charges" },
+      { value: "business_tax_fees_licenses_memberships", label: "Business tax, fees, licenses, memberships" },
+      { value: "office_expense", label: "Office expenses" },
+      { value: "supplies", label: "Supplies" },
+      { value: "legal_accounting", label: "Legal, accounting, and professional fees" },
+      { value: "management_admin", label: "Management and administration fees" },
+      { value: "rent", label: "Rent" },
+      { value: "maintenance_repairs", label: "Maintenance and repairs" },
+      { value: "salaries_wages_benefits", label: "Salaries, wages, and benefits" },
+      { value: "property_taxes", label: "Property taxes" },
+      { value: "travel", label: "Travel" },
+      { value: "utilities", label: "Utilities" },
+      { value: "delivery_freight", label: "Delivery, freight, and express" },
       { value: "motor_vehicle", label: "Motor vehicle" },
+      { value: "capital_cost_allowance", label: "Capital cost allowance" },
+      { value: "home_office", label: "Business-use-of-home expenses" },
       { value: "professional_fees", label: "Professional fees" },
       { value: "gst_hst_paid", label: "GST/HST/PST/QST paid" },
       { value: "other_expense", label: "Other expense" }
@@ -202,7 +241,7 @@ function populateTaxLabelOptions(type) {
   }
 
   const region = getCurrentRegion();
-  const options = CATEGORY_TAX_OPTIONS[region]?.[type === "expense" ? "expense" : "income"] || [];
+  const options = region ? CATEGORY_TAX_OPTIONS[region]?.[type === "expense" ? "expense" : "income"] || [] : [];
   const previous = select.value;
   select.innerHTML = '<option value="">Select tax treatment</option>';
   options.forEach((option) => {
@@ -212,17 +251,25 @@ function populateTaxLabelOptions(type) {
     select.appendChild(node);
   });
   select.value = options.some((option) => option.value === previous) ? previous : "";
+  select.disabled = !region || options.length === 0;
 
   if (hint) {
-    hint.textContent = region === "CA"
-      ? "Choose the Canadian tax bucket this category maps to."
-      : "Choose the U.S. tax bucket this category maps to.";
+    if (region === "CA") {
+      hint.textContent = "Showing Canadian T2125 and sales-tax mappings only.";
+    } else if (region === "US") {
+      hint.textContent = "Showing U.S. Schedule C mappings only.";
+    } else {
+      hint.textContent = "Set your business region first so only the correct tax mappings are shown.";
+    }
   }
 }
 
 function getCurrentRegion() {
-  const raw = String(localStorage.getItem("lb_region") || window.LUNA_REGION || "us").toUpperCase();
-  return raw === "CA" ? "CA" : "US";
+  const raw = String(localStorage.getItem("lb_region") || window.LUNA_REGION || "").toUpperCase();
+  if (raw === "CA" || raw === "US") {
+    return raw;
+  }
+  return null;
 }
 
 async function loadBusinessRegion() {
@@ -244,7 +291,10 @@ async function loadBusinessRegion() {
 
 function formatTaxLabel(value) {
   const region = getCurrentRegion();
-  const groups = CATEGORY_TAX_OPTIONS[region] || CATEGORY_TAX_OPTIONS.US;
+  const groups = region ? CATEGORY_TAX_OPTIONS[region] : null;
+  if (!groups) {
+    return value;
+  }
   const options = [...groups.income, ...groups.expense];
   return options.find((option) => option.value === value)?.label || value;
 }
