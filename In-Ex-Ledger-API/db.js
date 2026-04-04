@@ -7,7 +7,7 @@ const { Pool } = pg;
 // Validate SSL configuration explicitly
 const isProduction = process.env.NODE_ENV === 'production';
 const sslConfig = isProduction
-  ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false' }
+  ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true' }
   : false;
 
 const pool = new Pool({
