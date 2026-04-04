@@ -285,7 +285,7 @@ router.post("/send-verification", async (req, res) => {
     const { token, expiresAt } = await createVerificationToken(email);
     const verificationLink = buildVerificationLink(req, token);
 
-        await getResend().emails.send({
+    await getResend().emails.send({
       from: "InEx Ledger <onboarding@resend.dev>",
       to: [email],
       subject: "Verify Your InEx Ledger Account",
