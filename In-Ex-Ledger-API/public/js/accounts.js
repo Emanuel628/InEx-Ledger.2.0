@@ -137,6 +137,7 @@ async function renderAccountList() {
     }
 
     const accounts = await response.json();
+    syncAccountsCache(accounts);
     if (!Array.isArray(accounts) || accounts.length === 0) {
       container.innerHTML = '<div class="accounts-empty">No accounts yet. Add one to get started.</div>';
       return;
@@ -181,6 +182,12 @@ async function deleteAccount(accountId) {
 
   showAccountsToast("Account deleted");
   await renderAccountList();
+}
+
+function syncAccountsCache(accounts) {
+  const normalized = Array.isArray(accounts) ? accounts : [];
+  localStorage.setItem("lb_accounts", JSON.stringify(normalized));
+  window.dispatchEvent(new CustomEvent("accountsUpdated", { detail: normalized }));
 }
 
 function formatAccountType(value) {

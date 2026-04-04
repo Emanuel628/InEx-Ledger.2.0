@@ -96,11 +96,16 @@
 
       <section id="tax-cockpit" class="tax-banner">
         <div class="tax-banner-main">
-          <div class="tax-banner-icon">PDF</div>
+          <div class="tax-banner-icon" aria-hidden="true">
+            <svg viewBox="0 0 16 16" fill="none">
+              <rect x="3" y="1" width="10" height="13" rx="1.5"></rect>
+              <path d="M6 5h4M6 8h4M6 11h3"></path>
+            </svg>
+          </div>
           <div class="tax-banner-copy">
-            <div class="tax-banner-label">Estimated tax owed (YTD)</div>
+            <div class="tax-banner-label" id="taxBannerLabel">Estimated tax owed (YTD)</div>
             <div class="tax-banner-amount" id="taxOwed">$0.00</div>
-            <p class="tax-banner-note">Based on net profit at 24% self-employment rate</p>
+            <p class="tax-banner-note" id="taxBannerNote">Based on net profit at 24% self-employment rate</p>
           </div>
         </div>
         <div class="tax-banner-side">

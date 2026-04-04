@@ -15,7 +15,23 @@ const transactionFilters = {
 
 const DRAWER_OPEN_LABEL = "+ Add new";
 const DRAWER_CLOSE_LABEL = "Close";
-const TAX_RATE = 0.24;
+const US_TAX_RATE = 0.24;
+const CANADA_TAX_RATES = {
+  AB: 0.05,
+  BC: 0.12,
+  MB: 0.12,
+  NB: 0.15,
+  NL: 0.15,
+  NS: 0.15,
+  NT: 0.05,
+  NU: 0.05,
+  ON: 0.13,
+  PE: 0.15,
+  QC: 0.14975,
+  SK: 0.11,
+  YT: 0.05
+};
+const DEFAULT_CA_RATE = 0.05;
 let transactionDrawerElement = null;
 let transactionToggleElement = null;
 let transactionPageToggleElement = null;
@@ -27,6 +43,11 @@ const SLOT_ANIMATION_KEY = "lb_transactions_slot_played";
 let slotAnimationPlayed = false;
 const missingAccountWarnings = new Set();
 const missingCategoryWarnings = new Set();
+let businessTaxProfile = {
+  region: "US",
+  province: "",
+  rate: US_TAX_RATE
+};
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
 function formatCurrency(value) {
@@ -43,27 +64,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     enforceTrial();
   }
 
-  if (typeof enforceTrial === "function") {
-    enforceTrial();
-  }
-
   if (typeof renderTrialBanner === "function") {
     renderTrialBanner("trialBanner");
   }
 
   setupTransactionDrawer();
   wireTransactionIntentButtons();
+  await loadBusinessTaxProfile();
 
   seedDefaultCategories();
   wireTransactionForm();
-  populateAccountsFromStorage();
+  await refreshAccountOptions();
   populateCategoriesFromStorage();
   loadTransactions();
   wireTransactionSearch();
   wireTransactionCategoryFilter();
   wireTransactionModal();
-  window.addEventListener("accountsUpdated", () => {
-    populateAccountsFromStorage();
+  window.addEventListener("accountsUpdated", async () => {
+    await refreshAccountOptions();
     renderTransactionsTable();
   });
 
@@ -184,7 +202,7 @@ function wireTransactionForm() {
       markAccountAsUsed(accountId);
       ledgerState.transactions = transactions;
 
-      populateAccountsFromStorage();
+      populateAccountsFromStorage(getAccounts());
       populateCategoriesFromStorage();
       applyFilters();
       renderTotals();
@@ -284,7 +302,7 @@ function loadTransactions() {
 }
 
 function renderAccountOptions() {
-  populateAccountsFromStorage();
+  populateAccountsFromStorage(getAccounts());
   updateHelpText(
     document.getElementById("accountHelp"),
     document.getElementById("categoryHelp")
@@ -497,11 +515,14 @@ function getAccountName(accountId) {
   return match?.name || "";
 }
 
-function populateAccountsFromStorage() {
+function renderStoredAccountOptions() {
+  populateAccountsFromStorage(getAccounts());
+}
+
+function populateAccountsFromStorage(accounts = []) {
   const select = document.getElementById("txAccount") || document.getElementById("account");
   if (!select) return;
 
-  const accounts = JSON.parse(localStorage.getItem(STORAGE_KEYS.accounts) || "[]");
   select.innerHTML = '<option value="">Select account</option>';
   accounts.forEach((account) => {
     const option = document.createElement("option");
@@ -511,6 +532,37 @@ function populateAccountsFromStorage() {
   });
 
   select.disabled = accounts.length === 0;
+}
+
+async function refreshAccountOptions() {
+  const accounts = await fetchAccountsForTransactions();
+  populateAccountsFromStorage(accounts);
+  updateHelpText(
+    document.getElementById("accountHelp"),
+    document.getElementById("categoryHelp")
+  );
+}
+
+async function fetchAccountsForTransactions() {
+  const fallback = getAccounts();
+
+  try {
+    const response = await apiFetch("/api/accounts");
+    if (!response || !response.ok) {
+      return fallback;
+    }
+
+    const accounts = await response.json();
+    if (!Array.isArray(accounts)) {
+      return fallback;
+    }
+
+    localStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(accounts));
+    return accounts;
+  } catch (error) {
+    console.warn("[Transactions] Unable to refresh accounts", error);
+    return fallback;
+  }
 }
 
 function formatAccountType(type) {
@@ -708,6 +760,8 @@ function renderTotals() {
   const netLabel = document.getElementById("netProfitYTD");
   const taxLabel = document.getElementById("taxOwed");
   const setAsideLabel = document.getElementById("monthlySetAside");
+  const taxBannerLabel = document.getElementById("taxBannerLabel");
+  const taxBannerNote = document.getElementById("taxBannerNote");
   const incomeDelta = document.getElementById("incomeDelta");
   const expensesDelta = document.getElementById("expensesDelta");
   const transactionCountValue = document.getElementById("transactionCountValue");
@@ -744,13 +798,19 @@ function renderTotals() {
   const hasTransactions = transactionsCount > 0;
   if (tier !== "free" && taxLabel && setAsideLabel) {
     const taxableIncome = Math.max(0, totals.income - totals.expenses);
-    const estimatedTax = taxableIncome * TAX_RATE;
+    const estimatedTax = taxableIncome * businessTaxProfile.rate;
     const monthlySetAside = estimatedTax / 12;
     taxLabel.textContent = formatCurrency(estimatedTax);
     setAsideLabel.textContent = formatCurrency(monthlySetAside);
   } else if (taxLabel && setAsideLabel) {
     taxLabel.textContent = formatCurrency(0);
     setAsideLabel.textContent = formatCurrency(0);
+  }
+  if (taxBannerLabel) {
+    taxBannerLabel.textContent = `Estimated tax owed (${getAppliedTaxLabel()})`;
+  }
+  if (taxBannerNote) {
+    taxBannerNote.textContent = getAppliedTaxNote();
   }
   if (cockpit) {
     cockpit.style.display = tier === "free" || !hasTransactions ? "none" : "flex";
@@ -777,6 +837,52 @@ function calculateTotals() {
   });
 
   return { income, expenses };
+}
+
+async function loadBusinessTaxProfile() {
+  const fallbackRegion = String(localStorage.getItem("lb_region") || window.LUNA_REGION || "us").toUpperCase();
+  businessTaxProfile = {
+    region: fallbackRegion === "CA" ? "CA" : "US",
+    province: "",
+    rate: fallbackRegion === "CA" ? DEFAULT_CA_RATE : US_TAX_RATE
+  };
+
+  try {
+    const response = await apiFetch("/api/business");
+    if (!response || !response.ok) {
+      return;
+    }
+
+    const business = await response.json();
+    const region = String(business?.region || business?.country || businessTaxProfile.region || "US").toUpperCase();
+    const province = String(business?.province || "").toUpperCase();
+    const isCanada = region === "CA";
+    businessTaxProfile = {
+      region: isCanada ? "CA" : "US",
+      province,
+      rate: isCanada ? (CANADA_TAX_RATES[province] || DEFAULT_CA_RATE) : US_TAX_RATE
+    };
+    localStorage.setItem("lb_region", businessTaxProfile.region.toLowerCase());
+  } catch (error) {
+    console.warn("[Transactions] Unable to load business tax profile", error);
+  }
+}
+
+function getAppliedTaxLabel() {
+  if (businessTaxProfile.region === "CA") {
+    const province = businessTaxProfile.province || "CA";
+    const decimals = province === "QC" ? 3 : 0;
+    return `${province} ${(businessTaxProfile.rate * 100).toFixed(decimals)}%`;
+  }
+  return `US ${(businessTaxProfile.rate * 100).toFixed(0)}%`;
+}
+
+function getAppliedTaxNote() {
+  if (businessTaxProfile.region === "CA") {
+    const province = businessTaxProfile.province || "your province";
+    return `Based on net profit using the ${province} estimated combined GST/HST/PST/QST rate.`;
+  }
+  return "Based on net profit at 24% self-employment rate";
 }
 
 function formatDisplayDate(value) {

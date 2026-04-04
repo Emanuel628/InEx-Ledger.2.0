@@ -7,6 +7,13 @@ const SETTINGS_DEFAULT_THEME = typeof DEFAULT_THEME !== "undefined" ? DEFAULT_TH
 const SETTINGS_THEME_VERSION = typeof THEME_VERSION !== "undefined" ? THEME_VERSION : "2";
 const BUSINESS_PROFILE_KEY = "lb_business_profile";
 const SETTINGS_TOAST_MS = 3000;
+const SETTINGS_DELETE_DATA_KEYS = [
+  "lb_transactions",
+  "lb_receipts",
+  "lb_mileage",
+  "lb_export_history",
+  "lb_transactions_upsell_hidden"
+];
 const SETTINGS_PASSWORD_RULES = {
   length: (value) => value.length >= 8,
   number: (value) => /\d/.test(value),
@@ -29,6 +36,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
+  initSettingsNav();
   wireSignOutButtons();
   initBusinessProfileForm();
   await initPreferences();
@@ -211,9 +219,9 @@ function initSecurityForm() {
     const score = getPasswordScore(password);
     const label = getStrengthLabel(score);
     let color = "#b91c1c";
-    if (label === "Good") color = "#92600a";
+    if (label === "Fair") color = "#92600a";
     if (label === "Strong") color = "#1a7a4a";
-    strengthMeter.style.width = `${score * 25}%`;
+    strengthMeter.style.width = getStrengthWidth(score);
     strengthMeter.style.backgroundColor = color;
     strengthText.textContent = `${label} password`;
     strengthText.style.color = color;
@@ -278,19 +286,71 @@ function initSecurityForm() {
   updateSubmitState();
 }
 
+function initSettingsNav() {
+  const navButtons = Array.from(document.querySelectorAll("[data-settings-target]"));
+  if (!navButtons.length) {
+    return;
+  }
+
+  const targets = navButtons
+    .map((button) => ({
+      button,
+      target: document.getElementById(button.dataset.settingsTarget || "")
+    }))
+    .filter((entry) => entry.target);
+
+  const setActiveTarget = (targetId) => {
+    navButtons.forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.settingsTarget === targetId);
+    });
+  };
+
+  targets.forEach(({ button, target }) => {
+    button.addEventListener("click", () => {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      setActiveTarget(target.id);
+    });
+  });
+
+  if ("IntersectionObserver" in window) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible?.target?.id) {
+          setActiveTarget(visible.target.id);
+        }
+      },
+      {
+        rootMargin: "-20% 0px -55% 0px",
+        threshold: [0.2, 0.4, 0.6]
+      }
+    );
+
+    targets.forEach(({ target }) => observer.observe(target));
+  }
+}
+
 function getPasswordScore(password) {
   let score = 0;
   if (password.length >= 8) score++;
-  if (/[A-Z]/.test(password)) score++;
-  if (/\d/.test(password)) score++;
-  if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) score++;
+  if (/[\d\W_]/.test(password)) score++;
+  if (password.length >= 12 && /[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
   return score;
 }
 
 function getStrengthLabel(score) {
-  if (score >= 4) return "Strong";
-  if (score >= 2) return "Good";
+  if (score >= 3) return "Strong";
+  if (score >= 2) return "Fair";
   return "Weak";
+}
+
+function getStrengthWidth(score) {
+  if (score >= 3) return "100%";
+  if (score >= 2) return "66.6667%";
+  if (score >= 1) return "33.3333%";
+  return "0%";
 }
 
 function initDangerZone() {
@@ -340,7 +400,7 @@ function initDangerZone() {
 
   confirmButton?.addEventListener("click", () => {
     if (dangerAction === "delete_data") {
-      ["lb_transactions", "lb_accounts", "lb_categories", "lb_transactions_upsell_hidden"].forEach((key) => localStorage.removeItem(key));
+      SETTINGS_DELETE_DATA_KEYS.forEach((key) => localStorage.removeItem(key));
       showSettingsToast("Business data deleted");
     } else if (dangerAction === "delete_account") {
       clearToken();

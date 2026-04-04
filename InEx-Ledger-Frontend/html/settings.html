@@ -45,14 +45,14 @@
       <div class="settings-sidebar-card">
         <div class="sidebar-section-label">Account</div>
         <nav class="settings-nav">
-          <button class="settings-nav-item is-active" type="button" onclick="document.getElementById('settings-business').scrollIntoView({behavior:'smooth'})">Business profile</button>
-          <button class="settings-nav-item" type="button" onclick="document.getElementById('settings-security').scrollIntoView({behavior:'smooth'})">Security</button>
+          <button class="settings-nav-item is-active" type="button" data-settings-target="settings-business">Business profile</button>
+          <button class="settings-nav-item" type="button" data-settings-target="settings-security">Security</button>
         </nav>
         <div class="sidebar-section-label">Preferences</div>
         <nav class="settings-nav">
-          <button class="settings-nav-item" type="button" onclick="document.getElementById('settings-preferences').scrollIntoView({behavior:'smooth'})">Language &amp; region</button>
-          <button class="settings-nav-item" type="button" onclick="document.getElementById('settings-appearance').scrollIntoView({behavior:'smooth'})">Appearance</button>
-          <button class="settings-nav-item" type="button" onclick="document.getElementById('settings-privacy').scrollIntoView({behavior:'smooth'})">Privacy</button>
+          <button class="settings-nav-item" type="button" data-settings-target="settings-preferences">Language &amp; region</button>
+          <button class="settings-nav-item" type="button" data-settings-target="settings-appearance">Appearance</button>
+          <button class="settings-nav-item" type="button" data-settings-target="settings-privacy">Privacy</button>
         </nav>
       </div>
     </aside>

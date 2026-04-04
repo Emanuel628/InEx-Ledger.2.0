@@ -2,6 +2,42 @@
 const TRANSACTIONS_STORAGE_KEY = "lb_transactions";
 const CATEGORIES_TOAST_MS = 3000;
 
+const CATEGORY_TAX_OPTIONS = {
+  US: {
+    income: [
+      { value: "schedule_c_income", label: "Business income (Schedule C / T2125)" },
+      { value: "interest_income", label: "Interest income" },
+      { value: "other_income", label: "Other income" }
+    ],
+    expense: [
+      { value: "advertising", label: "Advertising / marketing" },
+      { value: "office_expense", label: "Office expense" },
+      { value: "software_tools", label: "Software / tools" },
+      { value: "travel_meals", label: "Travel / meals" },
+      { value: "vehicle_mileage", label: "Vehicle / mileage" },
+      { value: "professional_fees", label: "Professional fees" },
+      { value: "other_expense", label: "Other expense" }
+    ]
+  },
+  CA: {
+    income: [
+      { value: "t2125_income", label: "Business income (T2125)" },
+      { value: "gst_hst_collected", label: "GST/HST/PST/QST collected" },
+      { value: "other_income", label: "Other income" }
+    ],
+    expense: [
+      { value: "advertising", label: "Advertising" },
+      { value: "office_expense", label: "Office expense" },
+      { value: "software_tools", label: "Software / tools" },
+      { value: "travel_meals", label: "Travel / meals" },
+      { value: "motor_vehicle", label: "Motor vehicle" },
+      { value: "professional_fees", label: "Professional fees" },
+      { value: "gst_hst_paid", label: "GST/HST/PST/QST paid" },
+      { value: "other_expense", label: "Other expense" }
+    ]
+  }
+};
+
 let categoriesToastTimer = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -9,6 +45,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
+  await loadBusinessRegion();
   ensureDefaultCategories();
   wireCategoryModal();
   renderCategoryLists();
@@ -22,10 +59,18 @@ function wireCategoryModal() {
   const backdrop = modal?.querySelector("[data-modal-close]");
   const form = document.getElementById("categoryForm");
   const colorInput = document.getElementById("category-color");
+  const typeSelect = document.getElementById("category-type");
+  const taxLabelSelect = document.getElementById("category-tax-label");
 
-  openButton?.addEventListener("click", () => modal?.classList.remove("hidden"));
+  openButton?.addEventListener("click", () => {
+    populateTaxLabelOptions(typeSelect?.value || "income");
+    modal?.classList.remove("hidden");
+  });
   cancelButton?.addEventListener("click", () => closeCategoryModal());
   backdrop?.addEventListener("click", () => closeCategoryModal());
+  typeSelect?.addEventListener("change", () => populateTaxLabelOptions(typeSelect.value));
+
+  populateTaxLabelOptions(typeSelect?.value || "income");
 
   document.querySelectorAll(".color-swatch").forEach((button) => {
     button.addEventListener("click", () => {
@@ -40,8 +85,9 @@ function wireCategoryModal() {
   form?.addEventListener("submit", (event) => {
     event.preventDefault();
     const name = document.getElementById("category-name")?.value.trim() || "";
-    const type = document.getElementById("category-type")?.value || "income";
+    const type = typeSelect?.value || "income";
     const color = colorInput?.value || "blue";
+    const taxLabel = taxLabelSelect?.value || "";
     const message = document.getElementById("categoryFormMessage");
 
     if (!name) {
@@ -56,7 +102,8 @@ function wireCategoryModal() {
       id: `cat_${type}_${slugify(name)}_${Date.now()}`,
       name,
       type,
-      color
+      color,
+      taxLabel
     });
     saveCategories(categories);
     window.dispatchEvent(new Event("categoriesUpdated"));
@@ -76,6 +123,7 @@ function closeCategoryModal() {
     message.textContent = "";
   }
   document.getElementById("category-color").value = "blue";
+  populateTaxLabelOptions("income");
   document.querySelectorAll(".color-swatch").forEach((item) => item.classList.remove("is-active"));
   document.querySelector('.color-swatch[data-color="blue"]')?.classList.add("is-active");
 }
@@ -96,6 +144,7 @@ function renderCategoryGroup(containerId, type, emptyText) {
     container.innerHTML = `<div class="category-empty"><p>${emptyText}</p><button type="button" class="empty-add-btn" data-empty-add="${type}">+ Add ${type} category</button></div>`;
     container.querySelector("[data-empty-add]")?.addEventListener("click", () => {
       document.getElementById("category-type").value = type;
+      populateTaxLabelOptions(type);
       document.getElementById("showCategoryModal")?.click();
     });
     return;
@@ -103,7 +152,10 @@ function renderCategoryGroup(containerId, type, emptyText) {
 
   container.innerHTML = categories.map((category) => `
     <div class="category-item">
-      <span class="category-pill pill-${escapeHtml(category.color || defaultColorForType(type))}">${escapeHtml(category.name)}</span>
+      <div>
+        <span class="category-pill pill-${escapeHtml(category.color || defaultColorForType(type))}">${escapeHtml(category.name)}</span>
+        ${category.taxLabel ? `<div class="field-hint">${escapeHtml(formatTaxLabel(category.taxLabel))}</div>` : ""}
+      </div>
       <button type="button" class="category-delete" data-category-delete="${escapeHtml(category.id)}">Delete</button>
     </div>
   `).join("");
@@ -140,6 +192,61 @@ function ensureDefaultCategories() {
   (defaults.income || []).forEach((name) => seeded.push({ id: `cat_income_${slugify(name)}`, name, type: "income", color: "green" }));
   (defaults.expense || []).forEach((name) => seeded.push({ id: `cat_expense_${slugify(name)}`, name, type: "expense", color: "blue" }));
   saveCategories(seeded);
+}
+
+function populateTaxLabelOptions(type) {
+  const select = document.getElementById("category-tax-label");
+  const hint = document.getElementById("categoryTaxHint");
+  if (!select) {
+    return;
+  }
+
+  const region = getCurrentRegion();
+  const options = CATEGORY_TAX_OPTIONS[region]?.[type === "expense" ? "expense" : "income"] || [];
+  const previous = select.value;
+  select.innerHTML = '<option value="">Select tax treatment</option>';
+  options.forEach((option) => {
+    const node = document.createElement("option");
+    node.value = option.value;
+    node.textContent = option.label;
+    select.appendChild(node);
+  });
+  select.value = options.some((option) => option.value === previous) ? previous : "";
+
+  if (hint) {
+    hint.textContent = region === "CA"
+      ? "Choose the Canadian tax bucket this category maps to."
+      : "Choose the U.S. tax bucket this category maps to.";
+  }
+}
+
+function getCurrentRegion() {
+  const raw = String(localStorage.getItem("lb_region") || window.LUNA_REGION || "us").toUpperCase();
+  return raw === "CA" ? "CA" : "US";
+}
+
+async function loadBusinessRegion() {
+  try {
+    const response = await apiFetch("/api/business");
+    if (!response || !response.ok) {
+      return;
+    }
+    const business = await response.json();
+    const region = String(business?.region || "").toUpperCase();
+    if (region === "CA" || region === "US") {
+      localStorage.setItem("lb_region", region.toLowerCase());
+      window.LUNA_REGION = region.toLowerCase();
+    }
+  } catch (error) {
+    console.warn("[Categories] Unable to load business region", error);
+  }
+}
+
+function formatTaxLabel(value) {
+  const region = getCurrentRegion();
+  const groups = CATEGORY_TAX_OPTIONS[region] || CATEGORY_TAX_OPTIONS.US;
+  const options = [...groups.income, ...groups.expense];
+  return options.find((option) => option.value === value)?.label || value;
 }
 
 function getCategories() {
