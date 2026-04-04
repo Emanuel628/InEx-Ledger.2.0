@@ -69,7 +69,7 @@ async function callWorker(job) {
   }
 }
 
-export async function dispatchPdfJob(job) {
+async function dispatchPdfJob(job) {
   if (WORKER_BASE_URL && WORKER_SECRET) {
     try {
       return await callWorker(job);
@@ -83,3 +83,5 @@ export async function dispatchPdfJob(job) {
 }
 
 
+
+module.exports = { dispatchPdfJob };

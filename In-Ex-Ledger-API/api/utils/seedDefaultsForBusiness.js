@@ -1,5 +1,5 @@
-import crypto from "node:crypto";
-import pool from "../../db.js";
+const crypto = require("crypto");
+const { pool } = require("../../db.js");
 
 const defaultAccounts = [
   { name: "Checking", type: "asset" },
@@ -16,7 +16,7 @@ const defaultCategories = [
   { name: "Travel", kind: "expense" },
 ];
 
-export async function seedDefaultsForBusiness(db = pool, businessId) {
+async function seedDefaultsForBusiness(db = pool, businessId) {
   if (!businessId) {
     throw new Error("seedDefaultsForBusiness requires a businessId");
   }
@@ -43,3 +43,5 @@ export async function seedDefaultsForBusiness(db = pool, businessId) {
     );
   }
 }
+
+module.exports = { seedDefaultsForBusiness };
