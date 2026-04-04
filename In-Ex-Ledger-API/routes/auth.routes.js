@@ -16,12 +16,18 @@ const router = express.Router();
 /* =========================================================
    1. EMAIL API CONFIGURATION (Replaces SMTP)
    ========================================================= */
-// 2. CHANGE: Initialize Resend with your API Key
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// 3. CHANGE: We no longer need transporter.verify() because
-// API connections don't "stay open" like SMTP.
-console.log("?? Resend Email Engine Initialized");
+// Lazy init — avoids crash at startup when RESEND_API_KEY is not set
+let _resend = null;
+function getResend() {
+  if (!_resend) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is not configured");
+    }
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+}
+console.log("Email engine ready (Resend)");
 
 
 /* =========================================================
@@ -239,7 +245,7 @@ router.post("/register", authLimiter, async (req, res) => {
       const { token } = await createVerificationToken(email);
       const verificationLink = buildVerificationLink(req, token);
 
-      await resend.emails.send({
+      await getResend().emails.send({
         from: "InEx Ledger <onboarding@resend.dev>",
         to: [email],
         subject: "Verify Your InEx Ledger Account",
@@ -276,10 +282,10 @@ router.post("/send-verification", async (req, res) => {
     if (!user) return res.status(404).json({ error: "User not found" });
     if (user.email_verified) return res.status(200).json({ message: "Email already verified" });
 
-    const { token, expiresAt } = createVerificationToken(email);
+    const { token, expiresAt } = await createVerificationToken(email);
     const verificationLink = buildVerificationLink(req, token);
 
-        await resend.emails.send({
+        await getResend().emails.send({
       from: "InEx Ledger <onboarding@resend.dev>",
       to: [email],
       subject: "Verify Your InEx Ledger Account",
@@ -464,10 +470,10 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
   try {
     const userResult = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
     if (userResult.rowCount > 0) {
-      const { token } = createPasswordResetToken(email);
+      const { token } = await createPasswordResetToken(email);
       const resetLink = buildPasswordResetLink(req, token);
 
-      await resend.emails.send({
+      await getResend().emails.send({
         from: "InEx Ledger <onboarding@resend.dev>",
         to: [email],
         subject: "Password Reset Request",
@@ -544,7 +550,7 @@ router.post("/request-email-change", requireAuth, authLimiter, async (req, res) 
     );
 
     const confirmLink = `${req.protocol}://${req.get("host")}/api/auth/confirm-email-change?token=${token}`;
-    await resend.emails.send({
+    await getResend().emails.send({
       from: "InEx Ledger <onboarding@resend.dev>",
       to: [email],
       subject: "Confirm your new email address",
