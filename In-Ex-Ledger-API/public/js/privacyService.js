@@ -6,7 +6,7 @@
     "lb_recurring"
   ];
   let apiReady;
-  const API_BASE = "";
+  const API_BASE = " ";
   const buildApiUrl = (path) => {
     if (typeof path !== "string") return API_BASE;
     return path.startsWith("/") ? `${API_BASE}${path}` : `${API_BASE}/${path}`;

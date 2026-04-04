@@ -30,15 +30,6 @@ document.addEventListener("DOMContentLoaded", () => {
   form.addEventListener("submit", handleRegisterSubmit);
   wireShowPasswordToggle(document);
 
-  // Show PIPEDA consent checkbox for Canadian users
-  const region = localStorage.getItem("lb_region");
-  if (region && region.toLowerCase() === "ca") {
-    const pipedaField = document.getElementById("pipedaConsentField");
-    const pipedaInput = document.getElementById("pipedaConsent");
-    if (pipedaField) pipedaField.removeAttribute("hidden");
-    if (pipedaInput) pipedaInput.required = true;
-  }
-
   const passwordInput = form.querySelector("#password");
   const confirmInput = form.querySelector("#confirm-password");
 
@@ -86,30 +77,8 @@ async function handleRegisterSubmit(event) {
       showRegisterError(mapAuthError(regResponse.status, regBody));
       return;
     }
-
-    const loginResponse = await fetch(buildApiUrl("/api/auth/login"), {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
-
-    const loginBody = await loginResponse.json().catch(() => null);
-
-    if (!loginResponse.ok) {
-      showRegisterError("Account created, but automatic login failed. Please sign in.");
-      window.location.href = "login.html";
-      return;
-    }
-
-    if (!loginBody?.token) {
-      showRegisterError("Account created, but no session was returned. Please sign in.");
-      window.location.href = "login.html";
-      return;
-    }
-
-    setToken(loginBody.token);
-    window.location.href = "transactions.html";
+    localStorage.setItem("pendingVerificationEmail", email);
+    window.location.href = "verify-email.html?email=sent";
   } catch (err) {
     console.error("Register request failed:", err);
     showRegisterError(OFFLINE_ERROR_MESSAGE);

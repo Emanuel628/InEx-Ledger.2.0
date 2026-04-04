@@ -37,8 +37,6 @@ const SECURITY_REQUIREMENT_RULES = {
 };
 
 let securityState = {};
-const API_BASE = "";
-const DELETE_CONFIRM_TEXT = "delete my account";
 console.log("Settings JS loaded");
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
@@ -48,20 +46,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   const signOutBtn = document.querySelector("[data-logout]");
 console.log("Sign out button found:", signOutBtn);
 
-if (signOutBtn) {
-  signOutBtn.addEventListener("click", () => {
-    console.log("Sign out clicked");
+  if (signOutBtn) {
+    signOutBtn.addEventListener("click", () => {
+      console.log("Sign out clicked");
 
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("lb_token");
-    localStorage.removeItem("lb_user");
-    clearToken();
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("lb_token");
+      localStorage.removeItem("lb_user");
 
-    sessionStorage.clear();
+      sessionStorage.clear();
 
-    window.location.href = "login.html";
-  });
-}
+      clearToken();
+
+      window.location.href = "login.html";
+    });
+  }
   
   const regionSelect = document.getElementById("regionSelectSettings");
   const languageSelect = document.getElementById("languageSelectSettings");
@@ -71,7 +70,6 @@ if (signOutBtn) {
   const saveBar = document.getElementById("settingsSaveBar");
   const saveButton = document.getElementById("globalSaveBtn");
   const downloadBtn = document.getElementById("downloadMyDataBtn");
-  const deleteBtn = document.getElementById("deleteMyDataBtn");
   const consentStatus = document.getElementById("consentStatus");
 
   saveBarElement = saveBar;
@@ -108,10 +106,6 @@ if (signOutBtn) {
     darkModeToggle.addEventListener("change", (event) => {
       const nextTheme = event.target.checked ? "dark" : "light";
       document.documentElement.setAttribute("data-theme", nextTheme);
-      document.body.classList.remove("dark", "light");
-      document.body.classList.add(nextTheme);
-      localStorage.setItem("lb_theme", nextTheme);
-      localStorage.setItem("lb_theme_version", THEME_VERSION);
       markDirty();
     });
   }
@@ -121,7 +115,7 @@ if (signOutBtn) {
     unitToggle.addEventListener("change", markDirty);
   }
 
-  await initPrivacyControls(optOutToggle, consentStatus, downloadBtn, deleteBtn);
+  await initPrivacyControls(optOutToggle, consentStatus, downloadBtn);
 
   if (optOutToggle) {
     optOutToggle.addEventListener("change", markDirty);
@@ -140,7 +134,6 @@ if (signOutBtn) {
   }
 
   wireSecuritySection();
-  wireAccountDeletion();
 });
 
 async function handleSave({
@@ -211,8 +204,7 @@ function clearDirty() {
 async function initPrivacyControls(
   optOutToggle,
   consentStatus,
-  downloadBtn,
-  deleteBtn
+  downloadBtn
 ) {
   let settings = {
     dataSharingOptOut: false,
@@ -256,22 +248,6 @@ async function initPrivacyControls(
     });
   }
 
-  if (deleteBtn) {
-    deleteBtn.addEventListener("click", async () => {
-      const confirmed = window.confirm(t("settings_delete_confirmation"));
-      if (!confirmed) {
-        return;
-      }
-
-      if (
-        typeof privacyService === "object" &&
-        typeof privacyService.deleteBusinessData === "function"
-      ) {
-        await privacyService.deleteBusinessData();
-        window.alert(t("settings_delete_success"));
-      }
-    });
-  }
 }
 
 async function syncPrivacySettings(optOutValue) {
@@ -338,72 +314,6 @@ function getStrengthLabel(score) {
   }
 
   return "Weak";
-}
-
-function wireAccountDeletion() {
-  const trigger = document.getElementById("deleteAccountTrigger");
-  const confirmSection = document.getElementById("deleteAccountConfirm");
-  const confirmInput = document.getElementById("deleteAccountConfirmInput");
-  const confirmBtn = document.getElementById("deleteAccountConfirmBtn");
-  const cancelBtn = document.getElementById("deleteAccountCancelBtn");
-  const status = document.getElementById("deleteAccountStatus");
-
-  const resetSection = () => {
-    if (confirmSection) {
-      confirmSection.setAttribute("hidden", "");
-    }
-    if (confirmInput) {
-      confirmInput.value = "";
-    }
-    if (status) {
-      status.textContent = "";
-    }
-    if (confirmBtn) {
-      confirmBtn.disabled = false;
-    }
-  };
-
-  trigger?.addEventListener("click", () => {
-    confirmSection?.removeAttribute("hidden");
-  });
-
-  cancelBtn?.addEventListener("click", resetSection);
-
-  confirmBtn?.addEventListener("click", async () => {
-    if (!confirmInput || !confirmBtn) return;
-    if (confirmInput.value.trim().toLowerCase() !== DELETE_CONFIRM_TEXT) {
-      status.textContent = `Type “${DELETE_CONFIRM_TEXT}” to confirm.`;
-      return;
-    }
-
-      confirmBtn.disabled = true;
-      try {
-        const response = await apiFetch("/api/me", {
-          method: "DELETE"
-        });
-
-        if (!response) {
-          status.textContent = "Unable to delete account.";
-          confirmBtn.disabled = false;
-          return;
-        }
-
-        if (!response.ok) {
-          const error = await response.json().catch(() => null);
-          status.textContent = error?.error || "Unable to delete account.";
-          confirmBtn.disabled = false;
-          return;
-        }
-
-        clearToken();
-        sessionStorage.clear();
-        window.location.href = "/html/login.html";
-      } catch (err) {
-        console.error("Account deletion failed:", err);
-        status.textContent = "Unable to delete account.";
-        confirmBtn.disabled = false;
-      }
-  });
 }
 
 function wireSecuritySection() {

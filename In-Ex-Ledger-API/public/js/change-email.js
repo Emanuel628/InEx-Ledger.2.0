@@ -2,70 +2,70 @@
    Change Email Page JS
    ========================================================= */
 
+// Change Email is a protected page
 requireAuth();
+
+/* -------------------------
+   Page boot
+   ------------------------- */
 
 init();
 
 function init() {
+  console.log("Change email page loaded.");
+
   wireForm();
 }
 
+/* -------------------------
+   Form handling (preliminary)
+   ------------------------- */
+
 function wireForm() {
   const form = document.querySelector("form");
-  if (!form) return;
-  form.addEventListener("submit", async (e) => {
+
+  if (!form) {
+    console.warn("Change email form not found.");
+    return;
+  }
+
+  form.addEventListener("submit", (e) => {
     e.preventDefault();
-    await handleChangeEmail(form);
+    handleChangeEmail();
   });
 }
 
-async function handleChangeEmail(form) {
-  const emailInput = form.querySelector('input[type="email"]');
-  const passwordInput = form.querySelector('input[type="password"]');
-  const messageEl = form.querySelector(".form-message") || document.getElementById("changeEmailMessage");
+/* -------------------------
+   Behavior (preliminary)
+   ------------------------- */
 
-  const newEmail = emailInput ? emailInput.value.trim() : "";
-  const currentPassword = passwordInput ? passwordInput.value : "";
+function handleChangeEmail() {
+  const emailInput = document.querySelector('input[type="email"]');
 
-  if (!newEmail || !isValidEmail(newEmail)) {
-    showMessage(messageEl, "Please enter a valid email address.", "error");
-    return;
-  }
-  if (!currentPassword) {
-    showMessage(messageEl, "Please enter your current password.", "error");
+  const email = emailInput ? emailInput.value.trim() : "";
+
+  if (!email) {
+    alert("Please enter a new email address.");
     return;
   }
 
-  const submitBtn = form.querySelector('button[type="submit"]');
-  if (submitBtn) submitBtn.disabled = true;
-
-  try {
-    const response = await apiFetch("/api/auth/request-email-change", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ newEmail, currentPassword })
-    });
-
-    if (!response) return;
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => null);
-      showMessage(messageEl, err?.error || "Failed to request email change.", "error");
-      return;
-    }
-
-    showMessage(messageEl, "Check your new email address for a confirmation link.", "success");
-    form.reset();
-  } finally {
-    if (submitBtn) submitBtn.disabled = false;
+  if (!isValidEmail(email)) {
+    alert("Please enter a valid email address.");
+    return;
   }
+
+  localStorage.setItem("pendingVerificationEmail", email);
+
+  alert("Email updated. Please verify your new email address.");
+  console.log("Email change requested (preliminary):", email);
+  return;
+
+  // Future: apiFetch("/security/change-email", { method: "POST", body: ... })
 }
 
-function showMessage(el, text, type) {
-  if (!el) { alert(text); return; }
-  el.textContent = text;
-  el.style.color = type === "error" ? "#ef4444" : "#22c55e";
-}
+/* -------------------------
+   Helpers
+   ------------------------- */
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

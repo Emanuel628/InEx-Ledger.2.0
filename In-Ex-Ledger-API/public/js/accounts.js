@@ -1,4 +1,4 @@
-const API_BASE = "";
+const API_BASE = " ";
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 let editingAccountId = null;
 let accountFormState = null;
@@ -176,8 +176,6 @@ async function renderAccountList() {
 
   const accounts = await response.json();
   container.innerHTML = "";
-  localStorage.setItem("lb_accounts", JSON.stringify(accounts));
-  window.dispatchEvent(new CustomEvent("accountsUpdated"));
 
   if (!accounts.length) {
     container.innerHTML =
@@ -217,13 +215,17 @@ async function deleteAccount(accountId) {
     method: "DELETE"
   });
 
-  if (!response || !response.ok) {
+  if (!response) {
+    alert("Failed to delete account.");
+    return;
+  }
+
+  if (!response.ok) {
     alert("Failed to delete account.");
     return;
   }
 
   renderAccountList();
-  window.dispatchEvent(new CustomEvent("accountsUpdated"));
 }
 
 function showAccountsError(message) {

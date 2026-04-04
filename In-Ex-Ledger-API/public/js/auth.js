@@ -15,7 +15,7 @@ const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const LOGIN_PAGE = "/html/login.html";
 
 if (!window.API_BASE) {
-  window.API_BASE = "";
+  window.API_BASE = " ";
 }
 
 if (!window.__AUTH_GUARD_STATE__) {

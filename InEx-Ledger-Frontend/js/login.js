@@ -98,6 +98,12 @@ function showLoginReasonMessage() {
     showLoginError(EXPIRED_SESSION_MESSAGE);
   } else if (reason === "network") {
     showLoginError(OFFLINE_ERROR_MESSAGE);
+  } else if (params.get("verified") === "true") {
+    showLoginError("Email verified. You can sign in now.");
+    loginErrorElement.style.color = "#22c55e";
+  } else if (params.get("email_changed") === "true") {
+    showLoginError("Email updated. Please sign in with your new address.");
+    loginErrorElement.style.color = "#22c55e";
   }
 }
 
@@ -107,6 +113,9 @@ function showLoginError(message) {
   }
   loginErrorElement.textContent = message || "";
   loginErrorElement.hidden = !message;
+  if (!message) {
+    loginErrorElement.style.color = "";
+  }
 }
 
 function clearLoginError() {

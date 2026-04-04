@@ -7,6 +7,12 @@
   gap: 28px;
 }
 
+.transactions-page .mobile-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 main {
   max-width: 1180px;
   margin: 0 auto;
@@ -21,6 +27,10 @@ section {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 20px;
+}
+
+.kpi-row .summary-card {
+  min-height: 120px;
 }
 
 .summary-card {
@@ -88,6 +98,12 @@ section {
   padding: 34px;
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
+}
+
+.transactions-card .mobile-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .ledger-toolbar input,
@@ -651,6 +667,19 @@ tbody tr:last-child {
   section {
     padding: 18px;
   }
+
+  .kpi-row {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .ledger-toolbar {
+    justify-content: stretch;
+  }
+
+  .transactions-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 @media (max-width: 640px) {
@@ -660,6 +689,12 @@ tbody tr:last-child {
 
   button {
     min-height: 44px;
+  }
+
+  .transactions-controls input,
+  .transactions-controls select {
+    min-width: 0;
+    width: 100%;
   }
 }
 
@@ -718,6 +753,38 @@ tbody tr:last-child {
 
   .stats-bar .stat-card {
     width: 100%;
+  }
+
+  .transactions-table {
+    border-spacing: 0;
+  }
+
+  .transactions-table th {
+    display: none;
+  }
+
+  .transactions-table tbody tr {
+    display: block;
+    margin-bottom: 16px;
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .transactions-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 8px 0;
+  }
+
+  .transactions-table tbody td:last-child {
+    border-bottom: none;
+  }
+
+  .transactions-table tbody td span {
+    display: inline-block;
   }
 }
 .txn-entry-selector {

@@ -21,7 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
   wireActions();
 
   if (pendingEmail) {
-    resendVerification();
+    updateStatus("Check your inbox for the verification email we just sent.");
   } else {
     updateStatus(
       "Please register to receive a verification link.",
@@ -55,12 +55,7 @@ function updateStatus(message, isError = false) {
 
 function renderVerificationLink(url) {
   if (!linkNode) return;
-  if (!url) {
-    linkNode.textContent = "";
-    return;
-  }
-
-  linkNode.innerHTML = `<a href="${url}" target="_blank" rel="noopener">Open verification link</a>`;
+  linkNode.textContent = url || "";
 }
 
 async function resendVerification() {
@@ -75,47 +70,28 @@ async function resendVerification() {
     return;
   }
 
-  if (typeof apiFetch !== "function") {
-    updateStatus(
-      "Server unavailable. Please try again later.",
-      true
-    );
-    return;
-  }
-
   try {
-    const payload = await apiFetch("/auth/send-verification", {
+    const response = await fetch("/api/auth/send-verification", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email })
     });
 
+    const payload = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      updateStatus(
+        payload?.error || "Unable to send a verification link right now.",
+        true
+      );
+      renderVerificationLink("");
+      return;
+    }
+
     pendingEmail = email;
     localStorage.setItem("pendingVerificationEmail", email);
-    if (payload.token) {
-      localStorage.setItem("pendingVerificationToken", payload.token);
-    }
-    if (payload.verificationLink) {
-      localStorage.setItem(
-        "pendingVerificationLink",
-        payload.verificationLink
-      );
-      renderVerificationLink(payload.verificationLink);
-    }
-    if (payload.expiresAt) {
-      localStorage.setItem(
-        "pendingVerificationExpires",
-        String(payload.expiresAt)
-      );
-    }
-
-    const expiresAt = payload.expiresAt
-      ? new Date(payload.expiresAt)
-      : null;
-    const message = expiresAt
-      ? `Verification link expires at ${expiresAt.toLocaleTimeString()}.`
-      : "Verification link sent.";
-
-    updateStatus(message);
+    renderVerificationLink("");
+    updateStatus(payload?.message || "Verification email sent.");
   } catch (error) {
     updateStatus(
       (error && error.message) ||

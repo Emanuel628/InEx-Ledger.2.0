@@ -1,0 +1,10 @@
+{
+  "id": "uuid",
+  "owner_id": "uuid",
+  "legal_name": "Luna Consulting LLC",
+  "display_name": "Luna Consulting",
+  "region": "US",
+  "currency": "USD",
+  "fiscal_year_start": "01-01",
+  "created_at": "2026-01-15T00:00:00Z"
+}

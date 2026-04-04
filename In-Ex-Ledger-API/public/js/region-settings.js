@@ -2,86 +2,45 @@
    Region Settings Page JS
    ========================================================= */
 
+// Region Settings is a protected page
 requireAuth();
+
+/* -------------------------
+   Page boot
+   ------------------------- */
 
 init();
 
 function init() {
-  loadRegionSettings();
+  console.log("Region settings page loaded.");
+
   wireForm();
 }
 
-async function loadRegionSettings() {
-  try {
-    const response = await apiFetch("/api/business");
-    if (!response || !response.ok) return;
-    const business = await response.json();
-
-    const regionInputs = document.querySelectorAll('input[name="region"]');
-    regionInputs.forEach((input) => {
-      if (input.value === business.region) input.checked = true;
-    });
-
-    const provinceSelect = document.getElementById("province");
-    if (provinceSelect && business.province) {
-      provinceSelect.value = business.province;
-    }
-
-    toggleProvinceField(business.region);
-  } catch (err) {
-    console.error("Failed to load region settings:", err);
-  }
-}
+/* -------------------------
+   Form handling (preliminary)
+   ------------------------- */
 
 function wireForm() {
   const form = document.querySelector("form");
-  if (!form) return;
 
-  const regionInputs = document.querySelectorAll('input[name="region"]');
-  regionInputs.forEach((input) => {
-    input.addEventListener("change", () => toggleProvinceField(input.value));
-  });
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    await saveRegionSettings(form);
-  });
-}
-
-function toggleProvinceField(region) {
-  const provinceField = document.getElementById("provinceField");
-  if (provinceField) {
-    provinceField.hidden = region !== "CA";
-  }
-}
-
-async function saveRegionSettings(form) {
-  const selectedRegion = form.querySelector('input[name="region"]:checked')?.value;
-  const provinceSelect = form.querySelector("#province");
-  const province = selectedRegion === "CA" ? (provinceSelect?.value || null) : null;
-
-  if (!selectedRegion) {
-    alert("Please select a region.");
+  if (!form) {
+    console.warn("Region settings form not found.");
     return;
   }
 
-  const submitBtn = form.querySelector('button[type="submit"]');
-  if (submitBtn) submitBtn.disabled = true;
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    saveRegionSettings();
+  });
+}
 
-  try {
-    const response = await apiFetch("/api/business", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ region: selectedRegion, province })
-    });
+/* -------------------------
+   Future hooks
+   ------------------------- */
 
-    if (response && response.ok) {
-      localStorage.setItem("lb_region", selectedRegion.toLowerCase());
-      alert("Region settings saved.");
-    } else {
-      alert("Failed to save region settings.");
-    }
-  } finally {
-    if (submitBtn) submitBtn.disabled = false;
-  }
+function saveRegionSettings() {
+  // Future: apiFetch("/settings/region", { method: "POST", body: ... })
+  console.log("Saving region settings (preliminary).");
+  alert("Region settings saved.");
 }

@@ -4,53 +4,55 @@
   <meta charset="UTF-8" />
   <title>InEx Ledger — Sign In</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="/css/app.css">
-  <link rel="stylesheet" href="/css/pages/login.css">
-  <style>
-    .forgot-password a {
-      text-decoration: none;
-      color: var(--primary-color, #2563eb);
-    }
-    .forgot-password a:hover {
-      text-decoration: underline;
-    }
-    #loginError:not([hidden]) {
-      display: block;
-      color: #ef4444;
-      margin: 10px 0;
-    }
-  </style>
+<link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/pages/login.css">
 </head>
 
 <body>
   <header>
-    <h1>InEx Ledger</h1>
-  </header>
+  <p class="site-logo">InEx Ledger</p>
+  <nav>
+    <a href="/html/login.html">Sign In</a>
+    <a href="/html/subscription.html">Pricing</a>
+  </nav>
+</header>
 
   <div id="canadaTestBanner" class="trial-banner" style="display:none;"></div>
 
   <main>
     <section>
-      <h2 data-i18n="login_title">Sign in</h2>
+      <h2>Sign in</h2>
 
       <form id="loginForm" method="post">
         <div>
           <label for="email" data-i18n="login_email_label">Email address</label><br />
-          <input type="email" id="email" name="email" required autocomplete="email" />
+          <input
+            type="email"
+            id="email"
+            name="email"
+            required
+            autocomplete="email"
+          />
         </div>
 
         <br />
 
         <div>
           <label for="password" data-i18n="login_password_label">Password</label><br />
-          <input type="password" id="password" name="password" required autocomplete="current-password" />
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            autocomplete="current-password"
+          />
         </div>
 
-        <label class="show-password-toggle show-password-switch">
+        <label class="show-password-toggle" data-i18n="login_toggle_show_password">
           <input type="checkbox" id="togglePassword" />
-          <span class="switch"></span>
-          <span data-i18n="login_toggle_show_password">Show password</span>
+          Show password
         </label>
+
         <br />
 
         <div>
@@ -61,7 +63,9 @@
       <p id="loginError" class="auth-error" role="alert" aria-live="polite" hidden></p>
 
       <p class="forgot-password">
-        <a href="forgot-password.html">Forgot password?</a>
+        <a href="forgot-password.html" data-i18n="login_forgot_password">
+          Forgot password?
+        </a>
       </p>
 
       <p>
@@ -77,13 +81,12 @@
       <a href="privacy.html">Privacy</a>
       <a href="terms.html">Terms</a>
     </p>
-    <p>&copy; InEx Ledger</p>
+    <p>&copy; 2026 InEx Ledger</p>
   </footer>
-
-  <script src="../js/global.js"></script>
-  <script src="../js/i18n.js"></script>
-  <script src="../js/auth.js"></script>
-  <script src="../js/login.js"></script>
+<script src="../js/global.js"></script>
+<script src="../js/i18n.js"></script>
+<script src="../js/auth.js"></script>
+<script src="../js/login.js"></script>
 </body>
 </html>
 

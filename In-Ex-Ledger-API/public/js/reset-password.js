@@ -60,7 +60,7 @@ async function resetPassword(form, token, statusEl) {
       return;
     }
 
-    setStatus(payload?.message ?? "Password re-saved successfully.", true, statusEl);
+    setStatus(payload?.message ?? "Password reset successfully.", true, statusEl);
     form.reset();
   } catch (err) {
     console.error(err);

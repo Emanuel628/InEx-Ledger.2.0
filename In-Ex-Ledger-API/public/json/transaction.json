@@ -1,0 +1,11 @@
+{
+  "id": "uuid",
+  "business_id": "uuid",
+  "date": "2026-01-10",
+  "description": "Printer ink",
+  "amount": -45.99,
+  "account_id": "uuid",
+  "category_id": "uuid",
+  "receipt_id": "uuid",
+  "created_at": "2026-01-15T00:00:00Z"
+}

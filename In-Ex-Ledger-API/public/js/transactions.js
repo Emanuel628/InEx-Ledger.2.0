@@ -57,7 +57,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireTransactionForm();
   populateAccountsFromStorage();
   populateCategoriesFromStorage();
-  await loadTransactions();
+  loadTransactions();
   wireTransactionSearch();
   wireTransactionCategoryFilter();
   wireTransactionModal();
@@ -146,38 +146,46 @@ function wireTransactionForm() {
     }
 
     try {
-      const apiPayload = {
-        account_id: accountId,
-        category_id: categoryId,
-        amount,
-        type,
+      const categoriesById = mapById(getCategories());
+      const taxLabel = categoriesById[categoryId]?.taxLabel || "";
+
+      const transactionPayload = {
+        date,
         description,
-        date
+        amount,
+        accountId,
+        categoryId,
+        type,
+        taxLabel
       };
 
-      let response;
+      const transactions = getTransactions();
       if (editingTransactionId) {
-        response = await apiFetch(`/api/transactions/${editingTransactionId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(apiPayload)
-        });
+        const idx = transactions.findIndex((txn) => txn.id === editingTransactionId);
+        if (idx >= 0) {
+          const existing = transactions[idx];
+          transactions[idx] = {
+            ...existing,
+            ...transactionPayload
+          };
+        }
       } else {
-        response = await apiFetch("/api/transactions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(apiPayload)
+        transactions.push({
+          ...transactionPayload,
+          id: `txn_${Date.now()}`,
+          receiptId: "",
+          note: ""
         });
       }
-
-      if (!response || !response.ok) {
-        const err = response ? await response.json().catch(() => null) : null;
-        setTransactionFormMessage(err?.error || "Failed to save transaction.");
-        return;
-      }
+      saveTransactions(transactions);
 
       markAccountAsUsed(accountId);
-      await loadTransactions();
+      ledgerState.transactions = transactions;
+
+      populateAccountsFromStorage();
+      populateCategoriesFromStorage();
+      applyFilters();
+      renderTotals();
 
       form.reset();
       closeTransactionDrawer();
@@ -249,40 +257,15 @@ function updateHelpText(accountHelp, categoryHelp) {
   }
 }
 
-async function loadTransactions() {
+function loadTransactions() {
   setTransactionsLoading(true);
-  try {
-    const response = await apiFetch("/api/transactions?limit=500&offset=0");
-    if (response && response.ok) {
-      const json = await response.json();
-      const rows = Array.isArray(json) ? json : (json.data || []);
-      ledgerState.transactions = rows.map(normalizeApiTransaction);
-    } else {
-      ledgerState.transactions = getTransactions();
-    }
-  } catch {
-    ledgerState.transactions = getTransactions();
-  }
+  ledgerState.transactions = getTransactions();
 
   renderAccountOptions();
   renderCategoryOptions();
   renderTotals();
-  setTransactionsLoading(false);
-  renderTransactionList();
-}
 
-function normalizeApiTransaction(t) {
-  return {
-    id: t.id,
-    date: t.date,
-    description: t.description || "",
-    amount: parseFloat(t.amount) || 0,
-    accountId: t.account_id || t.accountId || "",
-    categoryId: t.category_id || t.categoryId || "",
-    type: t.type || "expense",
-    note: t.note || "",
-    receiptId: t.receipt_id || t.receiptId || ""
-  };
+  setTransactionsLoading(false);
 }
 
 function renderAccountOptions() {
@@ -389,27 +372,17 @@ function closeTransactionModal() {
   }
 }
 
-async function updateTransactionNote(transactionId, note) {
-  const txn = (ledgerState.transactions || []).find((t) => t.id === transactionId);
-  if (!txn) return;
-
-  const response = await apiFetch(`/api/transactions/${transactionId}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      account_id: txn.accountId,
-      category_id: txn.categoryId,
-      amount: txn.amount,
-      type: txn.type,
-      description: txn.description,
-      date: txn.date,
-      note
-    })
+function updateTransactionNote(transactionId, note) {
+  const transactions = getTransactions();
+  const updated = transactions.map((txn) => {
+    if (txn.id === transactionId) {
+      return { ...txn, note };
+    }
+    return txn;
   });
-
-  if (response && response.ok) {
-    await loadTransactions();
-  }
+  ledgerState.transactions = updated;
+  saveTransactions(updated);
+  applyFilters();
 }
 
 function handleEditEntry(transactionId) {
@@ -500,19 +473,18 @@ function applyFilters() {
   renderTransactionList(filtered);
 }
 
-async function handleTransactionDelete(transactionId) {
-  const response = await apiFetch(`/api/transactions/${transactionId}`, {
-    method: "DELETE"
-  });
-
-  if (response && response.ok) {
-    if (editingTransactionId === transactionId) {
-      editingTransactionId = null;
-      setEditingMode(false);
-    }
-    closeTransactionModal();
-    await loadTransactions();
+function handleTransactionDelete(transactionId) {
+  const current = ledgerState.transactions || [];
+  const updated = current.filter((txn) => txn.id !== transactionId);
+  ledgerState.transactions = updated;
+  saveTransactions(updated);
+  if (editingTransactionId === transactionId) {
+    editingTransactionId = null;
+    setEditingMode(false);
   }
+  closeTransactionModal();
+  applyFilters();
+  renderTotals();
 }
 function getCategoryName(categoryId) {
   const categories = getCategories();

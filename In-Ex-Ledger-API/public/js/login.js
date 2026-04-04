@@ -1,38 +1,60 @@
 /**
- * LOGIN PAGE LOGIC
- * Authenticates existing users.
+ * SHARED AUTH CONTRACT
+ * This file MUST remain identical in:
+ * - InEx-Ledger-Frontend
+ * - In-Ex-Ledger-API/public
+ *
+ * Do NOT edit in only one bundle.
+ * Always apply changes to BOTH.
  */
+
+/* =========================================================
+   Login Page JS
+   ========================================================= */
 
 let loginForm = null;
 let loginErrorElement = null;
 let isSubmittingLogin = false;
+const OFFLINE_ERROR_MESSAGE = "Unable to reach server. Check your connection and try again.";
+const EXPIRED_SESSION_MESSAGE = "Your session expired. Please log in again.";
+
+redirectIfAuthenticated();
 
 document.addEventListener("DOMContentLoaded", () => {
   loginForm = document.getElementById("loginForm");
   loginErrorElement = document.getElementById("loginError");
 
-  if (!loginForm) return;
+  if (!loginForm) {
+    console.warn("Login form not found.");
+    return;
+  }
 
   loginForm.addEventListener("submit", handleLoginSubmit);
   wireShowPasswordToggle(document);
-  
-  // Show specialized messages if redirected from Register
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("reason") === "created") {
-    showLoginError("Account created! Please sign in to verify your session.");
-    loginErrorElement.style.color = "#22c55e"; // Green for success
-  }
+  showLoginReasonMessage();
 });
 
 async function handleLoginSubmit(event) {
   event.preventDefault();
-  if (isSubmittingLogin) return;
+  if (!loginForm || isSubmittingLogin) {
+    return;
+  }
 
-  const email = document.getElementById("email")?.value.trim();
-  const password = document.getElementById("password")?.value;
-  const submitButton = loginForm.querySelector('button[type="submit"]');
+  const submitButton = loginForm.querySelector("button[type=\"submit\"]");
+  const email = document.getElementById("email")?.value.trim() || "";
+  const password = document.getElementById("password")?.value || "";
 
-  showLoginError("");
+  clearLoginError();
+
+  if (!email || !password) {
+    showLoginError("Enter your email and password.");
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    showLoginError("Please enter a valid email address.");
+    return;
+  }
 
   isSubmittingLogin = true;
   submitButton?.setAttribute("disabled", "true");
@@ -40,6 +62,7 @@ async function handleLoginSubmit(event) {
   try {
     const response = await fetch(buildApiUrl("/api/auth/login"), {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });
@@ -51,36 +74,69 @@ async function handleLoginSubmit(event) {
       return;
     }
 
-    // Check for token OR accessToken
-    const token = data?.token || data?.accessToken;
-
-    if (!token) {
-      showLoginError("Server didn't provide a session. Contact support.");
+    if (!data?.token) {
+      showLoginError("Login failed. Please try again.");
       return;
     }
 
-    setToken(token);
+    setToken(data.token);
     window.location.href = "transactions.html";
   } catch (err) {
-    showLoginError("Connection failed. Please check your internet.");
+    console.error("Login request failed:", err);
+    showLoginError(OFFLINE_ERROR_MESSAGE);
   } finally {
-    isSubmittingLogin = false;
     submitButton?.removeAttribute("disabled");
+    isSubmittingLogin = false;
   }
 }
 
-function showLoginError(msg) {
-  if (!loginErrorElement) return;
-  loginErrorElement.textContent = msg;
-  loginErrorElement.hidden = !msg;
-  loginErrorElement.style.display = msg ? "block" : "none";
+function showLoginReasonMessage() {
+  const params = new URLSearchParams(window.location.search);
+  const reason = params.get("reason");
+
+  if (reason === "expired") {
+    showLoginError(EXPIRED_SESSION_MESSAGE);
+  } else if (reason === "network") {
+    showLoginError(OFFLINE_ERROR_MESSAGE);
+  } else if (params.get("verified") === "true") {
+    showLoginError("Email verified. You can sign in now.");
+    loginErrorElement.style.color = "#22c55e";
+  } else if (params.get("email_changed") === "true") {
+    showLoginError("Email updated. Please sign in with your new address.");
+    loginErrorElement.style.color = "#22c55e";
+  }
 }
 
-function wireShowPasswordToggle(container) {
-  const toggle = container.querySelector("#togglePassword");
-  if (!toggle) return;
+function showLoginError(message) {
+  if (!loginErrorElement) {
+    return;
+  }
+  loginErrorElement.textContent = message || "";
+  loginErrorElement.hidden = !message;
+  if (!message) {
+    loginErrorElement.style.color = "";
+  }
+}
+
+function clearLoginError() {
+  showLoginError("");
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function wireShowPasswordToggle(container = document) {
+  const toggle = container.querySelector(".show-password-toggle input[type=\"checkbox\"]");
+  if (!toggle) {
+    return;
+  }
+
   toggle.addEventListener("change", () => {
-    const pw = container.querySelector("#password");
-    if (pw) pw.type = toggle.checked ? "text" : "password";
+    const passwordField = container.querySelector('input[type="password"]');
+    if (!passwordField) {
+      return;
+    }
+    passwordField.type = toggle.checked ? "text" : "password";
   });
 }

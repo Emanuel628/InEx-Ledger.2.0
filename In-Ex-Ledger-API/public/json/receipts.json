@@ -1,0 +1,8 @@
+{
+  "id": "uuid",
+  "business_id": "uuid",
+  "transaction_id": "uuid",
+  "filename": "receipt-ink.jpg",
+  "mime_type": "image/jpeg",
+  "uploaded_at": "2026-01-15T00:00:00Z"
+}
