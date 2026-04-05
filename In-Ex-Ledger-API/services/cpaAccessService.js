@@ -167,6 +167,8 @@ async function listAccessibleBusinessScopeForUser(user) {
             b.id AS business_id,
             b.name AS business_name,
             b.region AS business_region,
+            b.province AS business_province,
+            b.language AS business_language,
             CASE
               WHEN EXISTS (
                 SELECT 1
@@ -208,7 +210,9 @@ async function listAccessibleBusinessScopeForUser(user) {
     grouped.get(key).businesses.push({
       id: row.business_id,
       name: row.business_name,
-      region: row.business_region
+      region: row.business_region,
+      province: row.business_province,
+      language: row.business_language
     });
   });
 

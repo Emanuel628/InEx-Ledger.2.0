@@ -13,6 +13,7 @@ const {
   logCpaAuditEvent
 } = require("../services/cpaAccessService.js");
 const { pool } = require("../db.js");
+const { buildRedactedStream } = require("../services/exportStorage.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -80,10 +81,13 @@ router.get("/portfolio/:ownerUserId/summary", async (req, res) => {
     const ids = portfolio.business_ids;
     const [transactionsResult, receiptsResult, mileageResult, exportsResult] = await Promise.all([
       pool.query(
-        `SELECT type, COALESCE(SUM(ABS(amount)), 0) AS total, COUNT(*)::int AS count
+        `SELECT business_id,
+                type,
+                COALESCE(SUM(ABS(amount)), 0) AS total,
+                COUNT(*)::int AS count
            FROM transactions
           WHERE business_id = ANY($1::uuid[])
-          GROUP BY type`,
+          GROUP BY business_id, type`,
         [ids]
       ),
       pool.query(
@@ -109,6 +113,25 @@ router.get("/portfolio/:ownerUserId/summary", async (req, res) => {
     let income = 0;
     let expenses = 0;
     let transactionCount = 0;
+    const businessSummaryMap = new Map(
+      portfolio.businesses.map((business) => [
+        business.id,
+        {
+          business_id: business.id,
+          business_name: business.name || "Business",
+          region: String(business.region || "US").toUpperCase(),
+          province: String(business.province || "").toUpperCase(),
+          language: business.language || "en",
+          currency: String(business.region || "").toUpperCase() === "CA" ? "CAD" : "USD",
+          tax_form_label: String(business.region || "").toUpperCase() === "CA" ? "Canada T2125" : "U.S. Schedule C",
+          total_income: 0,
+          total_expenses: 0,
+          net_profit: 0,
+          transaction_count: 0
+        }
+      ])
+    );
+
     transactionsResult.rows.forEach((row) => {
       const total = Number(row.total) || 0;
       const count = Number(row.count) || 0;
@@ -118,7 +141,25 @@ router.get("/portfolio/:ownerUserId/summary", async (req, res) => {
       } else {
         expenses += total;
       }
+
+      const businessSummary = businessSummaryMap.get(row.business_id);
+      if (!businessSummary) {
+        return;
+      }
+      businessSummary.transaction_count += count;
+      if (row.type === "income") {
+        businessSummary.total_income += total;
+      } else {
+        businessSummary.total_expenses += total;
+      }
     });
+
+    for (const summary of businessSummaryMap.values()) {
+      summary.net_profit = summary.total_income - summary.total_expenses;
+    }
+
+    const businessSummaries = [...businessSummaryMap.values()];
+    const currencies = [...new Set(businessSummaries.map((summary) => summary.currency))];
 
     await logCpaAuditEvent({
       actorUserId: req.user.id,
@@ -143,8 +184,11 @@ router.get("/portfolio/:ownerUserId/summary", async (req, res) => {
         transaction_count: transactionCount,
         receipt_count: Number(receiptsResult.rows[0]?.count || 0),
         mileage_count: Number(mileageResult.rows[0]?.count || 0),
-        export_count: Number(exportsResult.rows[0]?.count || 0)
-      }
+        export_count: Number(exportsResult.rows[0]?.count || 0),
+        currency: currencies.length === 1 ? currencies[0] : null,
+        mixed_currency_scope: currencies.length > 1
+      },
+      business_summaries: businessSummaries
     });
   } catch (error) {
     console.error("GET /api/cpa-access/portfolio/:ownerUserId/summary error:", error.message);
@@ -165,6 +209,7 @@ router.get("/portfolio/:ownerUserId/transactions", async (req, res) => {
       `SELECT t.id,
               t.business_id,
               b.name AS business_name,
+              b.region AS business_region,
               t.account_id,
               a.name AS account_name,
               t.category_id,
@@ -314,6 +359,8 @@ router.get("/portfolio/:ownerUserId/exports", async (req, res) => {
       `SELECT e.id,
               e.business_id,
               b.name AS business_name,
+              b.region AS business_region,
+              b.province AS business_province,
               e.export_type,
               e.start_date,
               e.end_date,
@@ -346,6 +393,142 @@ router.get("/portfolio/:ownerUserId/exports", async (req, res) => {
   } catch (error) {
     console.error("GET /api/cpa-access/portfolio/:ownerUserId/exports error:", error.message);
     res.status(500).json({ error: "Failed to load CPA exports." });
+  }
+});
+
+router.get("/portfolio/:ownerUserId/audit", async (req, res) => {
+  try {
+    const portfolio = await resolveGrantedPortfolioOr404(req, res);
+    if (!portfolio) {
+      return;
+    }
+
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), 100);
+    const grantsResult = await pool.query(
+      `SELECT id
+         FROM cpa_access_grants
+        WHERE owner_user_id = $1
+          AND grantee_user_id = $2
+          AND status = 'active'
+          AND (
+            scope = 'all'
+            OR business_id = ANY($3::uuid[])
+          )`,
+      [portfolio.owner_user_id, req.user.id, portfolio.business_ids]
+    );
+
+    const grantIds = grantsResult.rows.map((row) => row.id);
+    const auditQuery = grantIds.length
+      ? `SELECT l.id,
+                l.actor_user_id,
+                actor.email AS actor_email,
+                l.owner_user_id,
+                l.grant_id,
+                l.business_id,
+                b.name AS business_name,
+                l.action,
+                l.metadata,
+                l.created_at
+           FROM cpa_audit_logs l
+           LEFT JOIN users actor ON actor.id = l.actor_user_id
+           LEFT JOIN businesses b ON b.id = l.business_id
+          WHERE l.owner_user_id = $1
+            AND (
+              l.actor_user_id = $2
+              OR l.grant_id = ANY($3::uuid[])
+            )
+            AND (
+              l.business_id IS NULL
+              OR l.business_id = ANY($4::uuid[])
+            )
+          ORDER BY l.created_at DESC
+          LIMIT $5`
+      : `SELECT l.id,
+                l.actor_user_id,
+                actor.email AS actor_email,
+                l.owner_user_id,
+                l.grant_id,
+                l.business_id,
+                b.name AS business_name,
+                l.action,
+                l.metadata,
+                l.created_at
+           FROM cpa_audit_logs l
+           LEFT JOIN users actor ON actor.id = l.actor_user_id
+           LEFT JOIN businesses b ON b.id = l.business_id
+          WHERE l.owner_user_id = $1
+            AND l.actor_user_id = $2
+            AND (
+              l.business_id IS NULL
+              OR l.business_id = ANY($3::uuid[])
+            )
+          ORDER BY l.created_at DESC
+          LIMIT $4`;
+    const auditParams = grantIds.length
+      ? [portfolio.owner_user_id, req.user.id, grantIds, portfolio.business_ids, limit]
+      : [portfolio.owner_user_id, req.user.id, portfolio.business_ids, limit];
+    const auditResult = await pool.query(auditQuery, auditParams);
+
+    await logCpaAuditEvent({
+      actorUserId: req.user.id,
+      ownerUserId: portfolio.owner_user_id,
+      businessId: portfolio.business_ids.length === 1 ? portfolio.business_ids[0] : null,
+      action: "portfolio_audit_viewed",
+      metadata: {
+        grant_scope: portfolio.grant_scope,
+        business_ids: portfolio.business_ids,
+        limit
+      }
+    });
+
+    res.json({ logs: auditResult.rows });
+  } catch (error) {
+    console.error("GET /api/cpa-access/portfolio/:ownerUserId/audit error:", error.message);
+    res.status(500).json({ error: "Failed to load CPA audit activity." });
+  }
+});
+
+router.get("/portfolio/:ownerUserId/exports/:exportId/redacted", async (req, res) => {
+  try {
+    const portfolio = await resolveGrantedPortfolioOr404(req, res);
+    if (!portfolio) {
+      return;
+    }
+
+    const exportId = String(req.params.exportId || "").trim();
+    const result = await pool.query(
+      `SELECT e.id,
+              e.business_id,
+              e.file_path
+         FROM exports e
+        WHERE e.id = $1
+          AND e.business_id = ANY($2::uuid[])
+        LIMIT 1`,
+      [exportId, portfolio.business_ids]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ error: "Export not found in granted scope." });
+    }
+
+    await logCpaAuditEvent({
+      actorUserId: req.user.id,
+      ownerUserId: portfolio.owner_user_id,
+      businessId: result.rows[0].business_id,
+      action: "portfolio_export_downloaded",
+      metadata: {
+        export_id: exportId,
+        grant_scope: portfolio.grant_scope
+      }
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Cache-Control", "private, max-age=0, no-store");
+    res.setHeader("Content-Disposition", `attachment; filename="inex-ledger-cpa-export-${exportId}.pdf"`);
+    buildRedactedStream(res, result.rows[0].file_path);
+  } catch (error) {
+    console.error("GET /api/cpa-access/portfolio/:ownerUserId/exports/:exportId/redacted error:", error.message);
+    res.status(500).json({ error: "Failed to download CPA export." });
   }
 });
 
