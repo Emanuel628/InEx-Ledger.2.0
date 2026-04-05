@@ -289,66 +289,40 @@
               <h3>Multi-factor authentication</h3>
               <p class="session-note">Require an authenticator app code on new or untrusted devices. Recovery codes are generated for emergency access.</p>
             </div>
-            <span id="mfaStatusBadge" class="mfa-status-badge is-disabled">Disabled</span>
+            <label class="switch mfa-switch">
+              <input type="checkbox" id="mfaEnabledToggle" />
+              <span class="switch-track"></span>
+            </label>
           </div>
-
-          <form id="mfaSetupStartForm" class="mfa-form">
-            <div class="security-grid">
-              <div class="form-field">
-                <label for="mfa-current-password">Current password</label>
-                <input type="password" id="mfa-current-password" autocomplete="current-password" />
-              </div>
-            </div>
-            <button type="submit" class="settings-primary-btn">Start MFA setup</button>
-          </form>
 
           <div id="mfaSetupPanel" class="mfa-setup-panel hidden">
             <div class="settings-form-grid">
-              <div class="form-field form-field-full">
-                <label for="mfaSetupSecret">Setup key</label>
-                <input type="text" id="mfaSetupSecret" readonly />
-              </div>
-              <div class="form-field form-field-full">
-                <label for="mfaSetupOtpAuth">Authenticator app link</label>
-                <textarea id="mfaSetupOtpAuth" rows="3" readonly></textarea>
+              <div class="form-field">
+                <label for="mfa-current-password">Current password</label>
+                <input type="password" id="mfa-current-password" autocomplete="current-password" />
               </div>
               <div class="form-field">
                 <label for="mfaSetupCode">Verification code</label>
                 <input type="text" id="mfaSetupCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
               </div>
+              <div class="form-field form-field-full mfa-setup-secret-row hidden" id="mfaSetupSecretRow">
+                <label for="mfaSetupSecret">Setup key</label>
+                <input type="text" id="mfaSetupSecret" readonly />
+              </div>
+              <div class="form-field form-field-full mfa-setup-secret-row hidden" id="mfaSetupOtpAuthRow">
+                <label for="mfaSetupOtpAuth">Authenticator app link</label>
+                <textarea id="mfaSetupOtpAuth" rows="3" readonly></textarea>
+              </div>
             </div>
-            <div class="mfa-recovery-wrap">
+            <div id="mfaRecoveryWrap" class="mfa-recovery-wrap hidden">
               <div class="settings-row-title">Recovery codes</div>
-              <p class="settings-helper-note">Store these in a safe place. Each recovery code can be used once.</p>
+              <p class="settings-helper-note">Store these in a safe place. Each recovery code can be used once. You only need these if you lose your authenticator app.</p>
               <div id="mfaRecoveryCodes" class="mfa-recovery-codes"></div>
             </div>
             <div class="mfa-actions">
-              <button type="button" id="mfaEnableButton" class="settings-primary-btn">Enable MFA</button>
-              <button type="button" id="mfaCancelButton" class="settings-secondary-btn">Cancel</button>
+              <button type="button" id="mfaPrimaryButton" class="settings-primary-btn">Turn on MFA</button>
+              <button type="button" id="mfaCancelButton" class="settings-secondary-btn hidden">Cancel</button>
             </div>
-          </div>
-
-          <form id="mfaManageForm" class="mfa-form hidden">
-            <div class="security-grid">
-              <div class="form-field">
-                <label for="mfa-manage-password">Current password</label>
-                <input type="password" id="mfa-manage-password" autocomplete="current-password" />
-              </div>
-              <div class="form-field">
-                <label for="mfa-manage-code">Authenticator or recovery code</label>
-                <input type="text" id="mfa-manage-code" autocomplete="one-time-code" placeholder="123456 or ABCD-EF12" />
-              </div>
-            </div>
-            <div class="mfa-actions">
-              <button type="button" id="mfaRegenerateCodesButton" class="settings-secondary-btn">Regenerate recovery codes</button>
-              <button type="button" id="mfaDisableButton" class="danger-outline-btn">Disable MFA</button>
-            </div>
-          </form>
-
-          <div id="mfaRegeneratedCodesWrap" class="mfa-recovery-wrap hidden">
-            <div class="settings-row-title">New recovery codes</div>
-            <p class="settings-helper-note">These replace your previous recovery codes immediately.</p>
-            <div id="mfaRegeneratedCodes" class="mfa-recovery-codes"></div>
           </div>
 
           <p id="mfaMessage" class="settings-inline-message"></p>

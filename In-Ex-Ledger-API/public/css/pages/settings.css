@@ -1235,36 +1235,15 @@ body {
   color: var(--ink);
 }
 
-.mfa-status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
+.mfa-switch {
+  margin-top: 2px;
+  flex-shrink: 0;
 }
 
-.mfa-status-badge.is-enabled {
-  background: rgba(16, 185, 129, 0.15);
-  color: #047857;
-}
-
-.mfa-status-badge.is-disabled {
-  background: rgba(148, 163, 184, 0.16);
-  color: var(--ink2);
-}
-
-.mfa-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.mfa-form.hidden,
 .mfa-setup-panel.hidden,
-.mfa-recovery-wrap.hidden {
+.mfa-recovery-wrap.hidden,
+.mfa-setup-secret-row.hidden,
+.settings-secondary-btn.hidden {
   display: none;
 }
 
