@@ -2,10 +2,30 @@ const express = require("express");
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 
 const router = express.Router();
+const MAX_DISTANCE_VALUE = 50000;
+const MAX_ODOMETER_VALUE = 9999999.99;
 router.use(requireAuth);
+router.use(createDataApiLimiter());
+
+function parseOptionalNumber(value, field, max) {
+  if (value === undefined || value === null || value === "") {
+    return { value: null };
+  }
+
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) {
+    return { error: `${field} must be a valid number.` };
+  }
+  if (parsed < 0 || parsed > max) {
+    return { error: `${field} must be between 0 and ${max}.` };
+  }
+
+  return { value: parsed };
+}
 
 /**
  * GET /api/mileage
@@ -53,6 +73,48 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: "trip_date and purpose are required" });
   }
 
+  if (Number.isNaN(Date.parse(trip_date))) {
+    return res.status(400).json({ error: "trip_date must be a valid date." });
+  }
+
+  const parsedMiles = parseOptionalNumber(miles, "miles", MAX_DISTANCE_VALUE);
+  if (parsedMiles.error) {
+    return res.status(400).json({ error: parsedMiles.error });
+  }
+
+  const parsedKm = parseOptionalNumber(km, "km", MAX_DISTANCE_VALUE);
+  if (parsedKm.error) {
+    return res.status(400).json({ error: parsedKm.error });
+  }
+
+  const parsedOdometerStart = parseOptionalNumber(odometer_start, "odometer_start", MAX_ODOMETER_VALUE);
+  if (parsedOdometerStart.error) {
+    return res.status(400).json({ error: parsedOdometerStart.error });
+  }
+
+  const parsedOdometerEnd = parseOptionalNumber(odometer_end, "odometer_end", MAX_ODOMETER_VALUE);
+  if (parsedOdometerEnd.error) {
+    return res.status(400).json({ error: parsedOdometerEnd.error });
+  }
+
+  const hasDistance =
+    (parsedMiles.value !== null && parsedMiles.value > 0) ||
+    (parsedKm.value !== null && parsedKm.value > 0);
+  const hasOdometerRange =
+    parsedOdometerStart.value !== null && parsedOdometerEnd.value !== null;
+
+  if (!hasDistance && !hasOdometerRange) {
+    return res.status(400).json({
+      error: "Provide miles, kilometers, or both odometer values."
+    });
+  }
+
+  if (hasOdometerRange && parsedOdometerEnd.value < parsedOdometerStart.value) {
+    return res.status(400).json({
+      error: "odometer_end must be greater than or equal to odometer_start."
+    });
+  }
+
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
@@ -62,10 +124,10 @@ router.post("/", async (req, res) => {
       [
         crypto.randomUUID(), businessId, trip_date, purpose,
         destination || null,
-        miles != null ? parseFloat(miles) : null,
-        km != null ? parseFloat(km) : null,
-        odometer_start != null ? parseFloat(odometer_start) : null,
-        odometer_end != null ? parseFloat(odometer_end) : null
+        parsedMiles.value,
+        parsedKm.value,
+        parsedOdometerStart.value,
+        parsedOdometerEnd.value
       ]
     );
     res.status(201).json(result.rows[0]);

@@ -2,10 +2,12 @@ const express = require("express");
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(createDataApiLimiter());
 
 const VALID_KINDS = new Set(["income", "expense"]);
 const VALID_COLORS = new Set(["blue", "green", "amber", "pink", "red", "slate"]);

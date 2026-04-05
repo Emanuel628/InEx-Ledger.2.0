@@ -2,13 +2,18 @@ const express = require("express");
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
+const MAX_TRANSACTION_AMOUNT = 999999999.99;
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+router.use(requireAuth);
+router.use(createDataApiLimiter());
 
 function deriveCategoryKindFromSlug(slug) {
   const normalized = String(slug ?? "").trim().toLowerCase();
@@ -76,12 +81,17 @@ function validateTransactionPayload(payload) {
     return { valid: false, message: "category_id is required" };
   }
 
-  if (amount === undefined || amount === null) {
+  if (amount === undefined || amount === null || amount === "") {
     return { valid: false, message: "amount is required" };
   }
 
-  if (typeof amount !== "number" || Number.isNaN(amount)) {
+  const normalizedAmount = Number.parseFloat(amount);
+  if (!Number.isFinite(normalizedAmount)) {
     return { valid: false, message: "amount must be a number" };
+  }
+
+  if (normalizedAmount <= 0 || normalizedAmount > MAX_TRANSACTION_AMOUNT) {
+    return { valid: false, message: `amount must be greater than 0 and at most ${MAX_TRANSACTION_AMOUNT}` };
   }
 
   if (!type || !VALID_TRANSACTION_TYPES.has(type)) {
@@ -92,10 +102,19 @@ function validateTransactionPayload(payload) {
     return { valid: false, message: "date must be a valid ISO string" };
   }
 
-  return { valid: true };
+  return {
+    valid: true,
+    normalized: {
+      account_id,
+      category_id,
+      amount: normalizedAmount,
+      date,
+      type
+    }
+  };
 }
 
-router.get("/", requireAuth, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
@@ -137,7 +156,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", async (req, res) => {
   const validation = validateTransactionPayload(req.body);
   if (!validation.valid) {
     return res.status(400).json({ error: validation.message });
@@ -146,8 +165,8 @@ router.post("/", requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
-    const { account_id, category_id, amount, type, description, date, note } =
-      req.body;
+    const { account_id, category_id, amount, type, date } = validation.normalized;
+    const { description, note } = req.body;
 
     const accountCheck = await pool.query(
       "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
@@ -192,7 +211,7 @@ router.post("/", requireAuth, async (req, res) => {
   }
 });
 
-router.put("/:id", requireAuth, async (req, res) => {
+router.put("/:id", async (req, res) => {
   const validation = validateTransactionPayload(req.body);
   if (!validation.valid) {
     return res.status(400).json({ error: validation.message });
@@ -200,7 +219,8 @@ router.put("/:id", requireAuth, async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const { account_id, category_id, amount, type, description, date, note } = req.body;
+    const { account_id, category_id, amount, type, date } = validation.normalized;
+    const { description, note } = req.body;
 
     const accountCheck = await pool.query(
       "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
@@ -236,7 +256,7 @@ router.put("/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.delete("/:id", requireAuth, async (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(

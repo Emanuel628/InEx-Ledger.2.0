@@ -2,14 +2,17 @@ const express = require("express");
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 
 const router = express.Router();
+router.use(requireAuth);
+router.use(createDataApiLimiter());
 
 /**
  * GET all accounts for logged-in business
  */
-router.get("/", requireAuth, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
@@ -26,7 +29,7 @@ router.get("/", requireAuth, async (req, res) => {
 /**
  * CREATE new account
  */
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", async (req, res) => {
   const { name, type } = req.body;
 
   if (!name || !type) {
@@ -34,9 +37,6 @@ router.post("/", requireAuth, async (req, res) => {
   }
 
   try {
-    const dbCheck = await pool.query(
-      "SELECT current_database(), current_schema()"
-    );
     const businessId = await resolveBusinessIdForUser(req.user);
 
     const result = await pool.query(
@@ -61,9 +61,20 @@ router.post("/", requireAuth, async (req, res) => {
 /**
  * DELETE account
  */
-router.delete("/:id", requireAuth, async (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+
+    const usage = await pool.query(
+      "SELECT COUNT(*) FROM transactions WHERE account_id = $1 AND business_id = $2",
+      [req.params.id, businessId]
+    );
+    if (parseInt(usage.rows[0]?.count || "0", 10) > 0) {
+      return res.status(409).json({
+        error: "This account cannot be deleted because it is in use."
+      });
+    }
+
     const result = await pool.query(
       "DELETE FROM accounts WHERE id = $1 AND business_id = $2",
       [req.params.id, businessId]
