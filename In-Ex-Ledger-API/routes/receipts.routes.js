@@ -5,7 +5,10 @@ const express = require("express");
 const multer = require("multer");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
-const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const {
+  resolveBusinessIdForUser,
+  getBusinessScopeForUser
+} = require("../api/utils/resolveBusinessIdForUser.js");
 const { pool } = require("../db.js");
 const {
   getSubscriptionSnapshotForBusiness,
@@ -115,9 +118,9 @@ function moveFileIfExists(fromPath, toPath) {
 
 router.get("/", async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
 
-    if (!businessId) {
+    if (!scope.businessIds.length) {
       return res.status(400).json({
         error: "Missing business context"
       });
@@ -125,18 +128,21 @@ router.get("/", async (req, res) => {
 
     const sql = `
       SELECT
-        id,
-        transaction_id,
-        filename,
-        mime_type,
-        storage_path,
-        created_at,
-        file_hash
-      FROM receipts
-      WHERE business_id = $1
-      ORDER BY created_at DESC NULLS LAST
+        r.id,
+        r.business_id,
+        b.name AS business_name,
+        r.transaction_id,
+        r.filename,
+        r.mime_type,
+        r.storage_path,
+        r.created_at,
+        r.file_hash
+      FROM receipts r
+      JOIN businesses b ON b.id = r.business_id
+      WHERE r.business_id = ANY($1::uuid[])
+      ORDER BY b.name ASC, r.created_at DESC NULLS LAST
     `;
-    const result = await pool.query(sql, [businessId]);
+    const result = await pool.query(sql, [scope.businessIds]);
 
     return res.status(200).json(result.rows || []);
   } catch (err) {

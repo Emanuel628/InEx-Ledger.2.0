@@ -62,14 +62,23 @@
           <p class="page-subtitle">2026 fiscal year · Chase Business + N accounts</p>
           <p class="page-context-note" id="transactionsTaxContext">Tax form context: U.S. Schedule C estimate</p>
         </div>
-        <button
-          id="addTxTogglePage"
-          class="page-add-button"
-          type="button"
-          data-i18n="transactions_add_transaction_button"
-        >
-          + Add transaction
-        </button>
+        <div class="page-header-actions">
+          <label class="scope-select-wrap" for="transactionsScope">
+            <span class="scope-select-label">View</span>
+            <select id="transactionsScope" class="scope-select">
+              <option value="active">Active business</option>
+              <option value="all">All businesses</option>
+            </select>
+          </label>
+          <button
+            id="addTxTogglePage"
+            class="page-add-button"
+            type="button"
+            data-i18n="transactions_add_transaction_button"
+          >
+            + Add transaction
+          </button>
+        </div>
       </div>
 
       <section class="stats-row">

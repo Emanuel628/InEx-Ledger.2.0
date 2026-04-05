@@ -3,7 +3,10 @@ const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
-const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const {
+  resolveBusinessIdForUser,
+  getBusinessScopeForUser
+} = require("../api/utils/resolveBusinessIdForUser.js");
 const { processDueRecurringTransactions } = require("../services/recurringTransactionsService.js");
 
 const router = express.Router();
@@ -122,36 +125,44 @@ function validateTransactionPayload(payload) {
 
 router.get("/", async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    await processDueRecurringTransactions(businessId);
+    const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
+    for (const businessId of scope.businessIds) {
+      await processDueRecurringTransactions(businessId);
+    }
 
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
     const result = await pool.query(
-      `SELECT id,
-              business_id,
-              account_id,
-              category_id,
-              amount,
-              type,
-              cleared,
-              description,
-              date,
-              note,
-              recurring_transaction_id,
-              recurring_occurrence_date,
-              created_at
-       FROM transactions
-       WHERE business_id = $1
-       ORDER BY date DESC, created_at DESC
+      `SELECT t.id,
+              t.business_id,
+              b.name AS business_name,
+              t.account_id,
+              a.name AS account_name,
+              t.category_id,
+              c.name AS category_name,
+              t.amount,
+              t.type,
+              t.cleared,
+              t.description,
+              t.date,
+              t.note,
+              t.recurring_transaction_id,
+              t.recurring_occurrence_date,
+              t.created_at
+       FROM transactions t
+       JOIN businesses b ON b.id = t.business_id
+       LEFT JOIN accounts a ON a.id = t.account_id
+       LEFT JOIN categories c ON c.id = t.category_id
+       WHERE t.business_id = ANY($1::uuid[])
+       ORDER BY t.date DESC, t.created_at DESC
        LIMIT $2 OFFSET $3`,
-      [businessId, limit, offset]
+      [scope.businessIds, limit, offset]
     );
 
     const countResult = await pool.query(
-      "SELECT COUNT(*) FROM transactions WHERE business_id = $1",
-      [businessId]
+      "SELECT COUNT(*) FROM transactions WHERE business_id = ANY($1::uuid[])",
+      [scope.businessIds]
     );
 
     res.status(200).json({

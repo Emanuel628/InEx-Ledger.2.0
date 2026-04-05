@@ -1053,6 +1053,42 @@ body {
   margin-bottom: 20px;
 }
 
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.scope-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.scope-select-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+
+.scope-select {
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.scope-select:focus {
+  outline: none;
+}
+
 .page-title {
   font-size: 20px;
   font-weight: 500;
@@ -1074,6 +1110,12 @@ body {
   color: #fff;
   font-size: 12px;
   font-weight: 500;
+}
+
+.page-add-button:disabled,
+.toolbar-add-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .stats-row {
@@ -1525,6 +1567,19 @@ body {
   color: var(--ink3);
 }
 
+.business-scope-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-right: 6px;
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--accent2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
 .account-tag {
   display: inline-flex;
   align-items: center;
@@ -1820,6 +1875,11 @@ body {
   .page-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .page-header-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .stats-row {

@@ -123,6 +123,23 @@ async function listBusinessesForUser(userId) {
   }));
 }
 
+async function getBusinessScopeForUser(user, requestedScope = "active") {
+  const activeBusinessId = await resolveBusinessIdForUser(user);
+  const businesses = await listBusinessesForUser(user.id);
+  const activeBusiness = businesses.find((business) => business.id === activeBusinessId) || null;
+  const scope = String(requestedScope || "active").toLowerCase() === "all" ? "all" : "active";
+  const businessIds =
+    scope === "all" ? businesses.map((business) => business.id) : [activeBusinessId];
+
+  return {
+    scope,
+    activeBusinessId,
+    activeBusiness,
+    businesses,
+    businessIds
+  };
+}
+
 async function setActiveBusinessForUser(userId, businessId) {
   const result = await pool.query(
     `UPDATE users u
@@ -180,6 +197,7 @@ async function createBusinessForUser(user, payload = {}) {
 
 module.exports = {
   resolveBusinessIdForUser,
+  getBusinessScopeForUser,
   listBusinessesForUser,
   setActiveBusinessForUser,
   createBusinessForUser

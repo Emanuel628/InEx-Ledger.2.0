@@ -1,4 +1,5 @@
 const express = require("express");
+const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const {
   resolveBusinessIdForUser,
@@ -42,6 +43,34 @@ router.get("/", async (req, res) => {
   } catch (err) {
     console.error("GET /businesses error:", err.message);
     res.status(500).json({ error: "Failed to load businesses." });
+  }
+});
+
+router.get("/:id/profile", async (req, res) => {
+  try {
+    const businesses = await listBusinessesForUser(req.user.id);
+    const business = businesses.find((item) => item.id === req.params.id);
+    if (!business) {
+      return res.status(404).json({ error: "Business not found." });
+    }
+
+    const result = await pool.query(
+      `SELECT id, name, region, language, fiscal_year_start, province,
+              business_type, tax_id, address, created_at
+       FROM businesses
+       WHERE id = $1
+       LIMIT 1`,
+      [req.params.id]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ error: "Business not found." });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("GET /businesses/:id/profile error:", err.message);
+    res.status(500).json({ error: "Failed to load business profile." });
   }
 });
 

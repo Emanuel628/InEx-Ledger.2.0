@@ -3,7 +3,10 @@ const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
-const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const {
+  resolveBusinessIdForUser,
+  getBusinessScopeForUser
+} = require("../api/utils/resolveBusinessIdForUser.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -17,13 +20,14 @@ const VALID_COLORS = new Set(["blue", "green", "amber", "pink", "red", "slate"])
  */
 router.get("/", async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
     const result = await pool.query(
-      `SELECT id, name, kind, color, tax_map_us, tax_map_ca, is_default, created_at
-       FROM categories
-       WHERE business_id = $1
-       ORDER BY kind, name`,
-      [businessId]
+      `SELECT c.id, c.business_id, b.name AS business_name, c.name, c.kind, c.color, c.tax_map_us, c.tax_map_ca, c.is_default, c.created_at
+       FROM categories c
+       JOIN businesses b ON b.id = c.business_id
+       WHERE c.business_id = ANY($1::uuid[])
+       ORDER BY b.name ASC, c.kind, c.name`,
+      [scope.businessIds]
     );
     res.json(result.rows);
   } catch (err) {

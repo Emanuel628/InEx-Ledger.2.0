@@ -4,7 +4,9 @@ const ACCOUNTS_KEY = "lb_accounts";
 const CATEGORIES_KEY = "lb_categories";
 const RECEIPTS_KEY = "lb_receipts";
 const MILEAGE_KEY = "lb_mileage";
+const BUSINESSES_KEY = "lb_businesses";
 const EXPORT_LANG_KEY = "lb_export_language";
+const EXPORT_SCOPE_KEY = "lb_export_scope";
 const BUSINESS_PROFILE_KEY = "lb_business_profile";
 const VALID_EXPORT_LANGS = ["en", "es", "fr"];
 const DEFAULT_EXPORT_LANG = "en";
@@ -15,12 +17,18 @@ const EXPORT_TOAST_MS = 3000;
 
 let exportToastTimer = null;
 let unattachedReceiptsCount = 0;
+let exportContext = {
+  activeBusinessId: "",
+  businesses: []
+};
 
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
+  await hydrateBusinessList();
+  initExportScopeSelect();
   await hydrateExportData();
   populateExportFilters();
   initExportLanguageSelect();
@@ -43,9 +51,149 @@ async function hydrateExportData() {
   ]);
 }
 
+async function hydrateBusinessList() {
+  try {
+    const response = await apiFetch("/api/businesses");
+    if (!response || !response.ok) {
+      return;
+    }
+    const payload = await response.json().catch(() => null);
+    exportContext = {
+      activeBusinessId: payload?.active_business_id || "",
+      businesses: Array.isArray(payload?.businesses) ? payload.businesses : []
+    };
+    localStorage.setItem(BUSINESSES_KEY, JSON.stringify(exportContext));
+  } catch (error) {
+    console.warn("[Exports] Unable to hydrate businesses", error);
+  }
+}
+
+function initExportScopeSelect() {
+  const select = document.getElementById("exportScope");
+  if (!select) {
+    return;
+  }
+
+  setExportScope(select, localStorage.getItem(EXPORT_SCOPE_KEY));
+  syncExportScopeUi();
+  select.addEventListener("change", async () => {
+    setExportScope(select, select.value);
+    await hydrateExportData();
+    populateExportFilters();
+    await refreshReceiptsDot();
+    syncExportScopeUi();
+    updateExportSummary();
+    renderExportHistory();
+  });
+}
+
+function getExportScope() {
+  const select = document.getElementById("exportScope");
+  if (select?.value === "all") {
+    return "all";
+  }
+  return localStorage.getItem(EXPORT_SCOPE_KEY) === "all" ? "all" : "active";
+}
+
+function setExportScope(select, value) {
+  const normalized = value === "all" ? "all" : "active";
+  if (select) {
+    select.value = normalized;
+  }
+  localStorage.setItem(EXPORT_SCOPE_KEY, normalized);
+}
+
+function buildScopeQuery() {
+  return getExportScope() === "all" ? "?scope=all" : "";
+}
+
+function getStoredBusinesses() {
+  if (Array.isArray(exportContext.businesses) && exportContext.businesses.length) {
+    return exportContext.businesses;
+  }
+  try {
+    const parsed = JSON.parse(localStorage.getItem(BUSINESSES_KEY) || "null");
+    if (parsed && Array.isArray(parsed.businesses)) {
+      exportContext = parsed;
+      return parsed.businesses;
+    }
+  } catch {}
+  return [];
+}
+
+function getActiveBusinessId() {
+  return exportContext.activeBusinessId || localStorage.getItem("lb_active_business_id") || "";
+}
+
+function getBusinessById(businessId) {
+  return getStoredBusinesses().find((business) => business.id === businessId) || null;
+}
+
+function getBusinessesInScope() {
+  const businesses = getStoredBusinesses();
+  if (getExportScope() === "all") {
+    return businesses;
+  }
+  const active = businesses.find((business) => business.id === getActiveBusinessId());
+  return active ? [active] : businesses.slice(0, 1);
+}
+
+function getBusinessCurrency(businessId) {
+  const region = String(getBusinessById(businessId)?.region || "").toLowerCase() === "ca" ? "ca" : "us";
+  return getCurrencyForRegion(region);
+}
+
+function hasMixedCurrenciesInScope() {
+  const currencies = new Set(
+    getBusinessesInScope().map((business) => getBusinessCurrency(business.id))
+  );
+  return currencies.size > 1;
+}
+
+function syncExportScopeUi() {
+  const scopeHelp = document.getElementById("exportScopeHelp");
+  const taxIdCheckbox = document.getElementById("exportIncludeTaxId");
+  const taxIdValue = document.getElementById("exportTaxIdValue");
+  const pdfNote = document.getElementById("exportPdfNote");
+  const scope = getExportScope();
+  const mixedCurrencies = hasMixedCurrenciesInScope();
+
+  if (scopeHelp) {
+    scopeHelp.textContent =
+      scope === "all"
+        ? "Exports and totals use every business you have access to."
+        : "Exports and totals use your current active business.";
+  }
+
+  if (taxIdCheckbox) {
+    taxIdCheckbox.disabled = scope === "all";
+    if (scope === "all") {
+      taxIdCheckbox.checked = false;
+    }
+  }
+
+  if (taxIdValue && scope === "all") {
+    taxIdValue.textContent = "Per-business";
+  } else if (taxIdValue) {
+    initBusinessTaxId();
+  }
+
+  if (pdfNote) {
+    pdfNote.textContent =
+      scope === "all"
+        ? "PDF bulk export downloads one file per business. Combined totals stay separate when currencies differ."
+        : "PDF export is included in InEx Ledger V1.";
+  }
+
+  const summaryNet = document.getElementById("exportSummaryNet");
+  if (scope === "all" && mixedCurrencies && summaryNet) {
+    summaryNet.textContent = "Per-business";
+  }
+}
+
 async function hydrateTransactionsCache() {
   try {
-    const response = await apiFetch("/api/transactions");
+    const response = await apiFetch(`/api/transactions${buildScopeQuery()}`);
     if (!response || !response.ok) {
       return;
     }
@@ -59,6 +207,8 @@ async function hydrateTransactionsCache() {
       : [];
     const normalized = transactions.map((transaction) => ({
       id: transaction.id,
+      businessId: transaction.businessId || transaction.business_id || "",
+      businessName: transaction.businessName || transaction.business_name || "",
       date: String(transaction.date || "").slice(0, 10),
       description: transaction.description || "",
       amount: Number(transaction.amount) || 0,
@@ -77,13 +227,18 @@ async function hydrateTransactionsCache() {
 
 async function hydrateAccountsCache() {
   try {
-    const response = await apiFetch("/api/accounts");
+    const response = await apiFetch(`/api/accounts${buildScopeQuery()}`);
     if (!response || !response.ok) {
       return;
     }
     const accounts = await response.json().catch(() => []);
     if (Array.isArray(accounts)) {
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+      const normalized = accounts.map((account) => ({
+        ...account,
+        businessId: account.businessId || account.business_id || "",
+        businessName: account.businessName || account.business_name || ""
+      }));
+      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(normalized));
     }
   } catch (error) {
     console.warn("[Exports] Unable to hydrate accounts", error);
@@ -92,7 +247,7 @@ async function hydrateAccountsCache() {
 
 async function hydrateCategoriesCache() {
   try {
-    const response = await apiFetch("/api/categories");
+    const response = await apiFetch(`/api/categories${buildScopeQuery()}`);
     if (!response || !response.ok) {
       return;
     }
@@ -100,6 +255,8 @@ async function hydrateCategoriesCache() {
     if (Array.isArray(categories)) {
       const normalized = categories.map((category) => ({
         id: category.id,
+        businessId: category.businessId || category.business_id || "",
+        businessName: category.businessName || category.business_name || "",
         name: category.name,
         type: category.kind,
         taxLabel: category.tax_map_us || category.tax_map_ca || ""
@@ -113,7 +270,7 @@ async function hydrateCategoriesCache() {
 
 async function hydrateReceiptsCache() {
   try {
-    const response = await apiFetch("/api/receipts");
+    const response = await apiFetch(`/api/receipts${buildScopeQuery()}`);
     if (!response || !response.ok) {
       return;
     }
@@ -125,6 +282,8 @@ async function hydrateReceiptsCache() {
       : [];
     const normalized = receipts.map((receipt) => ({
       id: receipt.id,
+      businessId: receipt.businessId || receipt.business_id || "",
+      businessName: receipt.businessName || receipt.business_name || "",
       filename: receipt.filename || "",
       uploadedAt: receipt.created_at || "",
       transactionId: receipt.transaction_id || "",
@@ -138,6 +297,21 @@ async function hydrateReceiptsCache() {
 }
 
 async function hydrateBusinessProfileCache() {
+  if (getExportScope() === "all") {
+    localStorage.setItem(
+      BUSINESS_PROFILE_KEY,
+      JSON.stringify({
+        name: "All businesses",
+        type: "",
+        ein: "",
+        taxId: "",
+        fiscalYearStart: "",
+        address: ""
+      })
+    );
+    return;
+  }
+
   try {
     const response = await apiFetch("/api/business");
     if (!response || !response.ok) {
@@ -170,7 +344,7 @@ function setupExportForm() {
   applyDatePreset("2026-ytd");
   updatePresetChipState("2026-ytd");
 
-  ["period-start", "period-end", "exportAccountFilter", "exportCategoryFilter", "exportLanguage", "exportIncludeTaxId"].forEach((id) => {
+  ["period-start", "period-end", "exportAccountFilter", "exportCategoryFilter", "exportLanguage", "exportIncludeTaxId", "exportScope"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", () => {
       if (id === "period-start" || id === "period-end") {
         clearCustomPresetState();
@@ -298,6 +472,11 @@ function initBusinessTaxId() {
     return;
   }
 
+  if (getExportScope() === "all") {
+    taxIdNode.textContent = "Per-business";
+    return;
+  }
+
   const profile = readBusinessProfile();
   const region = getRegion();
   const taxId = profile.ein || profile.taxId || localStorage.getItem(region === "ca" ? "lb_bn" : "lb_ein") || "";
@@ -331,6 +510,7 @@ function getValidatedExportRange() {
 }
 
 function updateExportSummary() {
+  const summaryScope = document.getElementById("exportSummaryScope");
   const summaryTaxForm = document.getElementById("exportSummaryTaxForm");
   const taxContextNote = document.getElementById("exportTaxContext");
   const summaryPeriod = document.getElementById("exportSummaryPeriod");
@@ -339,12 +519,18 @@ function updateExportSummary() {
   const summaryNet = document.getElementById("exportSummaryNet");
   const startDate = document.getElementById("period-start")?.value || "";
   const endDate = document.getElementById("period-end")?.value || "";
+  const scope = getExportScope();
+  const mixedCurrencies = hasMixedCurrenciesInScope();
 
   if (!summaryPeriod || !summaryIncome || !summaryExpenses || !summaryNet) {
     return;
   }
 
-  const taxContext = getTaxFormContext();
+  const taxContext = getTaxFormContextForScope();
+  if (summaryScope) {
+    summaryScope.textContent =
+      scope === "all" ? "All businesses" : getBusinessById(getActiveBusinessId())?.name || "Active business";
+  }
   if (summaryTaxForm) {
     summaryTaxForm.textContent = taxContext.label;
   }
@@ -370,98 +556,162 @@ function updateExportSummary() {
   const net = income - expenses;
 
   summaryPeriod.textContent = `${startDate} to ${endDate}`;
-  summaryIncome.textContent = formatMoney(income);
-  summaryExpenses.textContent = formatMoney(expenses);
-  summaryNet.textContent = formatMoney(net);
+  if (scope === "all" && mixedCurrencies) {
+    summaryIncome.textContent = "Per-business";
+    summaryExpenses.textContent = "Per-business";
+    summaryNet.textContent = "Per-business";
+    return;
+  }
+
+  const currencyRegion = scope === "all"
+    ? String(getBusinessesInScope()[0]?.region || "").toLowerCase()
+    : getRegion();
+  summaryIncome.textContent = formatMoney(income, currencyRegion);
+  summaryExpenses.textContent = formatMoney(expenses, currencyRegion);
+  summaryNet.textContent = formatMoney(net, currencyRegion);
 }
 
 function exportCsv(startDate, endDate, recordHistory = true, explicitFilename, tierOverride, exportLangOverride) {
   const tier = tierOverride || (typeof effectiveTier === "function" ? effectiveTier() : "free");
   const exportLang = clampExportLang(exportLangOverride || getCurrentExportLanguage());
-  const region = getRegion();
-  const currency = getCurrencyForRegion(region);
+  const scope = getExportScope();
   const transactions = filterTransactions(startDate, endDate);
   const isFull = tier === "v1";
   const format = isFull ? CSV_FULL_FORMAT : CSV_BASIC_FORMAT;
-  const filename = explicitFilename || (isFull ? makeExportFilename(startDate, endDate) : makeBasicFilename(startDate, endDate));
-  const csvContent = isFull ? buildFullCsv(transactions, currency) : buildBasicCsv(transactions);
+  const batches = buildExportBatches(transactions, scope);
+  const historyEntries = [];
 
-  downloadFile(csvContent, filename, "text/csv");
-  showExportToast("CSV export generated");
+  if (!batches.length) {
+    showExportToast("No data found for that export range");
+    return;
+  }
 
-  if (recordHistory) {
-    appendExportHistory({
-      id: `exp_${Date.now()}`,
+  batches.forEach((batch, index) => {
+    const currency = batch.region ? getCurrencyForRegion(batch.region) : getCurrencyForRegion(getRegion());
+    const filename = explicitFilename && batches.length === 1
+      ? explicitFilename
+      : isFull
+      ? makeExportFilename(startDate, endDate, batch)
+      : makeBasicFilename(startDate, endDate, batch);
+    const csvContent = isFull
+      ? buildFullCsv(batch.transactions, currency, scope === "all")
+      : buildBasicCsv(batch.transactions, scope === "all");
+
+    window.setTimeout(() => {
+      downloadFile(csvContent, filename, "text/csv");
+    }, index * 120);
+
+    historyEntries.push({
+      id: `exp_${Date.now()}_${index}`,
       startDate,
       endDate,
       exportedAt: new Date().toISOString(),
       filename,
       tier,
       format,
-      exportLang
+      exportLang,
+      scope,
+      businessId: batch.businessId || "",
+      batchMode: batches.length > 1
     });
+  });
+
+  showExportToast(batches.length > 1 ? `Exported ${batches.length} CSV files` : "CSV export generated");
+
+  if (recordHistory) {
+    historyEntries.forEach((entry) => appendExportHistory(entry));
     renderExportHistory();
   }
 }
 
-function exportPdf(startDate, endDate, recordHistory = true, explicitFilename, exportLangOverride) {
+async function exportPdf(startDate, endDate, recordHistory = true, explicitFilename, exportLangOverride) {
   if (typeof buildPdfExport !== "function") {
     console.warn("PDF export helper is not available.");
     return;
   }
 
   const exportLang = clampExportLang(exportLangOverride || getCurrentExportLanguage());
-  const filename = explicitFilename || makePdfFilename(startDate, endDate);
-  const region = getRegion();
-  const businessProfile = readBusinessProfile();
-  const includeTaxId = !!document.getElementById("exportIncludeTaxId")?.checked;
-  const taxId = includeTaxId ? (businessProfile.ein || localStorage.getItem(region === "ca" ? "lb_bn" : "lb_ein") || "") : "";
-  const pdfBytes = buildPdfExport({
-    transactions: filterTransactions(startDate, endDate),
-    accounts: getAccounts(),
-    categories: getCategories(),
-    receipts: getReceipts(),
-    mileage: getMileage(),
-    startDate,
-    endDate,
-    exportLang,
-    currency: getCurrencyForRegion(region),
-    legalName: localStorage.getItem("lb_legal_name") || businessProfile.name || "",
-    businessName: businessProfile.name || localStorage.getItem("lb_business_name") || "",
-    operatingName: localStorage.getItem("lb_dba") || "",
-    taxId,
-    naics: localStorage.getItem("lb_naics") || "",
-    region
-  });
+  const scope = getExportScope();
+  const includeTaxId = scope !== "all" && !!document.getElementById("exportIncludeTaxId")?.checked;
+  const transactions = filterTransactions(startDate, endDate);
+  const batches = await buildExportPdfBatches(transactions, scope);
+  const historyEntries = [];
 
-  downloadFile(pdfBytes, filename, "application/pdf");
-  showExportToast("PDF export generated");
+  if (!batches.length) {
+    showExportToast("No data found for that export range");
+    return;
+  }
 
-  if (recordHistory) {
-    appendExportHistory({
-      id: `exp_${Date.now()}`,
+  batches.forEach((batch, index) => {
+    const businessProfile = batch.businessProfile || readBusinessProfile();
+    const region = String(batch.region || getRegion()).toLowerCase();
+    const taxId = includeTaxId
+      ? businessProfile.ein || businessProfile.taxId || localStorage.getItem(region === "ca" ? "lb_bn" : "lb_ein") || ""
+      : "";
+    const pdfBytes = buildPdfExport({
+      transactions: batch.transactions,
+      accounts: getAccounts().filter((account) => !batch.businessId || account.businessId === batch.businessId),
+      categories: getCategories().filter((category) => !batch.businessId || category.businessId === batch.businessId),
+      receipts: getReceipts().filter((receipt) => !batch.businessId || receipt.businessId === batch.businessId),
+      mileage: getMileage().filter((item) => !batch.businessId || item.businessId === batch.businessId),
+      startDate,
+      endDate,
+      exportLang,
+      currency: getCurrencyForRegion(region),
+      legalName: localStorage.getItem("lb_legal_name") || businessProfile.name || "",
+      businessName: businessProfile.name || batch.businessName || localStorage.getItem("lb_business_name") || "",
+      operatingName: localStorage.getItem("lb_dba") || "",
+      taxId,
+      naics: localStorage.getItem("lb_naics") || "",
+      region
+    });
+    const filename = explicitFilename && batches.length === 1
+      ? explicitFilename
+      : makePdfFilename(startDate, endDate, batch);
+
+    window.setTimeout(() => {
+      downloadFile(pdfBytes, filename, "application/pdf");
+    }, index * 120);
+
+    historyEntries.push({
+      id: `exp_${Date.now()}_${index}`,
       startDate,
       endDate,
       exportedAt: new Date().toISOString(),
       filename,
       tier: "v1",
       format: PDF_FORMAT,
-      exportLang
+      exportLang,
+      scope,
+      businessId: batch.businessId || "",
+      batchMode: batches.length > 1
     });
+  });
+
+  showExportToast(batches.length > 1 ? `Exported ${batches.length} PDF files` : "PDF export generated");
+
+  if (recordHistory) {
+    historyEntries.forEach((entry) => appendExportHistory(entry));
     renderExportHistory();
   }
 }
 
-function buildBasicCsv(transactions) {
-  const rows = [
-    ["Date", "Description", "Type", "Status", "Amount"]
-  ];
+function buildBasicCsv(transactions, includeBusiness = false) {
+  const rows = [[
+    ...(includeBusiness ? ["Business"] : []),
+    "Date",
+    "Description",
+    "Type",
+    "Status",
+    "Amount"
+  ]];
 
   transactions
     .slice()
     .sort((left, right) => (left.date || "").localeCompare(right.date || ""))
     .forEach((transaction) => {
       rows.push([
+        ...(includeBusiness ? [transaction.businessName || getBusinessById(transaction.businessId)?.name || "Business"] : []),
         transaction.date || "",
         transaction.description || "",
         resolveTransactionType(transaction),
@@ -473,10 +723,11 @@ function buildBasicCsv(transactions) {
   return rows.map((row) => row.map(escapeCsv).join(",")).join("\n");
 }
 
-function buildFullCsv(transactions, currency) {
+function buildFullCsv(transactions, currency, includeBusiness = false) {
   const accounts = mapById(getAccounts());
   const categories = mapById(getCategories());
   const rows = [[
+    ...(includeBusiness ? ["Business"] : []),
     "Date",
     "Description",
     "Type",
@@ -504,10 +755,12 @@ function buildFullCsv(transactions, currency) {
       const accountId = transaction.accountId || "";
       const numericAmount = Math.abs(Number(transaction.amount) || 0);
       const signedAmount = type === "income" ? numericAmount : -numericAmount;
-      const nextBalance = (runningBalances.get(accountId) || 0) + signedAmount;
-      runningBalances.set(accountId, nextBalance);
+      const runningBalanceKey = includeBusiness ? `${transaction.businessId || ""}:${accountId}` : accountId;
+      const nextBalance = (runningBalances.get(runningBalanceKey) || 0) + signedAmount;
+      runningBalances.set(runningBalanceKey, nextBalance);
 
       rows.push([
+        ...(includeBusiness ? [transaction.businessName || getBusinessById(transaction.businessId)?.name || "Business"] : []),
         transaction.date || "",
         transaction.description || "",
         type,
@@ -589,7 +842,7 @@ function renderExportHistory() {
   }).join("");
 }
 
-function replayHistoryEntry(entryId) {
+async function replayHistoryEntry(entryId) {
   if (!entryId) {
     return;
   }
@@ -597,6 +850,13 @@ function replayHistoryEntry(entryId) {
   if (!entry) {
     return;
   }
+
+  setExportScope(document.getElementById("exportScope"), entry.scope);
+  await hydrateExportData();
+  await refreshReceiptsDot();
+  syncExportScopeUi();
+  populateExportFilters();
+  updateExportSummary();
 
   if (entry.format === PDF_FORMAT) {
     exportPdf(entry.startDate, entry.endDate, false, entry.filename, entry.exportLang);
@@ -664,7 +924,10 @@ function populateExportFilters() {
     accounts.forEach((account) => {
       const option = document.createElement("option");
       option.value = account.id || "";
-      option.textContent = account.name || "Account";
+      option.textContent =
+        getExportScope() === "all"
+          ? `${account.businessName || getBusinessById(account.businessId)?.name || "Business"} · ${account.name || "Account"}`
+          : account.name || "Account";
       accountSelect.appendChild(option);
     });
     accountSelect.disabled = accounts.length === 0;
@@ -676,7 +939,10 @@ function populateExportFilters() {
     categories.forEach((category) => {
       const option = document.createElement("option");
       option.value = category.id || "";
-      option.textContent = category.name || "Category";
+      option.textContent =
+        getExportScope() === "all"
+          ? `${category.businessName || getBusinessById(category.businessId)?.name || "Business"} · ${category.name || "Category"}`
+          : category.name || "Category";
       categorySelect.appendChild(option);
     });
     categorySelect.disabled = categories.length === 0;
@@ -685,11 +951,11 @@ function populateExportFilters() {
 
 async function refreshReceiptsDot() {
   try {
-    const response = await apiFetch("/api/receipts");
+    const response = await apiFetch(`/api/receipts${buildScopeQuery()}`);
     if (response && response.ok) {
       const payload = await response.json().catch(() => []);
       const receipts = Array.isArray(payload) ? payload : Array.isArray(payload?.receipts) ? payload.receipts : [];
-      unattachedReceiptsCount = receipts.filter((receipt) => !receipt?.transaction_id).length;
+      unattachedReceiptsCount = receipts.filter((receipt) => !receipt?.transaction_id && !receipt?.transactionId).length;
     }
   } catch (error) {
     console.warn("[Exports] Unable to refresh receipts dot", error);
@@ -729,16 +995,16 @@ function resolveTransactionType(transaction, category) {
   return category?.type === "income" ? "income" : "expense";
 }
 
-function makeExportFilename(startDate, endDate) {
-  return `inex-ledger-${getTaxFormContext().slug}-export-${startDate}_to_${endDate}.csv`;
+function makeExportFilename(startDate, endDate, batch) {
+  return `inex-ledger-${buildExportFileSlug(batch)}-export-${startDate}_to_${endDate}.csv`;
 }
 
-function makeBasicFilename(startDate, endDate) {
-  return `inex-ledger-${getTaxFormContext().slug}-basic-export-${startDate}_to_${endDate}.csv`;
+function makeBasicFilename(startDate, endDate, batch) {
+  return `inex-ledger-${buildExportFileSlug(batch)}-basic-export-${startDate}_to_${endDate}.csv`;
 }
 
-function makePdfFilename(startDate, endDate) {
-  return `inex-ledger-${getTaxFormContext().slug}-export-${startDate}_to_${endDate}.pdf`;
+function makePdfFilename(startDate, endDate, batch) {
+  return `inex-ledger-${buildExportFileSlug(batch)}-export-${startDate}_to_${endDate}.pdf`;
 }
 
 function formatHistoryDate(value) {
@@ -756,10 +1022,10 @@ function formatHistorySize(format) {
   return format === PDF_FORMAT ? "PDF" : "CSV";
 }
 
-function formatMoney(amount) {
+function formatMoney(amount, regionOverride = getRegion()) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: getCurrencyForRegion(getRegion()),
+    currency: getCurrencyForRegion(regionOverride),
     minimumFractionDigits: 2
   }).format(amount || 0);
 }
@@ -783,6 +1049,127 @@ function getTaxFormContext(region = getRegion()) {
     exportLabel: "U.S. Schedule C export package",
     slug: "schedule-c"
   };
+}
+
+function getTaxFormContextForScope() {
+  const businesses = getBusinessesInScope();
+  if (getExportScope() !== "all") {
+    return getTaxFormContext(String(businesses[0]?.region || getRegion()).toLowerCase());
+  }
+
+  const regions = new Set(
+    businesses.map((business) => (String(business.region || "").toUpperCase() === "CA" ? "CA" : "US"))
+  );
+  if (regions.size === 1) {
+    return getTaxFormContext([...regions][0] === "CA" ? "ca" : "us");
+  }
+
+  return {
+    label: "Multi-business",
+    exportLabel: "Multi-business export package",
+    slug: "multi-business"
+  };
+}
+
+function slugifyBusinessName(value) {
+  return String(value || "business")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "business";
+}
+
+function buildExportFileSlug(batch) {
+  const taxContext = getTaxFormContextForScope();
+  if (!batch?.businessId || getExportScope() !== "all") {
+    return taxContext.slug;
+  }
+  return `${taxContext.slug}-${slugifyBusinessName(batch.businessName || batch.businessId)}`;
+}
+
+function buildExportBatches(transactions, scope) {
+  if (scope !== "all") {
+    const activeBusiness = getBusinessById(getActiveBusinessId());
+    return [{
+      businessId: activeBusiness?.id || "",
+      businessName: activeBusiness?.name || readBusinessProfile().name || "Business",
+      region: String(activeBusiness?.region || getRegion()).toLowerCase(),
+      businessProfile: readBusinessProfile(),
+      transactions
+    }];
+  }
+
+  return getBusinessesInScope().map((business) => ({
+    businessId: business.id,
+    businessName: business.name || "Business",
+    region: String(business.region || "US").toLowerCase(),
+    transactions: transactions.filter((transaction) => transaction.businessId === business.id),
+    businessProfile: {
+      name: business.name || "Business",
+      taxId: "",
+      ein: "",
+      type: "",
+      address: ""
+    }
+  })).filter((batch) => batch.transactions.length > 0);
+}
+
+async function buildExportPdfBatches(transactions, scope) {
+  const batches = buildExportBatches(transactions, scope);
+  if (scope !== "all") {
+    return batches;
+  }
+
+  const hydratedProfiles = await Promise.all(
+    batches.map(async (batch) => ({
+      ...batch,
+      businessProfile: await fetchBusinessProfileById(batch.businessId, batch.businessName)
+    }))
+  );
+
+  return hydratedProfiles;
+}
+
+async function fetchBusinessProfileById(businessId, fallbackName = "Business") {
+  if (!businessId) {
+    return {
+      name: fallbackName,
+      taxId: "",
+      ein: "",
+      type: "",
+      address: "",
+      fiscalYearStart: ""
+    };
+  }
+
+  try {
+    const response = await apiFetch(`/api/businesses/${encodeURIComponent(businessId)}/profile`);
+    if (!response || !response.ok) {
+      throw new Error("Profile request failed");
+    }
+    const business = await response.json().catch(() => null);
+    if (!business) {
+      throw new Error("Profile payload missing");
+    }
+
+    return {
+      name: business.name || fallbackName,
+      type: business.business_type || "",
+      ein: business.tax_id || "",
+      taxId: business.tax_id || "",
+      fiscalYearStart: business.fiscal_year_start || "",
+      address: business.address || ""
+    };
+  } catch (error) {
+    console.warn("[Exports] Unable to hydrate business profile", businessId, error);
+    return {
+      name: fallbackName,
+      taxId: "",
+      ein: "",
+      type: "",
+      address: "",
+      fiscalYearStart: ""
+    };
+  }
 }
 
 function getCurrencyForRegion(region) {

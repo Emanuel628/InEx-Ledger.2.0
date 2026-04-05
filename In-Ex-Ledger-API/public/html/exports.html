@@ -129,6 +129,15 @@
           </div>
 
           <div class="form-field">
+            <label class="field-label" for="exportScope">Export scope</label>
+            <select id="exportScope">
+              <option value="active">Active business only</option>
+              <option value="all">All businesses</option>
+            </select>
+            <p class="helper-text" id="exportScopeHelp">Use the current business or export every business in one action.</p>
+          </div>
+
+          <div class="form-field">
             <label class="field-label" for="exportLanguage">Export language</label>
             <select id="exportLanguage">
               <option value="en">English</option>
@@ -153,6 +162,7 @@
           </label>
 
           <div class="summary-panel" id="exportSummaryPanel">
+            <div class="summary-row"><span>Scope</span><strong id="exportSummaryScope">Active business</strong></div>
             <div class="summary-row"><span>Tax form</span><strong id="exportSummaryTaxForm">U.S. Schedule C</strong></div>
             <div class="summary-row"><span>Period</span><strong id="exportSummaryPeriod">-</strong></div>
             <div class="summary-row"><span>Total income</span><strong class="summary-income" id="exportSummaryIncome">$0.00</strong></div>
@@ -160,7 +170,7 @@
             <div class="summary-row summary-net"><span>Net profit</span><strong id="exportSummaryNet">$0.00</strong></div>
           </div>
 
-          <p id="exportPdfNote" class="small-note">PDF export is included in InEx Ledger V1.</p>
+          <p id="exportPdfNote" class="small-note">PDF export is included in InEx Ledger V1. All-business export downloads one file per business.</p>
         </section>
       </form>
 

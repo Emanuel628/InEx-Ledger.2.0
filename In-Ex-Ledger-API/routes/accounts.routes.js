@@ -3,7 +3,10 @@ const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
-const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const {
+  resolveBusinessIdForUser,
+  getBusinessScopeForUser
+} = require("../api/utils/resolveBusinessIdForUser.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -14,10 +17,15 @@ router.use(createDataApiLimiter());
  */
 router.get("/", async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
     const result = await pool.query(
-      "SELECT * FROM accounts WHERE business_id = $1 ORDER BY created_at DESC",
-      [businessId]
+      `SELECT a.*,
+              b.name AS business_name
+       FROM accounts a
+       JOIN businesses b ON b.id = a.business_id
+       WHERE a.business_id = ANY($1::uuid[])
+       ORDER BY b.name ASC, a.created_at DESC`,
+      [scope.businessIds]
     );
     res.json(result.rows);
   } catch (err) {

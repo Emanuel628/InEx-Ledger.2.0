@@ -2,7 +2,9 @@ const STORAGE_KEYS = {
   accounts: "lb_accounts",
   categories: "lb_categories",
   transactions: "lb_transactions",
-  receipts: "lb_receipts"
+  receipts: "lb_receipts",
+  businesses: "lb_businesses",
+  scope: "lb_transactions_scope"
 };
 
 const ledgerState = {
@@ -52,12 +54,16 @@ let pendingTransactionReceiptFile = null;
 let recurringDrawerElement = null;
 let recurringToggleElement = null;
 let editingRecurringTemplateId = null;
+let transactionBusinessContext = {
+  activeBusinessId: "",
+  businesses: []
+};
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
-function formatCurrency(value) {
+function formatCurrency(value, regionOverride = getRegion()) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD"
+    currency: regionOverride === "ca" ? "CAD" : "USD"
   }).format(value);
 }
 
@@ -72,6 +78,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderTrialBanner("trialBanner");
   }
 
+  await hydrateTransactionBusinessContext();
+  initTransactionScopeSelect();
   setupTransactionDrawer();
   initSidebarTypeFilter();
   wireTransactionIntentButtons();
@@ -122,6 +130,134 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 });
+
+async function hydrateTransactionBusinessContext() {
+  try {
+    const response = await apiFetch("/api/businesses");
+    if (!response || !response.ok) {
+      return;
+    }
+    const payload = await response.json().catch(() => null);
+    transactionBusinessContext = {
+      activeBusinessId: payload?.active_business_id || "",
+      businesses: Array.isArray(payload?.businesses) ? payload.businesses : []
+    };
+    localStorage.setItem(STORAGE_KEYS.businesses, JSON.stringify(transactionBusinessContext));
+  } catch (error) {
+    console.warn("[Transactions] Unable to hydrate businesses", error);
+  }
+}
+
+function initTransactionScopeSelect() {
+  const select = document.getElementById("transactionsScope");
+  if (!select) {
+    return;
+  }
+
+  setTransactionScope(select, localStorage.getItem(STORAGE_KEYS.scope));
+  syncTransactionScopeUi();
+  select.addEventListener("change", async () => {
+    setTransactionScope(select, select.value);
+    syncTransactionScopeUi();
+    await loadBusinessTaxProfile();
+    await refreshAccountOptions();
+    await refreshCategoryOptions();
+    await loadTransactions();
+    if (getTransactionScope() === "active") {
+      await loadRecurringTemplates();
+    }
+  });
+}
+
+function getTransactionScope() {
+  const select = document.getElementById("transactionsScope");
+  if (select?.value === "all") {
+    return "all";
+  }
+  return localStorage.getItem(STORAGE_KEYS.scope) === "all" ? "all" : "active";
+}
+
+function setTransactionScope(select, value) {
+  const normalized = value === "all" ? "all" : "active";
+  if (select) {
+    select.value = normalized;
+  }
+  localStorage.setItem(STORAGE_KEYS.scope, normalized);
+}
+
+function buildTransactionScopeQuery() {
+  return getTransactionScope() === "all" ? "?scope=all" : "";
+}
+
+function getStoredBusinesses() {
+  if (Array.isArray(transactionBusinessContext.businesses) && transactionBusinessContext.businesses.length) {
+    return transactionBusinessContext.businesses;
+  }
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.businesses) || "null");
+    if (parsed && Array.isArray(parsed.businesses)) {
+      transactionBusinessContext = parsed;
+      return parsed.businesses;
+    }
+  } catch {}
+  return [];
+}
+
+function getBusinessById(businessId) {
+  return getStoredBusinesses().find((business) => business.id === businessId) || null;
+}
+
+function getBusinessesInScope() {
+  const businesses = getStoredBusinesses();
+  if (getTransactionScope() === "all") {
+    return businesses;
+  }
+  const activeBusinessId =
+    transactionBusinessContext.activeBusinessId || localStorage.getItem("lb_active_business_id") || "";
+  const activeBusiness = businesses.find((business) => business.id === activeBusinessId);
+  return activeBusiness ? [activeBusiness] : businesses.slice(0, 1);
+}
+
+function hasMixedCurrenciesInScope() {
+  const currencies = new Set(
+    getBusinessesInScope().map((business) =>
+      String(business.region || "").toUpperCase() === "CA" ? "CAD" : "USD"
+    )
+  );
+  return currencies.size > 1;
+}
+
+function syncTransactionScopeUi() {
+  const isAllScope = getTransactionScope() === "all";
+  const addButtons = [document.getElementById("addTxToggle"), document.getElementById("addTxTogglePage")];
+  const recurringPanel = document.querySelector(".recurring-panel");
+  const subtitle = document.querySelector(".page-subtitle");
+  const taxContext = document.getElementById("transactionsTaxContext");
+
+  if (subtitle) {
+    subtitle.textContent = isAllScope
+      ? `${getBusinessesInScope().length || 0} businesses · portfolio reporting view`
+      : "Active business ledger · current reporting period";
+  }
+
+  addButtons.filter(Boolean).forEach((button) => {
+    button.disabled = isAllScope;
+    button.title = isAllScope ? "Switch to Active business to add or edit transactions." : "";
+  });
+
+  if (isAllScope) {
+    closeTransactionDrawer();
+    closeRecurringDrawer();
+  }
+
+  if (recurringPanel) {
+    recurringPanel.hidden = isAllScope;
+  }
+
+  if (taxContext && isAllScope && hasMixedCurrenciesInScope()) {
+    taxContext.textContent = "Tax form context: Multi-business reporting view";
+  }
+}
 
 function wireTransactionForm() {
   const form = document.querySelector("form");
@@ -1010,7 +1146,7 @@ async function fetchAccountsForTransactions() {
   const fallback = getAccounts();
 
   try {
-    const response = await apiFetch("/api/accounts");
+    const response = await apiFetch(`/api/accounts${buildTransactionScopeQuery()}`);
     if (!response || !response.ok) {
       return fallback;
     }
@@ -1061,7 +1197,10 @@ function populateTransactionCategoryFilter() {
   categories.forEach((category) => {
     const option = document.createElement("option");
     option.value = category.id;
-    option.textContent = category.name;
+    option.textContent =
+      getTransactionScope() === "all"
+        ? `${category.businessName || getBusinessById(category.businessId)?.name || "Business"} · ${category.name}`
+        : category.name;
     select.appendChild(option);
   });
   select.value = transactionFilters.category || prevValue || "";
@@ -1165,7 +1304,7 @@ async function fetchCategoriesForTransactions() {
   const fallback = getCategories();
 
   try {
-    const response = await apiFetch("/api/categories");
+    const response = await apiFetch(`/api/categories${buildTransactionScopeQuery()}`);
     if (!response || !response.ok) {
       return fallback;
     }
@@ -1177,6 +1316,8 @@ async function fetchCategoriesForTransactions() {
 
     return categories.map((category) => ({
       id: category.id,
+      businessId: category.businessId || category.business_id || "",
+      businessName: category.businessName || category.business_name || "",
       name: category.name,
       type: category.kind,
       taxLabel:
@@ -1189,7 +1330,7 @@ async function fetchCategoriesForTransactions() {
 }
 
 async function fetchTransactionsForPage() {
-  const response = await apiFetch("/api/transactions");
+  const response = await apiFetch(`/api/transactions${buildTransactionScopeQuery()}`);
   if (!response || !response.ok) {
     throw new Error("Failed to load transactions.");
   }
@@ -1208,7 +1349,7 @@ async function fetchTransactionsForPage() {
 
 async function fetchReceiptLinksSnapshot() {
   try {
-    const response = await apiFetch("/api/receipts");
+    const response = await apiFetch(`/api/receipts${buildTransactionScopeQuery()}`);
     if (!response || !response.ok) {
       return { byTransactionId: {}, unattachedCount: 0 };
     }
@@ -1244,11 +1385,15 @@ function normalizeTransaction(transaction) {
 
   return {
     id: transaction.id,
+    businessId: transaction.businessId || transaction.business_id || "",
+    businessName: transaction.businessName || transaction.business_name || "",
     date: String(transaction.date || "").slice(0, 10),
     description: transaction.description || "",
     amount: Number(transaction.amount) || 0,
     accountId: transaction.accountId || transaction.account_id || "",
+    accountName: transaction.accountName || transaction.account_name || "",
     categoryId: transaction.categoryId || transaction.category_id || "",
+    categoryName: transaction.categoryName || transaction.category_name || "",
     type: transaction.type === "income" ? "income" : "expense",
     note: transaction.note || "",
     receiptId: transaction.receiptId || transaction.receipt_id || "",
@@ -1289,20 +1434,26 @@ function renderTransactionsTable(filteredTransactions) {
 
   const accountsById = mapById(getAccounts());
   const categoriesById = mapById(getCategories());
+  const isAllScope = getTransactionScope() === "all";
   tbody.innerHTML = "";
 
   transactions.forEach((txn) => {
     const row = document.createElement("tr");
-    const categoryName = categoriesById[txn.categoryId]?.name || "-";
+    const categoryName = txn.categoryName || categoriesById[txn.categoryId]?.name || "-";
+    const accountName = txn.accountName || accountsById[txn.accountId]?.name || "-";
     const sourceBadge = txn.recurringTransactionId
       ? '<span class="source-badge">Recurring</span>'
       : "";
     const recurringMeta = txn.recurringOccurrenceDate
       ? `Generated ${formatDisplayDate(txn.recurringOccurrenceDate)}`
       : "Generated automatically";
-    const descriptionSub = txn.recurringTransactionId
+    const descriptionTail = txn.recurringTransactionId
       ? `${sourceBadge}${txn.note ? ` ${txn.note}` : ` ${recurringMeta}`}`
       : txn.note || categoryName || "";
+    const businessBadge = isAllScope
+      ? `<span class="business-scope-badge">${txn.businessName || getBusinessById(txn.businessId)?.name || "Business"}</span>`
+      : "";
+    const descriptionSub = `${businessBadge}${descriptionTail}`;
     const amountClass = txn.type === "income" ? "amount-positive" : "amount-negative";
     const amountPrefix = txn.type === "income" ? "+" : "-";
     const clearedMarkup = txn.cleared
@@ -1315,7 +1466,7 @@ function renderTransactionsTable(filteredTransactions) {
     row.innerHTML = `
       <td><span class="date-cell">${formatDisplayDate(txn.date)}</span></td>
       <td><div class="description-primary">${txn.description || "-"}</div><div class="description-sub">${descriptionSub}</div></td>
-      <td><span class="account-tag">${accountsById[txn.accountId]?.name || "-"}</span></td>
+      <td><span class="account-tag">${accountName}</span></td>
       <td><span class="category-pill ${getCategoryToneClass(categoryName)}">${categoryName}</span></td>
       <td>${receiptMarkup}</td>
       <td>
@@ -1325,8 +1476,8 @@ function renderTransactionsTable(filteredTransactions) {
       </td>
       <td class="amount-cell"><span class="${amountClass}">${amountPrefix}${formatCurrency(Math.abs(Number(txn.amount) || 0))}</span></td>
       <td class="actions-cell">
-        <button type="button" class="action-button" data-action="edit-transaction" data-id="${txn.id}">Edit</button>
-        <button type="button" class="action-button delete" data-action="delete-transaction" data-id="${txn.id}">Delete</button>
+        <button type="button" class="action-button" data-action="edit-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>Edit</button>
+        <button type="button" class="action-button delete" data-action="delete-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>Delete</button>
       </td>
     `;
     tbody.appendChild(row);
@@ -1359,18 +1510,22 @@ function renderTotals() {
   const transactionsTaxContext = document.getElementById("transactionsTaxContext");
   const cockpit = document.getElementById("tax-cockpit");
   const upsell = document.getElementById("tax-upsell");
+  const isAllScope = getTransactionScope() === "all";
+  const mixedCurrencies = hasMixedCurrenciesInScope();
+  const scopeRegion = getScopeCurrencyRegion();
 
   const totals = calculateTotals();
   const comparison = calculateYearComparisons();
   const transactionsCount = (ledgerState.transactions || []).length;
   if (incomeLabel) {
-    incomeLabel.textContent = formatCurrency(totals.income);
+    incomeLabel.textContent = isAllScope && mixedCurrencies ? "Per-business" : formatCurrency(totals.income, scopeRegion);
   }
   if (expensesLabel) {
-    expensesLabel.textContent = formatCurrency(totals.expenses);
+    expensesLabel.textContent = isAllScope && mixedCurrencies ? "Per-business" : formatCurrency(totals.expenses, scopeRegion);
   }
   if (netLabel) {
-    netLabel.textContent = formatCurrency(totals.income - totals.expenses);
+    netLabel.textContent =
+      isAllScope && mixedCurrencies ? "Per-business" : formatCurrency(totals.income - totals.expenses, scopeRegion);
   }
   if (incomeDelta) {
     incomeDelta.innerHTML = `<span class="stat-delta-positive">${formatPercentChange(comparison.income)}</span> vs last year`;
@@ -1387,27 +1542,31 @@ function renderTotals() {
 
   const tier = effectiveTier();
   const hasTransactions = transactionsCount > 0;
-  if (tier !== "free" && taxLabel && setAsideLabel) {
+  if (!isAllScope && tier !== "free" && taxLabel && setAsideLabel) {
     const taxableIncome = Math.max(0, totals.income - totals.expenses);
     const estimatedTax = taxableIncome * businessTaxProfile.rate;
     const monthlySetAside = estimatedTax / 12;
-    taxLabel.textContent = formatCurrency(estimatedTax);
-    setAsideLabel.textContent = formatCurrency(monthlySetAside);
+    taxLabel.textContent = formatCurrency(estimatedTax, scopeRegion);
+    setAsideLabel.textContent = formatCurrency(monthlySetAside, scopeRegion);
   } else if (taxLabel && setAsideLabel) {
-    taxLabel.textContent = formatCurrency(0);
-    setAsideLabel.textContent = formatCurrency(0);
+    taxLabel.textContent = isAllScope ? "Not shown" : formatCurrency(0, scopeRegion);
+    setAsideLabel.textContent = isAllScope ? "Switch to one business" : formatCurrency(0, scopeRegion);
   }
   if (taxBannerLabel) {
-    taxBannerLabel.textContent = `Estimated tax owed (${getAppliedTaxLabel()})`;
+    taxBannerLabel.textContent = isAllScope ? "Estimated tax owed" : `Estimated tax owed (${getAppliedTaxLabel()})`;
   }
   if (taxBannerNote) {
-    taxBannerNote.textContent = getAppliedTaxNote();
+    taxBannerNote.textContent = isAllScope
+      ? "Tax estimates stay single-business. Switch to Active business for a filing-specific estimate."
+      : getAppliedTaxNote();
   }
   if (transactionsTaxContext) {
-    transactionsTaxContext.textContent = `Tax form context: ${getTaxFormContext().label} estimate`;
+    transactionsTaxContext.textContent = isAllScope
+      ? `Tax form context: ${getTaxFormContext().label} reporting view`
+      : `Tax form context: ${getTaxFormContext().label} estimate`;
   }
   if (cockpit) {
-    cockpit.style.display = tier === "free" || !hasTransactions ? "none" : "flex";
+    cockpit.style.display = tier === "free" || !hasTransactions || isAllScope ? "none" : "flex";
   }
   if (upsell) {
     const upsellDismissed = localStorage.getItem("lb_transactions_upsell_hidden") === "true";
@@ -1434,6 +1593,11 @@ function calculateTotals() {
 }
 
 async function loadBusinessTaxProfile() {
+  if (getTransactionScope() === "all") {
+    businessTaxProfile = getScopeTaxProfile();
+    return;
+  }
+
   let fallbackSettings = {};
   try {
     fallbackSettings = JSON.parse(localStorage.getItem("lb_business_settings") || "null") || {};
@@ -1462,6 +1626,21 @@ async function loadBusinessTaxProfile() {
   }
 }
 
+function getScopeTaxProfile() {
+  const businesses = getBusinessesInScope();
+  const regions = new Set(
+    businesses.map((business) => (String(business.region || "").toUpperCase() === "CA" ? "CA" : "US"))
+  );
+
+  if (regions.size !== 1) {
+    return { region: "US", province: "", rate: 0 };
+  }
+
+  const onlyRegion = [...regions][0];
+  const firstBusiness = businesses[0] || {};
+  return resolveEstimatedTaxProfileHelper(onlyRegion, String(firstBusiness.province || "").toUpperCase());
+}
+
 function getAppliedTaxLabel() {
   if (businessTaxProfile.region === "CA") {
     const province = businessTaxProfile.province || "CA";
@@ -1479,10 +1658,21 @@ function getAppliedTaxNote() {
 }
 
 function getTaxFormContext() {
+  if (getTransactionScope() === "all" && hasMixedCurrenciesInScope()) {
+    return { label: "Multi-business" };
+  }
   if (businessTaxProfile.region === "CA") {
     return { label: "Canada T2125" };
   }
   return { label: "U.S. Schedule C" };
+}
+
+function getScopeCurrencyRegion() {
+  const businesses = getBusinessesInScope();
+  if (!businesses.length) {
+    return getRegion();
+  }
+  return String(businesses[0].region || getRegion()).toLowerCase() === "ca" ? "ca" : "us";
 }
 
 function formatDisplayDate(value) {
