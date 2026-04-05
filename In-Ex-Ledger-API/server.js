@@ -137,9 +137,11 @@ for (const pageName of htmlPageNames) {
 }
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use('/html', express.static(htmlDir, {
+  index: false,
   setHeaders: setNoCacheHtmlHeaders
 }));
 app.use(express.static(publicDir, {
+  index: false,
   setHeaders: setNoCacheHtmlHeaders
 }));
 app.use(express.json({ limit: '100kb' }));
@@ -169,6 +171,10 @@ app.get('/favicon.svg', (req, res) => {
 
 app.get('/', (req, res) => {
   sendCanonicalPage('landing', req, res);
+});
+
+app.get('/index.html', (req, res) => {
+  res.redirect(301, '/');
 });
 
 /* =========================================================
