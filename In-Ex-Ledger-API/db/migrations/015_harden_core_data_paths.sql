@@ -23,6 +23,35 @@ CREATE INDEX IF NOT EXISTS receipts_business_id_idx
 CREATE INDEX IF NOT EXISTS receipts_transaction_id_idx
   ON receipts (transaction_id);
 
+ALTER TABLE mileage
+ADD COLUMN IF NOT EXISTS trip_date DATE;
+
+ALTER TABLE mileage
+ADD COLUMN IF NOT EXISTS purpose TEXT;
+
+ALTER TABLE mileage
+ADD COLUMN IF NOT EXISTS destination TEXT;
+
+ALTER TABLE mileage
+ADD COLUMN IF NOT EXISTS miles NUMERIC(10,2);
+
+ALTER TABLE mileage
+ADD COLUMN IF NOT EXISTS km NUMERIC(10,2);
+
+ALTER TABLE mileage
+ADD COLUMN IF NOT EXISTS odometer_start NUMERIC(10,2);
+
+ALTER TABLE mileage
+ADD COLUMN IF NOT EXISTS odometer_end NUMERIC(10,2);
+
+UPDATE mileage
+SET trip_date = COALESCE(trip_date, created_at::date, CURRENT_DATE)
+WHERE trip_date IS NULL;
+
+UPDATE mileage
+SET purpose = COALESCE(NULLIF(purpose, ''), 'Business trip')
+WHERE purpose IS NULL OR purpose = '';
+
 CREATE INDEX IF NOT EXISTS mileage_business_id_trip_date_idx
   ON mileage (business_id, trip_date DESC, created_at DESC);
 
