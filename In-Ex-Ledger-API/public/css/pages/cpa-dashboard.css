@@ -330,6 +330,17 @@
   cursor: progress;
 }
 
+.cpa-list-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.cpa-download-button.secondary {
+  background: transparent;
+}
+
 .hidden {
   display: none !important;
 }

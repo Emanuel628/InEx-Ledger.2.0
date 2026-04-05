@@ -69,10 +69,11 @@ async function initCpaDashboard() {
     const ownerUserId = ownerSelect.value;
     const query = businessSelect.value ? `?business_id=${encodeURIComponent(businessSelect.value)}` : "";
 
-    const [summaryResponse, transactionsResponse, receiptsResponse, exportsResponse, auditResponse] = await Promise.all([
+    const [summaryResponse, transactionsResponse, receiptsResponse, mileageResponse, exportsResponse, auditResponse] = await Promise.all([
       apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/summary${query}`),
       apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/transactions${query}`),
       apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/receipts${query}`),
+      apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/mileage${query}`),
       apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/exports${query}`),
       apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/audit${query}`)
     ]);
@@ -80,6 +81,7 @@ async function initCpaDashboard() {
     const summaryPayload = summaryResponse && summaryResponse.ok ? await summaryResponse.json().catch(() => null) : null;
     const transactionsPayload = transactionsResponse && transactionsResponse.ok ? await transactionsResponse.json().catch(() => null) : null;
     const receiptsPayload = receiptsResponse && receiptsResponse.ok ? await receiptsResponse.json().catch(() => null) : null;
+    const mileagePayload = mileageResponse && mileageResponse.ok ? await mileageResponse.json().catch(() => null) : null;
     const exportsPayload = exportsResponse && exportsResponse.ok ? await exportsResponse.json().catch(() => null) : null;
     const auditPayload = auditResponse && auditResponse.ok ? await auditResponse.json().catch(() => null) : null;
 
@@ -88,6 +90,7 @@ async function initCpaDashboard() {
     renderBusinessContext(businessSummaries, businessSelect.value);
     renderTransactions(Array.isArray(transactionsPayload?.data) ? transactionsPayload.data : []);
     renderReceipts(Array.isArray(receiptsPayload?.receipts) ? receiptsPayload.receipts : []);
+    renderMileage(Array.isArray(mileagePayload?.data) ? mileagePayload.data : []);
     renderExports(Array.isArray(exportsPayload?.exports) ? exportsPayload.exports : []);
     renderAuditLog(Array.isArray(auditPayload?.logs) ? auditPayload.logs : []);
   };
@@ -106,15 +109,14 @@ async function initCpaDashboard() {
 
   document.addEventListener("click", async (event) => {
     const trigger = event.target instanceof HTMLElement
-      ? event.target.closest("[data-cpa-export-download]")
+      ? event.target.closest("[data-cpa-export-download], [data-cpa-receipt-download]")
       : null;
     if (!(trigger instanceof HTMLButtonElement)) {
       return;
     }
 
-    const exportId = trigger.getAttribute("data-cpa-export-download") || "";
     const ownerUserId = ownerSelect.value;
-    if (!exportId || !ownerUserId) {
+    if (!ownerUserId) {
       return;
     }
 
@@ -122,9 +124,16 @@ async function initCpaDashboard() {
     trigger.disabled = true;
     trigger.textContent = "Downloading...";
     try {
-      const response = await apiFetch(
-        `/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/exports/${encodeURIComponent(exportId)}/redacted${query}`
-      );
+      const exportId = trigger.getAttribute("data-cpa-export-download") || "";
+      const receiptId = trigger.getAttribute("data-cpa-receipt-download") || "";
+      const downloadUrl = exportId
+        ? `/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/exports/${encodeURIComponent(exportId)}/redacted${query}`
+        : `/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/receipts/${encodeURIComponent(receiptId)}${query}`;
+      if (!exportId && !receiptId) {
+        throw new Error("Download target missing");
+      }
+
+      const response = await apiFetch(downloadUrl);
       if (!response || !response.ok) {
         throw new Error("Download failed");
       }
@@ -132,18 +141,23 @@ async function initCpaDashboard() {
       const objectUrl = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = objectUrl;
-      anchor.download = `inex-ledger-cpa-export-${exportId}.pdf`;
+      const fallbackName = exportId
+        ? `inex-ledger-cpa-export-${exportId}.pdf`
+        : `inex-ledger-cpa-receipt-${receiptId}`;
+      anchor.download = getDownloadFilename(response, fallbackName);
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       window.URL.revokeObjectURL(objectUrl);
     } catch (error) {
-      console.error("[CPA] Export download failed", error);
+      console.error("[CPA] Download failed", error);
       trigger.textContent = "Retry download";
       trigger.disabled = false;
       return;
     }
-    trigger.textContent = "Download redacted PDF";
+    trigger.textContent = trigger.hasAttribute("data-cpa-export-download")
+      ? "Download redacted PDF"
+      : "Download receipt";
     trigger.disabled = false;
   });
 
@@ -272,13 +286,48 @@ function renderReceipts(receipts) {
   }
 
   list.innerHTML = receipts.slice(0, 8).map((receipt) => `
-    <div class="cpa-list-item">
-      <p class="cpa-list-title">${escapeCpaHtml(receipt.filename || "Receipt")}</p>
-      <p class="cpa-list-meta">${escapeCpaHtml(receipt.business_name || "-")} • ${escapeCpaHtml(formatCpaDate(receipt.created_at))}</p>
+    <div class="cpa-list-item cpa-list-item-action">
+      <div class="cpa-list-copy">
+        <p class="cpa-list-title">${escapeCpaHtml(receipt.filename || "Receipt")}</p>
+        <p class="cpa-list-meta">${escapeCpaHtml(receipt.business_name || "-")} • ${escapeCpaHtml(formatCpaDate(receipt.created_at))}</p>
+      </div>
+      <div class="cpa-list-actions">
+        <button
+          type="button"
+          class="cpa-download-button secondary"
+          data-cpa-receipt-download="${escapeCpaHtml(receipt.id || "")}"
+        >
+          Download receipt
+        </button>
+      </div>
     </div>
   `).join("");
 }
 
+function renderMileage(mileageRecords) {
+  const list = document.getElementById("cpaMileageList");
+  if (!list) {
+    return;
+  }
+
+  if (!mileageRecords.length) {
+    list.innerHTML = '<div class="cpa-list-empty">No mileage records found.</div>';
+    return;
+  }
+
+  list.innerHTML = mileageRecords.slice(0, 8).map((entry) => {
+    const distance = Number(entry.km) > 0
+      ? `${Number(entry.km).toFixed(1)} km`
+      : `${Number(entry.miles || 0).toFixed(1)} mi`;
+    return `
+      <div class="cpa-list-item">
+        <p class="cpa-list-title">${escapeCpaHtml(entry.purpose || "Business trip")}</p>
+        <p class="cpa-list-meta">${escapeCpaHtml(entry.business_name || "-")} • ${escapeCpaHtml(formatCpaDate(entry.trip_date))}</p>
+        <p class="cpa-list-meta">${escapeCpaHtml(entry.destination || "No destination noted")} • ${escapeCpaHtml(distance)}</p>
+      </div>
+    `;
+  }).join("");
+}
 function renderExports(exportsList) {
   const list = document.getElementById("cpaExportsList");
   if (!list) {
@@ -397,9 +446,23 @@ function formatAuditAction(action) {
     portfolio_mileage_viewed: "Mileage reviewed",
     portfolio_exports_viewed: "Exports reviewed",
     portfolio_audit_viewed: "Audit feed viewed",
-    portfolio_export_downloaded: "Redacted export downloaded"
+    portfolio_export_downloaded: "Redacted export downloaded",
+    portfolio_receipt_downloaded: "Receipt downloaded"
   };
   return labels[action] || String(action || "activity").replace(/_/g, " ");
+}
+
+function getDownloadFilename(response, fallback) {
+  const header = response.headers.get("content-disposition") || "";
+  const utfMatch = header.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utfMatch?.[1]) {
+    return decodeURIComponent(utfMatch[1]);
+  }
+  const simpleMatch = header.match(/filename="?([^";]+)"?/i);
+  if (simpleMatch?.[1]) {
+    return simpleMatch[1];
+  }
+  return fallback;
 }
 
 function escapeCpaHtml(value) {
@@ -410,3 +473,6 @@ function escapeCpaHtml(value) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+
+

@@ -1,4 +1,5 @@
 const express = require("express");
+const fs = require("fs");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const {
@@ -302,6 +303,63 @@ router.get("/portfolio/:ownerUserId/receipts", async (req, res) => {
   } catch (error) {
     console.error("GET /api/cpa-access/portfolio/:ownerUserId/receipts error:", error.message);
     res.status(500).json({ error: "Failed to load CPA receipts." });
+  }
+});
+
+router.get("/portfolio/:ownerUserId/receipts/:receiptId", async (req, res) => {
+  try {
+    const portfolio = await resolveGrantedPortfolioOr404(req, res);
+    if (!portfolio) {
+      return;
+    }
+
+    const receiptId = String(req.params.receiptId || "").trim();
+    const result = await pool.query(
+      `SELECT r.id,
+              r.business_id,
+              r.filename,
+              r.mime_type,
+              r.storage_path
+         FROM receipts r
+        WHERE r.id = $1
+          AND r.business_id = ANY($2::uuid[])
+        LIMIT 1`,
+      [receiptId, portfolio.business_ids]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ error: "Receipt not found in granted scope." });
+    }
+
+    const receipt = result.rows[0];
+    if (!receipt.storage_path || !fs.existsSync(receipt.storage_path)) {
+      return res.status(404).json({ error: "Receipt file missing." });
+    }
+
+    await logCpaAuditEvent({
+      actorUserId: req.user.id,
+      ownerUserId: portfolio.owner_user_id,
+      businessId: receipt.business_id,
+      action: "portfolio_receipt_downloaded",
+      metadata: {
+        receipt_id: receiptId,
+        grant_scope: portfolio.grant_scope
+      }
+    });
+
+    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader("Content-Type", receipt.mime_type || "application/octet-stream");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename*=UTF-8''${encodeURIComponent(receipt.filename || `receipt-${receiptId}`)}`
+    );
+
+    return res.sendFile(receipt.storage_path);
+  } catch (error) {
+    console.error("GET /api/cpa-access/portfolio/:ownerUserId/receipts/:receiptId error:", error.message);
+    return res.status(500).json({ error: "Failed to download CPA receipt." });
   }
 });
 

@@ -410,6 +410,7 @@ async function initCpaAccess() {
   const businessWrap = document.getElementById("cpaBusinessSelectWrap");
   const messageNode = document.getElementById("cpaAccessMessage");
   const listNode = document.getElementById("cpaAccessList");
+  const auditNode = document.getElementById("cpaAuditActivityList");
 
   if (!form || !emailInput || !scopeSelect || !businessSelect || !businessWrap || !listNode) {
     return;
@@ -517,6 +518,7 @@ async function initCpaAccess() {
           setMessage("CPA access revoked.", "is-success");
           showSettingsToast("CPA access revoked");
           await renderOwnedGrants();
+          await renderAuditActivity();
         });
       });
 
@@ -540,6 +542,7 @@ async function initCpaAccess() {
           setMessage("Revoked CPA access deleted.", "is-success");
           showSettingsToast("Revoked CPA access deleted");
           await renderOwnedGrants();
+          await renderAuditActivity();
         });
       });
     } catch (error) {
@@ -547,6 +550,43 @@ async function initCpaAccess() {
       listNode.innerHTML = '<div class="cpa-access-empty">Unable to load CPA access grants.</div>';
     }
   };
+
+  const renderAuditActivity = async () => {
+    if (!auditNode) {
+      return;
+    }
+
+    try {
+      const response = await apiFetch("/api/cpa-access/audit?limit=12");
+      if (!response || !response.ok) {
+        throw new Error("Unable to load audit activity.");
+      }
+
+      const payload = await response.json().catch(() => null);
+      const logs = Array.isArray(payload?.logs) ? payload.logs : [];
+
+      if (!logs.length) {
+        auditNode.innerHTML = '<div class="cpa-access-empty">No CPA audit activity yet.</div>';
+        return;
+      }
+
+      auditNode.innerHTML = logs.map((entry) => `
+        <div class="cpa-access-item">
+          <div class="cpa-access-meta">
+            <div class="cpa-access-email">${escapeSettingsHtml(formatSettingsAuditAction(entry.action))}</div>
+            <div class="cpa-access-tags">
+              <span class="cpa-access-tag business">${escapeSettingsHtml(entry.business_name || "Portfolio-wide")}</span>
+            </div>
+            <div class="cpa-access-detail">${escapeSettingsHtml(formatSettingsDateTime(entry.created_at))}${entry.actor_email ? ` | ${escapeSettingsHtml(entry.actor_email)}` : ""}</div>
+          </div>
+        </div>
+      `).join("");
+    } catch (error) {
+      console.error("Failed to load CPA audit activity", error);
+      auditNode.innerHTML = '<div class="cpa-access-empty">Unable to load CPA audit activity.</div>';
+    }
+  };
+
   scopeSelect.addEventListener("change", () => {
     syncBusinessVisibility();
     setMessage("");
@@ -582,11 +622,13 @@ async function initCpaAccess() {
     setMessage("CPA access invite created.", "is-success");
     showSettingsToast("CPA access invite created");
     await renderOwnedGrants();
+    await renderAuditActivity();
   });
 
   await loadBusinessOptions();
   syncBusinessVisibility();
   await renderOwnedGrants();
+  await renderAuditActivity();
 }
 
 function escapeSettingsHtml(value) {
@@ -607,6 +649,42 @@ function formatSettingsDate(value) {
     return value;
   }
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatSettingsDateTime(value) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function formatSettingsAuditAction(action) {
+  const labels = {
+    grant_auto_accepted: "Grant auto-accepted",
+    grant_created_active: "Grant created",
+    grant_created_pending: "Invite created",
+    grant_revoked: "Grant revoked",
+    grant_deleted: "Revoked grant deleted",
+    portfolio_summary_viewed: "CPA reviewed summary",
+    portfolio_transactions_viewed: "CPA reviewed transactions",
+    portfolio_receipts_viewed: "CPA reviewed receipts",
+    portfolio_receipt_downloaded: "CPA downloaded receipt",
+    portfolio_mileage_viewed: "CPA reviewed mileage",
+    portfolio_exports_viewed: "CPA reviewed exports",
+    portfolio_export_downloaded: "CPA downloaded redacted export",
+    portfolio_audit_viewed: "CPA reviewed audit feed"
+  };
+  return labels[action] || String(action || "activity").replace(/_/g, " ");
 }
 
 function refreshSettingsLocalizedState() {
