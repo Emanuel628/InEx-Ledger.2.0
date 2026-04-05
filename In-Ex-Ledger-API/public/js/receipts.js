@@ -5,11 +5,8 @@ let receiptRecords = [];
 let transactionMap = {};
 let activeReceiptLinkId = null;
 
-if (typeof requireAuth === "function") {
-  requireAuth();
-}
-
 document.addEventListener("DOMContentLoaded", async () => {
+  await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 

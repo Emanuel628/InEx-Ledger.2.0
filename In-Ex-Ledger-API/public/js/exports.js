@@ -17,7 +17,7 @@ let exportToastTimer = null;
 let unattachedReceiptsCount = 0;
 
 document.addEventListener("DOMContentLoaded", async () => {
-  if (typeof requireAuth === "function") requireAuth();
+  await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
