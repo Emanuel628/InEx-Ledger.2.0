@@ -361,6 +361,48 @@ async function revokeOwnedCpaGrant(ownerUserId, grantId) {
   return true;
 }
 
+async function deleteOwnedRevokedCpaGrant(ownerUserId, grantId) {
+  const grantResult = await pool.query(
+    `SELECT id, owner_user_id, business_id, scope, grantee_email, status
+       FROM cpa_access_grants
+      WHERE id = $1
+        AND owner_user_id = $2
+      LIMIT 1`,
+    [grantId, ownerUserId]
+  );
+
+  if (!grantResult.rowCount) {
+    return false;
+  }
+
+  const grant = grantResult.rows[0];
+  if (grant.status !== "revoked") {
+    throw new Error("Only revoked CPA grants can be deleted.");
+  }
+
+  await pool.query(
+    `DELETE FROM cpa_access_grants
+      WHERE id = $1
+        AND owner_user_id = $2
+        AND status = 'revoked'`,
+    [grantId, ownerUserId]
+  );
+
+  await logCpaAuditEvent({
+    actorUserId: ownerUserId,
+    ownerUserId,
+    grantId,
+    businessId: grant.business_id || null,
+    action: "grant_deleted",
+    metadata: {
+      scope: grant.scope || null,
+      grantee_email: grant.grantee_email || null
+    }
+  });
+
+  return true;
+}
+
 async function acceptAssignedCpaGrant(user, grantId) {
   const result = await pool.query(
     `UPDATE cpa_access_grants
@@ -404,5 +446,6 @@ module.exports = {
   resolveAccessiblePortfolioForUser,
   createCpaGrant,
   revokeOwnedCpaGrant,
+  deleteOwnedRevokedCpaGrant,
   acceptAssignedCpaGrant
 };

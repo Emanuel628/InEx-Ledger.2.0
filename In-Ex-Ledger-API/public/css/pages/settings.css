@@ -385,6 +385,15 @@ main {
   font-weight: 600;
 }
 
+.cpa-access-delete {
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-primary);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
 @media (max-width: 640px) {
   .cpa-access-item {
     flex-direction: column;

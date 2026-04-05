@@ -9,6 +9,7 @@ const {
   resolveAccessiblePortfolioForUser,
   createCpaGrant,
   revokeOwnedCpaGrant,
+  deleteOwnedRevokedCpaGrant,
   acceptAssignedCpaGrant,
   logCpaAuditEvent
 } = require("../services/cpaAccessService.js");
@@ -569,6 +570,21 @@ router.delete("/grants/:id", async (req, res) => {
   } catch (error) {
     console.error("DELETE /api/cpa-access/grants/:id error:", error.message);
     res.status(500).json({ error: "Failed to revoke CPA access." });
+  }
+});
+
+router.delete("/grants/:id/permanent", async (req, res) => {
+  try {
+    const deleted = await deleteOwnedRevokedCpaGrant(req.user.id, req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "CPA access grant not found." });
+    }
+    res.status(204).end();
+  } catch (error) {
+    const message = error?.message || "Failed to delete CPA access grant.";
+    const status = /only revoked/i.test(message) ? 400 : 500;
+    console.error("DELETE /api/cpa-access/grants/:id/permanent error:", message);
+    res.status(status).json({ error: message });
   }
 });
 

@@ -30,6 +30,7 @@ function getResend() {
   return _resend;
 }
 console.log("Email engine ready (Resend)");
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "InEx Ledger <noreply@inexledger.com>";
 
 
 /* =========================================================
@@ -126,15 +127,30 @@ async function consumePasswordResetToken(token) {
    5. LINK BUILDERS
    ========================================================= */
 function buildVerificationLink(req, token) {
-  const protocol = req.protocol;
-  const host = req.get("host");
-  return `${protocol}://${host}/api/auth/verify-email?token=${token}`;
+  return `${getAppBaseUrl(req)}/api/auth/verify-email?token=${token}`;
 }
 
 function buildPasswordResetLink(req, token) {
+  return `${getAppBaseUrl(req)}/reset-password?token=${token}`;
+}
+
+function getAppBaseUrl(req) {
+  const configured = String(process.env.APP_BASE_URL || "").trim().replace(/\/+$/, "");
+  if (configured) {
+    return configured;
+  }
   const protocol = req.protocol;
   const host = req.get("host");
-  return `${protocol}://${host}/reset-password.html?token=${token}`;
+  return `${protocol}://${host}`;
+}
+
+async function sendAppEmail({ to, subject, html }) {
+  return getResend().emails.send({
+    from: RESEND_FROM_EMAIL,
+    to: Array.isArray(to) ? to : [to],
+    subject,
+    html
+  });
 }
 
 /* =========================================================
@@ -247,9 +263,8 @@ router.post("/register", authLimiter, async (req, res) => {
       const { token } = await createVerificationToken(email);
       const verificationLink = buildVerificationLink(req, token);
 
-      await getResend().emails.send({
-        from: "InEx Ledger <onboarding@resend.dev>",
-        to: [email],
+      await sendAppEmail({
+        to: email,
         subject: "Verify Your InEx Ledger Account",
         html: `<p>Welcome! Click <a href="${verificationLink}">here</a> to verify your account.</p>`
       });
@@ -287,9 +302,8 @@ router.post("/send-verification", async (req, res) => {
     const { token, expiresAt } = await createVerificationToken(email);
     const verificationLink = buildVerificationLink(req, token);
 
-    await getResend().emails.send({
-      from: "InEx Ledger <onboarding@resend.dev>",
-      to: [email],
+    await sendAppEmail({
+      to: email,
       subject: "Verify Your InEx Ledger Account",
       html: `
         <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px;">
@@ -297,7 +311,7 @@ router.post("/send-verification", async (req, res) => {
           <p>Please click the button below to verify your email address. This link will expire in 15 minutes.</p>
           <a href="${verificationLink}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 4px;">Verify Email</a>
           <p style="margin-top: 20px; font-size: 12px; color: #666;">If you didn't create an account, you can safely ignore this email.</p>
-        </div>
+      </div>
       `
     });
 
@@ -467,7 +481,7 @@ router.get("/verify-email", async (req, res) => {
     if (result.rowCount === 0) return res.status(404).send("User not found.");
 
     // Redirect to login with a success parameter
-    return res.redirect("/html/login.html?verified=true");
+    return res.redirect("/login?verified=true");
   } catch (err) {
     console.error("Verification error:", err);
     return res.status(500).send("Verification failed.");
@@ -487,11 +501,17 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
       const { token } = await createPasswordResetToken(email);
       const resetLink = buildPasswordResetLink(req, token);
 
-      await getResend().emails.send({
-        from: "InEx Ledger <onboarding@resend.dev>",
-        to: [email],
+      await sendAppEmail({
+        to: email,
         subject: "Password Reset Request",
-        html: `<p>Click here to reset your password:</p><a href="${resetLink}">${resetLink}</a>`
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px;">
+            <h2>Reset your InEx Ledger password</h2>
+            <p>Use the button below to choose a new password. This link will expire soon.</p>
+            <a href="${resetLink}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 4px;">Reset password</a>
+            <p style="margin-top: 20px; font-size: 12px; color: #666;">If you did not request this, you can ignore this email.</p>
+          </div>
+        `
       });
 
     }
@@ -563,12 +583,17 @@ router.post("/request-email-change", requireAuth, authLimiter, async (req, res) 
       [token, req.user.id, email, expiresAt]
     );
 
-    const confirmLink = `${req.protocol}://${req.get("host")}/api/auth/confirm-email-change?token=${token}`;
-    await getResend().emails.send({
-      from: "InEx Ledger <onboarding@resend.dev>",
-      to: [email],
+    const confirmLink = `${getAppBaseUrl(req)}/api/auth/confirm-email-change?token=${token}`;
+    await sendAppEmail({
+      to: email,
       subject: "Confirm your new email address",
-      html: `<p>Click to confirm your new email address: <a href="${confirmLink}">${confirmLink}</a></p>`
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px;">
+          <h2>Confirm your new email address</h2>
+          <p>Click below to confirm this email change for your InEx Ledger account.</p>
+          <a href="${confirmLink}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 4px;">Confirm email change</a>
+        </div>
+      `
     });
 
     res.json({ message: "Confirmation email sent to your new address." });
@@ -597,7 +622,7 @@ router.get("/confirm-email-change", async (req, res) => {
     const { user_id, new_email } = result.rows[0];
     await pool.query("UPDATE users SET email = $1 WHERE id = $2", [new_email, user_id]);
 
-    return res.redirect("/html/login.html?email_changed=true");
+    return res.redirect("/login?email_changed=true");
   } catch (err) {
     console.error("Confirm email change error:", err);
     res.status(500).send("Email change failed.");

@@ -472,22 +472,30 @@ async function initCpaAccess() {
         return;
       }
 
-      listNode.innerHTML = grants.map((grant) => `
-        <div class="cpa-access-item">
-          <div class="cpa-access-meta">
-            <div class="cpa-access-email">${escapeSettingsHtml(grant.grantee_email || "")}</div>
-            <div class="cpa-access-tags">
-              <span class="cpa-access-tag scope">${grant.scope === "all" ? "All businesses" : "One business"}</span>
-              <span class="cpa-access-tag business">${escapeSettingsHtml(grant.business_name || "Portfolio-wide")}</span>
-              <span class="cpa-access-tag ${escapeSettingsHtml(grant.status || "pending")}">${escapeSettingsHtml(grant.status || "pending")}</span>
+      listNode.innerHTML = grants.map((grant) => {
+        const detailParts = [`Created ${formatSettingsDate(grant.created_at)}`];
+        if (grant.accepted_at) detailParts.push(`Accepted ${formatSettingsDate(grant.accepted_at)}`);
+        if (grant.revoked_at) detailParts.push(`Revoked ${formatSettingsDate(grant.revoked_at)}`);
+
+        return `
+          <div class="cpa-access-item">
+            <div class="cpa-access-meta">
+              <div class="cpa-access-email">${escapeSettingsHtml(grant.grantee_email || "")}</div>
+              <div class="cpa-access-tags">
+                <span class="cpa-access-tag scope">${grant.scope === "all" ? "All businesses" : "One business"}</span>
+                <span class="cpa-access-tag business">${escapeSettingsHtml(grant.business_name || "Portfolio-wide")}</span>
+                <span class="cpa-access-tag ${escapeSettingsHtml(grant.status || "pending")}">${escapeSettingsHtml(grant.status || "pending")}</span>
+              </div>
+              <div class="cpa-access-detail">${escapeSettingsHtml(detailParts.join(" | "))}</div>
             </div>
-            <div class="cpa-access-detail">Created ${formatSettingsDate(grant.created_at)}${grant.accepted_at ? ` · Accepted ${formatSettingsDate(grant.accepted_at)}` : ""}</div>
+            <div class="cpa-access-actions">
+              ${grant.status !== "revoked"
+                ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeSettingsHtml(grant.id || "")}">Revoke</button>`
+                : `<button type="button" class="cpa-access-delete" data-cpa-delete="${escapeSettingsHtml(grant.id || "")}">Delete</button>`}
+            </div>
           </div>
-          <div class="cpa-access-actions">
-            ${grant.status !== "revoked" ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeSettingsHtml(grant.id || "")}">Revoke</button>` : ""}
-          </div>
-        </div>
-      `).join("");
+        `;
+      }).join("");
 
       listNode.querySelectorAll("[data-cpa-revoke]").forEach((button) => {
         button.addEventListener("click", async () => {
@@ -496,13 +504,13 @@ async function initCpaAccess() {
             return;
           }
 
-          const response = await apiFetch(`/api/cpa-access/grants/${grantId}`, {
+          const revokeResponse = await apiFetch(`/api/cpa-access/grants/${grantId}`, {
             method: "DELETE"
           });
 
-          if (!response || !response.ok) {
-            const payload = await response?.json().catch(() => null);
-            setMessage(payload?.error || "Unable to revoke CPA access.", "is-error");
+          if (!revokeResponse || !revokeResponse.ok) {
+            const errorPayload = await revokeResponse?.json().catch(() => null);
+            setMessage(errorPayload?.error || "Unable to revoke CPA access.", "is-error");
             return;
           }
 
@@ -511,12 +519,34 @@ async function initCpaAccess() {
           await renderOwnedGrants();
         });
       });
+
+      listNode.querySelectorAll("[data-cpa-delete]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const grantId = button.getAttribute("data-cpa-delete");
+          if (!grantId) {
+            return;
+          }
+
+          const deleteResponse = await apiFetch(`/api/cpa-access/grants/${grantId}/permanent`, {
+            method: "DELETE"
+          });
+
+          if (!deleteResponse || !deleteResponse.ok) {
+            const errorPayload = await deleteResponse?.json().catch(() => null);
+            setMessage(errorPayload?.error || "Unable to delete revoked CPA access.", "is-error");
+            return;
+          }
+
+          setMessage("Revoked CPA access deleted.", "is-success");
+          showSettingsToast("Revoked CPA access deleted");
+          await renderOwnedGrants();
+        });
+      });
     } catch (error) {
       console.error("Failed to load CPA grants", error);
       listNode.innerHTML = '<div class="cpa-access-empty">Unable to load CPA access grants.</div>';
     }
   };
-
   scopeSelect.addEventListener("change", () => {
     syncBusinessVisibility();
     setMessage("");
@@ -1024,3 +1054,4 @@ function showSettingsToast(message) {
     toast.classList.add("hidden");
   }, SETTINGS_TOAST_MS);
 }
+
