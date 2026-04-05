@@ -266,12 +266,10 @@ async function initPreferences() {
 
   if (regionSelect) {
     regionSelect.addEventListener("change", updatePendingPreferences);
-    regionSelect.addEventListener("input", updatePendingPreferences);
   }
 
   if (provinceSelect) {
     provinceSelect.addEventListener("change", updatePendingPreferences);
-    provinceSelect.addEventListener("input", updatePendingPreferences);
   }
 
   if (languageSelect) {
