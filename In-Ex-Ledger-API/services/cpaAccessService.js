@@ -10,20 +10,65 @@ function normalizeScope(value) {
   return String(value || "").trim().toLowerCase() === "all" ? "all" : "business";
 }
 
+async function logCpaAuditEvent({
+  actorUserId = null,
+  ownerUserId = null,
+  grantId = null,
+  businessId = null,
+  action,
+  metadata = {}
+}) {
+  if (!action) {
+    return;
+  }
+
+  await pool.query(
+    `INSERT INTO cpa_audit_logs
+       (id, actor_user_id, owner_user_id, grant_id, business_id, action, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+    [
+      crypto.randomUUID(),
+      actorUserId,
+      ownerUserId,
+      grantId,
+      businessId,
+      action,
+      JSON.stringify(metadata || {})
+    ]
+  );
+}
+
 async function syncPendingCpaGrantsForUser(user) {
   const email = normalizeEmail(user?.email);
   if (!user?.id || !email) {
     return;
   }
 
-  await pool.query(
+  const result = await pool.query(
     `UPDATE cpa_access_grants
         SET grantee_user_id = $1,
             status = CASE WHEN status = 'pending' THEN 'active' ELSE status END,
             accepted_at = COALESCE(accepted_at, NOW())
       WHERE lower(grantee_email) = $2
-        AND status = 'pending'`,
+        AND status = 'pending'
+    RETURNING id, owner_user_id, business_id, scope`,
     [user.id, email]
+  );
+
+  await Promise.all(
+    result.rows.map((row) =>
+      logCpaAuditEvent({
+        actorUserId: user.id,
+        ownerUserId: row.owner_user_id,
+        grantId: row.id,
+        businessId: row.business_id,
+        action: "grant_auto_accepted",
+        metadata: {
+          scope: row.scope,
+          grantee_email: email
+        }
+      })
+    )
   );
 }
 
@@ -47,6 +92,30 @@ async function listOwnedCpaGrants(ownerUserId) {
       WHERE g.owner_user_id = $1
       ORDER BY g.created_at DESC`,
     [ownerUserId]
+  );
+
+  return result.rows;
+}
+
+async function listOwnedCpaAuditLogs(ownerUserId, limit = 100) {
+  const result = await pool.query(
+    `SELECT l.id,
+            l.actor_user_id,
+            actor.email AS actor_email,
+            l.owner_user_id,
+            l.grant_id,
+            l.business_id,
+            b.name AS business_name,
+            l.action,
+            l.metadata,
+            l.created_at
+       FROM cpa_audit_logs l
+       LEFT JOIN users actor ON actor.id = l.actor_user_id
+       LEFT JOIN businesses b ON b.id = l.business_id
+      WHERE l.owner_user_id = $1
+      ORDER BY l.created_at DESC
+      LIMIT $2`,
+    [ownerUserId, limit]
   );
 
   return result.rows;
@@ -226,7 +295,21 @@ async function createCpaGrant(ownerUser, payload) {
       ]
     );
 
-    return result.rows[0]?.id || null;
+    const grantId = result.rows[0]?.id || null;
+    await logCpaAuditEvent({
+      actorUserId: ownerUser.id,
+      ownerUserId: ownerUser.id,
+      grantId,
+      businessId,
+      action: status === "active" ? "grant_created_active" : "grant_created_pending",
+      metadata: {
+        grantee_email: email,
+        scope,
+        accepted_immediately: status === "active"
+      }
+    });
+
+    return grantId;
   } catch (error) {
     if (error.code === "23505") {
       throw new Error("A CPA access grant with this scope already exists.");
@@ -247,7 +330,31 @@ async function revokeOwnedCpaGrant(ownerUserId, grantId) {
     [grantId, ownerUserId]
   );
 
-  return result.rowCount > 0;
+  if (!result.rowCount) {
+    return false;
+  }
+
+  const grant = await pool.query(
+    `SELECT owner_user_id, business_id, scope, grantee_email
+       FROM cpa_access_grants
+      WHERE id = $1
+      LIMIT 1`,
+    [grantId]
+  );
+
+  await logCpaAuditEvent({
+    actorUserId: ownerUserId,
+    ownerUserId,
+    grantId,
+    businessId: grant.rows[0]?.business_id || null,
+    action: "grant_revoked",
+    metadata: {
+      scope: grant.rows[0]?.scope || null,
+      grantee_email: grant.rows[0]?.grantee_email || null
+    }
+  });
+
+  return true;
 }
 
 async function acceptAssignedCpaGrant(user, grantId) {
@@ -259,17 +366,35 @@ async function acceptAssignedCpaGrant(user, grantId) {
       WHERE id = $2
         AND lower(grantee_email) = $3
         AND status = 'pending'
-      RETURNING id`,
+      RETURNING id, owner_user_id, business_id, scope`,
     [user.id, grantId, normalizeEmail(user.email)]
   );
 
-  return result.rowCount > 0;
+  if (!result.rowCount) {
+    return false;
+  }
+
+  await logCpaAuditEvent({
+    actorUserId: user.id,
+    ownerUserId: result.rows[0].owner_user_id,
+    grantId: result.rows[0].id,
+    businessId: result.rows[0].business_id,
+    action: "grant_accepted",
+    metadata: {
+      scope: result.rows[0].scope,
+      grantee_email: normalizeEmail(user.email)
+    }
+  });
+
+  return true;
 }
 
 module.exports = {
   normalizeScope,
+  logCpaAuditEvent,
   syncPendingCpaGrantsForUser,
   listOwnedCpaGrants,
+  listOwnedCpaAuditLogs,
   listAssignedCpaGrants,
   listAccessibleBusinessScopeForUser,
   resolveAccessiblePortfolioForUser,

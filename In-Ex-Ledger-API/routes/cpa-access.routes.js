@@ -3,12 +3,14 @@ const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const {
   listOwnedCpaGrants,
+  listOwnedCpaAuditLogs,
   listAssignedCpaGrants,
   listAccessibleBusinessScopeForUser,
   resolveAccessiblePortfolioForUser,
   createCpaGrant,
   revokeOwnedCpaGrant,
-  acceptAssignedCpaGrant
+  acceptAssignedCpaGrant,
+  logCpaAuditEvent
 } = require("../services/cpaAccessService.js");
 const { pool } = require("../db.js");
 
@@ -33,6 +35,17 @@ router.get("/grants/assigned", async (req, res) => {
   } catch (error) {
     console.error("GET /api/cpa-access/grants/assigned error:", error.message);
     res.status(500).json({ error: "Failed to load assigned CPA access." });
+  }
+});
+
+router.get("/audit", async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const logs = await listOwnedCpaAuditLogs(req.user.id, limit);
+    res.json({ logs });
+  } catch (error) {
+    console.error("GET /api/cpa-access/audit error:", error.message);
+    res.status(500).json({ error: "Failed to load CPA audit logs." });
   }
 });
 
@@ -107,6 +120,17 @@ router.get("/portfolio/:ownerUserId/summary", async (req, res) => {
       }
     });
 
+    await logCpaAuditEvent({
+      actorUserId: req.user.id,
+      ownerUserId: portfolio.owner_user_id,
+      businessId: portfolio.business_ids.length === 1 ? portfolio.business_ids[0] : null,
+      action: "portfolio_summary_viewed",
+      metadata: {
+        grant_scope: portfolio.grant_scope,
+        business_ids: portfolio.business_ids
+      }
+    });
+
     res.json({
       owner_user_id: portfolio.owner_user_id,
       owner_email: portfolio.owner_email,
@@ -169,6 +193,19 @@ router.get("/portfolio/:ownerUserId/transactions", async (req, res) => {
       [portfolio.business_ids]
     );
 
+    await logCpaAuditEvent({
+      actorUserId: req.user.id,
+      ownerUserId: portfolio.owner_user_id,
+      businessId: portfolio.business_ids.length === 1 ? portfolio.business_ids[0] : null,
+      action: "portfolio_transactions_viewed",
+      metadata: {
+        grant_scope: portfolio.grant_scope,
+        business_ids: portfolio.business_ids,
+        limit,
+        offset
+      }
+    });
+
     res.json({
       data: result.rows,
       total: Number(countResult.rows[0]?.count || 0),
@@ -204,6 +241,17 @@ router.get("/portfolio/:ownerUserId/receipts", async (req, res) => {
       [portfolio.business_ids]
     );
 
+    await logCpaAuditEvent({
+      actorUserId: req.user.id,
+      ownerUserId: portfolio.owner_user_id,
+      businessId: portfolio.business_ids.length === 1 ? portfolio.business_ids[0] : null,
+      action: "portfolio_receipts_viewed",
+      metadata: {
+        grant_scope: portfolio.grant_scope,
+        business_ids: portfolio.business_ids
+      }
+    });
+
     res.json({ receipts: result.rows, businesses: portfolio.businesses });
   } catch (error) {
     console.error("GET /api/cpa-access/portfolio/:ownerUserId/receipts error:", error.message);
@@ -236,6 +284,17 @@ router.get("/portfolio/:ownerUserId/mileage", async (req, res) => {
         ORDER BY m.trip_date DESC, m.created_at DESC`,
       [portfolio.business_ids]
     );
+
+    await logCpaAuditEvent({
+      actorUserId: req.user.id,
+      ownerUserId: portfolio.owner_user_id,
+      businessId: portfolio.business_ids.length === 1 ? portfolio.business_ids[0] : null,
+      action: "portfolio_mileage_viewed",
+      metadata: {
+        grant_scope: portfolio.grant_scope,
+        business_ids: portfolio.business_ids
+      }
+    });
 
     res.json({ data: result.rows, businesses: portfolio.businesses });
   } catch (error) {
@@ -271,6 +330,17 @@ router.get("/portfolio/:ownerUserId/exports", async (req, res) => {
         LIMIT 100`,
       [portfolio.business_ids]
     );
+
+    await logCpaAuditEvent({
+      actorUserId: req.user.id,
+      ownerUserId: portfolio.owner_user_id,
+      businessId: portfolio.business_ids.length === 1 ? portfolio.business_ids[0] : null,
+      action: "portfolio_exports_viewed",
+      metadata: {
+        grant_scope: portfolio.grant_scope,
+        business_ids: portfolio.business_ids
+      }
+    });
 
     res.json({ exports: result.rows, businesses: portfolio.businesses });
   } catch (error) {
