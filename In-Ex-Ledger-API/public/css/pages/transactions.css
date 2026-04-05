@@ -1844,13 +1844,14 @@ body {
     width: 100%;
     border-right: none;
     border-bottom: 0.5px solid var(--border);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 16px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 14px;
+    padding: 14px 16px;
   }
 
   .sidebar-nav {
-    min-width: 180px;
+    min-width: 0;
   }
 
   .tax-banner {
@@ -1868,27 +1869,124 @@ body {
 }
 
 @media (max-width: 640px) {
+  .app-topbar {
+    padding: 10px 12px;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .topbar-left {
+    width: 100%;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .topbar-brand {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .topbar-brand-text {
+    font-size: 14px;
+  }
+
+  .topbar-left .business-pill {
+    order: 3;
+    width: 100%;
+    max-width: none;
+  }
+
+  .user-pill {
+    margin-left: auto;
+    max-width: 44vw;
+  }
+
+  .user-name,
+  .business-pill-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .app-content {
-    padding: 16px;
+    padding: 14px 12px 20px;
+  }
+
+  .app-sidebar {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    padding: 12px;
+  }
+
+  .sidebar-section-label {
+    padding: 0 0 4px;
+  }
+
+  .sidebar-link {
+    padding: 10px 8px;
+    font-size: 12px;
+    border-radius: 10px;
   }
 
   .page-header {
     flex-direction: column;
     align-items: stretch;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .page-title {
+    font-size: 22px;
+  }
+
+  .page-subtitle {
+    font-size: 12px;
   }
 
   .page-header-actions {
     width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .scope-select-wrap {
+    width: 100%;
     justify-content: space-between;
+    padding: 9px 12px;
+  }
+
+  .scope-select {
+    flex: 1 1 auto;
+    text-align: right;
+  }
+
+  .page-add-button {
+    width: 100%;
+    min-height: 44px;
+    font-size: 13px;
   }
 
   .stats-row {
     grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .stat-card {
+    padding: 14px 16px;
+  }
+
+  .stat-value {
+    font-size: 20px;
   }
 
   .transactions-toolbar {
     flex-direction: column;
     align-items: stretch;
+    padding: 12px;
+    gap: 8px;
   }
 
   .transactions-panel-title {
@@ -1902,9 +2000,119 @@ body {
     width: 100%;
   }
 
+  .toolbar-search input {
+    width: 100%;
+  }
+
+  .tax-banner {
+    padding: 14px 16px;
+    gap: 12px;
+  }
+
+  .tax-banner-main {
+    align-items: flex-start;
+  }
+
+  .tax-banner-amount {
+    font-size: 18px;
+  }
+
   .transactions-table {
     display: block;
     overflow-x: auto;
     white-space: nowrap;
+  }
+
+  .onboarding-tour-card {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    padding: 16px 16px 14px;
+  }
+}
+
+@media (max-width: 520px) {
+  .app-topbar {
+    padding: 10px 10px 12px;
+  }
+
+  .topbar-left .business-pill,
+  .user-pill {
+    max-width: 100%;
+  }
+
+  .app-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar-nav {
+    gap: 6px;
+  }
+
+  .sidebar-link {
+    justify-content: flex-start;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .page-context-note {
+    font-size: 11px;
+  }
+
+  .transactions-panel,
+  .tax-upsell-card,
+  .tax-banner {
+    border-radius: 16px;
+  }
+
+  .transaction-drawer-card,
+  .recurring-drawer-card {
+    padding: 16px 12px;
+  }
+
+  .transaction-drawer-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .txn-entry-selector {
+    width: 100%;
+  }
+
+  .txn-intent-btn {
+    flex: 1 1 0;
+  }
+
+  .transactions-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .transactions-table thead th {
+    font-size: 10px;
+    padding: 8px 6px;
+  }
+
+  .transactions-table td {
+    font-size: 12px;
+    padding: 10px 8px;
+  }
+
+  .onboarding-tour-card {
+    padding: 14px 14px 12px;
+  }
+
+  .onboarding-tour-card h3 {
+    font-size: 1rem;
+  }
+
+  .onboarding-tour-card p,
+  .onboarding-tour-card li {
+    font-size: 13px;
   }
 }
