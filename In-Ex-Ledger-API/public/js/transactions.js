@@ -345,6 +345,15 @@ function wireTransactionForm() {
         await response.json().catch(() => null)
       );
 
+      if (savedTransaction?.id) {
+        mergeSavedTransactionIntoLedger(savedTransaction, {
+          accountName: getSelectedOptionLabel(accountSelect),
+          categoryName: getSelectedOptionLabel(categorySelect)
+        });
+        applyFilters();
+        renderTotals();
+      }
+
       if (savedTransaction?.id && pendingTransactionReceiptFile) {
         const uploaded = await uploadReceipt(savedTransaction.id, pendingTransactionReceiptFile);
         if (!uploaded) {
@@ -353,10 +362,17 @@ function wireTransactionForm() {
       }
 
       markAccountAsUsed(accountId);
-      await loadTransactions();
+      try {
+        await loadTransactions();
+      } catch (reloadError) {
+        console.warn("[Transactions] Save succeeded but refresh failed", reloadError);
+      }
 
       form.reset();
       closeTransactionDrawer();
+    } catch (error) {
+      console.error("Transaction save failed:", error);
+      setTransactionFormMessage("Unable to save transaction.");
     } finally {
       if (submitButton) {
         submitButton.disabled = false;
@@ -551,10 +567,13 @@ function updateHelpText(accountHelp, categoryHelp) {
 async function loadTransactions() {
   setTransactionsLoading(true);
   try {
-    const [transactions, receiptSnapshot] = await Promise.all([
-      fetchTransactionsForPage(),
-      fetchReceiptLinksSnapshot()
-    ]);
+    const transactions = await fetchTransactionsForPage();
+    let receiptSnapshot = { byTransactionId: {}, unattachedCount: 0 };
+    try {
+      receiptSnapshot = await fetchReceiptLinksSnapshot();
+    } catch (receiptError) {
+      console.warn("[Transactions] Receipt snapshot unavailable", receiptError);
+    }
 
     ledgerState.transactions = transactions.filter(Boolean).map((transaction) => ({
       ...transaction,
@@ -1813,6 +1832,32 @@ function setTransactionFormMessage(text) {
   if (message) {
     message.textContent = text || "";
   }
+}
+
+function getSelectedOptionLabel(select) {
+  const option = select?.selectedOptions?.[0];
+  return option ? String(option.textContent || "").trim() : "";
+}
+
+function mergeSavedTransactionIntoLedger(transaction, context = {}) {
+  if (!transaction?.id) {
+    return;
+  }
+
+  const nextTransaction = {
+    ...transaction,
+    accountName: transaction.accountName || context.accountName || "",
+    categoryName: transaction.categoryName || context.categoryName || ""
+  };
+  const existingIndex = (ledgerState.transactions || []).findIndex((entry) => entry.id === nextTransaction.id);
+
+  if (existingIndex >= 0) {
+    ledgerState.transactions.splice(existingIndex, 1, nextTransaction);
+  } else {
+    ledgerState.transactions.unshift(nextTransaction);
+  }
+
+  saveTransactions(ledgerState.transactions);
 }
 
 function validateTransactionForm({ date, description, amount, accountId, categoryId, type }) {
