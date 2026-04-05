@@ -146,6 +146,33 @@ async function listAccessibleBusinessScopeForUser(user) {
   return [...grouped.values()];
 }
 
+async function resolveAccessiblePortfolioForUser(user, ownerUserId, requestedBusinessId = "") {
+  const portfolios = await listAccessibleBusinessScopeForUser(user);
+  const portfolio = portfolios.find((item) => item.owner_user_id === ownerUserId);
+  if (!portfolio) {
+    return null;
+  }
+
+  const normalizedBusinessId = String(requestedBusinessId || "").trim();
+  if (!normalizedBusinessId) {
+    return {
+      ...portfolio,
+      business_ids: portfolio.businesses.map((business) => business.id)
+    };
+  }
+
+  const business = portfolio.businesses.find((item) => item.id === normalizedBusinessId);
+  if (!business) {
+    return null;
+  }
+
+  return {
+    ...portfolio,
+    businesses: [business],
+    business_ids: [business.id]
+  };
+}
+
 async function createCpaGrant(ownerUser, payload) {
   const email = normalizeEmail(payload?.email);
   const scope = normalizeScope(payload?.scope);
@@ -245,6 +272,7 @@ module.exports = {
   listOwnedCpaGrants,
   listAssignedCpaGrants,
   listAccessibleBusinessScopeForUser,
+  resolveAccessiblePortfolioForUser,
   createCpaGrant,
   revokeOwnedCpaGrant,
   acceptAssignedCpaGrant
