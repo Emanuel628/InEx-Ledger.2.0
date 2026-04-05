@@ -39,6 +39,7 @@ router.post("/exports/request-grant", async (req, res) => {
   const sanitizedBody = sanitizePayload(req.body);
   try {
     const user = req.user;
+    user.business_id = await resolveBusinessIdForUser(user);
     const businessId = user.business_id || (await resolveBusinessIdForUser(user));
     const exportType = (req.body?.exportType || "pdf").toLowerCase();
     const includeTaxId = Boolean(req.body?.includeTaxId);
@@ -105,6 +106,7 @@ router.post("/exports/generate", async (req, res) => {
   }
 
   const user = req.user;
+  user.business_id = await resolveBusinessIdForUser(user);
   const businessId = user.business_id || (await resolveBusinessIdForUser(user));
 
   if (grantPayload.businessId !== businessId || grantPayload.userId !== user.id) {
@@ -176,6 +178,7 @@ router.post("/exports/generate", async (req, res) => {
 router.get("/exports/history", async (req, res) => {
   try {
     const user = req.user;
+    user.business_id = await resolveBusinessIdForUser(user);
     const businessId = user.business_id || (await resolveBusinessIdForUser(user));
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
@@ -206,6 +209,7 @@ router.get("/exports/history", async (req, res) => {
 router.get("/exports/history/:id/redacted", async (req, res) => {
   try {
     const user = req.user;
+    user.business_id = await resolveBusinessIdForUser(user);
     const businessId = user.business_id || (await resolveBusinessIdForUser(user));
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {

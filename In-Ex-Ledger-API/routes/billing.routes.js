@@ -102,6 +102,7 @@ function buildAppUrl(req, path) {
 
 router.get("/subscription", requireAuth, async (req, res) => {
   try {
+    req.user.business_id = await resolveBusinessIdForUser(req.user);
     const businessId = req.user.business_id || (await resolveBusinessIdForUser(req.user));
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     res.json({ subscription });
@@ -113,6 +114,7 @@ router.get("/subscription", requireAuth, async (req, res) => {
 
 router.post("/checkout-session", requireAuth, async (req, res) => {
   try {
+    req.user.business_id = await resolveBusinessIdForUser(req.user);
     const businessId = req.user.business_id || (await resolveBusinessIdForUser(req.user));
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (subscription.isPaid && !subscription.cancelAtPeriodEnd) {
@@ -140,6 +142,7 @@ router.post("/checkout-session", requireAuth, async (req, res) => {
 
 router.post("/customer-portal", requireAuth, async (req, res) => {
   try {
+    req.user.business_id = await resolveBusinessIdForUser(req.user);
     const businessId = req.user.business_id || (await resolveBusinessIdForUser(req.user));
     const customerId = await ensureStripeCustomer(businessId, req.user);
     const session = await stripeRequest("/billing_portal/sessions", {

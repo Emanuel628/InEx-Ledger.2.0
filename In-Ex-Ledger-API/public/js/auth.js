@@ -13,6 +13,8 @@ const TIER_KEY = "tier";
 const TRIAL_EXPIRED_KEY = "luna_trial_expired";
 const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const SUBSCRIPTION_KEY = "lb_subscription";
+const ACTIVE_BUSINESS_ID_KEY = "lb_active_business_id";
+const ACTIVE_BUSINESS_NAME_KEY = "lb_business_name";
 const LOGIN_PAGE = "/html/login.html";
 const ACCOUNT_MENU_STYLE_ID = "luna-account-menu-style";
 
@@ -37,7 +39,14 @@ function buildApiUrl(path = "") {
 }
 
 function clearAppState() {
-  ["lb_accounts", "lb_categories", "lb_transactions", "lb_transactions_upsell_hidden"].forEach(
+  [
+    "lb_accounts",
+    "lb_categories",
+    "lb_transactions",
+    "lb_transactions_upsell_hidden",
+    ACTIVE_BUSINESS_ID_KEY,
+    ACTIVE_BUSINESS_NAME_KEY
+  ].forEach(
     (key) => localStorage.removeItem(key)
   );
 }
@@ -115,11 +124,38 @@ function getUserInitials(profile = {}) {
   return "U";
 }
 
+function getBusinessCollection(profile = {}) {
+  return Array.isArray(profile.businesses) ? profile.businesses : [];
+}
+
+function getActiveBusiness(profile = {}) {
+  if (profile.active_business && typeof profile.active_business === "object") {
+    return profile.active_business;
+  }
+
+  const activeBusinessId =
+    profile.active_business_id || profile.business_id || localStorage.getItem(ACTIVE_BUSINESS_ID_KEY) || "";
+  const businesses = getBusinessCollection(profile);
+  return businesses.find((business) => business.id === activeBusinessId) || null;
+}
+
+function persistBusinessContext(profile = {}) {
+  const activeBusiness = getActiveBusiness(profile);
+  if (!activeBusiness?.id) {
+    return;
+  }
+
+  localStorage.setItem(ACTIVE_BUSINESS_ID_KEY, activeBusiness.id);
+  localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || "Business");
+}
+
 function updateAuthenticatedChrome(profile = {}) {
   const displayName = getUserDisplayName(profile);
   const initials = getUserInitials(profile);
 
+  persistBusinessContext(profile);
   ensureLegacyUserPills();
+  ensureBusinessPills(profile);
 
   document.querySelectorAll(".user-name").forEach((node) => {
     node.textContent = displayName;
@@ -130,7 +166,8 @@ function updateAuthenticatedChrome(profile = {}) {
     node.setAttribute("aria-label", `${displayName} initials`);
   });
 
-  initAccountMenus(displayName);
+  initBusinessMenus(profile);
+  initAccountMenus(displayName, profile);
 }
 
 function ensureLegacyUserPills() {
@@ -153,6 +190,37 @@ function ensureLegacyUserPills() {
   `;
 
   header.appendChild(pill);
+}
+
+function ensureBusinessPills(profile = {}) {
+  const activeBusiness = getActiveBusiness(profile);
+  if (!activeBusiness) {
+    return;
+  }
+
+  document.querySelectorAll(".user-pill").forEach((userPill, index) => {
+    const parent = userPill.parentElement;
+    if (!parent) {
+      return;
+    }
+
+    let businessPill = parent.querySelector(`.business-pill[data-business-pill-index="${index}"]`);
+    if (!businessPill) {
+      businessPill = document.createElement("div");
+      businessPill.className = "business-pill";
+      businessPill.dataset.businessPillIndex = String(index);
+      businessPill.innerHTML = `
+        <span class="business-pill-icon" aria-hidden="true">B</span>
+        <span class="business-pill-copy">
+          <span class="business-pill-label">Business</span>
+          <span class="business-pill-name">Business</span>
+        </span>
+      `;
+      parent.insertBefore(businessPill, userPill);
+    }
+
+    businessPill.querySelector(".business-pill-name").textContent = activeBusiness.name || "Business";
+  });
 }
 
 function getToken() {
@@ -343,79 +411,157 @@ async function signOut() {
   window.location.href = "landing.html";
 }
 
-function initAccountMenus(displayName = "User") {
-  ensureAccountMenuStyles();
+function wireMenuTrigger(trigger, menu) {
+  const setOpenState = (isOpen) => {
+    menu.classList.toggle("hidden", !isOpen);
+    trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  };
 
-  document.querySelectorAll(".user-pill").forEach((pill, index) => {
-    if (pill.dataset.accountMenuReady === "true") {
-      const menuLabel = pill.querySelector(".account-menu-label");
-      if (menuLabel) {
-        menuLabel.textContent = displayName;
-      }
-      return;
+  const toggleMenu = () => {
+    const isHidden = menu.classList.contains("hidden");
+    closeAllAccountMenus();
+    setOpenState(isHidden);
+  };
+
+  trigger.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleMenu();
+  });
+
+  trigger.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleMenu();
+    }
+    if (event.key === "Escape") {
+      setOpenState(false);
+    }
+  });
+}
+
+function initBusinessMenus(profile = {}) {
+  ensureAccountMenuStyles();
+  ensureBusinessCreationModal();
+  const businesses = getBusinessCollection(profile);
+  const activeBusiness = getActiveBusiness(profile);
+  const businessCountLabel = `${businesses.length} business${businesses.length === 1 ? "" : "es"}`;
+
+  document.querySelectorAll(".business-pill").forEach((pill, index) => {
+    const menuId = `businessMenu-${index + 1}`;
+    let menu = pill.querySelector(".business-menu");
+    if (!menu) {
+      pill.classList.add("menu-trigger");
+      pill.setAttribute("role", "button");
+      pill.setAttribute("tabindex", "0");
+      pill.setAttribute("aria-haspopup", "menu");
+      pill.setAttribute("aria-expanded", "false");
+      pill.setAttribute("aria-controls", menuId);
+
+      menu = document.createElement("div");
+      menu.className = "account-menu business-menu hidden";
+      menu.id = menuId;
+      menu.setAttribute("role", "menu");
+      pill.appendChild(menu);
+      wireMenuTrigger(pill, menu);
     }
 
-    pill.dataset.accountMenuReady = "true";
-    pill.classList.add("account-menu-trigger");
+    menu.innerHTML = `
+      <div class="account-menu-section">
+        <div class="account-menu-caption">Active business</div>
+        <div class="account-menu-current">${activeBusiness?.name || "Business"}</div>
+        <div class="account-menu-hint">${businessCountLabel}</div>
+      </div>
+      <div class="account-menu-section">
+        ${businesses.map((business) => `
+          <button
+            type="button"
+            class="account-menu-item business-menu-item ${business.is_active ? "is-active" : ""}"
+            data-business-switch="${business.id}"
+            role="menuitem"
+          >
+            <span class="business-menu-copy">
+              <span class="account-menu-label">${business.name || "Business"}</span>
+              <span class="account-menu-hint">${business.region || "US"}</span>
+            </span>
+            ${business.is_active ? '<span class="business-menu-state">Current</span>' : ""}
+          </button>
+        `).join("")}
+      </div>
+      <button type="button" class="account-menu-item account-menu-secondary" data-business-create="true" role="menuitem">
+        <span class="account-menu-label">Add another business</span>
+        <span class="account-menu-hint">Create and switch instantly</span>
+      </button>
+    `;
+
+    menu.onclick = async (event) => {
+      event.stopPropagation();
+      const switchId = event.target.closest("[data-business-switch]")?.getAttribute("data-business-switch");
+      if (switchId) {
+        event.preventDefault();
+        closeAllAccountMenus();
+        await switchActiveBusiness(switchId);
+        return;
+      }
+
+      if (event.target.closest("[data-business-create]")) {
+        event.preventDefault();
+        closeAllAccountMenus();
+        openBusinessCreationModal();
+      }
+    };
+  });
+}
+
+function initAccountMenus(displayName = "User", profile = {}) {
+  ensureAccountMenuStyles();
+  ensureBusinessCreationModal();
+  const activeBusiness = getActiveBusiness(profile);
+
+  document.querySelectorAll(".user-pill").forEach((pill, index) => {
+    let menu = pill.querySelector(".account-menu");
+    const menuId = `accountMenu-${index + 1}`;
+
+    pill.classList.add("menu-trigger");
     pill.setAttribute("role", "button");
     pill.setAttribute("tabindex", "0");
     pill.setAttribute("aria-haspopup", "menu");
     pill.setAttribute("aria-expanded", "false");
-
-    const menuId = `accountMenu-${index + 1}`;
     pill.setAttribute("aria-controls", menuId);
 
-    const menu = document.createElement("div");
-    menu.className = "account-menu hidden";
-    menu.id = menuId;
-    menu.setAttribute("role", "menu");
+    if (!menu) {
+      menu = document.createElement("div");
+      menu.className = "account-menu hidden";
+      menu.id = menuId;
+      menu.setAttribute("role", "menu");
+      pill.appendChild(menu);
+      wireMenuTrigger(pill, menu);
+    }
+
     menu.innerHTML = `
+      <div class="account-menu-section">
+        <div class="account-menu-caption">Signed in as</div>
+        <div class="account-menu-current">${displayName}</div>
+        <div class="account-menu-hint">${activeBusiness?.name || "Business"}</div>
+      </div>
+      <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="add-business" role="menuitem">
+        <span class="account-menu-label">Add another business</span>
+        <span class="account-menu-hint">Create and switch instantly</span>
+      </button>
       <button type="button" class="account-menu-item" data-account-menu-action="logout" role="menuitem">
         Sign out
       </button>
-      <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="add-business" role="menuitem">
-        <span class="account-menu-label">Add another business</span>
-        <span class="account-menu-hint">Coming soon</span>
-      </button>
     `;
 
-    pill.appendChild(menu);
-
-    const setOpenState = (isOpen) => {
-      menu.classList.toggle("hidden", !isOpen);
-      pill.setAttribute("aria-expanded", isOpen ? "true" : "false");
-    };
-
-    const toggleMenu = () => {
-      const isHidden = menu.classList.contains("hidden");
-      closeAllAccountMenus();
-      setOpenState(isHidden);
-    };
-
-    pill.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      toggleMenu();
-    });
-
-    pill.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        toggleMenu();
-      }
-      if (event.key === "Escape") {
-        setOpenState(false);
-      }
-    });
-
-    menu.addEventListener("click", async (event) => {
+    menu.onclick = async (event) => {
       event.stopPropagation();
       const action = event.target.closest("[data-account-menu-action]")?.getAttribute("data-account-menu-action");
-      if (!action) return;
+      if (!action) {
+        return;
+      }
 
       event.preventDefault();
-      event.stopPropagation();
-      setOpenState(false);
+      closeAllAccountMenus();
 
       if (action === "logout") {
         await signOut();
@@ -423,18 +569,18 @@ function initAccountMenus(displayName = "User") {
       }
 
       if (action === "add-business") {
-        showAccountMenuNotice("Multi-business is coming next. The switcher and paid prompt are not live yet.");
+        openBusinessCreationModal();
       }
-    });
+    };
   });
 }
 
 function closeAllAccountMenus() {
-  document.querySelectorAll(".account-menu").forEach((menu) => {
+  document.querySelectorAll(".account-menu, .business-menu").forEach((menu) => {
     menu.classList.add("hidden");
   });
-  document.querySelectorAll(".user-pill[aria-expanded]").forEach((pill) => {
-    pill.setAttribute("aria-expanded", "false");
+  document.querySelectorAll(".menu-trigger[aria-expanded]").forEach((trigger) => {
+    trigger.setAttribute("aria-expanded", "false");
   });
 }
 
@@ -454,6 +600,7 @@ function ensureAccountMenuStyles() {
       flex-wrap: wrap;
     }
     .legacy-auth-header .user-pill,
+    .business-pill,
     .legacy-user-pill {
       display: inline-flex;
       align-items: center;
@@ -463,7 +610,48 @@ function ensureAccountMenuStyles() {
       background: rgba(255, 255, 255, 0.1);
       border: 0.5px solid rgba(15, 25, 35, 0.12);
       color: var(--ink);
+    }
+    .legacy-auth-header .user-pill,
+    .legacy-user-pill {
       margin-left: auto;
+    }
+    .business-pill {
+      position: relative;
+      min-width: 0;
+      max-width: min(280px, 48vw);
+    }
+    .business-pill-copy {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .business-pill-label {
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--ink3);
+    }
+    .business-pill-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: inherit;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .business-pill-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--surface2);
+      color: var(--ink);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      flex-shrink: 0;
     }
     .legacy-auth-header .user-avatar,
     .legacy-user-pill .user-avatar {
@@ -485,7 +673,7 @@ function ensureAccountMenuStyles() {
       color: inherit;
       white-space: nowrap;
     }
-    .account-menu-trigger {
+    .menu-trigger {
       position: relative;
       cursor: pointer;
     }
@@ -530,13 +718,284 @@ function ensureAccountMenuStyles() {
     .account-menu-label {
       font-weight: 500;
     }
+    .account-menu-caption {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--ink3);
+      margin-bottom: 4px;
+    }
+    .account-menu-current {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .account-menu-section {
+      padding: 8px 10px;
+    }
+    .business-menu-item {
+      align-items: center;
+    }
+    .business-menu-item.is-active {
+      background: rgba(37, 99, 168, 0.08);
+    }
+    .business-menu-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      align-items: flex-start;
+    }
+    .business-menu-state {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent2, #2563a8);
+    }
     .account-menu-hint {
       font-size: 11px;
       color: var(--ink3);
     }
+    .business-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 25, 35, 0.52);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 240;
+    }
+    .business-modal-backdrop[hidden] {
+      display: none;
+    }
+    .business-modal {
+      width: min(100%, 420px);
+      border-radius: 18px;
+      background: var(--surface, #fff);
+      border: 1px solid var(--border, rgba(15, 25, 35, 0.12));
+      box-shadow: 0 24px 60px rgba(15, 25, 35, 0.24);
+      padding: 22px;
+    }
+    .business-modal h3 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      color: var(--ink);
+    }
+    .business-modal p {
+      margin: 0 0 16px;
+      color: var(--ink2, #4b5563);
+      font-size: 13px;
+    }
+    .business-modal-form {
+      display: grid;
+      gap: 12px;
+    }
+    .business-modal-form label {
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--ink2, #4b5563);
+    }
+    .business-modal-form input,
+    .business-modal-form select {
+      width: 100%;
+      min-height: 42px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border, rgba(15, 25, 35, 0.12));
+      background: var(--surface2, #f8fafc);
+      color: var(--ink);
+    }
+    .business-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .business-modal-actions button {
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border, rgba(15, 25, 35, 0.12));
+      background: var(--surface2, #f8fafc);
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .business-modal-actions button[data-business-submit] {
+      background: var(--accent2, #2563a8);
+      border-color: var(--accent2, #2563a8);
+      color: #fff;
+    }
+    .business-modal-error {
+      min-height: 18px;
+      font-size: 12px;
+      color: #b42318;
+    }
   `;
 
   document.head.appendChild(style);
+}
+
+function ensureBusinessCreationModal() {
+  if (document.getElementById("businessCreationModal")) {
+    return;
+  }
+
+  const modal = document.createElement("div");
+  modal.id = "businessCreationModal";
+  modal.className = "business-modal-backdrop";
+  modal.hidden = true;
+  modal.innerHTML = `
+    <div class="business-modal" role="dialog" aria-modal="true" aria-labelledby="businessModalTitle">
+      <h3 id="businessModalTitle">Add another business</h3>
+      <p>Create a new business and make it the active scope across the app.</p>
+      <form class="business-modal-form" id="businessCreationForm">
+        <label>
+          Business name
+          <input type="text" id="businessNameInput" maxlength="120" placeholder="River Street Rentals LLC" required />
+        </label>
+        <label>
+          Region
+          <select id="businessRegionInput">
+            <option value="US">United States</option>
+            <option value="CA">Canada</option>
+          </select>
+        </label>
+        <label>
+          Language
+          <select id="businessLanguageInput">
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+          </select>
+        </label>
+        <div class="business-modal-error" id="businessModalError"></div>
+        <div class="business-modal-actions">
+          <button type="button" data-business-cancel>Cancel</button>
+          <button type="submit" data-business-submit>Create business</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal || event.target.closest("[data-business-cancel]")) {
+      closeBusinessCreationModal();
+    }
+  });
+
+  modal.querySelector("#businessCreationForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await submitBusinessCreation();
+  });
+}
+
+function openBusinessCreationModal() {
+  ensureBusinessCreationModal();
+  const modal = document.getElementById("businessCreationModal");
+  const error = document.getElementById("businessModalError");
+  const nameInput = document.getElementById("businessNameInput");
+  if (!modal) {
+    return;
+  }
+
+  if (error) {
+    error.textContent = "";
+  }
+  modal.hidden = false;
+  setTimeout(() => nameInput?.focus(), 0);
+}
+
+function closeBusinessCreationModal() {
+  const modal = document.getElementById("businessCreationModal");
+  const form = document.getElementById("businessCreationForm");
+  const error = document.getElementById("businessModalError");
+  if (form) {
+    form.reset();
+  }
+  if (error) {
+    error.textContent = "";
+  }
+  if (modal) {
+    modal.hidden = true;
+  }
+}
+
+async function submitBusinessCreation() {
+  const nameInput = document.getElementById("businessNameInput");
+  const regionInput = document.getElementById("businessRegionInput");
+  const languageInput = document.getElementById("businessLanguageInput");
+  const submitButton = document.querySelector("[data-business-submit]");
+  const error = document.getElementById("businessModalError");
+  const name = String(nameInput?.value || "").trim();
+
+  if (!name) {
+    if (error) {
+      error.textContent = "Business name is required.";
+    }
+    return;
+  }
+
+  if (submitButton) {
+    submitButton.disabled = true;
+  }
+
+  try {
+    const response = await apiFetch("/api/businesses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name,
+        region: regionInput?.value || "US",
+        language: languageInput?.value || "en"
+      })
+    });
+
+    if (!response || !response.ok) {
+      const payload = await response?.json().catch(() => null);
+      if (error) {
+        error.textContent = payload?.error || "Unable to create business.";
+      }
+      return;
+    }
+
+    const payload = await response.json().catch(() => null);
+    const activeBusiness = payload?.active_business || null;
+    if (activeBusiness?.id) {
+      localStorage.setItem(ACTIVE_BUSINESS_ID_KEY, activeBusiness.id);
+      localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || "Business");
+    }
+    closeBusinessCreationModal();
+    window.location.reload();
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+    }
+  }
+}
+
+async function switchActiveBusiness(businessId) {
+  const response = await apiFetch(`/api/businesses/${businessId}/activate`, {
+    method: "POST"
+  });
+
+  if (!response || !response.ok) {
+    const payload = await response?.json().catch(() => null);
+    showAccountMenuNotice(payload?.error || "Unable to switch businesses.");
+    return;
+  }
+
+  const payload = await response.json().catch(() => null);
+  const activeBusiness = payload?.active_business || null;
+  if (activeBusiness?.id) {
+    localStorage.setItem(ACTIVE_BUSINESS_ID_KEY, activeBusiness.id);
+    localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || "Business");
+  }
+  window.location.reload();
 }
 
 function showAccountMenuNotice(message) {
@@ -595,7 +1054,13 @@ document.addEventListener("click", (e) => {
 });
 
 document.addEventListener("click", (event) => {
-  if (event.target.closest(".user-pill") || event.target.closest(".account-menu")) {
+  if (
+    event.target.closest(".user-pill") ||
+    event.target.closest(".business-pill") ||
+    event.target.closest(".account-menu") ||
+    event.target.closest(".business-menu") ||
+    event.target.closest(".business-modal")
+  ) {
     return;
   }
   closeAllAccountMenus();
@@ -604,6 +1069,7 @@ document.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeAllAccountMenus();
+    closeBusinessCreationModal();
   }
 });
 

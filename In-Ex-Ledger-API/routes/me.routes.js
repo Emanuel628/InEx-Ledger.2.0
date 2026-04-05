@@ -1,14 +1,14 @@
 const express = require("express");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
-const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 
 const router = express.Router();
 
 router.get("/", requireAuth, async (req, res) => {
   try {
-    const businessId = req.user.business_id || (await resolveBusinessIdForUser(req.user));
+    const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
       `SELECT id, email, role, email_verified, full_name, display_name, created_at
          FROM users
@@ -22,9 +22,14 @@ router.get("/", requireAuth, async (req, res) => {
     }
 
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    const businesses = await listBusinessesForUser(req.user.id);
+    const activeBusiness = businesses.find((business) => business.id === businessId) || null;
     res.status(200).json({
       ...result.rows[0],
       business_id: businessId,
+      active_business_id: businessId,
+      active_business: activeBusiness,
+      businesses,
       subscription
     });
   } catch (err) {
