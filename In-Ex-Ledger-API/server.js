@@ -11,6 +11,16 @@ const { initDatabase } = require('./db.js');
 const app = express();
 const publicDir = path.join(process.cwd(), 'public');
 const htmlDir = path.join(publicDir, 'html');
+const LEGACY_HTML_REDIRECTS = new Map([
+  ['/landing.html', '/html/landing.html'],
+  ['/html/account-profile.html', '/html/settings.html#settings-business'],
+  ['/html/business-profile.html', '/html/settings.html#settings-business'],
+  ['/html/fiscal-settings.html', '/html/settings.html#settings-business'],
+  ['/html/region-settings.html', '/html/settings.html#settings-preferences'],
+  ['/html/security.html', '/html/settings.html#settings-security'],
+  ['/html/sessions.html', '/html/settings.html#settings-security'],
+  ['/html/mfa.html', '/html/settings.html#settings-security']
+]);
 
 function setNoCacheHtmlHeaders(res, filePath) {
   if (!String(filePath || '').toLowerCase().endsWith('.html')) {
@@ -70,6 +80,11 @@ app.use(cors({
 /* =========================================================
    MIDDLEWARE STACK
    ========================================================= */
+for (const [legacyPath, nextPath] of LEGACY_HTML_REDIRECTS.entries()) {
+  app.get(legacyPath, (req, res) => {
+    res.redirect(302, nextPath);
+  });
+}
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use('/html', express.static(htmlDir, {
   setHeaders: setNoCacheHtmlHeaders
