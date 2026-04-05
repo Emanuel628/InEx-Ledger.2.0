@@ -71,8 +71,10 @@ app.use(cors({
    MIDDLEWARE STACK
    ========================================================= */
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
-app.use(express.static(publicDir));
 app.use('/html', express.static(htmlDir, {
+  setHeaders: setNoCacheHtmlHeaders
+}));
+app.use(express.static(publicDir, {
   setHeaders: setNoCacheHtmlHeaders
 }));
 app.use(express.json({ limit: '100kb' }));
