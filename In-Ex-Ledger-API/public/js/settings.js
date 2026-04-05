@@ -190,6 +190,7 @@ async function initPreferences() {
   const optOutToggle = document.getElementById("optOutToggle");
   const consentStatus = document.getElementById("consentStatus");
   const downloadBtn = document.getElementById("downloadMyDataBtn");
+  const replayOnboardingTipsButton = document.getElementById("replayOnboardingTips");
   const saveBar = document.getElementById("settingsSaveBar");
   const saveButton = document.getElementById("settingsSavePreferences");
   const cancelButton = document.getElementById("settingsCancelChanges");
@@ -307,6 +308,23 @@ async function initPreferences() {
       showSettingsToast("Data export started");
     });
   }
+
+  replayOnboardingTipsButton?.addEventListener("click", async () => {
+    try {
+      const response = await apiFetch("/api/me/onboarding/replay", {
+        method: "POST"
+      });
+
+      if (!response || !response.ok) {
+        throw new Error("Unable to reset onboarding tips");
+      }
+
+      showSettingsToast("Getting started tips reset");
+    } catch (error) {
+      console.error("Failed to reset onboarding tips", error);
+      showSettingsToast("Unable to reset getting started tips");
+    }
+  });
 
   cancelButton?.addEventListener("click", () => {
     pendingPreferences = { ...preferenceBaseline };

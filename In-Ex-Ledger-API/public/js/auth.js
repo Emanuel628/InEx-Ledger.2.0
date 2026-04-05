@@ -15,8 +15,10 @@ const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const SUBSCRIPTION_KEY = "lb_subscription";
 const ACTIVE_BUSINESS_ID_KEY = "lb_active_business_id";
 const ACTIVE_BUSINESS_NAME_KEY = "lb_business_name";
+const ONBOARDING_PAGE = "/onboarding";
 const LOGIN_PAGE = "/login";
 const ACCOUNT_MENU_STYLE_ID = "luna-account-menu-style";
+const ONBOARDING_RUNTIME_PAGES = new Set(["/transactions", "/receipts", "/mileage", "/exports"]);
 
 if (!window.API_BASE) {
   window.API_BASE = "";
@@ -174,6 +176,41 @@ function updateAuthenticatedChrome(profile = {}) {
   initAccountMenus(displayName, profile);
 }
 
+function getNormalizedPathname() {
+  const path = String(window.location.pathname || "/").replace(/\/+$/, "") || "/";
+  return path;
+}
+
+function isOnboardingRoute(pathname = getNormalizedPathname()) {
+  return pathname === ONBOARDING_PAGE;
+}
+
+function shouldRedirectToOnboarding(profile = {}) {
+  return !profile?.onboarding?.completed && !isOnboardingRoute();
+}
+
+function maybeLoadOnboardingRuntime(profile = {}) {
+  const path = getNormalizedPathname();
+  if (!profile?.onboarding?.completed || !ONBOARDING_RUNTIME_PAGES.has(path)) {
+    return;
+  }
+
+  if (!document.querySelector('link[data-onboarding-runtime="true"]')) {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "/css/pages/onboarding.css";
+    link.dataset.onboardingRuntime = "true";
+    document.head.appendChild(link);
+  }
+
+  if (!document.querySelector('script[data-onboarding-runtime="true"]')) {
+    const script = document.createElement("script");
+    script.src = "/js/onboarding.js?v=20260405c";
+    script.dataset.onboardingRuntime = "true";
+    document.body.appendChild(script);
+  }
+}
+
 function ensureLegacyUserPills() {
   if (document.querySelector(".user-pill")) {
     return;
@@ -300,11 +337,22 @@ async function requireValidSessionOrRedirect() {
 
     if (response.status === 200) {
       const payload = await response.json().catch(() => null);
+      window.__LUNA_ME__ = payload;
+      window.__LUNA_ONBOARDING__ = payload?.onboarding || null;
       if (payload?.subscription) {
         applySubscriptionState(payload.subscription);
       }
       if (payload) {
         updateAuthenticatedChrome(payload);
+      }
+      if (shouldRedirectToOnboarding(payload)) {
+        window.__AUTH_GUARD_STATE__.running = false;
+        window.location.href = ONBOARDING_PAGE;
+        return;
+      }
+      maybeLoadOnboardingRuntime(payload);
+      if (typeof window !== "undefined" && typeof CustomEvent === "function") {
+        window.dispatchEvent(new CustomEvent("lunaProfileReady", { detail: payload }));
       }
       console.log("[AUTH] Session valid");
       window.__AUTH_GUARD_STATE__.running = false;
@@ -346,13 +394,15 @@ async function redirectIfAuthenticated() {
     console.log("[AUTH] redirectIfAuthenticated /api/me status =", response.status);
     if (response.status === 200) {
       const payload = await response.json().catch(() => null);
+      window.__LUNA_ME__ = payload;
+      window.__LUNA_ONBOARDING__ = payload?.onboarding || null;
       if (payload?.subscription) {
         applySubscriptionState(payload.subscription);
       }
       if (payload) {
         updateAuthenticatedChrome(payload);
       }
-      window.location.href = "/transactions";
+      window.location.href = payload?.onboarding?.completed ? "/transactions" : ONBOARDING_PAGE;
     }
   } catch (err) {
     console.error("[AUTH] redirectIfAuthenticated failed:", err);
