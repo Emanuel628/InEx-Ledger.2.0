@@ -11,12 +11,33 @@
 </head>
 <body>
 
-<header>
-  <p class="site-logo">InEx Ledger</p>
-  <nav>
-    <a href="/html/login.html">Sign In</a>
-    <a href="/html/subscription.html">Pricing</a>
-  </nav>
+<header class="app-topbar">
+  <div class="topbar-left">
+    <a href="transactions.html" class="topbar-brand">
+      <span class="brand-mark brand-mark-topbar" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
+          <rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="0.6"></rect>
+          <rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity="0.6"></rect>
+          <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity="0.35"></rect>
+        </svg>
+      </span>
+      <span class="topbar-brand-text">InEx Ledger</span>
+    </a>
+    <nav class="topbar-nav" aria-label="Primary">
+      <a href="transactions.html"><span class="nav-icon" aria-hidden="true">▦</span><span>Transactions</span></a>
+      <a href="accounts.html"><span class="nav-icon" aria-hidden="true">▣</span><span>Accounts</span></a>
+      <a href="categories.html"><span class="nav-icon" aria-hidden="true">◔</span><span>Categories</span></a>
+      <a href="receipts.html"><span class="nav-icon" aria-hidden="true">▤</span><span>Receipts</span></a>
+      <a href="mileage.html"><span class="nav-icon" aria-hidden="true">⊙</span><span>Mileage</span></a>
+      <a href="exports.html"><span class="nav-icon" aria-hidden="true">↗</span><span>Exports</span></a>
+      <a href="settings.html"><span class="nav-icon" aria-hidden="true">⚙</span><span>Settings</span></a>
+    </nav>
+  </div>
+  <div class="user-pill">
+    <span class="user-avatar">IL</span>
+    <span class="user-name">InEx Ledger</span>
+  </div>
 </header>
 
 <main>
@@ -84,10 +105,11 @@
   <p>&copy; InEx Ledger</p>
 </footer>
 
-<script src="../js/global.js"></script>
-<script src="../js/auth.js"></script>
-<script src="../js/trial.js"></script>
-<script src="../js/subscription.js"></script>
+<script src="../js/global.js?v=20260405c"></script>
+<script src="../js/i18n.js?v=20260405c"></script>
+<script src="../js/auth.js?v=20260405c"></script>
+<script src="../js/trial.js?v=20260405c"></script>
+<script src="../js/subscription.js?v=20260405c"></script>
 </body>
 </html>
 

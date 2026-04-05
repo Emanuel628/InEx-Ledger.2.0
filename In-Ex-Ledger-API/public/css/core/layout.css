@@ -213,3 +213,129 @@ body[data-theme="light"] select option {
   background: var(--surface);
   color: var(--ink);
 }
+
+.app-topbar,
+.settings-topbar,
+.accounts-topbar,
+.exports-topbar,
+.receipts-topbar,
+.categories-topbar,
+.mileage-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  min-height: 56px;
+  background: var(--accent);
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.12);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.topbar-left,
+.topbar-brand,
+.topbar-nav,
+.topbar-nav a,
+.user-pill {
+  display: flex;
+  align-items: center;
+}
+
+.topbar-left {
+  gap: 28px;
+}
+
+.topbar-brand {
+  gap: 8px;
+  text-decoration: none;
+}
+
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-mark-topbar {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.topbar-brand-text {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+
+.topbar-nav {
+  gap: 8px;
+}
+
+.topbar-nav a {
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  text-decoration: none;
+}
+
+.topbar-nav a:hover,
+.topbar-nav a.nav-link-active,
+.topbar-nav a.is-active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.nav-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-icon svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.user-pill {
+  gap: 8px;
+  padding: 5px 10px 5px 6px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.user-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent2);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.user-name {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+@media (max-width: 1024px) {
+  .topbar-nav {
+    display: none;
+  }
+}
