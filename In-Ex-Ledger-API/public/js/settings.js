@@ -916,6 +916,9 @@ function initSecurityForm() {
   const mfaEnabledToggle = document.getElementById("mfaEnabledToggle");
   const mfaCurrentPassword = document.getElementById("mfa-current-password");
   const mfaSetupPanel = document.getElementById("mfaSetupPanel");
+  const mfaCodeField = document.getElementById("mfaCodeField");
+  const mfaSetupCode = document.getElementById("mfaSetupCode");
+  const mfaHelperNote = document.getElementById("mfaHelperNote");
   const mfaPrimaryButton = document.getElementById("mfaPrimaryButton");
   const mfaCancelButton = document.getElementById("mfaCancelButton");
   const mfaMessage = document.getElementById("mfaMessage");
@@ -925,6 +928,7 @@ function initSecurityForm() {
     delivery: "email"
   };
   let mfaMode = "idle";
+  let mfaPendingToken = "";
 
   const updateStrength = () => {
     const password = newInput.value;
@@ -987,7 +991,10 @@ function initSecurityForm() {
   const resetSetupPanel = () => {
     mfaSetupPanel?.classList.add("hidden");
     if (mfaCurrentPassword) mfaCurrentPassword.value = "";
+    if (mfaSetupCode) mfaSetupCode.value = "";
+    mfaCodeField?.classList.add("hidden");
     mfaCancelButton?.classList.add("hidden");
+    mfaPendingToken = "";
   };
 
   const updateMfaUi = () => {
@@ -996,7 +1003,23 @@ function initSecurityForm() {
     }
 
     if (mfaPrimaryButton) {
-      mfaPrimaryButton.textContent = mfaStatus.enabled ? "Turn off MFA" : "Turn on MFA";
+      if (mfaMode === "enable_verify") {
+        mfaPrimaryButton.textContent = "Verify and turn on MFA";
+      } else if (mfaMode === "disable_verify") {
+        mfaPrimaryButton.textContent = "Verify and turn off MFA";
+      } else {
+        mfaPrimaryButton.textContent = mfaStatus.enabled ? "Turn off MFA" : "Turn on MFA";
+      }
+    }
+
+    if (mfaHelperNote) {
+      if (mfaMode === "enable_verify") {
+        mfaHelperNote.textContent = "We emailed you a 6-digit code. Enter it to finish turning MFA on.";
+      } else if (mfaMode === "disable_verify") {
+        mfaHelperNote.textContent = "We emailed you a 6-digit code. Enter it to finish turning MFA off.";
+      } else {
+        mfaHelperNote.textContent = "Enter your password and confirm the switch. We will email you a code to verify it is really you.";
+      }
     }
 
     if (mfaMode === "idle") {
@@ -1087,6 +1110,11 @@ function initSecurityForm() {
 
     mfaMode = mfaEnabledToggle.checked ? "enable_start" : "disable";
     mfaSetupPanel?.classList.remove("hidden");
+    mfaCodeField?.classList.add("hidden");
+    if (mfaSetupCode) {
+      mfaSetupCode.value = "";
+    }
+    mfaPendingToken = "";
     updateMfaUi();
   });
 
@@ -1112,15 +1140,53 @@ function initSecurityForm() {
           return;
         }
 
+        if (payload?.pending_verification && payload?.mfa_token) {
+          mfaPendingToken = payload.mfa_token;
+          mfaMode = "enable_verify";
+          mfaCodeField?.classList.remove("hidden");
+          updateMfaUi();
+          setMfaMessage(payload?.message || "Enter the code we emailed you to finish turning MFA on.", "is-success");
+          return;
+        }
+
+        setMfaMessage(payload?.error || "Unable to enable MFA.", "is-error");
+        mfaEnabledToggle.checked = false;
+      } catch (error) {
+        console.error("MFA enable failed", error);
+        setMfaMessage("Unable to enable MFA.", "is-error");
+        mfaEnabledToggle.checked = false;
+      }
+      return;
+    }
+
+    if (mfaMode === "enable_verify") {
+      try {
+        const response = await apiFetch("/api/auth/mfa/enable", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            currentPassword: mfaCurrentPassword?.value || "",
+            code: mfaSetupCode?.value || "",
+            mfaToken: mfaPendingToken
+          })
+        });
+        const payload = await response?.json().catch(() => null);
+
+        if (!response || !response.ok) {
+          setMfaMessage(payload?.error || "Unable to enable MFA.", "is-error");
+          return;
+        }
+
         mfaStatus = payload?.status || { enabled: true, delivery: "email" };
         mfaMode = "idle";
         updateMfaUi();
         showSettingsToast("Multi-factor authentication enabled");
         setMfaMessage("MFA is now on. We will email a 6-digit code on new or untrusted sign-ins.", "is-success");
       } catch (error) {
-        console.error("MFA enable failed", error);
+        console.error("MFA enable verification failed", error);
         setMfaMessage("Unable to enable MFA.", "is-error");
-        mfaEnabledToggle.checked = false;
       }
       return;
     }
@@ -1144,15 +1210,53 @@ function initSecurityForm() {
           return;
         }
 
+        if (payload?.pending_verification && payload?.mfa_token) {
+          mfaPendingToken = payload.mfa_token;
+          mfaMode = "disable_verify";
+          mfaCodeField?.classList.remove("hidden");
+          updateMfaUi();
+          setMfaMessage(payload?.message || "Enter the code we emailed you to finish turning MFA off.", "is-success");
+          return;
+        }
+
+        setMfaMessage(payload?.error || "Unable to disable MFA.", "is-error");
+        mfaEnabledToggle.checked = true;
+      } catch (error) {
+        console.error("MFA disable failed", error);
+        setMfaMessage("Unable to disable MFA.", "is-error");
+        mfaEnabledToggle.checked = true;
+      }
+      return;
+    }
+
+    if (mfaMode === "disable_verify") {
+      try {
+        const response = await apiFetch("/api/auth/mfa/disable", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            currentPassword: mfaCurrentPassword?.value || "",
+            code: mfaSetupCode?.value || "",
+            mfaToken: mfaPendingToken
+          })
+        });
+        const payload = await response?.json().catch(() => null);
+
+        if (!response || !response.ok) {
+          setMfaMessage(payload?.error || "Unable to disable MFA.", "is-error");
+          return;
+        }
+
         mfaStatus = payload?.status || { enabled: false, delivery: "email" };
         mfaMode = "idle";
         updateMfaUi();
         showSettingsToast("Multi-factor authentication disabled");
         setMfaMessage("MFA is now off.", "is-success");
       } catch (error) {
-        console.error("MFA disable failed", error);
+        console.error("MFA disable verification failed", error);
         setMfaMessage("Unable to disable MFA.", "is-error");
-        mfaEnabledToggle.checked = true;
       }
     }
   });

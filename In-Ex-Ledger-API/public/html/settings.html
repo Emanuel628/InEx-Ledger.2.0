@@ -301,8 +301,12 @@
                 <label for="mfa-current-password">Current password</label>
                 <input type="password" id="mfa-current-password" autocomplete="current-password" />
               </div>
+              <div class="form-field form-field-full hidden" id="mfaCodeField">
+                <label for="mfaSetupCode">Verification code</label>
+                <input type="text" id="mfaSetupCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
+              </div>
             </div>
-            <p class="settings-helper-note">Enter your password and confirm the switch. You will only be asked for a code on new or untrusted devices.</p>
+            <p id="mfaHelperNote" class="settings-helper-note">Enter your password and confirm the switch. We will email you a code to verify it is really you.</p>
             <div class="mfa-actions">
               <button type="button" id="mfaPrimaryButton" class="settings-primary-btn">Turn on MFA</button>
               <button type="button" id="mfaCancelButton" class="settings-secondary-btn hidden">Cancel</button>

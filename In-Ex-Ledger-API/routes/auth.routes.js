@@ -277,15 +277,16 @@ function generateMfaEmailCode() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, "0");
 }
 
-function createPendingMfaToken(user, businessId, challengeId) {
+function createPendingMfaToken(user, businessId, challengeId, purpose = "mfa_pending", extraPayload = {}) {
   return signToken(
     {
-      purpose: "mfa_pending",
+      purpose,
       id: user.id,
       email: user.email,
       email_verified: !!user.email_verified,
       business_id: businessId,
-      challenge_id: challengeId
+      challenge_id: challengeId,
+      ...extraPayload
     },
     MFA_PENDING_TOKEN_EXPIRY_SECONDS
   );
@@ -303,7 +304,18 @@ async function clearPendingMfaEmailChallenges(userId) {
   await pool.query("DELETE FROM mfa_email_challenges WHERE user_id = $1 AND consumed_at IS NULL", [userId]);
 }
 
-async function createMfaEmailChallenge(user, req, businessId) {
+async function createMfaEmailChallenge(user, req, options = {}) {
+  const {
+    businessId = null,
+    tokenPurpose = "mfa_pending",
+    tokenPayload = {},
+    subject = "Your InEx Ledger sign-in code",
+    heading = "Your sign-in verification code",
+    body = "We noticed a sign-in from a new or untrusted device. Enter this code to finish signing in.",
+    footer = "If this was not you, change your password immediately.",
+    locationLabel = "Sign-in page",
+    locationPath = "/login"
+  } = options;
   const code = generateMfaEmailCode();
   const expiresAt = new Date(Date.now() + MFA_EMAIL_CODE_EXPIRY_MS);
   const challengeId = crypto.randomUUID();
@@ -318,33 +330,33 @@ async function createMfaEmailChallenge(user, req, businessId) {
   const appBaseUrl = getAppBaseUrl(req);
   await sendAppEmail({
     to: user.email,
-    subject: "Your InEx Ledger sign-in code",
+    subject,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
         <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
           <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger security</div>
-          <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">Your sign-in verification code</h1>
+          <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${heading}</h1>
         </div>
         <div style="padding: 28px;">
           <p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">
-            We noticed a sign-in from a new or untrusted device. Enter this code to finish signing in.
+            ${body}
           </p>
           <div style="margin: 24px 0; padding: 18px 20px; border-radius: 12px; background: #eff6ff; color: #1d4ed8; font-size: 32px; font-weight: 800; letter-spacing: 0.18em; text-align: center;">
             ${code}
           </div>
           <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">
-            This code expires in ${MFA_EMAIL_CODE_EXPIRY_MINUTES} minutes. If this was not you, change your password immediately.
+            This code expires in ${MFA_EMAIL_CODE_EXPIRY_MINUTES} minutes. ${footer}
           </p>
           <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">
-            Sign-in page: ${appBaseUrl}/login
+            ${locationLabel}: ${appBaseUrl}${locationPath}
           </p>
         </div>
       </div>
     `,
-    text: `Your InEx Ledger sign-in code is ${code}. It expires in ${MFA_EMAIL_CODE_EXPIRY_MINUTES} minutes. If this was not you, change your password immediately.`
+    text: `${heading}\n\n${body}\n\nCode: ${code}\n\nThis code expires in ${MFA_EMAIL_CODE_EXPIRY_MINUTES} minutes. ${footer}`
   });
 
-  return createPendingMfaToken(user, businessId, challengeId);
+  return createPendingMfaToken(user, businessId, challengeId, tokenPurpose, tokenPayload);
 }
 
 async function findActiveMfaEmailChallenge(challengeId, userId) {
@@ -657,7 +669,11 @@ router.post("/login", authLimiter, async (req, res) => {
       }
 
       if (!trustedDevice) {
-        const mfaToken = await createMfaEmailChallenge(user, req, businessId);
+        const mfaToken = await createMfaEmailChallenge(user, req, {
+          businessId,
+          locationLabel: "Sign-in page",
+          locationPath: "/login"
+        });
         return res.status(200).json({
           mfa_required: true,
           mfa_token: mfaToken,
@@ -846,6 +862,8 @@ router.post("/mfa/setup/cancel", requireAuth, async (req, res) => {
 
 router.post("/mfa/enable", requireAuth, authLimiter, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
+  const code = String(req.body?.code || "").trim();
+  const mfaToken = String(req.body?.mfaToken || "").trim();
   if (!currentPassword) {
     return res.status(400).json({ error: "Current password is required." });
   }
@@ -861,6 +879,51 @@ router.post("/mfa/enable", requireAuth, authLimiter, async (req, res) => {
       return res.status(401).json({ error: "Current password is incorrect." });
     }
 
+    if (!code || !mfaToken) {
+      const pendingToken = await createMfaEmailChallenge(user, req, {
+        tokenPurpose: "mfa_settings_enable",
+        tokenPayload: { target_state: true },
+        subject: "Confirm MFA setup for InEx Ledger",
+        heading: "Confirm MFA setup",
+        body: "We received a request to turn on multi-factor authentication for your account. Enter this code in Settings to confirm it was really you.",
+        footer: "If you did not request this change, do not enter the code.",
+        locationLabel: "Settings",
+        locationPath: "/settings"
+      });
+
+      return res.status(200).json({
+        pending_verification: true,
+        mfa_token: pendingToken,
+        message: "We emailed you a verification code. Enter it to finish turning MFA on."
+      });
+    }
+
+    let pending;
+    try {
+      pending = verifyToken(mfaToken);
+    } catch (error) {
+      return res.status(401).json({ error: "Verification session expired. Start again." });
+    }
+
+    if (pending.purpose !== "mfa_settings_enable" || pending.id !== user.id || pending.email !== user.email) {
+      return res.status(401).json({ error: "Verification session expired. Start again." });
+    }
+
+    const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
+    if (!challenge) {
+      return res.status(401).json({ error: "Verification code expired. Start again." });
+    }
+
+    if (Number(challenge.attempt_count || 0) >= 8) {
+      return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
+    }
+
+    if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+      await recordFailedMfaEmailAttempt(challenge.id);
+      return res.status(401).json({ error: "Invalid verification code." });
+    }
+
+    await consumeMfaEmailChallenge(challenge.id);
     await pool.query(
       `UPDATE users
           SET mfa_enabled = true,
@@ -891,6 +954,8 @@ router.post("/mfa/enable", requireAuth, authLimiter, async (req, res) => {
 
 router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
+  const code = String(req.body?.code || "").trim();
+  const mfaToken = String(req.body?.mfaToken || "").trim();
   if (!currentPassword) {
     return res.status(400).json({ error: "Current password is required." });
   }
@@ -906,6 +971,51 @@ router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
       return res.status(401).json({ error: "Current password is incorrect." });
     }
 
+    if (!code || !mfaToken) {
+      const pendingToken = await createMfaEmailChallenge(user, req, {
+        tokenPurpose: "mfa_settings_disable",
+        tokenPayload: { target_state: false },
+        subject: "Confirm MFA removal for InEx Ledger",
+        heading: "Confirm MFA removal",
+        body: "We received a request to turn off multi-factor authentication for your account. Enter this code in Settings to confirm it was really you.",
+        footer: "If you did not request this change, do not enter the code.",
+        locationLabel: "Settings",
+        locationPath: "/settings"
+      });
+
+      return res.status(200).json({
+        pending_verification: true,
+        mfa_token: pendingToken,
+        message: "We emailed you a verification code. Enter it to finish turning MFA off."
+      });
+    }
+
+    let pending;
+    try {
+      pending = verifyToken(mfaToken);
+    } catch (error) {
+      return res.status(401).json({ error: "Verification session expired. Start again." });
+    }
+
+    if (pending.purpose !== "mfa_settings_disable" || pending.id !== user.id || pending.email !== user.email) {
+      return res.status(401).json({ error: "Verification session expired. Start again." });
+    }
+
+    const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
+    if (!challenge) {
+      return res.status(401).json({ error: "Verification code expired. Start again." });
+    }
+
+    if (Number(challenge.attempt_count || 0) >= 8) {
+      return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
+    }
+
+    if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+      await recordFailedMfaEmailAttempt(challenge.id);
+      return res.status(401).json({ error: "Invalid verification code." });
+    }
+
+    await consumeMfaEmailChallenge(challenge.id);
     await pool.query(
       `UPDATE users
           SET mfa_enabled = false,
