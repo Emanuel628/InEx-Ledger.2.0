@@ -144,12 +144,15 @@ function getAppBaseUrl(req) {
   return `${protocol}://${host}`;
 }
 
-async function sendAppEmail({ to, subject, html }) {
+async function sendAppEmail({ to, subject, html, text }) {
+  const replyTo = process.env.RESEND_REPLY_TO || process.env.EMAIL_REPLY_TO || undefined;
   return getResend().emails.send({
     from: RESEND_FROM_EMAIL,
     to: Array.isArray(to) ? to : [to],
     subject,
-    html
+    html,
+    text,
+    replyTo
   });
 }
 
@@ -265,8 +268,31 @@ router.post("/register", authLimiter, async (req, res) => {
 
       await sendAppEmail({
         to: email,
-        subject: "Verify Your InEx Ledger Account",
-        html: `<p>Welcome! Click <a href="${verificationLink}">here</a> to verify your account.</p>`
+        subject: "Welcome to InEx Ledger - verify your email",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
+            <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
+              <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">Welcome to InEx Ledger</div>
+              <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">Your account is ready. One last step.</h1>
+            </div>
+            <div style="padding: 28px;">
+              <p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">
+                Thanks for signing up. Verify your email to unlock your workspace and start tracking income,
+                expenses, receipts, mileage, and tax-ready exports.
+              </p>
+              <div style="margin: 24px 0;">
+                <a href="${verificationLink}" style="display: inline-block; padding: 14px 22px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700;">
+                  Verify email
+                </a>
+              </div>
+              <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">
+                This verification link expires in 15 minutes. If the button does not work, copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0; word-break: break-all; color: #1d4ed8; font-size: 13px;">${verificationLink}</p>
+            </div>
+          </div>
+        `,
+        text: `Welcome to InEx Ledger.\n\nVerify your email to activate your account:\n${verificationLink}\n\nThis link expires in 15 minutes.`
       });
       console.log("?? Verification Email Sent via Resend API");
     } catch (emailErr) {
@@ -304,15 +330,30 @@ router.post("/send-verification", async (req, res) => {
 
     await sendAppEmail({
       to: email,
-      subject: "Verify Your InEx Ledger Account",
+      subject: "Verify your InEx Ledger email",
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px;">
-          <h2>Welcome to InEx Ledger</h2>
-          <p>Please click the button below to verify your email address. This link will expire in 15 minutes.</p>
-          <a href="${verificationLink}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 4px;">Verify Email</a>
-          <p style="margin-top: 20px; font-size: 12px; color: #666;">If you didn't create an account, you can safely ignore this email.</p>
-      </div>
-      `
+        <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
+          <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
+            <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger</div>
+            <h1 style="margin: 12px 0 0; font-size: 26px; line-height: 1.15;">Verify your email</h1>
+          </div>
+          <div style="padding: 28px;">
+            <p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">
+              Click the button below to verify your email address and finish setting up your account.
+            </p>
+            <div style="margin: 24px 0;">
+              <a href="${verificationLink}" style="display: inline-block; padding: 14px 22px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700;">
+                Verify email
+              </a>
+            </div>
+            <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">
+              This verification link expires in 15 minutes. If you did not create this account, you can ignore this email.
+            </p>
+            <p style="margin: 0; word-break: break-all; color: #1d4ed8; font-size: 13px;">${verificationLink}</p>
+          </div>
+        </div>
+      `,
+      text: `Verify your InEx Ledger email.\n\nUse this link to verify your account:\n${verificationLink}\n\nThis link expires in 15 minutes.`
     });
 
 

@@ -1,35 +1,63 @@
-/* =========================
-   Auth Pages — Overrides
-   ========================= */
+@import url("/css/pages/login.css");
 
-header nav {
-  display: none;
+.verify-card {
+  max-width: 520px;
 }
 
-main {
-  max-width: 420px;
-  padding-top: 48px;
+.verify-eyebrow {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent2);
 }
 
-section {
-  margin-top: 32px;
+.verify-copy {
+  color: var(--ink2);
+  margin-bottom: 12px;
 }
 
-footer {
-  margin-top: 40px;
+.verify-copy.subtle {
+  font-size: 13px;
+  color: var(--ink3);
+}
+
+.verify-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.auth-submit.secondary {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--border);
+  box-shadow: none;
 }
 
 .verification-status,
 .verification-link {
+  min-height: 20px;
   margin-top: 12px;
   font-size: 14px;
 }
 
-.verification-link a {
-  color: var(--link-color, #3b82f6);
-  text-decoration: underline;
+.verification-status {
+  color: var(--ink);
 }
 
 .verification-status.error {
-  color: #dc2626;
+  color: var(--red);
+}
+
+.verification-link {
+  color: var(--ink3);
+}
+
+.resend-link {
+  margin-top: 16px;
+  text-align: center;
+  color: var(--ink3);
+  font-size: 13px;
 }

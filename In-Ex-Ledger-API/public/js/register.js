@@ -15,6 +15,9 @@
 let form = null;
 let registerErrorElement = null;
 let isSubmittingRegister = false;
+let languageSelect = null;
+let tosConsentCheckbox = null;
+let tosConsentMessage = null;
 const OFFLINE_ERROR_MESSAGE = "Unable to reach server. Check your connection and try again.";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -25,7 +28,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   registerErrorElement = document.getElementById("registerError");
+  languageSelect = document.getElementById("languageSelectRegister");
+  tosConsentCheckbox = document.getElementById("tosConsent");
+  tosConsentMessage = document.getElementById("tosConsentMessage");
   hideRegisterError();
+
+  if (languageSelect) {
+    if (typeof populateLanguageOptions === "function") {
+      populateLanguageOptions(languageSelect);
+    } else {
+      legacyPopulateLanguageOptions();
+    }
+    languageSelect.addEventListener("change", persistRegionAndLanguage);
+  }
+  persistRegionAndLanguage();
 
   form.addEventListener("submit", handleRegisterSubmit);
   wireShowPasswordToggle(document);
@@ -54,9 +70,17 @@ async function handleRegisterSubmit(event) {
   const password = document.getElementById("password")?.value || "";
 
   hideRegisterError();
+  if (!ensureConsent()) {
+    return;
+  }
 
   if (!email || !password) {
     showRegisterError("Enter an email and password.");
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    showRegisterError("Please enter a valid email address.");
     return;
   }
 
@@ -77,6 +101,9 @@ async function handleRegisterSubmit(event) {
       showRegisterError(mapAuthError(regResponse.status, regBody));
       return;
     }
+
+    persistRegionAndLanguage();
+    await persistConsent();
     localStorage.setItem("pendingVerificationEmail", email);
     window.location.href = "verify-email?email=sent";
   } catch (err) {
@@ -241,7 +268,7 @@ function legacyPopulateLanguageOptions() {
 }
 
 function persistRegionAndLanguage() {
-  const selectedRegion = regionSelect && regionSelect.value ? regionSelect.value : "us";
+  const selectedRegion = "us";
   const selectedLanguage =
     (languageSelect && languageSelect.value) ||
     (typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en");

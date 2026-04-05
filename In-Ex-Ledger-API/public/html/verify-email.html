@@ -1,59 +1,72 @@
 <!DOCTYPE html>
-<html lang= en>
+<html lang="en">
 <head>
-  <meta charset=UTF-8>
-  <title>InEx Ledger — Verify Email</title>
-  <meta name=viewport content=width=device-width initial-scale=1.0>
-
-  <!-- Global + Page CSS -->
-  <link rel=stylesheet href=/css/global.css>
-  <link rel=stylesheet href=/css/verify-email.css>
+  <meta charset="UTF-8" />
+  <title>InEx Ledger - Verify Email</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/pages/verify-email.css" />
 </head>
-
 <body>
-  <header>
-  <p class="site-logo">InEx Ledger</p>
-  <nav>
-    <a href="/login">Sign In</a>
-    <a href="/subscription">Pricing</a>
-  </nav>
-</header>
+  <header class="marketing-header auth-header">
+    <a class="brand" href="/" aria-label="InEx Ledger home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
+          <rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+          <rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+          <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".35"></rect>
+        </svg>
+      </span>
+      <span class="brand-text">InEx Ledger</span>
+    </a>
+    <nav>
+      <a href="/login">Sign in</a>
+      <a href="/subscription">Pricing</a>
+    </nav>
+  </header>
 
   <main>
-    <section>
+    <section class="auth-card verify-card">
+      <p class="verify-eyebrow">Account setup</p>
       <h2>Verify your email</h2>
-
-      <p>
-        We''ve sent a verification link to your email address.
-        Please check your inbox and click the link to continue.
+      <p class="verify-copy">
+        We sent a verification link to your inbox. Open the email, click the button,
+        and come back here once your account is confirmed.
+      </p>
+      <p class="verify-copy subtle">
+        If you do not see it within a minute, check junk mail first, then resend the message below.
       </p>
 
-      <p>
-        If you''t see the email, check your spam folder or request a new link.
-      </p>
+      <p id="verificationStatus" class="verification-status" aria-live="polite"></p>
+      <p id="verificationLink" class="verification-link"></p>
 
-      <p id=verificationStatus class=verification-status aria-live=polite></p>
-      <p id=verificationLink class=verification-link></p>
+      <div class="verify-actions">
+        <button id="resendVerificationButton" type="button" class="auth-submit secondary">
+          Resend verification email
+        </button>
+        <button id="continueToLoginButton" type="button" class="auth-submit">
+          Continue to Login
+        </button>
+      </div>
 
-      <form method=post>
-        <button id=resendVerificationButton type=submit>Resend verification email</button>
-      </form>
-
-      <form action=login method=get>
-        <button id=continueToLoginButton type=submit>Continue to Login</button>
-      </form>
-
-      <p class=resend-link>
-        <a href=# id=resendVerificationLink>Send verification again</a>
+      <p class="resend-link">
+        Still nothing?
+        <a href="#" id="resendVerificationLink">Send verification again</a>
       </p>
     </section>
   </main>
 
   <footer>
-    <p>&copy; InEx Ledger</p>
+    <p>
+      <a href="/subscription">Pricing</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+    </p>
+    <p>&copy; 2026 InEx Ledger</p>
   </footer>
-<script src=../js/global.js></script>
-<script src=../js/verify-email.js></script>
+
+  <script src="../js/global.js?v=20260405c"></script>
+  <script src="../js/verify-email.js?v=20260405c"></script>
 </body>
 </html>
-
