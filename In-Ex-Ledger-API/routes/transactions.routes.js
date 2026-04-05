@@ -71,7 +71,7 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
 }
 
 function validateTransactionPayload(payload) {
-  const { account_id, category_id, amount, date, type } = payload ?? {};
+  const { account_id, category_id, amount, date, type, cleared } = payload ?? {};
 
   if (!account_id) {
     return { valid: false, message: "account_id is required" };
@@ -102,6 +102,10 @@ function validateTransactionPayload(payload) {
     return { valid: false, message: "date must be a valid ISO string" };
   }
 
+  if (cleared !== undefined && typeof cleared !== "boolean") {
+    return { valid: false, message: "cleared must be true or false" };
+  }
+
   return {
     valid: true,
     normalized: {
@@ -109,7 +113,8 @@ function validateTransactionPayload(payload) {
       category_id,
       amount: normalizedAmount,
       date,
-      type
+      type,
+      cleared: cleared === true
     }
   };
 }
@@ -128,6 +133,7 @@ router.get("/", async (req, res) => {
               category_id,
               amount,
               type,
+              cleared,
               description,
               date,
               note,
@@ -165,7 +171,7 @@ router.post("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
-    const { account_id, category_id, amount, type, date } = validation.normalized;
+    const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
     const { description, note } = req.body;
 
     const accountCheck = await pool.query(
@@ -188,8 +194,8 @@ router.post("/", async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO transactions
-        (id, business_id, account_id, category_id, amount, type, description, date, note)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        (id, business_id, account_id, category_id, amount, type, cleared, description, date, note)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         crypto.randomUUID(),
@@ -198,6 +204,7 @@ router.post("/", async (req, res) => {
         mappedCategoryId,
         amount,
         type,
+        cleared,
         description || null,
         date,
         note || null
@@ -219,7 +226,7 @@ router.put("/:id", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const { account_id, category_id, amount, type, date } = validation.normalized;
+    const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
     const { description, note } = req.body;
 
     const accountCheck = await pool.query(
@@ -238,10 +245,10 @@ router.put("/:id", async (req, res) => {
     const result = await pool.query(
       `UPDATE transactions
        SET account_id = $1, category_id = $2, amount = $3, type = $4,
-           description = $5, date = $6, note = $7
-       WHERE id = $8 AND business_id = $9
+           cleared = $5, description = $6, date = $7, note = $8
+       WHERE id = $9 AND business_id = $10
        RETURNING *`,
-      [account_id, mappedCategoryId, amount, type, description || null, date, note || null,
+      [account_id, mappedCategoryId, amount, type, cleared, description || null, date, note || null,
        req.params.id, businessId]
     );
 
@@ -272,6 +279,32 @@ router.delete("/:id", async (req, res) => {
   } catch (err) {
     console.error("DELETE /transactions/:id error:", err);
     res.status(500).json({ error: "Failed to delete transaction." });
+  }
+});
+
+router.patch("/:id/cleared", async (req, res) => {
+  if (typeof req.body?.cleared !== "boolean") {
+    return res.status(400).json({ error: "cleared must be true or false" });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const result = await pool.query(
+      `UPDATE transactions
+       SET cleared = $1
+       WHERE id = $2 AND business_id = $3
+       RETURNING *`,
+      [req.body.cleared, req.params.id, businessId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Transaction not found." });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("PATCH /transactions/:id/cleared error:", err);
+    res.status(500).json({ error: "Failed to update cleared status." });
   }
 });
 

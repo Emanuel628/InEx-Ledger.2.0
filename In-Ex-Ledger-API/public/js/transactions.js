@@ -133,6 +133,7 @@ function wireTransactionForm() {
     const accountSelect = document.getElementById("account");
     const categorySelect = document.getElementById("category");
     const typeSelect = document.getElementById("txType");
+    const clearedInput = document.getElementById("cleared");
 
     const date = dateInput.value;
     const description = descriptionInput.value.trim();
@@ -140,6 +141,7 @@ function wireTransactionForm() {
     const accountId = accountSelect.value;
     const categoryId = categorySelect.value;
     const type = typeSelect?.value === "income" ? "income" : "expense";
+    const cleared = !!clearedInput?.checked;
 
     const validationError = validateTransactionForm({
       date,
@@ -170,7 +172,8 @@ function wireTransactionForm() {
         type,
         description,
         date,
-        note: ""
+        note: "",
+        cleared
       };
 
       const endpoint = editingTransactionId
@@ -472,6 +475,7 @@ function prefillTransactionForm(transaction) {
   const accountSelect = document.getElementById("account");
   const categorySelect = document.getElementById("category");
   const typeSelect = document.getElementById("txType");
+  const clearedInput = document.getElementById("cleared");
 
   if (dateInput) {
     dateInput.value = transaction.date || "";
@@ -490,6 +494,9 @@ function prefillTransactionForm(transaction) {
   }
   if (typeSelect) {
     typeSelect.value = transaction.type || "expense";
+  }
+  if (clearedInput) {
+    clearedInput.checked = !!transaction.cleared;
   }
 }
 
@@ -560,6 +567,26 @@ async function handleTransactionDelete(transactionId) {
     setEditingMode(false);
   }
   closeTransactionModal();
+  await loadTransactions();
+}
+
+async function toggleTransactionCleared(transactionId, nextCleared) {
+  const response = await apiFetch(`/api/transactions/${transactionId}/cleared`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ cleared: nextCleared })
+  });
+
+  if (!response || !response.ok) {
+    const errorPayload = await response?.json().catch(() => null);
+    setTransactionFormMessage(
+      errorPayload?.error || "Unable to update reconciliation status."
+    );
+    return;
+  }
+
   await loadTransactions();
 }
 function getCategoryName(categoryId) {
@@ -848,7 +875,8 @@ function normalizeTransaction(transaction) {
     type: transaction.type === "income" ? "income" : "expense",
     note: transaction.note || "",
     receiptId: transaction.receiptId || transaction.receipt_id || "",
-    createdAt: transaction.createdAt || transaction.created_at || ""
+    createdAt: transaction.createdAt || transaction.created_at || "",
+    cleared: transaction.cleared === true
   };
 }
 
@@ -861,7 +889,7 @@ function renderTransactionsTable(filteredTransactions) {
   if (!tbody) return;
 
   if (transactionsLoading && filteredTransactions === undefined) {
-    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">Loading transactions...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="placeholder">Loading transactions...</td></tr>`;
     return;
   }
 
@@ -872,7 +900,7 @@ function renderTransactionsTable(filteredTransactions) {
         : typeof t === "function"
         ? t("transactions_empty")
         : "No transactions yet.";
-    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">${emptyText}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="placeholder">${emptyText}</td></tr>`;
     return;
   }
 
@@ -886,6 +914,9 @@ function renderTransactionsTable(filteredTransactions) {
     const descriptionSub = txn.note || categoryName || "";
     const amountClass = txn.type === "income" ? "amount-positive" : "amount-negative";
     const amountPrefix = txn.type === "income" ? "+" : "-";
+    const clearedMarkup = txn.cleared
+      ? '<span class="status-badge status-cleared">Cleared</span>'
+      : '<span class="status-badge status-pending">Pending</span>';
     const receiptMarkup = txn.receiptId
       ? '<span class="receipt-status attached"><span class="receipt-dot"></span><span>Attached</span></span>'
       : '<span class="receipt-status none"><span class="receipt-dot"></span><span>None</span></span>';
@@ -896,6 +927,11 @@ function renderTransactionsTable(filteredTransactions) {
       <td><span class="account-tag">${accountsById[txn.accountId]?.name || "-"}</span></td>
       <td><span class="category-pill ${getCategoryToneClass(categoryName)}">${categoryName}</span></td>
       <td>${receiptMarkup}</td>
+      <td>
+        <button type="button" class="status-toggle-button ${txn.cleared ? "is-cleared" : ""}" data-action="toggle-cleared" data-id="${txn.id}">
+          ${clearedMarkup}
+        </button>
+      </td>
       <td class="amount-cell"><span class="${amountClass}">${amountPrefix}${formatCurrency(Math.abs(Number(txn.amount) || 0))}</span></td>
       <td class="actions-cell">
         <button type="button" class="action-button" data-action="edit-transaction" data-id="${txn.id}">Edit</button>
@@ -909,6 +945,9 @@ function renderTransactionsTable(filteredTransactions) {
     });
     row.querySelector('[data-action="delete-transaction"]')?.addEventListener("click", () => {
       openTransactionModal(txn.id);
+    });
+    row.querySelector('[data-action="toggle-cleared"]')?.addEventListener("click", async () => {
+      await toggleTransactionCleared(txn.id, !txn.cleared);
     });
   });
 }

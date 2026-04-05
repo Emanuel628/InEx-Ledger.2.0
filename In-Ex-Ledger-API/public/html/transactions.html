@@ -199,6 +199,13 @@
                   <input class="form-control" type="number" id="amount" name="amount" step="0.01" required />
                 </div>
                 <div class="form-field form-field-full">
+                  <label class="status-toggle-row" for="cleared">
+                    <input type="checkbox" id="cleared" name="cleared" />
+                    <span>Mark as cleared / reconciled</span>
+                  </label>
+                  <p class="small-note">Use this once the transaction matches your bank or card statement.</p>
+                </div>
+                <div class="form-field form-field-full">
                   <label for="transactionReceiptInput" class="form-label">Receipt attachment</label>
                   <div class="receipt-upload-inline">
                     <button type="button" id="transactionReceiptButton" class="receipt-upload-button">Choose receipt</button>
@@ -228,6 +235,7 @@
                 <th class="col-account" data-i18n="transactions_table_account">Account</th>
                 <th class="col-category" data-i18n="transactions_table_category">Category</th>
                 <th class="col-receipt">Receipt</th>
+                <th class="col-status">Status</th>
                 <th class="col-amount" data-i18n="transactions_table_amount">Amount</th>
                 <th class="col-actions">Actions</th>
               </tr>

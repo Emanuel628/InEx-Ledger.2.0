@@ -1413,6 +1413,10 @@ body {
   width: 80px;
 }
 
+.transactions-table .col-status {
+  width: 96px;
+}
+
 .transactions-table .col-amount {
   width: 100px;
   text-align: right;
@@ -1539,6 +1543,57 @@ body {
 
 .receipt-status.none .receipt-dot {
   background: var(--border2);
+}
+
+.status-toggle-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  border: 0.5px solid transparent;
+}
+
+.status-pending {
+  color: var(--ink2);
+  background: var(--surface2);
+  border-color: var(--border2);
+}
+
+.status-cleared {
+  color: var(--green);
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.status-toggle-button:hover .status-pending,
+.status-toggle-button:hover .status-cleared {
+  transform: translateY(-1px);
+}
+
+.status-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--ink2);
+  cursor: pointer;
+}
+
+.status-toggle-row input {
+  width: 14px;
+  height: 14px;
 }
 
 .amount-positive {

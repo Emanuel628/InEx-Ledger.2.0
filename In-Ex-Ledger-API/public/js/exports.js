@@ -66,7 +66,8 @@ async function hydrateTransactionsCache() {
       categoryId: transaction.categoryId || transaction.category_id || "",
       type: transaction.type === "income" ? "income" : "expense",
       note: transaction.note || "",
-      receiptId: transaction.receiptId || transaction.receipt_id || ""
+      receiptId: transaction.receiptId || transaction.receipt_id || "",
+      cleared: transaction.cleared === true
     }));
     localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(normalized));
   } catch (error) {
@@ -453,7 +454,7 @@ function exportPdf(startDate, endDate, recordHistory = true, explicitFilename, e
 
 function buildBasicCsv(transactions) {
   const rows = [
-    ["Date", "Description", "Type", "Amount"]
+    ["Date", "Description", "Type", "Status", "Amount"]
   ];
 
   transactions
@@ -464,6 +465,7 @@ function buildBasicCsv(transactions) {
         transaction.date || "",
         transaction.description || "",
         resolveTransactionType(transaction),
+        transaction.cleared ? "Cleared" : "Pending",
         String(Math.abs(Number(transaction.amount) || 0))
       ]);
     });
@@ -474,20 +476,46 @@ function buildBasicCsv(transactions) {
 function buildFullCsv(transactions, currency) {
   const accounts = mapById(getAccounts());
   const categories = mapById(getCategories());
-  const rows = [["Date", "Description", "Type", "Amount", "Account", "Category", "Receipt Attached", "Currency"]];
+  const rows = [[
+    "Date",
+    "Description",
+    "Type",
+    "Status",
+    "Amount",
+    "Account",
+    "Category",
+    "Running Balance",
+    "Receipt Attached",
+    "Currency"
+  ]];
+  const runningBalances = new Map();
 
   transactions
     .slice()
-    .sort((left, right) => (left.date || "").localeCompare(right.date || ""))
+    .sort((left, right) => {
+      const accountCompare = `${left.accountId || ""}`.localeCompare(`${right.accountId || ""}`);
+      if (accountCompare !== 0) return accountCompare;
+      const dateCompare = (left.date || "").localeCompare(right.date || "");
+      if (dateCompare !== 0) return dateCompare;
+      return `${left.id || ""}`.localeCompare(`${right.id || ""}`);
+    })
     .forEach((transaction) => {
       const type = resolveTransactionType(transaction, categories[transaction.categoryId]);
+      const accountId = transaction.accountId || "";
+      const numericAmount = Math.abs(Number(transaction.amount) || 0);
+      const signedAmount = type === "income" ? numericAmount : -numericAmount;
+      const nextBalance = (runningBalances.get(accountId) || 0) + signedAmount;
+      runningBalances.set(accountId, nextBalance);
+
       rows.push([
         transaction.date || "",
         transaction.description || "",
         type,
-        String(Math.abs(Number(transaction.amount) || 0)),
+        transaction.cleared ? "Cleared" : "Pending",
+        String(numericAmount),
         accounts[transaction.accountId]?.name || "",
         categories[transaction.categoryId]?.name || "",
+        nextBalance.toFixed(2),
         transaction.receiptId || transaction.receipt_id ? "Yes" : "No",
         currency
       ]);
