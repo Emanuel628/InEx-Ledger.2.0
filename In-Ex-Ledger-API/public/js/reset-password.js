@@ -43,7 +43,9 @@ async function resetPassword(form, token, statusEl) {
   button.disabled = true;
 
   try {
-    const response = await fetch("/api/auth/reset-password", {
+    const response = await fetch(
+      typeof buildApiUrl === "function" ? buildApiUrl("/api/auth/reset-password") : "/api/auth/reset-password",
+      {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -51,7 +53,8 @@ async function resetPassword(form, token, statusEl) {
         password,
         confirmPassword: confirm
       })
-    });
+      }
+    );
 
     const payload = await response.json().catch(() => null);
 
