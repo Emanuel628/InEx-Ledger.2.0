@@ -1,4 +1,4 @@
-# InEx Ledger – Deployment Checklist
+# InEx Ledger - Deployment Checklist
 
 Use this checklist every time you deploy to production to ensure nothing is missed.
 
@@ -9,7 +9,7 @@ Use this checklist every time you deploy to production to ensure nothing is miss
 ### Environment Variables
 - [ ] `DATABASE_URL` is set and points to the production database
 - [ ] `DB_SSL_REJECT_UNAUTHORIZED` is set appropriately (`true` for production)
-- [ ] `JWT_SECRET` is a strong random string (≥ 32 characters), unique to production
+- [ ] `JWT_SECRET` is a strong random string (>= 32 characters), unique to production
 - [ ] `JWT_EXPIRY_SECONDS` is set (default: 900)
 - [ ] `EXPORT_GRANT_SECRET` is a strong random string, unique to production
 - [ ] `EXPORT_GRANT_TTL_MS` is set (default: 300000)
@@ -31,10 +31,9 @@ Use this checklist every time you deploy to production to ensure nothing is miss
 - [ ] All pending migrations have been reviewed
 - [ ] Migration rollback plan is documented for this release
 
-### Frontend Sync
-- [ ] Run `node scripts/sync-frontend.js` (or CI step) to copy latest frontend into `public/`
-- [ ] Verify `public/html/landing.html` is present and up to date
-- [ ] Verify static assets (CSS, JS, images) are present in `public/`
+### Frontend Bundle
+- [ ] Verify `In-Ex-Ledger-API/public/html/landing.html` is present and up to date
+- [ ] Verify static assets (CSS, JS, images) are present in `In-Ex-Ledger-API/public/`
 
 ---
 
@@ -42,9 +41,8 @@ Use this checklist every time you deploy to production to ensure nothing is miss
 
 1. Pull latest code to the server / push to Railway/Render/etc.
 2. Install dependencies: `npm install --omit=dev`
-3. Sync frontend: `node scripts/sync-frontend.js`
-4. Restart the application process (or rely on the platform auto-restart)
-5. Monitor logs for any startup errors
+3. Restart the application process (or rely on the platform auto-restart)
+4. Monitor logs for any startup errors
 
 ---
 

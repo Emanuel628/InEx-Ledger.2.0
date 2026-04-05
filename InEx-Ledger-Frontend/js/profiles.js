@@ -1,1 +1,0 @@
-requireAuthAndTier("v1");

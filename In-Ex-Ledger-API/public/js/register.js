@@ -1,7 +1,7 @@
 /**
  * SHARED AUTH CONTRACT
  * This file MUST remain identical in:
- * - InEx-Ledger-Frontend
+ * - In-Ex-Ledger-API/public
  * - In-Ex-Ledger-API/public
  *
  * Do NOT edit in only one bundle.
@@ -295,3 +295,4 @@ async function persistConsent() {
     });
   }
 }
+

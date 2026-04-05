@@ -2,7 +2,7 @@
 
 Simple accounting for 1099 workers and independent contractors.
 
-Track income and expenses, upload receipts, and export clean records for tax time — without complex accounting software.
+Track income and expenses, upload receipts, and export clean records for tax time without complex accounting software.
 
 ## Live App
 
@@ -17,9 +17,8 @@ Track income and expenses, upload receipts, and export clean records for tax tim
 
 ## Project Structure
 
-- `In-Ex-Ledger-API/` — Backend API server
-- `InEx-Ledger-Frontend/` — Frontend HTML/CSS/JS
-- `pdf-worker/` — PDF export microservice
+- `In-Ex-Ledger-API/` - Backend API server and live frontend bundle under `public/`
+- `pdf-worker/` - PDF export microservice
 
 ## Features (V1)
 
@@ -32,4 +31,4 @@ Track income and expenses, upload receipts, and export clean records for tax tim
 
 ## License
 
-Private — All rights reserved.
+Private - All rights reserved.
