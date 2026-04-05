@@ -238,6 +238,9 @@ function renderCategoryGroup(containerId, type, emptyText) {
 
 async function handleCategoryDelete(categoryId) {
   const message = document.getElementById("categoryMessage");
+  if (!window.confirm("Delete this category? This cannot be undone.")) {
+    return;
+  }
   const response = await apiFetch(`/api/categories/${categoryId}`, { method: "DELETE" });
 
   if (!response || !response.ok) {

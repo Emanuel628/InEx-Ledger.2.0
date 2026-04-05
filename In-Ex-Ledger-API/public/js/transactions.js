@@ -926,6 +926,7 @@ function renderTotals() {
   const expensesDelta = document.getElementById("expensesDelta");
   const transactionCountValue = document.getElementById("transactionCountValue");
   const transactionCountDelta = document.getElementById("transactionCountDelta");
+  const transactionsTaxContext = document.getElementById("transactionsTaxContext");
   const cockpit = document.getElementById("tax-cockpit");
   const upsell = document.getElementById("tax-upsell");
 
@@ -971,6 +972,9 @@ function renderTotals() {
   }
   if (taxBannerNote) {
     taxBannerNote.textContent = getAppliedTaxNote();
+  }
+  if (transactionsTaxContext) {
+    transactionsTaxContext.textContent = `Tax form context: ${getTaxFormContext().label} estimate`;
   }
   if (cockpit) {
     cockpit.style.display = tier === "free" || !hasTransactions ? "none" : "flex";
@@ -1039,9 +1043,16 @@ function getAppliedTaxLabel() {
 function getAppliedTaxNote() {
   if (businessTaxProfile.region === "CA") {
     const province = businessTaxProfile.province || "your province";
-    return `Based on net profit using the ${province} estimated combined GST/HST/PST/QST rate.`;
+    return `Canada T2125 estimate only. Based on net profit using the ${province} estimated combined GST/HST/PST/QST rate.`;
   }
-  return "Based on net profit at 24% self-employment rate";
+  return "U.S. Schedule C estimate only. Based on net profit at 24% self-employment rate.";
+}
+
+function getTaxFormContext() {
+  if (businessTaxProfile.region === "CA") {
+    return { label: "Canada T2125" };
+  }
+  return { label: "U.S. Schedule C" };
 }
 
 function formatDisplayDate(value) {

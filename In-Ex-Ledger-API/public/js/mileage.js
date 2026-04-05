@@ -107,6 +107,9 @@ function renderMileageTable() {
 }
 
 async function deleteMileage(id) {
+  if (!window.confirm("Delete this mileage entry? This cannot be undone.")) {
+    return;
+  }
   const response = await apiFetch(`/api/mileage/${id}`, {
     method: "DELETE"
   });

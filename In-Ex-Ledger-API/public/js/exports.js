@@ -330,6 +330,8 @@ function getValidatedExportRange() {
 }
 
 function updateExportSummary() {
+  const summaryTaxForm = document.getElementById("exportSummaryTaxForm");
+  const taxContextNote = document.getElementById("exportTaxContext");
   const summaryPeriod = document.getElementById("exportSummaryPeriod");
   const summaryIncome = document.getElementById("exportSummaryIncome");
   const summaryExpenses = document.getElementById("exportSummaryExpenses");
@@ -339,6 +341,14 @@ function updateExportSummary() {
 
   if (!summaryPeriod || !summaryIncome || !summaryExpenses || !summaryNet) {
     return;
+  }
+
+  const taxContext = getTaxFormContext();
+  if (summaryTaxForm) {
+    summaryTaxForm.textContent = taxContext.label;
+  }
+  if (taxContextNote) {
+    taxContextNote.textContent = `Tax form context: ${taxContext.exportLabel}`;
   }
 
   if (!startDate || !endDate || startDate > endDate) {
@@ -692,15 +702,15 @@ function resolveTransactionType(transaction, category) {
 }
 
 function makeExportFilename(startDate, endDate) {
-  return `luna-business-export-${startDate}_to_${endDate}.csv`;
+  return `inex-ledger-${getTaxFormContext().slug}-export-${startDate}_to_${endDate}.csv`;
 }
 
 function makeBasicFilename(startDate, endDate) {
-  return `luna-business-basic-export-${startDate}_to_${endDate}.csv`;
+  return `inex-ledger-${getTaxFormContext().slug}-basic-export-${startDate}_to_${endDate}.csv`;
 }
 
 function makePdfFilename(startDate, endDate) {
-  return `luna-business-export-${startDate}_to_${endDate}.pdf`;
+  return `inex-ledger-${getTaxFormContext().slug}-export-${startDate}_to_${endDate}.pdf`;
 }
 
 function formatHistoryDate(value) {
@@ -729,6 +739,22 @@ function formatMoney(amount) {
 function getRegion() {
   const stored = window.LUNA_REGION || localStorage.getItem("lb_region");
   return stored?.toLowerCase() === "ca" ? "ca" : "us";
+}
+
+function getTaxFormContext(region = getRegion()) {
+  if (region === "ca") {
+    return {
+      label: "Canada T2125",
+      exportLabel: "Canada T2125 export package",
+      slug: "t2125"
+    };
+  }
+
+  return {
+    label: "U.S. Schedule C",
+    exportLabel: "U.S. Schedule C export package",
+    slug: "schedule-c"
+  };
 }
 
 function getCurrencyForRegion(region) {

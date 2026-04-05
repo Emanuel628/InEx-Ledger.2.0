@@ -171,6 +171,10 @@ async function renderAccountList() {
 }
 
 async function deleteAccount(accountId) {
+  if (!window.confirm("Delete this account? This cannot be undone.")) {
+    return;
+  }
+
   const response = await apiFetch(`/api/accounts/${accountId}`, {
     method: "DELETE"
   });

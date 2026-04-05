@@ -317,6 +317,10 @@ async function deleteReceiptRecord(receiptId) {
     return;
   }
 
+  if (!window.confirm(`Delete receipt "${receipt.filename || "this receipt"}"? This cannot be undone.`)) {
+    return;
+  }
+
   const response = await apiFetch(`/api/receipts/${receiptId}`, {
     method: "DELETE"
   });

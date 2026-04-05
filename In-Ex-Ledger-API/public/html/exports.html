@@ -60,6 +60,7 @@
         <div>
           <h1 class="page-title">Export records</h1>
           <p class="page-subtitle">Generate clean reports for tax filing or CPA handoff</p>
+          <p class="page-context-note" id="exportTaxContext">Tax form context: U.S. Schedule C export package</p>
         </div>
         <div class="exports-hero-actions">
           <button type="submit" form="exportForm" class="export-btn export-btn-secondary" id="exportCsvBtn">Export CSV</button>
@@ -152,6 +153,7 @@
           </label>
 
           <div class="summary-panel" id="exportSummaryPanel">
+            <div class="summary-row"><span>Tax form</span><strong id="exportSummaryTaxForm">U.S. Schedule C</strong></div>
             <div class="summary-row"><span>Period</span><strong id="exportSummaryPeriod">-</strong></div>
             <div class="summary-row"><span>Total income</span><strong class="summary-income" id="exportSummaryIncome">$0.00</strong></div>
             <div class="summary-row"><span>Total expenses</span><strong class="summary-expense" id="exportSummaryExpenses">$0.00</strong></div>

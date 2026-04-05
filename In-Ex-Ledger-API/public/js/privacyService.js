@@ -125,9 +125,9 @@
   }
 
   async function exportMyData() {
-    const fileName = `luna-business-my-data-${new Date()
-      .toISOString()
-      .slice(0, 10)}.json`;
+    const fileName = `inex-ledger-my-data-${new Date()
+        .toISOString()
+        .slice(0, 10)}.json`;
 
     if (await apiAvailable()) {
       const res = await fetch(buildApiUrl("/api/privacy/export"), {
