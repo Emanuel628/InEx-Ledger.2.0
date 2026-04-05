@@ -17,7 +17,10 @@ router.get("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
-      "SELECT id, name, region, language, fiscal_year_start, province, created_at FROM businesses WHERE id = $1",
+      `SELECT id, name, region, language, fiscal_year_start, province,
+              business_type, tax_id, address, created_at
+       FROM businesses
+       WHERE id = $1`,
       [businessId]
     );
     res.json(result.rows[0]);
@@ -31,7 +34,16 @@ router.get("/", async (req, res) => {
  * PUT /api/business
  */
 router.put("/", async (req, res) => {
-  const { name, region, language, fiscal_year_start, province } = req.body ?? {};
+  const {
+    name,
+    region,
+    language,
+    fiscal_year_start,
+    province,
+    business_type,
+    tax_id,
+    address
+  } = req.body ?? {};
 
   if (region && !VALID_REGIONS.has(region)) {
     return res.status(400).json({ error: "region must be 'US' or 'CA'" });
@@ -55,11 +67,24 @@ router.put("/", async (req, res) => {
              WHEN COALESCE($2, region) = 'US' THEN NULL
              WHEN $5 IS NOT NULL THEN $5
              ELSE province
-           END
-       WHERE id = $6
-       RETURNING id, name, region, language, fiscal_year_start, province, created_at`,
-      [name?.trim() || null, region || null, language || null,
-       fiscal_year_start || null, province || null, businessId]
+           END,
+           business_type = COALESCE($6, business_type),
+           tax_id = COALESCE($7, tax_id),
+           address = COALESCE($8, address)
+       WHERE id = $9
+       RETURNING id, name, region, language, fiscal_year_start, province,
+                 business_type, tax_id, address, created_at`,
+      [
+        name?.trim() || null,
+        region || null,
+        language || null,
+        fiscal_year_start || null,
+        province || null,
+        business_type?.trim() || null,
+        tax_id?.trim() || null,
+        address?.trim() || null,
+        businessId
+      ]
     );
     res.json(result.rows[0]);
   } catch (err) {

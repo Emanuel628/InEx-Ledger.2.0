@@ -317,6 +317,38 @@
   text-decoration: underline;
 }
 
+.receipt-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.receipt-link-btn,
+.receipt-delete-btn {
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.receipt-link-btn {
+  border: 0.5px solid var(--border2);
+  background: var(--surface);
+  color: var(--accent2);
+}
+
+.receipt-delete-btn {
+  border: 0.5px solid var(--red-border);
+  background: transparent;
+  color: var(--red);
+}
+
+.receipt-delete-btn:hover {
+  background: var(--red-bg);
+}
+
 .receipts-empty-state {
   padding: 32px 20px;
   text-align: center;
@@ -353,6 +385,80 @@
 
 .receipts-toast.hidden {
   display: none;
+}
+
+.receipt-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 25, 35, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+
+.receipt-modal.hidden {
+  display: none;
+}
+
+.receipt-modal-card {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(15, 25, 35, 0.18);
+}
+
+.receipt-modal-card h3 {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.receipt-modal-card p {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ink3);
+  line-height: 1.5;
+}
+
+.receipt-link-select {
+  width: 100%;
+  margin-top: 16px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--border2);
+  border-radius: 7px;
+  background: var(--surface2);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.receipt-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.receipt-secondary-btn,
+.receipt-primary-btn {
+  padding: 8px 14px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.receipt-secondary-btn {
+  border: 0.5px solid var(--border2);
+  background: var(--surface);
+  color: var(--ink2);
+}
+
+.receipt-primary-btn {
+  border: none;
+  background: var(--accent2);
+  color: #fff;
 }
 
 @media (max-width: 1024px) {

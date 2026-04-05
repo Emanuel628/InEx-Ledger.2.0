@@ -6,6 +6,7 @@ const REGION_DISPLAY = {
 const SETTINGS_DEFAULT_THEME = typeof DEFAULT_THEME !== "undefined" ? DEFAULT_THEME : "light";
 const SETTINGS_THEME_VERSION = typeof THEME_VERSION !== "undefined" ? THEME_VERSION : "2";
 const BUSINESS_PROFILE_KEY = "lb_business_profile";
+const BUSINESS_SETTINGS_KEY = "lb_business_settings";
 const SETTINGS_TOAST_MS = 3000;
 const SETTINGS_DELETE_DATA_KEYS = [
   "lb_transactions",
@@ -46,7 +47,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   initSettingsNav();
   wireSignOutButtons();
-  initBusinessProfileForm();
+  await initBusinessProfileForm();
   await initPreferences();
   initSecurityForm();
   initDangerZone();
@@ -86,28 +87,83 @@ function saveBusinessProfile(profile) {
   localStorage.setItem(BUSINESS_PROFILE_KEY, JSON.stringify(profile));
 }
 
-function initBusinessProfileForm() {
+async function initBusinessProfileForm() {
   const form = document.getElementById("businessProfileForm");
   if (!form) return;
 
-  const profile = getBusinessProfile();
+  const profile = await loadBusinessProfile();
   document.getElementById("business-name").value = profile.name || "";
   document.getElementById("business-type-select").value = profile.type || "sole_proprietor";
   document.getElementById("businessEin").value = profile.ein || "";
   document.getElementById("fiscal-year").value = profile.fiscalYearStart || "";
   document.getElementById("business-address").value = profile.address || "";
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    saveBusinessProfile({
+    const nextProfile = {
       name: document.getElementById("business-name").value.trim(),
       type: document.getElementById("business-type-select").value,
       ein: document.getElementById("businessEin").value.trim(),
       fiscalYearStart: document.getElementById("fiscal-year").value,
       address: document.getElementById("business-address").value.trim()
-    });
+    };
+
+    const saved = await saveBusinessProfileToApi(nextProfile);
+    if (!saved) {
+      showSettingsToast("Unable to save business profile");
+      return;
+    }
+    saveBusinessProfile(nextProfile);
     showSettingsToast("Business profile saved");
   });
+}
+
+async function loadBusinessProfile() {
+  const fallback = getBusinessProfile();
+
+  try {
+    const response = await apiFetch("/api/business");
+    if (!response || !response.ok) {
+      return fallback;
+    }
+
+    const business = await response.json().catch(() => null);
+    const profile = {
+      name: business?.name || fallback.name || "",
+      type: business?.business_type || fallback.type || "sole_proprietor",
+      ein: business?.tax_id || fallback.ein || "",
+      fiscalYearStart: business?.fiscal_year_start || fallback.fiscalYearStart || "",
+      address: business?.address || fallback.address || ""
+    };
+    saveBusinessProfile(profile);
+    return profile;
+  } catch (error) {
+    console.error("Failed to load business profile", error);
+    return fallback;
+  }
+}
+
+async function saveBusinessProfileToApi(profile) {
+  try {
+    const response = await apiFetch("/api/business", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name: profile.name,
+        fiscal_year_start: profile.fiscalYearStart || null,
+        business_type: profile.type || null,
+        tax_id: profile.ein || null,
+        address: profile.address || null
+      })
+    });
+
+    return !!(response && response.ok);
+  } catch (error) {
+    console.error("Failed to save business profile", error);
+    return false;
+  }
 }
 
 async function initPreferences() {
@@ -352,30 +408,55 @@ function normalizeProvinceCode(value) {
   return CA_PROVINCES.includes(code) ? code : "";
 }
 
-async function loadBusinessSettings() {
+function readBusinessSettingsFallback() {
   try {
-    const response = await apiFetch("/api/business");
-    if (!response || !response.ok) {
-      return {
-        region: String(localStorage.getItem("region") || localStorage.getItem("lb_region") || "US").toUpperCase(),
-        language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en",
-        province: ""
-      };
-    }
-
-    const business = await response.json();
+    const stored = JSON.parse(localStorage.getItem(BUSINESS_SETTINGS_KEY) || "null") || {};
     return {
-      region: String(business?.region || "US").toUpperCase(),
-      language: String(business?.language || (typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en")).toLowerCase(),
-      province: normalizeProvinceCode(business?.province || "")
+      region: String(stored.region || localStorage.getItem("region") || localStorage.getItem("lb_region") || "US").toUpperCase(),
+      language: String(stored.language || (typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en")).toLowerCase(),
+      province: normalizeProvinceCode(stored.province || "")
     };
-  } catch (error) {
-    console.error("Failed to load business settings", error);
+  } catch {
     return {
       region: String(localStorage.getItem("region") || localStorage.getItem("lb_region") || "US").toUpperCase(),
       language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en",
       province: ""
     };
+  }
+}
+
+function writeBusinessSettingsFallback({ region, language, province }) {
+  const normalizedRegion = String(region || "US").toUpperCase() === "CA" ? "CA" : "US";
+  const normalizedLanguage = String(language || "en").toLowerCase();
+  const normalizedProvince = normalizedRegion === "CA" ? normalizeProvinceCode(province || "") : "";
+  localStorage.setItem(
+    BUSINESS_SETTINGS_KEY,
+    JSON.stringify({
+      region: normalizedRegion,
+      language: normalizedLanguage,
+      province: normalizedProvince
+    })
+  );
+}
+
+async function loadBusinessSettings() {
+  try {
+    const response = await apiFetch("/api/business");
+    if (!response || !response.ok) {
+      return readBusinessSettingsFallback();
+    }
+
+    const business = await response.json();
+    const resolved = {
+      region: String(business?.region || "US").toUpperCase(),
+      language: String(business?.language || (typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en")).toLowerCase(),
+      province: normalizeProvinceCode(business?.province || "")
+    };
+    writeBusinessSettingsFallback(resolved);
+    return resolved;
+  } catch (error) {
+    console.error("Failed to load business settings", error);
+    return readBusinessSettingsFallback();
   }
 }
 
@@ -392,7 +473,14 @@ async function saveBusinessSettings({ region, language, province }) {
         province
       })
     });
-    return !!(response && response.ok);
+    if (!response || !response.ok) {
+      const errorPayload = await response?.json().catch(() => null);
+      console.error("Business settings API rejected save", errorPayload || response?.status);
+      return false;
+    }
+
+    writeBusinessSettingsFallback({ region, language, province });
+    return true;
   } catch (error) {
     console.error("Failed to save business settings", error);
     return false;

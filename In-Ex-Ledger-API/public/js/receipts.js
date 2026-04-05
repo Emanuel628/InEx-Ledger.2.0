@@ -3,6 +3,7 @@
 let receiptsToastTimer = null;
 let receiptRecords = [];
 let transactionMap = {};
+let activeReceiptLinkId = null;
 
 if (typeof requireAuth === "function") {
   requireAuth();
@@ -13,6 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
   wireReceiptUpload();
+  wireReceiptLinkModal();
   await loadTransactionMap();
   await loadReceipts();
   syncTierNotice();
@@ -88,16 +90,16 @@ async function loadTransactionMap() {
       ? payload
       : Array.isArray(payload?.transactions)
       ? payload.transactions
+      : Array.isArray(payload?.data)
+      ? payload.data
       : [];
 
-    if (transactions.length) {
-      transactionMap = transactions.reduce((accumulator, transaction) => {
-        if (transaction?.id) {
-          accumulator[transaction.id] = transaction;
-        }
-        return accumulator;
-      }, {});
-    }
+    transactionMap = transactions.reduce((accumulator, transaction) => {
+      if (transaction?.id) {
+        accumulator[transaction.id] = transaction;
+      }
+      return accumulator;
+    }, {});
   } catch (error) {
     console.error("Failed to load transactions for receipts page:", error);
   }
@@ -121,6 +123,8 @@ async function loadReceipts() {
   try {
     const response = await apiFetch("/api/receipts");
     if (!response) {
+      receiptRecords = [];
+      renderReceipts(receiptRecords);
       return;
     }
 
@@ -130,11 +134,13 @@ async function loadReceipts() {
     }
 
     const payload = await response.json().catch(() => null);
-    receiptRecords = Array.isArray(payload)
+    const remoteReceipts = Array.isArray(payload)
       ? payload
       : Array.isArray(payload?.receipts)
       ? payload.receipts
       : [];
+
+    receiptRecords = remoteReceipts;
 
     renderReceipts(receiptRecords);
   } catch (error) {
@@ -173,6 +179,12 @@ function renderReceipts(receipts) {
         </td>
         <td>${escapeHtml(formatReceiptDate(receipt.created_at))}</td>
         <td>${transactionCell}</td>
+        <td>
+          <div class="receipt-row-actions">
+            <button type="button" class="receipt-link-btn" data-receipt-link="${escapeHtml(receipt.id || "")}">Link</button>
+            <button type="button" class="receipt-delete-btn" data-receipt-delete="${escapeHtml(receipt.id || "")}">Delete</button>
+          </div>
+        </td>
       </tr>
     `;
   }).join("");
@@ -193,6 +205,20 @@ function renderReceipts(receipts) {
       }
     });
   });
+
+  tableBody.querySelectorAll("[data-receipt-link]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const receiptId = button.getAttribute("data-receipt-link") || "";
+      openReceiptLinkModal(receiptId);
+    });
+  });
+
+  tableBody.querySelectorAll("[data-receipt-delete]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const receiptId = button.getAttribute("data-receipt-delete") || "";
+      await deleteReceiptRecord(receiptId);
+    });
+  });
 }
 
 function renderTransactionCell(transactionId) {
@@ -203,6 +229,107 @@ function renderTransactionCell(transactionId) {
   const transaction = transactionMap[transactionId];
   const label = transaction?.description || transactionId;
   return `<a class="receipt-transaction-link" href="transactions.html">${escapeHtml(label)}</a>`;
+}
+
+function wireReceiptLinkModal() {
+  const cancelButton = document.getElementById("receiptLinkCancel");
+  const saveButton = document.getElementById("receiptLinkSave");
+
+  cancelButton?.addEventListener("click", closeReceiptLinkModal);
+  saveButton?.addEventListener("click", async () => {
+    const select = document.getElementById("receiptLinkSelect");
+    await saveReceiptLink(activeReceiptLinkId, select?.value || "");
+  });
+}
+
+function openReceiptLinkModal(receiptId) {
+  const modal = document.getElementById("receiptLinkModal");
+  const select = document.getElementById("receiptLinkSelect");
+  const receipt = receiptRecords.find((record) => record.id === receiptId);
+  if (!modal || !select || !receipt) {
+    return;
+  }
+
+  activeReceiptLinkId = receiptId;
+  const transactions = Object.values(transactionMap)
+    .sort((left, right) => String(right.date || "").localeCompare(String(left.date || "")));
+  select.innerHTML = '<option value="">Not attached</option>';
+  transactions.forEach((transaction) => {
+    if (!transaction?.id) {
+      return;
+    }
+    const option = document.createElement("option");
+    option.value = transaction.id;
+    option.textContent = `${transaction.date || ""} - ${transaction.description || transaction.id}`;
+    select.appendChild(option);
+  });
+  select.value = receipt.transaction_id || "";
+  modal.classList.remove("hidden");
+}
+
+function closeReceiptLinkModal() {
+  const modal = document.getElementById("receiptLinkModal");
+  if (modal) {
+    modal.classList.add("hidden");
+  }
+  activeReceiptLinkId = null;
+}
+
+async function saveReceiptLink(receiptId, transactionId) {
+  if (!receiptId) {
+    return;
+  }
+
+  const receipt = receiptRecords.find((record) => record.id === receiptId);
+  if (!receipt) {
+    return;
+  }
+
+  const response = await apiFetch(`/api/receipts/${receiptId}/attach`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      transaction_id: transactionId || null
+    })
+  });
+
+  if (!response || !response.ok) {
+    const errorPayload = await response?.json().catch(() => null);
+    showReceiptsToast(errorPayload?.error || "Unable to link receipt");
+    return;
+  }
+
+  closeReceiptLinkModal();
+  await loadTransactionMap();
+  await loadReceipts();
+  showReceiptsToast(transactionId ? "Receipt linked" : "Receipt unlinked");
+}
+
+async function deleteReceiptRecord(receiptId) {
+  if (!receiptId) {
+    return;
+  }
+
+  const receipt = receiptRecords.find((record) => record.id === receiptId);
+  if (!receipt) {
+    return;
+  }
+
+  const response = await apiFetch(`/api/receipts/${receiptId}`, {
+    method: "DELETE"
+  });
+
+  if (!response || !response.ok) {
+    const errorPayload = await response?.json().catch(() => null);
+    showReceiptsToast(errorPayload?.error || "Unable to delete receipt");
+    return;
+  }
+
+  await loadTransactionMap();
+  await loadReceipts();
+  showReceiptsToast("Receipt deleted");
 }
 
 async function openReceiptPreview(receiptId, filename) {

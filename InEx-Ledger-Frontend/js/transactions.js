@@ -1,7 +1,8 @@
 const STORAGE_KEYS = {
   accounts: "lb_accounts",
   categories: "lb_categories",
-  transactions: "lb_transactions"
+  transactions: "lb_transactions",
+  receipts: "lb_receipts"
 };
 
 const ledgerState = {
@@ -9,6 +10,7 @@ const ledgerState = {
 };
 
 const transactionFilters = {
+  type: "all",
   search: "",
   category: ""
 };
@@ -48,6 +50,8 @@ let businessTaxProfile = {
   province: "",
   rate: US_TAX_RATE
 };
+let unattachedReceiptsCount = 0;
+let pendingTransactionReceiptFile = null;
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
 function formatCurrency(value) {
@@ -69,14 +73,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   setupTransactionDrawer();
+  initSidebarTypeFilter();
   wireTransactionIntentButtons();
   await loadBusinessTaxProfile();
 
-  seedDefaultCategories();
   wireTransactionForm();
   await refreshAccountOptions();
-  populateCategoriesFromStorage();
-  loadTransactions();
+  await refreshCategoryOptions();
+  await loadTransactions();
   wireTransactionSearch();
   wireTransactionCategoryFilter();
   wireTransactionModal();
@@ -119,15 +123,15 @@ function wireTransactionForm() {
   const form = document.querySelector("form");
   const accountHelp = document.getElementById("accountHelp");
   const categoryHelp = document.getElementById("categoryHelp");
-  const message = document.getElementById("transactionFormMessage");
 
   updateHelpText(accountHelp, categoryHelp);
+  initTransactionReceiptField();
 
   if (!form) {
     return;
   }
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const dateInput = document.getElementById("date");
@@ -166,46 +170,47 @@ function wireTransactionForm() {
     }
 
     try {
-      const categoriesById = mapById(getCategories());
-      const taxLabel = categoriesById[categoryId]?.taxLabel || "";
-
-      const transactionPayload = {
-        date,
-        description,
+      const requestBody = {
+        account_id: accountId,
+        category_id: categoryId,
         amount,
-        accountId,
-        categoryId,
         type,
-        taxLabel
+        description,
+        date,
+        note: ""
       };
 
-      const transactions = getTransactions();
-      if (editingTransactionId) {
-        const idx = transactions.findIndex((txn) => txn.id === editingTransactionId);
-        if (idx >= 0) {
-          const existing = transactions[idx];
-          transactions[idx] = {
-            ...existing,
-            ...transactionPayload
-          };
-        }
-      } else {
-        transactions.push({
-          ...transactionPayload,
-          id: `txn_${Date.now()}`,
-          receiptId: "",
-          note: ""
-        });
+      const endpoint = editingTransactionId
+        ? `/api/transactions/${editingTransactionId}`
+        : "/api/transactions";
+      const method = editingTransactionId ? "PUT" : "POST";
+      const response = await apiFetch(endpoint, {
+        method,
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response || !response.ok) {
+        const errorPayload = await response?.json().catch(() => null);
+        setTransactionFormMessage(errorPayload?.error || "Unable to save transaction.");
+        return;
       }
-      saveTransactions(transactions);
+
+      const savedTransaction = normalizeTransaction(
+        await response.json().catch(() => null)
+      );
+
+      if (savedTransaction?.id && pendingTransactionReceiptFile) {
+        const uploaded = await uploadReceipt(savedTransaction.id, pendingTransactionReceiptFile);
+        if (!uploaded) {
+          return;
+        }
+      }
 
       markAccountAsUsed(accountId);
-      ledgerState.transactions = transactions;
-
-      populateAccountsFromStorage(getAccounts());
-      populateCategoriesFromStorage();
-      applyFilters();
-      renderTotals();
+      await loadTransactions();
 
       form.reset();
       closeTransactionDrawer();
@@ -290,15 +295,30 @@ function updateHelpText(accountHelp, categoryHelp) {
   }
 }
 
-function loadTransactions() {
+async function loadTransactions() {
   setTransactionsLoading(true);
-  ledgerState.transactions = getTransactions();
+  try {
+    const [transactions, receiptSnapshot] = await Promise.all([
+      fetchTransactionsForPage(),
+      fetchReceiptLinksSnapshot()
+    ]);
 
-  renderAccountOptions();
-  renderCategoryOptions();
-  renderTotals();
-
-  setTransactionsLoading(false);
+    ledgerState.transactions = transactions.filter(Boolean).map((transaction) => ({
+      ...transaction,
+      receiptId: receiptSnapshot.byTransactionId[transaction.id] || transaction.receiptId || ""
+    }));
+    unattachedReceiptsCount = receiptSnapshot.unattachedCount;
+    saveTransactions(ledgerState.transactions);
+  } catch (error) {
+    console.error("Failed to load transactions:", error);
+    ledgerState.transactions = getTransactions();
+  } finally {
+    renderAccountOptions();
+    renderCategoryOptions();
+    applyFilters();
+    renderTotals();
+    setTransactionsLoading(false);
+  }
 }
 
 function renderAccountOptions() {
@@ -342,6 +362,18 @@ function wireTransactionCategoryFilter() {
   filter.addEventListener("change", () => {
     transactionFilters.category = filter.value;
     applyFilters();
+  });
+}
+
+function initSidebarTypeFilter() {
+  const params = new URLSearchParams(window.location.search);
+  const requestedType = params.get("type");
+  transactionFilters.type =
+    requestedType === "income" || requestedType === "expense" ? requestedType : "all";
+
+  document.querySelectorAll("[data-sidebar-filter]").forEach((link) => {
+    const filterType = link.getAttribute("data-sidebar-filter") || "all";
+    link.classList.toggle("nav-link-active", filterType === transactionFilters.type);
   });
 }
 
@@ -450,6 +482,8 @@ function resetTransactionForm() {
   if (form) {
     form.reset();
   }
+  pendingTransactionReceiptFile = null;
+  updateTransactionReceiptLabel();
   editingTransactionId = null;
   setEditingMode(false);
   const message = document.getElementById("transactionFormMessage");
@@ -470,6 +504,9 @@ function applyFilters() {
   const transactions = ledgerState.transactions || [];
   const term = (transactionFilters.search || "").trim().toLowerCase();
   let filtered = transactions;
+  if (transactionFilters.type === "income" || transactionFilters.type === "expense") {
+    filtered = filtered.filter((tx) => tx.type === transactionFilters.type);
+  }
   if (term) {
     filtered = filtered.filter((tx) => {
       const desc = (tx.description || "").toLowerCase();
@@ -490,18 +527,24 @@ function applyFilters() {
   renderTransactionsTable(filtered);
 }
 
-function handleTransactionDelete(transactionId) {
-  const current = ledgerState.transactions || [];
-  const updated = current.filter((txn) => txn.id !== transactionId);
-  ledgerState.transactions = updated;
-  saveTransactions(updated);
+async function handleTransactionDelete(transactionId) {
+  const response = await apiFetch(`/api/transactions/${transactionId}`, {
+    method: "DELETE"
+  });
+
+  if (!response || !response.ok) {
+    const errorPayload = await response?.json().catch(() => null);
+    setTransactionFormMessage(errorPayload?.error || "Unable to delete transaction.");
+    closeTransactionModal();
+    return;
+  }
+
   if (editingTransactionId === transactionId) {
     editingTransactionId = null;
     setEditingMode(false);
   }
   closeTransactionModal();
-  applyFilters();
-  renderTotals();
+  await loadTransactions();
 }
 function getCategoryName(categoryId) {
   const categories = getCategories();
@@ -692,6 +735,107 @@ function renderTransactionList(filteredTransactions) {
   });
 }
 
+async function refreshCategoryOptions() {
+  const categories = await fetchCategoriesForTransactions();
+  localStorage.setItem(STORAGE_KEYS.categories, JSON.stringify(categories));
+  populateCategoriesFromStorage();
+}
+
+async function fetchCategoriesForTransactions() {
+  const fallback = getCategories();
+
+  try {
+    const response = await apiFetch("/api/categories");
+    if (!response || !response.ok) {
+      return fallback;
+    }
+
+    const categories = await response.json().catch(() => []);
+    if (!Array.isArray(categories)) {
+      return fallback;
+    }
+
+    return categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      type: category.kind,
+      taxLabel:
+        businessTaxProfile.region === "CA" ? category.tax_map_ca || "" : category.tax_map_us || ""
+    }));
+  } catch (error) {
+    console.warn("[Transactions] Unable to refresh categories", error);
+    return fallback;
+  }
+}
+
+async function fetchTransactionsForPage() {
+  const response = await apiFetch("/api/transactions");
+  if (!response || !response.ok) {
+    throw new Error("Failed to load transactions.");
+  }
+
+  const payload = await response.json().catch(() => null);
+  const transactions = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.transactions)
+    ? payload.transactions
+    : Array.isArray(payload?.data)
+    ? payload.data
+    : [];
+
+  return transactions.map(normalizeTransaction).filter(Boolean);
+}
+
+async function fetchReceiptLinksSnapshot() {
+  try {
+    const response = await apiFetch("/api/receipts");
+    if (!response || !response.ok) {
+      return { byTransactionId: {}, unattachedCount: 0 };
+    }
+
+    const payload = await response.json().catch(() => []);
+    const receipts = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.receipts)
+      ? payload.receipts
+      : [];
+
+    return receipts.reduce(
+      (snapshot, receipt) => {
+        if (receipt?.transaction_id) {
+          snapshot.byTransactionId[receipt.transaction_id] = receipt.id;
+        } else {
+          snapshot.unattachedCount += 1;
+        }
+        return snapshot;
+      },
+      { byTransactionId: {}, unattachedCount: 0 }
+    );
+  } catch (error) {
+    console.warn("[Transactions] Unable to load receipt links", error);
+    return { byTransactionId: {}, unattachedCount: 0 };
+  }
+}
+
+function normalizeTransaction(transaction) {
+  if (!transaction || typeof transaction !== "object") {
+    return null;
+  }
+
+  return {
+    id: transaction.id,
+    date: String(transaction.date || "").slice(0, 10),
+    description: transaction.description || "",
+    amount: Number(transaction.amount) || 0,
+    accountId: transaction.accountId || transaction.account_id || "",
+    categoryId: transaction.categoryId || transaction.category_id || "",
+    type: transaction.type === "income" ? "income" : "expense",
+    note: transaction.note || "",
+    receiptId: transaction.receiptId || transaction.receipt_id || "",
+    createdAt: transaction.createdAt || transaction.created_at || ""
+  };
+}
+
 function renderTransactionsTable(filteredTransactions) {
   const tbody = document.querySelector("tbody");
   const transactions =
@@ -840,11 +984,23 @@ function calculateTotals() {
 }
 
 async function loadBusinessTaxProfile() {
-  const fallbackRegion = String(localStorage.getItem("lb_region") || window.LUNA_REGION || "us").toUpperCase();
+  let fallbackSettings = {};
+  try {
+    fallbackSettings = JSON.parse(localStorage.getItem("lb_business_settings") || "null") || {};
+  } catch {
+    fallbackSettings = {};
+  }
+  const fallbackRegion = String(
+    fallbackSettings.region || localStorage.getItem("lb_region") || window.LUNA_REGION || "us"
+  ).toUpperCase();
+  const fallbackProvince = String(fallbackSettings.province || "").toUpperCase();
   businessTaxProfile = {
     region: fallbackRegion === "CA" ? "CA" : "US",
-    province: "",
-    rate: fallbackRegion === "CA" ? DEFAULT_CA_RATE : US_TAX_RATE
+    province: fallbackRegion === "CA" ? fallbackProvince : "",
+    rate:
+      fallbackRegion === "CA"
+        ? (CANADA_TAX_RATES[fallbackProvince] || DEFAULT_CA_RATE)
+        : US_TAX_RATE
   };
 
   try {
@@ -964,7 +1120,7 @@ function updateReceiptsDot() {
   if (!dot) {
     return;
   }
-  dot.hidden = !(ledgerState.transactions || []).some((txn) => !txn.receiptId);
+  dot.hidden = unattachedReceiptsCount === 0;
 }
 
 function mapById(items) {
@@ -979,11 +1135,7 @@ function getAccounts() {
 }
 
 function getCategories() {
-  const categories = readStorageArray(STORAGE_KEYS.categories);
-  if (categories.length === 0) {
-    return seedDefaultCategories();
-  }
-  return categories;
+  return readStorageArray(STORAGE_KEYS.categories);
 }
 
 function getTransactions() {
@@ -1055,6 +1207,37 @@ let receiptInputElement = null;
 const TRANSACTION_ID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function initTransactionReceiptField() {
+  const button = document.getElementById("transactionReceiptButton");
+  const input = document.getElementById("transactionReceiptInput");
+  if (!button || !input) {
+    return;
+  }
+
+  if (button.dataset.wired !== "true") {
+    button.dataset.wired = "true";
+    button.addEventListener("click", () => input.click());
+    input.addEventListener("change", () => {
+      pendingTransactionReceiptFile = input.files?.[0] || null;
+      updateTransactionReceiptLabel();
+    });
+  }
+
+  updateTransactionReceiptLabel();
+}
+
+function updateTransactionReceiptLabel() {
+  const nameNode = document.getElementById("transactionReceiptName");
+  const input = document.getElementById("transactionReceiptInput");
+  if (!nameNode) {
+    return;
+  }
+  nameNode.textContent = pendingTransactionReceiptFile?.name || "No file selected";
+  if (!pendingTransactionReceiptFile && input) {
+    input.value = "";
+  }
+}
+
 function initReceiptInput() {
   if (receiptInputElement) {
     return;
@@ -1105,49 +1288,17 @@ async function uploadReceipt(transactionId, file) {
     if (!response.ok) {
       const error = await response.json().catch(() => null);
       setTransactionFormMessage(error?.error || "Receipt upload failed.");
-      return;
+      return false;
     }
 
+    await loadTransactions();
     setTransactionFormMessage("Receipt uploaded.");
+    return true;
   } catch (err) {
     console.error("Receipt upload error:", err);
     setTransactionFormMessage("Receipt upload failed.");
+    return false;
   }
-}
-
-function seedDefaultCategories() {
-  const existing = JSON.parse(localStorage.getItem(STORAGE_KEYS.categories) || "[]");
-  if (existing.length > 0) {
-    return existing;
-  }
-
-  const defaults = window.LUNA_DEFAULTS?.categories || {};
-  const income = defaults.income || [];
-  const expense = defaults.expense || [];
-  const seeded = [];
-
-  income.forEach((name) => {
-    seeded.push({
-      id: `cat_income_${slugify(name)}`,
-      name,
-      type: "income"
-    });
-  });
-
-  expense.forEach((name) => {
-    seeded.push({
-      id: `cat_expense_${slugify(name)}`,
-      name,
-      type: "expense"
-    });
-  });
-
-  localStorage.setItem(STORAGE_KEYS.categories, JSON.stringify(seeded));
-  return seeded;
-}
-
-function slugify(value) {
-  return value.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
 function maybePlaySlotAnimation() {

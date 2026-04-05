@@ -43,9 +43,9 @@
     <aside class="app-sidebar" aria-label="Sidebar">
       <div class="sidebar-section-label">Overview</div>
       <nav class="sidebar-nav">
-        <a href="transactions.html" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>All transactions</span></a>
-        <a href="transactions.html?type=income" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg></span><span>Income</span></a>
-        <a href="transactions.html?type=expense" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 5v6M5 8l3 3 3-3"></path></svg></span><span>Expenses</span></a>
+        <a href="transactions.html" class="sidebar-link" data-sidebar-filter="all"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>All transactions</span></a>
+        <a href="transactions.html?type=income" class="sidebar-link" data-sidebar-filter="income"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg></span><span>Income</span></a>
+        <a href="transactions.html?type=expense" class="sidebar-link" data-sidebar-filter="expense"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 5v6M5 8l3 3 3-3"></path></svg></span><span>Expenses</span></a>
       </nav>
       <div class="sidebar-section-label">Tools</div>
       <nav class="sidebar-nav">
@@ -196,6 +196,14 @@
                 <div class="form-field">
                   <label for="amount" class="form-label" data-i18n="transaction_label_amount">Amount</label>
                   <input class="form-control" type="number" id="amount" name="amount" step="0.01" required />
+                </div>
+                <div class="form-field form-field-full">
+                  <label for="transactionReceiptInput" class="form-label">Receipt attachment</label>
+                  <div class="receipt-upload-inline">
+                    <button type="button" id="transactionReceiptButton" class="receipt-upload-button">Choose receipt</button>
+                    <span id="transactionReceiptName" class="receipt-upload-name">No file selected</span>
+                  </div>
+                  <input class="receipt-upload-input" type="file" id="transactionReceiptInput" accept="image/*,.pdf,application/pdf" />
                 </div>
               </div>
 

@@ -14,22 +14,153 @@ const CSV_BASIC_FORMAT = "csv_basic";
 const EXPORT_TOAST_MS = 3000;
 
 let exportToastTimer = null;
+let unattachedReceiptsCount = 0;
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   if (typeof requireAuth === "function") requireAuth();
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
+  await hydrateExportData();
   populateExportFilters();
   initExportLanguageSelect();
   initPresetChips();
   initBusinessTaxId();
   setupExportForm();
   setupPdfButton();
-  updateReceiptsDot();
+  await refreshReceiptsDot();
   updateExportSummary();
   renderExportHistory();
 });
+
+async function hydrateExportData() {
+  await Promise.all([
+    hydrateTransactionsCache(),
+    hydrateAccountsCache(),
+    hydrateCategoriesCache(),
+    hydrateReceiptsCache(),
+    hydrateBusinessProfileCache()
+  ]);
+}
+
+async function hydrateTransactionsCache() {
+  try {
+    const response = await apiFetch("/api/transactions");
+    if (!response || !response.ok) {
+      return;
+    }
+    const payload = await response.json().catch(() => null);
+    const transactions = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.transactions)
+      ? payload.transactions
+      : Array.isArray(payload?.data)
+      ? payload.data
+      : [];
+    const normalized = transactions.map((transaction) => ({
+      id: transaction.id,
+      date: String(transaction.date || "").slice(0, 10),
+      description: transaction.description || "",
+      amount: Number(transaction.amount) || 0,
+      accountId: transaction.accountId || transaction.account_id || "",
+      categoryId: transaction.categoryId || transaction.category_id || "",
+      type: transaction.type === "income" ? "income" : "expense",
+      note: transaction.note || "",
+      receiptId: transaction.receiptId || transaction.receipt_id || ""
+    }));
+    localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(normalized));
+  } catch (error) {
+    console.warn("[Exports] Unable to hydrate transactions", error);
+  }
+}
+
+async function hydrateAccountsCache() {
+  try {
+    const response = await apiFetch("/api/accounts");
+    if (!response || !response.ok) {
+      return;
+    }
+    const accounts = await response.json().catch(() => []);
+    if (Array.isArray(accounts)) {
+      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+    }
+  } catch (error) {
+    console.warn("[Exports] Unable to hydrate accounts", error);
+  }
+}
+
+async function hydrateCategoriesCache() {
+  try {
+    const response = await apiFetch("/api/categories");
+    if (!response || !response.ok) {
+      return;
+    }
+    const categories = await response.json().catch(() => []);
+    if (Array.isArray(categories)) {
+      const normalized = categories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        type: category.kind,
+        taxLabel: category.tax_map_us || category.tax_map_ca || ""
+      }));
+      localStorage.setItem(CATEGORIES_KEY, JSON.stringify(normalized));
+    }
+  } catch (error) {
+    console.warn("[Exports] Unable to hydrate categories", error);
+  }
+}
+
+async function hydrateReceiptsCache() {
+  try {
+    const response = await apiFetch("/api/receipts");
+    if (!response || !response.ok) {
+      return;
+    }
+    const payload = await response.json().catch(() => null);
+    const receipts = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.receipts)
+      ? payload.receipts
+      : [];
+    const normalized = receipts.map((receipt) => ({
+      id: receipt.id,
+      filename: receipt.filename || "",
+      uploadedAt: receipt.created_at || "",
+      transactionId: receipt.transaction_id || "",
+      mimeType: receipt.mime_type || ""
+    }));
+    unattachedReceiptsCount = normalized.filter((receipt) => !receipt.transactionId).length;
+    localStorage.setItem(RECEIPTS_KEY, JSON.stringify(normalized));
+  } catch (error) {
+    console.warn("[Exports] Unable to hydrate receipts", error);
+  }
+}
+
+async function hydrateBusinessProfileCache() {
+  try {
+    const response = await apiFetch("/api/business");
+    if (!response || !response.ok) {
+      return;
+    }
+    const business = await response.json().catch(() => null);
+    if (!business) {
+      return;
+    }
+    localStorage.setItem(
+      BUSINESS_PROFILE_KEY,
+      JSON.stringify({
+        name: business.name || "",
+        type: business.business_type || "",
+        ein: business.tax_id || "",
+        taxId: business.tax_id || "",
+        fiscalYearStart: business.fiscal_year_start || "",
+        address: business.address || ""
+      })
+    );
+  } catch (error) {
+    console.warn("[Exports] Unable to hydrate business profile", error);
+  }
+}
 
 function setupExportForm() {
   const form = document.getElementById("exportForm");
@@ -168,7 +299,7 @@ function initBusinessTaxId() {
 
   const profile = readBusinessProfile();
   const region = getRegion();
-  const taxId = profile.ein || localStorage.getItem(region === "ca" ? "lb_bn" : "lb_ein") || "";
+  const taxId = profile.ein || profile.taxId || localStorage.getItem(region === "ca" ? "lb_bn" : "lb_ein") || "";
   taxIdNode.textContent = taxId || "Not set";
 }
 
@@ -514,12 +645,26 @@ function populateExportFilters() {
   }
 }
 
+async function refreshReceiptsDot() {
+  try {
+    const response = await apiFetch("/api/receipts");
+    if (response && response.ok) {
+      const payload = await response.json().catch(() => []);
+      const receipts = Array.isArray(payload) ? payload : Array.isArray(payload?.receipts) ? payload.receipts : [];
+      unattachedReceiptsCount = receipts.filter((receipt) => !receipt?.transaction_id).length;
+    }
+  } catch (error) {
+    console.warn("[Exports] Unable to refresh receipts dot", error);
+  }
+  updateReceiptsDot();
+}
+
 function updateReceiptsDot() {
   const dot = document.getElementById("receiptsDot");
   if (!dot) {
     return;
   }
-  dot.hidden = !getReceipts().some((receipt) => !receipt.transactionId);
+  dot.hidden = unattachedReceiptsCount === 0;
 }
 
 function showExportToast(message) {

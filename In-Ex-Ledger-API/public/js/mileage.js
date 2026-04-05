@@ -3,16 +3,19 @@ const METRIC_STORAGE_KEY = "lb_unit_metric";
 const MILEAGE_TOAST_MS = 3000;
 
 let mileageToastTimer = null;
+let mileageRecords = [];
+let unattachedReceiptsCount = 0;
 
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
+  await loadMileageRecords();
   wireMileageForm();
   renderMileageTable();
   refreshMileageLabels();
-  updateReceiptsDot();
+  await refreshReceiptsDot();
   window.addEventListener("storage", refreshMileageLabels);
   window.addEventListener("lunaRegionChanged", refreshMileageLabels);
   window.addEventListener("lunaLanguageChanged", refreshMileageLabels);
@@ -20,7 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function wireMileageForm() {
   const form = document.getElementById("mileageForm");
-  form?.addEventListener("submit", (event) => {
+  form?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const message = document.getElementById("mileageFormMessage");
     if (message) message.textContent = "";
@@ -36,16 +39,27 @@ function wireMileageForm() {
     }
 
     const useKilometers = shouldUseKilometers();
-    const entries = getMileageRecords();
-    entries.unshift({
-      id: `mile_${Date.now()}`,
-      date,
-      purpose,
-      destination,
-      distance: Number(distance.toFixed(1)),
-      unit: useKilometers ? "km" : "mi"
+    const response = await apiFetch("/api/mileage", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        trip_date: date,
+        purpose,
+        destination,
+        miles: useKilometers ? null : Number(distance.toFixed(1)),
+        km: useKilometers ? Number(distance.toFixed(1)) : null
+      })
     });
-    saveMileageRecords(entries);
+
+    if (!response || !response.ok) {
+      const errorPayload = await response?.json().catch(() => null);
+      if (message) message.textContent = errorPayload?.error || "Unable to save mileage.";
+      return;
+    }
+
+    await loadMileageRecords();
     form.reset();
     renderMileageTable();
     showMileageToast("Mileage added");
@@ -65,8 +79,10 @@ function renderMileageTable() {
   const body = document.getElementById("mileageTableBody");
   const empty = document.getElementById("mileageEmpty");
   const useKilometers = shouldUseKilometers();
-  const unit = useKilometers ? "km" : "mi";
-  const entries = getMileageRecords().filter((entry) => entry.unit === unit);
+  const entries = mileageRecords.map((entry) => ({
+    ...entry,
+    displayDistance: convertMileageDistance(entry, useKilometers)
+  }));
 
   if (!entries.length) {
     body.innerHTML = "";
@@ -80,18 +96,25 @@ function renderMileageTable() {
       <td>${escapeHtml(entry.date)}</td>
       <td>${escapeHtml(entry.purpose)}</td>
       <td>${escapeHtml(entry.destination || "-")}</td>
-      <td>${escapeHtml(Number(entry.distance || 0).toFixed(1))}</td>
+      <td>${escapeHtml(Number(entry.displayDistance || 0).toFixed(1))}</td>
       <td><button type="button" class="mileage-delete" data-mileage-delete="${escapeHtml(entry.id)}">${escapeHtml(t("mileage_button_delete"))}</button></td>
     </tr>
   `).join("");
 
   body.querySelectorAll("[data-mileage-delete]").forEach((button) => {
-    button.addEventListener("click", () => deleteMileage(button.getAttribute("data-mileage-delete") || ""));
+    button.addEventListener("click", async () => deleteMileage(button.getAttribute("data-mileage-delete") || ""));
   });
 }
 
-function deleteMileage(id) {
-  saveMileageRecords(getMileageRecords().filter((entry) => entry.id !== id));
+async function deleteMileage(id) {
+  const response = await apiFetch(`/api/mileage/${id}`, {
+    method: "DELETE"
+  });
+  if (!response || !response.ok) {
+    showMileageToast("Unable to delete mileage");
+    return;
+  }
+  await loadMileageRecords();
   renderMileageTable();
   showMileageToast("Mileage deleted");
 }
@@ -101,27 +124,60 @@ function shouldUseKilometers() {
   return localStorage.getItem(METRIC_STORAGE_KEY) === "true" || region === "ca";
 }
 
-function getMileageRecords() {
+async function loadMileageRecords() {
   try {
-    return JSON.parse(localStorage.getItem(MILEAGE_STORAGE_KEY) || "[]");
-  } catch {
-    return [];
+    const response = await apiFetch("/api/mileage");
+    if (!response || !response.ok) {
+      throw new Error("Failed to load mileage.");
+    }
+    const payload = await response.json().catch(() => null);
+    const entries = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.data)
+      ? payload.data
+      : [];
+    mileageRecords = entries.map((entry) => ({
+      id: entry.id,
+      date: String(entry.trip_date || "").slice(0, 10),
+      purpose: entry.purpose || "",
+      destination: entry.destination || "",
+      miles: entry.miles != null ? Number(entry.miles) : null,
+      km: entry.km != null ? Number(entry.km) : null,
+      distance: Number(entry.km ?? entry.miles ?? 0),
+      unit: entry.km != null ? "km" : "mi"
+    }));
+    localStorage.setItem(MILEAGE_STORAGE_KEY, JSON.stringify(mileageRecords));
+  } catch (error) {
+    console.error("Failed to load mileage:", error);
+    try {
+      mileageRecords = JSON.parse(localStorage.getItem(MILEAGE_STORAGE_KEY) || "[]");
+    } catch {
+      mileageRecords = [];
+    }
   }
 }
 
-function saveMileageRecords(records) {
-  localStorage.setItem(MILEAGE_STORAGE_KEY, JSON.stringify(records));
+async function refreshReceiptsDot() {
+  try {
+    const response = await apiFetch("/api/receipts");
+    if (!response || !response.ok) {
+      unattachedReceiptsCount = 0;
+      updateReceiptsDot();
+      return;
+    }
+    const payload = await response.json().catch(() => []);
+    const receipts = Array.isArray(payload) ? payload : Array.isArray(payload?.receipts) ? payload.receipts : [];
+    unattachedReceiptsCount = receipts.filter((receipt) => !receipt?.transaction_id).length;
+  } catch {
+    unattachedReceiptsCount = 0;
+  }
+  updateReceiptsDot();
 }
 
 function updateReceiptsDot() {
   const dot = document.getElementById("receiptsDot");
   if (!dot) return;
-  try {
-    const receipts = JSON.parse(localStorage.getItem("lb_receipts") || "[]");
-    dot.hidden = !receipts.some((receipt) => !receipt.transactionId && !receipt.transaction_id);
-  } catch {
-    dot.hidden = true;
-  }
+  dot.hidden = unattachedReceiptsCount === 0;
 }
 
 function showMileageToast(message) {
@@ -132,6 +188,20 @@ function showMileageToast(message) {
   toast.classList.remove("hidden");
   if (mileageToastTimer) clearTimeout(mileageToastTimer);
   mileageToastTimer = window.setTimeout(() => toast.classList.add("hidden"), MILEAGE_TOAST_MS);
+}
+
+function convertMileageDistance(entry, useKilometers) {
+  const milesValue = entry.miles != null
+    ? Number(entry.miles)
+    : entry.km != null
+    ? Number(entry.km) / 1.60934
+    : Number(entry.distance || 0);
+
+  if (useKilometers) {
+    return entry.km != null ? Number(entry.km) : milesValue * 1.60934;
+  }
+
+  return milesValue;
 }
 
 function escapeHtml(value) {
