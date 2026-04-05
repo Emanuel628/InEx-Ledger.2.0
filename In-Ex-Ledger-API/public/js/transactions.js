@@ -60,7 +60,16 @@ let transactionBusinessContext = {
 };
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
-function formatCurrency(value, regionOverride = getRegion()) {
+function getResolvedRegion() {
+  const raw =
+    localStorage.getItem("lb_region") ||
+    localStorage.getItem("region") ||
+    window.LUNA_REGION ||
+    "us";
+  return String(raw).toLowerCase() === "ca" ? "ca" : "us";
+}
+
+function formatCurrency(value, regionOverride = getResolvedRegion()) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: regionOverride === "ca" ? "CAD" : "USD"
@@ -1689,9 +1698,9 @@ function getTaxFormContext() {
 function getScopeCurrencyRegion() {
   const businesses = getBusinessesInScope();
   if (!businesses.length) {
-    return getRegion();
+    return getResolvedRegion();
   }
-  return String(businesses[0].region || getRegion()).toLowerCase() === "ca" ? "ca" : "us";
+  return String(businesses[0].region || getResolvedRegion()).toLowerCase() === "ca" ? "ca" : "us";
 }
 
 function formatDisplayDate(value) {
