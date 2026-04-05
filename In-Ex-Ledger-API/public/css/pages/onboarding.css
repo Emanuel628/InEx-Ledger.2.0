@@ -1,6 +1,8 @@
 @import url("/css/pages/login.css");
 
 .onboarding-main {
+  max-width: 1180px;
+  margin: 0 auto;
   padding: 32px 20px 56px;
 }
 
@@ -8,9 +10,13 @@
   max-width: 1080px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 340px) minmax(420px, 1fr);
   gap: 28px;
   align-items: start;
+}
+
+.onboarding-shell > * {
+  min-width: 0;
 }
 
 .onboarding-intro {
@@ -53,6 +59,8 @@
 }
 
 .onboarding-card {
+  width: 100%;
+  min-width: 0;
   padding: 28px;
   border: 1px solid var(--border2);
   border-radius: 28px;
@@ -64,6 +72,21 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
+}
+
+.onboarding-card .form-field {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.onboarding-card .form-field-full {
+  grid-column: 1 / -1;
+}
+
+.onboarding-card label,
+.onboarding-card input,
+.onboarding-card select {
+  width: 100%;
 }
 
 .onboarding-actions {
@@ -125,7 +148,7 @@
   cursor: pointer;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .onboarding-shell {
     grid-template-columns: 1fr;
   }
