@@ -1,6 +1,9 @@
 let mfaChallengeForm = null;
 let mfaChallengeError = null;
 let isSubmittingMfa = false;
+function tx(key) {
+  return typeof window.t === "function" ? window.t(key) : key;
+}
 
 const pendingMfaToken = sessionStorage.getItem("lb_pending_mfa_token") || "";
 const pendingMfaEmail = sessionStorage.getItem("lb_pending_mfa_email") || "";
@@ -16,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const intro = document.getElementById("mfaChallengeIntro");
   if (intro && pendingMfaEmail) {
-    intro.textContent = `Finish signing in for ${pendingMfaEmail}. Enter the 6-digit code we just emailed you.`;
+    intro.textContent = `${tx("mfa_challenge_intro_prefix")} ${pendingMfaEmail}. ${tx("mfa_challenge_intro_suffix")}`;
   }
 
   mfaChallengeForm?.addEventListener("submit", handleMfaChallengeSubmit);
@@ -38,7 +41,7 @@ async function handleMfaChallengeSubmit(event) {
 
   clearMfaChallengeError();
   if (!code) {
-    showMfaChallengeError("Enter the 6-digit code from your email.");
+    showMfaChallengeError(tx("mfa_challenge_error_missing"));
     return;
   }
 
@@ -59,7 +62,7 @@ async function handleMfaChallengeSubmit(event) {
 
     const data = await response.json().catch(() => null);
     if (!response.ok || !data?.token) {
-      showMfaChallengeError(data?.error || "Unable to verify your email code.");
+      showMfaChallengeError(data?.error || tx("mfa_challenge_error_verify"));
       return;
     }
 
@@ -71,7 +74,7 @@ async function handleMfaChallengeSubmit(event) {
     window.location.href = "transactions";
   } catch (error) {
     console.error("MFA challenge request failed:", error);
-    showMfaChallengeError("Unable to reach server. Check your connection and try again.");
+    showMfaChallengeError(tx("login_error_offline"));
   } finally {
     submitButton?.removeAttribute("disabled");
     isSubmittingMfa = false;

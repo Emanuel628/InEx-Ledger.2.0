@@ -24,14 +24,14 @@
 
   <main>
     <section class="auth-card">
-      <h2>Verify sign-in</h2>
+      <h2 data-i18n="mfa_challenge_title">Verify sign-in</h2>
       <p id="mfaChallengeIntro" class="auth-helper">
         Enter the 6-digit code we emailed you to finish signing in.
       </p>
 
       <form id="mfaChallengeForm" class="auth-form">
         <div class="form-field">
-          <label for="mfaChallengeCode">Email verification code</label>
+          <label for="mfaChallengeCode" data-i18n="mfa_challenge_code_label">Email verification code</label>
           <input
             type="text"
             id="mfaChallengeCode"
@@ -45,11 +45,11 @@
 
         <label class="auth-checkbox">
           <input type="checkbox" id="mfaTrustDevice" />
-          Trust this device
+          <span data-i18n="mfa_challenge_trust_device">Trust this device</span>
         </label>
 
-        <button type="submit" class="auth-submit">Verify and continue</button>
-        <button type="button" id="mfaChallengeBack" class="auth-secondary-btn">Back to sign in</button>
+        <button type="submit" class="auth-submit" data-i18n="mfa_challenge_submit">Verify and continue</button>
+        <button type="button" id="mfaChallengeBack" class="auth-secondary-btn" data-i18n="mfa_challenge_back">Back to sign in</button>
       </form>
 
       <p id="mfaChallengeError" class="auth-error" role="alert" aria-live="polite" hidden></p>

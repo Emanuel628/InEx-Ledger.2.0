@@ -18,7 +18,10 @@ let isSubmittingRegister = false;
 let languageSelect = null;
 let tosConsentCheckbox = null;
 let tosConsentMessage = null;
-const OFFLINE_ERROR_MESSAGE = "Unable to reach server. Check your connection and try again.";
+function tx(key) {
+  return typeof window.t === "function" ? window.t(key) : key;
+}
+const OFFLINE_ERROR_MESSAGE = "login_error_offline";
 
 document.addEventListener("DOMContentLoaded", () => {
   form = document.getElementById("registerForm");
@@ -75,12 +78,12 @@ async function handleRegisterSubmit(event) {
   }
 
   if (!email || !password) {
-    showRegisterError("Enter an email and password.");
+    showRegisterError(tx("register_error_missing_fields"));
     return;
   }
 
   if (!isValidEmail(email)) {
-    showRegisterError("Please enter a valid email address.");
+    showRegisterError(tx("register_alert_valid_email"));
     return;
   }
 
@@ -108,7 +111,7 @@ async function handleRegisterSubmit(event) {
     window.location.href = "verify-email?email=sent";
   } catch (err) {
     console.error("Register request failed:", err);
-    showRegisterError(OFFLINE_ERROR_MESSAGE);
+    showRegisterError(tx(OFFLINE_ERROR_MESSAGE));
   } finally {
     submitButton?.removeAttribute("disabled");
     isSubmittingRegister = false;

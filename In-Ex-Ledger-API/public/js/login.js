@@ -15,8 +15,11 @@
 let loginForm = null;
 let loginErrorElement = null;
 let isSubmittingLogin = false;
-const OFFLINE_ERROR_MESSAGE = "Unable to reach server. Check your connection and try again.";
-const EXPIRED_SESSION_MESSAGE = "Your session expired. Please log in again.";
+function tx(key) {
+  return typeof window.t === "function" ? window.t(key) : key;
+}
+const OFFLINE_ERROR_MESSAGE = "login_error_offline";
+const EXPIRED_SESSION_MESSAGE = "login_error_expired";
 
 redirectIfAuthenticated();
 
@@ -47,12 +50,12 @@ async function handleLoginSubmit(event) {
   clearLoginError();
 
   if (!email || !password) {
-    showLoginError("Enter your email and password.");
+    showLoginError(tx("login_error_missing_fields"));
     return;
   }
 
   if (!isValidEmail(email)) {
-    showLoginError("Please enter a valid email address.");
+    showLoginError(tx("register_alert_valid_email"));
     return;
   }
 
@@ -82,7 +85,7 @@ async function handleLoginSubmit(event) {
     }
 
     if (!data?.token) {
-      showLoginError("Login failed. Please try again.");
+      showLoginError(tx("login_error_generic"));
       return;
     }
 
@@ -93,7 +96,7 @@ async function handleLoginSubmit(event) {
     window.location.href = "transactions";
   } catch (err) {
     console.error("Login request failed:", err);
-    showLoginError(OFFLINE_ERROR_MESSAGE);
+    showLoginError(tx(OFFLINE_ERROR_MESSAGE));
   } finally {
     submitButton?.removeAttribute("disabled");
     isSubmittingLogin = false;
@@ -105,14 +108,14 @@ function showLoginReasonMessage() {
   const reason = params.get("reason");
 
   if (reason === "expired") {
-    showLoginError(EXPIRED_SESSION_MESSAGE);
+    showLoginError(tx(EXPIRED_SESSION_MESSAGE));
   } else if (reason === "network") {
-    showLoginError(OFFLINE_ERROR_MESSAGE);
+    showLoginError(tx(OFFLINE_ERROR_MESSAGE));
   } else if (params.get("verified") === "true") {
-    showLoginError("Email verified. You can sign in now.");
+    showLoginError(tx("login_success_verified"));
     loginErrorElement.style.color = "#22c55e";
   } else if (params.get("email_changed") === "true") {
-    showLoginError("Email updated. Please sign in with your new address.");
+    showLoginError(tx("login_success_email_changed"));
     loginErrorElement.style.color = "#22c55e";
   }
 }

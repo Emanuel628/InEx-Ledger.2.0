@@ -29,7 +29,7 @@
         <a data-i18n="nav_accounts" href="accounts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg></span><span>Accounts</span></a>
         <a data-i18n="nav_categories" href="categories"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg></span><span>Categories</span></a>
         <a data-i18n="nav_receipts" href="receipts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span>Receipts</span></a>
-        <a href="mileage"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span>Mileage</span></a>
+        <a href="mileage"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span data-i18n="nav_mileage">Mileage</span></a>
         <a data-i18n="nav_exports" href="exports"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Exports</span></a>
         <a data-i18n="nav_settings" href="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg></span><span>Settings</span></a>
       </nav>
@@ -46,7 +46,7 @@
         <div class="sidebar-section-label" data-i18n="settings_sidebar_account">Account</div>
         <nav class="settings-nav">
           <button class="settings-nav-item is-active" type="button" data-settings-target="settings-business" data-i18n="settings_nav_business_profile">Business profile</button>
-          <button class="settings-nav-item" type="button" data-settings-target="settings-cpa-access">CPA access</button>
+          <button class="settings-nav-item" type="button" data-settings-target="settings-cpa-access" data-i18n="settings_nav_cpa_access">CPA access</button>
           <button class="settings-nav-item" type="button" data-settings-target="settings-security" data-i18n="settings_nav_security">Security</button>
         </nav>
         <div class="sidebar-section-label" data-i18n="settings_sidebar_preferences">Preferences</div>
@@ -56,7 +56,7 @@
           <button class="settings-nav-item" type="button" data-settings-target="settings-privacy" data-i18n="settings_nav_privacy">Privacy</button>
         </nav>
         <div class="settings-sidebar-actions">
-          <button type="button" id="replayOnboardingTipsSidebar" class="settings-sidebar-action">Replay tips</button>
+          <button type="button" id="replayOnboardingTipsSidebar" class="settings-sidebar-action" data-i18n="settings_replay_tips">Replay tips</button>
         </div>
       </div>
     </aside>
@@ -77,9 +77,9 @@
               <label for="business-type-select" data-i18n="settings_label_business_type">Business type</label>
               <select id="business-type-select" name="business_type_select">
                 <option value="sole_proprietor" data-i18n="settings_business_type_sole_prop">Sole proprietor</option>
-                <option value="llc">LLC</option>
-                <option value="s_corp">S-Corp</option>
-                <option value="partnership">Partnership</option>
+                <option value="llc" data-i18n="settings_business_type_llc">LLC</option>
+                <option value="s_corp" data-i18n="settings_business_type_scorp">S-Corp</option>
+                <option value="partnership" data-i18n="settings_business_type_partnership">Partnership</option>
               </select>
             </div>
             <div class="form-field">
@@ -101,44 +101,44 @@
 
       <section class="settings-card" id="settings-cpa-access">
         <div class="card-head">
-          <h2 class="card-title">CPA access</h2>
-          <p class="card-desc">Invite a bookkeeper or CPA to review one business or your full portfolio. Access is explicit and revocable.</p>
+          <h2 class="card-title" data-i18n="settings_cpa_access_title">CPA access</h2>
+          <p class="card-desc" data-i18n="settings_cpa_access_desc">Invite a bookkeeper or CPA to review one business or your full portfolio. Access is explicit and revocable.</p>
         </div>
         <form id="cpaAccessForm" class="business-form">
           <div class="settings-form-grid cpa-access-grid">
             <div class="form-field">
-              <label for="cpaAccessEmail">CPA email</label>
+              <label for="cpaAccessEmail" data-i18n="settings_cpa_email">CPA email</label>
               <input type="email" id="cpaAccessEmail" name="cpa_access_email" placeholder="name@firm.com" required />
             </div>
             <div class="form-field">
-              <label for="cpaAccessScope">Access scope</label>
+              <label for="cpaAccessScope" data-i18n="settings_cpa_scope">Access scope</label>
               <select id="cpaAccessScope" name="cpa_access_scope">
-                <option value="business">One business</option>
-                <option value="all">All businesses</option>
+                <option value="business" data-i18n="settings_cpa_scope_business">One business</option>
+                <option value="all" data-i18n="settings_cpa_scope_all">All businesses</option>
               </select>
             </div>
             <div class="form-field" id="cpaBusinessSelectWrap">
-              <label for="cpaAccessBusiness">Business</label>
+              <label for="cpaAccessBusiness" data-i18n="common_business">Business</label>
               <select id="cpaAccessBusiness" name="cpa_access_business"></select>
             </div>
           </div>
-          <p class="settings-helper-note">Use one-business access when a CPA is filing a single entity. Use all-business access only when they need your full portfolio.</p>
+          <p class="settings-helper-note" data-i18n="settings_cpa_scope_note">Use one-business access when a CPA is filing a single entity. Use all-business access only when they need your full portfolio.</p>
           <p id="cpaAccessMessage" class="settings-inline-message"></p>
-          <button type="submit" class="settings-primary-btn">Send access invite</button>
+          <button type="submit" class="settings-primary-btn" data-i18n="settings_cpa_send_invite">Send access invite</button>
         </form>
 
         <div class="cpa-access-list-wrap">
           <div class="card-head cpa-access-subhead">
-            <h3 class="card-title">Current access grants</h3>
-            <p class="card-desc">Pending invites stay pending until that email signs in. Active grants can be revoked at any time, and revoked entries can be deleted once you are done with the record.</p>
+            <h3 class="card-title" data-i18n="settings_cpa_grants_title">Current access grants</h3>
+            <p class="card-desc" data-i18n="settings_cpa_grants_desc">Pending invites stay pending until that email signs in. Active grants can be revoked at any time, and revoked entries can be deleted once you are done with the record.</p>
           </div>
           <div id="cpaAccessList" class="cpa-access-list"></div>
         </div>
 
         <div class="cpa-access-list-wrap">
           <div class="card-head cpa-access-subhead">
-            <h3 class="card-title">CPA audit activity</h3>
-            <p class="card-desc">Review invite, revoke, acceptance, and portfolio access events tied to your accountant access.</p>
+            <h3 class="card-title" data-i18n="settings_cpa_audit_title">CPA audit activity</h3>
+            <p class="card-desc" data-i18n="settings_cpa_audit_desc">Review invite, revoke, acceptance, and portfolio access events tied to your accountant access.</p>
           </div>
           <div id="cpaAuditActivityList" class="cpa-access-list"></div>
         </div>
@@ -241,10 +241,10 @@
         </div>
         <div class="settings-row">
           <div class="settings-row-copy">
-            <div class="settings-row-title">Getting started tips</div>
-            <div class="settings-row-desc">Show the first-run tips again on Transactions, Receipts, Mileage, and Exports.</div>
+            <div class="settings-row-title" data-i18n="settings_getting_started_tips">Getting started tips</div>
+            <div class="settings-row-desc" data-i18n="settings_getting_started_tips_desc">Show the first-run tips again on Transactions, Receipts, Mileage, and Exports.</div>
           </div>
-          <button type="button" id="replayOnboardingTips" class="settings-secondary-btn">Replay tips</button>
+          <button type="button" id="replayOnboardingTips" class="settings-secondary-btn" data-i18n="settings_replay_tips">Replay tips</button>
         </div>
       </section>
 
@@ -296,8 +296,8 @@
         <div class="mfa-block">
           <div class="mfa-header">
             <div>
-              <h3>Multi-factor authentication</h3>
-              <p class="session-note">When this is on, we email you a 6-digit code whenever you sign in from a new or untrusted device.</p>
+              <h3 data-i18n="settings_mfa_title">Multi-factor authentication</h3>
+              <p class="session-note" data-i18n="settings_mfa_desc">When this is on, we email you a 6-digit code whenever you sign in from a new or untrusted device.</p>
             </div>
             <label class="switch mfa-switch">
               <input type="checkbox" id="mfaEnabledToggle" />
@@ -312,14 +312,14 @@
                 <input type="password" id="mfa-current-password" autocomplete="current-password" />
               </div>
               <div class="form-field form-field-full hidden" id="mfaCodeField">
-                <label for="mfaSetupCode">Verification code</label>
+                <label for="mfaSetupCode" data-i18n="settings_mfa_code_label">Verification code</label>
                 <input type="text" id="mfaSetupCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
               </div>
             </div>
-            <p id="mfaHelperNote" class="settings-helper-note">Enter your password and confirm the switch. We will email you a code to verify it is really you.</p>
+            <p id="mfaHelperNote" class="settings-helper-note" data-i18n="settings_mfa_helper_note">Enter your password and confirm the switch. We will email you a code to verify it is really you.</p>
             <div class="mfa-actions">
-              <button type="button" id="mfaPrimaryButton" class="settings-primary-btn">Turn on MFA</button>
-              <button type="button" id="mfaCancelButton" class="settings-secondary-btn hidden">Cancel</button>
+              <button type="button" id="mfaPrimaryButton" class="settings-primary-btn" data-i18n="settings_mfa_turn_on">Turn on MFA</button>
+              <button type="button" id="mfaCancelButton" class="settings-secondary-btn hidden" data-i18n="common_cancel">Cancel</button>
             </div>
           </div>
 
