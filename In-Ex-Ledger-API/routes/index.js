@@ -25,6 +25,7 @@ router.use('/categories', categoriesRoutes);
 router.use('/exports', exportsRoutes);
 router.use('/business', businessRoutes);
 router.use('/system', systemRoutes);
+router.use('/', systemRoutes);
 router.use('/me', meRoutes);
 router.use('/crypto', cryptoRoutes);
 router.use('/privacy', privacyRoutes);
