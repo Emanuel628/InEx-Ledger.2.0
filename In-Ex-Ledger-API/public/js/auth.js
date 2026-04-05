@@ -139,6 +139,10 @@ function getActiveBusiness(profile = {}) {
   return businesses.find((business) => business.id === activeBusinessId) || null;
 }
 
+function getAssignedCpaPortfolios(profile = {}) {
+  return Array.isArray(profile.assigned_cpa_portfolios) ? profile.assigned_cpa_portfolios : [];
+}
+
 function persistBusinessContext(profile = {}) {
   const activeBusiness = getActiveBusiness(profile);
   if (!activeBusiness?.id) {
@@ -517,6 +521,8 @@ function initAccountMenus(displayName = "User", profile = {}) {
   ensureAccountMenuStyles();
   ensureBusinessCreationModal();
   const activeBusiness = getActiveBusiness(profile);
+  const assignedCpaPortfolios = getAssignedCpaPortfolios(profile);
+  const hasCpaWorkspace = assignedCpaPortfolios.length > 0;
 
   document.querySelectorAll(".user-pill").forEach((pill, index) => {
     let menu = pill.querySelector(".account-menu");
@@ -544,6 +550,12 @@ function initAccountMenus(displayName = "User", profile = {}) {
         <div class="account-menu-current">${displayName}</div>
         <div class="account-menu-hint">${activeBusiness?.name || "Business"}</div>
       </div>
+      ${hasCpaWorkspace ? `
+      <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="cpa-workspace" role="menuitem">
+        <span class="account-menu-label">CPA workspace</span>
+        <span class="account-menu-hint">${assignedCpaPortfolios.length} portfolio${assignedCpaPortfolios.length === 1 ? "" : "s"} assigned</span>
+      </button>
+      ` : ""}
       <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="add-business" role="menuitem">
         <span class="account-menu-label">Add another business</span>
         <span class="account-menu-hint">Create and switch instantly</span>
@@ -565,6 +577,11 @@ function initAccountMenus(displayName = "User", profile = {}) {
 
       if (action === "logout") {
         await signOut();
+        return;
+      }
+
+      if (action === "cpa-workspace") {
+        window.location.href = "/html/cpa-dashboard.html";
         return;
       }
 
