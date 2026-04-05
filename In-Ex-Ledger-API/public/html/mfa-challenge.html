@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>InEx Ledger - Verify sign-in</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/pages/login.css">
+</head>
+<body>
+  <header class="marketing-header auth-header">
+    <a class="brand" href="/" aria-label="InEx Ledger home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
+          <rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+          <rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+          <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".35"></rect>
+        </svg>
+      </span>
+      <span class="brand-text">InEx Ledger</span>
+    </a>
+  </header>
+
+  <main>
+    <section class="auth-card">
+      <h2>Verify sign-in</h2>
+      <p id="mfaChallengeIntro" class="auth-helper">
+        Enter the code from your authenticator app to finish signing in.
+      </p>
+
+      <form id="mfaChallengeForm" class="auth-form">
+        <div class="form-field">
+          <label for="mfaChallengeCode">Authenticator or recovery code</label>
+          <input
+            type="text"
+            id="mfaChallengeCode"
+            name="mfaChallengeCode"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            placeholder="123456 or ABCD-EF12"
+            required
+          />
+        </div>
+
+        <label class="auth-checkbox">
+          <input type="checkbox" id="mfaTrustDevice" />
+          Trust this device for 30 days
+        </label>
+
+        <button type="submit" class="auth-submit">Verify and continue</button>
+        <button type="button" id="mfaChallengeBack" class="auth-secondary-btn">Back to sign in</button>
+      </form>
+
+      <p id="mfaChallengeError" class="auth-error" role="alert" aria-live="polite" hidden></p>
+    </section>
+  </main>
+
+  <script src="../js/global.js?v=20260405c"></script>
+  <script src="../js/i18n.js?v=20260405c"></script>
+  <script src="../js/auth.js?v=20260405c"></script>
+  <script src="../js/mfa-challenge.js?v=20260405c"></script>
+</body>
+</html>

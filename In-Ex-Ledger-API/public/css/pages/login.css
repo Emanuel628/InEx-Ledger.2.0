@@ -90,12 +90,6 @@ main {
   color: var(--ink2);
 }
 
-.auth-inline-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
 .auth-secondary-btn {
   width: 100%;
   padding: 9px 18px;
@@ -105,6 +99,21 @@ main {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--ink);
+}
+
+.auth-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink2);
+  line-height: 1.4;
+}
+
+.auth-checkbox input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
 }
 
 .show-password-toggle {

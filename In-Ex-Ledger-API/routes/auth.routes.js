@@ -75,8 +75,11 @@ const mfaVerifyLimiter = rateLimit({
    3. CONSTANTS & COOKIE CONFIGURATION
    ========================================================= */
 const REFRESH_TOKEN_COOKIE = "refresh_token";
+const MFA_TRUST_COOKIE = "mfa_trust";
 const REFRESH_TOKEN_EXPIRY_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
 const REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+const MFA_TRUST_EXPIRY_DAYS = Number(process.env.MFA_TRUST_EXPIRY_DAYS) || 30;
+const MFA_TRUST_EXPIRY_MS = MFA_TRUST_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 const REFRESH_TOKEN_BYTE_LENGTH = 48;
 const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 15 * 60;
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
@@ -347,7 +350,22 @@ function clearRefreshCookie(res) {
   res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
 }
 
+function setMfaTrustCookie(res, token, expiresAt) {
+  res.cookie(MFA_TRUST_COOKIE, token, {
+    ...COOKIE_OPTIONS,
+    expires: expiresAt
+  });
+}
+
+function clearMfaTrustCookie(res) {
+  res.clearCookie(MFA_TRUST_COOKIE, COOKIE_OPTIONS);
+}
+
 function hashRefreshToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function hashMfaTrustToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
@@ -365,6 +383,51 @@ async function createRefreshToken(userId) {
 
 async function revokeRefreshTokenByHash(tokenHash) {
   await pool.query("UPDATE refresh_tokens SET revoked = true WHERE token_hash = $1", [tokenHash]);
+}
+
+async function createTrustedMfaDevice(user, req) {
+  const token = crypto.randomBytes(48).toString("hex");
+  const tokenHash = hashMfaTrustToken(token);
+  const expiresAt = new Date(Date.now() + MFA_TRUST_EXPIRY_MS);
+  const userAgent = String(req.get("user-agent") || "").slice(0, 512);
+  const deviceLabel = req.body?.deviceLabel
+    ? String(req.body.deviceLabel).trim().slice(0, 120)
+    : null;
+
+  await pool.query(
+    `INSERT INTO mfa_trusted_devices (id, user_id, token_hash, device_label, user_agent, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [crypto.randomUUID(), user.id, tokenHash, deviceLabel, userAgent || null, expiresAt]
+  );
+
+  return { token, expiresAt };
+}
+
+async function resolveTrustedMfaDevice(rawToken, userId) {
+  if (!rawToken || !userId) {
+    return null;
+  }
+
+  const tokenHash = hashMfaTrustToken(rawToken);
+  const result = await pool.query(
+    `SELECT id, user_id, expires_at
+       FROM mfa_trusted_devices
+      WHERE token_hash = $1
+        AND user_id = $2
+        AND expires_at > NOW()
+      LIMIT 1`,
+    [tokenHash, userId]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function touchTrustedMfaDevice(deviceId) {
+  await pool.query("UPDATE mfa_trusted_devices SET last_used_at = NOW() WHERE id = $1", [deviceId]);
+}
+
+async function revokeTrustedMfaDevicesForUser(userId) {
+  await pool.query("DELETE FROM mfa_trusted_devices WHERE user_id = $1", [userId]);
 }
 
 /* =========================================================
@@ -550,12 +613,21 @@ router.post("/login", authLimiter, async (req, res) => {
     const businessId = await resolveBusinessIdForUser(user);
 
     if (user.mfa_enabled) {
+      const trustedDevice = await resolveTrustedMfaDevice(req.cookies?.[MFA_TRUST_COOKIE], user.id);
+      if (trustedDevice) {
+        await touchTrustedMfaDevice(trustedDevice.id);
+      } else {
+        clearMfaTrustCookie(res);
+      }
+
+      if (!trustedDevice) {
       return res.status(200).json({
         mfa_required: true,
         mfa_token: createPendingMfaToken(user, businessId),
         email_verified: verified,
         mfa_enabled: true
       });
+      }
     }
 
     const session = await issueAuthenticatedSession(res, user, businessId);
@@ -703,6 +775,8 @@ router.post("/change-password", requireAuth, authLimiter, async (req, res) => {
     const nextHash = await hashPassword(newPassword);
     await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [nextHash, user.id]);
     await resetCurrentRefreshSession(res, user);
+    await revokeTrustedMfaDevicesForUser(user.id);
+    clearMfaTrustCookie(res);
 
     return res.status(200).json({ success: true, message: "Password updated." });
   } catch (err) {
@@ -815,6 +889,8 @@ router.post("/mfa/enable", requireAuth, mfaVerifyLimiter, async (req, res) => {
 
     const refreshedUser = await findUserById(user.id);
     await resetCurrentRefreshSession(res, refreshedUser);
+    await revokeTrustedMfaDevicesForUser(user.id);
+    clearMfaTrustCookie(res);
 
     return res.status(200).json({
       success: true,
@@ -865,6 +941,8 @@ router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
 
     const refreshedUser = await findUserById(user.id);
     await resetCurrentRefreshSession(res, refreshedUser);
+    await revokeTrustedMfaDevicesForUser(user.id);
+    clearMfaTrustCookie(res);
 
     return res.status(200).json({
       success: true,
@@ -924,6 +1002,7 @@ router.post("/mfa/recovery-codes/regenerate", requireAuth, mfaVerifyLimiter, asy
 router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
   const mfaToken = req.body?.mfaToken;
   const code = req.body?.code;
+  const trustDevice = !!req.body?.trustDevice;
 
   if (!mfaToken || !code) {
     return res.status(400).json({ error: "MFA token and code are required." });
@@ -953,6 +1032,10 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
     }
 
     const refreshedUser = await findUserById(user.id);
+    if (trustDevice) {
+      const trustedDevice = await createTrustedMfaDevice(refreshedUser, req);
+      setMfaTrustCookie(res, trustedDevice.token, trustedDevice.expiresAt);
+    }
     const session = await issueAuthenticatedSession(res, refreshedUser, pending.business_id || null);
     return res.status(200).json(session);
   } catch (err) {

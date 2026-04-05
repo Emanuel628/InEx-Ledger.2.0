@@ -13,10 +13,8 @@
    ========================================================= */
 
 let loginForm = null;
-let mfaForm = null;
 let loginErrorElement = null;
 let isSubmittingLogin = false;
-let pendingMfaToken = "";
 const OFFLINE_ERROR_MESSAGE = "Unable to reach server. Check your connection and try again.";
 const EXPIRED_SESSION_MESSAGE = "Your session expired. Please log in again.";
 
@@ -24,7 +22,6 @@ redirectIfAuthenticated();
 
 document.addEventListener("DOMContentLoaded", () => {
   loginForm = document.getElementById("loginForm");
-  mfaForm = document.getElementById("mfaForm");
   loginErrorElement = document.getElementById("loginError");
 
   if (!loginForm) {
@@ -33,8 +30,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   loginForm.addEventListener("submit", handleLoginSubmit);
-  mfaForm?.addEventListener("submit", handleMfaSubmit);
-  document.getElementById("mfaBackButton")?.addEventListener("click", resetMfaState);
   wireShowPasswordToggle(document);
   showLoginReasonMessage();
 });
@@ -80,8 +75,9 @@ async function handleLoginSubmit(event) {
     }
 
     if (data?.mfa_required && data?.mfa_token) {
-      pendingMfaToken = data.mfa_token;
-      enterMfaMode(email);
+      sessionStorage.setItem("lb_pending_mfa_token", data.mfa_token);
+      sessionStorage.setItem("lb_pending_mfa_email", email);
+      window.location.href = "mfa-challenge";
       return;
     }
 
@@ -119,83 +115,6 @@ function showLoginReasonMessage() {
     showLoginError("Email updated. Please sign in with your new address.");
     loginErrorElement.style.color = "#22c55e";
   }
-}
-
-async function handleMfaSubmit(event) {
-  event.preventDefault();
-  if (!mfaForm || isSubmittingLogin || !pendingMfaToken) {
-    return;
-  }
-
-  const submitButton = mfaForm.querySelector("button[type=\"submit\"]");
-  const code = document.getElementById("mfaCode")?.value.trim() || "";
-
-  clearLoginError();
-
-  if (!code) {
-    showLoginError("Enter your authenticator or recovery code.");
-    return;
-  }
-
-  isSubmittingLogin = true;
-  submitButton?.setAttribute("disabled", "true");
-
-  try {
-    const response = await fetch(buildApiUrl("/api/auth/mfa/verify"), {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mfaToken: pendingMfaToken,
-        code
-      })
-    });
-
-    const data = await response.json().catch(() => null);
-    if (!response.ok || !data?.token) {
-      showLoginError(data?.error || "Unable to verify MFA code.");
-      return;
-    }
-
-    setToken(data.token);
-    if (data?.subscription && typeof applySubscriptionState === "function") {
-      applySubscriptionState(data.subscription);
-    }
-    window.location.href = "transactions";
-  } catch (err) {
-    console.error("MFA verification failed:", err);
-    showLoginError(OFFLINE_ERROR_MESSAGE);
-  } finally {
-    submitButton?.removeAttribute("disabled");
-    isSubmittingLogin = false;
-  }
-}
-
-function enterMfaMode(email) {
-  if (loginForm) {
-    loginForm.hidden = true;
-  }
-  if (mfaForm) {
-    mfaForm.hidden = false;
-  }
-  const intro = document.getElementById("mfaIntro");
-  if (intro) {
-    intro.textContent = `Multi-factor authentication is enabled for ${email}. Enter the 6-digit code from your authenticator app or use a recovery code.`;
-  }
-  document.getElementById("mfaCode")?.focus();
-  showLoginError("Multi-factor authentication required.");
-}
-
-function resetMfaState() {
-  pendingMfaToken = "";
-  document.getElementById("mfaCode")?.closest("form")?.reset();
-  if (mfaForm) {
-    mfaForm.hidden = true;
-  }
-  if (loginForm) {
-    loginForm.hidden = false;
-  }
-  clearLoginError();
 }
 
 function showLoginError(message) {
