@@ -22,7 +22,7 @@ async function requestPasswordReset(form) {
   const email = emailInput?.value.trim();
 
   if (!email) {
-    setStatus("Please enter your email address.", false, statusEl);
+    setStatus(typeof t === "function" ? t("forgot_password_email_label") + " required." : "Please enter your email address.", false, statusEl);
     hideLink(linkEl);
     return;
   }
@@ -32,7 +32,7 @@ async function requestPasswordReset(form) {
   hideLink(linkEl);
 
   try {
-    const response = await fetch("/api/auth/forgot-password", {
+    const response = await fetch(typeof buildApiUrl === "function" ? buildApiUrl("/api/auth/forgot-password") : "/api/auth/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email })
