@@ -18,7 +18,14 @@ const ACTIVE_BUSINESS_NAME_KEY = "lb_business_name";
 const ONBOARDING_PAGE = "/onboarding";
 const LOGIN_PAGE = "/login";
 const ACCOUNT_MENU_STYLE_ID = "luna-account-menu-style";
-const ONBOARDING_RUNTIME_PAGES = new Set(["/transactions", "/receipts", "/mileage", "/exports"]);
+const ONBOARDING_RUNTIME_PAGES = new Set([
+  "/transactions",
+  "/accounts",
+  "/categories",
+  "/receipts",
+  "/mileage",
+  "/exports"
+]);
 
 if (!window.API_BASE) {
   window.API_BASE = "";

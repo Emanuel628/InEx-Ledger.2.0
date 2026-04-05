@@ -8,6 +8,24 @@ const ONBOARDING_TOURS = {
       "Your tax estimate updates as transactions come in."
     ]
   },
+  accounts: {
+    title: "Set up the accounts you actually use",
+    body: "Add the bank, card, cash, and loan accounts you use to move money. Your transactions should post into these.",
+    points: [
+      "Start with your main checking account first.",
+      "Keep account names recognizable so reconciliation is easier later.",
+      "You can add more accounts any time your setup grows."
+    ]
+  },
+  categories: {
+    title: "Categories drive clean books",
+    body: "Use categories to sort income and expenses so your reports and tax exports stay accurate.",
+    points: [
+      "Keep categories practical instead of overly detailed.",
+      "Map categories carefully if you want cleaner Schedule C or T2125 exports.",
+      "You can refine your category list as real transactions come in."
+    ]
+  },
   receipts: {
     title: "Capture receipts as you go",
     body: "Upload receipts here first or attach them while entering a transaction. Either path works.",
