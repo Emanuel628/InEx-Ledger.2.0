@@ -209,7 +209,12 @@ async function initPreferences() {
 
   const syncProvinceVisibility = (region) => {
     if (!provinceRow) return;
-    provinceRow.classList.toggle("hidden", region !== "ca");
+    const isCanada = normalizeSettingsRegion(region) === "ca";
+    provinceRow.classList.toggle("hidden", !isCanada);
+    provinceRow.style.display = isCanada ? "flex" : "none";
+    if (provinceSelect) {
+      provinceSelect.disabled = !isCanada;
+    }
   };
 
   const syncPreferenceControls = (state) => {
@@ -262,10 +267,12 @@ async function initPreferences() {
 
   if (regionSelect) {
     regionSelect.addEventListener("change", updatePendingPreferences);
+    regionSelect.addEventListener("input", updatePendingPreferences);
   }
 
   if (provinceSelect) {
     provinceSelect.addEventListener("change", updatePendingPreferences);
+    provinceSelect.addEventListener("input", updatePendingPreferences);
   }
 
   if (languageSelect) {
@@ -416,10 +423,15 @@ function refreshSettingsLocalizedState() {
     provinceSelect.value = pendingPreferences?.province || preferenceBaseline?.province || normalizeProvinceCode(businessSettingsState.province);
   }
   if (provinceRow) {
-    provinceRow.classList.toggle(
-      "hidden",
-      (pendingPreferences?.region || preferenceBaseline?.region || normalizeSettingsRegion(businessSettingsState.region)) !== "ca"
-    );
+    const isCanada =
+      (pendingPreferences?.region || preferenceBaseline?.region || normalizeSettingsRegion(businessSettingsState.region)) === "ca";
+    provinceRow.classList.toggle("hidden", !isCanada);
+    provinceRow.style.display = isCanada ? "flex" : "none";
+  }
+  if (provinceSelect) {
+    const isCanada =
+      (pendingPreferences?.region || preferenceBaseline?.region || normalizeSettingsRegion(businessSettingsState.region)) === "ca";
+    provinceSelect.disabled = !isCanada;
   }
   updateProvinceRateNote(
     pendingPreferences?.region || preferenceBaseline?.region || normalizeSettingsRegion(businessSettingsState.region),
