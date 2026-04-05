@@ -46,6 +46,7 @@
         <div class="sidebar-section-label" data-i18n="settings_sidebar_account">Account</div>
         <nav class="settings-nav">
           <button class="settings-nav-item is-active" type="button" data-settings-target="settings-business" data-i18n="settings_nav_business_profile">Business profile</button>
+          <button class="settings-nav-item" type="button" data-settings-target="settings-cpa-access">CPA access</button>
           <button class="settings-nav-item" type="button" data-settings-target="settings-security" data-i18n="settings_nav_security">Security</button>
         </nav>
         <div class="sidebar-section-label" data-i18n="settings_sidebar_preferences">Preferences</div>
@@ -93,6 +94,43 @@
           </div>
           <button type="submit" class="settings-primary-btn" data-i18n="settings_save_changes">Save changes</button>
         </form>
+      </section>
+
+      <section class="settings-card" id="settings-cpa-access">
+        <div class="card-head">
+          <h2 class="card-title">CPA access</h2>
+          <p class="card-desc">Invite a bookkeeper or CPA to review one business or your full portfolio. Access is explicit and revocable.</p>
+        </div>
+        <form id="cpaAccessForm" class="business-form">
+          <div class="settings-form-grid cpa-access-grid">
+            <div class="form-field">
+              <label for="cpaAccessEmail">CPA email</label>
+              <input type="email" id="cpaAccessEmail" name="cpa_access_email" placeholder="name@firm.com" required />
+            </div>
+            <div class="form-field">
+              <label for="cpaAccessScope">Access scope</label>
+              <select id="cpaAccessScope" name="cpa_access_scope">
+                <option value="business">One business</option>
+                <option value="all">All businesses</option>
+              </select>
+            </div>
+            <div class="form-field" id="cpaBusinessSelectWrap">
+              <label for="cpaAccessBusiness">Business</label>
+              <select id="cpaAccessBusiness" name="cpa_access_business"></select>
+            </div>
+          </div>
+          <p class="settings-helper-note">Use one-business access when a CPA is filing a single entity. Use all-business access only when they need your full portfolio.</p>
+          <p id="cpaAccessMessage" class="settings-inline-message"></p>
+          <button type="submit" class="settings-primary-btn">Send access invite</button>
+        </form>
+
+        <div class="cpa-access-list-wrap">
+          <div class="card-head cpa-access-subhead">
+            <h3 class="card-title">Current access grants</h3>
+            <p class="card-desc">Pending invites stay pending until that email signs in. Active grants can be revoked at any time.</p>
+          </div>
+          <div id="cpaAccessList" class="cpa-access-list"></div>
+        </div>
       </section>
 
       <section class="settings-card settings-pref-card" id="settings-preferences">

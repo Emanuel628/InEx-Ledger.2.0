@@ -71,6 +71,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   initSettingsNav();
   await initBusinessProfileForm();
+  await initCpaAccess();
   await initPreferences();
   initSecurityForm();
   initDangerZone();
@@ -399,6 +400,183 @@ async function initPreferences() {
         : t("settings_changes_saved")
     );
   });
+}
+
+async function initCpaAccess() {
+  const form = document.getElementById("cpaAccessForm");
+  const emailInput = document.getElementById("cpaAccessEmail");
+  const scopeSelect = document.getElementById("cpaAccessScope");
+  const businessSelect = document.getElementById("cpaAccessBusiness");
+  const businessWrap = document.getElementById("cpaBusinessSelectWrap");
+  const messageNode = document.getElementById("cpaAccessMessage");
+  const listNode = document.getElementById("cpaAccessList");
+
+  if (!form || !emailInput || !scopeSelect || !businessSelect || !businessWrap || !listNode) {
+    return;
+  }
+
+  const syncBusinessVisibility = () => {
+    const scopedToAll = scopeSelect.value === "all";
+    businessWrap.classList.toggle("hidden", scopedToAll);
+    businessWrap.style.display = scopedToAll ? "none" : "";
+    businessSelect.disabled = scopedToAll;
+  };
+
+  const setMessage = (message = "", tone = "") => {
+    messageNode.textContent = message;
+    messageNode.classList.remove("is-error", "is-success");
+    if (tone) {
+      messageNode.classList.add(tone);
+    }
+  };
+
+  const loadBusinessOptions = async () => {
+    try {
+      const response = await apiFetch("/api/businesses");
+      if (!response || !response.ok) {
+        throw new Error("Unable to load businesses.");
+      }
+
+      const payload = await response.json().catch(() => null);
+      const businesses = Array.isArray(payload?.businesses) ? payload.businesses : [];
+      const activeBusinessId = payload?.active_business_id || "";
+
+      businessSelect.innerHTML = "";
+      businesses.forEach((business) => {
+        const option = document.createElement("option");
+        option.value = business.id;
+        option.textContent = business.name || "Business";
+        if (business.id === activeBusinessId) {
+          option.selected = true;
+        }
+        businessSelect.appendChild(option);
+      });
+    } catch (error) {
+      console.error("Failed to load CPA business options", error);
+      setMessage("Unable to load businesses for CPA access.", "is-error");
+    }
+  };
+
+  const renderOwnedGrants = async () => {
+    try {
+      const response = await apiFetch("/api/cpa-access/grants/owned");
+      if (!response || !response.ok) {
+        throw new Error("Unable to load grants.");
+      }
+
+      const payload = await response.json().catch(() => null);
+      const grants = Array.isArray(payload?.grants) ? payload.grants : [];
+
+      if (!grants.length) {
+        listNode.innerHTML = '<div class="cpa-access-empty">No CPA access grants yet.</div>';
+        return;
+      }
+
+      listNode.innerHTML = grants.map((grant) => `
+        <div class="cpa-access-item">
+          <div class="cpa-access-meta">
+            <div class="cpa-access-email">${escapeSettingsHtml(grant.grantee_email || "")}</div>
+            <div class="cpa-access-tags">
+              <span class="cpa-access-tag scope">${grant.scope === "all" ? "All businesses" : "One business"}</span>
+              <span class="cpa-access-tag business">${escapeSettingsHtml(grant.business_name || "Portfolio-wide")}</span>
+              <span class="cpa-access-tag ${escapeSettingsHtml(grant.status || "pending")}">${escapeSettingsHtml(grant.status || "pending")}</span>
+            </div>
+            <div class="cpa-access-detail">Created ${formatSettingsDate(grant.created_at)}${grant.accepted_at ? ` · Accepted ${formatSettingsDate(grant.accepted_at)}` : ""}</div>
+          </div>
+          <div class="cpa-access-actions">
+            ${grant.status !== "revoked" ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeSettingsHtml(grant.id || "")}">Revoke</button>` : ""}
+          </div>
+        </div>
+      `).join("");
+
+      listNode.querySelectorAll("[data-cpa-revoke]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const grantId = button.getAttribute("data-cpa-revoke");
+          if (!grantId) {
+            return;
+          }
+
+          const response = await apiFetch(`/api/cpa-access/grants/${grantId}`, {
+            method: "DELETE"
+          });
+
+          if (!response || !response.ok) {
+            const payload = await response?.json().catch(() => null);
+            setMessage(payload?.error || "Unable to revoke CPA access.", "is-error");
+            return;
+          }
+
+          setMessage("CPA access revoked.", "is-success");
+          showSettingsToast("CPA access revoked");
+          await renderOwnedGrants();
+        });
+      });
+    } catch (error) {
+      console.error("Failed to load CPA grants", error);
+      listNode.innerHTML = '<div class="cpa-access-empty">Unable to load CPA access grants.</div>';
+    }
+  };
+
+  scopeSelect.addEventListener("change", () => {
+    syncBusinessVisibility();
+    setMessage("");
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    setMessage("");
+
+    const payload = {
+      email: emailInput.value.trim(),
+      scope: scopeSelect.value === "all" ? "all" : "business",
+      business_id: scopeSelect.value === "all" ? null : businessSelect.value || null
+    };
+
+    const response = await apiFetch("/api/cpa-access/grants", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response || !response.ok) {
+      const body = await response?.json().catch(() => null);
+      setMessage(body?.error || "Unable to create CPA access grant.", "is-error");
+      return;
+    }
+
+    emailInput.value = "";
+    scopeSelect.value = "business";
+    syncBusinessVisibility();
+    setMessage("CPA access invite created.", "is-success");
+    showSettingsToast("CPA access invite created");
+    await renderOwnedGrants();
+  });
+
+  await loadBusinessOptions();
+  syncBusinessVisibility();
+  await renderOwnedGrants();
+}
+
+function escapeSettingsHtml(value) {
+  return `${value ?? ""}`
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatSettingsDate(value) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function refreshSettingsLocalizedState() {

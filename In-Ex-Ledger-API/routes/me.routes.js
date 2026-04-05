@@ -3,6 +3,7 @@ const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
+const { listAssignedCpaGrants, listAccessibleBusinessScopeForUser } = require("../services/cpaAccessService.js");
 
 const router = express.Router();
 
@@ -24,12 +25,16 @@ router.get("/", requireAuth, async (req, res) => {
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     const businesses = await listBusinessesForUser(req.user.id);
     const activeBusiness = businesses.find((business) => business.id === businessId) || null;
+    const assignedCpaGrants = await listAssignedCpaGrants(result.rows[0]);
+    const assignedCpaPortfolios = await listAccessibleBusinessScopeForUser(result.rows[0]);
     res.status(200).json({
       ...result.rows[0],
       business_id: businessId,
       active_business_id: businessId,
       active_business: activeBusiness,
       businesses,
+      assigned_cpa_grants: assignedCpaGrants,
+      assigned_cpa_portfolios: assignedCpaPortfolios,
       subscription
     });
   } catch (err) {
