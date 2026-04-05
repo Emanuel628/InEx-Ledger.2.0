@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const buttons = Array.from(document.querySelectorAll("button"));
   const starterBtn = buttons.find((btn) => btn.textContent.toLowerCase().includes("starter"));
   const proBtn = buttons.find((btn) => btn.textContent.toLowerCase().includes("pro"));
+  const tx = (key) => (typeof window.t === "function" ? window.t(key) : key);
 
   if (!starterBtn || !proBtn) {
     return;
@@ -12,7 +13,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.location.href = "register";
     });
     starterBtn.disabled = true;
-    starterBtn.textContent = "Current Plan";
+    starterBtn.textContent = tx("subscription_current_plan");
     return;
   }
 
@@ -30,14 +31,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (subscription?.effectiveTier === "v1") {
       proBtn.disabled = true;
-      proBtn.textContent = "Current Plan";
-      starterBtn.textContent = "Manage Billing";
+      proBtn.textContent = tx("subscription_current_plan");
+      starterBtn.textContent = tx("subscription_manage_billing");
       starterBtn.addEventListener("click", openCustomerPortal);
       return;
     }
 
     starterBtn.disabled = true;
-    starterBtn.textContent = "Current Plan";
+    starterBtn.textContent = tx("subscription_current_plan");
     proBtn.addEventListener("click", startCheckout);
   } catch (err) {
     console.error("[Subscription] Failed to load subscription:", err);
@@ -55,13 +56,13 @@ async function startCheckout() {
     }
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new Error(payload?.error || "Unable to start checkout.");
+      throw new Error(payload?.error || (typeof window.t === "function" ? window.t("subscription_checkout_error") : "Unable to start checkout."));
     }
     if (payload?.url) {
       window.location.href = payload.url;
     }
   } catch (err) {
-    alert(err.message || "Unable to start checkout.");
+    alert(err.message || (typeof window.t === "function" ? window.t("subscription_checkout_error") : "Unable to start checkout."));
   }
 }
 
@@ -76,12 +77,12 @@ async function openCustomerPortal() {
     }
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new Error(payload?.error || "Unable to open billing portal.");
+      throw new Error(payload?.error || (typeof window.t === "function" ? window.t("subscription_portal_error") : "Unable to open billing portal."));
     }
     if (payload?.url) {
       window.location.href = payload.url;
     }
   } catch (err) {
-    alert(err.message || "Unable to open billing portal.");
+    alert(err.message || (typeof window.t === "function" ? window.t("subscription_portal_error") : "Unable to open billing portal."));
   }
 }

@@ -5,6 +5,9 @@ const MILEAGE_TOAST_MS = 3000;
 let mileageToastTimer = null;
 let mileageRecords = [];
 let unattachedReceiptsCount = 0;
+function tx(key) {
+  return typeof window.t === "function" ? window.t(key) : key;
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
@@ -55,14 +58,14 @@ function wireMileageForm() {
 
     if (!response || !response.ok) {
       const errorPayload = await response?.json().catch(() => null);
-      if (message) message.textContent = errorPayload?.error || "Unable to save mileage.";
+      if (message) message.textContent = errorPayload?.error || tx("mileage_error_save");
       return;
     }
 
     await loadMileageRecords();
     form.reset();
     renderMileageTable();
-    showMileageToast("Mileage added");
+    showMileageToast(tx("mileage_added"));
   });
 }
 
@@ -107,19 +110,19 @@ function renderMileageTable() {
 }
 
 async function deleteMileage(id) {
-  if (!window.confirm("Delete this mileage entry? This cannot be undone.")) {
+  if (!window.confirm(tx("mileage_confirm_delete"))) {
     return;
   }
   const response = await apiFetch(`/api/mileage/${id}`, {
     method: "DELETE"
   });
   if (!response || !response.ok) {
-    showMileageToast("Unable to delete mileage");
+    showMileageToast(tx("mileage_error_delete"));
     return;
   }
   await loadMileageRecords();
   renderMileageTable();
-  showMileageToast("Mileage deleted");
+  showMileageToast(tx("mileage_deleted"));
 }
 
 function shouldUseKilometers() {
@@ -131,7 +134,7 @@ async function loadMileageRecords() {
   try {
     const response = await apiFetch("/api/mileage");
     if (!response || !response.ok) {
-      throw new Error("Failed to load mileage.");
+      throw new Error(tx("mileage_error_load"));
     }
     const payload = await response.json().catch(() => null);
     const entries = Array.isArray(payload)
