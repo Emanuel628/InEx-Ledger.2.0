@@ -14,6 +14,7 @@ const privacyRoutes = require('./privacy.routes.js');
 const mileageRoutes = require('./mileage.routes.js');
 const sessionsRoutes = require('./sessions.routes.js');
 const billingRoutes = require('./billing.routes.js');
+const recurringRoutes = require('./recurring.routes.js');
 
 router.use('/auth', authRoutes);
 router.use('/accounts', accountsRoutes);
@@ -28,5 +29,6 @@ router.use('/privacy', privacyRoutes);
 router.use('/mileage', mileageRoutes);
 router.use('/sessions', sessionsRoutes);
 router.use('/billing', billingRoutes);
+router.use('/recurring', recurringRoutes);
 
 module.exports = router;

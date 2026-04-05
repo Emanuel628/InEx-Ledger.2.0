@@ -4,6 +4,7 @@ const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { processDueRecurringTransactions } = require("../services/recurringTransactionsService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -122,6 +123,7 @@ function validateTransactionPayload(payload) {
 router.get("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    await processDueRecurringTransactions(businessId);
 
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
@@ -137,6 +139,8 @@ router.get("/", async (req, res) => {
               description,
               date,
               note,
+              recurring_transaction_id,
+              recurring_occurrence_date,
               created_at
        FROM transactions
        WHERE business_id = $1

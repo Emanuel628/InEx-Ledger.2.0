@@ -75,6 +75,16 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
+    const recurringUsage = await pool.query(
+      "SELECT COUNT(*) FROM recurring_transactions WHERE account_id = $1 AND business_id = $2",
+      [req.params.id, businessId]
+    );
+    if (parseInt(recurringUsage.rows[0]?.count || "0", 10) > 0) {
+      return res.status(409).json({
+        error: "This account cannot be deleted because it is used by a recurring transaction."
+      });
+    }
+
     const result = await pool.query(
       "DELETE FROM accounts WHERE id = $1 AND business_id = $2",
       [req.params.id, businessId]

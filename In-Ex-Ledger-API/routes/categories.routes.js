@@ -128,6 +128,16 @@ router.delete("/:id", async (req, res) => {
       return res.status(409).json({ error: "This category cannot be deleted because it is in use." });
     }
 
+    const recurringUsage = await pool.query(
+      "SELECT COUNT(*) FROM recurring_transactions WHERE category_id = $1 AND business_id = $2",
+      [req.params.id, businessId]
+    );
+    if (parseInt(recurringUsage.rows[0]?.count || "0", 10) > 0) {
+      return res.status(409).json({
+        error: "This category cannot be deleted because it is used by a recurring transaction."
+      });
+    }
+
     await pool.query(
       "DELETE FROM categories WHERE id = $1 AND business_id = $2",
       [req.params.id, businessId]

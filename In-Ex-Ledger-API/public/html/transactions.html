@@ -245,6 +245,111 @@
           </table>
         </div>
       </section>
+
+      <section class="transactions-panel recurring-panel">
+        <div class="transactions-toolbar recurring-toolbar">
+          <div>
+            <h2 class="transactions-panel-title">Recurring templates</h2>
+            <p class="page-subtitle recurring-subtitle">Automate retainers, subscriptions, and fixed monthly expenses.</p>
+          </div>
+          <button id="recurringToggle" class="toolbar-add-button" type="button" aria-expanded="false">
+            + Add recurring template
+          </button>
+        </div>
+
+        <div id="recurringDrawer" hidden>
+          <form id="recurringForm" method="post">
+            <div class="transaction-drawer-card recurring-drawer-card">
+              <div class="transaction-drawer-head">
+                <h3 class="drawer-title">Recurring template</h3>
+              </div>
+
+              <div class="transaction-form-grid">
+                <div class="form-field">
+                  <label for="recurringType" class="form-label">Type</label>
+                  <select id="recurringType" class="form-control" required>
+                    <option value="expense">Expense</option>
+                    <option value="income">Income</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="recurringCadence" class="form-label">Cadence</label>
+                  <select id="recurringCadence" class="form-control" required>
+                    <option value="weekly">Weekly</option>
+                    <option value="biweekly">Biweekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="recurringDescription" class="form-label">Description</label>
+                  <input id="recurringDescription" class="form-control" type="text" required />
+                </div>
+                <div class="form-field">
+                  <label for="recurringAmount" class="form-label">Amount</label>
+                  <input id="recurringAmount" class="form-control" type="number" step="0.01" required />
+                </div>
+                <div class="form-field">
+                  <label for="recurringAccount" class="form-label">Account</label>
+                  <select id="recurringAccount" class="form-control" required>
+                    <option value="">Select account</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="recurringCategory" class="form-label">Category</label>
+                  <select id="recurringCategory" class="form-control" required>
+                    <option value="">Select category</option>
+                  </select>
+                </div>
+                <div class="form-field">
+                  <label for="recurringStartDate" class="form-label">Start date</label>
+                  <input id="recurringStartDate" class="form-control" type="date" required />
+                </div>
+                <div class="form-field">
+                  <label for="recurringEndDate" class="form-label">End date</label>
+                  <input id="recurringEndDate" class="form-control" type="date" />
+                </div>
+                <div class="form-field form-field-full">
+                  <label for="recurringNote" class="form-label">Internal note</label>
+                  <input id="recurringNote" class="form-control" type="text" placeholder="Optional note for generated entries" />
+                </div>
+                <div class="form-field form-field-full">
+                  <label class="status-toggle-row" for="recurringClearedDefault">
+                    <input type="checkbox" id="recurringClearedDefault" />
+                    <span>Mark generated entries as cleared by default</span>
+                  </label>
+                </div>
+              </div>
+
+              <p id="recurringFormMessage" class="error-text"></p>
+
+              <div class="tx-actions recurring-actions">
+                <button type="button" id="recurringCancel" class="modal-cancel">Cancel</button>
+                <button type="submit" id="recurringSubmit" class="drawer-submit">Save recurring template</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="table-wrapper recurring-table-wrapper">
+          <table class="transactions-table recurring-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Cadence</th>
+                <th>Next run</th>
+                <th>Status</th>
+                <th>Amount</th>
+                <th class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="recurringTableBody">
+              <tr><td colspan="6" class="placeholder">Loading recurring templates...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   </main>
 

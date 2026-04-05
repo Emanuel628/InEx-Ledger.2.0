@@ -9,6 +9,10 @@ const ledgerState = {
   transactions: []
 };
 
+const recurringState = {
+  templates: []
+};
+
 const transactionFilters = {
   type: "all",
   search: "",
@@ -45,6 +49,9 @@ let businessTaxProfile = {
 };
 let unattachedReceiptsCount = 0;
 let pendingTransactionReceiptFile = null;
+let recurringDrawerElement = null;
+let recurringToggleElement = null;
+let editingRecurringTemplateId = null;
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
 function formatCurrency(value) {
@@ -71,15 +78,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadBusinessTaxProfile();
 
   wireTransactionForm();
+  setupRecurringDrawer();
+  wireRecurringForm();
   await refreshAccountOptions();
   await refreshCategoryOptions();
   await loadTransactions();
+  await loadRecurringTemplates();
   wireTransactionSearch();
   wireTransactionCategoryFilter();
   wireTransactionModal();
   window.addEventListener("accountsUpdated", async () => {
     await refreshAccountOptions();
     renderTransactionsTable();
+    renderRecurringAccountOptions();
   });
 
   const tier = effectiveTier();
@@ -240,6 +251,73 @@ function setupTransactionDrawer() {
   closeTransactionDrawer();
 }
 
+function wireRecurringForm() {
+  const form = document.getElementById("recurringForm");
+  if (!form) {
+    return;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const payload = {
+      type: document.getElementById("recurringType")?.value || "expense",
+      cadence: document.getElementById("recurringCadence")?.value || "monthly",
+      description: document.getElementById("recurringDescription")?.value.trim() || "",
+      amount: parseFloat(document.getElementById("recurringAmount")?.value || ""),
+      account_id: document.getElementById("recurringAccount")?.value || "",
+      category_id: document.getElementById("recurringCategory")?.value || "",
+      start_date: document.getElementById("recurringStartDate")?.value || "",
+      end_date: document.getElementById("recurringEndDate")?.value || "",
+      note: document.getElementById("recurringNote")?.value.trim() || "",
+      cleared_default: !!document.getElementById("recurringClearedDefault")?.checked,
+      active: true
+    };
+
+    const validationError = validateRecurringForm(payload);
+    if (validationError) {
+      setRecurringFormMessage(validationError);
+      return;
+    }
+
+    setRecurringFormMessage("");
+    const submitButton = document.getElementById("recurringSubmit");
+    if (submitButton) {
+      submitButton.disabled = true;
+    }
+
+    try {
+      const endpoint = editingRecurringTemplateId
+        ? `/api/recurring/${editingRecurringTemplateId}`
+        : "/api/recurring";
+      const method = editingRecurringTemplateId ? "PUT" : "POST";
+      const response = await apiFetch(endpoint, {
+        method,
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          ...payload,
+          end_date: payload.end_date || null
+        })
+      });
+
+      if (!response || !response.ok) {
+        const errorPayload = await response?.json().catch(() => null);
+        setRecurringFormMessage(errorPayload?.error || "Unable to save recurring template.");
+        return;
+      }
+
+      await Promise.all([loadRecurringTemplates(), loadTransactions()]);
+      closeRecurringDrawer();
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+      }
+    }
+  });
+}
+
 function openTransactionDrawer() {
   if (!transactionDrawerElement) {
     return;
@@ -272,6 +350,49 @@ function closeTransactionDrawer() {
     transactionPageToggleElement.textContent = "+ Add transaction";
   }
   resetTransactionForm();
+}
+
+function setupRecurringDrawer() {
+  recurringDrawerElement = document.getElementById("recurringDrawer");
+  recurringToggleElement = document.getElementById("recurringToggle");
+  const cancelButton = document.getElementById("recurringCancel");
+
+  if (!recurringDrawerElement || !recurringToggleElement) {
+    return;
+  }
+
+  recurringToggleElement.addEventListener("click", () => {
+    if (recurringDrawerElement.hasAttribute("hidden")) {
+      openRecurringDrawer();
+    } else {
+      closeRecurringDrawer();
+    }
+  });
+
+  cancelButton?.addEventListener("click", () => closeRecurringDrawer());
+  closeRecurringDrawer();
+}
+
+function openRecurringDrawer() {
+  if (!recurringDrawerElement || !recurringToggleElement) {
+    return;
+  }
+  recurringDrawerElement.removeAttribute("hidden");
+  recurringToggleElement.textContent = "Close recurring";
+  recurringToggleElement.setAttribute("aria-expanded", "true");
+  setTimeout(() => {
+    document.getElementById("recurringDescription")?.focus();
+  }, 0);
+}
+
+function closeRecurringDrawer() {
+  if (!recurringDrawerElement || !recurringToggleElement) {
+    return;
+  }
+  recurringDrawerElement.setAttribute("hidden", "");
+  recurringToggleElement.textContent = "+ Add recurring template";
+  recurringToggleElement.setAttribute("aria-expanded", "false");
+  resetRecurringForm();
 }
 
 function updateHelpText(accountHelp, categoryHelp) {
@@ -319,6 +440,7 @@ async function loadTransactions() {
 
 function renderAccountOptions() {
   populateAccountsFromStorage(getAccounts());
+  renderRecurringAccountOptions();
   updateHelpText(
     document.getElementById("accountHelp"),
     document.getElementById("categoryHelp")
@@ -327,6 +449,7 @@ function renderAccountOptions() {
 
 function renderCategoryOptions() {
   populateCategoriesFromStorage();
+  renderRecurringCategoryOptions();
   updateHelpText(
     document.getElementById("accountHelp"),
     document.getElementById("categoryHelp")
@@ -466,6 +589,260 @@ function handleEditEntry(transactionId) {
   prefillTransactionForm(transaction);
   openTransactionDrawer();
   closeTransactionModal();
+}
+
+function handleEditRecurringTemplate(templateId) {
+  const template = (recurringState.templates || []).find((item) => item.id === templateId);
+  if (!template) {
+    return;
+  }
+
+  editingRecurringTemplateId = templateId;
+  document.getElementById("recurringType").value = template.type || "expense";
+  document.getElementById("recurringCadence").value = template.cadence || "monthly";
+  document.getElementById("recurringDescription").value = template.description || "";
+  document.getElementById("recurringAmount").value = template.amount ?? "";
+  document.getElementById("recurringAccount").value = template.account_id || "";
+  document.getElementById("recurringCategory").value = template.category_id || "";
+  document.getElementById("recurringStartDate").value = template.start_date || "";
+  document.getElementById("recurringEndDate").value = template.end_date || "";
+  document.getElementById("recurringNote").value = template.note || "";
+  document.getElementById("recurringClearedDefault").checked = !!template.cleared_default;
+  const submitButton = document.getElementById("recurringSubmit");
+  if (submitButton) {
+    submitButton.textContent = "Update recurring template";
+  }
+  openRecurringDrawer();
+}
+
+async function toggleRecurringTemplateStatus(templateId, active) {
+  const response = await apiFetch(`/api/recurring/${templateId}/status`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ active })
+  });
+
+  if (!response || !response.ok) {
+    const errorPayload = await response?.json().catch(() => null);
+    setRecurringFormMessage(errorPayload?.error || "Unable to update recurring status.");
+    return;
+  }
+
+  await loadRecurringTemplates();
+}
+
+async function runRecurringTemplate(templateId) {
+  const response = await apiFetch(`/api/recurring/${templateId}/run`, {
+    method: "POST"
+  });
+
+  if (!response || !response.ok) {
+    const errorPayload = await response?.json().catch(() => null);
+    setRecurringFormMessage(errorPayload?.error || "Unable to post recurring transaction.");
+    return;
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (payload && payload.created === false) {
+    setRecurringFormMessage("The next recurring entry has already been generated.");
+  } else {
+    setRecurringFormMessage("");
+  }
+
+  await Promise.all([loadRecurringTemplates(), loadTransactions()]);
+}
+
+async function deleteRecurringTemplate(templateId) {
+  const template = (recurringState.templates || []).find((item) => item.id === templateId);
+  if (!template) {
+    return;
+  }
+
+  if (!window.confirm(`Delete recurring template "${template.description}"? Future occurrences will stop.`)) {
+    return;
+  }
+
+  const response = await apiFetch(`/api/recurring/${templateId}`, {
+    method: "DELETE"
+  });
+
+  if (!response || !response.ok) {
+    const errorPayload = await response?.json().catch(() => null);
+    setRecurringFormMessage(errorPayload?.error || "Unable to delete recurring template.");
+    return;
+  }
+
+  await loadRecurringTemplates();
+}
+
+function validateRecurringForm(payload) {
+  if (!payload.description) {
+    return "Add a description for the recurring template.";
+  }
+  if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
+    return "Recurring amount must be greater than zero.";
+  }
+  if (!payload.account_id) {
+    return "Select an account for the recurring template.";
+  }
+  if (!payload.category_id) {
+    return "Select a category for the recurring template.";
+  }
+  if (!payload.start_date) {
+    return "Choose a start date.";
+  }
+  if (payload.end_date && payload.end_date < payload.start_date) {
+    return "End date must be on or after the start date.";
+  }
+  return null;
+}
+
+function setRecurringFormMessage(text) {
+  const node = document.getElementById("recurringFormMessage");
+  if (node) {
+    node.textContent = text || "";
+  }
+}
+
+function resetRecurringForm() {
+  const form = document.getElementById("recurringForm");
+  if (form) {
+    form.reset();
+  }
+  editingRecurringTemplateId = null;
+  document.getElementById("recurringType").value = "expense";
+  document.getElementById("recurringCadence").value = "monthly";
+  const submitButton = document.getElementById("recurringSubmit");
+  if (submitButton) {
+    submitButton.textContent = "Save recurring template";
+  }
+  setRecurringFormMessage("");
+}
+
+async function loadRecurringTemplates() {
+  const tbody = document.getElementById("recurringTableBody");
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="6" class="placeholder">Loading recurring templates...</td></tr>';
+  }
+
+  try {
+    const response = await apiFetch("/api/recurring");
+    if (!response || !response.ok) {
+      throw new Error("Failed to load recurring templates.");
+    }
+
+    const payload = await response.json().catch(() => []);
+    recurringState.templates = Array.isArray(payload) ? payload : [];
+  } catch (error) {
+    console.error("Failed to load recurring templates:", error);
+    recurringState.templates = [];
+  } finally {
+    renderRecurringTemplates();
+  }
+}
+
+function renderRecurringAccountOptions() {
+  const select = document.getElementById("recurringAccount");
+  if (!select) {
+    return;
+  }
+  const currentValue = select.value;
+  select.innerHTML = '<option value="">Select account</option>';
+  getAccounts().forEach((account) => {
+    const option = document.createElement("option");
+    option.value = account.id;
+    option.textContent = `${account.name} (${formatAccountType(account.type)})`;
+    select.appendChild(option);
+  });
+  select.value = currentValue || "";
+}
+
+function renderRecurringCategoryOptions() {
+  const select = document.getElementById("recurringCategory");
+  if (!select) {
+    return;
+  }
+  const currentValue = select.value;
+  select.innerHTML = '<option value="">Select category</option>';
+  getCategories().forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category.id || category.name;
+    option.textContent = category.name;
+    select.appendChild(option);
+  });
+  select.value = currentValue || "";
+}
+
+function renderRecurringTemplates() {
+  const tbody = document.getElementById("recurringTableBody");
+  if (!tbody) {
+    return;
+  }
+
+  if (!recurringState.templates.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="placeholder">No recurring templates yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = "";
+  recurringState.templates.forEach((template) => {
+    const row = document.createElement("tr");
+    const activeBadge = template.active
+      ? '<span class="status-badge status-cleared">Active</span>'
+      : '<span class="status-badge status-pending">Paused</span>';
+
+    row.innerHTML = `
+      <td>
+        <div class="recurring-meta">
+          <span class="recurring-primary">${template.description || "-"}</span>
+          <span class="recurring-secondary">${template.note || "No internal note"}</span>
+        </div>
+      </td>
+      <td>${formatRecurringCadence(template.cadence)}</td>
+      <td>${formatDisplayDate(template.next_run_date)}</td>
+      <td>${activeBadge}</td>
+      <td class="amount-cell"><span class="${template.type === "income" ? "amount-positive" : "amount-negative"}">${template.type === "income" ? "+" : "-"}${formatCurrency(Math.abs(Number(template.amount) || 0))}</span></td>
+      <td class="recurring-actions-cell">
+        <button type="button" class="action-button" data-action="recurring-run" data-id="${template.id}">Post next</button>
+        <button type="button" class="action-button" data-action="recurring-status" data-id="${template.id}">${template.active ? "Pause" : "Resume"}</button>
+        <button type="button" class="action-button" data-action="recurring-edit" data-id="${template.id}">Edit</button>
+        <button type="button" class="action-button delete" data-action="recurring-delete" data-id="${template.id}">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(row);
+
+    row.querySelector('[data-action="recurring-run"]')?.addEventListener("click", async () => {
+      await runRecurringTemplate(template.id);
+    });
+    row.querySelector('[data-action="recurring-status"]')?.addEventListener("click", async () => {
+      await toggleRecurringTemplateStatus(template.id, !template.active);
+    });
+    row.querySelector('[data-action="recurring-edit"]')?.addEventListener("click", () => {
+      handleEditRecurringTemplate(template.id);
+    });
+    row.querySelector('[data-action="recurring-delete"]')?.addEventListener("click", async () => {
+      await deleteRecurringTemplate(template.id);
+    });
+  });
+}
+
+function formatRecurringCadence(cadence) {
+  switch (cadence) {
+    case "weekly":
+      return "Weekly";
+    case "biweekly":
+      return "Biweekly";
+    case "monthly":
+      return "Monthly";
+    case "quarterly":
+      return "Quarterly";
+    case "yearly":
+      return "Yearly";
+    default:
+      return cadence || "-";
+  }
 }
 
 function prefillTransactionForm(transaction) {
@@ -876,7 +1253,13 @@ function normalizeTransaction(transaction) {
     note: transaction.note || "",
     receiptId: transaction.receiptId || transaction.receipt_id || "",
     createdAt: transaction.createdAt || transaction.created_at || "",
-    cleared: transaction.cleared === true
+    cleared: transaction.cleared === true,
+    recurringTransactionId:
+      transaction.recurringTransactionId || transaction.recurring_transaction_id || "",
+    recurringOccurrenceDate:
+      String(
+        transaction.recurringOccurrenceDate || transaction.recurring_occurrence_date || ""
+      ).slice(0, 10)
   };
 }
 
@@ -911,7 +1294,15 @@ function renderTransactionsTable(filteredTransactions) {
   transactions.forEach((txn) => {
     const row = document.createElement("tr");
     const categoryName = categoriesById[txn.categoryId]?.name || "-";
-    const descriptionSub = txn.note || categoryName || "";
+    const sourceBadge = txn.recurringTransactionId
+      ? '<span class="source-badge">Recurring</span>'
+      : "";
+    const recurringMeta = txn.recurringOccurrenceDate
+      ? `Generated ${formatDisplayDate(txn.recurringOccurrenceDate)}`
+      : "Generated automatically";
+    const descriptionSub = txn.recurringTransactionId
+      ? `${sourceBadge}${txn.note ? ` ${txn.note}` : ` ${recurringMeta}`}`
+      : txn.note || categoryName || "";
     const amountClass = txn.type === "income" ? "amount-positive" : "amount-negative";
     const amountPrefix = txn.type === "income" ? "+" : "-";
     const clearedMarkup = txn.cleared

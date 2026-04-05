@@ -1215,6 +1215,69 @@ body {
   padding: 0;
 }
 
+.recurring-panel {
+  margin-top: 20px;
+}
+
+.recurring-toolbar {
+  align-items: center;
+}
+
+.recurring-subtitle {
+  margin-top: 2px;
+}
+
+.recurring-drawer-card {
+  border-top: 0.5px solid var(--border);
+}
+
+.recurring-actions {
+  gap: 10px;
+}
+
+.recurring-table-wrapper {
+  margin-top: 0;
+}
+
+.recurring-table tbody td:first-child {
+  min-width: 220px;
+}
+
+.recurring-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recurring-primary {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.recurring-secondary {
+  font-size: 11px;
+  color: var(--ink3);
+}
+
+.recurring-actions-cell {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--accent2);
+  background: var(--accent-light);
+}
+
 .transactions-toolbar {
   padding: 14px 16px;
   border-bottom: 0.5px solid var(--border);
