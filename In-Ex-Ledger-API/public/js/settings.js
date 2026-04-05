@@ -913,6 +913,30 @@ function initSecurityForm() {
   const matchMessage = document.getElementById("securityPasswordMatchMessage");
   const requirementItems = document.querySelectorAll(".password-requirements li");
   const submitButton = document.getElementById("securitySaveButton");
+  const mfaStatusBadge = document.getElementById("mfaStatusBadge");
+  const mfaSetupStartForm = document.getElementById("mfaSetupStartForm");
+  const mfaCurrentPassword = document.getElementById("mfa-current-password");
+  const mfaSetupPanel = document.getElementById("mfaSetupPanel");
+  const mfaSetupSecret = document.getElementById("mfaSetupSecret");
+  const mfaSetupOtpAuth = document.getElementById("mfaSetupOtpAuth");
+  const mfaSetupCode = document.getElementById("mfaSetupCode");
+  const mfaRecoveryCodes = document.getElementById("mfaRecoveryCodes");
+  const mfaEnableButton = document.getElementById("mfaEnableButton");
+  const mfaCancelButton = document.getElementById("mfaCancelButton");
+  const mfaManageForm = document.getElementById("mfaManageForm");
+  const mfaManagePassword = document.getElementById("mfa-manage-password");
+  const mfaManageCode = document.getElementById("mfa-manage-code");
+  const mfaDisableButton = document.getElementById("mfaDisableButton");
+  const mfaRegenerateCodesButton = document.getElementById("mfaRegenerateCodesButton");
+  const mfaMessage = document.getElementById("mfaMessage");
+  const mfaRegeneratedCodesWrap = document.getElementById("mfaRegeneratedCodesWrap");
+  const mfaRegeneratedCodes = document.getElementById("mfaRegeneratedCodes");
+
+  let mfaStatus = {
+    enabled: false,
+    recovery_code_count: 0,
+    pending_setup: false
+  };
 
   const updateStrength = () => {
     const password = newInput.value;
@@ -961,6 +985,69 @@ function initSecurityForm() {
     submitButton.disabled = !(matches && meetsRules && currentInput.value.trim());
   };
 
+  const setMfaMessage = (message = "", tone = "") => {
+    if (!mfaMessage) {
+      return;
+    }
+    mfaMessage.textContent = message;
+    mfaMessage.classList.remove("is-error", "is-success");
+    if (tone) {
+      mfaMessage.classList.add(tone);
+    }
+  };
+
+  const renderRecoveryCodes = (container, codes) => {
+    if (!container) {
+      return;
+    }
+    const items = Array.isArray(codes) ? codes : [];
+    if (!items.length) {
+      container.innerHTML = "";
+      return;
+    }
+    container.innerHTML = items
+      .map((code) => `<code class="mfa-recovery-code">${escapeSettingsHtml(code)}</code>`)
+      .join("");
+  };
+
+  const resetSetupPanel = () => {
+    mfaSetupPanel?.classList.add("hidden");
+    if (mfaSetupSecret) mfaSetupSecret.value = "";
+    if (mfaSetupOtpAuth) mfaSetupOtpAuth.value = "";
+    if (mfaSetupCode) mfaSetupCode.value = "";
+    if (mfaCurrentPassword) mfaCurrentPassword.value = "";
+    if (mfaRecoveryCodes) mfaRecoveryCodes.innerHTML = "";
+  };
+
+  const updateMfaUi = () => {
+    if (mfaStatusBadge) {
+      mfaStatusBadge.textContent = mfaStatus.enabled ? "Enabled" : "Disabled";
+      mfaStatusBadge.classList.toggle("is-enabled", !!mfaStatus.enabled);
+      mfaStatusBadge.classList.toggle("is-disabled", !mfaStatus.enabled);
+    }
+
+    mfaSetupStartForm?.classList.toggle("hidden", !!mfaStatus.enabled);
+    mfaManageForm?.classList.toggle("hidden", !mfaStatus.enabled);
+
+    if (!mfaStatus.pending_setup) {
+      resetSetupPanel();
+    }
+  };
+
+  const loadMfaStatus = async () => {
+    const response = await apiFetch("/api/auth/mfa/status");
+    if (!response || !response.ok) {
+      throw new Error("Unable to load MFA status");
+    }
+
+    mfaStatus = await response.json().catch(() => ({
+      enabled: false,
+      recovery_code_count: 0,
+      pending_setup: false
+    }));
+    updateMfaUi();
+  };
+
   [currentInput, newInput, confirmInput].forEach((input) => {
     input.addEventListener("input", () => {
       updateStrength();
@@ -972,25 +1059,204 @@ function initSecurityForm() {
 
   showToggle?.addEventListener("change", () => {
     const type = showToggle.checked ? "text" : "password";
-    [currentInput, newInput, confirmInput].forEach((input) => {
+    [currentInput, newInput, confirmInput, mfaCurrentPassword, mfaManagePassword].forEach((input) => {
+      if (!input) {
+        return;
+      }
       input.type = type;
     });
   });
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    showSettingsToast("Password updated");
-    form.reset();
-    updateStrength();
-    updateRequirements();
-    updateMatch();
-    updateSubmitState();
+    setMfaMessage("");
+
+    try {
+      const response = await apiFetch("/api/auth/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          currentPassword: currentInput.value,
+          newPassword: newInput.value,
+          confirmPassword: confirmInput.value
+        })
+      });
+
+      const payload = await response?.json().catch(() => null);
+      if (!response || !response.ok) {
+        showSettingsToast(payload?.error || "Unable to update password");
+        return;
+      }
+
+      showSettingsToast(payload?.message || "Password updated");
+      form.reset();
+      updateStrength();
+      updateRequirements();
+      updateMatch();
+      updateSubmitState();
+    } catch (error) {
+      console.error("Password update failed", error);
+      showSettingsToast("Unable to update password");
+    }
+  });
+
+  mfaSetupStartForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    setMfaMessage("");
+    mfaRegeneratedCodesWrap?.classList.add("hidden");
+    renderRecoveryCodes(mfaRegeneratedCodes, []);
+
+    try {
+      const response = await apiFetch("/api/auth/mfa/setup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          currentPassword: mfaCurrentPassword?.value || ""
+        })
+      });
+      const payload = await response?.json().catch(() => null);
+
+      if (!response || !response.ok) {
+        setMfaMessage(payload?.error || "Unable to start MFA setup.", "is-error");
+        return;
+      }
+
+      if (mfaSetupSecret) mfaSetupSecret.value = payload?.secret || "";
+      if (mfaSetupOtpAuth) mfaSetupOtpAuth.value = payload?.otpauth_url || "";
+      renderRecoveryCodes(mfaRecoveryCodes, payload?.recovery_codes || []);
+      mfaSetupPanel?.classList.remove("hidden");
+      mfaStatus.pending_setup = true;
+      updateMfaUi();
+      setMfaMessage("Authenticator setup generated. Verify the code from your app to enable MFA.", "is-success");
+    } catch (error) {
+      console.error("MFA setup failed", error);
+      setMfaMessage("Unable to start MFA setup.", "is-error");
+    }
+  });
+
+  mfaEnableButton?.addEventListener("click", async () => {
+    setMfaMessage("");
+
+    try {
+      const response = await apiFetch("/api/auth/mfa/enable", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          code: mfaSetupCode?.value || ""
+        })
+      });
+      const payload = await response?.json().catch(() => null);
+
+      if (!response || !response.ok) {
+        setMfaMessage(payload?.error || "Unable to enable MFA.", "is-error");
+        return;
+      }
+
+      mfaStatus = payload?.status || { enabled: true, recovery_code_count: 0, pending_setup: false };
+      mfaStatus.pending_setup = false;
+      updateMfaUi();
+      showSettingsToast("Multi-factor authentication enabled");
+      setMfaMessage("MFA is now protecting your sign-in.", "is-success");
+    } catch (error) {
+      console.error("MFA enable failed", error);
+      setMfaMessage("Unable to enable MFA.", "is-error");
+    }
+  });
+
+  mfaCancelButton?.addEventListener("click", async () => {
+    try {
+      await apiFetch("/api/auth/mfa/setup/cancel", { method: "POST" });
+    } catch (error) {
+      console.error("Failed to cancel MFA setup", error);
+    }
+    mfaStatus.pending_setup = false;
+    resetSetupPanel();
+    updateMfaUi();
+    setMfaMessage("");
+  });
+
+  mfaDisableButton?.addEventListener("click", async () => {
+    setMfaMessage("");
+
+    try {
+      const response = await apiFetch("/api/auth/mfa/disable", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          currentPassword: mfaManagePassword?.value || "",
+          code: mfaManageCode?.value || ""
+        })
+      });
+      const payload = await response?.json().catch(() => null);
+
+      if (!response || !response.ok) {
+        setMfaMessage(payload?.error || "Unable to disable MFA.", "is-error");
+        return;
+      }
+
+      if (mfaManagePassword) mfaManagePassword.value = "";
+      if (mfaManageCode) mfaManageCode.value = "";
+      mfaRegeneratedCodesWrap?.classList.add("hidden");
+      renderRecoveryCodes(mfaRegeneratedCodes, []);
+      mfaStatus = payload?.status || { enabled: false, recovery_code_count: 0, pending_setup: false };
+      updateMfaUi();
+      showSettingsToast("Multi-factor authentication disabled");
+      setMfaMessage("MFA disabled.", "is-success");
+    } catch (error) {
+      console.error("MFA disable failed", error);
+      setMfaMessage("Unable to disable MFA.", "is-error");
+    }
+  });
+
+  mfaRegenerateCodesButton?.addEventListener("click", async () => {
+    setMfaMessage("");
+
+    try {
+      const response = await apiFetch("/api/auth/mfa/recovery-codes/regenerate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          currentPassword: mfaManagePassword?.value || "",
+          code: mfaManageCode?.value || ""
+        })
+      });
+      const payload = await response?.json().catch(() => null);
+
+      if (!response || !response.ok) {
+        setMfaMessage(payload?.error || "Unable to regenerate recovery codes.", "is-error");
+        return;
+      }
+
+      mfaStatus = payload?.status || mfaStatus;
+      updateMfaUi();
+      mfaRegeneratedCodesWrap?.classList.remove("hidden");
+      renderRecoveryCodes(mfaRegeneratedCodes, payload?.recovery_codes || []);
+      showSettingsToast("Recovery codes regenerated");
+      setMfaMessage("New recovery codes generated. Store them safely.", "is-success");
+    } catch (error) {
+      console.error("Recovery code regeneration failed", error);
+      setMfaMessage("Unable to regenerate recovery codes.", "is-error");
+    }
   });
 
   updateStrength();
   updateRequirements();
   updateMatch();
   updateSubmitState();
+  loadMfaStatus().catch((error) => {
+    console.error("Failed to initialize MFA settings", error);
+    setMfaMessage("Unable to load MFA status.", "is-error");
+  });
 }
 
 function initSettingsNav() {

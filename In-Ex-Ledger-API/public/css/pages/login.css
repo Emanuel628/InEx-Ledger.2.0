@@ -83,6 +83,30 @@ main {
   margin-top: 0;
 }
 
+.auth-helper {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink2);
+}
+
+.auth-inline-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-secondary-btn {
+  width: 100%;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink);
+}
+
 .show-password-toggle {
   display: inline-flex;
   align-items: center;

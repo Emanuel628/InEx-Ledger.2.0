@@ -8,10 +8,21 @@ const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const { Resend } = require("resend");
 const rateLimit = require("express-rate-limit");
-const { signToken, requireAuth } = require("../middleware/auth.middleware.js");
+const { signToken, verifyToken, requireAuth } = require("../middleware/auth.middleware.js");
 const { pool } = require("../db.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
+const {
+  buildOtpAuthUrl,
+  consumeRecoveryCode,
+  decryptSecret,
+  encryptSecret,
+  generateRecoveryCodes,
+  generateSecret,
+  hashRecoveryCodes,
+  serializeRecoveryCodes,
+  verifyTotp
+} = require("../services/mfaService.js");
 
 const router = express.Router();
 
@@ -52,6 +63,14 @@ const passwordLimiter = rateLimit({
   message: { error: "Too many password reset attempts, please try again later." }
 });
 
+const mfaVerifyLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 12,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many MFA attempts, please try again shortly." }
+});
+
 /* =========================================================
    3. CONSTANTS & COOKIE CONFIGURATION
    ========================================================= */
@@ -75,6 +94,7 @@ const COOKIE_OPTIONS = {
    ========================================================= */
 const VERIFICATION_TOKEN_TTL_MS = 15 * 60 * 1000;
 const PASSWORD_RESET_TTL_MS = 20 * 60 * 1000;
+const MFA_PENDING_TOKEN_EXPIRY_SECONDS = 5 * 60;
 
 function normalizeEmail(email) {
   return String(email ?? "").trim().toLowerCase();
@@ -189,6 +209,131 @@ async function verifyPassword(password, stored) {
 
   const match = await bcrypt.compare(password, stored);
   return { match, legacy: false };
+}
+
+function isStrongPassword(password) {
+  const value = String(password || "");
+  return (
+    value.length >= 8 &&
+    /\d/.test(value) &&
+    /[A-Z]/.test(value) &&
+    /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)
+  );
+}
+
+async function findUserByEmail(email) {
+  const result = await pool.query("SELECT * FROM users WHERE email = $1 LIMIT 1", [email]);
+  return result.rows[0] || null;
+}
+
+async function findUserById(userId) {
+  const result = await pool.query("SELECT * FROM users WHERE id = $1 LIMIT 1", [userId]);
+  return result.rows[0] || null;
+}
+
+async function revokeAllRefreshTokensForUser(userId) {
+  await pool.query("UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false", [
+    userId
+  ]);
+}
+
+async function issueAuthenticatedSession(res, user, businessIdOverride = null) {
+  const verified = Boolean(user.email_verified);
+  const businessId = businessIdOverride || (await resolveBusinessIdForUser(user));
+  const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+  const token = signToken(
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role || "user",
+      email_verified: verified,
+      business_id: businessId,
+      mfa_enabled: !!user.mfa_enabled
+    },
+    ACCESS_TOKEN_EXPIRY_SECONDS
+  );
+
+  const { token: refreshToken, expiresAt } = await createRefreshToken(user.id);
+  setRefreshCookie(res, refreshToken, expiresAt);
+
+  return {
+    token,
+    email_verified: verified,
+    subscription,
+    mfa_enabled: !!user.mfa_enabled,
+    message: verified ? undefined : "Please verify your email before requesting exports."
+  };
+}
+
+async function resetCurrentRefreshSession(res, user) {
+  await revokeAllRefreshTokensForUser(user.id);
+  const { token, expiresAt } = await createRefreshToken(user.id);
+  setRefreshCookie(res, token, expiresAt);
+}
+
+function ensureArrayValue(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function getActiveRecoveryCodeHashes(user) {
+  return serializeRecoveryCodes(user?.mfa_recovery_codes_hash);
+}
+
+function getTempRecoveryCodeHashes(user) {
+  return serializeRecoveryCodes(user?.mfa_temp_recovery_codes_hash);
+}
+
+function createPendingMfaToken(user, businessId) {
+  return signToken(
+    {
+      purpose: "mfa_pending",
+      id: user.id,
+      email: user.email,
+      email_verified: !!user.email_verified,
+      business_id: businessId
+    },
+    MFA_PENDING_TOKEN_EXPIRY_SECONDS
+  );
+}
+
+function buildMfaStatusPayload(user) {
+  return {
+    enabled: !!user?.mfa_enabled,
+    enabled_at: user?.mfa_enabled_at || null,
+    recovery_code_count: getActiveRecoveryCodeHashes(user).length,
+    pending_setup: !!user?.mfa_temp_secret_encrypted
+  };
+}
+
+function verifyMfaChallengeForUser(user, code) {
+  if (!user?.mfa_enabled || !user?.mfa_secret_encrypted) {
+    return { ok: false, reason: "MFA is not enabled." };
+  }
+
+  const normalizedCode = String(code || "").trim();
+  if (!normalizedCode) {
+    return { ok: false, reason: "A code is required." };
+  }
+
+  const secret = decryptSecret(user.mfa_secret_encrypted);
+  if (verifyTotp(secret, normalizedCode)) {
+    return {
+      ok: true,
+      usedRecoveryCode: false,
+      recoveryCodesHash: getActiveRecoveryCodeHashes(user)
+    };
+  }
+
+  const remainingRecoveryCodes = consumeRecoveryCode(getActiveRecoveryCodeHashes(user), normalizedCode);
+  if (remainingRecoveryCodes) {
+    return {
+      ok: true,
+      usedRecoveryCode: true,
+      recoveryCodesHash: remainingRecoveryCodes
+    };
+  }
+
+  return { ok: false, reason: "Invalid authenticator or recovery code." };
 }
 
 function setRefreshCookie(res, token, expiresAt) {
@@ -378,8 +523,7 @@ router.post("/login", authLimiter, async (req, res) => {
   }
 
   try {
-    const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-    const user = result.rows[0];
+    const user = await findUserByEmail(email);
 
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
@@ -404,28 +548,18 @@ router.post("/login", authLimiter, async (req, res) => {
 
     const verified = Boolean(user.email_verified);
     const businessId = await resolveBusinessIdForUser(user);
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
 
-    const token = signToken(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role || "user",
+    if (user.mfa_enabled) {
+      return res.status(200).json({
+        mfa_required: true,
+        mfa_token: createPendingMfaToken(user, businessId),
         email_verified: verified,
-        business_id: businessId
-      },
-      ACCESS_TOKEN_EXPIRY_SECONDS
-    );
+        mfa_enabled: true
+      });
+    }
 
-    const { token: refreshToken, expiresAt } = await createRefreshToken(user.id);
-    setRefreshCookie(res, refreshToken, expiresAt);
-
-    res.status(200).json({
-      token,
-      email_verified: verified,
-      subscription,
-      message: verified ? undefined : "Please verify your email before requesting exports."
-    });
+    const session = await issueAuthenticatedSession(res, user, businessId);
+    res.status(200).json(session);
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Login failed" });
@@ -447,6 +581,7 @@ router.post("/refresh", async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT rt.user_id, u.email, u.role, u.email_verified
+              , u.mfa_enabled
        FROM refresh_tokens rt
        JOIN users u ON u.id = rt.user_id
        WHERE rt.token_hash = $1 AND rt.revoked = false AND rt.expires_at > NOW()
@@ -476,7 +611,8 @@ router.post("/refresh", async (req, res) => {
         email: result.rows[0].email,
         role: result.rows[0].role || "user",
         email_verified: !!result.rows[0].email_verified,
-        business_id: businessId
+        business_id: businessId,
+        mfa_enabled: !!result.rows[0].mfa_enabled
       },
       ACCESS_TOKEN_EXPIRY_SECONDS
     );
@@ -526,6 +662,302 @@ router.get("/verify-email", async (req, res) => {
   } catch (err) {
     console.error("Verification error:", err);
     return res.status(500).send("Verification failed.");
+  }
+});
+
+router.post("/change-password", requireAuth, authLimiter, async (req, res) => {
+  const currentPassword = req.body?.currentPassword;
+  const newPassword = req.body?.newPassword;
+  const confirmPassword = req.body?.confirmPassword;
+
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    return res.status(400).json({ error: "All password fields are required." });
+  }
+
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({ error: "New passwords do not match." });
+  }
+
+  if (!isStrongPassword(newPassword)) {
+    return res.status(400).json({
+      error: "Password must be at least 8 characters and include an uppercase letter, number, and symbol."
+    });
+  }
+
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { match } = await verifyPassword(currentPassword, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "Current password is incorrect." });
+    }
+
+    const samePassword = await verifyPassword(newPassword, user.password_hash);
+    if (samePassword.match) {
+      return res.status(400).json({ error: "Choose a different password." });
+    }
+
+    const nextHash = await hashPassword(newPassword);
+    await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [nextHash, user.id]);
+    await resetCurrentRefreshSession(res, user);
+
+    return res.status(200).json({ success: true, message: "Password updated." });
+  } catch (err) {
+    console.error("Change password error:", err);
+    return res.status(500).json({ error: "Unable to update password." });
+  }
+});
+
+router.get("/mfa/status", requireAuth, async (req, res) => {
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    return res.status(200).json(buildMfaStatusPayload(user));
+  } catch (err) {
+    console.error("MFA status error:", err);
+    return res.status(500).json({ error: "Unable to load MFA status." });
+  }
+});
+
+router.post("/mfa/setup", requireAuth, authLimiter, async (req, res) => {
+  const currentPassword = req.body?.currentPassword;
+  if (!currentPassword) {
+    return res.status(400).json({ error: "Current password is required." });
+  }
+
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { match } = await verifyPassword(currentPassword, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "Current password is incorrect." });
+    }
+
+    const secret = generateSecret();
+    const recoveryCodes = generateRecoveryCodes();
+    await pool.query(
+      `UPDATE users
+          SET mfa_temp_secret_encrypted = $1,
+              mfa_temp_recovery_codes_hash = $2
+        WHERE id = $3`,
+      [encryptSecret(secret), JSON.stringify(hashRecoveryCodes(recoveryCodes)), user.id]
+    );
+
+    return res.status(200).json({
+      secret,
+      otpauth_url: buildOtpAuthUrl(user.email, secret),
+      recovery_codes: recoveryCodes
+    });
+  } catch (err) {
+    console.error("MFA setup error:", err);
+    return res.status(500).json({ error: "Unable to start MFA setup." });
+  }
+});
+
+router.post("/mfa/setup/cancel", requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE users
+          SET mfa_temp_secret_encrypted = NULL,
+              mfa_temp_recovery_codes_hash = '[]'::jsonb
+        WHERE id = $1`,
+      [req.user.id]
+    );
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("MFA setup cancel error:", err);
+    return res.status(500).json({ error: "Unable to cancel MFA setup." });
+  }
+});
+
+router.post("/mfa/enable", requireAuth, mfaVerifyLimiter, async (req, res) => {
+  const code = req.body?.code;
+  if (!code) {
+    return res.status(400).json({ error: "Verification code is required." });
+  }
+
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.mfa_temp_secret_encrypted) {
+      return res.status(400).json({ error: "Start MFA setup first." });
+    }
+
+    const secret = decryptSecret(user.mfa_temp_secret_encrypted);
+    if (!verifyTotp(secret, code)) {
+      return res.status(400).json({ error: "Invalid authenticator code." });
+    }
+
+    const tempRecoveryCodes = getTempRecoveryCodeHashes(user);
+    await pool.query(
+      `UPDATE users
+          SET mfa_enabled = true,
+              mfa_secret_encrypted = $1,
+              mfa_recovery_codes_hash = $2,
+              mfa_temp_secret_encrypted = NULL,
+              mfa_temp_recovery_codes_hash = '[]'::jsonb,
+              mfa_enabled_at = NOW()
+        WHERE id = $3`,
+      [user.mfa_temp_secret_encrypted, JSON.stringify(tempRecoveryCodes), user.id]
+    );
+
+    const refreshedUser = await findUserById(user.id);
+    await resetCurrentRefreshSession(res, refreshedUser);
+
+    return res.status(200).json({
+      success: true,
+      message: "MFA enabled.",
+      status: buildMfaStatusPayload(refreshedUser)
+    });
+  } catch (err) {
+    console.error("MFA enable error:", err);
+    return res.status(500).json({ error: "Unable to enable MFA." });
+  }
+});
+
+router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
+  const currentPassword = req.body?.currentPassword;
+  const code = req.body?.code;
+
+  if (!currentPassword || !code) {
+    return res.status(400).json({ error: "Current password and MFA code are required." });
+  }
+
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { match } = await verifyPassword(currentPassword, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "Current password is incorrect." });
+    }
+
+    const verification = verifyMfaChallengeForUser(user, code);
+    if (!verification.ok) {
+      return res.status(400).json({ error: verification.reason });
+    }
+
+    await pool.query(
+      `UPDATE users
+          SET mfa_enabled = false,
+              mfa_secret_encrypted = NULL,
+              mfa_recovery_codes_hash = '[]'::jsonb,
+              mfa_temp_secret_encrypted = NULL,
+              mfa_temp_recovery_codes_hash = '[]'::jsonb,
+              mfa_enabled_at = NULL
+        WHERE id = $1`,
+      [user.id]
+    );
+
+    const refreshedUser = await findUserById(user.id);
+    await resetCurrentRefreshSession(res, refreshedUser);
+
+    return res.status(200).json({
+      success: true,
+      message: "MFA disabled.",
+      status: buildMfaStatusPayload(refreshedUser)
+    });
+  } catch (err) {
+    console.error("MFA disable error:", err);
+    return res.status(500).json({ error: "Unable to disable MFA." });
+  }
+});
+
+router.post("/mfa/recovery-codes/regenerate", requireAuth, mfaVerifyLimiter, async (req, res) => {
+  const currentPassword = req.body?.currentPassword;
+  const code = req.body?.code;
+
+  if (!currentPassword || !code) {
+    return res.status(400).json({ error: "Current password and MFA code are required." });
+  }
+
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const { match } = await verifyPassword(currentPassword, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "Current password is incorrect." });
+    }
+
+    const verification = verifyMfaChallengeForUser(user, code);
+    if (!verification.ok) {
+      return res.status(400).json({ error: verification.reason });
+    }
+
+    const recoveryCodes = generateRecoveryCodes();
+    await pool.query("UPDATE users SET mfa_recovery_codes_hash = $1 WHERE id = $2", [
+      JSON.stringify(hashRecoveryCodes(recoveryCodes)),
+      user.id
+    ]);
+
+    const refreshedUser = await findUserById(user.id);
+    await resetCurrentRefreshSession(res, refreshedUser);
+
+    return res.status(200).json({
+      success: true,
+      recovery_codes: recoveryCodes,
+      status: buildMfaStatusPayload(refreshedUser)
+    });
+  } catch (err) {
+    console.error("MFA recovery code rotation error:", err);
+    return res.status(500).json({ error: "Unable to regenerate recovery codes." });
+  }
+});
+
+router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
+  const mfaToken = req.body?.mfaToken;
+  const code = req.body?.code;
+
+  if (!mfaToken || !code) {
+    return res.status(400).json({ error: "MFA token and code are required." });
+  }
+
+  try {
+    const pending = verifyToken(mfaToken);
+    if (pending.purpose !== "mfa_pending" || !pending.id) {
+      return res.status(401).json({ error: "Invalid MFA session." });
+    }
+
+    const user = await findUserById(pending.id);
+    if (!user || user.email !== pending.email || !user.mfa_enabled) {
+      return res.status(401).json({ error: "MFA session is no longer valid." });
+    }
+
+    const verification = verifyMfaChallengeForUser(user, code);
+    if (!verification.ok) {
+      return res.status(401).json({ error: verification.reason });
+    }
+
+    if (verification.usedRecoveryCode) {
+      await pool.query("UPDATE users SET mfa_recovery_codes_hash = $1 WHERE id = $2", [
+        JSON.stringify(verification.recoveryCodesHash),
+        user.id
+      ]);
+    }
+
+    const refreshedUser = await findUserById(user.id);
+    const session = await issueAuthenticatedSession(res, refreshedUser, pending.business_id || null);
+    return res.status(200).json(session);
+  } catch (err) {
+    console.error("MFA verify error:", err);
+    return res.status(401).json({ error: "Invalid or expired MFA session." });
   }
 });
 

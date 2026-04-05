@@ -1215,6 +1215,100 @@ body {
   font-size: 12px;
 }
 
+.mfa-block {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 0.5px solid var(--border);
+}
+
+.mfa-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.mfa-header h3 {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.mfa-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.mfa-status-badge.is-enabled {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+}
+
+.mfa-status-badge.is-disabled {
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--ink2);
+}
+
+.mfa-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mfa-form.hidden,
+.mfa-setup-panel.hidden,
+.mfa-recovery-wrap.hidden {
+  display: none;
+}
+
+.mfa-setup-panel,
+.mfa-recovery-wrap {
+  margin-top: 14px;
+  padding: 16px;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface2);
+}
+
+.mfa-setup-panel textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.mfa-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mfa-recovery-codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mfa-recovery-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 0.5px solid var(--border2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .danger-card {
   border: 0.5px solid var(--red-border);
   border-radius: var(--radius-lg);

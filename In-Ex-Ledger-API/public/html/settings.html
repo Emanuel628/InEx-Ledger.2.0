@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ï»¿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -283,6 +283,76 @@
           <button type="button" class="settings-primary-btn secondary-session-btn" data-logout data-action="logout" data-i18n="settings_sign_out">Sign out of all sessions</button>
           <p class="session-note" data-i18n="settings_session_note">Use this if your account has been accessed from a device you don't recognize.</p>
         </div>
+        <div class="mfa-block">
+          <div class="mfa-header">
+            <div>
+              <h3>Multi-factor authentication</h3>
+              <p class="session-note">Require an authenticator app code when you sign in. Recovery codes are generated for emergency access.</p>
+            </div>
+            <span id="mfaStatusBadge" class="mfa-status-badge is-disabled">Disabled</span>
+          </div>
+
+          <form id="mfaSetupStartForm" class="mfa-form">
+            <div class="security-grid">
+              <div class="form-field">
+                <label for="mfa-current-password">Current password</label>
+                <input type="password" id="mfa-current-password" autocomplete="current-password" />
+              </div>
+            </div>
+            <button type="submit" class="settings-primary-btn">Start MFA setup</button>
+          </form>
+
+          <div id="mfaSetupPanel" class="mfa-setup-panel hidden">
+            <div class="settings-form-grid">
+              <div class="form-field form-field-full">
+                <label for="mfaSetupSecret">Setup key</label>
+                <input type="text" id="mfaSetupSecret" readonly />
+              </div>
+              <div class="form-field form-field-full">
+                <label for="mfaSetupOtpAuth">Authenticator app link</label>
+                <textarea id="mfaSetupOtpAuth" rows="3" readonly></textarea>
+              </div>
+              <div class="form-field">
+                <label for="mfaSetupCode">Verification code</label>
+                <input type="text" id="mfaSetupCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
+              </div>
+            </div>
+            <div class="mfa-recovery-wrap">
+              <div class="settings-row-title">Recovery codes</div>
+              <p class="settings-helper-note">Store these in a safe place. Each recovery code can be used once.</p>
+              <div id="mfaRecoveryCodes" class="mfa-recovery-codes"></div>
+            </div>
+            <div class="mfa-actions">
+              <button type="button" id="mfaEnableButton" class="settings-primary-btn">Enable MFA</button>
+              <button type="button" id="mfaCancelButton" class="settings-secondary-btn">Cancel</button>
+            </div>
+          </div>
+
+          <form id="mfaManageForm" class="mfa-form hidden">
+            <div class="security-grid">
+              <div class="form-field">
+                <label for="mfa-manage-password">Current password</label>
+                <input type="password" id="mfa-manage-password" autocomplete="current-password" />
+              </div>
+              <div class="form-field">
+                <label for="mfa-manage-code">Authenticator or recovery code</label>
+                <input type="text" id="mfa-manage-code" autocomplete="one-time-code" placeholder="123456 or ABCD-EF12" />
+              </div>
+            </div>
+            <div class="mfa-actions">
+              <button type="button" id="mfaRegenerateCodesButton" class="settings-secondary-btn">Regenerate recovery codes</button>
+              <button type="button" id="mfaDisableButton" class="danger-outline-btn">Disable MFA</button>
+            </div>
+          </form>
+
+          <div id="mfaRegeneratedCodesWrap" class="mfa-recovery-wrap hidden">
+            <div class="settings-row-title">New recovery codes</div>
+            <p class="settings-helper-note">These replace your previous recovery codes immediately.</p>
+            <div id="mfaRegeneratedCodes" class="mfa-recovery-codes"></div>
+          </div>
+
+          <p id="mfaMessage" class="settings-inline-message"></p>
+        </div>
       </section>
 
       <section class="danger-card" id="settings-danger">
@@ -303,14 +373,14 @@
             <div class="danger-name" data-i18n="settings_delete_business_data_title">Delete business data</div>
             <div class="danger-desc" data-i18n="settings_delete_business_data_desc">Removes all transactions, receipts, and mileage records. Your account and settings are kept.</div>
           </div>
-          <button type="button" id="deleteMyDataBtn" class="danger-outline-btn" data-i18n="privacy_delete_button">Delete data…</button>
+          <button type="button" id="deleteMyDataBtn" class="danger-outline-btn" data-i18n="privacy_delete_button">Delete dataâ€¦</button>
         </div>
         <div class="danger-row">
           <div class="danger-copy">
             <div class="danger-name" data-i18n="settings_delete_account_title">Delete account permanently</div>
             <div class="danger-desc" data-i18n="settings_delete_account_desc">Permanently removes your account and all associated data. This cannot be undone.</div>
           </div>
-          <button id="deleteAccountTrigger" type="button" class="danger-outline-btn" data-i18n="settings_delete_account_button">Delete account…</button>
+          <button id="deleteAccountTrigger" type="button" class="danger-outline-btn" data-i18n="settings_delete_account_button">Delete accountâ€¦</button>
         </div>
       </section>
     </main>
@@ -355,5 +425,6 @@
   <script src="../js/settings.js?v=20260405c"></script>
 </body>
 </html>
+
 
 

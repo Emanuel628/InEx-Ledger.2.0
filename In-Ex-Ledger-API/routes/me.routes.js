@@ -11,7 +11,7 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
-      `SELECT id, email, role, email_verified, full_name, display_name, created_at
+      `SELECT id, email, role, email_verified, mfa_enabled, full_name, display_name, created_at
          FROM users
         WHERE id = $1
         LIMIT 1`,
