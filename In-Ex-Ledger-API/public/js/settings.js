@@ -20,6 +20,7 @@ const SETTINGS_PASSWORD_RULES = {
   uppercase: (value) => /[A-Z]/.test(value),
   special: (value) => /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)
 };
+const CA_PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"];
 
 let privacySettings = {
   dataSharingOptOut: false,
@@ -30,6 +31,11 @@ let toastTimer = null;
 let dangerAction = null;
 let preferenceBaseline = null;
 let pendingPreferences = null;
+let businessSettingsState = {
+  region: "US",
+  language: "en",
+  province: ""
+};
 
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
@@ -106,6 +112,8 @@ function initBusinessProfileForm() {
 
 async function initPreferences() {
   const regionSelect = document.getElementById("regionSelectSettings");
+  const provinceSelect = document.getElementById("provinceSelectSettings");
+  const provinceRow = document.getElementById("settingsProvinceRow");
   const languageSelect = document.getElementById("languageSelectSettings");
   const darkModeToggle = document.getElementById("darkModeToggle");
   const distanceSelect = document.getElementById("distanceSelect");
@@ -116,16 +124,27 @@ async function initPreferences() {
   const saveButton = document.getElementById("settingsSavePreferences");
   const cancelButton = document.getElementById("settingsCancelChanges");
 
+  businessSettingsState = await loadBusinessSettings();
+
   const buildPreferenceState = () => ({
-    region: typeof getCurrentRegion === "function" ? getCurrentRegion() : (localStorage.getItem("lb_region") || "us"),
-    language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en",
+    region: normalizeSettingsRegion(
+      businessSettingsState.region || (typeof getCurrentRegion === "function" ? getCurrentRegion() : (localStorage.getItem("lb_region") || "us"))
+    ),
+    province: normalizeProvinceCode(businessSettingsState.province || ""),
+    language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : businessSettingsState.language || "en",
     theme: resolveSavedTheme(),
     distance: localStorage.getItem("lb_unit_metric") === "true" ? "km" : "mi",
     optOutAnalytics: !!privacySettings.dataSharingOptOut
   });
 
+  const syncProvinceVisibility = (region) => {
+    if (!provinceRow) return;
+    provinceRow.classList.toggle("hidden", region !== "ca");
+  };
+
   const syncPreferenceControls = (state) => {
     if (regionSelect) regionSelect.value = state.region;
+    if (provinceSelect) provinceSelect.value = state.province || "";
     if (languageSelect) {
       if (typeof populateLanguageOptions === "function") {
         populateLanguageOptions(languageSelect);
@@ -135,6 +154,7 @@ async function initPreferences() {
     if (darkModeToggle) darkModeToggle.checked = state.theme === "dark";
     if (distanceSelect) distanceSelect.value = state.distance;
     if (optOutToggle) optOutToggle.checked = !!state.optOutAnalytics;
+    syncProvinceVisibility(state.region);
   };
 
   const hasPendingPreferenceChanges = () => {
@@ -154,17 +174,26 @@ async function initPreferences() {
   const updatePendingPreferences = () => {
     if (!pendingPreferences) return;
     pendingPreferences = {
-      region: regionSelect ? regionSelect.value : pendingPreferences.region,
+      region: regionSelect ? normalizeSettingsRegion(regionSelect.value) : pendingPreferences.region,
+      province:
+        regionSelect && normalizeSettingsRegion(regionSelect.value) === "ca"
+          ? normalizeProvinceCode(provinceSelect?.value || pendingPreferences.province)
+          : "",
       language: languageSelect ? languageSelect.value : pendingPreferences.language,
       theme: darkModeToggle?.checked ? "dark" : "light",
       distance: distanceSelect ? distanceSelect.value : pendingPreferences.distance,
       optOutAnalytics: !!optOutToggle?.checked
     };
+    syncProvinceVisibility(pendingPreferences.region);
     updateSaveBar();
   };
 
   if (regionSelect) {
     regionSelect.addEventListener("change", updatePendingPreferences);
+  }
+
+  if (provinceSelect) {
+    provinceSelect.addEventListener("change", updatePendingPreferences);
   }
 
   if (languageSelect) {
@@ -215,6 +244,35 @@ async function initPreferences() {
     }
 
     const nextPreferences = { ...pendingPreferences };
+    if (nextPreferences.region === "ca" && !nextPreferences.province) {
+      showSettingsToast("Select a Canadian province or territory before saving.");
+      provinceSelect?.focus();
+      return;
+    }
+
+    const businessSettingsChanged =
+      !preferenceBaseline ||
+      preferenceBaseline.region !== nextPreferences.region ||
+      preferenceBaseline.language !== nextPreferences.language ||
+      preferenceBaseline.province !== nextPreferences.province;
+
+    if (businessSettingsChanged) {
+      const businessSaveOk = await saveBusinessSettings({
+        region: nextPreferences.region.toUpperCase(),
+        language: nextPreferences.language,
+        province: nextPreferences.region === "ca" ? nextPreferences.province : null
+      });
+      if (!businessSaveOk) {
+        showSettingsToast("Unable to save region settings");
+        return;
+      }
+
+      businessSettingsState = {
+        region: nextPreferences.region.toUpperCase(),
+        language: nextPreferences.language,
+        province: nextPreferences.region === "ca" ? nextPreferences.province : ""
+      };
+    }
 
     if (typeof setCurrentRegion === "function") {
       setCurrentRegion(nextPreferences.region);
@@ -261,12 +319,83 @@ async function initPreferences() {
 function refreshSettingsLocalizedState() {
   const consentStatus = document.getElementById("consentStatus");
   const languageSelect = document.getElementById("languageSelectSettings");
+  const regionSelect = document.getElementById("regionSelectSettings");
+  const provinceSelect = document.getElementById("provinceSelectSettings");
+  const provinceRow = document.getElementById("settingsProvinceRow");
   if (consentStatus) {
     consentStatus.textContent = privacySettings.consentGiven ? t("status_yes") : t("status_no");
   }
   if (languageSelect && typeof populateLanguageOptions === "function") {
     populateLanguageOptions(languageSelect);
     languageSelect.value = pendingPreferences?.language || preferenceBaseline?.language || getCurrentLanguage();
+  }
+  if (regionSelect) {
+    regionSelect.value = pendingPreferences?.region || preferenceBaseline?.region || normalizeSettingsRegion(businessSettingsState.region);
+  }
+  if (provinceSelect) {
+    provinceSelect.value = pendingPreferences?.province || preferenceBaseline?.province || normalizeProvinceCode(businessSettingsState.province);
+  }
+  if (provinceRow) {
+    provinceRow.classList.toggle(
+      "hidden",
+      (pendingPreferences?.region || preferenceBaseline?.region || normalizeSettingsRegion(businessSettingsState.region)) !== "ca"
+    );
+  }
+}
+
+function normalizeSettingsRegion(value) {
+  return String(value || "").toLowerCase() === "ca" ? "ca" : "us";
+}
+
+function normalizeProvinceCode(value) {
+  const code = String(value || "").toUpperCase();
+  return CA_PROVINCES.includes(code) ? code : "";
+}
+
+async function loadBusinessSettings() {
+  try {
+    const response = await apiFetch("/api/business");
+    if (!response || !response.ok) {
+      return {
+        region: String(localStorage.getItem("region") || localStorage.getItem("lb_region") || "US").toUpperCase(),
+        language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en",
+        province: ""
+      };
+    }
+
+    const business = await response.json();
+    return {
+      region: String(business?.region || "US").toUpperCase(),
+      language: String(business?.language || (typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en")).toLowerCase(),
+      province: normalizeProvinceCode(business?.province || "")
+    };
+  } catch (error) {
+    console.error("Failed to load business settings", error);
+    return {
+      region: String(localStorage.getItem("region") || localStorage.getItem("lb_region") || "US").toUpperCase(),
+      language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en",
+      province: ""
+    };
+  }
+}
+
+async function saveBusinessSettings({ region, language, province }) {
+  try {
+    const response = await apiFetch("/api/business", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        region,
+        language,
+        province
+      })
+    });
+    return !!(response && response.ok);
+  } catch (error) {
+    console.error("Failed to save business settings", error);
+    return false;
   }
 }
 

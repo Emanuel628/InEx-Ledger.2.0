@@ -51,7 +51,11 @@ router.put("/", async (req, res) => {
            region = COALESCE($2, region),
            language = COALESCE($3, language),
            fiscal_year_start = COALESCE($4, fiscal_year_start),
-           province = COALESCE($5, province)
+           province = CASE
+             WHEN COALESCE($2, region) = 'US' THEN NULL
+             WHEN $5 IS NOT NULL THEN $5
+             ELSE province
+           END
        WHERE id = $6
        RETURNING id, name, region, language, fiscal_year_start, province, created_at`,
       [name?.trim() || null, region || null, language || null,

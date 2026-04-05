@@ -922,6 +922,18 @@ body {
   gap: 16px;
 }
 
+.settings-row.hidden {
+  display: none;
+}
+
+.settings-helper-note {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink3);
+  max-width: 420px;
+}
+
 .settings-save-bar {
   position: sticky;
   bottom: 20px;
