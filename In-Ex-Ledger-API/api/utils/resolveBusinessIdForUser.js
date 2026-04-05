@@ -102,6 +102,7 @@ async function listBusinessesForUser(userId) {
     `SELECT b.id,
             b.name,
             b.region,
+            b.province,
             b.language,
             b.created_at,
             (u.active_business_id = b.id) AS is_active
@@ -117,6 +118,7 @@ async function listBusinessesForUser(userId) {
     id: row.id,
     name: row.name || "",
     region: row.region || "US",
+    province: row.province || "",
     language: row.language || "en",
     created_at: row.created_at || "",
     is_active: row.is_active === true

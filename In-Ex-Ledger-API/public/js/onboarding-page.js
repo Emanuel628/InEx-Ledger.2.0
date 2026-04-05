@@ -1,6 +1,7 @@
 let onboardingForm = null;
 let onboardingMessage = null;
 let onboardingSubmitting = false;
+const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 
 document.addEventListener("DOMContentLoaded", async () => {
   const valid = await requireValidSessionOrRedirect();
@@ -23,6 +24,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   hydrateOnboardingDefaults(profile);
+  document.getElementById("onboardingRegion")?.addEventListener("change", syncProvinceField);
   onboardingForm.addEventListener("submit", handleOnboardingSubmit);
 });
 
@@ -47,12 +49,16 @@ function hydrateOnboardingDefaults(profile = {}) {
     onboardingData.business_type || business.business_type || "sole_proprietor";
   document.getElementById("onboardingRegion").value =
     onboardingData.region || business.region || "US";
+  document.getElementById("onboardingProvince").value =
+    onboardingData.province || business.province || "";
   document.getElementById("onboardingStarterAccountType").value =
     onboardingData.starter_account_type || "checking";
   document.getElementById("onboardingStarterAccountName").value =
     onboardingData.starter_account_name || "Business Checking";
   document.getElementById("onboardingStartFocus").value =
     onboardingData.start_focus || "transactions";
+
+  syncProvinceField();
 }
 
 async function handleOnboardingSubmit(event) {
@@ -66,11 +72,20 @@ async function handleOnboardingSubmit(event) {
     business_name: document.getElementById("onboardingBusinessName")?.value.trim() || "",
     business_type: document.getElementById("onboardingBusinessType")?.value || "",
     region: document.getElementById("onboardingRegion")?.value || "US",
+    province: document.getElementById("onboardingProvince")?.value || "",
     language: document.getElementById("onboardingLanguage")?.value || "en",
     starter_account_type: document.getElementById("onboardingStarterAccountType")?.value || "",
     starter_account_name: document.getElementById("onboardingStarterAccountName")?.value.trim() || "",
     start_focus: document.getElementById("onboardingStartFocus")?.value || "transactions"
   };
+
+  if (payload.region !== "CA") {
+    payload.province = "";
+  }
+  if (payload.region === "CA" && !CA_PROVINCES.has(payload.province)) {
+    setOnboardingMessage("Choose your province before continuing.");
+    return;
+  }
 
   setOnboardingMessage("");
   onboardingSubmitting = true;
@@ -113,4 +128,21 @@ function setOnboardingMessage(message = "") {
   }
   onboardingMessage.textContent = message;
   onboardingMessage.hidden = !message;
+}
+
+function syncProvinceField() {
+  const regionSelect = document.getElementById("onboardingRegion");
+  const provinceField = document.getElementById("onboardingProvinceField");
+  const provinceSelect = document.getElementById("onboardingProvince");
+  const isCanada = regionSelect?.value === "CA";
+
+  if (!provinceField || !provinceSelect) {
+    return;
+  }
+
+  provinceField.hidden = !isCanada;
+  provinceSelect.required = isCanada;
+  if (!isCanada) {
+    provinceSelect.value = "";
+  }
 }

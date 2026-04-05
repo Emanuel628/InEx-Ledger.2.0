@@ -13,6 +13,7 @@ const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const VALID_BUSINESS_TYPES = new Set(["sole_proprietor", "llc", "s_corp", "partnership"]);
 const VALID_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash", "loan"]);
 const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
+const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const REFRESH_TOKEN_COOKIE = "refresh_token";
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -96,6 +97,7 @@ router.put("/onboarding", requireAuth, async (req, res) => {
   const businessName = String(req.body?.business_name || "").trim();
   const businessType = String(req.body?.business_type || "").trim();
   const region = String(req.body?.region || "").trim().toUpperCase();
+  const province = String(req.body?.province || "").trim().toUpperCase();
   const language = String(req.body?.language || "").trim();
   const starterAccountType = String(req.body?.starter_account_type || "").trim();
   const starterAccountName = String(req.body?.starter_account_name || "").trim();
@@ -112,6 +114,9 @@ router.put("/onboarding", requireAuth, async (req, res) => {
   }
   if (!VALID_LANGUAGES.has(language)) {
     return res.status(400).json({ error: "Choose a valid language." });
+  }
+  if (region === "CA" && !CA_PROVINCES.has(province)) {
+    return res.status(400).json({ error: "Choose a valid province." });
   }
   if (!VALID_ACCOUNT_TYPES.has(starterAccountType)) {
     return res.status(400).json({ error: "Choose a starter account type." });
@@ -131,9 +136,13 @@ router.put("/onboarding", requireAuth, async (req, res) => {
           SET name = $1,
               business_type = $2,
               region = $3,
-              language = $4
-        WHERE id = $5`,
-      [businessName, businessType, region, language, businessId]
+              language = $4,
+              province = CASE
+                WHEN $3 = 'CA' THEN $5
+                ELSE NULL
+              END
+        WHERE id = $6`,
+      [businessName, businessType, region, language, province || null, businessId]
     );
 
     const accountCheck = await pool.query(
@@ -154,6 +163,7 @@ router.put("/onboarding", requireAuth, async (req, res) => {
       business_name: businessName,
       business_type: businessType,
       region,
+      province: region === "CA" ? province : "",
       language,
       starter_account_type: starterAccountType,
       starter_account_name: starterAccountName,
