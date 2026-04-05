@@ -96,7 +96,7 @@ async function updateBusinessRow(businessId, payload) {
                   fiscal_year_start = COALESCE($4, fiscal_year_start),
                   province = CASE
                     WHEN COALESCE($2, region) = 'US' THEN NULL
-                    WHEN $5 IS NOT NULL THEN $5
+                    WHEN $5::text IS NOT NULL THEN $5::text
                     ELSE province
                   END,
                   business_type = COALESCE($6, business_type),
@@ -125,7 +125,7 @@ async function updateBusinessRow(businessId, payload) {
                   fiscal_year_start = COALESCE($4, fiscal_year_start),
                   province = CASE
                     WHEN COALESCE($2, region) = 'US' THEN NULL
-                    WHEN $5 IS NOT NULL THEN $5
+                    WHEN $5::text IS NOT NULL THEN $5::text
                     ELSE province
                   END
               WHERE id = $6
