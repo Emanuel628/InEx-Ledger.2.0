@@ -46,7 +46,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
   initSettingsNav();
-  wireSignOutButtons();
   await initBusinessProfileForm();
   await initPreferences();
   initSecurityForm();
@@ -63,16 +62,6 @@ function resolveSavedTheme() {
     return SETTINGS_DEFAULT_THEME;
   }
   return localStorage.getItem("lb_theme") || SETTINGS_DEFAULT_THEME;
-}
-
-function wireSignOutButtons() {
-  document.querySelectorAll("[data-logout]").forEach((button) => {
-    button.addEventListener("click", () => {
-      clearToken();
-      sessionStorage.clear();
-      window.location.href = "login.html";
-    });
-  });
 }
 
 function getBusinessProfile() {

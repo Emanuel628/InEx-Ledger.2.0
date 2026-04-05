@@ -9,6 +9,21 @@ router.use(requireAuth);
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
+let businessColumnsEnsured = false;
+
+async function ensureBusinessProfileColumns() {
+  if (businessColumnsEnsured) {
+    return;
+  }
+
+  await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS fiscal_year_start TEXT DEFAULT '01-01'`);
+  await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS province TEXT`);
+  await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS business_type TEXT`);
+  await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS tax_id TEXT`);
+  await pool.query(`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS address TEXT`);
+
+  businessColumnsEnsured = true;
+}
 
 async function fetchBusinessRow(businessId) {
   const queries = [
@@ -43,6 +58,26 @@ async function fetchBusinessRow(businessId) {
         : row;
     } catch (err) {
       if (err?.code !== "42703") throw err;
+
+      try {
+        await ensureBusinessProfileColumns();
+        const result = await pool.query(queries[0], [businessId]);
+        const row = result.rows[0];
+        return row
+          ? {
+              fiscal_year_start: null,
+              province: null,
+              business_type: null,
+              tax_id: null,
+              address: null,
+              ...row
+            }
+          : row;
+      } catch (ensureErr) {
+        if (ensureErr?.code !== "42703") {
+          console.warn("Failed to auto-heal business profile columns on read:", ensureErr.message);
+        }
+      }
     }
   }
 
@@ -51,6 +86,7 @@ async function fetchBusinessRow(businessId) {
 
 async function updateBusinessRow(businessId, payload) {
   const { name, region, language, fiscal_year_start, province, business_type, tax_id, address } = payload;
+  const requiresProvincePersistence = region === "CA" && !!province;
   const attempts = [
     {
       query: `UPDATE businesses
@@ -139,7 +175,7 @@ async function updateBusinessRow(businessId, payload) {
     try {
       const result = await pool.query(attempt.query, attempt.params);
       const row = result.rows[0];
-      return row
+      const normalizedRow = row
         ? {
             fiscal_year_start: null,
             province: null,
@@ -149,8 +185,40 @@ async function updateBusinessRow(businessId, payload) {
             ...row
           }
         : row;
+
+      if (requiresProvincePersistence && normalizedRow?.province !== province) {
+        throw new Error("Province could not be persisted with the current business schema.");
+      }
+
+      return normalizedRow;
     } catch (err) {
       if (err?.code !== "42703") throw err;
+
+      try {
+        await ensureBusinessProfileColumns();
+        const retryResult = await pool.query(attempts[0].query, attempts[0].params);
+        const row = retryResult.rows[0];
+        const normalizedRow = row
+          ? {
+              fiscal_year_start: null,
+              province: null,
+              business_type: null,
+              tax_id: null,
+              address: null,
+              ...row
+            }
+          : row;
+
+        if (requiresProvincePersistence && normalizedRow?.province !== province) {
+          throw new Error("Province could not be persisted after schema repair.");
+        }
+
+        return normalizedRow;
+      } catch (ensureErr) {
+        if (ensureErr?.code !== "42703") {
+          console.warn("Failed to auto-heal business profile columns on write:", ensureErr.message);
+        }
+      }
     }
   }
 
@@ -194,21 +262,26 @@ router.put("/", async (req, res) => {
   if (province && !CA_PROVINCES.has(province)) {
     return res.status(400).json({ error: "Invalid Canadian province code" });
   }
+  if (region === "CA" && !province) {
+    return res.status(400).json({ error: "Province is required for Canadian businesses." });
+  }
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    res.json(
-      await updateBusinessRow(businessId, {
-        name,
-        region,
-        language,
-        fiscal_year_start,
-        province,
-        business_type,
-        tax_id,
-        address
-      })
-    );
+    const updated = await updateBusinessRow(businessId, {
+      name,
+      region,
+      language,
+      fiscal_year_start,
+      province,
+      business_type,
+      tax_id,
+      address
+    });
+    if (region === "CA" && province && updated?.province !== province) {
+      return res.status(500).json({ error: "Province could not be saved. Apply the business profile migrations and try again." });
+    }
+    res.json(updated);
   } catch (err) {
     console.error("PUT /business error:", err.message);
     res.status(500).json({ error: "Failed to update business profile." });

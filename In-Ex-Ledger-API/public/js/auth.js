@@ -14,6 +14,7 @@ const TRIAL_EXPIRED_KEY = "luna_trial_expired";
 const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const SUBSCRIPTION_KEY = "lb_subscription";
 const LOGIN_PAGE = "/html/login.html";
+const ACCOUNT_MENU_STYLE_ID = "luna-account-menu-style";
 
 if (!window.API_BASE) {
   window.API_BASE = "";
@@ -126,6 +127,8 @@ function updateAuthenticatedChrome(profile = {}) {
     node.textContent = initials;
     node.setAttribute("aria-label", `${displayName} initials`);
   });
+
+  initAccountMenus(displayName);
 }
 
 function getToken() {
@@ -316,6 +319,171 @@ async function signOut() {
   window.location.href = "landing.html";
 }
 
+function initAccountMenus(displayName = "User") {
+  ensureAccountMenuStyles();
+
+  document.querySelectorAll(".user-pill").forEach((pill, index) => {
+    if (pill.dataset.accountMenuReady === "true") {
+      const menuLabel = pill.querySelector(".account-menu-label");
+      if (menuLabel) {
+        menuLabel.textContent = displayName;
+      }
+      return;
+    }
+
+    pill.dataset.accountMenuReady = "true";
+    pill.classList.add("account-menu-trigger");
+    pill.setAttribute("role", "button");
+    pill.setAttribute("tabindex", "0");
+    pill.setAttribute("aria-haspopup", "menu");
+    pill.setAttribute("aria-expanded", "false");
+
+    const menuId = `accountMenu-${index + 1}`;
+    pill.setAttribute("aria-controls", menuId);
+
+    const menu = document.createElement("div");
+    menu.className = "account-menu hidden";
+    menu.id = menuId;
+    menu.setAttribute("role", "menu");
+    menu.innerHTML = `
+      <button type="button" class="account-menu-item" data-account-menu-action="logout" role="menuitem">
+        Sign out
+      </button>
+      <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="add-business" role="menuitem">
+        <span class="account-menu-label">Add another business</span>
+        <span class="account-menu-hint">Coming soon</span>
+      </button>
+    `;
+
+    pill.appendChild(menu);
+
+    const setOpenState = (isOpen) => {
+      menu.classList.toggle("hidden", !isOpen);
+      pill.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    };
+
+    const toggleMenu = () => {
+      const isHidden = menu.classList.contains("hidden");
+      closeAllAccountMenus();
+      setOpenState(isHidden);
+    };
+
+    pill.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleMenu();
+    });
+
+    pill.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggleMenu();
+      }
+      if (event.key === "Escape") {
+        setOpenState(false);
+      }
+    });
+
+    menu.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const action = event.target.closest("[data-account-menu-action]")?.getAttribute("data-account-menu-action");
+      if (!action) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      setOpenState(false);
+
+      if (action === "logout") {
+        await signOut();
+        return;
+      }
+
+      if (action === "add-business") {
+        showAccountMenuNotice("Multi-business is coming next. The switcher and paid prompt are not live yet.");
+      }
+    });
+  });
+}
+
+function closeAllAccountMenus() {
+  document.querySelectorAll(".account-menu").forEach((menu) => {
+    menu.classList.add("hidden");
+  });
+  document.querySelectorAll(".user-pill[aria-expanded]").forEach((pill) => {
+    pill.setAttribute("aria-expanded", "false");
+  });
+}
+
+function ensureAccountMenuStyles() {
+  if (document.getElementById(ACCOUNT_MENU_STYLE_ID)) {
+    return;
+  }
+
+  const style = document.createElement("style");
+  style.id = ACCOUNT_MENU_STYLE_ID;
+  style.textContent = `
+    .account-menu-trigger {
+      position: relative;
+      cursor: pointer;
+    }
+    .account-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      min-width: 220px;
+      padding: 8px;
+      border-radius: 12px;
+      background: var(--surface);
+      border: 0.5px solid var(--border);
+      box-shadow: 0 18px 40px rgba(15, 25, 35, 0.18);
+      z-index: 120;
+    }
+    .account-menu.hidden {
+      display: none;
+    }
+    .account-menu-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--ink);
+      font-size: 13px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .account-menu-item:hover {
+      background: var(--surface2);
+    }
+    .account-menu-secondary {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .account-menu-label {
+      font-weight: 500;
+    }
+    .account-menu-hint {
+      font-size: 11px;
+      color: var(--ink3);
+    }
+  `;
+
+  document.head.appendChild(style);
+}
+
+function showAccountMenuNotice(message) {
+  if (typeof showSettingsToast === "function") {
+    showSettingsToast(message);
+    return;
+  }
+  window.alert(message);
+}
+
 function effectiveTier() {
   const tier = localStorage.getItem(TIER_KEY);
 
@@ -360,5 +528,18 @@ document.addEventListener("click", (e) => {
   } else {
     clearToken();
     window.location.href = "landing.html";
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (event.target.closest(".user-pill") || event.target.closest(".account-menu")) {
+    return;
+  }
+  closeAllAccountMenus();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeAllAccountMenus();
   }
 });
