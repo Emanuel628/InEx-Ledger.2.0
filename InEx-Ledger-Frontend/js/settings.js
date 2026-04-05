@@ -6,7 +6,6 @@ const REGION_DISPLAY = {
 const SETTINGS_DEFAULT_THEME = typeof DEFAULT_THEME !== "undefined" ? DEFAULT_THEME : "light";
 const SETTINGS_THEME_VERSION = typeof THEME_VERSION !== "undefined" ? THEME_VERSION : "2";
 const BUSINESS_PROFILE_KEY = "lb_business_profile";
-const BUSINESS_SETTINGS_KEY = "lb_business_settings";
 const SETTINGS_TOAST_MS = 3000;
 const SETTINGS_DELETE_DATA_KEYS = [
   "lb_transactions",
@@ -198,7 +197,7 @@ async function initPreferences() {
 
   const buildPreferenceState = () => ({
     region: normalizeSettingsRegion(
-      businessSettingsState.region || (typeof getCurrentRegion === "function" ? getCurrentRegion() : (localStorage.getItem("lb_region") || "us"))
+      businessSettingsState.region || (typeof getCurrentRegion === "function" ? getCurrentRegion() : "us")
     ),
     province: normalizeProvinceCode(businessSettingsState.province || ""),
     language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : businessSettingsState.language || "en",
@@ -350,20 +349,21 @@ async function initPreferences() {
         return;
       }
 
-      businessSettingsState = {
+      businessSettingsState = businessSaveResult.settings || normalizeBusinessSettings({
         region: nextPreferences.region.toUpperCase(),
         language: nextPreferences.language,
         province: nextPreferences.region === "ca" ? nextPreferences.province : ""
-      };
+      });
     }
 
     if (typeof setCurrentRegion === "function") {
-      setCurrentRegion(nextPreferences.region);
+      applyCurrentRegionRuntime(nextPreferences.region);
     } else {
-      localStorage.setItem("lb_region", nextPreferences.region);
       window.LUNA_REGION = nextPreferences.region;
+      if (typeof window !== "undefined" && typeof CustomEvent === "function") {
+        window.dispatchEvent(new CustomEvent("lunaRegionChanged", { detail: nextPreferences.region }));
+      }
     }
-    localStorage.setItem("region", nextPreferences.region === "ca" ? "CA" : "US");
 
     if (typeof setCurrentLanguage === "function") {
       setCurrentLanguage(nextPreferences.language);
@@ -493,6 +493,18 @@ function updateProvinceRateNote(region, province) {
   note.textContent = resolveEffectiveTaxProfile(region, province).label;
 }
 
+function applyCurrentRegionRuntime(region) {
+  const normalized = normalizeSettingsRegion(region);
+  window.LUNA_REGION = normalized;
+  if (typeof applyTranslations === "function") {
+    applyTranslations(typeof getCurrentLanguage === "function" ? getCurrentLanguage() : undefined);
+  }
+  if (typeof window !== "undefined" && typeof CustomEvent === "function") {
+    window.dispatchEvent(new CustomEvent("lunaRegionChanged", { detail: normalized }));
+  }
+  return normalized;
+}
+
 function normalizeSettingsLanguage(value) {
   const language = String(value || "").toLowerCase();
   return ["en", "es", "fr"].includes(language) ? language : "en";
@@ -512,55 +524,36 @@ function interpolateTranslatedMessage(key, values) {
   return String(template).replace(/\{(\w+)\}/g, (_, token) => values?.[token] ?? "");
 }
 
-function readBusinessSettingsFallback() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(BUSINESS_SETTINGS_KEY) || "null") || {};
-    return {
-      region: String(stored.region || localStorage.getItem("region") || localStorage.getItem("lb_region") || "US").toUpperCase(),
-      language: String(stored.language || (typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en")).toLowerCase(),
-      province: normalizeProvinceCode(stored.province || "")
-    };
-  } catch {
-    return {
-      region: String(localStorage.getItem("region") || localStorage.getItem("lb_region") || "US").toUpperCase(),
-      language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en",
-      province: ""
-    };
-  }
+function normalizeBusinessSettings(business) {
+  return {
+    region: String(business?.region || "US").toUpperCase() === "CA" ? "CA" : "US",
+    language: normalizeSettingsLanguage(
+      business?.language || (typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en")
+    ),
+    province: normalizeProvinceCode(business?.province || "")
+  };
 }
 
-function writeBusinessSettingsFallback({ region, language, province }) {
-  const normalizedRegion = String(region || "US").toUpperCase() === "CA" ? "CA" : "US";
-  const normalizedLanguage = String(language || "en").toLowerCase();
-  const normalizedProvince = normalizedRegion === "CA" ? normalizeProvinceCode(province || "") : "";
-  localStorage.setItem(
-    BUSINESS_SETTINGS_KEY,
-    JSON.stringify({
-      region: normalizedRegion,
-      language: normalizedLanguage,
-      province: normalizedProvince
-    })
-  );
+function getDefaultBusinessSettings() {
+  return normalizeBusinessSettings({
+    region: window.LUNA_REGION || "US",
+    language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en",
+    province: ""
+  });
 }
 
 async function loadBusinessSettings() {
   try {
     const response = await apiFetch("/api/business");
     if (!response || !response.ok) {
-      return readBusinessSettingsFallback();
+      return getDefaultBusinessSettings();
     }
 
     const business = await response.json();
-    const resolved = {
-      region: String(business?.region || "US").toUpperCase(),
-      language: String(business?.language || (typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en")).toLowerCase(),
-      province: normalizeProvinceCode(business?.province || "")
-    };
-    writeBusinessSettingsFallback(resolved);
-    return resolved;
+    return normalizeBusinessSettings(business);
   } catch (error) {
     console.error("Failed to load business settings", error);
-    return readBusinessSettingsFallback();
+    return getDefaultBusinessSettings();
   }
 }
 
@@ -586,8 +579,11 @@ async function saveBusinessSettings({ region, language, province }) {
       };
     }
 
-    writeBusinessSettingsFallback({ region, language, province });
-    return { ok: true };
+    const business = await response.json().catch(() => null);
+    return {
+      ok: true,
+      settings: normalizeBusinessSettings(business || { region, language, province })
+    };
   } catch (error) {
     console.error("Failed to save business settings", error);
     return {
