@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const fs = require('fs');
 const path = require('path');
 const routes = require('./routes/index.js');
 const cookieParser = require('cookie-parser');
@@ -11,15 +12,25 @@ const { initDatabase } = require('./db.js');
 const app = express();
 const publicDir = path.join(process.cwd(), 'public');
 const htmlDir = path.join(publicDir, 'html');
+const htmlPageNames = fs.readdirSync(htmlDir)
+  .filter((name) => name.toLowerCase().endsWith('.html'))
+  .map((name) => path.basename(name, '.html'));
 const LEGACY_HTML_REDIRECTS = new Map([
-  ['/landing.html', '/html/landing.html'],
-  ['/html/account-profile.html', '/html/settings.html#settings-business'],
-  ['/html/business-profile.html', '/html/settings.html#settings-business'],
-  ['/html/fiscal-settings.html', '/html/settings.html#settings-business'],
-  ['/html/region-settings.html', '/html/settings.html#settings-preferences'],
-  ['/html/security.html', '/html/settings.html#settings-security'],
-  ['/html/sessions.html', '/html/settings.html#settings-security'],
-  ['/html/mfa.html', '/html/settings.html#settings-security']
+  ['/landing.html', '/'],
+  ['/html/account-profile.html', '/settings#settings-business'],
+  ['/account-profile.html', '/settings#settings-business'],
+  ['/html/business-profile.html', '/settings#settings-business'],
+  ['/business-profile.html', '/settings#settings-business'],
+  ['/html/fiscal-settings.html', '/settings#settings-business'],
+  ['/fiscal-settings.html', '/settings#settings-business'],
+  ['/html/region-settings.html', '/settings#settings-preferences'],
+  ['/region-settings.html', '/settings#settings-preferences'],
+  ['/html/security.html', '/settings#settings-security'],
+  ['/security.html', '/settings#settings-security'],
+  ['/html/sessions.html', '/settings#settings-security'],
+  ['/sessions.html', '/settings#settings-security'],
+  ['/html/mfa.html', '/settings#settings-security'],
+  ['/mfa.html', '/settings#settings-security']
 ]);
 
 function setNoCacheHtmlHeaders(res, filePath) {
@@ -29,6 +40,17 @@ function setNoCacheHtmlHeaders(res, filePath) {
   res.setHeader('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+}
+
+function getCanonicalPagePath(pageName) {
+  return pageName === 'landing' ? '/' : `/${pageName}`;
+}
+
+function sendCanonicalPage(pageName, req, res) {
+  const fileName = `${pageName}.html`;
+  const filePath = path.join(htmlDir, fileName);
+  setNoCacheHtmlHeaders(res, filePath);
+  res.sendFile(filePath);
 }
 
 /* =========================================================
@@ -85,6 +107,34 @@ for (const [legacyPath, nextPath] of LEGACY_HTML_REDIRECTS.entries()) {
     res.redirect(302, nextPath);
   });
 }
+for (const pageName of htmlPageNames) {
+  const canonicalPath = getCanonicalPagePath(pageName);
+  if (pageName === 'landing') {
+    app.get('/landing', (req, res) => {
+      res.redirect(301, '/');
+    });
+    app.get('/html/landing', (req, res) => {
+      res.redirect(301, '/');
+    });
+    app.get('/html/landing.html', (req, res) => {
+      res.redirect(301, '/');
+    });
+    continue;
+  }
+
+  app.get(canonicalPath, (req, res) => {
+    sendCanonicalPage(pageName, req, res);
+  });
+  app.get(`/html/${pageName}`, (req, res) => {
+    res.redirect(301, canonicalPath);
+  });
+  app.get(`/html/${pageName}.html`, (req, res) => {
+    res.redirect(301, canonicalPath);
+  });
+  app.get(`/${pageName}.html`, (req, res) => {
+    res.redirect(301, canonicalPath);
+  });
+}
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use('/html', express.static(htmlDir, {
   setHeaders: setNoCacheHtmlHeaders
@@ -118,8 +168,7 @@ app.get('/favicon.svg', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-  setNoCacheHtmlHeaders(res, path.join(htmlDir, 'landing.html'));
-  res.sendFile(path.join(htmlDir, 'landing.html'));
+  sendCanonicalPage('landing', req, res);
 });
 
 /* =========================================================

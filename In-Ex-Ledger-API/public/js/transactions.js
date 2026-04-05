@@ -126,7 +126,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const upgradeButton = document.querySelector("[data-upgrade]");
   if (upgradeButton) {
     upgradeButton.addEventListener("click", () => {
-      window.location.href = "subscription.html";
+      window.location.href = "subscription";
     });
   }
 });
@@ -646,8 +646,8 @@ function initSidebarTypeFilter() {
 
       const nextUrl =
         transactionFilters.type === "all"
-          ? "transactions.html"
-          : `transactions.html?type=${transactionFilters.type}`;
+          ? "transactions"
+          : `transactions?type=${transactionFilters.type}`;
       window.history.replaceState({}, "", nextUrl);
       syncSidebarState();
       applyFilters();

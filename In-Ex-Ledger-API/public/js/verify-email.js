@@ -103,5 +103,5 @@ async function resendVerification() {
 }
 
 function goToLogin() {
-  window.location.href = "login.html";
+  window.location.href = "login";
 }

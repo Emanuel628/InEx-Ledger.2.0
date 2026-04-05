@@ -8,7 +8,7 @@ function isTrialExpired() {
 
 function enforceTrial() {
   if (isTrialExpired()) {
-    window.location.href = "subscription.html";
+    window.location.href = "subscription";
   }
 }
 
@@ -36,7 +36,7 @@ function renderTrialBanner(containerId) {
   const updateMessage = () => {
     const formatted = formatTrialRemaining();
     container.innerHTML = `
-      <p>${formatted} <a href="subscription.html">Manage plan</a>.</p>
+      <p>${formatted} <a href="subscription">Manage plan</a>.</p>
     `;
   };
 

@@ -1,4 +1,4 @@
-﻿const RECEIPTS_TOAST_MS = 3000;
+const RECEIPTS_TOAST_MS = 3000;
 
 let receiptsToastTimer = null;
 let receiptRecords = [];
@@ -225,7 +225,7 @@ function renderTransactionCell(transactionId) {
 
   const transaction = transactionMap[transactionId];
   const label = transaction?.description || transactionId;
-  return `<a class="receipt-transaction-link" href="transactions.html">${escapeHtml(label)}</a>`;
+  return `<a class="receipt-transaction-link" href="transactions">${escapeHtml(label)}</a>`;
 }
 
 function wireReceiptLinkModal() {

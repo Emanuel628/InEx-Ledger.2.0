@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (upgradeBtn) {
       upgradeBtn.addEventListener("click", () => {
-        window.location.href = "subscription.html";
+        window.location.href = "subscription";
       });
     }
   } else {

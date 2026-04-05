@@ -2,7 +2,7 @@ requireAuthAndTier("v1");
 
 function ensureV1Filters() {
   if (effectiveTier() !== "v1") {
-    window.location.href = "upgrade.html";
+    window.location.href = "upgrade";
     return false;
   }
 

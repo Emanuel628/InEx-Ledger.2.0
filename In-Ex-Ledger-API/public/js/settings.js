@@ -1005,7 +1005,7 @@ function initDangerZone() {
       clearToken();
       showSettingsToast("Account deletion requested");
       setTimeout(() => {
-        window.location.href = "landing.html";
+        window.location.href = "/";
       }, 600);
     }
     closeModal();

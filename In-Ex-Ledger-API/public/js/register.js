@@ -78,7 +78,7 @@ async function handleRegisterSubmit(event) {
       return;
     }
     localStorage.setItem("pendingVerificationEmail", email);
-    window.location.href = "verify-email.html?email=sent";
+    window.location.href = "verify-email?email=sent";
   } catch (err) {
     console.error("Register request failed:", err);
     showRegisterError(OFFLINE_ERROR_MESSAGE);

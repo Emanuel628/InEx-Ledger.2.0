@@ -52,10 +52,16 @@ function setGlobalTheme(theme) {
 }
 
 function highlightNavigation() {
-  const path = window.location.pathname.split("/").pop() || "index.html";
+  const normalizeRoute = (value) => {
+    const raw = String(value || "").split(/[?#]/)[0];
+    const segment = raw.split("/").filter(Boolean).pop() || "landing";
+    return segment.replace(/\.html$/i, "") || "landing";
+  };
+
+  const path = normalizeRoute(window.location.pathname);
   document.querySelectorAll("nav a").forEach((link) => {
     const href = link.getAttribute("href") || "";
-    if (href.split("/").pop() === path) {
+    if (normalizeRoute(href) === path) {
       link.classList.add("nav-link-active");
     } else {
       link.classList.remove("nav-link-active");

@@ -83,7 +83,7 @@ async function handleLoginSubmit(event) {
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }
-    window.location.href = "transactions.html";
+    window.location.href = "transactions";
   } catch (err) {
     console.error("Login request failed:", err);
     showLoginError(OFFLINE_ERROR_MESSAGE);

@@ -15,7 +15,7 @@ const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const SUBSCRIPTION_KEY = "lb_subscription";
 const ACTIVE_BUSINESS_ID_KEY = "lb_active_business_id";
 const ACTIVE_BUSINESS_NAME_KEY = "lb_business_name";
-const LOGIN_PAGE = "/html/login.html";
+const LOGIN_PAGE = "/login";
 const ACCOUNT_MENU_STYLE_ID = "luna-account-menu-style";
 
 if (!window.API_BASE) {
@@ -352,7 +352,7 @@ async function redirectIfAuthenticated() {
       if (payload) {
         updateAuthenticatedChrome(payload);
       }
-      window.location.href = "transactions.html";
+      window.location.href = "/transactions";
     }
   } catch (err) {
     console.error("[AUTH] redirectIfAuthenticated failed:", err);
@@ -412,7 +412,7 @@ async function signOut() {
   } catch (err) {
     console.error("Logout error:", err);
   }
-  window.location.href = "landing.html";
+  window.location.href = "/";
 }
 
 function wireMenuTrigger(trigger, menu) {
@@ -581,7 +581,7 @@ function initAccountMenus(displayName = "User", profile = {}) {
       }
 
       if (action === "cpa-workspace") {
-        window.location.href = "/html/cpa-dashboard.html";
+        window.location.href = "/cpa-dashboard";
         return;
       }
 
@@ -1048,7 +1048,7 @@ function requireTier(minTier) {
   }
 
   if (currentIndex < requiredIndex) {
-    window.location.href = "upgrade.html";
+    window.location.href = "/upgrade";
   }
 }
 
@@ -1066,7 +1066,7 @@ document.addEventListener("click", (e) => {
     signOut();
   } else {
     clearToken();
-    window.location.href = "landing.html";
+    window.location.href = "/";
   }
 });
 

@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (!isAuthenticated()) {
     proBtn.addEventListener("click", () => {
-      window.location.href = "register.html";
+      window.location.href = "register";
     });
     starterBtn.disabled = true;
     starterBtn.textContent = "Current Plan";
