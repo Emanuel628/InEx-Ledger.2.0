@@ -23,6 +23,7 @@ const transactionFilters = {
 
 const DRAWER_OPEN_LABEL = "+ Add new";
 const DRAWER_CLOSE_LABEL = "Close";
+const txT = (key, fallback) => (typeof t === "function" ? t(key) : fallback);
 const taxHelpers = window.LUNA_TAX || {};
 const resolveEstimatedTaxProfileHelper = taxHelpers.resolveEstimatedTaxProfile || ((region, province) => ({
   region: String(region || "").toUpperCase() === "CA" ? "CA" : "US",
@@ -264,7 +265,41 @@ function syncTransactionScopeUi() {
   }
 
   if (taxContext && isAllScope && hasMixedCurrenciesInScope()) {
-    taxContext.textContent = "Tax form context: Multi-business reporting view";
+    taxContext.textContent = txT("transactions_tax_context_multi", "Tax form context: Multi-business reporting view");
+  }
+}
+
+function syncTransactionScopeUi() {
+  const isAllScope = getTransactionScope() === "all";
+  const addButtons = [document.getElementById("addTxToggle"), document.getElementById("addTxTogglePage")];
+  const recurringPanel = document.querySelector(".recurring-panel");
+  const subtitle = document.querySelector(".page-subtitle");
+  const taxContext = document.getElementById("transactionsTaxContext");
+
+  if (subtitle) {
+    subtitle.textContent = isAllScope
+      ? `${getBusinessesInScope().length || 0} ${txT("transactions_scope_businesses", "businesses")} · ${txT("transactions_scope_portfolio_view", "portfolio reporting view")}`
+      : txT("transactions_scope_active_subtitle", "Active business ledger · current reporting period");
+  }
+
+  addButtons.filter(Boolean).forEach((button) => {
+    button.disabled = isAllScope;
+    button.title = isAllScope
+      ? txT("transactions_scope_switch_to_active", "Switch to Active business to add or edit transactions.")
+      : "";
+  });
+
+  if (isAllScope) {
+    closeTransactionDrawer();
+    closeRecurringDrawer();
+  }
+
+  if (recurringPanel) {
+    recurringPanel.hidden = isAllScope;
+  }
+
+  if (taxContext && isAllScope && hasMixedCurrenciesInScope()) {
+    taxContext.textContent = txT("transactions_tax_context_multi", "Tax form context: Multi-business reporting view");
   }
 }
 
@@ -346,7 +381,7 @@ function wireTransactionForm() {
 
       if (!response || !response.ok) {
         const errorPayload = await response?.json().catch(() => null);
-        setTransactionFormMessage(errorPayload?.error || "Unable to save transaction.");
+        setTransactionFormMessage(errorPayload?.error || txT("transactions_error_save", "Unable to save transaction."));
         return;
       }
 
@@ -381,7 +416,7 @@ function wireTransactionForm() {
       closeTransactionDrawer();
     } catch (error) {
       console.error("Transaction save failed:", error);
-      setTransactionFormMessage("Unable to save transaction.");
+      setTransactionFormMessage(txT("transactions_error_save", "Unable to save transaction."));
     } finally {
       if (submitButton) {
         submitButton.disabled = false;
@@ -490,7 +525,7 @@ function openTransactionDrawer() {
     transactionToggleElement.setAttribute("aria-expanded", "true");
   }
   if (transactionPageToggleElement) {
-    transactionPageToggleElement.textContent = "Close";
+    transactionPageToggleElement.textContent = txT("common_close", "Close");
   }
   setTimeout(() => {
     document.getElementById("txType")?.focus();
@@ -508,7 +543,7 @@ function closeTransactionDrawer() {
     transactionToggleElement.setAttribute("aria-expanded", "false");
   }
   if (transactionPageToggleElement) {
-    transactionPageToggleElement.textContent = "+ Add transaction";
+    transactionPageToggleElement.textContent = txT("transactions_add_button", "+ Add transaction");
   }
   resetTransactionForm();
 }
@@ -539,7 +574,7 @@ function openRecurringDrawer() {
     return;
   }
   recurringDrawerElement.removeAttribute("hidden");
-  recurringToggleElement.textContent = "Close recurring";
+  recurringToggleElement.textContent = txT("transactions_recurring_close", "Close recurring");
   recurringToggleElement.setAttribute("aria-expanded", "true");
   setTimeout(() => {
     document.getElementById("recurringDescription")?.focus();
@@ -551,7 +586,7 @@ function closeRecurringDrawer() {
     return;
   }
   recurringDrawerElement.setAttribute("hidden", "");
-  recurringToggleElement.textContent = "+ Add recurring template";
+  recurringToggleElement.textContent = txT("transactions_recurring_add", "+ Add recurring template");
   recurringToggleElement.setAttribute("aria-expanded", "false");
   resetRecurringForm();
 }
@@ -562,13 +597,13 @@ function updateHelpText(accountHelp, categoryHelp) {
 
   if (accountHelp) {
     accountHelp.textContent = accounts.length === 0
-      ? "Create an account to record transactions."
+      ? txT("transactions_help_create_account", "Create an account to record transactions.")
       : "";
   }
 
   if (categoryHelp) {
     categoryHelp.textContent = categories.length === 0
-      ? "Add categories (income/expense) before recording activity."
+      ? txT("transactions_help_add_categories", "Add categories (income/expense) before recording activity.")
       : "";
   }
 }
@@ -711,10 +746,10 @@ function openTransactionModal(transactionId) {
   const body = document.getElementById("transactionModalBody");
   activeModalTransactionId = transactionId;
   if (title) {
-    title.textContent = "Delete this transaction?";
+    title.textContent = txT("transactions_delete_title", "Delete this transaction?");
   }
   if (body) {
-    body.textContent = `This will permanently remove "${transaction.description || "this transaction"}" from your ledger.`;
+    body.textContent = `${txT("transactions_delete_body_prefix", "This will permanently remove")} "${transaction.description || txT("transactions_delete_this", "this transaction")}" ${txT("transactions_delete_body_suffix", "from your ledger.")}`;
   }
   transactionModalElement.classList.remove("hidden");
 }
@@ -774,7 +809,7 @@ function handleEditRecurringTemplate(templateId) {
   document.getElementById("recurringClearedDefault").checked = !!template.cleared_default;
   const submitButton = document.getElementById("recurringSubmit");
   if (submitButton) {
-    submitButton.textContent = "Update recurring template";
+    submitButton.textContent = txT("transactions_recurring_update_submit", "Update recurring template");
   }
   openRecurringDrawer();
 }
@@ -843,22 +878,22 @@ async function deleteRecurringTemplate(templateId) {
 
 function validateRecurringForm(payload) {
   if (!payload.description) {
-    return "Add a description for the recurring template.";
+    return txT("transactions_recurring_validation_description", "Add a description for the recurring template.");
   }
   if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
-    return "Recurring amount must be greater than zero.";
+    return txT("transactions_recurring_validation_amount", "Recurring amount must be greater than zero.");
   }
   if (!payload.account_id) {
-    return "Select an account for the recurring template.";
+    return txT("transactions_recurring_validation_account", "Select an account for the recurring template.");
   }
   if (!payload.category_id) {
-    return "Select a category for the recurring template.";
+    return txT("transactions_recurring_validation_category", "Select a category for the recurring template.");
   }
   if (!payload.start_date) {
-    return "Choose a start date.";
+    return txT("transactions_recurring_validation_start", "Choose a start date.");
   }
   if (payload.end_date && payload.end_date < payload.start_date) {
-    return "End date must be on or after the start date.";
+    return txT("transactions_recurring_validation_end", "End date must be on or after the start date.");
   }
   return null;
 }
@@ -880,7 +915,7 @@ function resetRecurringForm() {
   document.getElementById("recurringCadence").value = "monthly";
   const submitButton = document.getElementById("recurringSubmit");
   if (submitButton) {
-    submitButton.textContent = "Save recurring template";
+    submitButton.textContent = txT("transactions_recurring_save_submit", "Save recurring template");
   }
   setRecurringFormMessage("");
 }
@@ -888,13 +923,13 @@ function resetRecurringForm() {
 async function loadRecurringTemplates() {
   const tbody = document.getElementById("recurringTableBody");
   if (tbody) {
-    tbody.innerHTML = '<tr><td colspan="6" class="placeholder">Loading recurring templates...</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="6" class="placeholder">${txT("transactions_recurring_loading", "Loading recurring templates...")}</td></tr>`;
   }
 
   try {
     const response = await apiFetch("/api/recurring");
     if (!response || !response.ok) {
-      throw new Error("Failed to load recurring templates.");
+      throw new Error(txT("transactions_recurring_error_load", "Failed to load recurring templates."));
     }
 
     const payload = await response.json().catch(() => []);
@@ -913,7 +948,7 @@ function renderRecurringAccountOptions() {
     return;
   }
   const currentValue = select.value;
-  select.innerHTML = '<option value="">Select account</option>';
+  select.innerHTML = `<option value="">${txT("transactions_select_account", "Select account")}</option>`;
   getAccounts().forEach((account) => {
     const option = document.createElement("option");
     option.value = account.id;
@@ -929,7 +964,7 @@ function renderRecurringCategoryOptions() {
     return;
   }
   const currentValue = select.value;
-  select.innerHTML = '<option value="">Select category</option>';
+  select.innerHTML = `<option value="">${txT("transactions_select_category", "Select category")}</option>`;
   getCategories().forEach((category) => {
     const option = document.createElement("option");
     option.value = category.id || category.name;
@@ -946,7 +981,7 @@ function renderRecurringTemplates() {
   }
 
   if (!recurringState.templates.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="placeholder">No recurring templates yet.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="6" class="placeholder">${txT("transactions_recurring_empty", "No recurring templates yet.")}</td></tr>`;
     return;
   }
 
@@ -954,14 +989,14 @@ function renderRecurringTemplates() {
   recurringState.templates.forEach((template) => {
     const row = document.createElement("tr");
     const activeBadge = template.active
-      ? '<span class="status-badge status-cleared">Active</span>'
-      : '<span class="status-badge status-pending">Paused</span>';
+      ? `<span class="status-badge status-cleared">${txT("transactions_recurring_active", "Active")}</span>`
+      : `<span class="status-badge status-pending">${txT("transactions_recurring_paused", "Paused")}</span>`;
 
     row.innerHTML = `
       <td>
         <div class="recurring-meta">
           <span class="recurring-primary">${template.description || "-"}</span>
-          <span class="recurring-secondary">${template.note || "No internal note"}</span>
+          <span class="recurring-secondary">${template.note || txT("transactions_recurring_no_note", "No internal note")}</span>
         </div>
       </td>
       <td>${formatRecurringCadence(template.cadence)}</td>
@@ -969,10 +1004,10 @@ function renderRecurringTemplates() {
       <td>${activeBadge}</td>
       <td class="amount-cell"><span class="${template.type === "income" ? "amount-positive" : "amount-negative"}">${template.type === "income" ? "+" : "-"}${formatCurrency(Math.abs(Number(template.amount) || 0))}</span></td>
       <td class="recurring-actions-cell">
-        <button type="button" class="action-button" data-action="recurring-run" data-id="${template.id}">Post next</button>
-        <button type="button" class="action-button" data-action="recurring-status" data-id="${template.id}">${template.active ? "Pause" : "Resume"}</button>
-        <button type="button" class="action-button" data-action="recurring-edit" data-id="${template.id}">Edit</button>
-        <button type="button" class="action-button delete" data-action="recurring-delete" data-id="${template.id}">Delete</button>
+        <button type="button" class="action-button" data-action="recurring-run" data-id="${template.id}">${txT("transactions_recurring_post_next", "Post next")}</button>
+        <button type="button" class="action-button" data-action="recurring-status" data-id="${template.id}">${template.active ? txT("transactions_recurring_pause", "Pause") : txT("transactions_recurring_resume", "Resume")}</button>
+        <button type="button" class="action-button" data-action="recurring-edit" data-id="${template.id}">${txT("common_edit", "Edit")}</button>
+        <button type="button" class="action-button delete" data-action="recurring-delete" data-id="${template.id}">${txT("common_delete", "Delete")}</button>
       </td>
     `;
     tbody.appendChild(row);
@@ -995,15 +1030,15 @@ function renderRecurringTemplates() {
 function formatRecurringCadence(cadence) {
   switch (cadence) {
     case "weekly":
-      return "Weekly";
+      return txT("transactions_recurring_cadence_weekly", "Weekly");
     case "biweekly":
-      return "Biweekly";
+      return txT("transactions_recurring_cadence_biweekly", "Biweekly");
     case "monthly":
-      return "Monthly";
+      return txT("transactions_recurring_cadence_monthly", "Monthly");
     case "quarterly":
-      return "Quarterly";
+      return txT("transactions_recurring_cadence_quarterly", "Quarterly");
     case "yearly":
-      return "Yearly";
+      return txT("transactions_recurring_cadence_yearly", "Yearly");
     default:
       return cadence || "-";
   }
@@ -1061,7 +1096,9 @@ function setEditingMode(enabled) {
   if (!submitButton) {
     return;
   }
-  submitButton.textContent = enabled ? "Update transaction" : "Save transaction";
+  submitButton.textContent = enabled
+    ? txT("transactions_update_submit", "Update transaction")
+    : txT("transactions_save_submit", "Save transaction");
 }
 
 function applyFilters() {
@@ -1098,7 +1135,7 @@ async function handleTransactionDelete(transactionId) {
 
   if (!response || !response.ok) {
     const errorPayload = await response?.json().catch(() => null);
-    setTransactionFormMessage(errorPayload?.error || "Unable to delete transaction.");
+    setTransactionFormMessage(errorPayload?.error || txT("transactions_error_delete", "Unable to delete transaction."));
     closeTransactionModal();
     return;
   }
@@ -1123,7 +1160,7 @@ async function toggleTransactionCleared(transactionId, nextCleared) {
   if (!response || !response.ok) {
     const errorPayload = await response?.json().catch(() => null);
     setTransactionFormMessage(
-      errorPayload?.error || "Unable to update reconciliation status."
+      errorPayload?.error || txT("transactions_error_update_cleared", "Unable to update reconciliation status.")
     );
     return;
   }
@@ -1150,7 +1187,7 @@ function populateAccountsFromStorage(accounts = []) {
   const select = document.getElementById("txAccount") || document.getElementById("account");
   if (!select) return;
 
-  select.innerHTML = '<option value="">Select account</option>';
+  select.innerHTML = `<option value="">${txT("transactions_select_account", "Select account")}</option>`;
   accounts.forEach((account) => {
     const option = document.createElement("option");
     option.value = account.id;
@@ -1203,7 +1240,7 @@ function populateCategoriesFromStorage() {
   if (!select) return;
 
   const categories = JSON.parse(localStorage.getItem(STORAGE_KEYS.categories) || "[]");
-  select.innerHTML = '<option value="">Select category</option>';
+  select.innerHTML = `<option value="">${txT("transactions_select_category", "Select category")}</option>`;
   categories.forEach((category) => {
     const option = document.createElement("option");
     option.value = category.id || category.name;
@@ -1221,7 +1258,7 @@ function populateTransactionCategoryFilter() {
   if (!select) return;
   const categories = getCategories();
   const prevValue = select.value;
-  select.innerHTML = '<option value="">All categories</option>';
+  select.innerHTML = `<option value="">${txT("transactions_all_categories", "All categories")}</option>`;
   categories.forEach((category) => {
     const option = document.createElement("option");
     option.value = category.id;
@@ -1243,14 +1280,14 @@ function renderTransactionList(filteredTransactions) {
   if (!tbody) return;
 
   if (transactionsLoading && filteredTransactions === undefined) {
-    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">Loading transactions...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">${txT("transactions_loading", "Loading transactions...")}</td></tr>`;
     return;
   }
 
   if (transactions.length === 0) {
     const emptyText =
       isFilteredView && ledgerState.transactions.length > 0
-        ? "No matching transactions."
+        ? txT("transactions_empty_filtered", "No matching transactions.")
         : typeof t === "function"
         ? t("transactions_empty")
         : "No transactions yet.";
@@ -1293,7 +1330,7 @@ function renderTransactionList(filteredTransactions) {
           data-action="upload-receipt"
           data-id="${txn.id}"
         >
-          Upload receipt
+          ${txT("transactions_upload_receipt", "Upload receipt")}
         </button>
         <button
           type="button"
@@ -1301,7 +1338,7 @@ function renderTransactionList(filteredTransactions) {
           data-action="edit-transaction"
           data-id="${txn.id}"
         >
-          Edit
+          ${txT("common_edit", "Edit")}
         </button>
       </td>
     `;
@@ -1360,7 +1397,7 @@ async function fetchCategoriesForTransactions() {
 async function fetchTransactionsForPage() {
   const response = await apiFetch(`/api/transactions${buildTransactionScopeQuery()}`);
   if (!response || !response.ok) {
-    throw new Error("Failed to load transactions.");
+    throw new Error(txT("transactions_error_load", "Failed to load transactions."));
   }
 
   const payload = await response.json().catch(() => null);
@@ -1445,14 +1482,14 @@ function renderTransactionsTable(filteredTransactions) {
   if (!tbody) return;
 
   if (transactionsLoading && filteredTransactions === undefined) {
-    tbody.innerHTML = `<tr><td colspan="8" class="placeholder">Loading transactions...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="placeholder">${txT("transactions_loading", "Loading transactions...")}</td></tr>`;
     return;
   }
 
   if (transactions.length === 0) {
     const emptyText =
       isFilteredView && ledgerState.transactions.length > 0
-        ? "No matching transactions."
+        ? txT("transactions_empty_filtered", "No matching transactions.")
         : typeof t === "function"
         ? t("transactions_empty")
         : "No transactions yet.";
@@ -1470,11 +1507,11 @@ function renderTransactionsTable(filteredTransactions) {
     const categoryName = txn.categoryName || categoriesById[txn.categoryId]?.name || "-";
     const accountName = txn.accountName || accountsById[txn.accountId]?.name || "-";
     const sourceBadge = txn.recurringTransactionId
-      ? '<span class="source-badge">Recurring</span>'
+      ? `<span class="source-badge">${txT("transactions_source_recurring", "Recurring")}</span>`
       : "";
     const recurringMeta = txn.recurringOccurrenceDate
-      ? `Generated ${formatDisplayDate(txn.recurringOccurrenceDate)}`
-      : "Generated automatically";
+      ? `${txT("transactions_generated_on", "Generated")} ${formatDisplayDate(txn.recurringOccurrenceDate)}`
+      : txT("transactions_generated_auto", "Generated automatically");
     const descriptionTail = txn.recurringTransactionId
       ? `${sourceBadge}${txn.note ? ` ${txn.note}` : ` ${recurringMeta}`}`
       : txn.note || categoryName || "";
@@ -1485,11 +1522,11 @@ function renderTransactionsTable(filteredTransactions) {
     const amountClass = txn.type === "income" ? "amount-positive" : "amount-negative";
     const amountPrefix = txn.type === "income" ? "+" : "-";
     const clearedMarkup = txn.cleared
-      ? '<span class="status-badge status-cleared">Cleared</span>'
-      : '<span class="status-badge status-pending">Pending</span>';
+      ? `<span class="status-badge status-cleared">${txT("transactions_status_cleared", "Cleared")}</span>`
+      : `<span class="status-badge status-pending">${txT("transactions_status_pending", "Pending")}</span>`;
     const receiptMarkup = txn.receiptId
-      ? '<span class="receipt-status attached"><span class="receipt-dot"></span><span>Attached</span></span>'
-      : '<span class="receipt-status none"><span class="receipt-dot"></span><span>None</span></span>';
+      ? `<span class="receipt-status attached"><span class="receipt-dot"></span><span>${txT("transactions_receipt_attached_short", "Attached")}</span></span>`
+      : `<span class="receipt-status none"><span class="receipt-dot"></span><span>${txT("transactions_receipt_none", "None")}</span></span>`;
 
     row.innerHTML = `
       <td><span class="date-cell">${formatDisplayDate(txn.date)}</span></td>
@@ -1504,8 +1541,8 @@ function renderTransactionsTable(filteredTransactions) {
       </td>
       <td class="amount-cell"><span class="${amountClass}">${amountPrefix}${formatCurrency(Math.abs(Number(txn.amount) || 0))}</span></td>
       <td class="actions-cell">
-        <button type="button" class="action-button" data-action="edit-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>Edit</button>
-        <button type="button" class="action-button delete" data-action="delete-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>Delete</button>
+        <button type="button" class="action-button" data-action="edit-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("common_edit", "Edit")}</button>
+        <button type="button" class="action-button delete" data-action="delete-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("common_delete", "Delete")}</button>
       </td>
     `;
     tbody.appendChild(row);
@@ -1546,26 +1583,26 @@ function renderTotals() {
   const comparison = calculateYearComparisons();
   const transactionsCount = (ledgerState.transactions || []).length;
   if (incomeLabel) {
-    incomeLabel.textContent = isAllScope && mixedCurrencies ? "Per-business" : formatCurrency(totals.income, scopeRegion);
+    incomeLabel.textContent = isAllScope && mixedCurrencies ? txT("exports_per_business", "Per-business") : formatCurrency(totals.income, scopeRegion);
   }
   if (expensesLabel) {
-    expensesLabel.textContent = isAllScope && mixedCurrencies ? "Per-business" : formatCurrency(totals.expenses, scopeRegion);
+    expensesLabel.textContent = isAllScope && mixedCurrencies ? txT("exports_per_business", "Per-business") : formatCurrency(totals.expenses, scopeRegion);
   }
   if (netLabel) {
     netLabel.textContent =
-      isAllScope && mixedCurrencies ? "Per-business" : formatCurrency(totals.income - totals.expenses, scopeRegion);
+      isAllScope && mixedCurrencies ? txT("exports_per_business", "Per-business") : formatCurrency(totals.income - totals.expenses, scopeRegion);
   }
   if (incomeDelta) {
-    incomeDelta.innerHTML = `<span class="stat-delta-positive">${formatPercentChange(comparison.income)}</span> vs last year`;
+    incomeDelta.innerHTML = `<span class="stat-delta-positive">${formatPercentChange(comparison.income)}</span> ${txT("transactions_vs_last_year", "vs last year")}`;
   }
   if (expensesDelta) {
-    expensesDelta.innerHTML = `<span class="stat-delta-positive">${formatPercentChange(comparison.expenses)}</span> vs last year`;
+    expensesDelta.innerHTML = `<span class="stat-delta-positive">${formatPercentChange(comparison.expenses)}</span> ${txT("transactions_vs_last_year", "vs last year")}`;
   }
   if (transactionCountValue) {
     transactionCountValue.textContent = String(transactionsCount);
   }
   if (transactionCountDelta) {
-    transactionCountDelta.textContent = `${countTransactionsThisMonth()} this month`;
+    transactionCountDelta.textContent = `${countTransactionsThisMonth()} ${txT("transactions_this_month", "this month")}`;
   }
 
   const tier = effectiveTier();
@@ -1577,21 +1614,23 @@ function renderTotals() {
     taxLabel.textContent = formatCurrency(estimatedTax, scopeRegion);
     setAsideLabel.textContent = formatCurrency(monthlySetAside, scopeRegion);
   } else if (taxLabel && setAsideLabel) {
-    taxLabel.textContent = isAllScope ? "Not shown" : formatCurrency(0, scopeRegion);
-    setAsideLabel.textContent = isAllScope ? "Switch to one business" : formatCurrency(0, scopeRegion);
+    taxLabel.textContent = isAllScope ? txT("transactions_tax_not_shown", "Not shown") : formatCurrency(0, scopeRegion);
+    setAsideLabel.textContent = isAllScope ? txT("transactions_tax_switch_one_business", "Switch to one business") : formatCurrency(0, scopeRegion);
   }
   if (taxBannerLabel) {
-    taxBannerLabel.textContent = isAllScope ? "Estimated tax owed" : `Estimated tax owed (${getAppliedTaxLabel()})`;
+    taxBannerLabel.textContent = isAllScope
+      ? txT("transactions_tax_estimated_owed", "Estimated tax owed")
+      : `${txT("transactions_tax_estimated_owed", "Estimated tax owed")} (${getAppliedTaxLabel()})`;
   }
   if (taxBannerNote) {
     taxBannerNote.textContent = isAllScope
-      ? "Tax estimates stay single-business. Switch to Active business for a filing-specific estimate."
+      ? txT("transactions_tax_single_business_note", "Tax estimates stay single-business. Switch to Active business for a filing-specific estimate.")
       : getAppliedTaxNote();
   }
   if (transactionsTaxContext) {
     transactionsTaxContext.textContent = isAllScope
-      ? `Tax form context: ${getTaxFormContext().label} reporting view`
-      : `Tax form context: ${getTaxFormContext().label} estimate`;
+      ? `${txT("exports_tax_context_prefix", "Tax form context")}: ${getTaxFormContext().label} ${txT("transactions_reporting_view", "reporting view")}`
+      : `${txT("exports_tax_context_prefix", "Tax form context")}: ${getTaxFormContext().label} ${txT("transactions_estimate", "estimate")}`;
   }
   if (cockpit) {
     cockpit.style.display = tier === "free" || !hasTransactions || isAllScope ? "none" : "flex";
@@ -1679,20 +1718,20 @@ function getAppliedTaxLabel() {
 
 function getAppliedTaxNote() {
   if (businessTaxProfile.region === "CA") {
-    const province = businessTaxProfile.province || "your province";
-    return `Canada T2125 estimate only. Based on net profit using the ${province} estimated combined GST/HST/PST/QST rate.`;
+    const province = businessTaxProfile.province || txT("transactions_your_province", "your province");
+    return `${txT("transactions_tax_note_ca_prefix", "Canada T2125 estimate only. Based on net profit using the")} ${province} ${txT("transactions_tax_note_ca_suffix", "estimated combined GST/HST/PST/QST rate.")}`;
   }
-  return "U.S. Schedule C estimate only. Based on net profit at 24% self-employment rate.";
+  return txT("transactions_tax_note_us", "U.S. Schedule C estimate only. Based on net profit at 24% self-employment rate.");
 }
 
 function getTaxFormContext() {
   if (getTransactionScope() === "all" && hasMixedCurrenciesInScope()) {
-    return { label: "Multi-business" };
+    return { label: txT("transactions_multi_business", "Multi-business") };
   }
   if (businessTaxProfile.region === "CA") {
-    return { label: "Canada T2125" };
+    return { label: txT("transactions_tax_form_ca", "Canada T2125") };
   }
-  return { label: "U.S. Schedule C" };
+  return { label: txT("transactions_tax_form_us", "U.S. Schedule C") };
 }
 
 function getScopeCurrencyRegion() {
@@ -1871,22 +1910,22 @@ function mergeSavedTransactionIntoLedger(transaction, context = {}) {
 
 function validateTransactionForm({ date, description, amount, accountId, categoryId, type }) {
   if (!date) {
-    return "Choose a date for the transaction.";
+    return txT("transactions_validation_date", "Choose a date for the transaction.");
   }
   if (!description) {
-    return "Describe the transaction.";
+    return txT("transactions_validation_description", "Describe the transaction.");
   }
   if (Number.isNaN(amount) || amount <= 0) {
-    return "Amount must be greater than zero.";
+    return txT("transactions_validation_amount", "Amount must be greater than zero.");
   }
   if (!accountId) {
-    return "Select an account.";
+    return txT("transactions_validation_account", "Select an account.");
   }
   if (!categoryId) {
-    return "Select a category.";
+    return txT("transactions_validation_category", "Select a category.");
   }
   if (!type) {
-    return "Choose a transaction type.";
+    return txT("transactions_validation_type", "Choose a transaction type.");
   }
   return null;
 }
