@@ -4,6 +4,10 @@
 
 init();
 
+function tx(key) {
+  return typeof window.t === "function" ? window.t(key) : key;
+}
+
 function init() {
   const form = document.getElementById("forgotPasswordForm");
   if (!form) return;
@@ -21,7 +25,7 @@ async function requestPasswordReset(form) {
   const email = emailInput?.value.trim();
 
   if (!email) {
-    setStatus(typeof t === "function" ? t("forgot_password_email_label") + " required." : "Please enter your email address.", false, statusEl);
+    setStatus(tx("forgot_password_error_missing"), false, statusEl);
     return;
   }
 
@@ -38,19 +42,21 @@ async function requestPasswordReset(form) {
     const payload = await response.json().catch(() => null);
 
     if (!response.ok) {
-      setStatus(payload?.error ?? "Unable to request a reset link.", false, statusEl);
+      setStatus(payload?.error ?? tx("forgot_password_error_request"), false, statusEl);
       return;
     }
 
     const baseMessage =
-      payload?.message ?? "If the email is registered, you will receive a reset link shortly.";
+      payload?.message ?? tx("forgot_password_success");
     const expiresAt = payload?.expiresAt ? new Date(payload.expiresAt).toLocaleString() : null;
-    const message = expiresAt ? `${baseMessage} It expires ${expiresAt}.` : baseMessage;
+    const message = expiresAt
+      ? `${baseMessage} ${tx("forgot_password_success_expires")} ${expiresAt}.`
+      : baseMessage;
 
     setStatus(message, true, statusEl);
   } catch (err) {
     console.error(err);
-    setStatus("Server unreachable. Please try again later.", false, statusEl);
+    setStatus(tx("common_server_unreachable"), false, statusEl);
   } finally {
     button.disabled = false;
   }

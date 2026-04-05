@@ -124,11 +124,11 @@ async function initBusinessProfileForm() {
 
     const saved = await saveBusinessProfileToApi(nextProfile);
     if (!saved) {
-      showSettingsToast("Unable to save business profile");
+      showSettingsToast(t("settings_business_profile_save_error"));
       return;
     }
     saveBusinessProfile(nextProfile);
-    showSettingsToast("Business profile saved");
+    showSettingsToast(t("settings_business_profile_saved"));
   });
 }
 
@@ -306,7 +306,7 @@ async function initPreferences() {
       if (typeof privacyService === "object" && typeof privacyService.exportMyData === "function") {
         await privacyService.exportMyData();
       }
-      showSettingsToast("Data export started");
+      showSettingsToast(t("settings_data_export_started"));
     });
   }
 
@@ -320,10 +320,10 @@ async function initPreferences() {
         throw new Error("Unable to reset onboarding tips");
       }
 
-      showSettingsToast("Getting started tips reset");
+      showSettingsToast(t("settings_tips_reset"));
     } catch (error) {
       console.error("Failed to reset onboarding tips", error);
-      showSettingsToast("Unable to reset getting started tips");
+      showSettingsToast(t("settings_tips_reset_error"));
     }
   };
 
@@ -344,7 +344,7 @@ async function initPreferences() {
 
     const nextPreferences = { ...pendingPreferences };
     if (nextPreferences.region === "ca" && !nextPreferences.province) {
-      showSettingsToast("Select a Canadian province or territory before saving.");
+      showSettingsToast(t("settings_province_required"));
       provinceSelect?.focus();
       return;
     }
@@ -366,7 +366,7 @@ async function initPreferences() {
         province: nextPreferences.region === "ca" ? nextPreferences.province : null
       });
       if (!businessSaveResult.ok) {
-        showSettingsToast(businessSaveResult.error || "Unable to save region settings");
+        showSettingsToast(businessSaveResult.error || t("settings_region_save_error"));
         return;
       }
 
@@ -457,7 +457,7 @@ async function initCpaAccess() {
     try {
       const response = await apiFetch("/api/businesses");
       if (!response || !response.ok) {
-        throw new Error("Unable to load businesses.");
+        throw new Error(t("settings_cpa_load_businesses_error"));
       }
 
       const payload = await response.json().catch(() => null);
@@ -468,7 +468,7 @@ async function initCpaAccess() {
       businesses.forEach((business) => {
         const option = document.createElement("option");
         option.value = business.id;
-        option.textContent = business.name || "Business";
+        option.textContent = business.name || t("common_business");
         if (business.id === activeBusinessId) {
           option.selected = true;
         }
@@ -476,7 +476,7 @@ async function initCpaAccess() {
       });
     } catch (error) {
       console.error("Failed to load CPA business options", error);
-      setMessage("Unable to load businesses for CPA access.", "is-error");
+      setMessage(t("settings_cpa_load_businesses_error"), "is-error");
     }
   };
 
@@ -484,37 +484,37 @@ async function initCpaAccess() {
     try {
       const response = await apiFetch("/api/cpa-access/grants/owned");
       if (!response || !response.ok) {
-        throw new Error("Unable to load grants.");
+        throw new Error(t("settings_cpa_grants_load_error"));
       }
 
       const payload = await response.json().catch(() => null);
       const grants = Array.isArray(payload?.grants) ? payload.grants : [];
 
       if (!grants.length) {
-        listNode.innerHTML = '<div class="cpa-access-empty">No CPA access grants yet.</div>';
+        listNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_grants_empty"))}</div>`;
         return;
       }
 
       listNode.innerHTML = grants.map((grant) => {
-        const detailParts = [`Created ${formatSettingsDate(grant.created_at)}`];
-        if (grant.accepted_at) detailParts.push(`Accepted ${formatSettingsDate(grant.accepted_at)}`);
-        if (grant.revoked_at) detailParts.push(`Revoked ${formatSettingsDate(grant.revoked_at)}`);
+        const detailParts = [interpolateTranslatedMessage("settings_cpa_detail_created", { date: formatSettingsDate(grant.created_at) })];
+        if (grant.accepted_at) detailParts.push(interpolateTranslatedMessage("settings_cpa_detail_accepted", { date: formatSettingsDate(grant.accepted_at) }));
+        if (grant.revoked_at) detailParts.push(interpolateTranslatedMessage("settings_cpa_detail_revoked", { date: formatSettingsDate(grant.revoked_at) }));
 
         return `
           <div class="cpa-access-item">
             <div class="cpa-access-meta">
               <div class="cpa-access-email">${escapeSettingsHtml(grant.grantee_email || "")}</div>
               <div class="cpa-access-tags">
-                <span class="cpa-access-tag scope">${grant.scope === "all" ? "All businesses" : "One business"}</span>
-                <span class="cpa-access-tag business">${escapeSettingsHtml(grant.business_name || "Portfolio-wide")}</span>
+                <span class="cpa-access-tag scope">${grant.scope === "all" ? escapeSettingsHtml(t("settings_cpa_scope_all")) : escapeSettingsHtml(t("settings_cpa_scope_business"))}</span>
+                <span class="cpa-access-tag business">${escapeSettingsHtml(grant.business_name || t("settings_cpa_portfolio_wide"))}</span>
                 <span class="cpa-access-tag ${escapeSettingsHtml(grant.status || "pending")}">${escapeSettingsHtml(grant.status || "pending")}</span>
               </div>
               <div class="cpa-access-detail">${escapeSettingsHtml(detailParts.join(" | "))}</div>
             </div>
             <div class="cpa-access-actions">
               ${grant.status !== "revoked"
-                ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeSettingsHtml(grant.id || "")}">Revoke</button>`
-                : `<button type="button" class="cpa-access-delete" data-cpa-delete="${escapeSettingsHtml(grant.id || "")}">Delete</button>`}
+                ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeSettingsHtml(grant.id || "")}">${escapeSettingsHtml(t("settings_cpa_revoke"))}</button>`
+                : `<button type="button" class="cpa-access-delete" data-cpa-delete="${escapeSettingsHtml(grant.id || "")}">${escapeSettingsHtml(t("common_delete"))}</button>`}
             </div>
           </div>
         `;
@@ -533,12 +533,12 @@ async function initCpaAccess() {
 
           if (!revokeResponse || !revokeResponse.ok) {
             const errorPayload = await revokeResponse?.json().catch(() => null);
-            setMessage(errorPayload?.error || "Unable to revoke CPA access.", "is-error");
+            setMessage(errorPayload?.error || t("settings_cpa_revoke_error"), "is-error");
             return;
           }
 
-          setMessage("CPA access revoked.", "is-success");
-          showSettingsToast("CPA access revoked");
+          setMessage(t("settings_cpa_revoked"), "is-success");
+          showSettingsToast(t("settings_cpa_revoked"));
           await renderOwnedGrants();
           await renderAuditActivity();
         });
@@ -557,19 +557,19 @@ async function initCpaAccess() {
 
           if (!deleteResponse || !deleteResponse.ok) {
             const errorPayload = await deleteResponse?.json().catch(() => null);
-            setMessage(errorPayload?.error || "Unable to delete revoked CPA access.", "is-error");
+            setMessage(errorPayload?.error || t("settings_cpa_delete_error"), "is-error");
             return;
           }
 
-          setMessage("Revoked CPA access deleted.", "is-success");
-          showSettingsToast("Revoked CPA access deleted");
+          setMessage(t("settings_cpa_deleted"), "is-success");
+          showSettingsToast(t("settings_cpa_deleted"));
           await renderOwnedGrants();
           await renderAuditActivity();
         });
       });
     } catch (error) {
       console.error("Failed to load CPA grants", error);
-      listNode.innerHTML = '<div class="cpa-access-empty">Unable to load CPA access grants.</div>';
+      listNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_grants_load_error"))}</div>`;
     }
   };
 
@@ -581,31 +581,31 @@ async function initCpaAccess() {
     try {
       const response = await apiFetch("/api/cpa-access/audit?limit=12");
       if (!response || !response.ok) {
-        throw new Error("Unable to load audit activity.");
+        throw new Error(t("settings_cpa_audit_load_error"));
       }
 
       const payload = await response.json().catch(() => null);
       const logs = Array.isArray(payload?.logs) ? payload.logs : [];
 
       if (!logs.length) {
-        auditNode.innerHTML = '<div class="cpa-access-empty">No CPA audit activity yet.</div>';
+        auditNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_audit_empty"))}</div>`;
         return;
       }
 
       auditNode.innerHTML = logs.map((entry) => `
         <div class="cpa-access-item">
           <div class="cpa-access-meta">
-            <div class="cpa-access-email">${escapeSettingsHtml(formatSettingsAuditAction(entry.action))}</div>
-            <div class="cpa-access-tags">
-              <span class="cpa-access-tag business">${escapeSettingsHtml(entry.business_name || "Portfolio-wide")}</span>
-            </div>
+              <div class="cpa-access-email">${escapeSettingsHtml(formatSettingsAuditAction(entry.action))}</div>
+              <div class="cpa-access-tags">
+                <span class="cpa-access-tag business">${escapeSettingsHtml(entry.business_name || t("settings_cpa_portfolio_wide"))}</span>
+              </div>
             <div class="cpa-access-detail">${escapeSettingsHtml(formatSettingsDateTime(entry.created_at))}${entry.actor_email ? ` | ${escapeSettingsHtml(entry.actor_email)}` : ""}</div>
           </div>
         </div>
       `).join("");
     } catch (error) {
       console.error("Failed to load CPA audit activity", error);
-      auditNode.innerHTML = '<div class="cpa-access-empty">Unable to load CPA audit activity.</div>';
+      auditNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_audit_load_error"))}</div>`;
     }
   };
 
@@ -634,15 +634,15 @@ async function initCpaAccess() {
 
     if (!response || !response.ok) {
       const body = await response?.json().catch(() => null);
-      setMessage(body?.error || "Unable to create CPA access grant.", "is-error");
+      setMessage(body?.error || t("settings_cpa_create_error"), "is-error");
       return;
     }
 
     emailInput.value = "";
     scopeSelect.value = "business";
     syncBusinessVisibility();
-    setMessage("CPA access invite created.", "is-success");
-    showSettingsToast("CPA access invite created");
+    setMessage(t("settings_cpa_created"), "is-success");
+    showSettingsToast(t("settings_cpa_created"));
     await renderOwnedGrants();
     await renderAuditActivity();
   });
@@ -881,7 +881,7 @@ async function saveBusinessSettings({ region, language, province }) {
       console.error("Business settings API rejected save", errorPayload || response?.status);
       return {
         ok: false,
-        error: errorPayload?.error || "Unable to save region settings"
+        error: errorPayload?.error || t("settings_region_save_error")
       };
     }
 
@@ -894,7 +894,7 @@ async function saveBusinessSettings({ region, language, province }) {
     console.error("Failed to save business settings", error);
     return {
       ok: false,
-      error: error?.message || "Unable to save region settings"
+      error: error?.message || t("settings_region_save_error")
     };
   }
 }
@@ -1036,11 +1036,11 @@ function initSecurityForm() {
 
     if (mfaHelperNote) {
       if (mfaMode === "enable_verify") {
-        mfaHelperNote.textContent = "We emailed you a 6-digit code. Enter it to finish turning MFA on.";
+        mfaHelperNote.textContent = t("settings_mfa_helper_enable_verify");
       } else if (mfaMode === "disable_verify") {
-        mfaHelperNote.textContent = "We emailed you a 6-digit code. Enter it to finish turning MFA off.";
+        mfaHelperNote.textContent = t("settings_mfa_helper_disable_verify");
       } else {
-        mfaHelperNote.textContent = "Enter your password and confirm the switch. We will email you a code to verify it is really you.";
+        mfaHelperNote.textContent = t("settings_mfa_helper_note");
       }
     }
 
@@ -1058,7 +1058,7 @@ function initSecurityForm() {
   const loadMfaStatus = async () => {
     const response = await apiFetch("/api/auth/mfa/status");
     if (!response || !response.ok) {
-      throw new Error("Unable to load MFA status");
+      throw new Error(t("settings_mfa_status_error"));
     }
 
     mfaStatus = await response.json().catch(() => ({
@@ -1106,11 +1106,11 @@ function initSecurityForm() {
 
       const payload = await response?.json().catch(() => null);
       if (!response || !response.ok) {
-        showSettingsToast(payload?.error || "Unable to update password");
+        showSettingsToast(payload?.error || t("settings_password_update_error"));
         return;
       }
 
-      showSettingsToast(payload?.message || "Password updated");
+      showSettingsToast(payload?.message || t("settings_password_updated"));
       form.reset();
       updateStrength();
       updateRequirements();
@@ -1118,7 +1118,7 @@ function initSecurityForm() {
       updateSubmitState();
     } catch (error) {
       console.error("Password update failed", error);
-      showSettingsToast("Unable to update password");
+      showSettingsToast(t("settings_password_update_error"));
     }
   });
 
@@ -1157,7 +1157,7 @@ function initSecurityForm() {
         const payload = await response?.json().catch(() => null);
 
         if (!response || !response.ok) {
-          setMfaMessage(payload?.error || "Unable to enable MFA.", "is-error");
+          setMfaMessage(payload?.error || t("settings_mfa_enable_error"), "is-error");
           mfaEnabledToggle.checked = false;
           return;
         }
@@ -1167,15 +1167,15 @@ function initSecurityForm() {
           mfaMode = "enable_verify";
           mfaCodeField?.classList.remove("hidden");
           updateMfaUi();
-          setMfaMessage(payload?.message || "Enter the code we emailed you to finish turning MFA on.", "is-success");
+          setMfaMessage(payload?.message || t("settings_mfa_enable_verify_message"), "is-success");
           return;
         }
 
-        setMfaMessage(payload?.error || "Unable to enable MFA.", "is-error");
+        setMfaMessage(payload?.error || t("settings_mfa_enable_error"), "is-error");
         mfaEnabledToggle.checked = false;
       } catch (error) {
         console.error("MFA enable failed", error);
-        setMfaMessage("Unable to enable MFA.", "is-error");
+        setMfaMessage(t("settings_mfa_enable_error"), "is-error");
         mfaEnabledToggle.checked = false;
       }
       return;
@@ -1197,18 +1197,18 @@ function initSecurityForm() {
         const payload = await response?.json().catch(() => null);
 
         if (!response || !response.ok) {
-          setMfaMessage(payload?.error || "Unable to enable MFA.", "is-error");
+          setMfaMessage(payload?.error || t("settings_mfa_enable_error"), "is-error");
           return;
         }
 
         mfaStatus = payload?.status || { enabled: true, delivery: "email" };
         mfaMode = "idle";
         updateMfaUi();
-        showSettingsToast("Multi-factor authentication enabled");
-        setMfaMessage("MFA is now on. We will email a 6-digit code on new or untrusted sign-ins.", "is-success");
+        showSettingsToast(t("settings_mfa_enabled"));
+        setMfaMessage(t("settings_mfa_enabled_message"), "is-success");
       } catch (error) {
         console.error("MFA enable verification failed", error);
-        setMfaMessage("Unable to enable MFA.", "is-error");
+        setMfaMessage(t("settings_mfa_enable_error"), "is-error");
       }
       return;
     }
@@ -1227,7 +1227,7 @@ function initSecurityForm() {
         const payload = await response?.json().catch(() => null);
 
         if (!response || !response.ok) {
-          setMfaMessage(payload?.error || "Unable to disable MFA.", "is-error");
+          setMfaMessage(payload?.error || t("settings_mfa_disable_error"), "is-error");
           mfaEnabledToggle.checked = true;
           return;
         }
@@ -1237,15 +1237,15 @@ function initSecurityForm() {
           mfaMode = "disable_verify";
           mfaCodeField?.classList.remove("hidden");
           updateMfaUi();
-          setMfaMessage(payload?.message || "Enter the code we emailed you to finish turning MFA off.", "is-success");
+          setMfaMessage(payload?.message || t("settings_mfa_disable_verify_message"), "is-success");
           return;
         }
 
-        setMfaMessage(payload?.error || "Unable to disable MFA.", "is-error");
+        setMfaMessage(payload?.error || t("settings_mfa_disable_error"), "is-error");
         mfaEnabledToggle.checked = true;
       } catch (error) {
         console.error("MFA disable failed", error);
-        setMfaMessage("Unable to disable MFA.", "is-error");
+        setMfaMessage(t("settings_mfa_disable_error"), "is-error");
         mfaEnabledToggle.checked = true;
       }
       return;
@@ -1267,18 +1267,18 @@ function initSecurityForm() {
         const payload = await response?.json().catch(() => null);
 
         if (!response || !response.ok) {
-          setMfaMessage(payload?.error || "Unable to disable MFA.", "is-error");
+          setMfaMessage(payload?.error || t("settings_mfa_disable_error"), "is-error");
           return;
         }
 
         mfaStatus = payload?.status || { enabled: false, delivery: "email" };
         mfaMode = "idle";
         updateMfaUi();
-        showSettingsToast("Multi-factor authentication disabled");
-        setMfaMessage("MFA is now off.", "is-success");
+        showSettingsToast(t("settings_mfa_disabled"));
+        setMfaMessage(t("settings_mfa_disabled_message"), "is-success");
       } catch (error) {
         console.error("MFA disable verification failed", error);
-        setMfaMessage("Unable to disable MFA.", "is-error");
+        setMfaMessage(t("settings_mfa_disable_error"), "is-error");
       }
     }
   });
@@ -1299,7 +1299,7 @@ function initSecurityForm() {
   updateSubmitState();
   loadMfaStatus().catch((error) => {
     console.error("Failed to initialize MFA settings", error);
-    setMfaMessage("Unable to load MFA status.", "is-error");
+    setMfaMessage(t("settings_mfa_status_error"), "is-error");
   });
 }
 
@@ -1358,9 +1358,9 @@ function getPasswordScore(password) {
 }
 
 function getStrengthLabel(score) {
-  if (score >= 3) return "Strong";
-  if (score >= 2) return "Fair";
-  return "Weak";
+  if (score >= 3) return t("settings_password_strong");
+  if (score >= 2) return t("settings_password_fair");
+  return t("settings_password_weak");
 }
 
 function getStrengthWidth(score) {
@@ -1419,7 +1419,7 @@ function initDangerZone() {
     void (async () => {
       if (dangerAction === "delete_data") {
         SETTINGS_DELETE_DATA_KEYS.forEach((key) => localStorage.removeItem(key));
-        showSettingsToast("Business data deleted");
+        showSettingsToast(t("settings_business_data_deleted"));
         closeModal();
         return;
       }
@@ -1433,13 +1433,13 @@ function initDangerZone() {
           const payload = await response?.json().catch(() => null);
 
           if (!response || !response.ok) {
-            showSettingsToast(payload?.error || "Unable to delete account");
+            showSettingsToast(payload?.error || t("settings_delete_account_error"));
             confirmButton.disabled = false;
             return;
           }
 
           clearToken();
-          showSettingsToast("Account permanently deleted");
+          showSettingsToast(t("settings_delete_account_success"));
           closeModal();
           setTimeout(() => {
             window.location.href = "/";
@@ -1447,7 +1447,7 @@ function initDangerZone() {
           return;
         } catch (error) {
           console.error("Account deletion failed", error);
-          showSettingsToast("Unable to delete account");
+          showSettingsToast(t("settings_delete_account_error"));
           confirmButton.disabled = false;
           return;
         }

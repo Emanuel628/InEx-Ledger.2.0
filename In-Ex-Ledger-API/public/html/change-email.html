@@ -21,38 +21,38 @@
       <span class="brand-text">InEx Ledger</span>
     </a>
     <nav>
-      <a href="/transactions">Transactions</a>
-      <a href="/settings#settings-security">Security</a>
+      <a href="/transactions" data-i18n="nav_transactions">Transactions</a>
+      <a href="/settings#settings-security" data-i18n="settings_nav_security">Security</a>
     </nav>
   </header>
   <main>
     <section class="auth-card">
-      <h2>Change email</h2>
+      <h2 data-i18n="change_email_title">Change email</h2>
       <form id="changeEmailForm" method="post" class="auth-form">
         <div class="form-field">
-          <label for="newEmail">New email address</label>
+          <label for="newEmail" data-i18n="change_email_new_label">New email address</label>
           <input type="email" id="newEmail" name="newEmail" required autocomplete="email" />
         </div>
         <div class="form-field">
-          <label for="currentPassword">Current password</label>
+          <label for="currentPassword" data-i18n="settings_current_password">Current password</label>
           <input type="password" id="currentPassword" name="currentPassword" required autocomplete="current-password" />
         </div>
-        <button type="submit" class="auth-submit">Send confirmation email</button>
+        <button type="submit" class="auth-submit" data-i18n="change_email_submit">Send confirmation email</button>
       </form>
       <p id="changeEmailStatus" class="auth-error" aria-live="polite" hidden></p>
-      <p class="auth-helper">
+      <p class="auth-helper" data-i18n="change_email_help">
         We will send a confirmation link to the new address. Your email will not change until you click it.
       </p>
       <p class="forgot-password">
-        <a href="/settings#settings-security">Back to security settings</a>
+        <a href="/settings#settings-security" data-i18n="change_email_back">Back to security settings</a>
       </p>
     </section>
   </main>
   <footer>
     <p>
-      <a href="/subscription">Pricing</a>
-      <a href="/privacy">Privacy</a>
-      <a href="/terms">Terms</a>
+      <a href="/subscription" data-i18n="nav_pricing">Pricing</a>
+      <a href="/privacy" data-i18n="footer_privacy">Privacy</a>
+      <a href="/terms" data-i18n="footer_terms">Terms</a>
     </p>
     <p>&copy; 2026 InEx Ledger</p>
   </footer>

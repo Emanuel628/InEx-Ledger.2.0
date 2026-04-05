@@ -4,6 +4,10 @@
 
 init();
 
+function tx(key) {
+  return typeof window.t === "function" ? window.t(key) : key;
+}
+
 function init() {
   const form = document.getElementById("resetPasswordForm");
   if (!form) return;
@@ -12,7 +16,7 @@ function init() {
   const token = new URLSearchParams(window.location.search).get("token");
 
   if (!token) {
-    setStatus("The reset link is missing or invalid.", false, statusEl);
+    setStatus(tx("reset_password_error_invalid"), false, statusEl);
     form.querySelector("button").disabled = true;
     return;
   }
@@ -31,12 +35,12 @@ async function resetPassword(form, token, statusEl) {
   const confirm = confirmInput?.value.trim();
 
   if (!password || !confirm) {
-    setStatus("Please fill out both password fields.", false, statusEl);
+    setStatus(tx("reset_password_error_missing"), false, statusEl);
     return;
   }
 
   if (password !== confirm) {
-    setStatus("Passwords do not match.", false, statusEl);
+    setStatus(tx("reset_password_error_match"), false, statusEl);
     return;
   }
 
@@ -59,15 +63,15 @@ async function resetPassword(form, token, statusEl) {
     const payload = await response.json().catch(() => null);
 
     if (!response.ok) {
-      setStatus(payload?.error ?? "Unable to reset password.", false, statusEl);
+      setStatus(payload?.error ?? tx("reset_password_error_request"), false, statusEl);
       return;
     }
 
-    setStatus(payload?.message ?? "Password reset successfully.", true, statusEl);
+    setStatus(payload?.message ?? tx("reset_password_success"), true, statusEl);
     form.reset();
   } catch (err) {
     console.error(err);
-    setStatus("Server unreachable. Please try again later.", false, statusEl);
+    setStatus(tx("common_server_unreachable"), false, statusEl);
   } finally {
     button.disabled = false;
   }

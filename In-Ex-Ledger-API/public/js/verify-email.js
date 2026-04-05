@@ -8,6 +8,9 @@ let resendButton;
 let resendLinkTrigger;
 let continueButton;
 let pendingEmail = "";
+function tx(key) {
+  return typeof window.t === "function" ? window.t(key) : key;
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   statusNode = document.getElementById("verificationStatus");
@@ -21,12 +24,9 @@ document.addEventListener("DOMContentLoaded", () => {
   wireActions();
 
   if (pendingEmail) {
-    updateStatus("Check your inbox for the verification email we just sent.");
+    updateStatus(tx("verify_email_status_sent"));
   } else {
-    updateStatus(
-      "Please register to receive a verification link.",
-      true
-    );
+    updateStatus(tx("verify_email_status_register"), true);
   }
 });
 
@@ -63,10 +63,7 @@ async function resendVerification() {
     pendingEmail || localStorage.getItem("pendingVerificationEmail") || "";
 
   if (!email) {
-    updateStatus(
-      "We need your email address to generate a verification link.",
-      true
-    );
+    updateStatus(tx("verify_email_status_missing_email"), true);
     return;
   }
 
@@ -81,7 +78,7 @@ async function resendVerification() {
 
     if (!response.ok) {
       updateStatus(
-        payload?.error || "Unable to send a verification link right now.",
+        payload?.error || tx("verify_email_status_resend_error"),
         true
       );
       renderVerificationLink("");
@@ -91,11 +88,11 @@ async function resendVerification() {
     pendingEmail = email;
     localStorage.setItem("pendingVerificationEmail", email);
     renderVerificationLink("");
-    updateStatus(payload?.message || "Verification email sent.");
+    updateStatus(payload?.message || tx("verify_email_status_resent"));
   } catch (error) {
     updateStatus(
       (error && error.message) ||
-        "Unable to send a verification link right now.",
+        tx("verify_email_status_resend_error"),
       true
     );
     renderVerificationLink("");
