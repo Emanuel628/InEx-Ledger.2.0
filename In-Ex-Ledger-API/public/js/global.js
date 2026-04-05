@@ -2,6 +2,23 @@
 
 const DEFAULT_THEME = "light";
 const THEME_VERSION = "2";
+const US_ESTIMATED_TAX_RATE = 0.24;
+const CANADA_ESTIMATED_TAX_RATES = {
+  AB: 0.05,
+  BC: 0.12,
+  MB: 0.12,
+  NB: 0.15,
+  NL: 0.15,
+  NS: 0.15,
+  NT: 0.05,
+  NU: 0.05,
+  ON: 0.13,
+  PE: 0.15,
+  QC: 0.14975,
+  SK: 0.11,
+  YT: 0.05
+};
+const DEFAULT_CA_ESTIMATED_TAX_RATE = 0.05;
 
 function resolveSavedTheme() {
   const storedVersion = localStorage.getItem("lb_theme_version");
@@ -53,6 +70,38 @@ function applyDateInputConstraints() {
   });
 }
 
+function normalizeEstimatedTaxRegion(region) {
+  return String(region || "").toUpperCase() === "CA" ? "CA" : "US";
+}
+
+function normalizeEstimatedTaxProvince(province) {
+  return String(province || "").toUpperCase();
+}
+
+function formatEstimatedTaxPercent(rate, province = "") {
+  const normalizedProvince = normalizeEstimatedTaxProvince(province);
+  const decimals = normalizedProvince === "QC" ? 3 : 0;
+  return `${(Number(rate || 0) * 100).toFixed(decimals)}%`;
+}
+
+function resolveEstimatedTaxProfile(region, province) {
+  const normalizedRegion = normalizeEstimatedTaxRegion(region);
+  const normalizedProvince = normalizeEstimatedTaxProvince(province);
+  if (normalizedRegion === "CA") {
+    return {
+      region: "CA",
+      province: normalizedProvince,
+      rate: CANADA_ESTIMATED_TAX_RATES[normalizedProvince] || DEFAULT_CA_ESTIMATED_TAX_RATE
+    };
+  }
+
+  return {
+    region: "US",
+    province: "",
+    rate: US_ESTIMATED_TAX_RATE
+  };
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
   highlightNavigation();
@@ -61,3 +110,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
 window.applyGlobalTheme = applyGlobalTheme;
 window.setGlobalTheme = setGlobalTheme;
+window.LUNA_TAX = {
+  US_ESTIMATED_TAX_RATE,
+  CANADA_ESTIMATED_TAX_RATES,
+  DEFAULT_CA_ESTIMATED_TAX_RATE,
+  resolveEstimatedTaxProfile,
+  formatEstimatedTaxPercent
+};

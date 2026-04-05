@@ -17,23 +17,16 @@ const transactionFilters = {
 
 const DRAWER_OPEN_LABEL = "+ Add new";
 const DRAWER_CLOSE_LABEL = "Close";
-const US_TAX_RATE = 0.24;
-const CANADA_TAX_RATES = {
-  AB: 0.05,
-  BC: 0.12,
-  MB: 0.12,
-  NB: 0.15,
-  NL: 0.15,
-  NS: 0.15,
-  NT: 0.05,
-  NU: 0.05,
-  ON: 0.13,
-  PE: 0.15,
-  QC: 0.14975,
-  SK: 0.11,
-  YT: 0.05
-};
-const DEFAULT_CA_RATE = 0.05;
+const taxHelpers = window.LUNA_TAX || {};
+const resolveEstimatedTaxProfile = taxHelpers.resolveEstimatedTaxProfile || ((region, province) => ({
+  region: String(region || "").toUpperCase() === "CA" ? "CA" : "US",
+  province: String(province || "").toUpperCase(),
+  rate: String(region || "").toUpperCase() === "CA" ? 0.05 : 0.24
+}));
+const formatEstimatedTaxPercent = taxHelpers.formatEstimatedTaxPercent || ((rate, province = "") => {
+  const decimals = String(province || "").toUpperCase() === "QC" ? 3 : 0;
+  return `${(Number(rate || 0) * 100).toFixed(decimals)}%`;
+});
 let transactionDrawerElement = null;
 let transactionToggleElement = null;
 let transactionPageToggleElement = null;
@@ -48,7 +41,7 @@ const missingCategoryWarnings = new Set();
 let businessTaxProfile = {
   region: "US",
   province: "",
-  rate: US_TAX_RATE
+  rate: resolveEstimatedTaxProfile("US", "").rate
 };
 let unattachedReceiptsCount = 0;
 let pendingTransactionReceiptFile = null;
@@ -1017,14 +1010,7 @@ async function loadBusinessTaxProfile() {
     fallbackSettings.region || localStorage.getItem("lb_region") || window.LUNA_REGION || "us"
   ).toUpperCase();
   const fallbackProvince = String(fallbackSettings.province || "").toUpperCase();
-  businessTaxProfile = {
-    region: fallbackRegion === "CA" ? "CA" : "US",
-    province: fallbackRegion === "CA" ? fallbackProvince : "",
-    rate:
-      fallbackRegion === "CA"
-        ? (CANADA_TAX_RATES[fallbackProvince] || DEFAULT_CA_RATE)
-        : US_TAX_RATE
-  };
+  businessTaxProfile = resolveEstimatedTaxProfile(fallbackRegion, fallbackProvince);
 
   try {
     const response = await apiFetch("/api/business");
@@ -1035,12 +1021,7 @@ async function loadBusinessTaxProfile() {
     const business = await response.json();
     const region = String(business?.region || business?.country || businessTaxProfile.region || "US").toUpperCase();
     const province = String(business?.province || "").toUpperCase();
-    const isCanada = region === "CA";
-    businessTaxProfile = {
-      region: isCanada ? "CA" : "US",
-      province,
-      rate: isCanada ? (CANADA_TAX_RATES[province] || DEFAULT_CA_RATE) : US_TAX_RATE
-    };
+    businessTaxProfile = resolveEstimatedTaxProfile(region, province);
     localStorage.setItem("lb_region", businessTaxProfile.region.toLowerCase());
   } catch (error) {
     console.warn("[Transactions] Unable to load business tax profile", error);
@@ -1050,10 +1031,9 @@ async function loadBusinessTaxProfile() {
 function getAppliedTaxLabel() {
   if (businessTaxProfile.region === "CA") {
     const province = businessTaxProfile.province || "CA";
-    const decimals = province === "QC" ? 3 : 0;
-    return `${province} ${(businessTaxProfile.rate * 100).toFixed(decimals)}%`;
+    return `${province} ${formatEstimatedTaxPercent(businessTaxProfile.rate, province)}`;
   }
-  return `US ${(businessTaxProfile.rate * 100).toFixed(0)}%`;
+  return `US ${formatEstimatedTaxPercent(businessTaxProfile.rate)}`;
 }
 
 function getAppliedTaxNote() {

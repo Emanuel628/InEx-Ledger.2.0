@@ -22,6 +22,31 @@ const SETTINGS_PASSWORD_RULES = {
   special: (value) => /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)
 };
 const CA_PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"];
+const taxHelpers = window.LUNA_TAX || {};
+const resolveEstimatedTaxProfile = taxHelpers.resolveEstimatedTaxProfile || ((region, province) => ({
+  region: String(region || "").toUpperCase() === "CA" ? "CA" : "US",
+  province: String(province || "").toUpperCase(),
+  rate: String(region || "").toUpperCase() === "CA" ? 0.05 : 0.24
+}));
+const formatEstimatedTaxPercent = taxHelpers.formatEstimatedTaxPercent || ((rate, province = "") => {
+  const decimals = String(province || "").toUpperCase() === "QC" ? 3 : 0;
+  return `${(Number(rate || 0) * 100).toFixed(decimals)}%`;
+});
+const CA_PROVINCE_NAMES = {
+  AB: "Alberta",
+  BC: "British Columbia",
+  MB: "Manitoba",
+  NB: "New Brunswick",
+  NL: "Newfoundland and Labrador",
+  NS: "Nova Scotia",
+  NT: "Northwest Territories",
+  NU: "Nunavut",
+  ON: "Ontario",
+  PE: "Prince Edward Island",
+  QC: "Quebec",
+  SK: "Saskatchewan",
+  YT: "Yukon"
+};
 
 let privacySettings = {
   dataSharingOptOut: false,
@@ -200,6 +225,7 @@ async function initPreferences() {
     if (distanceSelect) distanceSelect.value = state.distance;
     if (optOutToggle) optOutToggle.checked = !!state.optOutAnalytics;
     syncProvinceVisibility(state.region);
+    updateProvinceRateNote(state.region, state.province);
   };
 
   const hasPendingPreferenceChanges = () => {
@@ -230,6 +256,7 @@ async function initPreferences() {
       optOutAnalytics: !!optOutToggle?.checked
     };
     syncProvinceVisibility(pendingPreferences.region);
+    updateProvinceRateNote(pendingPreferences.region, pendingPreferences.province);
     updateSaveBar();
   };
 
@@ -300,6 +327,10 @@ async function initPreferences() {
       preferenceBaseline.region !== nextPreferences.region ||
       preferenceBaseline.language !== nextPreferences.language ||
       preferenceBaseline.province !== nextPreferences.province;
+    const taxSettingsChanged =
+      !preferenceBaseline ||
+      preferenceBaseline.region !== nextPreferences.region ||
+      preferenceBaseline.province !== nextPreferences.province;
 
     if (businessSettingsChanged) {
       const businessSaveResult = await saveBusinessSettings({
@@ -357,7 +388,11 @@ async function initPreferences() {
     syncPreferenceControls(preferenceBaseline);
     refreshSettingsLocalizedState();
     updateSaveBar();
-    showSettingsToast(t("settings_changes_saved"));
+    showSettingsToast(
+      taxSettingsChanged
+        ? resolveEffectiveTaxProfile(nextPreferences.region, nextPreferences.province).label
+        : t("settings_changes_saved")
+    );
   });
 }
 
@@ -386,6 +421,10 @@ function refreshSettingsLocalizedState() {
       (pendingPreferences?.region || preferenceBaseline?.region || normalizeSettingsRegion(businessSettingsState.region)) !== "ca"
     );
   }
+  updateProvinceRateNote(
+    pendingPreferences?.region || preferenceBaseline?.region || normalizeSettingsRegion(businessSettingsState.region),
+    pendingPreferences?.province || preferenceBaseline?.province || normalizeProvinceCode(businessSettingsState.province)
+  );
 }
 
 function normalizeSettingsRegion(value) {
@@ -395,6 +434,63 @@ function normalizeSettingsRegion(value) {
 function normalizeProvinceCode(value) {
   const code = String(value || "").toUpperCase();
   return CA_PROVINCES.includes(code) ? code : "";
+}
+
+function resolveEffectiveTaxProfile(region, province) {
+  const normalizedRegion = normalizeSettingsRegion(region);
+  const normalizedProvince = normalizeProvinceCode(province);
+  const taxProfile = resolveEstimatedTaxProfile(normalizedRegion, normalizedProvince);
+
+  if (normalizedRegion === "ca") {
+    if (!normalizedProvince) {
+      return {
+        ...taxProfile,
+        label: interpolateTranslatedMessage("settings_tax_rate_note_ca_default", {
+          rate: formatEstimatedTaxPercent(taxProfile.rate)
+        })
+      };
+    }
+
+    return {
+      ...taxProfile,
+      label: interpolateTranslatedMessage("settings_tax_rate_note_ca_selected", {
+        rate: formatEstimatedTaxPercent(taxProfile.rate, normalizedProvince),
+        province: CA_PROVINCE_NAMES[normalizedProvince] || normalizedProvince
+      })
+    };
+  }
+
+  return {
+    ...taxProfile,
+    label: interpolateTranslatedMessage("settings_tax_rate_note_us", {
+      rate: formatEstimatedTaxPercent(taxProfile.rate)
+    })
+  };
+}
+
+function updateProvinceRateNote(region, province) {
+  const note = document.getElementById("settingsProvinceRateNote");
+  if (!note) return;
+  note.textContent = resolveEffectiveTaxProfile(region, province).label;
+}
+
+function normalizeSettingsLanguage(value) {
+  const language = String(value || "").toLowerCase();
+  return ["en", "es", "fr"].includes(language) ? language : "en";
+}
+
+function interpolateTranslatedMessage(key, values) {
+  const language = typeof getCurrentLanguage === "function"
+    ? normalizeSettingsLanguage(getCurrentLanguage())
+    : normalizeSettingsLanguage(businessSettingsState.language);
+  const template = t(key);
+  if (language === "fr") {
+    return String(template).replace(/\{(\w+)\}/g, (_, token) => {
+      const value = values?.[token];
+      return token === "rate" ? String(value || "").replace(".", ",") : (value ?? "");
+    });
+  }
+  return String(template).replace(/\{(\w+)\}/g, (_, token) => values?.[token] ?? "");
 }
 
 function readBusinessSettingsFallback() {
