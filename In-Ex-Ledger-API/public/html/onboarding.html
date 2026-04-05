@@ -25,43 +25,43 @@
   <main class="onboarding-main">
     <section class="onboarding-shell">
       <div class="onboarding-intro">
-        <span class="onboarding-kicker">Get set up</span>
+        <span class="onboarding-kicker" data-i18n="onboarding_kicker">Get set up</span>
         <h1>Let’s make your workspace usable in one pass.</h1>
         <p>Tell us the basics, we’ll set your defaults, create your first account, and point you to the right starting page.</p>
         <ol class="onboarding-steps">
-          <li>Business basics</li>
-          <li>Regional defaults</li>
-          <li>First account</li>
-          <li>Your starting workflow</li>
+          <li data-i18n="onboarding_step_1">Business basics</li>
+          <li data-i18n="onboarding_step_2">Regional defaults</li>
+          <li data-i18n="onboarding_step_3">First account</li>
+          <li data-i18n="onboarding_step_4">Your starting workflow</li>
         </ol>
       </div>
 
       <form id="onboardingForm" class="onboarding-card">
         <div class="onboarding-grid">
           <div class="form-field">
-            <label for="onboardingBusinessName">Business name</label>
+            <label for="onboardingBusinessName" data-i18n="onboarding_business_name">Business name</label>
             <input type="text" id="onboardingBusinessName" autocomplete="organization" required />
           </div>
           <div class="form-field">
-            <label for="onboardingBusinessType">Business type</label>
+            <label for="onboardingBusinessType" data-i18n="onboarding_business_type">Business type</label>
             <select id="onboardingBusinessType" required>
-              <option value="sole_proprietor">Sole proprietor</option>
-              <option value="llc">LLC</option>
-              <option value="s_corp">S-Corp</option>
-              <option value="partnership">Partnership</option>
+              <option value="sole_proprietor" data-i18n="settings_business_type_sole_prop">Sole proprietor</option>
+              <option value="llc" data-i18n="settings_business_type_llc">LLC</option>
+              <option value="s_corp" data-i18n="settings_business_type_scorp">S-Corp</option>
+              <option value="partnership" data-i18n="settings_business_type_partnership">Partnership</option>
             </select>
           </div>
           <div class="form-field">
-            <label for="onboardingRegion">Region</label>
+            <label for="onboardingRegion" data-i18n="onboarding_region">Region</label>
             <select id="onboardingRegion" required>
-              <option value="US">United States</option>
-              <option value="CA">Canada</option>
+              <option value="US" data-i18n="region_us">United States</option>
+              <option value="CA" data-i18n="region_ca">Canada</option>
             </select>
           </div>
           <div class="form-field" id="onboardingProvinceField" hidden>
-            <label for="onboardingProvince">Province</label>
+            <label for="onboardingProvince" data-i18n="onboarding_province">Province</label>
             <select id="onboardingProvince">
-              <option value="">Choose a province</option>
+              <option value="" data-i18n="onboarding_province_placeholder">Choose a province</option>
               <option value="AB">Alberta</option>
               <option value="BC">British Columbia</option>
               <option value="MB">Manitoba</option>
@@ -78,30 +78,30 @@
             </select>
           </div>
           <div class="form-field">
-            <label for="onboardingLanguage">Language</label>
+            <label for="onboardingLanguage" data-i18n="onboarding_language">Language</label>
             <select id="onboardingLanguage" data-language-select required></select>
           </div>
           <div class="form-field">
-            <label for="onboardingStarterAccountType">First account type</label>
+            <label for="onboardingStarterAccountType" data-i18n="onboarding_first_account_type">First account type</label>
             <select id="onboardingStarterAccountType" required>
-              <option value="checking">Checking</option>
-              <option value="savings">Savings</option>
-              <option value="credit_card">Credit card</option>
-              <option value="cash">Cash</option>
-              <option value="loan">Loan</option>
+              <option value="checking" data-i18n="accounts_type_checking">Checking</option>
+              <option value="savings" data-i18n="accounts_type_savings">Savings</option>
+              <option value="credit_card" data-i18n="accounts_type_credit_card">Credit card</option>
+              <option value="cash" data-i18n="accounts_type_cash">Cash</option>
+              <option value="loan" data-i18n="accounts_type_loan">Loan</option>
             </select>
           </div>
           <div class="form-field">
-            <label for="onboardingStarterAccountName">First account name</label>
+            <label for="onboardingStarterAccountName" data-i18n="onboarding_first_account_name">First account name</label>
             <input type="text" id="onboardingStarterAccountName" required />
           </div>
           <div class="form-field form-field-full">
-            <label for="onboardingStartFocus">What do you want to do first?</label>
+            <label for="onboardingStartFocus" data-i18n="onboarding_start_focus">What do you want to do first?</label>
             <select id="onboardingStartFocus" required>
-              <option value="transactions">Start logging transactions</option>
-              <option value="receipts">Upload receipts</option>
-              <option value="mileage">Track mileage</option>
-              <option value="exports">Review exports</option>
+              <option value="transactions" data-i18n="onboarding_focus_transactions">Start logging transactions</option>
+              <option value="receipts" data-i18n="onboarding_focus_receipts">Upload receipts</option>
+              <option value="mileage" data-i18n="onboarding_focus_mileage">Track mileage</option>
+              <option value="exports" data-i18n="onboarding_focus_exports">Review exports</option>
             </select>
           </div>
         </div>
@@ -109,7 +109,7 @@
         <p id="onboardingMessage" class="auth-error" role="alert" aria-live="polite" hidden></p>
 
         <div class="onboarding-actions">
-          <button type="submit" class="auth-submit">Save and continue</button>
+          <button type="submit" class="auth-submit" data-i18n="onboarding_submit">Save and continue</button>
         </div>
       </form>
     </section>

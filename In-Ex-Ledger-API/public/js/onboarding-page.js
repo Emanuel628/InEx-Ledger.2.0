@@ -2,6 +2,9 @@ let onboardingForm = null;
 let onboardingMessage = null;
 let onboardingSubmitting = false;
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
+function tx(key) {
+  return typeof window.t === "function" ? window.t(key) : key;
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
   const valid = await requireValidSessionOrRedirect();
@@ -14,6 +17,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!onboardingForm) {
     return;
   }
+
+  applyOnboardingStaticCopy();
 
   const profile = window.__LUNA_ME__ || null;
   if (profile?.onboarding?.completed) {
@@ -54,7 +59,7 @@ function hydrateOnboardingDefaults(profile = {}) {
   document.getElementById("onboardingStarterAccountType").value =
     onboardingData.starter_account_type || "checking";
   document.getElementById("onboardingStarterAccountName").value =
-    onboardingData.starter_account_name || "Business Checking";
+    onboardingData.starter_account_name || tx("onboarding_default_account_name");
   document.getElementById("onboardingStartFocus").value =
     onboardingData.start_focus || "transactions";
 
@@ -83,7 +88,7 @@ async function handleOnboardingSubmit(event) {
     payload.province = "";
   }
   if (payload.region === "CA" && !CA_PROVINCES.has(payload.province)) {
-    setOnboardingMessage("Choose your province before continuing.");
+    setOnboardingMessage(tx("onboarding_error_province"));
     return;
   }
 
@@ -102,7 +107,7 @@ async function handleOnboardingSubmit(event) {
     const result = await response?.json().catch(() => null);
 
     if (!response || !response.ok) {
-      setOnboardingMessage(result?.error || "Unable to finish setup.");
+      setOnboardingMessage(result?.error || tx("onboarding_error_finish"));
       return;
     }
 
@@ -115,7 +120,7 @@ async function handleOnboardingSubmit(event) {
     window.location.href = result?.redirect_to || "/transactions";
   } catch (error) {
     console.error("Onboarding save failed:", error);
-    setOnboardingMessage("Unable to finish setup.");
+    setOnboardingMessage(tx("onboarding_error_finish"));
   } finally {
     submitButton?.removeAttribute("disabled");
     onboardingSubmitting = false;
@@ -145,4 +150,11 @@ function syncProvinceField() {
   if (!isCanada) {
     provinceSelect.value = "";
   }
+}
+
+function applyOnboardingStaticCopy() {
+  const intro = document.querySelector(".onboarding-intro");
+  intro?.querySelector("h1")?.replaceChildren(tx("onboarding_title"));
+  intro?.querySelector("p")?.replaceChildren(tx("onboarding_intro"));
+  document.title = `InEx Ledger - ${tx("onboarding_page_title")}`;
 }
