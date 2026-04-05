@@ -22,12 +22,12 @@ const SETTINGS_PASSWORD_RULES = {
 };
 const CA_PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"];
 const taxHelpers = window.LUNA_TAX || {};
-const resolveEstimatedTaxProfile = taxHelpers.resolveEstimatedTaxProfile || ((region, province) => ({
+const resolveEstimatedTaxProfileHelper = taxHelpers.resolveEstimatedTaxProfile || ((region, province) => ({
   region: String(region || "").toUpperCase() === "CA" ? "CA" : "US",
   province: String(province || "").toUpperCase(),
   rate: String(region || "").toUpperCase() === "CA" ? 0.05 : 0.24
 }));
-const formatEstimatedTaxPercent = taxHelpers.formatEstimatedTaxPercent || ((rate, province = "") => {
+const formatEstimatedTaxPercentHelper = taxHelpers.formatEstimatedTaxPercent || ((rate, province = "") => {
   const decimals = String(province || "").toUpperCase() === "QC" ? 3 : 0;
   return `${(Number(rate || 0) * 100).toFixed(decimals)}%`;
 });
@@ -458,14 +458,14 @@ function normalizeProvinceCode(value) {
 function resolveEffectiveTaxProfile(region, province) {
   const normalizedRegion = normalizeSettingsRegion(region);
   const normalizedProvince = normalizeProvinceCode(province);
-  const taxProfile = resolveEstimatedTaxProfile(normalizedRegion, normalizedProvince);
+  const taxProfile = resolveEstimatedTaxProfileHelper(normalizedRegion, normalizedProvince);
 
   if (normalizedRegion === "ca") {
     if (!normalizedProvince) {
       return {
         ...taxProfile,
         label: interpolateTranslatedMessage("settings_tax_rate_note_ca_default", {
-          rate: formatEstimatedTaxPercent(taxProfile.rate)
+          rate: formatEstimatedTaxPercentHelper(taxProfile.rate)
         })
       };
     }
@@ -473,7 +473,7 @@ function resolveEffectiveTaxProfile(region, province) {
     return {
       ...taxProfile,
       label: interpolateTranslatedMessage("settings_tax_rate_note_ca_selected", {
-        rate: formatEstimatedTaxPercent(taxProfile.rate, normalizedProvince),
+        rate: formatEstimatedTaxPercentHelper(taxProfile.rate, normalizedProvince),
         province: CA_PROVINCE_NAMES[normalizedProvince] || normalizedProvince
       })
     };
@@ -482,7 +482,7 @@ function resolveEffectiveTaxProfile(region, province) {
   return {
     ...taxProfile,
     label: interpolateTranslatedMessage("settings_tax_rate_note_us", {
-      rate: formatEstimatedTaxPercent(taxProfile.rate)
+      rate: formatEstimatedTaxPercentHelper(taxProfile.rate)
     })
   };
 }
