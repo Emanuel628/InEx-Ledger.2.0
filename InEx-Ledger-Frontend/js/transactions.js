@@ -315,9 +315,9 @@ async function loadTransactions() {
   } finally {
     renderAccountOptions();
     renderCategoryOptions();
+    setTransactionsLoading(false);
     applyFilters();
     renderTotals();
-    setTransactionsLoading(false);
   }
 }
 
@@ -371,9 +371,32 @@ function initSidebarTypeFilter() {
   transactionFilters.type =
     requestedType === "income" || requestedType === "expense" ? requestedType : "all";
 
+  const syncSidebarState = () => {
+    document.querySelectorAll("[data-sidebar-filter]").forEach((link) => {
+      const filterType = link.getAttribute("data-sidebar-filter") || "all";
+      const isActive = filterType === transactionFilters.type;
+      link.classList.toggle("nav-link-active", isActive);
+      link.classList.toggle("is-active", isActive);
+    });
+  };
+
+  syncSidebarState();
+
   document.querySelectorAll("[data-sidebar-filter]").forEach((link) => {
     const filterType = link.getAttribute("data-sidebar-filter") || "all";
-    link.classList.toggle("nav-link-active", filterType === transactionFilters.type);
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      transactionFilters.type =
+        filterType === "income" || filterType === "expense" ? filterType : "all";
+
+      const nextUrl =
+        transactionFilters.type === "all"
+          ? "transactions.html"
+          : `transactions.html?type=${transactionFilters.type}`;
+      window.history.replaceState({}, "", nextUrl);
+      syncSidebarState();
+      applyFilters();
+    });
   });
 }
 
