@@ -11,51 +11,65 @@ const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
 
 async function fetchBusinessRow(businessId) {
-  try {
-    const result = await pool.query(
-      `SELECT id, name, region, language, fiscal_year_start, province,
-              business_type, tax_id, address, created_at
-       FROM businesses
-       WHERE id = $1`,
-      [businessId]
-    );
-    return result.rows[0];
-  } catch (err) {
-    if (err?.code !== "42703") throw err;
+  const queries = [
+    `SELECT id, name, region, language, fiscal_year_start, province,
+            business_type, tax_id, address, created_at
+     FROM businesses
+     WHERE id = $1`,
+    `SELECT id, name, region, language, fiscal_year_start, province, created_at
+     FROM businesses
+     WHERE id = $1`,
+    `SELECT id, name, region, language, fiscal_year_start, created_at
+     FROM businesses
+     WHERE id = $1`,
+    `SELECT id, name, region, language, created_at
+     FROM businesses
+     WHERE id = $1`
+  ];
 
-    const result = await pool.query(
-      `SELECT id, name, region, language, fiscal_year_start, province, created_at
-       FROM businesses
-       WHERE id = $1`,
-      [businessId]
-    );
-    const row = result.rows[0];
-    return row ? { ...row, business_type: null, tax_id: null, address: null } : row;
+  for (const query of queries) {
+    try {
+      const result = await pool.query(query, [businessId]);
+      const row = result.rows[0];
+      return row
+        ? {
+            fiscal_year_start: null,
+            province: null,
+            business_type: null,
+            tax_id: null,
+            address: null,
+            ...row
+          }
+        : row;
+    } catch (err) {
+      if (err?.code !== "42703") throw err;
+    }
   }
+
+  throw new Error("Failed to load business profile.");
 }
 
 async function updateBusinessRow(businessId, payload) {
   const { name, region, language, fiscal_year_start, province, business_type, tax_id, address } = payload;
-
-  try {
-    const result = await pool.query(
-      `UPDATE businesses
-       SET name = COALESCE($1, name),
-           region = COALESCE($2, region),
-           language = COALESCE($3, language),
-           fiscal_year_start = COALESCE($4, fiscal_year_start),
-           province = CASE
-             WHEN COALESCE($2, region) = 'US' THEN NULL
-             WHEN $5 IS NOT NULL THEN $5
-             ELSE province
-           END,
-           business_type = COALESCE($6, business_type),
-           tax_id = COALESCE($7, tax_id),
-           address = COALESCE($8, address)
-       WHERE id = $9
-       RETURNING id, name, region, language, fiscal_year_start, province,
-                 business_type, tax_id, address, created_at`,
-      [
+  const attempts = [
+    {
+      query: `UPDATE businesses
+              SET name = COALESCE($1, name),
+                  region = COALESCE($2, region),
+                  language = COALESCE($3, language),
+                  fiscal_year_start = COALESCE($4, fiscal_year_start),
+                  province = CASE
+                    WHEN COALESCE($2, region) = 'US' THEN NULL
+                    WHEN $5 IS NOT NULL THEN $5
+                    ELSE province
+                  END,
+                  business_type = COALESCE($6, business_type),
+                  tax_id = COALESCE($7, tax_id),
+                  address = COALESCE($8, address)
+              WHERE id = $9
+              RETURNING id, name, region, language, fiscal_year_start, province,
+                        business_type, tax_id, address, created_at`,
+      params: [
         name?.trim() || null,
         region || null,
         language || null,
@@ -66,27 +80,21 @@ async function updateBusinessRow(businessId, payload) {
         address?.trim() || null,
         businessId
       ]
-    );
-    return result.rows[0];
-  } catch (err) {
-    if (err?.code !== "42703") throw err;
-  }
-
-  try {
-    const result = await pool.query(
-      `UPDATE businesses
-       SET name = COALESCE($1, name),
-           region = COALESCE($2, region),
-           language = COALESCE($3, language),
-           fiscal_year_start = COALESCE($4, fiscal_year_start),
-           province = CASE
-             WHEN COALESCE($2, region) = 'US' THEN NULL
-             WHEN $5 IS NOT NULL THEN $5
-             ELSE province
-           END
-       WHERE id = $6
-       RETURNING id, name, region, language, fiscal_year_start, province, created_at`,
-      [
+    },
+    {
+      query: `UPDATE businesses
+              SET name = COALESCE($1, name),
+                  region = COALESCE($2, region),
+                  language = COALESCE($3, language),
+                  fiscal_year_start = COALESCE($4, fiscal_year_start),
+                  province = CASE
+                    WHEN COALESCE($2, region) = 'US' THEN NULL
+                    WHEN $5 IS NOT NULL THEN $5
+                    ELSE province
+                  END
+              WHERE id = $6
+              RETURNING id, name, region, language, fiscal_year_start, province, created_at`,
+      params: [
         name?.trim() || null,
         region || null,
         language || null,
@@ -94,31 +102,59 @@ async function updateBusinessRow(businessId, payload) {
         province || null,
         businessId
       ]
-    );
-    const row = result.rows[0];
-    return row ? { ...row, business_type: null, tax_id: null, address: null } : row;
-  } catch (err) {
-    if (err?.code !== "42703") throw err;
+    },
+    {
+      query: `UPDATE businesses
+              SET name = COALESCE($1, name),
+                  region = COALESCE($2, region),
+                  language = COALESCE($3, language),
+                  fiscal_year_start = COALESCE($4, fiscal_year_start)
+              WHERE id = $5
+              RETURNING id, name, region, language, fiscal_year_start, created_at`,
+      params: [
+        name?.trim() || null,
+        region || null,
+        language || null,
+        fiscal_year_start || null,
+        businessId
+      ]
+    },
+    {
+      query: `UPDATE businesses
+              SET name = COALESCE($1, name),
+                  region = COALESCE($2, region),
+                  language = COALESCE($3, language)
+              WHERE id = $4
+              RETURNING id, name, region, language, created_at`,
+      params: [
+        name?.trim() || null,
+        region || null,
+        language || null,
+        businessId
+      ]
+    }
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const result = await pool.query(attempt.query, attempt.params);
+      const row = result.rows[0];
+      return row
+        ? {
+            fiscal_year_start: null,
+            province: null,
+            business_type: null,
+            tax_id: null,
+            address: null,
+            ...row
+          }
+        : row;
+    } catch (err) {
+      if (err?.code !== "42703") throw err;
+    }
   }
 
-  const result = await pool.query(
-    `UPDATE businesses
-     SET name = COALESCE($1, name),
-         region = COALESCE($2, region),
-         language = COALESCE($3, language),
-         fiscal_year_start = COALESCE($4, fiscal_year_start)
-     WHERE id = $5
-     RETURNING id, name, region, language, fiscal_year_start, created_at`,
-    [
-      name?.trim() || null,
-      region || null,
-      language || null,
-      fiscal_year_start || null,
-      businessId
-    ]
-  );
-  const row = result.rows[0];
-  return row ? { ...row, province: null, business_type: null, tax_id: null, address: null } : row;
+  throw new Error("Failed to update business profile.");
 }
 
 /**
