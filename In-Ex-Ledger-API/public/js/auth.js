@@ -119,6 +119,8 @@ function updateAuthenticatedChrome(profile = {}) {
   const displayName = getUserDisplayName(profile);
   const initials = getUserInitials(profile);
 
+  ensureLegacyUserPills();
+
   document.querySelectorAll(".user-name").forEach((node) => {
     node.textContent = displayName;
   });
@@ -129,6 +131,28 @@ function updateAuthenticatedChrome(profile = {}) {
   });
 
   initAccountMenus(displayName);
+}
+
+function ensureLegacyUserPills() {
+  if (document.querySelector(".user-pill")) {
+    return;
+  }
+
+  const header = document.querySelector("header");
+  if (!header) {
+    return;
+  }
+
+  header.classList.add("legacy-auth-header");
+
+  const pill = document.createElement("div");
+  pill.className = "user-pill legacy-user-pill";
+  pill.innerHTML = `
+    <span class="user-avatar">U</span>
+    <span class="user-name">User</span>
+  `;
+
+  header.appendChild(pill);
 }
 
 function getToken() {
@@ -422,6 +446,45 @@ function ensureAccountMenuStyles() {
   const style = document.createElement("style");
   style.id = ACCOUNT_MENU_STYLE_ID;
   style.textContent = `
+    .legacy-auth-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .legacy-auth-header .user-pill,
+    .legacy-user-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px 5px 6px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 0.5px solid rgba(15, 25, 35, 0.12);
+      color: var(--ink);
+      margin-left: auto;
+    }
+    .legacy-auth-header .user-avatar,
+    .legacy-user-pill .user-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent2, #2563a8);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+    .legacy-auth-header .user-name,
+    .legacy-user-pill .user-name {
+      font-size: 12px;
+      color: inherit;
+      white-space: nowrap;
+    }
     .account-menu-trigger {
       position: relative;
       cursor: pointer;
