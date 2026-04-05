@@ -43,16 +43,16 @@
   <div class="settings-shell">
     <aside class="settings-sidebar" aria-label="Settings navigation">
       <div class="settings-sidebar-card">
-        <div class="sidebar-section-label">Account</div>
+        <div class="sidebar-section-label" data-i18n="settings_sidebar_account">Account</div>
         <nav class="settings-nav">
-          <button class="settings-nav-item is-active" type="button" data-settings-target="settings-business">Business profile</button>
-          <button class="settings-nav-item" type="button" data-settings-target="settings-security">Security</button>
+          <button class="settings-nav-item is-active" type="button" data-settings-target="settings-business" data-i18n="settings_nav_business_profile">Business profile</button>
+          <button class="settings-nav-item" type="button" data-settings-target="settings-security" data-i18n="settings_nav_security">Security</button>
         </nav>
-        <div class="sidebar-section-label">Preferences</div>
+        <div class="sidebar-section-label" data-i18n="settings_sidebar_preferences">Preferences</div>
         <nav class="settings-nav">
-          <button class="settings-nav-item" type="button" data-settings-target="settings-preferences">Language &amp; region</button>
-          <button class="settings-nav-item" type="button" data-settings-target="settings-appearance">Appearance</button>
-          <button class="settings-nav-item" type="button" data-settings-target="settings-privacy">Privacy</button>
+          <button class="settings-nav-item" type="button" data-settings-target="settings-preferences" data-i18n="settings_nav_language_region">Language &amp; region</button>
+          <button class="settings-nav-item" type="button" data-settings-target="settings-appearance" data-i18n="settings_nav_appearance">Appearance</button>
+          <button class="settings-nav-item" type="button" data-settings-target="settings-privacy" data-i18n="settings_nav_privacy">Privacy</button>
         </nav>
       </div>
     </aside>
@@ -60,59 +60,59 @@
     <main class="settings-main">
       <section class="settings-card" id="settings-business">
         <div class="card-head">
-          <h2 class="card-title">Business profile</h2>
-          <p class="card-desc">This information appears on your PDF exports and CPA-ready reports.</p>
+          <h2 class="card-title" data-i18n="settings_business_profile_title">Business profile</h2>
+          <p class="card-desc" data-i18n="settings_business_profile_desc">This information appears on your PDF exports and CPA-ready reports.</p>
         </div>
         <form id="businessProfileForm" class="business-form">
           <div class="settings-form-grid">
             <div class="form-field">
-              <label for="business-name">Business name</label>
+              <label for="business-name" data-i18n="settings_label_business_name">Business name</label>
               <input type="text" id="business-name" name="business_name" required />
             </div>
             <div class="form-field">
-              <label for="business-type-select">Business type</label>
+              <label for="business-type-select" data-i18n="settings_label_business_type">Business type</label>
               <select id="business-type-select" name="business_type_select">
-                <option value="sole_proprietor">Sole proprietor</option>
+                <option value="sole_proprietor" data-i18n="settings_business_type_sole_prop">Sole proprietor</option>
                 <option value="llc">LLC</option>
                 <option value="s_corp">S-Corp</option>
                 <option value="partnership">Partnership</option>
               </select>
             </div>
             <div class="form-field">
-              <label for="businessEin">EIN</label>
+              <label for="businessEin" data-i18n-region="settings_label_tax_id">EIN</label>
               <input type="text" id="businessEin" name="business_ein" placeholder="XX-XXXXXXX" autocomplete="off" />
             </div>
             <div class="form-field">
-              <label for="fiscal-year">Fiscal year start</label>
+              <label for="fiscal-year" data-i18n="settings_label_fiscal_year_start">Fiscal year start</label>
               <input type="date" id="fiscal-year" name="fiscal_year_start" />
             </div>
             <div class="form-field form-field-full">
-              <label for="business-address">Business address</label>
+              <label for="business-address" data-i18n="settings_label_business_address">Business address</label>
               <textarea id="business-address" name="business_address" rows="3"></textarea>
             </div>
           </div>
-          <button type="submit" class="settings-primary-btn">Save changes</button>
+          <button type="submit" class="settings-primary-btn" data-i18n="settings_save_changes">Save changes</button>
         </form>
       </section>
 
       <section class="settings-card settings-pref-card" id="settings-preferences">
         <div class="card-head">
-          <h2 class="card-title">Preferences</h2>
+          <h2 class="card-title" data-i18n="settings_preferences_title">Preferences</h2>
         </div>
         <div class="settings-row">
           <div class="settings-row-copy">
-            <div class="settings-row-title">Distance units</div>
-            <div class="settings-row-desc">Choose how mileage is displayed throughout the app.</div>
+            <div class="settings-row-title" data-i18n="settings_distance_units_title">Distance units</div>
+            <div class="settings-row-desc" data-i18n="settings_distance_units_desc">Choose how mileage is displayed throughout the app.</div>
           </div>
           <select id="distanceSelect" class="inline-select">
-            <option value="mi">Miles (mi)</option>
-            <option value="km">Kilometers (km)</option>
+            <option value="mi" data-i18n="settings_units_miles">Miles (mi)</option>
+            <option value="km" data-i18n="settings_units_km">Kilometers (km)</option>
           </select>
         </div>
         <div class="settings-row" id="settings-appearance">
           <div class="settings-row-copy">
-            <div class="settings-row-title">Dark mode</div>
-            <div class="settings-row-desc">Switch the interface between light and dark appearance.</div>
+            <div class="settings-row-title" data-i18n="settings_dark_mode_title">Dark mode</div>
+            <div class="settings-row-desc" data-i18n="settings_dark_mode_desc">Switch the interface between light and dark appearance.</div>
           </div>
           <label class="switch">
             <input type="checkbox" id="darkModeToggle" />
@@ -121,8 +121,8 @@
         </div>
         <div class="settings-row">
           <div class="settings-row-copy">
-            <div class="settings-row-title">Language</div>
-            <div class="settings-row-desc">Set the language used in your interface and reports.</div>
+            <div class="settings-row-title" data-i18n="settings_language_title">Language</div>
+            <div class="settings-row-desc" data-i18n="settings_language_desc">Set the language used in your interface and reports.</div>
           </div>
           <select id="languageSelectSettings" class="inline-select" data-language-select>
             <option value="en">English</option>
@@ -132,8 +132,8 @@
         </div>
         <div class="settings-row">
           <div class="settings-row-copy">
-            <div class="settings-row-title">Region</div>
-            <div class="settings-row-desc">Use the tax and formatting defaults that match your region.</div>
+            <div class="settings-row-title" data-i18n="settings_region_title">Region</div>
+            <div class="settings-row-desc" data-i18n="settings_region_desc">Use the tax and formatting defaults that match your region.</div>
           </div>
           <select id="regionSelectSettings" class="inline-select">
             <option value="us" data-i18n="region_us">United States</option>
@@ -142,8 +142,8 @@
         </div>
         <div class="settings-row" id="settings-privacy">
           <div class="settings-row-copy">
-            <div class="settings-row-title">Opt out of analytics</div>
-            <div class="settings-row-desc">Disable analytics and personal data sharing for product improvement.</div>
+            <div class="settings-row-title" data-i18n="settings_opt_out_title">Opt out of analytics</div>
+            <div class="settings-row-desc" data-i18n="settings_opt_out_desc">Disable analytics and personal data sharing for product improvement.</div>
           </div>
           <label class="switch">
             <input type="checkbox" id="optOutToggle" />
@@ -157,52 +157,62 @@
             <span id="consentStatus">No</span>
           </p>
         </div>
+        <div id="settingsSaveBar" class="settings-save-bar hidden" aria-live="polite">
+          <div class="settings-save-copy">
+            <strong data-i18n="settings_unsaved_title">Unsaved preference changes</strong>
+            <span data-i18n="settings_unsaved_body">Save to apply language, region, appearance, and privacy updates across the app.</span>
+          </div>
+          <div class="settings-save-actions">
+            <button type="button" id="settingsCancelChanges" class="settings-secondary-btn" data-i18n="common_cancel">Cancel</button>
+            <button type="button" id="settingsSavePreferences" class="settings-primary-btn" data-i18n="settings_save_preferences">Save preferences</button>
+          </div>
+        </div>
       </section>
 
       <section class="settings-card security-card" id="settings-security">
         <div class="card-head">
-          <h2 class="card-title">Security</h2>
-          <p class="card-desc">Manage how you protect access to your account.</p>
+          <h2 class="card-title" data-i18n="settings_security_title">Security</h2>
+          <p class="card-desc" data-i18n="settings_security_desc">Manage how you protect access to your account.</p>
         </div>
         <form id="securityForm" class="security-form">
           <fieldset class="security-fieldset">
-            <legend>Change password</legend>
+            <legend data-i18n="settings_change_password">Change password</legend>
             <div class="security-grid">
               <div class="form-field">
-                <label for="security-current-password">Current password</label>
+                <label for="security-current-password" data-i18n="settings_current_password">Current password</label>
                 <input type="password" id="security-current-password" name="current-password" autocomplete="current-password" />
               </div>
               <div class="form-field">
-                <label for="security-new-password">New password</label>
+                <label for="security-new-password" data-i18n="settings_new_password">New password</label>
                 <input type="password" id="security-new-password" name="new-password" autocomplete="new-password" />
               </div>
               <div class="form-field form-field-full">
-                <label for="security-confirm-password">Confirm new password</label>
+                <label for="security-confirm-password" data-i18n="settings_confirm_new_password">Confirm new password</label>
                 <input type="password" id="security-confirm-password" name="confirm-password" autocomplete="new-password" />
               </div>
             </div>
             <div class="password-meter settings-password-meter">
               <div class="meter-bar" id="securityPasswordMeter"></div>
             </div>
-            <p id="securityPasswordStrengthText" class="password-strength-text">Weak password</p>
+            <p id="securityPasswordStrengthText" class="password-strength-text" data-i18n="settings_password_weak">Weak password</p>
             <ul class="password-requirements">
-              <li data-requirement="length">At least 8 characters</li>
-              <li data-requirement="number">Includes a number</li>
-              <li data-requirement="uppercase">Includes an uppercase letter</li>
-              <li data-requirement="special">Includes a symbol</li>
+              <li data-requirement="length" data-i18n="settings_password_rule_length">At least 8 characters</li>
+              <li data-requirement="number" data-i18n="settings_password_rule_number">Includes a number</li>
+              <li data-requirement="uppercase" data-i18n="settings_password_rule_uppercase">Includes an uppercase letter</li>
+              <li data-requirement="special" data-i18n="settings_password_rule_special">Includes a symbol</li>
             </ul>
             <p id="securityPasswordMatchMessage" class="password-match-message"></p>
             <label class="security-show-password">
               <input type="checkbox" id="securityShowPasswordToggle" />
-              <span>Show passwords</span>
+              <span data-i18n="settings_show_passwords">Show passwords</span>
             </label>
-            <button type="submit" id="securitySaveButton" class="settings-primary-btn">Update password</button>
+            <button type="submit" id="securitySaveButton" class="settings-primary-btn" data-i18n="settings_update_password">Update password</button>
           </fieldset>
         </form>
         <div class="session-block">
-          <h3>Session</h3>
+          <h3 data-i18n="settings_session_title">Session</h3>
           <button type="button" class="settings-primary-btn secondary-session-btn" data-logout data-action="logout" data-i18n="settings_sign_out">Sign out of all sessions</button>
-          <p class="session-note">Use this if your account has been accessed from a device you don't recognize.</p>
+          <p class="session-note" data-i18n="settings_session_note">Use this if your account has been accessed from a device you don't recognize.</p>
         </div>
       </section>
 
@@ -216,22 +226,22 @@
                 <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
               </svg>
             </span>
-            <span>Danger zone</span>
+            <span data-i18n="settings_danger_title">Danger zone</span>
           </h2>
         </div>
         <div class="danger-row">
           <div class="danger-copy">
-            <div class="danger-name">Delete business data</div>
-            <div class="danger-desc">Removes all transactions, receipts, and mileage records. Your account and settings are kept.</div>
+            <div class="danger-name" data-i18n="settings_delete_business_data_title">Delete business data</div>
+            <div class="danger-desc" data-i18n="settings_delete_business_data_desc">Removes all transactions, receipts, and mileage records. Your account and settings are kept.</div>
           </div>
           <button type="button" id="deleteMyDataBtn" class="danger-outline-btn" data-i18n="privacy_delete_button">Delete data…</button>
         </div>
         <div class="danger-row">
           <div class="danger-copy">
-            <div class="danger-name">Delete account permanently</div>
-            <div class="danger-desc">Permanently removes your account and all associated data. This cannot be undone.</div>
+            <div class="danger-name" data-i18n="settings_delete_account_title">Delete account permanently</div>
+            <div class="danger-desc" data-i18n="settings_delete_account_desc">Permanently removes your account and all associated data. This cannot be undone.</div>
           </div>
-          <button id="deleteAccountTrigger" type="button" class="danger-outline-btn">Delete account…</button>
+          <button id="deleteAccountTrigger" type="button" class="danger-outline-btn" data-i18n="settings_delete_account_button">Delete account…</button>
         </div>
       </section>
     </main>
@@ -246,15 +256,15 @@
           <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
         </svg>
       </div>
-      <h3 id="dangerModalTitle">Delete business data?</h3>
-      <p id="dangerModalBody">This action cannot be undone.</p>
+      <h3 id="dangerModalTitle" data-i18n="settings_delete_business_data_modal_title">Delete business data?</h3>
+      <p id="dangerModalBody" data-i18n="settings_delete_business_data_modal_body">This action cannot be undone.</p>
       <div id="dangerModalConfirmWrap" class="danger-confirm-wrap hidden">
-        <label for="dangerModalConfirmInput">Type DELETE to confirm</label>
+        <label for="dangerModalConfirmInput" data-i18n="settings_type_delete_confirm">Type DELETE to confirm</label>
         <input type="text" id="dangerModalConfirmInput" autocomplete="off" />
       </div>
       <div class="modal-actions danger-actions">
-        <button type="button" id="dangerModalCancel" class="modal-cancel">Cancel</button>
-        <button type="button" id="dangerModalConfirm" class="modal-delete">Delete</button>
+        <button type="button" id="dangerModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
+        <button type="button" id="dangerModalConfirm" class="modal-delete" data-i18n="common_delete">Delete</button>
       </div>
     </div>
   </div>

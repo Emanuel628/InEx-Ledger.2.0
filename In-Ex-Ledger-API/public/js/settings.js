@@ -28,6 +28,8 @@ let privacySettings = {
 
 let toastTimer = null;
 let dangerAction = null;
+let preferenceBaseline = null;
+let pendingPreferences = null;
 
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
@@ -42,6 +44,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initPreferences();
   initSecurityForm();
   initDangerZone();
+  window.addEventListener("lunaLanguageChanged", refreshSettingsLocalizedState);
+  window.addEventListener("lunaRegionChanged", refreshSettingsLocalizedState);
 });
 
 function resolveSavedTheme() {
@@ -108,63 +112,85 @@ async function initPreferences() {
   const optOutToggle = document.getElementById("optOutToggle");
   const consentStatus = document.getElementById("consentStatus");
   const downloadBtn = document.getElementById("downloadMyDataBtn");
+  const saveBar = document.getElementById("settingsSaveBar");
+  const saveButton = document.getElementById("settingsSavePreferences");
+  const cancelButton = document.getElementById("settingsCancelChanges");
 
-  const savedRegion = localStorage.getItem("lb_region") || "us";
-  const savedTheme = resolveSavedTheme();
-  const savedDistance = localStorage.getItem("lb_unit_metric") === "true" ? "km" : "mi";
+  const buildPreferenceState = () => ({
+    region: typeof getCurrentRegion === "function" ? getCurrentRegion() : (localStorage.getItem("lb_region") || "us"),
+    language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en",
+    theme: resolveSavedTheme(),
+    distance: localStorage.getItem("lb_unit_metric") === "true" ? "km" : "mi",
+    optOutAnalytics: !!privacySettings.dataSharingOptOut
+  });
+
+  const syncPreferenceControls = (state) => {
+    if (regionSelect) regionSelect.value = state.region;
+    if (languageSelect) {
+      if (typeof populateLanguageOptions === "function") {
+        populateLanguageOptions(languageSelect);
+      }
+      languageSelect.value = state.language;
+    }
+    if (darkModeToggle) darkModeToggle.checked = state.theme === "dark";
+    if (distanceSelect) distanceSelect.value = state.distance;
+    if (optOutToggle) optOutToggle.checked = !!state.optOutAnalytics;
+  };
+
+  const hasPendingPreferenceChanges = () => {
+    if (!preferenceBaseline || !pendingPreferences) {
+      return false;
+    }
+    return Object.keys(preferenceBaseline).some(
+      (key) => preferenceBaseline[key] !== pendingPreferences[key]
+    );
+  };
+
+  const updateSaveBar = () => {
+    if (!saveBar) return;
+    saveBar.classList.toggle("hidden", !hasPendingPreferenceChanges());
+  };
+
+  const updatePendingPreferences = () => {
+    if (!pendingPreferences) return;
+    pendingPreferences = {
+      region: regionSelect ? regionSelect.value : pendingPreferences.region,
+      language: languageSelect ? languageSelect.value : pendingPreferences.language,
+      theme: darkModeToggle?.checked ? "dark" : "light",
+      distance: distanceSelect ? distanceSelect.value : pendingPreferences.distance,
+      optOutAnalytics: !!optOutToggle?.checked
+    };
+    updateSaveBar();
+  };
 
   if (regionSelect) {
-    regionSelect.value = savedRegion;
-    regionSelect.addEventListener("change", () => {
-      const normalized = regionSelect.value === "ca" ? "ca" : "us";
-      localStorage.setItem("lb_region", normalized);
-      localStorage.setItem("region", normalized === "ca" ? "CA" : "US");
-      window.LUNA_REGION = normalized;
-      showSettingsToast(`Region updated to ${REGION_DISPLAY[normalized]}`);
-    });
+    regionSelect.addEventListener("change", updatePendingPreferences);
   }
 
-  if (languageSelect && typeof populateLanguageOptions === "function") {
-    populateLanguageOptions(languageSelect);
-    languageSelect.value = typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en";
-    languageSelect.addEventListener("change", () => {
-      if (typeof setCurrentLanguage === "function") {
-        setCurrentLanguage(languageSelect.value);
-      }
-      showSettingsToast("Language updated");
-    });
+  if (languageSelect) {
+    languageSelect.addEventListener("change", updatePendingPreferences);
   }
 
   if (darkModeToggle) {
-    darkModeToggle.checked = savedTheme === "dark";
-    darkModeToggle.addEventListener("change", () => {
-      const nextTheme = darkModeToggle.checked ? "dark" : "light";
-      localStorage.setItem("lb_theme", nextTheme);
-      localStorage.setItem("lb_theme_version", SETTINGS_THEME_VERSION);
-      document.documentElement.setAttribute("data-theme", nextTheme);
-      showSettingsToast("Appearance updated");
-    });
+    darkModeToggle.addEventListener("change", updatePendingPreferences);
   }
 
   if (distanceSelect) {
-    distanceSelect.value = savedDistance;
-    distanceSelect.addEventListener("change", () => {
-      localStorage.setItem("lb_unit_metric", String(distanceSelect.value === "km"));
-      showSettingsToast("Distance unit updated");
-    });
+    distanceSelect.addEventListener("change", updatePendingPreferences);
   }
 
   privacySettings = await getPrivacySettingsSafe();
   if (optOutToggle) {
-    optOutToggle.checked = !!privacySettings.dataSharingOptOut;
-    optOutToggle.addEventListener("change", async () => {
-      await setPrivacySettingsSafe({ dataSharingOptOut: !!optOutToggle.checked });
-      showSettingsToast("Privacy preference updated");
-    });
+    optOutToggle.addEventListener("change", updatePendingPreferences);
   }
 
+  preferenceBaseline = buildPreferenceState();
+  pendingPreferences = { ...preferenceBaseline };
+  syncPreferenceControls(preferenceBaseline);
+  updateSaveBar();
+
   if (consentStatus) {
-    consentStatus.textContent = privacySettings.consentGiven ? "Yes" : "No";
+    consentStatus.textContent = privacySettings.consentGiven ? t("status_yes") : t("status_no");
   }
 
   if (downloadBtn) {
@@ -174,6 +200,73 @@ async function initPreferences() {
       }
       showSettingsToast("Data export started");
     });
+  }
+
+  cancelButton?.addEventListener("click", () => {
+    pendingPreferences = { ...preferenceBaseline };
+    syncPreferenceControls(preferenceBaseline);
+    updateSaveBar();
+  });
+
+  saveButton?.addEventListener("click", async () => {
+    if (!pendingPreferences || !hasPendingPreferenceChanges()) {
+      updateSaveBar();
+      return;
+    }
+
+    const nextPreferences = { ...pendingPreferences };
+
+    if (typeof setCurrentRegion === "function") {
+      setCurrentRegion(nextPreferences.region);
+    } else {
+      localStorage.setItem("lb_region", nextPreferences.region);
+      window.LUNA_REGION = nextPreferences.region;
+    }
+    localStorage.setItem("region", nextPreferences.region === "ca" ? "CA" : "US");
+
+    if (typeof setCurrentLanguage === "function") {
+      setCurrentLanguage(nextPreferences.language);
+    } else if (typeof applyTranslations === "function") {
+      localStorage.setItem("lb_language", nextPreferences.language);
+      window.LUNA_LANGUAGE = nextPreferences.language;
+      applyTranslations(nextPreferences.language);
+    }
+
+    if (typeof setGlobalTheme === "function") {
+      setGlobalTheme(nextPreferences.theme);
+    } else {
+      localStorage.setItem("lb_theme", nextPreferences.theme);
+      localStorage.setItem("lb_theme_version", SETTINGS_THEME_VERSION);
+      document.documentElement.setAttribute("data-theme", nextPreferences.theme);
+    }
+
+    localStorage.setItem("lb_unit_metric", String(nextPreferences.distance === "km"));
+    if (typeof window !== "undefined" && typeof CustomEvent === "function") {
+      window.dispatchEvent(
+        new CustomEvent("lunaDistanceUnitChanged", { detail: nextPreferences.distance })
+      );
+    }
+
+    await setPrivacySettingsSafe({ dataSharingOptOut: nextPreferences.optOutAnalytics });
+
+    preferenceBaseline = { ...nextPreferences };
+    pendingPreferences = { ...nextPreferences };
+    syncPreferenceControls(preferenceBaseline);
+    refreshSettingsLocalizedState();
+    updateSaveBar();
+    showSettingsToast(t("settings_changes_saved"));
+  });
+}
+
+function refreshSettingsLocalizedState() {
+  const consentStatus = document.getElementById("consentStatus");
+  const languageSelect = document.getElementById("languageSelectSettings");
+  if (consentStatus) {
+    consentStatus.textContent = privacySettings.consentGiven ? t("status_yes") : t("status_no");
+  }
+  if (languageSelect && typeof populateLanguageOptions === "function") {
+    populateLanguageOptions(languageSelect);
+    languageSelect.value = pendingPreferences?.language || preferenceBaseline?.language || getCurrentLanguage();
   }
 }
 
@@ -223,7 +316,13 @@ function initSecurityForm() {
     if (label === "Strong") color = "#1a7a4a";
     strengthMeter.style.width = getStrengthWidth(score);
     strengthMeter.style.backgroundColor = color;
-    strengthText.textContent = `${label} password`;
+    const labelKey =
+      label === "Strong"
+        ? "settings_password_strong"
+        : label === "Fair"
+        ? "settings_password_fair"
+        : "settings_password_weak";
+    strengthText.textContent = t(labelKey);
     strengthText.style.color = color;
   };
 
@@ -241,10 +340,11 @@ function initSecurityForm() {
       return;
     }
     if (newInput.value !== confirmInput.value) {
-      matchMessage.textContent = "Passwords do not match";
+      matchMessage.textContent = t("register_password_match_error");
       matchMessage.style.color = "#b91c1c";
     } else {
-      matchMessage.textContent = "";
+      matchMessage.textContent = t("register_password_match_success");
+      matchMessage.style.color = "#1a7a4a";
     }
   };
 
@@ -377,13 +477,13 @@ function initDangerZone() {
   const openModal = (action) => {
     dangerAction = action;
     if (action === "delete_account") {
-      title.textContent = "Delete account permanently?";
-      body.textContent = "This permanently removes your account and all associated data. This cannot be undone.";
+      title.textContent = t("settings_delete_account_modal_title");
+      body.textContent = t("settings_delete_account_modal_body");
       confirmWrap.classList.remove("hidden");
       confirmButton.disabled = true;
     } else {
-      title.textContent = "Delete business data?";
-      body.textContent = "This removes transactions, receipts, and mileage records. Your account and settings are kept.";
+      title.textContent = t("settings_delete_business_data_modal_title");
+      body.textContent = t("settings_delete_business_data_modal_body_full");
       confirmWrap.classList.add("hidden");
       confirmButton.disabled = false;
     }

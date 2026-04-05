@@ -14,6 +14,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   refreshMileageLabels();
   updateReceiptsDot();
   window.addEventListener("storage", refreshMileageLabels);
+  window.addEventListener("lunaRegionChanged", refreshMileageLabels);
+  window.addEventListener("lunaLanguageChanged", refreshMileageLabels);
 });
 
 function wireMileageForm() {
@@ -29,7 +31,7 @@ function wireMileageForm() {
     const distance = parseFloat(document.getElementById("mileageDistance")?.value || "");
 
     if (!date || !purpose || !Number.isFinite(distance)) {
-      if (message) message.textContent = "Date, purpose, and distance are required.";
+      if (message) message.textContent = t("mileage_error_required_fields");
       return;
     }
 
@@ -52,10 +54,10 @@ function wireMileageForm() {
 
 function refreshMileageLabels() {
   const useKilometers = shouldUseKilometers();
-  document.getElementById("mileageUnitNote").textContent = useKilometers ? "Keep a simple log for Canadian tax reporting." : "Keep a simple log for US tax reporting.";
-  document.getElementById("mileageSubtext").textContent = useKilometers ? "Using kilometers (Canada default). Change in Settings if needed." : "Using miles (U.S. default). Change in Settings if needed.";
-  document.getElementById("distanceLabel").textContent = useKilometers ? "Kilometers" : "Miles";
-  document.getElementById("distanceHeader").textContent = useKilometers ? "Kilometers" : "Miles";
+  document.getElementById("mileageUnitNote").textContent = useKilometers ? t("mileage_unit_note_ca") : t("mileage_unit_note_us");
+  document.getElementById("mileageSubtext").textContent = useKilometers ? t("mileage_subtext_ca") : t("mileage_subtext_us");
+  document.getElementById("distanceLabel").textContent = useKilometers ? t("mileage_label_kilometers") : t("mileage_label_miles");
+  document.getElementById("distanceHeader").textContent = useKilometers ? t("mileage_table_km") : t("mileage_table_miles");
   renderMileageTable();
 }
 
@@ -79,7 +81,7 @@ function renderMileageTable() {
       <td>${escapeHtml(entry.purpose)}</td>
       <td>${escapeHtml(entry.destination || "-")}</td>
       <td>${escapeHtml(Number(entry.distance || 0).toFixed(1))}</td>
-      <td><button type="button" class="mileage-delete" data-mileage-delete="${escapeHtml(entry.id)}">Delete</button></td>
+      <td><button type="button" class="mileage-delete" data-mileage-delete="${escapeHtml(entry.id)}">${escapeHtml(t("mileage_button_delete"))}</button></td>
     </tr>
   `).join("");
 

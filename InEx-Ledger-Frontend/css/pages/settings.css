@@ -922,6 +922,59 @@ body {
   gap: 16px;
 }
 
+.settings-save-bar {
+  position: sticky;
+  bottom: 20px;
+  margin: 18px 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(15, 25, 35, 0.18);
+}
+
+.settings-save-bar.hidden {
+  display: none;
+}
+
+.settings-save-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-save-copy strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.settings-save-copy span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.settings-save-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.settings-secondary-btn {
+  padding: 8px 16px;
+  border: 0.5px solid rgba(255, 255, 255, 0.28);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .consent-status {
   font-size: 12px;
   color: var(--ink3);
@@ -1216,14 +1269,23 @@ body {
   }
 
   .settings-row,
-  .danger-row {
+  .danger-row,
+  .settings-save-bar {
     flex-direction: column;
     align-items: stretch;
   }
 
   .inline-select,
   .danger-outline-btn,
-  .safe-action {
+  .safe-action,
+  .settings-secondary-btn,
+  .settings-save-actions,
+  .settings-save-actions .settings-primary-btn {
     width: 100%;
+  }
+
+  .settings-save-actions {
+    display: flex;
+    flex-direction: column;
   }
 }

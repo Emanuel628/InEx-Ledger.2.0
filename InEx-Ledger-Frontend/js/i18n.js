@@ -15,12 +15,25 @@ function normalizeLanguage(code) {
   return LANGUAGES.includes(normalized) ? normalized : 'en';
 }
 
+function normalizeRegion(code) {
+  if (!code || typeof code !== 'string') {
+    return 'us';
+  }
+
+  const normalized = code.toLowerCase();
+  return normalized === 'ca' ? 'ca' : 'us';
+}
+
 function getStoredLanguage() {
   return normalizeLanguage(localStorage.getItem('lb_language'));
 }
 
 function getCurrentLanguage() {
   return window.LUNA_LANGUAGE || getStoredLanguage();
+}
+
+function getCurrentRegion() {
+  return normalizeRegion(window.LUNA_REGION || localStorage.getItem('lb_region'));
 }
 
 function setCurrentLanguage(lang) {
@@ -32,6 +45,19 @@ function setCurrentLanguage(lang) {
   return normalized;
 }
 
+function setCurrentRegion(region) {
+  const normalized = normalizeRegion(region);
+  localStorage.setItem('lb_region', normalized);
+  window.LUNA_REGION = normalized;
+  applyTranslations(getCurrentLanguage());
+  if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
+    window.dispatchEvent(
+      new CustomEvent('lunaRegionChanged', { detail: normalized })
+    );
+  }
+  return normalized;
+}
+
 function t(key) {
   const lang = getCurrentLanguage();
   const translations = TRANSLATIONS[lang] || TRANSLATIONS.en || {};
@@ -40,6 +66,7 @@ function t(key) {
 
 function applyTranslations(languageOverride) {
   const language = normalizeLanguage(languageOverride || getCurrentLanguage());
+  const region = getCurrentRegion();
   window.LUNA_LANGUAGE = language;
   localStorage.setItem('lb_language', language);
 
@@ -51,6 +78,19 @@ function applyTranslations(languageOverride) {
     const key = node.getAttribute('data-i18n');
     if (!key) return;
     const text = t(key);
+    if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
+      node.value = text;
+    } else {
+      node.textContent = text;
+    }
+  });
+
+  const regionNodes = document.querySelectorAll('[data-i18n-region]');
+  regionNodes.forEach((node) => {
+    const baseKey = node.getAttribute('data-i18n-region');
+    if (!baseKey) return;
+    const regionKey = `${baseKey}_${region}`;
+    const text = t(regionKey) !== regionKey ? t(regionKey) : t(baseKey);
     if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
       node.value = text;
     } else {
@@ -105,16 +145,25 @@ window.LUNA_I18N = {
   t,
   applyTranslations,
   populateLanguageOptions,
-  setCurrentLanguage
+  setCurrentLanguage,
+  getCurrentRegion,
+  setCurrentRegion
 };
 
 window.t = t;
 window.applyTranslations = applyTranslations;
 window.populateLanguageOptions = populateLanguageOptions;
 window.setCurrentLanguage = setCurrentLanguage;
+window.getCurrentRegion = getCurrentRegion;
+window.setCurrentRegion = setCurrentRegion;
 window.LUNA_LANGUAGE_LABELS = LANGUAGE_LABELS;
 
 window.LUNA_LANGUAGE = window.LUNA_LANGUAGE || getCurrentLanguage();
+window.LUNA_REGION = window.LUNA_REGION || getCurrentRegion();
+
+document.addEventListener('DOMContentLoaded', () => {
+  applyTranslations(getCurrentLanguage());
+});
 
 const TRANSLATIONS = {
   en: {
@@ -128,8 +177,14 @@ const TRANSLATIONS = {
     nav_sign_in: 'Sign in',
     nav_create_account: 'Create account',
     landing_hero_title: 'Track your 1099 money without the headache',
+    landing_hero_title_us: 'Track your 1099 money without the headache',
+    landing_hero_title_ca: 'Track your self-employed income without the headache',
     landing_hero_subtitle:
       'A simple, calm ledger for freelancers and contractors to track income & expenses and export clean records for tax time.',
+    landing_hero_subtitle_us:
+      'A simple, calm ledger for freelancers and contractors to track income, expenses, and clean records for U.S. tax time.',
+    landing_hero_subtitle_ca:
+      'A simple, calm ledger for freelancers and contractors to track income, expenses, and clean records for Canadian tax time.',
     landing_start_trial: 'Start free trial',
     landing_sign_in: 'Sign in',
     landing_what_it_does: 'What it does',
@@ -146,6 +201,8 @@ const TRANSLATIONS = {
     landing_included_item1: 'Account creation & sign-in',
     landing_included_item2: 'Transaction ledger (income & expenses)',
     landing_included_item3: 'Basic organization built for 1099 workers',
+    landing_included_item3_us: 'Basic organization built for 1099 workers',
+    landing_included_item3_ca: 'Basic organization built for self-employed Canadians',
     landing_included_item4: 'CSV export for tax prep',
     landing_included_item5: '30-day free trial (then choose a plan)',
     landing_coming_title: "What's coming in V2",
@@ -303,6 +360,8 @@ const TRANSLATIONS = {
     exports_label_end: 'End date',
     exports_button_csv: 'Export CSV',
     mileage_title: 'Record a trip',
+    mileage_unit_note_us: 'Keep a simple log for US tax reporting.',
+    mileage_unit_note_ca: 'Keep a simple log for Canadian tax reporting.',
     mileage_subtext_us: 'Using miles (U.S. default). Change in Settings if needed.',
     mileage_subtext_ca: 'Using kilometers (Canada default). Change in Settings if needed.',
     mileage_label_date: 'Date',
@@ -329,6 +388,65 @@ const TRANSLATIONS = {
     mileage_error_odometer_order: 'Odometer end must be greater than or equal to start.',
     mileage_empty: 'No mileage logged yet.',
     settings_title: 'Settings',
+    settings_sidebar_account: 'Account',
+    settings_sidebar_preferences: 'Preferences',
+    settings_nav_business_profile: 'Business profile',
+    settings_nav_security: 'Security',
+    settings_nav_language_region: 'Language & region',
+    settings_nav_appearance: 'Appearance',
+    settings_nav_privacy: 'Privacy',
+    settings_business_profile_title: 'Business profile',
+    settings_business_profile_desc: 'This information appears on your PDF exports and CPA-ready reports.',
+    settings_label_business_name: 'Business name',
+    settings_label_business_type: 'Business type',
+    settings_label_tax_id: 'EIN',
+    settings_label_fiscal_year_start: 'Fiscal year start',
+    settings_label_business_address: 'Business address',
+    settings_business_type_sole_prop: 'Sole proprietor',
+    settings_preferences_title: 'Preferences',
+    settings_distance_units_title: 'Distance units',
+    settings_distance_units_desc: 'Choose how mileage is displayed throughout the app.',
+    settings_units_miles: 'Miles (mi)',
+    settings_units_km: 'Kilometers (km)',
+    settings_dark_mode_title: 'Dark mode',
+    settings_dark_mode_desc: 'Switch the interface between light and dark appearance.',
+    settings_language_title: 'Language',
+    settings_language_desc: 'Set the language used in your interface and reports.',
+    settings_region_title: 'Region',
+    settings_region_desc: 'Use the tax and formatting defaults that match your region.',
+    settings_opt_out_title: 'Opt out of analytics',
+    settings_opt_out_desc: 'Disable analytics and personal data sharing for product improvement.',
+    settings_security_title: 'Security',
+    settings_security_desc: 'Manage how you protect access to your account.',
+    settings_change_password: 'Change password',
+    settings_current_password: 'Current password',
+    settings_new_password: 'New password',
+    settings_confirm_new_password: 'Confirm new password',
+    settings_password_weak: 'Weak password',
+    settings_password_fair: 'Fair password',
+    settings_password_strong: 'Strong password',
+    settings_password_rule_length: 'At least 8 characters',
+    settings_password_rule_number: 'Includes a number',
+    settings_password_rule_uppercase: 'Includes an uppercase letter',
+    settings_password_rule_special: 'Includes a symbol',
+    settings_show_passwords: 'Show passwords',
+    settings_update_password: 'Update password',
+    settings_session_title: 'Session',
+    settings_session_note: "Use this if your account has been accessed from a device you don't recognize.",
+    settings_danger_title: 'Danger zone',
+    settings_delete_business_data_title: 'Delete business data',
+    settings_delete_business_data_desc: 'Removes all transactions, receipts, and mileage records. Your account and settings are kept.',
+    settings_delete_account_title: 'Delete account permanently',
+    settings_delete_account_desc: 'Permanently removes your account and all associated data. This cannot be undone.',
+    settings_delete_account_button: 'Delete account…',
+    settings_delete_business_data_modal_title: 'Delete business data?',
+    settings_delete_business_data_modal_body: 'This action cannot be undone.',
+    settings_delete_business_data_modal_body_full: 'This removes transactions, receipts, and mileage records. Your account and settings are kept.',
+    settings_delete_account_modal_title: 'Delete account permanently?',
+    settings_delete_account_modal_body: 'This permanently removes your account and all associated data. This cannot be undone.',
+    settings_type_delete_confirm: 'Type DELETE to confirm',
+    common_cancel: 'Cancel',
+    common_delete: 'Delete',
     settings_business_title: 'Business',
     settings_intro:
       'Manage your business information, security, and preferences.',
@@ -358,6 +476,9 @@ const TRANSLATIONS = {
     privacy_terms_accepted: 'Terms accepted:',
     status_yes: 'Yes',
     status_no: 'No',
+    settings_unsaved_title: 'Unsaved preference changes',
+    settings_unsaved_body: 'Save to apply language, region, appearance, and privacy updates across the app.',
+    settings_save_preferences: 'Save preferences',
     settings_save_changes: 'Save changes',
     settings_changes_saved: 'Settings updated.',
     settings_business_ids_saved: 'Business IDs saved',
@@ -388,8 +509,14 @@ const TRANSLATIONS = {
     nav_sign_in: 'Iniciar sesión',
     nav_create_account: 'Crear cuenta',
     landing_hero_title: 'Controla tu dinero 1099 sin dolor de cabeza',
+    landing_hero_title_us: 'Controla tu dinero 1099 sin dolor de cabeza',
+    landing_hero_title_ca: 'Controla tus ingresos como trabajador autónomo sin dolor de cabeza',
     landing_hero_subtitle:
       'Un libro mayor sencillo y tranquilo para freelancers y contratistas que registra ingresos, gastos y exporta registros limpios para impuestos.',
+    landing_hero_subtitle_us:
+      'Un libro mayor sencillo y tranquilo para freelancers y contratistas que registra ingresos, gastos y mantiene registros limpios para los impuestos en EE. UU.',
+    landing_hero_subtitle_ca:
+      'Un libro mayor sencillo y tranquilo para freelancers y contratistas que registra ingresos, gastos y mantiene registros limpios para los impuestos en Canadá.',
     landing_start_trial: 'Comenzar prueba gratuita',
     landing_sign_in: 'Iniciar sesión',
     landing_what_it_does: 'Qué hace',
@@ -406,6 +533,8 @@ const TRANSLATIONS = {
     landing_included_item1: 'Creación de cuenta e inicio de sesión',
     landing_included_item2: 'Libro de transacciones (ingresos y gastos)',
     landing_included_item3: 'Organización básica para trabajadores 1099',
+    landing_included_item3_us: 'Organización básica para trabajadores 1099',
+    landing_included_item3_ca: 'Organización básica para trabajadores autónomos en Canadá',
     landing_included_item4: 'Exportación CSV para impuestos',
     landing_included_item5: 'Prueba gratuita de 30 días',
     landing_coming_title: 'Qué viene en V2',
@@ -561,6 +690,8 @@ const TRANSLATIONS = {
     exports_label_end: 'Fecha final',
     exports_button_csv: 'Exportar CSV',
     mileage_title: 'Registrar un viaje',
+    mileage_unit_note_us: 'Mantén un registro sencillo para la declaración de impuestos en EE. UU.',
+    mileage_unit_note_ca: 'Mantén un registro sencillo para la declaración de impuestos en Canadá.',
     mileage_subtext_us: 'Usando millas (predeterminado en EE. UU.). Puedes cambiarlo en Configuración.',
     mileage_subtext_ca: 'Usando kilómetros (predeterminado en Canadá). Puedes cambiarlo en Configuración.',
     mileage_label_date: 'Fecha',
@@ -587,6 +718,65 @@ const TRANSLATIONS = {
     mileage_error_odometer_order: 'El odómetro final debe ser mayor o igual al inicial.',
     mileage_empty: 'Aún no hay viajes registrados.',
     settings_title: 'Configuración',
+    settings_sidebar_account: 'Cuenta',
+    settings_sidebar_preferences: 'Preferencias',
+    settings_nav_business_profile: 'Perfil del negocio',
+    settings_nav_security: 'Seguridad',
+    settings_nav_language_region: 'Idioma y región',
+    settings_nav_appearance: 'Apariencia',
+    settings_nav_privacy: 'Privacidad',
+    settings_business_profile_title: 'Perfil del negocio',
+    settings_business_profile_desc: 'Esta información aparece en tus exportaciones PDF e informes para tu contador.',
+    settings_label_business_name: 'Nombre del negocio',
+    settings_label_business_type: 'Tipo de negocio',
+    settings_label_tax_id: 'ID fiscal',
+    settings_label_fiscal_year_start: 'Inicio del año fiscal',
+    settings_label_business_address: 'Dirección del negocio',
+    settings_business_type_sole_prop: 'Propietario único',
+    settings_preferences_title: 'Preferencias',
+    settings_distance_units_title: 'Unidades de distancia',
+    settings_distance_units_desc: 'Elige cómo se muestra el kilometraje en toda la app.',
+    settings_units_miles: 'Millas (mi)',
+    settings_units_km: 'Kilómetros (km)',
+    settings_dark_mode_title: 'Modo oscuro',
+    settings_dark_mode_desc: 'Cambia la interfaz entre modo claro y oscuro.',
+    settings_language_title: 'Idioma',
+    settings_language_desc: 'Define el idioma usado en la interfaz y los informes.',
+    settings_region_title: 'Región',
+    settings_region_desc: 'Usa la configuración fiscal y de formato que corresponde a tu región.',
+    settings_opt_out_title: 'Desactivar analítica',
+    settings_opt_out_desc: 'Desactiva la analítica y el uso compartido de datos para mejorar el producto.',
+    settings_security_title: 'Seguridad',
+    settings_security_desc: 'Administra cómo proteges el acceso a tu cuenta.',
+    settings_change_password: 'Cambiar contraseña',
+    settings_current_password: 'Contraseña actual',
+    settings_new_password: 'Nueva contraseña',
+    settings_confirm_new_password: 'Confirmar nueva contraseña',
+    settings_password_weak: 'Contraseña débil',
+    settings_password_fair: 'Contraseña aceptable',
+    settings_password_strong: 'Contraseña fuerte',
+    settings_password_rule_length: 'Al menos 8 caracteres',
+    settings_password_rule_number: 'Incluye un número',
+    settings_password_rule_uppercase: 'Incluye una letra mayúscula',
+    settings_password_rule_special: 'Incluye un símbolo',
+    settings_show_passwords: 'Mostrar contraseñas',
+    settings_update_password: 'Actualizar contraseña',
+    settings_session_title: 'Sesión',
+    settings_session_note: 'Úsalo si tu cuenta fue accedida desde un dispositivo que no reconoces.',
+    settings_danger_title: 'Zona de peligro',
+    settings_delete_business_data_title: 'Eliminar datos del negocio',
+    settings_delete_business_data_desc: 'Elimina todas las transacciones, recibos y registros de kilometraje. Tu cuenta y configuración se conservan.',
+    settings_delete_account_title: 'Eliminar cuenta permanentemente',
+    settings_delete_account_desc: 'Elimina permanentemente tu cuenta y todos los datos asociados. Esto no se puede deshacer.',
+    settings_delete_account_button: 'Eliminar cuenta…',
+    settings_delete_business_data_modal_title: '¿Eliminar datos del negocio?',
+    settings_delete_business_data_modal_body: 'Esta acción no se puede deshacer.',
+    settings_delete_business_data_modal_body_full: 'Esto elimina transacciones, recibos y kilometraje. Tu cuenta y configuración se conservan.',
+    settings_delete_account_modal_title: '¿Eliminar cuenta permanentemente?',
+    settings_delete_account_modal_body: 'Esto elimina permanentemente tu cuenta y todos los datos asociados. No se puede deshacer.',
+    settings_type_delete_confirm: 'Escribe DELETE para confirmar',
+    common_cancel: 'Cancelar',
+    common_delete: 'Eliminar',
     settings_business_title: 'Negocio',
     settings_intro:
       'Administra tu información empresarial, seguridad y preferencias.',
@@ -616,6 +806,9 @@ const TRANSLATIONS = {
     privacy_terms_accepted: 'Términos aceptados:',
     status_yes: 'Sí',
     status_no: 'No',
+    settings_unsaved_title: 'Cambios de preferencias sin guardar',
+    settings_unsaved_body: 'Guarda para aplicar idioma, región, apariencia y privacidad en toda la aplicación.',
+    settings_save_preferences: 'Guardar preferencias',
     settings_save_changes: 'Guardar cambios',
     settings_changes_saved: 'Configuración guardada.',
     settings_business_ids_saved: 'Identificadores guardados',
@@ -646,8 +839,14 @@ const TRANSLATIONS = {
     nav_sign_in: 'Connexion',
     nav_create_account: 'Créer un compte',
     landing_hero_title: 'Suivez votre argent 1099 sans stress',
+    landing_hero_title_us: 'Suivez votre argent 1099 sans stress',
+    landing_hero_title_ca: 'Suivez vos revenus de travail autonome sans stress',
     landing_hero_subtitle:
       'Un grand livre apaisant pour indépendants et contractuels qui suit les revenus, dépenses et crée des dossiers propres pour la saison fiscale.',
+    landing_hero_subtitle_us:
+      'Un grand livre apaisant pour indépendants et contractuels qui suit les revenus, dépenses et crée des dossiers propres pour la saison fiscale aux États-Unis.',
+    landing_hero_subtitle_ca:
+      'Un grand livre apaisant pour indépendants et contractuels qui suit les revenus, dépenses et crée des dossiers propres pour la saison fiscale au Canada.',
     landing_start_trial: 'Commencer l\'essai gratuit',
     landing_sign_in: 'Connexion',
     landing_what_it_does: 'Ce que nous faisons',
@@ -664,6 +863,8 @@ const TRANSLATIONS = {
     landing_included_item1: 'Création de compte et connexion',
     landing_included_item2: 'Grand livre des transactions (revenus et dépenses)',
     landing_included_item3: 'Organisation simple pour les travailleurs 1099',
+    landing_included_item3_us: 'Organisation simple pour les travailleurs 1099',
+    landing_included_item3_ca: 'Organisation simple pour les travailleurs autonomes au Canada',
     landing_included_item4: 'Export CSV pour la préparation fiscale',
     landing_included_item5: 'Essai gratuit de 30 jours',
     landing_coming_title: 'Ce qui arrive dans V2',
@@ -818,6 +1019,8 @@ const TRANSLATIONS = {
     exports_label_end: 'Date de fin',
     exports_button_csv: 'Exporter CSV',
     mileage_title: 'Enregistrer un trajet',
+    mileage_unit_note_us: 'Tenez un registre simple pour la déclaration fiscale américaine.',
+    mileage_unit_note_ca: 'Tenez un registre simple pour la déclaration fiscale canadienne.',
     mileage_subtext_us: 'Utilisation des miles (par défaut aux États-Unis). Vous pouvez changer dans Paramètres.',
     mileage_subtext_ca: 'Utilisation des kilomètres (par défaut au Canada). Vous pouvez changer dans Paramètres.',
     mileage_label_date: 'Date',
@@ -844,6 +1047,65 @@ const TRANSLATIONS = {
     mileage_error_odometer_order: 'L\'odomètre final doit être supérieur ou égal au départ.',
     mileage_empty: 'Aucun trajet enregistré pour le moment.',
     settings_title: 'Paramètres',
+    settings_sidebar_account: 'Compte',
+    settings_sidebar_preferences: 'Préférences',
+    settings_nav_business_profile: 'Profil de l’entreprise',
+    settings_nav_security: 'Sécurité',
+    settings_nav_language_region: 'Langue et région',
+    settings_nav_appearance: 'Apparence',
+    settings_nav_privacy: 'Confidentialité',
+    settings_business_profile_title: 'Profil de l’entreprise',
+    settings_business_profile_desc: 'Ces informations apparaissent sur vos exports PDF et rapports prêts pour votre comptable.',
+    settings_label_business_name: 'Nom de l’entreprise',
+    settings_label_business_type: 'Type d’entreprise',
+    settings_label_tax_id: 'ID fiscal',
+    settings_label_fiscal_year_start: 'Début de l’exercice',
+    settings_label_business_address: 'Adresse de l’entreprise',
+    settings_business_type_sole_prop: 'Entreprise individuelle',
+    settings_preferences_title: 'Préférences',
+    settings_distance_units_title: 'Unités de distance',
+    settings_distance_units_desc: 'Choisissez comment le kilométrage est affiché dans l’application.',
+    settings_units_miles: 'Miles (mi)',
+    settings_units_km: 'Kilomètres (km)',
+    settings_dark_mode_title: 'Mode sombre',
+    settings_dark_mode_desc: 'Basculez l’interface entre apparence claire et sombre.',
+    settings_language_title: 'Langue',
+    settings_language_desc: 'Définissez la langue utilisée dans l’interface et les rapports.',
+    settings_region_title: 'Région',
+    settings_region_desc: 'Utilisez les paramètres fiscaux et de format adaptés à votre région.',
+    settings_opt_out_title: 'Désactiver les analyses',
+    settings_opt_out_desc: 'Désactivez les analyses et le partage de données pour l’amélioration du produit.',
+    settings_security_title: 'Sécurité',
+    settings_security_desc: 'Gérez la protection de l’accès à votre compte.',
+    settings_change_password: 'Changer le mot de passe',
+    settings_current_password: 'Mot de passe actuel',
+    settings_new_password: 'Nouveau mot de passe',
+    settings_confirm_new_password: 'Confirmer le nouveau mot de passe',
+    settings_password_weak: 'Mot de passe faible',
+    settings_password_fair: 'Mot de passe correct',
+    settings_password_strong: 'Mot de passe fort',
+    settings_password_rule_length: 'Au moins 8 caractères',
+    settings_password_rule_number: 'Inclut un chiffre',
+    settings_password_rule_uppercase: 'Inclut une majuscule',
+    settings_password_rule_special: 'Inclut un symbole',
+    settings_show_passwords: 'Afficher les mots de passe',
+    settings_update_password: 'Mettre à jour le mot de passe',
+    settings_session_title: 'Session',
+    settings_session_note: 'Utilisez ceci si votre compte a été consulté depuis un appareil inconnu.',
+    settings_danger_title: 'Zone de danger',
+    settings_delete_business_data_title: 'Supprimer les données de l’entreprise',
+    settings_delete_business_data_desc: 'Supprime toutes les transactions, reçus et données de kilométrage. Votre compte et vos paramètres sont conservés.',
+    settings_delete_account_title: 'Supprimer définitivement le compte',
+    settings_delete_account_desc: 'Supprime définitivement votre compte et toutes les données associées. Cette action est irréversible.',
+    settings_delete_account_button: 'Supprimer le compte…',
+    settings_delete_business_data_modal_title: 'Supprimer les données de l’entreprise ?',
+    settings_delete_business_data_modal_body: 'Cette action est irréversible.',
+    settings_delete_business_data_modal_body_full: 'Cela supprime les transactions, reçus et données de kilométrage. Votre compte et vos paramètres sont conservés.',
+    settings_delete_account_modal_title: 'Supprimer définitivement le compte ?',
+    settings_delete_account_modal_body: 'Cela supprime définitivement votre compte et toutes les données associées. Cette action est irréversible.',
+    settings_type_delete_confirm: 'Tapez DELETE pour confirmer',
+    common_cancel: 'Annuler',
+    common_delete: 'Supprimer',
     settings_business_title: 'Entreprise',
     settings_intro:
       'Gérez votre entreprise, votre sécurité et vos préférences.',
@@ -873,6 +1135,9 @@ const TRANSLATIONS = {
     privacy_terms_accepted: 'Conditions acceptées :',
     status_yes: 'Oui',
     status_no: 'Non',
+    settings_unsaved_title: 'Modifications de préférences non enregistrées',
+    settings_unsaved_body: 'Enregistrez pour appliquer la langue, la région, l’apparence et la confidentialité dans toute l’application.',
+    settings_save_preferences: 'Enregistrer les préférences',
     settings_save_changes: 'Enregistrer les modifications',
     settings_changes_saved: 'Paramètres enregistrés.',
     settings_business_ids_saved: 'Identifiants enregistrés',
