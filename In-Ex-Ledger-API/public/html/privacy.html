@@ -11,15 +11,15 @@
   <header>
   <p class="site-logo">InEx Ledger</p>
   <nav>
-    <a href="/login">Sign In</a>
-    <a href="/subscription">Pricing</a>
+    <a href="/login" data-i18n="nav_sign_in">Sign In</a>
+    <a href="/subscription" data-i18n="nav_pricing">Pricing</a>
   </nav>
 </header>
 
   <main>
     <section>
-      <h2>Your data is kept safe</h2>
-      <p>
+      <h2 data-i18n="privacy_safe_title">Your data is kept safe</h2>
+      <p data-i18n="privacy_safe_body">
         InEx Ledger stores the minimum data needed to provide your bookkeeping app.
         That includes account email, authentication/session information, ledger entries,
         receipts, exports, and usage signals. The data may be processed and stored in the
@@ -29,62 +29,63 @@
     </section>
 
     <section>
-      <h2>Data we collect</h2>
+      <h2 data-i18n="privacy_collect_title">Data we collect</h2>
       <ul>
-        <li>Account credentials and email</li>
-        <li>Auth/session tokens</li>
-        <li>App usage and navigation data</li>
-        <li>Financial entries you enter (transactions, receipts, recurring data)</li>
-        <li>Exports and reports you generate</li>
+        <li data-i18n="privacy_collect_1">Account credentials and email</li>
+        <li data-i18n="privacy_collect_2">Auth/session tokens</li>
+        <li data-i18n="privacy_collect_3">App usage and navigation data</li>
+        <li data-i18n="privacy_collect_4">Financial entries you enter (transactions, receipts, recurring data)</li>
+        <li data-i18n="privacy_collect_5">Exports and reports you generate</li>
       </ul>
     </section>
 
     <section>
-      <h2>Data we do not sell</h2>
-      <p>
+      <h2 data-i18n="privacy_no_sell_title">Data we do not sell</h2>
+      <p data-i18n="privacy_no_sell_body">
         We do not sell your personal data. That means no targeted advertising or profiling
         for sale. Your data stays within InEx Ledger unless you explicitly export it yourself.
       </p>
     </section>
 
     <section>
-      <h2>Your rights</h2>
-      <p>New Jersey data privacy law (effective Jan 15, 2025) guarantees:</p>
+      <h2 data-i18n="privacy_rights_title">Your rights</h2>
+      <p data-i18n="privacy_rights_intro">New Jersey data privacy law (effective Jan 15, 2025) guarantees:</p>
       <ul>
-        <li>Access and correction of your data</li>
-        <li>Deletion and portability of your records</li>
-        <li>Opt-out of targeted advertising, sale, or profiling</li>
+        <li data-i18n="privacy_rights_1">Access and correction of your data</li>
+        <li data-i18n="privacy_rights_2">Deletion and portability of your records</li>
+        <li data-i18n="privacy_rights_3">Opt-out of targeted advertising, sale, or profiling</li>
       </ul>
     </section>
 
     <section>
-      <h2>How to exercise rights</h2>
+      <h2 data-i18n="privacy_exercise_title">How to exercise rights</h2>
       <p>
         Use <strong>Settings &gt; Privacy &amp; Data</strong> to change your preferences, download
-        data, or request deletion. For manual requests, email
-        Questions? <a href="https://inexledger.com">Visit inexledger.com</a> for support.
+        <span data-i18n="privacy_exercise_body_tail">data, or request deletion. For manual requests, email Questions?</span>
+        <a href="https://inexledger.com" data-i18n="privacy_exercise_link">Visit inexledger.com</a>
+        <span data-i18n="privacy_exercise_suffix">for support.</span>
       </p>
     </section>
 
     <section>
-      <h2>Retention</h2>
-      <p>
+      <h2 data-i18n="privacy_retention_title">Retention</h2>
+      <p data-i18n="privacy_retention_body">
         Account and ledger data is retained until a deletion request is honored. Business
         data may remain in backups only as required by law.
       </p>
     </section>
 
     <section>
-      <h2>Security</h2>
-      <p>
+      <h2 data-i18n="privacy_security_title">Security</h2>
+      <p data-i18n="privacy_security_body">
         Passwords are hashed before storage, TLS encrypts every request, and access follows
         least-privilege principles. We monitor for suspicious behavior to keep your records safe.
       </p>
     </section>
 
     <section>
-      <h2>Canada GST/HST note</h2>
-      <p>
+      <h2 data-i18n="privacy_canada_title">Canada GST/HST note</h2>
+      <p data-i18n="privacy_canada_body">
         If you are in Canada and your total taxable revenue exceeds $30,000 CAD within
         twelve months, you may have obligations to register and collect GST/HST. Use InEx Ledger
         to keep clean records, and consult your advisor for the next steps.
@@ -92,7 +93,7 @@
     </section>
 
     <section>
-      <p>
+      <p data-i18n="privacy_disclaimer">
         Estimates are informational and not tax advice.
       </p>
     </section>
@@ -100,14 +101,15 @@
 
   <footer>
     <p>
-      <a href="subscription">Pricing</a>
-      <a href="privacy">Privacy</a>
-      <a href="terms">Terms</a>
+      <a href="subscription" data-i18n="nav_pricing">Pricing</a>
+      <a href="privacy" data-i18n="footer_privacy">Privacy</a>
+      <a href="terms" data-i18n="footer_terms">Terms</a>
     </p>
     <p>&copy; 2026 InEx Ledger</p>
   </footer>
 
   <script src="../js/global.js?v=20260405c"></script>
+  <script src="../js/i18n.js?v=20260405c"></script>
   <script src="../js/privacy.js?v=20260405c"></script>
 </body>
 </html>
