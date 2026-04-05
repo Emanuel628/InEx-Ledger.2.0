@@ -5,6 +5,10 @@ let receiptRecords = [];
 let transactionMap = {};
 let activeReceiptLinkId = null;
 
+function tx(key) {
+  return typeof window.t === "function" ? window.t(key) : key;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
@@ -37,12 +41,12 @@ function wireReceiptUpload() {
 
     try {
       await uploadReceipt(file);
-      showReceiptsToast("Receipt uploaded");
+      showReceiptsToast(tx("receipts_uploaded_success"));
       uploadInput.value = "";
       await loadReceipts();
     } catch (error) {
       console.error("Receipt upload failed:", error);
-      showReceiptsToast(error.message || "Receipt upload failed");
+      showReceiptsToast(error.message || tx("receipts_error_upload"));
     }
   });
 }
@@ -62,12 +66,12 @@ async function uploadReceipt(file) {
 
   if (response.status === 402) {
     syncTierNotice(true);
-    throw new Error("Receipt uploads require InEx Ledger V1.");
+    throw new Error(tx("receipts_error_v1_required"));
   }
 
   if (!response.ok) {
     const errorPayload = await response.json().catch(() => null);
-    throw new Error(errorPayload?.error || "Failed to upload receipt.");
+    throw new Error(errorPayload?.error || tx("receipts_error_upload"));
   }
 
   return response.json().catch(() => ({}));
@@ -127,7 +131,7 @@ async function loadReceipts() {
 
     if (!response.ok) {
       const errorPayload = await response.json().catch(() => null);
-      throw new Error(errorPayload?.error || "Failed to load receipts.");
+      throw new Error(errorPayload?.error || tx("receipts_error_load"));
     }
 
     const payload = await response.json().catch(() => null);
@@ -171,15 +175,15 @@ function renderReceipts(receipts) {
     const transactionCell = renderTransactionCell(receipt.transaction_id);
     return `
       <tr>
-        <td data-label="Filename">
-          <button type="button" class="receipt-file-button" data-receipt-download="${escapeHtml(receipt.id || "")}">${escapeHtml(receipt.filename || "Receipt")}</button>
+        <td data-label="${escapeHtml(tx("receipts_table_filename"))}">
+          <button type="button" class="receipt-file-button" data-receipt-download="${escapeHtml(receipt.id || "")}">${escapeHtml(receipt.filename || tx("receipts_fallback_name"))}</button>
         </td>
-        <td data-label="Uploaded date">${escapeHtml(formatReceiptDate(receipt.created_at))}</td>
-        <td data-label="Attached to transaction">${transactionCell}</td>
-        <td data-label="Actions">
+        <td data-label="${escapeHtml(tx("receipts_table_uploaded"))}">${escapeHtml(formatReceiptDate(receipt.created_at))}</td>
+        <td data-label="${escapeHtml(tx("receipts_table_attached"))}">${transactionCell}</td>
+        <td data-label="${escapeHtml(tx("common_actions"))}">
           <div class="receipt-row-actions">
-            <button type="button" class="receipt-link-btn" data-receipt-link="${escapeHtml(receipt.id || "")}">Link</button>
-            <button type="button" class="receipt-delete-btn" data-receipt-delete="${escapeHtml(receipt.id || "")}">Delete</button>
+            <button type="button" class="receipt-link-btn" data-receipt-link="${escapeHtml(receipt.id || "")}">${escapeHtml(tx("receipts_link_action"))}</button>
+            <button type="button" class="receipt-delete-btn" data-receipt-delete="${escapeHtml(receipt.id || "")}">${escapeHtml(tx("common_delete"))}</button>
           </div>
         </td>
       </tr>
@@ -198,7 +202,7 @@ function renderReceipts(receipts) {
         await openReceiptPreview(receipt.id, receipt.filename || "receipt");
       } catch (error) {
         console.error("Receipt preview failed:", error);
-        showReceiptsToast(error.message || "Receipt preview failed");
+        showReceiptsToast(error.message || tx("receipts_error_preview"));
       }
     });
   });
@@ -250,7 +254,7 @@ function openReceiptLinkModal(receiptId) {
   activeReceiptLinkId = receiptId;
   const transactions = Object.values(transactionMap)
     .sort((left, right) => String(right.date || "").localeCompare(String(left.date || "")));
-  select.innerHTML = '<option value="">Not attached</option>';
+  select.innerHTML = `<option value="">${escapeHtml(tx("receipts_not_attached"))}</option>`;
   transactions.forEach((transaction) => {
     if (!transaction?.id) {
       return;
@@ -294,14 +298,14 @@ async function saveReceiptLink(receiptId, transactionId) {
 
   if (!response || !response.ok) {
     const errorPayload = await response?.json().catch(() => null);
-    showReceiptsToast(errorPayload?.error || "Unable to link receipt");
+    showReceiptsToast(errorPayload?.error || tx("receipts_error_link"));
     return;
   }
 
   closeReceiptLinkModal();
   await loadTransactionMap();
   await loadReceipts();
-  showReceiptsToast(transactionId ? "Receipt linked" : "Receipt unlinked");
+  showReceiptsToast(transactionId ? tx("receipts_linked") : tx("receipts_unlinked"));
 }
 
 async function deleteReceiptRecord(receiptId) {
@@ -314,7 +318,8 @@ async function deleteReceiptRecord(receiptId) {
     return;
   }
 
-  if (!window.confirm(`Delete receipt "${receipt.filename || "this receipt"}"? This cannot be undone.`)) {
+  const receiptName = receipt.filename || tx("receipts_this_receipt");
+  if (!window.confirm(`${tx("receipts_confirm_delete_prefix")} "${receiptName}"? ${tx("receipts_confirm_delete_suffix")}`)) {
     return;
   }
 
@@ -324,13 +329,13 @@ async function deleteReceiptRecord(receiptId) {
 
   if (!response || !response.ok) {
     const errorPayload = await response?.json().catch(() => null);
-    showReceiptsToast(errorPayload?.error || "Unable to delete receipt");
+    showReceiptsToast(errorPayload?.error || tx("receipts_error_delete"));
     return;
   }
 
   await loadTransactionMap();
   await loadReceipts();
-  showReceiptsToast("Receipt deleted");
+  showReceiptsToast(tx("receipts_deleted"));
 }
 
 async function openReceiptPreview(receiptId, filename) {
@@ -343,7 +348,7 @@ async function openReceiptPreview(receiptId, filename) {
   });
 
   if (!response.ok) {
-    throw new Error("Failed to open receipt.");
+    throw new Error(tx("receipts_error_open"));
   }
 
   const blob = await response.blob();

@@ -24,13 +24,13 @@
         <span class="topbar-brand-text">InEx Ledger</span>
       </a>
       <nav class="topbar-nav" aria-label="Primary">
-        <a href="transactions"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>Transactions</span></a>
-        <a href="accounts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg></span><span>Accounts</span></a>
-        <a class="is-active" href="categories"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg></span><span>Categories</span></a>
-        <a href="receipts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span>Receipts</span></a>
-        <a href="mileage"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span>Mileage</span></a>
-        <a href="exports"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Exports</span></a>
-        <a href="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg></span><span>Settings</span></a>
+        <a href="transactions"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span data-i18n="nav_transactions">Transactions</span></a>
+        <a href="accounts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg></span><span data-i18n="nav_accounts">Accounts</span></a>
+        <a class="is-active" href="categories"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg></span><span data-i18n="nav_categories">Categories</span></a>
+        <a href="receipts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span data-i18n="nav_receipts">Receipts</span></a>
+        <a href="mileage"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span data-i18n="nav_mileage">Mileage</span></a>
+        <a href="exports"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span data-i18n="nav_exports">Exports</span></a>
+        <a href="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg></span><span data-i18n="nav_settings">Settings</span></a>
       </nav>
     </div>
     <div class="user-pill"><span class="user-avatar">IL</span><span class="user-name">InEx Ledger</span></div>
@@ -38,36 +38,36 @@
 
   <main class="app-shell">
     <aside class="app-sidebar" aria-label="Sidebar">
-      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-section-label" data-i18n="sidebar_overview">Overview</div>
       <nav class="sidebar-nav">
-        <a href="transactions" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>All transactions</span></a>
-        <a href="transactions?type=income" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg></span><span>Income</span></a>
-        <a href="transactions?type=expense" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 5v6M5 8l3 3 3-3"></path></svg></span><span>Expenses</span></a>
+        <a href="transactions" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span data-i18n="sidebar_all_transactions">All transactions</span></a>
+        <a href="transactions?type=income" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg></span><span data-i18n="sidebar_income">Income</span></a>
+        <a href="transactions?type=expense" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 5v6M5 8l3 3 3-3"></path></svg></span><span data-i18n="sidebar_expenses">Expenses</span></a>
       </nav>
-      <div class="sidebar-section-label">Tools</div>
+      <div class="sidebar-section-label" data-i18n="sidebar_tools">Tools</div>
       <nav class="sidebar-nav">
-        <a href="receipts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span>Receipts</span><span id="receiptsDot" class="sidebar-dot" hidden></span></a>
-        <a href="mileage" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span>Mileage</span></a>
-        <a href="exports" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Exports</span></a>
+        <a href="receipts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span data-i18n="nav_receipts">Receipts</span><span id="receiptsDot" class="sidebar-dot" hidden></span></a>
+        <a href="mileage" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span data-i18n="nav_mileage">Mileage</span></a>
+        <a href="exports" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span data-i18n="nav_exports">Exports</span></a>
       </nav>
     </aside>
 
     <div class="app-content categories-content">
       <section class="categories-page-header">
         <div>
-          <h1 class="categories-page-title">Categories</h1>
-          <p class="categories-page-subtitle">Organize transactions into income or expense groups.</p>
+          <h1 class="categories-page-title" data-i18n="categories_title">Categories</h1>
+          <p class="categories-page-subtitle" data-i18n="categories_page_subtitle">Organize transactions into income or expense groups.</p>
         </div>
-        <button id="showCategoryModal" type="button" class="categories-add-btn">Add category</button>
+        <button id="showCategoryModal" type="button" class="categories-add-btn" data-i18n="categories_add">Add category</button>
       </section>
 
       <section class="category-card">
-        <div class="category-card-head"><h2>Income categories</h2></div>
+        <div class="category-card-head"><h2 data-i18n="categories_income_title">Income categories</h2></div>
         <div id="incomeCategories" class="category-list"></div>
       </section>
 
       <section class="category-card">
-        <div class="category-card-head"><h2>Expense categories</h2></div>
+        <div class="category-card-head"><h2 data-i18n="categories_expense_title">Expense categories</h2></div>
         <div id="expenseCategories" class="category-list"></div>
       </section>
 
@@ -78,28 +78,28 @@
   <div id="categoryModal" class="category-modal hidden">
     <div class="category-modal-backdrop" data-modal-close></div>
     <div class="category-modal-panel">
-      <h3>Add category</h3>
+      <h3 data-i18n="categories_add">Add category</h3>
       <form id="categoryForm" class="category-form">
         <div class="form-field">
-          <label class="field-label" for="category-name">Category name</label>
+          <label class="field-label" for="category-name" data-i18n="categories_label_name">Category name</label>
           <input type="text" id="category-name" required />
         </div>
         <div class="form-field">
-          <label class="field-label" for="category-type">Type</label>
+          <label class="field-label" for="category-type" data-i18n="categories_label_type">Type</label>
           <select id="category-type" required>
-            <option value="income">Income</option>
-            <option value="expense">Expense</option>
+            <option value="income" data-i18n="categories_type_income">Income</option>
+            <option value="expense" data-i18n="categories_type_expense">Expense</option>
           </select>
         </div>
         <div class="form-field">
-          <label class="field-label" for="category-tax-label">Tax selection</label>
+          <label class="field-label" for="category-tax-label" data-i18n="categories_tax_selection">Tax selection</label>
           <select id="category-tax-label">
-            <option value="">Select tax treatment</option>
+            <option value="" data-i18n="categories_tax_select">Select tax treatment</option>
           </select>
-          <p class="field-hint" id="categoryTaxHint">Choose the tax bucket this category maps to for your region.</p>
+          <p class="field-hint" id="categoryTaxHint" data-i18n="categories_tax_hint_default">Choose the tax bucket this category maps to for your region.</p>
         </div>
         <div class="form-field">
-          <label class="field-label">Color</label>
+          <label class="field-label" data-i18n="categories_color">Color</label>
           <div class="swatch-row" id="categoryColorRow">
             <button type="button" class="color-swatch is-active" data-color="blue" style="--swatch:#1a3a5c"></button>
             <button type="button" class="color-swatch" data-color="green" style="--swatch:#1a5c35"></button>
@@ -111,8 +111,8 @@
           <input type="hidden" id="category-color" value="blue" />
         </div>
         <div class="form-actions">
-          <button type="button" id="cancelCategoryModal" class="modal-cancel">Cancel</button>
-          <button type="submit" class="modal-save">Add category</button>
+          <button type="button" id="cancelCategoryModal" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
+          <button type="submit" class="modal-save" data-i18n="categories_add">Add category</button>
         </div>
       </form>
       <p id="categoryFormMessage" class="category-message"></p>
@@ -121,7 +121,7 @@
 
   <div id="categoriesToast" class="categories-toast hidden" role="status" aria-live="polite">
     <span class="toast-check" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><polyline points="2 8 6 12 14 4"></polyline></svg></span>
-    <span id="categoriesToastMessage">Category added</span>
+    <span id="categoriesToastMessage" data-i18n="categories_added">Category added</span>
   </div>
 
   <script src="../js/global.js?v=20260405c"></script>

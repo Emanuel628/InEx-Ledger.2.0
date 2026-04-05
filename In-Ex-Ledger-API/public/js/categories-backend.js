@@ -81,6 +81,10 @@ let categoryRecords = [];
 let currentRegion = null;
 let unattachedReceiptsCount = 0;
 
+function tx(key) {
+  return typeof window.t === "function" ? window.t(key) : key;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
@@ -129,7 +133,7 @@ function wireCategoryModal() {
     const message = document.getElementById("categoryFormMessage");
 
     if (!name) {
-      if (message) message.textContent = "Enter a category name.";
+      if (message) message.textContent = tx("categories_error_name");
       return;
     }
 
@@ -147,13 +151,13 @@ function wireCategoryModal() {
 
     if (!response || !response.ok) {
       const errorPayload = await response?.json().catch(() => null);
-      if (message) message.textContent = errorPayload?.error || "Unable to add category.";
+      if (message) message.textContent = errorPayload?.error || tx("categories_error_add");
       return;
     }
 
     closeCategoryModal();
     await loadCategories();
-    showCategoriesToast("Category added");
+    showCategoriesToast(tx("categories_added"));
   });
 }
 
@@ -174,7 +178,7 @@ async function loadCategories() {
   try {
     const response = await apiFetch("/api/categories");
     if (!response || !response.ok) {
-      throw new Error("Failed to load categories.");
+      throw new Error(tx("categories_error_load"));
     }
     let categories = await response.json().catch(() => []);
     if (Array.isArray(categories) && categories.length === 0) {
@@ -200,8 +204,8 @@ function normalizeCategory(category) {
 }
 
 function renderCategoryLists() {
-  renderCategoryGroup("incomeCategories", "income", "No income categories yet.");
-  renderCategoryGroup("expenseCategories", "expense", "No expense categories yet.");
+  renderCategoryGroup("incomeCategories", "income", tx("categories_no_income"));
+  renderCategoryGroup("expenseCategories", "expense", tx("categories_no_expense"));
 }
 
 function renderCategoryGroup(containerId, type, emptyText) {
@@ -210,7 +214,8 @@ function renderCategoryGroup(containerId, type, emptyText) {
 
   const categories = categoryRecords.filter((item) => item.type === type);
   if (!categories.length) {
-    container.innerHTML = `<div class="category-empty"><p>${emptyText}</p><button type="button" class="empty-add-btn" data-empty-add="${type}">+ Add ${type} category</button></div>`;
+    const addLabel = type === "income" ? tx("categories_add_income") : tx("categories_add_expense");
+    container.innerHTML = `<div class="category-empty"><p>${escapeHtml(emptyText)}</p><button type="button" class="empty-add-btn" data-empty-add="${type}">${escapeHtml(addLabel)}</button></div>`;
     container.querySelector("[data-empty-add]")?.addEventListener("click", () => {
       document.getElementById("category-type").value = type;
       populateTaxLabelOptions(type);
@@ -225,7 +230,7 @@ function renderCategoryGroup(containerId, type, emptyText) {
         <span class="category-pill pill-${escapeHtml(category.color || defaultColorForType(type))}">${escapeHtml(category.name)}</span>
         ${category.taxLabel ? `<div class="field-hint">${escapeHtml(formatTaxLabel(category.taxLabel))}</div>` : ""}
       </div>
-      <button type="button" class="category-delete" data-category-delete="${escapeHtml(category.id)}">Delete</button>
+      <button type="button" class="category-delete" data-category-delete="${escapeHtml(category.id)}">${escapeHtml(tx("common_delete"))}</button>
     </div>
   `).join("");
 
@@ -238,20 +243,20 @@ function renderCategoryGroup(containerId, type, emptyText) {
 
 async function handleCategoryDelete(categoryId) {
   const message = document.getElementById("categoryMessage");
-  if (!window.confirm("Delete this category? This cannot be undone.")) {
+  if (!window.confirm(tx("categories_confirm_delete"))) {
     return;
   }
   const response = await apiFetch(`/api/categories/${categoryId}`, { method: "DELETE" });
 
   if (!response || !response.ok) {
     const errorPayload = await response?.json().catch(() => null);
-    if (message) message.textContent = errorPayload?.error || "Unable to delete category.";
+    if (message) message.textContent = errorPayload?.error || tx("categories_error_delete");
     return;
   }
 
   if (message) message.textContent = "";
   await loadCategories();
-  showCategoriesToast("Category deleted");
+  showCategoriesToast(tx("categories_deleted"));
 }
 
 function populateTaxLabelOptions(type) {
@@ -261,7 +266,7 @@ function populateTaxLabelOptions(type) {
 
   const options = currentRegion ? CATEGORY_TAX_OPTIONS[currentRegion]?.[type === "expense" ? "expense" : "income"] || [] : [];
   const previous = select.value;
-  select.innerHTML = '<option value="">Select tax treatment</option>';
+  select.innerHTML = `<option value="">${escapeHtml(tx("categories_tax_select"))}</option>`;
   options.forEach((option) => {
     const node = document.createElement("option");
     node.value = option.value;
@@ -273,11 +278,11 @@ function populateTaxLabelOptions(type) {
 
   if (hint) {
     if (currentRegion === "CA") {
-      hint.textContent = "Showing Canadian T2125 and sales-tax mappings only.";
+      hint.textContent = tx("categories_tax_hint_ca");
     } else if (currentRegion === "US") {
-      hint.textContent = "Showing U.S. Schedule C mappings only.";
+      hint.textContent = tx("categories_tax_hint_us");
     } else {
-      hint.textContent = "Set your business region first so only the correct tax mappings are shown.";
+      hint.textContent = tx("categories_tax_hint_region");
     }
   }
 }
@@ -334,13 +339,13 @@ async function migrateLegacyCategories() {
 
     if (!response || !response.ok) {
       const errorPayload = await response?.json().catch(() => null);
-      throw new Error(errorPayload?.error || "Unable to migrate existing categories.");
+      throw new Error(errorPayload?.error || tx("categories_error_migrate"));
     }
   }
 
   const refreshed = await apiFetch("/api/categories");
   if (!refreshed || !refreshed.ok) {
-    throw new Error("Unable to reload migrated categories.");
+    throw new Error(tx("categories_error_reload"));
   }
   const payload = await refreshed.json().catch(() => []);
   return Array.isArray(payload) ? payload : [];

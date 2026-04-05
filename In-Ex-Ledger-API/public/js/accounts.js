@@ -1,13 +1,17 @@
 ﻿const ACCOUNT_TYPES = [
-  { value: "checking", label: "Checking" },
-  { value: "savings", label: "Savings" },
-  { value: "credit_card", label: "Credit card" },
-  { value: "loan", label: "Loan" },
-  { value: "cash", label: "Cash" }
+  { value: "checking", labelKey: "accounts_type_checking" },
+  { value: "savings", labelKey: "accounts_type_savings" },
+  { value: "credit_card", labelKey: "accounts_type_credit_card" },
+  { value: "loan", labelKey: "accounts_type_loan" },
+  { value: "cash", labelKey: "accounts_type_cash" }
 ];
 const ACCOUNTS_TOAST_MS = 3000;
 
 let accountsToastTimer = null;
+
+function tx(key) {
+  return typeof window.t === "function" ? window.t(key) : key;
+}
 
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
@@ -56,7 +60,7 @@ function wireAccountForm() {
 
     if (!name || !type) {
       if (message) {
-        message.textContent = "Enter a name and select a type.";
+        message.textContent = tx("accounts_error_name_type");
       }
       return;
     }
@@ -78,20 +82,20 @@ function wireAccountForm() {
       });
 
       if (!response) {
-        throw new Error("Failed to save account.");
+        throw new Error(tx("accounts_error_save"));
       }
 
       if (!response.ok) {
-        throw new Error(await getApiErrorText(response, "Failed to save account."));
+        throw new Error(await getApiErrorText(response, tx("accounts_error_save")));
       }
 
       form.reset();
       formContainer.hidden = true;
-      showAccountsToast("Account added");
+      showAccountsToast(tx("accounts_added"));
       await renderAccountList();
     } catch (error) {
       if (message) {
-        message.textContent = error.message || "Failed to save account.";
+        message.textContent = error.message || tx("accounts_error_save");
       }
     } finally {
       if (submitButton) {
@@ -106,11 +110,11 @@ function populateAccountTypes(selectElement) {
     return;
   }
 
-  selectElement.innerHTML = '<option value="">Select type</option>';
+  selectElement.innerHTML = `<option value="">${escapeHtml(tx("accounts_select_type"))}</option>`;
   ACCOUNT_TYPES.forEach((type) => {
     const option = document.createElement("option");
     option.value = type.value;
-    option.textContent = type.label;
+    option.textContent = tx(type.labelKey);
     selectElement.appendChild(option);
   });
 }
@@ -129,27 +133,27 @@ async function renderAccountList() {
   try {
     const response = await apiFetch("/api/accounts");
     if (!response) {
-      throw new Error("Could not reach the account service.");
+      throw new Error(tx("accounts_error_unreachable"));
     }
 
     if (!response.ok) {
-      throw new Error("Unable to load accounts.");
+      throw new Error(tx("accounts_error_load"));
     }
 
     const accounts = await response.json();
     syncAccountsCache(accounts);
     if (!Array.isArray(accounts) || accounts.length === 0) {
-      container.innerHTML = '<div class="accounts-empty">No accounts yet. Add one to get started.</div>';
+      container.innerHTML = `<div class="accounts-empty">${escapeHtml(tx("accounts_no_accounts"))}</div>`;
       return;
     }
 
     container.innerHTML = accounts.map((account) => `
       <article class="account-card">
         <div>
-          <div class="account-name">${escapeHtml(account.name || "Account")}</div>
+          <div class="account-name">${escapeHtml(account.name || tx("accounts_fallback_name"))}</div>
           <div class="account-type">${escapeHtml(formatAccountType(account.type))}</div>
         </div>
-        <button type="button" class="account-delete-btn" data-account-delete="${escapeHtml(account.id || "")}">Delete</button>
+        <button type="button" class="account-delete-btn" data-account-delete="${escapeHtml(account.id || "")}">${escapeHtml(tx("common_delete"))}</button>
       </article>
     `).join("");
 
@@ -165,13 +169,13 @@ async function renderAccountList() {
   } catch (error) {
     container.innerHTML = "";
     if (message) {
-      message.textContent = error.message || "Unable to load accounts.";
+      message.textContent = error.message || tx("accounts_error_load");
     }
   }
 }
 
 async function deleteAccount(accountId) {
-  if (!window.confirm("Delete this account? This cannot be undone.")) {
+  if (!window.confirm(tx("accounts_confirm_delete"))) {
     return;
   }
 
@@ -180,11 +184,11 @@ async function deleteAccount(accountId) {
   });
 
   if (!response || !response.ok) {
-    showAccountsToast("Failed to delete account");
+    showAccountsToast(tx("accounts_error_delete"));
     return;
   }
 
-  showAccountsToast("Account deleted");
+  showAccountsToast(tx("accounts_deleted"));
   await renderAccountList();
 }
 
@@ -196,7 +200,7 @@ function syncAccountsCache(accounts) {
 
 function formatAccountType(value) {
   const type = ACCOUNT_TYPES.find((item) => item.value === value);
-  return type?.label || value || "Account";
+  return tx(type?.labelKey) || value || tx("accounts_fallback_name");
 }
 
 function updateReceiptsDot() {
@@ -247,5 +251,5 @@ async function getApiErrorText(response, fallback) {
     }
   } catch {
   }
-  return fallback || "An error occurred.";
+  return fallback || tx("common_error");
 }
