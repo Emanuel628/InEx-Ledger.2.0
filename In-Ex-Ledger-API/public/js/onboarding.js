@@ -81,6 +81,7 @@ function renderOnboardingTour(page) {
   card.id = "onboardingTourCard";
   card.className = "onboarding-tour-card";
   card.innerHTML = `
+    <button type="button" class="onboarding-tour-close" aria-label="Close getting started tip">×</button>
     <div class="onboarding-tour-kicker">Getting started</div>
     <h3>${escapeOnboardingHtml(config.title)}</h3>
     <p>${escapeOnboardingHtml(config.body)}</p>
@@ -93,7 +94,7 @@ function renderOnboardingTour(page) {
   `;
 
   document.body.appendChild(card);
-  card.querySelector(".onboarding-tour-dismiss")?.addEventListener("click", async () => {
+  const dismissTour = async () => {
     card.remove();
     try {
       await apiFetch("/api/me/onboarding/tour", {
@@ -106,7 +107,10 @@ function renderOnboardingTour(page) {
     } catch (error) {
       console.error("Failed to update onboarding tour state", error);
     }
-  });
+  };
+
+  card.querySelector(".onboarding-tour-dismiss")?.addEventListener("click", dismissTour);
+  card.querySelector(".onboarding-tour-close")?.addEventListener("click", dismissTour);
 }
 
 function escapeOnboardingHtml(value) {

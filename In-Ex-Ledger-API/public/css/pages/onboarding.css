@@ -111,6 +111,30 @@
   backdrop-filter: blur(8px);
 }
 
+.onboarding-tour-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  padding: 0;
+  background: transparent;
+  color: var(--ink2);
+  font-size: 22px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.onboarding-tour-close:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--ink);
+}
+
 .onboarding-tour-kicker {
   margin-bottom: 8px;
   font-size: 11px;
