@@ -1,72 +1,65 @@
-/* =========================================================
-   Change Email Page JS
-   ========================================================= */
-
-// Change Email is a protected page
-requireAuth();
-
-/* -------------------------
-   Page boot
-   ------------------------- */
+requireValidSessionOrRedirect();
 
 init();
 
 function init() {
-  console.log("Change email page loaded.");
+  const form = document.getElementById("changeEmailForm");
+  const statusEl = document.getElementById("changeEmailStatus");
 
-  wireForm();
-}
-
-/* -------------------------
-   Form handling (preliminary)
-   ------------------------- */
-
-function wireForm() {
-  const form = document.querySelector("form");
-
-  if (!form) {
-    console.warn("Change email form not found.");
+  if (!form || !statusEl) {
     return;
   }
 
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    handleChangeEmail();
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await submitEmailChange(form, statusEl);
   });
 }
 
-/* -------------------------
-   Behavior (preliminary)
-   ------------------------- */
+async function submitEmailChange(form, statusEl) {
+  const submitButton = form.querySelector("button[type='submit']");
+  const newEmail = form.newEmail?.value.trim();
+  const currentPassword = form.currentPassword?.value || "";
 
-function handleChangeEmail() {
-  const emailInput = document.querySelector('input[type="email"]');
-
-  const email = emailInput ? emailInput.value.trim() : "";
-
-  if (!email) {
-    alert("Please enter a new email address.");
+  if (!newEmail || !currentPassword) {
+    setStatus(statusEl, "Enter your new email and current password.", false);
     return;
   }
 
-  if (!isValidEmail(email)) {
-    alert("Please enter a valid email address.");
-    return;
+  submitButton.disabled = true;
+  setStatus(statusEl, "", false);
+
+  try {
+    const response = await apiFetch("/api/auth/request-email-change", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        newEmail,
+        currentPassword
+      })
+    });
+
+    const payload = await response?.json().catch(() => null);
+    if (!response || !response.ok) {
+      setStatus(statusEl, payload?.error || "Unable to start email change.", false);
+      return;
+    }
+
+    form.reset();
+    setStatus(statusEl, payload?.message || "Confirmation email sent to your new address.", true);
+  } catch (error) {
+    console.error("Email change request failed:", error);
+    setStatus(statusEl, "Unable to start email change.", false);
+  } finally {
+    submitButton.disabled = false;
   }
-
-  localStorage.setItem("pendingVerificationEmail", email);
-
-  alert("Email updated. Please verify your new email address.");
-  console.log("Email change requested (preliminary):", email);
-  return;
-
-  // Future: apiFetch("/security/change-email", { method: "POST", body: ... })
 }
 
-/* -------------------------
-   Helpers
-   ------------------------- */
-
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+function setStatus(target, message, isSuccess) {
+  target.textContent = message;
+  target.classList.toggle("success", !!isSuccess);
+  target.classList.toggle("error", !isSuccess);
+  target.hidden = !message;
 }

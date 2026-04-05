@@ -5,52 +5,60 @@
   <title>InEx Ledger — Change Email</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="stylesheet" href="/css/app.css">
-<link rel="stylesheet" href="/css/pages/change-email.css">
+<link rel="stylesheet" href="/css/pages/login.css">
 </head>
 <body>
-  <header class="app-topbar">
-    <div class="topbar-left">
-      <a class="topbar-brand" href="transactions" aria-label="InEx Ledger home">
-        <span class="brand-mark brand-mark-topbar" aria-hidden="true">
-          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
-            <rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
-            <rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
-            <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".35"></rect>
-          </svg>
-        </span>
-        <span class="topbar-brand-text">InEx Ledger</span>
-      </a>
-      <nav class="topbar-nav" aria-label="Primary">
-        <a href="transactions"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>Transactions</span></a>
-        <a href="accounts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg></span><span>Accounts</span></a>
-        <a href="categories"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg></span><span>Categories</span></a>
-        <a href="receipts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span>Receipts</span></a>
-        <a href="mileage"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span>Mileage</span></a>
-        <a href="exports"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Exports</span></a>
-        <a href="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg></span><span>Settings</span></a>
-      </nav>
-    </div>
-    <div class="user-pill">
-      <span class="user-avatar">IL</span>
-      <span class="user-name">InEx Ledger</span>
-    </div>
+  <header class="marketing-header auth-header">
+    <a class="brand" href="/transactions" aria-label="InEx Ledger home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
+          <rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+          <rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+          <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".35"></rect>
+        </svg>
+      </span>
+      <span class="brand-text">InEx Ledger</span>
+    </a>
+    <nav>
+      <a href="/transactions">Transactions</a>
+      <a href="/settings#settings-security">Security</a>
+    </nav>
   </header>
-  <div id="trialBanner" class="trial-banner"></div>
   <main>
-    <h2>Change email</h2>
-    <form method="post">
-      <input type="email" placeholder="New email address" required /><br /><br />
-      <button type="submit">Update email</button>
-    </form>
+    <section class="auth-card">
+      <h2>Change email</h2>
+      <form id="changeEmailForm" method="post" class="auth-form">
+        <div class="form-field">
+          <label for="newEmail">New email address</label>
+          <input type="email" id="newEmail" name="newEmail" required autocomplete="email" />
+        </div>
+        <div class="form-field">
+          <label for="currentPassword">Current password</label>
+          <input type="password" id="currentPassword" name="currentPassword" required autocomplete="current-password" />
+        </div>
+        <button type="submit" class="auth-submit">Send confirmation email</button>
+      </form>
+      <p id="changeEmailStatus" class="auth-error" aria-live="polite" hidden></p>
+      <p class="auth-helper">
+        We will send a confirmation link to the new address. Your email will not change until you click it.
+      </p>
+      <p class="forgot-password">
+        <a href="/settings#settings-security">Back to security settings</a>
+      </p>
+    </section>
   </main>
   <footer>
+    <p>
+      <a href="/subscription">Pricing</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+    </p>
     <p>&copy; 2026 InEx Ledger</p>
   </footer>
 <script src="../js/global.js?v=20260405c"></script>
 <script src="../js/i18n.js?v=20260405c"></script>
 <script src="../js/auth.js?v=20260405c"></script>
-<script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/change-email.js?v=20260405c"></script>
 </body>
 </html>
