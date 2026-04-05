@@ -589,6 +589,19 @@
 }
 
 @media (max-width: 1024px) {
+  .app-topbar {
+    height: auto;
+    padding: 12px 16px;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .topbar-left {
+    width: 100%;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
   .topbar-nav {
     display: none;
   }
@@ -603,12 +616,31 @@
 }
 
 @media (max-width: 720px) {
+  .app-topbar {
+    padding: 10px 12px;
+    flex-direction: column;
+  }
+
+  .topbar-left {
+    gap: 12px;
+  }
+
+  .user-pill {
+    align-self: flex-start;
+    max-width: 100%;
+  }
+
+  .topbar-brand-text {
+    font-size: 14px;
+  }
+
   .exports-content {
     padding: 16px;
   }
 
   .exports-page-header {
     flex-direction: column;
+    gap: 12px;
   }
 
   .exports-hero-actions {
@@ -626,6 +658,23 @@
   .history-columns,
   .history-item {
     grid-template-columns: 1fr;
+  }
+
+  .exports-card,
+  .history-card {
+    border-radius: 16px;
+  }
+
+  .exports-card {
+    padding: 18px 16px;
+  }
+
+  .preset-row {
+    gap: 8px;
+  }
+
+  .preset-chip {
+    min-height: 34px;
   }
 
   .history-columns {

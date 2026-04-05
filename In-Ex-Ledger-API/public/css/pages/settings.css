@@ -1499,6 +1499,19 @@ body {
 }
 
 @media (max-width: 1024px) {
+  .settings-topbar {
+    height: auto;
+    padding: 12px 16px;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .topbar-left {
+    width: 100%;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
   .topbar-nav {
     display: none;
   }
@@ -1514,6 +1527,34 @@ body {
 }
 
 @media (max-width: 720px) {
+  .settings-topbar {
+    padding: 10px 12px;
+    flex-direction: column;
+  }
+
+  .topbar-left {
+    gap: 12px;
+  }
+
+  .user-pill {
+    align-self: flex-start;
+    max-width: 100%;
+  }
+
+  .topbar-brand-text {
+    font-size: 14px;
+  }
+
+  .settings-sidebar-card,
+  .settings-card,
+  .danger-card {
+    border-radius: 16px;
+  }
+
+  .settings-sidebar-card {
+    padding: 14px;
+  }
+
   .settings-main {
     padding: 16px;
   }
@@ -1542,5 +1583,20 @@ body {
   .settings-save-actions {
     display: flex;
     flex-direction: column;
+  }
+
+  .settings-nav-item,
+  .settings-sidebar-action,
+  .settings-primary-btn,
+  .sign-out-btn,
+  .cpa-access-revoke,
+  .cpa-access-delete {
+    width: 100%;
+  }
+
+  .cpa-access-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
   }
 }

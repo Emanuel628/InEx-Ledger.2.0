@@ -171,12 +171,12 @@ function renderReceipts(receipts) {
     const transactionCell = renderTransactionCell(receipt.transaction_id);
     return `
       <tr>
-        <td>
+        <td data-label="Filename">
           <button type="button" class="receipt-file-button" data-receipt-download="${escapeHtml(receipt.id || "")}">${escapeHtml(receipt.filename || "Receipt")}</button>
         </td>
-        <td>${escapeHtml(formatReceiptDate(receipt.created_at))}</td>
-        <td>${transactionCell}</td>
-        <td>
+        <td data-label="Uploaded date">${escapeHtml(formatReceiptDate(receipt.created_at))}</td>
+        <td data-label="Attached to transaction">${transactionCell}</td>
+        <td data-label="Actions">
           <div class="receipt-row-actions">
             <button type="button" class="receipt-link-btn" data-receipt-link="${escapeHtml(receipt.id || "")}">Link</button>
             <button type="button" class="receipt-delete-btn" data-receipt-delete="${escapeHtml(receipt.id || "")}">Delete</button>
