@@ -1412,17 +1412,45 @@ function initDangerZone() {
   });
 
   confirmButton?.addEventListener("click", () => {
-    if (dangerAction === "delete_data") {
-      SETTINGS_DELETE_DATA_KEYS.forEach((key) => localStorage.removeItem(key));
-      showSettingsToast("Business data deleted");
-    } else if (dangerAction === "delete_account") {
-      clearToken();
-      showSettingsToast("Account deletion requested");
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 600);
-    }
-    closeModal();
+    void (async () => {
+      if (dangerAction === "delete_data") {
+        SETTINGS_DELETE_DATA_KEYS.forEach((key) => localStorage.removeItem(key));
+        showSettingsToast("Business data deleted");
+        closeModal();
+        return;
+      }
+
+      if (dangerAction === "delete_account") {
+        confirmButton.disabled = true;
+        try {
+          const response = await apiFetch("/api/me", {
+            method: "DELETE"
+          });
+          const payload = await response?.json().catch(() => null);
+
+          if (!response || !response.ok) {
+            showSettingsToast(payload?.error || "Unable to delete account");
+            confirmButton.disabled = false;
+            return;
+          }
+
+          clearToken();
+          showSettingsToast("Account permanently deleted");
+          closeModal();
+          setTimeout(() => {
+            window.location.href = "/";
+          }, 600);
+          return;
+        } catch (error) {
+          console.error("Account deletion failed", error);
+          showSettingsToast("Unable to delete account");
+          confirmButton.disabled = false;
+          return;
+        }
+      }
+
+      closeModal();
+    })();
   });
 }
 

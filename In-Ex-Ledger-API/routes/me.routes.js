@@ -13,6 +13,13 @@ const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const VALID_BUSINESS_TYPES = new Set(["sole_proprietor", "llc", "s_corp", "partnership"]);
 const VALID_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash", "loan"]);
 const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
+const REFRESH_TOKEN_COOKIE = "refresh_token";
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  path: "/"
+};
 
 function normalizeOnboardingPayload(user) {
   return {
@@ -250,6 +257,7 @@ router.delete("/", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
     res.status(200).json({ message: "Account and data deleted" });
   } catch (err) {
     console.error("DELETE /me error:", err.message);
