@@ -191,6 +191,7 @@ async function initPreferences() {
   const consentStatus = document.getElementById("consentStatus");
   const downloadBtn = document.getElementById("downloadMyDataBtn");
   const replayOnboardingTipsButton = document.getElementById("replayOnboardingTips");
+  const replayOnboardingTipsSidebarButton = document.getElementById("replayOnboardingTipsSidebar");
   const saveBar = document.getElementById("settingsSaveBar");
   const saveButton = document.getElementById("settingsSavePreferences");
   const cancelButton = document.getElementById("settingsCancelChanges");
@@ -309,7 +310,7 @@ async function initPreferences() {
     });
   }
 
-  replayOnboardingTipsButton?.addEventListener("click", async () => {
+  const replayTips = async () => {
     try {
       const response = await apiFetch("/api/me/onboarding/replay", {
         method: "POST"
@@ -324,7 +325,10 @@ async function initPreferences() {
       console.error("Failed to reset onboarding tips", error);
       showSettingsToast("Unable to reset getting started tips");
     }
-  });
+  };
+
+  replayOnboardingTipsButton?.addEventListener("click", replayTips);
+  replayOnboardingTipsSidebarButton?.addEventListener("click", replayTips);
 
   cancelButton?.addEventListener("click", () => {
     pendingPreferences = { ...preferenceBaseline };

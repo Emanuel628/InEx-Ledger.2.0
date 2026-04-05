@@ -664,6 +664,30 @@ main {
   gap: 8px;
 }
 
+.settings-sidebar-actions {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-sidebar-action {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-sidebar-action:hover {
+  background: var(--surface2);
+}
+
 .settings-nav-item {
   width: 100%;
   text-align: left;
