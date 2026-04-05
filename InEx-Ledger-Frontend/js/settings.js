@@ -302,13 +302,13 @@ async function initPreferences() {
       preferenceBaseline.province !== nextPreferences.province;
 
     if (businessSettingsChanged) {
-      const businessSaveOk = await saveBusinessSettings({
+      const businessSaveResult = await saveBusinessSettings({
         region: nextPreferences.region.toUpperCase(),
         language: nextPreferences.language,
         province: nextPreferences.region === "ca" ? nextPreferences.province : null
       });
-      if (!businessSaveOk) {
-        showSettingsToast("Unable to save region settings");
+      if (!businessSaveResult.ok) {
+        showSettingsToast(businessSaveResult.error || "Unable to save region settings");
         return;
       }
 
@@ -465,14 +465,20 @@ async function saveBusinessSettings({ region, language, province }) {
     if (!response || !response.ok) {
       const errorPayload = await response?.json().catch(() => null);
       console.error("Business settings API rejected save", errorPayload || response?.status);
-      return false;
+      return {
+        ok: false,
+        error: errorPayload?.error || "Unable to save region settings"
+      };
     }
 
     writeBusinessSettingsFallback({ region, language, province });
-    return true;
+    return { ok: true };
   } catch (error) {
     console.error("Failed to save business settings", error);
-    return false;
+    return {
+      ok: false,
+      error: error?.message || "Unable to save region settings"
+    };
   }
 }
 

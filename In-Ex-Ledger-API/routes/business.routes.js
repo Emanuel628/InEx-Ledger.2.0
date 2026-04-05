@@ -234,7 +234,7 @@ router.get("/", async (req, res) => {
     res.json(await fetchBusinessRow(businessId));
   } catch (err) {
     console.error("GET /business error:", err.message);
-    res.status(500).json({ error: "Failed to load business profile." });
+    res.status(500).json({ error: err.message || "Failed to load business profile." });
   }
 });
 
@@ -284,7 +284,7 @@ router.put("/", async (req, res) => {
     res.json(updated);
   } catch (err) {
     console.error("PUT /business error:", err.message);
-    res.status(500).json({ error: "Failed to update business profile." });
+    res.status(500).json({ error: err.message || "Failed to update business profile." });
   }
 });
 
