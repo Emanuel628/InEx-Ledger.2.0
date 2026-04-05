@@ -428,7 +428,14 @@ function refreshSettingsLocalizedState() {
 }
 
 function normalizeSettingsRegion(value) {
-  return String(value || "").toLowerCase() === "ca" ? "ca" : "us";
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "ca" || normalized === "canada") {
+    return "ca";
+  }
+  if (normalized === "us" || normalized === "usa" || normalized === "united states" || normalized === "united states of america") {
+    return "us";
+  }
+  return "us";
 }
 
 function normalizeProvinceCode(value) {

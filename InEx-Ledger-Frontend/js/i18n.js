@@ -20,8 +20,14 @@ function normalizeRegion(code) {
     return 'us';
   }
 
-  const normalized = code.toLowerCase();
-  return normalized === 'ca' ? 'ca' : 'us';
+  const normalized = code.trim().toLowerCase();
+  if (normalized === 'ca' || normalized === 'canada') {
+    return 'ca';
+  }
+  if (normalized === 'us' || normalized === 'usa' || normalized === 'united states' || normalized === 'united states of america') {
+    return 'us';
+  }
+  return 'us';
 }
 
 function getStoredLanguage() {

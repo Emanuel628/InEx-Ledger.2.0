@@ -71,7 +71,14 @@ function applyDateInputConstraints() {
 }
 
 function normalizeEstimatedTaxRegion(region) {
-  return String(region || "").toUpperCase() === "CA" ? "CA" : "US";
+  const normalized = String(region || "").trim().toLowerCase();
+  if (normalized === "ca" || normalized === "canada") {
+    return "CA";
+  }
+  if (normalized === "us" || normalized === "usa" || normalized === "united states" || normalized === "united states of america") {
+    return "US";
+  }
+  return "US";
 }
 
 function normalizeEstimatedTaxProvince(province) {
