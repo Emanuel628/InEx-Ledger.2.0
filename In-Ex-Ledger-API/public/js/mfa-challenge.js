@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const intro = document.getElementById("mfaChallengeIntro");
   if (intro && pendingMfaEmail) {
-    intro.textContent = `Finish signing in for ${pendingMfaEmail}. Enter the code from your authenticator app or use one of your recovery codes.`;
+    intro.textContent = `Finish signing in for ${pendingMfaEmail}. Enter the 6-digit code we just emailed you.`;
   }
 
   mfaChallengeForm?.addEventListener("submit", handleMfaChallengeSubmit);
@@ -38,7 +38,7 @@ async function handleMfaChallengeSubmit(event) {
 
   clearMfaChallengeError();
   if (!code) {
-    showMfaChallengeError("Enter your authenticator or recovery code.");
+    showMfaChallengeError("Enter the 6-digit code from your email.");
     return;
   }
 
@@ -59,7 +59,7 @@ async function handleMfaChallengeSubmit(event) {
 
     const data = await response.json().catch(() => null);
     if (!response.ok || !data?.token) {
-      showMfaChallengeError(data?.error || "Unable to verify MFA code.");
+      showMfaChallengeError(data?.error || "Unable to verify your email code.");
       return;
     }
 

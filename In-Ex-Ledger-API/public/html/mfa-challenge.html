@@ -26,19 +26,19 @@
     <section class="auth-card">
       <h2>Verify sign-in</h2>
       <p id="mfaChallengeIntro" class="auth-helper">
-        Enter the code from your authenticator app to finish signing in.
+        Enter the 6-digit code we emailed you to finish signing in.
       </p>
 
       <form id="mfaChallengeForm" class="auth-form">
         <div class="form-field">
-          <label for="mfaChallengeCode">Authenticator or recovery code</label>
+          <label for="mfaChallengeCode">Email verification code</label>
           <input
             type="text"
             id="mfaChallengeCode"
             name="mfaChallengeCode"
             inputmode="numeric"
             autocomplete="one-time-code"
-            placeholder="123456 or ABCD-EF12"
+            placeholder="123456"
             required
           />
         </div>

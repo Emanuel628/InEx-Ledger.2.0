@@ -916,21 +916,13 @@ function initSecurityForm() {
   const mfaEnabledToggle = document.getElementById("mfaEnabledToggle");
   const mfaCurrentPassword = document.getElementById("mfa-current-password");
   const mfaSetupPanel = document.getElementById("mfaSetupPanel");
-  const mfaSetupSecretRow = document.getElementById("mfaSetupSecretRow");
-  const mfaSetupOtpAuthRow = document.getElementById("mfaSetupOtpAuthRow");
-  const mfaSetupSecret = document.getElementById("mfaSetupSecret");
-  const mfaSetupOtpAuth = document.getElementById("mfaSetupOtpAuth");
-  const mfaSetupCode = document.getElementById("mfaSetupCode");
-  const mfaRecoveryWrap = document.getElementById("mfaRecoveryWrap");
-  const mfaRecoveryCodes = document.getElementById("mfaRecoveryCodes");
   const mfaPrimaryButton = document.getElementById("mfaPrimaryButton");
   const mfaCancelButton = document.getElementById("mfaCancelButton");
   const mfaMessage = document.getElementById("mfaMessage");
 
   let mfaStatus = {
     enabled: false,
-    recovery_code_count: 0,
-    pending_setup: false
+    delivery: "email"
   };
   let mfaMode = "idle";
 
@@ -992,30 +984,9 @@ function initSecurityForm() {
     }
   };
 
-  const renderRecoveryCodes = (container, codes) => {
-    if (!container) {
-      return;
-    }
-    const items = Array.isArray(codes) ? codes : [];
-    if (!items.length) {
-      container.innerHTML = "";
-      return;
-    }
-    container.innerHTML = items
-      .map((code) => `<code class="mfa-recovery-code">${escapeSettingsHtml(code)}</code>`)
-      .join("");
-  };
-
   const resetSetupPanel = () => {
     mfaSetupPanel?.classList.add("hidden");
-    mfaSetupSecretRow?.classList.add("hidden");
-    mfaSetupOtpAuthRow?.classList.add("hidden");
-    mfaRecoveryWrap?.classList.add("hidden");
-    if (mfaSetupSecret) mfaSetupSecret.value = "";
-    if (mfaSetupOtpAuth) mfaSetupOtpAuth.value = "";
-    if (mfaSetupCode) mfaSetupCode.value = "";
     if (mfaCurrentPassword) mfaCurrentPassword.value = "";
-    if (mfaRecoveryCodes) mfaRecoveryCodes.innerHTML = "";
     mfaCancelButton?.classList.add("hidden");
   };
 
@@ -1025,12 +996,7 @@ function initSecurityForm() {
     }
 
     if (mfaPrimaryButton) {
-      mfaPrimaryButton.textContent =
-        mfaMode === "enable_verify"
-          ? "Verify and turn on"
-          : mfaStatus.enabled
-          ? "Turn off MFA"
-          : "Turn on MFA";
+      mfaPrimaryButton.textContent = mfaStatus.enabled ? "Turn off MFA" : "Turn on MFA";
     }
 
     if (mfaMode === "idle") {
@@ -1041,9 +1007,7 @@ function initSecurityForm() {
       mfaCancelButton?.classList.toggle("hidden", mfaStatus.enabled);
     }
 
-    if (!mfaStatus.pending_setup && mfaMode !== "disable") {
-      resetSetupPanel();
-    }
+    if (mfaMode === "idle") resetSetupPanel();
   };
 
   const loadMfaStatus = async () => {
@@ -1054,8 +1018,7 @@ function initSecurityForm() {
 
     mfaStatus = await response.json().catch(() => ({
       enabled: false,
-      recovery_code_count: 0,
-      pending_setup: false
+      delivery: "email"
     }));
     updateMfaUi();
   };
@@ -1124,13 +1087,6 @@ function initSecurityForm() {
 
     mfaMode = mfaEnabledToggle.checked ? "enable_start" : "disable";
     mfaSetupPanel?.classList.remove("hidden");
-    mfaSetupSecretRow?.classList.add("hidden");
-    mfaSetupOtpAuthRow?.classList.add("hidden");
-    mfaRecoveryWrap?.classList.add("hidden");
-    if (mfaSetupCode) {
-      mfaSetupCode.placeholder = mfaEnabledToggle.checked ? "123456" : "123456 or ABCD-EF12";
-      mfaSetupCode.value = "";
-    }
     updateMfaUi();
   });
 
@@ -1139,7 +1095,7 @@ function initSecurityForm() {
 
     if (mfaMode === "enable_start") {
       try {
-        const response = await apiFetch("/api/auth/mfa/setup", {
+        const response = await apiFetch("/api/auth/mfa/enable", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -1151,56 +1107,20 @@ function initSecurityForm() {
         const payload = await response?.json().catch(() => null);
 
         if (!response || !response.ok) {
-          setMfaMessage(payload?.error || "Unable to start MFA setup.", "is-error");
+          setMfaMessage(payload?.error || "Unable to enable MFA.", "is-error");
           mfaEnabledToggle.checked = false;
           return;
         }
 
-        if (mfaSetupSecret) mfaSetupSecret.value = payload?.secret || "";
-        if (mfaSetupOtpAuth) mfaSetupOtpAuth.value = payload?.otpauth_url || "";
-        renderRecoveryCodes(mfaRecoveryCodes, payload?.recovery_codes || []);
-        mfaSetupSecretRow?.classList.remove("hidden");
-        mfaSetupOtpAuthRow?.classList.remove("hidden");
-        mfaRecoveryWrap?.classList.remove("hidden");
-        mfaMode = "enable_verify";
-        mfaStatus.pending_setup = true;
-        updateMfaUi();
-        setMfaMessage("Scan or copy the setup key, then enter one authenticator code to finish turning MFA on.", "is-success");
-      } catch (error) {
-        console.error("MFA setup failed", error);
-        setMfaMessage("Unable to start MFA setup.", "is-error");
-        mfaEnabledToggle.checked = false;
-      }
-      return;
-    }
-
-    if (mfaMode === "enable_verify") {
-      try {
-        const response = await apiFetch("/api/auth/mfa/enable", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            code: mfaSetupCode?.value || ""
-          })
-        });
-        const payload = await response?.json().catch(() => null);
-
-        if (!response || !response.ok) {
-          setMfaMessage(payload?.error || "Unable to enable MFA.", "is-error");
-          return;
-        }
-
-        mfaStatus = payload?.status || { enabled: true, recovery_code_count: 0, pending_setup: false };
-        mfaStatus.pending_setup = false;
+        mfaStatus = payload?.status || { enabled: true, delivery: "email" };
         mfaMode = "idle";
         updateMfaUi();
         showSettingsToast("Multi-factor authentication enabled");
-        setMfaMessage("MFA is now on.", "is-success");
+        setMfaMessage("MFA is now on. We will email a 6-digit code on new or untrusted sign-ins.", "is-success");
       } catch (error) {
         console.error("MFA enable failed", error);
         setMfaMessage("Unable to enable MFA.", "is-error");
+        mfaEnabledToggle.checked = false;
       }
       return;
     }
@@ -1213,8 +1133,7 @@ function initSecurityForm() {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            currentPassword: mfaCurrentPassword?.value || "",
-            code: mfaSetupCode?.value || ""
+            currentPassword: mfaCurrentPassword?.value || ""
           })
         });
         const payload = await response?.json().catch(() => null);
@@ -1225,7 +1144,7 @@ function initSecurityForm() {
           return;
         }
 
-        mfaStatus = payload?.status || { enabled: false, recovery_code_count: 0, pending_setup: false };
+        mfaStatus = payload?.status || { enabled: false, delivery: "email" };
         mfaMode = "idle";
         updateMfaUi();
         showSettingsToast("Multi-factor authentication disabled");
@@ -1239,18 +1158,10 @@ function initSecurityForm() {
   });
 
   mfaCancelButton?.addEventListener("click", async () => {
-    if (mfaMode === "enable_verify" || mfaStatus.pending_setup) {
-      try {
-        await apiFetch("/api/auth/mfa/setup/cancel", { method: "POST" });
-      } catch (error) {
-        console.error("Failed to cancel MFA setup", error);
-      }
-    }
     if (mfaEnabledToggle) {
       mfaEnabledToggle.checked = !!mfaStatus.enabled;
     }
     mfaMode = "idle";
-    mfaStatus.pending_setup = false;
     resetSetupPanel();
     updateMfaUi();
     setMfaMessage("");

@@ -12,17 +12,6 @@ const { signToken, verifyToken, requireAuth } = require("../middleware/auth.midd
 const { pool } = require("../db.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
-const {
-  buildOtpAuthUrl,
-  consumeRecoveryCode,
-  decryptSecret,
-  encryptSecret,
-  generateRecoveryCodes,
-  generateSecret,
-  hashRecoveryCodes,
-  serializeRecoveryCodes,
-  verifyTotp
-} = require("../services/mfaService.js");
 
 const router = express.Router();
 
@@ -80,6 +69,8 @@ const REFRESH_TOKEN_EXPIRY_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRY_DAYS) 
 const REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 const MFA_TRUST_EXPIRY_DAYS = Number(process.env.MFA_TRUST_EXPIRY_DAYS) || 30;
 const MFA_TRUST_EXPIRY_MS = MFA_TRUST_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+const MFA_EMAIL_CODE_EXPIRY_MINUTES = Number(process.env.MFA_EMAIL_CODE_EXPIRY_MINUTES) || 10;
+const MFA_EMAIL_CODE_EXPIRY_MS = MFA_EMAIL_CODE_EXPIRY_MINUTES * 60 * 1000;
 const REFRESH_TOKEN_BYTE_LENGTH = 48;
 const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 15 * 60;
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
@@ -278,22 +269,23 @@ function ensureArrayValue(value) {
   return Array.isArray(value) ? value : [];
 }
 
-function getActiveRecoveryCodeHashes(user) {
-  return serializeRecoveryCodes(user?.mfa_recovery_codes_hash);
+function hashMfaEmailCode(code) {
+  return crypto.createHash("sha256").update(String(code || "")).digest("hex");
 }
 
-function getTempRecoveryCodeHashes(user) {
-  return serializeRecoveryCodes(user?.mfa_temp_recovery_codes_hash);
+function generateMfaEmailCode() {
+  return String(crypto.randomInt(0, 1000000)).padStart(6, "0");
 }
 
-function createPendingMfaToken(user, businessId) {
+function createPendingMfaToken(user, businessId, challengeId) {
   return signToken(
     {
       purpose: "mfa_pending",
       id: user.id,
       email: user.email,
       email_verified: !!user.email_verified,
-      business_id: businessId
+      business_id: businessId,
+      challenge_id: challengeId
     },
     MFA_PENDING_TOKEN_EXPIRY_SECONDS
   );
@@ -303,40 +295,84 @@ function buildMfaStatusPayload(user) {
   return {
     enabled: !!user?.mfa_enabled,
     enabled_at: user?.mfa_enabled_at || null,
-    recovery_code_count: getActiveRecoveryCodeHashes(user).length,
-    pending_setup: !!user?.mfa_temp_secret_encrypted
+    delivery: "email"
   };
 }
 
-function verifyMfaChallengeForUser(user, code) {
-  if (!user?.mfa_enabled || !user?.mfa_secret_encrypted) {
-    return { ok: false, reason: "MFA is not enabled." };
-  }
+async function clearPendingMfaEmailChallenges(userId) {
+  await pool.query("DELETE FROM mfa_email_challenges WHERE user_id = $1 AND consumed_at IS NULL", [userId]);
+}
 
-  const normalizedCode = String(code || "").trim();
-  if (!normalizedCode) {
-    return { ok: false, reason: "A code is required." };
-  }
+async function createMfaEmailChallenge(user, req, businessId) {
+  const code = generateMfaEmailCode();
+  const expiresAt = new Date(Date.now() + MFA_EMAIL_CODE_EXPIRY_MS);
+  const challengeId = crypto.randomUUID();
 
-  const secret = decryptSecret(user.mfa_secret_encrypted);
-  if (verifyTotp(secret, normalizedCode)) {
-    return {
-      ok: true,
-      usedRecoveryCode: false,
-      recoveryCodesHash: getActiveRecoveryCodeHashes(user)
-    };
-  }
+  await clearPendingMfaEmailChallenges(user.id);
+  await pool.query(
+    `INSERT INTO mfa_email_challenges (id, user_id, code_hash, expires_at)
+     VALUES ($1, $2, $3, $4)`,
+    [challengeId, user.id, hashMfaEmailCode(code), expiresAt]
+  );
 
-  const remainingRecoveryCodes = consumeRecoveryCode(getActiveRecoveryCodeHashes(user), normalizedCode);
-  if (remainingRecoveryCodes) {
-    return {
-      ok: true,
-      usedRecoveryCode: true,
-      recoveryCodesHash: remainingRecoveryCodes
-    };
-  }
+  const appBaseUrl = getAppBaseUrl(req);
+  await sendAppEmail({
+    to: user.email,
+    subject: "Your InEx Ledger sign-in code",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
+        <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
+          <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger security</div>
+          <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">Your sign-in verification code</h1>
+        </div>
+        <div style="padding: 28px;">
+          <p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">
+            We noticed a sign-in from a new or untrusted device. Enter this code to finish signing in.
+          </p>
+          <div style="margin: 24px 0; padding: 18px 20px; border-radius: 12px; background: #eff6ff; color: #1d4ed8; font-size: 32px; font-weight: 800; letter-spacing: 0.18em; text-align: center;">
+            ${code}
+          </div>
+          <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">
+            This code expires in ${MFA_EMAIL_CODE_EXPIRY_MINUTES} minutes. If this was not you, change your password immediately.
+          </p>
+          <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">
+            Sign-in page: ${appBaseUrl}/login
+          </p>
+        </div>
+      </div>
+    `,
+    text: `Your InEx Ledger sign-in code is ${code}. It expires in ${MFA_EMAIL_CODE_EXPIRY_MINUTES} minutes. If this was not you, change your password immediately.`
+  });
 
-  return { ok: false, reason: "Invalid authenticator or recovery code." };
+  return createPendingMfaToken(user, businessId, challengeId);
+}
+
+async function findActiveMfaEmailChallenge(challengeId, userId) {
+  const result = await pool.query(
+    `SELECT id, code_hash, attempt_count, expires_at
+       FROM mfa_email_challenges
+      WHERE id = $1
+        AND user_id = $2
+        AND consumed_at IS NULL
+        AND expires_at > NOW()
+      LIMIT 1`,
+    [challengeId, userId]
+  );
+  return result.rows[0] || null;
+}
+
+async function recordFailedMfaEmailAttempt(challengeId) {
+  await pool.query(
+    "UPDATE mfa_email_challenges SET attempt_count = attempt_count + 1 WHERE id = $1",
+    [challengeId]
+  );
+}
+
+async function consumeMfaEmailChallenge(challengeId) {
+  await pool.query(
+    "UPDATE mfa_email_challenges SET consumed_at = NOW() WHERE id = $1",
+    [challengeId]
+  );
 }
 
 function setRefreshCookie(res, token, expiresAt) {
@@ -621,12 +657,13 @@ router.post("/login", authLimiter, async (req, res) => {
       }
 
       if (!trustedDevice) {
-      return res.status(200).json({
-        mfa_required: true,
-        mfa_token: createPendingMfaToken(user, businessId),
-        email_verified: verified,
-        mfa_enabled: true
-      });
+        const mfaToken = await createMfaEmailChallenge(user, req, businessId);
+        return res.status(200).json({
+          mfa_required: true,
+          mfa_token: mfaToken,
+          email_verified: verified,
+          mfa_enabled: true
+        });
       }
     }
 
@@ -800,6 +837,14 @@ router.get("/mfa/status", requireAuth, async (req, res) => {
 });
 
 router.post("/mfa/setup", requireAuth, authLimiter, async (req, res) => {
+  return res.status(410).json({ error: "Authenticator app setup is no longer used." });
+});
+
+router.post("/mfa/setup/cancel", requireAuth, async (req, res) => {
+  return res.status(200).json({ success: true });
+});
+
+router.post("/mfa/enable", requireAuth, authLimiter, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   if (!currentPassword) {
     return res.status(400).json({ error: "Current password is required." });
@@ -816,75 +861,16 @@ router.post("/mfa/setup", requireAuth, authLimiter, async (req, res) => {
       return res.status(401).json({ error: "Current password is incorrect." });
     }
 
-    const secret = generateSecret();
-    const recoveryCodes = generateRecoveryCodes();
-    await pool.query(
-      `UPDATE users
-          SET mfa_temp_secret_encrypted = $1,
-              mfa_temp_recovery_codes_hash = $2
-        WHERE id = $3`,
-      [encryptSecret(secret), JSON.stringify(hashRecoveryCodes(recoveryCodes)), user.id]
-    );
-
-    return res.status(200).json({
-      secret,
-      otpauth_url: buildOtpAuthUrl(user.email, secret),
-      recovery_codes: recoveryCodes
-    });
-  } catch (err) {
-    console.error("MFA setup error:", err);
-    return res.status(500).json({ error: "Unable to start MFA setup." });
-  }
-});
-
-router.post("/mfa/setup/cancel", requireAuth, async (req, res) => {
-  try {
-    await pool.query(
-      `UPDATE users
-          SET mfa_temp_secret_encrypted = NULL,
-              mfa_temp_recovery_codes_hash = '[]'::jsonb
-        WHERE id = $1`,
-      [req.user.id]
-    );
-    return res.status(200).json({ success: true });
-  } catch (err) {
-    console.error("MFA setup cancel error:", err);
-    return res.status(500).json({ error: "Unable to cancel MFA setup." });
-  }
-});
-
-router.post("/mfa/enable", requireAuth, mfaVerifyLimiter, async (req, res) => {
-  const code = req.body?.code;
-  if (!code) {
-    return res.status(400).json({ error: "Verification code is required." });
-  }
-
-  try {
-    const user = await findUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    if (!user.mfa_temp_secret_encrypted) {
-      return res.status(400).json({ error: "Start MFA setup first." });
-    }
-
-    const secret = decryptSecret(user.mfa_temp_secret_encrypted);
-    if (!verifyTotp(secret, code)) {
-      return res.status(400).json({ error: "Invalid authenticator code." });
-    }
-
-    const tempRecoveryCodes = getTempRecoveryCodeHashes(user);
     await pool.query(
       `UPDATE users
           SET mfa_enabled = true,
-              mfa_secret_encrypted = $1,
-              mfa_recovery_codes_hash = $2,
+              mfa_secret_encrypted = NULL,
+              mfa_recovery_codes_hash = '[]'::jsonb,
               mfa_temp_secret_encrypted = NULL,
               mfa_temp_recovery_codes_hash = '[]'::jsonb,
-              mfa_enabled_at = NOW()
-        WHERE id = $3`,
-      [user.mfa_temp_secret_encrypted, JSON.stringify(tempRecoveryCodes), user.id]
+              mfa_enabled_at = COALESCE(mfa_enabled_at, NOW())
+        WHERE id = $1`,
+      [user.id]
     );
 
     const refreshedUser = await findUserById(user.id);
@@ -905,10 +891,8 @@ router.post("/mfa/enable", requireAuth, mfaVerifyLimiter, async (req, res) => {
 
 router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
-  const code = req.body?.code;
-
-  if (!currentPassword || !code) {
-    return res.status(400).json({ error: "Current password and MFA code are required." });
+  if (!currentPassword) {
+    return res.status(400).json({ error: "Current password is required." });
   }
 
   try {
@@ -920,11 +904,6 @@ router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
     const { match } = await verifyPassword(currentPassword, user.password_hash);
     if (!match) {
       return res.status(401).json({ error: "Current password is incorrect." });
-    }
-
-    const verification = verifyMfaChallengeForUser(user, code);
-    if (!verification.ok) {
-      return res.status(400).json({ error: verification.reason });
     }
 
     await pool.query(
@@ -956,47 +935,7 @@ router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
 });
 
 router.post("/mfa/recovery-codes/regenerate", requireAuth, mfaVerifyLimiter, async (req, res) => {
-  const currentPassword = req.body?.currentPassword;
-  const code = req.body?.code;
-
-  if (!currentPassword || !code) {
-    return res.status(400).json({ error: "Current password and MFA code are required." });
-  }
-
-  try {
-    const user = await findUserById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const { match } = await verifyPassword(currentPassword, user.password_hash);
-    if (!match) {
-      return res.status(401).json({ error: "Current password is incorrect." });
-    }
-
-    const verification = verifyMfaChallengeForUser(user, code);
-    if (!verification.ok) {
-      return res.status(400).json({ error: verification.reason });
-    }
-
-    const recoveryCodes = generateRecoveryCodes();
-    await pool.query("UPDATE users SET mfa_recovery_codes_hash = $1 WHERE id = $2", [
-      JSON.stringify(hashRecoveryCodes(recoveryCodes)),
-      user.id
-    ]);
-
-    const refreshedUser = await findUserById(user.id);
-    await resetCurrentRefreshSession(res, refreshedUser);
-
-    return res.status(200).json({
-      success: true,
-      recovery_codes: recoveryCodes,
-      status: buildMfaStatusPayload(refreshedUser)
-    });
-  } catch (err) {
-    console.error("MFA recovery code rotation error:", err);
-    return res.status(500).json({ error: "Unable to regenerate recovery codes." });
-  }
+  return res.status(410).json({ error: "Recovery codes are no longer used." });
 });
 
 router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
@@ -1019,18 +958,21 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
       return res.status(401).json({ error: "MFA session is no longer valid." });
     }
 
-    const verification = verifyMfaChallengeForUser(user, code);
-    if (!verification.ok) {
-      return res.status(401).json({ error: verification.reason });
+    const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
+    if (!challenge) {
+      return res.status(401).json({ error: "Verification code expired. Sign in again to get a new one." });
     }
 
-    if (verification.usedRecoveryCode) {
-      await pool.query("UPDATE users SET mfa_recovery_codes_hash = $1 WHERE id = $2", [
-        JSON.stringify(verification.recoveryCodesHash),
-        user.id
-      ]);
+    if (Number(challenge.attempt_count || 0) >= 8) {
+      return res.status(429).json({ error: "Too many invalid verification attempts. Sign in again to get a new code." });
     }
 
+    if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+      await recordFailedMfaEmailAttempt(challenge.id);
+      return res.status(401).json({ error: "Invalid verification code." });
+    }
+
+    await consumeMfaEmailChallenge(challenge.id);
     const refreshedUser = await findUserById(user.id);
     if (trustDevice) {
       const trustedDevice = await createTrustedMfaDevice(refreshedUser, req);

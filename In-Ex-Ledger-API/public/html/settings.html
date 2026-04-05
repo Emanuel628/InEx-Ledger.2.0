@@ -287,7 +287,7 @@
           <div class="mfa-header">
             <div>
               <h3>Multi-factor authentication</h3>
-              <p class="session-note">Require an authenticator app code on new or untrusted devices. Recovery codes are generated for emergency access.</p>
+              <p class="session-note">When this is on, we email you a 6-digit code whenever you sign in from a new or untrusted device.</p>
             </div>
             <label class="switch mfa-switch">
               <input type="checkbox" id="mfaEnabledToggle" />
@@ -297,28 +297,12 @@
 
           <div id="mfaSetupPanel" class="mfa-setup-panel hidden">
             <div class="settings-form-grid">
-              <div class="form-field">
+              <div class="form-field form-field-full">
                 <label for="mfa-current-password">Current password</label>
                 <input type="password" id="mfa-current-password" autocomplete="current-password" />
               </div>
-              <div class="form-field">
-                <label for="mfaSetupCode">Verification code</label>
-                <input type="text" id="mfaSetupCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
-              </div>
-              <div class="form-field form-field-full mfa-setup-secret-row hidden" id="mfaSetupSecretRow">
-                <label for="mfaSetupSecret">Setup key</label>
-                <input type="text" id="mfaSetupSecret" readonly />
-              </div>
-              <div class="form-field form-field-full mfa-setup-secret-row hidden" id="mfaSetupOtpAuthRow">
-                <label for="mfaSetupOtpAuth">Authenticator app link</label>
-                <textarea id="mfaSetupOtpAuth" rows="3" readonly></textarea>
-              </div>
             </div>
-            <div id="mfaRecoveryWrap" class="mfa-recovery-wrap hidden">
-              <div class="settings-row-title">Recovery codes</div>
-              <p class="settings-helper-note">Store these in a safe place. Each recovery code can be used once. You only need these if you lose your authenticator app.</p>
-              <div id="mfaRecoveryCodes" class="mfa-recovery-codes"></div>
-            </div>
+            <p class="settings-helper-note">Enter your password and confirm the switch. You will only be asked for a code on new or untrusted devices.</p>
             <div class="mfa-actions">
               <button type="button" id="mfaPrimaryButton" class="settings-primary-btn">Turn on MFA</button>
               <button type="button" id="mfaCancelButton" class="settings-secondary-btn hidden">Cancel</button>
