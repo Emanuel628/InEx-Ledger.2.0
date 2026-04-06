@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>InEx Ledger - CPA Workspace</title>
+  <title data-i18n="cpa_page_title">InEx Ledger - CPA Workspace</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/css/pages/cpa-dashboard.css" />
@@ -10,7 +10,7 @@
 <body>
   <header class="app-topbar">
     <div class="topbar-left">
-      <a class="topbar-brand" href="transactions" aria-label="InEx Ledger home">
+      <a class="topbar-brand" href="transactions" data-i18n-aria-label="cpa_home_aria" aria-label="InEx Ledger home">
         <span class="brand-mark brand-mark-topbar" aria-hidden="true">
           <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor"></rect>
@@ -31,62 +31,62 @@
   <main class="cpa-shell">
     <section class="cpa-hero">
       <div>
-        <p class="cpa-eyebrow">Read-only workspace</p>
-        <h1 class="cpa-title">CPA portfolio access</h1>
-        <p class="cpa-subtitle">Review client businesses, exports, receipts, mileage, and ledger activity within the scope they granted.</p>
+        <p class="cpa-eyebrow" data-i18n="cpa_eyebrow">Read-only workspace</p>
+        <h1 class="cpa-title" data-i18n="cpa_title">CPA portfolio access</h1>
+        <p class="cpa-subtitle" data-i18n="cpa_subtitle">Review client businesses, exports, receipts, mileage, and ledger activity within the scope they granted.</p>
       </div>
       <div class="cpa-controls">
         <label class="cpa-control">
-          <span>Client</span>
+          <span data-i18n="cpa_label_client">Client</span>
           <select id="cpaOwnerSelect"></select>
         </label>
         <label class="cpa-control">
-          <span>Business</span>
+          <span data-i18n="cpa_label_business">Business</span>
           <select id="cpaBusinessSelect"></select>
         </label>
       </div>
     </section>
 
     <section id="cpaEmptyState" class="cpa-empty hidden">
-      <h2>No CPA access assigned</h2>
-      <p>Your workspace will appear here once a client invites your account to one or more businesses.</p>
+      <h2 data-i18n="cpa_empty_title">No CPA access assigned</h2>
+      <p data-i18n="cpa_empty_body">Your workspace will appear here once a client invites your account to one or more businesses.</p>
     </section>
 
     <section id="cpaWorkspace" class="cpa-workspace hidden">
       <section class="cpa-summary-grid">
         <article class="cpa-summary-card">
-          <div class="cpa-summary-label">Income</div>
+          <div class="cpa-summary-label" data-i18n="cpa_summary_income">Income</div>
           <div class="cpa-summary-value" id="cpaIncomeValue">$0.00</div>
         </article>
         <article class="cpa-summary-card">
-          <div class="cpa-summary-label">Expenses</div>
+          <div class="cpa-summary-label" data-i18n="cpa_summary_expenses">Expenses</div>
           <div class="cpa-summary-value" id="cpaExpensesValue">$0.00</div>
         </article>
         <article class="cpa-summary-card">
-          <div class="cpa-summary-label">Net</div>
+          <div class="cpa-summary-label" data-i18n="cpa_summary_net">Net</div>
           <div class="cpa-summary-value" id="cpaNetValue">$0.00</div>
         </article>
         <article class="cpa-summary-card">
-          <div class="cpa-summary-label">Transactions</div>
+          <div class="cpa-summary-label" data-i18n="cpa_summary_transactions">Transactions</div>
           <div class="cpa-summary-value" id="cpaTransactionCountValue">0</div>
         </article>
       </section>
 
       <section class="cpa-meta-grid">
         <article class="cpa-meta-card">
-          <h2>Portfolio scope</h2>
+          <h2 data-i18n="cpa_meta_scope">Portfolio scope</h2>
           <p id="cpaScopeValue">-</p>
         </article>
         <article class="cpa-meta-card">
-          <h2>Receipts</h2>
+          <h2 data-i18n="cpa_meta_receipts">Receipts</h2>
           <p id="cpaReceiptCountValue">0</p>
         </article>
         <article class="cpa-meta-card">
-          <h2>Mileage records</h2>
+          <h2 data-i18n="cpa_meta_mileage">Mileage records</h2>
           <p id="cpaMileageCountValue">0</p>
         </article>
         <article class="cpa-meta-card">
-          <h2>Exports</h2>
+          <h2 data-i18n="cpa_meta_exports">Exports</h2>
           <p id="cpaExportCountValue">0</p>
         </article>
       </section>
@@ -94,15 +94,15 @@
       <section class="cpa-two-column">
         <section class="cpa-panel">
           <div class="cpa-panel-head">
-            <h2>Business context</h2>
-            <p>Tax form and currency details for each business in scope.</p>
+            <h2 data-i18n="cpa_business_context_title">Business context</h2>
+            <p data-i18n="cpa_business_context_body">Tax form and currency details for each business in scope.</p>
           </div>
           <div id="cpaBusinessContextList" class="cpa-context-list"></div>
         </section>
         <section class="cpa-panel">
           <div class="cpa-panel-head">
-            <h2>Recent audit activity</h2>
-            <p>Invite, access, and download events tied to this client scope.</p>
+            <h2 data-i18n="cpa_audit_title">Recent audit activity</h2>
+            <p data-i18n="cpa_audit_body">Invite, access, and download events tied to this client scope.</p>
           </div>
           <div id="cpaAuditList" class="cpa-list"></div>
         </section>
@@ -110,19 +110,19 @@
 
       <section class="cpa-panel">
         <div class="cpa-panel-head">
-          <h2>Recent transactions</h2>
-          <p>Most recent activity within the granted scope.</p>
+          <h2 data-i18n="cpa_transactions_title">Recent transactions</h2>
+          <p data-i18n="cpa_transactions_body">Most recent activity within the granted scope.</p>
         </div>
         <div class="cpa-table-wrap">
           <table class="cpa-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Business</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th>Status</th>
-                <th>Amount</th>
+                <th data-i18n="transactions_table_date">Date</th>
+                <th data-i18n="common_business">Business</th>
+                <th data-i18n="transactions_table_description">Description</th>
+                <th data-i18n="transactions_table_category">Category</th>
+                <th data-i18n="cpa_table_status">Status</th>
+                <th data-i18n="transactions_table_amount">Amount</th>
               </tr>
             </thead>
             <tbody id="cpaTransactionsBody"></tbody>
@@ -133,15 +133,15 @@
       <section class="cpa-two-column">
         <section class="cpa-panel">
           <div class="cpa-panel-head">
-            <h2>Recent exports</h2>
-            <p>Latest generated export packages in scope. Download redacted copies directly.</p>
+            <h2 data-i18n="cpa_exports_title">Recent exports</h2>
+            <p data-i18n="cpa_exports_body">Latest generated export packages in scope. Download redacted copies directly.</p>
           </div>
           <div id="cpaExportsList" class="cpa-list"></div>
         </section>
         <section class="cpa-panel">
           <div class="cpa-panel-head">
-            <h2>Recent receipts</h2>
-            <p>Newest uploaded receipts in scope.</p>
+            <h2 data-i18n="cpa_receipts_title">Recent receipts</h2>
+            <p data-i18n="cpa_receipts_body">Newest uploaded receipts in scope.</p>
           </div>
           <div id="cpaReceiptsList" class="cpa-list"></div>
         </section>
@@ -149,8 +149,8 @@
 
       <section class="cpa-panel">
         <div class="cpa-panel-head">
-          <h2>Recent mileage</h2>
-          <p>Latest mileage records in scope with purpose, destination, and logged distance.</p>
+          <h2 data-i18n="cpa_mileage_title">Recent mileage</h2>
+          <p data-i18n="cpa_mileage_body">Latest mileage records in scope with purpose, destination, and logged distance.</p>
         </div>
         <div id="cpaMileageList" class="cpa-list"></div>
       </section>
