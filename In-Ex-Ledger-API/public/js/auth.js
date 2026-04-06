@@ -603,22 +603,22 @@ function initAccountMenus(displayName = "User", profile = {}) {
 
     menu.innerHTML = `
       <div class="account-menu-section">
-        <div class="account-menu-caption">Signed in as</div>
+        <div class="account-menu-caption">${typeof t === "function" ? t("auth_signed_in_as") : "Signed in as"}</div>
         <div class="account-menu-current">${displayName}</div>
-        <div class="account-menu-hint">${activeBusiness?.name || "Business"}</div>
+        <div class="account-menu-hint">${activeBusiness?.name || (typeof t === "function" ? t("common_business") : "Business")}</div>
       </div>
       ${hasCpaWorkspace ? `
       <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="cpa-workspace" role="menuitem">
-        <span class="account-menu-label">CPA workspace</span>
-        <span class="account-menu-hint">${assignedCpaPortfolios.length} portfolio${assignedCpaPortfolios.length === 1 ? "" : "s"} assigned</span>
+        <span class="account-menu-label">${typeof t === "function" ? t("auth_cpa_workspace") : "CPA workspace"}</span>
+        <span class="account-menu-hint">${assignedCpaPortfolios.length} ${typeof t === "function" ? t(assignedCpaPortfolios.length === 1 ? "auth_portfolio_assigned_singular" : "auth_portfolio_assigned_plural") : assignedCpaPortfolios.length === 1 ? "portfolio assigned" : "portfolios assigned"}</span>
       </button>
       ` : ""}
       <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="add-business" role="menuitem">
-        <span class="account-menu-label">Add another business</span>
-        <span class="account-menu-hint">Create and switch instantly</span>
+        <span class="account-menu-label">${typeof t === "function" ? t("auth_add_another_business") : "Add another business"}</span>
+        <span class="account-menu-hint">${typeof t === "function" ? t("auth_create_and_switch") : "Create and switch instantly"}</span>
       </button>
       <button type="button" class="account-menu-item" data-account-menu-action="logout" role="menuitem">
-        Sign out
+        ${typeof t === "function" ? t("auth_sign_out") : "Sign out"}
       </button>
     `;
 
@@ -1032,7 +1032,7 @@ async function submitBusinessCreation() {
     if (!response || !response.ok) {
       const payload = await response?.json().catch(() => null);
       if (error) {
-        error.textContent = payload?.error || "Unable to create business.";
+        error.textContent = payload?.error || (typeof t === "function" ? t("auth_error_create_business") : "Unable to create business.");
       }
       return;
     }
@@ -1041,7 +1041,7 @@ async function submitBusinessCreation() {
     const activeBusiness = payload?.active_business || null;
     if (activeBusiness?.id) {
       localStorage.setItem(ACTIVE_BUSINESS_ID_KEY, activeBusiness.id);
-      localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || "Business");
+      localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || (typeof t === "function" ? t("common_business") : "Business"));
     }
     closeBusinessCreationModal();
     window.location.reload();
@@ -1059,7 +1059,7 @@ async function switchActiveBusiness(businessId) {
 
   if (!response || !response.ok) {
     const payload = await response?.json().catch(() => null);
-    showAccountMenuNotice(payload?.error || "Unable to switch businesses.");
+    showAccountMenuNotice(payload?.error || (typeof t === "function" ? t("auth_error_switch_business") : "Unable to switch businesses."));
     return;
   }
 
@@ -1067,7 +1067,7 @@ async function switchActiveBusiness(businessId) {
   const activeBusiness = payload?.active_business || null;
   if (activeBusiness?.id) {
     localStorage.setItem(ACTIVE_BUSINESS_ID_KEY, activeBusiness.id);
-    localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || "Business");
+    localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || (typeof t === "function" ? t("common_business") : "Business"));
   }
   window.location.reload();
 }
