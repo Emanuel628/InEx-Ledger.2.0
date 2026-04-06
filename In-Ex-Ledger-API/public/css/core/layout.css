@@ -54,6 +54,13 @@ main {
   padding: 24px 16px 44px;
 }
 
+main.app-shell {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
 section {
   background: var(--surface);
   border: 0.5px solid var(--border);
