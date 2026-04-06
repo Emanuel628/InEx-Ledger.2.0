@@ -231,6 +231,8 @@ body[data-theme="light"] select option {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .topbar-left,
@@ -244,11 +246,16 @@ body[data-theme="light"] select option {
 
 .topbar-left {
   gap: 28px;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .topbar-brand {
   gap: 8px;
   text-decoration: none;
+  min-width: 0;
+  flex-shrink: 0;
 }
 
 .brand-mark {
@@ -274,6 +281,9 @@ body[data-theme="light"] select option {
 
 .topbar-nav {
   gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .topbar-nav a {
@@ -314,6 +324,9 @@ body[data-theme="light"] select option {
   padding: 5px 10px 5px 6px;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.1);
+  min-width: 0;
+  max-width: min(260px, 34vw);
+  flex-shrink: 1;
 }
 
 .user-avatar {
@@ -332,6 +345,10 @@ body[data-theme="light"] select option {
 .user-name {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.85);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 1024px) {

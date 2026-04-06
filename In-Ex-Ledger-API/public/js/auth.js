@@ -672,6 +672,7 @@ function ensureAccountMenuStyles() {
       justify-content: space-between;
       gap: 16px;
       flex-wrap: wrap;
+      min-width: 0;
     }
     .legacy-auth-header .user-pill,
     .business-pill,
@@ -684,6 +685,8 @@ function ensureAccountMenuStyles() {
       background: rgba(255, 255, 255, 0.1);
       border: 0.5px solid rgba(15, 25, 35, 0.12);
       color: var(--ink);
+      min-width: 0;
+      flex-shrink: 1;
     }
     .legacy-auth-header .user-pill,
     .legacy-user-pill {
@@ -692,7 +695,7 @@ function ensureAccountMenuStyles() {
     .business-pill {
       position: relative;
       min-width: 0;
-      max-width: min(280px, 48vw);
+      max-width: min(320px, 36vw);
     }
     .business-pill-copy {
       display: flex;
@@ -745,11 +748,15 @@ function ensureAccountMenuStyles() {
     .legacy-user-pill .user-name {
       font-size: 12px;
       color: inherit;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
     }
     .menu-trigger {
       position: relative;
       cursor: pointer;
+      min-width: 0;
     }
     .account-menu {
       position: absolute;
