@@ -11,7 +11,10 @@ function addDays(date, days) {
 
 async function ensureBusinessSubscription(businessId) {
   const existing = await pool.query(
-    `SELECT *
+    `SELECT id, business_id, provider, plan_code, status, stripe_customer_id,
+            stripe_subscription_id, stripe_price_id, trial_started_at, trial_ends_at,
+            current_period_start, current_period_end, cancel_at_period_end, canceled_at,
+            metadata_json
        FROM business_subscriptions
       WHERE business_id = $1
       LIMIT 1`,

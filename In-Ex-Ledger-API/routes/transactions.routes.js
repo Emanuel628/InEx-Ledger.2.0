@@ -3,11 +3,7 @@ const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
-const {
-  resolveBusinessIdForUser,
-  getBusinessScopeForUser
-} = require("../api/utils/resolveBusinessIdForUser.js");
-const { processDueRecurringTransactions } = require("../services/recurringTransactionsService.js");
+const { resolveBusinessIdForUser, getBusinessScopeForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -126,10 +122,6 @@ function validateTransactionPayload(payload) {
 router.get("/", async (req, res) => {
   try {
     const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
-    for (const businessId of scope.businessIds) {
-      await processDueRecurringTransactions(businessId);
-    }
-
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 

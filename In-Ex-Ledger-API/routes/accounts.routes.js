@@ -40,8 +40,14 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   const { name, type } = req.body;
 
+  const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card"];
+
   if (!name || !type) {
     return res.status(400).json({ error: "Account name and type are required." });
+  }
+
+  if (!ALLOWED_ACCOUNT_TYPES.includes(type)) {
+    return res.status(400).json({ error: `Account type must be one of: ${ALLOWED_ACCOUNT_TYPES.join(", ")}.` });
   }
 
   try {

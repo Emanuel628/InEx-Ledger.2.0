@@ -10,15 +10,44 @@ router.use(requireAuth);
  * GET /api/privacy/settings
  */
 router.get("/settings", async (req, res) => {
-  res.json({ dataSharingOptOut: false, consentGiven: true });
+  try {
+    const result = await pool.query(
+      "SELECT data_sharing_opt_out, consent_given FROM user_privacy_settings WHERE user_id = $1",
+      [req.user.id]
+    );
+    const row = result.rows[0];
+    res.json({
+      dataSharingOptOut: row ? row.data_sharing_opt_out : false,
+      consentGiven: row ? row.consent_given : true
+    });
+  } catch (err) {
+    console.error("GET /privacy/settings error:", err.message);
+    res.status(500).json({ error: "Failed to load privacy settings." });
+  }
 });
 
 /**
  * POST /api/privacy/settings
  */
 router.post("/settings", async (req, res) => {
-  // Future: persist privacy preferences to DB
-  res.json({ ok: true });
+  const dataSharingOptOut = req.body?.dataSharingOptOut === true;
+  const consentGiven = req.body?.consentGiven !== false;
+
+  try {
+    await pool.query(
+      `INSERT INTO user_privacy_settings (user_id, data_sharing_opt_out, consent_given, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (user_id) DO UPDATE
+         SET data_sharing_opt_out = EXCLUDED.data_sharing_opt_out,
+             consent_given = EXCLUDED.consent_given,
+             updated_at = NOW()`,
+      [req.user.id, dataSharingOptOut, consentGiven]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("POST /privacy/settings error:", err.message);
+    res.status(500).json({ error: "Failed to save privacy settings." });
+  }
 });
 
 /**
@@ -33,7 +62,12 @@ router.post("/export", async (req, res) => {
       await Promise.all([
         pool.query("SELECT id, email, created_at FROM users WHERE id = $1", [req.user.id]),
         pool.query("SELECT id, name, region, language, created_at FROM businesses WHERE id = $1", [businessId]),
-        pool.query("SELECT * FROM transactions WHERE business_id = $1 ORDER BY date DESC", [businessId]),
+        pool.query(
+          `SELECT id, account_id, category_id, amount, type, description, date, note,
+                  cleared, recurring_transaction_id, recurring_occurrence_date, created_at
+           FROM transactions WHERE business_id = $1 ORDER BY date DESC`,
+          [businessId]
+        ),
         pool.query("SELECT id, name, type, created_at FROM accounts WHERE business_id = $1", [businessId]),
         pool.query("SELECT id, name, kind, created_at FROM categories WHERE business_id = $1", [businessId])
       ]);

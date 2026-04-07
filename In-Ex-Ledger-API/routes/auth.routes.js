@@ -216,12 +216,18 @@ function isStrongPassword(password) {
 }
 
 async function findUserByEmail(email) {
-  const result = await pool.query("SELECT * FROM users WHERE email = $1 LIMIT 1", [email]);
+  const result = await pool.query(
+    "SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at FROM users WHERE email = $1 LIMIT 1",
+    [email]
+  );
   return result.rows[0] || null;
 }
 
 async function findUserById(userId) {
-  const result = await pool.query("SELECT * FROM users WHERE id = $1 LIMIT 1", [userId]);
+  const result = await pool.query(
+    "SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at FROM users WHERE id = $1 LIMIT 1",
+    [userId]
+  );
   return result.rows[0] || null;
 }
 
@@ -489,14 +495,12 @@ router.post("/register", authLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
 
-  console.log("?? Registration Attempt:", email);
-
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
 
-  if (password.length < 8) {
-    return res.status(400).json({ error: "Password must be at least 8 characters" });
+  if (!isStrongPassword(password)) {
+    return res.status(400).json({ error: "Password must be at least 8 characters and include an uppercase letter, number, and symbol." });
   }
 
   const hashedPassword = await hashPassword(password);
@@ -514,8 +518,6 @@ router.post("/register", authLimiter, async (req, res) => {
        RETURNING id, email`,
       [crypto.randomUUID(), email, hashedPassword]
     );
-
-            console.log("?? Account Created:", result.rows[0].email);
 
     // --- START OF EMAIL LOGIC ---
     try {
@@ -550,9 +552,8 @@ router.post("/register", authLimiter, async (req, res) => {
         `,
         text: `Welcome to InEx Ledger.\n\nVerify your email to activate your account:\n${verificationLink}\n\nThis link expires in 15 minutes.`
       });
-      console.log("?? Verification Email Sent via Resend API");
     } catch (emailErr) {
-      console.error("?? Email failed to send, but account was created:", emailErr);
+      console.error("Email failed to send, but account was created:", emailErr);
     }
     // --- END OF EMAIL LOGIC ---
 
@@ -568,9 +569,9 @@ router.post("/register", authLimiter, async (req, res) => {
 
 /**
  * POST /send-verification
- * Now sends a REAL email via SMTP.
+ * Sends a verification email via the Resend API.
  */
-router.post("/send-verification", async (req, res) => {
+router.post("/send-verification", authLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   if (!email) return res.status(400).json({ error: "Email is required" });
 
@@ -612,8 +613,6 @@ router.post("/send-verification", async (req, res) => {
       text: `Verify your InEx Ledger email.\n\nUse this link to verify your account:\n${verificationLink}\n\nThis link expires in 15 minutes.`
     });
 
-
-    console.log("?? Verification Email Sent to:", email);
     res.status(200).json({ message: "Verification link sent to your email." });
   } catch (err) {
     console.error("Send verification error:", err);
@@ -1141,8 +1140,8 @@ router.post("/reset-password", passwordLimiter, async (req, res) => {
     return res.status(400).json({ error: "Invalid input or passwords do not match." });
   }
 
-  if (password.length < 8) {
-    return res.status(400).json({ error: "Password must be at least 8 characters" });
+  if (!isStrongPassword(password)) {
+    return res.status(400).json({ error: "Password must be at least 8 characters and include an uppercase letter, number, and symbol." });
   }
 
   const email = await consumePasswordResetToken(token);
@@ -1171,7 +1170,10 @@ router.post("/request-email-change", requireAuth, authLimiter, async (req, res) 
   }
 
   try {
-    const result = await pool.query("SELECT * FROM users WHERE id = $1", [req.user.id]);
+    const result = await pool.query(
+      "SELECT id, email, password_hash FROM users WHERE id = $1",
+      [req.user.id]
+    );
     const user = result.rows[0];
     if (!user) return res.status(404).json({ error: "User not found" });
 

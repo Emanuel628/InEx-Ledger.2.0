@@ -7,7 +7,6 @@ const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForU
 const {
   RecurringTemplateValidationError,
   normalizeRecurringPayload,
-  processDueRecurringTransactions,
   materializeTemplateRuns,
   materializeNextTemplateRun,
   verifyTemplateOwnership,
@@ -22,10 +21,11 @@ router.use(createDataApiLimiter({ max: 80 }));
 router.get("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    await processDueRecurringTransactions(businessId);
 
     const result = await pool.query(
-      `SELECT *
+      `SELECT id, business_id, account_id, category_id, amount, type, description, note,
+              cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
+              created_at, updated_at
        FROM recurring_transactions
        WHERE business_id = $1
        ORDER BY active DESC, next_run_date ASC, created_at DESC`,
@@ -81,7 +81,10 @@ router.post("/", async (req, res) => {
     await materializeTemplateRuns(businessId, result.rows[0].id);
 
     const refreshed = await pool.query(
-      "SELECT * FROM recurring_transactions WHERE id = $1 AND business_id = $2 LIMIT 1",
+      `SELECT id, business_id, account_id, category_id, amount, type, description, note,
+              cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
+              created_at, updated_at
+       FROM recurring_transactions WHERE id = $1 AND business_id = $2 LIMIT 1`,
       [result.rows[0].id, businessId]
     );
 
@@ -111,7 +114,9 @@ router.put("/:id", async (req, res) => {
     await client.query("BEGIN");
 
     const existing = await client.query(
-      `SELECT *
+      `SELECT id, business_id, account_id, category_id, amount, type, description, note,
+              cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
+              created_at, updated_at
        FROM recurring_transactions
        WHERE id = $1 AND business_id = $2
        FOR UPDATE`,
@@ -211,7 +216,10 @@ router.post("/:id/run", async (req, res) => {
     }
 
     const template = await pool.query(
-      "SELECT * FROM recurring_transactions WHERE id = $1 AND business_id = $2 LIMIT 1",
+      `SELECT id, business_id, account_id, category_id, amount, type, description, note,
+              cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
+              created_at, updated_at
+       FROM recurring_transactions WHERE id = $1 AND business_id = $2 LIMIT 1`,
       [req.params.id, businessId]
     );
     if (!template.rowCount) {
