@@ -1,6 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
+const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const {
@@ -12,6 +13,14 @@ const {
 
 const router = express.Router();
 router.use(requireAuth);
+
+const businessDeleteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many deletion attempts, please try again later." }
+});
 
 const TAX_ID_PREFIX = "enc:";
 
@@ -152,7 +161,7 @@ router.post("/:id/activate", async (req, res) => {
  * Delete a business account and all its associated data.
  * Requires password confirmation. Cannot delete the user's only business.
  */
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", businessDeleteLimiter, async (req, res) => {
   const { password } = req.body ?? {};
   const businessId = req.params.id;
 

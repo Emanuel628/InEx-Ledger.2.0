@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const {
@@ -14,6 +15,14 @@ const router = express.Router();
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
 const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2024-06-20";
+
+const billingMutationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many billing requests, please try again later." }
+});
 
 function getStripeSecretKey() {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -153,7 +162,7 @@ router.post("/customer-portal", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/cancel", requireAuth, async (req, res) => {
+router.post("/cancel", requireAuth, billingMutationLimiter, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
@@ -167,7 +176,7 @@ router.post("/cancel", requireAuth, async (req, res) => {
 
     // Cancel at period end via Stripe
     await stripeRequest(`/subscriptions/${subscription.stripeSubscriptionId}`, {
-      cancel_at_period_end: "true"
+      cancel_at_period_end: true
     });
 
     // Sync the updated state from Stripe
@@ -193,7 +202,7 @@ router.post("/cancel", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/history", requireAuth, async (req, res) => {
+router.get("/history", requireAuth, billingMutationLimiter, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subRow = await pool.query(
