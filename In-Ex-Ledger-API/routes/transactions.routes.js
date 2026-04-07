@@ -4,6 +4,7 @@ const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser, getBusinessScopeForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { encrypt, decrypt } = require("../services/encryptionService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -119,6 +120,29 @@ function validateTransactionPayload(payload) {
   };
 }
 
+function decryptTransactionRow(row) {
+  if (!row) return row;
+  // Decrypt the description and strip the raw encrypted column from the API response
+  const { description_encrypted, ...rest } = row;
+  return {
+    ...rest,
+    description: description_encrypted
+      ? tryDecrypt(description_encrypted)
+      : row.description
+  };
+}
+
+function tryDecrypt(value) {
+  try {
+    return decrypt(value);
+  } catch (err) {
+    // Decryption failure falls back to returning the raw value so that
+    // legacy plain-text entries remain readable during the migration window.
+    console.warn("transaction description decryption failed, returning raw value:", err.message);
+    return value;
+  }
+}
+
 router.get("/", async (req, res) => {
   try {
     const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
@@ -137,10 +161,13 @@ router.get("/", async (req, res) => {
               t.type,
               t.cleared,
               t.description,
+              t.description_encrypted,
               t.date,
               t.note,
               t.recurring_transaction_id,
               t.recurring_occurrence_date,
+              t.is_adjustment,
+              t.original_transaction_id,
               t.created_at
        FROM transactions t
        JOIN businesses b ON b.id = t.business_id
@@ -158,7 +185,7 @@ router.get("/", async (req, res) => {
     );
 
     res.status(200).json({
-      data: result.rows,
+      data: result.rows.map(decryptTransactionRow),
       total: parseInt(countResult.rows[0].count),
       limit,
       offset
@@ -180,6 +207,7 @@ router.post("/", async (req, res) => {
 
     const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
     const { description, note } = req.body;
+    const encryptedDescription = description ? encrypt(description) : null;
 
     const accountCheck = await pool.query(
       "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
@@ -201,8 +229,8 @@ router.post("/", async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO transactions
-        (id, business_id, account_id, category_id, amount, type, cleared, description, date, note)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted, date, note)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
         crypto.randomUUID(),
@@ -213,12 +241,13 @@ router.post("/", async (req, res) => {
         type,
         cleared,
         description || null,
+        encryptedDescription,
         date,
         note || null
       ]
     );
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     console.error("POST /transactions error:", err);
     res.status(500).json({ error: "Failed to save transaction." });
@@ -236,6 +265,15 @@ router.put("/:id", async (req, res) => {
     const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
     const { description, note } = req.body;
 
+    // Verify the original transaction exists and belongs to this business
+    const originalResult = await pool.query(
+      "SELECT id FROM transactions WHERE id = $1 AND business_id = $2 AND is_adjustment = false",
+      [req.params.id, businessId]
+    );
+    if (originalResult.rowCount === 0) {
+      return res.status(404).json({ error: "Transaction not found." });
+    }
+
     const accountCheck = await pool.query(
       "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
       [account_id, businessId]
@@ -249,21 +287,34 @@ router.put("/:id", async (req, res) => {
       return res.status(400).json({ error: "category_id is invalid" });
     }
 
+    const encryptedDescription = description ? encrypt(description) : null;
+
+    // Audit Pivot: insert a new adjustment row referencing the original transaction
     const result = await pool.query(
-      `UPDATE transactions
-       SET account_id = $1, category_id = $2, amount = $3, type = $4,
-           cleared = $5, description = $6, date = $7, note = $8
-       WHERE id = $9 AND business_id = $10
+      `INSERT INTO transactions
+        (id, business_id, account_id, category_id, amount, type, cleared,
+         description, description_encrypted, date, note,
+         is_adjustment, original_transaction_id, adjusted_by_id, adjusted_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, $12, $13, NOW())
        RETURNING *`,
-      [account_id, mappedCategoryId, amount, type, cleared, description || null, date, note || null,
-       req.params.id, businessId]
+      [
+        crypto.randomUUID(),
+        businessId,
+        account_id,
+        mappedCategoryId,
+        amount,
+        type,
+        cleared,
+        description || null,
+        encryptedDescription,
+        date,
+        note || null,
+        req.params.id,
+        req.user.id
+      ]
     );
 
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Transaction not found." });
-    }
-
-    res.json(result.rows[0]);
+    res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     console.error("PUT /transactions/:id error:", err);
     res.status(500).json({ error: "Failed to update transaction." });

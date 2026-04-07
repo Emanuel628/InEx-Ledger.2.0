@@ -38,7 +38,8 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
-      `SELECT id, email, role, email_verified, mfa_enabled, full_name, display_name, created_at,
+      `SELECT id, email, role, email_verified, mfa_enabled, full_name, display_name,
+              country, province, data_residency, created_at,
               onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen
          FROM users
         WHERE id = $1

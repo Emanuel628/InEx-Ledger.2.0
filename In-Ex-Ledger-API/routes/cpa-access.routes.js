@@ -1,6 +1,6 @@
 const express = require("express");
 const fs = require("fs");
-const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const {
   listOwnedCpaGrants,
@@ -19,6 +19,7 @@ const { buildRedactedStream } = require("../services/exportStorage.js");
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireMfa);
 router.use(createDataApiLimiter({ max: 60 }));
 
 router.get("/grants/owned", async (req, res) => {

@@ -495,6 +495,10 @@ router.post("/register", authLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
 
+  // Optional geo-tagging fields for data residency tracking (PIPEDA / Quebec Law 25)
+  const country = String(req.body?.country || "").trim().toUpperCase() || null;
+  const province = String(req.body?.province || "").trim().toUpperCase() || null;
+
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
@@ -513,10 +517,21 @@ router.post("/register", authLimiter, async (req, res) => {
     }
 
     const result = await client.query(
-      `INSERT INTO users (id, email, password_hash, created_at)
-       VALUES ($1, $2, $3, NOW())
+      `INSERT INTO users (id, email, password_hash, country, province, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
        RETURNING id, email`,
-      [crypto.randomUUID(), email, hashedPassword]
+      [crypto.randomUUID(), email, hashedPassword, country, province]
+    );
+
+    const newUserId = result.rows[0].id;
+
+    // Quebec Privacy Default (Law 25): data sharing is opt-OUT by default for QC residents
+    const isQuebec = country === "CA" && province === "QC";
+    await client.query(
+      `INSERT INTO user_privacy_settings (user_id, data_sharing_opt_out, consent_given, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (user_id) DO NOTHING`,
+      [newUserId, isQuebec, !isQuebec]
     );
 
     // --- START OF EMAIL LOGIC ---
