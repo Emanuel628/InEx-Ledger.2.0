@@ -22,15 +22,6 @@
 /* Section card */
 .analytics-card{background:var(--surface);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:20px 22px;margin-bottom:16px}.analytics-card h2{font-size:14px;font-weight:500;color:var(--ink)}.analytics-card h2+p{margin-top:4px;font-size:12px;color:var(--ink3)}
 
-.tax-widget-card{margin-top:4px}
-.tax-widget-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
-.tax-widget-field{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:500;letter-spacing:.05em;color:var(--ink3);text-transform:uppercase}
-.tax-widget-field input,.tax-widget-field select{padding:8px 10px;border:.5px solid var(--border2);border-radius:7px;font-size:13px;color:var(--ink);background:var(--surface2);box-sizing:border-box}
-.tax-widget-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
-.tax-widget-actions button{padding:8px 12px;border:.5px solid var(--border2);border-radius:7px;background:var(--surface2);color:var(--ink2);font-size:12px;font-weight:500;cursor:pointer}
-.tax-widget-actions button[data-tax-control="apply"]{background:var(--accent2);border-color:var(--accent2);color:#fff}
-.tax-widget-note{min-height:16px;margin-top:8px;font-size:12px;color:var(--ink3)}
-
 /* Risk notification */
 .risk-alert{margin-top:10px;padding:10px 14px;background:var(--amber-bg);border:.5px solid var(--amber);border-radius:8px;font-size:12px;color:var(--amber)}
 
