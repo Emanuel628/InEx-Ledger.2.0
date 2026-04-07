@@ -174,7 +174,7 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
   const timestampSeconds = parseInt(timestamp, 10);
   const nowSeconds = Math.floor(Date.now() / 1000);
   if (Math.abs(nowSeconds - timestampSeconds) > STRIPE_WEBHOOK_TOLERANCE_SECONDS) {
-    throw new Error("Stripe webhook timestamp is too old");
+    throw new Error("Stripe webhook timestamp is outside the acceptable tolerance window");
   }
 
   const payload = `${timestamp}.${rawBody.toString("utf8")}`;

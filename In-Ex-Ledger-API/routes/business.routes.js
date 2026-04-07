@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
@@ -14,6 +15,41 @@ const BUSINESS_SELECT = `SELECT id, name, region, language, fiscal_year_start, p
                          FROM businesses
                          WHERE id = $1`;
 
+const TAX_ID_PREFIX = "enc:";
+
+function getTaxIdKey() {
+  const secret = process.env.JWT_SECRET || "";
+  return crypto.createHash("sha256").update(secret).digest();
+}
+
+function encryptTaxId(plaintext) {
+  if (!plaintext) return plaintext;
+  const key = getTaxIdKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return `${TAX_ID_PREFIX}${iv.toString("base64")}:${authTag.toString("base64")}:${encrypted.toString("base64")}`;
+}
+
+function decryptTaxId(stored) {
+  if (!stored || !stored.startsWith(TAX_ID_PREFIX)) return stored;
+  try {
+    const parts = stored.slice(TAX_ID_PREFIX.length).split(":");
+    if (parts.length !== 3) return stored;
+    const [ivB64, authTagB64, encryptedB64] = parts;
+    const key = getTaxIdKey();
+    const iv = Buffer.from(ivB64, "base64");
+    const authTag = Buffer.from(authTagB64, "base64");
+    const encrypted = Buffer.from(encryptedB64, "base64");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(authTag);
+    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
 function normalizeBusinessRow(row) {
   if (!row) {
     return row;
@@ -25,7 +61,8 @@ function normalizeBusinessRow(row) {
     business_type: null,
     tax_id: null,
     address: null,
-    ...row
+    ...row,
+    tax_id: decryptTaxId(row.tax_id)
   };
 }
 
@@ -36,6 +73,7 @@ async function fetchBusinessRow(businessId) {
 
 async function updateBusinessRow(businessId, payload) {
   const { name, region, language, fiscal_year_start, province, business_type, tax_id, address } = payload;
+  const encryptedTaxId = tax_id?.trim() ? encryptTaxId(tax_id.trim()) : null;
   const result = await pool.query(
     `UPDATE businesses
      SET name = COALESCE($1, name),
@@ -56,7 +94,7 @@ async function updateBusinessRow(businessId, payload) {
       fiscal_year_start || null,
       province,
       business_type?.trim() || null,
-      tax_id?.trim() || null,
+      encryptedTaxId,
       address?.trim() || null,
       businessId
     ]

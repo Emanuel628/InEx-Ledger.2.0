@@ -1,10 +1,12 @@
 const express = require("express");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(createDataApiLimiter());
 
 /**
  * GET /api/privacy/settings
@@ -30,8 +32,8 @@ router.get("/settings", async (req, res) => {
  * POST /api/privacy/settings
  */
 router.post("/settings", async (req, res) => {
-  const dataSharingOptOut = req.body?.dataSharingOptOut === true;
-  const consentGiven = req.body?.consentGiven !== false;
+  const dataSharingOptOut = typeof req.body?.dataSharingOptOut === "boolean" ? req.body.dataSharingOptOut : false;
+  const consentGiven = typeof req.body?.consentGiven === "boolean" ? req.body.consentGiven : true;
 
   try {
     await pool.query(
