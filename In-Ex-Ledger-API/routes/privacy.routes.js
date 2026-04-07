@@ -8,6 +8,8 @@ const router = express.Router();
 router.use(requireAuth);
 router.use(createDataApiLimiter());
 
+const MAX_USER_AGENT_LENGTH = 512;
+
 /**
  * GET /api/privacy/settings
  */
@@ -71,7 +73,7 @@ router.post("/settings", async (req, res) => {
     if (dataResidency === "CA-QC") {
       const action = dataSharingOptOut ? "opt_out" : "opt_in";
       const ipAddress = req.ip || req.connection?.remoteAddress || null;
-      const userAgent = String(req.get("user-agent") || "").slice(0, 512) || null;
+      const userAgent = String(req.get("user-agent") || "").slice(0, MAX_USER_AGENT_LENGTH) || null;
       await pool.query(
         `INSERT INTO privacy_consent_log (user_id, data_residency, action, ip_address, user_agent)
          VALUES ($1, $2, $3, $4, $5)`,

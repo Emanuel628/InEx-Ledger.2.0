@@ -135,7 +135,10 @@ function decryptTransactionRow(row) {
 function tryDecrypt(value) {
   try {
     return decrypt(value);
-  } catch {
+  } catch (err) {
+    // Decryption failure falls back to returning the raw value so that
+    // legacy plain-text entries remain readable during the migration window.
+    console.warn("transaction description decryption failed, returning raw value:", err.message);
     return value;
   }
 }

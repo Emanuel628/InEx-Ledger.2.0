@@ -10,7 +10,7 @@
  *
  * The 32-byte key must be supplied as a hex-encoded string in the
  * FIELD_ENCRYPTION_KEY environment variable (64 hex characters).
- * Generate one with:  node -e "require('crypto').randomBytes(32).toString('hex')|0" 
+ * Generate one with:  node -e "require('crypto').randomBytes(32).toString('hex')"
  * (or: openssl rand -hex 32)
  *
  * Encrypted payloads are stored as:
