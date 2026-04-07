@@ -28,15 +28,7 @@ BEGIN
 END $$;
 
 -- mileage: ensure trip_date and purpose have NOT NULL enforced
--- (they were defined NOT NULL in migration 001 but only nullable in migration 015 ALTER TABLE)
-UPDATE mileage
-SET trip_date = COALESCE(trip_date, created_at::date, CURRENT_DATE)
-WHERE trip_date IS NULL;
-
-UPDATE mileage
-SET purpose = COALESCE(NULLIF(TRIM(purpose), ''), 'Business trip')
-WHERE purpose IS NULL OR TRIM(purpose) = '';
-
+-- (migration 015 already backfills NULLs; this enforces the constraint)
 DO $$
 BEGIN
   IF EXISTS (

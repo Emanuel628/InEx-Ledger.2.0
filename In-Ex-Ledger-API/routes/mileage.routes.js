@@ -71,7 +71,7 @@ router.post("/", async (req, res) => {
   const purpose = typeof req.body?.purpose === "string" ? req.body.purpose.trim() : "";
   const destination = typeof req.body?.destination === "string" ? req.body.destination.trim() : "";
 
-  if (!trip_date || !purpose) {
+  if (!trip_date || purpose.length === 0) {
     return res.status(400).json({ error: "trip_date and purpose are required" });
   }
 
