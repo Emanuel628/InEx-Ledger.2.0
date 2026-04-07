@@ -143,6 +143,26 @@ function tryDecrypt(value) {
   }
 }
 
+/**
+ * Attempts to encrypt a transaction description using AES-256-GCM.
+ * Falls back to null (plain-text storage only) when FIELD_ENCRYPTION_KEY is
+ * not configured so that transactions can still be saved without encryption.
+ * A warning is logged so that server operators are alerted to the missing key.
+ */
+function tryEncryptDescription(description) {
+  if (!description) return null;
+  try {
+    return encrypt(description);
+  } catch (encryptErr) {
+    console.error(
+      "[transactions] Field encryption unavailable — description stored as plain text. " +
+      "Set FIELD_ENCRYPTION_KEY to enable at-rest encryption:",
+      encryptErr.message
+    );
+    return null;
+  }
+}
+
 router.get("/", async (req, res) => {
   try {
     const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
@@ -207,7 +227,7 @@ router.post("/", async (req, res) => {
 
     const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
     const { description, note } = req.body;
-    const encryptedDescription = description ? encrypt(description) : null;
+    const encryptedDescription = tryEncryptDescription(description);
 
     const accountCheck = await pool.query(
       "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
@@ -287,7 +307,7 @@ router.put("/:id", async (req, res) => {
       return res.status(400).json({ error: "category_id is invalid" });
     }
 
-    const encryptedDescription = description ? encrypt(description) : null;
+    const encryptedDescription = tryEncryptDescription(description);
 
     // Audit Pivot: insert a new adjustment row referencing the original transaction
     const result = await pool.query(
