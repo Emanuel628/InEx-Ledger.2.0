@@ -13,14 +13,28 @@ router.use(createDataApiLimiter());
  */
 router.get("/settings", async (req, res) => {
   try {
-    const result = await pool.query(
-      "SELECT data_sharing_opt_out, consent_given FROM user_privacy_settings WHERE user_id = $1",
-      [req.user.id]
-    );
-    const row = result.rows[0];
+    const [privacyResult, userResult] = await Promise.all([
+      pool.query(
+        "SELECT data_sharing_opt_out, consent_given FROM user_privacy_settings WHERE user_id = $1",
+        [req.user.id]
+      ),
+      pool.query(
+        "SELECT data_residency FROM users WHERE id = $1 LIMIT 1",
+        [req.user.id]
+      )
+    ]);
+
+    const row = privacyResult.rows[0];
+    const dataResidency = userResult.rows[0]?.data_residency || "US";
+    const isQuebec = dataResidency === "CA-QC";
+
+    // Quebec Privacy Default: if no row exists yet, default data sharing to OFF
+    const defaultOptOut = isQuebec;
+
     res.json({
-      dataSharingOptOut: row ? row.data_sharing_opt_out : false,
-      consentGiven: row ? row.consent_given : true
+      dataSharingOptOut: row ? row.data_sharing_opt_out : defaultOptOut,
+      consentGiven: row ? row.consent_given : !defaultOptOut,
+      dataResidency
     });
   } catch (err) {
     console.error("GET /privacy/settings error:", err.message);
@@ -36,6 +50,13 @@ router.post("/settings", async (req, res) => {
   const consentGiven = typeof req.body?.consentGiven === "boolean" ? req.body.consentGiven : true;
 
   try {
+    // Fetch the user's data_residency to determine if consent logging is required
+    const userResult = await pool.query(
+      "SELECT data_residency FROM users WHERE id = $1 LIMIT 1",
+      [req.user.id]
+    );
+    const dataResidency = userResult.rows[0]?.data_residency || "US";
+
     await pool.query(
       `INSERT INTO user_privacy_settings (user_id, data_sharing_opt_out, consent_given, updated_at)
        VALUES ($1, $2, $3, NOW())
@@ -45,6 +66,19 @@ router.post("/settings", async (req, res) => {
              updated_at = NOW()`,
       [req.user.id, dataSharingOptOut, consentGiven]
     );
+
+    // Log explicit consent changes for Quebec users (Law 25 requirement)
+    if (dataResidency === "CA-QC") {
+      const action = dataSharingOptOut ? "opt_out" : "opt_in";
+      const ipAddress = req.ip || req.connection?.remoteAddress || null;
+      const userAgent = String(req.get("user-agent") || "").slice(0, 512) || null;
+      await pool.query(
+        `INSERT INTO privacy_consent_log (user_id, data_residency, action, ip_address, user_agent)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [req.user.id, dataResidency, action, ipAddress, userAgent]
+      );
+    }
+
     res.json({ ok: true });
   } catch (err) {
     console.error("POST /privacy/settings error:", err.message);
