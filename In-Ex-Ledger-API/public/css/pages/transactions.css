@@ -1021,8 +1021,9 @@ body {
 }
 
 .sidebar-link.nav-link-active {
-  background: var(--accent-light);
+  background: transparent;
   color: var(--accent2);
+  font-weight: 600;
 }
 
 .sidebar-icon {
