@@ -115,11 +115,65 @@ function resolveEstimatedTaxProfile(region, province) {
   };
 }
 
+const DESKTOP_VIEW_KEY = "lb_desktop_view";
+
+function isDesktopViewRequested() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("view") === "desktop") {
+    return true;
+  }
+  try {
+    return localStorage.getItem(DESKTOP_VIEW_KEY) === "true";
+  } catch (_) {
+    return false;
+  }
+}
+
+function applyDesktopViewport() {
+  let meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = "viewport";
+    document.head.appendChild(meta);
+  }
+  meta.content = "width=1280";
+}
+
+function injectMobileDesktopLink() {
+  const wrapper = document.createElement("div");
+  wrapper.className = "mobile-desktop-link";
+  const link = document.createElement("a");
+  link.href = "#";
+  link.setAttribute("data-i18n", "mobile_desktop_version");
+  link.textContent = "Desktop Version";
+  link.addEventListener("click", function (e) {
+    e.preventDefault();
+    try {
+      localStorage.setItem(DESKTOP_VIEW_KEY, "true");
+    } catch (_) {}
+    const url = new URL(window.location.href);
+    url.searchParams.set("view", "desktop");
+    window.location.href = url.toString();
+  });
+  wrapper.appendChild(link);
+  document.body.appendChild(wrapper);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
   highlightNavigation();
   applyDateInputConstraints();
+  injectMobileDesktopLink();
 });
+
+(function () {
+  if (isDesktopViewRequested()) {
+    try {
+      localStorage.setItem(DESKTOP_VIEW_KEY, "true");
+    } catch (_) {}
+    applyDesktopViewport();
+  }
+})();
 
 window.applyGlobalTheme = applyGlobalTheme;
 window.setGlobalTheme = setGlobalTheme;
