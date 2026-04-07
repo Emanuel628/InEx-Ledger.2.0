@@ -102,8 +102,7 @@ function buildAppUrl(req, path) {
 
 router.get("/subscription", requireAuth, async (req, res) => {
   try {
-    req.user.business_id = await resolveBusinessIdForUser(req.user);
-    const businessId = req.user.business_id || (await resolveBusinessIdForUser(req.user));
+    const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     res.json({ subscription });
   } catch (err) {
@@ -114,8 +113,7 @@ router.get("/subscription", requireAuth, async (req, res) => {
 
 router.post("/checkout-session", requireAuth, async (req, res) => {
   try {
-    req.user.business_id = await resolveBusinessIdForUser(req.user);
-    const businessId = req.user.business_id || (await resolveBusinessIdForUser(req.user));
+    const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (subscription.isPaid && !subscription.cancelAtPeriodEnd) {
       return res.status(409).json({ error: "Business is already on an active paid plan." });
@@ -142,8 +140,7 @@ router.post("/checkout-session", requireAuth, async (req, res) => {
 
 router.post("/customer-portal", requireAuth, async (req, res) => {
   try {
-    req.user.business_id = await resolveBusinessIdForUser(req.user);
-    const businessId = req.user.business_id || (await resolveBusinessIdForUser(req.user));
+    const businessId = await resolveBusinessIdForUser(req.user);
     const customerId = await ensureStripeCustomer(businessId, req.user);
     const session = await stripeRequest("/billing_portal/sessions", {
       customer: customerId,
@@ -155,6 +152,8 @@ router.post("/customer-portal", requireAuth, async (req, res) => {
     res.status(500).json({ error: err.message || "Failed to open billing portal." });
   }
 });
+
+const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300; // 5-minute replay window
 
 function verifyWebhookSignature(rawBody, signatureHeader) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -170,6 +169,12 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
 
   if (!timestamp || !v1) {
     throw new Error("Missing Stripe signature");
+  }
+
+  const timestampSeconds = parseInt(timestamp, 10);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSeconds - timestampSeconds) > STRIPE_WEBHOOK_TOLERANCE_SECONDS) {
+    throw new Error("Stripe webhook timestamp is outside the acceptable tolerance window");
   }
 
   const payload = `${timestamp}.${rawBody.toString("utf8")}`;

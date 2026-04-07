@@ -1,10 +1,8 @@
 const crypto = require("crypto");
-const jwt = require("jsonwebtoken");
 const { pool } = require("../db.js");
 
 const EXPORT_GRANT_SECRET = process.env.EXPORT_GRANT_SECRET;
 const EXPORT_GRANT_TTL_MS = Number(process.env.EXPORT_GRANT_TTL_MS || 60_000);
-const JWT_ALGORITHM = "HS512";
 const ACTION_SCOPE = "generate_pdf";
 
 if (!EXPORT_GRANT_SECRET) {
@@ -17,11 +15,61 @@ function ensureSecret() {
   }
 }
 
+function encodeSegment(value) {
+  const payload = typeof value === "string" ? value : JSON.stringify(value ?? {});
+  return Buffer.from(payload, "utf8").toString("base64url");
+}
+
+function decodeSegment(value) {
+  return Buffer.from(value, "base64url").toString("utf8");
+}
+
+function signWithGrantSecret(message) {
+  return crypto.createHmac("sha256", EXPORT_GRANT_SECRET).update(message).digest("base64url");
+}
+
+function signGrantToken(payload, expiresInSeconds) {
+  const header = encodeSegment({ alg: "HS256", typ: "JWT" });
+  const now = Math.floor(Date.now() / 1000);
+  const bodyPayload = {
+    ...payload,
+    iat: now,
+    exp: now + expiresInSeconds
+  };
+  const body = encodeSegment(bodyPayload);
+  const signature = signWithGrantSecret(`${header}.${body}`);
+  return `${header}.${body}.${signature}`;
+}
+
+function verifyGrantToken(token) {
+  const parts = token.split(".");
+  if (parts.length !== 3) {
+    throw new Error("Invalid token format");
+  }
+  const [header, body, signature] = parts;
+  const expected = signWithGrantSecret(`${header}.${body}`);
+  const bufferSignature = Buffer.from(signature, "base64url");
+  const bufferExpected = Buffer.from(expected, "base64url");
+  if (
+    bufferSignature.length !== bufferExpected.length ||
+    !crypto.timingSafeEqual(bufferSignature, bufferExpected)
+  ) {
+    throw new Error("Invalid grant token signature");
+  }
+  const decoded = JSON.parse(decodeSegment(body));
+  const now = Math.floor(Date.now() / 1000);
+  if (typeof decoded.exp === "number" && decoded.exp <= now) {
+    throw new Error("Grant token expired");
+  }
+  return decoded;
+}
+
 async function issueExportGrant({ businessId, userId, exportType = "pdf", includeTaxId = false, dateRange, metadata = {} }) {
   ensureSecret();
   const now = Date.now();
   const expiresAt = now + EXPORT_GRANT_TTL_MS;
   const jti = crypto.randomUUID();
+  const expiresInSeconds = Math.floor(EXPORT_GRANT_TTL_MS / 1000);
   const payload = {
     jti,
     action: ACTION_SCOPE,
@@ -30,14 +78,10 @@ async function issueExportGrant({ businessId, userId, exportType = "pdf", includ
     exportType,
     includeTaxId,
     dateRange,
-    metadata,
-    iat: Math.floor(now / 1000),
-    exp: Math.floor(expiresAt / 1000)
+    metadata
   };
 
-  const token = jwt.sign(payload, EXPORT_GRANT_SECRET, {
-    algorithm: JWT_ALGORITHM
-  });
+  const token = signGrantToken(payload, expiresInSeconds);
 
   await pool.query(
     "INSERT INTO export_grant_jtis (jti, expires_at) VALUES ($1, $2)",
@@ -49,9 +93,7 @@ async function issueExportGrant({ businessId, userId, exportType = "pdf", includ
 
 async function verifyExportGrant(token) {
   ensureSecret();
-  const payload = jwt.verify(token, EXPORT_GRANT_SECRET, {
-    algorithms: [JWT_ALGORITHM]
-  });
+  const payload = verifyGrantToken(token);
 
   if (payload.action !== ACTION_SCOPE) {
     throw new Error("Grant token action is not supported.");

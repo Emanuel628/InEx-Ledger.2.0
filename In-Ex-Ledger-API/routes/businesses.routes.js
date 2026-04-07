@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const {
@@ -10,6 +11,31 @@ const {
 
 const router = express.Router();
 router.use(requireAuth);
+
+const TAX_ID_PREFIX = "enc:";
+
+function getTaxIdKey() {
+  const secret = process.env.JWT_SECRET || "";
+  return crypto.createHash("sha256").update(secret).digest();
+}
+
+function decryptTaxId(stored) {
+  if (!stored || !stored.startsWith(TAX_ID_PREFIX)) return stored;
+  try {
+    const parts = stored.slice(TAX_ID_PREFIX.length).split(":");
+    if (parts.length !== 3) return stored;
+    const [ivB64, authTagB64, encryptedB64] = parts;
+    const key = getTaxIdKey();
+    const iv = Buffer.from(ivB64, "base64");
+    const authTag = Buffer.from(authTagB64, "base64");
+    const encrypted = Buffer.from(encryptedB64, "base64");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(authTag);
+    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
+  } catch {
+    return null;
+  }
+}
 
 function normalizeBusinessPayload(payload = {}) {
   const name = String(payload.name || "").trim();
@@ -67,7 +93,8 @@ router.get("/:id/profile", async (req, res) => {
       return res.status(404).json({ error: "Business not found." });
     }
 
-    res.json(result.rows[0]);
+    const row = result.rows[0];
+    res.json({ ...row, tax_id: decryptTaxId(row.tax_id) });
   } catch (err) {
     console.error("GET /businesses/:id/profile error:", err.message);
     res.status(500).json({ error: "Failed to load business profile." });

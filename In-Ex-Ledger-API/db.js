@@ -92,7 +92,15 @@ async function initDatabase() {
       await withRetry(() => pool.query(sql));
       console.log(`Migration applied: ${filename}`);
     } catch (err) {
-      if (err.code === '42P07' || err.code === '42710') {
+      // Ignore errors for objects that already exist (idempotent migrations)
+      const IGNORABLE_CODES = new Set([
+        '42P07', // duplicate_table
+        '42710', // duplicate_object
+        '42701', // duplicate_column
+        '23505', // unique_violation (e.g. duplicate INSERT in seed data)
+        '42P16', // invalid_table_definition (some ALTER IF NOT EXISTS variants)
+      ]);
+      if (IGNORABLE_CODES.has(err.code)) {
         console.log(`Migration already applied (ignored): ${filename}`);
         continue;
       }

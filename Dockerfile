@@ -3,11 +3,11 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install deps first (better caching)
-COPY package*.json ./
+COPY In-Ex-Ledger-API/package*.json ./
 RUN npm install --production
 
-# Copy rest of app
-COPY . .
+# Copy rest of API
+COPY In-Ex-Ledger-API/ .
 
 ENV NODE_ENV=production
 ENV PORT=8080
