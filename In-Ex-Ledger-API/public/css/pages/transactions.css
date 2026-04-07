@@ -1372,6 +1372,72 @@ body {
   background: var(--surface2);
 }
 
+.advanced-filter-panel {
+  margin: 0 16px 16px;
+  padding: 16px;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.advanced-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.advanced-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink3);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.advanced-filter-field input,
+.advanced-filter-field select {
+  padding: 8px 10px;
+  border: 0.5px solid var(--border2);
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--surface2);
+}
+
+.advanced-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.advanced-filter-actions button {
+  padding: 8px 12px;
+  border: 0.5px solid var(--border2);
+  border-radius: 7px;
+  background: var(--surface2);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.advanced-filter-actions button[data-filter-apply] {
+  background: var(--accent2);
+  color: #fff;
+  border-color: var(--accent2);
+}
+
+.advanced-filter-message {
+  min-height: 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink3);
+}
+
 .toolbar-add-button {
   padding: 7px 12px;
   background: var(--accent2);

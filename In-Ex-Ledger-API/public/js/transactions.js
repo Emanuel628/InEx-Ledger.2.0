@@ -46,6 +46,7 @@ let activeModalTransactionId = null;
 let editingTransactionId = null;
 let transactionsLoading = false;
 const SLOT_ANIMATION_KEY = "lb_transactions_slot_played";
+const ADVANCED_FILTER_STORAGE_KEY = "lb_advanced_transaction_filters";
 let slotAnimationPlayed = false;
 const missingAccountWarnings = new Set();
 const missingCategoryWarnings = new Set();
@@ -109,6 +110,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireTransactionSearch();
   wireTransactionCategoryFilter();
   wireTransactionModal();
+  window.addEventListener("advancedTransactionFiltersChanged", () => {
+    applyFilters();
+  });
   window.addEventListener("accountsUpdated", async () => {
     await refreshAccountOptions();
     renderTransactionsTable();
@@ -1109,6 +1113,7 @@ function setEditingMode(enabled) {
 function applyFilters() {
   const transactions = ledgerState.transactions || [];
   const term = (transactionFilters.search || "").trim().toLowerCase();
+  const advancedFilters = readAdvancedTransactionFilters();
   let filtered = transactions;
   if (transactionFilters.type === "income" || transactionFilters.type === "expense") {
     filtered = filtered.filter((tx) => tx.type === transactionFilters.type);
@@ -1130,7 +1135,58 @@ function applyFilters() {
   if (transactionFilters.category) {
     filtered = filtered.filter((tx) => tx.categoryId === transactionFilters.category);
   }
+  filtered = filtered.filter((tx) => matchesAdvancedTransactionFilters(tx, advancedFilters));
   renderTransactionsTable(filtered);
+}
+
+function readAdvancedTransactionFilters() {
+  try {
+    const raw = localStorage.getItem(ADVANCED_FILTER_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function matchesAdvancedTransactionFilters(tx, filters) {
+  const normalizedDate = String(tx.date || "").slice(0, 10);
+  if (filters.dateFrom && normalizedDate && normalizedDate < filters.dateFrom) {
+    return false;
+  }
+  if (filters.dateTo && normalizedDate && normalizedDate > filters.dateTo) {
+    return false;
+  }
+
+  if (filters.cleared === "cleared" && !tx.cleared) {
+    return false;
+  }
+  if (filters.cleared === "uncleared" && tx.cleared) {
+    return false;
+  }
+
+  const amount = Math.abs(Number(tx.amount) || 0);
+  const minAmount = parseOptionalFilterAmount(filters.minAmount);
+  const maxAmount = parseOptionalFilterAmount(filters.maxAmount);
+  if (minAmount !== null && amount < minAmount) {
+    return false;
+  }
+  if (maxAmount !== null && amount > maxAmount) {
+    return false;
+  }
+
+  return true;
+}
+
+function parseOptionalFilterAmount(value) {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 async function handleTransactionDelete(transactionId) {
