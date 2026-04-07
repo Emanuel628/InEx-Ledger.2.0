@@ -67,7 +67,10 @@ Tasks **1–8**, F1–F6, F8–F17, F19, JS1, L1, L2 were marked done before the
 | 29 | `routes/transactions.routes.js` + `public/js/transactions.js` | Transactions PUT + DELETE |
 | 30 | `routes/transactions.routes.js` | Pagination (`limit`/`offset`) on GET /transactions |
 | 32 | `db.js` | SSL `rejectUnauthorized` now controlled by `DB_SSL_REJECT_UNAUTHORIZED` env var |
-| 33 | New `routes/sessions.routes.js` + `public/js/sessions.js` | Sessions listing + revocation |
+| 33 | New `routes/sessions.routes.js` + `public/html/sessions.html` + `public/js/sessions.js` | Sessions listing + revocation (dedicated page) |
+| 36 | `pdf-worker/index.js` `buildPdfContent()` | Formatted text report with header, transactions table, and footer |
+| L3 | `public/html/landing.html` + `css/pages/landing.css` | Pricing section added to landing page |
+| P5 | `public/html/landing.html`, `public/html/sessions.html`, `public/js/sessions.js` | Synced new and updated files to root `public/` folder |
 | 34 | `public/js/account-profile.js` + route | User profile PUT (`/api/me`) |
 | 35 | `public/js/fiscal-settings.js` + `region-settings.js` | Fiscal + region settings persisted via `/api/business` PUT |
 | 39 | `region-settings.html` | Province selector added |
@@ -81,14 +84,11 @@ Tasks **1–8**, F1–F6, F8–F17, F19, JS1, L1, L2 were marked done before the
 
 | # | Fix | Notes |
 |---|-----|-------|
-| P5 | Sync command to copy all frontend fixes into live `public/` folder | |
 | 20 | Integrate Stripe payment processor | Blocks 21, 31, 38 |
 | 21 | Add real billing/cancel section to `settings.html` | Depends on Stripe (20) |
 | 31 | Replace localStorage tier enforcement with server-side | Depends on Stripe (20) |
-| 36 | Build real PDF export worker (`pdf-worker/index.js`) | |
 | 37 | Implement MFA (new routes + `public/js/mfa.js`) | |
 | 38 | Remove mock subscription, enforce tiers server-side | Depends on Stripe (20) |
-| L3 | Add pricing visible on `landing.html` | |
 | L4 | Add screenshot or demo to `landing.html` | |
 | Audit | Immutable transaction history (edits create reversals, not overwrites) | |
 | Audit | Locked accounting periods | |
