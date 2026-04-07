@@ -428,9 +428,9 @@ async function initPreferences() {
     );
     const province = normalizeProvinceCode(businessSettingsState.province || "");
     const isQC = region === "ca" && province === "QC";
-    // Quebec Law 25: privacy opt-out defaults to ON for QC users if not previously set
+    // Quebec Law 25: privacy opt-out defaults to ON for QC users if not previously explicitly set
     const storedOptOut = privacySettings.dataSharingOptOut;
-    const optOutDefault = isQC && storedOptOut !== false ? true : !!storedOptOut;
+    const optOutDefault = isQC && storedOptOut == null ? true : !!storedOptOut;
     return {
       region,
       province,

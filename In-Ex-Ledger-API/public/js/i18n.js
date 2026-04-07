@@ -69,8 +69,9 @@ function setCurrentRegion(region, province) {
   if (province !== undefined) {
     setCurrentProvince(province);
   }
+  const resolvedProvince = getCurrentProvince();
   applyTranslations(getCurrentLanguage());
-  applyRegionHardening(normalized);
+  applyRegionHardening(normalized, resolvedProvince);
   if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
     window.dispatchEvent(
       new CustomEvent('lunaRegionChanged', { detail: normalized })
@@ -262,19 +263,19 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('lunaProfileReady', function (event) {
     const profile = event && event.detail;
     const activeBusiness = (profile && profile.active_business) || null;
-    if (activeBusiness && activeBusiness.region) {
-      const region = String(activeBusiness.region).toLowerCase();
-      const province = String(activeBusiness.province || '').toUpperCase();
-      if (region !== getCurrentRegion()) {
-        localStorage.setItem('lb_region', region);
-        window.LUNA_REGION = region;
-      }
-      if (province && province !== getCurrentProvince()) {
-        localStorage.setItem('lb_province', province);
-        window.LUNA_PROVINCE = province;
-      }
-      applyRegionHardening(region, province);
+    if (!activeBusiness || !activeBusiness.region) return;
+    const region = String(activeBusiness.region).toLowerCase();
+    const province = String(activeBusiness.province || '').toUpperCase();
+    // Persist any changed values then apply hardening once with the resolved values
+    if (region !== getCurrentRegion()) {
+      localStorage.setItem('lb_region', region);
+      window.LUNA_REGION = region;
     }
+    if (province && province !== getCurrentProvince()) {
+      localStorage.setItem('lb_province', province);
+      window.LUNA_PROVINCE = province;
+    }
+    applyRegionHardening(region, province);
   });
 });
 
