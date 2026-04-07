@@ -111,8 +111,10 @@ router.get("/dashboard", async (req, res) => {
     const activeMonths = months.filter((m) => m.income > 0 || m.expense > 0).length || 1;
     const avgMonthlyIncome = totalIncome / activeMonths;
     const avgMonthlyExpense = totalExpense / activeMonths;
-    // Simplified tax liability estimate: 25% of net income (informational only)
-    const estimatedTaxPct = totalIncome > 0 ? Math.min(100, ((totalIncome - totalExpense) * 0.25) / totalIncome * 100) : 0;
+    // Estimated tax rate on net income (25% of net income as a % of gross — informational only).
+    // Formula: (net * 0.25) / grossIncome * 100 gives the proportion of gross income owed as estimated tax.
+    const netIncome = totalIncome - totalExpense;
+    const estimatedTaxPct = totalIncome > 0 ? Math.min(100, (netIncome * 0.25) / totalIncome * 100) : 0;
 
     res.json({
       period_months: 12,
@@ -120,7 +122,7 @@ router.get("/dashboard", async (req, res) => {
       summary: {
         total_income: Number(totalIncome.toFixed(2)),
         total_expense: Number(totalExpense.toFixed(2)),
-        net: Number((totalIncome - totalExpense).toFixed(2)),
+        net: Number(netIncome.toFixed(2)),
         avg_monthly_income: Number(avgMonthlyIncome.toFixed(2)),
         avg_monthly_expense: Number(avgMonthlyExpense.toFixed(2)),
         estimated_tax_liability_pct: Number(estimatedTaxPct.toFixed(1))
@@ -219,22 +221,30 @@ router.get("/cash-flow", async (req, res) => {
       }
     }
 
-    // Project next 3 months
+    // Project next 3 months.
+    // Use historical average as expense baseline (recurring transactions are already included
+    // in that history). If active recurring commitments now exceed the historical average,
+    // warn the user but don't silently inflate the projected expense — report both.
     const projections = [];
     const now = new Date();
-    const RISK_THRESHOLD = 0; // warn if projected net < 0
 
     for (let i = 1; i <= 3; i++) {
       const projDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
       const label = projDate.toISOString().slice(0, 7);
+      // Projected income: historical average (non-recurring) + known recurring income
       const projectedIncome = avgHistIncome + recurringMonthlyIncome;
-      const projectedExpense = Math.max(avgHistExpense, recurringMonthlyExpense);
+      // Projected expense: use historical average as the baseline
+      const projectedExpense = avgHistExpense;
       const projectedNet = projectedIncome - projectedExpense;
 
       let risk_notification = null;
-      if (projectedNet < RISK_THRESHOLD) {
+      if (projectedNet < 0) {
         const shortfall = Math.abs(projectedNet).toFixed(2);
         risk_notification = `You may fall short by $${shortfall} in ${label} due to recurring expenses and lower income.`;
+      } else if (recurringMonthlyExpense > avgHistExpense) {
+        // Committed recurring is higher than historical — worth flagging
+        const excess = (recurringMonthlyExpense - avgHistExpense).toFixed(2);
+        risk_notification = `Your active recurring expenses ($${recurringMonthlyExpense.toFixed(2)}/mo) exceed your historical average by $${excess}. Watch your cash flow in ${label}.`;
       }
 
       projections.push({
