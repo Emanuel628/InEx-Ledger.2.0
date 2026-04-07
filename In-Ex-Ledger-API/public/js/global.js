@@ -140,6 +140,8 @@ function applyDesktopViewport() {
 }
 
 function isMobileDevice() {
+  // Exclude Macintosh to avoid false-positive on iPads using "Request Desktop Website"
+  // (which sends a Mac UA but still has touch points)
   return /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
     || (navigator.maxTouchPoints > 0 && !/Macintosh/i.test(navigator.userAgent));
 }
