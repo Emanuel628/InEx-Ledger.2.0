@@ -67,13 +67,15 @@ router.get("/", async (req, res) => {
  * POST /api/mileage
  */
 router.post("/", async (req, res) => {
-  const { trip_date, purpose, destination, miles, km, odometer_start, odometer_end } = req.body ?? {};
+  const { trip_date, miles, km, odometer_start, odometer_end } = req.body ?? {};
+  const purpose = typeof req.body?.purpose === "string" ? req.body.purpose.trim() : "";
+  const destination = typeof req.body?.destination === "string" ? req.body.destination.trim() : "";
 
   if (!trip_date || !purpose) {
     return res.status(400).json({ error: "trip_date and purpose are required" });
   }
 
-  if (Number.isNaN(Date.parse(trip_date))) {
+  if (typeof trip_date !== "string" || Number.isNaN(Date.parse(trip_date))) {
     return res.status(400).json({ error: "trip_date must be a valid date." });
   }
 
@@ -132,7 +134,7 @@ router.post("/", async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("POST /mileage error:", err.message);
+    console.error("POST /mileage error:", err);
     res.status(500).json({ error: "Failed to save mileage record." });
   }
 });
