@@ -11,8 +11,3 @@ main {
 p {
   line-height: 1.6;
 }
-
-/* De-emphasize navigation visually */
-nav {
-  opacity: 0.85;
-}
