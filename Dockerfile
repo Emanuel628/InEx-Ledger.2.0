@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install deps first (better caching)
 COPY In-Ex-Ledger-API/package*.json ./
-RUN npm install --production
+RUN npm install --omit=dev
 
 # Copy rest of API
 COPY In-Ex-Ledger-API/ .
