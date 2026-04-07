@@ -1,52 +1,220 @@
 /* =========================
-   Subscription / Pricing Page
+   Subscription Management Page
    ========================= */
 
-main {
-  max-width: 720px;
-  margin: 20px auto;
-  padding: 22px;
+/* Sub-status block */
+.sub-status-block {
+  padding: 16px 0 8px;
 }
 
-section {
-  margin-bottom: 32px;
+.sub-status-loading {
+  color: var(--text-secondary);
+  font-size: 14px;
 }
 
-.plan {
+.sub-status-error {
+  color: var(--danger, #b91c1c);
+  font-size: 14px;
+}
+
+.sub-status-inner {
+  border-radius: 10px;
   border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 16px;
-  background: var(--card-bg);
+  padding: 16px 20px;
+  background: var(--surface-alt, var(--card-bg));
 }
 
-.plan h3 {
-  margin: 0 0 8px;
-  font-size: 18px;
+.sub-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.plan .price {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 12px;
+.sub-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
-.plan ul {
-  list-style: disc;
-  padding-left: 20px;
-  margin: 0 0 16px;
+.sub-badge-trial {
+  background: #fffbeb;
+  color: #92600a;
+  border: 1px solid #fde68a;
 }
 
-.plan ul li {
-  margin-bottom: 4px;
+.sub-badge-active {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+.sub-badge-free {
+  background: var(--surface, #f3f4f6);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.sub-badge-canceling {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+}
+
+.sub-status-detail {
   font-size: 14px;
   color: var(--text-secondary);
 }
 
-.plan button {
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
+.sub-actions-row {
+  padding-top: 12px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
+
+/* Plans Grid */
+.sub-plans-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+@media (max-width: 600px) {
+  .sub-plans-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sub-plan-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 20px;
+  background: var(--card-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sub-plan-card.sub-plan-featured {
+  border-color: var(--primary, #2563eb);
+  box-shadow: 0 0 0 1px var(--primary, #2563eb);
+}
+
+.sub-plan-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sub-plan-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sub-plan-price {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sub-plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sub-plan-features li {
+  font-size: 14px;
+  color: var(--text-secondary);
+  padding-left: 16px;
+  position: relative;
+}
+
+.sub-plan-features li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--primary, #2563eb);
+  font-size: 12px;
+}
+
+/* Billing History */
+.billing-history-list {
+  margin-top: 8px;
+}
+
+.billing-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.billing-history-table th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.billing-history-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.billing-history-table tr:last-child td {
+  border-bottom: none;
+}
+
+.billing-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.billing-status-paid {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.billing-status-open,
+.billing-status-draft {
+  background: #fffbeb;
+  color: #92600a;
+}
+
+.billing-invoice-link {
+  color: var(--primary, #2563eb);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.billing-invoice-link:hover {
+  text-decoration: underline;
+}
+
+.sub-empty-msg {
+  color: var(--text-secondary);
+  font-size: 14px;
+  padding: 16px 0;
+}
+

@@ -2,18 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Pricing | InEx Ledger</title>
+  <title>Subscription | InEx Ledger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- Global + page CSS -->
   <link rel="stylesheet" href="/css/app.css" />
-  <link rel="stylesheet" href="/css/pages/upgrade.css" />
+  <link rel="stylesheet" href="/css/pages/settings.css" />
+  <link rel="stylesheet" href="/css/pages/subscription.css" />
 </head>
 <body>
 
-<header class="app-topbar">
+<div id="trialBanner" class="trial-banner settings-trial-banner"></div>
+
+<header class="app-topbar settings-topbar">
   <div class="topbar-left">
-    <a href="transactions" class="topbar-brand">
+    <a href="transactions" class="topbar-brand" aria-label="InEx Ledger home">
       <span class="brand-mark brand-mark-topbar" aria-hidden="true">
         <svg viewBox="0 0 16 16" fill="none">
           <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
@@ -25,13 +28,13 @@
       <span class="topbar-brand-text">InEx Ledger</span>
     </a>
     <nav class="topbar-nav" aria-label="Primary">
-      <a href="transactions"><span class="nav-icon" aria-hidden="true">▦</span><span>Transactions</span></a>
-      <a href="accounts"><span class="nav-icon" aria-hidden="true">▣</span><span>Accounts</span></a>
-      <a href="categories"><span class="nav-icon" aria-hidden="true">◔</span><span>Categories</span></a>
-      <a href="receipts"><span class="nav-icon" aria-hidden="true">▤</span><span>Receipts</span></a>
-      <a href="mileage"><span class="nav-icon" aria-hidden="true">⊙</span><span>Mileage</span></a>
-      <a href="exports"><span class="nav-icon" aria-hidden="true">↗</span><span>Exports</span></a>
-      <a href="settings"><span class="nav-icon" aria-hidden="true">⚙</span><span>Settings</span></a>
+      <a href="transactions"><span class="nav-icon" aria-hidden="true">▦</span><span data-i18n="nav_transactions">Transactions</span></a>
+      <a href="accounts"><span class="nav-icon" aria-hidden="true">▣</span><span data-i18n="nav_accounts">Accounts</span></a>
+      <a href="categories"><span class="nav-icon" aria-hidden="true">◔</span><span data-i18n="nav_categories">Categories</span></a>
+      <a href="receipts"><span class="nav-icon" aria-hidden="true">▤</span><span data-i18n="nav_receipts">Receipts</span></a>
+      <a href="mileage"><span class="nav-icon" aria-hidden="true">⊙</span><span data-i18n="nav_mileage">Mileage</span></a>
+      <a href="exports"><span class="nav-icon" aria-hidden="true">↗</span><span data-i18n="nav_exports">Exports</span></a>
+      <a href="settings"><span class="nav-icon" aria-hidden="true">⚙</span><span data-i18n="nav_settings">Settings</span></a>
     </nav>
   </div>
   <div class="user-pill">
@@ -40,70 +43,118 @@
   </div>
 </header>
 
-<main>
-
-  <section>
-    <h2 data-i18n="subscription_plans_title">Plans (V1)</h2>
-    <p data-i18n="subscription_plans_intro">
-      Start with a 30-day free trial. After that, choose the plan that fits you.
-    </p>
-
-    <div class="plan">
-      <h3 data-i18n="subscription_starter_title">Starter</h3>
-      <p class="price" data-i18n="subscription_starter_price">$0 / month</p>
-      <ul>
-        <li data-i18n="subscription_starter_1">Basic ledger</li>
-        <li data-i18n="subscription_starter_2">Up to 50 transactions / month</li>
-        <li data-i18n="subscription_starter_3">CSV export</li>
-      </ul>
-      <button data-i18n="subscription_starter_cta">Stay on Starter</button>
+<div class="settings-shell">
+  <aside class="settings-sidebar" aria-label="Subscription navigation">
+    <div class="settings-sidebar-card">
+      <div class="sidebar-section-label" data-i18n="sub_mgmt_sidebar_label">Subscription</div>
+      <nav class="settings-nav">
+        <button class="settings-nav-item is-active" type="button" data-settings-target="sub-status-section" data-i18n="sub_mgmt_nav_status">Status &amp; plan</button>
+        <button class="settings-nav-item" type="button" data-settings-target="sub-plans-section" data-i18n="sub_mgmt_nav_plans">Plans</button>
+        <button class="settings-nav-item" type="button" data-settings-target="sub-history-section" data-i18n="sub_mgmt_nav_history">Billing history</button>
+      </nav>
+      <div class="settings-sidebar-actions">
+        <a href="settings" class="settings-sidebar-action" data-i18n="sub_mgmt_back_settings">← Back to settings</a>
+      </div>
     </div>
+  </aside>
 
-    <div class="plan">
-      <h3 data-i18n="subscription_pro_title">Pro</h3>
-      <p class="price" data-i18n="subscription_pro_price">$12 / month</p>
-      <ul>
-        <li data-i18n="subscription_pro_1">Unlimited transactions</li>
-        <li data-i18n="subscription_pro_2">Receipt uploads (as released)</li>
-        <li data-i18n="subscription_pro_3">Priority support</li>
-        <li data-i18n="subscription_pro_4">Advanced exports (as released)</li>
-      </ul>
-      <button data-i18n="subscription_pro_cta">Upgrade to Pro</button>
+  <main class="settings-main">
+
+    <!-- Current Status Card -->
+    <section class="settings-card" id="sub-status-section">
+      <div class="card-head">
+        <h2 class="card-title" data-i18n="sub_mgmt_status_title">Subscription status</h2>
+        <p class="card-desc" data-i18n="sub_mgmt_status_desc">Your current plan and billing details.</p>
+      </div>
+
+      <div class="sub-status-block" id="subStatusBlock">
+        <div class="sub-status-loading" data-i18n="settings_loading">Loading…</div>
+      </div>
+
+      <div class="settings-row sub-actions-row">
+        <button type="button" id="subManageBillingBtn" class="settings-secondary-btn hidden" data-i18n="subscription_manage_billing">Manage billing</button>
+        <button type="button" id="subCancelBtn" class="danger-outline-btn hidden" data-i18n="settings_cancel_subscription_btn">Cancel subscription…</button>
+      </div>
+    </section>
+
+    <!-- Plans Section -->
+    <section class="settings-card" id="sub-plans-section">
+      <div class="card-head">
+        <h2 class="card-title" data-i18n="sub_mgmt_plans_title">Available plans</h2>
+        <p class="card-desc" data-i18n="sub_mgmt_plans_desc">Choose the plan that fits your needs.</p>
+      </div>
+
+      <div class="sub-plans-grid">
+        <div class="sub-plan-card" id="planFree">
+          <div class="sub-plan-header">
+            <h3 class="sub-plan-name" data-i18n="subscription_starter_title">Starter</h3>
+            <p class="sub-plan-price" data-i18n="subscription_starter_price">$0 / month</p>
+          </div>
+          <ul class="sub-plan-features">
+            <li data-i18n="subscription_starter_1">Basic ledger</li>
+            <li data-i18n="subscription_starter_2">Up to 50 transactions / month</li>
+            <li data-i18n="subscription_starter_3">CSV export</li>
+          </ul>
+          <button type="button" id="planFreeBtn" class="settings-secondary-btn" data-i18n="subscription_starter_cta">Stay on Starter</button>
+        </div>
+
+        <div class="sub-plan-card sub-plan-featured" id="planPro">
+          <div class="sub-plan-header">
+            <h3 class="sub-plan-name" data-i18n="subscription_pro_title">Pro</h3>
+            <p class="sub-plan-price" data-i18n="subscription_pro_price">$12 / month</p>
+          </div>
+          <ul class="sub-plan-features">
+            <li data-i18n="subscription_pro_1">Unlimited transactions</li>
+            <li data-i18n="subscription_pro_2">Receipt uploads (as released)</li>
+            <li data-i18n="subscription_pro_3">Priority support</li>
+            <li data-i18n="subscription_pro_4">Advanced exports (as released)</li>
+          </ul>
+          <button type="button" id="planProBtn" class="settings-primary-btn" data-i18n="subscription_pro_cta">Upgrade to Pro</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Billing History -->
+    <section class="settings-card" id="sub-history-section">
+      <div class="card-head">
+        <h2 class="card-title" data-i18n="sub_mgmt_history_title">Billing history</h2>
+        <p class="card-desc" data-i18n="sub_mgmt_history_desc">Past payments and invoices.</p>
+      </div>
+      <div id="billingHistoryList" class="billing-history-list">
+        <div class="sub-status-loading" data-i18n="settings_loading">Loading…</div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Cancel Subscription Modal -->
+<div id="subCancelModal" class="transaction-modal hidden">
+  <div class="transaction-modal-content danger-modal">
+    <div class="danger-modal-icon" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="none">
+        <path d="M8 3L14 13H2L8 3Z"></path>
+        <line x1="8" y1="7" x2="8" y2="10"></line>
+        <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
+      </svg>
     </div>
-  </section>
+    <h3 data-i18n="settings_cancel_sub_modal_title">Cancel subscription?</h3>
+    <p id="subCancelModalBody" data-i18n="settings_cancel_sub_modal_body">Your subscription will remain active until the end of the current billing period.</p>
+    <div class="modal-actions danger-actions">
+      <button type="button" id="subCancelModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
+      <button type="button" id="subCancelModalConfirm" class="modal-delete" data-i18n="settings_cancel_sub_confirm_btn">Yes, cancel subscription</button>
+    </div>
+  </div>
+</div>
 
-  <section>
-    <h2 data-i18n="subscription_v2_title">V2 subscriptions (coming next)</h2>
-    <p data-i18n="subscription_v2_intro">
-      V2 adds automation and deeper reporting. Pricing may change as features ship.
-    </p>
-    <ul>
-      <li>Bank sync + auto-imports</li>
-      <li>Smarter categorization</li>
-      <li>More export formats + reports</li>
-      <li>Multi-business support</li>
-      <li>Bookkeeper/CPA access</li>
-    </ul>
-  </section>
-
-  <section>
-    <h2 data-i18n="subscription_billing_title">Billing</h2>
-    <p data-i18n="subscription_billing_body">
-      You can manage your plan from Settings. Cancel anytime.
-    </p>
-  </section>
-
-</main>
-
-<footer>
-  <p>
-    <a href="subscription" data-i18n="nav_pricing">Pricing</a>
-    <a href="privacy" data-i18n="footer_privacy">Privacy</a>
-    <a href="terms" data-i18n="footer_terms">Terms</a>
-  </p>
-  <p data-i18n="subscription_footer_note">Plans are shown for V1. V2 features will roll out over time.</p>
-  <p>&copy; InEx Ledger</p>
-</footer>
+<div id="subToast" class="settings-toast hidden" role="status" aria-live="polite">
+  <span class="toast-check" aria-hidden="true">
+    <svg viewBox="0 0 16 16" fill="none">
+      <polyline points="2 8 6 12 14 4"></polyline>
+    </svg>
+  </span>
+  <span id="subToastMessage">Saved</span>
+</div>
 
 <script src="../js/global.js?v=20260405c"></script>
 <script src="../js/i18n.js?v=20260405c"></script>

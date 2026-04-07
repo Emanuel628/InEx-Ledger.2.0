@@ -46,6 +46,7 @@
         <div class="sidebar-section-label" data-i18n="settings_sidebar_account">Account</div>
         <nav class="settings-nav">
           <button class="settings-nav-item is-active" type="button" data-settings-target="settings-business" data-i18n="settings_nav_business_profile">Business profile</button>
+          <button class="settings-nav-item" type="button" data-settings-target="settings-account" data-i18n="settings_nav_account_settings">Account &amp; Subscription</button>
           <button class="settings-nav-item" type="button" data-settings-target="settings-cpa-access" data-i18n="settings_nav_cpa_access">CPA access</button>
           <button class="settings-nav-item" type="button" data-settings-target="settings-security" data-i18n="settings_nav_security">Security</button>
         </nav>
@@ -97,6 +98,40 @@
           </div>
           <button type="submit" class="settings-primary-btn" data-i18n="settings_save_changes">Save changes</button>
         </form>
+
+        <div class="settings-business-management">
+          <div class="card-head">
+            <h3 class="card-title" data-i18n="settings_business_management_title">Business management</h3>
+            <p class="card-desc" data-i18n="settings_business_management_desc">Manage your business accounts. You can switch between businesses or delete one you no longer need.</p>
+          </div>
+          <div id="businessListWrap" class="business-list-wrap"></div>
+          <button type="button" id="addBusinessBtn" class="settings-secondary-btn" data-i18n="settings_add_business">Add another business</button>
+        </div>
+      </section>
+
+      <section class="settings-card" id="settings-account">
+        <div class="card-head">
+          <h2 class="card-title" data-i18n="settings_account_settings_title">Account &amp; Subscription</h2>
+          <p class="card-desc" data-i18n="settings_account_settings_desc">View your subscription status and manage billing.</p>
+        </div>
+
+        <div class="settings-row">
+          <div class="settings-row-copy">
+            <div class="settings-row-title" data-i18n="settings_subscription_status_title">Subscription</div>
+            <div class="settings-row-desc">
+              <span id="accountSubStatusLabel" data-i18n="settings_loading">Loading…</span>
+            </div>
+          </div>
+          <a href="subscription" class="settings-secondary-btn" data-i18n="settings_manage_subscription">Manage subscription</a>
+        </div>
+
+        <div class="settings-row" id="cancelSubscriptionRow">
+          <div class="settings-row-copy">
+            <div class="settings-row-title" data-i18n="settings_cancel_subscription_title">Cancel subscription</div>
+            <div class="settings-row-desc" data-i18n="settings_cancel_subscription_desc">Your access continues until the end of your current billing period.</div>
+          </div>
+          <button type="button" id="cancelSubscriptionBtn" class="danger-outline-btn" data-i18n="settings_cancel_subscription_btn">Cancel subscription…</button>
+        </div>
       </section>
 
       <section class="settings-card" id="settings-cpa-access">
@@ -376,9 +411,31 @@
         <label for="dangerModalConfirmInput" data-i18n="settings_type_delete_confirm">Type DELETE to confirm</label>
         <input type="text" id="dangerModalConfirmInput" autocomplete="off" />
       </div>
+      <div id="dangerModalPasswordWrap" class="danger-confirm-wrap hidden">
+        <label for="dangerModalPasswordInput" data-i18n="settings_enter_password_confirm">Enter your password to confirm</label>
+        <input type="password" id="dangerModalPasswordInput" autocomplete="current-password" />
+      </div>
       <div class="modal-actions danger-actions">
         <button type="button" id="dangerModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
         <button type="button" id="dangerModalConfirm" class="modal-delete" data-i18n="common_delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cancelSubModal" class="transaction-modal hidden">
+    <div class="transaction-modal-content danger-modal">
+      <div class="danger-modal-icon" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none">
+          <path d="M8 3L14 13H2L8 3Z"></path>
+          <line x1="8" y1="7" x2="8" y2="10"></line>
+          <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
+        </svg>
+      </div>
+      <h3 data-i18n="settings_cancel_sub_modal_title">Cancel subscription?</h3>
+      <p id="cancelSubModalBody" data-i18n="settings_cancel_sub_modal_body">Your subscription will remain active until the end of the current billing period.</p>
+      <div class="modal-actions danger-actions">
+        <button type="button" id="cancelSubModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
+        <button type="button" id="cancelSubModalConfirm" class="modal-delete" data-i18n="settings_cancel_sub_confirm_btn">Yes, cancel subscription</button>
       </div>
     </div>
   </div>

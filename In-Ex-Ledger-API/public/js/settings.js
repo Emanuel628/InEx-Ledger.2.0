@@ -71,6 +71,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   initSettingsNav();
   await initBusinessProfileForm();
+  await initAccountSettings();
   await initCpaAccess();
   await initPreferences();
   initSecurityForm();
@@ -130,6 +131,210 @@ async function initBusinessProfileForm() {
     saveBusinessProfile(nextProfile);
     showSettingsToast(t("settings_business_profile_saved"));
   });
+
+  await renderBusinessList();
+  document.getElementById("addBusinessBtn")?.addEventListener("click", () => {
+    openAddBusinessModal();
+  });
+}
+
+async function renderBusinessList() {
+  const wrap = document.getElementById("businessListWrap");
+  if (!wrap) return;
+
+  try {
+    const response = await apiFetch("/api/businesses");
+    if (!response || !response.ok) {
+      wrap.innerHTML = `<p class="settings-helper-note">${escapeSettingsHtml(t("settings_businesses_load_error"))}</p>`;
+      return;
+    }
+
+    const payload = await response.json().catch(() => null);
+    const businesses = Array.isArray(payload?.businesses) ? payload.businesses : [];
+    const activeId = payload?.active_business_id || "";
+
+    if (!businesses.length) {
+      wrap.innerHTML = `<p class="settings-helper-note">${escapeSettingsHtml(t("settings_no_businesses"))}</p>`;
+      return;
+    }
+
+    wrap.innerHTML = businesses.map((biz) => `
+      <div class="business-list-item ${biz.id === activeId ? "is-active" : ""}">
+        <div class="business-list-meta">
+          <span class="business-list-name">${escapeSettingsHtml(biz.name || t("common_business"))}</span>
+          ${biz.id === activeId ? `<span class="business-list-badge" data-i18n="settings_business_active_badge">${escapeSettingsHtml(t("settings_business_active_badge"))}</span>` : ""}
+        </div>
+        <div class="business-list-actions">
+          ${biz.id !== activeId ? `<button type="button" class="settings-secondary-btn business-switch-btn" data-business-switch="${escapeSettingsHtml(biz.id)}">${escapeSettingsHtml(t("settings_business_switch"))}</button>` : ""}
+          <button type="button" class="danger-outline-btn business-delete-btn" data-business-delete="${escapeSettingsHtml(biz.id)}" data-business-name="${escapeSettingsHtml(biz.name || "")}">${escapeSettingsHtml(t("settings_delete_business_btn"))}</button>
+        </div>
+      </div>
+    `).join("");
+
+    wrap.querySelectorAll("[data-business-switch]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const bizId = btn.getAttribute("data-business-switch");
+        btn.disabled = true;
+        try {
+          const res = await apiFetch(`/api/businesses/${bizId}/activate`, { method: "POST" });
+          if (!res || !res.ok) throw new Error();
+          showSettingsToast(t("settings_business_switched"));
+          await renderBusinessList();
+        } catch {
+          showSettingsToast(t("settings_business_switch_error"));
+          btn.disabled = false;
+        }
+      });
+    });
+
+    wrap.querySelectorAll("[data-business-delete]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const bizId = btn.getAttribute("data-business-delete");
+        const bizName = btn.getAttribute("data-business-name") || t("common_business");
+        openDeleteBusinessModal(bizId, bizName);
+      });
+    });
+  } catch (err) {
+    console.error("Failed to render business list", err);
+    wrap.innerHTML = `<p class="settings-helper-note">${escapeSettingsHtml(t("settings_businesses_load_error"))}</p>`;
+  }
+}
+
+function openAddBusinessModal() {
+  const name = window.prompt(t("settings_add_business_prompt") || "New business name:");
+  if (!name || !name.trim()) return;
+  void (async () => {
+    try {
+      const res = await apiFetch("/api/businesses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), region: "US", language: "en" })
+      });
+      if (!res || !res.ok) {
+        const err = await res?.json().catch(() => null);
+        showSettingsToast(err?.error || t("settings_add_business_error"));
+        return;
+      }
+      showSettingsToast(t("settings_business_added"));
+      await renderBusinessList();
+    } catch {
+      showSettingsToast(t("settings_add_business_error"));
+    }
+  })();
+}
+
+let pendingDeleteBusinessId = null;
+
+function openDeleteBusinessModal(bizId, bizName) {
+  const modal = document.getElementById("dangerModal");
+  const title = document.getElementById("dangerModalTitle");
+  const body = document.getElementById("dangerModalBody");
+  const confirmWrap = document.getElementById("dangerModalConfirmWrap");
+  const passwordWrap = document.getElementById("dangerModalPasswordWrap");
+  const passwordInput = document.getElementById("dangerModalPasswordInput");
+  const confirmButton = document.getElementById("dangerModalConfirm");
+  if (!modal) return;
+
+  pendingDeleteBusinessId = bizId;
+  dangerAction = "delete_business";
+  title.textContent = t("settings_delete_business_modal_title");
+  body.textContent = interpolateTranslatedMessage("settings_delete_business_modal_body", { name: bizName });
+  confirmWrap.classList.add("hidden");
+  passwordWrap.classList.remove("hidden");
+  if (passwordInput) passwordInput.value = "";
+  confirmButton.disabled = false;
+  modal.classList.remove("hidden");
+}
+
+async function initAccountSettings() {
+  const statusLabel = document.getElementById("accountSubStatusLabel");
+  const cancelRow = document.getElementById("cancelSubscriptionRow");
+  const cancelBtn = document.getElementById("cancelSubscriptionBtn");
+  const cancelModal = document.getElementById("cancelSubModal");
+  const cancelModalCancel = document.getElementById("cancelSubModalCancel");
+  const cancelModalConfirm = document.getElementById("cancelSubModalConfirm");
+  const cancelModalBody = document.getElementById("cancelSubModalBody");
+
+  const closeCancelModal = () => {
+    cancelModal?.classList.add("hidden");
+  };
+
+  cancelModalCancel?.addEventListener("click", closeCancelModal);
+
+  cancelBtn?.addEventListener("click", () => {
+    cancelModal?.classList.remove("hidden");
+  });
+
+  cancelModalConfirm?.addEventListener("click", async () => {
+    cancelModalConfirm.disabled = true;
+    try {
+      const res = await apiFetch("/api/billing/cancel", { method: "POST" });
+      const payload = await res?.json().catch(() => null);
+      if (!res || !res.ok) {
+        showSettingsToast(payload?.error || t("settings_cancel_sub_error"));
+        cancelModalConfirm.disabled = false;
+        return;
+      }
+      closeCancelModal();
+      showSettingsToast(t("settings_cancel_sub_success"));
+      await loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBody);
+    } catch (err) {
+      console.error("Cancel subscription failed", err);
+      showSettingsToast(t("settings_cancel_sub_error"));
+      cancelModalConfirm.disabled = false;
+    }
+  });
+
+  await loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBody);
+}
+
+async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBody) {
+  if (!statusLabel) return;
+  try {
+    const res = await apiFetch("/api/billing/subscription");
+    if (!res || !res.ok) {
+      statusLabel.textContent = t("settings_sub_status_unknown");
+      return;
+    }
+    const payload = await res.json().catch(() => null);
+    const sub = payload?.subscription;
+    if (!sub) {
+      statusLabel.textContent = t("settings_sub_status_unknown");
+      return;
+    }
+
+    const tierLabel = sub.effectiveTier === "v1" ? "Pro" : "Free";
+    let statusText = "";
+    if (sub.isTrialing && sub.trialEndsAt) {
+      const endDate = new Date(sub.trialEndsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      statusText = interpolateTranslatedMessage("settings_sub_status_trial", { date: endDate });
+    } else if (sub.cancelAtPeriodEnd && sub.currentPeriodEnd) {
+      const endDate = new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      statusText = interpolateTranslatedMessage("settings_sub_status_canceling", { date: endDate });
+    } else if (sub.isPaid && sub.currentPeriodEnd) {
+      const renewDate = new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      statusText = interpolateTranslatedMessage("settings_sub_status_active", { plan: tierLabel, date: renewDate });
+    } else {
+      statusText = interpolateTranslatedMessage("settings_sub_status_free", { plan: tierLabel });
+    }
+
+    statusLabel.textContent = statusText;
+
+    // Show cancel button only for active paid plans that aren't already canceling
+    const canCancel = sub.isPaid && !sub.cancelAtPeriodEnd;
+    if (cancelRow) {
+      cancelRow.style.display = canCancel ? "" : "none";
+    }
+
+    // Update cancel modal body with period end date
+    if (cancelModalBody && sub.currentPeriodEnd) {
+      const endDate = new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+      cancelModalBody.textContent = interpolateTranslatedMessage("settings_cancel_sub_modal_body_date", { date: endDate });
+    }
+  } catch (err) {
+    console.error("Failed to load subscription for account settings", err);
+    if (statusLabel) statusLabel.textContent = t("settings_sub_status_unknown");
+  }
 }
 
 async function loadBusinessProfile() {
@@ -1375,7 +1580,9 @@ function initDangerZone() {
   const title = document.getElementById("dangerModalTitle");
   const body = document.getElementById("dangerModalBody");
   const confirmWrap = document.getElementById("dangerModalConfirmWrap");
+  const passwordWrap = document.getElementById("dangerModalPasswordWrap");
   const confirmInput = document.getElementById("dangerModalConfirmInput");
+  const passwordInput = document.getElementById("dangerModalPasswordInput");
   const confirmButton = document.getElementById("dangerModalConfirm");
   const cancelButton = document.getElementById("dangerModalCancel");
   const deleteDataButton = document.getElementById("deleteMyDataBtn");
@@ -1386,8 +1593,11 @@ function initDangerZone() {
   const closeModal = () => {
     modal.classList.add("hidden");
     dangerAction = null;
-    confirmInput.value = "";
+    pendingDeleteBusinessId = null;
+    if (confirmInput) confirmInput.value = "";
+    if (passwordInput) passwordInput.value = "";
     confirmWrap.classList.add("hidden");
+    if (passwordWrap) passwordWrap.classList.add("hidden");
     confirmButton.disabled = false;
   };
 
@@ -1397,11 +1607,13 @@ function initDangerZone() {
       title.textContent = t("settings_delete_account_modal_title");
       body.textContent = t("settings_delete_account_modal_body");
       confirmWrap.classList.remove("hidden");
+      if (passwordWrap) passwordWrap.classList.add("hidden");
       confirmButton.disabled = true;
     } else {
       title.textContent = t("settings_delete_business_data_modal_title");
       body.textContent = t("settings_delete_business_data_modal_body_full");
       confirmWrap.classList.add("hidden");
+      if (passwordWrap) passwordWrap.classList.add("hidden");
       confirmButton.disabled = false;
     }
     modal.classList.remove("hidden");
@@ -1412,7 +1624,9 @@ function initDangerZone() {
   cancelButton?.addEventListener("click", closeModal);
 
   confirmInput?.addEventListener("input", () => {
-    confirmButton.disabled = confirmInput.value !== "DELETE";
+    if (dangerAction === "delete_account") {
+      confirmButton.disabled = confirmInput.value !== "DELETE";
+    }
   });
 
   confirmButton?.addEventListener("click", () => {
@@ -1421,6 +1635,37 @@ function initDangerZone() {
         SETTINGS_DELETE_DATA_KEYS.forEach((key) => localStorage.removeItem(key));
         showSettingsToast(t("settings_business_data_deleted"));
         closeModal();
+        return;
+      }
+
+      if (dangerAction === "delete_business") {
+        const password = passwordInput?.value || "";
+        if (!password) {
+          showSettingsToast(t("settings_enter_password_confirm"));
+          passwordInput?.focus();
+          return;
+        }
+        confirmButton.disabled = true;
+        try {
+          const res = await apiFetch(`/api/businesses/${pendingDeleteBusinessId}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password })
+          });
+          const payload = await res?.json().catch(() => null);
+          if (!res || !res.ok) {
+            showSettingsToast(payload?.error || t("settings_delete_business_error"));
+            confirmButton.disabled = false;
+            return;
+          }
+          showSettingsToast(t("settings_delete_business_success"));
+          closeModal();
+          await renderBusinessList();
+        } catch (err) {
+          console.error("Business deletion failed", err);
+          showSettingsToast(t("settings_delete_business_error"));
+          confirmButton.disabled = false;
+        }
         return;
       }
 

@@ -1618,3 +1618,80 @@ body {
     align-items: stretch;
   }
 }
+
+/* ==============================
+   Business Management Section
+   ============================== */
+
+.settings-business-management {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settings-business-management .card-head {
+  margin-bottom: 12px;
+}
+
+.business-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.business-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-alt, var(--card-bg));
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.business-list-item.is-active {
+  border-color: var(--primary, #2563eb);
+  background: var(--primary-muted, #eff6ff);
+}
+
+.business-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.business-list-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.business-list-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--primary, #2563eb);
+  color: #fff;
+  white-space: nowrap;
+}
+
+.business-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ==============================
+   Account Settings Rows
+   ============================== */
