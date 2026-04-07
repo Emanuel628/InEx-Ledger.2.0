@@ -134,6 +134,7 @@ function wireCategoryModal() {
 
     if (!name) {
       if (message) message.textContent = tx("categories_error_name");
+      showFieldTooltip(document.getElementById("category-name"), tx("categories_validation_required") || "Please fill in this required field.");
       return;
     }
 

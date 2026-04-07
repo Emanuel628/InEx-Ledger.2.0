@@ -194,3 +194,77 @@ window.LUNA_TAX = {
   resolveEstimatedTaxProfile,
   formatEstimatedTaxPercent
 };
+
+/* ── Field Validation Tooltip Bubble ─────────────────────────
+   Shared across all pages. Shows a white floating bubble that
+   points to a specific form field with a validation message.
+   ──────────────────────────────────────────────────────────── */
+(function () {
+  let _tooltipTimer = null;
+  let _dismissListeners = [];
+
+  function _clearTooltipState() {
+    if (_tooltipTimer) {
+      clearTimeout(_tooltipTimer);
+      _tooltipTimer = null;
+    }
+    _dismissListeners.forEach(function (entry) {
+      entry.target.removeEventListener(entry.type, entry.fn);
+    });
+    _dismissListeners = [];
+  }
+
+  function hideFieldTooltip() {
+    _clearTooltipState();
+    const existing = document.getElementById("field-tooltip-bubble");
+    if (existing) {
+      existing.remove();
+    }
+  }
+
+  function showFieldTooltip(fieldElement, message) {
+    hideFieldTooltip();
+    if (!fieldElement) return;
+
+    const tooltip = document.createElement("div");
+    tooltip.id = "field-tooltip-bubble";
+    tooltip.className = "field-tooltip-bubble";
+    tooltip.textContent = message || "Please fill in this required field.";
+    document.body.appendChild(tooltip);
+
+    const rect = fieldElement.getBoundingClientRect();
+    const TOOLTIP_MAX_WIDTH = 280;
+    let left = rect.left;
+    if (left + TOOLTIP_MAX_WIDTH > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - TOOLTIP_MAX_WIDTH - 8);
+    }
+    tooltip.style.position = "fixed";
+    tooltip.style.top = (rect.bottom + 8) + "px";
+    tooltip.style.left = left + "px";
+
+    try {
+      fieldElement.focus({ preventScroll: true });
+    } catch (_) {}
+
+    function dismiss() {
+      hideFieldTooltip();
+    }
+
+    var listeners = [
+      { target: fieldElement, type: "input", fn: dismiss },
+      { target: fieldElement, type: "change", fn: dismiss },
+      { target: document, type: "keydown", fn: dismiss },
+      { target: document, type: "click", fn: dismiss }
+    ];
+
+    listeners.forEach(function (entry) {
+      entry.target.addEventListener(entry.type, entry.fn);
+    });
+    _dismissListeners = listeners;
+
+    _tooltipTimer = setTimeout(hideFieldTooltip, 6000);
+  }
+
+  window.showFieldTooltip = showFieldTooltip;
+  window.hideFieldTooltip = hideFieldTooltip;
+}());

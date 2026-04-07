@@ -344,7 +344,8 @@ function wireTransactionForm() {
     });
 
     if (validationError) {
-      setTransactionFormMessage(validationError);
+      setTransactionFormMessage(validationError.message);
+      showFieldTooltip(document.getElementById(validationError.fieldId), txT("transactions_validation_required_field", "Please fill in this required field."));
       return;
     }
 
@@ -1910,22 +1911,19 @@ function mergeSavedTransactionIntoLedger(transaction, context = {}) {
 
 function validateTransactionForm({ date, description, amount, accountId, categoryId, type }) {
   if (!date) {
-    return txT("transactions_validation_date", "Choose a date for the transaction.");
-  }
-  if (!description) {
-    return txT("transactions_validation_description", "Describe the transaction.");
+    return { message: txT("transactions_validation_date", "Choose a date for the transaction."), fieldId: "date" };
   }
   if (Number.isNaN(amount) || amount <= 0) {
-    return txT("transactions_validation_amount", "Amount must be greater than zero.");
+    return { message: txT("transactions_validation_amount", "Amount must be greater than zero."), fieldId: "amount" };
   }
   if (!accountId) {
-    return txT("transactions_validation_account", "Select an account.");
+    return { message: txT("transactions_validation_account", "Select an account."), fieldId: "account" };
   }
   if (!categoryId) {
-    return txT("transactions_validation_category", "Select a category.");
+    return { message: txT("transactions_validation_category", "Select a category."), fieldId: "category" };
   }
   if (!type) {
-    return txT("transactions_validation_type", "Choose a transaction type.");
+    return { message: txT("transactions_validation_type", "Choose a transaction type."), fieldId: "txType" };
   }
   return null;
 }
