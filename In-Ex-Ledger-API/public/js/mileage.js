@@ -42,6 +42,8 @@ function wireMileageForm() {
     }
 
     const useKilometers = shouldUseKilometers();
+    const milesValue = useKilometers ? Number((distance / 1.60934).toFixed(2)) : Number(distance.toFixed(1));
+    const kmValue = useKilometers ? Number(distance.toFixed(1)) : Number((distance * 1.60934).toFixed(2));
     const response = await apiFetch("/api/mileage", {
       method: "POST",
       headers: {
@@ -51,8 +53,8 @@ function wireMileageForm() {
         trip_date: date,
         purpose,
         destination,
-        miles: useKilometers ? null : Number(distance.toFixed(1)),
-        km: useKilometers ? Number(distance.toFixed(1)) : null
+        miles: milesValue,
+        km: kmValue
       })
     });
 

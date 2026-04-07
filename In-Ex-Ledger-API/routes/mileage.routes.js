@@ -107,9 +107,14 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: parsedOdometerEnd.error });
   }
 
+  const normalizedDistances = normalizeMileageDistances(parsedMiles.value, parsedKm.value);
+  if (normalizedDistances.error) {
+    return res.status(400).json({ error: normalizedDistances.error });
+  }
+
   const hasDistance =
-    (parsedMiles.value !== null && parsedMiles.value > 0) ||
-    (parsedKm.value !== null && parsedKm.value > 0);
+    (normalizedDistances.miles !== null && normalizedDistances.miles > 0) ||
+    (normalizedDistances.km !== null && normalizedDistances.km > 0);
   const hasOdometerRange =
     parsedOdometerStart.value !== null && parsedOdometerEnd.value !== null;
 
@@ -135,8 +140,8 @@ router.post("/", async (req, res) => {
       mileageDate,
       purpose,
       destination,
-      parsedMiles.value,
-      parsedKm.value,
+      normalizedDistances.miles,
+      normalizedDistances.km,
       parsedOdometerStart.value,
       parsedOdometerEnd.value
     );
@@ -249,6 +254,33 @@ function buildMileageInsertValues(
     odometerEnd
   );
   return values;
+}
+
+function normalizeMileageDistances(miles, km) {
+  if (miles === null && km === null) {
+    return {
+      error: "Provide miles, kilometers, or both odometer values."
+    };
+  }
+
+  if (miles === null && km !== null) {
+    return {
+      miles: Number((km / 1.60934).toFixed(2)),
+      km
+    };
+  }
+
+  if (km === null && miles !== null) {
+    return {
+      miles,
+      km: Number((miles * 1.60934).toFixed(2))
+    };
+  }
+
+  return {
+    miles,
+    km
+  };
 }
 
 /**
