@@ -18,7 +18,7 @@
     }
 
     try {
-      const res = await fetch(buildApiUrl("/api/health"));
+        const res = await fetch(buildApiUrl("/health"));
       apiReady = res.ok;
       return apiReady;
     } catch (err) {
