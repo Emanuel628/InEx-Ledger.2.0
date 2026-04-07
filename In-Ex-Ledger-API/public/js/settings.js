@@ -8,9 +8,12 @@ const SETTINGS_THEME_VERSION = typeof THEME_VERSION !== "undefined" ? THEME_VERS
 const BUSINESS_PROFILE_KEY = "lb_business_profile";
 const SETTINGS_TOAST_MS = 3000;
 const SETTINGS_DELETE_DATA_KEYS = [
+  "lb_accounts",
+  "lb_categories",
   "lb_transactions",
   "lb_receipts",
   "lb_mileage",
+  "lb_recurring",
   "lb_export_history",
   "lb_transactions_upsell_hidden"
 ];
@@ -1756,6 +1759,22 @@ function getStrengthWidth(score) {
   return "0%";
 }
 
+function clearBusinessDataState() {
+  SETTINGS_DELETE_DATA_KEYS.forEach((key) => localStorage.removeItem(key));
+}
+
+function clearAccountDeletionState() {
+  clearBusinessDataState();
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("lb_privacy_settings");
+  localStorage.removeItem("lb_token");
+  localStorage.removeItem("lb_user");
+  sessionStorage.clear();
+  if (typeof clearToken === "function") {
+    clearToken();
+  }
+}
+
 function initDangerZone() {
   const modal = document.getElementById("dangerModal");
   const title = document.getElementById("dangerModalTitle");
@@ -1820,11 +1839,8 @@ function initDangerZone() {
             typeof privacyService.deleteBusinessData === "function"
           ) {
             await privacyService.deleteBusinessData();
-          } else {
-            SETTINGS_DELETE_DATA_KEYS.forEach((key) =>
-              localStorage.removeItem(key)
-            );
           }
+          clearBusinessDataState();
           showSettingsToast(t("settings_business_data_deleted"));
           closeModal();
         } catch (err) {
@@ -1880,7 +1896,7 @@ function initDangerZone() {
             return;
           }
 
-          clearToken();
+          clearAccountDeletionState();
           showSettingsToast(t("settings_delete_account_success"));
           closeModal();
           setTimeout(() => {
