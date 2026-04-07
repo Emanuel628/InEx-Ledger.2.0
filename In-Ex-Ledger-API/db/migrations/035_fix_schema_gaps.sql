@@ -11,8 +11,17 @@ ALTER TABLE categories ADD COLUMN IF NOT EXISTS tax_map_ca   TEXT;
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_default   BOOLEAN DEFAULT false;
 
 -- mileage: ensure business_id has NOT NULL enforced
--- Delete any orphaned rows with NULL business_id before adding the constraint
-DELETE FROM mileage WHERE business_id IS NULL;
+-- Log and remove any orphaned rows (NULL business_id) before adding the constraint
+DO $$
+DECLARE
+  v_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO v_count FROM mileage WHERE business_id IS NULL;
+  IF v_count > 0 THEN
+    RAISE NOTICE 'Migration 035: removing % mileage row(s) with NULL business_id', v_count;
+    DELETE FROM mileage WHERE business_id IS NULL;
+  END IF;
+END $$;
 DO $$
 BEGIN
   IF EXISTS (

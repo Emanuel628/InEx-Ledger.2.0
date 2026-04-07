@@ -71,11 +71,11 @@ router.post("/", async (req, res) => {
   const purpose = typeof req.body?.purpose === "string" ? req.body.purpose.trim() : "";
   const destination = typeof req.body?.destination === "string" ? req.body.destination.trim() : "";
 
-  if (!trip_date || purpose.length === 0) {
+  if (!trip_date || typeof trip_date !== "string" || trip_date.length === 0 || purpose.length === 0) {
     return res.status(400).json({ error: "trip_date and purpose are required" });
   }
 
-  if (typeof trip_date !== "string" || Number.isNaN(Date.parse(trip_date))) {
+  if (Number.isNaN(Date.parse(trip_date))) {
     return res.status(400).json({ error: "trip_date must be a valid date." });
   }
 
