@@ -1689,9 +1689,25 @@ function initDangerZone() {
   confirmButton?.addEventListener("click", () => {
     void (async () => {
       if (dangerAction === "delete_data") {
-        SETTINGS_DELETE_DATA_KEYS.forEach((key) => localStorage.removeItem(key));
-        showSettingsToast(t("settings_business_data_deleted"));
-        closeModal();
+        confirmButton.disabled = true;
+        try {
+          if (
+            typeof privacyService === "object" &&
+            typeof privacyService.deleteBusinessData === "function"
+          ) {
+            await privacyService.deleteBusinessData();
+          } else {
+            SETTINGS_DELETE_DATA_KEYS.forEach((key) =>
+              localStorage.removeItem(key)
+            );
+          }
+          showSettingsToast(t("settings_business_data_deleted"));
+          closeModal();
+        } catch (err) {
+          console.error("Business data deletion failed", err);
+          showSettingsToast(t("settings_delete_business_error"));
+          confirmButton.disabled = false;
+        }
         return;
       }
 
