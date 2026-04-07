@@ -16,7 +16,8 @@ async function logCpaAuditEvent({
   grantId = null,
   businessId = null,
   action,
-  metadata = {}
+  metadata = {},
+  ipAddress = null
 }) {
   if (!action) {
     return;
@@ -24,8 +25,8 @@ async function logCpaAuditEvent({
 
   await pool.query(
     `INSERT INTO cpa_audit_logs
-       (id, actor_user_id, owner_user_id, grant_id, business_id, action, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)`,
+       (id, actor_user_id, owner_user_id, grant_id, business_id, action, metadata, ip_address)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)`,
     [
       crypto.randomUUID(),
       actorUserId,
@@ -33,7 +34,8 @@ async function logCpaAuditEvent({
       grantId,
       businessId,
       action,
-      JSON.stringify(metadata || {})
+      JSON.stringify(metadata || {}),
+      ipAddress || null
     ]
   );
 }
@@ -66,7 +68,8 @@ async function syncPendingCpaGrantsForUser(user) {
         metadata: {
           scope: row.scope,
           grantee_email: email
-        }
+        },
+        ipAddress: null
       })
     )
   );
@@ -246,7 +249,7 @@ async function resolveAccessiblePortfolioForUser(user, ownerUserId, requestedBus
   };
 }
 
-async function createCpaGrant(ownerUser, payload) {
+async function createCpaGrant(ownerUser, payload, grantIp = null) {
   const email = normalizeEmail(payload?.email);
   const scope = normalizeScope(payload?.scope);
   const businesses = await listBusinessesForUser(ownerUser.id);
@@ -284,8 +287,8 @@ async function createCpaGrant(ownerUser, payload) {
   try {
     const result = await pool.query(
       `INSERT INTO cpa_access_grants
-         (id, owner_user_id, grantee_user_id, grantee_email, scope, business_id, status, accepted_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (id, owner_user_id, grantee_user_id, grantee_email, scope, business_id, status, accepted_at, grant_ip)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id`,
       [
         crypto.randomUUID(),
@@ -295,7 +298,8 @@ async function createCpaGrant(ownerUser, payload) {
         scope,
         businessId,
         status,
-        acceptedAt
+        acceptedAt,
+        grantIp || null
       ]
     );
 
@@ -310,7 +314,8 @@ async function createCpaGrant(ownerUser, payload) {
         grantee_email: email,
         scope,
         accepted_immediately: status === "active"
-      }
+      },
+      ipAddress: grantIp || null
     });
 
     return grantId;
@@ -322,7 +327,7 @@ async function createCpaGrant(ownerUser, payload) {
   }
 }
 
-async function revokeOwnedCpaGrant(ownerUserId, grantId) {
+async function revokeOwnedCpaGrant(ownerUserId, grantId, ipAddress = null) {
   const result = await pool.query(
     `UPDATE cpa_access_grants
         SET status = 'revoked',
@@ -355,13 +360,14 @@ async function revokeOwnedCpaGrant(ownerUserId, grantId) {
     metadata: {
       scope: grant.rows[0]?.scope || null,
       grantee_email: grant.rows[0]?.grantee_email || null
-    }
+    },
+    ipAddress
   });
 
   return true;
 }
 
-async function deleteOwnedRevokedCpaGrant(ownerUserId, grantId) {
+async function deleteOwnedRevokedCpaGrant(ownerUserId, grantId, ipAddress = null) {
   const grantResult = await pool.query(
     `SELECT id, owner_user_id, business_id, scope, grantee_email, status
        FROM cpa_access_grants
@@ -397,13 +403,14 @@ async function deleteOwnedRevokedCpaGrant(ownerUserId, grantId) {
     metadata: {
       scope: grant.scope || null,
       grantee_email: grant.grantee_email || null
-    }
+    },
+    ipAddress
   });
 
   return true;
 }
 
-async function acceptAssignedCpaGrant(user, grantId) {
+async function acceptAssignedCpaGrant(user, grantId, ipAddress = null) {
   const result = await pool.query(
     `UPDATE cpa_access_grants
         SET grantee_user_id = $1,
@@ -429,7 +436,8 @@ async function acceptAssignedCpaGrant(user, grantId) {
     metadata: {
       scope: result.rows[0].scope,
       grantee_email: normalizeEmail(user.email)
-    }
+    },
+    ipAddress
   });
 
   return true;

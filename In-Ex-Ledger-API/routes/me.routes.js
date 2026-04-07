@@ -40,7 +40,9 @@ router.get("/", requireAuth, async (req, res) => {
     const result = await pool.query(
       `SELECT id, email, role, email_verified, mfa_enabled, full_name, display_name,
               country, province, data_residency, created_at,
-              onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen
+              onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen,
+              cpa_license_number, cpa_license_verified, cpa_license_status,
+              cpa_license_verified_at, cpa_license_jurisdiction
          FROM users
         WHERE id = $1
         LIMIT 1`,
@@ -56,15 +58,24 @@ router.get("/", requireAuth, async (req, res) => {
     const activeBusiness = businesses.find((business) => business.id === businessId) || null;
     const assignedCpaGrants = await listAssignedCpaGrants(result.rows[0]);
     const assignedCpaPortfolios = await listAccessibleBusinessScopeForUser(result.rows[0]);
+    const user = result.rows[0];
     res.status(200).json({
-      ...result.rows[0],
+      ...user,
       business_id: businessId,
       active_business_id: businessId,
       active_business: activeBusiness,
       businesses,
       assigned_cpa_grants: assignedCpaGrants,
       assigned_cpa_portfolios: assignedCpaPortfolios,
-      onboarding: normalizeOnboardingPayload(result.rows[0]),
+      onboarding: normalizeOnboardingPayload(user),
+      cpa_verification: {
+        hasLicense: !!user.cpa_license_number,
+        licenseNumber: user.cpa_license_number || null,
+        verified: !!user.cpa_license_verified,
+        status: user.cpa_license_status || null,
+        verifiedAt: user.cpa_license_verified_at || null,
+        jurisdiction: user.cpa_license_jurisdiction || null
+      },
       subscription
     });
   } catch (err) {

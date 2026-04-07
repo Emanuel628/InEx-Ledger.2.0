@@ -22,6 +22,10 @@ router.use(requireAuth);
 router.use(requireMfa);
 router.use(createDataApiLimiter({ max: 60 }));
 
+function getClientIp(req) {
+  return req.ip || req.socket?.remoteAddress || null;
+}
+
 router.get("/grants/owned", async (req, res) => {
   try {
     const grants = await listOwnedCpaGrants(req.user.id);
@@ -594,7 +598,7 @@ router.get("/portfolio/:ownerUserId/exports/:exportId/redacted", async (req, res
 
 router.post("/grants", async (req, res) => {
   try {
-    const grantId = await createCpaGrant(req.user, req.body);
+    const grantId = await createCpaGrant(req.user, req.body, getClientIp(req));
     const grants = await listOwnedCpaGrants(req.user.id);
     res.status(201).json({ id: grantId, grants });
   } catch (error) {
@@ -607,7 +611,7 @@ router.post("/grants", async (req, res) => {
 
 router.post("/grants/:id/accept", async (req, res) => {
   try {
-    const accepted = await acceptAssignedCpaGrant(req.user, req.params.id);
+    const accepted = await acceptAssignedCpaGrant(req.user, req.params.id, getClientIp(req));
     if (!accepted) {
       return res.status(404).json({ error: "CPA access grant not found." });
     }
@@ -621,7 +625,7 @@ router.post("/grants/:id/accept", async (req, res) => {
 
 router.delete("/grants/:id", async (req, res) => {
   try {
-    const revoked = await revokeOwnedCpaGrant(req.user.id, req.params.id);
+    const revoked = await revokeOwnedCpaGrant(req.user.id, req.params.id, getClientIp(req));
     if (!revoked) {
       return res.status(404).json({ error: "CPA access grant not found." });
     }
@@ -634,7 +638,7 @@ router.delete("/grants/:id", async (req, res) => {
 
 router.delete("/grants/:id/permanent", async (req, res) => {
   try {
-    const deleted = await deleteOwnedRevokedCpaGrant(req.user.id, req.params.id);
+    const deleted = await deleteOwnedRevokedCpaGrant(req.user.id, req.params.id, getClientIp(req));
     if (!deleted) {
       return res.status(404).json({ error: "CPA access grant not found." });
     }
