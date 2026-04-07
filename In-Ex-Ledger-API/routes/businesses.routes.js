@@ -1,5 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
+const bcrypt = require("bcrypt");
+const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const {
@@ -11,6 +13,14 @@ const {
 
 const router = express.Router();
 router.use(requireAuth);
+
+const businessDeleteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many deletion attempts, please try again later." }
+});
 
 const TAX_ID_PREFIX = "enc:";
 
@@ -143,6 +153,104 @@ router.post("/:id/activate", async (req, res) => {
   } catch (err) {
     console.error("POST /businesses/:id/activate error:", err.message);
     res.status(500).json({ error: "Failed to switch business." });
+  }
+});
+
+/**
+ * DELETE /api/businesses/:id
+ * Delete a business account and all its associated data.
+ * Requires password confirmation. Cannot delete the user's only business.
+ */
+router.delete("/:id", businessDeleteLimiter, async (req, res) => {
+  const { password } = req.body ?? {};
+  const businessId = req.params.id;
+
+  if (!password) {
+    return res.status(400).json({ error: "Password is required to delete a business." });
+  }
+
+  try {
+    // Verify that the business belongs to this user
+    const ownerCheck = await pool.query(
+      "SELECT id FROM businesses WHERE id = $1 AND user_id = $2 LIMIT 1",
+      [businessId, req.user.id]
+    );
+    if (!ownerCheck.rowCount) {
+      return res.status(404).json({ error: "Business not found." });
+    }
+
+    // Prevent deletion of the user's only business
+    const countCheck = await pool.query(
+      "SELECT COUNT(*)::int AS count FROM businesses WHERE user_id = $1",
+      [req.user.id]
+    );
+    if (Number(countCheck.rows[0]?.count || 0) <= 1) {
+      return res.status(409).json({
+        error: "You cannot delete your only business account. Delete your account instead."
+      });
+    }
+
+    // Verify the user's password
+    const userRow = await pool.query(
+      "SELECT password_hash FROM users WHERE id = $1 LIMIT 1",
+      [req.user.id]
+    );
+    if (!userRow.rowCount) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const match = await bcrypt.compare(password, userRow.rows[0].password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "Incorrect password." });
+    }
+
+    // Delete in a transaction. Must clear recurring_transactions before accounts/categories
+    // because of ON DELETE RESTRICT on account_id and category_id.
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      // Clear runs first (CASCADE would handle this, but be explicit)
+      await client.query(
+        "DELETE FROM recurring_transaction_runs WHERE business_id = $1",
+        [businessId]
+      );
+
+      // Clear recurring templates (RESTRICT on account_id/category_id blocks cascade from accounts)
+      await client.query(
+        "DELETE FROM recurring_transactions WHERE business_id = $1",
+        [businessId]
+      );
+
+      // Delete the business — all remaining child rows cascade (transactions, receipts,
+      // mileage, accounts, categories, exports, subscriptions, cpa_access_grants, financial_goals)
+      await client.query(
+        "DELETE FROM businesses WHERE id = $1 AND user_id = $2",
+        [businessId, req.user.id]
+      );
+
+      // If this was the active business, point to another one
+      await client.query(
+        `UPDATE users
+            SET active_business_id = (
+              SELECT id FROM businesses WHERE user_id = $1 ORDER BY created_at ASC, id ASC LIMIT 1
+            )
+          WHERE id = $1`,
+        [req.user.id]
+      );
+
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    const businesses = await listBusinessesForUser(req.user.id);
+    res.status(200).json({ message: "Business deleted.", businesses });
+  } catch (err) {
+    console.error("DELETE /businesses/:id error:", err.message);
+    res.status(500).json({ error: "Failed to delete business." });
   }
 });
 

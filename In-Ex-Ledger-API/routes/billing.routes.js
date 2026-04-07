@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const express = require("express");
+const rateLimit = require("express-rate-limit");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const {
@@ -14,6 +15,14 @@ const router = express.Router();
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
 const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2024-06-20";
+
+const billingMutationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many billing requests, please try again later." }
+});
 
 function getStripeSecretKey() {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -150,6 +159,94 @@ router.post("/customer-portal", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("POST /api/billing/customer-portal error:", err.message);
     res.status(500).json({ error: err.message || "Failed to open billing portal." });
+  }
+});
+
+router.post("/cancel", requireAuth, billingMutationLimiter, async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+
+    if (!subscription.stripeSubscriptionId) {
+      // No Stripe subscription — just downgrade to free immediately
+      await setFreePlanForBusiness(businessId);
+      const updated = await getSubscriptionSnapshotForBusiness(businessId);
+      return res.status(200).json({ subscription: updated });
+    }
+
+    // Cancel at period end via Stripe
+    await stripeRequest(`/subscriptions/${subscription.stripeSubscriptionId}`, {
+      cancel_at_period_end: true
+    });
+
+    // Sync the updated state from Stripe
+    const stripeSubResponse = await fetch(
+      `${STRIPE_API_BASE}/subscriptions/${subscription.stripeSubscriptionId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${getStripeSecretKey()}`,
+          "Stripe-Version": STRIPE_API_VERSION
+        }
+      }
+    );
+    const stripeSub = await stripeSubResponse.json().catch(() => null);
+    if (stripeSub && !stripeSub.error) {
+      await syncStripeSubscriptionForBusiness(businessId, stripeSub);
+    }
+
+    const updated = await getSubscriptionSnapshotForBusiness(businessId);
+    res.status(200).json({ subscription: updated });
+  } catch (err) {
+    console.error("POST /api/billing/cancel error:", err.message);
+    res.status(500).json({ error: err.message || "Failed to cancel subscription." });
+  }
+});
+
+router.get("/history", requireAuth, billingMutationLimiter, async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const subRow = await pool.query(
+      "SELECT stripe_customer_id FROM business_subscriptions WHERE business_id = $1 LIMIT 1",
+      [businessId]
+    );
+
+    const stripeCustomerId = subRow.rows[0]?.stripe_customer_id;
+    if (!stripeCustomerId) {
+      return res.status(200).json({ invoices: [] });
+    }
+
+    const response = await fetch(
+      `${STRIPE_API_BASE}/invoices?customer=${stripeCustomerId}&limit=24&status=paid`,
+      {
+        headers: {
+          Authorization: `Bearer ${getStripeSecretKey()}`,
+          "Stripe-Version": STRIPE_API_VERSION
+        }
+      }
+    );
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(payload?.error?.message || "Failed to fetch billing history");
+    }
+
+    const invoices = (payload?.data || []).map((inv) => ({
+      id: inv.id,
+      number: inv.number,
+      amount_paid: inv.amount_paid,
+      currency: inv.currency,
+      status: inv.status,
+      period_start: inv.period_start,
+      period_end: inv.period_end,
+      created: inv.created,
+      hosted_invoice_url: inv.hosted_invoice_url,
+      invoice_pdf: inv.invoice_pdf
+    }));
+
+    res.status(200).json({ invoices });
+  } catch (err) {
+    console.error("GET /api/billing/history error:", err.message);
+    res.status(500).json({ error: err.message || "Failed to load billing history." });
   }
 });
 
