@@ -132,6 +132,35 @@ function t(key) {
   return translations[key] || (TRANSLATIONS.en && TRANSLATIONS.en[key]) || key;
 }
 
+function setTranslatedContent(node, text) {
+  if (!node) {
+    return;
+  }
+
+  if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
+    node.value = text;
+    return;
+  }
+
+  const brandText = node.querySelector('.topbar-brand-text');
+  if (brandText) {
+    brandText.textContent = text;
+    return;
+  }
+
+  if (node.querySelector('.nav-icon')) {
+    const labelTarget = Array.from(node.children).find((child) =>
+      !child.classList.contains('nav-icon') && !child.classList.contains('brand-mark')
+    );
+    if (labelTarget) {
+      labelTarget.textContent = text;
+      return;
+    }
+  }
+
+  node.textContent = text;
+}
+
 function applyTranslations(languageOverride) {
   const language = normalizeLanguage(languageOverride || getCurrentLanguage());
   const region = getCurrentRegion();
@@ -146,11 +175,7 @@ function applyTranslations(languageOverride) {
     const key = node.getAttribute('data-i18n');
     if (!key) return;
     const text = t(key);
-    if (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA') {
-      node.value = text;
-    } else {
-      node.textContent = text;
-    }
+    setTranslatedContent(node, text);
   });
 
   const regionNodes = document.querySelectorAll('[data-i18n-region]');
