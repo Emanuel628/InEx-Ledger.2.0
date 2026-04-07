@@ -139,7 +139,15 @@ function applyDesktopViewport() {
   meta.content = "width=1280";
 }
 
+function isMobileDevice() {
+  return /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    || (navigator.maxTouchPoints > 0 && !/Macintosh/i.test(navigator.userAgent));
+}
+
 function injectMobileDesktopLink() {
+  if (!isMobileDevice() || isDesktopViewRequested()) {
+    return;
+  }
   const wrapper = document.createElement("div");
   wrapper.className = "mobile-desktop-link";
   const link = document.createElement("a");

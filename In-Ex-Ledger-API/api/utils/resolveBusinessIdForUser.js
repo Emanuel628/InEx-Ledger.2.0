@@ -3,19 +3,11 @@ const { pool } = require("../../db.js");
 const { seedDefaultsForBusiness } = require("./seedDefaultsForBusiness.js");
 
 function buildBusinessName(user) {
-  const email = typeof user?.email === "string" ? user.email.trim() : "";
-  if (email) {
-    const prefix = email.split("@")[0];
-    if (prefix) {
-      return `${prefix}'s Business`;
-    }
-  }
-
   if (typeof user?.name === "string" && user.name.trim()) {
     return `${user.name.trim()}'s Business`;
   }
 
-  return "User's Business";
+  return "My Business";
 }
 
 async function resolveBusinessIdForUser(user) {
