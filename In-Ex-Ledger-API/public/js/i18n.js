@@ -106,14 +106,14 @@ function applyRegionHardening(regionOverride, provinceOverride) {
   }
 
   document.querySelectorAll('[data-region-show]').forEach(function (node) {
-    var target = node.getAttribute('data-region-show');
-    var visible = matchesTarget(target);
+    const target = node.getAttribute('data-region-show');
+    const visible = matchesTarget(target);
     node.classList.toggle('region-hidden', !visible);
   });
 
   document.querySelectorAll('[data-region-hide]').forEach(function (node) {
-    var target = node.getAttribute('data-region-hide');
-    var hidden = matchesTarget(target);
+    const target = node.getAttribute('data-region-hide');
+    const hidden = matchesTarget(target);
     node.classList.toggle('region-hidden', hidden);
   });
 
@@ -260,11 +260,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   // Sync region from profile when auth guard completes
   window.addEventListener('lunaProfileReady', function (event) {
-    var profile = event && event.detail;
-    var activeBusiness = (profile && profile.active_business) || null;
+    const profile = event && event.detail;
+    const activeBusiness = (profile && profile.active_business) || null;
     if (activeBusiness && activeBusiness.region) {
-      var region = String(activeBusiness.region).toLowerCase();
-      var province = String(activeBusiness.province || '').toUpperCase();
+      const region = String(activeBusiness.region).toLowerCase();
+      const province = String(activeBusiness.province || '').toUpperCase();
       if (region !== getCurrentRegion()) {
         localStorage.setItem('lb_region', region);
         window.LUNA_REGION = region;

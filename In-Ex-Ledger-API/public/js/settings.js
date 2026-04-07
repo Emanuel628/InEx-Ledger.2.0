@@ -385,6 +385,25 @@ async function saveBusinessProfileToApi(profile) {
   }
 }
 
+function syncBusinessTypeOptions(region) {
+  const businessTypeSelect = document.getElementById("business-type-select");
+  if (!businessTypeSelect) return;
+  const isCA = normalizeSettingsRegion(region) === "ca";
+  const isUS = !isCA;
+  Array.from(businessTypeSelect.options).forEach((opt) => {
+    const showFor = opt.getAttribute("data-region-show");
+    if (!showFor) return;
+    const shouldShow = (showFor === "us" && isUS) || (showFor === "ca" && isCA);
+    opt.hidden = !shouldShow;
+    opt.disabled = !shouldShow;
+  });
+  // If the currently selected option is now hidden, fall back to sole_proprietor
+  const selected = businessTypeSelect.options[businessTypeSelect.selectedIndex];
+  if (selected && selected.hidden) {
+    businessTypeSelect.value = "sole_proprietor";
+  }
+}
+
 async function initPreferences() {
   const regionSelect = document.getElementById("regionSelectSettings");
   const provinceSelect = document.getElementById("provinceSelectSettings");
@@ -411,7 +430,7 @@ async function initPreferences() {
     const isQC = region === "ca" && province === "QC";
     // Quebec Law 25: privacy opt-out defaults to ON for QC users if not previously set
     const storedOptOut = privacySettings.dataSharingOptOut;
-    const optOutDefault = isQC ? (storedOptOut === false ? false : true) : !!storedOptOut;
+    const optOutDefault = isQC && storedOptOut !== false ? true : !!storedOptOut;
     return {
       region,
       province,
@@ -437,25 +456,6 @@ async function initPreferences() {
       applyRegionHardening(region, province || "");
     }
     syncBusinessTypeOptions(region);
-  };
-
-  const syncBusinessTypeOptions = (region) => {
-    const businessTypeSelect = document.getElementById("business-type-select");
-    if (!businessTypeSelect) return;
-    const isCA = normalizeSettingsRegion(region) === "ca";
-    const isUS = !isCA;
-    Array.from(businessTypeSelect.options).forEach((opt) => {
-      const showFor = opt.getAttribute("data-region-show");
-      if (!showFor) return;
-      const shouldShow = (showFor === "us" && isUS) || (showFor === "ca" && isCA);
-      opt.hidden = !shouldShow;
-      opt.disabled = !shouldShow;
-    });
-    // If the currently selected option is now hidden, fall back to sole_proprietor
-    const selected = businessTypeSelect.options[businessTypeSelect.selectedIndex];
-    if (selected && selected.hidden) {
-      businessTypeSelect.value = "sole_proprietor";
-    }
   };
 
   const syncPreferenceControls = (state) => {
@@ -995,17 +995,7 @@ function refreshSettingsLocalizedState() {
   if (typeof applyRegionHardening === "function") {
     applyRegionHardening(currentRegion, currentProvince);
   }
-  const businessTypeSelect = document.getElementById("business-type-select");
-  if (businessTypeSelect) {
-    const isCA = currentRegion === "ca";
-    Array.from(businessTypeSelect.options).forEach((opt) => {
-      const showFor = opt.getAttribute("data-region-show");
-      if (!showFor) return;
-      const shouldShow = (showFor === "us" && !isCA) || (showFor === "ca" && isCA);
-      opt.hidden = !shouldShow;
-      opt.disabled = !shouldShow;
-    });
-  }
+  syncBusinessTypeOptions(currentRegion);
 }
 
 function normalizeSettingsRegion(value) {
