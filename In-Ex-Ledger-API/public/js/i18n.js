@@ -42,6 +42,17 @@ function getCurrentRegion() {
   return normalizeRegion(window.LUNA_REGION || localStorage.getItem('lb_region'));
 }
 
+function getCurrentProvince() {
+  return String(window.LUNA_PROVINCE || localStorage.getItem('lb_province') || '').toUpperCase();
+}
+
+function setCurrentProvince(province) {
+  const normalized = String(province || '').toUpperCase();
+  localStorage.setItem('lb_province', normalized);
+  window.LUNA_PROVINCE = normalized;
+  return normalized;
+}
+
 function setCurrentLanguage(lang) {
   const normalized = normalizeLanguage(lang);
   localStorage.setItem('lb_language', normalized);
@@ -51,17 +62,68 @@ function setCurrentLanguage(lang) {
   return normalized;
 }
 
-function setCurrentRegion(region) {
+function setCurrentRegion(region, province) {
   const normalized = normalizeRegion(region);
   localStorage.setItem('lb_region', normalized);
   window.LUNA_REGION = normalized;
+  if (province !== undefined) {
+    setCurrentProvince(province);
+  }
+  const resolvedProvince = getCurrentProvince();
   applyTranslations(getCurrentLanguage());
+  applyRegionHardening(normalized, resolvedProvince);
   if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
     window.dispatchEvent(
       new CustomEvent('lunaRegionChanged', { detail: normalized })
     );
   }
   return normalized;
+}
+
+/**
+ * applyRegionHardening — shows/hides DOM elements based on data-region-show
+ * and data-region-hide attributes using the current user region/province.
+ *
+ * data-region-show="us"    → visible only for US users
+ * data-region-show="ca"    → visible only for CA users
+ * data-region-show="ca-qc" → visible only for Quebec users (CA + province QC)
+ * data-region-hide="us"    → hidden for US users
+ * data-region-hide="ca"    → hidden for CA users
+ * data-region-hide="ca-qc" → hidden for Quebec users
+ */
+function applyRegionHardening(regionOverride, provinceOverride) {
+  const region = normalizeRegion(regionOverride !== undefined ? regionOverride : getCurrentRegion());
+  const province = String(provinceOverride !== undefined ? provinceOverride : getCurrentProvince()).toUpperCase();
+  const isCA = region === 'ca';
+  const isUS = region === 'us';
+  const isQC = isCA && province === 'QC';
+
+  function matchesTarget(target) {
+    const t = String(target || '').toLowerCase().trim();
+    if (t === 'us') return isUS;
+    if (t === 'ca') return isCA;
+    if (t === 'ca-qc') return isQC;
+    return false;
+  }
+
+  document.querySelectorAll('[data-region-show]').forEach(function (node) {
+    const target = node.getAttribute('data-region-show');
+    const visible = matchesTarget(target);
+    node.classList.toggle('region-hidden', !visible);
+  });
+
+  document.querySelectorAll('[data-region-hide]').forEach(function (node) {
+    const target = node.getAttribute('data-region-hide');
+    const hidden = matchesTarget(target);
+    node.classList.toggle('region-hidden', hidden);
+  });
+
+  // Dispatch event so pages can react
+  if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('lunaRegionHardened', {
+      detail: { region: region, province: province, isCA: isCA, isUS: isUS, isQC: isQC }
+    }));
+  }
 }
 
 function t(key) {
@@ -134,6 +196,8 @@ function applyTranslations(languageOverride) {
       new CustomEvent('lunaLanguageChanged', { detail: language })
     );
   }
+  // Apply region-based element visibility after updating text
+  applyRegionHardening();
 }
 
 function populateLanguageOptions(selectElement) {
@@ -167,7 +231,10 @@ window.LUNA_I18N = {
   populateLanguageOptions,
   setCurrentLanguage,
   getCurrentRegion,
-  setCurrentRegion
+  getCurrentProvince,
+  setCurrentRegion,
+  setCurrentProvince,
+  applyRegionHardening
 };
 
 window.t = t;
@@ -175,14 +242,41 @@ window.applyTranslations = applyTranslations;
 window.populateLanguageOptions = populateLanguageOptions;
 window.setCurrentLanguage = setCurrentLanguage;
 window.getCurrentRegion = getCurrentRegion;
+window.getCurrentProvince = getCurrentProvince;
 window.setCurrentRegion = setCurrentRegion;
+window.setCurrentProvince = setCurrentProvince;
+window.applyRegionHardening = applyRegionHardening;
 window.LUNA_LANGUAGE_LABELS = LANGUAGE_LABELS;
 
 window.LUNA_LANGUAGE = window.LUNA_LANGUAGE || getCurrentLanguage();
 window.LUNA_REGION = window.LUNA_REGION || getCurrentRegion();
+window.LUNA_PROVINCE = window.LUNA_PROVINCE || getCurrentProvince();
 
 document.addEventListener('DOMContentLoaded', () => {
   applyTranslations(getCurrentLanguage());
+  applyRegionHardening();
+  // Re-apply hardening when region changes (e.g. from settings)
+  window.addEventListener('lunaRegionChanged', function () {
+    applyRegionHardening();
+  });
+  // Sync region from profile when auth guard completes
+  window.addEventListener('lunaProfileReady', function (event) {
+    const profile = event && event.detail;
+    const activeBusiness = (profile && profile.active_business) || null;
+    if (!activeBusiness || !activeBusiness.region) return;
+    const region = String(activeBusiness.region).toLowerCase();
+    const province = String(activeBusiness.province || '').toUpperCase();
+    // Persist any changed values then apply hardening once with the resolved values
+    if (region !== getCurrentRegion()) {
+      localStorage.setItem('lb_region', region);
+      window.LUNA_REGION = region;
+    }
+    if (province && province !== getCurrentProvince()) {
+      localStorage.setItem('lb_province', province);
+      window.LUNA_PROVINCE = province;
+    }
+    applyRegionHardening(region, province);
+  });
 });
 
 const TRANSLATIONS = {
@@ -826,12 +920,21 @@ const TRANSLATIONS = {
     settings_label_business_name: 'Business name',
     settings_label_business_type: 'Business type',
     settings_label_tax_id: 'EIN',
+    settings_label_tax_id_us: 'EIN',
+    settings_label_tax_id_ca: 'Business Number (BN)',
     settings_label_fiscal_year_start: 'Fiscal year start',
     settings_label_business_address: 'Business address',
     settings_business_type_sole_prop: 'Sole proprietor',
     settings_business_type_llc: 'LLC',
     settings_business_type_scorp: 'S-Corp',
     settings_business_type_partnership: 'Partnership',
+    settings_business_type_corporation: 'Corporation',
+    settings_ssn_row_title: 'Social Security Number (SSN)',
+    settings_ssn_row_desc: 'Used on U.S. federal tax filings for sole proprietors. Stored encrypted.',
+    settings_sin_row_title: 'Social Insurance Number (SIN)',
+    settings_sin_row_desc: 'Used on Canadian T1 and T2125 filings. Stored encrypted.',
+    settings_qc_privacy_title: 'Quebec Law 25 (Bill 64)',
+    settings_qc_privacy_note: 'As a Quebec resident, your data-sharing opt-out is enabled by default under Law 25. You may change this in the Privacy settings, but opting back in is your choice.',
     settings_preferences_title: 'Preferences',
     settings_distance_units_title: 'Distance units',
     settings_distance_units_desc: 'Choose how mileage is displayed throughout the app.',
@@ -1711,12 +1814,21 @@ const TRANSLATIONS = {
     settings_label_business_name: 'Nombre del negocio',
     settings_label_business_type: 'Tipo de negocio',
     settings_label_tax_id: 'ID fiscal',
+    settings_label_tax_id_us: 'EIN',
+    settings_label_tax_id_ca: 'Número de empresa (NE)',
     settings_label_fiscal_year_start: 'Inicio del año fiscal',
     settings_label_business_address: 'Dirección del negocio',
     settings_business_type_sole_prop: 'Propietario único',
     settings_business_type_llc: 'LLC',
     settings_business_type_scorp: 'S-Corp',
     settings_business_type_partnership: 'Sociedad',
+    settings_business_type_corporation: 'Sociedad anónima',
+    settings_ssn_row_title: 'Número de Seguro Social (SSN)',
+    settings_ssn_row_desc: 'Se utiliza en declaraciones fiscales federales de EE. UU. para propietarios únicos. Almacenado cifrado.',
+    settings_sin_row_title: 'Número de Seguro Social (NAS)',
+    settings_sin_row_desc: 'Se utiliza en declaraciones T1 y T2125 canadienses. Almacenado cifrado.',
+    settings_qc_privacy_title: 'Ley 25 de Quebec (Proyecto de Ley 64)',
+    settings_qc_privacy_note: 'Como residente de Quebec, la exclusión voluntaria del intercambio de datos está habilitada de forma predeterminada según la Ley 25. Puedes cambiar esto en Privacidad.',
     settings_preferences_title: 'Preferencias',
     settings_distance_units_title: 'Unidades de distancia',
     settings_distance_units_desc: 'Elige cómo se muestra el kilometraje en toda la app.',
@@ -2602,12 +2714,21 @@ const TRANSLATIONS = {
     settings_label_business_name: 'Nom de l’entreprise',
     settings_label_business_type: 'Type d’entreprise',
     settings_label_tax_id: 'ID fiscal',
+    settings_label_tax_id_us: 'EIN',
+    settings_label_tax_id_ca: 'Numéro d\'entreprise (NE)',
     settings_label_fiscal_year_start: 'Début de l’exercice',
     settings_label_business_address: 'Adresse de l’entreprise',
     settings_business_type_sole_prop: 'Entreprise individuelle',
     settings_business_type_llc: 'LLC',
     settings_business_type_scorp: 'S-Corp',
     settings_business_type_partnership: 'Partenariat',
+    settings_business_type_corporation: 'Société par actions',
+    settings_ssn_row_title: 'Numéro de sécurité sociale (SSN)',
+    settings_ssn_row_desc: 'Utilisé sur les déclarations fiscales fédérales américaines pour les entreprises individuelles. Stocké chiffré.',
+    settings_sin_row_title: 'Numéro d\'assurance sociale (NAS)',
+    settings_sin_row_desc: 'Utilisé sur les déclarations T1 et T2125 canadiennes. Stocké chiffré.',
+    settings_qc_privacy_title: 'Loi 25 du Québec (Projet de loi 64)',
+    settings_qc_privacy_note: 'En tant que résident du Québec, la désinscription au partage de données est activée par défaut en vertu de la Loi 25. Vous pouvez modifier cela dans les paramètres de confidentialité.',
     settings_preferences_title: 'Préférences',
     settings_distance_units_title: 'Unités de distance',
     settings_distance_units_desc: 'Choisissez comment le kilométrage est affiché dans l’application.',

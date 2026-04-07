@@ -385,6 +385,25 @@ async function saveBusinessProfileToApi(profile) {
   }
 }
 
+function syncBusinessTypeOptions(region) {
+  const businessTypeSelect = document.getElementById("business-type-select");
+  if (!businessTypeSelect) return;
+  const isCA = normalizeSettingsRegion(region) === "ca";
+  const isUS = !isCA;
+  Array.from(businessTypeSelect.options).forEach((opt) => {
+    const showFor = opt.getAttribute("data-region-show");
+    if (!showFor) return;
+    const shouldShow = (showFor === "us" && isUS) || (showFor === "ca" && isCA);
+    opt.hidden = !shouldShow;
+    opt.disabled = !shouldShow;
+  });
+  // If the currently selected option is now hidden, fall back to sole_proprietor
+  const selected = businessTypeSelect.options[businessTypeSelect.selectedIndex];
+  if (selected && selected.hidden) {
+    businessTypeSelect.value = "sole_proprietor";
+  }
+}
+
 async function initPreferences() {
   const regionSelect = document.getElementById("regionSelectSettings");
   const provinceSelect = document.getElementById("provinceSelectSettings");
@@ -403,16 +422,24 @@ async function initPreferences() {
 
   businessSettingsState = await loadBusinessSettings();
 
-  const buildPreferenceState = () => ({
-    region: normalizeSettingsRegion(
+  const buildPreferenceState = () => {
+    const region = normalizeSettingsRegion(
       businessSettingsState.region || (typeof getCurrentRegion === "function" ? getCurrentRegion() : "us")
-    ),
-    province: normalizeProvinceCode(businessSettingsState.province || ""),
-    language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : businessSettingsState.language || "en",
-    theme: resolveSavedTheme(),
-    distance: localStorage.getItem("lb_unit_metric") === "true" ? "km" : "mi",
-    optOutAnalytics: !!privacySettings.dataSharingOptOut
-  });
+    );
+    const province = normalizeProvinceCode(businessSettingsState.province || "");
+    const isQC = region === "ca" && province === "QC";
+    // Quebec Law 25: privacy opt-out defaults to ON for QC users if not previously explicitly set
+    const storedOptOut = privacySettings.dataSharingOptOut;
+    const optOutDefault = isQC && storedOptOut == null ? true : !!storedOptOut;
+    return {
+      region,
+      province,
+      language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : businessSettingsState.language || "en",
+      theme: resolveSavedTheme(),
+      distance: localStorage.getItem("lb_unit_metric") === "true" ? "km" : "mi",
+      optOutAnalytics: optOutDefault
+    };
+  };
 
   const syncProvinceVisibility = (region) => {
     if (!provinceRow) return;
@@ -422,6 +449,13 @@ async function initPreferences() {
     if (provinceSelect) {
       provinceSelect.disabled = !isCanada;
     }
+  };
+
+  const syncRegionHardening = (region, province) => {
+    if (typeof applyRegionHardening === "function") {
+      applyRegionHardening(region, province || "");
+    }
+    syncBusinessTypeOptions(region);
   };
 
   const syncPreferenceControls = (state) => {
@@ -438,6 +472,7 @@ async function initPreferences() {
     if (optOutToggle) optOutToggle.checked = !!state.optOutAnalytics;
     syncProvinceVisibility(state.region);
     updateProvinceRateNote(state.region, state.province);
+    syncRegionHardening(state.region, state.province);
   };
 
   const hasPendingPreferenceChanges = () => {
@@ -456,12 +491,13 @@ async function initPreferences() {
 
   const updatePendingPreferences = () => {
     if (!pendingPreferences) return;
+    const nextRegion = regionSelect ? normalizeSettingsRegion(regionSelect.value) : pendingPreferences.region;
+    const nextProvince = nextRegion === "ca"
+      ? normalizeProvinceCode(provinceSelect?.value || pendingPreferences.province)
+      : "";
     pendingPreferences = {
-      region: regionSelect ? normalizeSettingsRegion(regionSelect.value) : pendingPreferences.region,
-      province:
-        regionSelect && normalizeSettingsRegion(regionSelect.value) === "ca"
-          ? normalizeProvinceCode(provinceSelect?.value || pendingPreferences.province)
-          : "",
+      region: nextRegion,
+      province: nextProvince,
       language: languageSelect ? languageSelect.value : pendingPreferences.language,
       theme: darkModeToggle?.checked ? "dark" : "light",
       distance: distanceSelect ? distanceSelect.value : pendingPreferences.distance,
@@ -469,6 +505,7 @@ async function initPreferences() {
     };
     syncProvinceVisibility(pendingPreferences.region);
     updateProvinceRateNote(pendingPreferences.region, pendingPreferences.province);
+    syncRegionHardening(pendingPreferences.region, pendingPreferences.province);
     updateSaveBar();
   };
 
@@ -583,9 +620,13 @@ async function initPreferences() {
     }
 
     if (typeof setCurrentRegion === "function") {
-      applyCurrentRegionRuntime(nextPreferences.region);
+      applyCurrentRegionRuntime(nextPreferences.region, nextPreferences.province || "");
     } else {
       window.LUNA_REGION = nextPreferences.region;
+      if (nextPreferences.province) {
+        window.LUNA_PROVINCE = nextPreferences.province;
+        localStorage.setItem("lb_province", nextPreferences.province);
+      }
       if (typeof window !== "undefined" && typeof CustomEvent === "function") {
         window.dispatchEvent(new CustomEvent("lunaRegionChanged", { detail: nextPreferences.region }));
       }
@@ -948,6 +989,13 @@ function refreshSettingsLocalizedState() {
     pendingPreferences?.region || preferenceBaseline?.region || normalizeSettingsRegion(businessSettingsState.region),
     pendingPreferences?.province || preferenceBaseline?.province || normalizeProvinceCode(businessSettingsState.province)
   );
+  // Re-apply region hardening to reflect the current state
+  const currentRegion = pendingPreferences?.region || preferenceBaseline?.region || normalizeSettingsRegion(businessSettingsState.region);
+  const currentProvince = pendingPreferences?.province || preferenceBaseline?.province || normalizeProvinceCode(businessSettingsState.province);
+  if (typeof applyRegionHardening === "function") {
+    applyRegionHardening(currentRegion, currentProvince);
+  }
+  syncBusinessTypeOptions(currentRegion);
 }
 
 function normalizeSettingsRegion(value) {
@@ -1004,11 +1052,20 @@ function updateProvinceRateNote(region, province) {
   note.textContent = resolveEffectiveTaxProfile(region, province).label;
 }
 
-function applyCurrentRegionRuntime(region) {
+function applyCurrentRegionRuntime(region, province) {
   const normalized = normalizeSettingsRegion(region);
   window.LUNA_REGION = normalized;
+  localStorage.setItem("lb_region", normalized);
+  if (province !== undefined) {
+    const normalizedProvince = normalizeProvinceCode(province);
+    window.LUNA_PROVINCE = normalizedProvince;
+    localStorage.setItem("lb_province", normalizedProvince);
+  }
   if (typeof applyTranslations === "function") {
     applyTranslations(typeof getCurrentLanguage === "function" ? getCurrentLanguage() : undefined);
+  }
+  if (typeof applyRegionHardening === "function") {
+    applyRegionHardening(normalized, province !== undefined ? normalizeProvinceCode(province) : undefined);
   }
   if (typeof window !== "undefined" && typeof CustomEvent === "function") {
     window.dispatchEvent(new CustomEvent("lunaRegionChanged", { detail: normalized }));

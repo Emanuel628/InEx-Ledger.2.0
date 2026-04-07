@@ -152,6 +152,31 @@ function getAssignedCpaPortfolios(profile = {}) {
   return Array.isArray(profile.assigned_cpa_portfolios) ? profile.assigned_cpa_portfolios : [];
 }
 
+/**
+ * Sync region and province from the active business to localStorage and
+ * window globals so region-hardening functions have the correct context.
+ */
+function syncRegionFromProfile(profile = {}) {
+  const activeBusiness = getActiveBusiness(profile);
+  if (!activeBusiness || !activeBusiness.region) {
+    return;
+  }
+  const region = String(activeBusiness.region).toLowerCase();
+  const province = String(activeBusiness.province || "").toUpperCase();
+  if (region === "us" || region === "ca") {
+    localStorage.setItem("lb_region", region);
+    window.LUNA_REGION = region;
+  }
+  if (province) {
+    localStorage.setItem("lb_province", province);
+    window.LUNA_PROVINCE = province;
+  }
+  // Trigger hardening if i18n is already loaded
+  if (typeof window.applyRegionHardening === "function") {
+    window.applyRegionHardening(region, province);
+  }
+}
+
 function persistBusinessContext(profile = {}) {
   const activeBusiness = getActiveBusiness(profile);
   if (!activeBusiness?.id) {
@@ -352,6 +377,8 @@ async function requireValidSessionOrRedirect() {
       if (payload) {
         updateAuthenticatedChrome(payload);
       }
+      // Sync region and province from active business profile
+      syncRegionFromProfile(payload);
       if (shouldRedirectToOnboarding(payload)) {
         window.__AUTH_GUARD_STATE__.running = false;
         window.location.href = ONBOARDING_PAGE;
@@ -409,6 +436,7 @@ async function redirectIfAuthenticated() {
       if (payload) {
         updateAuthenticatedChrome(payload);
       }
+      syncRegionFromProfile(payload);
       window.location.href = payload?.onboarding?.completed ? "/transactions" : ONBOARDING_PAGE;
     }
   } catch (err) {

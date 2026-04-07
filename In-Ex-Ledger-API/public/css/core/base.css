@@ -42,3 +42,13 @@ video {
   max-width: 100%;
   height: auto;
 }
+
+/* Region-hardening utility — applied by applyRegionHardening() in i18n.js */
+[data-region-show],
+[data-region-hide] {
+  transition: none;
+}
+
+.region-hidden {
+  display: none !important;
+}
