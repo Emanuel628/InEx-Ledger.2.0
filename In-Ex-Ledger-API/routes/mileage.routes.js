@@ -35,13 +35,16 @@ router.get("/", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+    const mileageColumns = await getMileageColumnMode();
+    const dateSelect = mileageDateSelect(mileageColumns);
+    const dateOrderBy = mileageDateOrderBy(mileageColumns);
 
     const result = await pool.query(
-      `SELECT id, trip_date, purpose, destination, miles, km,
+      `SELECT id, ${dateSelect} AS trip_date, purpose, destination, miles, km,
               odometer_start, odometer_end, created_at
        FROM mileage
        WHERE business_id = $1
-       ORDER BY trip_date DESC, created_at DESC
+       ORDER BY ${dateOrderBy} DESC, created_at DESC
        LIMIT $2 OFFSET $3`,
       [businessId, limit, offset]
     );
@@ -67,15 +70,20 @@ router.get("/", async (req, res) => {
  * POST /api/mileage
  */
 router.post("/", async (req, res) => {
-  const { trip_date, miles, km, odometer_start, odometer_end } = req.body ?? {};
+  const { trip_date, date, miles, km, odometer_start, odometer_end } = req.body ?? {};
   const purpose = typeof req.body?.purpose === "string" ? req.body.purpose.trim() : "";
   const destination = typeof req.body?.destination === "string" ? req.body.destination.trim() : "";
+  const mileageDate = typeof trip_date === "string" && trip_date.trim()
+    ? trip_date.trim()
+    : typeof date === "string" && date.trim()
+    ? date.trim()
+    : "";
 
-  if (!trip_date || typeof trip_date !== "string" || trip_date.length === 0 || purpose.length === 0) {
-    return res.status(400).json({ error: "trip_date and purpose are required" });
+  if (!mileageDate || purpose.length === 0) {
+    return res.status(400).json({ error: "trip_date/date and purpose are required" });
   }
 
-  if (Number.isNaN(Date.parse(trip_date))) {
+  if (Number.isNaN(Date.parse(mileageDate))) {
     return res.status(400).json({ error: "trip_date must be a valid date." });
   }
 
@@ -119,18 +127,22 @@ router.post("/", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const mileageColumns = await getMileageColumnMode();
+    const insertSql = buildMileageInsertSql(mileageColumns);
+    const insertValues = buildMileageInsertValues(
+      mileageColumns,
+      businessId,
+      mileageDate,
+      purpose,
+      destination,
+      parsedMiles.value,
+      parsedKm.value,
+      parsedOdometerStart.value,
+      parsedOdometerEnd.value
+    );
     const result = await pool.query(
-      `INSERT INTO mileage (id, business_id, trip_date, purpose, destination, miles, km, odometer_start, odometer_end)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
-      [
-        crypto.randomUUID(), businessId, trip_date, purpose,
-        destination || null,
-        parsedMiles.value,
-        parsedKm.value,
-        parsedOdometerStart.value,
-        parsedOdometerEnd.value
-      ]
+      insertSql,
+      insertValues
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -138,6 +150,106 @@ router.post("/", async (req, res) => {
     res.status(500).json({ error: "Failed to save mileage record." });
   }
 });
+
+async function getMileageColumnMode() {
+  const { rows } = await pool.query(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'mileage'
+        AND column_name IN ('date', 'trip_date')`
+  );
+
+  const columns = new Set(rows.map((row) => row.column_name));
+  return {
+    hasDate: columns.has("date"),
+    hasTripDate: columns.has("trip_date")
+  };
+}
+
+function mileageDateSelect(mode) {
+  if (mode.hasTripDate && mode.hasDate) {
+    return "COALESCE(trip_date, date)";
+  }
+
+  if (mode.hasTripDate) {
+    return "trip_date";
+  }
+
+  return "date";
+}
+
+function mileageDateOrderBy(mode) {
+  if (mode.hasTripDate && mode.hasDate) {
+    return "COALESCE(trip_date, date)";
+  }
+
+  if (mode.hasTripDate) {
+    return "trip_date";
+  }
+
+  return "date";
+}
+
+function buildMileageInsertSql(mode) {
+  const dateColumns = [];
+  if (mode.hasDate) {
+    dateColumns.push("date");
+  }
+  if (mode.hasTripDate) {
+    dateColumns.push("trip_date");
+  }
+
+  if (!dateColumns.length) {
+    throw new Error("Mileage table is missing both date and trip_date columns.");
+  }
+
+  const valuePositions = [
+    "$1",
+    "$2",
+    ...dateColumns.map((_, index) => `$${index + 3}`),
+    `$${dateColumns.length + 3}`,
+    `$${dateColumns.length + 4}`,
+    `$${dateColumns.length + 5}`,
+    `$${dateColumns.length + 6}`,
+    `$${dateColumns.length + 7}`,
+    `$${dateColumns.length + 8}`
+  ];
+
+  const columns = ["id", "business_id", ...dateColumns, "purpose", "destination", "miles", "km", "odometer_start", "odometer_end"];
+  return `INSERT INTO mileage (${columns.join(", ")})
+       VALUES (${valuePositions.join(", ")})
+       RETURNING *`;
+}
+
+function buildMileageInsertValues(
+  mode,
+  businessId,
+  mileageDate,
+  purpose,
+  destination,
+  miles,
+  km,
+  odometerStart,
+  odometerEnd
+) {
+  const values = [crypto.randomUUID(), businessId];
+  if (mode.hasDate) {
+    values.push(mileageDate);
+  }
+  if (mode.hasTripDate) {
+    values.push(mileageDate);
+  }
+  values.push(
+    purpose,
+    destination || null,
+    miles,
+    km,
+    odometerStart,
+    odometerEnd
+  );
+  return values;
+}
 
 /**
  * DELETE /api/mileage/:id
