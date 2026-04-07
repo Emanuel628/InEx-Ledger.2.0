@@ -78,9 +78,10 @@
               <label for="business-type-select" data-i18n="settings_label_business_type">Business type</label>
               <select id="business-type-select" name="business_type_select">
                 <option value="sole_proprietor" data-i18n="settings_business_type_sole_prop">Sole proprietor</option>
-                <option value="llc" data-i18n="settings_business_type_llc">LLC</option>
-                <option value="s_corp" data-i18n="settings_business_type_scorp">S-Corp</option>
+                <option value="llc" data-region-show="us" data-i18n="settings_business_type_llc">LLC</option>
+                <option value="s_corp" data-region-show="us" data-i18n="settings_business_type_scorp">S-Corp</option>
                 <option value="partnership" data-i18n="settings_business_type_partnership">Partnership</option>
+                <option value="corporation" data-region-show="ca" data-i18n="settings_business_type_corporation">Corporation</option>
               </select>
             </div>
             <div class="form-field">
@@ -131,6 +132,20 @@
             <div class="settings-row-desc" data-i18n="settings_cancel_subscription_desc">Your access continues until the end of your current billing period.</div>
           </div>
           <button type="button" id="cancelSubscriptionBtn" class="danger-outline-btn" data-i18n="settings_cancel_subscription_btn">Cancel subscription…</button>
+        </div>
+
+        <div class="settings-row" data-region-show="us">
+          <div class="settings-row-copy">
+            <div class="settings-row-title" data-i18n="settings_ssn_row_title">Social Security Number (SSN)</div>
+            <div class="settings-row-desc" data-i18n="settings_ssn_row_desc">Used on U.S. federal tax filings for sole proprietors. Stored encrypted.</div>
+          </div>
+        </div>
+
+        <div class="settings-row" data-region-show="ca">
+          <div class="settings-row-copy">
+            <div class="settings-row-title" data-i18n="settings_sin_row_title">Social Insurance Number (SIN)</div>
+            <div class="settings-row-desc" data-i18n="settings_sin_row_desc">Used on Canadian T1 and T2125 filings. Stored encrypted.</div>
+          </div>
         </div>
       </section>
 
@@ -256,6 +271,12 @@
             <input type="checkbox" id="optOutToggle" />
             <span class="switch-track"></span>
           </label>
+        </div>
+        <div class="settings-row" data-region-show="ca-qc" id="settingsQcPrivacyNote">
+          <div class="settings-row-copy">
+            <div class="settings-row-title" data-i18n="settings_qc_privacy_title">Quebec Law 25 (Bill 64)</div>
+            <div class="settings-row-desc" data-i18n="settings_qc_privacy_note">As a Quebec resident, your data-sharing opt-out is enabled by default under Law 25. You may change this in the Privacy settings, but opting back in is your choice.</div>
+          </div>
         </div>
         <div class="settings-row settings-row-actions">
           <button type="button" id="downloadMyDataBtn" class="safe-action" data-i18n="privacy_download_button">Download my data</button>
