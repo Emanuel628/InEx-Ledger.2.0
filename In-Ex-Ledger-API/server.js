@@ -27,8 +27,8 @@ const LEGACY_HTML_REDIRECTS = new Map([
   ['/region-settings.html', '/settings#settings-preferences'],
   ['/html/security.html', '/settings#settings-security'],
   ['/security.html', '/settings#settings-security'],
-  ['/html/sessions.html', '/settings#settings-security'],
-  ['/sessions.html', '/settings#settings-security'],
+  ['/html/sessions.html', '/sessions'],
+  ['/sessions.html', '/sessions'],
   ['/html/mfa.html', '/settings#settings-security'],
   ['/mfa.html', '/settings#settings-security']
 ]);

@@ -1,13 +1,338 @@
 /* =========================
-   Settings & Account Pages
+   Sessions Page
    ========================= */
 
-/* Keep settings calmer & narrower */
 main {
   max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 16px 80px;
 }
 
-/* Stack sections more clearly */
 section + section {
-  margin-top: 22px;
+  margin-top: 16px;
+}
+
+/* Page heading */
+.sessions-page-head {
+  padding: 24px 0 20px;
+}
+
+.sessions-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink2);
+  margin-bottom: 12px;
+}
+
+.sessions-breadcrumb a {
+  color: var(--ink2);
+  text-decoration: none;
+}
+
+.sessions-breadcrumb a:hover {
+  color: var(--accent2);
+  text-decoration: underline;
+}
+
+.breadcrumb-sep {
+  color: var(--ink3);
+}
+
+.sessions-page-head h1 {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+
+.sessions-page-desc {
+  font-size: 14px;
+  color: var(--ink2);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Main sessions card */
+.sessions-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 24px;
+}
+
+.sessions-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.sessions-card-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+
+.sessions-card-desc {
+  font-size: 13px;
+  color: var(--ink2);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Revoke-all button */
+.sessions-revoke-all-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.sessions-revoke-all-btn:hover {
+  border-color: var(--danger, #e53e3e);
+  color: var(--danger, #e53e3e);
+  background: rgba(229, 62, 62, 0.06);
+}
+
+/* Status message */
+.sessions-message {
+  font-size: 13px;
+  margin: 0 0 12px;
+  min-height: 18px;
+}
+
+.sessions-message.is-error {
+  color: var(--danger, #e53e3e);
+}
+
+.sessions-message.is-info {
+  color: var(--ink2);
+}
+
+/* Sessions list */
+.sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sessions-loading,
+.sessions-empty {
+  padding: 20px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink2);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+
+/* Individual session card */
+.session-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface2);
+  transition: border-color 120ms ease;
+}
+
+.session-card:hover {
+  border-color: var(--accent2);
+}
+
+.session-card-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(26, 90, 150, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent2);
+}
+
+.session-card-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+}
+
+.session-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-card-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.session-card-label {
+  color: var(--ink3);
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.session-card-date {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.session-expiring-soon {
+  color: var(--warn, #d97706);
+}
+
+.session-expiring-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  background: rgba(217, 119, 6, 0.12);
+  color: var(--warn, #d97706);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* Revoke button */
+.session-revoke-btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--ink2);
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.session-revoke-btn:hover {
+  border-color: var(--danger, #e53e3e);
+  color: var(--danger, #e53e3e);
+  background: rgba(229, 62, 62, 0.06);
+}
+
+/* Info / tips card */
+.sessions-info-card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 24px;
+}
+
+.sessions-info-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0 0 14px;
+}
+
+.sessions-info-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sessions-info-list li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--ink2);
+  line-height: 1.6;
+}
+
+.sessions-info-list li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--accent2);
+}
+
+.sessions-info-list a {
+  color: var(--accent2);
+  text-decoration: underline;
+}
+
+/* Toast */
+.sessions-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: var(--ink);
+  color: #fff;
+  border-radius: 12px;
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+  z-index: 9000;
+  pointer-events: none;
+}
+
+.sessions-toast.hidden {
+  display: none;
+}
+
+.sessions-toast .toast-check svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+/* Responsive */
+@media (max-width: 540px) {
+  .sessions-card-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sessions-revoke-all-btn {
+    text-align: center;
+  }
+
+  .session-card {
+    flex-wrap: wrap;
+  }
+
+  .session-card-body {
+    flex-basis: calc(100% - 50px);
+  }
+
+  .session-revoke-btn {
+    margin-left: 50px;
+  }
 }

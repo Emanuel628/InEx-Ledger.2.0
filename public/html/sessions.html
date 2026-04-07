@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Active Sessions | InEx Ledger</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/pages/sessions.css" />
+</head>
+<body>
+  <div id="trialBanner" class="trial-banner"></div>
+
+  <header class="app-topbar">
+    <div class="topbar-left">
+      <a class="topbar-brand" href="transactions" aria-label="InEx Ledger home">
+        <span class="brand-mark brand-mark-topbar" aria-hidden="true">
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
+            <rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+            <rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+            <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".35"></rect>
+          </svg>
+        </span>
+        <span class="topbar-brand-text">InEx Ledger</span>
+      </a>
+      <nav class="topbar-nav" aria-label="Primary">
+        <a href="transactions"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span data-i18n="nav_transactions">Transactions</span></a>
+        <a href="accounts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg></span><span data-i18n="nav_accounts">Accounts</span></a>
+        <a href="categories"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg></span><span data-i18n="nav_categories">Categories</span></a>
+        <a href="receipts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span data-i18n="nav_receipts">Receipts</span></a>
+        <a href="mileage"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span data-i18n="nav_mileage">Mileage</span></a>
+        <a href="exports"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span data-i18n="nav_exports">Exports</span></a>
+        <a href="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg></span><span data-i18n="nav_settings">Settings</span></a>
+      </nav>
+    </div>
+    <div class="user-pill">
+      <span class="user-avatar">IL</span>
+      <span class="user-name">InEx Ledger</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="sessions-page-head">
+      <div class="sessions-breadcrumb">
+        <a href="settings" data-i18n="nav_settings">Settings</a>
+        <span class="breadcrumb-sep" aria-hidden="true">›</span>
+        <span data-i18n="sessions_title">Active sessions</span>
+      </div>
+      <h1 data-i18n="sessions_title">Active sessions</h1>
+      <p class="sessions-page-desc" data-i18n="sessions_desc">
+        These are all devices and browsers currently signed in to your account.
+        Revoking a session signs that device out immediately.
+      </p>
+    </div>
+
+    <section class="sessions-card">
+      <div class="sessions-card-head">
+        <div>
+          <h2 class="sessions-card-title" data-i18n="sessions_current_title">Current sessions</h2>
+          <p class="sessions-card-desc" data-i18n="sessions_current_desc">Each entry represents an active refresh token. Expires times are shown in your local timezone.</p>
+        </div>
+        <button
+          type="button"
+          id="revokeAllBtn"
+          class="sessions-revoke-all-btn"
+          data-i18n="sessions_revoke_all"
+        >Sign out everywhere</button>
+      </div>
+
+      <p id="sessionsMessage" class="sessions-message" role="status" aria-live="polite"></p>
+
+      <div id="sessionsList" class="sessions-list" aria-label="Active sessions">
+        <div class="sessions-loading" aria-live="polite" data-i18n="common_loading">Loading…</div>
+      </div>
+    </section>
+
+    <section class="sessions-info-card">
+      <h2 class="sessions-info-title" data-i18n="sessions_security_title">Security tips</h2>
+      <ul class="sessions-info-list">
+        <li data-i18n="sessions_tip_1">If you see a session you don't recognise, revoke it immediately and change your password.</li>
+        <li data-i18n="sessions_tip_2">Enabling multi-factor authentication adds an extra layer of protection. You can manage MFA in <a href="settings#settings-security">Security settings</a>.</li>
+        <li data-i18n="sessions_tip_3">Sessions expire automatically, but revoking them signs out the device right away.</li>
+      </ul>
+    </section>
+  </main>
+
+  <div id="sessionsToast" class="sessions-toast hidden" role="status" aria-live="polite">
+    <span class="toast-check" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="none">
+        <polyline points="2 8 6 12 14 4"></polyline>
+      </svg>
+    </span>
+    <span id="sessionsToastMessage">Done</span>
+  </div>
+
+  <script src="../js/global.js?v=20260407"></script>
+  <script src="../js/i18n.js?v=20260407"></script>
+  <script src="../js/auth.js?v=20260407"></script>
+  <script src="../js/trial.js?v=20260407"></script>
+  <script src="../js/sessions.js?v=20260407"></script>
+</body>
+</html>

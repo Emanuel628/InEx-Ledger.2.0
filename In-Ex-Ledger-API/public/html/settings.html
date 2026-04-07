@@ -290,7 +290,10 @@
         </form>
         <div class="session-block">
           <h3 data-i18n="settings_session_title">Session</h3>
-          <button type="button" class="settings-primary-btn secondary-session-btn" data-logout data-action="logout" data-i18n="settings_sign_out">Sign out of all sessions</button>
+          <div class="session-actions">
+            <a href="sessions" class="settings-secondary-btn session-manage-link" data-i18n="settings_manage_sessions">Manage active sessions</a>
+            <button type="button" class="settings-primary-btn secondary-session-btn" data-logout data-action="logout" data-i18n="settings_sign_out">Sign out of all sessions</button>
+          </div>
           <p class="session-note" data-i18n="settings_session_note">Use this if your account has been accessed from a device you don't recognize.</p>
         </div>
         <div class="mfa-block">
