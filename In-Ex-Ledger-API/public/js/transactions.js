@@ -23,7 +23,11 @@ const transactionFilters = {
 
 const DRAWER_OPEN_LABEL = "+ Add new";
 const DRAWER_CLOSE_LABEL = "Close";
-const txT = (key, fallback) => (typeof t === "function" ? t(key) : fallback);
+const txT = (key, fallback) => {
+  if (typeof t !== "function") return fallback !== undefined ? fallback : key;
+  const result = t(key);
+  return result !== key ? result : (fallback !== undefined ? fallback : key);
+};
 const taxHelpers = window.LUNA_TAX || {};
 const resolveEstimatedTaxProfileHelper = taxHelpers.resolveEstimatedTaxProfile || ((region, province) => ({
   region: String(region || "").toUpperCase() === "CA" ? "CA" : "US",

@@ -36,7 +36,7 @@ function wireMileageForm() {
     const destination = document.getElementById("mileageDestination")?.value.trim() || "";
     const distance = parseFloat(document.getElementById("mileageDistance")?.value || "");
 
-    if (!date || !purpose || !Number.isFinite(distance)) {
+    if (!date || !purpose || !Number.isFinite(distance) || distance <= 0) {
       if (message) message.textContent = t("mileage_error_required_fields");
       return;
     }
