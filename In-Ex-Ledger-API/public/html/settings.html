@@ -435,7 +435,7 @@
     </main>
   </div>
 
-  <div id="dangerModal" class="transaction-modal hidden">
+  <div id="dangerModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="dangerModalTitle" aria-describedby="dangerModalBody">
     <div class="transaction-modal-content danger-modal">
       <div class="danger-modal-icon" aria-hidden="true">
         <svg viewBox="0 0 16 16" fill="none">
@@ -461,7 +461,7 @@
     </div>
   </div>
 
-  <div id="cancelSubModal" class="transaction-modal hidden">
+  <div id="cancelSubModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="cancelSubModalTitle" aria-describedby="cancelSubModalBody">
     <div class="transaction-modal-content danger-modal">
       <div class="danger-modal-icon" aria-hidden="true">
         <svg viewBox="0 0 16 16" fill="none">
@@ -470,7 +470,7 @@
           <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
         </svg>
       </div>
-      <h3 data-i18n="settings_cancel_sub_modal_title">Cancel subscription?</h3>
+      <h3 id="cancelSubModalTitle" data-i18n="settings_cancel_sub_modal_title">Cancel subscription?</h3>
       <p id="cancelSubModalBody" data-i18n="settings_cancel_sub_modal_body">Your subscription will remain active until the end of the current billing period.</p>
       <div class="modal-actions danger-actions">
         <button type="button" id="cancelSubModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
