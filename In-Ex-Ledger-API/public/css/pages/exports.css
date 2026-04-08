@@ -704,6 +704,39 @@
   color: var(--accent, #2563eb);
 }
 
+/* ─── Modal overlay (shared) ─────────────────────────────── */
+
+.transaction-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.transaction-modal.hidden {
+  display: none;
+}
+
+.modal-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.modal-cancel {
+  padding: 8px 16px;
+  border: 0.5px solid var(--border2);
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--ink2);
+  background: var(--surface);
+  cursor: pointer;
+}
+
 /* ─── Secure Export Modal ─────────────────────────────────── */
 
 .secure-export-modal-content {

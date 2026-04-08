@@ -1470,10 +1470,11 @@ function initSecureExportModal() {
     toggleBtn.textContent = isHidden ? tx("secure_export_modal_hide") : tx("secure_export_modal_show");
   });
 
-  // Enable generate button only when both input and checkbox are valid
+  // Enable generate button only when input is non-empty, format is valid, and checkbox is checked
   const syncGenerateBtn = () => {
     if (generateBtn) {
-      generateBtn.disabled = !(input?.value?.trim()) || !checkbox?.checked;
+      const val = input?.value?.trim() || "";
+      generateBtn.disabled = !val || !isValidTaxId(val) || !checkbox?.checked;
     }
   };
   input?.addEventListener("input", syncGenerateBtn);
@@ -1487,6 +1488,10 @@ function initSecureExportModal() {
     const taxId = input?.value?.trim() || "";
     if (!taxId) {
       showSecureExportError(tx("secure_export_modal_error_taxid"));
+      return;
+    }
+    if (!isValidTaxId(taxId)) {
+      showSecureExportError(tx("secure_export_modal_error_taxid_format"));
       return;
     }
     if (!checkbox?.checked) {
@@ -1516,6 +1521,16 @@ function initSecureExportModal() {
       showSecureExportError(err?.message || tx("secure_export_modal_error_generic"));
     }
   });
+}
+
+function isValidTaxId(value) {
+  if (!value) return false;
+  const v = value.trim();
+  // US SSN: 9 digits or XXX-XX-XXXX
+  const SSN_RE = /^(\d{3}-\d{2}-\d{4}|\d{9})$/;
+  // Canada SIN: 9 digits or XXX-XXX-XXX
+  const SIN_RE = /^(\d{3}-\d{3}-\d{3}|\d{9})$/;
+  return SSN_RE.test(v) || SIN_RE.test(v);
 }
 
 function showSecureExportError(message) {
