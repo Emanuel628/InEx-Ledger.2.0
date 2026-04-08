@@ -169,6 +169,65 @@ function injectMobileDesktopLink() {
   document.body.appendChild(wrapper);
 }
 
+function injectMobileMenu() {
+  const topbar = document.querySelector(".app-topbar");
+  const nav = document.querySelector(".app-topbar .topbar-nav");
+  if (!topbar || !nav) return;
+
+  const HAMBURGER_SVG = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M3 5h14M3 10h14M3 15h14"/></svg>';
+  const CLOSE_SVG = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M5 5l10 10M15 5L5 15"/></svg>';
+
+  const btn = document.createElement("button");
+  btn.className = "topbar-hamburger";
+  btn.setAttribute("aria-label", "Open navigation menu");
+  btn.setAttribute("aria-expanded", "false");
+  btn.innerHTML = HAMBURGER_SVG;
+  topbar.appendChild(btn);
+
+  const overlay = document.createElement("div");
+  overlay.className = "mobile-nav-overlay";
+  overlay.setAttribute("aria-hidden", "true");
+  document.body.appendChild(overlay);
+
+  const drawer = document.createElement("nav");
+  drawer.className = "mobile-nav-drawer";
+  drawer.setAttribute("aria-label", "Mobile navigation");
+  drawer.innerHTML = nav.innerHTML;
+  document.body.appendChild(drawer);
+
+  function openMenu() {
+    drawer.classList.add("is-open");
+    overlay.classList.add("is-open");
+    btn.setAttribute("aria-expanded", "true");
+    btn.setAttribute("aria-label", "Close navigation menu");
+    btn.innerHTML = CLOSE_SVG;
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeMenu() {
+    drawer.classList.remove("is-open");
+    overlay.classList.remove("is-open");
+    btn.setAttribute("aria-expanded", "false");
+    btn.setAttribute("aria-label", "Open navigation menu");
+    btn.innerHTML = HAMBURGER_SVG;
+    document.body.style.overflow = "";
+  }
+
+  btn.addEventListener("click", function () {
+    drawer.classList.contains("is-open") ? closeMenu() : openMenu();
+  });
+
+  overlay.addEventListener("click", closeMenu);
+
+  drawer.querySelectorAll("a").forEach(function (link) {
+    link.addEventListener("click", closeMenu);
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeMenu();
+  });
+}
+
 function injectHelpNavLink() {
   document.querySelectorAll(".app-topbar .topbar-nav").forEach((nav) => {
     if (nav.querySelector('[data-nav-help="true"]')) {
@@ -226,7 +285,8 @@ document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
   injectHelpNavLink();
   injectMessagesNavLink();
-  highlightNavigation();
+  injectMobileMenu();   // clones nav after Help/Messages are injected
+  highlightNavigation(); // runs on all nav a elements including the drawer
   applyDateInputConstraints();
   injectMobileDesktopLink();
 

@@ -115,7 +115,7 @@ section {
   border-radius: 24px;
   padding: 32px;
   border: 1px solid var(--border-subtle);
-  box-shadow: 0 25px 45px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
 }
 
 section h2 {
