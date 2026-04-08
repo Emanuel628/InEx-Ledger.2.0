@@ -5,6 +5,12 @@ const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createTransactionLimiter } = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser, getBusinessScopeForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { encrypt, decrypt } = require("../services/encryptionService.js");
+const {
+  AccountingPeriodLockedError,
+  assertDateUnlocked,
+  loadAccountingLockState
+} = require("../services/accountingLockService.js");
+const { archiveTransaction } = require("../services/transactionAuditService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -324,6 +330,25 @@ function tryEncryptDescription(description) {
   }
 }
 
+async function assertUnlockedBusinessDates(businessId, ...dates) {
+  const lockState = await loadAccountingLockState(pool, businessId);
+  dates.filter(Boolean).forEach((date) => assertDateUnlocked(lockState, date));
+  return lockState;
+}
+
+function handleTransactionMutationError(res, err, fallbackMessage) {
+  if (err instanceof AccountingPeriodLockedError) {
+    return res.status(err.status).json({
+      error: err.message,
+      code: err.code,
+      locked_through_date: err.lockedThroughDate,
+      transaction_date: err.transactionDate
+    });
+  }
+
+  return res.status(500).json({ error: fallbackMessage });
+}
+
 router.get("/", async (req, res) => {
   try {
     const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
@@ -366,13 +391,14 @@ router.get("/", async (req, res) => {
        LEFT JOIN accounts a ON a.id = t.account_id
        LEFT JOIN categories c ON c.id = t.category_id
        WHERE t.business_id = ANY($1::uuid[])
+         AND t.deleted_at IS NULL
        ORDER BY t.date DESC, t.created_at DESC
        LIMIT $2 OFFSET $3`,
       [scope.businessIds, limit, offset]
     );
 
     const countResult = await pool.query(
-      "SELECT COUNT(*) FROM transactions WHERE business_id = ANY($1::uuid[])",
+      "SELECT COUNT(*) FROM transactions WHERE business_id = ANY($1::uuid[]) AND deleted_at IS NULL",
       [scope.businessIds]
     );
 
@@ -404,6 +430,7 @@ router.post("/", async (req, res) => {
 
     const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
     const { description, note } = req.body;
+    await assertUnlockedBusinessDates(businessId, date);
     const encryptedDescription = tryEncryptDescription(description);
 
     const accountCheck = await pool.query(
@@ -463,7 +490,7 @@ router.post("/", async (req, res) => {
     res.status(201).json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     console.error("POST /transactions error:", err);
-    res.status(500).json({ error: "Failed to save transaction." });
+    return handleTransactionMutationError(res, err, "Failed to save transaction.");
   }
 });
 
@@ -485,12 +512,13 @@ router.put("/:id", async (req, res) => {
 
     // Verify the original transaction exists and belongs to this business
     const originalResult = await pool.query(
-      "SELECT id FROM transactions WHERE id = $1 AND business_id = $2 AND is_adjustment = false",
+      "SELECT id, date FROM transactions WHERE id = $1 AND business_id = $2 AND is_adjustment = false AND deleted_at IS NULL",
       [req.params.id, businessId]
     );
     if (originalResult.rowCount === 0) {
       return res.status(404).json({ error: "Transaction not found." });
     }
+    await assertUnlockedBusinessDates(businessId, originalResult.rows[0].date, date);
 
     const accountCheck = await pool.query(
       "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
@@ -552,26 +580,39 @@ router.put("/:id", async (req, res) => {
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     console.error("PUT /transactions/:id error:", err);
-    res.status(500).json({ error: "Failed to update transaction." });
+    return handleTransactionMutationError(res, err, "Failed to update transaction.");
   }
 });
 
 router.delete("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const result = await pool.query(
-      "DELETE FROM transactions WHERE id = $1 AND business_id = $2",
+    const existing = await pool.query(
+      "SELECT id, date FROM transactions WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1",
       [req.params.id, businessId]
     );
 
-    if (result.rowCount === 0) {
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ error: "Transaction not found." });
+    }
+    await assertUnlockedBusinessDates(businessId, existing.rows[0].date);
+
+    const archived = await archiveTransaction({
+      pool,
+      businessId,
+      transactionId: req.params.id,
+      userId: req.user.id,
+      reason: req.body?.reason || null
+    });
+
+    if (!archived) {
       return res.status(404).json({ error: "Transaction not found." });
     }
 
     res.json({ message: "Transaction deleted." });
   } catch (err) {
     console.error("DELETE /transactions/:id error:", err);
-    res.status(500).json({ error: "Failed to delete transaction." });
+    return handleTransactionMutationError(res, err, "Failed to delete transaction.");
   }
 });
 
@@ -582,10 +623,20 @@ router.patch("/:id/cleared", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const existing = await pool.query(
+      "SELECT id, date FROM transactions WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1",
+      [req.params.id, businessId]
+    );
+
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ error: "Transaction not found." });
+    }
+
+    await assertUnlockedBusinessDates(businessId, existing.rows[0].date);
     const result = await pool.query(
       `UPDATE transactions
        SET cleared = $1
-       WHERE id = $2 AND business_id = $3
+       WHERE id = $2 AND business_id = $3 AND deleted_at IS NULL
        RETURNING *`,
       [req.body.cleared, req.params.id, businessId]
     );
@@ -597,7 +648,7 @@ router.patch("/:id/cleared", async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error("PATCH /transactions/:id/cleared error:", err);
-    res.status(500).json({ error: "Failed to update cleared status." });
+    return handleTransactionMutationError(res, err, "Failed to update cleared status.");
   }
 });
 

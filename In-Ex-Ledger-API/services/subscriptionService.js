@@ -51,16 +51,16 @@ function deriveEffectiveState(row) {
   const now = Date.now();
   const trialEndsAt = row?.trial_ends_at ? new Date(row.trial_ends_at) : null;
   const currentPeriodEnd = row?.current_period_end ? new Date(row.current_period_end) : null;
-  const isTrialing = row?.status === "trialing" && trialEndsAt && trialEndsAt.getTime() > now;
+  const isTrialing = Boolean(row?.status === "trialing" && trialEndsAt && trialEndsAt.getTime() > now);
   const isActivePaid =
-    (row?.status === "active" || row?.status === "past_due") &&
+    Boolean((row?.status === "active" || row?.status === "past_due") &&
     row?.plan_code === PLAN_V1 &&
-    (!currentPeriodEnd || currentPeriodEnd.getTime() > now);
+    (!currentPeriodEnd || currentPeriodEnd.getTime() > now));
   const isGracePeriod =
-    row?.cancel_at_period_end &&
+    Boolean(row?.cancel_at_period_end &&
     row?.plan_code === PLAN_V1 &&
     currentPeriodEnd &&
-    currentPeriodEnd.getTime() > now;
+    currentPeriodEnd.getTime() > now);
 
   let effectiveTier = PLAN_FREE;
   let effectiveStatus = row?.status || "inactive";
@@ -88,7 +88,7 @@ function deriveEffectiveState(row) {
     effectiveTier,
     effectiveStatus,
     isTrialing,
-    isPaid: isActivePaid || isGracePeriod,
+    isPaid: Boolean(isActivePaid || isGracePeriod),
     cancelAtPeriodEnd: Boolean(row?.cancel_at_period_end),
     stripeCustomerId: row?.stripe_customer_id || null,
     stripeSubscriptionId: row?.stripe_subscription_id || null,
@@ -204,6 +204,7 @@ module.exports = {
   PLAN_FREE,
   PLAN_V1,
   ensureBusinessSubscription,
+  deriveEffectiveState,
   getSubscriptionSnapshotForBusiness,
   getSubscriptionSnapshotForUser,
   updateStripeCustomerForBusiness,

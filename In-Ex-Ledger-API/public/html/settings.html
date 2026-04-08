@@ -41,16 +41,16 @@
   <div class="settings-shell">
     <aside class="settings-sidebar" aria-label="Settings navigation">
       <div class="settings-sidebar-card">
-        <div class="settings-sidebar-title">Settings</div>
+        <div class="settings-sidebar-title" data-i18n="settings_sidebar_title">Settings</div>
         <nav class="settings-nav">
-          <button class="settings-nav-item is-active" type="button" data-settings-nav-item data-settings-target="settings-overview">Overview</button>
-          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-business">Business</button>
-          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-billing">Billing</button>
-          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-cpa-access">CPA Access</button>
-          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-security">Security</button>
-          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-preferences">Preferences</button>
-          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-privacy-data">Privacy &amp; Data</button>
-          <button class="settings-nav-item settings-nav-danger" type="button" data-settings-nav-item data-settings-target="settings-danger-zone">Danger Zone</button>
+          <button class="settings-nav-item is-active" type="button" data-settings-nav-item data-settings-target="settings-overview" data-i18n="settings_nav_overview">Overview</button>
+          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-business" data-i18n="settings_nav_business">Business</button>
+          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-billing" data-i18n="settings_nav_billing">Billing</button>
+          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-cpa-access" data-i18n="settings_nav_cpa_access">CPA Access</button>
+          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-security" data-i18n="settings_nav_security">Security</button>
+          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-preferences" data-i18n="settings_nav_preferences">Preferences</button>
+          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-privacy-data" data-i18n="settings_nav_privacy_data">Privacy &amp; Data</button>
+          <button class="settings-nav-item settings-nav-danger" type="button" data-settings-nav-item data-settings-target="settings-danger-zone" data-i18n="settings_nav_danger_zone">Danger Zone</button>
         </nav>
         <div class="settings-sidebar-trial-card">
           <div id="trialBanner" class="trial-banner settings-trial-banner"></div>
@@ -61,92 +61,92 @@
     <main class="settings-main">
       <section class="settings-overview" id="settings-overview">
         <div class="settings-page-heading">
-          <h1>Settings</h1>
-          <p>Manage your account, business, and data. Choose a category to get started.</p>
+          <h1 data-i18n="settings_overview_title">Settings</h1>
+          <p data-i18n="settings_overview_intro">Manage your account, business, and data. Choose a category to get started.</p>
         </div>
 
         <div class="settings-overview-grid">
           <button class="settings-summary-card" type="button" data-settings-target="settings-business">
             <div class="settings-summary-card-head">
               <div>
-                <h2>Business</h2>
-                <p>Manage your business details, tax setup, and connected businesses.</p>
+                <h2 data-i18n="settings_nav_business">Business</h2>
+                <p data-i18n="settings_overview_business_desc">Manage your business details, tax setup, and connected businesses.</p>
               </div>
-              <span class="settings-summary-action">Manage</span>
+              <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
             </div>
-            <p id="overviewBusinessSummary" class="settings-summary-meta">Loading business details...</p>
+            <p id="overviewBusinessSummary" class="settings-summary-meta" data-i18n="settings_overview_business_loading">Loading business details...</p>
           </button>
           <button class="settings-summary-card" type="button" data-settings-target="settings-billing">
             <div class="settings-summary-card-head">
               <div>
-                <h2>Billing</h2>
-                <p>View your plan, billing details, and tax information.</p>
+                <h2 data-i18n="settings_nav_billing">Billing</h2>
+                <p data-i18n="settings_overview_billing_desc">View your plan, billing details, and tax information.</p>
               </div>
-              <span class="settings-summary-action">Manage</span>
+              <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
             </div>
-            <p id="overviewBillingSummary" class="settings-summary-meta">Loading subscription details...</p>
+            <p id="overviewBillingSummary" class="settings-summary-meta" data-i18n="settings_overview_billing_loading">Loading subscription details...</p>
           </button>
           <button class="settings-summary-card" type="button" data-settings-target="settings-cpa-access">
             <div class="settings-summary-card-head">
               <div>
-                <h2>CPA Access</h2>
-                <p>Invite your accountant and manage their access.</p>
+                <h2 data-i18n="settings_nav_cpa_access">CPA Access</h2>
+                <p data-i18n="settings_overview_cpa_desc">Invite your accountant and manage their access.</p>
               </div>
-              <span class="settings-summary-action">Manage</span>
+              <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
             </div>
-            <p id="overviewCpaSummary" class="settings-summary-meta">Loading access details...</p>
+            <p id="overviewCpaSummary" class="settings-summary-meta" data-i18n="settings_overview_cpa_loading">Loading access details...</p>
           </button>
           <button class="settings-summary-card" type="button" data-settings-target="settings-security">
             <div class="settings-summary-card-head">
               <div>
-                <h2>Security</h2>
-                <p>Password, multi-factor authentication, and active sessions.</p>
+                <h2 data-i18n="settings_nav_security">Security</h2>
+                <p data-i18n="settings_overview_security_desc">Password, multi-factor authentication, and active sessions.</p>
               </div>
-              <span class="settings-summary-action">Manage</span>
+              <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
             </div>
-            <p id="overviewSecuritySummary" class="settings-summary-meta">Loading security details...</p>
+            <p id="overviewSecuritySummary" class="settings-summary-meta" data-i18n="settings_overview_security_loading">Loading security details...</p>
           </button>
           <button class="settings-summary-card" type="button" data-settings-target="settings-preferences">
             <div class="settings-summary-card-head">
               <div>
-                <h2>Preferences</h2>
-                <p>Language, region, appearance, and product preferences.</p>
+                <h2 data-i18n="settings_nav_preferences">Preferences</h2>
+                <p data-i18n="settings_overview_preferences_desc">Language, region, appearance, and product preferences.</p>
               </div>
-              <span class="settings-summary-action">Manage</span>
+              <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
             </div>
-            <p id="overviewPreferencesSummary" class="settings-summary-meta">Loading preference details...</p>
+            <p id="overviewPreferencesSummary" class="settings-summary-meta" data-i18n="settings_overview_preferences_loading">Loading preference details...</p>
           </button>
           <button class="settings-summary-card" type="button" data-settings-target="settings-privacy-data">
             <div class="settings-summary-card-head">
               <div>
-                <h2>Privacy &amp; Data</h2>
-                <p>Control analytics, downloads, and data protections.</p>
+                <h2 data-i18n="settings_nav_privacy_data">Privacy &amp; Data</h2>
+                <p data-i18n="settings_overview_privacy_desc">Control analytics, downloads, and data protections.</p>
               </div>
-              <span class="settings-summary-action">Manage</span>
+              <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
             </div>
-            <p id="overviewPrivacySummary" class="settings-summary-meta">Loading privacy details...</p>
+            <p id="overviewPrivacySummary" class="settings-summary-meta" data-i18n="settings_overview_privacy_loading">Loading privacy details...</p>
           </button>
         </div>
 
         <div class="settings-trust-banner">
           <div>
-            <strong>Your data is private and encrypted</strong>
-            <p>We use bank-level security to protect your information.</p>
+            <strong data-i18n="settings_trust_title">Your data is private and encrypted</strong>
+            <p data-i18n="settings_trust_desc">We use bank-level security to protect your information.</p>
           </div>
-          <a href="privacy-policy">Learn more</a>
+          <a href="privacy" data-i18n="settings_learn_more">Learn more</a>
         </div>
       </section>
 
       <div class="settings-detail-grid">
       <section class="settings-card settings-panel" id="settings-business">
         <div class="settings-panel-head card-head">
-          <h2 class="card-title">Business</h2>
-          <p class="card-desc">Edit details, manage businesses, or remove a business you no longer use.</p>
+          <h2 class="card-title" data-i18n="settings_nav_business">Business</h2>
+          <p class="card-desc" data-i18n="settings_business_desc">Edit details, manage businesses, or remove a business you no longer use.</p>
         </div>
         <div class="settings-subpanel">
           <div class="settings-subpanel-head">
-            <h3>Business details</h3>
-            <p>Business identity, tax profile, and address.</p>
+            <h3 data-i18n="settings_business_details_title">Business details</h3>
+            <p data-i18n="settings_business_details_desc">Business identity, tax profile, and address.</p>
           </div>
           <form id="businessProfileForm" class="business-form">
           <div class="settings-form-grid">
@@ -189,17 +189,41 @@
           <div id="businessListWrap" class="business-list-wrap"></div>
           <button type="button" id="addBusinessBtn" class="settings-secondary-btn" data-i18n="settings_add_business">Add another business</button>
         </div>
+
+        <div class="settings-subpanel">
+          <div class="settings-subpanel-head">
+            <h3 data-i18n="settings_accounting_lock_title">Accounting period lock</h3>
+            <p data-i18n="settings_accounting_lock_desc">Block edits, deletes, and new transactions on or before a closing date.</p>
+          </div>
+          <form id="accountingLockForm" class="business-form">
+            <div class="settings-form-grid">
+              <div class="form-field">
+                <label for="accountingLockDate" data-i18n="settings_accounting_lock_date_label">Locked through</label>
+                <input type="date" id="accountingLockDate" name="locked_through_date" />
+              </div>
+              <div class="form-field form-field-full">
+                <label for="accountingLockNote" data-i18n="settings_accounting_lock_note_label">Closing note</label>
+                <textarea id="accountingLockNote" name="locked_period_note" rows="2" data-i18n-placeholder="settings_accounting_lock_note_placeholder" placeholder="Optional note for this close."></textarea>
+              </div>
+            </div>
+            <div class="settings-inline-actions">
+              <button type="submit" class="settings-primary-btn" data-i18n="settings_accounting_lock_save">Save lock</button>
+              <button type="button" id="clearAccountingLockBtn" class="settings-secondary-btn" data-i18n="settings_accounting_lock_clear">Clear lock</button>
+            </div>
+            <p id="accountingLockStatus" class="settings-helper-note" data-i18n="settings_accounting_lock_loading">Loading lock status...</p>
+          </form>
+        </div>
       </section>
 
       <section class="settings-card settings-panel" id="settings-billing">
         <div class="settings-panel-head card-head">
-          <h2 class="card-title">Billing</h2>
-          <p class="card-desc">Review your plan, billing status, and filing identity details.</p>
+          <h2 class="card-title" data-i18n="settings_nav_billing">Billing</h2>
+          <p class="card-desc" data-i18n="settings_billing_desc">Review your plan, billing status, and filing identity details.</p>
         </div>
 
         <div class="settings-subpanel">
           <div class="settings-subpanel-head">
-            <h3>Your plan</h3>
+            <h3 data-i18n="settings_your_plan_title">Your plan</h3>
           </div>
           <div class="settings-row">
             <div class="settings-row-copy">
@@ -222,7 +246,7 @@
 
         <div class="settings-subpanel">
           <div class="settings-subpanel-head">
-            <h3>Tax information</h3>
+            <h3 data-i18n="settings_tax_information_title">Tax information</h3>
           </div>
           <div class="settings-row" data-region-show="us">
             <div class="settings-row-copy">
@@ -242,22 +266,22 @@
 
       <section class="settings-card settings-panel" id="settings-cpa-access">
         <div class="settings-panel-head card-head">
-          <h2 class="card-title">CPA Access</h2>
-          <p class="card-desc">Invite your accountant, review active access, and audit changes.</p>
+          <h2 class="card-title" data-i18n="settings_nav_cpa_access">CPA Access</h2>
+          <p class="card-desc" data-i18n="settings_cpa_desc">Invite your accountant, review active access, and audit changes.</p>
         </div>
 
         <div class="settings-tabs" role="tablist" aria-label="CPA access sections">
-          <button class="settings-tab is-active" type="button" role="tab" aria-selected="true" data-cpa-tab="active">Active</button>
-          <button class="settings-tab" type="button" role="tab" aria-selected="false" data-cpa-tab="invite">Invite</button>
-          <button class="settings-tab" type="button" role="tab" aria-selected="false" data-cpa-tab="history">History</button>
-          <button class="settings-tab" type="button" role="tab" aria-selected="false" data-cpa-tab="audit">Audit</button>
+          <button class="settings-tab is-active" type="button" role="tab" aria-selected="true" data-cpa-tab="active" data-i18n="settings_cpa_tab_active">Active</button>
+          <button class="settings-tab" type="button" role="tab" aria-selected="false" data-cpa-tab="invite" data-i18n="settings_cpa_tab_invite">Invite</button>
+          <button class="settings-tab" type="button" role="tab" aria-selected="false" data-cpa-tab="history" data-i18n="settings_cpa_tab_history">History</button>
+          <button class="settings-tab" type="button" role="tab" aria-selected="false" data-cpa-tab="audit" data-i18n="settings_cpa_tab_audit">Audit</button>
         </div>
 
         <div class="settings-tab-panel is-active" data-cpa-panel="active">
           <div class="settings-subpanel">
             <div class="settings-subpanel-head">
               <h3 data-i18n="settings_cpa_current_title">Current access</h3>
-              <p>People who can review your data right now.</p>
+              <p data-i18n="settings_cpa_active_desc">People who can review your data right now.</p>
             </div>
             <div id="cpaCurrentAccessList" class="cpa-access-list"></div>
           </div>
@@ -266,8 +290,8 @@
         <div class="settings-tab-panel" data-cpa-panel="invite">
           <div class="settings-subpanel">
             <div class="settings-subpanel-head">
-              <h3>Invite</h3>
-              <p>Grant access to one business or your full portfolio.</p>
+              <h3 data-i18n="settings_cpa_invite_title">Invite</h3>
+              <p data-i18n="settings_cpa_invite_desc">Grant access to one business or your full portfolio.</p>
             </div>
             <form id="cpaAccessForm" class="business-form">
               <div class="settings-form-grid cpa-access-grid">
@@ -298,7 +322,7 @@
           <div class="settings-subpanel">
             <div class="settings-subpanel-head">
               <h3 data-i18n="settings_cpa_history_title">History</h3>
-              <p>Pending, expired, and revoked access records.</p>
+              <p data-i18n="settings_cpa_history_panel_desc">Pending, expired, and revoked access records.</p>
             </div>
             <div id="cpaAccessHistoryList" class="cpa-access-list"></div>
           </div>
@@ -308,7 +332,7 @@
           <div class="settings-subpanel">
             <div class="settings-subpanel-head">
               <h3 data-i18n="settings_cpa_audit_title">Audit</h3>
-              <p>Review invite, revoke, and accountant activity events.</p>
+              <p data-i18n="settings_cpa_audit_desc">Review invite, revoke, and accountant activity events.</p>
             </div>
             <div id="cpaAuditActivityList" class="cpa-access-list"></div>
           </div>
@@ -317,8 +341,8 @@
 
       <section class="settings-card settings-panel" id="settings-preferences">
         <div class="settings-panel-head card-head">
-          <h2 class="card-title">Preferences</h2>
-          <p class="card-desc">Personalize your region, language, units, and appearance.</p>
+          <h2 class="card-title" data-i18n="settings_nav_preferences">Preferences</h2>
+          <p class="card-desc" data-i18n="settings_preferences_desc">Personalize your region, language, units, and appearance.</p>
         </div>
         <div class="settings-row">
           <div class="settings-row-copy">
@@ -386,20 +410,19 @@
         </div>
         <div class="settings-row">
           <div class="settings-row-copy">
-            <div class="settings-row-title">Show onboarding tips again</div>
-            <div class="settings-row-desc">Replay the first-run guidance across core pages.</div>
+            <div class="settings-row-title" data-i18n="settings_tips_title">Show onboarding tips again</div>
+            <div class="settings-row-desc" data-i18n="settings_tips_desc">Replay the first-run guidance across core pages.</div>
           </div>
           <div class="settings-inline-actions">
-            <button type="button" id="replayOnboardingTips" class="settings-secondary-btn">Replay tips</button>
-            <button type="button" id="replayOnboardingTipsSidebar" class="settings-secondary-btn">Replay tips</button>
+            <button type="button" id="replayOnboardingTips" class="settings-secondary-btn" data-i18n="settings_tips_cta">Replay tips</button>
           </div>
         </div>
       </section>
 
       <section class="settings-card settings-panel" id="settings-privacy-data">
         <div class="settings-panel-head card-head">
-          <h2 class="card-title">Privacy &amp; Data</h2>
-          <p class="card-desc">Control data sharing, exports, and privacy preferences.</p>
+          <h2 class="card-title" data-i18n="settings_nav_privacy_data">Privacy &amp; Data</h2>
+          <p class="card-desc" data-i18n="settings_privacy_data_desc">Control data sharing, exports, and privacy preferences.</p>
         </div>
         <div class="settings-row">
           <div class="settings-row-copy">
@@ -429,29 +452,29 @@
         </div>
         <div class="settings-row">
           <div class="settings-row-copy">
-            <div class="settings-row-title">Your data</div>
-            <div class="settings-row-desc">Download a copy of your data, including transactions, receipts, and settings.</div>
+            <div class="settings-row-title" data-i18n="settings_your_data_title">Your data</div>
+            <div class="settings-row-desc" data-i18n="settings_your_data_desc">Download a copy of your data, including transactions, receipts, and settings.</div>
           </div>
           <button type="button" id="downloadMyDataBtn" class="safe-action" data-i18n="privacy_download_button">Download my data</button>
         </div>
         <div class="settings-row settings-row-static">
           <div class="settings-row-copy">
-            <div class="settings-row-title">Terms accepted</div>
+            <div class="settings-row-title" data-i18n="settings_terms_accepted_title">Terms accepted</div>
             <div class="settings-row-desc"><span id="consentStatus">No</span></div>
           </div>
-          <a class="settings-link-btn" href="privacy-policy">Privacy Policy</a>
+          <a class="settings-link-btn" href="privacy" data-i18n="settings_privacy_policy">Privacy Policy</a>
         </div>
       </section>
 
       <section class="settings-card settings-panel security-card" id="settings-security">
         <div class="settings-panel-head card-head">
-          <h2 class="card-title">Security</h2>
-          <p class="card-desc">Password, multi-factor authentication, and active sessions.</p>
+          <h2 class="card-title" data-i18n="settings_nav_security">Security</h2>
+          <p class="card-desc" data-i18n="settings_security_desc">Password, multi-factor authentication, and active sessions.</p>
         </div>
         <div class="settings-subpanel">
         <form id="securityForm" class="security-form">
           <fieldset class="security-fieldset">
-            <legend>Password</legend>
+            <legend data-i18n="settings_password_title">Password</legend>
             <div class="security-grid">
               <div class="form-field">
                 <label for="security-current-password" data-i18n="settings_current_password">Current password</label>
@@ -540,7 +563,7 @@
             </span>
             <span data-i18n="settings_danger_title">Danger zone</span>
           </h2>
-          <p>Destructive actions require extra confirmation.</p>
+          <p data-i18n="settings_danger_desc">Destructive actions require extra confirmation.</p>
         </div>
         <div class="danger-row">
           <div class="danger-copy">

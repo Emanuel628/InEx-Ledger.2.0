@@ -3,6 +3,11 @@ const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const {
+  normalizeDateOnly,
+  loadAccountingLockState,
+  saveAccountingLockState
+} = require("../services/accountingLockService.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -171,6 +176,37 @@ router.put("/", async (req, res) => {
   } catch (err) {
     console.error("PUT /business error:", err.message);
     res.status(500).json({ error: err.message || "Failed to update business profile." });
+  }
+});
+
+router.get("/accounting-lock", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const lock = await loadAccountingLockState(pool, businessId);
+    res.json({ lock });
+  } catch (err) {
+    console.error("GET /business/accounting-lock error:", err.message);
+    res.status(500).json({ error: err.message || "Failed to load accounting lock." });
+  }
+});
+
+router.put("/accounting-lock", async (req, res) => {
+  const { locked_through_date, note } = req.body ?? {};
+
+  try {
+    const normalizedLockDate = normalizeDateOnly(locked_through_date);
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const lock = await saveAccountingLockState(pool, businessId, req.user.id, {
+      lockedThroughDate: normalizedLockDate,
+      note
+    });
+    res.json({ lock });
+  } catch (err) {
+    if (err.message === "Date value is invalid.") {
+      return res.status(400).json({ error: "locked_through_date must be a valid date." });
+    }
+    console.error("PUT /business/accounting-lock error:", err.message);
+    res.status(500).json({ error: err.message || "Failed to update accounting lock." });
   }
 });
 

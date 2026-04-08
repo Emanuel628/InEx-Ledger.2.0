@@ -9,7 +9,9 @@
     "test:region-tax": "node scripts/test-region-tax.mjs",
     "verify:redacted-storage": "node scripts/verify-redacted-storage.mjs",
     "log_scan": "node scripts/log_scan.js",
-    "test:rate-limiter": "node --test tests/rateLimiter.test.js"
+    "test:rate-limiter": "node --test tests/rateLimiter.test.js",
+    "test:subscription-service": "node --test tests/subscriptionService.test.js",
+    "test:accounting-controls": "node --test tests/accountingControls.test.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

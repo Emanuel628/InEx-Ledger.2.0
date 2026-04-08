@@ -59,12 +59,12 @@ const CA_PROVINCE_NAMES = {
   SK: "Saskatchewan",
   YT: "Yukon"
 };
-const SETTINGS_BUSINESS_TYPE_LABELS = {
-  sole_proprietor: "Sole proprietor",
-  llc: "LLC",
-  s_corp: "S-Corp",
-  partnership: "Partnership",
-  corporation: "Corporation"
+const SETTINGS_BUSINESS_TYPE_KEYS = {
+  sole_proprietor: "settings_business_type_sole_prop",
+  llc: "settings_business_type_llc",
+  s_corp: "settings_business_type_scorp",
+  partnership: "settings_business_type_partnership",
+  corporation: "settings_business_type_corporation"
 };
 
 let privacySettings = {
@@ -101,6 +101,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initSettingsNav();
   initSettingsTabs();
   await initBusinessProfileForm();
+  await initAccountingLockPanel();
   await initAccountSettings();
   await initCpaAccess();
   await initPreferences();
@@ -134,10 +135,30 @@ function saveBusinessProfile(profile) {
 }
 
 function formatFiscalYearSummary(value) {
-  if (!value) return "Fiscal year not set";
+  if (!value) return t("settings_overview_fiscal_not_set");
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return `FY starts ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  const formatted = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return interpolateTranslatedMessage("settings_overview_fiscal_year", { date: formatted });
+}
+
+function localizeBusinessType(type) {
+  const key = SETTINGS_BUSINESS_TYPE_KEYS[String(type || "").trim()];
+  return key ? t(key) : t("settings_overview_business_type_missing");
+}
+
+function localizeLanguageSummary(language) {
+  if (language === "es") return t("settings_language_option_es");
+  if (language === "fr") return t("settings_language_option_fr");
+  return t("settings_language_option_en");
+}
+
+function localizeRegionSummary(region) {
+  return normalizeSettingsRegion(region) === "ca" ? t("region_ca") : t("region_us");
+}
+
+function localizeThemeSummary(theme) {
+  return theme === "dark" ? t("settings_theme_dark") : t("settings_theme_light");
 }
 
 function resolvePreferenceSummaryState() {
@@ -146,9 +167,9 @@ function resolvePreferenceSummaryState() {
     language: normalizeSettingsLanguage(businessSettingsState.language),
     theme: resolveSavedTheme()
   };
-  const language = source.language === "es" ? "Spanish" : source.language === "fr" ? "French" : "English";
-  const region = normalizeSettingsRegion(source.region) === "ca" ? "Canada" : "United States";
-  const theme = source.theme === "dark" ? "Dark mode" : "Light mode";
+  const language = localizeLanguageSummary(source.language);
+  const region = localizeRegionSummary(source.region);
+  const theme = localizeThemeSummary(source.theme);
   return `${language} • ${region} • ${theme}`;
 }
 
@@ -161,21 +182,29 @@ function syncSettingsOverviewSummaries() {
   const privacyNode = document.getElementById("overviewPrivacySummary");
 
   const businessProfile = settingsOverviewState.businessProfile || getBusinessProfile();
-  const businessName = businessProfile?.name || "Business not set";
-  const businessType = SETTINGS_BUSINESS_TYPE_LABELS[businessProfile?.type] || "Business type not set";
+  const businessName = businessProfile?.name || t("settings_overview_business_missing");
+  const businessType = localizeBusinessType(businessProfile?.type);
   const fiscalYear = formatFiscalYearSummary(businessProfile?.fiscalYearStart);
   if (businessNode) businessNode.textContent = `${businessName} • ${businessType} • ${fiscalYear}`;
 
   if (billingNode) {
-    billingNode.textContent = settingsOverviewState.billingStatus || "Subscription details unavailable";
+    billingNode.textContent = settingsOverviewState.billingStatus || t("settings_overview_billing_unavailable");
   }
 
   if (cpaNode) {
-    cpaNode.textContent = `${settingsOverviewState.cpaActiveCount} active grant${settingsOverviewState.cpaActiveCount === 1 ? "" : "s"} • ${settingsOverviewState.cpaHistoryCount} history item${settingsOverviewState.cpaHistoryCount === 1 ? "" : "s"}`;
+    const activeLabel = settingsOverviewState.cpaActiveCount === 1
+      ? t("settings_overview_active_grant_singular")
+      : t("settings_overview_active_grant_plural");
+    const historyLabel = settingsOverviewState.cpaHistoryCount === 1
+      ? t("settings_overview_history_item_singular")
+      : t("settings_overview_history_item_plural");
+    cpaNode.textContent = `${settingsOverviewState.cpaActiveCount} ${activeLabel} • ${settingsOverviewState.cpaHistoryCount} ${historyLabel}`;
   }
 
   if (securityNode) {
-    securityNode.textContent = settingsOverviewState.mfaEnabled ? "MFA enabled • Sessions available" : "MFA disabled • Sessions available";
+    securityNode.textContent = settingsOverviewState.mfaEnabled
+      ? `${t("settings_overview_mfa_enabled")} • ${t("settings_overview_sessions_available")}`
+      : `${t("settings_overview_mfa_disabled")} • ${t("settings_overview_sessions_available")}`;
   }
 
   if (preferencesNode) {
@@ -183,7 +212,9 @@ function syncSettingsOverviewSummaries() {
   }
 
   if (privacyNode) {
-    privacyNode.textContent = `${privacySettings.dataSharingOptOut ? "Analytics off" : "Analytics on"} • Data export available`;
+    privacyNode.textContent = privacySettings.dataSharingOptOut
+      ? `${t("settings_overview_analytics_off")} • ${t("settings_overview_data_export")}`
+      : `${t("settings_overview_analytics_on")} • ${t("settings_overview_data_export")}`;
   }
 }
 
@@ -290,6 +321,10 @@ async function renderBusinessList() {
 }
 
 function openAddBusinessModal() {
+  if (typeof openBusinessCreationModal === "function") {
+    openBusinessCreationModal();
+    return;
+  }
   const name = window.prompt(t("settings_add_business_prompt") || "New business name:");
   if (!name || !name.trim()) return;
   void (async () => {
@@ -430,6 +465,103 @@ async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBod
   }
 }
 
+async function initAccountingLockPanel() {
+  const form = document.getElementById("accountingLockForm");
+  const dateInput = document.getElementById("accountingLockDate");
+  const noteInput = document.getElementById("accountingLockNote");
+  const statusNode = document.getElementById("accountingLockStatus");
+  const clearButton = document.getElementById("clearAccountingLockBtn");
+  if (!form || !dateInput || !noteInput || !statusNode || !clearButton) {
+    return;
+  }
+
+  const renderStatus = (lock) => {
+    if (lock?.lockedThroughDate) {
+      statusNode.textContent = interpolateTranslatedMessage("settings_accounting_lock_status_locked", {
+        date: lock.lockedThroughDate
+      });
+      return;
+    }
+    statusNode.textContent = t("settings_accounting_lock_status_unlocked");
+  };
+
+  const loadLock = async () => {
+    statusNode.textContent = t("settings_accounting_lock_loading");
+    try {
+      const response = await apiFetch("/api/business/accounting-lock");
+      if (!response || !response.ok) {
+        throw new Error();
+      }
+
+      const payload = await response.json().catch(() => null);
+      const lock = payload?.lock || null;
+      dateInput.value = lock?.lockedThroughDate || "";
+      noteInput.value = lock?.note || "";
+      renderStatus(lock);
+    } catch (error) {
+      console.error("Failed to load accounting lock", error);
+      statusNode.textContent = t("settings_accounting_lock_load_error");
+    }
+  };
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const response = await apiFetch("/api/business/accounting-lock", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          locked_through_date: dateInput.value || null,
+          note: noteInput.value.trim()
+        })
+      });
+      const payload = await response?.json().catch(() => null);
+      if (!response || !response.ok) {
+        showSettingsToast(payload?.error || t("settings_accounting_lock_save_error"));
+        return;
+      }
+
+      renderStatus(payload?.lock || null);
+      showSettingsToast(t("settings_accounting_lock_saved"));
+    } catch (error) {
+      console.error("Failed to save accounting lock", error);
+      showSettingsToast(t("settings_accounting_lock_save_error"));
+    }
+  });
+
+  clearButton.addEventListener("click", async () => {
+    try {
+      const response = await apiFetch("/api/business/accounting-lock", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          locked_through_date: null,
+          note: ""
+        })
+      });
+      const payload = await response?.json().catch(() => null);
+      if (!response || !response.ok) {
+        showSettingsToast(payload?.error || t("settings_accounting_lock_save_error"));
+        return;
+      }
+
+      dateInput.value = "";
+      noteInput.value = "";
+      renderStatus(payload?.lock || null);
+      showSettingsToast(t("settings_accounting_lock_cleared"));
+    } catch (error) {
+      console.error("Failed to clear accounting lock", error);
+      showSettingsToast(t("settings_accounting_lock_save_error"));
+    }
+  });
+
+  await loadLock();
+}
+
 async function loadBusinessProfile() {
   const fallback = getBusinessProfile();
 
@@ -508,7 +640,6 @@ async function initPreferences() {
   const consentStatus = document.getElementById("consentStatus");
   const downloadBtn = document.getElementById("downloadMyDataBtn");
   const replayOnboardingTipsButton = document.getElementById("replayOnboardingTips");
-  const replayOnboardingTipsSidebarButton = document.getElementById("replayOnboardingTipsSidebar");
   const analyticsOptInToggle = document.getElementById("analyticsOptInToggle");
   const analyticsOptInRow = document.getElementById("settingsQcAnalyticsRow");
   const qcConsentModal = document.getElementById("qcAnalyticsConsentModal");
@@ -654,7 +785,7 @@ async function initPreferences() {
           qcConsentModal.classList.remove("hidden");
         }
       } else {
-        // Disabling tracking — no consent prompt needed; save immediately.
+        // Disabling tracking: no consent prompt needed; save immediately.
         saveQcAnalyticsOptIn(false);
       }
     });
@@ -721,7 +852,6 @@ async function initPreferences() {
   };
 
   replayOnboardingTipsButton?.addEventListener("click", replayTips);
-  replayOnboardingTipsSidebarButton?.addEventListener("click", replayTips);
 
   cancelButton?.addEventListener("click", () => {
     pendingPreferences = { ...preferenceBaseline };
@@ -1506,11 +1636,13 @@ function initSecurityForm() {
 
     if (mfaPrimaryButton) {
       if (mfaMode === "enable_verify") {
-        mfaPrimaryButton.textContent = "Verify and turn on MFA";
+        mfaPrimaryButton.textContent = t("settings_mfa_verify_enable");
       } else if (mfaMode === "disable_verify") {
-        mfaPrimaryButton.textContent = "Verify and turn off MFA";
+        mfaPrimaryButton.textContent = t("settings_mfa_verify_disable");
       } else {
-        mfaPrimaryButton.textContent = mfaStatus.enabled ? "Turn off MFA" : "Turn on MFA";
+        mfaPrimaryButton.textContent = mfaStatus.enabled
+          ? t("settings_mfa_turn_off")
+          : t("settings_mfa_turn_on");
       }
     }
 
@@ -1805,7 +1937,6 @@ function initSettingsTabs() {
     button.addEventListener("click", () => setActiveTab(button.dataset.cpaTab || "active"));
   });
 }
-
 function initSettingsNav() {
   const triggers = Array.from(document.querySelectorAll("[data-settings-target]"));
   const navButtons = Array.from(document.querySelectorAll("[data-settings-nav-item]"));
@@ -2043,4 +2174,5 @@ function showSettingsToast(message) {
     toast.classList.add("hidden");
   }, SETTINGS_TOAST_MS);
 }
+
 

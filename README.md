@@ -19,6 +19,7 @@ Track income and expenses, upload receipts, and export clean records for tax tim
 
 - `In-Ex-Ledger-API/` - Backend API server and live frontend bundle under `public/`
 - `pdf-worker/` - PDF export microservice
+- `public/` - Legacy mirror of a few frontend files; not the Railway production bundle
 
 ## Features (V1)
 
@@ -26,8 +27,15 @@ Track income and expenses, upload receipts, and export clean records for tax tim
 - Income and expense tracking
 - Receipt uploads
 - CSV and PDF exports for tax prep
+- Stripe-backed subscription management
+- Multi-factor authentication and session controls
 - Multi-language support (English, Spanish, French)
 - US and Canada support
+
+## Environment
+
+Use `In-Ex-Ledger-API/.env.example` as the baseline for local or production configuration.
+Stripe billing requires `STRIPE_SECRET_KEY`, `STRIPE_PRICE_V1_MONTHLY`, and `STRIPE_WEBHOOK_SECRET`.
 
 ## License
 
