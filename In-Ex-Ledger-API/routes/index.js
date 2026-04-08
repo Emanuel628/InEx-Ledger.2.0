@@ -18,7 +18,6 @@ const recurringRoutes = require('./recurring.routes.js');
 const businessesRoutes = require('./businesses.routes.js');
 const cpaAccessRoutes = require('./cpa-access.routes.js');
 const cpaVerificationRoutes = require('./cpa-verification.routes.js');
-const goalsRoutes = require('./goals.routes.js');
 const analyticsRoutes = require('./analytics.routes.js');
 const messagesRoutes = require('./messages.routes.js');
 
@@ -40,7 +39,6 @@ router.use('/recurring', recurringRoutes);
 router.use('/businesses', businessesRoutes);
 router.use('/cpa-access', cpaAccessRoutes);
 router.use('/cpa-verification', cpaVerificationRoutes);
-router.use('/goals', goalsRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/messages', messagesRoutes);
 
