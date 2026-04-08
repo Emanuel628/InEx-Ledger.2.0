@@ -29,11 +29,21 @@ const txT = (key, fallback) => {
   return result !== key ? result : (fallback !== undefined ? fallback : key);
 };
 const taxHelpers = window.LUNA_TAX || {};
-const resolveEstimatedTaxProfileHelper = taxHelpers.resolveEstimatedTaxProfile || ((region, province) => ({
-  region: String(region || "").toUpperCase() === "CA" ? "CA" : "US",
-  province: String(province || "").toUpperCase(),
-  rate: String(region || "").toUpperCase() === "CA" ? 0.05 : 0.24
-}));
+const resolveEstimatedTaxProfileHelper = taxHelpers.resolveEstimatedTaxProfile || ((region, province) => {
+  const normalizedRegion = String(region || "").toUpperCase() === "CA" ? "CA" : "US";
+  const normalizedProvince = String(province || "").toUpperCase();
+  const caRates = taxHelpers.CANADA_ESTIMATED_TAX_RATES || {
+    AB: 0.05, BC: 0.12, MB: 0.12, NB: 0.15, NL: 0.15, NS: 0.15,
+    NT: 0.05, NU: 0.05, ON: 0.13, PE: 0.15, QC: 0.14975, SK: 0.11, YT: 0.05
+  };
+  return {
+    region: normalizedRegion,
+    province: normalizedProvince,
+    rate: normalizedRegion === "CA"
+      ? (caRates[normalizedProvince] || (taxHelpers.DEFAULT_CA_ESTIMATED_TAX_RATE || 0.05))
+      : (taxHelpers.US_ESTIMATED_TAX_RATE || 0.24)
+  };
+});
 const formatEstimatedTaxPercentHelper = taxHelpers.formatEstimatedTaxPercent || ((rate, province = "") => {
   const decimals = String(province || "").toUpperCase() === "QC" ? 3 : 0;
   return `${(Number(rate || 0) * 100).toFixed(decimals)}%`;
@@ -151,7 +161,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireTransactionIntentButtons();
   await loadBusinessTaxProfile();
   setTransactionAdvancedDefaults();
-  window.addEventListener("lunaRegionChanged", setTransactionAdvancedDefaults);
+  window.addEventListener("lunaRegionChanged", async () => {
+    try {
+      await loadBusinessTaxProfile();
+    } catch (err) {
+      console.warn("[Transactions] Tax profile reload on region change failed", err);
+    }
+    renderTotals();
+    setTransactionAdvancedDefaults();
+  });
 
   wireTransactionForm();
   setupRecurringDrawer();
@@ -1861,7 +1879,9 @@ async function loadBusinessTaxProfile() {
   const fallbackRegion = String(
     fallbackSettings.region || localStorage.getItem("lb_region") || window.LUNA_REGION || "us"
   ).toUpperCase();
-  const fallbackProvince = String(fallbackSettings.province || "").toUpperCase();
+  const fallbackProvince = String(
+    fallbackSettings.province || window.LUNA_PROVINCE || localStorage.getItem("lb_province") || ""
+  ).toUpperCase();
   businessTaxProfile = resolveEstimatedTaxProfileHelper(fallbackRegion, fallbackProvince);
 
   try {
@@ -1875,6 +1895,10 @@ async function loadBusinessTaxProfile() {
     const province = String(business?.province || "").toUpperCase();
     businessTaxProfile = resolveEstimatedTaxProfileHelper(region, province);
     localStorage.setItem("lb_region", businessTaxProfile.region.toLowerCase());
+    if (businessTaxProfile.province) {
+      localStorage.setItem("lb_province", businessTaxProfile.province);
+      window.LUNA_PROVINCE = businessTaxProfile.province;
+    }
   } catch (error) {
     console.warn("[Transactions] Unable to load business tax profile", error);
   }

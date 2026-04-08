@@ -37,11 +37,12 @@ function buildPdfExport(options) {
     operatingName = "",
     taxId = "",
     naics = "",
-    region = "us"
+    region = "us",
+    province = ""
   } = options;
 
   const labels = getPdfLabels(exportLang);
-  const totals = calculateTotals(transactions);
+  const totals = calculateTotals(transactions, region, province);
   const categoryPages = buildCategoryPages(
     transactions,
     categories,
@@ -471,7 +472,24 @@ function getEdgeCaseReasons(txn, baseCurrency) {
   return reasons;
 }
 
-function calculateTotals(transactions) {
+function resolvePdfTaxRate(region, province) {
+  const lunaTax = window.LUNA_TAX || {};
+  if (typeof lunaTax.resolveEstimatedTaxProfile === "function") {
+    return lunaTax.resolveEstimatedTaxProfile(region, province).rate;
+  }
+  const normalizedRegion = String(region || "").toLowerCase();
+  const normalizedProvince = String(province || "").toUpperCase();
+  if (normalizedRegion === "ca") {
+    const caRates = lunaTax.CANADA_ESTIMATED_TAX_RATES || {
+      AB: 0.05, BC: 0.12, MB: 0.12, NB: 0.15, NL: 0.15, NS: 0.15,
+      NT: 0.05, NU: 0.05, ON: 0.13, PE: 0.15, QC: 0.14975, SK: 0.11, YT: 0.05
+    };
+    return caRates[normalizedProvince] || (lunaTax.DEFAULT_CA_ESTIMATED_TAX_RATE || 0.05);
+  }
+  return lunaTax.US_ESTIMATED_TAX_RATE || 0.24;
+}
+
+function calculateTotals(transactions, region, province) {
   let income = 0;
   let expenses = 0;
   transactions.forEach((txn) => {
@@ -483,7 +501,8 @@ function calculateTotals(transactions) {
     }
   });
   const netProfit = income - expenses;
-  const estimatedTax = Math.max(0, netProfit) * 0.25;
+  const taxRate = resolvePdfTaxRate(region, province);
+  const estimatedTax = Math.max(0, netProfit) * taxRate;
   return { income, expenses, netProfit, estimatedTax };
 }
 
