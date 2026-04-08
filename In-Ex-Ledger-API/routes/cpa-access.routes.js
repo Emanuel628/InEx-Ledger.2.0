@@ -598,9 +598,13 @@ router.get("/portfolio/:ownerUserId/exports/:exportId/redacted", async (req, res
 
 router.post("/grants", async (req, res) => {
   try {
-    const grantId = await createCpaGrant(req.user, req.body, getClientIp(req));
+    const grant = await createCpaGrant(req.user, req.body, getClientIp(req));
     const grants = await listOwnedCpaGrants(req.user.id);
-    res.status(201).json({ id: grantId, grants });
+    res.status(201).json({
+      id: grant.grantId,
+      email_sent: grant.emailSent,
+      grants
+    });
   } catch (error) {
     const message = error?.message || "Failed to create CPA access grant.";
     const status = /required|cannot invite|not found|already exists/i.test(message) ? 400 : 500;

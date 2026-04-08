@@ -1,6 +1,25 @@
 const crypto = require("crypto");
+const { Resend } = require("resend");
 const { pool } = require("../db.js");
 const { listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+
+let _resend = null;
+
+function getResend() {
+  if (!_resend) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is not configured");
+    }
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+}
+
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "InEx Ledger <noreply@inexledger.com>";
+
+function getAppBaseUrl() {
+  return String(process.env.APP_BASE_URL || "").trim().replace(/\/+$/, "");
+}
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
@@ -38,6 +57,57 @@ async function logCpaAuditEvent({
       ipAddress || null
     ]
   );
+}
+
+async function sendCpaInviteEmail({
+  to,
+  ownerName,
+  ownerEmail,
+  scope,
+  businessName,
+  status
+}) {
+  const baseUrl = getAppBaseUrl();
+  const appLoginUrl = baseUrl ? `${baseUrl}/login` : "";
+  const subject = status === "active"
+    ? "InEx Ledger CPA access granted"
+    : "InEx Ledger CPA access invite";
+  const intro = status === "active"
+    ? "You now have active CPA access in InEx Ledger."
+    : "You have been invited to review InEx Ledger data as a CPA.";
+  const actionCopy = appLoginUrl
+    ? status === "active"
+      ? `Sign in at ${appLoginUrl} with this email to view the shared portfolio.`
+      : `Sign in at ${appLoginUrl} with this email to accept the invitation. If you do not yet have an account, create one with the same email address.`
+    : status === "active"
+      ? "Sign in with this email to view the shared portfolio."
+      : "Sign in with this email to accept the invitation. If you do not yet have an account, create one with the same email address.";
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
+      <p>${intro}</p>
+      <p><strong>Owner:</strong> ${ownerName || ownerEmail || "InEx Ledger user"}</p>
+      <p><strong>Access scope:</strong> ${scope === "all" ? "All businesses" : `One business: ${businessName || "Selected business"}`}</p>
+      <p>${actionCopy}</p>
+      <p>If you were not expecting this, you can ignore this message.</p>
+    </div>
+  `;
+
+  const text = [
+    intro,
+    `Owner: ${ownerName || ownerEmail || "InEx Ledger user"}`,
+    `Access scope: ${scope === "all" ? "All businesses" : `One business: ${businessName || "Selected business"}`}`,
+    actionCopy,
+    "If you were not expecting this, you can ignore this message."
+  ].join("\n\n");
+
+  return getResend().emails.send({
+    from: RESEND_FROM_EMAIL,
+    to,
+    subject,
+    html,
+    text
+  });
 }
 
 async function syncPendingCpaGrantsForUser(user) {
@@ -262,6 +332,7 @@ async function createCpaGrant(ownerUser, payload, grantIp = null) {
   }
 
   let businessId = null;
+  let businessName = null;
   if (scope === "business") {
     businessId = String(payload?.business_id || "").trim();
     if (!businessId) {
@@ -271,6 +342,7 @@ async function createCpaGrant(ownerUser, payload, grantIp = null) {
     if (!ownsBusiness) {
       throw new Error("Selected business was not found.");
     }
+    businessName = businesses.find((business) => business.id === businessId)?.name || null;
   }
 
   const existingUser = await pool.query(
@@ -318,7 +390,22 @@ async function createCpaGrant(ownerUser, payload, grantIp = null) {
       ipAddress: grantIp || null
     });
 
-    return grantId;
+    let emailSent = false;
+    try {
+      await sendCpaInviteEmail({
+        to: email,
+        ownerName: ownerUser.full_name || ownerUser.display_name || ownerUser.email || null,
+        ownerEmail: ownerUser.email || null,
+        scope,
+        businessName,
+        status
+      });
+      emailSent = true;
+    } catch (emailError) {
+      console.error("CPA invite email failed:", emailError.message);
+    }
+
+    return { grantId, emailSent };
   } catch (error) {
     if (error.code === "23505") {
       throw new Error("A CPA access grant with this scope already exists.");
