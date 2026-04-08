@@ -5,8 +5,8 @@ const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 
 const router = express.Router();
-router.use(requireAuth);
 router.use(createDataApiLimiter({ max: 120 }));
+router.use(requireAuth);
 
 const VALID_MESSAGE_TYPES = new Set(["cpa", "it_support", "general", "support_request"]);
 const MAX_SUBJECT_LEN = 200;
@@ -355,7 +355,6 @@ router.patch("/:id/archive", async (req, res) => {
     }
 
     const msg = msgCheck.rows[0];
-    let updateQuery;
 
     if (msg.receiver_id === req.user.id) {
       const next = !msg.is_archived_by_receiver;

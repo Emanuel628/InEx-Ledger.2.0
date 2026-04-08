@@ -232,7 +232,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Poll unread message count for the nav badge every 60 s
   pollGlobalUnreadCount();
-  setInterval(pollGlobalUnreadCount, 60000);
+  var _globalMsgPollTimer = setInterval(function () {
+    var t = "";
+    try { t = localStorage.getItem("token") || ""; } catch (_) {}
+    if (!t) {
+      clearInterval(_globalMsgPollTimer);
+      return;
+    }
+    pollGlobalUnreadCount();
+  }, 60000);
 });
 
 (function () {

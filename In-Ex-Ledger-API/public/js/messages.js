@@ -3,6 +3,7 @@
 const TOAST_MS = 3500;
 const POLL_INTERVAL_MS = 30000; // 30 s polling for unread count
 const PAGE_SIZE = 25;
+const PREVIEW_MAX_LENGTH = 80;
 
 let _toastTimer = null;
 let _pollTimer = null;
@@ -145,7 +146,7 @@ function renderMessageRow(m, tab) {
   const unreadClass = (!isSent && !m.is_read) ? " is-unread" : "";
   const typeLabel = { cpa: "CPA", it_support: "IT Support", support_request: "Support", general: "General" }[m.message_type] || m.message_type;
   const subject = m.subject || "(No subject)";
-  const preview = m.body.replace(/\n/g, " ").slice(0, 80) + (m.body.length > 80 ? "…" : "");
+  const preview = m.body.replace(/\n/g, " ").slice(0, PREVIEW_MAX_LENGTH) + (m.body.length > PREVIEW_MAX_LENGTH ? "…" : "");
   const dateStr = formatRelativeDate(m.created_at);
   const archiveLabel = m.is_archived ? "Unarchive" : "Archive";
 
