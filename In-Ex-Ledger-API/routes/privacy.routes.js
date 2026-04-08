@@ -157,8 +157,10 @@ router.post("/settings", async (req, res) => {
         [req.user.id, dataResidency, action, ipAddress, userAgent]
       );
 
-      // Log analytics opt-in consent separately when the QC user explicitly enables tracking
-      if (analyticsOptIn !== null && analyticsOptIn !== previousAnalyticsOptIn) {
+      // Log analytics opt-in consent separately when the QC user explicitly enables tracking.
+      // isQuebec is always true here (already inside the CA-QC block) but is kept
+      // as a guard for clarity and to protect against future refactoring.
+      if (isQuebec && analyticsOptIn !== null && analyticsOptIn !== previousAnalyticsOptIn) {
         const analyticsAction = analyticsOptIn ? "opt_in" : "opt_out";
         await pool.query(
           `INSERT INTO privacy_consent_log (user_id, data_residency, action, ip_address, user_agent)
