@@ -393,7 +393,7 @@ function wireTransactionForm() {
       accountId,
       categoryId,
       type
-    }) || validateEdgeCaseFields({
+    }) ?? validateEdgeCaseFields({
       sourceAmount: sourceAmountInput?.value,
       exchangeRate: exchangeRateInput?.value,
       convertedAmount: convertedAmountInput?.value,
@@ -2228,12 +2228,12 @@ function updateDeductiblePreview() {
   const amountInput = document.getElementById("amount");
   const pctInput = document.getElementById("transactionPersonalUsePct");
   const preview = document.getElementById("transactionDeductiblePreview");
+  const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
   if (!preview) {
     return;
   }
   const amount = Number.parseFloat(amountInput?.value || "0");
   const pct = Number.parseFloat(pctInput?.value || "");
-  const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
   if (taxTreatmentSelect?.value !== "split_use" || !Number.isFinite(pct)) {
     preview.textContent = "";
     preview.hidden = true;
