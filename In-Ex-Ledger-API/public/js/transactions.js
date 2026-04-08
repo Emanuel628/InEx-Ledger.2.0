@@ -304,38 +304,6 @@ function syncTransactionScopeUi() {
 
   if (subtitle) {
     subtitle.textContent = isAllScope
-      ? `${getBusinessesInScope().length || 0} businesses · portfolio reporting view`
-      : "Active business ledger · current reporting period";
-  }
-
-  addButtons.filter(Boolean).forEach((button) => {
-    button.disabled = isAllScope;
-    button.title = isAllScope ? "Switch to Active business to add or edit transactions." : "";
-  });
-
-  if (isAllScope) {
-    closeTransactionDrawer();
-    closeRecurringDrawer();
-  }
-
-  if (recurringPanel) {
-    recurringPanel.hidden = isAllScope;
-  }
-
-  if (taxContext && isAllScope && hasMixedCurrenciesInScope()) {
-    taxContext.textContent = txT("transactions_tax_context_multi", "Tax form context: Multi-business reporting view");
-  }
-}
-
-function syncTransactionScopeUi() {
-  const isAllScope = getTransactionScope() === "all";
-  const addButtons = [document.getElementById("addTxToggle"), document.getElementById("addTxTogglePage")];
-  const recurringPanel = document.querySelector(".recurring-panel");
-  const subtitle = document.querySelector(".page-subtitle");
-  const taxContext = document.getElementById("transactionsTaxContext");
-
-  if (subtitle) {
-    subtitle.textContent = isAllScope
       ? `${getBusinessesInScope().length || 0} ${txT("transactions_scope_businesses", "businesses")} · ${txT("transactions_scope_portfolio_view", "portfolio reporting view")}`
       : txT("transactions_scope_active_subtitle", "Active business ledger · current reporting period");
   }
@@ -361,6 +329,7 @@ function syncTransactionScopeUi() {
   }
 }
 
+
 function wireTransactionForm() {
   const form = document.querySelector("form");
   const accountHelp = document.getElementById("accountHelp");
@@ -370,6 +339,7 @@ function wireTransactionForm() {
 
   updateHelpText(accountHelp, categoryHelp);
   initTransactionReceiptField();
+  wireEdgeCaseFields();
   typeSelect?.addEventListener("change", () => {
     if (!taxTreatmentSelect) {
       return;
@@ -379,6 +349,7 @@ function wireTransactionForm() {
     } else if (taxTreatmentSelect.value === "income") {
       taxTreatmentSelect.value = "operating";
     }
+    syncEdgeCaseUi();
   });
 
   if (!form) {
@@ -422,6 +393,11 @@ function wireTransactionForm() {
       accountId,
       categoryId,
       type
+    }) ?? validateEdgeCaseFields({
+      sourceAmount: sourceAmountInput?.value,
+      exchangeRate: exchangeRateInput?.value,
+      convertedAmount: convertedAmountInput?.value,
+      personalUsePct: personalUseInput?.value
     });
 
     if (validationError) {
@@ -1211,6 +1187,7 @@ function prefillTransactionForm(transaction) {
   if (reviewNotesInput) {
     reviewNotesInput.value = transaction.reviewNotes || transaction.review_notes || "";
   }
+  syncEdgeCaseUi();
 }
 
 function resetTransactionForm() {
@@ -1254,6 +1231,7 @@ function setTransactionAdvancedDefaults() {
         ? "Use this for GST/HST/QST that must be reviewed or recovered."
         : "Use this for sales tax or other indirect taxes that need CPA review.";
   }
+  syncEdgeCaseUi();
 }
 
 function setEditingMode(enabled) {
@@ -2135,6 +2113,159 @@ function validateTransactionForm({ date, description, amount, accountId, categor
   }
   return null;
 }
+
+function validateEdgeCaseFields({ sourceAmount, exchangeRate, convertedAmount, personalUsePct }) {
+  const srcRaw = String(sourceAmount ?? "").trim();
+  if (srcRaw !== "") {
+    const src = Number.parseFloat(srcRaw);
+    if (!Number.isFinite(src) || src <= 0) {
+      return { message: txT("transactions_validation_source_amount", "Source amount must be a positive number."), fieldId: "transactionSourceAmount" };
+    }
+  }
+
+  const rateRaw = String(exchangeRate ?? "").trim();
+  if (rateRaw !== "") {
+    const rate = Number.parseFloat(rateRaw);
+    if (!Number.isFinite(rate) || rate <= 0) {
+      return { message: txT("transactions_validation_exchange_rate", "Exchange rate must be a positive number."), fieldId: "transactionExchangeRate" };
+    }
+  }
+
+  const convRaw = String(convertedAmount ?? "").trim();
+  if (convRaw !== "") {
+    const conv = Number.parseFloat(convRaw);
+    if (!Number.isFinite(conv) || conv <= 0) {
+      return { message: txT("transactions_validation_converted_amount", "Converted amount must be a positive number."), fieldId: "transactionConvertedAmount" };
+    }
+  }
+
+  const pctRaw = String(personalUsePct ?? "").trim();
+  if (pctRaw !== "") {
+    const pct = Number.parseFloat(pctRaw);
+    if (!Number.isFinite(pct) || pct < 0 || pct > 100) {
+      return { message: txT("transactions_validation_personal_use_pct", "Personal-use % must be between 0 and 100."), fieldId: "transactionPersonalUsePct" };
+    }
+  }
+
+  return null;
+}
+
+function wireEdgeCaseFields() {
+  const sourceAmountInput = document.getElementById("transactionSourceAmount");
+  const exchangeRateInput = document.getElementById("transactionExchangeRate");
+  const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
+  const personalUseInput = document.getElementById("transactionPersonalUsePct");
+  const reviewStatusSelect = document.getElementById("transactionReviewStatus");
+  const amountInput = document.getElementById("amount");
+
+  if (sourceAmountInput && exchangeRateInput) {
+    sourceAmountInput.addEventListener("input", updateConvertedAmountPreview);
+    exchangeRateInput.addEventListener("input", updateConvertedAmountPreview);
+  }
+
+  if (taxTreatmentSelect) {
+    taxTreatmentSelect.addEventListener("change", syncEdgeCaseUi);
+  }
+
+  if (personalUseInput) {
+    personalUseInput.addEventListener("input", updateDeductiblePreview);
+  }
+
+  if (amountInput) {
+    amountInput.addEventListener("input", updateDeductiblePreview);
+  }
+
+  if (reviewStatusSelect) {
+    reviewStatusSelect.addEventListener("change", syncEdgeCaseUi);
+  }
+
+  syncEdgeCaseUi();
+}
+
+function syncEdgeCaseUi() {
+  syncPersonalUsePctVisibility();
+  updateDeductiblePreview();
+  syncReviewStatusWarning();
+  syncRegionNotes();
+}
+
+function updateConvertedAmountPreview() {
+  const sourceInput = document.getElementById("transactionSourceAmount");
+  const rateInput = document.getElementById("transactionExchangeRate");
+  const convertedInput = document.getElementById("transactionConvertedAmount");
+  if (!sourceInput || !rateInput || !convertedInput) {
+    return;
+  }
+  const src = Number.parseFloat(sourceInput.value);
+  const rate = Number.parseFloat(rateInput.value);
+  if (Number.isFinite(src) && src > 0 && Number.isFinite(rate) && rate > 0) {
+    convertedInput.value = (src * rate).toFixed(2);
+  }
+}
+
+function syncPersonalUsePctVisibility() {
+  const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
+  const personalUseField = document.getElementById("transactionPersonalUsePctField");
+  if (!personalUseField) {
+    return;
+  }
+  const isSplitUse = taxTreatmentSelect?.value === "split_use";
+  personalUseField.hidden = !isSplitUse;
+  if (!isSplitUse) {
+    const personalUseInput = document.getElementById("transactionPersonalUsePct");
+    if (personalUseInput) {
+      personalUseInput.value = "";
+    }
+    const preview = document.getElementById("transactionDeductiblePreview");
+    if (preview) {
+      preview.textContent = "";
+      preview.hidden = true;
+    }
+  }
+}
+
+function updateDeductiblePreview() {
+  const amountInput = document.getElementById("amount");
+  const pctInput = document.getElementById("transactionPersonalUsePct");
+  const preview = document.getElementById("transactionDeductiblePreview");
+  const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
+  if (!preview) {
+    return;
+  }
+  const amount = Number.parseFloat(amountInput?.value || "0");
+  const pct = Number.parseFloat(pctInput?.value || "");
+  if (taxTreatmentSelect?.value !== "split_use" || !Number.isFinite(pct)) {
+    preview.textContent = "";
+    preview.hidden = true;
+    return;
+  }
+  if (Number.isFinite(amount) && amount > 0 && pct >= 0 && pct <= 100) {
+    const deductiblePct = 100 - pct;
+    const deductibleAmount = amount * (deductiblePct / 100);
+    preview.textContent = `${txT("transactions_deductible_preview", "Deductible portion")}: ${deductiblePct.toFixed(1)}% = ${formatCurrency(deductibleAmount)}`;
+    preview.hidden = false;
+  } else {
+    preview.textContent = "";
+    preview.hidden = true;
+  }
+}
+
+function syncReviewStatusWarning() {
+  const reviewStatusSelect = document.getElementById("transactionReviewStatus");
+  const lockedWarning = document.getElementById("transactionLockedWarning");
+  if (!lockedWarning) {
+    return;
+  }
+  lockedWarning.hidden = reviewStatusSelect?.value !== "locked";
+}
+
+function syncRegionNotes() {
+  const region = getResolvedRegion();
+  document.querySelectorAll("[data-region-show]").forEach((el) => {
+    el.hidden = el.getAttribute("data-region-show") !== region;
+  });
+}
+
 
 let receiptInputElement = null;
 const TRANSACTION_ID_REGEX =
