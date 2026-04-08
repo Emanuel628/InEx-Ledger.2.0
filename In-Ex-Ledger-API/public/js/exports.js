@@ -383,7 +383,11 @@ function setupExportForm() {
     if (!target) {
       return;
     }
-    replayHistoryEntry(target.dataset.historyId);
+    if (target.dataset.backendId) {
+      downloadBackendExport(target.dataset.backendId);
+    } else {
+      replayHistoryEntry(target.dataset.historyId);
+    }
   });
 }
 
@@ -854,30 +858,72 @@ function downloadFile(content, filename, type) {
 }
 
 function appendExportHistory(entry) {
-  const history = getExportHistory();
+  const history = getLocalExportHistory();
   history.unshift(entry);
-  localStorage.setItem(EXPORT_HISTORY_KEY, JSON.stringify(history));
+  // Keep at most 50 local entries (CSV exports are not stored server-side)
+  localStorage.setItem(EXPORT_HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
 }
 
-function renderExportHistory() {
+async function fetchBackendExportHistory() {
+  try {
+    const response = await apiFetch("/api/exports/history");
+    if (!response || !response.ok) {
+      return [];
+    }
+    const rows = await response.json().catch(() => []);
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+    return rows.map((row) => ({
+      id: row.id,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      exportedAt: row.created_at,
+      filename: `export_${row.start_date}_to_${row.end_date}.pdf`,
+      format: PDF_FORMAT,
+      exportLang: row.language || "en",
+      source: "backend"
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function renderExportHistory() {
   const historyRows = document.getElementById("exportHistoryRows");
   if (!historyRows) {
     return;
   }
 
-  const history = getExportHistory()
-    .slice()
-    .sort((left, right) => new Date(right.exportedAt) - new Date(left.exportedAt))
-    .slice(0, 5);
+  const [backendEntries, localEntries] = await Promise.all([
+    fetchBackendExportHistory(),
+    Promise.resolve(getLocalExportHistory())
+  ]);
 
-  if (history.length === 0) {
+  // Merge: backend PDF entries take precedence; avoid duplicates by id
+  const backendIds = new Set(backendEntries.map((e) => e.id));
+  const merged = [
+    ...backendEntries,
+    ...localEntries.filter((e) => !backendIds.has(e.id))
+  ]
+    .sort((left, right) => new Date(right.exportedAt) - new Date(left.exportedAt))
+    .slice(0, 10);
+
+  if (merged.length === 0) {
     historyRows.innerHTML = `<div class="history-empty">${escapeHtml(tx("exports_no_history"))}</div>`;
     return;
   }
 
-  historyRows.innerHTML = history.map((entry) => {
+  historyRows.innerHTML = merged.map((entry) => {
     const descriptor = describeHistoryEntry(entry);
     const formatClass = descriptor.formatLabel === "PDF" ? "pdf" : "csv";
+    const isBackend = entry.source === "backend";
+    const actionLabel = isBackend
+      ? escapeHtml(tx("exports_history_download_redacted") || "Download")
+      : escapeHtml(tx("exports_history_download_label"));
+    const dataAttr = isBackend
+      ? `data-backend-id="${escapeHtml(entry.id)}"`
+      : `data-history-id="${escapeHtml(entry.id || "")}"`;
     return `
       <div class="history-item">
         <div class="history-file">
@@ -888,9 +934,9 @@ function renderExportHistory() {
         <div class="history-meta">${escapeHtml(formatHistoryDate(entry.exportedAt))}</div>
         <div class="history-size">${escapeHtml(formatHistorySize(entry.format))}</div>
         <div class="history-download-cell">
-          <button type="button" class="history-download" data-history-id="${escapeHtml(entry.id || "")}">
+          <button type="button" class="history-download" ${dataAttr}>
             <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v7M5 7l3 3 3-3"></path><line x1="3" y1="13" x2="13" y2="13"></line></svg>
-            <span>${escapeHtml(tx("exports_history_download_label"))}</span>
+            <span>${actionLabel}</span>
           </button>
         </div>
       </div>
@@ -898,11 +944,36 @@ function renderExportHistory() {
   }).join("");
 }
 
+async function downloadBackendExport(exportId) {
+  if (!exportId) {
+    return;
+  }
+  try {
+    const response = await apiFetch(`/api/exports/history/${encodeURIComponent(exportId)}/redacted`);
+    if (!response || !response.ok) {
+      showExportToast(tx("exports_history_download_error") || "Download failed");
+      return;
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `export-redacted-${exportId}.pdf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("Backend export download failed:", err);
+    showExportToast(tx("exports_history_download_error") || "Download failed");
+  }
+}
+
 async function replayHistoryEntry(entryId) {
   if (!entryId) {
     return;
   }
-  const entry = getExportHistory().find((record) => record.id === entryId);
+  const entry = getLocalExportHistory().find((record) => record.id === entryId);
   if (!entry) {
     return;
   }
@@ -944,7 +1015,7 @@ function clampExportLang(value) {
   return VALID_EXPORT_LANGS.includes(normalized) ? normalized : DEFAULT_EXPORT_LANG;
 }
 
-function getExportHistory() {
+function getLocalExportHistory() {
   try {
     return JSON.parse(localStorage.getItem(EXPORT_HISTORY_KEY) || "[]");
   } catch {

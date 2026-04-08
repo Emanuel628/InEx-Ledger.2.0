@@ -1,11 +1,9 @@
 /**
  * SHARED AUTH CONTRACT
- * This file MUST remain identical in:
- * - In-Ex-Ledger-API/public
- * - In-Ex-Ledger-API/public
- * 
- * Do NOT edit in only one bundle.
- * Always apply changes to BOTH.
+ * This file is the canonical auth guard used by the API-hosted frontend.
+ * It handles session validation, token refresh, and subscription state.
+ *
+ * Do NOT embed Railway or hardcoded API URLs here.
  */
 
 const TOKEN_KEY = "token";
