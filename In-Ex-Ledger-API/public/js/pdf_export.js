@@ -57,6 +57,7 @@ function buildPdfExport(options) {
   );
   const receiptsPages = buildReceiptsPages(receipts, transactions, labels);
   const mileagePages = buildMileagePage(mileage, labels);
+  const edgeCasePages = buildEdgeCaseSummaryPage(transactions, labels, region);
 
   const canvases = [
     buildIdentityPage({
@@ -71,6 +72,7 @@ function buildPdfExport(options) {
       startDate,
       endDate
     }),
+    ...edgeCasePages,
     ...categoryPages,
     ...transactionPages,
     ...receiptsPages,
@@ -379,6 +381,94 @@ function buildMileagePage(mileage, labels) {
   canvas.text(40, y, labels.mileage_note_csv, 10);
 
   return [canvas];
+}
+
+function buildEdgeCaseSummaryPage(transactions, labels, region) {
+  const records = Array.isArray(transactions) ? transactions : [];
+  const baseCurrency = String(region || "").toLowerCase() === "ca" ? "CAD" : "USD";
+  const foreignCurrency = records.filter((txn) => String(txn.currency || baseCurrency).toUpperCase() !== baseCurrency);
+  const capitalItems = records.filter((txn) => String(txn.taxTreatment || txn.tax_treatment || "").toLowerCase() === "capital");
+  const splitUseItems = records.filter((txn) => {
+    const treatment = String(txn.taxTreatment || txn.tax_treatment || "").toLowerCase();
+    return treatment === "split_use" || Number(txn.personalUsePct ?? txn.personal_use_pct) > 0;
+  });
+  const indirectTaxItems = records.filter((txn) => Number(txn.indirectTaxAmount ?? txn.indirect_tax_amount) > 0);
+  const edgeCaseItems = records.filter((txn) => getEdgeCaseReasons(txn, baseCurrency).length > 0);
+
+  const hasAnyItems =
+    foreignCurrency.length || capitalItems.length || splitUseItems.length || indirectTaxItems.length || edgeCaseItems.length;
+
+  if (!hasAnyItems) {
+    return [];
+  }
+
+  const canvas = new PdfCanvas();
+  canvas.text(40, 760, labels.cpa_edge_cases_title, 16);
+  let y = 724;
+
+  const summaryRows = [
+    [labels.cpa_edge_case_foreign_currency, foreignCurrency.length],
+    [labels.cpa_edge_case_capital_item, capitalItems.length],
+    [labels.cpa_edge_case_split_use, splitUseItems.length],
+    [labels.cpa_edge_case_indirect_tax, indirectTaxItems.length],
+    [labels.cpa_edge_case_needs_review, edgeCaseItems.length]
+  ];
+
+  summaryRows.forEach(([label, count]) => {
+    canvas.text(40, y, `${label}: ${count}`, 11);
+    y -= 18;
+  });
+
+  y -= 8;
+  canvas.text(40, y, labels.cpa_edge_case_reason, 11);
+  canvas.text(220, y, labels.cpa_edge_case_transaction, 11);
+  canvas.text(500, y, "Amount", 11);
+  y -= 18;
+
+  const reviewRows = edgeCaseItems.slice(0, 10).map((txn) => ({
+    label: getEdgeCaseReason(txn, baseCurrency),
+    transaction: truncateText(txn.description || "-", 28),
+    amount: formatCurrencyForPdf(Math.abs(Number(txn.amount) || 0), baseCurrency)
+  }));
+
+  if (!reviewRows.length) {
+    canvas.text(40, y, labels.cpa_edge_cases_none, 11);
+    return [canvas];
+  }
+
+  reviewRows.forEach((row) => {
+    canvas.text(40, y, row.label, 10);
+    canvas.text(220, y, row.transaction, 10);
+    canvas.text(500, y, row.amount, 10);
+    y -= 16;
+  });
+
+  return [canvas];
+}
+
+function getEdgeCaseReason(txn, baseCurrency) {
+  return getEdgeCaseReasons(txn, baseCurrency).join(", ") || "Review";
+}
+
+function getEdgeCaseReasons(txn, baseCurrency) {
+  const reasons = [];
+  const currency = String(txn.currency || baseCurrency).toUpperCase();
+  if (currency !== baseCurrency) {
+    reasons.push(`${currency} FX`);
+  }
+  if (String(txn.taxTreatment || txn.tax_treatment || "").toLowerCase() === "capital") {
+    reasons.push("Capital");
+  }
+  if (String(txn.taxTreatment || txn.tax_treatment || "").toLowerCase() === "split_use" || Number(txn.personalUsePct ?? txn.personal_use_pct) > 0) {
+    reasons.push("Split-use");
+  }
+  if (Number(txn.indirectTaxAmount ?? txn.indirect_tax_amount) > 0) {
+    reasons.push("Indirect tax");
+  }
+  if (String(txn.reviewStatus || txn.review_status || "needs_review").toLowerCase() !== "ready") {
+    reasons.push(String(txn.reviewStatus || txn.review_status || "Needs review").replace(/_/g, " "));
+  }
+  return reasons;
 }
 
 function calculateTotals(transactions) {

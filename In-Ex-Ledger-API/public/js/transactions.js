@@ -54,6 +54,20 @@ let businessTaxProfile = {
   province: "",
   rate: resolveEstimatedTaxProfileHelper("US", "").rate
 };
+const TRANSACTION_CURRENCY_OPTIONS = ["USD", "CAD", "EUR", "GBP", "AUD", "JPY"];
+const TRANSACTION_TREATMENT_LABELS = {
+  income: "Income",
+  operating: "Operating expense",
+  capital: "Capital item",
+  split_use: "Split-use / personal use",
+  nondeductible: "Non-deductible"
+};
+const TRANSACTION_REVIEW_LABELS = {
+  needs_review: "Needs review",
+  ready: "Ready",
+  matched: "Matched",
+  locked: "Locked"
+};
 let unattachedReceiptsCount = 0;
 let pendingTransactionReceiptFile = null;
 let recurringDrawerElement = null;
@@ -81,6 +95,44 @@ function formatCurrency(value, regionOverride = getResolvedRegion()) {
   }).format(value);
 }
 
+function getBusinessCurrencyCode() {
+  return businessTaxProfile.region === "CA" ? "CAD" : "USD";
+}
+
+function getTransactionDefaultCurrency() {
+  return getBusinessCurrencyCode();
+}
+
+function normalizeNumberOrEmpty(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "";
+  }
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) ? parsed : "";
+}
+
+function formatTransactionMetaBadge(text, className = "") {
+  if (!text) {
+    return "";
+  }
+  return `<span class="tx-meta-badge${className ? ` ${className}` : ""}">${escapeHtml(text)}</span>`;
+}
+
+function getIndirectTaxLabel(regionOverride = getResolvedRegion()) {
+  return String(regionOverride || "").toLowerCase() === "ca"
+    ? "GST/HST/QST amount"
+    : "Sales tax / indirect tax amount";
+}
+
+function getTaxTreatmentLabel(value) {
+  return TRANSACTION_TREATMENT_LABELS[value] || value || "";
+}
+
+function getReviewStatusLabel(value) {
+  return TRANSACTION_REVIEW_LABELS[value] || value || "";
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
 
@@ -98,6 +150,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   initSidebarTypeFilter();
   wireTransactionIntentButtons();
   await loadBusinessTaxProfile();
+  setTransactionAdvancedDefaults();
+  window.addEventListener("lunaRegionChanged", setTransactionAdvancedDefaults);
 
   wireTransactionForm();
   setupRecurringDrawer();
@@ -311,9 +365,21 @@ function wireTransactionForm() {
   const form = document.querySelector("form");
   const accountHelp = document.getElementById("accountHelp");
   const categoryHelp = document.getElementById("categoryHelp");
+  const typeSelect = document.getElementById("txType");
+  const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
 
   updateHelpText(accountHelp, categoryHelp);
   initTransactionReceiptField();
+  typeSelect?.addEventListener("change", () => {
+    if (!taxTreatmentSelect) {
+      return;
+    }
+    if (typeSelect.value === "income") {
+      taxTreatmentSelect.value = "income";
+    } else if (taxTreatmentSelect.value === "income") {
+      taxTreatmentSelect.value = "operating";
+    }
+  });
 
   if (!form) {
     return;
@@ -329,6 +395,17 @@ function wireTransactionForm() {
     const categorySelect = document.getElementById("category");
     const typeSelect = document.getElementById("txType");
     const clearedInput = document.getElementById("cleared");
+    const currencySelect = document.getElementById("transactionCurrency");
+    const sourceAmountInput = document.getElementById("transactionSourceAmount");
+    const exchangeRateInput = document.getElementById("transactionExchangeRate");
+    const exchangeDateInput = document.getElementById("transactionExchangeDate");
+    const convertedAmountInput = document.getElementById("transactionConvertedAmount");
+    const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
+    const personalUseInput = document.getElementById("transactionPersonalUsePct");
+    const indirectTaxAmountInput = document.getElementById("transactionIndirectTaxAmount");
+    const indirectTaxRecoverableInput = document.getElementById("transactionIndirectTaxRecoverable");
+    const reviewStatusSelect = document.getElementById("transactionReviewStatus");
+    const reviewNotesInput = document.getElementById("transactionReviewNotes");
 
     const date = dateInput.value;
     const description = descriptionInput.value.trim();
@@ -369,7 +446,18 @@ function wireTransactionForm() {
         description,
         date,
         note: "",
-        cleared
+        cleared,
+        currency: currencySelect?.value || getTransactionDefaultCurrency(),
+        source_amount: normalizeNumberOrEmpty(sourceAmountInput?.value),
+        exchange_rate: normalizeNumberOrEmpty(exchangeRateInput?.value),
+        exchange_date: exchangeDateInput?.value || "",
+        converted_amount: normalizeNumberOrEmpty(convertedAmountInput?.value),
+        tax_treatment: taxTreatmentSelect?.value || "",
+        indirect_tax_amount: normalizeNumberOrEmpty(indirectTaxAmountInput?.value),
+        indirect_tax_recoverable: !!indirectTaxRecoverableInput?.checked,
+        personal_use_pct: normalizeNumberOrEmpty(personalUseInput?.value),
+        review_status: reviewStatusSelect?.value || "",
+        review_notes: reviewNotesInput?.value.trim() || ""
       };
 
       const endpoint = editingTransactionId
@@ -1057,6 +1145,17 @@ function prefillTransactionForm(transaction) {
   const categorySelect = document.getElementById("category");
   const typeSelect = document.getElementById("txType");
   const clearedInput = document.getElementById("cleared");
+  const currencySelect = document.getElementById("transactionCurrency");
+  const sourceAmountInput = document.getElementById("transactionSourceAmount");
+  const exchangeRateInput = document.getElementById("transactionExchangeRate");
+  const exchangeDateInput = document.getElementById("transactionExchangeDate");
+  const convertedAmountInput = document.getElementById("transactionConvertedAmount");
+  const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
+  const personalUseInput = document.getElementById("transactionPersonalUsePct");
+  const indirectTaxAmountInput = document.getElementById("transactionIndirectTaxAmount");
+  const indirectTaxRecoverableInput = document.getElementById("transactionIndirectTaxRecoverable");
+  const reviewStatusSelect = document.getElementById("transactionReviewStatus");
+  const reviewNotesInput = document.getElementById("transactionReviewNotes");
 
   if (dateInput) {
     dateInput.value = transaction.date || "";
@@ -1079,6 +1178,39 @@ function prefillTransactionForm(transaction) {
   if (clearedInput) {
     clearedInput.checked = !!transaction.cleared;
   }
+  if (currencySelect) {
+    currencySelect.value = String(transaction.currency || getTransactionDefaultCurrency()).toUpperCase();
+  }
+  if (sourceAmountInput) {
+    sourceAmountInput.value = transaction.sourceAmount ?? transaction.source_amount ?? "";
+  }
+  if (exchangeRateInput) {
+    exchangeRateInput.value = transaction.exchangeRate ?? transaction.exchange_rate ?? "";
+  }
+  if (exchangeDateInput) {
+    exchangeDateInput.value = String(transaction.exchangeDate || transaction.exchange_date || "").slice(0, 10);
+  }
+  if (convertedAmountInput) {
+    convertedAmountInput.value = transaction.convertedAmount ?? transaction.converted_amount ?? "";
+  }
+  if (taxTreatmentSelect) {
+    taxTreatmentSelect.value = transaction.taxTreatment || transaction.tax_treatment || (transaction.type === "income" ? "income" : "operating");
+  }
+  if (personalUseInput) {
+    personalUseInput.value = transaction.personalUsePct ?? transaction.personal_use_pct ?? "";
+  }
+  if (indirectTaxAmountInput) {
+    indirectTaxAmountInput.value = transaction.indirectTaxAmount ?? transaction.indirect_tax_amount ?? "";
+  }
+  if (indirectTaxRecoverableInput) {
+    indirectTaxRecoverableInput.checked = transaction.indirectTaxRecoverable === true || transaction.indirect_tax_recoverable === true;
+  }
+  if (reviewStatusSelect) {
+    reviewStatusSelect.value = transaction.reviewStatus || transaction.review_status || "needs_review";
+  }
+  if (reviewNotesInput) {
+    reviewNotesInput.value = transaction.reviewNotes || transaction.review_notes || "";
+  }
 }
 
 function resetTransactionForm() {
@@ -1090,9 +1222,37 @@ function resetTransactionForm() {
   updateTransactionReceiptLabel();
   editingTransactionId = null;
   setEditingMode(false);
+  setTransactionAdvancedDefaults();
   const message = document.getElementById("transactionFormMessage");
   if (message) {
     message.textContent = "";
+  }
+}
+
+function setTransactionAdvancedDefaults() {
+  const currencySelect = document.getElementById("transactionCurrency");
+  const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
+  const reviewStatusSelect = document.getElementById("transactionReviewStatus");
+  const indirectTaxLabel = document.getElementById("transactionIndirectTaxLabel");
+  const indirectTaxNote = document.getElementById("transactionIndirectTaxNote");
+  const currency = getTransactionDefaultCurrency();
+  if (currencySelect) {
+    currencySelect.value = currency;
+  }
+  if (taxTreatmentSelect) {
+    taxTreatmentSelect.value = "operating";
+  }
+  if (reviewStatusSelect) {
+    reviewStatusSelect.value = "ready";
+  }
+  if (indirectTaxLabel) {
+    indirectTaxLabel.textContent = getIndirectTaxLabel();
+  }
+  if (indirectTaxNote) {
+    indirectTaxNote.textContent =
+      getResolvedRegion() === "ca"
+        ? "Use this for GST/HST/QST that must be reviewed or recovered."
+        : "Use this for sales tax or other indirect taxes that need CPA review.";
   }
 }
 
@@ -1119,11 +1279,19 @@ function applyFilters() {
       const cat = (getCategoryName(tx.categoryId) || "").toLowerCase();
       const acct = (getAccountName(tx.accountId) || "").toLowerCase();
       const dest = (tx.destination || "").toLowerCase();
+      const notes = (tx.note || "").toLowerCase();
+      const review = (tx.reviewNotes || "").toLowerCase();
+      const treatment = (tx.taxTreatment || "").toLowerCase();
+      const currency = (tx.currency || "").toLowerCase();
       return (
         desc.includes(term) ||
         cat.includes(term) ||
         acct.includes(term) ||
-        dest.includes(term)
+        dest.includes(term) ||
+        notes.includes(term) ||
+        review.includes(term) ||
+        treatment.includes(term) ||
+        currency.includes(term)
       );
     });
   }
@@ -1469,6 +1637,18 @@ function normalizeTransaction(transaction) {
     receiptId: transaction.receiptId || transaction.receipt_id || "",
     createdAt: transaction.createdAt || transaction.created_at || "",
     cleared: transaction.cleared === true,
+    currency: String(transaction.currency || "").toUpperCase() || getTransactionDefaultCurrency(),
+    sourceAmount: transaction.sourceAmount ?? transaction.source_amount ?? null,
+    exchangeRate: transaction.exchangeRate ?? transaction.exchange_rate ?? null,
+    exchangeDate: String(transaction.exchangeDate || transaction.exchange_date || "").slice(0, 10),
+    convertedAmount: transaction.convertedAmount ?? transaction.converted_amount ?? null,
+    taxTreatment: transaction.taxTreatment || transaction.tax_treatment || (transaction.type === "income" ? "income" : "operating"),
+    indirectTaxAmount: transaction.indirectTaxAmount ?? transaction.indirect_tax_amount ?? null,
+    indirectTaxRecoverable:
+      transaction.indirectTaxRecoverable === true || transaction.indirect_tax_recoverable === true,
+    personalUsePct: transaction.personalUsePct ?? transaction.personal_use_pct ?? null,
+    reviewStatus: transaction.reviewStatus || transaction.review_status || "ready",
+    reviewNotes: transaction.reviewNotes || transaction.review_notes || "",
     recurringTransactionId:
       transaction.recurringTransactionId || transaction.recurring_transaction_id || "",
     recurringOccurrenceDate:
@@ -1511,6 +1691,11 @@ function renderTransactionsTable(filteredTransactions) {
     const row = document.createElement("tr");
     const categoryName = txn.categoryName || categoriesById[txn.categoryId]?.name || "-";
     const accountName = txn.accountName || accountsById[txn.accountId]?.name || "-";
+    const rowRegion = String(
+      getBusinessById(txn.businessId)?.region || businessTaxProfile.region || getResolvedRegion()
+    ).toUpperCase() === "CA"
+      ? "ca"
+      : "us";
     const sourceBadge = txn.recurringTransactionId
       ? `<span class="source-badge">${txT("transactions_source_recurring", "Recurring")}</span>`
       : "";
@@ -1518,12 +1703,31 @@ function renderTransactionsTable(filteredTransactions) {
       ? `${txT("transactions_generated_on", "Generated")} ${formatDisplayDate(txn.recurringOccurrenceDate)}`
       : txT("transactions_generated_auto", "Generated automatically");
     const descriptionTail = txn.recurringTransactionId
-      ? `${sourceBadge}${txn.note ? ` ${txn.note}` : ` ${recurringMeta}`}`
-      : txn.note || categoryName || "";
+      ? `${sourceBadge}${txn.note ? ` ${escapeHtml(txn.note)}` : ` ${escapeHtml(recurringMeta)}`}`
+      : escapeHtml(txn.note || categoryName || "");
     const businessBadge = isAllScope
-      ? `<span class="business-scope-badge">${txn.businessName || getBusinessById(txn.businessId)?.name || "Business"}</span>`
+      ? `<span class="business-scope-badge">${escapeHtml(txn.businessName || getBusinessById(txn.businessId)?.name || "Business")}</span>`
       : "";
-    const descriptionSub = `${businessBadge}${descriptionTail}`;
+    const metadataBadges = [];
+    const businessCurrency = String(getBusinessById(txn.businessId)?.region || businessTaxProfile.region || getResolvedRegion()).toUpperCase() === "CA"
+      ? "CAD"
+      : "USD";
+    if (txn.currency && txn.currency !== businessCurrency) {
+      metadataBadges.push(formatTransactionMetaBadge(`FX ${txn.currency}`, "fx"));
+    }
+    if (txn.taxTreatment && txn.taxTreatment !== "operating") {
+      metadataBadges.push(formatTransactionMetaBadge(getTaxTreatmentLabel(txn.taxTreatment), txn.taxTreatment === "capital" ? "capital" : ""));
+    }
+    if (txn.personalUsePct !== null && txn.personalUsePct !== undefined && txn.personalUsePct !== "") {
+      metadataBadges.push(formatTransactionMetaBadge(`${Number(txn.personalUsePct).toFixed(1)}% personal use`, "split"));
+    }
+    if (txn.indirectTaxAmount !== null && txn.indirectTaxAmount !== undefined && Number(txn.indirectTaxAmount) > 0) {
+      metadataBadges.push(formatTransactionMetaBadge(`${getIndirectTaxLabel(rowRegion)} ${formatCurrency(Number(txn.indirectTaxAmount) || 0, rowRegion)}`, "tax"));
+    }
+    if (txn.reviewStatus && txn.reviewStatus !== "ready") {
+      metadataBadges.push(formatTransactionMetaBadge(getReviewStatusLabel(txn.reviewStatus), txn.reviewStatus));
+    }
+    const descriptionSub = [businessBadge, descriptionTail, metadataBadges.join(" ")].filter(Boolean).join(" ");
     const amountClass = txn.type === "income" ? "amount-positive" : "amount-negative";
     const amountPrefix = txn.type === "income" ? "+" : "-";
     const clearedMarkup = txn.cleared
@@ -1535,16 +1739,16 @@ function renderTransactionsTable(filteredTransactions) {
 
     row.innerHTML = `
       <td><span class="date-cell">${formatDisplayDate(txn.date)}</span></td>
-      <td><div class="description-primary">${txn.description || "-"}</div><div class="description-sub">${descriptionSub}</div></td>
-      <td><span class="account-tag">${accountName}</span></td>
-      <td><span class="category-pill ${getCategoryToneClass(categoryName)}">${categoryName}</span></td>
+      <td><div class="description-primary">${escapeHtml(txn.description || "-")}</div><div class="description-sub">${descriptionSub}</div></td>
+      <td><span class="account-tag">${escapeHtml(accountName)}</span></td>
+      <td><span class="category-pill ${getCategoryToneClass(categoryName)}">${escapeHtml(categoryName)}</span></td>
       <td>${receiptMarkup}</td>
       <td>
         <button type="button" class="status-toggle-button ${txn.cleared ? "is-cleared" : ""}" data-action="toggle-cleared" data-id="${txn.id}">
           ${clearedMarkup}
         </button>
       </td>
-      <td class="amount-cell"><span class="${amountClass}">${amountPrefix}${formatCurrency(Math.abs(Number(txn.amount) || 0))}</span></td>
+      <td class="amount-cell"><span class="${amountClass}">${amountPrefix}${formatCurrency(Math.abs(Number(txn.amount) || 0), rowRegion)}</span></td>
       <td class="actions-cell">
         <button type="button" class="action-button" data-action="edit-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("common_edit", "Edit")}</button>
         <button type="button" class="action-button delete" data-action="delete-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("common_delete", "Delete")}</button>
@@ -2083,9 +2287,17 @@ function wireTransactionIntentButtons() {
 
 function setTransactionType(intent) {
   const typeSelect = document.getElementById('txType');
+  const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
   const buttons = document.querySelectorAll(".txn-intent-btn");
   if (typeSelect) {
     typeSelect.value = intent;
+  }
+  if (taxTreatmentSelect) {
+    if (intent === "income") {
+      taxTreatmentSelect.value = "income";
+    } else if (taxTreatmentSelect.value === "income") {
+      taxTreatmentSelect.value = "operating";
+    }
   }
   buttons.forEach((button) => {
     const matches = (button.dataset.intent === "income" ? "income" : "expense") === intent;

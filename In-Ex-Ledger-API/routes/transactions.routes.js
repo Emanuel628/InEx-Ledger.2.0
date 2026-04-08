@@ -8,7 +8,10 @@ const { encrypt, decrypt } = require("../services/encryptionService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
+const VALID_TAX_TREATMENTS = new Set(["income", "operating", "capital", "split_use", "nondeductible"]);
+const VALID_REVIEW_STATUSES = new Set(["needs_review", "ready", "matched", "locked"]);
 const MAX_TRANSACTION_AMOUNT = 999999999.99;
+const MAX_PERCENT = 100;
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -71,7 +74,159 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
   return inserted.rows[0].id;
 }
 
-function validateTransactionPayload(payload) {
+function normalizeCurrencyCode(value, fallbackCurrency) {
+  const raw = String(value ?? "").trim().toUpperCase();
+  if (!raw) {
+    return fallbackCurrency;
+  }
+  if (/^[A-Z]{3}$/.test(raw)) {
+    return raw;
+  }
+  return fallbackCurrency;
+}
+
+function parseOptionalDecimal(value, fieldName, { min = null, max = null } = {}) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return { valid: true, value: null };
+  }
+  const parsed = Number.parseFloat(raw);
+  if (!Number.isFinite(parsed)) {
+    return { valid: false, message: `${fieldName} must be a number` };
+  }
+  if (min !== null && parsed < min) {
+    return { valid: false, message: `${fieldName} must be at least ${min}` };
+  }
+  if (max !== null && parsed > max) {
+    return { valid: false, message: `${fieldName} must be at most ${max}` };
+  }
+  return { valid: true, value: parsed };
+}
+
+function parseOptionalDate(value, fieldName) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return { valid: true, value: null };
+  }
+  if (Number.isNaN(Date.parse(raw))) {
+    return { valid: false, message: `${fieldName} must be a valid ISO date` };
+  }
+  return { valid: true, value: raw.slice(0, 10) };
+}
+
+function normalizeTransactionTaxPayload(payload, fallbackCurrency) {
+  const currency = normalizeCurrencyCode(payload?.currency, fallbackCurrency);
+  const sourceAmountResult = parseOptionalDecimal(payload?.source_amount, "source_amount", {
+    min: 0,
+    max: MAX_TRANSACTION_AMOUNT
+  });
+  if (!sourceAmountResult.valid) {
+    return sourceAmountResult;
+  }
+
+  const exchangeRateResult = parseOptionalDecimal(payload?.exchange_rate, "exchange_rate", {
+    min: 0
+  });
+  if (!exchangeRateResult.valid) {
+    return exchangeRateResult;
+  }
+
+  const exchangeDateResult = parseOptionalDate(payload?.exchange_date, "exchange_date");
+  if (!exchangeDateResult.valid) {
+    return exchangeDateResult;
+  }
+
+  const convertedAmountResult = parseOptionalDecimal(payload?.converted_amount, "converted_amount", {
+    min: 0,
+    max: MAX_TRANSACTION_AMOUNT
+  });
+  if (!convertedAmountResult.valid) {
+    return convertedAmountResult;
+  }
+
+  const indirectTaxAmountResult = parseOptionalDecimal(payload?.indirect_tax_amount, "indirect_tax_amount", {
+    min: 0,
+    max: MAX_TRANSACTION_AMOUNT
+  });
+  if (!indirectTaxAmountResult.valid) {
+    return indirectTaxAmountResult;
+  }
+
+  const personalUsePctResult = parseOptionalDecimal(payload?.personal_use_pct, "personal_use_pct", {
+    min: 0,
+    max: MAX_PERCENT
+  });
+  if (!personalUsePctResult.valid) {
+    return personalUsePctResult;
+  }
+
+  const taxTreatmentRaw = String(payload?.tax_treatment || "").trim().toLowerCase();
+  const taxTreatment = taxTreatmentRaw || null;
+  if (taxTreatment && !VALID_TAX_TREATMENTS.has(taxTreatment)) {
+    return {
+      valid: false,
+      message: "tax_treatment must be one of income, operating, capital, split_use, or nondeductible"
+    };
+  }
+
+  const reviewStatusRaw = String(payload?.review_status || "").trim().toLowerCase();
+  const reviewStatus = reviewStatusRaw || null;
+  if (reviewStatus && !VALID_REVIEW_STATUSES.has(reviewStatus)) {
+    return {
+      valid: false,
+      message: "review_status must be one of needs_review, ready, matched, or locked"
+    };
+  }
+
+  const hasEdgeCaseSignals =
+    currency !== fallbackCurrency ||
+    sourceAmountResult.value !== null ||
+    exchangeRateResult.value !== null ||
+    exchangeDateResult.value !== null ||
+    convertedAmountResult.value !== null ||
+    indirectTaxAmountResult.value !== null ||
+    personalUsePctResult.value !== null ||
+    taxTreatment === "capital" ||
+    taxTreatment === "split_use" ||
+    taxTreatment === "nondeductible" ||
+    String(payload?.review_notes || "").trim().length > 0;
+
+  return {
+      valid: true,
+      normalized: {
+        currency,
+        source_amount: sourceAmountResult.value,
+        exchange_rate: exchangeRateResult.value,
+        exchange_date: exchangeDateResult.value,
+        converted_amount:
+          convertedAmountResult.value !== null
+            ? convertedAmountResult.value
+            : sourceAmountResult.value !== null && exchangeRateResult.value !== null
+              ? Number((sourceAmountResult.value * exchangeRateResult.value).toFixed(2))
+              : null,
+        tax_treatment: taxTreatment,
+        indirect_tax_amount: indirectTaxAmountResult.value,
+        indirect_tax_recoverable: payload?.indirect_tax_recoverable === true,
+      personal_use_pct: personalUsePctResult.value,
+      review_status: reviewStatus || (hasEdgeCaseSignals ? "needs_review" : "ready"),
+      review_notes: String(payload?.review_notes || "").trim() || null
+    }
+  };
+}
+
+async function getBusinessRegionAndCurrency(businessId) {
+  const result = await pool.query(
+    "SELECT region FROM businesses WHERE id = $1 LIMIT 1",
+    [businessId]
+  );
+  const region = String(result.rows[0]?.region || "US").toUpperCase() === "CA" ? "CA" : "US";
+  return {
+    region,
+    currency: region === "CA" ? "CAD" : "USD"
+  };
+}
+
+function validateTransactionPayload(payload, fallbackCurrency = "USD") {
   const { account_id, category_id, amount, date, type, cleared } = payload ?? {};
 
   if (!account_id) {
@@ -107,6 +262,11 @@ function validateTransactionPayload(payload) {
     return { valid: false, message: "cleared must be true or false" };
   }
 
+  const taxPayload = normalizeTransactionTaxPayload(payload, fallbackCurrency);
+  if (!taxPayload.valid) {
+    return taxPayload;
+  }
+
   return {
     valid: true,
     normalized: {
@@ -115,7 +275,8 @@ function validateTransactionPayload(payload) {
       amount: normalizedAmount,
       date,
       type,
-      cleared: cleared === true
+      cleared: cleared === true,
+      ...taxPayload.normalized
     }
   };
 }
@@ -184,6 +345,17 @@ router.get("/", async (req, res) => {
               t.description_encrypted,
               t.date,
               t.note,
+              t.currency,
+              t.source_amount,
+              t.exchange_rate,
+              t.exchange_date,
+              t.converted_amount,
+              t.tax_treatment,
+              t.indirect_tax_amount,
+              t.indirect_tax_recoverable,
+              t.personal_use_pct,
+              t.review_status,
+              t.review_notes,
               t.recurring_transaction_id,
               t.recurring_occurrence_date,
               t.is_adjustment,
@@ -224,6 +396,11 @@ router.post("/", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const businessTaxContext = await getBusinessRegionAndCurrency(businessId);
+    const taxPayload = normalizeTransactionTaxPayload(req.body, businessTaxContext.currency);
+    if (!taxPayload.valid) {
+      return res.status(400).json({ error: taxPayload.message });
+    }
 
     const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
     const { description, note } = req.body;
@@ -249,8 +426,11 @@ router.post("/", async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO transactions
-        (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted, date, note)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted, date, note,
+         currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
+         indirect_tax_amount, indirect_tax_recoverable, personal_use_pct, review_status, review_notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+               $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
        RETURNING *`,
       [
         crypto.randomUUID(),
@@ -263,7 +443,20 @@ router.post("/", async (req, res) => {
         description || null,
         encryptedDescription,
         date,
-        note || null
+        note || null,
+        taxPayload.normalized.currency || businessTaxContext.currency,
+        taxPayload.normalized.source_amount,
+        taxPayload.normalized.exchange_rate,
+        taxPayload.normalized.exchange_date,
+        taxPayload.normalized.converted_amount !== null
+          ? taxPayload.normalized.converted_amount
+          : amount,
+        taxPayload.normalized.tax_treatment || (type === "income" ? "income" : "operating"),
+        taxPayload.normalized.indirect_tax_amount,
+        taxPayload.normalized.indirect_tax_recoverable,
+        taxPayload.normalized.personal_use_pct,
+        taxPayload.normalized.review_status || "ready",
+        taxPayload.normalized.review_notes
       ]
     );
 
@@ -282,6 +475,11 @@ router.put("/:id", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const businessTaxContext = await getBusinessRegionAndCurrency(businessId);
+    const taxPayload = normalizeTransactionTaxPayload(req.body, businessTaxContext.currency);
+    if (!taxPayload.valid) {
+      return res.status(400).json({ error: taxPayload.message });
+    }
     const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
     const { description, note } = req.body;
 
@@ -314,8 +512,12 @@ router.put("/:id", async (req, res) => {
       `INSERT INTO transactions
         (id, business_id, account_id, category_id, amount, type, cleared,
          description, description_encrypted, date, note,
+         currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
+         indirect_tax_amount, indirect_tax_recoverable, personal_use_pct, review_status, review_notes,
          is_adjustment, original_transaction_id, adjusted_by_id, adjusted_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, $12, $13, NOW())
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+               $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
+               true, $23, $24, NOW())
        RETURNING *`,
       [
         crypto.randomUUID(),
@@ -329,6 +531,19 @@ router.put("/:id", async (req, res) => {
         encryptedDescription,
         date,
         note || null,
+        taxPayload.normalized.currency || businessTaxContext.currency,
+        taxPayload.normalized.source_amount,
+        taxPayload.normalized.exchange_rate,
+        taxPayload.normalized.exchange_date,
+        taxPayload.normalized.converted_amount !== null
+          ? taxPayload.normalized.converted_amount
+          : amount,
+        taxPayload.normalized.tax_treatment || (type === "income" ? "income" : "operating"),
+        taxPayload.normalized.indirect_tax_amount,
+        taxPayload.normalized.indirect_tax_recoverable,
+        taxPayload.normalized.personal_use_pct,
+        taxPayload.normalized.review_status || "ready",
+        taxPayload.normalized.review_notes,
         req.params.id,
         req.user.id
       ]

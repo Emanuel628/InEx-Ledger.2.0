@@ -16,7 +16,16 @@ const _PDF_LABELS = {
     transaction_log_title: "Transaction ledger",
     receipts_index_title: "Receipts index",
     mileage_summary_title: "Mileage summary",
-    mileage_note_csv: "Full detailed mileage log available in CSV export."
+    mileage_note_csv: "Full detailed mileage log available in CSV export.",
+    cpa_edge_cases_title: "CPA edge-case summary",
+    cpa_edge_cases_none: "No edge-case items were detected in this reporting period.",
+    cpa_edge_case_foreign_currency: "Foreign currency entries",
+    cpa_edge_case_capital_item: "Capital items",
+    cpa_edge_case_split_use: "Split-use or personal-use entries",
+    cpa_edge_case_indirect_tax: "Indirect tax entries",
+    cpa_edge_case_needs_review: "Transactions with edge-case flags",
+    cpa_edge_case_reason: "Reason",
+    cpa_edge_case_transaction: "Transaction"
   },
   es: {
     report_title: "Informe de exportación",
@@ -64,5 +73,5 @@ function getPdfLabels(lang) {
   if (!lang || !_PDF_LABELS[lang]) {
     return _PDF_LABELS.en;
   }
-  return _PDF_LABELS[lang];
+  return { ..._PDF_LABELS.en, ..._PDF_LABELS[lang] };
 }

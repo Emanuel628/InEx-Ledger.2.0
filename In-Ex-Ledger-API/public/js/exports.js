@@ -221,7 +221,19 @@ async function hydrateTransactionsCache() {
       type: transaction.type === "income" ? "income" : "expense",
       note: transaction.note || "",
       receiptId: transaction.receiptId || transaction.receipt_id || "",
-      cleared: transaction.cleared === true
+      cleared: transaction.cleared === true,
+      currency: String(transaction.currency || "").toUpperCase(),
+      sourceAmount: transaction.sourceAmount ?? transaction.source_amount ?? null,
+      exchangeRate: transaction.exchangeRate ?? transaction.exchange_rate ?? null,
+      exchangeDate: String(transaction.exchangeDate || transaction.exchange_date || "").slice(0, 10),
+      convertedAmount: transaction.convertedAmount ?? transaction.converted_amount ?? null,
+      taxTreatment: transaction.taxTreatment || transaction.tax_treatment || "",
+      indirectTaxAmount: transaction.indirectTaxAmount ?? transaction.indirect_tax_amount ?? null,
+      indirectTaxRecoverable:
+        transaction.indirectTaxRecoverable === true || transaction.indirect_tax_recoverable === true,
+      personalUsePct: transaction.personalUsePct ?? transaction.personal_use_pct ?? null,
+      reviewStatus: transaction.reviewStatus || transaction.review_status || "",
+      reviewNotes: transaction.reviewNotes || transaction.review_notes || ""
     }));
     localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(normalized));
   } catch (error) {
@@ -741,7 +753,17 @@ function buildFullCsv(transactions, currency, includeBusiness = false) {
     "Category",
     "Running Balance",
     "Receipt Attached",
-    "Currency"
+    "Currency",
+    "Source Amount",
+    "Exchange Rate",
+    "Exchange Date",
+    "Converted Amount",
+    "Tax Treatment",
+    "Indirect Tax Amount",
+    "Indirect Tax Recoverable",
+    "Personal Use %",
+    "Review Status",
+    "Review Notes"
   ]];
   const runningBalances = new Map();
 
@@ -774,7 +796,26 @@ function buildFullCsv(transactions, currency, includeBusiness = false) {
         categories[transaction.categoryId]?.name || "",
         nextBalance.toFixed(2),
         transaction.receiptId || transaction.receipt_id ? tx("status_yes") : tx("status_no"),
-        currency
+        transaction.currency || currency,
+        formatOptionalCsvNumber(transaction.sourceAmount ?? transaction.source_amount),
+        formatOptionalCsvNumber(transaction.exchangeRate ?? transaction.exchange_rate, true),
+        transaction.exchangeDate || transaction.exchange_date || "",
+        formatOptionalCsvNumber(transaction.convertedAmount ?? transaction.converted_amount),
+        (() => {
+          const treatment = String(transaction.taxTreatment || transaction.tax_treatment || "").toLowerCase();
+          return treatment && treatment !== "operating" ? treatment : "";
+        })(),
+        formatOptionalCsvNumber(transaction.indirectTaxAmount ?? transaction.indirect_tax_amount),
+        transaction.indirectTaxRecoverable === true || transaction.indirect_tax_recoverable === true ? "Yes" : "",
+        (() => {
+          const pct = Number(transaction.personalUsePct ?? transaction.personal_use_pct);
+          return Number.isFinite(pct) && pct > 0 ? pct.toFixed(1) : "";
+        })(),
+        (() => {
+          const status = String(transaction.reviewStatus || transaction.review_status || "").toLowerCase();
+          return status && status !== "ready" ? status : "";
+        })(),
+        transaction.reviewNotes || transaction.review_notes || ""
       ]);
     });
 
@@ -787,6 +828,17 @@ function escapeCsv(value) {
     return stringValue;
   }
   return `"${stringValue.replace(/"/g, '""')}"`;
+}
+
+function formatOptionalCsvNumber(value, preservePrecision = false) {
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return "";
+  }
+  return preservePrecision ? String(num) : num.toFixed(2);
 }
 
 function downloadFile(content, filename, type) {
