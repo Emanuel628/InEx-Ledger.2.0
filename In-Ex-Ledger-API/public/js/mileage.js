@@ -1,5 +1,6 @@
 ﻿const MILEAGE_STORAGE_KEY = "lb_mileage";
 const METRIC_STORAGE_KEY = "lb_unit_metric";
+const MILES_TO_KM = 1.609344;
 const MILEAGE_TOAST_MS = 3000;
 
 let mileageToastTimer = null;
@@ -42,8 +43,8 @@ function wireMileageForm() {
     }
 
     const useKilometers = shouldUseKilometers();
-    const milesValue = useKilometers ? Number((distance / 1.60934).toFixed(2)) : Number(distance.toFixed(1));
-    const kmValue = useKilometers ? Number(distance.toFixed(1)) : Number((distance * 1.60934).toFixed(2));
+    const milesValue = useKilometers ? Number((distance / MILES_TO_KM).toFixed(2)) : Number(distance.toFixed(1));
+    const kmValue = useKilometers ? Number(distance.toFixed(1)) : Number((distance * MILES_TO_KM).toFixed(2));
     const response = await apiFetch("/api/mileage", {
       method: "POST",
       headers: {
@@ -202,11 +203,11 @@ function convertMileageDistance(entry, useKilometers) {
   const milesValue = entry.miles != null
     ? Number(entry.miles)
     : entry.km != null
-    ? Number(entry.km) / 1.60934
+    ? Number(entry.km) / MILES_TO_KM
     : Number(entry.distance || 0);
 
   if (useKilometers) {
-    return entry.km != null ? Number(entry.km) : milesValue * 1.60934;
+    return entry.km != null ? Number(entry.km) : milesValue * MILES_TO_KM;
   }
 
   return milesValue;

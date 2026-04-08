@@ -13,6 +13,12 @@ const VALID_CATEGORIES = new Set(["savings", "taxes", "emergency", "purchase", "
 const VALID_STATUSES = new Set(["active", "completed", "paused"]);
 const MAX_GOAL_AMOUNT = 999999999.99;
 
+function startOfLocalDay(value) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 function validateGoalPayload(payload) {
   const { name, target_amount, target_date, category, status, current_amount, description } = payload ?? {};
 
@@ -71,8 +77,8 @@ function computeGoalSuggestion(goal) {
     return { message: null, weeks_remaining: null, weekly_needed: null };
   }
 
-  const now = new Date();
-  const deadline = new Date(target_date);
+  const now = startOfLocalDay(new Date());
+  const deadline = startOfLocalDay(`${target_date}T00:00:00`);
   const diffMs = deadline - now;
   if (diffMs <= 0) {
     return { message: "This goal is past its target date.", weeks_remaining: 0, weekly_needed: null };

@@ -3,6 +3,8 @@ const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const WEEKS_PER_MONTH = 52 / 12;
+const BIWEEKS_PER_MONTH = 26 / 12;
 
 const router = express.Router();
 router.use(requireAuth);
@@ -26,6 +28,22 @@ function pastMonths(n) {
   return months;
 }
 
+function monthKey(year, month) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function buildTrailingMonthMap(monthCount) {
+  return pastMonths(monthCount).reduce((acc, entry) => {
+    acc.set(monthKey(entry.year, entry.month), {
+      month: monthKey(entry.year, entry.month),
+      income: 0,
+      expense: 0,
+      net: 0
+    });
+    return acc;
+  }, new Map());
+}
+
 /**
  * Returns a YYYY-MM-DD string for the first day of the month n months ago.
  */
@@ -43,7 +61,7 @@ function monthStartOffset(n) {
 router.get("/dashboard", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const since = monthStartOffset(12);
+    const since = monthStartOffset(11);
 
     // Monthly income / expense totals
     const monthlyResult = await pool.query(
@@ -95,26 +113,32 @@ router.get("/dashboard", async (req, res) => {
     );
 
     // Build monthly map
-    const monthlyMap = {};
+    const monthlyMap = buildTrailingMonthMap(12);
     for (const row of monthlyResult.rows) {
       const key = String(row.month).slice(0, 7); // YYYY-MM
-      if (!monthlyMap[key]) monthlyMap[key] = { income: 0, expense: 0 };
-      monthlyMap[key][row.type] += Number(row.total);
+      const bucket = monthlyMap.get(key);
+      if (!bucket) {
+        continue;
+      }
+      bucket[row.type] += Number(row.total);
+      bucket.net = bucket.income - bucket.expense;
     }
 
-    const months = Object.entries(monthlyMap)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, vals]) => ({ month, income: vals.income, expense: vals.expense, net: vals.income - vals.expense }));
+    const months = pastMonths(12).map((entry) => {
+      const key = monthKey(entry.year, entry.month);
+      return monthlyMap.get(key) || { month: key, income: 0, expense: 0, net: 0 };
+    });
 
     const totalIncome = months.reduce((s, m) => s + m.income, 0);
     const totalExpense = months.reduce((s, m) => s + m.expense, 0);
-    const activeMonths = months.filter((m) => m.income > 0 || m.expense > 0).length || 1;
-    const avgMonthlyIncome = totalIncome / activeMonths;
-    const avgMonthlyExpense = totalExpense / activeMonths;
+    const avgMonthlyIncome = totalIncome / 12;
+    const avgMonthlyExpense = totalExpense / 12;
     // Estimated tax rate on net income (25% of net income as a % of gross — informational only).
     // Formula: (net * 0.25) / grossIncome * 100 gives the proportion of gross income owed as estimated tax.
     const netIncome = totalIncome - totalExpense;
-    const estimatedTaxPct = totalIncome > 0 ? Math.min(100, (netIncome * 0.25) / totalIncome * 100) : 0;
+    const estimatedTaxPct = totalIncome > 0
+      ? Math.min(100, Math.max(0, (Math.max(netIncome, 0) * 0.25) / totalIncome * 100))
+      : 0;
 
     res.json({
       period_months: 12,
@@ -151,7 +175,7 @@ router.get("/dashboard", async (req, res) => {
 router.get("/cash-flow", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const since = monthStartOffset(6);
+    const since = monthStartOffset(5);
 
     // Historical monthly income / expense for trailing 6 months
     const histResult = await pool.query(
@@ -176,15 +200,22 @@ router.get("/cash-flow", async (req, res) => {
     );
 
     // Summarise historical averages
-    const monthTotals = {};
+    const monthTotals = buildTrailingMonthMap(6);
     for (const row of histResult.rows) {
       const key = String(row.month).slice(0, 7);
-      if (!monthTotals[key]) monthTotals[key] = { income: 0, expense: 0 };
-      monthTotals[key][row.type] += Number(row.total);
+      const bucket = monthTotals.get(key);
+      if (!bucket) {
+        continue;
+      }
+      bucket[row.type] += Number(row.total);
+      bucket.net = bucket.income - bucket.expense;
     }
 
-    const histMonths = Object.values(monthTotals);
-    const histCount = histMonths.length || 1;
+    const histMonths = pastMonths(6).map((entry) => {
+      const key = monthKey(entry.year, entry.month);
+      return monthTotals.get(key) || { month: key, income: 0, expense: 0, net: 0 };
+    });
+    const histCount = 6;
     const avgHistIncome = histMonths.reduce((s, m) => s + m.income, 0) / histCount;
     const avgHistExpense = histMonths.reduce((s, m) => s + m.expense, 0) / histCount;
 
@@ -196,10 +227,10 @@ router.get("/cash-flow", async (req, res) => {
       let monthlyEquivalent = 0;
       switch (r.cadence) {
         case "weekly":
-          monthlyEquivalent = amount * 4.33;
+          monthlyEquivalent = amount * WEEKS_PER_MONTH;
           break;
         case "biweekly":
-          monthlyEquivalent = amount * 2.17;
+          monthlyEquivalent = amount * BIWEEKS_PER_MONTH;
           break;
         case "monthly":
           monthlyEquivalent = amount;
@@ -351,7 +382,7 @@ router.get("/seasonal", async (req, res) => {
 router.post("/whatif", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const since = monthStartOffset(6);
+    const since = monthStartOffset(5);
 
     const {
       income_change_pct,
@@ -363,22 +394,20 @@ router.post("/whatif", async (req, res) => {
 
     // Fetch trailing 6-month average as baseline
     const histResult = await pool.query(
-      `SELECT type, SUM(amount) AS total, COUNT(DISTINCT DATE_TRUNC('month', date)) AS months
+      `SELECT
+         COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) AS income_total,
+         COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS expense_total
        FROM transactions
        WHERE business_id = $1
          AND date >= $2
-         AND is_adjustment = false
-       GROUP BY type`,
+         AND is_adjustment = false`,
       [businessId, since]
     );
 
-    let baseIncome = 0;
-    let baseExpense = 0;
-    for (const row of histResult.rows) {
-      const avg = Number(row.total) / Math.max(1, Number(row.months));
-      if (row.type === "income") baseIncome = avg;
-      else baseExpense = avg;
-    }
+    const incomeTotal = Number(histResult.rows?.[0]?.income_total || 0);
+    const expenseTotal = Number(histResult.rows?.[0]?.expense_total || 0);
+    const baseIncome = incomeTotal / 6;
+    const baseExpense = expenseTotal / 6;
 
     // Override with custom baseline if provided
     const monthlyIncome = custom_income != null ? Number(custom_income) : baseIncome;
@@ -388,8 +417,9 @@ router.post("/whatif", async (req, res) => {
     const incomePct = income_change_pct != null ? Number(income_change_pct) : 0;
     const expensePct = expense_change_pct != null ? Number(expense_change_pct) : 0;
 
-    // Weeks-off impact: reduce monthly income proportionally (assume 4.33 weeks/month)
-    const weeksOffImpact = weeks_off != null ? (Number(weeks_off) / 4.33) * monthlyIncome : 0;
+    // Weeks-off impact: reduce monthly income proportionally using the exact
+    // average weeks per month derived from a 52-week year.
+    const weeksOffImpact = weeks_off != null ? (Number(weeks_off) / WEEKS_PER_MONTH) * monthlyIncome : 0;
 
     const projectedIncome = monthlyIncome * (1 + incomePct / 100) - weeksOffImpact;
     const projectedExpense = monthlyExpense * (1 + expensePct / 100);

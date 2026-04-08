@@ -6,6 +6,7 @@ const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 
 const router = express.Router();
+const MILES_TO_KM = 1.609344;
 const MAX_DISTANCE_VALUE = 50000;
 const MAX_ODOMETER_VALUE = 9999999.99;
 router.use(requireAuth);
@@ -265,7 +266,7 @@ function normalizeMileageDistances(miles, km) {
 
   if (miles === null && km !== null) {
     return {
-      miles: Number((km / 1.60934).toFixed(2)),
+      miles: Number((km / MILES_TO_KM).toFixed(2)),
       km
     };
   }
@@ -273,7 +274,7 @@ function normalizeMileageDistances(miles, km) {
   if (km === null && miles !== null) {
     return {
       miles,
-      km: Number((miles * 1.60934).toFixed(2))
+      km: Number((miles * MILES_TO_KM).toFixed(2))
     };
   }
 
