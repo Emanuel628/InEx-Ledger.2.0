@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>InEx Ledger - Messages</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/pages/messages.css" />
+</head>
+<body>
+  <div id="trialBanner" class="trial-banner"></div>
+
+  <header class="app-topbar messages-topbar">
+    <div class="topbar-left">
+      <a class="topbar-brand" href="transactions" aria-label="InEx Ledger home">
+        <span class="brand-mark brand-mark-topbar" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect><rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect><rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect><rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".35"></rect></svg></span>
+        <span class="topbar-brand-text">InEx Ledger</span>
+      </a>
+      <nav class="topbar-nav" aria-label="Primary">
+        <a href="transactions"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>Transactions</span></a>
+        <a href="accounts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg></span><span>Accounts</span></a>
+        <a href="categories"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg></span><span>Categories</span></a>
+        <a href="receipts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span>Receipts</span></a>
+        <a href="analytics"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Analytics</span></a>
+        <a class="is-active" href="messages"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 4h12v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4z"></path><path d="M2 4l6 5 6-5"></path></svg></span><span>Messages</span></a>
+        <a href="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg></span><span>Settings</span></a>
+      </nav>
+    </div>
+    <div class="user-pill"><span class="user-avatar" id="topbarAvatar">IL</span><span class="user-name" id="topbarName">InEx Ledger</span></div>
+  </header>
+
+  <main class="app-shell">
+    <aside class="app-sidebar" aria-label="Sidebar">
+      <div class="sidebar-section-label">Messages</div>
+      <nav class="sidebar-nav">
+        <a href="#" class="sidebar-link is-active" id="sidebarInbox" data-tab="inbox">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 4h12v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4z"></path><path d="M2 4l6 5 6-5"></path></svg></span>
+          <span>Inbox</span>
+          <span id="sidebarUnreadBadge" class="messages-tab-badge" hidden></span>
+        </a>
+        <a href="#" class="sidebar-link" id="sidebarSent" data-tab="sent">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M14 2L2 7l5 2 2 5 5-12z"></path></svg></span>
+          <span>Sent</span>
+        </a>
+        <a href="#" class="sidebar-link" id="sidebarArchived" data-tab="archived">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="6" width="12" height="8" rx="1"></rect><path d="M2 6l2-4h8l2 4"></path><line x1="6" y1="10" x2="10" y2="10"></line></svg></span>
+          <span>Archived</span>
+        </a>
+      </nav>
+      <div class="sidebar-section-label" style="margin-top:12px">Support</div>
+      <nav class="sidebar-nav">
+        <a href="#" class="sidebar-link" id="sidebarNewMsg" data-action="compose">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 14l1.5-4.5L11 2l3 3-7.5 7.5L2 14z"></path><path d="M10 3l3 3"></path></svg></span>
+          <span>New Message</span>
+        </a>
+        <a href="#" class="sidebar-link" id="sidebarSupport" data-action="support">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6"></circle><path d="M6 6a2 2 0 1 1 2 2v1"></path><circle cx="8" cy="12" r=".5" fill="currentColor"></circle></svg></span>
+          <span>Request Support</span>
+        </a>
+      </nav>
+    </aside>
+
+    <div class="messages-content">
+      <div class="messages-header">
+        <h1 id="messagesTitle">Inbox</h1>
+        <button type="button" class="messages-compose-btn" id="composeBtn">+ Compose</button>
+      </div>
+
+      <div class="messages-tabs" role="tablist">
+        <button type="button" class="messages-tab is-active" id="tabInbox" role="tab" aria-selected="true" data-tab="inbox">
+          Inbox<span class="messages-tab-badge" id="inboxBadge" hidden></span>
+        </button>
+        <button type="button" class="messages-tab" id="tabSent" role="tab" aria-selected="false" data-tab="sent">Sent</button>
+        <button type="button" class="messages-tab" id="tabArchived" role="tab" aria-selected="false" data-tab="archived">Archived</button>
+      </div>
+
+      <div class="messages-list" id="messagesList">
+        <div class="messages-loading">Loading messages…</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Message detail slide-up panel -->
+  <div class="message-detail-overlay hidden" id="messageDetailOverlay" role="dialog" aria-modal="true" aria-labelledby="messageDetailSubject">
+    <div class="message-detail-panel">
+      <div class="message-detail-header">
+        <div class="message-detail-meta">
+          <div class="message-detail-subject" id="messageDetailSubject"></div>
+          <div class="message-detail-from" id="messageDetailFrom"></div>
+        </div>
+        <button type="button" class="message-detail-close" id="messageDetailClose" aria-label="Close">×</button>
+      </div>
+      <div class="message-detail-body" id="messageDetailBody"></div>
+      <div class="message-detail-footer">
+        <div class="message-detail-actions">
+          <button type="button" class="msg-btn" id="detailReplyBtn">Reply</button>
+          <button type="button" class="msg-btn" id="detailArchiveBtn">Archive</button>
+          <button type="button" class="msg-btn danger" id="detailDeleteBtn">Delete</button>
+        </div>
+      </div>
+      <div class="message-reply-area hidden" id="replyArea">
+        <textarea class="message-reply-input" id="replyInput" placeholder="Write your reply…" maxlength="10000"></textarea>
+        <button type="button" class="message-reply-send" id="replySendBtn">Send Reply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compose modal -->
+  <div class="compose-overlay hidden" id="composeOverlay" role="dialog" aria-modal="true" aria-labelledby="composeTitle">
+    <div class="compose-modal">
+      <h2 id="composeTitle">New Message</h2>
+      <div class="compose-field">
+        <label for="composeTo">To</label>
+        <select id="composeTo">
+          <option value="">Select contact…</option>
+        </select>
+      </div>
+      <div class="compose-field">
+        <label for="composeType">Message Type</label>
+        <select id="composeType">
+          <option value="general">General</option>
+          <option value="cpa">CPA / Financial Review</option>
+          <option value="it_support">IT Support</option>
+          <option value="support_request">Support Request</option>
+        </select>
+      </div>
+      <div class="compose-field">
+        <label for="composeSubject">Subject (optional)</label>
+        <input type="text" id="composeSubject" maxlength="200" placeholder="Brief subject…" />
+      </div>
+      <div class="compose-field">
+        <label for="composeBody">Message</label>
+        <textarea id="composeBody" maxlength="10000" placeholder="Write your message…"></textarea>
+      </div>
+      <p class="compose-error" id="composeError"></p>
+      <div class="compose-actions">
+        <button type="button" class="compose-cancel" id="composeCancelBtn">Cancel</button>
+        <button type="button" class="compose-send" id="composeSendBtn">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="messagesToast" class="messages-toast hidden" role="status" aria-live="polite">
+    <span id="messagesToastText">Message sent</span>
+  </div>
+
+  <script src="/js/global.js?v=20260408a"></script>
+  <script src="/js/i18n.js?v=20260408a"></script>
+  <script src="/js/auth.js?v=20260408a"></script>
+  <script src="/js/trial.js?v=20260408a"></script>
+  <script src="/js/messages.js?v=20260408a"></script>
+</body>
+</html>
