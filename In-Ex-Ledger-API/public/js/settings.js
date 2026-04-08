@@ -49,7 +49,9 @@ const CA_PROVINCE_NAMES = {
 
 let privacySettings = {
   dataSharingOptOut: false,
-  consentGiven: false
+  consentGiven: false,
+  analyticsOptIn: false,
+  dataResidency: "US"
 };
 
 let toastTimer = null;
@@ -416,6 +418,11 @@ async function initPreferences() {
   const downloadBtn = document.getElementById("downloadMyDataBtn");
   const replayOnboardingTipsButton = document.getElementById("replayOnboardingTips");
   const replayOnboardingTipsSidebarButton = document.getElementById("replayOnboardingTipsSidebar");
+  const analyticsOptInToggle = document.getElementById("analyticsOptInToggle");
+  const analyticsOptInRow = document.getElementById("settingsQcAnalyticsRow");
+  const qcConsentModal = document.getElementById("qcAnalyticsConsentModal");
+  const qcConsentConfirm = document.getElementById("qcConsentConfirm");
+  const qcConsentCancel = document.getElementById("qcConsentCancel");
   const saveBar = document.getElementById("settingsSaveBar");
   const saveButton = document.getElementById("settingsSavePreferences");
   const cancelButton = document.getElementById("settingsCancelChanges");
@@ -532,6 +539,56 @@ async function initPreferences() {
   privacySettings = await getPrivacySettingsSafe();
   if (optOutToggle) {
     optOutToggle.addEventListener("change", updatePendingPreferences);
+  }
+
+  // Quebec Analytics Opt-In: show the toggle only for QC residents (Law 25).
+  // Detection uses dataResidency from the user profile, not business province,
+  // to correctly handle traveling gig workers.
+  const isQcResident = privacySettings.dataResidency === "CA-QC";
+  if (analyticsOptInRow) {
+    analyticsOptInRow.classList.toggle("hidden", !isQcResident);
+  }
+  if (analyticsOptInToggle) {
+    analyticsOptInToggle.checked = !!privacySettings.analyticsOptIn;
+
+    analyticsOptInToggle.addEventListener("change", () => {
+      if (analyticsOptInToggle.checked) {
+        // Enabling analytics tracking requires explicit consent for QC users.
+        // Revert optimistic toggle until confirmed.
+        analyticsOptInToggle.checked = false;
+        if (qcConsentModal) {
+          qcConsentModal.classList.remove("hidden");
+        }
+      } else {
+        // Disabling tracking — no consent prompt needed; save immediately.
+        saveQcAnalyticsOptIn(false);
+      }
+    });
+  }
+
+  if (qcConsentConfirm) {
+    qcConsentConfirm.addEventListener("click", async () => {
+      if (qcConsentModal) qcConsentModal.classList.add("hidden");
+      if (analyticsOptInToggle) analyticsOptInToggle.checked = true;
+      await saveQcAnalyticsOptIn(true);
+    });
+  }
+
+  if (qcConsentCancel) {
+    qcConsentCancel.addEventListener("click", () => {
+      if (qcConsentModal) qcConsentModal.classList.add("hidden");
+      if (analyticsOptInToggle) analyticsOptInToggle.checked = false;
+    });
+  }
+
+  // Close consent modal on backdrop click
+  if (qcConsentModal) {
+    qcConsentModal.addEventListener("click", (e) => {
+      if (e.target === qcConsentModal) {
+        qcConsentModal.classList.add("hidden");
+        if (analyticsOptInToggle) analyticsOptInToggle.checked = false;
+      }
+    });
   }
 
   preferenceBaseline = buildPreferenceState();
@@ -1200,6 +1257,34 @@ async function getPrivacySettingsSafe() {
     }
   }
   return privacySettings;
+}
+
+/**
+ * Save the Quebec-specific analytics opt-in preference.
+ * Sends analyticsOptIn alongside the current dataSharingOptOut so the backend
+ * can log consent for Law 25 compliance.
+ */
+async function saveQcAnalyticsOptIn(optIn) {
+  try {
+    const payload = {
+      dataSharingOptOut: !!privacySettings.dataSharingOptOut,
+      consentGiven: true,
+      analyticsOptIn: optIn
+    };
+    const response = await apiFetch("/api/privacy/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response || !response.ok) {
+      throw new Error("Save failed");
+    }
+    privacySettings = { ...privacySettings, analyticsOptIn: optIn };
+    showSettingsToast(optIn ? t("qc_analytics_enabled") : t("qc_analytics_disabled"));
+  } catch (error) {
+    console.error("Failed to save analytics opt-in", error);
+    showSettingsToast(t("settings_region_save_error"));
+  }
 }
 
 async function setPrivacySettingsSafe(nextSettings) {

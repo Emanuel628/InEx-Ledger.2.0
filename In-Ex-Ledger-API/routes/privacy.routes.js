@@ -73,7 +73,7 @@ router.get("/settings", async (req, res) => {
   try {
     const [privacyResult, userResult] = await Promise.all([
       pool.query(
-        "SELECT data_sharing_opt_out, consent_given FROM user_privacy_settings WHERE user_id = $1",
+        "SELECT data_sharing_opt_out, consent_given, analytics_opt_in FROM user_privacy_settings WHERE user_id = $1",
         [req.user.id]
       ),
       pool.query(
@@ -92,6 +92,8 @@ router.get("/settings", async (req, res) => {
     res.json({
       dataSharingOptOut: row ? row.data_sharing_opt_out : defaultOptOut,
       consentGiven: row ? row.consent_given : !defaultOptOut,
+      // analyticsOptIn is the Quebec-specific explicit opt-in; defaults to false (off)
+      analyticsOptIn: row ? Boolean(row.analytics_opt_in) : false,
       dataResidency
     });
   } catch (err) {
@@ -106,6 +108,9 @@ router.get("/settings", async (req, res) => {
 router.post("/settings", async (req, res) => {
   const dataSharingOptOut = typeof req.body?.dataSharingOptOut === "boolean" ? req.body.dataSharingOptOut : false;
   const consentGiven = typeof req.body?.consentGiven === "boolean" ? req.body.consentGiven : true;
+  // analyticsOptIn is only meaningful for Quebec users (Law 25 explicit opt-in).
+  // Accepted but silently ignored for non-QC users.
+  const analyticsOptIn = typeof req.body?.analyticsOptIn === "boolean" ? req.body.analyticsOptIn : null;
 
   try {
     // Fetch the user's data_residency to determine if consent logging is required
@@ -114,27 +119,53 @@ router.post("/settings", async (req, res) => {
       [req.user.id]
     );
     const dataResidency = userResult.rows[0]?.data_residency || "US";
+    const isQuebec = dataResidency === "CA-QC";
+
+    // Fetch existing privacy row to detect changes for consent logging
+    const existingResult = await pool.query(
+      "SELECT analytics_opt_in FROM user_privacy_settings WHERE user_id = $1",
+      [req.user.id]
+    );
+    const previousAnalyticsOptIn = existingResult.rows[0]?.analytics_opt_in ?? false;
+
+    // Determine the analytics_opt_in value to persist.
+    // Only update it if a value was explicitly provided; otherwise keep the existing value.
+    const nextAnalyticsOptIn = analyticsOptIn !== null ? analyticsOptIn : previousAnalyticsOptIn;
 
     await pool.query(
-      `INSERT INTO user_privacy_settings (user_id, data_sharing_opt_out, consent_given, updated_at)
-       VALUES ($1, $2, $3, NOW())
+      `INSERT INTO user_privacy_settings (user_id, data_sharing_opt_out, consent_given, analytics_opt_in, updated_at)
+       VALUES ($1, $2, $3, $4, NOW())
        ON CONFLICT (user_id) DO UPDATE
          SET data_sharing_opt_out = EXCLUDED.data_sharing_opt_out,
              consent_given = EXCLUDED.consent_given,
+             analytics_opt_in = EXCLUDED.analytics_opt_in,
              updated_at = NOW()`,
-      [req.user.id, dataSharingOptOut, consentGiven]
+      [req.user.id, dataSharingOptOut, consentGiven, nextAnalyticsOptIn]
     );
 
-    // Log explicit consent changes for Quebec users (Law 25 requirement)
+    // Log explicit consent changes for Quebec users (Law 25 requirement).
+    // Always log data-sharing opt-out changes.
     if (dataResidency === "CA-QC") {
-      const action = dataSharingOptOut ? "opt_out" : "opt_in";
       const ipAddress = req.ip || req.connection?.remoteAddress || null;
       const userAgent = String(req.get("user-agent") || "").slice(0, MAX_USER_AGENT_LENGTH) || null;
+
+      // Log data-sharing opt-out change
+      const action = dataSharingOptOut ? "opt_out" : "opt_in";
       await pool.query(
         `INSERT INTO privacy_consent_log (user_id, data_residency, action, ip_address, user_agent)
          VALUES ($1, $2, $3, $4, $5)`,
         [req.user.id, dataResidency, action, ipAddress, userAgent]
       );
+
+      // Log analytics opt-in consent separately when the QC user explicitly enables tracking
+      if (isQuebec && analyticsOptIn !== null && analyticsOptIn !== previousAnalyticsOptIn) {
+        const analyticsAction = analyticsOptIn ? "opt_in" : "opt_out";
+        await pool.query(
+          `INSERT INTO privacy_consent_log (user_id, data_residency, action, ip_address, user_agent)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [req.user.id, `${dataResidency}:analytics`, analyticsAction, ipAddress, userAgent]
+        );
+      }
     }
 
     res.json({ ok: true });
