@@ -21,6 +21,15 @@ function getAppBaseUrl() {
   return String(process.env.APP_BASE_URL || "").trim().replace(/\/+$/, "");
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -63,11 +72,16 @@ async function sendCpaInviteEmail({
   to,
   ownerName,
   ownerEmail,
+  ownerUserId,
   scope,
   businessName,
+  businessId,
   status
 }) {
   const baseUrl = getAppBaseUrl();
+  const dashboardUrl = baseUrl
+    ? `${baseUrl}/cpa-dashboard?owner=${encodeURIComponent(ownerUserId || ownerEmail || "")}${businessId ? `&business=${encodeURIComponent(businessId)}` : ""}`
+    : "";
   const appLoginUrl = baseUrl ? `${baseUrl}/login` : "";
   const subject = status === "active"
     ? "InEx Ledger CPA access granted"
@@ -75,31 +89,51 @@ async function sendCpaInviteEmail({
   const intro = status === "active"
     ? "You now have active CPA access in InEx Ledger."
     : "You have been invited to review InEx Ledger data as a CPA.";
-  const actionCopy = appLoginUrl
-    ? status === "active"
-      ? `Sign in at ${appLoginUrl} with this email to view the shared portfolio.`
-      : `Sign in at ${appLoginUrl} with this email to accept the invitation. If you do not yet have an account, create one with the same email address.`
-    : status === "active"
-      ? "Sign in with this email to view the shared portfolio."
-      : "Sign in with this email to accept the invitation. If you do not yet have an account, create one with the same email address.";
+  const actionCopy = status === "active"
+    ? "Open the shared workspace to review the client profile and granted data."
+    : "Sign in with this email to accept the invitation. If you do not yet have an account, create one with the same email address.";
+  const primaryLabel = status === "active" ? "View shared workspace" : "Accept invitation";
+  const primaryUrl = dashboardUrl || appLoginUrl;
+  const scopeLabel = scope === "all" ? "All businesses" : `One business: ${businessName || "Selected business"}`;
 
   const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
-      <p>${intro}</p>
-      <p><strong>Owner:</strong> ${ownerName || ownerEmail || "InEx Ledger user"}</p>
-      <p><strong>Access scope:</strong> ${scope === "all" ? "All businesses" : `One business: ${businessName || "Selected business"}`}</p>
-      <p>${actionCopy}</p>
-      <p>If you were not expecting this, you can ignore this message.</p>
+    <div style="margin:0;padding:0;background:#f4f6f8;">
+      <div style="max-width:640px;margin:0 auto;padding:32px 20px;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+        <div style="background:#0f172a;color:#fff;border-radius:18px 18px 0 0;padding:24px 28px;">
+          <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.72;">InEx Ledger</div>
+          <div style="font-size:28px;line-height:1.2;font-weight:700;margin-top:8px;">CPA access ${status === "active" ? "granted" : "invite"}</div>
+        </div>
+        <div style="background:#fff;border:1px solid #dfe5ec;border-top:none;border-radius:0 0 18px 18px;padding:28px;">
+          <p style="margin:0 0 16px;font-size:16px;line-height:1.6;">${escapeHtml(intro)}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:20px 0;">
+            <tr>
+              <td style="padding:10px 0;border-top:1px solid #edf1f5;font-size:14px;color:#4b5563;"><strong style="color:#111827;">Owner:</strong> ${escapeHtml(ownerName || ownerEmail || "InEx Ledger user")}</td>
+            </tr>
+            <tr>
+              <td style="padding:10px 0;border-top:1px solid #edf1f5;font-size:14px;color:#4b5563;"><strong style="color:#111827;">Access scope:</strong> ${escapeHtml(scopeLabel)}</td>
+            </tr>
+          </table>
+          <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#374151;">${escapeHtml(actionCopy)}</p>
+          ${primaryUrl ? `
+            <div style="margin:0 0 18px;">
+              <a href="${escapeHtml(primaryUrl)}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:10px;">${escapeHtml(primaryLabel)}</a>
+            </div>
+            <p style="margin:0 0 16px;font-size:12px;color:#6b7280;word-break:break-all;">${escapeHtml(primaryUrl)}</p>
+          ` : ""}
+          <p style="margin:0;font-size:12px;color:#6b7280;">If you were not expecting this, you can ignore this message.</p>
+        </div>
+      </div>
     </div>
   `;
 
   const text = [
     intro,
     `Owner: ${ownerName || ownerEmail || "InEx Ledger user"}`,
-    `Access scope: ${scope === "all" ? "All businesses" : `One business: ${businessName || "Selected business"}`}`,
+    `Access scope: ${scopeLabel}`,
     actionCopy,
+    primaryUrl ? `${primaryLabel}: ${primaryUrl}` : null,
     "If you were not expecting this, you can ignore this message."
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 
   return getResend().emails.send({
     from: RESEND_FROM_EMAIL,
@@ -156,6 +190,10 @@ async function listOwnedCpaGrants(ownerUserId) {
             g.created_at,
             g.accepted_at,
             g.revoked_at,
+            CASE
+              WHEN g.status = 'revoked' THEN g.revoked_at + INTERVAL '30 days'
+              ELSE NULL
+            END AS revoked_visible_until,
             u.id AS grantee_user_id,
             u.full_name AS grantee_full_name,
             u.display_name AS grantee_display_name
@@ -163,7 +201,17 @@ async function listOwnedCpaGrants(ownerUserId) {
        LEFT JOIN businesses b ON b.id = g.business_id
        LEFT JOIN users u ON u.id = g.grantee_user_id
       WHERE g.owner_user_id = $1
-      ORDER BY g.created_at DESC`,
+        AND (
+          g.status <> 'revoked'
+          OR g.revoked_at >= NOW() - INTERVAL '30 days'
+        )
+      ORDER BY
+        CASE
+          WHEN g.status = 'active' THEN 0
+          WHEN g.status = 'pending' THEN 1
+          ELSE 2
+        END,
+        COALESCE(g.revoked_at, g.accepted_at, g.created_at) DESC`,
     [ownerUserId]
   );
 
@@ -396,8 +444,10 @@ async function createCpaGrant(ownerUser, payload, grantIp = null) {
         to: email,
         ownerName: ownerUser.full_name || ownerUser.display_name || ownerUser.email || null,
         ownerEmail: ownerUser.email || null,
+        ownerUserId: ownerUser.id,
         scope,
         businessName,
+        businessId,
         status
       });
       emailSent = true;

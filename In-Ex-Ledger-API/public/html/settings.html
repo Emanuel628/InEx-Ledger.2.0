@@ -179,10 +179,18 @@
 
         <div class="cpa-access-list-wrap">
           <div class="card-head cpa-access-subhead">
-            <h3 class="card-title" data-i18n="settings_cpa_grants_title">Current access grants</h3>
-            <p class="card-desc" data-i18n="settings_cpa_grants_desc">Pending invites stay pending until that email signs in. Active grants can be revoked at any time, and revoked entries can be deleted once you are done with the record.</p>
+            <h3 class="card-title" data-i18n="settings_cpa_current_title">Currently has access</h3>
+            <p class="card-desc" data-i18n="settings_cpa_current_desc">These people can access your client data right now. Revoked grants move to history and stay visible for 30 days.</p>
           </div>
-          <div id="cpaAccessList" class="cpa-access-list"></div>
+          <div id="cpaCurrentAccessList" class="cpa-access-list"></div>
+        </div>
+
+        <div class="cpa-access-list-wrap">
+          <div class="card-head cpa-access-subhead">
+            <h3 class="card-title" data-i18n="settings_cpa_history_title">Recent invitations and revoked access</h3>
+            <p class="card-desc" data-i18n="settings_cpa_history_desc">Pending invites stay here until accepted or revoked. Revoked access stays visible for 30 days, then drops out of view.</p>
+          </div>
+          <div id="cpaAccessHistoryList" class="cpa-access-list"></div>
         </div>
 
         <div class="cpa-access-list-wrap">

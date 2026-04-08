@@ -677,10 +677,11 @@ async function initCpaAccess() {
   const businessSelect = document.getElementById("cpaAccessBusiness");
   const businessWrap = document.getElementById("cpaBusinessSelectWrap");
   const messageNode = document.getElementById("cpaAccessMessage");
-  const listNode = document.getElementById("cpaAccessList");
+  const currentListNode = document.getElementById("cpaCurrentAccessList");
+  const historyListNode = document.getElementById("cpaAccessHistoryList");
   const auditNode = document.getElementById("cpaAuditActivityList");
 
-  if (!form || !emailInput || !scopeSelect || !businessSelect || !businessWrap || !listNode) {
+  if (!form || !emailInput || !scopeSelect || !businessSelect || !businessWrap || !currentListNode || !historyListNode) {
     return;
   }
 
@@ -736,37 +737,63 @@ async function initCpaAccess() {
       const payload = await response.json().catch(() => null);
       const grants = Array.isArray(payload?.grants) ? payload.grants : [];
 
-      if (!grants.length) {
-        listNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_grants_empty"))}</div>`;
-        return;
-      }
+      const activeGrants = grants.filter((grant) => grant.status === "active");
+      const historyGrants = grants.filter((grant) => grant.status !== "active");
 
-      listNode.innerHTML = grants.map((grant) => {
+      const renderGrantCard = (grant, mode) => {
         const detailParts = [interpolateTranslatedMessage("settings_cpa_detail_created", { date: formatSettingsDate(grant.created_at) })];
         if (grant.accepted_at) detailParts.push(interpolateTranslatedMessage("settings_cpa_detail_accepted", { date: formatSettingsDate(grant.accepted_at) }));
         if (grant.revoked_at) detailParts.push(interpolateTranslatedMessage("settings_cpa_detail_revoked", { date: formatSettingsDate(grant.revoked_at) }));
+        if (grant.revoked_visible_until) detailParts.push(interpolateTranslatedMessage("settings_cpa_detail_visible_until", { date: formatSettingsDate(grant.revoked_visible_until) }));
+
+        const statusLabel =
+          grant.status === "active"
+            ? t("settings_cpa_status_current", "current")
+            : grant.status === "pending"
+              ? t("settings_cpa_status_pending", "pending")
+              : t("settings_cpa_status_revoked", "revoked");
+        const buttonMarkup =
+          grant.status === "active"
+            ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeSettingsHtml(grant.id || "")}">${escapeSettingsHtml(t("settings_cpa_revoke"))}</button>`
+            : grant.status === "pending"
+              ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeSettingsHtml(grant.id || "")}">${escapeSettingsHtml(t("settings_cpa_revoke"))}</button>`
+              : `<button type="button" class="cpa-access-delete" data-cpa-delete="${escapeSettingsHtml(grant.id || "")}">${escapeSettingsHtml(t("common_delete"))}</button>`;
 
         return `
-          <div class="cpa-access-item">
+          <div class="cpa-access-item ${mode}">
             <div class="cpa-access-meta">
               <div class="cpa-access-email">${escapeSettingsHtml(grant.grantee_email || "")}</div>
               <div class="cpa-access-tags">
                 <span class="cpa-access-tag scope">${grant.scope === "all" ? escapeSettingsHtml(t("settings_cpa_scope_all")) : escapeSettingsHtml(t("settings_cpa_scope_business"))}</span>
                 <span class="cpa-access-tag business">${escapeSettingsHtml(grant.business_name || t("settings_cpa_portfolio_wide"))}</span>
-                <span class="cpa-access-tag ${escapeSettingsHtml(grant.status || "pending")}">${escapeSettingsHtml(grant.status || "pending")}</span>
+                <span class="cpa-access-tag ${escapeSettingsHtml(grant.status || "pending")}">${escapeSettingsHtml(statusLabel)}</span>
               </div>
               <div class="cpa-access-detail">${escapeSettingsHtml(detailParts.join(" | "))}</div>
             </div>
             <div class="cpa-access-actions">
-              ${grant.status !== "revoked"
-                ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeSettingsHtml(grant.id || "")}">${escapeSettingsHtml(t("settings_cpa_revoke"))}</button>`
-                : `<button type="button" class="cpa-access-delete" data-cpa-delete="${escapeSettingsHtml(grant.id || "")}">${escapeSettingsHtml(t("common_delete"))}</button>`}
+              ${buttonMarkup}
             </div>
           </div>
         `;
-      }).join("");
+      };
 
-      listNode.querySelectorAll("[data-cpa-revoke]").forEach((button) => {
+      const currentNode = document.getElementById("cpaCurrentAccessList");
+      const historyNode = document.getElementById("cpaAccessHistoryList");
+
+      if (currentNode) {
+        currentNode.innerHTML = activeGrants.length
+          ? activeGrants.map((grant) => renderGrantCard(grant, "current")).join("")
+          : `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_current_empty", "No one currently has access."))}</div>`;
+      }
+
+      if (historyNode) {
+        historyNode.innerHTML = historyGrants.length
+          ? historyGrants.map((grant) => renderGrantCard(grant, "history")).join("")
+          : `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_history_empty", "No recent invitations or revoked access."))}</div>`;
+      }
+
+      const revokeTargets = [...document.querySelectorAll("[data-cpa-revoke]")];
+      revokeTargets.forEach((button) => {
         button.addEventListener("click", async () => {
           const grantId = button.getAttribute("data-cpa-revoke");
           if (!grantId) {
@@ -790,7 +817,8 @@ async function initCpaAccess() {
         });
       });
 
-      listNode.querySelectorAll("[data-cpa-delete]").forEach((button) => {
+      const deleteTargets = [...document.querySelectorAll("[data-cpa-delete]")];
+      deleteTargets.forEach((button) => {
         button.addEventListener("click", async () => {
           const grantId = button.getAttribute("data-cpa-delete");
           if (!grantId) {
@@ -815,7 +843,8 @@ async function initCpaAccess() {
       });
     } catch (error) {
       console.error("Failed to load CPA grants", error);
-      listNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_grants_load_error"))}</div>`;
+      currentListNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_grants_load_error"))}</div>`;
+      historyListNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_grants_load_error"))}</div>`;
     }
   };
 

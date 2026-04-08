@@ -27,6 +27,10 @@ async function initCpaDashboard() {
     return;
   }
 
+  const query = new URLSearchParams(window.location.search);
+  const requestedOwner = query.get("owner") || "";
+  const requestedBusiness = query.get("business") || "";
+
   emptyState.classList.add("hidden");
   workspace.classList.remove("hidden");
 
@@ -96,7 +100,18 @@ async function initCpaDashboard() {
   };
 
   populateOwnerSelect();
+  if (requestedOwner && portfolios.some((portfolio) => portfolio.owner_user_id === requestedOwner)) {
+    ownerSelect.value = requestedOwner;
+  } else {
+    ownerSelect.value = portfolios[0].owner_user_id;
+  }
   populateBusinessSelect();
+  if (requestedBusiness) {
+    const activePortfolio = getActivePortfolio();
+    if (activePortfolio.businesses.some((business) => business.id === requestedBusiness)) {
+      businessSelect.value = requestedBusiness;
+    }
+  }
 
   ownerSelect.addEventListener("change", async () => {
     populateBusinessSelect();
@@ -195,7 +210,7 @@ function renderSummary(summary, grantScope, businessSummaries) {
   if (scopeValue) {
     scopeValue.textContent = grantScope === "all" ? "All granted businesses" : "One granted business";
     if (mixedScope) {
-      scopeValue.textContent += " • mixed currencies";
+      scopeValue.textContent += " ï¿½ mixed currencies";
     }
   }
 }
@@ -215,13 +230,13 @@ function renderBusinessContext(businessSummaries, selectedBusinessId) {
     const selectedBadge = selectedBusinessId && selectedBusinessId === summary.business_id
       ? '<span class="cpa-context-pill selected">Selected</span>'
       : "";
-    const province = summary.province ? ` • ${escapeCpaHtml(summary.province)}` : "";
+    const province = summary.province ? ` ï¿½ ${escapeCpaHtml(summary.province)}` : "";
     return `
       <article class="cpa-context-card">
         <div class="cpa-context-head">
           <div>
             <h3>${escapeCpaHtml(summary.business_name || "Business")}</h3>
-            <p>${escapeCpaHtml(summary.tax_form_label || "-")} • ${escapeCpaHtml(summary.currency || "USD")}${province}</p>
+            <p>${escapeCpaHtml(summary.tax_form_label || "-")} ï¿½ ${escapeCpaHtml(summary.currency || "USD")}${province}</p>
           </div>
           ${selectedBadge}
         </div>
@@ -289,7 +304,7 @@ function renderReceipts(receipts) {
     <div class="cpa-list-item cpa-list-item-action">
       <div class="cpa-list-copy">
         <p class="cpa-list-title">${escapeCpaHtml(receipt.filename || "Receipt")}</p>
-        <p class="cpa-list-meta">${escapeCpaHtml(receipt.business_name || "-")} • ${escapeCpaHtml(formatCpaDate(receipt.created_at))}</p>
+        <p class="cpa-list-meta">${escapeCpaHtml(receipt.business_name || "-")} ï¿½ ${escapeCpaHtml(formatCpaDate(receipt.created_at))}</p>
       </div>
       <div class="cpa-list-actions">
         <button
@@ -322,8 +337,8 @@ function renderMileage(mileageRecords) {
     return `
       <div class="cpa-list-item">
         <p class="cpa-list-title">${escapeCpaHtml(entry.purpose || "Business trip")}</p>
-        <p class="cpa-list-meta">${escapeCpaHtml(entry.business_name || "-")} • ${escapeCpaHtml(formatCpaDate(entry.trip_date))}</p>
-        <p class="cpa-list-meta">${escapeCpaHtml(entry.destination || "No destination noted")} • ${escapeCpaHtml(distance)}</p>
+        <p class="cpa-list-meta">${escapeCpaHtml(entry.business_name || "-")} ï¿½ ${escapeCpaHtml(formatCpaDate(entry.trip_date))}</p>
+        <p class="cpa-list-meta">${escapeCpaHtml(entry.destination || "No destination noted")} ï¿½ ${escapeCpaHtml(distance)}</p>
       </div>
     `;
   }).join("");
@@ -345,8 +360,8 @@ function renderExports(exportsList) {
     return `
       <div class="cpa-list-item cpa-list-item-action">
         <div class="cpa-list-copy">
-          <p class="cpa-list-title">${escapeCpaHtml((entry.export_type || "export").toUpperCase())} • ${escapeCpaHtml(entry.business_name || "-")}</p>
-          <p class="cpa-list-meta">${escapeCpaHtml(taxLabel)} • ${escapeCpaHtml(currency)} • ${escapeCpaHtml(formatCpaDate(entry.start_date))} to ${escapeCpaHtml(formatCpaDate(entry.end_date))}</p>
+          <p class="cpa-list-title">${escapeCpaHtml((entry.export_type || "export").toUpperCase())} ï¿½ ${escapeCpaHtml(entry.business_name || "-")}</p>
+          <p class="cpa-list-meta">${escapeCpaHtml(taxLabel)} ï¿½ ${escapeCpaHtml(currency)} ï¿½ ${escapeCpaHtml(formatCpaDate(entry.start_date))} to ${escapeCpaHtml(formatCpaDate(entry.end_date))}</p>
           <p class="cpa-list-meta">${escapeCpaHtml(formatCpaDate(entry.created_at))}</p>
         </div>
         <button
@@ -375,7 +390,7 @@ function renderAuditLog(logs) {
   list.innerHTML = logs.slice(0, 10).map((entry) => `
     <div class="cpa-list-item">
       <p class="cpa-list-title">${escapeCpaHtml(formatAuditAction(entry.action))}</p>
-      <p class="cpa-list-meta">${escapeCpaHtml(entry.business_name || "Portfolio-wide")} • ${escapeCpaHtml(formatCpaDateTime(entry.created_at))}</p>
+      <p class="cpa-list-meta">${escapeCpaHtml(entry.business_name || "Portfolio-wide")} ï¿½ ${escapeCpaHtml(formatCpaDateTime(entry.created_at))}</p>
       <p class="cpa-list-meta">${escapeCpaHtml(entry.actor_email || "System")}</p>
     </div>
   `).join("");
