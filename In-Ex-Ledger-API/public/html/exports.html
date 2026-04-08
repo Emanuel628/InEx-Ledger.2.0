@@ -74,7 +74,7 @@
         </div>
       </section>
 
-      <form id="exportForm" class="exports-grid" novalidate>
+      <form id="exportForm" class="exports-grid" novalidate aria-label="Export configuration">
         <section class="exports-card">
           <div class="card-title-row">
             <span class="card-title-icon" aria-hidden="true">
@@ -117,7 +117,7 @@
             </select>
           </div>
 
-          <p class="error-text" id="exportFormMessage"></p>
+          <p class="error-text" id="exportFormMessage" role="alert" aria-live="polite"></p>
         </section>
 
         <section class="exports-card">
@@ -130,7 +130,7 @@
 
           <div class="form-field">
             <label class="field-label" for="exportScope" data-i18n="exports_scope_label">Export scope</label>
-            <select id="exportScope">
+            <select id="exportScope" aria-describedby="exportScopeHelp">
               <option value="active" data-i18n="exports_scope_active">Active business only</option>
               <option value="all" data-i18n="exports_scope_all">All businesses</option>
             </select>
@@ -171,6 +171,12 @@
           </div>
 
           <p id="exportPdfNote" class="small-note" data-i18n="exports_pdf_note_default">PDF export is included in InEx Ledger V1. All-business export downloads one file per business.</p>
+
+          <p class="small-note exports-cross-border-note" data-i18n="exports_cross_border_note">
+            &#x26A0;&#xFE0F; Your data may be processed in the United States and is subject to U.S. laws,
+            including the U.S.A. Patriot Act. By exporting, you acknowledge this cross-border transfer.
+            See our <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a> for details.
+          </p>
         </section>
       </form>
 

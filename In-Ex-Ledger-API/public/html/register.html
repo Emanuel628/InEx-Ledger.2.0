@@ -21,7 +21,7 @@
       </span>
       <span class="brand-text">InEx Ledger</span>
     </a>
-    <nav>
+    <nav aria-label="Primary">
       <a href="/login" data-i18n="nav_sign_in">Sign in</a>
       <a href="/subscription" data-i18n="nav_pricing">Pricing</a>
     </nav>
@@ -39,7 +39,7 @@
 
         <div class="form-field">
           <label for="password" data-i18n="register_password_label">Password</label>
-          <input type="password" id="password" name="password" required autocomplete="new-password" />
+          <input type="password" id="password" name="password" required autocomplete="new-password" aria-describedby="passwordStrengthText" />
           <div class="password-meter" aria-hidden="true">
             <div class="meter-segment" data-segment="1"></div>
             <div class="meter-segment" data-segment="2"></div>
@@ -56,6 +56,7 @@
             name="confirm_password"
             required
             autocomplete="new-password"
+            aria-describedby="passwordMatchMessage"
           />
         </div>
 

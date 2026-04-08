@@ -689,3 +689,17 @@
     justify-content: flex-start;
   }
 }
+
+.exports-cross-border-note {
+  margin-top: 12px;
+  padding: 8px 10px;
+  background: var(--surface2, #f8f9fa);
+  border-left: 3px solid var(--warning, #d97706);
+  border-radius: 4px;
+  color: var(--ink2, #555);
+  line-height: 1.5;
+}
+
+.exports-cross-border-note a {
+  color: var(--accent, #2563eb);
+}
