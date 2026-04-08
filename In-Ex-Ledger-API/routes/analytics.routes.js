@@ -347,7 +347,7 @@ router.get("/seasonal", async (req, res) => {
       if (pct <= -10) {
         insight = `Your ${m.month_name} income is ${Math.abs(pct).toFixed(0)}% lower than average — consider building a buffer in this month.`;
       } else if (pct >= 10) {
-        insight = `Your ${m.month_name} income is ${pct.toFixed(0)}% higher than average — a great time to top up savings or goals.`;
+        insight = `Your ${m.month_name} income is ${pct.toFixed(0)}% higher than average — a great time to top up savings or build a financial buffer.`;
       }
       return { ...m, deviation_pct: Number(pct.toFixed(1)), insight };
     });
