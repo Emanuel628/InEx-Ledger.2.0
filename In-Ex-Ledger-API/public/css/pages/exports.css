@@ -703,3 +703,149 @@
 .exports-cross-border-note a {
   color: var(--accent, #2563eb);
 }
+
+/* ─── Secure Export Modal ─────────────────────────────────── */
+
+.secure-export-modal-content {
+  width: min(480px, 92vw);
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.secure-export-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.secure-export-modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.secure-export-lock-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.secure-export-ephemeral-note {
+  font-size: 12px;
+  color: var(--success, #16a34a);
+  margin-bottom: 14px;
+  font-weight: 500;
+}
+
+.secure-export-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.secure-export-tax-input {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid var(--border-soft, #cbd5e1);
+  border-radius: 8px;
+  background: var(--input-bg, #f8fafc);
+  color: var(--text-primary, #1e293b);
+  outline: none;
+  font-family: monospace;
+  letter-spacing: 0.1em;
+}
+
+.secure-export-tax-input:focus {
+  border-color: var(--accent2, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.secure-export-toggle-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border-soft, #cbd5e1);
+  border-radius: 6px;
+  background: var(--surface, #fff);
+  color: var(--accent2, #2563eb);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.secure-export-toggle-btn:hover {
+  background: var(--accent-light, #eff6ff);
+}
+
+.secure-export-legal {
+  background: var(--surface2, #f8f9fa);
+  border: 1px solid var(--border-soft, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.secure-export-legal-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink3, #64748b);
+  margin: 0 0 6px;
+}
+
+.secure-export-legal-body {
+  font-size: 12px;
+  color: var(--ink2, #475569);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.secure-export-legal-body + .secure-export-legal-body {
+  margin-top: 8px;
+}
+
+.secure-export-canada-text {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft, #e2e8f0);
+  margin-top: 8px;
+}
+
+.secure-export-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  margin-bottom: 14px;
+}
+
+.secure-export-checkbox-row input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: var(--accent2, #2563eb);
+}
+
+.secure-export-checkbox-row span {
+  font-size: 12px;
+  color: var(--ink2, #475569);
+  line-height: 1.5;
+}
+
+.secure-export-error {
+  font-size: 12px;
+  color: var(--danger, #dc2626);
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  background: rgba(220, 38, 38, 0.06);
+  border-radius: 6px;
+}
+
+.secure-export-error.hidden {
+  display: none;
+}
+
+.secure-export-canada-text.hidden {
+  display: none;
+}

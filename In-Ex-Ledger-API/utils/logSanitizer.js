@@ -1,11 +1,12 @@
 const SENSITIVE_KEYS = new Set([
-  "taxId",
-  "taxId_jwe",
+  "taxid",
+  "taxid_jwe",
   "ein",
   "bn",
   "tax_id",
-  "taxid",
-  "tax-id"
+  "tax-id",
+  "ssn",
+  "sin"
 ]);
 
 const STRING_PATTERNS = [
@@ -36,7 +37,7 @@ function sanitizePayload(payload) {
 
   const sanitized = {};
   for (const [key, value] of Object.entries(payload)) {
-    if (SENSITIVE_KEYS.has(key)) {
+    if (SENSITIVE_KEYS.has(key.toLowerCase())) {
       sanitized[key] = "[REDACTED]";
       continue;
     }
