@@ -139,6 +139,14 @@ button:active,
   color: var(--ink2);
   padding: 8px 16px;
   border-radius: 7px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.btn-secondary:hover,
+.ghost-btn:hover {
+  background: var(--surface3);
+  color: var(--ink);
 }
 
 .btn-delete,
@@ -148,6 +156,15 @@ button:active,
   border: 1px solid var(--red-border);
   padding: 8px 16px;
   border-radius: 7px;
+  cursor: pointer;
+}
+
+/* ── Focus-visible ring for interactive elements ─────────── */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--accent2);
+  outline-offset: 2px;
 }
 
 table {

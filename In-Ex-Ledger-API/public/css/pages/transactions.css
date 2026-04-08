@@ -1158,6 +1158,15 @@ body {
   color: var(--red);
 }
 
+/* Color-coded left border makes card type scannable at a glance */
+.stat-card:has(.stat-label-income) {
+  border-left: 3px solid var(--green);
+}
+
+.stat-card:has(.stat-label-expense) {
+  border-left: 3px solid var(--red);
+}
+
 .stat-delta {
   margin-top: 6px;
   font-size: 11px;

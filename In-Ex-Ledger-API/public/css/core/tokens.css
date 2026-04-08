@@ -1,4 +1,5 @@
 :root {
+  /* Core palette */
   --ink: #0f1923;
   --ink2: #4a5568;
   --ink3: #8a96a3;
@@ -22,4 +23,34 @@
   --radius-xl: 20px;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
   --shadow-card: 0 1px 3px rgba(15, 25, 35, 0.06), 0 1px 2px rgba(15, 25, 35, 0.04);
+
+  /* Aliases used by page-level CSS — map to canonical tokens above */
+  --card-bg: var(--surface);
+  --bg-surface: var(--surface);
+  --input-bg: var(--surface2);
+  --text-main: var(--ink);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink2);
+  --text-muted: var(--ink3);
+  --border-soft: var(--border);
+  --border-subtle: var(--border);
+  --accent-primary: var(--accent2);
+  --accent-success: var(--green);
+  --primary: var(--accent2);
+  --success: var(--green);
+  --danger: var(--red);
+  --shadow-sm: 0 1px 4px rgba(15, 25, 35, 0.07), 0 1px 2px rgba(15, 25, 35, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 25, 35, 0.10), 0 1px 3px rgba(15, 25, 35, 0.06);
+  --shadow-soft: var(--shadow-card);
+  --radius-modern: var(--radius-lg);
+
+  /* Spacing scale */
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+
+  /* Form field gap between label and input */
+  --field-label-gap: 6px;
 }
