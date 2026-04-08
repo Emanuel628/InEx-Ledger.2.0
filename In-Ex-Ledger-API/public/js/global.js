@@ -169,8 +169,24 @@ function injectMobileDesktopLink() {
   document.body.appendChild(wrapper);
 }
 
+function injectHelpNavLink() {
+  document.querySelectorAll(".app-topbar .topbar-nav").forEach((nav) => {
+    if (nav.querySelector('[data-nav-help="true"]')) {
+      return;
+    }
+
+    const link = document.createElement("a");
+    link.href = "help";
+    link.setAttribute("data-nav-help", "true");
+    link.setAttribute("data-i18n", "nav_help");
+    link.innerHTML = '<span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 3.5h6a1 1 0 0 1 1 1V13h-6a1 1 0 0 1-1-1z"></path><path d="M9.5 4.5H12a1 1 0 0 1 1 1V13h-3.5"></path><path d="M6 7.5h2.5M6 10h2.5"></path></svg></span><span>Help</span>';
+    nav.appendChild(link);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
+  injectHelpNavLink();
   highlightNavigation();
   applyDateInputConstraints();
   injectMobileDesktopLink();
