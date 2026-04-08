@@ -1,5 +1,6 @@
 const express = require("express");
 const crypto = require("crypto");
+const rateLimit = require("express-rate-limit");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { issueExportGrant, verifyExportGrant } = require("../services/exportGrantService.js");
@@ -12,6 +13,14 @@ const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+
+const secureExportLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many export requests. Please try again later." }
+});
 
 const router = express.Router();
 router.use(requireAuth);
@@ -231,6 +240,79 @@ router.get("/exports/history/:id/redacted", async (req, res) => {
   } catch (err) {
     logError("Redacted download error", { err: err.message });
     return res.status(500).json({ error: "Cannot download redacted export." });
+  }
+});
+
+// POST /exports/secure-export — single-step secure PDF export for the Secure Export Modal.
+// Accepts an encrypted tax ID (JWE) and date range, generates a PDF, and returns it directly.
+// Sensitive fields (ssn, sin, taxId_jwe) are redacted from all log output.
+router.post("/exports/secure-export", secureExportLimiter, async (req, res) => {
+  const sanitizedBody = sanitizePayload(req.body);
+  try {
+    const user = req.user;
+    user.business_id = await resolveBusinessIdForUser(user);
+    const businessId = user.business_id;
+
+    const dateRange = validateDateRange(req.body?.dateRange);
+    if (!dateRange) {
+      return res.status(400).json({ error: "Valid startDate and endDate are required." });
+    }
+
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    if (!hasFeatureAccess(subscription, "pdf_exports")) {
+      return res.status(402).json({ error: "PDF exports require an active InEx Ledger V1 plan." });
+    }
+
+    const includeTaxId = Boolean(req.body?.includeTaxId);
+    if (includeTaxId && !req.body?.taxId_jwe) {
+      return res.status(400).json({ error: "taxId_jwe is required when includeTaxId is true." });
+    }
+
+    const exportLang = req.body?.language || "en";
+    const currency = req.body?.currency || "USD";
+    const templateVersion = req.body?.templateVersion || "v1";
+
+    const jobId = crypto.randomUUID();
+    const filename = `luna-business-export-${dateRange.startDate}_to_${dateRange.endDate}.pdf`;
+
+    const job = {
+      jobId,
+      businessId,
+      userId: user.id,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+      includeTaxId,
+      taxId_jwe: includeTaxId ? req.body.taxId_jwe : undefined,
+      exportLang,
+      currency,
+      templateVersion
+    };
+
+    const workerResult = await dispatchPdfJob(job);
+    const redactedBuffer = workerResult.redactedPdfBuffer || Buffer.alloc(0);
+    const { filePath, hash } = await saveRedactedPdf(jobId, redactedBuffer);
+    const exportId = crypto.randomUUID();
+
+    await pool.query(
+      `INSERT INTO exports (id, business_id, user_id, export_type, start_date, end_date, include_tax_id, grant_jti, content_hash, file_path)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [exportId, businessId, user.id, "pdf", dateRange.startDate, dateRange.endDate, includeTaxId, null, hash, filePath]
+    );
+
+    const metadataId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO export_metadata (id, export_id, language, currency, page_count, notes)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [metadataId, exportId, exportLang, currency, Number(workerResult.metadata?.pageCount) || 0, workerResult.metadata?.notes || "Generated via secure export modal"]
+    );
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Cache-Control", "private, no-store, max-age=0");
+    return res.send(workerResult.fullPdfBuffer);
+  } catch (err) {
+    logError("Secure export error", { body: sanitizedBody, err: err.message });
+    return res.status(500).json({ error: "Failed to generate secure export." });
   }
 });
 

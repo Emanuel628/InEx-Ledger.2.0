@@ -40,6 +40,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initBusinessTaxId();
   setupExportForm();
   setupPdfButton();
+  initSecureExportModal();
   await refreshReceiptsDot();
   updateExportSummary();
   renderExportHistory();
@@ -417,7 +418,13 @@ function setupPdfButton() {
     if (!range) {
       return;
     }
-    exportPdf(range.startDate, range.endDate);
+    const scope = getExportScope();
+    const includeTaxId = scope !== "all" && !!document.getElementById("exportIncludeTaxId")?.checked;
+    if (includeTaxId) {
+      openSecureExportModal(range.startDate, range.endDate);
+    } else {
+      exportPdf(range.startDate, range.endDate);
+    }
   });
 }
 
@@ -1355,4 +1362,235 @@ function readStorageArray(key) {
   } catch {
     return [];
   }
+}
+
+// ─── Secure Export Modal ──────────────────────────────────────────────────────
+
+let secureExportPendingRange = null;
+
+function openSecureExportModal(startDate, endDate) {
+  const modal = document.getElementById("secureExportModal");
+  const input = document.getElementById("secureExportTaxId");
+  const checkbox = document.getElementById("secureExportCheckbox");
+  const generateBtn = document.getElementById("secureExportGenerateBtn");
+  const errorEl = document.getElementById("secureExportError");
+  const canadaText = document.getElementById("secureExportCanadaText");
+  const toggleBtn = document.getElementById("secureExportToggleBtn");
+
+  if (!modal) {
+    return;
+  }
+
+  secureExportPendingRange = { startDate, endDate };
+
+  // Reset state
+  if (input) {
+    input.value = "";
+    input.type = "password";
+  }
+  if (checkbox) {
+    checkbox.checked = false;
+  }
+  if (generateBtn) {
+    generateBtn.disabled = true;
+  }
+  if (errorEl) {
+    errorEl.textContent = "";
+    errorEl.classList.add("hidden");
+  }
+  if (toggleBtn) {
+    toggleBtn.textContent = tx("secure_export_modal_show");
+  }
+
+  // Show Canada-specific text if the business region is Canada
+  if (canadaText) {
+    const region = getRegion();
+    if (region === "ca") {
+      canadaText.classList.remove("hidden");
+    } else {
+      canadaText.classList.add("hidden");
+    }
+  }
+
+  modal.classList.remove("hidden");
+  input?.focus();
+}
+
+function closeSecureExportModal() {
+  const modal = document.getElementById("secureExportModal");
+  const input = document.getElementById("secureExportTaxId");
+  if (!modal) {
+    return;
+  }
+
+  // Wipe ephemeral data immediately on close
+  if (input) {
+    input.value = "";
+  }
+
+  modal.classList.add("hidden");
+  secureExportPendingRange = null;
+}
+
+function initSecureExportModal() {
+  const modal = document.getElementById("secureExportModal");
+  const input = document.getElementById("secureExportTaxId");
+  const checkbox = document.getElementById("secureExportCheckbox");
+  const generateBtn = document.getElementById("secureExportGenerateBtn");
+  const cancelBtn = document.getElementById("secureExportCancelBtn");
+  const toggleBtn = document.getElementById("secureExportToggleBtn");
+  const errorEl = document.getElementById("secureExportError");
+
+  if (!modal) {
+    return;
+  }
+
+  // Cancel / backdrop close
+  cancelBtn?.addEventListener("click", closeSecureExportModal);
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      closeSecureExportModal();
+    }
+  });
+
+  // Escape key closes
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !modal.classList.contains("hidden")) {
+      closeSecureExportModal();
+    }
+  });
+
+  // Show/hide toggle
+  toggleBtn?.addEventListener("click", () => {
+    if (!input) {
+      return;
+    }
+    const isHidden = input.type === "password";
+    input.type = isHidden ? "text" : "password";
+    toggleBtn.textContent = isHidden ? tx("secure_export_modal_hide") : tx("secure_export_modal_show");
+  });
+
+  // Enable generate button only when both input and checkbox are valid
+  const syncGenerateBtn = () => {
+    if (generateBtn) {
+      generateBtn.disabled = !(input?.value?.trim()) || !checkbox?.checked;
+    }
+  };
+  input?.addEventListener("input", syncGenerateBtn);
+  checkbox?.addEventListener("change", syncGenerateBtn);
+
+  // Generate export
+  generateBtn?.addEventListener("click", async () => {
+    if (!secureExportPendingRange) {
+      return;
+    }
+    const taxId = input?.value?.trim() || "";
+    if (!taxId) {
+      showSecureExportError(tx("secure_export_modal_error_taxid"));
+      return;
+    }
+    if (!checkbox?.checked) {
+      showSecureExportError(tx("secure_export_modal_error_checkbox"));
+      return;
+    }
+
+    generateBtn.disabled = true;
+    if (errorEl) {
+      errorEl.textContent = "";
+      errorEl.classList.add("hidden");
+    }
+
+    try {
+      await submitSecureExport(taxId, secureExportPendingRange.startDate, secureExportPendingRange.endDate);
+      // Wipe input immediately after API call regardless of outcome
+      if (input) {
+        input.value = "";
+      }
+      closeSecureExportModal();
+    } catch (err) {
+      // Input cleared even on error — no residual sensitive data
+      if (input) {
+        input.value = "";
+      }
+      generateBtn.disabled = false;
+      showSecureExportError(err?.message || tx("secure_export_modal_error_generic"));
+    }
+  });
+}
+
+function showSecureExportError(message) {
+  const errorEl = document.getElementById("secureExportError");
+  if (!errorEl) {
+    return;
+  }
+  errorEl.textContent = message || tx("secure_export_modal_error_generic");
+  errorEl.classList.remove("hidden");
+}
+
+async function submitSecureExport(taxId, startDate, endDate) {
+  // Encrypt the tax ID client-side before sending
+  let taxId_jwe;
+  try {
+    if (!window.exportCrypto?.encryptTaxId) {
+      throw new Error(tx("secure_export_modal_error_generic"));
+    }
+    taxId_jwe = await window.exportCrypto.encryptTaxId(taxId);
+  } catch (encErr) {
+    throw new Error(tx("secure_export_modal_error_generic"));
+  }
+
+  const scope = getExportScope();
+  const exportLang = clampExportLang(getCurrentExportLanguage());
+  const region = getRegion();
+  const currency = getCurrencyForRegion(region);
+
+  const response = await apiFetch("/api/exports/secure-export", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      dateRange: { startDate, endDate },
+      includeTaxId: true,
+      taxId_jwe,
+      language: exportLang,
+      currency,
+      templateVersion: "v1"
+    })
+  });
+
+  if (!response || !response.ok) {
+    let errorMessage = tx("secure_export_modal_error_generic");
+    try {
+      const payload = await response.json();
+      if (payload?.error && typeof payload.error === "string") {
+        errorMessage = payload.error;
+      }
+    } catch {}
+    throw new Error(errorMessage);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `inex-ledger-secure-export-${startDate}_to_${endDate}.pdf`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+
+  showExportToast(tx("exports_generated_pdf"));
+
+  const historyEntry = {
+    id: `exp_${Date.now()}`,
+    startDate,
+    endDate,
+    exportedAt: new Date().toISOString(),
+    filename: `inex-ledger-secure-export-${startDate}_to_${endDate}.pdf`,
+    tier: "v1",
+    format: PDF_FORMAT,
+    exportLang,
+    scope
+  };
+  appendExportHistory(historyEntry);
+  renderExportHistory();
 }
