@@ -222,7 +222,7 @@ router.delete("/:id", businessDeleteLimiter, async (req, res) => {
       );
 
       // Delete the business — all remaining child rows cascade (transactions, receipts,
-      // mileage, accounts, categories, exports, subscriptions, cpa_access_grants, financial_goals)
+      // mileage, accounts, categories, exports, subscriptions, cpa_access_grants)
       await client.query(
         "DELETE FROM businesses WHERE id = $1 AND user_id = $2",
         [businessId, req.user.id]
