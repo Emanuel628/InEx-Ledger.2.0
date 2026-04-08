@@ -1,0 +1,125 @@
+/* ============================================================
+   Messages page — Inbox, Sent, Compose
+   ============================================================ */
+
+/* ── Topbar / Nav (reuse goals-topbar pattern) ─────────────── */
+.messages-topbar{position:sticky;top:0;z-index:40;height:56px;background:var(--accent);display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+.topbar-left,.topbar-brand,.topbar-nav,.topbar-nav a,.sidebar-link,.sidebar-icon,.user-pill{display:flex;align-items:center}
+.topbar-left{gap:28px}
+.topbar-brand{gap:8px;text-decoration:none}
+.brand-mark{width:28px;height:28px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}
+.brand-mark-topbar{background:rgba(255,255,255,.15);color:#fff}
+.topbar-brand-text{font-size:15px;font-weight:500;letter-spacing:.02em;color:#fff}
+.topbar-nav{gap:8px}
+.topbar-nav a{gap:6px;padding:6px 12px;border-radius:7px;font-size:13px;color:rgba(255,255,255,.6);text-decoration:none}
+.topbar-nav a:hover,.topbar-nav a.is-active{background:rgba(255,255,255,.15);color:#fff}
+.nav-icon{width:14px;height:14px;justify-content:center}
+.nav-icon svg,.sidebar-icon svg{width:100%;height:100%;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.user-pill{gap:8px;padding:5px 10px 5px 6px;border-radius:20px;background:rgba(255,255,255,.1)}
+.user-avatar{width:24px;height:24px;border-radius:50%;background:var(--accent2);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:500}
+.user-name{font-size:12px;color:rgba(255,255,255,.85)}
+
+/* ── App shell ─────────────────────────────────────────────── */
+.app-shell{display:flex;min-height:calc(100vh - 56px)}
+.app-sidebar{width:200px;background:var(--surface);border-right:.5px solid var(--border);padding:20px 12px}
+.sidebar-section-label{padding:12px 8px 6px;font-size:10px;font-weight:500;letter-spacing:.08em;color:var(--ink3);text-transform:uppercase}
+.sidebar-nav{display:flex;flex-direction:column;gap:2px}
+.sidebar-link{gap:10px;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--ink2);text-decoration:none}
+.sidebar-link:hover{background:var(--surface2);color:var(--ink)}
+.sidebar-link.is-active{background:var(--accent-light);color:var(--accent2)}
+.sidebar-icon{width:15px;height:15px;flex-shrink:0}
+
+/* ── Main messages layout ───────────────────────────────────── */
+.messages-content{flex:1;display:flex;flex-direction:column;background:var(--surface2);min-height:0}
+
+.messages-header{padding:20px 24px 0;display:flex;justify-content:space-between;align-items:center}
+.messages-header h1{font-size:18px;font-weight:600;color:var(--ink)}
+.messages-compose-btn{padding:9px 16px;background:var(--accent2);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+
+/* ── Tab bar ────────────────────────────────────────────────── */
+.messages-tabs{display:flex;gap:2px;padding:16px 24px 0;border-bottom:.5px solid var(--border)}
+.messages-tab{padding:8px 14px;font-size:13px;font-weight:500;color:var(--ink3);border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.messages-tab:hover{color:var(--ink)}
+.messages-tab.is-active{color:var(--accent2);border-bottom-color:var(--accent2)}
+.messages-tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;background:var(--accent2);color:#fff;border-radius:9px;font-size:10px;font-weight:600;margin-left:6px;vertical-align:middle}
+
+/* ── Message list ───────────────────────────────────────────── */
+.messages-list{flex:1;overflow-y:auto;padding:16px 24px}
+.messages-empty{padding:48px 0;text-align:center;color:var(--ink3);font-size:13px}
+.messages-loading{padding:48px 0;text-align:center;color:var(--ink3);font-size:13px}
+
+.message-row{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;background:var(--surface);border:.5px solid var(--border);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:box-shadow .15s}
+.message-row:hover{box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.message-row.is-unread{border-left:3px solid var(--accent2)}
+
+.message-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent-light);color:var(--accent2);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0}
+
+.message-row-body{flex:1;min-width:0}
+.message-row-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.message-from{font-size:13px;font-weight:600;color:var(--ink)}
+.message-date{font-size:11px;color:var(--ink3);white-space:nowrap}
+.message-subject{font-size:12px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.message-preview{font-size:12px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+
+.message-type-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;margin-left:8px}
+.message-type-badge.cpa{background:#e8f5e9;color:#2e7d32}
+.message-type-badge.it_support{background:#e3f2fd;color:#1565c0}
+.message-type-badge.support_request{background:#fff8e1;color:#f57f17}
+.message-type-badge.general{background:var(--surface3);color:var(--ink3)}
+
+.message-row-actions{display:flex;gap:6px;flex-shrink:0;margin-left:8px}
+.msg-btn{padding:4px 8px;font-size:11px;border-radius:6px;cursor:pointer;border:.5px solid var(--border2);background:var(--surface);color:var(--ink2)}
+.msg-btn:hover{background:var(--surface2)}
+.msg-btn.danger{color:var(--red);border-color:var(--red-border)}
+.msg-btn.danger:hover{background:var(--red-bg)}
+
+/* ── Message detail panel ───────────────────────────────────── */
+.message-detail-overlay{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center;padding:0}
+.message-detail-overlay.hidden{display:none}
+.message-detail-panel{width:100%;max-width:680px;max-height:85vh;background:var(--surface);border-radius:14px 14px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -4px 24px rgba(0,0,0,.18)}
+
+.message-detail-header{padding:16px 20px;border-bottom:.5px solid var(--border);display:flex;align-items:flex-start;gap:12px}
+.message-detail-close{margin-left:auto;background:none;border:none;font-size:18px;cursor:pointer;color:var(--ink3);line-height:1;padding:2px 6px}
+.message-detail-meta{flex:1;min-width:0}
+.message-detail-subject{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.message-detail-from{font-size:12px;color:var(--ink3)}
+.message-detail-from strong{color:var(--ink)}
+
+.message-detail-body{flex:1;overflow-y:auto;padding:20px;font-size:13px;color:var(--ink);line-height:1.6;white-space:pre-wrap;word-break:break-word}
+
+.message-detail-footer{padding:12px 20px;border-top:.5px solid var(--border);display:flex;gap:8px;align-items:center}
+.message-detail-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Reply area */
+.message-reply-area{padding:12px 20px;border-top:.5px solid var(--border);display:flex;flex-direction:column;gap:8px}
+.message-reply-area.hidden{display:none}
+.message-reply-input{width:100%;padding:10px 12px;border:.5px solid var(--border2);border-radius:8px;font-size:13px;color:var(--ink);background:var(--surface2);resize:vertical;min-height:72px;box-sizing:border-box;font-family:inherit}
+.message-reply-send{align-self:flex-end;padding:8px 16px;background:var(--accent2);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer}
+
+/* ── Compose modal ──────────────────────────────────────────── */
+.compose-overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:20px}
+.compose-overlay.hidden{display:none}
+.compose-modal{background:var(--surface);border-radius:var(--radius-lg);padding:24px;width:100%;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:12px}
+.compose-modal h2{font-size:15px;font-weight:600;color:var(--ink);margin:0}
+
+.compose-field{display:flex;flex-direction:column;gap:5px}
+.compose-field label{font-size:10px;font-weight:500;letter-spacing:.06em;color:var(--ink3);text-transform:uppercase}
+.compose-field input,.compose-field select,.compose-field textarea{padding:9px 11px;border:.5px solid var(--border2);border-radius:7px;font-size:13px;color:var(--ink);background:var(--surface2);width:100%;box-sizing:border-box;font-family:inherit}
+.compose-field textarea{resize:vertical;min-height:100px}
+
+.compose-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.compose-cancel{padding:8px 16px;border:.5px solid var(--border2);border-radius:7px;background:none;font-size:13px;color:var(--ink2);cursor:pointer}
+.compose-send{padding:8px 16px;border:none;border-radius:7px;background:var(--accent2);color:#fff;font-size:13px;font-weight:500;cursor:pointer}
+.compose-error{font-size:12px;color:var(--red);min-height:16px}
+
+/* ── Toast ──────────────────────────────────────────────────── */
+.messages-toast{position:fixed;right:24px;bottom:24px;z-index:2000;display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--accent);color:#fff;border-radius:var(--radius);font-size:13px;min-width:240px;box-shadow:0 4px 16px rgba(15,25,35,.18)}
+.messages-toast.hidden{display:none}
+
+/* ── Notification badge in nav (injected by global.js) ─────── */
+.nav-msg-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;background:var(--red,#e53935);color:#fff;border-radius:8px;font-size:9px;font-weight:700;margin-left:4px;vertical-align:middle;line-height:1}
+.nav-msg-badge[data-count="0"]{display:none}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width:1024px){.topbar-nav{display:none}.app-sidebar{display:none}}
+@media (max-width:720px){.messages-list{padding:12px}.messages-header{padding:16px 12px 0}.messages-tabs{padding:12px 12px 0}.message-detail-panel{max-width:100%;border-radius:0}}
