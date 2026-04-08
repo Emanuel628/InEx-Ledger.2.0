@@ -618,22 +618,10 @@ main {
     gap: 12px;
   }
 
-  .settings-save-bar {
-    width: calc(100% - 32px);
-  }
 }
 /* =========================
    Settings Layout Shell (Step 1)
    ========================= */
-
-.settings-shell {
-  max-width: 1240px;
-  margin: 0 auto;
-  padding: 32px 24px 80px;
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 28px;
-}
 
 .settings-sidebar {
   position: sticky;
@@ -790,103 +778,15 @@ body {
   background: var(--surface2);
 }
 
-.settings-topbar {
-  padding: 0 20px;
-}
-
-.topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 28px;
-}
-
-.topbar-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-}
-
-.brand-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.brand-mark-topbar {
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-}
-
-.topbar-brand-text {
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: #fff;
-}
-
-.topbar-nav,
-.topbar-nav a {
-  display: flex;
-  align-items: center;
-}
-
-.topbar-nav {
-  gap: 8px;
-}
-
-.topbar-nav a {
-  gap: 6px;
-}
-
-.nav-icon {
-  width: 14px;
-  height: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.nav-icon svg,
+/* SVG icon sizing for settings-specific icons */
 .danger-card-icon svg,
-.danger-modal-icon svg,
-.toast-check svg {
+.danger-modal-icon svg {
   width: 100%;
   height: 100%;
   stroke: currentColor;
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.user-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px 5px 6px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.user-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--accent2);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 500;
-}
-
-.user-name {
-  font-size: 12px;
 }
 
 .settings-shell {
@@ -952,7 +852,7 @@ body {
 }
 
 .settings-main {
-  padding: 28px;
+  padding: 28px 28px 80px; /* bottom pad keeps content above fixed save bar */
   background: var(--surface2);
   display: flex;
   flex-direction: column;
@@ -1013,7 +913,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
+  /* Negative horizontal margins cancel the card's 22px padding so the
+     border-top rule runs wall-to-wall, matching the card's inner edges. */
+  margin-left: -22px;
+  margin-right: -22px;
+  padding: 14px 22px;
   border-top: 0.5px solid var(--border);
 }
 
@@ -1105,18 +1009,21 @@ body {
 }
 
 .settings-save-bar {
-  position: sticky;
-  bottom: 20px;
-  margin: 18px 20px 0;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 500;
+  margin: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 16px;
+  padding: 14px 28px;
   background: var(--accent);
   color: #fff;
-  border-radius: var(--radius);
-  box-shadow: 0 4px 16px rgba(15, 25, 35, 0.18);
+  border-radius: 0;
+  box-shadow: 0 -2px 12px rgba(15, 25, 35, 0.14);
 }
 
 .settings-save-bar.hidden {
@@ -1574,7 +1481,7 @@ body {
   }
 
   .settings-main {
-    padding: 16px;
+    padding: 16px 16px 80px;
   }
 
   .settings-form-grid,
@@ -1583,8 +1490,7 @@ body {
   }
 
   .settings-row,
-  .danger-row,
-  .settings-save-bar {
+  .danger-row {
     flex-direction: column;
     align-items: stretch;
   }

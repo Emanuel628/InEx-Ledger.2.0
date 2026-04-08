@@ -49,10 +49,11 @@
           <button class="settings-nav-item" type="button" data-settings-target="settings-account" data-i18n="settings_nav_account_settings">Account &amp; Subscription</button>
           <button class="settings-nav-item" type="button" data-settings-target="settings-cpa-access" data-i18n="settings_nav_cpa_access">CPA access</button>
           <button class="settings-nav-item" type="button" data-settings-target="settings-security" data-i18n="settings_nav_security">Security</button>
+          <button class="settings-nav-item settings-nav-danger" type="button" data-settings-target="settings-danger" data-i18n="settings_nav_danger_zone">Danger zone</button>
         </nav>
         <div class="sidebar-section-label" data-i18n="settings_sidebar_preferences">Preferences</div>
         <nav class="settings-nav">
-          <button class="settings-nav-item" type="button" data-settings-target="settings-preferences" data-i18n="settings_nav_language_region">Language &amp; region</button>
+          <button class="settings-nav-item" type="button" data-settings-target="settings-language" data-i18n="settings_nav_language_region">Language &amp; region</button>
           <button class="settings-nav-item" type="button" data-settings-target="settings-appearance" data-i18n="settings_nav_appearance">Appearance</button>
           <button class="settings-nav-item" type="button" data-settings-target="settings-privacy" data-i18n="settings_nav_privacy">Privacy</button>
         </nav>
@@ -147,6 +148,13 @@
             <div class="settings-row-desc" data-i18n="settings_sin_row_desc">Used on Canadian T1 and T2125 filings. Stored encrypted.</div>
           </div>
         </div>
+        <div class="settings-row">
+          <div class="settings-row-copy">
+            <div class="settings-row-title" data-i18n="settings_getting_started_tips">Getting started tips</div>
+            <div class="settings-row-desc" data-i18n="settings_getting_started_tips_desc">Show the first-run tips again on Transactions, Receipts, Mileage, and Exports.</div>
+          </div>
+          <button type="button" id="replayOnboardingTips" class="settings-secondary-btn" data-i18n="settings_replay_tips">Replay tips</button>
+        </div>
       </section>
 
       <section class="settings-card" id="settings-cpa-access">
@@ -202,9 +210,11 @@
         </div>
       </section>
 
-      <section class="settings-card settings-pref-card" id="settings-preferences">
+      <!-- Language & Region -->
+      <section class="settings-card" id="settings-language">
         <div class="card-head">
-          <h2 class="card-title" data-i18n="settings_preferences_title">Preferences</h2>
+          <h2 class="card-title" data-i18n="settings_nav_language_region">Language &amp; region</h2>
+          <p class="card-desc" data-i18n="settings_language_region_desc">Control the language, region, and units used across the app.</p>
         </div>
         <div class="settings-row">
           <div class="settings-row-copy">
@@ -215,16 +225,6 @@
             <option value="mi" data-i18n="settings_units_miles">Miles (mi)</option>
             <option value="km" data-i18n="settings_units_km">Kilometers (km)</option>
           </select>
-        </div>
-        <div class="settings-row" id="settings-appearance">
-          <div class="settings-row-copy">
-            <div class="settings-row-title" data-i18n="settings_dark_mode_title">Dark mode</div>
-            <div class="settings-row-desc" data-i18n="settings_dark_mode_desc">Switch the interface between light and dark appearance.</div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="darkModeToggle" />
-            <span class="switch-track"></span>
-          </label>
         </div>
         <div class="settings-row">
           <div class="settings-row-copy">
@@ -270,7 +270,33 @@
             <option value="YT">Yukon</option>
           </select>
         </div>
-        <div class="settings-row" id="settings-privacy">
+      </section>
+
+      <!-- Appearance -->
+      <section class="settings-card" id="settings-appearance">
+        <div class="card-head">
+          <h2 class="card-title" data-i18n="settings_nav_appearance">Appearance</h2>
+          <p class="card-desc" data-i18n="settings_appearance_desc">Customize how the app looks.</p>
+        </div>
+        <div class="settings-row">
+          <div class="settings-row-copy">
+            <div class="settings-row-title" data-i18n="settings_dark_mode_title">Dark mode</div>
+            <div class="settings-row-desc" data-i18n="settings_dark_mode_desc">Switch the interface between light and dark appearance.</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="darkModeToggle" />
+            <span class="switch-track"></span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Privacy -->
+      <section class="settings-card" id="settings-privacy">
+        <div class="card-head">
+          <h2 class="card-title" data-i18n="settings_nav_privacy">Privacy</h2>
+          <p class="card-desc" data-i18n="settings_privacy_desc">Control how your data is used and shared.</p>
+        </div>
+        <div class="settings-row">
           <div class="settings-row-copy">
             <div class="settings-row-title" data-i18n="settings_opt_out_title">Opt out of analytics</div>
             <div class="settings-row-desc" data-i18n="settings_opt_out_desc">Disable analytics and personal data sharing for product improvement.</div>
@@ -302,23 +328,6 @@
             <span data-i18n="privacy_terms_accepted">Terms accepted:</span>
             <span id="consentStatus">No</span>
           </p>
-        </div>
-        <div id="settingsSaveBar" class="settings-save-bar hidden" aria-live="polite">
-          <div class="settings-save-copy">
-            <strong data-i18n="settings_unsaved_title">Unsaved preference changes</strong>
-            <span data-i18n="settings_unsaved_body">Save to apply language, region, appearance, and privacy updates across the app.</span>
-          </div>
-          <div class="settings-save-actions">
-            <button type="button" id="settingsCancelChanges" class="settings-secondary-btn" data-i18n="common_cancel">Cancel</button>
-            <button type="button" id="settingsSavePreferences" class="settings-primary-btn" data-i18n="settings_save_preferences">Save preferences</button>
-          </div>
-        </div>
-        <div class="settings-row">
-          <div class="settings-row-copy">
-            <div class="settings-row-title" data-i18n="settings_getting_started_tips">Getting started tips</div>
-            <div class="settings-row-desc" data-i18n="settings_getting_started_tips_desc">Show the first-run tips again on Transactions, Receipts, Mileage, and Exports.</div>
-          </div>
-          <button type="button" id="replayOnboardingTips" class="settings-secondary-btn" data-i18n="settings_replay_tips">Replay tips</button>
         </div>
       </section>
 
@@ -432,6 +441,18 @@
           <button id="deleteAccountTrigger" type="button" class="danger-outline-btn" data-i18n="settings_delete_account_button">Delete account…</button>
         </div>
       </section>
+
+      <!-- Preference save bar — fixed to viewport bottom, shown when preferences change -->
+      <div id="settingsSaveBar" class="settings-save-bar hidden" aria-live="polite">
+        <div class="settings-save-copy">
+          <strong data-i18n="settings_unsaved_title">Unsaved preference changes</strong>
+          <span data-i18n="settings_unsaved_body">Save to apply language, region, appearance, and privacy updates across the app.</span>
+        </div>
+        <div class="settings-save-actions">
+          <button type="button" id="settingsCancelChanges" class="settings-secondary-btn" data-i18n="common_cancel">Cancel</button>
+          <button type="button" id="settingsSavePreferences" class="settings-primary-btn" data-i18n="settings_save_preferences">Save preferences</button>
+        </div>
+      </div>
     </main>
   </div>
 
