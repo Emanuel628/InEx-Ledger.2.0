@@ -97,7 +97,7 @@ router.get("/settings", async (req, res) => {
       dataResidency
     });
   } catch (err) {
-    console.error("GET /privacy/settings error:", err.message);
+    logError("GET /privacy/settings error", { err: err.message });
     res.status(500).json({ error: "Failed to load privacy settings." });
   }
 });
@@ -158,7 +158,7 @@ router.post("/settings", async (req, res) => {
       );
 
       // Log analytics opt-in consent separately when the QC user explicitly enables tracking
-      if (isQuebec && analyticsOptIn !== null && analyticsOptIn !== previousAnalyticsOptIn) {
+      if (analyticsOptIn !== null && analyticsOptIn !== previousAnalyticsOptIn) {
         const analyticsAction = analyticsOptIn ? "opt_in" : "opt_out";
         await pool.query(
           `INSERT INTO privacy_consent_log (user_id, data_residency, action, ip_address, user_agent)
@@ -170,7 +170,7 @@ router.post("/settings", async (req, res) => {
 
     res.json({ ok: true });
   } catch (err) {
-    console.error("POST /privacy/settings error:", err.message);
+    logError("POST /privacy/settings error", { err: err.message });
     res.status(500).json({ error: "Failed to save privacy settings." });
   }
 });
