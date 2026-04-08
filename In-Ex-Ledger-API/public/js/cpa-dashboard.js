@@ -387,13 +387,62 @@ function renderAuditLog(logs) {
     return;
   }
 
-  list.innerHTML = logs.slice(0, 10).map((entry) => `
-    <div class="cpa-list-item">
-      <p class="cpa-list-title">${escapeCpaHtml(formatAuditAction(entry.action))}</p>
-      <p class="cpa-list-meta">${escapeCpaHtml(entry.business_name || "Portfolio-wide")} � ${escapeCpaHtml(formatCpaDateTime(entry.created_at))}</p>
-      <p class="cpa-list-meta">${escapeCpaHtml(entry.actor_email || "System")}</p>
-    </div>
-  `).join("");
+  // Actions that warrant a visual highlight in both collapsed and expanded views.
+  const CRITICAL_ACTIONS = new Set([
+    "grant_revoked",
+    "portfolio_export_downloaded",
+    "grant_created_active",
+    "grant_auto_accepted"
+  ]);
+
+  const PREVIEW_COUNT = 3;
+  const totalCount = logs.length;
+  // Logs arrive newest-first; the first entry is the most recent activity.
+  const lastModified = logs[0]?.created_at;
+
+  const renderEntry = (entry) => {
+    const isCritical = CRITICAL_ACTIONS.has(entry.action);
+    return `
+      <div class="cpa-list-item${isCritical ? " cpa-audit-critical" : ""}">
+        ${isCritical ? '<span class="cpa-audit-critical-badge" aria-label="Critical activity" title="Critical activity">!</span>' : ""}
+        <p class="cpa-list-title">${escapeCpaHtml(formatAuditAction(entry.action))}</p>
+        <p class="cpa-list-meta">${escapeCpaHtml(entry.business_name || "Portfolio-wide")} · ${escapeCpaHtml(formatCpaDateTime(entry.created_at))}</p>
+        <p class="cpa-list-meta">${escapeCpaHtml(entry.actor_email || "System")}</p>
+      </div>
+    `;
+  };
+
+  const previewEntries = logs.slice(0, PREVIEW_COUNT);
+  const hiddenEntries = logs.slice(PREVIEW_COUNT);
+  const hiddenCount = hiddenEntries.length;
+
+  let html = `<div class="cpa-audit-last-modified">Last modified: ${escapeCpaHtml(formatCpaDateTime(lastModified))}</div>`;
+  html += '<div class="cpa-audit-preview">';
+  html += previewEntries.map(renderEntry).join("");
+  html += "</div>";
+
+  if (hiddenCount > 0) {
+    html += '<div class="cpa-audit-overflow hidden" id="cpaAuditOverflow">';
+    html += hiddenEntries.map(renderEntry).join("");
+    html += "</div>";
+    const label = hiddenCount === 1 ? "Show 1 more entry" : `Show ${hiddenCount} more entries`;
+    html += `<button type="button" class="cpa-audit-toggle" id="cpaAuditToggle" aria-expanded="false">${escapeCpaHtml(label)}</button>`;
+  }
+
+  list.innerHTML = html;
+
+  const toggleBtn = list.querySelector("#cpaAuditToggle");
+  const overflow = list.querySelector("#cpaAuditOverflow");
+  if (toggleBtn && overflow) {
+    toggleBtn.addEventListener("click", () => {
+      const expanded = toggleBtn.getAttribute("aria-expanded") === "true";
+      overflow.classList.toggle("hidden", expanded);
+      toggleBtn.setAttribute("aria-expanded", String(!expanded));
+      toggleBtn.textContent = expanded
+        ? (hiddenCount === 1 ? "Show 1 more entry" : `Show ${hiddenCount} more entries`)
+        : "Show less";
+    });
+  }
 }
 
 function formatCpaMoney(amount, positive = null, currency = "USD") {

@@ -286,6 +286,16 @@
             <div class="settings-row-desc" data-i18n="settings_qc_privacy_note">As a Quebec resident, your data-sharing opt-out is enabled by default under Law 25. You may change this in the Privacy settings, but opting back in is your choice.</div>
           </div>
         </div>
+        <div class="settings-row hidden" id="settingsQcAnalyticsRow">
+          <div class="settings-row-copy">
+            <div class="settings-row-title" data-i18n="settings_qc_analytics_title">Enable Analytics Tracking</div>
+            <div class="settings-row-desc" data-i18n="settings_qc_analytics_desc">Analytics tracking is disabled by default for Quebec residents (Law 25). Enable only if you consent to usage data collection.</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="analyticsOptInToggle" />
+            <span class="switch-track"></span>
+          </label>
+        </div>
         <div class="settings-row settings-row-actions">
           <button type="button" id="downloadMyDataBtn" class="safe-action" data-i18n="privacy_download_button">Download my data</button>
           <p class="consent-status">
@@ -476,6 +486,18 @@
       </svg>
     </span>
     <span id="settingsToastMessage">Saved</span>
+  </div>
+
+  <!-- Quebec Analytics Consent Modal -->
+  <div id="qcAnalyticsConsentModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="qcConsentModalTitle">
+    <div class="transaction-modal-content danger-modal">
+      <h3 id="qcConsentModalTitle" data-i18n="qc_analytics_consent_title">Enable Analytics Tracking</h3>
+      <p data-i18n="qc_analytics_consent_body">By enabling analytics tracking, I agree that my usage data may be collected and analyzed for improving the app's services. I understand I can disable tracking at any time via Privacy Settings.</p>
+      <div class="modal-actions danger-actions">
+        <button type="button" id="qcConsentCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
+        <button type="button" id="qcConsentConfirm" class="modal-delete" style="background:var(--accent,#2563eb)" data-i18n="qc_analytics_consent_confirm">I Agree – Enable Tracking</button>
+      </div>
+    </div>
   </div>
 
   <script src="../js/global.js?v=20260405c"></script>
