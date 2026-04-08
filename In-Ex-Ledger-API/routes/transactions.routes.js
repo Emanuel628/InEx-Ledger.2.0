@@ -2,7 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
-const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
+const { createTransactionLimiter } = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser, getBusinessScopeForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { encrypt, decrypt } = require("../services/encryptionService.js");
 
@@ -17,7 +17,7 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 router.use(requireAuth);
-router.use(createDataApiLimiter());
+router.use(createTransactionLimiter());
 
 function deriveCategoryKindFromSlug(slug) {
   const normalized = String(slug ?? "").trim().toLowerCase();

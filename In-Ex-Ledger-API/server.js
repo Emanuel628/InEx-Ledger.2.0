@@ -6,6 +6,7 @@ const path = require('path');
 const routes = require('./routes/index.js');
 const cookieParser = require('cookie-parser');
 const transactionsRouter = require('./routes/transactions.routes.js');
+const { createGlobalLimiter } = require('./middleware/rateLimitTiers.js');
 const { initDatabase } = require('./db.js');
 
 const app = express();
@@ -152,6 +153,7 @@ app.use(express.static(publicDir, {
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 app.use(cookieParser());
+app.use('/api', createGlobalLimiter());
 
 /* =========================================================
    SYSTEM ROUTES (HEALTH & STATIC)

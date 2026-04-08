@@ -7,8 +7,12 @@ const express = require("express");
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const { Resend } = require("resend");
-const rateLimit = require("express-rate-limit");
 const { signToken, verifyToken, requireAuth } = require("../middleware/auth.middleware.js");
+const {
+  createAuthLimiter,
+  createMfaVerifyLimiter,
+  createPasswordLimiter
+} = require("../middleware/rateLimitTiers.js");
 const { pool } = require("../db.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
@@ -36,29 +40,9 @@ const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FRO
 /* =========================================================
    2. RATE LIMITERS
    ========================================================= */
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many requests, please try again later." }
-});
-
-const passwordLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many password reset attempts, please try again later." }
-});
-
-const mfaVerifyLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 12,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many MFA attempts, please try again shortly." }
-});
+const authLimiter = createAuthLimiter();
+const passwordLimiter = createPasswordLimiter();
+const mfaVerifyLimiter = createMfaVerifyLimiter();
 
 /* =========================================================
    3. CONSTANTS & COOKIE CONFIGURATION

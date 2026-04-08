@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const express = require("express");
 const multer = require("multer");
 const { requireAuth } = require("../middleware/auth.middleware.js");
-const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
+const { createReceiptLimiter } = require("../middleware/rateLimitTiers.js");
 const {
   resolveBusinessIdForUser,
   getBusinessScopeForUser
@@ -19,7 +19,7 @@ const router = express.Router();
 const storageDir = path.join(process.cwd(), "storage", "receipts");
 fs.mkdirSync(storageDir, { recursive: true });
 router.use(requireAuth);
-router.use(createDataApiLimiter({ max: 90 }));
+router.use(createReceiptLimiter());
 
 /* =========================================================
    Receipt Upload Guards

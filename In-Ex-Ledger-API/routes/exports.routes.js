@@ -1,7 +1,10 @@
 const express = require("express");
 const crypto = require("crypto");
-const rateLimit = require("express-rate-limit");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const {
+  createExportGrantLimiter,
+  createSecureExportLimiter
+} = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { issueExportGrant, verifyExportGrant } = require("../services/exportGrantService.js");
 const { dispatchPdfJob } = require("../services/pdfWorkerClient.js");
@@ -14,13 +17,8 @@ const {
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
 
-const secureExportLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many export requests. Please try again later." }
-});
+const exportGrantLimiter = createExportGrantLimiter();
+const secureExportLimiter = createSecureExportLimiter();
 
 const router = express.Router();
 router.use(requireAuth);
@@ -44,7 +42,7 @@ function validateDateRange(range) {
   return { startDate, endDate };
 }
 
-router.post("/exports/request-grant", async (req, res) => {
+router.post("/exports/request-grant", exportGrantLimiter, async (req, res) => {
   const sanitizedBody = sanitizePayload(req.body);
   try {
     const user = req.user;
@@ -92,7 +90,7 @@ router.post("/exports/request-grant", async (req, res) => {
   }
 });
 
-router.post("/exports/generate", async (req, res) => {
+router.post("/exports/generate", exportGrantLimiter, async (req, res) => {
   const token = req.body?.grantToken;
   if (!token) {
     return res.status(400).json({ error: "grantToken is required." });

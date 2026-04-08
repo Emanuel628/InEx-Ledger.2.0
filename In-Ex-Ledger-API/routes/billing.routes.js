@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const express = require("express");
-const rateLimit = require("express-rate-limit");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { createBillingMutationLimiter } = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const {
   getSubscriptionSnapshotForBusiness,
@@ -16,13 +16,7 @@ const router = express.Router();
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
 const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2024-06-20";
 
-const billingMutationLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many billing requests, please try again later." }
-});
+const billingMutationLimiter = createBillingMutationLimiter();
 
 function getStripeSecretKey() {
   if (!process.env.STRIPE_SECRET_KEY) {

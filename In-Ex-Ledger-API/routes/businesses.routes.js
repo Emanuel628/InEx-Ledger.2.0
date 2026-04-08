@@ -1,9 +1,9 @@
 const express = require("express");
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
-const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { createBusinessDeleteLimiter } = require("../middleware/rateLimitTiers.js");
 const {
   resolveBusinessIdForUser,
   listBusinessesForUser,
@@ -14,13 +14,7 @@ const {
 const router = express.Router();
 router.use(requireAuth);
 
-const businessDeleteLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many deletion attempts, please try again later." }
-});
+const businessDeleteLimiter = createBusinessDeleteLimiter();
 
 const TAX_ID_PREFIX = "enc:";
 

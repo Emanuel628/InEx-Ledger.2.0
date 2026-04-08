@@ -59,6 +59,13 @@ const CA_PROVINCE_NAMES = {
   SK: "Saskatchewan",
   YT: "Yukon"
 };
+const SETTINGS_BUSINESS_TYPE_LABELS = {
+  sole_proprietor: "Sole proprietor",
+  llc: "LLC",
+  s_corp: "S-Corp",
+  partnership: "Partnership",
+  corporation: "Corporation"
+};
 
 let privacySettings = {
   dataSharingOptOut: false,
@@ -76,6 +83,13 @@ let businessSettingsState = {
   language: "en",
   province: ""
 };
+let settingsOverviewState = {
+  businessProfile: null,
+  billingStatus: "",
+  cpaActiveCount: 0,
+  cpaHistoryCount: 0,
+  mfaEnabled: false
+};
 
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
@@ -85,12 +99,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
   initSettingsNav();
+  initSettingsTabs();
   await initBusinessProfileForm();
   await initAccountSettings();
   await initCpaAccess();
   await initPreferences();
   initSecurityForm();
   initDangerZone();
+  syncSettingsOverviewSummaries();
   window.addEventListener("lunaLanguageChanged", refreshSettingsLocalizedState);
   window.addEventListener("lunaRegionChanged", refreshSettingsLocalizedState);
 });
@@ -117,6 +133,60 @@ function saveBusinessProfile(profile) {
   localStorage.setItem(BUSINESS_PROFILE_KEY, JSON.stringify(profile));
 }
 
+function formatFiscalYearSummary(value) {
+  if (!value) return "Fiscal year not set";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `FY starts ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+}
+
+function resolvePreferenceSummaryState() {
+  const source = pendingPreferences || preferenceBaseline || {
+    region: normalizeSettingsRegion(businessSettingsState.region),
+    language: normalizeSettingsLanguage(businessSettingsState.language),
+    theme: resolveSavedTheme()
+  };
+  const language = source.language === "es" ? "Spanish" : source.language === "fr" ? "French" : "English";
+  const region = normalizeSettingsRegion(source.region) === "ca" ? "Canada" : "United States";
+  const theme = source.theme === "dark" ? "Dark mode" : "Light mode";
+  return `${language} • ${region} • ${theme}`;
+}
+
+function syncSettingsOverviewSummaries() {
+  const businessNode = document.getElementById("overviewBusinessSummary");
+  const billingNode = document.getElementById("overviewBillingSummary");
+  const cpaNode = document.getElementById("overviewCpaSummary");
+  const securityNode = document.getElementById("overviewSecuritySummary");
+  const preferencesNode = document.getElementById("overviewPreferencesSummary");
+  const privacyNode = document.getElementById("overviewPrivacySummary");
+
+  const businessProfile = settingsOverviewState.businessProfile || getBusinessProfile();
+  const businessName = businessProfile?.name || "Business not set";
+  const businessType = SETTINGS_BUSINESS_TYPE_LABELS[businessProfile?.type] || "Business type not set";
+  const fiscalYear = formatFiscalYearSummary(businessProfile?.fiscalYearStart);
+  if (businessNode) businessNode.textContent = `${businessName} • ${businessType} • ${fiscalYear}`;
+
+  if (billingNode) {
+    billingNode.textContent = settingsOverviewState.billingStatus || "Subscription details unavailable";
+  }
+
+  if (cpaNode) {
+    cpaNode.textContent = `${settingsOverviewState.cpaActiveCount} active grant${settingsOverviewState.cpaActiveCount === 1 ? "" : "s"} • ${settingsOverviewState.cpaHistoryCount} history item${settingsOverviewState.cpaHistoryCount === 1 ? "" : "s"}`;
+  }
+
+  if (securityNode) {
+    securityNode.textContent = settingsOverviewState.mfaEnabled ? "MFA enabled • Sessions available" : "MFA disabled • Sessions available";
+  }
+
+  if (preferencesNode) {
+    preferencesNode.textContent = resolvePreferenceSummaryState();
+  }
+
+  if (privacyNode) {
+    privacyNode.textContent = `${privacySettings.dataSharingOptOut ? "Analytics off" : "Analytics on"} • Data export available`;
+  }
+}
+
 async function initBusinessProfileForm() {
   const form = document.getElementById("businessProfileForm");
   if (!form) return;
@@ -127,6 +197,8 @@ async function initBusinessProfileForm() {
   document.getElementById("businessEin").value = profile.ein || "";
   document.getElementById("fiscal-year").value = profile.fiscalYearStart || "";
   document.getElementById("business-address").value = profile.address || "";
+  settingsOverviewState.businessProfile = profile;
+  syncSettingsOverviewSummaries();
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -144,6 +216,8 @@ async function initBusinessProfileForm() {
       return;
     }
     saveBusinessProfile(nextProfile);
+    settingsOverviewState.businessProfile = nextProfile;
+    syncSettingsOverviewSummaries();
     showSettingsToast(t("settings_business_profile_saved"));
   });
 
@@ -334,6 +408,8 @@ async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBod
     }
 
     statusLabel.textContent = statusText;
+    settingsOverviewState.billingStatus = statusText;
+    syncSettingsOverviewSummaries();
 
     // Show cancel button only for active paid plans that aren't already canceling
     const canCancel = sub.isPaid && !sub.cancelAtPeriodEnd;
@@ -349,6 +425,8 @@ async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBod
   } catch (err) {
     console.error("Failed to load subscription for account settings", err);
     if (statusLabel) statusLabel.textContent = t("settings_sub_status_unknown");
+    settingsOverviewState.billingStatus = t("settings_sub_status_unknown");
+    syncSettingsOverviewSummaries();
   }
 }
 
@@ -493,6 +571,7 @@ async function initPreferences() {
     syncProvinceVisibility(state.region);
     updateProvinceRateNote(state.region, state.province);
     syncRegionHardening(state.region, state.province);
+    syncSettingsOverviewSummaries();
   };
 
   const hasPendingPreferenceChanges = () => {
@@ -526,6 +605,7 @@ async function initPreferences() {
     syncProvinceVisibility(pendingPreferences.region);
     updateProvinceRateNote(pendingPreferences.region, pendingPreferences.province);
     syncRegionHardening(pendingPreferences.region, pendingPreferences.province);
+    syncSettingsOverviewSummaries();
     updateSaveBar();
   };
 
@@ -550,6 +630,7 @@ async function initPreferences() {
   }
 
   privacySettings = await getPrivacySettingsSafe();
+  syncSettingsOverviewSummaries();
   if (optOutToggle) {
     optOutToggle.addEventListener("change", updatePendingPreferences);
   }
@@ -809,6 +890,9 @@ async function initCpaAccess() {
 
       const activeGrants = grants.filter((grant) => grant.status === "active");
       const historyGrants = grants.filter((grant) => grant.status !== "active");
+      settingsOverviewState.cpaActiveCount = activeGrants.length;
+      settingsOverviewState.cpaHistoryCount = historyGrants.length;
+      syncSettingsOverviewSummaries();
 
       const renderGrantCard = (grant, mode) => {
         const detailParts = [interpolateTranslatedMessage("settings_cpa_detail_created", { date: formatSettingsDate(grant.created_at) })];
@@ -913,6 +997,9 @@ async function initCpaAccess() {
       });
     } catch (error) {
       console.error("Failed to load CPA grants", error);
+      settingsOverviewState.cpaActiveCount = 0;
+      settingsOverviewState.cpaHistoryCount = 0;
+      syncSettingsOverviewSummaries();
       currentListNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_grants_load_error"))}</div>`;
       historyListNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_grants_load_error"))}</div>`;
     }
@@ -1095,6 +1182,7 @@ function refreshSettingsLocalizedState() {
     applyRegionHardening(currentRegion, currentProvince);
   }
   syncBusinessTypeOptions(currentRegion);
+  syncSettingsOverviewSummaries();
 }
 
 function normalizeSettingsRegion(value) {
@@ -1293,6 +1381,7 @@ async function saveQcAnalyticsOptIn(optIn) {
       throw new Error("Save failed");
     }
     privacySettings = { ...privacySettings, analyticsOptIn: optIn };
+    syncSettingsOverviewSummaries();
     showSettingsToast(optIn ? t("qc_analytics_enabled") : t("qc_analytics_disabled"));
   } catch (error) {
     console.error("Failed to save analytics opt-in", error);
@@ -1409,6 +1498,8 @@ function initSecurityForm() {
   };
 
   const updateMfaUi = () => {
+    settingsOverviewState.mfaEnabled = !!mfaStatus.enabled;
+    syncSettingsOverviewSummaries();
     if (mfaEnabledToggle) {
       mfaEnabledToggle.checked = !!mfaStatus.enabled;
     }
@@ -1692,13 +1783,37 @@ function initSecurityForm() {
   });
 }
 
-function initSettingsNav() {
-  const navButtons = Array.from(document.querySelectorAll("[data-settings-target]"));
-  if (!navButtons.length) {
+function initSettingsTabs() {
+  const tabButtons = Array.from(document.querySelectorAll("[data-cpa-tab]"));
+  const tabPanels = Array.from(document.querySelectorAll("[data-cpa-panel]"));
+  if (!tabButtons.length || !tabPanels.length) {
     return;
   }
 
-  const targets = navButtons
+  const setActiveTab = (tabId) => {
+    tabButtons.forEach((button) => {
+      const isActive = button.dataset.cpaTab === tabId;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+    tabPanels.forEach((panel) => {
+      panel.classList.toggle("is-active", panel.dataset.cpaPanel === tabId);
+    });
+  };
+
+  tabButtons.forEach((button) => {
+    button.addEventListener("click", () => setActiveTab(button.dataset.cpaTab || "active"));
+  });
+}
+
+function initSettingsNav() {
+  const triggers = Array.from(document.querySelectorAll("[data-settings-target]"));
+  const navButtons = Array.from(document.querySelectorAll("[data-settings-nav-item]"));
+  if (!triggers.length) {
+    return;
+  }
+
+  const targets = triggers
     .map((button) => ({
       button,
       target: document.getElementById(button.dataset.settingsTarget || "")
