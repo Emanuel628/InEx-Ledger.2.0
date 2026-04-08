@@ -22,11 +22,21 @@ const SETTINGS_PASSWORD_RULES = {
 };
 const CA_PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"];
 const taxHelpers = window.LUNA_TAX || {};
-const resolveEstimatedTaxProfileHelper = taxHelpers.resolveEstimatedTaxProfile || ((region, province) => ({
-  region: String(region || "").toUpperCase() === "CA" ? "CA" : "US",
-  province: String(province || "").toUpperCase(),
-  rate: String(region || "").toUpperCase() === "CA" ? 0.05 : 0.24
-}));
+const resolveEstimatedTaxProfileHelper = taxHelpers.resolveEstimatedTaxProfile || ((region, province) => {
+  const normalizedRegion = String(region || "").toUpperCase() === "CA" ? "CA" : "US";
+  const normalizedProvince = String(province || "").toUpperCase();
+  const caRates = taxHelpers.CANADA_ESTIMATED_TAX_RATES || {
+    AB: 0.05, BC: 0.12, MB: 0.12, NB: 0.15, NL: 0.15, NS: 0.15,
+    NT: 0.05, NU: 0.05, ON: 0.13, PE: 0.15, QC: 0.14975, SK: 0.11, YT: 0.05
+  };
+  return {
+    region: normalizedRegion,
+    province: normalizedProvince,
+    rate: normalizedRegion === "CA"
+      ? (caRates[normalizedProvince] || (taxHelpers.DEFAULT_CA_ESTIMATED_TAX_RATE || 0.05))
+      : (taxHelpers.US_ESTIMATED_TAX_RATE || 0.24)
+  };
+});
 const formatEstimatedTaxPercentHelper = taxHelpers.formatEstimatedTaxPercent || ((rate, province = "") => {
   const decimals = String(province || "").toUpperCase() === "QC" ? 3 : 0;
   return `${(Number(rate || 0) * 100).toFixed(decimals)}%`;

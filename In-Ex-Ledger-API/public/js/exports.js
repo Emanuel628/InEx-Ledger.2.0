@@ -672,6 +672,8 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
   batches.forEach((batch, index) => {
     const businessProfile = batch.businessProfile || readBusinessProfile();
     const region = String(batch.region || getRegion()).toLowerCase();
+    const batchProvince = batch.province || (region === "ca" ? getProvince() : "");
+    const province = String(batchProvince).toUpperCase();
     const taxId = includeTaxId
       ? businessProfile.ein || businessProfile.taxId || localStorage.getItem(region === "ca" ? "lb_bn" : "lb_ein") || ""
       : "";
@@ -690,7 +692,8 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
       operatingName: localStorage.getItem("lb_dba") || "",
       taxId,
       naics: localStorage.getItem("lb_naics") || "",
-      region
+      region,
+      province
     });
     const filename = explicitFilename && batches.length === 1
       ? explicitFilename
@@ -1169,6 +1172,14 @@ function getRegion() {
   return stored?.toLowerCase() === "ca" ? "ca" : "us";
 }
 
+function getProvince() {
+  return String(
+    (typeof window !== "undefined" && window.LUNA_PROVINCE) ||
+    localStorage.getItem("lb_province") ||
+    ""
+  ).toUpperCase();
+}
+
 function getTaxFormContext(region = getRegion()) {
   if (region === "ca") {
     return {
@@ -1227,6 +1238,7 @@ function buildExportBatches(transactions, scope) {
       businessId: activeBusiness?.id || "",
       businessName: activeBusiness?.name || readBusinessProfile().name || "Business",
       region: String(activeBusiness?.region || getRegion()).toLowerCase(),
+      province: String(activeBusiness?.province || getProvince()).toUpperCase(),
       businessProfile: readBusinessProfile(),
       transactions
     }];
@@ -1236,6 +1248,7 @@ function buildExportBatches(transactions, scope) {
     businessId: business.id,
     businessName: business.name || "Business",
     region: String(business.region || "US").toLowerCase(),
+    province: String(business.province || "").toUpperCase(),
     transactions: transactions.filter((transaction) => transaction.businessId === business.id),
     businessProfile: {
       name: business.name || "Business",
