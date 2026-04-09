@@ -315,7 +315,7 @@ router.post("/export", async (req, res) => {
     // JSON export: full structured package
     const exportData = {
       exportedAt: new Date().toISOString(),
-      schemaVersion: "phase4-v1",
+      schemaVersion: "phase5-v1",
       user: userResult.rows[0],
       business: businessResult.rows[0],
       accounts: accountsResult.rows,

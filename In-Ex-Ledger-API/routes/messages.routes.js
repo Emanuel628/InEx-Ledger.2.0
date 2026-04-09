@@ -13,7 +13,16 @@ const MAX_SUBJECT_LEN = 200;
 const MAX_BODY_LEN = 10000;
 const MAX_PAGE_SIZE = 50;
 
-function mapMessageRow(row) {
+function mapMessageRow(row, viewerUserId) {
+  let isArchived;
+  if (viewerUserId && row.receiver_id === viewerUserId) {
+    isArchived = row.is_archived_by_receiver || false;
+  } else if (viewerUserId && row.sender_id === viewerUserId) {
+    isArchived = row.is_archived_by_sender || false;
+  } else {
+    isArchived = row.is_archived_by_sender || row.is_archived_by_receiver || false;
+  }
+
   return {
     id: row.id,
     sender_id: row.sender_id,
@@ -26,7 +35,7 @@ function mapMessageRow(row) {
     subject: row.subject || null,
     body: row.body,
     is_read: row.is_read,
-    is_archived: row.is_archived_by_sender || row.is_archived_by_receiver || false,
+    is_archived: isArchived,
     parent_id: row.parent_id || null,
     created_at: row.created_at,
     updated_at: row.updated_at
@@ -137,9 +146,7 @@ router.get("/inbox", async (req, res) => {
       [req.user.id, archived, limit, offset]
     );
 
-    res.json({ messages: rows.map(mapMessageRow) });
-  } catch (err) {
-    console.error("GET /messages/inbox error:", err.message);
+    res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
     res.status(500).json({ error: "Failed to fetch inbox." });
   }
 });
@@ -168,9 +175,7 @@ router.get("/sent", async (req, res) => {
       [req.user.id, archived, limit, offset]
     );
 
-    res.json({ messages: rows.map(mapMessageRow) });
-  } catch (err) {
-    console.error("GET /messages/sent error:", err.message);
+    res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
     res.status(500).json({ error: "Failed to fetch sent messages." });
   }
 });
@@ -212,7 +217,7 @@ router.get("/:id", async (req, res) => {
       msg.is_read = true;
     }
 
-    res.json({ message: mapMessageRow(msg) });
+    res.json({ message: mapMessageRow(msg, req.user.id) });
   } catch (err) {
     console.error("GET /messages/:id error:", err.message);
     res.status(500).json({ error: "Failed to fetch message." });
@@ -304,7 +309,7 @@ router.post("/", async (req, res) => {
       [result.rows[0].id]
     );
 
-    res.status(201).json({ message: mapMessageRow(rows[0]) });
+    res.status(201).json({ message: mapMessageRow(rows[0], req.user.id) });
   } catch (err) {
     console.error("POST /messages error:", err.message);
     res.status(500).json({ error: "Failed to send message." });

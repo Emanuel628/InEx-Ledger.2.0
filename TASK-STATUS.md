@@ -78,6 +78,13 @@ Tasks **1–8**, F1–F6, F8–F17, F19, JS1, L1, L2 were marked done before the
 | CI fix | `db.js` | SSL only enabled when `NODE_ENV === "production"` |
 | CI fix | `test-export-grant.mjs` | Added `await` to async token function calls |
 
+| P6 | `routes/messages.routes.js` | Fix `mapMessageRow` archive flags to be sender/receiver role-aware |
+| P7 | `routes/mileage.routes.js` | Cache `getMileageColumnMode()` to eliminate per-request schema introspection |
+| P8 | `routes/index.js` | Remove duplicate `router.use('/', systemRoutes)` mounting |
+| P9 | `db.js` | Remove unused `logDbIdentity` function and export |
+| P10 | `services/subscriptionService.js` | Remove unused `getSubscriptionSnapshotForUser` function and export |
+| P11 | `routes/privacy.routes.js` | Update stale `schemaVersion` from `phase4-v1` to `phase5-v1` |
+
 ---
 
 ## Still Pending
