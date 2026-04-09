@@ -1,11 +1,5 @@
 /**
- * SHARED AUTH CONTRACT
- * This file MUST remain identical in:
- * - In-Ex-Ledger-API/public
- * - In-Ex-Ledger-API/public
- *
- * Do NOT edit in only one bundle.
- * Always apply changes to BOTH.
+ * Register Page JS
  */
 
 /* =========================================================
