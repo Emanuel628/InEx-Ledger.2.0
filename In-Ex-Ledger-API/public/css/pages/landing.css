@@ -597,3 +597,137 @@ footer a:hover {
 main > section:last-of-type:not(.included-card):not(.pricing-section) {
   display: none;
 }
+
+.pricing-billing-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 auto 20px;
+  max-width: 900px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface2);
+}
+
+.pricing-billing-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.pricing-billing-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+
+.pricing-billing-help {
+  font-size: 13px;
+  color: var(--ink2);
+  line-height: 1.5;
+}
+
+.pricing-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+}
+
+.pricing-toggle-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.pricing-toggle-btn.is-active {
+  background: var(--accent2);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+}
+
+.pricing-baseline-note {
+  max-width: 900px;
+  margin: 0 auto 24px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+
+.pricing-grid-versions {
+  max-width: 900px;
+}
+
+.pricing-card-featured {
+  background: linear-gradient(180deg, rgba(36, 109, 187, 0.08), rgba(255, 255, 255, 0.98));
+}
+
+.pricing-card-coming {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.04), rgba(241, 245, 249, 0.96));
+  border-style: dashed;
+}
+
+.pricing-badge-muted {
+  background: #475569;
+}
+
+.pricing-tier-kicker {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(36, 109, 187, 0.10);
+  color: var(--accent2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pricing-billing-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--ink3);
+  line-height: 1.5;
+}
+
+.pricing-cta-disabled {
+  background: #e2e8f0;
+  color: #475569;
+  cursor: default;
+}
+
+.pricing-cta-disabled:hover {
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .pricing-billing-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pricing-toggle {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .pricing-toggle-btn {
+    flex: 1;
+  }
+}

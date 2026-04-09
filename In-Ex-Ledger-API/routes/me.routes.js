@@ -270,20 +270,99 @@ router.put("/", requireAuth, async (req, res) => {
 });
 
 router.delete("/", requireAuth, async (req, res) => {
+  const anonymizedEmail = `deleted-${crypto.randomUUID()}@deleted.invalid`;
+  const client = await pool.connect();
   try {
-    const result = await pool.query("DELETE FROM users WHERE id = $1", [
-      req.user.id
-    ]);
+    await client.query("BEGIN");
 
-    if (result.rowCount === 0) {
+    const userResult = await client.query(
+      "SELECT id, email FROM users WHERE id = $1 LIMIT 1",
+      [req.user.id]
+    );
+    if (!userResult.rowCount) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ error: "User not found" });
     }
+
+    const businessesResult = await client.query(
+      "SELECT id FROM businesses WHERE user_id = $1",
+      [req.user.id]
+    );
+    const businessIds = businessesResult.rows.map((row) => row.id);
+
+    await client.query(
+      `INSERT INTO user_action_audit_log
+         (id, user_id, action, ip_address, user_agent, metadata)
+       VALUES ($1, $2, 'data_deletion', $3, $4, $5)`,
+      [
+        crypto.randomUUID(),
+        req.user.id,
+        req.ip || req.connection?.remoteAddress || null,
+        req.get("user-agent") || null,
+        JSON.stringify({
+          accountDeletion: true,
+          requestedAt: new Date().toISOString(),
+          businessCount: businessIds.length
+        })
+      ]
+    );
+
+    if (businessIds.length) {
+      await client.query(
+        "DELETE FROM recurring_transaction_runs WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
+      );
+      await client.query(
+        "DELETE FROM recurring_transactions WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
+      );
+      await client.query(
+        "DELETE FROM businesses WHERE user_id = $1",
+        [req.user.id]
+      );
+    }
+
+    await client.query("DELETE FROM refresh_tokens WHERE user_id = $1", [req.user.id]);
+    await client.query("DELETE FROM mfa_trusted_devices WHERE user_id = $1", [req.user.id]);
+    await client.query("DELETE FROM mfa_email_challenges WHERE user_id = $1", [req.user.id]);
+    await client.query("DELETE FROM email_change_requests WHERE user_id = $1", [req.user.id]);
+    await client.query("DELETE FROM verification_tokens WHERE email = $1", [userResult.rows[0].email]);
+    await client.query("DELETE FROM password_reset_tokens WHERE email = $1", [userResult.rows[0].email]);
+
+    const result = await client.query(
+      `UPDATE users
+          SET email = $1,
+              password_hash = 'ERASED',
+              email_verified = false,
+              full_name = NULL,
+              display_name = NULL,
+              mfa_enabled = false,
+              mfa_enabled_at = NULL,
+              active_business_id = NULL,
+              country = NULL,
+              province = NULL,
+              is_erased = true,
+              erased_at = NOW()
+        WHERE id = $2
+        RETURNING id`,
+      [anonymizedEmail, req.user.id]
+    );
+
+    if (!result.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    await client.query("COMMIT");
 
     res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
     res.status(200).json({ message: "Account and data deleted" });
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("DELETE /me error:", err.message);
     res.status(500).json({ error: "Failed to delete account" });
+  } finally {
+    client.release();
   }
 });
 
