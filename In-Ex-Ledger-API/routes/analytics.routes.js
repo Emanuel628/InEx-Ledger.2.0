@@ -55,7 +55,7 @@ function monthStartOffset(n) {
   return d.toISOString().slice(0, 10);
 }
 
-function parseOptionalNumber(value, fieldName, { min = null, max = null } = {}) {
+function validateOptionalNumber(value, fieldName, { min = null, max = null } = {}) {
   if (value === undefined || value === null || value === "") {
     return { value: null };
   }
@@ -411,7 +411,7 @@ router.post("/whatif", async (req, res) => {
       custom_expense
     } = req.body ?? {};
 
-    const parsedIncomeChange = parseOptionalNumber(income_change_pct, "income_change_pct", {
+    const parsedIncomeChange = validateOptionalNumber(income_change_pct, "income_change_pct", {
       min: -100,
       max: 1000
     });
@@ -419,7 +419,7 @@ router.post("/whatif", async (req, res) => {
       return res.status(400).json({ error: parsedIncomeChange.error });
     }
 
-    const parsedExpenseChange = parseOptionalNumber(expense_change_pct, "expense_change_pct", {
+    const parsedExpenseChange = validateOptionalNumber(expense_change_pct, "expense_change_pct", {
       min: -100,
       max: 1000
     });
@@ -427,12 +427,12 @@ router.post("/whatif", async (req, res) => {
       return res.status(400).json({ error: parsedExpenseChange.error });
     }
 
-    const parsedWeeksOff = parseOptionalNumber(weeks_off, "weeks_off", { min: 0, max: 52 });
+    const parsedWeeksOff = validateOptionalNumber(weeks_off, "weeks_off", { min: 0, max: 52 });
     if (parsedWeeksOff.error) {
       return res.status(400).json({ error: parsedWeeksOff.error });
     }
 
-    const parsedCustomIncome = parseOptionalNumber(custom_income, "custom_income", {
+    const parsedCustomIncome = validateOptionalNumber(custom_income, "custom_income", {
       min: 0,
       max: MAX_ANALYTICS_AMOUNT
     });
@@ -440,7 +440,7 @@ router.post("/whatif", async (req, res) => {
       return res.status(400).json({ error: parsedCustomIncome.error });
     }
 
-    const parsedCustomExpense = parseOptionalNumber(custom_expense, "custom_expense", {
+    const parsedCustomExpense = validateOptionalNumber(custom_expense, "custom_expense", {
       min: 0,
       max: MAX_ANALYTICS_AMOUNT
     });

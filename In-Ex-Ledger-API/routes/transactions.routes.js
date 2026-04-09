@@ -66,14 +66,20 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
   const inserted = await pool.query(
     `INSERT INTO categories (id, business_id, name, kind, created_at)
     VALUES ($1, $2, $3, $4, now())
-    ON CONFLICT (business_id, lower(name)) DO UPDATE
-      SET name = categories.name
+    ON CONFLICT (business_id, lower(name)) DO NOTHING
     RETURNING id`,
     [crypto.randomUUID(), businessId, name, kind]
-    );
+  );
 
+  if (inserted.rowCount) {
+    return inserted.rows[0].id;
+  }
 
-  return inserted.rows[0].id;
+  const existingAfterInsert = await pool.query(
+    "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
+    [businessId, name]
+  );
+  return existingAfterInsert.rows[0]?.id || null;
 }
 
 function normalizeCurrencyCode(value, fallbackCurrency) {

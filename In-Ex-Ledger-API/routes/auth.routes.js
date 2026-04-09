@@ -96,7 +96,7 @@ function normalizeEmail(email) {
   if (!normalized) {
     return "";
   }
-  if (normalized.includes("..")) {
+  if (/\.{2,}/.test(normalized)) {
     return "";
   }
   const atIndex = normalized.indexOf("@");
