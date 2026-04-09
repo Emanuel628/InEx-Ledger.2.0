@@ -293,15 +293,21 @@ router.post("/onboarding/replay", async (req, res) => {
  * Update user profile (full_name, display_name).
  */
 router.put("/", async (req, res) => {
-  const { full_name, display_name } = req.body ?? {};
+  const body = req.body ?? {};
   try {
     const result = await pool.query(
       `UPDATE users
-       SET full_name = COALESCE($1, full_name),
-           display_name = COALESCE($2, display_name)
+       SET full_name = CASE WHEN $4::boolean THEN $1 ELSE full_name END,
+           display_name = CASE WHEN $5::boolean THEN $2 ELSE display_name END
        WHERE id = $3
        RETURNING id, email, full_name, display_name, created_at`,
-      [full_name?.trim() || null, display_name?.trim() || null, req.user.id]
+      [
+        'full_name' in body ? (body.full_name?.trim() || null) : null,
+        'display_name' in body ? (body.display_name?.trim() || null) : null,
+        req.user.id,
+        'full_name' in body,
+        'display_name' in body
+      ]
     );
     res.json(result.rows[0]);
   } catch (err) {

@@ -46,9 +46,9 @@ async function updateBusinessRow(businessId, payload) {
          language = COALESCE($3, language),
          fiscal_year_start = COALESCE($4, fiscal_year_start),
          province = $5,
-         business_type = COALESCE($6, business_type),
-         tax_id = COALESCE($7, tax_id),
-         address = COALESCE($8, address)
+         business_type = $6,
+         tax_id = $7,
+         address = $8
      WHERE id = $9
      RETURNING id, name, region, language, fiscal_year_start, province,
                business_type, tax_id, address, created_at`,
@@ -58,9 +58,9 @@ async function updateBusinessRow(businessId, payload) {
       language || null,
       fiscal_year_start || null,
       province,
-      business_type?.trim() || null,
+      business_type,
       encryptedTaxId,
-      address?.trim() || null,
+      address,
       businessId
     ]
   );
@@ -122,15 +122,22 @@ router.put("/", async (req, res) => {
       return res.status(400).json({ error: "Province is required for Canadian businesses." });
     }
 
+    const body = req.body ?? {};
+    const resolvedBusinessType = 'business_type' in body
+      ? (business_type?.trim() || null)
+      : current.business_type;
+    const resolvedTaxId = 'tax_id' in body ? (tax_id || null) : current.tax_id;
+    const resolvedAddress = 'address' in body ? (address?.trim() || null) : current.address;
+
     const updated = await updateBusinessRow(businessId, {
       name,
       region: resolvedRegion,
       language,
       fiscal_year_start,
       province: resolvedProvince,
-      business_type,
-      tax_id,
-      address
+      business_type: resolvedBusinessType,
+      tax_id: resolvedTaxId,
+      address: resolvedAddress
     });
     res.json(updated);
   } catch (err) {
