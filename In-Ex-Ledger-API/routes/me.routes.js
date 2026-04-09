@@ -10,6 +10,7 @@ const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/util
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 const { listAssignedCpaGrants, listAccessibleBusinessScopeForUser } = require("../services/cpaAccessService.js");
 const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
+const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 
 const router = express.Router();
 
@@ -42,6 +43,7 @@ function normalizeOnboardingPayload(user) {
 }
 
 router.use(requireAuth);
+router.use(createDataApiLimiter());
 
 router.get("/", async (req, res) => {
   try {
