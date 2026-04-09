@@ -5,6 +5,7 @@ const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const WEEKS_PER_MONTH = 52 / 12;
 const BIWEEKS_PER_MONTH = 26 / 12;
+const MAX_ANALYTICS_AMOUNT = 999999999.99;
 
 const router = express.Router();
 router.use(requireAuth);
@@ -52,6 +53,23 @@ function monthStartOffset(n) {
   d.setDate(1);
   d.setMonth(d.getMonth() - n);
   return d.toISOString().slice(0, 10);
+}
+
+function validateOptionalNumber(value, fieldName, { min = null, max = null } = {}) {
+  if (value === undefined || value === null || value === "") {
+    return { value: null };
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return { error: `${fieldName} must be a finite number.` };
+  }
+  if (min !== null && parsed < min) {
+    return { error: `${fieldName} must be at least ${min}.` };
+  }
+  if (max !== null && parsed > max) {
+    return { error: `${fieldName} must be at most ${max}.` };
+  }
+  return { value: parsed };
 }
 
 // ---------------------------------------------------------------------------
@@ -393,6 +411,43 @@ router.post("/whatif", async (req, res) => {
       custom_expense
     } = req.body ?? {};
 
+    const parsedIncomeChange = validateOptionalNumber(income_change_pct, "income_change_pct", {
+      min: -100,
+      max: 1000
+    });
+    if (parsedIncomeChange.error) {
+      return res.status(400).json({ error: parsedIncomeChange.error });
+    }
+
+    const parsedExpenseChange = validateOptionalNumber(expense_change_pct, "expense_change_pct", {
+      min: -100,
+      max: 1000
+    });
+    if (parsedExpenseChange.error) {
+      return res.status(400).json({ error: parsedExpenseChange.error });
+    }
+
+    const parsedWeeksOff = validateOptionalNumber(weeks_off, "weeks_off", { min: 0, max: 52 });
+    if (parsedWeeksOff.error) {
+      return res.status(400).json({ error: parsedWeeksOff.error });
+    }
+
+    const parsedCustomIncome = validateOptionalNumber(custom_income, "custom_income", {
+      min: 0,
+      max: MAX_ANALYTICS_AMOUNT
+    });
+    if (parsedCustomIncome.error) {
+      return res.status(400).json({ error: parsedCustomIncome.error });
+    }
+
+    const parsedCustomExpense = validateOptionalNumber(custom_expense, "custom_expense", {
+      min: 0,
+      max: MAX_ANALYTICS_AMOUNT
+    });
+    if (parsedCustomExpense.error) {
+      return res.status(400).json({ error: parsedCustomExpense.error });
+    }
+
     // Fetch trailing 6-month average as baseline
     const histResult = await pool.query(
       `SELECT
@@ -411,16 +466,18 @@ router.post("/whatif", async (req, res) => {
     const baseExpense = expenseTotal / 6;
 
     // Override with custom baseline if provided
-    const monthlyIncome = custom_income != null ? Number(custom_income) : baseIncome;
-    const monthlyExpense = custom_expense != null ? Number(custom_expense) : baseExpense;
+    const monthlyIncome = parsedCustomIncome.value !== null ? parsedCustomIncome.value : baseIncome;
+    const monthlyExpense = parsedCustomExpense.value !== null ? parsedCustomExpense.value : baseExpense;
 
     // Apply income change percentage
-    const incomePct = income_change_pct != null ? Number(income_change_pct) : 0;
-    const expensePct = expense_change_pct != null ? Number(expense_change_pct) : 0;
+    const incomePct = parsedIncomeChange.value ?? 0;
+    const expensePct = parsedExpenseChange.value ?? 0;
 
     // Weeks-off impact: reduce monthly income proportionally using the exact
     // average weeks per month derived from a 52-week year.
-    const weeksOffImpact = weeks_off != null ? (Number(weeks_off) / WEEKS_PER_MONTH) * monthlyIncome : 0;
+    const weeksOffImpact = parsedWeeksOff.value !== null
+      ? (parsedWeeksOff.value / WEEKS_PER_MONTH) * monthlyIncome
+      : 0;
 
     const projectedIncome = monthlyIncome * (1 + incomePct / 100) - weeksOffImpact;
     const projectedExpense = monthlyExpense * (1 + expensePct / 100);
@@ -431,15 +488,15 @@ router.post("/whatif", async (req, res) => {
     // Build narrative messages
     const messages = [];
 
-    if (incomePct !== 0 && !weeks_off) {
+    if (incomePct !== 0 && !parsedWeeksOff.value) {
       const direction = incomePct > 0 ? "increase" : "decrease";
       const abs = Math.abs(incomePct);
       const delta = Math.abs(monthlyIncome * incomePct / 100).toFixed(2);
       messages.push(`If you ${direction} your income by ${abs}%, your monthly income could ${direction} by $${delta}.`);
     }
 
-    if (weeks_off) {
-      messages.push(`Taking ${weeks_off} week(s) off could reduce your monthly cash flow by $${weeksOffImpact.toFixed(2)}.`);
+    if (parsedWeeksOff.value) {
+      messages.push(`Taking ${parsedWeeksOff.value} week(s) off could reduce your monthly cash flow by $${weeksOffImpact.toFixed(2)}.`);
     }
 
     if (expensePct !== 0) {
@@ -464,7 +521,7 @@ router.post("/whatif", async (req, res) => {
       scenario: {
         income_change_pct: incomePct,
         expense_change_pct: expensePct,
-        weeks_off: weeks_off ?? 0,
+        weeks_off: parsedWeeksOff.value ?? 0,
         projected_income: Number(projectedIncome.toFixed(2)),
         projected_expense: Number(projectedExpense.toFixed(2)),
         projected_net: Number(projectedNet.toFixed(2)),

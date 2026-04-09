@@ -32,6 +32,34 @@ const COOKIE_OPTIONS = {
   path: "/"
 };
 
+function isLegacyScryptHash(stored) {
+  return typeof stored === "string" && stored.includes("$") && stored.split("$").length === 2;
+}
+
+async function verifyPassword(password, stored) {
+  if (!stored || typeof stored !== "string") {
+    return { match: false, legacy: false };
+  }
+
+  if (isLegacyScryptHash(stored)) {
+    const [salt, hash] = stored.split("$");
+    if (!salt || !hash) {
+      return { match: false, legacy: true };
+    }
+    const derived = crypto.scryptSync(password, salt, 64).toString("hex");
+    const derivedBuffer = Buffer.from(derived, "hex");
+    const hashBuffer = Buffer.from(hash, "hex");
+    if (hashBuffer.length !== derivedBuffer.length) {
+      return { match: false, legacy: true };
+    }
+    const matched = crypto.timingSafeEqual(hashBuffer, derivedBuffer);
+    return { match: matched, legacy: matched };
+  }
+
+  const match = await bcrypt.compare(password, stored);
+  return { match, legacy: false };
+}
+
 function normalizeOnboardingPayload(user) {
   return {
     completed: !!user?.onboarding_completed,
@@ -294,7 +322,7 @@ router.delete("/", accountDeleteLimiter, requireAuth, async (req, res) => {
     if (!userRow.rowCount) {
       return res.status(404).json({ error: "User not found." });
     }
-    const match = await bcrypt.compare(password, userRow.rows[0].password_hash);
+    const { match } = await verifyPassword(password, userRow.rows[0].password_hash);
     if (!match) {
       return res.status(401).json({ error: "Incorrect password." });
     }

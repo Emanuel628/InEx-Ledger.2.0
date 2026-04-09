@@ -2,7 +2,7 @@
 -- Financial goals per business (savings targets, spending caps, income milestones)
 
 CREATE TABLE IF NOT EXISTS goals (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('savings', 'spending_limit', 'income_target')),

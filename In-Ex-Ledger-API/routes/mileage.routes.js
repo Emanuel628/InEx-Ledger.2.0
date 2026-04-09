@@ -9,6 +9,10 @@ const router = express.Router();
 const MILES_TO_KM = 1.609344;
 const MAX_DISTANCE_VALUE = 50000;
 const MAX_ODOMETER_VALUE = 9999999.99;
+const MILEAGE_SCHEMA_CACHE_MS = 5 * 60 * 1000;
+let cachedMileageColumnMode = null;
+let cachedMileageColumnFetchedAt = 0;
+let cachedMileageColumnModePromise = null;
 router.use(requireAuth);
 router.use(createDataApiLimiter());
 
@@ -108,9 +112,13 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: parsedOdometerEnd.error });
   }
 
-  const normalizedDistances = normalizeMileageDistances(parsedMiles.value, parsedKm.value);
-  if (normalizedDistances.error) {
-    return res.status(400).json({ error: normalizedDistances.error });
+  let normalizedDistances = { miles: null, km: null };
+  if (parsedMiles.value !== null || parsedKm.value !== null) {
+    const normalized = normalizeMileageDistances(parsedMiles.value, parsedKm.value);
+    if (normalized.error) {
+      return res.status(400).json({ error: normalized.error });
+    }
+    normalizedDistances = normalized;
   }
 
   const hasDistance =
@@ -158,19 +166,32 @@ router.post("/", async (req, res) => {
 });
 
 async function getMileageColumnMode() {
-  const { rows } = await pool.query(
+  if (cachedMileageColumnMode && Date.now() - cachedMileageColumnFetchedAt < MILEAGE_SCHEMA_CACHE_MS) {
+    return cachedMileageColumnMode;
+  }
+  if (cachedMileageColumnModePromise) {
+    return cachedMileageColumnModePromise;
+  }
+
+  cachedMileageColumnModePromise = pool.query(
     `SELECT column_name
        FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'mileage'
-        AND column_name IN ('date', 'trip_date')`
-  );
+       WHERE table_schema = 'public'
+         AND table_name = 'mileage'
+         AND column_name IN ('date', 'trip_date')`
+  ).then(({ rows }) => {
+    const columns = new Set(rows.map((row) => row.column_name));
+    cachedMileageColumnMode = {
+      hasDate: columns.has("date"),
+      hasTripDate: columns.has("trip_date")
+    };
+    cachedMileageColumnFetchedAt = Date.now();
+    return cachedMileageColumnMode;
+  }).finally(() => {
+    cachedMileageColumnModePromise = null;
+  });
 
-  const columns = new Set(rows.map((row) => row.column_name));
-  return {
-    hasDate: columns.has("date"),
-    hasTripDate: columns.has("trip_date")
-  };
+  return cachedMileageColumnModePromise;
 }
 
 function mileageDateSelect(mode) {
