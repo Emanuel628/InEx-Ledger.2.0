@@ -238,7 +238,7 @@ router.get("/cash-flow", async (req, res) => {
         case "quarterly":
           monthlyEquivalent = amount / 3;
           break;
-        case "annually":
+        case "yearly":
           monthlyEquivalent = amount / 12;
           break;
         default:

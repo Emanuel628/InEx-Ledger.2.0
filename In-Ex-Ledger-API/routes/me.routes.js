@@ -1,5 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
+const bcrypt = require("bcrypt");
+const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
@@ -7,6 +9,14 @@ const { getSubscriptionSnapshotForBusiness } = require("../services/subscription
 const { listAssignedCpaGrants, listAccessibleBusinessScopeForUser } = require("../services/cpaAccessService.js");
 
 const router = express.Router();
+
+const accountDeleteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many account deletion attempts. Please try again later." }
+});
 
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
@@ -269,14 +279,32 @@ router.put("/", requireAuth, async (req, res) => {
   }
 });
 
-router.delete("/", requireAuth, async (req, res) => {
+router.delete("/", accountDeleteLimiter, requireAuth, async (req, res) => {
+  const { password } = req.body ?? {};
+
+  if (!password) {
+    return res.status(400).json({ error: "Password is required to delete your account." });
+  }
+
   try {
+    const userRow = await pool.query(
+      "SELECT password_hash FROM users WHERE id = $1 LIMIT 1",
+      [req.user.id]
+    );
+    if (!userRow.rowCount) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const match = await bcrypt.compare(password, userRow.rows[0].password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "Incorrect password." });
+    }
+
     const result = await pool.query("DELETE FROM users WHERE id = $1", [
       req.user.id
     ]);
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "User not found." });
     }
 
     res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);

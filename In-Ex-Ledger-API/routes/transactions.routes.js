@@ -372,7 +372,7 @@ router.get("/", async (req, res) => {
     );
 
     const countResult = await pool.query(
-      "SELECT COUNT(*) FROM transactions WHERE business_id = ANY($1::uuid[])",
+      "SELECT COUNT(*) FROM transactions WHERE business_id = ANY($1::uuid[]) AND (is_adjustment = false OR is_adjustment IS NULL)",
       [scope.businessIds]
     );
 
@@ -594,7 +594,7 @@ router.patch("/:id/cleared", async (req, res) => {
       return res.status(404).json({ error: "Transaction not found." });
     }
 
-    res.json(result.rows[0]);
+    res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     console.error("PATCH /transactions/:id/cleared error:", err);
     res.status(500).json({ error: "Failed to update cleared status." });
