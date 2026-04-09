@@ -1125,6 +1125,7 @@ function formatRecurringCadence(cadence) {
     case "quarterly":
       return txT("transactions_recurring_cadence_quarterly", "Quarterly");
     case "yearly":
+    case "annually":
       return txT("transactions_recurring_cadence_yearly", "Yearly");
     default:
       return cadence || "-";
