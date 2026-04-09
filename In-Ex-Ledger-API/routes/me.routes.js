@@ -3,7 +3,7 @@ const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
-const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 const { listAssignedCpaGrants, listAccessibleBusinessScopeForUser } = require("../services/cpaAccessService.js");
@@ -72,7 +72,9 @@ function normalizeOnboardingPayload(user) {
   };
 }
 
-router.get("/", requireAuth, async (req, res) => {
+router.use(requireAuth);
+
+router.get("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
@@ -88,10 +90,7 @@ router.get("/", requireAuth, async (req, res) => {
     );
 
     if (!result.rowCount) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+      return res.status(404).json({ error: "User not found." });
     const businesses = await listBusinessesForUser(req.user.id);
     const activeBusiness = businesses.find((business) => business.id === businessId) || null;
     const assignedCpaGrants = await listAssignedCpaGrants(result.rows[0]);
@@ -118,11 +117,11 @@ router.get("/", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("GET /me error:", err.message);
-    res.status(500).json({ error: "Failed to load profile" });
+    res.status(500).json({ error: "Failed to load profile." });
   }
 });
 
-router.get("/onboarding", requireAuth, async (req, res) => {
+router.get("/onboarding", async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen
@@ -133,17 +132,17 @@ router.get("/onboarding", requireAuth, async (req, res) => {
     );
 
     if (!result.rowCount) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "User not found." });
     }
 
     return res.status(200).json(normalizeOnboardingPayload(result.rows[0]));
   } catch (err) {
     console.error("GET /me/onboarding error:", err.message);
-    return res.status(500).json({ error: "Failed to load onboarding state" });
+    return res.status(500).json({ error: "Failed to load onboarding state." });
   }
 });
 
-router.put("/onboarding", requireAuth, async (req, res) => {
+router.put("/onboarding", async (req, res) => {
   const businessName = String(req.body?.business_name || "").trim();
   const businessType = String(req.body?.business_type || "").trim();
   const region = String(req.body?.region || "").trim().toUpperCase();
@@ -240,7 +239,7 @@ router.put("/onboarding", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/onboarding/tour", requireAuth, async (req, res) => {
+router.post("/onboarding/tour", async (req, res) => {
   const page = String(req.body?.page || "").trim();
   if (!page) {
     return res.status(400).json({ error: "Page is required." });
@@ -252,7 +251,7 @@ router.post("/onboarding/tour", requireAuth, async (req, res) => {
       [req.user.id]
     );
     if (!current.rowCount) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "User not found." });
     }
 
     const nextState =
@@ -268,11 +267,11 @@ router.post("/onboarding/tour", requireAuth, async (req, res) => {
     return res.status(200).json({ success: true, tour_seen: nextState });
   } catch (err) {
     console.error("POST /me/onboarding/tour error:", err.message);
-    return res.status(500).json({ error: "Failed to update onboarding tour state" });
+    return res.status(500).json({ error: "Failed to update onboarding tour state." });
   }
 });
 
-router.post("/onboarding/replay", requireAuth, async (req, res) => {
+router.post("/onboarding/replay", async (req, res) => {
   try {
     await pool.query(
       "UPDATE users SET onboarding_tour_seen = '{}'::jsonb WHERE id = $1",
@@ -281,7 +280,7 @@ router.post("/onboarding/replay", requireAuth, async (req, res) => {
     return res.status(200).json({ success: true });
   } catch (err) {
     console.error("POST /me/onboarding/replay error:", err.message);
-    return res.status(500).json({ error: "Failed to reset onboarding tips" });
+    return res.status(500).json({ error: "Failed to reset onboarding tips." });
   }
 });
 
@@ -289,7 +288,7 @@ router.post("/onboarding/replay", requireAuth, async (req, res) => {
  * PUT /api/me
  * Update user profile (full_name, display_name).
  */
-router.put("/", requireAuth, async (req, res) => {
+router.put("/", async (req, res) => {
   const { full_name, display_name } = req.body ?? {};
   try {
     const result = await pool.query(
@@ -303,11 +302,11 @@ router.put("/", requireAuth, async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error("PUT /me error:", err.message);
-    res.status(500).json({ error: "Failed to update profile" });
+    res.status(500).json({ error: "Failed to update profile." });
   }
 });
 
-router.delete("/", accountDeleteLimiter, requireAuth, async (req, res) => {
+router.delete("/", accountDeleteLimiter, requireMfa, async (req, res) => {
   const { password } = req.body ?? {};
 
   if (!password) {
@@ -339,7 +338,7 @@ router.delete("/", accountDeleteLimiter, requireAuth, async (req, res) => {
     res.status(200).json({ message: "Account and data deleted" });
   } catch (err) {
     console.error("DELETE /me error:", err.message);
-    res.status(500).json({ error: "Failed to delete account" });
+    res.status(500).json({ error: "Failed to delete account." });
   }
 });
 

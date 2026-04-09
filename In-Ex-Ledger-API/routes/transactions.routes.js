@@ -41,6 +41,23 @@ function deriveCategoryNameFromSlug(slug) {
   return normalized;
 }
 
+/**
+ * Resolves a category reference to a category UUID for the given business.
+ *
+ * Accepts either a raw UUID (returned as-is) or a name/slug string.
+ * When a name is provided:
+ *   1. An existing category with a case-insensitive name match is reused.
+ *   2. If no match is found, a new category is auto-created with the derived
+ *      kind (from a "income:" / "expense:" slug prefix) or `fallbackKind`.
+ *   3. An ON CONFLICT DO NOTHING insert handles concurrent creation races.
+ *
+ * @param {string} businessId    - UUID of the business that owns the category.
+ * @param {string|null} categoryRef - UUID, name, or slug of the category.
+ * @param {string} [fallbackKind]   - Default kind ('income' | 'expense') used
+ *                                    when the slug carries no kind prefix.
+ * @returns {Promise<string|null>} Resolved category UUID, or null when
+ *                                 categoryRef is empty.
+ */
 async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
   const raw = String(categoryRef ?? "").trim();
   if (!raw) {

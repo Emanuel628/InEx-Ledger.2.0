@@ -8,6 +8,8 @@ const {
   getBusinessScopeForUser
 } = require("../api/utils/resolveBusinessIdForUser.js");
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const router = express.Router();
 router.use(requireAuth);
 router.use(createDataApiLimiter());
@@ -71,6 +73,9 @@ router.post("/", async (req, res) => {
  * PUT /api/categories/:id
  */
 router.put("/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid category ID." });
+  }
   const { name, kind, color, tax_map_us, tax_map_ca } = req.body ?? {};
 
   if (kind && !VALID_KINDS.has(kind)) {
@@ -113,6 +118,9 @@ router.put("/:id", async (req, res) => {
  * DELETE /api/categories/:id
  */
 router.delete("/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid category ID." });
+  }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 

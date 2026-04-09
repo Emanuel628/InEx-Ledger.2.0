@@ -64,11 +64,11 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000'
 ];
 
-console.log('🔥 SYSTEM START: INEX_LEDGER_PROD_2026');
+console.log('SYSTEM START: INEX_LEDGER_PROD_2026');
 
 const PORT = process.env.PORT || 8080;
-console.log(`📡 NETWORK: Port assigned: ${PORT}`);
-console.log('🔒 SECURITY: JWT_SECRET detected:', !!process.env.JWT_SECRET);
+console.log(`NETWORK: Port assigned: ${PORT}`);
+console.log('SECURITY: JWT_SECRET detected:', !!process.env.JWT_SECRET);
 
 app.set('trust proxy', 1);
 
@@ -93,7 +93,7 @@ app.use(cors({
     if (ALLOWED_ORIGINS.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.warn(`⚠️   CORS: Blocked request from ${origin}`);
+      console.warn(`CORS: Blocked request from ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -184,11 +184,11 @@ app.get('/index.html', (req, res) => {
 
 // Transaction management
 app.use('/api/transactions', transactionsRouter);
-console.log('✅ MOUNTED: /api/transactions');
+console.log('MOUNTED: /api/transactions');
 
 // Core auth and index routes
 app.use('/api', routes);
-console.log('✅ MOUNTED: /api (Core Routes)');
+console.log('MOUNTED: /api (Core Routes)');
 
 /* =========================================================
    SERVER INITIALIZATION
@@ -205,7 +205,7 @@ async function start() {
   }
 
   server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 READY: InEx Ledger API live on port ${PORT}`);
+    console.log(`READY: InEx Ledger API live on port ${PORT}`);
   });
 
   /* =========================================================
@@ -213,9 +213,9 @@ async function start() {
      ========================================================= */
 
   process.on('SIGTERM', () => {
-    console.log('🛑 SIGTERM: Shutdown signal received.');
+    console.log('SIGTERM: Shutdown signal received.');
     server.close(() => {
-      console.log('💥 Server closed safely. Goodbye!');
+      console.log('Server closed safely.');
       process.exit(0);
     });
   });
