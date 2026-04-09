@@ -4,7 +4,7 @@ const router = express.Router();
 router.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    service: "luna-business",
+    service: "inex-ledger",
     timestamp: new Date().toISOString()
   });
 });

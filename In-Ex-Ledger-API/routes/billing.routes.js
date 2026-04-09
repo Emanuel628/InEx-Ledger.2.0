@@ -142,8 +142,8 @@ router.post("/checkout-session", billingMutationLimiter, requireAuth, requireMfa
       customer: customerId,
       "line_items[0][price]": getStripePriceId(),
       "line_items[0][quantity]": 1,
-      success_url: buildAppUrl(req, "/html/subscription.html?checkout=success"),
-      cancel_url: buildAppUrl(req, "/html/subscription.html?checkout=cancel"),
+      success_url: buildAppUrl(req, "/subscription?checkout=success"),
+      cancel_url: buildAppUrl(req, "/subscription?checkout=cancel"),
       "metadata[business_id]": businessId,
       "metadata[user_id]": req.user.id
     });
@@ -161,7 +161,7 @@ router.post("/customer-portal", requireAuth, async (req, res) => {
     const customerId = await ensureStripeCustomer(businessId, req.user);
     const session = await stripeRequest("/billing_portal/sessions", {
       customer: customerId,
-      return_url: buildAppUrl(req, "/html/subscription.html")
+      return_url: buildAppUrl(req, "/subscription")
     });
     res.status(200).json({ url: session.url });
   } catch (err) {

@@ -191,6 +191,22 @@ app.use('/api', routes);
 console.log('MOUNTED: /api (Core Routes)');
 
 /* =========================================================
+   404 & ERROR HANDLERS (must come after all routes)
+   ========================================================= */
+
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  const status = err.status || err.statusCode || 500;
+  const message = status < 500 ? err.message : 'Internal server error';
+  res.status(status).json({ error: message });
+});
+
+/* =========================================================
    SERVER INITIALIZATION
    ========================================================= */
 

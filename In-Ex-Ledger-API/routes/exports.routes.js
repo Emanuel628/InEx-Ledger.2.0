@@ -124,7 +124,7 @@ router.post("/exports/generate", async (req, res) => {
 
   try {
     const jobId = crypto.randomUUID();
-    const filename = `luna-business-export-${grantPayload.dateRange.startDate}_to_${grantPayload.dateRange.endDate}.pdf`;
+    const filename = `inex-ledger-export-${grantPayload.dateRange.startDate}_to_${grantPayload.dateRange.endDate}.pdf`;
     const job = {
       jobId,
       businessId,
@@ -273,7 +273,7 @@ router.post("/exports/secure-export", secureExportLimiter, async (req, res) => {
     const templateVersion = req.body?.templateVersion || "v1";
 
     const jobId = crypto.randomUUID();
-    const filename = `luna-business-export-${dateRange.startDate}_to_${dateRange.endDate}.pdf`;
+    const filename = `inex-ledger-export-${dateRange.startDate}_to_${dateRange.endDate}.pdf`;
 
     const job = {
       jobId,

@@ -1,11 +1,5 @@
 /**
- * SHARED AUTH CONTRACT
- * This file MUST remain identical in:
- * - In-Ex-Ledger-API/public
- * - In-Ex-Ledger-API/public
- *
- * Do NOT edit in only one bundle.
- * Always apply changes to BOTH.
+ * Login Page JS
  */
 
 /* =========================================================
@@ -143,11 +137,12 @@ function wireShowPasswordToggle(container = document) {
     return;
   }
 
+  const passwordField = container.querySelector("#password");
+  if (!passwordField) {
+    return;
+  }
+
   toggle.addEventListener("change", () => {
-    const passwordField = container.querySelector('input[type="password"]');
-    if (!passwordField) {
-      return;
-    }
     passwordField.type = toggle.checked ? "text" : "password";
   });
 }
