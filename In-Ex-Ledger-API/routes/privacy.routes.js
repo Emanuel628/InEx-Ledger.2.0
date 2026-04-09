@@ -186,7 +186,7 @@ router.post("/settings", async (req, res) => {
  * Key ledger fields included: TransactionIDs, Amounts, Dates, Categories.
  * Audit trail: every successful export is logged in user_action_audit_log.
  */
-router.post("/export", async (req, res) => {
+router.post("/export", requireMfa, async (req, res) => {
   const format = String(req.query.format || req.body?.format || "json").toLowerCase();
   if (format !== "json" && format !== "csv") {
     return res.status(400).json({ error: "Unsupported format. Use 'json' or 'csv'." });
@@ -315,7 +315,7 @@ router.post("/export", async (req, res) => {
     // JSON export: full structured package
     const exportData = {
       exportedAt: new Date().toISOString(),
-      schemaVersion: "phase4-v1",
+      schemaVersion: "phase5-v1",
       user: userResult.rows[0],
       business: businessResult.rows[0],
       accounts: accountsResult.rows,

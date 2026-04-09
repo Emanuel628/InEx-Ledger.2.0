@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 
-const VALID_CADENCES = new Set(["weekly", "biweekly", "monthly", "quarterly", "yearly"]);
+const VALID_CADENCES = new Set(["weekly", "biweekly", "monthly", "quarterly", "yearly", "annually"]);
 
 class RecurringTemplateValidationError extends Error {
   constructor(message) {
@@ -63,6 +63,7 @@ function computeNextOccurrence(currentDate, cadence) {
     case "quarterly":
       return addMonths(currentDate, 3);
     case "yearly":
+    case "annually":
       return addMonths(currentDate, 12);
     default:
       throw new Error(`Unsupported cadence: ${cadence}`);
