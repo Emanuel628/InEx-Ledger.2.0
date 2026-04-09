@@ -3,9 +3,11 @@ const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(createDataApiLimiter());
 
 const sessionsMutationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

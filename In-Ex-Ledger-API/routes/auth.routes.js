@@ -12,6 +12,7 @@ const { signToken, verifyToken, requireAuth, requireMfa } = require("../middlewa
 const { pool } = require("../db.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
+const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
 
 const router = express.Router();
 
@@ -29,7 +30,9 @@ function getResend() {
   }
   return _resend;
 }
-console.log("Email engine ready (Resend)");
+if (process.env.NODE_ENV !== "production") {
+  console.log("Email engine ready (Resend)");
+}
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "InEx Ledger <noreply@inexledger.com>";
 
 
@@ -75,13 +78,6 @@ const REFRESH_TOKEN_BYTE_LENGTH = 48;
 const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 15 * 60;
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
 const MAX_MFA_ATTEMPTS = 8;
-
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-  path: "/"
-};
 
 
 /* =========================================================
@@ -191,34 +187,6 @@ async function sendAppEmail({ to, subject, html, text }) {
    ========================================================= */
 async function hashPassword(password) {
   return bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
-}
-
-function isLegacyScryptHash(stored) {
-  return typeof stored === "string" && stored.includes("$") && stored.split("$").length === 2;
-}
-
-async function verifyPassword(password, stored) {
-  if (!stored || typeof stored !== "string") {
-    return { match: false, legacy: false };
-  }
-
-  if (isLegacyScryptHash(stored)) {
-    const [salt, hash] = stored.split("$");
-    if (!salt || !hash) {
-      return { match: false, legacy: true };
-    }
-    const derived = crypto.scryptSync(password, salt, 64).toString("hex");
-    const derivedBuffer = Buffer.from(derived, "hex");
-    const hashBuffer = Buffer.from(hash, "hex");
-    if (hashBuffer.length !== derivedBuffer.length) {
-      return { match: false, legacy: true };
-    }
-    const matched = crypto.timingSafeEqual(hashBuffer, derivedBuffer);
-    return { match: matched, legacy: matched };
-  }
-
-  const match = await bcrypt.compare(password, stored);
-  return { match, legacy: false };
 }
 
 function isStrongPassword(password) {
