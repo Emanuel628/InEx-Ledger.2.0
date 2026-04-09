@@ -8,7 +8,7 @@ const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const { Resend } = require("resend");
 const rateLimit = require("express-rate-limit");
-const { signToken, verifyToken, requireAuth } = require("../middleware/auth.middleware.js");
+const { signToken, verifyToken, requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { pool } = require("../db.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
@@ -804,7 +804,7 @@ router.get("/verify-email", async (req, res) => {
   }
 });
 
-router.post("/change-password", requireAuth, authLimiter, async (req, res) => {
+router.post("/change-password", authLimiter, requireAuth, requireMfa, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   const newPassword = req.body?.newPassword;
   const confirmPassword = req.body?.confirmPassword;

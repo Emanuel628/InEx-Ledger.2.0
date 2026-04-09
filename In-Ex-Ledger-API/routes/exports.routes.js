@@ -49,7 +49,7 @@ router.post("/exports/request-grant", async (req, res) => {
   try {
     const user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
-    const businessId = user.business_id || (await resolveBusinessIdForUser(user));
+    const businessId = user.business_id;
     const exportType = (req.body?.exportType || "pdf").toLowerCase();
     const includeTaxId = Boolean(req.body?.includeTaxId);
     const dateRange = validateDateRange(req.body?.dateRange);
@@ -116,7 +116,7 @@ router.post("/exports/generate", async (req, res) => {
 
   const user = req.user;
   user.business_id = await resolveBusinessIdForUser(user);
-  const businessId = user.business_id || (await resolveBusinessIdForUser(user));
+  const businessId = user.business_id;
 
   if (grantPayload.businessId !== businessId || grantPayload.userId !== user.id) {
     return res.status(403).json({ error: "Grant token does not match requester." });
@@ -188,7 +188,7 @@ router.get("/exports/history", async (req, res) => {
   try {
     const user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
-    const businessId = user.business_id || (await resolveBusinessIdForUser(user));
+    const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
       return res.status(402).json({ error: "Export history requires an active InEx Ledger V1 plan." });
@@ -219,7 +219,7 @@ router.get("/exports/history/:id/redacted", async (req, res) => {
   try {
     const user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
-    const businessId = user.business_id || (await resolveBusinessIdForUser(user));
+    const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
       return res.status(402).json({ error: "Export history requires an active InEx Ledger V1 plan." });

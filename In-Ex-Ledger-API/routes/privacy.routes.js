@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const express = require("express");
 const { pool } = require("../db.js");
-const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError } = require("../utils/logger.js");
@@ -350,7 +350,7 @@ router.post("/export", async (req, res) => {
  * Audit trail: the erasure request is logged in user_action_audit_log before
  * any data is modified so that compliance teams have a permanent record.
  */
-router.post("/erase", async (req, res) => {
+router.post("/erase", requireMfa, async (req, res) => {
   const userId = req.user.id;
   const ipAddress = req.ip || req.connection?.remoteAddress || null;
   const userAgent = req.get("user-agent") || null;

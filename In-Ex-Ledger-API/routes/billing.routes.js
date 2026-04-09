@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
-const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const {
   getSubscriptionSnapshotForBusiness,
@@ -22,6 +22,14 @@ const billingMutationLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many billing requests, please try again later." }
+});
+
+const billingReadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." }
 });
 
 function getStripeSecretKey() {
@@ -120,7 +128,7 @@ router.get("/subscription", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/checkout-session", requireAuth, async (req, res) => {
+router.post("/checkout-session", billingMutationLimiter, requireAuth, requireMfa, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
@@ -202,7 +210,7 @@ router.post("/cancel", requireAuth, billingMutationLimiter, async (req, res) => 
   }
 });
 
-router.get("/history", requireAuth, billingMutationLimiter, async (req, res) => {
+router.get("/history", billingReadLimiter, requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subRow = await pool.query(
