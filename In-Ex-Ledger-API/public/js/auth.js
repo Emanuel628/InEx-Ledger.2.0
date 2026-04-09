@@ -400,7 +400,7 @@ async function requireValidSessionOrRedirect() {
     window.__AUTH_GUARD_STATE__.running = false;
     window.__AUTH_GUARD_STATE__.lastError = `me_${response.status}`;
   } catch (err) {
-    console.error("[AUTH] Session validation failed:", err);
+    if (localStorage.getItem("debug")) { console.error("[AUTH] Session validation failed:", err); }
     clearToken();
     window.__AUTH_GUARD_STATE__.running = false;
     window.__AUTH_GUARD_STATE__.lastError = "network";
@@ -432,7 +432,7 @@ async function redirectIfAuthenticated() {
       window.location.href = payload?.onboarding?.completed ? "/transactions" : ONBOARDING_PAGE;
     }
   } catch (err) {
-    console.error("[AUTH] redirectIfAuthenticated failed:", err);
+    if (localStorage.getItem("debug")) { console.error("[AUTH] redirectIfAuthenticated failed:", err); }
   }
 }
 
@@ -490,7 +490,7 @@ async function signOut() {
       headers: authHeader()
     });
   } catch (err) {
-    console.error("Logout error:", err);
+    if (localStorage.getItem("debug")) { console.error("Logout error:", err); }
   }
   clearToken();
   window.location.href = "/";

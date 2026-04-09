@@ -9,6 +9,7 @@ const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 const { listAssignedCpaGrants, listAccessibleBusinessScopeForUser } = require("../services/cpaAccessService.js");
+const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
 
 const router = express.Router();
 
@@ -27,40 +28,6 @@ const VALID_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash
 const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const REFRESH_TOKEN_COOKIE = "refresh_token";
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-  path: "/"
-};
-
-function isLegacyScryptHash(stored) {
-  return typeof stored === "string" && stored.includes("$") && stored.split("$").length === 2;
-}
-
-async function verifyPassword(password, stored) {
-  if (!stored || typeof stored !== "string") {
-    return { match: false, legacy: false };
-  }
-
-  if (isLegacyScryptHash(stored)) {
-    const [salt, hash] = stored.split("$");
-    if (!salt || !hash) {
-      return { match: false, legacy: true };
-    }
-    const derived = crypto.scryptSync(password, salt, 64).toString("hex");
-    const derivedBuffer = Buffer.from(derived, "hex");
-    const hashBuffer = Buffer.from(hash, "hex");
-    if (hashBuffer.length !== derivedBuffer.length) {
-      return { match: false, legacy: true };
-    }
-    const matched = crypto.timingSafeEqual(hashBuffer, derivedBuffer);
-    return { match: matched, legacy: matched };
-  }
-
-  const match = await bcrypt.compare(password, stored);
-  return { match, legacy: false };
-}
 
 function normalizeOnboardingPayload(user) {
   return {
@@ -183,60 +150,72 @@ router.put("/onboarding", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const client = await pool.connect();
 
-    await pool.query(
-      `UPDATE businesses
-          SET name = $1,
-              business_type = $2,
-              region = $3,
-              language = $4,
-              province = CASE
-                WHEN $3 = 'CA' THEN $5
-                ELSE NULL
-              END
-        WHERE id = $6`,
-      [businessName, businessType, region, language, province || null, businessId]
-    );
+    try {
+      await client.query("BEGIN");
 
-    const accountCheck = await pool.query(
-      "SELECT COUNT(*)::int AS count FROM accounts WHERE business_id = $1",
-      [businessId]
-    );
-    const hasAccounts = Number(accountCheck.rows[0]?.count || 0) > 0;
-
-    if (!hasAccounts) {
-      await pool.query(
-        `INSERT INTO accounts (id, business_id, name, type)
-         VALUES ($1, $2, $3, $4)`,
-        [crypto.randomUUID(), businessId, starterAccountName, starterAccountType]
+      await client.query(
+        `UPDATE businesses
+            SET name = $1,
+                business_type = $2,
+                region = $3,
+                language = $4,
+                province = CASE
+                  WHEN $3 = 'CA' THEN $5
+                  ELSE NULL
+                END
+          WHERE id = $6`,
+        [businessName, businessType, region, language, province || null, businessId]
       );
+
+      const accountCheck = await client.query(
+        "SELECT COUNT(*)::int AS count FROM accounts WHERE business_id = $1",
+        [businessId]
+      );
+      const hasAccounts = Number(accountCheck.rows[0]?.count || 0) > 0;
+
+      if (!hasAccounts) {
+        await client.query(
+          `INSERT INTO accounts (id, business_id, name, type)
+           VALUES ($1, $2, $3, $4)`,
+          [crypto.randomUUID(), businessId, starterAccountName, starterAccountType]
+        );
+      }
+
+      const onboardingData = {
+        business_name: businessName,
+        business_type: businessType,
+        region,
+        province: region === "CA" ? province : "",
+        language,
+        starter_account_type: starterAccountType,
+        starter_account_name: starterAccountName,
+        start_focus: startFocus
+      };
+
+      const updated = await client.query(
+        `UPDATE users
+            SET onboarding_completed = true,
+                onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()),
+                onboarding_data = $1::jsonb
+          WHERE id = $2
+          RETURNING onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen`,
+        [JSON.stringify(onboardingData), req.user.id]
+      );
+
+      await client.query("COMMIT");
+
+      return res.status(200).json({
+        onboarding: normalizeOnboardingPayload(updated.rows[0]),
+        redirect_to: `/${startFocus}`
+      });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
     }
-
-    const onboardingData = {
-      business_name: businessName,
-      business_type: businessType,
-      region,
-      province: region === "CA" ? province : "",
-      language,
-      starter_account_type: starterAccountType,
-      starter_account_name: starterAccountName,
-      start_focus: startFocus
-    };
-
-    const updated = await pool.query(
-      `UPDATE users
-          SET onboarding_completed = true,
-              onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()),
-              onboarding_data = $1::jsonb
-        WHERE id = $2
-        RETURNING onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen`,
-      [JSON.stringify(onboardingData), req.user.id]
-    );
-
-    return res.status(200).json({
-      onboarding: normalizeOnboardingPayload(updated.rows[0]),
-      redirect_to: `/${startFocus}`
-    });
   } catch (err) {
     console.error("PUT /me/onboarding error:", err.message);
     return res.status(500).json({ error: "Failed to save onboarding." });
