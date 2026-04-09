@@ -6,6 +6,7 @@ const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 
 const router = express.Router();
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MILES_TO_KM = 1.609344;
 const MAX_DISTANCE_VALUE = 50000;
 const MAX_ODOMETER_VALUE = 9999999.99;
@@ -309,6 +310,9 @@ function normalizeMileageDistances(miles, km) {
  * PUT /api/mileage/:id
  */
 router.put("/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid mileage record ID." });
+  }
   const { trip_date, date, miles, km, odometer_start, odometer_end } = req.body ?? {};
   const purpose = typeof req.body?.purpose === "string" ? req.body.purpose.trim() : undefined;
   const destination = typeof req.body?.destination === "string" ? req.body.destination.trim() : undefined;
@@ -461,6 +465,9 @@ router.put("/:id", async (req, res) => {
  * DELETE /api/mileage/:id
  */
 router.delete("/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid mileage record ID." });
+  }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(

@@ -112,7 +112,6 @@ async function initDatabase() {
 
 module.exports = {
   pool,
-  logDbIdentity,
   initDatabase,
   withRetry
 };

@@ -205,7 +205,6 @@ module.exports = {
   PLAN_V1,
   ensureBusinessSubscription,
   getSubscriptionSnapshotForBusiness,
-  getSubscriptionSnapshotForUser,
   updateStripeCustomerForBusiness,
   syncStripeSubscriptionForBusiness,
   setFreePlanForBusiness,
