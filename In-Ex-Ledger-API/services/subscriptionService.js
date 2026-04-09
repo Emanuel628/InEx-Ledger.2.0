@@ -105,14 +105,6 @@ async function getSubscriptionSnapshotForBusiness(businessId) {
   return deriveEffectiveState(row);
 }
 
-async function getSubscriptionSnapshotForUser(user) {
-  const businessId = user?.business_id;
-  if (!businessId) {
-    return null;
-  }
-  return getSubscriptionSnapshotForBusiness(businessId);
-}
-
 async function updateStripeCustomerForBusiness(businessId, stripeCustomerId) {
   await pool.query(
     `UPDATE business_subscriptions
@@ -205,7 +197,6 @@ module.exports = {
   PLAN_V1,
   ensureBusinessSubscription,
   getSubscriptionSnapshotForBusiness,
-  getSubscriptionSnapshotForUser,
   updateStripeCustomerForBusiness,
   syncStripeSubscriptionForBusiness,
   setFreePlanForBusiness,
