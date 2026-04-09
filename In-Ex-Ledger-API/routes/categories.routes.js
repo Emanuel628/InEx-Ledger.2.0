@@ -98,10 +98,10 @@ router.put("/:id", async (req, res) => {
 
     const current = existing.rows[0];
     const newName = name !== undefined ? (name?.trim() || null) : current.name;
-    const newKind = kind !== undefined ? (kind || null) : current.kind;
-    const newColor = color !== undefined ? (color || null) : current.color;
-    const newTaxMapUs = tax_map_us !== undefined ? (tax_map_us || null) : current.tax_map_us;
-    const newTaxMapCa = tax_map_ca !== undefined ? (tax_map_ca || null) : current.tax_map_ca;
+    const newKind = kind !== undefined ? (kind ?? null) : current.kind;
+    const newColor = color !== undefined ? (color ?? null) : current.color;
+    const newTaxMapUs = tax_map_us !== undefined ? (tax_map_us ?? null) : current.tax_map_us;
+    const newTaxMapCa = tax_map_ca !== undefined ? (tax_map_ca ?? null) : current.tax_map_ca;
 
     const result = await pool.query(
       `UPDATE categories

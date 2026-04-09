@@ -581,7 +581,7 @@ router.delete("/:id", async (req, res) => {
        SET is_void = true, voided_at = NOW(), voided_by_id = $3
        WHERE id = $1 AND business_id = $2
          AND (is_adjustment = false OR is_adjustment IS NULL)
-         AND is_void = false
+         AND (is_void = false OR is_void IS NULL)
        RETURNING id`,
       [req.params.id, businessId, req.user.id]
     );
