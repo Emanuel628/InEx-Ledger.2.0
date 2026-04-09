@@ -1,8 +1,8 @@
 # Security Plan & Privacy Impact Assessment (PIA)
 ## InEx Ledger 2.0
 
-**Prepared by:** Emanuel Beltran, Privacy Officer & Founder, InEx Ledger  
-**Contact:** support@lunabusiness.com  
+**Prepared by:** InEx Ledger Privacy Team  
+**Contact:** privacy@inexledger.com  
 **Jurisdictions:** United States · Canada (PIPEDA) · Quebec (Law 25 / Bill 64)  
 **Document status:** Living — updated as features change  
 **Last reviewed:** 2026-04-08
@@ -153,7 +153,7 @@ Analytics data collection is disabled by default for all users. Quebec residents
 
 | Date | Author | Summary |
 |---|---|---|
-| 2026-04-08 | Emanuel Beltran | Phase 2 — cross-border risk analysis, SIN/BN ephemeral processing, mitigation strategies |
+| 2026-04-08 | InEx Ledger Privacy Team | Phase 2 — cross-border risk analysis, SIN/BN ephemeral processing, mitigation strategies |
 | 2026-04-07 | InEx Ledger Engineering | Phase 1 — initial PIA for analytics opt-in and field encryption |
 
 ---

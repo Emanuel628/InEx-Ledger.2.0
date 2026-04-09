@@ -29,20 +29,26 @@ if (!window.API_BASE) {
   window.API_BASE = "";
 }
 
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 if (!window.__AUTH_GUARD_STATE__) {
   window.__AUTH_GUARD_STATE__ = { running: false, count: 0, lastError: null };
 }
 
 function getApiBase() {
-  console.log("[AUTH] API_BASE =", window.API_BASE);
   return window.API_BASE;
 }
 
 function buildApiUrl(path = "") {
   const base = getApiBase();
-  const url = /^https?:\/\//i.test(path) && path ? path : `${base}${path}`;
-  console.log("[AUTH] buildApiUrl:", url);
-  return url;
+  return /^https?:\/\//i.test(path) && path ? path : `${base}${path}`;
 }
 
 function clearAppState() {
@@ -299,12 +305,10 @@ function getToken() {
 }
 
 function setToken(token) {
-  console.log("[AUTH] setToken length =", token ? token.length : 0);
   localStorage.setItem(TOKEN_KEY, token);
 }
 
 function clearToken() {
-  console.log("[AUTH] clearToken called");
   localStorage.removeItem(TOKEN_KEY);
   clearSubscriptionState();
   clearAppState();
@@ -334,7 +338,6 @@ function mapAuthError(status, apiError) {
 
 async function requireValidSessionOrRedirect() {
   if (window.__AUTH_GUARD_STATE__.running) {
-    console.log("[AUTH] Guard already running, skipping");
     return;
   }
 
@@ -342,10 +345,8 @@ async function requireValidSessionOrRedirect() {
   window.__AUTH_GUARD_STATE__.count += 1;
 
   const token = getToken();
-  console.log("[AUTH] Guard start. token exists =", !!token);
 
   if (!token) {
-    console.log("[AUTH] No token -> redirect to login");
     window.__AUTH_GUARD_STATE__.running = false;
     window.location.href = LOGIN_PAGE;
     return;
@@ -353,7 +354,6 @@ async function requireValidSessionOrRedirect() {
 
   try {
     const meUrl = buildApiUrl("/api/me");
-    console.log("[AUTH] /api/me url:", meUrl);
     const response = await fetch(meUrl, {
       method: "GET",
       credentials: "include",
@@ -362,8 +362,6 @@ async function requireValidSessionOrRedirect() {
         ...authHeader()
       }
     });
-
-    console.log("[AUTH] /api/me status =", response.status);
 
     if (response.status === 200) {
       const payload = await response.json().catch(() => null);
@@ -386,14 +384,12 @@ async function requireValidSessionOrRedirect() {
       if (typeof window !== "undefined" && typeof CustomEvent === "function") {
         window.dispatchEvent(new CustomEvent("lunaProfileReady", { detail: payload }));
       }
-      console.log("[AUTH] Session valid");
       window.__AUTH_GUARD_STATE__.running = false;
       window.__AUTH_GUARD_STATE__.lastError = null;
       return true;
     }
 
     if (response.status === 401) {
-      console.log("[AUTH] Session invalid -> clearToken + redirect");
       clearToken();
       window.__AUTH_GUARD_STATE__.running = false;
       window.__AUTH_GUARD_STATE__.lastError = "expired";
@@ -401,7 +397,6 @@ async function requireValidSessionOrRedirect() {
       return;
     }
 
-    console.log("[AUTH] Unexpected /api/me status =", response.status);
     window.__AUTH_GUARD_STATE__.running = false;
     window.__AUTH_GUARD_STATE__.lastError = `me_${response.status}`;
   } catch (err) {
@@ -423,7 +418,6 @@ async function redirectIfAuthenticated() {
         ...authHeader()
       }
     });
-    console.log("[AUTH] redirectIfAuthenticated /api/me status =", response.status);
     if (response.status === 200) {
       const payload = await response.json().catch(() => null);
       window.__LUNA_ME__ = payload;
@@ -444,7 +438,11 @@ async function redirectIfAuthenticated() {
 
 async function apiFetch(url, options = {}) {
   const apiUrl = buildApiUrl(url);
-  const headers = { ...(options.headers || {}), ...authHeader() };
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+    ...authHeader()
+  };
   const response = await fetch(apiUrl, {
     ...options,
     credentials: "include",
@@ -452,7 +450,6 @@ async function apiFetch(url, options = {}) {
   });
 
   if (response.status === 401) {
-    console.log("[AUTH] apiFetch 401 -> clearing token + redirect");
     clearToken();
     window.location.href = LOGIN_PAGE;
     return null;
@@ -486,15 +483,16 @@ function requireAuth() {
 }
 
 async function signOut() {
-  clearToken();
   try {
     await fetch(buildApiUrl("/api/auth/logout"), {
       method: "POST",
-      credentials: "include"
+      credentials: "include",
+      headers: authHeader()
     });
   } catch (err) {
     console.error("Logout error:", err);
   }
+  clearToken();
   window.location.href = "/";
 }
 
@@ -556,7 +554,7 @@ function initBusinessMenus(profile = {}) {
     menu.innerHTML = `
       <div class="account-menu-section">
         <div class="account-menu-caption">Active business</div>
-        <div class="account-menu-current">${activeBusiness?.name || "Business"}</div>
+        <div class="account-menu-current">${escapeHtml(activeBusiness?.name || "Business")}</div>
         <div class="account-menu-hint">${businessCountLabel}</div>
       </div>
       <div class="account-menu-section">
@@ -564,12 +562,12 @@ function initBusinessMenus(profile = {}) {
           <button
             type="button"
             class="account-menu-item business-menu-item ${business.is_active ? "is-active" : ""}"
-            data-business-switch="${business.id}"
+            data-business-switch="${escapeHtml(business.id)}"
             role="menuitem"
           >
             <span class="business-menu-copy">
-              <span class="account-menu-label">${business.name || "Business"}</span>
-              <span class="account-menu-hint">${business.region || "US"}</span>
+              <span class="account-menu-label">${escapeHtml(business.name || "Business")}</span>
+              <span class="account-menu-hint">${escapeHtml(business.region || "US")}</span>
             </span>
             ${business.is_active ? '<span class="business-menu-state">Current</span>' : ""}
           </button>
@@ -630,8 +628,8 @@ function initAccountMenus(displayName = "User", profile = {}) {
     menu.innerHTML = `
       <div class="account-menu-section">
         <div class="account-menu-caption">${typeof t === "function" ? t("auth_signed_in_as") : "Signed in as"}</div>
-        <div class="account-menu-current">${displayName}</div>
-        <div class="account-menu-hint">${activeBusiness?.name || (typeof t === "function" ? t("common_business") : "Business")}</div>
+        <div class="account-menu-current">${escapeHtml(displayName)}</div>
+        <div class="account-menu-hint">${escapeHtml(activeBusiness?.name || (typeof t === "function" ? t("common_business") : "Business"))}</div>
       </div>
       ${hasCpaWorkspace ? `
       <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="cpa-workspace" role="menuitem">

@@ -1,10 +1,19 @@
 const express = require("express");
 const crypto = require("crypto");
+const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 
 const router = express.Router();
 router.use(requireAuth);
+
+const sessionsMutationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests. Please try again later." }
+});
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -34,7 +43,7 @@ router.get("/", async (req, res) => {
  * DELETE /api/sessions/:id
  * Revokes a specific session by its record ID.
  */
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", sessionsMutationLimiter, async (req, res) => {
   try {
     const result = await pool.query(
       "UPDATE refresh_tokens SET revoked = true WHERE id = $1 AND user_id = $2 RETURNING id",
@@ -54,7 +63,7 @@ router.delete("/:id", async (req, res) => {
  * DELETE /api/sessions
  * Revokes ALL sessions for the current user (sign out everywhere).
  */
-router.delete("/", async (req, res) => {
+router.delete("/", sessionsMutationLimiter, async (req, res) => {
   try {
     await pool.query(
       "UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false",

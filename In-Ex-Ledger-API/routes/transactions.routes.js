@@ -392,13 +392,14 @@ router.get("/", async (req, res) => {
        LEFT JOIN categories c ON c.id = t.category_id
        WHERE t.business_id = ANY($1::uuid[])
          AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
+         AND (t.is_void = false OR t.is_void IS NULL)
        ORDER BY t.date DESC, t.created_at DESC
        LIMIT $2 OFFSET $3`,
       [scope.businessIds, limit, offset]
     );
 
     const countResult = await pool.query(
-      "SELECT COUNT(*) FROM transactions WHERE business_id = ANY($1::uuid[]) AND (is_adjustment = false OR is_adjustment IS NULL)",
+      "SELECT COUNT(*) FROM transactions WHERE business_id = ANY($1::uuid[]) AND (is_adjustment = false OR is_adjustment IS NULL) AND (is_void = false OR is_void IS NULL)",
       [scope.businessIds]
     );
 
@@ -576,8 +577,13 @@ router.delete("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
-      "DELETE FROM transactions WHERE id = $1 AND business_id = $2 AND (is_adjustment = false OR is_adjustment IS NULL)",
-      [req.params.id, businessId]
+      `UPDATE transactions
+       SET is_void = true, voided_at = NOW(), voided_by_id = $3
+       WHERE id = $1 AND business_id = $2
+         AND (is_adjustment = false OR is_adjustment IS NULL)
+         AND is_void = false
+       RETURNING id`,
+      [req.params.id, businessId, req.user.id]
     );
 
     if (result.rowCount === 0) {
