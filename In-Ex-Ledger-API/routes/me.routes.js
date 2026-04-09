@@ -91,10 +91,12 @@ router.get("/", async (req, res) => {
 
     if (!result.rowCount) {
       return res.status(404).json({ error: "User not found." });
+    }
     const businesses = await listBusinessesForUser(req.user.id);
     const activeBusiness = businesses.find((business) => business.id === businessId) || null;
     const assignedCpaGrants = await listAssignedCpaGrants(result.rows[0]);
     const assignedCpaPortfolios = await listAccessibleBusinessScopeForUser(result.rows[0]);
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     const user = result.rows[0];
     res.status(200).json({
       ...user,
