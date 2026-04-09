@@ -157,7 +157,13 @@ router.post("/", async (req, res) => {
   }
 });
 
+let mileageColumnModeCache = null;
+
 async function getMileageColumnMode() {
+  if (mileageColumnModeCache) {
+    return mileageColumnModeCache;
+  }
+
   const { rows } = await pool.query(
     `SELECT column_name
        FROM information_schema.columns
@@ -167,10 +173,11 @@ async function getMileageColumnMode() {
   );
 
   const columns = new Set(rows.map((row) => row.column_name));
-  return {
+  mileageColumnModeCache = {
     hasDate: columns.has("date"),
     hasTripDate: columns.has("trip_date")
   };
+  return mileageColumnModeCache;
 }
 
 function mileageDateSelect(mode) {

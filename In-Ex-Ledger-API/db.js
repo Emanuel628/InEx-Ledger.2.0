@@ -32,23 +32,6 @@ if (!isProduction) {
   }
 }
 
-async function logDbIdentity() {
-  try {
-    const res = await pool.query(
-      'SELECT current_database(), current_schema(), inet_server_addr(), inet_server_port()'
-    );
-    const row = res.rows[0];
-    console.log('=== DB PHYSICAL IDENTITY ===');
-    console.log('DB NAME:', row.current_database);
-    console.log('SCHEMA:', row.current_schema);
-    console.log('SERVER IP:', row.inet_server_addr);
-    console.log('DB PORT:', row.inet_server_port);
-    console.log('===============================');
-  } catch (err) {
-    console.error('DB IDENTITY ERROR:', err.message);
-  }
-}
-
 // Transient PostgreSQL/TCP error codes that warrant a retry
 const TRANSIENT_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', '57P03', '08006']);
 
@@ -112,7 +95,6 @@ async function initDatabase() {
 
 module.exports = {
   pool,
-  logDbIdentity,
   initDatabase,
   withRetry
 };
