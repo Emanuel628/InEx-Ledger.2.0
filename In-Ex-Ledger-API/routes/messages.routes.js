@@ -147,6 +147,8 @@ router.get("/inbox", async (req, res) => {
     );
 
     res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
+  } catch (err) {
+    console.error("GET /messages/inbox error:", err.message);
     res.status(500).json({ error: "Failed to fetch inbox." });
   }
 });
@@ -176,6 +178,8 @@ router.get("/sent", async (req, res) => {
     );
 
     res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
+  } catch (err) {
+    console.error("GET /messages/sent error:", err.message);
     res.status(500).json({ error: "Failed to fetch sent messages." });
   }
 });
