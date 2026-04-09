@@ -435,7 +435,7 @@ router.post("/erase", requireMfa, async (req, res) => {
  * Deprecated in favour of /erase for GDPR/privacy-law compliance; retained for
  * backward-compatibility with existing clients.
  */
-router.post("/delete", async (req, res) => {
+router.post("/delete", requireMfa, async (req, res) => {
   const userId = req.user.id;
   const ipAddress = req.ip || req.connection?.remoteAddress || null;
   const userAgent = req.get("user-agent") || null;

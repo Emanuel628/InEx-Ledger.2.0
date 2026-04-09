@@ -74,6 +74,7 @@ const MFA_EMAIL_CODE_EXPIRY_MS = MFA_EMAIL_CODE_EXPIRY_MINUTES * 60 * 1000;
 const REFRESH_TOKEN_BYTE_LENGTH = 48;
 const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 15 * 60;
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -91,7 +92,11 @@ const PASSWORD_RESET_TTL_MS = 20 * 60 * 1000;
 const MFA_PENDING_TOKEN_EXPIRY_SECONDS = 5 * 60;
 
 function normalizeEmail(email) {
-  return String(email ?? "").trim().toLowerCase();
+  const normalized = String(email ?? "").trim().toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+  return EMAIL_REGEX.test(normalized) ? normalized : "";
 }
 
 async function createVerificationToken(email) {
@@ -217,7 +222,7 @@ function isStrongPassword(password) {
 
 async function findUserByEmail(email) {
   const result = await pool.query(
-    "SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at FROM users WHERE email = $1 LIMIT 1",
+    "SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at, is_erased FROM users WHERE email = $1 LIMIT 1",
     [email]
   );
   return result.rows[0] || null;
@@ -225,7 +230,7 @@ async function findUserByEmail(email) {
 
 async function findUserById(userId) {
   const result = await pool.query(
-    "SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at FROM users WHERE id = $1 LIMIT 1",
+    "SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at, is_erased FROM users WHERE id = $1 LIMIT 1",
     [userId]
   );
   return result.rows[0] || null;
@@ -509,10 +514,13 @@ router.post("/register", authLimiter, async (req, res) => {
 
   const hashedPassword = await hashPassword(password);
   const client = await pool.connect();
+  let committed = false;
 
   try {
+    await client.query("BEGIN");
     const existing = await client.query("SELECT id FROM users WHERE email = $1", [email]);
     if (existing.rowCount > 0) {
+      await client.query("ROLLBACK");
       return res.status(409).json({ error: "Email already registered" });
     }
 
@@ -533,6 +541,8 @@ router.post("/register", authLimiter, async (req, res) => {
        ON CONFLICT (user_id) DO NOTHING`,
       [newUserId, isQuebec, !isQuebec]
     );
+    await client.query("COMMIT");
+    committed = true;
 
     // --- START OF EMAIL LOGIC ---
     try {
@@ -574,6 +584,13 @@ router.post("/register", authLimiter, async (req, res) => {
 
     return res.status(201).json({ success: true, message: "Account created. Check your email!" });
   } catch (err) {
+    if (!committed) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackErr) {
+        console.error("Register rollback failed:", rollbackErr);
+      }
+    }
     console.error("Register error:", err);
     return res.status(500).json({ error: "Registration failed" });
   } finally {
@@ -651,6 +668,10 @@ router.post("/login", authLimiter, async (req, res) => {
     const user = await findUserByEmail(email);
 
     if (!user) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    if (user.is_erased) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
@@ -934,6 +955,9 @@ router.post("/mfa/enable", requireAuth, authLimiter, async (req, res) => {
 
     if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
       await recordFailedMfaEmailAttempt(challenge.id);
+      if (Number(challenge.attempt_count || 0) + 1 >= 8) {
+        return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
+      }
       return res.status(401).json({ error: "Invalid verification code." });
     }
 
@@ -1026,6 +1050,9 @@ router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
 
     if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
       await recordFailedMfaEmailAttempt(challenge.id);
+      if (Number(challenge.attempt_count || 0) + 1 >= 8) {
+        return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
+      }
       return res.status(401).json({ error: "Invalid verification code." });
     }
 
@@ -1093,6 +1120,9 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
 
     if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
       await recordFailedMfaEmailAttempt(challenge.id);
+      if (Number(challenge.attempt_count || 0) + 1 >= 8) {
+        return res.status(429).json({ error: "Too many invalid verification attempts. Sign in again to get a new code." });
+      }
       return res.status(401).json({ error: "Invalid verification code." });
     }
 
@@ -1246,6 +1276,10 @@ router.get("/confirm-email-change", async (req, res) => {
 
     const { user_id, new_email } = result.rows[0];
     await pool.query("UPDATE users SET email = $1 WHERE id = $2", [new_email, user_id]);
+    await revokeAllRefreshTokensForUser(user_id);
+    await revokeTrustedMfaDevicesForUser(user_id);
+    clearRefreshCookie(res);
+    clearMfaTrustCookie(res);
 
     return res.redirect("/login?email_changed=true");
   } catch (err) {
