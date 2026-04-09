@@ -896,83 +896,6 @@ body {
   background: var(--surface2);
 }
 
-.app-topbar {
-  padding: 0 20px;
-}
-
-.topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 28px;
-}
-
-.topbar-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-}
-
-.brand-mark-topbar {
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-}
-
-.topbar-brand-text {
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: #fff;
-}
-
-.topbar-nav,
-.topbar-nav a {
-  display: flex;
-  align-items: center;
-}
-
-.topbar-nav {
-  gap: 8px;
-}
-
-.topbar-nav a {
-  gap: 6px;
-}
-
-.nav-icon {
-  width: 14px;
-  text-align: center;
-  font-size: 13px;
-  line-height: 1;
-}
-
-.user-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px 5px 6px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.user-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--accent2);
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 500;
-}
-
-.user-name {
-  font-size: 12px;
-}
-
 .app-shell {
   max-width: none;
   margin: 0;
@@ -1902,10 +1825,6 @@ body {
 }
 
 @media (max-width: 1024px) {
-  .topbar-nav {
-    display: none;
-  }
-
   .stats-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
