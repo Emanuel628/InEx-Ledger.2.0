@@ -1,5 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const bcrypt = require("bcrypt");
 const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
@@ -328,6 +330,24 @@ router.delete("/", accountDeleteLimiter, requireMfa, async (req, res) => {
       return res.status(401).json({ error: "Incorrect password." });
     }
 
+    // Collect receipt file paths before the DB cascade removes the rows
+    const receiptFiles = await pool.query(
+      `SELECT r.storage_path
+         FROM receipts r
+         JOIN businesses b ON b.id = r.business_id
+        WHERE b.user_id = $1
+          AND r.storage_path IS NOT NULL`,
+      [req.user.id]
+    );
+    const storageDir = path.resolve(path.join(process.cwd(), "storage", "receipts"));
+    const storagePaths = receiptFiles.rows
+      .map((row) => row.storage_path)
+      .filter((filePath) => {
+        if (!filePath) return false;
+        // Guard against path traversal — only unlink files inside the receipts storage dir
+        return path.resolve(filePath).startsWith(storageDir + path.sep);
+      });
+
     const result = await pool.query("DELETE FROM users WHERE id = $1", [
       req.user.id
     ]);
@@ -335,6 +355,19 @@ router.delete("/", accountDeleteLimiter, requireMfa, async (req, res) => {
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "User not found." });
     }
+
+    // Unlink receipt files from disk after the DB rows have been removed
+    await Promise.all(
+      storagePaths.map(async (filePath) => {
+        try {
+          await fs.promises.unlink(filePath);
+        } catch (unlinkErr) {
+          if (unlinkErr.code !== "ENOENT") {
+            console.error("DELETE /me: failed to unlink receipt file:", filePath, unlinkErr);
+          }
+        }
+      })
+    );
 
     res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
     res.status(200).json({ message: "Account and data deleted" });
