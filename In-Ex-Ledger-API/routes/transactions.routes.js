@@ -67,7 +67,7 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
     `INSERT INTO categories (id, business_id, name, kind, created_at)
     VALUES ($1, $2, $3, $4, now())
     ON CONFLICT (business_id, lower(name)) DO UPDATE
-      SET name = EXCLUDED.name
+      SET name = categories.name
     RETURNING id`,
     [crypto.randomUUID(), businessId, name, kind]
     );

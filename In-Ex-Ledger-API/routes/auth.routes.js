@@ -74,7 +74,7 @@ const MFA_EMAIL_CODE_EXPIRY_MS = MFA_EMAIL_CODE_EXPIRY_MINUTES * 60 * 1000;
 const REFRESH_TOKEN_BYTE_LENGTH = 48;
 const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 15 * 60;
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_MFA_ATTEMPTS = 8;
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -96,7 +96,18 @@ function normalizeEmail(email) {
   if (!normalized) {
     return "";
   }
-  return EMAIL_REGEX.test(normalized) ? normalized : "";
+  if (normalized.includes("..")) {
+    return "";
+  }
+  const atIndex = normalized.indexOf("@");
+  if (atIndex <= 0 || atIndex !== normalized.lastIndexOf("@")) {
+    return "";
+  }
+  const domain = normalized.slice(atIndex + 1);
+  if (!domain || domain.startsWith(".") || domain.endsWith(".") || !domain.includes(".")) {
+    return "";
+  }
+  return normalized;
 }
 
 async function createVerificationToken(email) {
@@ -949,13 +960,14 @@ router.post("/mfa/enable", requireAuth, authLimiter, async (req, res) => {
       return res.status(401).json({ error: "Verification code expired. Start again." });
     }
 
-    if (Number(challenge.attempt_count || 0) >= 8) {
+    if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
       return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
     }
 
     if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+      const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
       await recordFailedMfaEmailAttempt(challenge.id);
-      if (Number(challenge.attempt_count || 0) + 1 >= 8) {
+      if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
         return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
       }
       return res.status(401).json({ error: "Invalid verification code." });
@@ -1044,13 +1056,14 @@ router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
       return res.status(401).json({ error: "Verification code expired. Start again." });
     }
 
-    if (Number(challenge.attempt_count || 0) >= 8) {
+    if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
       return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
     }
 
     if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+      const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
       await recordFailedMfaEmailAttempt(challenge.id);
-      if (Number(challenge.attempt_count || 0) + 1 >= 8) {
+      if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
         return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
       }
       return res.status(401).json({ error: "Invalid verification code." });
@@ -1114,13 +1127,14 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
       return res.status(401).json({ error: "Verification code expired. Sign in again to get a new one." });
     }
 
-    if (Number(challenge.attempt_count || 0) >= 8) {
+    if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
       return res.status(429).json({ error: "Too many invalid verification attempts. Sign in again to get a new code." });
     }
 
     if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+      const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
       await recordFailedMfaEmailAttempt(challenge.id);
-      if (Number(challenge.attempt_count || 0) + 1 >= 8) {
+      if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
         return res.status(429).json({ error: "Too many invalid verification attempts. Sign in again to get a new code." });
       }
       return res.status(401).json({ error: "Invalid verification code." });

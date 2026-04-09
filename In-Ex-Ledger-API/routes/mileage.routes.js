@@ -9,7 +9,9 @@ const router = express.Router();
 const MILES_TO_KM = 1.609344;
 const MAX_DISTANCE_VALUE = 50000;
 const MAX_ODOMETER_VALUE = 9999999.99;
+const MILEAGE_SCHEMA_CACHE_MS = 5 * 60 * 1000;
 let cachedMileageColumnMode = null;
+let cachedMileageColumnFetchedAt = 0;
 router.use(requireAuth);
 router.use(createDataApiLimiter());
 
@@ -163,7 +165,7 @@ router.post("/", async (req, res) => {
 });
 
 async function getMileageColumnMode() {
-  if (cachedMileageColumnMode) {
+  if (cachedMileageColumnMode && Date.now() - cachedMileageColumnFetchedAt < MILEAGE_SCHEMA_CACHE_MS) {
     return cachedMileageColumnMode;
   }
   const { rows } = await pool.query(
@@ -179,6 +181,7 @@ async function getMileageColumnMode() {
     hasDate: columns.has("date"),
     hasTripDate: columns.has("trip_date")
   };
+  cachedMileageColumnFetchedAt = Date.now();
   return cachedMileageColumnMode;
 }
 
