@@ -1805,17 +1805,14 @@ function initDangerZone() {
   deleteAccountButton?.addEventListener("click", () => openModal("delete_account"));
   cancelButton?.addEventListener("click", closeModal);
 
-  confirmInput?.addEventListener("input", () => {
+  const updateDeleteAccountButtonState = () => {
     if (dangerAction === "delete_account") {
-      confirmButton.disabled = confirmInput.value !== "DELETE" || !passwordInput?.value;
+      confirmButton.disabled = confirmInput?.value !== "DELETE" || !passwordInput?.value;
     }
-  });
+  };
 
-  passwordInput?.addEventListener("input", () => {
-    if (dangerAction === "delete_account") {
-      confirmButton.disabled = confirmInput?.value !== "DELETE" || !passwordInput.value;
-    }
-  });
+  confirmInput?.addEventListener("input", updateDeleteAccountButtonState);
+  passwordInput?.addEventListener("input", updateDeleteAccountButtonState);
 
   confirmButton?.addEventListener("click", () => {
     void (async () => {
