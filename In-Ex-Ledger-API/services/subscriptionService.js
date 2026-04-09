@@ -206,7 +206,6 @@ module.exports = {
   ensureBusinessSubscription,
   deriveEffectiveState,
   getSubscriptionSnapshotForBusiness,
-  getSubscriptionSnapshotForUser,
   updateStripeCustomerForBusiness,
   syncStripeSubscriptionForBusiness,
   setFreePlanForBusiness,

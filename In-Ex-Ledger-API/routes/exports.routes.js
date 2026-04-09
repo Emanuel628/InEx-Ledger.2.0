@@ -47,7 +47,7 @@ router.post("/exports/request-grant", exportGrantLimiter, async (req, res) => {
   try {
     const user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
-    const businessId = user.business_id || (await resolveBusinessIdForUser(user));
+    const businessId = user.business_id;
     const exportType = (req.body?.exportType || "pdf").toLowerCase();
     const includeTaxId = Boolean(req.body?.includeTaxId);
     const dateRange = validateDateRange(req.body?.dateRange);
@@ -114,7 +114,7 @@ router.post("/exports/generate", exportGrantLimiter, async (req, res) => {
 
   const user = req.user;
   user.business_id = await resolveBusinessIdForUser(user);
-  const businessId = user.business_id || (await resolveBusinessIdForUser(user));
+  const businessId = user.business_id;
 
   if (grantPayload.businessId !== businessId || grantPayload.userId !== user.id) {
     return res.status(403).json({ error: "Grant token does not match requester." });
@@ -122,7 +122,7 @@ router.post("/exports/generate", exportGrantLimiter, async (req, res) => {
 
   try {
     const jobId = crypto.randomUUID();
-    const filename = `luna-business-export-${grantPayload.dateRange.startDate}_to_${grantPayload.dateRange.endDate}.pdf`;
+    const filename = `inex-ledger-export-${grantPayload.dateRange.startDate}_to_${grantPayload.dateRange.endDate}.pdf`;
     const job = {
       jobId,
       businessId,
@@ -186,7 +186,7 @@ router.get("/exports/history", async (req, res) => {
   try {
     const user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
-    const businessId = user.business_id || (await resolveBusinessIdForUser(user));
+    const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
       return res.status(402).json({ error: "Export history requires an active InEx Ledger V1 plan." });
@@ -217,7 +217,7 @@ router.get("/exports/history/:id/redacted", async (req, res) => {
   try {
     const user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
-    const businessId = user.business_id || (await resolveBusinessIdForUser(user));
+    const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
       return res.status(402).json({ error: "Export history requires an active InEx Ledger V1 plan." });
@@ -271,7 +271,7 @@ router.post("/exports/secure-export", secureExportLimiter, async (req, res) => {
     const templateVersion = req.body?.templateVersion || "v1";
 
     const jobId = crypto.randomUUID();
-    const filename = `luna-business-export-${dateRange.startDate}_to_${dateRange.endDate}.pdf`;
+    const filename = `inex-ledger-export-${dateRange.startDate}_to_${dateRange.endDate}.pdf`;
 
     const job = {
       jobId,

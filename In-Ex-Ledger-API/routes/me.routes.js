@@ -1,12 +1,26 @@
 const express = require("express");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
+const bcrypt = require("bcrypt");
+const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
-const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 const { listAssignedCpaGrants, listAccessibleBusinessScopeForUser } = require("../services/cpaAccessService.js");
+const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
+const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 
 const router = express.Router();
+
+const accountDeleteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many account deletion attempts. Please try again later." }
+});
 
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
@@ -15,12 +29,6 @@ const VALID_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash
 const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const REFRESH_TOKEN_COOKIE = "refresh_token";
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-  path: "/"
-};
 
 function normalizeOnboardingPayload(user) {
   return {
@@ -34,7 +42,10 @@ function normalizeOnboardingPayload(user) {
   };
 }
 
-router.get("/", requireAuth, async (req, res) => {
+router.use(requireAuth);
+router.use(createDataApiLimiter());
+
+router.get("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
@@ -50,14 +61,13 @@ router.get("/", requireAuth, async (req, res) => {
     );
 
     if (!result.rowCount) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "User not found." });
     }
-
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     const businesses = await listBusinessesForUser(req.user.id);
     const activeBusiness = businesses.find((business) => business.id === businessId) || null;
     const assignedCpaGrants = await listAssignedCpaGrants(result.rows[0]);
     const assignedCpaPortfolios = await listAccessibleBusinessScopeForUser(result.rows[0]);
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     const user = result.rows[0];
     res.status(200).json({
       ...user,
@@ -80,11 +90,11 @@ router.get("/", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("GET /me error:", err.message);
-    res.status(500).json({ error: "Failed to load profile" });
+    res.status(500).json({ error: "Failed to load profile." });
   }
 });
 
-router.get("/onboarding", requireAuth, async (req, res) => {
+router.get("/onboarding", async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen
@@ -95,17 +105,17 @@ router.get("/onboarding", requireAuth, async (req, res) => {
     );
 
     if (!result.rowCount) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "User not found." });
     }
 
     return res.status(200).json(normalizeOnboardingPayload(result.rows[0]));
   } catch (err) {
     console.error("GET /me/onboarding error:", err.message);
-    return res.status(500).json({ error: "Failed to load onboarding state" });
+    return res.status(500).json({ error: "Failed to load onboarding state." });
   }
 });
 
-router.put("/onboarding", requireAuth, async (req, res) => {
+router.put("/onboarding", async (req, res) => {
   const businessName = String(req.body?.business_name || "").trim();
   const businessType = String(req.body?.business_type || "").trim();
   const region = String(req.body?.region || "").trim().toUpperCase();
@@ -142,67 +152,79 @@ router.put("/onboarding", requireAuth, async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const client = await pool.connect();
 
-    await pool.query(
-      `UPDATE businesses
-          SET name = $1,
-              business_type = $2,
-              region = $3,
-              language = $4,
-              province = CASE
-                WHEN $3 = 'CA' THEN $5
-                ELSE NULL
-              END
-        WHERE id = $6`,
-      [businessName, businessType, region, language, province || null, businessId]
-    );
+    try {
+      await client.query("BEGIN");
 
-    const accountCheck = await pool.query(
-      "SELECT COUNT(*)::int AS count FROM accounts WHERE business_id = $1",
-      [businessId]
-    );
-    const hasAccounts = Number(accountCheck.rows[0]?.count || 0) > 0;
-
-    if (!hasAccounts) {
-      await pool.query(
-        `INSERT INTO accounts (id, business_id, name, type)
-         VALUES ($1, $2, $3, $4)`,
-        [crypto.randomUUID(), businessId, starterAccountName, starterAccountType]
+      await client.query(
+        `UPDATE businesses
+            SET name = $1,
+                business_type = $2,
+                region = $3,
+                language = $4,
+                province = CASE
+                  WHEN $3 = 'CA' THEN $5
+                  ELSE NULL
+                END
+          WHERE id = $6`,
+        [businessName, businessType, region, language, province || null, businessId]
       );
+
+      const accountCheck = await client.query(
+        "SELECT COUNT(*)::int AS count FROM accounts WHERE business_id = $1",
+        [businessId]
+      );
+      const hasAccounts = Number(accountCheck.rows[0]?.count || 0) > 0;
+
+      if (!hasAccounts) {
+        await client.query(
+          `INSERT INTO accounts (id, business_id, name, type)
+           VALUES ($1, $2, $3, $4)`,
+          [crypto.randomUUID(), businessId, starterAccountName, starterAccountType]
+        );
+      }
+
+      const onboardingData = {
+        business_name: businessName,
+        business_type: businessType,
+        region,
+        province: region === "CA" ? province : "",
+        language,
+        starter_account_type: starterAccountType,
+        starter_account_name: starterAccountName,
+        start_focus: startFocus
+      };
+
+      const updated = await client.query(
+        `UPDATE users
+            SET onboarding_completed = true,
+                onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()),
+                onboarding_data = $1::jsonb
+          WHERE id = $2
+          RETURNING onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen`,
+        [JSON.stringify(onboardingData), req.user.id]
+      );
+
+      await client.query("COMMIT");
+
+      return res.status(200).json({
+        onboarding: normalizeOnboardingPayload(updated.rows[0]),
+        redirect_to: `/${startFocus}`
+      });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
     }
-
-    const onboardingData = {
-      business_name: businessName,
-      business_type: businessType,
-      region,
-      province: region === "CA" ? province : "",
-      language,
-      starter_account_type: starterAccountType,
-      starter_account_name: starterAccountName,
-      start_focus: startFocus
-    };
-
-    const updated = await pool.query(
-      `UPDATE users
-          SET onboarding_completed = true,
-              onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()),
-              onboarding_data = $1::jsonb
-        WHERE id = $2
-        RETURNING onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen`,
-      [JSON.stringify(onboardingData), req.user.id]
-    );
-
-    return res.status(200).json({
-      onboarding: normalizeOnboardingPayload(updated.rows[0]),
-      redirect_to: `/${startFocus}`
-    });
   } catch (err) {
     console.error("PUT /me/onboarding error:", err.message);
     return res.status(500).json({ error: "Failed to save onboarding." });
   }
 });
 
-router.post("/onboarding/tour", requireAuth, async (req, res) => {
+router.post("/onboarding/tour", async (req, res) => {
   const page = String(req.body?.page || "").trim();
   if (!page) {
     return res.status(400).json({ error: "Page is required." });
@@ -214,7 +236,7 @@ router.post("/onboarding/tour", requireAuth, async (req, res) => {
       [req.user.id]
     );
     if (!current.rowCount) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "User not found." });
     }
 
     const nextState =
@@ -230,11 +252,11 @@ router.post("/onboarding/tour", requireAuth, async (req, res) => {
     return res.status(200).json({ success: true, tour_seen: nextState });
   } catch (err) {
     console.error("POST /me/onboarding/tour error:", err.message);
-    return res.status(500).json({ error: "Failed to update onboarding tour state" });
+    return res.status(500).json({ error: "Failed to update onboarding tour state." });
   }
 });
 
-router.post("/onboarding/replay", requireAuth, async (req, res) => {
+router.post("/onboarding/replay", async (req, res) => {
   try {
     await pool.query(
       "UPDATE users SET onboarding_tour_seen = '{}'::jsonb WHERE id = $1",
@@ -243,7 +265,7 @@ router.post("/onboarding/replay", requireAuth, async (req, res) => {
     return res.status(200).json({ success: true });
   } catch (err) {
     console.error("POST /me/onboarding/replay error:", err.message);
-    return res.status(500).json({ error: "Failed to reset onboarding tips" });
+    return res.status(500).json({ error: "Failed to reset onboarding tips." });
   }
 });
 
@@ -251,38 +273,76 @@ router.post("/onboarding/replay", requireAuth, async (req, res) => {
  * PUT /api/me
  * Update user profile (full_name, display_name).
  */
-router.put("/", requireAuth, async (req, res) => {
-  const { full_name, display_name } = req.body ?? {};
+router.put("/", async (req, res) => {
+  const body = req.body ?? {};
   try {
     const result = await pool.query(
       `UPDATE users
-       SET full_name = COALESCE($1, full_name),
-           display_name = COALESCE($2, display_name)
+       SET full_name = CASE WHEN $4::boolean THEN $1 ELSE full_name END,
+           display_name = CASE WHEN $5::boolean THEN $2 ELSE display_name END
        WHERE id = $3
        RETURNING id, email, full_name, display_name, created_at`,
-      [full_name?.trim() || null, display_name?.trim() || null, req.user.id]
+      [
+        'full_name' in body ? (body.full_name?.trim() || null) : null,
+        'display_name' in body ? (body.display_name?.trim() || null) : null,
+        req.user.id,
+        'full_name' in body,
+        'display_name' in body
+      ]
     );
     res.json(result.rows[0]);
   } catch (err) {
     console.error("PUT /me error:", err.message);
-    res.status(500).json({ error: "Failed to update profile" });
+    res.status(500).json({ error: "Failed to update profile." });
   }
 });
 
-router.delete("/", requireAuth, async (req, res) => {
+router.delete("/", accountDeleteLimiter, requireMfa, async (req, res) => {
+  const { password } = req.body ?? {};
   const anonymizedEmail = `deleted-${crypto.randomUUID()}@deleted.invalid`;
   const client = await pool.connect();
+  let transactionOpen = false;
+
   try {
+    if (!password) {
+      return res.status(400).json({ error: "Password is required to delete your account." });
+    }
+
     await client.query("BEGIN");
+    transactionOpen = true;
 
     const userResult = await client.query(
-      "SELECT id, email FROM users WHERE id = $1 LIMIT 1",
+      "SELECT id, email, password_hash FROM users WHERE id = $1 LIMIT 1",
       [req.user.id]
     );
     if (!userResult.rowCount) {
       await client.query("ROLLBACK");
-      return res.status(404).json({ error: "User not found" });
+      transactionOpen = false;
+      return res.status(404).json({ error: "User not found." });
     }
+
+    const { match } = await verifyPassword(password, userResult.rows[0].password_hash);
+    if (!match) {
+      await client.query("ROLLBACK");
+      transactionOpen = false;
+      return res.status(401).json({ error: "Incorrect password." });
+    }
+
+    const receiptFiles = await client.query(
+      `SELECT r.storage_path
+         FROM receipts r
+         JOIN businesses b ON b.id = r.business_id
+        WHERE b.user_id = $1
+          AND r.storage_path IS NOT NULL`,
+      [req.user.id]
+    );
+    const storageDir = path.resolve(path.join(process.cwd(), "storage", "receipts"));
+    const storagePaths = receiptFiles.rows
+      .map((row) => row.storage_path)
+      .filter((filePath) => {
+        if (!filePath) return false;
+        return path.resolve(filePath).startsWith(storageDir + path.sep);
+      });
 
     const businessesResult = await client.query(
       "SELECT id FROM businesses WHERE user_id = $1",
@@ -350,17 +410,33 @@ router.delete("/", requireAuth, async (req, res) => {
 
     if (!result.rowCount) {
       await client.query("ROLLBACK");
-      return res.status(404).json({ error: "User not found" });
+      transactionOpen = false;
+      return res.status(404).json({ error: "User not found." });
     }
 
     await client.query("COMMIT");
+    transactionOpen = false;
+
+    await Promise.all(
+      storagePaths.map(async (filePath) => {
+        try {
+          await fs.promises.unlink(filePath);
+        } catch (unlinkErr) {
+          if (unlinkErr.code !== "ENOENT") {
+            console.error("DELETE /me: failed to unlink receipt file:", filePath, unlinkErr);
+          }
+        }
+      })
+    );
 
     res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
     res.status(200).json({ message: "Account and data deleted" });
   } catch (err) {
-    await client.query("ROLLBACK");
+    if (transactionOpen) {
+      await client.query("ROLLBACK");
+    }
     console.error("DELETE /me error:", err.message);
-    res.status(500).json({ error: "Failed to delete account" });
+    res.status(500).json({ error: "Failed to delete account." });
   } finally {
     client.release();
   }

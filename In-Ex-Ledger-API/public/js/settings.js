@@ -2095,7 +2095,8 @@ function initDangerZone() {
       title.textContent = t("settings_delete_account_modal_title");
       body.textContent = t("settings_delete_account_modal_body");
       confirmWrap.classList.remove("hidden");
-      if (passwordWrap) passwordWrap.classList.add("hidden");
+      if (passwordWrap) passwordWrap.classList.remove("hidden");
+      if (passwordInput) passwordInput.value = "";
       confirmButton.disabled = true;
     } else {
       title.textContent = t("settings_delete_business_data_modal_title");
@@ -2111,11 +2112,14 @@ function initDangerZone() {
   deleteAccountButton?.addEventListener("click", () => openModal("delete_account"));
   cancelButton?.addEventListener("click", closeModal);
 
-  confirmInput?.addEventListener("input", () => {
+  const updateDeleteAccountButtonState = () => {
     if (dangerAction === "delete_account") {
-      confirmButton.disabled = confirmInput.value !== "DELETE";
+      confirmButton.disabled = confirmInput?.value !== "DELETE" || !passwordInput?.value;
     }
-  });
+  };
+
+  confirmInput?.addEventListener("input", updateDeleteAccountButtonState);
+  passwordInput?.addEventListener("input", updateDeleteAccountButtonState);
 
   confirmButton?.addEventListener("click", () => {
     void (async () => {
@@ -2171,10 +2175,18 @@ function initDangerZone() {
       }
 
       if (dangerAction === "delete_account") {
+        const password = passwordInput?.value || "";
+        if (!password) {
+          showSettingsToast(t("settings_enter_password_confirm"));
+          passwordInput?.focus();
+          return;
+        }
         confirmButton.disabled = true;
         try {
           const response = await apiFetch("/api/me", {
-            method: "DELETE"
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password })
           });
           const payload = await response?.json().catch(() => null);
 

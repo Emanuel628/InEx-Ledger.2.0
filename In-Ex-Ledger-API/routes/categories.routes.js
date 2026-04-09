@@ -8,6 +8,8 @@ const {
   getBusinessScopeForUser
 } = require("../api/utils/resolveBusinessIdForUser.js");
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const router = express.Router();
 router.use(requireAuth);
 router.use(createDataApiLimiter());
@@ -71,12 +73,15 @@ router.post("/", async (req, res) => {
  * PUT /api/categories/:id
  */
 router.put("/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid category ID." });
+  }
   const { name, kind, color, tax_map_us, tax_map_ca } = req.body ?? {};
 
   if (kind && !VALID_KINDS.has(kind)) {
     return res.status(400).json({ error: "kind must be 'income' or 'expense'" });
   }
-  if (color && !VALID_COLORS.has(color)) {
+  if (color !== undefined && color !== null && !VALID_COLORS.has(color)) {
     return res.status(400).json({ error: "color is invalid" });
   }
 
@@ -84,23 +89,30 @@ router.put("/:id", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     const existing = await pool.query(
-      "SELECT id FROM categories WHERE id = $1 AND business_id = $2",
+      "SELECT id, name, kind, color, tax_map_us, tax_map_ca FROM categories WHERE id = $1 AND business_id = $2",
       [req.params.id, businessId]
     );
     if (existing.rowCount === 0) {
       return res.status(404).json({ error: "Category not found." });
     }
 
+    const current = existing.rows[0];
+    const newName = name !== undefined ? (name?.trim() || null) : current.name;
+    const newKind = kind !== undefined ? (kind ?? null) : current.kind;
+    const newColor = color !== undefined ? (color ?? null) : current.color;
+    const newTaxMapUs = tax_map_us !== undefined ? (tax_map_us ?? null) : current.tax_map_us;
+    const newTaxMapCa = tax_map_ca !== undefined ? (tax_map_ca ?? null) : current.tax_map_ca;
+
     const result = await pool.query(
       `UPDATE categories
-       SET name = COALESCE($1, name),
-           kind = COALESCE($2, kind),
-           color = COALESCE($3, color),
-           tax_map_us = COALESCE($4, tax_map_us),
-           tax_map_ca = COALESCE($5, tax_map_ca)
+       SET name = $1,
+           kind = $2,
+           color = $3,
+           tax_map_us = $4,
+           tax_map_ca = $5
        WHERE id = $6 AND business_id = $7
        RETURNING id, name, kind, color, tax_map_us, tax_map_ca, is_default, created_at`,
-      [name?.trim() || null, kind || null, color || null, tax_map_us || null, tax_map_ca || null, req.params.id, businessId]
+      [newName, newKind, newColor, newTaxMapUs, newTaxMapCa, req.params.id, businessId]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -113,6 +125,9 @@ router.put("/:id", async (req, res) => {
  * DELETE /api/categories/:id
  */
 router.delete("/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid category ID." });
+  }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 

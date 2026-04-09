@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const express = require("express");
-const { requireAuth } = require("../middleware/auth.middleware.js");
+const rateLimit = require("express-rate-limit");
+const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { createBillingMutationLimiter } = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const {
@@ -17,6 +18,14 @@ const STRIPE_API_BASE = "https://api.stripe.com/v1";
 const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2024-06-20";
 
 const billingMutationLimiter = createBillingMutationLimiter();
+
+const billingReadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." }
+});
 
 function getStripeSecretKey() {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -114,7 +123,7 @@ router.get("/subscription", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/checkout-session", requireAuth, async (req, res) => {
+router.post("/checkout-session", billingMutationLimiter, requireAuth, requireMfa, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
@@ -128,8 +137,8 @@ router.post("/checkout-session", requireAuth, async (req, res) => {
       customer: customerId,
       "line_items[0][price]": getStripePriceId(),
       "line_items[0][quantity]": 1,
-      success_url: buildAppUrl(req, "/html/subscription.html?checkout=success"),
-      cancel_url: buildAppUrl(req, "/html/subscription.html?checkout=cancel"),
+      success_url: buildAppUrl(req, "/subscription?checkout=success"),
+      cancel_url: buildAppUrl(req, "/subscription?checkout=cancel"),
       "metadata[business_id]": businessId,
       "metadata[user_id]": req.user.id
     });
@@ -147,7 +156,7 @@ router.post("/customer-portal", requireAuth, async (req, res) => {
     const customerId = await ensureStripeCustomer(businessId, req.user);
     const session = await stripeRequest("/billing_portal/sessions", {
       customer: customerId,
-      return_url: buildAppUrl(req, "/html/subscription.html")
+      return_url: buildAppUrl(req, "/subscription")
     });
     res.status(200).json({ url: session.url });
   } catch (err) {
@@ -196,7 +205,7 @@ router.post("/cancel", requireAuth, billingMutationLimiter, async (req, res) => 
   }
 });
 
-router.get("/history", requireAuth, billingMutationLimiter, async (req, res) => {
+router.get("/history", billingReadLimiter, requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subRow = await pool.query(

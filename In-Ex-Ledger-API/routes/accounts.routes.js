@@ -8,6 +8,8 @@ const {
   getBusinessScopeForUser
 } = require("../api/utils/resolveBusinessIdForUser.js");
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const router = express.Router();
 router.use(requireAuth);
 router.use(createDataApiLimiter());
@@ -29,7 +31,7 @@ router.get("/", async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error("✗ GET accounts error:", err.message);
+    console.error("GET accounts error:", err.message);
     res.status(500).json({ error: "Failed to retrieve accounts from DB." });
   }
 });
@@ -62,7 +64,7 @@ router.post("/", async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("✗ POST account error:", err.message);
+    console.error("POST account error:", err.message);
     if (err.code === "23505") {
       return res.status(409).json({
         error: "An account with this name already exists."
@@ -73,9 +75,64 @@ router.post("/", async (req, res) => {
 });
 
 /**
+ * UPDATE account (name and/or type)
+ */
+router.put("/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid account ID." });
+  }
+  const { name, type } = req.body;
+
+  const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card"];
+
+  if (!name && !type) {
+    return res.status(400).json({ error: "At least one of name or type is required." });
+  }
+
+  if (type && !ALLOWED_ACCOUNT_TYPES.includes(type)) {
+    return res.status(400).json({ error: `Account type must be one of: ${ALLOWED_ACCOUNT_TYPES.join(", ")}.` });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+
+    const existing = await pool.query(
+      "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
+      [req.params.id, businessId]
+    );
+
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ error: "Account not found or access denied." });
+    }
+
+    const result = await pool.query(
+      `UPDATE accounts
+          SET name = COALESCE($1, name),
+              type = COALESCE($2, type)
+        WHERE id = $3 AND business_id = $4
+        RETURNING *`,
+      [name || null, type || null, req.params.id, businessId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("PUT account error:", err.message);
+    if (err.code === "23505") {
+      return res.status(409).json({
+        error: "An account with this name already exists."
+      });
+    }
+    res.status(500).json({ error: "Failed to update account." });
+  }
+});
+
+/**
  * DELETE account
  */
 router.delete("/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid account ID." });
+  }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
@@ -110,7 +167,7 @@ router.delete("/:id", async (req, res) => {
 
     res.json({ message: "Account deleted successfully." });
   } catch (err) {
-    console.error("✗ DELETE account error:", err.message);
+    console.error("DELETE account error:", err.message);
     res.status(500).json({ error: "Delete failed." });
   }
 });

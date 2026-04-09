@@ -1,10 +1,11 @@
 const crypto = require("crypto");
 const express = require("express");
 const { pool } = require("../db.js");
-const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError } = require("../utils/logger.js");
+const { decrypt } = require("../services/encryptionService.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -185,7 +186,7 @@ router.post("/settings", async (req, res) => {
  * Key ledger fields included: TransactionIDs, Amounts, Dates, Categories.
  * Audit trail: every successful export is logged in user_action_audit_log.
  */
-router.post("/export", async (req, res) => {
+router.post("/export", requireMfa, async (req, res) => {
   const format = String(req.query.format || req.body?.format || "json").toLowerCase();
   if (format !== "json" && format !== "csv") {
     return res.status(400).json({ error: "Unsupported format. Use 'json' or 'csv'." });
@@ -219,6 +220,7 @@ router.post("/export", async (req, res) => {
                 t.amount,
                 t.type,
                 t.description,
+                t.description_encrypted,
                 t.date,
                 t.note,
                 t.cleared,
@@ -285,18 +287,24 @@ router.post("/export", async (req, res) => {
     if (format === "csv") {
       // CSV export: primary transactions sheet only (the most common use case).
       // Flat structure for spreadsheet interoperability.
-      const rows = txResult.rows.map((t) => ({
-        transaction_id:  t.transaction_id,
-        date:            t.date,
-        type:            t.type,
-        amount:          t.amount,
-        account:         t.account || "",
-        category:        t.category || "",
-        description:     t.description || "",
-        note:            t.note || "",
-        cleared:         t.cleared ? "true" : "false",
-        created_at:      t.created_at
-      }));
+      const rows = txResult.rows.map((t) => {
+        let description = t.description || "";
+        if (t.description_encrypted) {
+          try { description = decrypt(t.description_encrypted); } catch (err) { logError("Privacy CSV export: failed to decrypt description", { err: err.message, transactionId: t.transaction_id }); }
+        }
+        return {
+          transaction_id:  t.transaction_id,
+          date:            t.date,
+          type:            t.type,
+          amount:          t.amount,
+          account:         t.account || "",
+          category:        t.category || "",
+          description,
+          note:            t.note || "",
+          cleared:         t.cleared ? "true" : "false",
+          created_at:      t.created_at
+        };
+      });
       const csv = toCsv(rows);
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", 'attachment; filename="inex-ledger-transactions.csv"');
@@ -307,12 +315,18 @@ router.post("/export", async (req, res) => {
     // JSON export: full structured package
     const exportData = {
       exportedAt: new Date().toISOString(),
-      schemaVersion: "phase4-v1",
+      schemaVersion: "phase5-v1",
       user: userResult.rows[0],
       business: businessResult.rows[0],
       accounts: accountsResult.rows,
       categories: categoriesResult.rows,
-      transactions: txResult.rows,
+      transactions: txResult.rows.map((t) => {
+        const { description_encrypted, ...rest } = t;
+        if (description_encrypted) {
+          try { rest.description = decrypt(description_encrypted); } catch (err) { logError("Privacy JSON export: failed to decrypt description", { err: err.message, transactionId: rest.transaction_id }); }
+        }
+        return rest;
+      }),
       adjustmentHistory: adjustmentsResult.rows,
       auditLog: auditLogResult.rows
     };
@@ -336,7 +350,7 @@ router.post("/export", async (req, res) => {
  * Audit trail: the erasure request is logged in user_action_audit_log before
  * any data is modified so that compliance teams have a permanent record.
  */
-router.post("/erase", async (req, res) => {
+router.post("/erase", requireMfa, async (req, res) => {
   const userId = req.user.id;
   const ipAddress = req.ip || req.connection?.remoteAddress || null;
   const userAgent = req.get("user-agent") || null;
@@ -421,7 +435,7 @@ router.post("/erase", async (req, res) => {
  * Deprecated in favour of /erase for GDPR/privacy-law compliance; retained for
  * backward-compatibility with existing clients.
  */
-router.post("/delete", async (req, res) => {
+router.post("/delete", requireMfa, async (req, res) => {
   const userId = req.user.id;
   const ipAddress = req.ip || req.connection?.remoteAddress || null;
   const userAgent = req.get("user-agent") || null;
@@ -430,7 +444,21 @@ router.post("/delete", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    const businessId = await resolveBusinessIdForUser(req.user);
+    // Resolve business ID within the transaction boundary using the client
+    // so that all reads and writes share the same transaction scope.
+    const bizResult = await client.query(
+      `SELECT b.id
+         FROM users u
+         JOIN businesses b ON b.id = u.active_business_id AND b.user_id = u.id
+        WHERE u.id = $1
+        LIMIT 1`,
+      [userId]
+    );
+    if (!bizResult.rowCount) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "No active business found." });
+    }
+    const businessId = bizResult.rows[0].id;
 
     // Log the deletion to the audit trail before performing the deletion
     // so a compliance record always exists even if a subsequent step fails.

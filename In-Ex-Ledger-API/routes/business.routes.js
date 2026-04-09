@@ -1,5 +1,4 @@
 const express = require("express");
-const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
@@ -8,6 +7,7 @@ const {
   loadAccountingLockState,
   saveAccountingLockState
 } = require("../services/accountingLockService.js");
+const { encryptTaxId, decryptTaxId } = require("../services/taxIdService.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -19,41 +19,6 @@ const BUSINESS_SELECT = `SELECT id, name, region, language, fiscal_year_start, p
                                 business_type, tax_id, address, created_at
                          FROM businesses
                          WHERE id = $1`;
-
-const TAX_ID_PREFIX = "enc:";
-
-function getTaxIdKey() {
-  const secret = process.env.JWT_SECRET || "";
-  return crypto.createHash("sha256").update(secret).digest();
-}
-
-function encryptTaxId(plaintext) {
-  if (!plaintext) return plaintext;
-  const key = getTaxIdKey();
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  return `${TAX_ID_PREFIX}${iv.toString("base64")}:${authTag.toString("base64")}:${encrypted.toString("base64")}`;
-}
-
-function decryptTaxId(stored) {
-  if (!stored || !stored.startsWith(TAX_ID_PREFIX)) return stored;
-  try {
-    const parts = stored.slice(TAX_ID_PREFIX.length).split(":");
-    if (parts.length !== 3) return stored;
-    const [ivB64, authTagB64, encryptedB64] = parts;
-    const key = getTaxIdKey();
-    const iv = Buffer.from(ivB64, "base64");
-    const authTag = Buffer.from(authTagB64, "base64");
-    const encrypted = Buffer.from(encryptedB64, "base64");
-    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(authTag);
-    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
-  } catch {
-    return null;
-  }
-}
 
 function normalizeBusinessRow(row) {
   if (!row) {
@@ -86,9 +51,9 @@ async function updateBusinessRow(businessId, payload) {
          language = COALESCE($3, language),
          fiscal_year_start = COALESCE($4, fiscal_year_start),
          province = $5,
-         business_type = COALESCE($6, business_type),
-         tax_id = COALESCE($7, tax_id),
-         address = COALESCE($8, address)
+         business_type = $6,
+         tax_id = $7,
+         address = $8
      WHERE id = $9
      RETURNING id, name, region, language, fiscal_year_start, province,
                business_type, tax_id, address, created_at`,
@@ -98,9 +63,9 @@ async function updateBusinessRow(businessId, payload) {
       language || null,
       fiscal_year_start || null,
       province,
-      business_type?.trim() || null,
+      business_type,
       encryptedTaxId,
-      address?.trim() || null,
+      address,
       businessId
     ]
   );
@@ -162,15 +127,22 @@ router.put("/", async (req, res) => {
       return res.status(400).json({ error: "Province is required for Canadian businesses." });
     }
 
+    const body = req.body ?? {};
+    const resolvedBusinessType = 'business_type' in body
+      ? (business_type?.trim() || null)
+      : current.business_type;
+    const resolvedTaxId = 'tax_id' in body ? (tax_id || null) : current.tax_id;
+    const resolvedAddress = 'address' in body ? (address?.trim() || null) : current.address;
+
     const updated = await updateBusinessRow(businessId, {
       name,
       region: resolvedRegion,
       language,
       fiscal_year_start,
       province: resolvedProvince,
-      business_type,
-      tax_id,
-      address
+      business_type: resolvedBusinessType,
+      tax_id: resolvedTaxId,
+      address: resolvedAddress
     });
     res.json(updated);
   } catch (err) {

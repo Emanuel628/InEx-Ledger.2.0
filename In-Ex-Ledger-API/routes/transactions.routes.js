@@ -47,6 +47,23 @@ function deriveCategoryNameFromSlug(slug) {
   return normalized;
 }
 
+/**
+ * Resolves a category reference to a category UUID for the given business.
+ *
+ * Accepts either a raw UUID (returned as-is) or a name/slug string.
+ * When a name is provided:
+ *   1. An existing category with a case-insensitive name match is reused.
+ *   2. If no match is found, a new category is auto-created with the derived
+ *      kind (from a "income:" / "expense:" slug prefix) or `fallbackKind`.
+ *   3. An ON CONFLICT DO NOTHING insert handles concurrent creation races.
+ *
+ * @param {string} businessId    - UUID of the business that owns the category.
+ * @param {string|null} categoryRef - UUID, name, or slug of the category.
+ * @param {string} [fallbackKind]   - Default kind ('income' | 'expense') used
+ *                                    when the slug carries no kind prefix.
+ * @returns {Promise<string|null>} Resolved category UUID, or null when
+ *                                 categoryRef is empty.
+ */
 async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
   const raw = String(categoryRef ?? "").trim();
   if (!raw) {
@@ -72,12 +89,20 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
   const inserted = await pool.query(
     `INSERT INTO categories (id, business_id, name, kind, created_at)
     VALUES ($1, $2, $3, $4, now())
+    ON CONFLICT (business_id, lower(name)) DO NOTHING
     RETURNING id`,
     [crypto.randomUUID(), businessId, name, kind]
-    );
+  );
 
+  if (inserted.rowCount) {
+    return inserted.rows[0].id;
+  }
 
-  return inserted.rows[0].id;
+  const existingAfterInsert = await pool.query(
+    "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
+    [businessId, name]
+  );
+  return existingAfterInsert.rows[0]?.id || null;
 }
 
 function normalizeCurrencyCode(value, fallbackCurrency) {
@@ -392,13 +417,15 @@ router.get("/", async (req, res) => {
        LEFT JOIN categories c ON c.id = t.category_id
        WHERE t.business_id = ANY($1::uuid[])
          AND t.deleted_at IS NULL
+         AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
+         AND (t.is_void = false OR t.is_void IS NULL)
        ORDER BY t.date DESC, t.created_at DESC
        LIMIT $2 OFFSET $3`,
       [scope.businessIds, limit, offset]
     );
 
     const countResult = await pool.query(
-      "SELECT COUNT(*) FROM transactions WHERE business_id = ANY($1::uuid[]) AND deleted_at IS NULL",
+      "SELECT COUNT(*) FROM transactions WHERE business_id = ANY($1::uuid[]) AND deleted_at IS NULL AND (is_adjustment = false OR is_adjustment IS NULL) AND (is_void = false OR is_void IS NULL)",
       [scope.businessIds]
     );
 
@@ -415,17 +442,12 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const validation = validateTransactionPayload(req.body);
-  if (!validation.valid) {
-    return res.status(400).json({ error: validation.message });
-  }
-
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const businessTaxContext = await getBusinessRegionAndCurrency(businessId);
-    const taxPayload = normalizeTransactionTaxPayload(req.body, businessTaxContext.currency);
-    if (!taxPayload.valid) {
-      return res.status(400).json({ error: taxPayload.message });
+    const validation = validateTransactionPayload(req.body, businessTaxContext.currency);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.message });
     }
 
     const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
@@ -471,19 +493,19 @@ router.post("/", async (req, res) => {
         encryptedDescription,
         date,
         note || null,
-        taxPayload.normalized.currency || businessTaxContext.currency,
-        taxPayload.normalized.source_amount,
-        taxPayload.normalized.exchange_rate,
-        taxPayload.normalized.exchange_date,
-        taxPayload.normalized.converted_amount !== null
-          ? taxPayload.normalized.converted_amount
+        validation.normalized.currency || businessTaxContext.currency,
+        validation.normalized.source_amount,
+        validation.normalized.exchange_rate,
+        validation.normalized.exchange_date,
+        validation.normalized.converted_amount !== null
+          ? validation.normalized.converted_amount
           : amount,
-        taxPayload.normalized.tax_treatment || (type === "income" ? "income" : "operating"),
-        taxPayload.normalized.indirect_tax_amount,
-        taxPayload.normalized.indirect_tax_recoverable,
-        taxPayload.normalized.personal_use_pct,
-        taxPayload.normalized.review_status || "ready",
-        taxPayload.normalized.review_notes
+        validation.normalized.tax_treatment || (type === "income" ? "income" : "operating"),
+        validation.normalized.indirect_tax_amount,
+        validation.normalized.indirect_tax_recoverable,
+        validation.normalized.personal_use_pct,
+        validation.normalized.review_status || "ready",
+        validation.normalized.review_notes
       ]
     );
 
@@ -495,17 +517,12 @@ router.post("/", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const validation = validateTransactionPayload(req.body);
-  if (!validation.valid) {
-    return res.status(400).json({ error: validation.message });
-  }
-
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const businessTaxContext = await getBusinessRegionAndCurrency(businessId);
-    const taxPayload = normalizeTransactionTaxPayload(req.body, businessTaxContext.currency);
-    if (!taxPayload.valid) {
-      return res.status(400).json({ error: taxPayload.message });
+    const validation = validateTransactionPayload(req.body, businessTaxContext.currency);
+    if (!validation.valid) {
+      return res.status(400).json({ error: validation.message });
     }
     const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
     const { description, note } = req.body;
@@ -559,19 +576,19 @@ router.put("/:id", async (req, res) => {
         encryptedDescription,
         date,
         note || null,
-        taxPayload.normalized.currency || businessTaxContext.currency,
-        taxPayload.normalized.source_amount,
-        taxPayload.normalized.exchange_rate,
-        taxPayload.normalized.exchange_date,
-        taxPayload.normalized.converted_amount !== null
-          ? taxPayload.normalized.converted_amount
+        validation.normalized.currency || businessTaxContext.currency,
+        validation.normalized.source_amount,
+        validation.normalized.exchange_rate,
+        validation.normalized.exchange_date,
+        validation.normalized.converted_amount !== null
+          ? validation.normalized.converted_amount
           : amount,
-        taxPayload.normalized.tax_treatment || (type === "income" ? "income" : "operating"),
-        taxPayload.normalized.indirect_tax_amount,
-        taxPayload.normalized.indirect_tax_recoverable,
-        taxPayload.normalized.personal_use_pct,
-        taxPayload.normalized.review_status || "ready",
-        taxPayload.normalized.review_notes,
+        validation.normalized.tax_treatment || (type === "income" ? "income" : "operating"),
+        validation.normalized.indirect_tax_amount,
+        validation.normalized.indirect_tax_recoverable,
+        validation.normalized.personal_use_pct,
+        validation.normalized.review_status || "ready",
+        validation.normalized.review_notes,
         req.params.id,
         req.user.id
       ]
@@ -588,7 +605,7 @@ router.delete("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const existing = await pool.query(
-      "SELECT id, date FROM transactions WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1",
+      "SELECT id, date FROM transactions WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL AND (is_adjustment = false OR is_adjustment IS NULL) AND (is_void = false OR is_void IS NULL) LIMIT 1",
       [req.params.id, businessId]
     );
 
@@ -636,7 +653,11 @@ router.patch("/:id/cleared", async (req, res) => {
     const result = await pool.query(
       `UPDATE transactions
        SET cleared = $1
-       WHERE id = $2 AND business_id = $3 AND deleted_at IS NULL
+       WHERE id = $2
+         AND business_id = $3
+         AND deleted_at IS NULL
+         AND (is_adjustment = false OR is_adjustment IS NULL)
+         AND (is_void = false OR is_void IS NULL)
        RETURNING *`,
       [req.body.cleared, req.params.id, businessId]
     );
@@ -645,7 +666,7 @@ router.patch("/:id/cleared", async (req, res) => {
       return res.status(404).json({ error: "Transaction not found." });
     }
 
-    res.json(result.rows[0]);
+    res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     console.error("PATCH /transactions/:id/cleared error:", err);
     return handleTransactionMutationError(res, err, "Failed to update cleared status.");

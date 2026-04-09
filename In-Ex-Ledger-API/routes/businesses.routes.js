@@ -1,8 +1,7 @@
 const express = require("express");
-const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const { pool } = require("../db.js");
-const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { createBusinessDeleteLimiter } = require("../middleware/rateLimitTiers.js");
 const {
   resolveBusinessIdForUser,
@@ -10,36 +9,12 @@ const {
   setActiveBusinessForUser,
   createBusinessForUser
 } = require("../api/utils/resolveBusinessIdForUser.js");
+const { decryptTaxId } = require("../services/taxIdService.js");
 
 const router = express.Router();
 router.use(requireAuth);
 
 const businessDeleteLimiter = createBusinessDeleteLimiter();
-
-const TAX_ID_PREFIX = "enc:";
-
-function getTaxIdKey() {
-  const secret = process.env.JWT_SECRET || "";
-  return crypto.createHash("sha256").update(secret).digest();
-}
-
-function decryptTaxId(stored) {
-  if (!stored || !stored.startsWith(TAX_ID_PREFIX)) return stored;
-  try {
-    const parts = stored.slice(TAX_ID_PREFIX.length).split(":");
-    if (parts.length !== 3) return stored;
-    const [ivB64, authTagB64, encryptedB64] = parts;
-    const key = getTaxIdKey();
-    const iv = Buffer.from(ivB64, "base64");
-    const authTag = Buffer.from(authTagB64, "base64");
-    const encrypted = Buffer.from(encryptedB64, "base64");
-    const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
-    decipher.setAuthTag(authTag);
-    return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString("utf8");
-  } catch {
-    return null;
-  }
-}
 
 function normalizeBusinessPayload(payload = {}) {
   const name = String(payload.name || "").trim();
@@ -155,7 +130,7 @@ router.post("/:id/activate", async (req, res) => {
  * Delete a business account and all its associated data.
  * Requires password confirmation. Cannot delete the user's only business.
  */
-router.delete("/:id", businessDeleteLimiter, async (req, res) => {
+router.delete("/:id", businessDeleteLimiter, requireMfa, async (req, res) => {
   const { password } = req.body ?? {};
   const businessId = req.params.id;
 
