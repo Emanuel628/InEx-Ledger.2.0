@@ -68,14 +68,22 @@ function validateMileageUpdate(body) {
     return { status: 400, error: "odometer_end must be greater than or equal to odometer_start." };
   }
 
-  // Check for at least one field to update
-  const hasFields = mileageDate !== undefined ||
-    body?.purpose !== undefined ||
-    body?.destination !== undefined ||
+  const purpose = typeof body?.purpose === "string" ? body.purpose.trim() : undefined;
+  const destination = typeof body?.destination === "string" ? body.destination.trim() : undefined;
+
+  // Reject if no recognized field was provided
+  const hasAnyField =
+    mileageDate !== undefined ||
+    purpose !== undefined ||
+    destination !== undefined ||
     parsedMiles.value !== undefined ||
     parsedKm.value !== undefined ||
     parsedOdometerStart.value !== undefined ||
     parsedOdometerEnd.value !== undefined;
+
+  if (!hasAnyField) {
+    return { status: 400, error: "No valid fields provided for update." };
+  }
 
   return { status: 200, error: null };
 }
@@ -144,10 +152,11 @@ console.log("\n[10] Exceeds max odometer — should reject");
   assert(result.status === 400, "Returns 400 when odometer exceeds max");
 }
 
-console.log("\n[11] Empty body — should pass validation (no DB fields to check yet)");
+console.log("\n[11] Empty body — should reject (no fields to update)");
 {
   const result = validateMileageUpdate({});
-  assert(result.status === 200, "Empty body passes route-level validation");
+  assert(result.status === 400, "Empty body returns 400");
+  assert(result.error.includes("No valid fields"), "Error mentions no valid fields");
 }
 
 console.log("\n[12] Purpose update — should pass");

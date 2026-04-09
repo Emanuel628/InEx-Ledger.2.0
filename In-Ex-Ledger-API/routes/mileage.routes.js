@@ -346,6 +346,20 @@ router.put("/:id", async (req, res) => {
     normalizedMiles = normalizedKm !== null ? Number((normalizedKm / MILES_TO_KM).toFixed(2)) : null;
   }
 
+  // Reject immediately if no recognized field was provided
+  const hasAnyField =
+    mileageDate !== undefined ||
+    purpose !== undefined ||
+    destination !== undefined ||
+    parsedMiles.value !== undefined ||
+    parsedKm.value !== undefined ||
+    parsedOdometerStart.value !== undefined ||
+    parsedOdometerEnd.value !== undefined;
+
+  if (!hasAnyField) {
+    return res.status(400).json({ error: "No valid fields provided for update." });
+  }
+
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const mileageColumns = await getMileageColumnMode();
@@ -405,10 +419,6 @@ router.put("/:id", async (req, res) => {
       values.push(parsedOdometerEnd.value);
     }
 
-    if (setClauses.length === 0) {
-      return res.status(400).json({ error: "No valid fields provided for update." });
-    }
-
     values.push(req.params.id, businessId);
     const result = await pool.query(
       `UPDATE mileage SET ${setClauses.join(", ")} WHERE id = $${idx++} AND business_id = $${idx++} RETURNING *`,
@@ -417,7 +427,7 @@ router.put("/:id", async (req, res) => {
 
     const dateSelect = mileageDateSelect(mileageColumns);
     const row = result.rows[0];
-    // Normalise the trip_date field in the response
+    // Normalize the trip_date field in the response
     row.trip_date = row.trip_date ?? row.date ?? null;
     res.json(row);
   } catch (err) {
