@@ -1552,6 +1552,7 @@ function initSecurityForm() {
   const mfaPrimaryButton = document.getElementById("mfaPrimaryButton");
   const mfaCancelButton = document.getElementById("mfaCancelButton");
   const mfaMessage = document.getElementById("mfaMessage");
+  const revokeAllSessionsButton = document.getElementById("settingsRevokeAllSessionsBtn");
 
   let mfaStatus = {
     enabled: false,
@@ -1905,6 +1906,10 @@ function initSecurityForm() {
     setMfaMessage("");
   });
 
+  revokeAllSessionsButton?.addEventListener("click", async () => {
+    await revokeAllSessionsFromSettings(revokeAllSessionsButton);
+  });
+
   updateStrength();
   updateRequirements();
   updateMatch();
@@ -2018,6 +2023,43 @@ function clearAccountDeletionState() {
   sessionStorage.clear();
   if (typeof clearToken === "function") {
     clearToken();
+  }
+}
+
+async function revokeAllSessionsFromSettings(button) {
+  if (!window.confirm(t("sessions_confirm_revoke_all"))) {
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+  }
+
+  try {
+    const response = await apiFetch("/api/sessions", {
+      method: "DELETE"
+    });
+    const payload = await response?.json().catch(() => null);
+
+    if (!response || !response.ok) {
+      showSettingsToast(payload?.error || t("sessions_error_revoke_all"));
+      if (button) {
+        button.disabled = false;
+      }
+      return;
+    }
+
+    clearAccountDeletionState();
+    showSettingsToast(t("sessions_all_revoked"));
+    window.setTimeout(() => {
+      window.location.href = "/login";
+    }, 900);
+  } catch (error) {
+    console.error("Failed to revoke all sessions from settings", error);
+    showSettingsToast(t("sessions_error_revoke_all"));
+    if (button) {
+      button.disabled = false;
+    }
   }
 }
 
