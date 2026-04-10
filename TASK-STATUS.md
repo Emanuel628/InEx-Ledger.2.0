@@ -3,7 +3,6 @@
 ## Live App Structure
 
 - The live app is served from `In-Ex-Ledger-API/public/`.
-- The repo-root `public/` folder is a legacy mirror and is not the Railway production bundle.
 - The current settings hub layout lives in `In-Ex-Ledger-API/public/html/settings.html`.
 
 ## Implemented
@@ -24,7 +23,6 @@
 - Configure real production Stripe secrets in Railway.
 - Verify the Stripe webhook endpoint against the production deploy.
 - Expand automated coverage for auth, billing, and settings-critical flows.
-- Remove or consolidate the remaining legacy root-level `public/` mirror when safe.
 - Add audit-grade accounting controls:
   - apply period-lock enforcement to additional mutation surfaces beyond transactions when needed
   - add dedicated reporting/audit views for archived transaction history

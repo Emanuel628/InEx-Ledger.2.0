@@ -41,7 +41,6 @@ Use this checklist every time you deploy to production to ensure nothing is miss
 - [ ] Verify `In-Ex-Ledger-API/public/html/landing.html` is present and up to date
 - [ ] Verify `In-Ex-Ledger-API/public/html/settings.html` is present and up to date
 - [ ] Verify static assets (CSS, JS, images) are present in `In-Ex-Ledger-API/public/`
-- [ ] Ignore the repo-root `public/` legacy mirror when validating the live bundle; Railway serves from `In-Ex-Ledger-API/public/`
 
 ---
 

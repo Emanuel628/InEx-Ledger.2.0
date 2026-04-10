@@ -19,7 +19,6 @@ Track income and expenses, upload receipts, and export clean records for tax tim
 
 - `In-Ex-Ledger-API/` - Backend API server and live frontend bundle under `public/`
 - `pdf-worker/` - PDF export microservice
-- `public/` - Legacy mirror of a few frontend files; not the Railway production bundle
 
 ## Features (V1)
 
