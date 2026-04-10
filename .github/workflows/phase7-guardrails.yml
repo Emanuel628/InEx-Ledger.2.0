@@ -70,5 +70,13 @@ jobs:
         working-directory: In-Ex-Ledger-API
         run: npm run verify:redacted-storage
 
+      - name: Run auth-flows tests
+        working-directory: In-Ex-Ledger-API
+        run: npm run test:auth-flows
+
+      - name: Run critical-flows tests
+        working-directory: In-Ex-Ledger-API
+        run: npm run test:critical-flows
+
       - name: Check frontend bundle drift
         run: node scripts/check-bundle-drift.js
