@@ -265,7 +265,7 @@ async function renderBusinessList() {
   try {
     const response = await apiFetch("/api/businesses");
     if (!response || !response.ok) {
-      wrap.innerHTML = `<p class="settings-helper-note">${escapeSettingsHtml(t("settings_businesses_load_error"))}</p>`;
+      wrap.innerHTML = `<p class="settings-helper-note">${escapeHtml(t("settings_businesses_load_error"))}</p>`;
       return;
     }
 
@@ -274,19 +274,19 @@ async function renderBusinessList() {
     const activeId = payload?.active_business_id || "";
 
     if (!businesses.length) {
-      wrap.innerHTML = `<p class="settings-helper-note">${escapeSettingsHtml(t("settings_no_businesses"))}</p>`;
+      wrap.innerHTML = `<p class="settings-helper-note">${escapeHtml(t("settings_no_businesses"))}</p>`;
       return;
     }
 
     wrap.innerHTML = businesses.map((biz) => `
       <div class="business-list-item ${biz.id === activeId ? "is-active" : ""}">
         <div class="business-list-meta">
-          <span class="business-list-name">${escapeSettingsHtml(biz.name || t("common_business"))}</span>
-          ${biz.id === activeId ? `<span class="business-list-badge" data-i18n="settings_business_active_badge">${escapeSettingsHtml(t("settings_business_active_badge"))}</span>` : ""}
+          <span class="business-list-name">${escapeHtml(biz.name || t("common_business"))}</span>
+          ${biz.id === activeId ? `<span class="business-list-badge" data-i18n="settings_business_active_badge">${escapeHtml(t("settings_business_active_badge"))}</span>` : ""}
         </div>
         <div class="business-list-actions">
-          ${biz.id !== activeId ? `<button type="button" class="settings-secondary-btn business-switch-btn" data-business-switch="${escapeSettingsHtml(biz.id)}">${escapeSettingsHtml(t("settings_business_switch"))}</button>` : ""}
-          <button type="button" class="danger-outline-btn business-delete-btn" data-business-delete="${escapeSettingsHtml(biz.id)}" data-business-name="${escapeSettingsHtml(biz.name || "")}">${escapeSettingsHtml(t("settings_delete_business_btn"))}</button>
+          ${biz.id !== activeId ? `<button type="button" class="settings-secondary-btn business-switch-btn" data-business-switch="${escapeHtml(biz.id)}">${escapeHtml(t("settings_business_switch"))}</button>` : ""}
+          <button type="button" class="danger-outline-btn business-delete-btn" data-business-delete="${escapeHtml(biz.id)}" data-business-name="${escapeHtml(biz.name || "")}">${escapeHtml(t("settings_delete_business_btn"))}</button>
         </div>
       </div>
     `).join("");
@@ -316,7 +316,7 @@ async function renderBusinessList() {
     });
   } catch (err) {
     console.error("Failed to render business list", err);
-    wrap.innerHTML = `<p class="settings-helper-note">${escapeSettingsHtml(t("settings_businesses_load_error"))}</p>`;
+    wrap.innerHTML = `<p class="settings-helper-note">${escapeHtml(t("settings_businesses_load_error"))}</p>`;
   }
 }
 
@@ -1038,21 +1038,21 @@ async function initCpaAccess() {
               : t("settings_cpa_status_revoked", "revoked");
         const buttonMarkup =
           grant.status === "active"
-            ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeSettingsHtml(grant.id || "")}">${escapeSettingsHtml(t("settings_cpa_revoke"))}</button>`
+            ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeHtml(grant.id || "")}">${escapeHtml(t("settings_cpa_revoke"))}</button>`
             : grant.status === "pending"
-              ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeSettingsHtml(grant.id || "")}">${escapeSettingsHtml(t("settings_cpa_revoke"))}</button>`
-              : `<button type="button" class="cpa-access-delete" data-cpa-delete="${escapeSettingsHtml(grant.id || "")}">${escapeSettingsHtml(t("common_delete"))}</button>`;
+              ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeHtml(grant.id || "")}">${escapeHtml(t("settings_cpa_revoke"))}</button>`
+              : `<button type="button" class="cpa-access-delete" data-cpa-delete="${escapeHtml(grant.id || "")}">${escapeHtml(t("common_delete"))}</button>`;
 
         return `
           <div class="cpa-access-item ${mode}">
             <div class="cpa-access-meta">
-              <div class="cpa-access-email">${escapeSettingsHtml(grant.grantee_email || "")}</div>
+              <div class="cpa-access-email">${escapeHtml(grant.grantee_email || "")}</div>
               <div class="cpa-access-tags">
-                <span class="cpa-access-tag scope">${grant.scope === "all" ? escapeSettingsHtml(t("settings_cpa_scope_all")) : escapeSettingsHtml(t("settings_cpa_scope_business"))}</span>
-                <span class="cpa-access-tag business">${escapeSettingsHtml(grant.business_name || t("settings_cpa_portfolio_wide"))}</span>
-                <span class="cpa-access-tag ${escapeSettingsHtml(grant.status || "pending")}">${escapeSettingsHtml(statusLabel)}</span>
+                <span class="cpa-access-tag scope">${grant.scope === "all" ? escapeHtml(t("settings_cpa_scope_all")) : escapeHtml(t("settings_cpa_scope_business"))}</span>
+                <span class="cpa-access-tag business">${escapeHtml(grant.business_name || t("settings_cpa_portfolio_wide"))}</span>
+                <span class="cpa-access-tag ${escapeHtml(grant.status || "pending")}">${escapeHtml(statusLabel)}</span>
               </div>
-              <div class="cpa-access-detail">${escapeSettingsHtml(detailParts.join(" | "))}</div>
+              <div class="cpa-access-detail">${escapeHtml(detailParts.join(" | "))}</div>
             </div>
             <div class="cpa-access-actions">
               ${buttonMarkup}
@@ -1067,13 +1067,13 @@ async function initCpaAccess() {
       if (currentNode) {
         currentNode.innerHTML = activeGrants.length
           ? activeGrants.map((grant) => renderGrantCard(grant, "current")).join("")
-          : `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_current_empty", "No one currently has access."))}</div>`;
+          : `<div class="cpa-access-empty">${escapeHtml(t("settings_cpa_current_empty", "No one currently has access."))}</div>`;
       }
 
       if (historyNode) {
         historyNode.innerHTML = historyGrants.length
           ? historyGrants.map((grant) => renderGrantCard(grant, "history")).join("")
-          : `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_history_empty", "No recent invitations or revoked access."))}</div>`;
+          : `<div class="cpa-access-empty">${escapeHtml(t("settings_cpa_history_empty", "No recent invitations or revoked access."))}</div>`;
       }
 
       const revokeTargets = [...document.querySelectorAll("[data-cpa-revoke]")];
@@ -1130,8 +1130,8 @@ async function initCpaAccess() {
       settingsOverviewState.cpaActiveCount = 0;
       settingsOverviewState.cpaHistoryCount = 0;
       syncSettingsOverviewSummaries();
-      currentListNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_grants_load_error"))}</div>`;
-      historyListNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_grants_load_error"))}</div>`;
+      currentListNode.innerHTML = `<div class="cpa-access-empty">${escapeHtml(t("settings_cpa_grants_load_error"))}</div>`;
+      historyListNode.innerHTML = `<div class="cpa-access-empty">${escapeHtml(t("settings_cpa_grants_load_error"))}</div>`;
     }
   };
 
@@ -1150,24 +1150,24 @@ async function initCpaAccess() {
       const logs = Array.isArray(payload?.logs) ? payload.logs : [];
 
       if (!logs.length) {
-        auditNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_audit_empty"))}</div>`;
+        auditNode.innerHTML = `<div class="cpa-access-empty">${escapeHtml(t("settings_cpa_audit_empty"))}</div>`;
         return;
       }
 
       auditNode.innerHTML = logs.map((entry) => `
         <div class="cpa-access-item">
           <div class="cpa-access-meta">
-              <div class="cpa-access-email">${escapeSettingsHtml(formatSettingsAuditAction(entry.action))}</div>
+              <div class="cpa-access-email">${escapeHtml(formatSettingsAuditAction(entry.action))}</div>
               <div class="cpa-access-tags">
-                <span class="cpa-access-tag business">${escapeSettingsHtml(entry.business_name || t("settings_cpa_portfolio_wide"))}</span>
+                <span class="cpa-access-tag business">${escapeHtml(entry.business_name || t("settings_cpa_portfolio_wide"))}</span>
               </div>
-            <div class="cpa-access-detail">${escapeSettingsHtml(formatSettingsDateTime(entry.created_at))}${entry.actor_email ? ` | ${escapeSettingsHtml(entry.actor_email)}` : ""}</div>
+            <div class="cpa-access-detail">${escapeHtml(formatSettingsDateTime(entry.created_at))}${entry.actor_email ? ` | ${escapeHtml(entry.actor_email)}` : ""}</div>
           </div>
         </div>
       `).join("");
     } catch (error) {
       console.error("Failed to load CPA audit activity", error);
-      auditNode.innerHTML = `<div class="cpa-access-empty">${escapeSettingsHtml(t("settings_cpa_audit_load_error"))}</div>`;
+      auditNode.innerHTML = `<div class="cpa-access-empty">${escapeHtml(t("settings_cpa_audit_load_error"))}</div>`;
     }
   };
 
@@ -1213,15 +1213,6 @@ async function initCpaAccess() {
   syncBusinessVisibility();
   await renderOwnedGrants();
   await renderAuditActivity();
-}
-
-function escapeSettingsHtml(value) {
-  return `${value ?? ""}`
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 function formatSettingsDate(value) {

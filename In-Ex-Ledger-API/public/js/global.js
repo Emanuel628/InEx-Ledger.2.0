@@ -271,7 +271,7 @@ function injectMessagesNavLink() {
     link.innerHTML =
       '<span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4z"></path><path d="M2 4l6 5 6-5"></path></svg></span>' +
       '<span>Messages</span>' +
-      '<span class="nav-msg-badge" aria-label="unread messages" style="display:none"></span>';
+      '<span class="nav-msg-badge" aria-label="unread messages" data-count="0"></span>';
     nav.appendChild(link);
   });
 }
@@ -290,8 +290,7 @@ function pollGlobalUnreadCount() {
       var count = data.count || 0;
       document.querySelectorAll(".nav-msg-badge").forEach(function (badge) {
         badge.setAttribute("data-count", String(count));
-        badge.textContent = count > 99 ? "99+" : String(count);
-        badge.style.display = count > 0 ? "" : "none";
+        badge.textContent = count > 99 ? "99+" : (count > 0 ? String(count) : "");
       });
     })
     .catch(function () {});

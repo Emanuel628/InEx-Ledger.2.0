@@ -101,10 +101,10 @@ function renderOnboardingTour(page) {
   card.innerHTML = `
     <button type="button" class="onboarding-tour-close" aria-label="Close getting started tip">×</button>
     <div class="onboarding-tour-kicker">Getting started</div>
-    <h3>${escapeOnboardingHtml(config.title)}</h3>
-    <p>${escapeOnboardingHtml(config.body)}</p>
+    <h3>${escapeHtml(config.title)}</h3>
+    <p>${escapeHtml(config.body)}</p>
     <ul>
-      ${config.points.map((point) => `<li>${escapeOnboardingHtml(point)}</li>`).join("")}
+      ${config.points.map((point) => `<li>${escapeHtml(point)}</li>`).join("")}
     </ul>
     <div class="onboarding-tour-actions">
       <button type="button" class="onboarding-tour-dismiss">Got it</button>
@@ -129,13 +129,4 @@ function renderOnboardingTour(page) {
 
   card.querySelector(".onboarding-tour-dismiss")?.addEventListener("click", dismissTour);
   card.querySelector(".onboarding-tour-close")?.addEventListener("click", dismissTour);
-}
-
-function escapeOnboardingHtml(value) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }

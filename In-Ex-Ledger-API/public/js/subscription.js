@@ -204,8 +204,6 @@ async function loadBillingHistory() {
       return;
     }
 
-    const escHtml = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
     list.innerHTML = `
       <table class="billing-history-table">
         <thead>
@@ -219,12 +217,12 @@ async function loadBillingHistory() {
         <tbody>
           ${invoices.map((inv) => `
             <tr>
-              <td>${escHtml(fmtDate(inv.created))}</td>
-              <td>${escHtml(fmtAmount(inv.amount_paid, inv.currency))}</td>
-              <td><span class="billing-status-badge billing-status-${escHtml(inv.status)}">${escHtml(inv.status || "-")}</span></td>
+              <td>${escapeHtml(fmtDate(inv.created))}</td>
+              <td>${escapeHtml(fmtAmount(inv.amount_paid, inv.currency))}</td>
+              <td><span class="billing-status-badge billing-status-${escapeHtml(inv.status)}">${escapeHtml(inv.status || "-")}</span></td>
               <td>
                 ${inv.hosted_invoice_url
-                  ? `<a href="${escHtml(inv.hosted_invoice_url)}" target="_blank" rel="noopener noreferrer" class="billing-invoice-link">${tx("sub_mgmt_view_invoice")}</a>`
+                  ? `<a href="${escapeHtml(inv.hosted_invoice_url)}" target="_blank" rel="noopener noreferrer" class="billing-invoice-link">${tx("sub_mgmt_view_invoice")}</a>`
                   : "-"}
               </td>
             </tr>

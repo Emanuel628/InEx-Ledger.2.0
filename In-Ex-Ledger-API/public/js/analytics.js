@@ -64,7 +64,7 @@ function renderDashboard(data) {
   kpiRow.innerHTML = [
     kpiCard("Avg Monthly Income", fmt(summary.avg_monthly_income), "trailing 12 months"),
     kpiCard("Avg Monthly Expenses", fmt(summary.avg_monthly_expense), "trailing 12 months"),
-    kpiCard("12-Month Net", fmt(summary.net), summary.net >= 0 ? "profit" : "deficit", summary.net >= 0 ? "" : "style=\"color:var(--red)\""),
+    kpiCard("12-Month Net", fmt(summary.net), summary.net >= 0 ? "profit" : "deficit", summary.net >= 0 ? "" : "kpi-value--negative"),
     kpiCard("Est. Tax Liability", summary.estimated_tax_liability_pct.toFixed(1) + "%", "of net income (approx)")
   ].join("");
 
@@ -86,22 +86,26 @@ function renderDashboard(data) {
   // Top income sources bar chart
   if (top_income_sources && top_income_sources.length) {
     const maxIncome = Math.max(...top_income_sources.map((s) => s.total), 1);
-    document.getElementById("topIncomeChart").innerHTML = top_income_sources.map((s) => barRow(s.category, s.total, maxIncome, "income")).join("");
+    const topIncomeChart = document.getElementById("topIncomeChart");
+    topIncomeChart.innerHTML = top_income_sources.map((s) => barRow(s.category, s.total, maxIncome, "income")).join("");
+    applyBarWidths(topIncomeChart);
     document.getElementById("topIncomeCard").style.display = "";
   }
 
   // Top expense categories bar chart
   if (top_expense_categories && top_expense_categories.length) {
     const maxExpense = Math.max(...top_expense_categories.map((s) => s.total), 1);
-    document.getElementById("topExpenseChart").innerHTML = top_expense_categories.map((s) => barRow(s.category, s.total, maxExpense, "expense")).join("");
+    const topExpenseChart = document.getElementById("topExpenseChart");
+    topExpenseChart.innerHTML = top_expense_categories.map((s) => barRow(s.category, s.total, maxExpense, "expense")).join("");
+    applyBarWidths(topExpenseChart);
     document.getElementById("topExpenseCard").style.display = "";
   }
 }
 
-function kpiCard(label, value, note, extraAttr) {
+function kpiCard(label, value, note, extraClass) {
   return `<div class="kpi-card">
     <div class="kpi-label">${escapeHtml(label)}</div>
-    <div class="kpi-value" ${extraAttr || ""}>${escapeHtml(value)}</div>
+    <div class="kpi-value${extraClass ? ` ${escapeHtml(extraClass)}` : ""}">${escapeHtml(value)}</div>
     ${note ? `<div class="kpi-note">${escapeHtml(note)}</div>` : ""}
   </div>`;
 }
@@ -110,9 +114,15 @@ function barRow(label, value, max, type) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return `<div class="bar-row">
     <span class="bar-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
-    <div class="bar-track"><div class="bar-fill ${escapeHtml(type)}" style="width:${pct}%"></div></div>
+    <div class="bar-track"><div class="bar-fill ${escapeHtml(type)}" data-bar-pct="${pct}"></div></div>
     <span class="bar-amount">${fmt(value)}</span>
   </div>`;
+}
+
+function applyBarWidths(container) {
+  container.querySelectorAll(".bar-fill[data-bar-pct]").forEach((el) => {
+    el.style.width = `${el.dataset.barPct}%`;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +144,7 @@ async function loadCashFlow() {
 function renderCashFlow(data, container) {
   const { avg_monthly_income, avg_monthly_expense, recurring_monthly_expense, projections } = data;
 
-  let html = `<div class="kpi-row" style="margin-top:14px">
+  let html = `<div class="kpi-row kpi-row--spaced">
     ${kpiCard("Avg Monthly Income", fmt(avg_monthly_income), "trailing 6 months")}
     ${kpiCard("Avg Monthly Expenses", fmt(avg_monthly_expense), "trailing 6 months")}
     ${kpiCard("Recurring Expenses", fmt(recurring_monthly_expense), "estimated per month")}
@@ -147,7 +157,7 @@ function renderCashFlow(data, container) {
   }
 
   // Projection table
-  html += `<table class="monthly-table" style="margin-top:16px">
+  html += `<table class="monthly-table monthly-table--spaced">
     <thead><tr><th>Month</th><th>Projected Income</th><th>Projected Expenses</th><th>Projected Net</th></tr></thead>
     <tbody>
       ${projections.map((p) => {
@@ -213,7 +223,7 @@ function renderSeasonal(data, container) {
   // Per-month insight callouts
   const callouts = months.filter((m) => m.insight);
   if (callouts.length) {
-    html += `<div class="insight-list" style="margin-top:16px">
+    html += `<div class="insight-list insight-list--spaced">
       ${callouts.map((m) => `<div class="insight-item">📅 ${escapeHtml(m.insight)}</div>`).join("")}
     </div>`;
   }
@@ -266,7 +276,7 @@ async function runWhatIf() {
     renderWhatIf(data, messagesEl, tableEl);
     resultsEl.classList.add("visible");
   } catch {
-    messagesEl.innerHTML = '<span style="color:var(--red)">Unable to run scenario. Please try again.</span>';
+    messagesEl.innerHTML = '<span class="whatif-error">Unable to run scenario. Please try again.</span>';
     resultsEl.classList.add("visible");
   }
 }
@@ -311,8 +321,4 @@ function parseFloatOrNull(str) {
   if (str === "" || str === undefined || str === null) return null;
   const n = Number.parseFloat(str);
   return Number.isFinite(n) ? n : null;
-}
-
-function escapeHtml(value) {
-  return `${value ?? ""}`.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }

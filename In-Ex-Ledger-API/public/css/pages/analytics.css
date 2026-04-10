@@ -476,3 +476,10 @@
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* ── CSP-compliant utility classes (replaces inline styles) ─ */
+.kpi-value--negative { color: var(--red); }
+.kpi-row--spaced { margin-top: 14px; }
+.monthly-table--spaced { margin-top: 16px; }
+.insight-list--spaced { margin-top: 16px; }
+.whatif-error { color: var(--red); }

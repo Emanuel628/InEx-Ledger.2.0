@@ -234,15 +234,6 @@ function showAccountsToast(message) {
   }, ACCOUNTS_TOAST_MS);
 }
 
-function escapeHtml(value) {
-  return `${value ?? ""}`
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 async function getApiErrorText(response, fallback) {
   try {
     const payload = await response.json();

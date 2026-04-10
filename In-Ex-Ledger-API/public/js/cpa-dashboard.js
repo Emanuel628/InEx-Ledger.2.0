@@ -230,32 +230,32 @@ function renderBusinessContext(businessSummaries, selectedBusinessId) {
     const selectedBadge = selectedBusinessId && selectedBusinessId === summary.business_id
       ? '<span class="cpa-context-pill selected">Selected</span>'
       : "";
-    const province = summary.province ? ` � ${escapeCpaHtml(summary.province)}` : "";
+    const province = summary.province ? ` � ${escapeHtml(summary.province)}` : "";
     return `
       <article class="cpa-context-card">
         <div class="cpa-context-head">
           <div>
-            <h3>${escapeCpaHtml(summary.business_name || "Business")}</h3>
-            <p>${escapeCpaHtml(summary.tax_form_label || "-")} � ${escapeCpaHtml(summary.currency || "USD")}${province}</p>
+            <h3>${escapeHtml(summary.business_name || "Business")}</h3>
+            <p>${escapeHtml(summary.tax_form_label || "-")} � ${escapeHtml(summary.currency || "USD")}${province}</p>
           </div>
           ${selectedBadge}
         </div>
         <div class="cpa-context-grid">
           <div>
             <span>Income</span>
-            <strong>${escapeCpaHtml(formatCpaMoney(summary.total_income || 0, null, summary.currency || "USD"))}</strong>
+            <strong>${escapeHtml(formatCpaMoney(summary.total_income || 0, null, summary.currency || "USD"))}</strong>
           </div>
           <div>
             <span>Expenses</span>
-            <strong>${escapeCpaHtml(formatCpaMoney(summary.total_expenses || 0, null, summary.currency || "USD"))}</strong>
+            <strong>${escapeHtml(formatCpaMoney(summary.total_expenses || 0, null, summary.currency || "USD"))}</strong>
           </div>
           <div>
             <span>Net</span>
-            <strong>${escapeCpaHtml(formatCpaMoney(summary.net_profit || 0, null, summary.currency || "USD"))}</strong>
+            <strong>${escapeHtml(formatCpaMoney(summary.net_profit || 0, null, summary.currency || "USD"))}</strong>
           </div>
           <div>
             <span>Transactions</span>
-            <strong>${escapeCpaHtml(String(summary.transaction_count || 0))}</strong>
+            <strong>${escapeHtml(String(summary.transaction_count || 0))}</strong>
           </div>
         </div>
       </article>
@@ -278,12 +278,12 @@ function renderTransactions(transactions) {
     const currency = inferCurrencyFromRegion(transaction.business_region);
     return `
       <tr>
-        <td>${escapeCpaHtml(formatCpaDate(transaction.date))}</td>
-        <td>${escapeCpaHtml(transaction.business_name || "-")}</td>
-        <td>${escapeCpaHtml(transaction.description || "-")}</td>
-        <td>${escapeCpaHtml(transaction.category_name || "-")}</td>
+        <td>${escapeHtml(formatCpaDate(transaction.date))}</td>
+        <td>${escapeHtml(transaction.business_name || "-")}</td>
+        <td>${escapeHtml(transaction.description || "-")}</td>
+        <td>${escapeHtml(transaction.category_name || "-")}</td>
         <td><span class="cpa-status ${transaction.cleared ? "cleared" : "pending"}">${transaction.cleared ? "Cleared" : "Pending"}</span></td>
-        <td>${escapeCpaHtml(formatCpaMoney(Math.abs(Number(transaction.amount) || 0), transaction.type === "income", currency))}</td>
+        <td>${escapeHtml(formatCpaMoney(Math.abs(Number(transaction.amount) || 0), transaction.type === "income", currency))}</td>
       </tr>
     `;
   }).join("");
@@ -303,14 +303,14 @@ function renderReceipts(receipts) {
   list.innerHTML = receipts.slice(0, 8).map((receipt) => `
     <div class="cpa-list-item cpa-list-item-action">
       <div class="cpa-list-copy">
-        <p class="cpa-list-title">${escapeCpaHtml(receipt.filename || "Receipt")}</p>
-        <p class="cpa-list-meta">${escapeCpaHtml(receipt.business_name || "-")} � ${escapeCpaHtml(formatCpaDate(receipt.created_at))}</p>
+        <p class="cpa-list-title">${escapeHtml(receipt.filename || "Receipt")}</p>
+        <p class="cpa-list-meta">${escapeHtml(receipt.business_name || "-")} � ${escapeHtml(formatCpaDate(receipt.created_at))}</p>
       </div>
       <div class="cpa-list-actions">
         <button
           type="button"
           class="cpa-download-button secondary"
-          data-cpa-receipt-download="${escapeCpaHtml(receipt.id || "")}"
+          data-cpa-receipt-download="${escapeHtml(receipt.id || "")}"
         >
           Download receipt
         </button>
@@ -336,9 +336,9 @@ function renderMileage(mileageRecords) {
       : `${Number(entry.miles || 0).toFixed(1)} mi`;
     return `
       <div class="cpa-list-item">
-        <p class="cpa-list-title">${escapeCpaHtml(entry.purpose || "Business trip")}</p>
-        <p class="cpa-list-meta">${escapeCpaHtml(entry.business_name || "-")} � ${escapeCpaHtml(formatCpaDate(entry.trip_date))}</p>
-        <p class="cpa-list-meta">${escapeCpaHtml(entry.destination || "No destination noted")} � ${escapeCpaHtml(distance)}</p>
+        <p class="cpa-list-title">${escapeHtml(entry.purpose || "Business trip")}</p>
+        <p class="cpa-list-meta">${escapeHtml(entry.business_name || "-")} � ${escapeHtml(formatCpaDate(entry.trip_date))}</p>
+        <p class="cpa-list-meta">${escapeHtml(entry.destination || "No destination noted")} � ${escapeHtml(distance)}</p>
       </div>
     `;
   }).join("");
@@ -360,14 +360,14 @@ function renderExports(exportsList) {
     return `
       <div class="cpa-list-item cpa-list-item-action">
         <div class="cpa-list-copy">
-          <p class="cpa-list-title">${escapeCpaHtml((entry.export_type || "export").toUpperCase())} � ${escapeCpaHtml(entry.business_name || "-")}</p>
-          <p class="cpa-list-meta">${escapeCpaHtml(taxLabel)} � ${escapeCpaHtml(currency)} � ${escapeCpaHtml(formatCpaDate(entry.start_date))} to ${escapeCpaHtml(formatCpaDate(entry.end_date))}</p>
-          <p class="cpa-list-meta">${escapeCpaHtml(formatCpaDate(entry.created_at))}</p>
+          <p class="cpa-list-title">${escapeHtml((entry.export_type || "export").toUpperCase())} � ${escapeHtml(entry.business_name || "-")}</p>
+          <p class="cpa-list-meta">${escapeHtml(taxLabel)} � ${escapeHtml(currency)} � ${escapeHtml(formatCpaDate(entry.start_date))} to ${escapeHtml(formatCpaDate(entry.end_date))}</p>
+          <p class="cpa-list-meta">${escapeHtml(formatCpaDate(entry.created_at))}</p>
         </div>
         <button
           type="button"
           class="cpa-download-button"
-          data-cpa-export-download="${escapeCpaHtml(entry.id || "")}"
+          data-cpa-export-download="${escapeHtml(entry.id || "")}"
         >
           Download redacted PDF
         </button>
@@ -405,9 +405,9 @@ function renderAuditLog(logs) {
     return `
       <div class="cpa-list-item${isCritical ? " cpa-audit-critical" : ""}">
         ${isCritical ? '<span class="cpa-audit-critical-badge" aria-label="Critical activity" title="Critical activity">!</span>' : ""}
-        <p class="cpa-list-title">${escapeCpaHtml(formatAuditAction(entry.action))}</p>
-        <p class="cpa-list-meta">${escapeCpaHtml(entry.business_name || "Portfolio-wide")} · ${escapeCpaHtml(formatCpaDateTime(entry.created_at))}</p>
-        <p class="cpa-list-meta">${escapeCpaHtml(entry.actor_email || "System")}</p>
+        <p class="cpa-list-title">${escapeHtml(formatAuditAction(entry.action))}</p>
+        <p class="cpa-list-meta">${escapeHtml(entry.business_name || "Portfolio-wide")} · ${escapeHtml(formatCpaDateTime(entry.created_at))}</p>
+        <p class="cpa-list-meta">${escapeHtml(entry.actor_email || "System")}</p>
       </div>
     `;
   };
@@ -416,7 +416,7 @@ function renderAuditLog(logs) {
   const hiddenEntries = logs.slice(PREVIEW_COUNT);
   const hiddenCount = hiddenEntries.length;
 
-  let html = `<div class="cpa-audit-last-modified">Last modified: ${escapeCpaHtml(formatCpaDateTime(lastModified))}</div>`;
+  let html = `<div class="cpa-audit-last-modified">Last modified: ${escapeHtml(formatCpaDateTime(lastModified))}</div>`;
   html += '<div class="cpa-audit-preview">';
   html += previewEntries.map(renderEntry).join("");
   html += "</div>";
@@ -426,7 +426,7 @@ function renderAuditLog(logs) {
     html += hiddenEntries.map(renderEntry).join("");
     html += "</div>";
     const label = hiddenCount === 1 ? "Show 1 more entry" : `Show ${hiddenCount} more entries`;
-    html += `<button type="button" class="cpa-audit-toggle" id="cpaAuditToggle" aria-expanded="false">${escapeCpaHtml(label)}</button>`;
+    html += `<button type="button" class="cpa-audit-toggle" id="cpaAuditToggle" aria-expanded="false">${escapeHtml(label)}</button>`;
   }
 
   list.innerHTML = html;
@@ -527,15 +527,6 @@ function getDownloadFilename(response, fallback) {
     return simpleMatch[1];
   }
   return fallback;
-}
-
-function escapeCpaHtml(value) {
-  return `${value ?? ""}`
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 

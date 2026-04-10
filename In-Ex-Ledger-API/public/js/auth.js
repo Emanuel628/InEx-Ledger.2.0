@@ -29,14 +29,6 @@ if (!window.API_BASE) {
   window.API_BASE = "";
 }
 
-function escapeHtml(str) {
-  return String(str ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 if (!window.__AUTH_GUARD_STATE__) {
   window.__AUTH_GUARD_STATE__ = { running: false, count: 0, lastError: null };
