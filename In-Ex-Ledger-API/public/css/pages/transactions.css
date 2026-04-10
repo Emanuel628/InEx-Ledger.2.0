@@ -1886,19 +1886,12 @@ body {
     font-size: 14px;
   }
 
-  .topbar-left .business-pill {
-    order: 3;
-    width: 100%;
-    max-width: none;
-  }
-
   .user-pill {
     margin-left: auto;
     max-width: 44vw;
   }
 
-  .user-name,
-  .business-pill-name {
+  .user-name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2032,7 +2025,6 @@ body {
     padding: 10px 10px 12px;
   }
 
-  .topbar-left .business-pill,
   .user-pill {
     max-width: 100%;
   }

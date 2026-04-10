@@ -197,7 +197,6 @@ function updateAuthenticatedChrome(profile = {}) {
 
   persistBusinessContext(profile);
   ensureLegacyUserPills();
-  ensureBusinessPills(profile);
 
   document.querySelectorAll(".user-name").forEach((node) => {
     node.textContent = displayName;
@@ -208,7 +207,6 @@ function updateAuthenticatedChrome(profile = {}) {
     node.setAttribute("aria-label", `${displayName} initials`);
   });
 
-  initBusinessMenus(profile);
   initAccountMenus(displayName, profile);
 }
 
@@ -269,36 +267,6 @@ function ensureLegacyUserPills() {
   header.appendChild(pill);
 }
 
-function ensureBusinessPills(profile = {}) {
-  const activeBusiness = getActiveBusiness(profile);
-  if (!activeBusiness) {
-    return;
-  }
-
-  document.querySelectorAll(".user-pill").forEach((userPill, index) => {
-    const parent = userPill.parentElement;
-    if (!parent) {
-      return;
-    }
-
-    let businessPill = parent.querySelector(`.business-pill[data-business-pill-index="${index}"]`);
-    if (!businessPill) {
-      businessPill = document.createElement("div");
-      businessPill.className = "business-pill";
-      businessPill.dataset.businessPillIndex = String(index);
-      businessPill.innerHTML = `
-        <span class="business-pill-icon" aria-hidden="true">B</span>
-        <span class="business-pill-copy">
-          <span class="business-pill-label">Business</span>
-          <span class="business-pill-name">Business</span>
-        </span>
-      `;
-      parent.insertBefore(businessPill, userPill);
-    }
-
-    businessPill.querySelector(".business-pill-name").textContent = activeBusiness.name || "Business";
-  });
-}
 
 function getToken() {
   return localStorage.getItem(TOKEN_KEY) || "";
@@ -525,85 +493,14 @@ function wireMenuTrigger(trigger, menu) {
   });
 }
 
-function initBusinessMenus(profile = {}) {
-  ensureAccountMenuStyles();
-  ensureBusinessCreationModal();
-  const businesses = getBusinessCollection(profile);
-  const activeBusiness = getActiveBusiness(profile);
-  const businessCountLabel = `${businesses.length} business${businesses.length === 1 ? "" : "es"}`;
-
-  document.querySelectorAll(".business-pill").forEach((pill, index) => {
-    const menuId = `businessMenu-${index + 1}`;
-    let menu = pill.querySelector(".business-menu");
-    if (!menu) {
-      pill.classList.add("menu-trigger");
-      pill.setAttribute("role", "button");
-      pill.setAttribute("tabindex", "0");
-      pill.setAttribute("aria-haspopup", "menu");
-      pill.setAttribute("aria-expanded", "false");
-      pill.setAttribute("aria-controls", menuId);
-
-      menu = document.createElement("div");
-      menu.className = "account-menu business-menu hidden";
-      menu.id = menuId;
-      menu.setAttribute("role", "menu");
-      pill.appendChild(menu);
-      wireMenuTrigger(pill, menu);
-    }
-
-    menu.innerHTML = `
-      <div class="account-menu-section">
-        <div class="account-menu-caption">Active business</div>
-        <div class="account-menu-current">${escapeHtml(activeBusiness?.name || "Business")}</div>
-        <div class="account-menu-hint">${businessCountLabel}</div>
-      </div>
-      <div class="account-menu-section">
-        ${businesses.map((business) => `
-          <button
-            type="button"
-            class="account-menu-item business-menu-item ${business.is_active ? "is-active" : ""}"
-            data-business-switch="${escapeHtml(business.id)}"
-            role="menuitem"
-          >
-            <span class="business-menu-copy">
-              <span class="account-menu-label">${escapeHtml(business.name || "Business")}</span>
-              <span class="account-menu-hint">${escapeHtml(business.region || "US")}</span>
-            </span>
-            ${business.is_active ? '<span class="business-menu-state">Current</span>' : ""}
-          </button>
-        `).join("")}
-      </div>
-      <button type="button" class="account-menu-item account-menu-secondary" data-business-create="true" role="menuitem">
-        <span class="account-menu-label">Add another business</span>
-        <span class="account-menu-hint">Create and switch instantly</span>
-      </button>
-    `;
-
-    menu.onclick = async (event) => {
-      event.stopPropagation();
-      const switchId = event.target.closest("[data-business-switch]")?.getAttribute("data-business-switch");
-      if (switchId) {
-        event.preventDefault();
-        closeAllAccountMenus();
-        await switchActiveBusiness(switchId);
-        return;
-      }
-
-      if (event.target.closest("[data-business-create]")) {
-        event.preventDefault();
-        closeAllAccountMenus();
-        openBusinessCreationModal();
-      }
-    };
-  });
-}
-
 function initAccountMenus(displayName = "User", profile = {}) {
   ensureAccountMenuStyles();
   ensureBusinessCreationModal();
   const activeBusiness = getActiveBusiness(profile);
+  const businesses = getBusinessCollection(profile);
   const assignedCpaPortfolios = getAssignedCpaPortfolios(profile);
   const hasCpaWorkspace = assignedCpaPortfolios.length > 0;
+  const businessCountLabel = `${businesses.length} business${businesses.length === 1 ? "" : "es"}`;
 
   document.querySelectorAll(".user-pill").forEach((pill, index) => {
     let menu = pill.querySelector(".account-menu");
@@ -629,7 +526,27 @@ function initAccountMenus(displayName = "User", profile = {}) {
       <div class="account-menu-section">
         <div class="account-menu-caption">${typeof t === "function" ? t("auth_signed_in_as") : "Signed in as"}</div>
         <div class="account-menu-current">${escapeHtml(displayName)}</div>
-        <div class="account-menu-hint">${escapeHtml(activeBusiness?.name || (typeof t === "function" ? t("common_business") : "Business"))}</div>
+      </div>
+      <div class="account-menu-section">
+        <div class="account-menu-caption">Active business</div>
+        <div class="account-menu-current">${escapeHtml(activeBusiness?.name || (typeof t === "function" ? t("common_business") : "Business"))}</div>
+        <div class="account-menu-hint">${businessCountLabel}</div>
+      </div>
+      <div class="account-menu-section">
+        ${businesses.map((business) => `
+          <button
+            type="button"
+            class="account-menu-item business-menu-item ${business.is_active ? "is-active" : ""}"
+            data-business-switch="${escapeHtml(business.id)}"
+            role="menuitem"
+          >
+            <span class="business-menu-copy">
+              <span class="account-menu-label">${escapeHtml(business.name || "Business")}</span>
+              <span class="account-menu-hint">${escapeHtml(business.region || "US")}</span>
+            </span>
+            ${business.is_active ? '<span class="business-menu-state">Current</span>' : ""}
+          </button>
+        `).join("")}
       </div>
       ${hasCpaWorkspace ? `
       <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="cpa-workspace" role="menuitem">
@@ -648,6 +565,15 @@ function initAccountMenus(displayName = "User", profile = {}) {
 
     menu.onclick = async (event) => {
       event.stopPropagation();
+
+      const switchId = event.target.closest("[data-business-switch]")?.getAttribute("data-business-switch");
+      if (switchId) {
+        event.preventDefault();
+        closeAllAccountMenus();
+        await switchActiveBusiness(switchId);
+        return;
+      }
+
       const action = event.target.closest("[data-account-menu-action]")?.getAttribute("data-account-menu-action");
       if (!action) {
         return;
@@ -674,7 +600,7 @@ function initAccountMenus(displayName = "User", profile = {}) {
 }
 
 function closeAllAccountMenus() {
-  document.querySelectorAll(".account-menu, .business-menu").forEach((menu) => {
+  document.querySelectorAll(".account-menu").forEach((menu) => {
     menu.classList.add("hidden");
   });
   document.querySelectorAll(".menu-trigger[aria-expanded]").forEach((trigger) => {
@@ -699,7 +625,6 @@ function ensureAccountMenuStyles() {
       min-width: 0;
     }
     .legacy-auth-header .user-pill,
-    .business-pill,
     .legacy-user-pill {
       display: inline-flex;
       align-items: center;
@@ -711,48 +636,7 @@ function ensureAccountMenuStyles() {
       color: var(--ink);
       min-width: 0;
       flex-shrink: 1;
-    }
-    .legacy-auth-header .user-pill,
-    .legacy-user-pill {
       margin-left: auto;
-    }
-    .business-pill {
-      position: relative;
-      min-width: 0;
-      max-width: min(320px, 36vw);
-    }
-    .business-pill-copy {
-      display: flex;
-      min-width: 0;
-      flex-direction: column;
-      gap: 1px;
-    }
-    .business-pill-label {
-      font-size: 10px;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: var(--ink3);
-    }
-    .business-pill-name {
-      font-size: 12px;
-      font-weight: 600;
-      color: inherit;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .business-pill-icon {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: var(--surface2);
-      color: var(--ink);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 10px;
-      font-weight: 700;
-      flex-shrink: 0;
     }
     .legacy-auth-header .user-avatar,
     .legacy-user-pill .user-avatar {
@@ -1161,9 +1045,7 @@ document.addEventListener("click", (e) => {
 document.addEventListener("click", (event) => {
   if (
     event.target.closest(".user-pill") ||
-    event.target.closest(".business-pill") ||
     event.target.closest(".account-menu") ||
-    event.target.closest(".business-menu") ||
     event.target.closest(".business-modal")
   ) {
     return;
