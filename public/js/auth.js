@@ -104,6 +104,14 @@ function clearSubscriptionState() {
   localStorage.removeItem(TRIAL_ENDS_AT_KEY);
 }
 
+function getStoredSubscriptionState() {
+  try {
+    return JSON.parse(localStorage.getItem(SUBSCRIPTION_KEY) || "null");
+  } catch {
+    return null;
+  }
+}
+
 function getUserDisplayName(profile = {}) {
   const preferred = profile.display_name || profile.full_name || "";
   if (preferred && String(preferred).trim()) {
@@ -996,6 +1004,19 @@ function showAccountMenuNotice(message) {
 }
 
 function effectiveTier() {
+  const subscription = getStoredSubscriptionState();
+  if (subscription && typeof subscription === "object") {
+    if (subscription.effectiveStatus === "trialing") {
+      return isTrialValid() ? "v1" : "free";
+    }
+
+    if (subscription.effectiveTier === "v1") {
+      return "v1";
+    }
+
+    return "free";
+  }
+
   const tier = localStorage.getItem(TIER_KEY);
 
   if (!tier) {

@@ -7,6 +7,21 @@
   align-items: center;
 }
 
+.offline-banner {
+  padding: 10px 16px;
+  background: #7c2d12;
+  color: #fef2f2;
+  text-align: center;
+  width: 100%;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-sizing: border-box;
+}
+
+.offline-banner[hidden] {
+  display: none;
+}
+
 .trial-countdown-number {
   color: var(--red);
   font-weight: 500;

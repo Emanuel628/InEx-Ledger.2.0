@@ -17,6 +17,7 @@ const EXPORT_TOAST_MS = 3000;
 
 let exportToastTimer = null;
 let unattachedReceiptsCount = 0;
+let transactionsCacheFresh = false;
 let exportContext = {
   activeBusinessId: "",
   businesses: []
@@ -200,6 +201,7 @@ async function hydrateTransactionsCache() {
   try {
     const response = await apiFetch(`/api/transactions${buildScopeQuery()}`);
     if (!response || !response.ok) {
+      transactionsCacheFresh = false;
       return;
     }
     const payload = await response.json().catch(() => null);
@@ -237,7 +239,9 @@ async function hydrateTransactionsCache() {
       reviewNotes: transaction.reviewNotes || transaction.review_notes || ""
     }));
     localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(normalized));
+    transactionsCacheFresh = true;
   } catch (error) {
+    transactionsCacheFresh = false;
     console.warn("[Exports] Unable to hydrate transactions", error);
   }
 }
@@ -599,6 +603,10 @@ function updateExportSummary() {
 }
 
 function exportCsv(startDate, endDate, recordHistory = true, explicitFilename, tierOverride, exportLangOverride) {
+  if (!transactionsCacheFresh) {
+    showExportToast(tx("exports_error_stale_data"));
+    return;
+  }
   const tier = tierOverride || (typeof effectiveTier === "function" ? effectiveTier() : "free");
   const exportLang = clampExportLang(exportLangOverride || getCurrentExportLanguage());
   const scope = getExportScope();
@@ -654,6 +662,11 @@ function exportCsv(startDate, endDate, recordHistory = true, explicitFilename, t
 async function exportPdf(startDate, endDate, recordHistory = true, explicitFilename, exportLangOverride) {
   if (typeof buildPdfExport !== "function") {
     console.warn("PDF export helper is not available.");
+    return;
+  }
+
+  if (!transactionsCacheFresh) {
+    showExportToast(tx("exports_error_stale_data"));
     return;
   }
 
