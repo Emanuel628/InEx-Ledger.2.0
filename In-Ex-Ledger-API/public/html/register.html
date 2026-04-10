@@ -9,6 +9,7 @@
 </head>
 
 <body>
+  <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
   <header class="marketing-header auth-header">
     <a class="brand" href="/" aria-label="InEx Ledger home">
       <span class="brand-mark" aria-hidden="true">
@@ -23,7 +24,7 @@
     </a>
   </header>
 
-  <main>
+  <main id="main-content">
     <section class="auth-card">
       <h2 data-i18n="register_title">Create your account</h2>
 
@@ -115,6 +116,11 @@
             <a href="privacy" data-i18n="register_consent_privacy">Privacy Policy</a>
             <span data-i18n="register_consent_suffix">.</span>
           </label>
+        </div>
+
+        <div class="consent-field">
+          <input type="checkbox" id="caslConsent" class="consent-checkbox" />
+          <label for="caslConsent" data-i18n="register_casl_label">I agree to receive occasional product updates and tips from InEx Ledger by email. You can unsubscribe at any time.</label>
         </div>
 
         <p class="consent-required-hint" id="consentRequiredHint" data-i18n="register_consent_required" hidden>Required: You must accept the Terms and Privacy Policy.</p>
