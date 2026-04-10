@@ -569,6 +569,7 @@ const TRANSLATIONS = {
     register_alert_password_length: 'Password must be at least 8 characters.',
     register_alert_password_strength:
       'Please create a strong password and ensure both fields match.',
+    register_error_email_exists: 'An account with this email already exists.',
     register_error_missing_fields: 'Ingresa un correo y una contraseña.',
     login_error_missing_fields: 'Ingresa tu correo y contraseña.',
     login_error_generic: 'Error al iniciar sesión. Inténtalo de nuevo.',
@@ -1617,6 +1618,7 @@ const TRANSLATIONS = {
       'La contraseña debe tener al menos 8 caracteres.',
     register_alert_password_strength:
       'Crea una contraseña fuerte que coincida en ambos campos.',
+    register_error_email_exists: 'Ya existe una cuenta con este correo electrónico.',
     region_us: 'Estados Unidos',
     region_ca: 'Canadá',
     transactions_hero_title: 'Estimación de impuestos adeudados (YTD)',
@@ -2641,6 +2643,7 @@ const TRANSLATIONS = {
       'Le mot de passe doit contenir au moins 8 caractères.',
     register_alert_password_strength:
       'Créez un mot de passe fort et concordant.',
+    register_error_email_exists: 'Un compte avec cette adresse courriel existe déjà.',
     register_error_missing_fields: 'Saisissez un courriel et un mot de passe.',
     login_error_missing_fields: 'Saisissez votre courriel et votre mot de passe.',
     login_error_generic: 'Échec de la connexion. Réessayez.',

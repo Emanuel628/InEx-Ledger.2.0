@@ -575,6 +575,7 @@ const TRANSLATIONS = {
     register_alert_password_strength:
       'Please create a strong password and ensure both fields match.',
     register_password_requirements_error: 'Password does not meet all requirements.',
+    register_error_email_exists: 'An account with this email already exists.',
     register_consent_required: 'Required: You must accept the Terms and Privacy Policy.',
     register_error_missing_fields: 'Enter an email and password.',
     login_error_missing_fields: 'Enter your email and password.',
@@ -1623,6 +1624,7 @@ const TRANSLATIONS = {
     register_alert_password_strength:
       'Crea una contraseña fuerte que coincida en ambos campos.',
     register_password_requirements_error: 'La contraseña no cumple todos los requisitos.',
+    register_error_email_exists: 'Ya existe una cuenta con este correo electrónico.',
     register_consent_required: 'Obligatorio: Debes aceptar los Términos y la Política de privacidad.',
     region_us: 'Estados Unidos',
     region_ca: 'Canadá',
@@ -2654,6 +2656,7 @@ const TRANSLATIONS = {
     register_alert_password_strength:
       'Créez un mot de passe fort et concordant.',
     register_password_requirements_error: 'Le mot de passe ne répond pas à toutes les exigences.',
+    register_error_email_exists: 'Un compte avec cette adresse courriel existe déjà.',
     register_consent_required: 'Obligatoire : vous devez accepter les Conditions et la Politique de confidentialité.',
     register_error_missing_fields: 'Saisissez un courriel et un mot de passe.',
     login_error_missing_fields: 'Saisissez votre courriel et votre mot de passe.',

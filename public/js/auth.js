@@ -304,7 +304,7 @@ function mapAuthError(status, apiError) {
     return "Invalid email or password.";
   }
   if (status === 409) {
-    return "An account with this email already exists.";
+    return typeof t === "function" ? t("register_error_email_exists") : "An account with this email already exists.";
   }
   if (status === 429) {
     return errorMessage || "Too many attempts. Try again later.";
