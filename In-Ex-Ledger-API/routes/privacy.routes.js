@@ -1,4 +1,6 @@
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const express = require("express");
 const { pool } = require("../db.js");
 const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
@@ -431,11 +433,11 @@ router.post("/erase", requireMfa, async (req, res) => {
 
 /**
  * POST /api/privacy/delete
- * Deletes all business data (transactions, accounts, categories) but keeps the user account.
- * Deprecated in favour of /erase for GDPR/privacy-law compliance; retained for
- * backward-compatibility with existing clients.
+ * Deletes all business data (transactions, receipts, mileage, recurring
+ * transactions, accounts, categories) but keeps the user account.
+ * Receipt files stored on disk are also removed.
  */
-router.post("/delete", requireMfa, async (req, res) => {
+router.post("/delete", async (req, res) => {
   const userId = req.user.id;
   const ipAddress = req.ip || req.connection?.remoteAddress || null;
   const userAgent = req.get("user-agent") || null;
@@ -444,8 +446,7 @@ router.post("/delete", requireMfa, async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // Resolve business ID within the transaction boundary using the client
-    // so that all reads and writes share the same transaction scope.
+    // Resolve business ID within the transaction boundary.
     const bizResult = await client.query(
       `SELECT b.id
          FROM users u
@@ -460,8 +461,20 @@ router.post("/delete", requireMfa, async (req, res) => {
     }
     const businessId = bizResult.rows[0].id;
 
-    // Log the deletion to the audit trail before performing the deletion
-    // so a compliance record always exists even if a subsequent step fails.
+    // Collect receipt file paths before deleting DB rows.
+    const storageDir = path.resolve(path.join(process.cwd(), "storage", "receipts"));
+    const receiptFiles = await client.query(
+      "SELECT storage_path FROM receipts WHERE business_id = $1 AND storage_path IS NOT NULL",
+      [businessId]
+    );
+    const storagePaths = receiptFiles.rows
+      .map((row) => row.storage_path)
+      .filter((filePath) => {
+        if (!filePath) return false;
+        return path.resolve(filePath).startsWith(storageDir + path.sep);
+      });
+
+    // Log the deletion to the audit trail before performing any deletions.
     await client.query(
       `INSERT INTO user_action_audit_log
          (id, user_id, action, ip_address, user_agent, metadata)
@@ -475,11 +488,40 @@ router.post("/delete", requireMfa, async (req, res) => {
       ]
     );
 
+    // Must delete recurring runs and templates before accounts/categories
+    // because recurring_transactions has ON DELETE RESTRICT on account_id and category_id.
+    await client.query(
+      "DELETE FROM recurring_transaction_runs WHERE business_id = $1",
+      [businessId]
+    );
+    await client.query(
+      "DELETE FROM recurring_transactions WHERE business_id = $1",
+      [businessId]
+    );
+
     await client.query("DELETE FROM transactions WHERE business_id = $1", [businessId]);
+    await client.query("DELETE FROM receipts WHERE business_id = $1", [businessId]);
+    await client.query("DELETE FROM mileage WHERE business_id = $1", [businessId]);
     await client.query("DELETE FROM accounts WHERE business_id = $1", [businessId]);
     await client.query("DELETE FROM categories WHERE business_id = $1", [businessId]);
 
     await client.query("COMMIT");
+
+    // Remove receipt files from disk after the DB transaction commits.
+    await Promise.all(
+      storagePaths.map(async (filePath) => {
+        try {
+          await fs.promises.unlink(filePath);
+        } catch (unlinkErr) {
+          if (unlinkErr.code !== "ENOENT") {
+            logError("POST /privacy/delete: failed to unlink receipt file", {
+              filePath,
+              err: unlinkErr.message
+            });
+          }
+        }
+      })
+    );
 
     res.json({ message: "Business data deleted successfully." });
   } catch (err) {
