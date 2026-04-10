@@ -146,6 +146,22 @@ function isMobileDevice() {
     || (navigator.maxTouchPoints > 0 && !/Macintosh/i.test(navigator.userAgent));
 }
 
+function injectSkipLink() {
+  const main = document.querySelector("main");
+  if (!main) return;
+
+  if (!main.id) {
+    main.id = "main-content";
+  }
+
+  const link = document.createElement("a");
+  link.className = "skip-link";
+  link.href = "#" + main.id;
+  link.setAttribute("data-i18n", "a11y_skip_to_main");
+  link.textContent = "Skip to main content";
+  document.body.insertBefore(link, document.body.firstChild);
+}
+
 function injectMobileDesktopLink() {
   if (!isMobileDevice() || isDesktopViewRequested()) {
     return;
@@ -283,6 +299,7 @@ function pollGlobalUnreadCount() {
 
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
+  injectSkipLink();
   injectHelpNavLink();
   injectMessagesNavLink();
   injectMobileMenu();   // clones nav after Help/Messages are injected
