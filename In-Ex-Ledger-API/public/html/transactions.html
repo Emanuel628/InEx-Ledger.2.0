@@ -441,14 +441,14 @@
     </div>
   </main>
 
-  <div id="transactionModal" class="transaction-modal hidden">
+  <div id="transactionModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="transactionModalTitle" aria-describedby="transactionModalBody">
     <div class="transaction-modal-content danger-modal">
-      <div class="danger-modal-icon">!</div>
-      <h3 id="transactionModalTitle">Delete this transaction?</h3>
-      <p id="transactionModalBody">This will permanently remove the transaction from your ledger.</p>
+      <div class="danger-modal-icon" aria-hidden="true">!</div>
+      <h3 id="transactionModalTitle" data-i18n="transactions_delete_title">Delete this transaction?</h3>
+      <p id="transactionModalBody" data-i18n="transactions_delete_body_prefix">This will permanently remove the transaction from your ledger.</p>
       <div class="modal-actions danger-actions">
-        <button type="button" id="transactionModalClose" class="modal-cancel">Cancel</button>
-        <button type="button" id="transactionModalDelete" class="modal-delete">Delete</button>
+        <button type="button" id="transactionModalClose" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
+        <button type="button" id="transactionModalDelete" class="modal-delete" data-i18n="common_delete">Delete</button>
       </div>
     </div>
   </div>

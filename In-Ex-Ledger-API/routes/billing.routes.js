@@ -11,6 +11,7 @@ const {
   setFreePlanForBusiness
 } = require("../services/subscriptionService.js");
 const { pool } = require("../db.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 
@@ -118,7 +119,7 @@ router.get("/subscription", requireAuth, async (req, res) => {
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     res.json({ subscription });
   } catch (err) {
-    console.error("GET /api/billing/subscription error:", err.message);
+    logError("GET /api/billing/subscription error:", err.message);
     res.status(500).json({ error: "Failed to load subscription." });
   }
 });
@@ -145,7 +146,7 @@ router.post("/checkout-session", billingMutationLimiter, requireAuth, requireMfa
 
     res.status(200).json({ url: session.url, id: session.id });
   } catch (err) {
-    console.error("POST /api/billing/checkout-session error:", err.message);
+    logError("POST /api/billing/checkout-session error:", err.message);
     res.status(500).json({ error: err.message || "Failed to start checkout." });
   }
 });
@@ -160,7 +161,7 @@ router.post("/customer-portal", requireAuth, async (req, res) => {
     });
     res.status(200).json({ url: session.url });
   } catch (err) {
-    console.error("POST /api/billing/customer-portal error:", err.message);
+    logError("POST /api/billing/customer-portal error:", err.message);
     res.status(500).json({ error: err.message || "Failed to open billing portal." });
   }
 });
@@ -200,7 +201,7 @@ router.post("/cancel", requireAuth, billingMutationLimiter, async (req, res) => 
     const updated = await getSubscriptionSnapshotForBusiness(businessId);
     res.status(200).json({ subscription: updated });
   } catch (err) {
-    console.error("POST /api/billing/cancel error:", err.message);
+    logError("POST /api/billing/cancel error:", err.message);
     res.status(500).json({ error: err.message || "Failed to cancel subscription." });
   }
 });
@@ -248,7 +249,7 @@ router.get("/history", billingReadLimiter, requireAuth, async (req, res) => {
 
     res.status(200).json({ invoices });
   } catch (err) {
-    console.error("GET /api/billing/history error:", err.message);
+    logError("GET /api/billing/history error:", err.message);
     res.status(500).json({ error: err.message || "Failed to load billing history." });
   }
 });
@@ -312,7 +313,7 @@ router.post("/webhook", async (req, res) => {
 
     res.status(200).json({ received: true });
   } catch (err) {
-    console.error("Stripe webhook error:", err.message);
+    logError("Stripe webhook error:", err.message);
     res.status(400).json({ error: err.message || "Invalid webhook" });
   }
 });

@@ -8,6 +8,7 @@ const cookieParser = require('cookie-parser');
 const transactionsRouter = require('./routes/transactions.routes.js');
 const { createGlobalLimiter } = require('./middleware/rateLimitTiers.js');
 const { initDatabase } = require('./db.js');
+const { logInfo, logWarn, logError } = require('./utils/logger.js');
 
 const app = express();
 const publicDir = path.join(process.cwd(), 'public');
@@ -68,8 +69,8 @@ console.log('SYSTEM START: INEX_LEDGER_PROD_2026');
 
 const PORT = process.env.PORT || 8080;
 const DB_RETRY_DELAY_MS = Number(process.env.DB_RETRY_DELAY_MS || 15000);
-console.log(`NETWORK: Port assigned: ${PORT}`);
-console.log('SECURITY: JWT_SECRET detected:', !!process.env.JWT_SECRET);
+logInfo(`NETWORK: Port assigned: ${PORT}`);
+logInfo('SECURITY: JWT_SECRET detected:', { detected: !!process.env.JWT_SECRET });
 
 let dbState = 'starting';
 let dbLastError = null;
@@ -98,7 +99,7 @@ app.use(cors({
     if (ALLOWED_ORIGINS.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.warn(`CORS: Blocked request from ${origin}`);
+      logWarn(`CORS: Blocked request from ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -194,11 +195,11 @@ app.get('/index.html', (req, res) => {
 
 // Transaction management
 app.use('/api/transactions', transactionsRouter);
-console.log('MOUNTED: /api/transactions');
+logInfo('MOUNTED: /api/transactions');
 
 // Core auth and index routes
 app.use('/api', routes);
-console.log('MOUNTED: /api (Core Routes)');
+logInfo('MOUNTED: /api (Core Routes)');
 
 /* =========================================================
    404 & ERROR HANDLERS (must come after all routes)
@@ -210,8 +211,14 @@ app.use((req, res) => {
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
   const status = err.status || err.statusCode || 500;
+  logError('Unhandled error', {
+    status,
+    method: req.method,
+    path: req.path,
+    message: err.message,
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+  });
   const message = status < 500 ? err.message : 'Internal server error';
   res.status(status).json({ error: message });
 });
@@ -231,13 +238,13 @@ async function initializeDatabaseWithRetry() {
         await initDatabase();
         dbState = 'ready';
         dbLastError = null;
-        console.log('Database initialization completed.');
+        logInfo('Database initialization completed.');
         return;
       } catch (err) {
         dbState = 'retrying';
         dbLastError = err?.message || String(err);
-        console.error('Database initialization failed:', err);
-        console.log(`Retrying database initialization in ${DB_RETRY_DELAY_MS}ms.`);
+        logError('Database initialization failed:', { message: err?.message || String(err) });
+        logInfo(`Retrying database initialization in ${DB_RETRY_DELAY_MS}ms.`);
         await new Promise((resolve) => setTimeout(resolve, DB_RETRY_DELAY_MS));
       }
     }
@@ -253,9 +260,9 @@ function registerShutdownHandlers() {
      ========================================================= */
 
   process.on('SIGTERM', () => {
-    console.log('SIGTERM: Shutdown signal received.');
+    logInfo('SIGTERM: Shutdown signal received.');
     server.close(() => {
-      console.log('Server closed safely.');
+      logInfo('Server closed safely.');
       process.exit(0);
     });
   });
@@ -263,7 +270,7 @@ function registerShutdownHandlers() {
 
 async function start() {
   server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`READY: InEx Ledger API live on port ${PORT}`);
+    logInfo(`READY: InEx Ledger API live on port ${PORT}`);
   });
 
   registerShutdownHandlers();

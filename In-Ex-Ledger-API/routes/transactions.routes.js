@@ -11,6 +11,7 @@ const {
   loadAccountingLockState
 } = require("../services/accountingLockService.js");
 const { archiveTransaction } = require("../services/transactionAuditService.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -330,7 +331,7 @@ function tryDecrypt(value) {
   } catch (err) {
     // Decryption failure falls back to returning the raw value so that
     // legacy plain-text entries remain readable during the migration window.
-    console.warn("transaction description decryption failed, returning raw value:", err.message);
+    logWarn("transaction description decryption failed, returning raw value:", err.message);
     return value;
   }
 }
@@ -346,7 +347,7 @@ function tryEncryptDescription(description) {
   try {
     return encrypt(description);
   } catch (encryptErr) {
-    console.error(
+    logError(
       "[transactions] Field encryption unavailable — description stored as plain text. " +
       "Set FIELD_ENCRYPTION_KEY to enable at-rest encryption:",
       encryptErr.message
@@ -436,7 +437,7 @@ router.get("/", async (req, res) => {
       offset
     });
   } catch (err) {
-    console.error("GET /transactions error:", err);
+    logError("GET /transactions error:", err);
     res.status(500).json({ error: "Failed to load transactions." });
   }
 });
@@ -511,7 +512,7 @@ router.post("/", async (req, res) => {
 
     res.status(201).json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
-    console.error("POST /transactions error:", err);
+    logError("POST /transactions error:", err);
     return handleTransactionMutationError(res, err, "Failed to save transaction.");
   }
 });
@@ -596,7 +597,7 @@ router.put("/:id", async (req, res) => {
 
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
-    console.error("PUT /transactions/:id error:", err);
+    logError("PUT /transactions/:id error:", err);
     return handleTransactionMutationError(res, err, "Failed to update transaction.");
   }
 });
@@ -628,7 +629,7 @@ router.delete("/:id", async (req, res) => {
 
     res.json({ message: "Transaction deleted." });
   } catch (err) {
-    console.error("DELETE /transactions/:id error:", err);
+    logError("DELETE /transactions/:id error:", err);
     return handleTransactionMutationError(res, err, "Failed to delete transaction.");
   }
 });
@@ -668,7 +669,7 @@ router.patch("/:id/cleared", async (req, res) => {
 
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
-    console.error("PATCH /transactions/:id/cleared error:", err);
+    logError("PATCH /transactions/:id/cleared error:", err);
     return handleTransactionMutationError(res, err, "Failed to update cleared status.");
   }
 });

@@ -1,3 +1,4 @@
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const WORKER_BASE_URL = (process.env.PDF_WORKER_URL || "").replace(/\/+$/, "");
 const WORKER_SECRET = process.env.PDF_WORKER_SECRET;
 const WORKER_TIMEOUT_MS = Number(process.env.PDF_WORKER_TIMEOUT_MS || 15_000);
@@ -43,7 +44,7 @@ async function dispatchPdfJob(job) {
   try {
     return await callWorker(job);
   } catch (err) {
-    console.error("PDF worker dispatch failed:", err.message);
+    logError("PDF worker dispatch failed:", err.message);
     throw err;
   }
 }

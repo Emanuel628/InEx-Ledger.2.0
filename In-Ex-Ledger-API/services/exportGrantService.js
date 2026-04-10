@@ -1,12 +1,13 @@
 const crypto = require("crypto");
 const { pool } = require("../db.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const EXPORT_GRANT_SECRET = process.env.EXPORT_GRANT_SECRET;
 const EXPORT_GRANT_TTL_MS = Number(process.env.EXPORT_GRANT_TTL_MS || 60_000);
 const ACTION_SCOPE = "generate_pdf";
 
 if (!EXPORT_GRANT_SECRET) {
-  console.warn("EXPORT_GRANT_SECRET is not configured; export grants cannot be issued.");
+  logWarn("EXPORT_GRANT_SECRET is not configured; export grants cannot be issued.");
 }
 
 function ensureSecret() {

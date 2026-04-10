@@ -16,6 +16,7 @@ const {
 } = require("../services/cpaAccessService.js");
 const { pool } = require("../db.js");
 const { buildRedactedStream } = require("../services/exportStorage.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -31,7 +32,7 @@ router.get("/grants/owned", async (req, res) => {
     const grants = await listOwnedCpaGrants(req.user.id);
     res.json({ grants });
   } catch (error) {
-    console.error("GET /api/cpa-access/grants/owned error:", error.message);
+    logError("GET /api/cpa-access/grants/owned error:", error.message);
     res.status(500).json({ error: "Failed to load CPA access grants." });
   }
 });
@@ -41,7 +42,7 @@ router.get("/grants/assigned", async (req, res) => {
     const grants = await listAssignedCpaGrants(req.user);
     res.json({ grants });
   } catch (error) {
-    console.error("GET /api/cpa-access/grants/assigned error:", error.message);
+    logError("GET /api/cpa-access/grants/assigned error:", error.message);
     res.status(500).json({ error: "Failed to load assigned CPA access." });
   }
 });
@@ -52,7 +53,7 @@ router.get("/audit", async (req, res) => {
     const logs = await listOwnedCpaAuditLogs(req.user.id, limit);
     res.json({ logs });
   } catch (error) {
-    console.error("GET /api/cpa-access/audit error:", error.message);
+    logError("GET /api/cpa-access/audit error:", error.message);
     res.status(500).json({ error: "Failed to load CPA audit logs." });
   }
 });
@@ -62,7 +63,7 @@ router.get("/portfolio", async (req, res) => {
     const portfolios = await listAccessibleBusinessScopeForUser(req.user);
     res.json({ portfolios });
   } catch (error) {
-    console.error("GET /api/cpa-access/portfolio error:", error.message);
+    logError("GET /api/cpa-access/portfolio error:", error.message);
     res.status(500).json({ error: "Failed to load CPA portfolio access." });
   }
 });
@@ -198,7 +199,7 @@ router.get("/portfolio/:ownerUserId/summary", async (req, res) => {
       business_summaries: businessSummaries
     });
   } catch (error) {
-    console.error("GET /api/cpa-access/portfolio/:ownerUserId/summary error:", error.message);
+    logError("GET /api/cpa-access/portfolio/:ownerUserId/summary error:", error.message);
     res.status(500).json({ error: "Failed to load CPA summary." });
   }
 });
@@ -266,7 +267,7 @@ router.get("/portfolio/:ownerUserId/transactions", async (req, res) => {
       businesses: portfolio.businesses
     });
   } catch (error) {
-    console.error("GET /api/cpa-access/portfolio/:ownerUserId/transactions error:", error.message);
+    logError("GET /api/cpa-access/portfolio/:ownerUserId/transactions error:", error.message);
     res.status(500).json({ error: "Failed to load CPA transactions." });
   }
 });
@@ -306,7 +307,7 @@ router.get("/portfolio/:ownerUserId/receipts", async (req, res) => {
 
     res.json({ receipts: result.rows, businesses: portfolio.businesses });
   } catch (error) {
-    console.error("GET /api/cpa-access/portfolio/:ownerUserId/receipts error:", error.message);
+    logError("GET /api/cpa-access/portfolio/:ownerUserId/receipts error:", error.message);
     res.status(500).json({ error: "Failed to load CPA receipts." });
   }
 });
@@ -363,7 +364,7 @@ router.get("/portfolio/:ownerUserId/receipts/:receiptId", async (req, res) => {
 
     return res.sendFile(receipt.storage_path);
   } catch (error) {
-    console.error("GET /api/cpa-access/portfolio/:ownerUserId/receipts/:receiptId error:", error.message);
+    logError("GET /api/cpa-access/portfolio/:ownerUserId/receipts/:receiptId error:", error.message);
     return res.status(500).json({ error: "Failed to download CPA receipt." });
   }
 });
@@ -407,7 +408,7 @@ router.get("/portfolio/:ownerUserId/mileage", async (req, res) => {
 
     res.json({ data: result.rows, businesses: portfolio.businesses });
   } catch (error) {
-    console.error("GET /api/cpa-access/portfolio/:ownerUserId/mileage error:", error.message);
+    logError("GET /api/cpa-access/portfolio/:ownerUserId/mileage error:", error.message);
     res.status(500).json({ error: "Failed to load CPA mileage." });
   }
 });
@@ -455,7 +456,7 @@ router.get("/portfolio/:ownerUserId/exports", async (req, res) => {
 
     res.json({ exports: result.rows, businesses: portfolio.businesses });
   } catch (error) {
-    console.error("GET /api/cpa-access/portfolio/:ownerUserId/exports error:", error.message);
+    logError("GET /api/cpa-access/portfolio/:ownerUserId/exports error:", error.message);
     res.status(500).json({ error: "Failed to load CPA exports." });
   }
 });
@@ -547,7 +548,7 @@ router.get("/portfolio/:ownerUserId/audit", async (req, res) => {
 
     res.json({ logs: auditResult.rows });
   } catch (error) {
-    console.error("GET /api/cpa-access/portfolio/:ownerUserId/audit error:", error.message);
+    logError("GET /api/cpa-access/portfolio/:ownerUserId/audit error:", error.message);
     res.status(500).json({ error: "Failed to load CPA audit activity." });
   }
 });
@@ -591,7 +592,7 @@ router.get("/portfolio/:ownerUserId/exports/:exportId/redacted", async (req, res
     res.setHeader("Content-Disposition", `attachment; filename="inex-ledger-cpa-export-${exportId}.pdf"`);
     buildRedactedStream(res, result.rows[0].file_path);
   } catch (error) {
-    console.error("GET /api/cpa-access/portfolio/:ownerUserId/exports/:exportId/redacted error:", error.message);
+    logError("GET /api/cpa-access/portfolio/:ownerUserId/exports/:exportId/redacted error:", error.message);
     res.status(500).json({ error: "Failed to download CPA export." });
   }
 });
@@ -608,7 +609,7 @@ router.post("/grants", async (req, res) => {
   } catch (error) {
     const message = error?.message || "Failed to create CPA access grant.";
     const status = /required|cannot invite|not found|already exists/i.test(message) ? 400 : 500;
-    console.error("POST /api/cpa-access/grants error:", message);
+    logError("POST /api/cpa-access/grants error:", message);
     res.status(status).json({ error: message });
   }
 });
@@ -622,7 +623,7 @@ router.post("/grants/:id/accept", async (req, res) => {
     const grants = await listAssignedCpaGrants(req.user);
     res.json({ grants });
   } catch (error) {
-    console.error("POST /api/cpa-access/grants/:id/accept error:", error.message);
+    logError("POST /api/cpa-access/grants/:id/accept error:", error.message);
     res.status(500).json({ error: "Failed to accept CPA access." });
   }
 });
@@ -635,7 +636,7 @@ router.delete("/grants/:id", async (req, res) => {
     }
     res.status(204).end();
   } catch (error) {
-    console.error("DELETE /api/cpa-access/grants/:id error:", error.message);
+    logError("DELETE /api/cpa-access/grants/:id error:", error.message);
     res.status(500).json({ error: "Failed to revoke CPA access." });
   }
 });
@@ -650,7 +651,7 @@ router.delete("/grants/:id/permanent", async (req, res) => {
   } catch (error) {
     const message = error?.message || "Failed to delete CPA access grant.";
     const status = /only revoked/i.test(message) ? 400 : 500;
-    console.error("DELETE /api/cpa-access/grants/:id/permanent error:", message);
+    logError("DELETE /api/cpa-access/grants/:id/permanent error:", message);
     res.status(status).json({ error: message });
   }
 });

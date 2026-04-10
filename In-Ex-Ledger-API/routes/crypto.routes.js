@@ -1,4 +1,5 @@
 const express = require("express");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 
@@ -10,7 +11,7 @@ if (PUBLIC_KEY_JSON) {
   try {
     parsedKey = JSON.parse(PUBLIC_KEY_JSON);
   } catch (err) {
-    console.error("Failed to parse EXPORT_PUBLIC_KEY_JWK:", err.message);
+    logError("Failed to parse EXPORT_PUBLIC_KEY_JWK:", err.message);
   }
 }
 

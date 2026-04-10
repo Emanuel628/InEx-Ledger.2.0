@@ -75,10 +75,10 @@
     </div>
   </main>
 
-  <div id="categoryModal" class="category-modal hidden">
+  <div id="categoryModal" class="category-modal hidden" role="dialog" aria-modal="true" aria-labelledby="categoryModalTitle">
     <div class="category-modal-backdrop" data-modal-close></div>
     <div class="category-modal-panel">
-      <h3 data-i18n="categories_add">Add category</h3>
+      <h3 id="categoryModalTitle" data-i18n="categories_add">Add category</h3>
       <form id="categoryForm" class="category-form" novalidate>
         <div class="form-field">
           <label class="field-label" for="category-name" data-i18n="categories_label_name">Category name</label>

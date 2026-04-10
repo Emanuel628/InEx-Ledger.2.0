@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
   resolveBusinessIdForUser,
   getBusinessScopeForUser
@@ -33,7 +34,7 @@ router.get("/", async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error("GET /categories error:", err.message);
+    logError("GET /categories error:", err.message);
     res.status(500).json({ error: "Failed to load categories." });
   }
 });
@@ -64,7 +65,7 @@ router.post("/", async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("POST /categories error:", err.message);
+    logError("POST /categories error:", err.message);
     res.status(500).json({ error: "Failed to create category." });
   }
 });
@@ -116,7 +117,7 @@ router.put("/:id", async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("PUT /categories/:id error:", err.message);
+    logError("PUT /categories/:id error:", err.message);
     res.status(500).json({ error: "Failed to update category." });
   }
 });
@@ -164,7 +165,7 @@ router.delete("/:id", async (req, res) => {
 
     res.json({ message: "Category deleted." });
   } catch (err) {
-    console.error("DELETE /categories/:id error:", err.message);
+    logError("DELETE /categories/:id error:", err.message);
     res.status(500).json({ error: "Failed to delete category." });
   }
 });

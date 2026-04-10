@@ -17,6 +17,7 @@ const { pool } = require("../db.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 
@@ -35,7 +36,7 @@ function getResend() {
   return _resend;
 }
 if (process.env.NODE_ENV !== "production") {
-  console.log("Email engine ready (Resend)");
+  logInfo("Email engine ready (Resend)");
 }
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "InEx Ledger <noreply@inexledger.com>";
 
@@ -171,12 +172,12 @@ async function sendAppEmail({ to, subject, html, text }, { retries = 2, retryDel
         replyTo
       });
       if (process.env.NODE_ENV !== "production") {
-        console.log(`[email] sent to ${recipient.join(", ")} (subject: "${subject}")`);
+        logInfo(`[email] sent to ${recipient.join(", ")} (subject: "${subject}")`);
       }
       return result;
     } catch (err) {
       lastError = err;
-      console.error("[email] attempt", attempt + 1, "failed for subject", JSON.stringify(subject), "to", recipient.join(", "), "-", err?.message || err);
+      logError("[email] attempt", attempt + 1, "failed for subject", JSON.stringify(subject), "to", recipient.join(", "), "-", err?.message || err);
       if (attempt < retries) {
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs * Math.pow(2, attempt)));
       }
@@ -560,7 +561,7 @@ router.post("/register", authLimiter, async (req, res) => {
         text: `Welcome to InEx Ledger.\n\nVerify your email to activate your account:\n${verificationLink}\n\nThis link expires in 15 minutes.`
       });
     } catch (emailErr) {
-      console.error("Email failed to send, but account was created:", emailErr);
+      logError("Email failed to send, but account was created:", emailErr);
     }
     // --- END OF EMAIL LOGIC ---
 
@@ -570,10 +571,10 @@ router.post("/register", authLimiter, async (req, res) => {
       try {
         await client.query("ROLLBACK");
       } catch (rollbackErr) {
-        console.error("Register rollback failed:", rollbackErr);
+        logError("Register rollback failed:", rollbackErr);
       }
     }
-    console.error("Register error:", err);
+    logError("Register error:", err);
     return res.status(500).json({ error: "Registration failed" });
   } finally {
     client.release();
@@ -629,7 +630,7 @@ router.post("/send-verification", authLimiter, async (req, res) => {
 
     res.status(200).json({ message: "Verification link sent to your email." });
   } catch (err) {
-    console.error("Send verification error:", err);
+    logError("Send verification error:", err);
     res.status(500).json({ error: "Failed to send verification email." });
   }
 });
@@ -670,7 +671,7 @@ router.post("/login", authLimiter, async (req, res) => {
           user.id
         ]);
       } catch (migrationErr) {
-        console.error("Legacy password migration failed:", migrationErr);
+        logError("Legacy password migration failed:", migrationErr);
       }
     }
 
@@ -703,7 +704,7 @@ router.post("/login", authLimiter, async (req, res) => {
     const session = await issueAuthenticatedSession(res, user, businessId);
     res.status(200).json(session);
   } catch (err) {
-    console.error("Login error:", err);
+    logError("Login error:", err);
     res.status(500).json({ error: "Login failed" });
   }
 });
@@ -761,7 +762,7 @@ router.post("/refresh", async (req, res) => {
 
     res.status(200).json({ token, subscription });
   } catch (err) {
-    console.error("Refresh token error:", err);
+    logError("Refresh token error:", err);
     clearRefreshCookie(res);
     res.status(500).json({ error: "Failed to refresh token" });
   }
@@ -802,7 +803,7 @@ router.get("/verify-email", async (req, res) => {
     // Redirect to login with a success parameter
     return res.redirect("/login?verified=true");
   } catch (err) {
-    console.error("Verification error:", err);
+    logError("Verification error:", err);
     return res.status(500).send("Verification failed.");
   }
 });
@@ -850,7 +851,7 @@ router.post("/change-password", authLimiter, requireAuth, requireMfa, async (req
 
     return res.status(200).json({ success: true, message: "Password updated." });
   } catch (err) {
-    console.error("Change password error:", err);
+    logError("Change password error:", err);
     return res.status(500).json({ error: "Unable to update password." });
   }
 });
@@ -864,7 +865,7 @@ router.get("/mfa/status", requireAuth, async (req, res) => {
 
     return res.status(200).json(buildMfaStatusPayload(user));
   } catch (err) {
-    console.error("MFA status error:", err);
+    logError("MFA status error:", err);
     return res.status(500).json({ error: "Unable to load MFA status." });
   }
 });
@@ -968,7 +969,7 @@ router.post("/mfa/enable", requireAuth, authLimiter, async (req, res) => {
       status: buildMfaStatusPayload(refreshedUser)
     });
   } catch (err) {
-    console.error("MFA enable error:", err);
+    logError("MFA enable error:", err);
     return res.status(500).json({ error: "Unable to enable MFA." });
   }
 });
@@ -1064,7 +1065,7 @@ router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
       status: buildMfaStatusPayload(refreshedUser)
     });
   } catch (err) {
-    console.error("MFA disable error:", err);
+    logError("MFA disable error:", err);
     return res.status(500).json({ error: "Unable to disable MFA." });
   }
 });
@@ -1120,7 +1121,7 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
     const session = await issueAuthenticatedSession(res, refreshedUser, pending.business_id || null);
     return res.status(200).json(session);
   } catch (err) {
-    console.error("MFA verify error:", err);
+    logError("MFA verify error:", err);
     return res.status(401).json({ error: "Invalid or expired MFA session." });
   }
 });
@@ -1170,7 +1171,7 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
         text: `Reset your InEx Ledger password\n\nWe received a request to reset the password for your account. Use this link to choose a new password:\n${resetLink}\n\nThis link expires in 20 minutes.\n\nIf you did not request a password reset, you can safely ignore this email.`
         });
       } catch (emailErr) {
-        console.error("[forgot-password] failed to send reset email to", email, ":", emailErr?.message || emailErr);
+        logError("[forgot-password] failed to send reset email to", email, ":", emailErr?.message || emailErr);
         // Continue — do not expose email delivery failure to the caller
       }
 
@@ -1178,7 +1179,7 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
     // Always return 200 for security reasons (don't leak which emails exist)
     return res.status(200).json({ message: "If the email is registered, a reset link was sent." });
   } catch (err) {
-    console.error("Forgot password error:", err);
+    logError("Forgot password error:", err);
     res.status(500).json({ error: "Internal server error." });
   }
 });
@@ -1205,7 +1206,7 @@ router.post("/reset-password", passwordLimiter, async (req, res) => {
     await pool.query("UPDATE users SET password_hash = $1 WHERE email = $2", [hashedPassword, email]);
     return res.status(200).json({ message: "Password updated successfully." });
   } catch (err) {
-    console.error("Reset password error:", err);
+    logError("Reset password error:", err);
     res.status(500).json({ error: "Failed to reset password." });
   }
 });
@@ -1280,7 +1281,7 @@ router.post("/request-email-change", requireAuth, authLimiter, async (req, res) 
 
     res.json({ message: "Confirmation email sent to your new address." });
   } catch (err) {
-    console.error("Request email change error:", err);
+    logError("Request email change error:", err);
     res.status(500).json({ error: "Failed to initiate email change." });
   }
 });
@@ -1310,7 +1311,7 @@ router.get("/confirm-email-change", async (req, res) => {
 
     return res.redirect("/login?email_changed=true");
   } catch (err) {
-    console.error("Confirm email change error:", err);
+    logError("Confirm email change error:", err);
     res.status(500).send("Email change failed.");
   }
 });

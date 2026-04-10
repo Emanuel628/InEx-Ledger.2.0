@@ -97,6 +97,13 @@ textarea:focus {
   background: var(--surface);
 }
 
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent2);
+  outline-offset: 1px;
+}
+
 .form-row {
   margin-bottom: var(--space-md);
 }
