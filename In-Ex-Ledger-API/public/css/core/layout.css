@@ -268,7 +268,6 @@ body[data-theme="light"] select option {
 .categories-topbar,
 .mileage-topbar,
 .messages-topbar,
-.goals-topbar,
 .analytics-topbar,
 .help-topbar {
   position: sticky !important;
@@ -420,7 +419,6 @@ body[data-theme="light"] select option {
   .categories-topbar,
   .mileage-topbar,
   .messages-topbar,
-  .goals-topbar,
   .analytics-topbar,
   .help-topbar {
     height: auto !important;
@@ -449,7 +447,6 @@ body[data-theme="light"] select option {
   .categories-topbar,
   .mileage-topbar,
   .messages-topbar,
-  .goals-topbar,
   .analytics-topbar,
   .help-topbar {
     padding: 10px 12px !important;
