@@ -154,16 +154,35 @@ function getAppBaseUrl(req) {
   return `${protocol}://${host}`;
 }
 
-async function sendAppEmail({ to, subject, html, text }) {
+async function sendAppEmail({ to, subject, html, text }, { retries = 2, retryDelayMs = 500 } = {}) {
   const replyTo = process.env.RESEND_REPLY_TO || process.env.EMAIL_REPLY_TO || undefined;
-  return getResend().emails.send({
-    from: RESEND_FROM_EMAIL,
-    to: Array.isArray(to) ? to : [to],
-    subject,
-    html,
-    text,
-    replyTo
-  });
+  const recipient = Array.isArray(to) ? to : [to];
+
+  let lastError;
+  // One initial attempt plus up to `retries` additional attempts
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const result = await getResend().emails.send({
+        from: RESEND_FROM_EMAIL,
+        to: recipient,
+        subject,
+        html,
+        text,
+        replyTo
+      });
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`[email] sent to ${recipient.join(", ")} (subject: "${subject}")`);
+      }
+      return result;
+    } catch (err) {
+      lastError = err;
+      console.error("[email] attempt", attempt + 1, "failed for subject", JSON.stringify(subject), "to", recipient.join(", "), "-", err?.message || err);
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs * Math.pow(2, attempt)));
+      }
+    }
+  }
+  throw lastError;
 }
 
 /* =========================================================
@@ -1119,9 +1138,10 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
       const { token } = await createPasswordResetToken(email);
       const resetLink = buildPasswordResetLink(req, token);
 
-      await sendAppEmail({
-        to: email,
-        subject: "Reset your InEx Ledger password",
+      try {
+        await sendAppEmail({
+          to: email,
+          subject: "Reset your InEx Ledger password",
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
             <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
@@ -1148,7 +1168,11 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
           </div>
         `,
         text: `Reset your InEx Ledger password\n\nWe received a request to reset the password for your account. Use this link to choose a new password:\n${resetLink}\n\nThis link expires in 20 minutes.\n\nIf you did not request a password reset, you can safely ignore this email.`
-      });
+        });
+      } catch (emailErr) {
+        console.error("[forgot-password] failed to send reset email to", email, ":", emailErr?.message || emailErr);
+        // Continue — do not expose email delivery failure to the caller
+      }
 
     }
     // Always return 200 for security reasons (don't leak which emails exist)
