@@ -282,7 +282,13 @@ function registerShutdownHandlers() {
 
 async function start() {
   initializeReceiptStorage();
-  await initializeRateLimiterProtection();
+  try {
+    await initializeRateLimiterProtection();
+  } catch (err) {
+    logError('Rate limiting initialization failed', {
+      message: err?.message || String(err)
+    });
+  }
   server = app.listen(PORT, '0.0.0.0', () => {
     logInfo(`READY: InEx Ledger API live on port ${PORT}`);
   });
@@ -295,4 +301,3 @@ start().catch((err) => {
   logError('Server startup failed', { message: err?.message || String(err) });
   process.exit(1);
 });
-
