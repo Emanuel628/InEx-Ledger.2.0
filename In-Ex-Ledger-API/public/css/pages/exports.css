@@ -228,7 +228,11 @@
 .date-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 16px;
+}
+
+.date-grid .form-field {
+  margin-bottom: 0;
 }
 
 .exports-card input,

@@ -286,6 +286,8 @@ body[data-theme="light"] select option {
 }
 
 .topbar-left {
+  display: flex !important;
+  align-items: center !important;
   gap: 28px !important;
   flex: 1 1 auto !important;
   min-width: 0 !important;
@@ -323,6 +325,8 @@ body[data-theme="light"] select option {
 }
 
 .topbar-nav {
+  display: flex !important;
+  align-items: center !important;
   gap: 8px !important;
   flex: 1 1 auto !important;
   min-width: 0 !important;
@@ -376,6 +380,8 @@ body[data-theme="light"] select option {
 }
 
 .user-pill {
+  display: flex !important;
+  align-items: center !important;
   gap: 8px !important;
   padding: 5px 10px 5px 6px !important;
   border-radius: 20px !important;
