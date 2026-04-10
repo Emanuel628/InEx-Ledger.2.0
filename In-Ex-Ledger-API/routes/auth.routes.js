@@ -8,6 +8,7 @@ const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const { Resend } = require("resend");
 const { signToken, verifyToken, requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const {
   createAuthLimiter,
   createMfaVerifyLimiter,
@@ -712,7 +713,7 @@ router.post("/login", authLimiter, async (req, res) => {
 /**
  * POST /refresh
  */
-router.post("/refresh", async (req, res) => {
+router.post("/refresh", requireCsrfProtection, async (req, res) => {
   const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (!rawToken) {
     clearRefreshCookie(res);
@@ -771,7 +772,7 @@ router.post("/refresh", async (req, res) => {
 /**
  * POST /logout
  */
-router.post("/logout", requireAuth, async (req, res) => {
+router.post("/logout", requireAuth, requireCsrfProtection, async (req, res) => {
   const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (rawToken) {
     const hashed = hashRefreshToken(rawToken);
@@ -808,7 +809,7 @@ router.get("/verify-email", async (req, res) => {
   }
 });
 
-router.post("/change-password", authLimiter, requireAuth, requireMfa, async (req, res) => {
+router.post("/change-password", authLimiter, requireAuth, requireCsrfProtection, requireMfa, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   const newPassword = req.body?.newPassword;
   const confirmPassword = req.body?.confirmPassword;
@@ -870,15 +871,15 @@ router.get("/mfa/status", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/mfa/setup", requireAuth, authLimiter, async (req, res) => {
+router.post("/mfa/setup", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
   return res.status(410).json({ error: "Authenticator app setup is no longer used." });
 });
 
-router.post("/mfa/setup/cancel", requireAuth, async (req, res) => {
+router.post("/mfa/setup/cancel", requireAuth, requireCsrfProtection, async (req, res) => {
   return res.status(200).json({ success: true });
 });
 
-router.post("/mfa/enable", requireAuth, authLimiter, async (req, res) => {
+router.post("/mfa/enable", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   const code = String(req.body?.code || "").trim();
   const mfaToken = String(req.body?.mfaToken || "").trim();
@@ -974,7 +975,7 @@ router.post("/mfa/enable", requireAuth, authLimiter, async (req, res) => {
   }
 });
 
-router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
+router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   const code = String(req.body?.code || "").trim();
   const mfaToken = String(req.body?.mfaToken || "").trim();
@@ -1070,7 +1071,7 @@ router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
   }
 });
 
-router.post("/mfa/recovery-codes/regenerate", requireAuth, mfaVerifyLimiter, async (req, res) => {
+router.post("/mfa/recovery-codes/regenerate", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
   return res.status(410).json({ error: "Recovery codes are no longer used." });
 });
 
@@ -1215,7 +1216,7 @@ router.post("/reset-password", passwordLimiter, async (req, res) => {
  * POST /request-email-change
  * Initiates email change: verifies current password, sends link to new address.
  */
-router.post("/request-email-change", requireAuth, authLimiter, async (req, res) => {
+router.post("/request-email-change", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
   const { newEmail, currentPassword } = req.body ?? {};
   const email = normalizeEmail(newEmail);
 

@@ -3,11 +3,13 @@ const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 router.use(createDataApiLimiter());
 
 const sessionsMutationLimiter = rateLimit({

@@ -2,6 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
@@ -16,6 +17,7 @@ let cachedMileageColumnMode = null;
 let cachedMileageColumnFetchedAt = 0;
 let cachedMileageColumnModePromise = null;
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 router.use(createDataApiLimiter());
 
 function parseOptionalNumber(value, field, max) {

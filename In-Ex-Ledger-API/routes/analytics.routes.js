@@ -1,6 +1,7 @@
 const express = require("express");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
@@ -10,6 +11,7 @@ const MAX_ANALYTICS_AMOUNT = 999999999.99;
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 router.use(createDataApiLimiter());
 
 // ---------------------------------------------------------------------------

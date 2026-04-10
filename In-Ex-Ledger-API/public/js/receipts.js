@@ -59,7 +59,8 @@ async function uploadReceipt(file) {
     method: "POST",
     credentials: "include",
     headers: {
-      ...authHeader()
+      ...authHeader(),
+      ...(typeof csrfHeader === "function" ? csrfHeader("POST") : {})
     },
     body: formData
   });

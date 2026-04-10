@@ -1,6 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const {
   createExportGrantLimiter,
   createSecureExportLimiter
@@ -22,6 +23,7 @@ const secureExportLimiter = createSecureExportLimiter();
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 
 function requireEmailVerified(req, res, next) {
   if (!req.user?.email_verified) {

@@ -2368,8 +2368,10 @@ async function uploadReceipt(transactionId, file) {
   try {
     const response = await fetch(buildApiUrl("/api/receipts"), {
       method: "POST",
+      credentials: "include",
       headers: {
-        ...authHeader()
+        ...authHeader(),
+        ...(typeof csrfHeader === "function" ? csrfHeader("POST") : {})
       },
       body: formData
     });

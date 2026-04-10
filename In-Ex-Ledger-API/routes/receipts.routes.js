@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const express = require("express");
 const multer = require("multer");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createReceiptLimiter } = require("../middleware/rateLimitTiers.js");
 const {
   resolveBusinessIdForUser,
@@ -20,6 +21,7 @@ const router = express.Router();
 const storageDir = path.join(process.cwd(), "storage", "receipts");
 fs.mkdirSync(storageDir, { recursive: true });
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 router.use(createReceiptLimiter());
 
 /* =========================================================

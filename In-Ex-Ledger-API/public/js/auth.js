@@ -13,6 +13,8 @@ const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const SUBSCRIPTION_KEY = "lb_subscription";
 const ACTIVE_BUSINESS_ID_KEY = "lb_active_business_id";
 const ACTIVE_BUSINESS_NAME_KEY = "lb_business_name";
+const CSRF_COOKIE_NAME = "csrf_token";
+const CSRF_HEADER_NAME = "X-CSRF-Token";
 const ONBOARDING_PAGE = "/onboarding";
 const LOGIN_PAGE = "/login";
 const ACCOUNT_MENU_STYLE_ID = "luna-account-menu-style";
@@ -290,6 +292,43 @@ function authHeader() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function getCookieValue(name) {
+  const cookieString = String(document.cookie || "");
+  if (!cookieString || !name) {
+    return "";
+  }
+
+  const prefix = `${name}=`;
+  const match = cookieString
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix));
+
+  if (!match) {
+    return "";
+  }
+
+  return decodeURIComponent(match.slice(prefix.length));
+}
+
+function getCsrfToken() {
+  try {
+    return getCookieValue(CSRF_COOKIE_NAME);
+  } catch {
+    return "";
+  }
+}
+
+function csrfHeader(method = "GET") {
+  const normalizedMethod = String(method || "GET").toUpperCase();
+  if (normalizedMethod === "GET" || normalizedMethod === "HEAD" || normalizedMethod === "OPTIONS") {
+    return {};
+  }
+
+  const token = getCsrfToken();
+  return token ? { [CSRF_HEADER_NAME]: token } : {};
+}
+
 function mapAuthError(status, apiError) {
   const errorMessage = typeof apiError === "string" ? apiError : apiError?.error;
   if (status === 401) {
@@ -406,10 +445,12 @@ async function redirectIfAuthenticated() {
 
 async function apiFetch(url, options = {}) {
   const apiUrl = buildApiUrl(url);
+  const method = String(options.method || "GET").toUpperCase();
   const headers = {
     "Content-Type": "application/json",
     ...(options.headers || {}),
-    ...authHeader()
+    ...authHeader(),
+    ...csrfHeader(method)
   };
   const response = await fetch(apiUrl, {
     ...options,
@@ -455,7 +496,10 @@ async function signOut() {
     await fetch(buildApiUrl("/api/auth/logout"), {
       method: "POST",
       credentials: "include",
-      headers: authHeader()
+      headers: {
+        ...authHeader(),
+        ...csrfHeader("POST")
+      }
     });
   } catch (err) {
     if (localStorage.getItem("debug") === "true") { console.error("Logout error:", err); }

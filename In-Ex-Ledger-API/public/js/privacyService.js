@@ -27,13 +27,16 @@
     }
   }
 
-  function authHeaders() {
+  function authHeaders(method = "GET") {
     const headers = { "Content-Type": "application/json" };
     if (typeof getToken === "function") {
       const token = getToken();
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }
+    }
+    if (typeof csrfHeader === "function") {
+      Object.assign(headers, csrfHeader(method));
     }
     return headers;
   }
@@ -87,7 +90,8 @@
     if (await apiAvailable()) {
       await fetch(buildApiUrl("/api/privacy/settings"), {
         method: "PUT",
-        headers: authHeaders(),
+        headers: authHeaders("PUT"),
+        credentials: "include",
         body: JSON.stringify({
           dataSharingOptOut: !!merged.dataSharingOptOut,
           consentGiven: !!merged.consentGiven,
@@ -131,7 +135,9 @@
 
     if (await apiAvailable()) {
       const res = await fetch(buildApiUrl("/api/privacy/export"), {
-        headers: authHeaders()
+        method: "POST",
+        headers: authHeaders("POST"),
+        credentials: "include"
       });
 
       if (res.ok) {
@@ -169,7 +175,8 @@
     if (await apiAvailable()) {
       const res = await fetch(buildApiUrl("/api/privacy/delete"), {
         method: "POST",
-        headers: authHeaders(),
+        headers: authHeaders("POST"),
+        credentials: "include",
         body: JSON.stringify({ scope: "business_data" })
       });
       if (res.ok) {

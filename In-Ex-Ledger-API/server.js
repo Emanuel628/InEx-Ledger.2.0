@@ -7,6 +7,7 @@ const routes = require('./routes/index.js');
 const cookieParser = require('cookie-parser');
 const transactionsRouter = require('./routes/transactions.routes.js');
 const { createGlobalLimiter } = require('./middleware/rateLimitTiers.js');
+const { ensureCsrfCookie } = require('./middleware/csrf.middleware.js');
 const { initDatabase } = require('./db.js');
 const { logInfo, logWarn, logError } = require('./utils/logger.js');
 
@@ -142,6 +143,8 @@ for (const pageName of htmlPageNames) {
     res.redirect(301, canonicalPath);
   });
 }
+app.use(cookieParser());
+app.use(ensureCsrfCookie);
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use('/html', express.static(htmlDir, {
   index: false,
@@ -153,7 +156,6 @@ app.use(express.static(publicDir, {
 }));
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
-app.use(cookieParser());
 app.use('/api', createGlobalLimiter());
 
 /* =========================================================
