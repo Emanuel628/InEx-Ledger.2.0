@@ -1082,8 +1082,8 @@ function renderRecurringTemplates() {
     row.innerHTML = `
       <td>
         <div class="recurring-meta">
-          <span class="recurring-primary">${template.description || "-"}</span>
-          <span class="recurring-secondary">${template.note || txT("transactions_recurring_no_note", "No internal note")}</span>
+          <span class="recurring-primary">${escapeHtml(template.description || "-")}</span>
+          <span class="recurring-secondary">${template.note ? escapeHtml(template.note) : txT("transactions_recurring_no_note", "No internal note")}</span>
         </div>
       </td>
       <td>${formatRecurringCadence(template.cadence)}</td>
@@ -1128,7 +1128,7 @@ function formatRecurringCadence(cadence) {
     case "annually":
       return txT("transactions_recurring_cadence_yearly", "Yearly");
     default:
-      return cadence || "-";
+      return escapeHtml(cadence || "-");
   }
 }
 
@@ -1485,13 +1485,13 @@ function renderTransactionList(filteredTransactions) {
       ? '<span class="tx-note-indicator" title="Note attached">📄</span>'
       : "";
     row.innerHTML = `
-      <td>${txn.date}</td>
+      <td>${escapeHtml(txn.date)}</td>
       <td>
         <span class="tx-type-pill">${typeLabel}</span>
-        ${txn.description}${noteIndicator}${receiptClip}
+        ${escapeHtml(txn.description)}${noteIndicator}${receiptClip}
       </td>
-      <td>${accountsById[txn.accountId]?.name || "-"}</td>
-      <td>${categoriesById[txn.categoryId]?.name || "-"}</td>
+      <td>${escapeHtml(accountsById[txn.accountId]?.name || "-")}</td>
+      <td>${escapeHtml(categoriesById[txn.categoryId]?.name || "-")}</td>
       <td>${formatCurrency(txn.amount)}</td>
       <td>
         <button
@@ -1960,7 +1960,7 @@ function formatDisplayDate(value) {
   }
   const parsed = new Date(`${value}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) {
-    return value;
+    return escapeHtml(value);
   }
   return parsed.toLocaleDateString("en-US", {
     month: "short",
