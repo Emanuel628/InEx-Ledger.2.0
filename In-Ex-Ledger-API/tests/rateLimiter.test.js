@@ -6,11 +6,14 @@ const request = require("supertest");
 
 const {
   createLimiter,
+  getRateLimiterHealth,
+  resetRateLimiterHealthForTests,
   setRedisClientOverride
 } = require("../middleware/rateLimiter.js");
 
 const { MemoryStore } = rateLimit;
 const originalEnv = {
+  NODE_ENV: process.env.NODE_ENV,
   RATE_LIMIT_ENABLED: process.env.RATE_LIMIT_ENABLED,
   REDIS_URL: process.env.REDIS_URL
 };
@@ -24,9 +27,11 @@ function restoreEnv(name, value) {
 }
 
 test.afterEach(() => {
+  restoreEnv("NODE_ENV", originalEnv.NODE_ENV);
   restoreEnv("RATE_LIMIT_ENABLED", originalEnv.RATE_LIMIT_ENABLED);
   restoreEnv("REDIS_URL", originalEnv.REDIS_URL);
   setRedisClientOverride(null);
+  resetRateLimiterHealthForTests();
 });
 
 function createApp(limiter, userId = null) {
@@ -82,7 +87,8 @@ test("user-scoped limiter enforces authenticated windows", async () => {
   await request(app).get("/").expect(429);
 });
 
-test("limiter fails open when Redis is unavailable", async () => {
+test("production limiter fails closed when Redis is unavailable", async () => {
+  process.env.NODE_ENV = "production";
   process.env.RATE_LIMIT_ENABLED = "true";
   delete process.env.REDIS_URL;
   const limiter = await createLimiter({
@@ -92,9 +98,11 @@ test("limiter fails open when Redis is unavailable", async () => {
   });
   const app = createApp(limiter);
 
-  for (let index = 0; index < 5; index += 1) {
-    await request(app).get("/").expect(200);
-  }
+  const response = await request(app).get("/").expect(503);
+  assert.match(response.body.error, /rate limiting/i);
+  const health = getRateLimiterHealth();
+  assert.strictEqual(health.mode, "degraded");
+  assert.strictEqual(health.available, false);
 });
 
 test("Retry-After header appears on 429 responses", async () => {
@@ -127,4 +135,20 @@ test("disabling rate limiting bypasses all blocks", async () => {
     const response = await request(app).get("/").expect(200);
     assert.strictEqual(response.headers["x-ratelimit-limit"], "unlimited");
   }
+});
+
+test("disabling rate limiting in production returns 503", async () => {
+  process.env.NODE_ENV = "production";
+  process.env.RATE_LIMIT_ENABLED = "false";
+  const limiter = await createLimiter({
+    windowMs: 60_000,
+    max: 1,
+    keyPrefix: "test-disabled-production"
+  });
+  const app = createApp(limiter);
+
+  await request(app).get("/").expect(503);
+  const health = getRateLimiterHealth();
+  assert.strictEqual(health.mode, "degraded");
+  assert.strictEqual(health.available, false);
 });

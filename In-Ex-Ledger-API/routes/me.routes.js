@@ -13,6 +13,7 @@ const { listAssignedCpaGrants, listAccessibleBusinessScopeForUser } = require(".
 const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { isManagedReceiptPath } = require("../services/receiptStorage.js");
 
 const router = express.Router();
 
@@ -338,13 +339,9 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
           AND r.storage_path IS NOT NULL`,
       [req.user.id]
     );
-    const storageDir = path.resolve(path.join(process.cwd(), "storage", "receipts"));
     const storagePaths = receiptFiles.rows
       .map((row) => row.storage_path)
-      .filter((filePath) => {
-        if (!filePath) return false;
-        return path.resolve(filePath).startsWith(storageDir + path.sep);
-      });
+      .filter((filePath) => isManagedReceiptPath(filePath));
 
     const businessesResult = await client.query(
       "SELECT id FROM businesses WHERE user_id = $1",

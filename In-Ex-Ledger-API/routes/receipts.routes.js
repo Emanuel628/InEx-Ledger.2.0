@@ -16,9 +16,13 @@ const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+const {
+  getReceiptStorageDir,
+  requirePersistentReceiptStorage
+} = require("../services/receiptStorage.js");
 
 const router = express.Router();
-const storageDir = path.join(process.cwd(), "storage", "receipts");
+const storageDir = getReceiptStorageDir();
 fs.mkdirSync(storageDir, { recursive: true });
 router.use(requireAuth);
 router.use(requireCsrfProtection);
@@ -160,7 +164,7 @@ router.get("/", async (req, res) => {
    POST /receipts — Upload Receipt
    ========================================================= */
 
-router.post("/", upload.single("receipt"), async (req, res) => {
+router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "Receipt file is required." });
   }

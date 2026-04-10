@@ -7,8 +7,13 @@ const routes = require('./routes/index.js');
 const cookieParser = require('cookie-parser');
 const transactionsRouter = require('./routes/transactions.routes.js');
 const { createGlobalLimiter } = require('./middleware/rateLimitTiers.js');
+const {
+  getRateLimiterHealth,
+  initializeRateLimiterProtection
+} = require('./middleware/rateLimiter.js');
 const { ensureCsrfCookie } = require('./middleware/csrf.middleware.js');
 const { initDatabase } = require('./db.js');
+const { getReceiptStorageStatus, initializeReceiptStorage } = require('./services/receiptStorage.js');
 const { logInfo, logWarn, logError } = require('./utils/logger.js');
 
 const app = express();
@@ -164,12 +169,17 @@ app.use('/api', createGlobalLimiter());
 
 // Railway Deployment Healthcheck
 app.get('/health', (req, res) => {
+  const rateLimiting = getRateLimiterHealth();
+  const receiptStorage = getReceiptStorageStatus();
+  const healthy = dbState === 'ready' && rateLimiting.mode !== 'degraded' && receiptStorage.mode !== 'degraded';
   res.status(200).json({
-    status: dbState === 'ready' ? 'healthy' : 'starting',
+    status: healthy ? 'healthy' : (dbState === 'ready' ? 'degraded' : 'starting'),
     database: {
       state: dbState,
       lastError: dbLastError
     },
+    receiptStorage,
+    rateLimiting,
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
@@ -271,6 +281,8 @@ function registerShutdownHandlers() {
 }
 
 async function start() {
+  initializeReceiptStorage();
+  await initializeRateLimiterProtection();
   server = app.listen(PORT, '0.0.0.0', () => {
     logInfo(`READY: InEx Ledger API live on port ${PORT}`);
   });
@@ -279,5 +291,8 @@ async function start() {
   void initializeDatabaseWithRetry();
 }
 
-start();
+start().catch((err) => {
+  logError('Server startup failed', { message: err?.message || String(err) });
+  process.exit(1);
+});
 

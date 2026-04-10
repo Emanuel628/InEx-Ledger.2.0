@@ -1,7 +1,7 @@
 const rateLimit = require("express-rate-limit");
 const rateLimitRedis = require("rate-limit-redis");
 const { createClient } = require("redis");
-const { logWarn } = require("../utils/logger.js");
+const { logError, logInfo, logWarn } = require("../utils/logger.js");
 
 const RedisStore =
   rateLimitRedis.RedisStore || rateLimitRedis.default || rateLimitRedis;
@@ -11,10 +11,90 @@ const RETRY_ERROR_MESSAGE = "Too many requests";
 let sharedRedisClient = null;
 let redisClientPromise = null;
 let redisClientOverride = null;
+let limiterHealth = {
+  available: false,
+  enabled: false,
+  lastError: null,
+  mode: "disabled",
+  redisConfigured: false,
+  redisConnected: false,
+  required: false,
+  updatedAt: null
+};
 
 const metrics = {
   increment() {}
 };
+
+function isProduction() {
+  return process.env.NODE_ENV === "production";
+}
+
+function isRateLimitingEnabled() {
+  return process.env.RATE_LIMIT_ENABLED === "true";
+}
+
+function isRateLimitingRequired() {
+  return isProduction();
+}
+
+function updateLimiterHealth(nextState) {
+  const previous = limiterHealth;
+  limiterHealth = {
+    ...previous,
+    ...nextState,
+    updatedAt: new Date().toISOString()
+  };
+
+  if (previous.available && limiterHealth.available === false) {
+    logError("Rate limiting protection dropped", {
+      lastError: limiterHealth.lastError,
+      mode: limiterHealth.mode,
+      redisConfigured: limiterHealth.redisConfigured,
+      redisConnected: limiterHealth.redisConnected
+    });
+  } else if (!previous.available && limiterHealth.available) {
+    logInfo("Rate limiting protection restored", {
+      mode: limiterHealth.mode,
+      redisConfigured: limiterHealth.redisConfigured,
+      redisConnected: limiterHealth.redisConnected
+    });
+  }
+
+  return limiterHealth;
+}
+
+function markLimiterHealth(partial = {}) {
+  const required = partial.required ?? isRateLimitingRequired();
+  const enabled = partial.enabled ?? isRateLimitingEnabled();
+  const redisConfigured =
+    partial.redisConfigured ?? Boolean(redisClientOverride || process.env.REDIS_URL);
+  const redisConnected = partial.redisConnected ?? Boolean(redisClientOverride || sharedRedisClient);
+  let mode = partial.mode;
+
+  if (!mode) {
+    if (required && (!enabled || !redisConfigured || !redisConnected)) {
+      mode = "degraded";
+    } else if (enabled && (redisConfigured || partial.storeOverrideActive)) {
+      mode = required ? "enforced" : "enabled";
+    } else {
+      mode = "disabled";
+    }
+  }
+
+  const available =
+    partial.available ?? (!required || (enabled && (partial.storeOverrideActive || (redisConfigured && redisConnected))));
+
+  return updateLimiterHealth({
+    available,
+    enabled,
+    lastError: Object.prototype.hasOwnProperty.call(partial, "lastError") ? partial.lastError : limiterHealth.lastError,
+    mode,
+    redisConfigured,
+    redisConnected,
+    required
+  });
+}
 
 function buildNormalizedPrefix(keyPrefix) {
   if (!keyPrefix) {
@@ -25,15 +105,40 @@ function buildNormalizedPrefix(keyPrefix) {
 
 async function ensureRedisClient() {
   if (redisClientOverride) {
+    markLimiterHealth({
+      available: true,
+      enabled: true,
+      lastError: null,
+      mode: isRateLimitingRequired() ? "enforced" : "enabled",
+      redisConfigured: true,
+      redisConnected: true,
+      storeOverrideActive: true
+    });
     return redisClientOverride;
   }
 
   if (sharedRedisClient) {
+    markLimiterHealth({
+      available: true,
+      enabled: isRateLimitingEnabled(),
+      lastError: null,
+      mode: isRateLimitingRequired() ? "enforced" : "enabled",
+      redisConfigured: true,
+      redisConnected: true
+    });
     return sharedRedisClient;
   }
 
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) {
+    markLimiterHealth({
+      available: !isRateLimitingRequired(),
+      enabled: isRateLimitingEnabled(),
+      lastError: "REDIS_URL is not configured",
+      mode: isRateLimitingRequired() ? "degraded" : "disabled",
+      redisConfigured: false,
+      redisConnected: false
+    });
     return null;
   }
 
@@ -41,16 +146,60 @@ async function ensureRedisClient() {
     const client = createClient({ url: redisUrl });
     client.on("error", (err) => {
       logWarn("Redis client error", { err: err.message });
+      markLimiterHealth({
+        available: !isRateLimitingRequired(),
+        enabled: isRateLimitingEnabled(),
+        lastError: err.message,
+        mode: isRateLimitingRequired() ? "degraded" : "disabled",
+        redisConfigured: true,
+        redisConnected: false
+      });
+    });
+    client.on("ready", () => {
+      markLimiterHealth({
+        available: true,
+        enabled: isRateLimitingEnabled(),
+        lastError: null,
+        mode: isRateLimitingRequired() ? "enforced" : "enabled",
+        redisConfigured: true,
+        redisConnected: true
+      });
+    });
+    client.on("end", () => {
+      markLimiterHealth({
+        available: !isRateLimitingRequired(),
+        enabled: isRateLimitingEnabled(),
+        lastError: "Redis connection ended",
+        mode: isRateLimitingRequired() ? "degraded" : "disabled",
+        redisConfigured: true,
+        redisConnected: false
+      });
     });
     redisClientPromise = client
       .connect()
       .then(() => {
         sharedRedisClient = client;
+        markLimiterHealth({
+          available: true,
+          enabled: isRateLimitingEnabled(),
+          lastError: null,
+          mode: isRateLimitingRequired() ? "enforced" : "enabled",
+          redisConfigured: true,
+          redisConnected: true
+        });
         return sharedRedisClient;
       })
       .catch((err) => {
         logWarn("Unable to connect to Redis for rate limiting", {
           err: err.message
+        });
+        markLimiterHealth({
+          available: !isRateLimitingRequired(),
+          enabled: isRateLimitingEnabled(),
+          lastError: err.message,
+          mode: isRateLimitingRequired() ? "degraded" : "disabled",
+          redisConfigured: true,
+          redisConnected: false
         });
         return null;
       });
@@ -87,6 +236,19 @@ function buildUnlimitedLimiter() {
     res.setHeader("X-RateLimit-Remaining", "unlimited");
     res.setHeader("X-RateLimit-Reset", "0");
     next();
+  };
+}
+
+function buildUnavailableLimiter(errorMessage = "Rate limiting protection is temporarily unavailable.") {
+  return (_req, res) => {
+    res.setHeader("Retry-After", "60");
+    res.setHeader("X-RateLimit-Limit", "unavailable");
+    res.setHeader("X-RateLimit-Remaining", "0");
+    res.setHeader("X-RateLimit-Reset", "60");
+    res.status(503).json({
+      error: errorMessage,
+      retryAfter: 60
+    });
   };
 }
 
@@ -173,6 +335,16 @@ function setRedisClientOverride(client) {
   if (!client) {
     redisClientPromise = null;
   }
+  markLimiterHealth({
+    available: Boolean(client) || !isRateLimitingRequired(),
+    enabled: isRateLimitingEnabled(),
+    lastError: client ? null : limiterHealth.lastError,
+    mode: client
+      ? (isRateLimitingRequired() ? "enforced" : "enabled")
+      : (isRateLimitingRequired() ? "degraded" : "disabled"),
+    redisConfigured: Boolean(client) || Boolean(process.env.REDIS_URL),
+    redisConnected: Boolean(client)
+  });
 }
 
 async function createLimiter({
@@ -186,15 +358,72 @@ async function createLimiter({
   message = null
 }) {
   const resolvedErrorMessage = message || errorMessage;
+  const enabled = isRateLimitingEnabled();
+  const required = isRateLimitingRequired();
 
-  if (process.env.RATE_LIMIT_ENABLED !== "true") {
+  if (!enabled) {
+    markLimiterHealth({
+      available: !required,
+      enabled: false,
+      lastError: required ? "RATE_LIMIT_ENABLED must be true in production" : null,
+      mode: required ? "degraded" : "disabled",
+      redisConfigured: Boolean(process.env.REDIS_URL),
+      redisConnected: Boolean(sharedRedisClient)
+    });
+    if (required) {
+      return buildUnavailableLimiter("Rate limiting is required in production and is not enabled.");
+    }
     return buildUnlimitedLimiter();
   }
 
   const windowSeconds = Math.ceil(windowMs / 1000);
+  if (storeOverride) {
+    markLimiterHealth({
+      available: true,
+      enabled: true,
+      lastError: null,
+      mode: required ? "enforced" : "enabled",
+      redisConfigured: true,
+      redisConnected: true,
+      storeOverrideActive: true
+    });
+    const limiter = buildLimiterInstance({
+      windowMs,
+      max,
+      keyPrefix,
+      keyStrategy,
+      store: storeOverride,
+      skip,
+      errorMessage: resolvedErrorMessage
+    });
+
+    return (req, res, next) => {
+      limiter(req, res, (err) => {
+        if (err) {
+          logError("Rate limiter middleware failed", {
+            endpoint: req.originalUrl || req.path,
+            err: err.message,
+            tier: keyPrefix
+          });
+          if (required) {
+            return buildUnavailableLimiter()(req, res, next);
+          }
+          return next(err);
+        }
+
+        attachHeaders(req, res, windowSeconds).catch(() => {});
+        metrics.increment("rate_limit.allowed", { tier: keyPrefix });
+        return next();
+      });
+    };
+  }
+
   const client = await ensureRedisClient();
-  if (!client && !storeOverride) {
-    logWarn("Rate limiting disabled (Redis unavailable)", { tier: keyPrefix });
+  if (!client) {
+    logWarn("Rate limiting backend unavailable", { tier: keyPrefix });
+    if (required) {
+      return buildUnavailableLimiter("Rate limiting protection is unavailable because Redis is not ready.");
+    }
     return buildUnlimitedLimiter();
   }
 
@@ -217,17 +446,82 @@ async function createLimiter({
 
   return (req, res, next) => {
     limiter(req, res, (err) => {
-      if (!err) {
-        attachHeaders(req, res, windowSeconds).catch(() => {});
-        metrics.increment("rate_limit.allowed", { tier: keyPrefix });
+      if (err) {
+        logError("Rate limiter middleware failed", {
+          endpoint: req.originalUrl || req.path,
+          err: err.message,
+          tier: keyPrefix
+        });
+        markLimiterHealth({
+          available: !required,
+          enabled: true,
+          lastError: err.message,
+          mode: required ? "degraded" : "disabled",
+          redisConfigured: true,
+          redisConnected: false
+        });
+        if (required) {
+          return buildUnavailableLimiter()(req, res, next);
+        }
+        return next(err);
       }
-      next(err);
+
+      attachHeaders(req, res, windowSeconds).catch(() => {});
+      metrics.increment("rate_limit.allowed", { tier: keyPrefix });
+      return next();
     });
+  };
+}
+
+async function initializeRateLimiterProtection() {
+  const enabled = isRateLimitingEnabled();
+  const required = isRateLimitingRequired();
+
+  if (!enabled) {
+    markLimiterHealth({
+      available: !required,
+      enabled: false,
+      lastError: required ? "RATE_LIMIT_ENABLED must be true in production" : null,
+      mode: required ? "degraded" : "disabled",
+      redisConfigured: Boolean(process.env.REDIS_URL),
+      redisConnected: false
+    });
+    if (required) {
+      throw new Error("Rate limiting is required in production but RATE_LIMIT_ENABLED is not true.");
+    }
+    return limiterHealth;
+  }
+
+  const client = await ensureRedisClient();
+  if (!client && required) {
+    throw new Error(limiterHealth.lastError || "Redis is unavailable for rate limiting.");
+  }
+
+  return limiterHealth;
+}
+
+function getRateLimiterHealth() {
+  return { ...limiterHealth };
+}
+
+function resetRateLimiterHealthForTests() {
+  limiterHealth = {
+    available: false,
+    enabled: false,
+    lastError: null,
+    mode: "disabled",
+    redisConfigured: false,
+    redisConnected: false,
+    required: false,
+    updatedAt: null
   };
 }
 
 module.exports = {
   createLimiter,
+  getRateLimiterHealth,
+  initializeRateLimiterProtection,
   metrics,
+  resetRateLimiterHealthForTests,
   setRedisClientOverride
 };

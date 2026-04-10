@@ -9,6 +9,7 @@ const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError } = require("../utils/logger.js");
 const { decrypt } = require("../services/encryptionService.js");
+const { isManagedReceiptPath } = require("../services/receiptStorage.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -464,17 +465,13 @@ router.post("/delete", async (req, res) => {
     const businessId = bizResult.rows[0].id;
 
     // Collect receipt file paths before deleting DB rows.
-    const storageDir = path.resolve(path.join(process.cwd(), "storage", "receipts"));
     const receiptFiles = await client.query(
       "SELECT storage_path FROM receipts WHERE business_id = $1 AND storage_path IS NOT NULL",
       [businessId]
     );
     const storagePaths = receiptFiles.rows
       .map((row) => row.storage_path)
-      .filter((filePath) => {
-        if (!filePath) return false;
-        return path.resolve(filePath).startsWith(storageDir + path.sep);
-      });
+      .filter((filePath) => isManagedReceiptPath(filePath));
 
     // Log the deletion to the audit trail before performing any deletions.
     await client.query(

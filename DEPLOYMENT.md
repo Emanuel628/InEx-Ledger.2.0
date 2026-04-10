@@ -18,10 +18,14 @@ Use this checklist every time you deploy to production to ensure nothing is miss
 - [ ] `APP_BASE_URL` is set to the public app origin, for example `https://inexledger.com`
 - [ ] `FRONTEND_URL` is set when older flows still expect it
 - [ ] `DEFAULT_TRIAL_DAYS` is set as intended (default: 30)
+- [ ] `RATE_LIMIT_ENABLED` is set to `true`
+- [ ] `REDIS_URL` is set to the production Redis instance used for rate limiting
 - [ ] `STRIPE_SECRET_KEY` is set
 - [ ] `STRIPE_PRICE_V1_MONTHLY` is set to the live recurring price id
 - [ ] `STRIPE_WEBHOOK_SECRET` is set from the Stripe webhook endpoint
 - [ ] `STRIPE_API_VERSION` matches the version used by the app
+- [ ] `RECEIPT_STORAGE_DIR` points to the production receipt storage path
+- [ ] `RECEIPT_STORAGE_PERSISTENT` is set to `true` only after the receipt path is backed by persistent storage
 - [ ] `NODE_ENV` is set to `production`
 - [ ] `PORT` is set (default: 8080)
 
@@ -29,8 +33,9 @@ Use this checklist every time you deploy to production to ensure nothing is miss
 - [ ] No `.env` files are committed to the repository
 - [ ] CORS `ALLOWED_ORIGINS` in `server.js` contains only expected production origins
 - [ ] Content Security Policy is enabled and not globally disabled
-- [ ] Rate limiting is configured on all auth endpoints
+- [ ] Rate limiting is enabled and Redis-backed on all authenticated mutation and auth endpoints
 - [ ] Database SSL is enforced (`DB_SSL_REJECT_UNAUTHORIZED=true`)
+- [ ] Receipt storage is not using ephemeral platform disk for production uploads
 
 ### Database
 - [ ] Production database backup has been taken
@@ -55,7 +60,8 @@ Use this checklist every time you deploy to production to ensure nothing is miss
 
 ## Post-Deployment Verification
 
-- [ ] `GET /health` returns `{"status":"healthy"}`
+- [ ] `GET /health` returns `"status":"healthy"` and shows `rateLimiting.mode="enforced"`
+- [ ] `GET /health` shows `receiptStorage.persistentConfirmed=true`
 - [ ] Landing page loads at `/`
 - [ ] Login endpoint responds (does not return 500)
 - [ ] `GET /api/billing/subscription` responds for an authenticated user
