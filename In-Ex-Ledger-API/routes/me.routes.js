@@ -5,7 +5,7 @@ const path = require("path");
 const bcrypt = require("bcrypt");
 const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
-const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { requireAuth } = require("../middleware/auth.middleware.js");
 const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 const { listAssignedCpaGrants, listAccessibleBusinessScopeForUser } = require("../services/cpaAccessService.js");
@@ -297,9 +297,8 @@ router.put("/", async (req, res) => {
   }
 });
 
-router.delete("/", accountDeleteLimiter, requireMfa, async (req, res) => {
+router.delete("/", accountDeleteLimiter, async (req, res) => {
   const { password } = req.body ?? {};
-  const anonymizedEmail = `deleted-${crypto.randomUUID()}@deleted.invalid`;
   const client = await pool.connect();
   let transactionOpen = false;
 
@@ -368,6 +367,8 @@ router.delete("/", accountDeleteLimiter, requireMfa, async (req, res) => {
     );
 
     if (businessIds.length) {
+      // Must delete recurring runs and templates before accounts/categories
+      // because recurring_transactions has ON DELETE RESTRICT on account_id and category_id.
       await client.query(
         "DELETE FROM recurring_transaction_runs WHERE business_id = ANY($1::uuid[])",
         [businessIds]
@@ -382,30 +383,17 @@ router.delete("/", accountDeleteLimiter, requireMfa, async (req, res) => {
       );
     }
 
-    await client.query("DELETE FROM refresh_tokens WHERE user_id = $1", [req.user.id]);
-    await client.query("DELETE FROM mfa_trusted_devices WHERE user_id = $1", [req.user.id]);
-    await client.query("DELETE FROM mfa_email_challenges WHERE user_id = $1", [req.user.id]);
-    await client.query("DELETE FROM email_change_requests WHERE user_id = $1", [req.user.id]);
+    // Delete email-keyed tokens that have no FK to users and won't cascade.
     await client.query("DELETE FROM verification_tokens WHERE email = $1", [userResult.rows[0].email]);
     await client.query("DELETE FROM password_reset_tokens WHERE email = $1", [userResult.rows[0].email]);
 
+    // Hard-delete the user row.  All remaining child rows (refresh_tokens,
+    // mfa_trusted_devices, mfa_email_challenges, email_change_requests,
+    // user_privacy_settings, cpa_access_grants) are removed automatically
+    // via ON DELETE CASCADE foreign keys.
     const result = await client.query(
-      `UPDATE users
-          SET email = $1,
-              password_hash = 'ERASED',
-              email_verified = false,
-              full_name = NULL,
-              display_name = NULL,
-              mfa_enabled = false,
-              mfa_enabled_at = NULL,
-              active_business_id = NULL,
-              country = NULL,
-              province = NULL,
-              is_erased = true,
-              erased_at = NOW()
-        WHERE id = $2
-        RETURNING id`,
-      [anonymizedEmail, req.user.id]
+      "DELETE FROM users WHERE id = $1 RETURNING id",
+      [req.user.id]
     );
 
     if (!result.rowCount) {
