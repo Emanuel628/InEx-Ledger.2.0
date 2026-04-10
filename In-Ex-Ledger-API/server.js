@@ -19,6 +19,7 @@ const { logInfo, logWarn, logError } = require('./utils/logger.js');
 const app = express();
 const publicDir = path.join(process.cwd(), 'public');
 const htmlDir = path.join(publicDir, 'html');
+let globalLimiter = null;
 const htmlPageNames = fs.readdirSync(htmlDir)
   .filter((name) => name.toLowerCase().endsWith('.html'))
   .map((name) => path.basename(name, '.html'));
@@ -161,7 +162,18 @@ app.use(express.static(publicDir, {
 }));
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
-app.use('/api', createGlobalLimiter());
+app.use('/api', (req, res, next) => {
+  const rateLimiting = getRateLimiterHealth();
+  if (rateLimiting.required && !rateLimiting.available) {
+    return res.status(503).json({
+      error: 'Service temporarily unavailable due to rate limiting requirements.'
+    });
+  }
+  if (!globalLimiter) {
+    globalLimiter = createGlobalLimiter();
+  }
+  return globalLimiter(req, res, next);
+});
 
 /* =========================================================
    SYSTEM ROUTES (HEALTH & STATIC)
@@ -282,7 +294,14 @@ function registerShutdownHandlers() {
 
 async function start() {
   initializeReceiptStorage();
-  await initializeRateLimiterProtection();
+  try {
+    await initializeRateLimiterProtection();
+  } catch (err) {
+    logError('Rate limiting initialization failed', {
+      message: err?.message || String(err)
+    });
+    logWarn('Rate limiting is unavailable; API requests will fail closed until restored.');
+  }
   server = app.listen(PORT, '0.0.0.0', () => {
     logInfo(`READY: InEx Ledger API live on port ${PORT}`);
   });
@@ -295,4 +314,3 @@ start().catch((err) => {
   logError('Server startup failed', { message: err?.message || String(err) });
   process.exit(1);
 });
-
