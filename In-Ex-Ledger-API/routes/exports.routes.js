@@ -42,7 +42,7 @@ function validateDateRange(range) {
   return { startDate, endDate };
 }
 
-router.post("/exports/request-grant", exportGrantLimiter, async (req, res) => {
+router.post("/request-grant", exportGrantLimiter, async (req, res) => {
   const sanitizedBody = sanitizePayload(req.body);
   try {
     const user = req.user;
@@ -90,7 +90,7 @@ router.post("/exports/request-grant", exportGrantLimiter, async (req, res) => {
   }
 });
 
-router.post("/exports/generate", exportGrantLimiter, async (req, res) => {
+router.post("/generate", exportGrantLimiter, async (req, res) => {
   const token = req.body?.grantToken;
   if (!token) {
     return res.status(400).json({ error: "grantToken is required." });
@@ -182,7 +182,7 @@ router.post("/exports/generate", exportGrantLimiter, async (req, res) => {
   }
 });
 
-router.get("/exports/history", async (req, res) => {
+router.get("/history", async (req, res) => {
   try {
     const user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
@@ -213,7 +213,7 @@ router.get("/exports/history", async (req, res) => {
   }
 });
 
-router.get("/exports/history/:id/redacted", async (req, res) => {
+router.get("/history/:id/redacted", async (req, res) => {
   try {
     const user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
@@ -244,7 +244,7 @@ router.get("/exports/history/:id/redacted", async (req, res) => {
 // POST /exports/secure-export — single-step secure PDF export for the Secure Export Modal.
 // Accepts an encrypted tax ID (JWE) and date range, generates a PDF, and returns it directly.
 // Sensitive fields (ssn, sin, taxId_jwe) are redacted from all log output.
-router.post("/exports/secure-export", secureExportLimiter, async (req, res) => {
+router.post("/secure-export", secureExportLimiter, async (req, res) => {
   const sanitizedBody = sanitizePayload(req.body);
   try {
     const user = req.user;

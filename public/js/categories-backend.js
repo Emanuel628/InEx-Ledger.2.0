@@ -80,6 +80,7 @@ let categoriesToastTimer = null;
 let categoryRecords = [];
 let currentRegion = null;
 let unattachedReceiptsCount = 0;
+let categoriesServerAvailable = true;
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
@@ -187,11 +188,32 @@ async function loadCategories() {
     }
     categoryRecords = Array.isArray(categories) ? categories.map(normalizeCategory) : [];
     localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categoryRecords));
+    categoriesServerAvailable = true;
   } catch (error) {
     console.error("Failed to load categories:", error);
     categoryRecords = getCategories();
+    categoriesServerAvailable = false;
   }
+  showCategoriesOfflineBanner(!categoriesServerAvailable);
   renderCategoryLists();
+}
+
+function showCategoriesOfflineBanner(show) {
+  let banner = document.getElementById("categoriesOfflineBanner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "categoriesOfflineBanner";
+    banner.className = "offline-banner";
+    const main = document.querySelector("main") || document.body;
+    main.insertBefore(banner, main.firstChild);
+  }
+  banner.hidden = !show;
+  banner.textContent = show ? tx("categories_offline_warning") : "";
+
+  const addButton = document.getElementById("showCategoryModal");
+  if (addButton) {
+    addButton.disabled = show;
+  }
 }
 
 function normalizeCategory(category) {

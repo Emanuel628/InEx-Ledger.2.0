@@ -6,6 +6,7 @@ const MILEAGE_TOAST_MS = 3000;
 let mileageToastTimer = null;
 let mileageRecords = [];
 let unattachedReceiptsCount = 0;
+let mileageServerAvailable = true;
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
@@ -156,12 +157,36 @@ async function loadMileageRecords() {
       unit: entry.km != null ? "km" : "mi"
     }));
     localStorage.setItem(MILEAGE_STORAGE_KEY, JSON.stringify(mileageRecords));
+    mileageServerAvailable = true;
   } catch (error) {
     console.error("Failed to load mileage:", error);
     try {
       mileageRecords = JSON.parse(localStorage.getItem(MILEAGE_STORAGE_KEY) || "[]");
     } catch {
       mileageRecords = [];
+    }
+    mileageServerAvailable = false;
+  }
+  showMileageOfflineBanner(!mileageServerAvailable);
+}
+
+function showMileageOfflineBanner(show) {
+  let banner = document.getElementById("mileageOfflineBanner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "mileageOfflineBanner";
+    banner.className = "offline-banner";
+    const main = document.querySelector("main") || document.body;
+    main.insertBefore(banner, main.firstChild);
+  }
+  banner.hidden = !show;
+  banner.textContent = show ? tx("mileage_offline_warning") : "";
+
+  const form = document.getElementById("mileageForm");
+  if (form) {
+    const submitBtn = form.querySelector("button[type=\"submit\"]");
+    if (submitBtn) {
+      submitBtn.disabled = show;
     }
   }
 }

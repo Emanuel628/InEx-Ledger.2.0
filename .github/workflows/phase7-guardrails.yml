@@ -69,3 +69,6 @@ jobs:
       - name: Verify redacted export storage
         working-directory: In-Ex-Ledger-API
         run: npm run verify:redacted-storage
+
+      - name: Check frontend bundle drift
+        run: node scripts/check-bundle-drift.js

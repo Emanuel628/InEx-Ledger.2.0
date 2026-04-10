@@ -1,11 +1,5 @@
 /**
- * SHARED AUTH CONTRACT
- * This file MUST remain identical in:
- * - In-Ex-Ledger-API/public
- * - In-Ex-Ledger-API/public
- *
- * Do NOT edit in only one bundle.
- * Always apply changes to BOTH.
+ * Register Page JS
  */
 
 /* =========================================================
@@ -87,6 +81,7 @@ async function handleRegisterSubmit(event) {
   const submitButton = form.querySelector("button[type=\"submit\"]");
   const email = document.getElementById("email")?.value.trim() || "";
   const password = document.getElementById("password")?.value || "";
+  const confirmPassword = document.getElementById("confirm-password")?.value || "";
 
   hideRegisterError();
   if (!ensureConsent()) {
@@ -100,6 +95,11 @@ async function handleRegisterSubmit(event) {
 
   if (!isValidEmail(email)) {
     showRegisterError(tx("register_alert_valid_email"));
+    return;
+  }
+
+  if (confirmPassword !== password) {
+    showRegisterError(tx("register_password_match_error"));
     return;
   }
 
