@@ -4,6 +4,27 @@
 
 @import url("/css/pages/login.css");
 
+.password-meter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+
+.password-meter-row .password-meter {
+  flex: 1;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.password-meter-row .password-strength-text {
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
 .password-meter {
   display: flex;
   gap: 4px;
@@ -115,7 +136,7 @@
 
 .consent-required-hint {
   font-size: 11px;
-  color: var(--ink3);
+  color: var(--red);
   margin-top: 4px;
   margin-bottom: 0;
 }

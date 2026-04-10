@@ -36,12 +36,6 @@
         <div class="form-field">
           <label for="password" data-i18n="register_password_label">Password</label>
           <input type="password" id="password" name="password" required autocomplete="new-password" aria-describedby="passwordStrengthText" />
-          <ul class="password-requirements" aria-label="Password requirements">
-            <li data-requirement="length" data-i18n="settings_password_rule_length">At least 8 characters</li>
-            <li data-requirement="uppercase" data-i18n="settings_password_rule_uppercase">Includes an uppercase letter</li>
-            <li data-requirement="number" data-i18n="settings_password_rule_number">Includes a number</li>
-            <li data-requirement="special" data-i18n="settings_password_rule_special">Includes a symbol</li>
-          </ul>
         </div>
 
         <div class="form-field">
@@ -58,16 +52,25 @@
 
         <p id="passwordMatchMessage" class="password-match-message"></p>
 
-        <div class="password-meter" aria-hidden="true">
-          <div class="meter-segment" data-segment="1"></div>
-          <div class="meter-segment" data-segment="2"></div>
-          <div class="meter-segment" data-segment="3"></div>
+        <div class="password-meter-row">
+          <div class="password-meter" aria-hidden="true">
+            <div class="meter-segment" data-segment="1"></div>
+            <div class="meter-segment" data-segment="2"></div>
+            <div class="meter-segment" data-segment="3"></div>
+          </div>
+          <p id="passwordStrengthText" class="password-strength-text"></p>
         </div>
-        <p id="passwordStrengthText" class="password-strength-text"></p>
 
-        <label class="show-password-toggle show-password-switch" data-i18n="register_show_password">
+        <ul class="password-requirements" aria-label="Password requirements">
+          <li data-requirement="length" data-i18n="settings_password_rule_length">At least 8 characters</li>
+          <li data-requirement="uppercase" data-i18n="settings_password_rule_uppercase">Includes an uppercase letter</li>
+          <li data-requirement="number" data-i18n="settings_password_rule_number">Includes a number</li>
+          <li data-requirement="special" data-i18n="settings_password_rule_special">Includes a symbol</li>
+        </ul>
+
+        <label class="show-password-toggle show-password-switch">
           <input type="checkbox" id="togglePassword" />
-          Show password
+          <span data-i18n="register_show_password">Show password</span>
         </label>
 
         <div class="language-field form-field">
