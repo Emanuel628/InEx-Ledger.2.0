@@ -4,6 +4,7 @@ const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -67,7 +68,7 @@ router.get("/", async (req, res) => {
       offset
     });
   } catch (err) {
-    console.error("GET /mileage error:", err.message);
+    logError("GET /mileage error:", err.message);
     res.status(500).json({ error: "Failed to load mileage records." });
   }
 });
@@ -161,7 +162,7 @@ router.post("/", async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("POST /mileage error:", err);
+    logError("POST /mileage error:", err);
     res.status(500).json({ error: "Failed to save mileage record." });
   }
 });
@@ -456,7 +457,7 @@ router.put("/:id", async (req, res) => {
     row.trip_date = row.trip_date ?? row.date ?? null;
     res.json(row);
   } catch (err) {
-    console.error("PUT /mileage/:id error:", err.message);
+    logError("PUT /mileage/:id error:", err.message);
     res.status(500).json({ error: "Failed to update mileage record." });
   }
 });
@@ -479,7 +480,7 @@ router.delete("/:id", async (req, res) => {
     }
     res.json({ message: "Mileage record deleted." });
   } catch (err) {
-    console.error("DELETE /mileage/:id error:", err.message);
+    logError("DELETE /mileage/:id error:", err.message);
     res.status(500).json({ error: "Failed to delete mileage record." });
   }
 });

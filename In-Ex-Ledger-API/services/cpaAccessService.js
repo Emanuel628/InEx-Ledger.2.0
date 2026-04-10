@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const { Resend } = require("resend");
 const { pool } = require("../db.js");
 const { listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 let _resend = null;
 
@@ -452,7 +453,7 @@ async function createCpaGrant(ownerUser, payload, grantIp = null) {
       });
       emailSent = true;
     } catch (emailError) {
-      console.error("CPA invite email failed:", emailError.message);
+      logError("CPA invite email failed:", emailError.message);
     }
 
     return { grantId, emailSent };

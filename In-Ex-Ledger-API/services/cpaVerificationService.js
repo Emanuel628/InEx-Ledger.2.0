@@ -21,6 +21,7 @@
 const crypto = require('crypto');
 const https = require('https');
 const { pool } = require('../db.js');
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const PROVIDER = (process.env.CPA_VERIFICATION_PROVIDER || 'mock').toLowerCase();
 const API_KEY = process.env.CPA_VERIFICATION_API_KEY || '';
@@ -192,7 +193,7 @@ async function logVerificationEvent({ userId, action, metadata }) {
     );
   } catch (err) {
     // Logging failures must never block the main flow
-    console.error('cpaVerificationService: failed to write audit log:', err.message);
+    logError('cpaVerificationService: failed to write audit log:', err.message);
   }
 }
 
@@ -229,7 +230,7 @@ async function verifyCpaLicense(userId, licenseNumber, jurisdiction, ipAddress) 
     }
   } catch (err) {
     apiError = err;
-    console.error(`cpaVerificationService [${PROVIDER}] API failure:`, err.message);
+    logError(`cpaVerificationService [${PROVIDER}] API failure:`, err.message);
 
     await logVerificationEvent({
       userId,

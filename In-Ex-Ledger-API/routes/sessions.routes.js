@@ -4,6 +4,7 @@ const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -36,7 +37,7 @@ router.get("/", async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error("GET /sessions error:", err.message);
+    logError("GET /sessions error:", err.message);
     res.status(500).json({ error: "Failed to load sessions." });
   }
 });
@@ -56,7 +57,7 @@ router.delete("/:id", sessionsMutationLimiter, async (req, res) => {
     }
     res.json({ message: "Session revoked." });
   } catch (err) {
-    console.error("DELETE /sessions/:id error:", err.message);
+    logError("DELETE /sessions/:id error:", err.message);
     res.status(500).json({ error: "Failed to revoke session." });
   }
 });
@@ -73,7 +74,7 @@ router.delete("/", sessionsMutationLimiter, async (req, res) => {
     );
     res.json({ message: "All sessions revoked." });
   } catch (err) {
-    console.error("DELETE /sessions error:", err.message);
+    logError("DELETE /sessions error:", err.message);
     res.status(500).json({ error: "Failed to revoke sessions." });
   }
 });

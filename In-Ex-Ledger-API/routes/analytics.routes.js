@@ -3,6 +3,7 @@ const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const WEEKS_PER_MONTH = 52 / 12;
 const BIWEEKS_PER_MONTH = 26 / 12;
 const MAX_ANALYTICS_AMOUNT = 999999999.99;
@@ -180,7 +181,7 @@ router.get("/dashboard", async (req, res) => {
       }))
     });
   } catch (err) {
-    console.error("GET /analytics/dashboard error:", err);
+    logError("GET /analytics/dashboard error:", err);
     res.status(500).json({ error: "Failed to load dashboard analytics." });
   }
 });
@@ -315,7 +316,7 @@ router.get("/cash-flow", async (req, res) => {
       projections
     });
   } catch (err) {
-    console.error("GET /analytics/cash-flow error:", err);
+    logError("GET /analytics/cash-flow error:", err);
     res.status(500).json({ error: "Failed to load cash flow projection." });
   }
 });
@@ -388,7 +389,7 @@ router.get("/seasonal", async (req, res) => {
       insights
     });
   } catch (err) {
-    console.error("GET /analytics/seasonal error:", err);
+    logError("GET /analytics/seasonal error:", err);
     res.status(500).json({ error: "Failed to load seasonal analysis." });
   }
 });
@@ -530,7 +531,7 @@ router.post("/whatif", async (req, res) => {
       messages
     });
   } catch (err) {
-    console.error("POST /analytics/whatif error:", err);
+    logError("POST /analytics/whatif error:", err);
     res.status(500).json({ error: "Failed to compute what-if scenario." });
   }
 });

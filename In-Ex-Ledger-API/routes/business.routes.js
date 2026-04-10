@@ -8,6 +8,7 @@ const {
   saveAccountingLockState
 } = require("../services/accountingLockService.js");
 const { encryptTaxId, decryptTaxId } = require("../services/taxIdService.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -81,7 +82,7 @@ router.get("/", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     res.json(await fetchBusinessRow(businessId));
   } catch (err) {
-    console.error("GET /business error:", err.message);
+    logError("GET /business error:", err.message);
     res.status(500).json({ error: err.message || "Failed to load business profile." });
   }
 });
@@ -146,7 +147,7 @@ router.put("/", async (req, res) => {
     });
     res.json(updated);
   } catch (err) {
-    console.error("PUT /business error:", err.message);
+    logError("PUT /business error:", err.message);
     res.status(500).json({ error: err.message || "Failed to update business profile." });
   }
 });
@@ -157,7 +158,7 @@ router.get("/accounting-lock", async (req, res) => {
     const lock = await loadAccountingLockState(pool, businessId);
     res.json({ lock });
   } catch (err) {
-    console.error("GET /business/accounting-lock error:", err.message);
+    logError("GET /business/accounting-lock error:", err.message);
     res.status(500).json({ error: err.message || "Failed to load accounting lock." });
   }
 });
@@ -177,7 +178,7 @@ router.put("/accounting-lock", async (req, res) => {
     if (err.message === "Date value is invalid.") {
       return res.status(400).json({ error: "locked_through_date must be a valid date." });
     }
-    console.error("PUT /business/accounting-lock error:", err.message);
+    logError("PUT /business/accounting-lock error:", err.message);
     res.status(500).json({ error: err.message || "Failed to update accounting lock." });
   }
 });

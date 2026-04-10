@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
   resolveBusinessIdForUser,
   getBusinessScopeForUser
@@ -31,7 +32,7 @@ router.get("/", async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error("GET accounts error:", err.message);
+    logError("GET accounts error:", err.message);
     res.status(500).json({ error: "Failed to retrieve accounts from DB." });
   }
 });
@@ -64,7 +65,7 @@ router.post("/", async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    console.error("POST account error:", err.message);
+    logError("POST account error:", err.message);
     if (err.code === "23505") {
       return res.status(409).json({
         error: "An account with this name already exists."
@@ -116,7 +117,7 @@ router.put("/:id", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("PUT account error:", err.message);
+    logError("PUT account error:", err.message);
     if (err.code === "23505") {
       return res.status(409).json({
         error: "An account with this name already exists."
@@ -167,7 +168,7 @@ router.delete("/:id", async (req, res) => {
 
     res.json({ message: "Account deleted successfully." });
   } catch (err) {
-    console.error("DELETE account error:", err.message);
+    logError("DELETE account error:", err.message);
     res.status(500).json({ error: "Delete failed." });
   }
 });

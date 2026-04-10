@@ -10,6 +10,7 @@ const {
   createBusinessForUser
 } = require("../api/utils/resolveBusinessIdForUser.js");
 const { decryptTaxId } = require("../services/taxIdService.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -46,7 +47,7 @@ router.get("/", async (req, res) => {
       businesses
     });
   } catch (err) {
-    console.error("GET /businesses error:", err.message);
+    logError("GET /businesses error:", err.message);
     res.status(500).json({ error: "Failed to load businesses." });
   }
 });
@@ -75,7 +76,7 @@ router.get("/:id/profile", async (req, res) => {
     const row = result.rows[0];
     res.json({ ...row, tax_id: decryptTaxId(row.tax_id) });
   } catch (err) {
-    console.error("GET /businesses/:id/profile error:", err.message);
+    logError("GET /businesses/:id/profile error:", err.message);
     res.status(500).json({ error: "Failed to load business profile." });
   }
 });
@@ -98,7 +99,7 @@ router.post("/", async (req, res) => {
       businesses
     });
   } catch (err) {
-    console.error("POST /businesses error:", err.message);
+    logError("POST /businesses error:", err.message);
     res.status(500).json({ error: "Failed to create business." });
   }
 });
@@ -120,7 +121,7 @@ router.post("/:id/activate", async (req, res) => {
       businesses
     });
   } catch (err) {
-    console.error("POST /businesses/:id/activate error:", err.message);
+    logError("POST /businesses/:id/activate error:", err.message);
     res.status(500).json({ error: "Failed to switch business." });
   }
 });
@@ -218,7 +219,7 @@ router.delete("/:id", businessDeleteLimiter, requireMfa, async (req, res) => {
     const businesses = await listBusinessesForUser(req.user.id);
     res.status(200).json({ message: "Business deleted.", businesses });
   } catch (err) {
-    console.error("DELETE /businesses/:id error:", err.message);
+    logError("DELETE /businesses/:id error:", err.message);
     res.status(500).json({ error: "Failed to delete business." });
   }
 });

@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const DEFAULT_JWT_EXPIRY_SECONDS = Number(process.env.JWT_EXPIRY_SECONDS) || 15 * 60;
@@ -74,7 +75,7 @@ function requireAuth(req, res, next) {
   try {
     req.user = verifyToken(token);
   } catch (err) {
-    console.warn(`Auth rejected [${req.method} ${req.path}]: ${err.message}`);
+    logWarn(`Auth rejected [${req.method} ${req.path}]: ${err.message}`);
     return res.status(401).json({ error: "Authentication required" });
   }
 

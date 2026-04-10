@@ -12,6 +12,7 @@
 const express = require('express');
 const { requireAuth, requireMfa } = require('../middleware/auth.middleware.js');
 const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js');
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
   verifyCpaLicense,
   getCpaVerificationStatus
@@ -58,7 +59,7 @@ router.post('/verify', verifyLimiter, async (req, res) => {
   } catch (error) {
     const message = error?.message || 'Licence verification failed.';
     const status = /required/i.test(message) ? 400 : 503;
-    console.error('POST /api/cpa-verification/verify error:', message);
+    logError('POST /api/cpa-verification/verify error:', message);
     res.status(status).json({ error: message });
   }
 });
@@ -76,7 +77,7 @@ router.get('/status', async (req, res) => {
     }
     res.json(verificationStatus);
   } catch (error) {
-    console.error('GET /api/cpa-verification/status error:', error.message);
+    logError('GET /api/cpa-verification/status error:', error.message);
     res.status(500).json({ error: 'Failed to load verification status.' });
   }
 });

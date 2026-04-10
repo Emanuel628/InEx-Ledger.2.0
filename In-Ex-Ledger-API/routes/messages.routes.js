@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -49,7 +50,7 @@ router.get("/unread-count", async (req, res) => {
     );
     res.json({ count: result.rows[0]?.count ?? 0 });
   } catch (err) {
-    console.error("GET /messages/unread-count error:", err.message);
+    logError("GET /messages/unread-count error:", err.message);
     res.status(500).json({ error: "Failed to fetch unread count." });
   }
 });
@@ -110,7 +111,7 @@ router.get("/contacts", async (req, res) => {
       }))
     });
   } catch (err) {
-    console.error("GET /messages/contacts error:", err.message);
+    logError("GET /messages/contacts error:", err.message);
     res.status(500).json({ error: "Failed to fetch contacts." });
   }
 });
@@ -141,7 +142,7 @@ router.get("/inbox", async (req, res) => {
 
     res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
   } catch (err) {
-    console.error("GET /messages/inbox error:", err.message);
+    logError("GET /messages/inbox error:", err.message);
     res.status(500).json({ error: "Failed to fetch inbox." });
   }
 });
@@ -172,7 +173,7 @@ router.get("/sent", async (req, res) => {
 
     res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
   } catch (err) {
-    console.error("GET /messages/sent error:", err.message);
+    logError("GET /messages/sent error:", err.message);
     res.status(500).json({ error: "Failed to fetch sent messages." });
   }
 });
@@ -216,7 +217,7 @@ router.get("/:id", async (req, res) => {
 
     res.json({ message: mapMessageRow(msg, req.user.id) });
   } catch (err) {
-    console.error("GET /messages/:id error:", err.message);
+    logError("GET /messages/:id error:", err.message);
     res.status(500).json({ error: "Failed to fetch message." });
   }
 });
@@ -308,7 +309,7 @@ router.post("/", async (req, res) => {
 
     res.status(201).json({ message: mapMessageRow(rows[0], req.user.id) });
   } catch (err) {
-    console.error("POST /messages error:", err.message);
+    logError("POST /messages error:", err.message);
     res.status(500).json({ error: "Failed to send message." });
   }
 });
@@ -332,7 +333,7 @@ router.patch("/:id/read", async (req, res) => {
 
     res.json({ success: true, id: result.rows[0].id, is_read: true });
   } catch (err) {
-    console.error("PATCH /messages/:id/read error:", err.message);
+    logError("PATCH /messages/:id/read error:", err.message);
     res.status(500).json({ error: "Failed to mark message as read." });
   }
 });
@@ -374,7 +375,7 @@ router.patch("/:id/archive", async (req, res) => {
       res.json({ success: true, archived: next });
     }
   } catch (err) {
-    console.error("PATCH /messages/:id/archive error:", err.message);
+    logError("PATCH /messages/:id/archive error:", err.message);
     res.status(500).json({ error: "Failed to archive message." });
   }
 });
@@ -400,7 +401,7 @@ router.patch("/:id/resolve", async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("PATCH /messages/:id/resolve error:", err.message);
+    logError("PATCH /messages/:id/resolve error:", err.message);
     res.status(500).json({ error: "Failed to resolve message." });
   }
 });
@@ -438,7 +439,7 @@ router.delete("/:id", async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("DELETE /messages/:id error:", err.message);
+    logError("DELETE /messages/:id error:", err.message);
     res.status(500).json({ error: "Failed to delete message." });
   }
 });

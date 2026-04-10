@@ -11,6 +11,7 @@ const { getSubscriptionSnapshotForBusiness } = require("../services/subscription
 const { listAssignedCpaGrants, listAccessibleBusinessScopeForUser } = require("../services/cpaAccessService.js");
 const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 
@@ -89,7 +90,7 @@ router.get("/", async (req, res) => {
       subscription
     });
   } catch (err) {
-    console.error("GET /me error:", err.message);
+    logError("GET /me error:", err.message);
     res.status(500).json({ error: "Failed to load profile." });
   }
 });
@@ -110,7 +111,7 @@ router.get("/onboarding", async (req, res) => {
 
     return res.status(200).json(normalizeOnboardingPayload(result.rows[0]));
   } catch (err) {
-    console.error("GET /me/onboarding error:", err.message);
+    logError("GET /me/onboarding error:", err.message);
     return res.status(500).json({ error: "Failed to load onboarding state." });
   }
 });
@@ -219,7 +220,7 @@ router.put("/onboarding", async (req, res) => {
       client.release();
     }
   } catch (err) {
-    console.error("PUT /me/onboarding error:", err.message);
+    logError("PUT /me/onboarding error:", err.message);
     return res.status(500).json({ error: "Failed to save onboarding." });
   }
 });
@@ -251,7 +252,7 @@ router.post("/onboarding/tour", async (req, res) => {
 
     return res.status(200).json({ success: true, tour_seen: nextState });
   } catch (err) {
-    console.error("POST /me/onboarding/tour error:", err.message);
+    logError("POST /me/onboarding/tour error:", err.message);
     return res.status(500).json({ error: "Failed to update onboarding tour state." });
   }
 });
@@ -264,7 +265,7 @@ router.post("/onboarding/replay", async (req, res) => {
     );
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error("POST /me/onboarding/replay error:", err.message);
+    logError("POST /me/onboarding/replay error:", err.message);
     return res.status(500).json({ error: "Failed to reset onboarding tips." });
   }
 });
@@ -292,7 +293,7 @@ router.put("/", async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (err) {
-    console.error("PUT /me error:", err.message);
+    logError("PUT /me error:", err.message);
     res.status(500).json({ error: "Failed to update profile." });
   }
 });
@@ -411,7 +412,7 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
           await fs.promises.unlink(filePath);
         } catch (unlinkErr) {
           if (unlinkErr.code !== "ENOENT") {
-            console.error("DELETE /me: failed to unlink receipt file:", filePath, unlinkErr);
+            logError("DELETE /me: failed to unlink receipt file:", filePath, unlinkErr);
           }
         }
       })
@@ -423,7 +424,7 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
     if (transactionOpen) {
       await client.query("ROLLBACK");
     }
-    console.error("DELETE /me error:", err.message);
+    logError("DELETE /me error:", err.message);
     res.status(500).json({ error: "Failed to delete account." });
   } finally {
     client.release();

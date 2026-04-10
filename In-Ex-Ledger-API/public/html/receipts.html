@@ -107,9 +107,9 @@
     <span id="receiptsToastMessage" data-i18n="receipts_uploaded_success">Receipt uploaded</span>
   </div>
 
-  <div id="receiptLinkModal" class="receipt-modal hidden">
+  <div id="receiptLinkModal" class="receipt-modal hidden" role="dialog" aria-modal="true" aria-labelledby="receiptLinkModalTitle">
     <div class="receipt-modal-card">
-      <h3 data-i18n="receipts_link_title">Link receipt</h3>
+      <h3 id="receiptLinkModalTitle" data-i18n="receipts_link_title">Link receipt</h3>
       <p data-i18n="receipts_link_body">Choose the transaction this receipt belongs to. You can also clear the link.</p>
       <select id="receiptLinkSelect" class="receipt-link-select">
         <option value="" data-i18n="receipts_not_attached">Not attached</option>

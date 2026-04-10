@@ -10,6 +10,7 @@ const {
   getBusinessScopeForUser
 } = require("../api/utils/resolveBusinessIdForUser.js");
 const { pool } = require("../db.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
@@ -100,7 +101,7 @@ function safeUnlink(filePath) {
   try {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   } catch (err) {
-    console.error("Failed to delete file:", filePath, err);
+    logError("Failed to delete file:", filePath, err);
   }
 }
 
@@ -146,7 +147,7 @@ router.get("/", async (req, res) => {
 
     return res.status(200).json(result.rows || []);
   } catch (err) {
-    console.error("Receipts load error:", err);
+    logError("Receipts load error:", err);
     return res.status(500).json({
       error: "Failed to load receipts"
     });
@@ -201,7 +202,7 @@ router.post("/", upload.single("receipt"), async (req, res) => {
       url: `/api/receipts/${receiptId}`
     });
   } catch (err) {
-    console.error("POST /receipts error:", err);
+    logError("POST /receipts error:", err);
 
     // Orphan cleanup
     safeUnlink(req.file?.path);
@@ -258,7 +259,7 @@ router.patch("/:id/attach", async (req, res) => {
 
     return res.json(result.rows[0]);
   } catch (err) {
-    console.error("PATCH /receipts/:id/attach error:", err);
+    logError("PATCH /receipts/:id/attach error:", err);
     return res.status(500).json({
       error: "Failed to update receipt attachment."
     });
@@ -302,7 +303,7 @@ router.get("/:id", async (req, res) => {
 
     return res.sendFile(storage_path);
   } catch (err) {
-    console.error("GET /receipts/:id error:", err);
+    logError("GET /receipts/:id error:", err);
     return res.status(500).json({ error: "Failed to load receipt." });
   }
 });
@@ -363,16 +364,16 @@ router.delete("/:id", async (req, res) => {
     try {
       await client.query("ROLLBACK");
     } catch (rollbackErr) {
-      console.error("DELETE /receipts/:id rollback error:", rollbackErr);
+      logError("DELETE /receipts/:id rollback error:", rollbackErr);
     }
     if (movedToPending && pendingDeletePath && storagePath && fs.existsSync(pendingDeletePath)) {
       try {
         fs.renameSync(pendingDeletePath, storagePath);
       } catch (restoreErr) {
-        console.error("Failed to restore receipt after delete error:", restoreErr);
+        logError("Failed to restore receipt after delete error:", restoreErr);
       }
     }
-    console.error("DELETE /receipts/:id error:", err);
+    logError("DELETE /receipts/:id error:", err);
     return res.status(500).json({ error: "Failed to delete receipt." });
   } finally {
     client.release();

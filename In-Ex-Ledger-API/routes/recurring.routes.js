@@ -4,6 +4,7 @@ const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
   RecurringTemplateValidationError,
   normalizeRecurringPayload,
@@ -34,7 +35,7 @@ router.get("/", async (req, res) => {
 
     res.json(result.rows.map(mapRecurringRow));
   } catch (err) {
-    console.error("GET /recurring error:", err);
+    logError("GET /recurring error:", err);
     res.status(500).json({ error: "Failed to load recurring transactions." });
   }
 });
@@ -91,7 +92,7 @@ router.post("/", async (req, res) => {
     res.status(201).json(mapRecurringRow(refreshed.rows[0]));
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("POST /recurring error:", err);
+    logError("POST /recurring error:", err);
     const statusCode = err instanceof RecurringTemplateValidationError ? err.statusCode : 500;
     res.status(statusCode).json({
       error: err.message || "Failed to create recurring transaction."
@@ -171,7 +172,7 @@ router.put("/:id", async (req, res) => {
     res.json(mapRecurringRow(result.rows[0]));
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("PUT /recurring/:id error:", err);
+    logError("PUT /recurring/:id error:", err);
     const statusCode = err instanceof RecurringTemplateValidationError ? err.statusCode : 500;
     res.status(statusCode).json({
       error: err.message || "Failed to update recurring transaction."
@@ -202,7 +203,7 @@ router.patch("/:id/status", async (req, res) => {
 
     res.json(mapRecurringRow(result.rows[0]));
   } catch (err) {
-    console.error("PATCH /recurring/:id/status error:", err);
+    logError("PATCH /recurring/:id/status error:", err);
     res.status(500).json({ error: "Failed to update recurring status." });
   }
 });
@@ -231,7 +232,7 @@ router.post("/:id/run", async (req, res) => {
       recurring: mapRecurringRow(template.rows[0])
     });
   } catch (err) {
-    console.error("POST /recurring/:id/run error:", err);
+    logError("POST /recurring/:id/run error:", err);
     const statusCode = err instanceof RecurringTemplateValidationError ? err.statusCode : 500;
     res.status(statusCode).json({
       error: err.message || "Failed to post recurring transaction."
@@ -253,7 +254,7 @@ router.delete("/:id", async (req, res) => {
 
     res.json({ message: "Recurring transaction deleted." });
   } catch (err) {
-    console.error("DELETE /recurring/:id error:", err);
+    logError("DELETE /recurring/:id error:", err);
     res.status(500).json({ error: "Failed to delete recurring transaction." });
   }
 });
