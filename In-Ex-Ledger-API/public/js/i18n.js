@@ -167,6 +167,12 @@ function applyTranslations(languageOverride) {
   window.LUNA_LANGUAGE = language;
   localStorage.setItem('lb_language', language);
 
+  // Update the document language attribute so screen readers announce the
+  // correct language when the user switches between en / es / fr.
+  if (document.documentElement) {
+    document.documentElement.lang = language;
+  }
+
   const nodes = document.querySelectorAll('[data-i18n]');
   nodes.forEach((node) => {
     if (node.id === 'passwordMatchMessage') {
@@ -316,6 +322,7 @@ const TRANSLATIONS = {
     nav_pricing: 'Pricing',
     nav_sign_in: 'Sign in',
     nav_create_account: 'Create account',
+    a11y_skip_to_main: 'Skip to main content',
     landing_hero_title: 'Track your 1099 money without the headache',
     landing_hero_title_us: 'Track your 1099 money without the headache',
     landing_hero_title_ca: 'Track your self-employed income without the headache',
@@ -582,6 +589,8 @@ const TRANSLATIONS = {
     login_error_generic: 'Login failed. Please try again.',
     login_error_offline: 'Unable to reach server. Check your connection and try again.',
     login_error_expired: 'Your session expired. Please log in again.',
+    login_error_invalid_credentials: 'Invalid email or password.',
+    common_error_too_many_attempts: 'Too many attempts. Please try again later.',
     login_success_verified: 'Email verified. You can sign in now.',
     login_success_email_changed: 'Email updated. Please sign in with your new address.',
     region_us: 'United States',
@@ -1364,6 +1373,7 @@ const TRANSLATIONS = {
     nav_pricing: 'Precios',
     nav_sign_in: 'Iniciar sesión',
     nav_create_account: 'Crear cuenta',
+    a11y_skip_to_main: 'Saltar al contenido principal',
     landing_hero_title: 'Controla tu dinero 1099 sin dolor de cabeza',
     landing_hero_title_us: 'Controla tu dinero 1099 sin dolor de cabeza',
     landing_hero_title_ca: 'Controla tus ingresos como trabajador autónomo sin dolor de cabeza',
@@ -1626,6 +1636,15 @@ const TRANSLATIONS = {
     register_password_requirements_error: 'La contraseña no cumple todos los requisitos.',
     register_error_email_exists: 'Ya existe una cuenta con este correo electrónico.',
     register_consent_required: 'Obligatorio: Debes aceptar los Términos y la Política de privacidad.',
+    register_error_missing_fields: 'Ingresa un correo y una contraseña.',
+    login_error_missing_fields: 'Ingresa tu correo y contraseña.',
+    login_error_generic: 'Error al iniciar sesión. Inténtalo de nuevo.',
+    login_error_offline: 'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.',
+    login_error_expired: 'Tu sesión expiró. Inicia sesión de nuevo.',
+    login_success_verified: 'Correo verificado. Ya puedes iniciar sesión.',
+    login_success_email_changed: 'Correo actualizado. Inicia sesión con tu nueva dirección.',
+    login_error_invalid_credentials: 'Correo electrónico o contraseña incorrectos.',
+    common_error_too_many_attempts: 'Demasiados intentos. Por favor, inténtalo de nuevo más tarde.',
     region_us: 'Estados Unidos',
     region_ca: 'Canadá',
     transactions_hero_title: 'Estimación de impuestos adeudados (YTD)',
@@ -2395,6 +2414,7 @@ const TRANSLATIONS = {
     nav_pricing: 'Tarifs',
     nav_sign_in: 'Connexion',
     nav_create_account: 'Créer un compte',
+    a11y_skip_to_main: 'Aller au contenu principal',
     landing_hero_title: 'Suivez votre argent 1099 sans stress',
     landing_hero_title_us: 'Suivez votre argent 1099 sans stress',
     landing_hero_title_ca: 'Suivez vos revenus de travail autonome sans stress',
@@ -2665,6 +2685,8 @@ const TRANSLATIONS = {
     login_error_expired: 'Votre session a expiré. Veuillez vous reconnecter.',
     login_success_verified: 'Courriel vérifié. Vous pouvez maintenant vous connecter.',
     login_success_email_changed: 'Courriel mis à jour. Connectez-vous avec votre nouvelle adresse.',
+    login_error_invalid_credentials: 'Adresse courriel ou mot de passe incorrect.',
+    common_error_too_many_attempts: 'Trop de tentatives. Veuillez réessayer plus tard.',
     region_us: 'États-Unis',
     region_ca: 'Canada',
     transactions_hero_title: 'Impôt estimé dû (YTD)',

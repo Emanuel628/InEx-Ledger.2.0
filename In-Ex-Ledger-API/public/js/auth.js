@@ -301,15 +301,15 @@ function authHeader() {
 function mapAuthError(status, apiError) {
   const errorMessage = typeof apiError === "string" ? apiError : apiError?.error;
   if (status === 401) {
-    return "Invalid email or password.";
+    return typeof t === "function" ? t("login_error_invalid_credentials") : "Invalid email or password.";
   }
   if (status === 409) {
     return typeof t === "function" ? t("register_error_email_exists") : "An account with this email already exists.";
   }
   if (status === 429) {
-    return errorMessage || "Too many attempts. Try again later.";
+    return typeof t === "function" ? t("common_error_too_many_attempts") : (errorMessage || "Too many attempts. Try again later.");
   }
-  return errorMessage || "Something went wrong. Please try again.";
+  return errorMessage || (typeof t === "function" ? t("common_error") : "Something went wrong. Please try again.");
 }
 
 async function requireValidSessionOrRedirect() {
