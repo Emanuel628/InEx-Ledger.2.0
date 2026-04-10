@@ -85,6 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Re-run dynamic text updates when language changes
   window.addEventListener("lunaLanguageChanged", () => {
     updateStrengthMeter();
+    updateRequirementItems();
     updateMatchMessage();
   });
 });
@@ -209,6 +210,9 @@ function meetsPasswordRequirements(password) {
 function calculatePasswordScore(password) {
   let score = 0;
 
+  // Each criterion builds on the previous: length is the baseline,
+  // uppercase + digit indicate moderate complexity, and a special
+  // character completes the backend-required "strong" password set.
   if (password.length >= 8) score++;
   if (score > 0 && /[A-Z]/.test(password) && /\d/.test(password)) score++;
   if (score > 1 && SPECIAL_CHAR_RE.test(password)) score++;
