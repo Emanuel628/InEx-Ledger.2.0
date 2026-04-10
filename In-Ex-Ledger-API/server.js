@@ -166,7 +166,7 @@ app.use('/api', (req, res, next) => {
   const rateLimiting = getRateLimiterHealth();
   if (rateLimiting.required && !rateLimiting.available) {
     return res.status(503).json({
-      error: 'Rate limiting service unavailable. Please try again later.'
+      error: 'Service temporarily unavailable due to rate limiting requirements.'
     });
   }
   if (!globalLimiter) {
@@ -300,6 +300,7 @@ async function start() {
     logError('Rate limiting initialization failed', {
       message: err?.message || String(err)
     });
+    logWarn('Rate limiting is unavailable; API requests will fail closed until restored.');
   }
   server = app.listen(PORT, '0.0.0.0', () => {
     logInfo(`READY: InEx Ledger API live on port ${PORT}`);
