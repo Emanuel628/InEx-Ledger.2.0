@@ -182,7 +182,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
   }
 });
 
-router.get("/history", async (req, res) => {
+router.get("/history", exportGrantLimiter, async (req, res) => {
   try {
     const user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
@@ -213,7 +213,7 @@ router.get("/history", async (req, res) => {
   }
 });
 
-router.get("/history/:id/redacted", async (req, res) => {
+router.get("/history/:id/redacted", exportGrantLimiter, async (req, res) => {
   try {
     const user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
