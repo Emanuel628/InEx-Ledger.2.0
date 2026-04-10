@@ -53,6 +53,16 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       persistRegionAndLanguage();
     });
+
+    // Initialize province field visibility based on the default country selection
+    const provinceField = document.getElementById("provinceField");
+    if (provinceField) {
+      if (countrySelect.value === "CA") {
+        provinceField.removeAttribute("hidden");
+      } else {
+        provinceField.setAttribute("hidden", "");
+      }
+    }
   }
   persistRegionAndLanguage();
 
