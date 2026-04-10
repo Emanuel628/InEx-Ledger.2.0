@@ -60,6 +60,16 @@ function sendCanonicalPage(pageName, req, res) {
   res.sendFile(filePath);
 }
 
+function requireRateLimiterAvailability(req, res, next) {
+  const rateLimiting = getRateLimiterHealth();
+  if (rateLimiting.required && !rateLimiting.available) {
+    return res.status(503).json({
+      error: 'Rate limiting is required in production and is not available.'
+    });
+  }
+  return next();
+}
+
 /* =========================================================
    CORS & SECURITY CONFIGURATION
    ========================================================= */
@@ -161,6 +171,7 @@ app.use(express.static(publicDir, {
 }));
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
+app.use('/api', requireRateLimiterAvailability);
 app.use('/api', createGlobalLimiter());
 
 /* =========================================================
