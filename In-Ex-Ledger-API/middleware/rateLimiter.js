@@ -420,10 +420,42 @@ async function createLimiter({
 
   const client = await ensureRedisClient();
   if (!client) {
-    logWarn("Rate limiting backend unavailable", { tier: keyPrefix });
     if (required) {
-      return buildUnavailableLimiter("Rate limiting protection is unavailable because Redis is not ready.");
+      logWarn("Redis unavailable; rate limiting will use in-memory store", { tier: keyPrefix });
+      markLimiterHealth({
+        available: true,
+        enabled: true,
+        lastError: "Redis unavailable; rate limiting using in-memory store",
+        mode: "enforced",
+        redisConfigured: Boolean(process.env.REDIS_URL),
+        redisConnected: false
+      });
+      const inMemoryLimiter = buildLimiterInstance({
+        windowMs,
+        max,
+        keyPrefix,
+        keyStrategy,
+        store: undefined,
+        skip,
+        errorMessage: resolvedErrorMessage
+      });
+      return (req, res, next) => {
+        inMemoryLimiter(req, res, (err) => {
+          if (err) {
+            logError("Rate limiter middleware failed", {
+              endpoint: req.originalUrl || req.path,
+              err: err.message,
+              tier: keyPrefix
+            });
+            return buildUnavailableLimiter()(req, res, next);
+          }
+          attachHeaders(req, res, windowSeconds).catch(() => {});
+          metrics.increment("rate_limit.allowed", { tier: keyPrefix });
+          return next();
+        });
+      };
     }
+    logWarn("Rate limiting backend unavailable", { tier: keyPrefix });
     return buildUnlimitedLimiter();
   }
 
@@ -493,8 +525,19 @@ async function initializeRateLimiterProtection() {
   }
 
   const client = await ensureRedisClient();
-  if (!client && required) {
-    throw new Error(limiterHealth.lastError || "Redis is unavailable for rate limiting.");
+  if (!client) {
+    logWarn("Redis unavailable; rate limiting will use in-memory store per limiter", {
+      redisConfigured: Boolean(process.env.REDIS_URL)
+    });
+    markLimiterHealth({
+      available: true,
+      enabled: true,
+      lastError: "Redis unavailable; rate limiting using in-memory store",
+      mode: required ? "enforced" : "enabled",
+      redisConfigured: Boolean(process.env.REDIS_URL),
+      redisConnected: false
+    });
+    return limiterHealth;
   }
 
   return limiterHealth;

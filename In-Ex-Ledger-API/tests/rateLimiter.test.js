@@ -87,7 +87,7 @@ test("user-scoped limiter enforces authenticated windows", async () => {
   await request(app).get("/").expect(429);
 });
 
-test("production limiter fails closed when Redis is unavailable", async () => {
+test("production limiter uses in-memory store when Redis is unavailable", async () => {
   process.env.NODE_ENV = "production";
   process.env.RATE_LIMIT_ENABLED = "true";
   delete process.env.REDIS_URL;
@@ -98,11 +98,12 @@ test("production limiter fails closed when Redis is unavailable", async () => {
   });
   const app = createApp(limiter);
 
-  const response = await request(app).get("/").expect(503);
-  assert.match(response.body.error, /rate limiting/i);
+  const first = await request(app).get("/").expect(200);
+  assert.ok(first.body.ok);
+  await request(app).get("/").expect(429);
   const health = getRateLimiterHealth();
-  assert.strictEqual(health.mode, "degraded");
-  assert.strictEqual(health.available, false);
+  assert.strictEqual(health.mode, "enforced");
+  assert.strictEqual(health.available, true);
 });
 
 test("Retry-After header appears on 429 responses", async () => {
