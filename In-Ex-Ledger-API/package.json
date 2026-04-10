@@ -17,7 +17,9 @@
     "test:receipt-storage": "node --test tests/receiptStorage.test.js",
     "test:rate-limiter": "node --test tests/rateLimiter.test.js",
     "test:subscription-service": "node --test tests/subscriptionService.test.js",
-    "test:accounting-controls": "node --test tests/accountingControls.test.js"
+    "test:accounting-controls": "node --test tests/accountingControls.test.js",
+    "test:auth-flows": "node --test tests/authFlows.test.js",
+    "test:critical-flows": "node --test tests/criticalFlows.test.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
