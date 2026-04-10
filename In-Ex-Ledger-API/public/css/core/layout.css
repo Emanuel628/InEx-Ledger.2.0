@@ -379,6 +379,8 @@ body[data-theme="light"] select option {
 }
 
 .user-pill {
+  display: flex !important;
+  align-items: center !important;
   gap: 8px !important;
   padding: 5px 10px 5px 6px !important;
   border-radius: 20px !important;
