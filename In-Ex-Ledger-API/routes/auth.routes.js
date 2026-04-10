@@ -1121,15 +1121,33 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
 
       await sendAppEmail({
         to: email,
-        subject: "Password Reset Request",
+        subject: "Reset your InEx Ledger password",
         html: `
-          <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px;">
-            <h2>Reset your InEx Ledger password</h2>
-            <p>Use the button below to choose a new password. This link will expire soon.</p>
-            <a href="${resetLink}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 4px;">Reset password</a>
-            <p style="margin-top: 20px; font-size: 12px; color: #666;">If you did not request this, you can ignore this email.</p>
+          <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
+            <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
+              <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger security</div>
+              <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">Reset your password</h1>
+            </div>
+            <div style="padding: 28px;">
+              <p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">
+                We received a request to reset the password for your InEx Ledger account. Click the button below to choose a new password.
+              </p>
+              <div style="margin: 24px 0;">
+                <a href="${resetLink}" style="display: inline-block; padding: 14px 22px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700;">
+                  Reset password
+                </a>
+              </div>
+              <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">
+                This link expires in 20 minutes. If the button does not work, copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${resetLink}</p>
+              <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">
+                If you did not request a password reset, you can safely ignore this email.
+              </p>
+            </div>
           </div>
-        `
+        `,
+        text: `Reset your InEx Ledger password\n\nWe received a request to reset the password for your account. Use this link to choose a new password:\n${resetLink}\n\nThis link expires in 20 minutes.\n\nIf you did not request a password reset, you can safely ignore this email.`
       });
 
     }
@@ -1207,14 +1225,33 @@ router.post("/request-email-change", requireAuth, authLimiter, async (req, res) 
     const confirmLink = `${getAppBaseUrl(req)}/api/auth/confirm-email-change?token=${token}`;
     await sendAppEmail({
       to: email,
-      subject: "Confirm your new email address",
+      subject: "Confirm your new InEx Ledger email address",
       html: `
-        <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px;">
-          <h2>Confirm your new email address</h2>
-          <p>Click below to confirm this email change for your InEx Ledger account.</p>
-          <a href="${confirmLink}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 4px;">Confirm email change</a>
+        <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
+          <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
+            <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger account</div>
+            <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">Confirm your new email</h1>
+          </div>
+          <div style="padding: 28px;">
+            <p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">
+              We received a request to change the email address on your InEx Ledger account. Click the button below to confirm this change.
+            </p>
+            <div style="margin: 24px 0;">
+              <a href="${confirmLink}" style="display: inline-block; padding: 14px 22px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700;">
+                Confirm email change
+              </a>
+            </div>
+            <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">
+              This link expires in 30 minutes. If the button does not work, copy and paste this link into your browser:
+            </p>
+            <p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${confirmLink}</p>
+            <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">
+              Your email address will not change until you click the link above. If you did not request this change, you can safely ignore this email.
+            </p>
+          </div>
         </div>
-      `
+      `,
+      text: `Confirm your new InEx Ledger email address\n\nWe received a request to change the email address on your account. Use this link to confirm the change:\n${confirmLink}\n\nThis link expires in 30 minutes.\n\nYour email address will not change until you click the link. If you did not request this change, you can safely ignore this email.`
     });
 
     res.json({ message: "Confirmation email sent to your new address." });
