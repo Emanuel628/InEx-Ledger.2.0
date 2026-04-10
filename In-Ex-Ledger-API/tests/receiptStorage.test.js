@@ -75,3 +75,17 @@ test("receipt upload guard returns 503 when production persistence is not confir
   const response = await request(app).post("/receipts").expect(503);
   assert.match(response.body.error, /persistent storage/i);
 });
+
+test("receipt upload guard allows upload in production when persistence is confirmed", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "receipt-storage-"));
+  process.env.NODE_ENV = "production";
+  process.env.RECEIPT_STORAGE_DIR = tempDir;
+  process.env.RECEIPT_STORAGE_PERSISTENT = "true";
+
+  const app = express();
+  app.post("/receipts", requirePersistentReceiptStorage, (_req, res) => {
+    res.status(204).end();
+  });
+
+  await request(app).post("/receipts").expect(204);
+});

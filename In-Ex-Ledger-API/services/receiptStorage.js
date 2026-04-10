@@ -20,9 +20,9 @@ function isReceiptStoragePersistenceConfirmed() {
 
 function buildReceiptStorageStatus(error = null) {
   const directory = getReceiptStorageDir();
-  const persistentConfirmed = isReceiptStoragePersistenceConfirmed();
-  const persistenceRequired = isProduction();
   const writable = !error;
+  const persistentConfirmed = isReceiptStoragePersistenceConfirmed() && writable;
+  const persistenceRequired = isProduction();
   const available = writable && (!persistenceRequired || persistentConfirmed);
   let mode = "development";
 
