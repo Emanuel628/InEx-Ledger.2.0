@@ -1345,15 +1345,6 @@ function mapById(items) {
   }, {});
 }
 
-function escapeHtml(value) {
-  return `${value ?? ""}`
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function readBusinessProfile() {
   try {
     return JSON.parse(localStorage.getItem(BUSINESS_PROFILE_KEY) || "null") || {};

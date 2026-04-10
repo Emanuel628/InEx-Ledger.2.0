@@ -434,7 +434,3 @@ function showCategoriesToast(message) {
   if (categoriesToastTimer) clearTimeout(categoriesToastTimer);
   categoriesToastTimer = window.setTimeout(() => toast.classList.add("hidden"), CATEGORIES_TOAST_MS);
 }
-
-function escapeHtml(value) {
-  return `${value ?? ""}`.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}

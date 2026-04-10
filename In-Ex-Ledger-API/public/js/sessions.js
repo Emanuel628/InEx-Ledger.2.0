@@ -8,15 +8,6 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
-function escapeHtml(value) {
-  return `${value ?? ""}`
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function formatSessionDate(isoString) {
   if (!isoString) return "—";
   try {

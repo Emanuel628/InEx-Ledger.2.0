@@ -151,19 +151,19 @@ function renderMessageRow(m, tab) {
   const archiveLabel = m.is_archived ? "Unarchive" : "Archive";
 
   return `
-    <div class="message-row${unreadClass}" data-id="${esc(m.id)}" tabindex="0" role="button" aria-label="Open message: ${esc(subject)}">
-      <span class="message-avatar" aria-hidden="true">${esc(initial)}</span>
+    <div class="message-row${unreadClass}" data-id="${escapeHtml(m.id)}" tabindex="0" role="button" aria-label="Open message: ${escapeHtml(subject)}">
+      <span class="message-avatar" aria-hidden="true">${escapeHtml(initial)}</span>
       <div class="message-row-body">
         <div class="message-row-top">
-          <span class="message-from">${esc(counterpart)}<span class="message-type-badge ${esc(m.message_type)}">${esc(typeLabel)}</span></span>
-          <span class="message-date">${esc(dateStr)}</span>
+          <span class="message-from">${escapeHtml(counterpart)}<span class="message-type-badge ${escapeHtml(m.message_type)}">${escapeHtml(typeLabel)}</span></span>
+          <span class="message-date">${escapeHtml(dateStr)}</span>
         </div>
-        <div class="message-subject">${esc(subject)}</div>
-        <div class="message-preview">${esc(preview)}</div>
+        <div class="message-subject">${escapeHtml(subject)}</div>
+        <div class="message-preview">${escapeHtml(preview)}</div>
       </div>
       <div class="message-row-actions">
-        <button type="button" class="msg-btn" data-archive="${esc(m.id)}">${archiveLabel}</button>
-        <button type="button" class="msg-btn danger" data-delete="${esc(m.id)}">Delete</button>
+        <button type="button" class="msg-btn" data-archive="${escapeHtml(m.id)}">${archiveLabel}</button>
+        <button type="button" class="msg-btn danger" data-delete="${escapeHtml(m.id)}">Delete</button>
       </div>
     </div>`;
 }
@@ -228,8 +228,8 @@ async function openMessageDetail(id) {
     if (subjectEl) subjectEl.textContent = `${subject} [${typeLabel}]`;
     if (fromEl) {
       fromEl.innerHTML = isSent
-        ? `To: <strong>${esc(counterpart)}</strong> &mdash; ${esc(dateStr)}`
-        : `From: <strong>${esc(counterpart)}</strong> &mdash; ${esc(dateStr)}`;
+        ? `To: <strong>${escapeHtml(counterpart)}</strong> &mdash; ${escapeHtml(dateStr)}`
+        : `From: <strong>${escapeHtml(counterpart)}</strong> &mdash; ${escapeHtml(dateStr)}`;
     }
     if (bodyEl) bodyEl.textContent = m.body;
     if (replyArea) { replyArea.classList.add("hidden"); }
@@ -495,17 +495,6 @@ function schedulePoll() {
   _pollTimer = setInterval(updateUnreadBadge, POLL_INTERVAL_MS);
 }
 
-// ─────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────
-function esc(str) {
-  return String(str ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 function formatRelativeDate(iso) {
   if (!iso) return "";
