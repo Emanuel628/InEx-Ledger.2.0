@@ -133,7 +133,7 @@ router.get("/dashboard", async (req, res) => {
     // Build monthly map
     const monthlyMap = buildTrailingMonthMap(12);
     for (const row of monthlyResult.rows) {
-      const key = String(row.month).slice(0, 7); // YYYY-MM
+      const key = (row.month instanceof Date ? row.month : new Date(row.month)).toISOString().slice(0, 7);
       const bucket = monthlyMap.get(key);
       if (!bucket) {
         continue;
@@ -220,7 +220,7 @@ router.get("/cash-flow", async (req, res) => {
     // Summarise historical averages
     const monthTotals = buildTrailingMonthMap(6);
     for (const row of histResult.rows) {
-      const key = String(row.month).slice(0, 7);
+      const key = (row.month instanceof Date ? row.month : new Date(row.month)).toISOString().slice(0, 7);
       const bucket = monthTotals.get(key);
       if (!bucket) {
         continue;
