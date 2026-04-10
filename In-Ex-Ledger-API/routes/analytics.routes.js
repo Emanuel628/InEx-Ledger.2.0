@@ -94,6 +94,8 @@ router.get("/dashboard", async (req, res) => {
        WHERE business_id = $1
          AND date >= $2
          AND is_adjustment = false
+         AND deleted_at IS NULL
+         AND (is_void = false OR is_void IS NULL)
        GROUP BY month, type
        ORDER BY month ASC`,
       [businessId, since]
@@ -110,6 +112,8 @@ router.get("/dashboard", async (req, res) => {
          AND t.type = 'income'
          AND t.date >= $2
          AND t.is_adjustment = false
+         AND t.deleted_at IS NULL
+         AND (t.is_void = false OR t.is_void IS NULL)
        GROUP BY c.name
        ORDER BY total DESC
        LIMIT 5`,
@@ -127,6 +131,8 @@ router.get("/dashboard", async (req, res) => {
          AND t.type = 'expense'
          AND t.date >= $2
          AND t.is_adjustment = false
+         AND t.deleted_at IS NULL
+         AND (t.is_void = false OR t.is_void IS NULL)
        GROUP BY c.name
        ORDER BY total DESC
        LIMIT 5`,
@@ -208,6 +214,8 @@ router.get("/cash-flow", async (req, res) => {
        WHERE business_id = $1
          AND date >= $2
          AND is_adjustment = false
+         AND deleted_at IS NULL
+         AND (is_void = false OR is_void IS NULL)
        GROUP BY month, type`,
       [businessId, since]
     );
@@ -344,6 +352,8 @@ router.get("/seasonal", async (req, res) => {
        WHERE business_id = $1
          AND type = 'income'
          AND is_adjustment = false
+         AND deleted_at IS NULL
+         AND (is_void = false OR is_void IS NULL)
        GROUP BY month_num, month_name
        ORDER BY month_num ASC`,
       [businessId]
@@ -459,7 +469,9 @@ router.post("/whatif", async (req, res) => {
        FROM transactions
        WHERE business_id = $1
          AND date >= $2
-         AND is_adjustment = false`,
+         AND is_adjustment = false
+         AND deleted_at IS NULL
+         AND (is_void = false OR is_void IS NULL)`,
       [businessId, since]
     );
 

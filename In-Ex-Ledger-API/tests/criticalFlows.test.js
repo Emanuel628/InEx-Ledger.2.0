@@ -27,8 +27,8 @@
  *   14. Receipts routes — auth + CSRF guards
  *   15. CPA Access routes — auth + CSRF + MFA guards
  *   16. Accounting lock — loadAccountingLockState, saveAccountingLockState
- *   17. Transaction archive — assertDateUnlocked integration with accounting lock
- *   18. Transaction payload validation — validateTransactionPayload
+ *   17. assertDateUnlocked + archiveTransaction interaction (lock boundary, multi-date, exact date)
+ *   18. AccountingPeriodLockedError contract — status, code, lockedThroughDate, transactionDate
  */
 
 "use strict";
@@ -1085,7 +1085,7 @@ test("saveAccountingLockState clears the lock when lockedThroughDate is null", a
 });
 
 // ---------------------------------------------------------------------------
-// 8. assertDateUnlocked + archiveTransaction interaction
+// 17. assertDateUnlocked + archiveTransaction interaction
 // ---------------------------------------------------------------------------
 
 test("assertDateUnlocked does not throw when lock state has no date (no lock active)", () => {
@@ -1107,6 +1107,47 @@ test("assertDateUnlocked throws AccountingPeriodLockedError for a date inside th
       assert.ok(err instanceof AccountingPeriodLockedError);
       assert.equal(err.status, 409);
       assert.equal(err.code, "accounting_period_locked");
+      return true;
+    }
+  );
+});
+
+test("assertDateUnlocked throws when the transaction date equals the lock date (exact boundary)", () => {
+  assert.throws(
+    () => assertDateUnlocked({ lockedThroughDate: "2026-03-31" }, "2026-03-31"),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      assert.equal(err.lockedThroughDate, "2026-03-31");
+      assert.equal(err.transactionDate, "2026-03-31");
+      return true;
+    }
+  );
+});
+
+test("multi-date lock check: date after lock passes, date inside lock throws (mimics PUT original+new date check)", () => {
+  const lockState = { lockedThroughDate: "2026-03-31" };
+
+  // First date (after lock) should pass
+  assert.doesNotThrow(() => assertDateUnlocked(lockState, "2026-04-01"));
+
+  // Second date (in lock period) should throw
+  assert.throws(
+    () => assertDateUnlocked(lockState, "2026-03-15"),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      return true;
+    }
+  );
+});
+
+test("multi-date lock check: both dates in locked period — first checked date throws immediately", () => {
+  const lockState = { lockedThroughDate: "2026-03-31" };
+
+  assert.throws(
+    () => assertDateUnlocked(lockState, "2026-03-01"),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      assert.equal(err.transactionDate, "2026-03-01");
       return true;
     }
   );
@@ -1158,4 +1199,33 @@ test("archiveTransaction trims whitespace from the reason before storing", async
 
   // capturedParams[3] is the reason
   assert.equal(capturedParams[3], "duplicate", "whitespace must be trimmed from reason");
+});
+
+// ---------------------------------------------------------------------------
+// 18. Accounting mutation error shape — AccountingPeriodLockedError contract
+// ---------------------------------------------------------------------------
+
+test("AccountingPeriodLockedError has status 409, code accounting_period_locked, and date fields", () => {
+  const err = new AccountingPeriodLockedError({
+    lockedThroughDate: "2026-03-31",
+    transactionDate: "2026-03-10"
+  });
+
+  assert.ok(err instanceof Error);
+  assert.equal(err.status, 409);
+  assert.equal(err.code, "accounting_period_locked");
+  assert.equal(err.lockedThroughDate, "2026-03-31");
+  assert.equal(err.transactionDate, "2026-03-10");
+  assert.match(err.message, /2026-03-31/);
+});
+
+test("AccountingPeriodLockedError is an instance of Error and has a meaningful message", () => {
+  const err = new AccountingPeriodLockedError({
+    lockedThroughDate: "2026-06-30",
+    transactionDate: "2026-06-15"
+  });
+
+  assert.ok(err instanceof Error, "must be an Error instance");
+  assert.ok(err.message.length > 0, "must have a non-empty message");
+  assert.match(err.message, /locked/i);
 });
