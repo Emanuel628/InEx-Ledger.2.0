@@ -2973,7 +2973,7 @@ const TRANSLATIONS = {
     exports_exported_prefix: 'Exporté',
     exports_exported_suffix: 'fichiers',
     exports_no_data: 'Aucune donnée trouvée pour cette période d’exportation',
-    exports_error_stale_data: 'Les données d'exportation n'ont pas pu être chargées depuis le serveur. Veuillez actualiser la page et réessayer.',
+    exports_error_stale_data: "Les données d'exportation n'ont pas pu être chargées depuis le serveur. Veuillez actualiser la page et réessayer.",
     exports_tax_context_prefix: 'Contexte fiscal',
     secure_export_modal_title: 'Export Sécurisé',
     secure_export_modal_ephemeral: 'Chiffré et Éphémère\u00a0: Ces données sont traitées en mémoire et ne sont jamais stockées sur nos serveurs.',

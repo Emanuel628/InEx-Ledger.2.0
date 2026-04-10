@@ -383,13 +383,21 @@ function ensureConsent() {
     return true;
   }
 
+  const consentHint = document.getElementById("consentRequiredHint");
+
   if (!tosConsentCheckbox.checked) {
+    if (consentHint) {
+      consentHint.removeAttribute("hidden");
+    }
     if (tosConsentMessage) {
-      tosConsentMessage.textContent = t("register_consent_error");
+      tosConsentMessage.textContent = "";
     }
     return false;
   }
 
+  if (consentHint) {
+    consentHint.setAttribute("hidden", "");
+  }
   if (tosConsentMessage) {
     tosConsentMessage.textContent = "";
   }
