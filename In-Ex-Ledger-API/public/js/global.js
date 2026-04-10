@@ -412,3 +412,135 @@ window.LUNA_TAX = {
   window.showFieldTooltip = showFieldTooltip;
   window.hideFieldTooltip = hideFieldTooltip;
 }());
+
+/* =========================================================
+   Cookie / Consent Banner — CASL + Quebec Law 25
+   ========================================================= */
+(function () {
+  var CONSENT_KEY = 'lb_cookie_consent';
+  var CONSENT_VERSION = '1';
+
+  function getConsentRecord() {
+    try {
+      return JSON.parse(localStorage.getItem(CONSENT_KEY) || 'null');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function setConsentRecord(decision) {
+    localStorage.setItem(CONSENT_KEY, JSON.stringify({
+      decision: decision,
+      version: CONSENT_VERSION,
+      at: new Date().toISOString()
+    }));
+  }
+
+  function needsBanner() {
+    var record = getConsentRecord();
+    if (!record) return true;
+    if (record.version !== CONSENT_VERSION) return true;
+    return false;
+  }
+
+  function tBanner(key, fallback) {
+    return (typeof window.t === 'function') ? (window.t(key) || fallback) : fallback;
+  }
+
+  function buildBanner() {
+    var banner = document.createElement('div');
+    banner.id = 'cookie-consent-banner';
+    banner.setAttribute('role', 'region');
+    banner.setAttribute('aria-label', 'Cookie consent');
+    banner.style.cssText = [
+      'position:fixed',
+      'bottom:0',
+      'left:0',
+      'right:0',
+      'z-index:10000',
+      'background:var(--surface,#fff)',
+      'border-top:1px solid var(--border,#e0e0e0)',
+      'padding:12px 16px',
+      'display:flex',
+      'flex-wrap:wrap',
+      'align-items:center',
+      'gap:8px',
+      'font-size:0.875rem',
+      'box-shadow:0 -2px 8px rgba(0,0,0,0.08)'
+    ].join(';');
+
+    var msg = document.createElement('span');
+    msg.style.flex = '1';
+    msg.style.minWidth = '200px';
+    msg.setAttribute('data-i18n', 'cookie_banner_message');
+    msg.textContent = tBanner('cookie_banner_message',
+      'We use essential cookies for authentication and preferences. If we ever add analytics or non-essential tracking, we will ask for your consent first.');
+
+    var privacyLink = document.createElement('a');
+    privacyLink.href = '/privacy';
+    privacyLink.setAttribute('data-i18n', 'cookie_banner_privacy_link');
+    privacyLink.textContent = tBanner('cookie_banner_privacy_link', 'Privacy Policy');
+    privacyLink.style.marginLeft = '4px';
+
+    var btnAccept = document.createElement('button');
+    btnAccept.type = 'button';
+    btnAccept.setAttribute('data-i18n', 'cookie_banner_accept');
+    btnAccept.textContent = tBanner('cookie_banner_accept', 'Accept');
+    btnAccept.style.cssText = 'padding:6px 14px;border-radius:4px;border:none;background:var(--accent2,#2563a8);color:#fff;cursor:pointer;font-size:0.875rem;font-weight:600;';
+
+    var btnDecline = document.createElement('button');
+    btnDecline.type = 'button';
+    btnDecline.setAttribute('data-i18n', 'cookie_banner_decline');
+    btnDecline.textContent = tBanner('cookie_banner_decline', 'Decline');
+    btnDecline.style.cssText = 'padding:6px 14px;border-radius:4px;border:1px solid var(--border,#e0e0e0);background:transparent;cursor:pointer;font-size:0.875rem;';
+
+    btnAccept.addEventListener('click', function () {
+      setConsentRecord('accepted');
+      banner.remove();
+    });
+
+    btnDecline.addEventListener('click', function () {
+      setConsentRecord('declined');
+      banner.remove();
+    });
+
+    banner.appendChild(msg);
+    banner.appendChild(privacyLink);
+    banner.appendChild(btnAccept);
+    banner.appendChild(btnDecline);
+    return banner;
+  }
+
+  function initCookieBanner() {
+    if (!needsBanner()) return;
+    var banner = buildBanner();
+    document.body.appendChild(banner);
+
+    // Re-translate if language changes after banner is shown
+    window.addEventListener('lunaLanguageChanged', function () {
+      var b = document.getElementById('cookie-consent-banner');
+      if (!b) return;
+      b.querySelectorAll('[data-i18n]').forEach(function (el) {
+        var key = el.getAttribute('data-i18n');
+        if (typeof window.t === 'function') {
+          var text = window.t(key);
+          if (text) el.textContent = text;
+        }
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCookieBanner);
+  } else {
+    initCookieBanner();
+  }
+
+  window.cookieConsent = {
+    getRecord: getConsentRecord,
+    hasAccepted: function () {
+      var r = getConsentRecord();
+      return r && r.decision === 'accepted';
+    }
+  };
+}());

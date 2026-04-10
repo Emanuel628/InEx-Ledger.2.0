@@ -406,6 +406,9 @@ function ensureConsent() {
 }
 
 async function persistConsent() {
+  const caslCheckbox = document.getElementById("caslConsent");
+  const caslOptIn = caslCheckbox ? caslCheckbox.checked : false;
+
   if (
     typeof privacyService === "object" &&
     typeof privacyService.setPrivacySettings === "function"
@@ -415,7 +418,8 @@ async function persistConsent() {
       consentAt: new Date().toISOString(),
       termsVersion: "v1",
       privacyVersion: "v1",
-      dataSharingOptOut: false
+      dataSharingOptOut: false,
+      marketingEmailOptIn: caslOptIn
     });
   }
 }
