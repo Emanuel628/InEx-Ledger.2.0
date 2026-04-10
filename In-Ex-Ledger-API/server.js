@@ -19,7 +19,7 @@ const { logInfo, logWarn, logError } = require('./utils/logger.js');
 const app = express();
 const publicDir = path.join(process.cwd(), 'public');
 const htmlDir = path.join(publicDir, 'html');
-const globalLimiter = createGlobalLimiter();
+let globalLimiter = null;
 const htmlPageNames = fs.readdirSync(htmlDir)
   .filter((name) => name.toLowerCase().endsWith('.html'))
   .map((name) => path.basename(name, '.html'));
@@ -165,7 +165,12 @@ app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 app.use('/api', (req, res, next) => {
   const rateLimiting = getRateLimiterHealth();
   if (rateLimiting.required && !rateLimiting.available) {
-    return res.status(503).json({ error: 'Service temporarily unavailable.' });
+    return res.status(503).json({
+      error: 'Rate limiting service unavailable. Please try again later.'
+    });
+  }
+  if (!globalLimiter) {
+    globalLimiter = createGlobalLimiter();
   }
   return globalLimiter(req, res, next);
 });
