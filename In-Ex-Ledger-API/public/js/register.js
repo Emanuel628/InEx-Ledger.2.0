@@ -74,12 +74,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const runStrengthUpdate = () => {
     updateStrengthMeter();
+    updateRequirementItems();
     updateMatchMessage();
   };
 
   passwordInput?.addEventListener("input", runStrengthUpdate);
   confirmInput?.addEventListener("input", updateMatchMessage);
   runStrengthUpdate();
+
+  // Re-run dynamic text updates when language changes
+  window.addEventListener("lunaLanguageChanged", () => {
+    updateStrengthMeter();
+    updateRequirementItems();
+    updateMatchMessage();
+  });
 });
 
 async function handleRegisterSubmit(event) {
@@ -110,6 +118,11 @@ async function handleRegisterSubmit(event) {
 
   if (confirmPassword !== password) {
     showRegisterError(tx("register_password_match_error"));
+    return;
+  }
+
+  if (!meetsPasswordRequirements(password)) {
+    showRegisterError(tx("register_password_requirements_error"));
     return;
   }
 
@@ -183,12 +196,26 @@ function hideRegisterError() {
   showRegisterError("");
 }
 
+const SPECIAL_CHAR_RE = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/;
+
+function meetsPasswordRequirements(password) {
+  return (
+    password.length >= 8 &&
+    /[A-Z]/.test(password) &&
+    /\d/.test(password) &&
+    SPECIAL_CHAR_RE.test(password)
+  );
+}
+
 function calculatePasswordScore(password) {
   let score = 0;
 
+  // Each criterion builds on the previous: length is the baseline,
+  // uppercase + digit indicate moderate complexity, and a special
+  // character completes the backend-required "strong" password set.
   if (password.length >= 8) score++;
-  if (/[\d\W_]/.test(password)) score++;
-  if (password.length >= 12 && /[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+  if (score > 0 && /[A-Z]/.test(password) && /\d/.test(password)) score++;
+  if (score > 1 && SPECIAL_CHAR_RE.test(password)) score++;
 
   return score;
 }
@@ -215,6 +242,16 @@ function updateStrengthMeter() {
   }
 
   const score = calculatePasswordScore(passwordInput.value);
+
+  if (!passwordInput.value) {
+    strengthSegments.forEach((segment) => {
+      segment.classList.remove("is-weak", "is-fair", "is-strong");
+    });
+    strengthText.textContent = "";
+    strengthText.style.color = "";
+    return;
+  }
+
   const label = getStrengthLabel(score);
   let color = "#b91c1c";
   let segmentClass = "is-weak";
@@ -267,6 +304,24 @@ function updateMatchMessage() {
     ? t("register_password_match_success")
     : t("register_password_match_error");
   matchMessage.classList.add(match ? "is-ok" : "is-bad");
+}
+
+function updateRequirementItems() {
+  const passwordInput = form?.querySelector("#password");
+  if (!passwordInput) return;
+
+  const password = passwordInput.value;
+  const rules = {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    number: /\d/.test(password),
+    special: SPECIAL_CHAR_RE.test(password)
+  };
+
+  document.querySelectorAll(".password-requirements [data-requirement]").forEach((item) => {
+    const key = item.dataset.requirement;
+    item.classList.toggle("is-met", rules[key] === true);
+  });
 }
 
 function isValidEmail(email) {
