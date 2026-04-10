@@ -46,9 +46,17 @@ for (const htmlFile of htmlFiles) {
       continue;
     }
 
-    // Normalise relative paths like ../js/foo.js → /js/foo.js
-    const normalised = rawSrc.replace(/^\.\.\//, "/");
+    // Normalise relative paths like ../js/foo.js or ../../js/foo.js → /js/foo.js
+    const normalised = rawSrc.replace(/^(\.\.\/)+/, "/");
     const filePath = path.join(PUBLIC_DIR, normalised);
+
+    // Guard against path traversal: resolved path must stay inside PUBLIC_DIR
+    if (!filePath.startsWith(PUBLIC_DIR + path.sep) && filePath !== PUBLIC_DIR) {
+      console.error(
+        `[bundle-drift] SKIP: "${rawSrc}" resolves outside public directory — skipping`
+      );
+      continue;
+    }
 
     checkedRefs += 1;
 
