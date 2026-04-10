@@ -11,14 +11,24 @@
  * accountingControls.test.js).
  *
  * Areas covered:
- *   1. Session management routes — auth + CSRF guards
- *   2. Privacy / GDPR routes — auth + CSRF + MFA guards
- *   3. Password change — auth + CSRF + MFA guards
- *   4. Billing routes — auth + CSRF guards
- *   5. Settings (me) routes — auth + CSRF guards
- *   6. Accounting lock — loadAccountingLockState, saveAccountingLockState
- *   7. Transaction archive — assertDateUnlocked integration with accounting lock
- *   8. Transaction payload validation — validateTransactionPayload
+ *   1.  Session management routes — auth + CSRF guards
+ *   2.  Privacy / GDPR routes — auth + CSRF + MFA guards
+ *   3.  Password change / logout / email-change — auth + CSRF + MFA guards
+ *   4.  Billing routes — auth + CSRF + MFA guards
+ *   5.  Settings (me) routes — auth + CSRF guards
+ *   6.  Transaction routes — auth + CSRF guards
+ *   7.  Business routes — auth + CSRF + MFA guards
+ *   8.  Categories routes — auth + CSRF guards
+ *   9.  Accounts routes — auth + CSRF guards
+ *   10. Recurring transactions routes — auth + CSRF guards
+ *   11. Mileage routes — auth + CSRF guards
+ *   12. Exports routes — auth + CSRF guards
+ *   13. Analytics routes — auth + CSRF guards
+ *   14. Receipts routes — auth + CSRF guards
+ *   15. CPA Access routes — auth + CSRF + MFA guards
+ *   16. Accounting lock — loadAccountingLockState, saveAccountingLockState
+ *   17. Transaction archive — assertDateUnlocked integration with accounting lock
+ *   18. Transaction payload validation — validateTransactionPayload
  */
 
 "use strict";
@@ -433,8 +443,545 @@ test("transactions: PUT /:id rejects unauthenticated requests (401)", async () =
   assert.equal(res.status, 401);
 });
 
+test("transactions: PUT /:id rejects missing CSRF token (403)", async () => {
+  const txRouter = require("../routes/transactions.routes.js");
+  const app = buildApp(txRouter, "/api/transactions");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .put("/api/transactions/some-tx-id")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ amount: 200, type: "income" });
+  assert.equal(res.status, 403);
+});
+
+test("transactions: PATCH /:id/cleared rejects unauthenticated requests (401)", async () => {
+  const txRouter = require("../routes/transactions.routes.js");
+  const app = buildApp(txRouter, "/api/transactions");
+
+  const res = await request(app).patch("/api/transactions/some-tx-id/cleared");
+  assert.equal(res.status, 401);
+});
+
+test("transactions: PATCH /:id/cleared rejects missing CSRF token (403)", async () => {
+  const txRouter = require("../routes/transactions.routes.js");
+  const app = buildApp(txRouter, "/api/transactions");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .patch("/api/transactions/some-tx-id/cleared")
+    .set("Authorization", `Bearer ${authToken}`);
+  assert.equal(res.status, 403);
+});
+
 // ---------------------------------------------------------------------------
-// 7. Accounting Lock — service layer with fake pool
+// 7. Businesses Routes
+// ---------------------------------------------------------------------------
+
+test("businesses: POST / (create business) rejects unauthenticated requests (401)", async () => {
+  const bizRouter = require("../routes/businesses.routes.js");
+  const app = buildApp(bizRouter, "/api/businesses");
+
+  const res = await request(app).post("/api/businesses").send({ name: "Acme", region: "US" });
+  assert.equal(res.status, 401);
+});
+
+test("businesses: POST / (create business) rejects missing CSRF token (403)", async () => {
+  const bizRouter = require("../routes/businesses.routes.js");
+  const app = buildApp(bizRouter, "/api/businesses");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .post("/api/businesses")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ name: "Acme", region: "US" });
+  assert.equal(res.status, 403);
+});
+
+test("businesses: POST /:id/activate rejects unauthenticated requests (401)", async () => {
+  const bizRouter = require("../routes/businesses.routes.js");
+  const app = buildApp(bizRouter, "/api/businesses");
+
+  const res = await request(app).post("/api/businesses/some-biz-id/activate");
+  assert.equal(res.status, 401);
+});
+
+test("businesses: POST /:id/activate rejects missing CSRF token (403)", async () => {
+  const bizRouter = require("../routes/businesses.routes.js");
+  const app = buildApp(bizRouter, "/api/businesses");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .post("/api/businesses/some-biz-id/activate")
+    .set("Authorization", `Bearer ${authToken}`);
+  assert.equal(res.status, 403);
+});
+
+test("businesses: DELETE /:id rejects unauthenticated requests (401)", async () => {
+  const bizRouter = require("../routes/businesses.routes.js");
+  const app = buildApp(bizRouter, "/api/businesses");
+
+  const res = await request(app)
+    .delete("/api/businesses/some-biz-id")
+    .send({ password: "secret" });
+  assert.equal(res.status, 401);
+});
+
+test("businesses: DELETE /:id rejects missing CSRF token (403)", async () => {
+  const bizRouter = require("../routes/businesses.routes.js");
+  const app = buildApp(bizRouter, "/api/businesses");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .delete("/api/businesses/some-biz-id")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ password: "secret" });
+  assert.equal(res.status, 403);
+});
+
+test("businesses: DELETE /:id requires MFA (403 mfa_required) when MFA is not enabled", async () => {
+  const bizRouter = require("../routes/businesses.routes.js");
+  const app = buildApp(bizRouter, "/api/businesses");
+  const authToken = makeToken({ mfa_enabled: false });
+  const csrf = generateCsrfToken();
+
+  const res = await request(app)
+    .delete("/api/businesses/some-biz-id")
+    .set("Authorization", `Bearer ${authToken}`)
+    .set(CSRF_HEADER_NAME, csrf)
+    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
+    .send({ password: "secret" });
+  assert.equal(res.status, 403);
+  assert.equal(res.body?.mfa_required, true);
+});
+
+// ---------------------------------------------------------------------------
+// 8. Categories Routes
+// ---------------------------------------------------------------------------
+
+test("categories: POST / rejects unauthenticated requests (401)", async () => {
+  const catRouter = require("../routes/categories.routes.js");
+  const app = buildApp(catRouter, "/api/categories");
+
+  const res = await request(app)
+    .post("/api/categories")
+    .send({ name: "Utilities", kind: "expense" });
+  assert.equal(res.status, 401);
+});
+
+test("categories: POST / rejects missing CSRF token (403)", async () => {
+  const catRouter = require("../routes/categories.routes.js");
+  const app = buildApp(catRouter, "/api/categories");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .post("/api/categories")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ name: "Utilities", kind: "expense" });
+  assert.equal(res.status, 403);
+});
+
+test("categories: PUT /:id rejects unauthenticated requests (401)", async () => {
+  const catRouter = require("../routes/categories.routes.js");
+  const app = buildApp(catRouter, "/api/categories");
+
+  const res = await request(app)
+    .put("/api/categories/some-cat-id")
+    .send({ name: "Utilities" });
+  assert.equal(res.status, 401);
+});
+
+test("categories: PUT /:id rejects missing CSRF token (403)", async () => {
+  const catRouter = require("../routes/categories.routes.js");
+  const app = buildApp(catRouter, "/api/categories");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .put("/api/categories/some-cat-id")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ name: "Utilities" });
+  assert.equal(res.status, 403);
+});
+
+test("categories: DELETE /:id rejects unauthenticated requests (401)", async () => {
+  const catRouter = require("../routes/categories.routes.js");
+  const app = buildApp(catRouter, "/api/categories");
+
+  const res = await request(app).delete("/api/categories/some-cat-id");
+  assert.equal(res.status, 401);
+});
+
+test("categories: DELETE /:id rejects missing CSRF token (403)", async () => {
+  const catRouter = require("../routes/categories.routes.js");
+  const app = buildApp(catRouter, "/api/categories");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .delete("/api/categories/some-cat-id")
+    .set("Authorization", `Bearer ${authToken}`);
+  assert.equal(res.status, 403);
+});
+
+// ---------------------------------------------------------------------------
+// 9. Accounts Routes
+// ---------------------------------------------------------------------------
+
+test("accounts: POST / rejects unauthenticated requests (401)", async () => {
+  const accRouter = require("../routes/accounts.routes.js");
+  const app = buildApp(accRouter, "/api/accounts");
+
+  const res = await request(app).post("/api/accounts").send({ name: "Cash", kind: "checking" });
+  assert.equal(res.status, 401);
+});
+
+test("accounts: POST / rejects missing CSRF token (403)", async () => {
+  const accRouter = require("../routes/accounts.routes.js");
+  const app = buildApp(accRouter, "/api/accounts");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .post("/api/accounts")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ name: "Cash", kind: "checking" });
+  assert.equal(res.status, 403);
+});
+
+test("accounts: PUT /:id rejects unauthenticated requests (401)", async () => {
+  const accRouter = require("../routes/accounts.routes.js");
+  const app = buildApp(accRouter, "/api/accounts");
+
+  const res = await request(app)
+    .put("/api/accounts/some-acc-id")
+    .send({ name: "Savings" });
+  assert.equal(res.status, 401);
+});
+
+test("accounts: PUT /:id rejects missing CSRF token (403)", async () => {
+  const accRouter = require("../routes/accounts.routes.js");
+  const app = buildApp(accRouter, "/api/accounts");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .put("/api/accounts/some-acc-id")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ name: "Savings" });
+  assert.equal(res.status, 403);
+});
+
+test("accounts: DELETE /:id rejects unauthenticated requests (401)", async () => {
+  const accRouter = require("../routes/accounts.routes.js");
+  const app = buildApp(accRouter, "/api/accounts");
+
+  const res = await request(app).delete("/api/accounts/some-acc-id");
+  assert.equal(res.status, 401);
+});
+
+test("accounts: DELETE /:id rejects missing CSRF token (403)", async () => {
+  const accRouter = require("../routes/accounts.routes.js");
+  const app = buildApp(accRouter, "/api/accounts");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .delete("/api/accounts/some-acc-id")
+    .set("Authorization", `Bearer ${authToken}`);
+  assert.equal(res.status, 403);
+});
+
+// ---------------------------------------------------------------------------
+// 10. Recurring Transactions Routes
+// ---------------------------------------------------------------------------
+
+test("recurring: POST / rejects unauthenticated requests (401)", async () => {
+  const recRouter = require("../routes/recurring.routes.js");
+  const app = buildApp(recRouter, "/api/recurring");
+
+  const res = await request(app).post("/api/recurring").send({ name: "Rent" });
+  assert.equal(res.status, 401);
+});
+
+test("recurring: POST / rejects missing CSRF token (403)", async () => {
+  const recRouter = require("../routes/recurring.routes.js");
+  const app = buildApp(recRouter, "/api/recurring");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .post("/api/recurring")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ name: "Rent" });
+  assert.equal(res.status, 403);
+});
+
+test("recurring: PUT /:id rejects unauthenticated requests (401)", async () => {
+  const recRouter = require("../routes/recurring.routes.js");
+  const app = buildApp(recRouter, "/api/recurring");
+
+  const res = await request(app)
+    .put("/api/recurring/some-rec-id")
+    .send({ name: "Rent Updated" });
+  assert.equal(res.status, 401);
+});
+
+test("recurring: PUT /:id rejects missing CSRF token (403)", async () => {
+  const recRouter = require("../routes/recurring.routes.js");
+  const app = buildApp(recRouter, "/api/recurring");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .put("/api/recurring/some-rec-id")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ name: "Rent Updated" });
+  assert.equal(res.status, 403);
+});
+
+test("recurring: DELETE /:id rejects unauthenticated requests (401)", async () => {
+  const recRouter = require("../routes/recurring.routes.js");
+  const app = buildApp(recRouter, "/api/recurring");
+
+  const res = await request(app).delete("/api/recurring/some-rec-id");
+  assert.equal(res.status, 401);
+});
+
+test("recurring: DELETE /:id rejects missing CSRF token (403)", async () => {
+  const recRouter = require("../routes/recurring.routes.js");
+  const app = buildApp(recRouter, "/api/recurring");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .delete("/api/recurring/some-rec-id")
+    .set("Authorization", `Bearer ${authToken}`);
+  assert.equal(res.status, 403);
+});
+
+// ---------------------------------------------------------------------------
+// 11. Mileage Routes
+// ---------------------------------------------------------------------------
+
+test("mileage: POST / rejects unauthenticated requests (401)", async () => {
+  const milRouter = require("../routes/mileage.routes.js");
+  const app = buildApp(milRouter, "/api/mileage");
+
+  const res = await request(app).post("/api/mileage").send({ distance: 10 });
+  assert.equal(res.status, 401);
+});
+
+test("mileage: POST / rejects missing CSRF token (403)", async () => {
+  const milRouter = require("../routes/mileage.routes.js");
+  const app = buildApp(milRouter, "/api/mileage");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .post("/api/mileage")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ distance: 10 });
+  assert.equal(res.status, 403);
+});
+
+test("mileage: PUT /:id rejects unauthenticated requests (401)", async () => {
+  const milRouter = require("../routes/mileage.routes.js");
+  const app = buildApp(milRouter, "/api/mileage");
+
+  const res = await request(app)
+    .put("/api/mileage/some-mil-id")
+    .send({ distance: 20 });
+  assert.equal(res.status, 401);
+});
+
+test("mileage: PUT /:id rejects missing CSRF token (403)", async () => {
+  const milRouter = require("../routes/mileage.routes.js");
+  const app = buildApp(milRouter, "/api/mileage");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .put("/api/mileage/some-mil-id")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ distance: 20 });
+  assert.equal(res.status, 403);
+});
+
+test("mileage: DELETE /:id rejects unauthenticated requests (401)", async () => {
+  const milRouter = require("../routes/mileage.routes.js");
+  const app = buildApp(milRouter, "/api/mileage");
+
+  const res = await request(app).delete("/api/mileage/some-mil-id");
+  assert.equal(res.status, 401);
+});
+
+test("mileage: DELETE /:id rejects missing CSRF token (403)", async () => {
+  const milRouter = require("../routes/mileage.routes.js");
+  const app = buildApp(milRouter, "/api/mileage");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .delete("/api/mileage/some-mil-id")
+    .set("Authorization", `Bearer ${authToken}`);
+  assert.equal(res.status, 403);
+});
+
+// ---------------------------------------------------------------------------
+// 12. Exports Routes
+// ---------------------------------------------------------------------------
+
+test("exports: POST /request-grant rejects unauthenticated requests (401)", async () => {
+  const expRouter = require("../routes/exports.routes.js");
+  const app = buildApp(expRouter, "/api/exports");
+
+  const res = await request(app).post("/api/exports/request-grant").send({});
+  assert.equal(res.status, 401);
+});
+
+test("exports: POST /request-grant rejects missing CSRF token (403)", async () => {
+  const expRouter = require("../routes/exports.routes.js");
+  const app = buildApp(expRouter, "/api/exports");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .post("/api/exports/request-grant")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({});
+  assert.equal(res.status, 403);
+});
+
+test("exports: POST /secure-export rejects unauthenticated requests (401)", async () => {
+  const expRouter = require("../routes/exports.routes.js");
+  const app = buildApp(expRouter, "/api/exports");
+
+  const res = await request(app).post("/api/exports/secure-export").send({});
+  assert.equal(res.status, 401);
+});
+
+test("exports: POST /secure-export rejects missing CSRF token (403)", async () => {
+  const expRouter = require("../routes/exports.routes.js");
+  const app = buildApp(expRouter, "/api/exports");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .post("/api/exports/secure-export")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({});
+  assert.equal(res.status, 403);
+});
+
+// ---------------------------------------------------------------------------
+// 13. Analytics Routes
+// ---------------------------------------------------------------------------
+
+test("analytics: POST /whatif rejects unauthenticated requests (401)", async () => {
+  const analyticsRouter = require("../routes/analytics.routes.js");
+  const app = buildApp(analyticsRouter, "/api/analytics");
+
+  const res = await request(app).post("/api/analytics/whatif").send({});
+  assert.equal(res.status, 401);
+});
+
+test("analytics: POST /whatif rejects missing CSRF token (403)", async () => {
+  const analyticsRouter = require("../routes/analytics.routes.js");
+  const app = buildApp(analyticsRouter, "/api/analytics");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .post("/api/analytics/whatif")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({});
+  assert.equal(res.status, 403);
+});
+
+// ---------------------------------------------------------------------------
+// 14. Receipts Routes
+// ---------------------------------------------------------------------------
+
+test("receipts: DELETE /:id rejects unauthenticated requests (401)", async () => {
+  const receiptsRouter = require("../routes/receipts.routes.js");
+  const app = buildApp(receiptsRouter, "/api/receipts");
+
+  const res = await request(app).delete("/api/receipts/some-receipt-id");
+  assert.equal(res.status, 401);
+});
+
+test("receipts: DELETE /:id rejects missing CSRF token (403)", async () => {
+  const receiptsRouter = require("../routes/receipts.routes.js");
+  const app = buildApp(receiptsRouter, "/api/receipts");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .delete("/api/receipts/some-receipt-id")
+    .set("Authorization", `Bearer ${authToken}`);
+  assert.equal(res.status, 403);
+});
+
+test("receipts: PATCH /:id/attach rejects unauthenticated requests (401)", async () => {
+  const receiptsRouter = require("../routes/receipts.routes.js");
+  const app = buildApp(receiptsRouter, "/api/receipts");
+
+  const res = await request(app)
+    .patch("/api/receipts/some-receipt-id/attach")
+    .send({ transaction_id: "tx-1" });
+  assert.equal(res.status, 401);
+});
+
+test("receipts: PATCH /:id/attach rejects missing CSRF token (403)", async () => {
+  const receiptsRouter = require("../routes/receipts.routes.js");
+  const app = buildApp(receiptsRouter, "/api/receipts");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .patch("/api/receipts/some-receipt-id/attach")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ transaction_id: "tx-1" });
+  assert.equal(res.status, 403);
+});
+
+// ---------------------------------------------------------------------------
+// 15. CPA Access Routes — MFA-gated
+// ---------------------------------------------------------------------------
+
+test("cpa-access: GET /grants/owned rejects unauthenticated requests (401)", async () => {
+  const cpaRouter = require("../routes/cpa-access.routes.js");
+  const app = buildApp(cpaRouter, "/api/cpa-access");
+
+  const res = await request(app).get("/api/cpa-access/grants/owned");
+  assert.equal(res.status, 401);
+});
+
+test("cpa-access: GET /grants/owned requires MFA (403 mfa_required) when MFA is not enabled", async () => {
+  const cpaRouter = require("../routes/cpa-access.routes.js");
+  const app = buildApp(cpaRouter, "/api/cpa-access");
+  const authToken = makeToken({ mfa_enabled: false });
+  const csrf = generateCsrfToken();
+
+  const res = await request(app)
+    .get("/api/cpa-access/grants/owned")
+    .set("Authorization", `Bearer ${authToken}`)
+    .set(CSRF_HEADER_NAME, csrf)
+    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`);
+  assert.equal(res.status, 403);
+  assert.equal(res.body?.mfa_required, true);
+});
+
+test("cpa-access: GET /portfolio/:ownerId rejects unauthenticated requests (401)", async () => {
+  const cpaRouter = require("../routes/cpa-access.routes.js");
+  const app = buildApp(cpaRouter, "/api/cpa-access");
+
+  const res = await request(app).get("/api/cpa-access/portfolio/some-owner-id");
+  assert.equal(res.status, 401);
+});
+
+test("cpa-access: GET /portfolio/:ownerId requires MFA (403 mfa_required) when MFA is not enabled", async () => {
+  const cpaRouter = require("../routes/cpa-access.routes.js");
+  const app = buildApp(cpaRouter, "/api/cpa-access");
+  const authToken = makeToken({ mfa_enabled: false });
+  const csrf = generateCsrfToken();
+
+  const res = await request(app)
+    .get("/api/cpa-access/portfolio/some-owner-id")
+    .set("Authorization", `Bearer ${authToken}`)
+    .set(CSRF_HEADER_NAME, csrf)
+    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`);
+  assert.equal(res.status, 403);
+  assert.equal(res.body?.mfa_required, true);
+});
+
+// ---------------------------------------------------------------------------
+// 16. Accounting Lock — service layer with fake pool
 // ---------------------------------------------------------------------------
 
 test("loadAccountingLockState returns unlocked state when no row exists", async () => {
