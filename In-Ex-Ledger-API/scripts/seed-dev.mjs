@@ -13,7 +13,7 @@
  * dev@inexledger.local           DevPassword1!   Fully onboarded US user.
  *                                                2 businesses (switch test),
  *                                                3 accounts, 21 categories,
- *                                                11 transactions (inc. 1 edge
+ *                                                11 transactions (incl. 1 edge
  *                                                case), 4 mileage entries,
  *                                                2 recurring rules, 1 receipt.
  * unverified@inexledger.local    DevPassword1!   Brand-new signup — email NOT
@@ -76,35 +76,35 @@ const PERSONAS = {
     label: "Fully onboarded US user",
     emailVerified: true,
     onboardingCompleted: true,
-    mfaEnabled: false,
+    twoFactorEnabled: false,
   },
   unverified: {
     email: "unverified@inexledger.local",
     label: "Brand-new unverified user",
     emailVerified: false,
     onboardingCompleted: false,
-    mfaEnabled: false,
+    twoFactorEnabled: false,
   },
   verified: {
     email: "verified@inexledger.local",
     label: "Verified but onboarding incomplete",
     emailVerified: true,
     onboardingCompleted: false,
-    mfaEnabled: false,
+    twoFactorEnabled: false,
   },
   canada: {
     email: "canada@inexledger.local",
     label: "Fully onboarded Canadian user (CA/fr)",
     emailVerified: true,
     onboardingCompleted: true,
-    mfaEnabled: false,
+    twoFactorEnabled: false,
   },
   mfa: {
     email: "mfa@inexledger.local",
     label: "MFA-enabled US user",
     emailVerified: true,
     onboardingCompleted: true,
-    mfaEnabled: true,
+    twoFactorEnabled: true,
   },
 };
 
@@ -245,7 +245,7 @@ async function seedUser(pool, persona) {
     [id, persona.email, passwordHash,
      persona.emailVerified,
      persona.onboardingCompleted,
-     persona.mfaEnabled]
+     persona.twoFactorEnabled]
   );
 
   const { rows } = await pool.query("SELECT id FROM users WHERE email = $1", [persona.email]);
@@ -661,11 +661,11 @@ async function printSummary(personas, devBusinessId, caBizId) {
   console.log("  └─────────────────────────────────────────────────────────────────┘");
   console.log();
 
-  for (const [key, { email, label, emailVerified, onboardingCompleted, mfaEnabled }] of Object.entries(personas)) {
+  for (const [key, { email, label, emailVerified, onboardingCompleted, twoFactorEnabled }] of Object.entries(personas)) {
     const flags = [
       emailVerified ? "✓ email verified" : "✗ email NOT verified",
       onboardingCompleted ? "✓ onboarded" : "✗ onboarding incomplete",
-      mfaEnabled ? "✓ MFA enabled" : null,
+      twoFactorEnabled ? "✓ MFA enabled" : null,
     ].filter(Boolean).join("  ");
     console.log(`  ${email.padEnd(36)}  ${flags}`);
     console.log(`    ↳ ${label}`);

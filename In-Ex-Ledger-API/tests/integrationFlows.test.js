@@ -539,7 +539,7 @@ test("categories: POST with invalid color returns 400", async () => {
     .set("Authorization", `Bearer ${token}`)
     .set(CSRF_HEADER_NAME, csrf)
     .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
-    .send({ name: "My Category", kind: "expense", color: "fuschia" });
+    .send({ name: "My Category", kind: "expense", color: "fuchsia" });
 
   assert.equal(res.status, 400);
   assert.match(res.body.error, /color/);
