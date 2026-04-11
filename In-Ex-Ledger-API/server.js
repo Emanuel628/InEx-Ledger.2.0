@@ -169,6 +169,12 @@ app.use('/api', (req, res, next) => {
       error: 'Service temporarily unavailable due to rate limiting requirements.'
     });
   }
+  if (dbState !== 'ready') {
+    return res.status(503).json({
+      error: 'Service starting up. Please try again shortly.',
+      database: { state: dbState }
+    });
+  }
   if (!globalLimiter) {
     globalLimiter = createGlobalLimiter();
   }

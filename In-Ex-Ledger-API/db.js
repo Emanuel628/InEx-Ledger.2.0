@@ -1,6 +1,7 @@
 const pg = require('pg');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const { Pool } = pg;
 
@@ -66,7 +67,58 @@ async function withRetry(fn, retries = 3, delayMs = 500) {
   }
 }
 
-// Transparent Migration Runner
+// Compute a SHA-256 checksum of migration SQL content for drift detection
+function computeChecksum(content) {
+  return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
+// Create the schema_migrations tracking table if it does not already exist
+async function bootstrapMigrationsTable() {
+  await withRetry(() =>
+    pool.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        filename   TEXT        PRIMARY KEY,
+        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        checksum   TEXT        NOT NULL
+      )
+    `)
+  );
+}
+
+// Return a Map of filename -> checksum for every already-applied migration
+async function getAppliedMigrations() {
+  const result = await withRetry(() =>
+    pool.query('SELECT filename, checksum FROM schema_migrations ORDER BY filename')
+  );
+  const applied = new Map();
+  for (const row of result.rows) {
+    applied.set(row.filename, row.checksum);
+  }
+  return applied;
+}
+
+// Run a single migration file inside a transaction and record it on success
+async function runMigration(filename, sql, checksum) {
+  const client = await withRetry(() => pool.connect());
+  try {
+    await client.query('BEGIN');
+    await client.query(sql);
+    await client.query(
+      'INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)',
+      [filename, checksum]
+    );
+    await client.query('COMMIT');
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (rollbackErr) {
+      console.error(`ROLLBACK failed after migration error (${filename}): ${rollbackErr.message}`);
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Migration Runner with explicit tracking
 async function initDatabase() {
   const migrationsDir = path.join(__dirname, 'db', 'migrations');
 
@@ -85,29 +137,42 @@ async function initDatabase() {
     return;
   }
 
+  await bootstrapMigrationsTable();
+  const applied = await getAppliedMigrations();
+
+  let newCount = 0;
+  let skippedCount = 0;
+
   for (const filename of migrationFiles) {
     const filePath = path.join(migrationsDir, filename);
     const sql = fs.readFileSync(filePath, 'utf8');
-    try {
-      await withRetry(() => pool.query(sql));
-      console.log(`Migration applied: ${filename}`);
-    } catch (err) {
-      // Ignore errors for objects that already exist (idempotent migrations)
-      const IGNORABLE_CODES = new Set([
-        '42P07', // duplicate_table
-        '42710', // duplicate_object
-        '42701', // duplicate_column
-        '23505', // unique_violation (e.g. duplicate INSERT in seed data)
-        '42P16', // invalid_table_definition (some ALTER IF NOT EXISTS variants)
-      ]);
-      if (IGNORABLE_CODES.has(err.code)) {
-        console.log(`Migration already applied (ignored): ${filename}`);
-        continue;
+    const checksum = computeChecksum(sql);
+
+    if (applied.has(filename)) {
+      const storedChecksum = applied.get(filename);
+      if (storedChecksum !== checksum) {
+        const msg = `Migration content changed since last run (${filename}). ` +
+          'Re-running a previously applied migration is unsafe. ' +
+          'Create a new migration file to make incremental schema changes.';
+        console.error(msg);
+        throw new Error(msg);
       }
+      skippedCount++;
+      continue;
+    }
+
+    console.log(`Applying migration: ${filename}`);
+    try {
+      await runMigration(filename, sql, checksum);
+      console.log(`Migration applied: ${filename}`);
+      newCount++;
+    } catch (err) {
       console.error(`Migration failed (${filename}): [${err.code}] ${err.message}`);
       throw err;
     }
   }
+
+  console.log(`Migrations complete: ${newCount} applied, ${skippedCount} already up to date.`);
 }
 
 module.exports = {
