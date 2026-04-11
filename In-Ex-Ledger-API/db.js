@@ -50,6 +50,28 @@ async function logDbIdentity() {
   }
 }
 
+// Thrown when a previously-applied migration file has been edited after the fact
+class MigrationContentDriftError extends Error {
+  constructor(filename) {
+    super(
+      `Migration content changed since last run (${filename}). ` +
+      'Re-running a previously applied migration is unsafe. ' +
+      'Create a new migration file to make incremental schema changes.'
+    );
+    this.name = 'MigrationContentDriftError';
+    this.filename = filename;
+  }
+}
+
+// Provides visibility into the outcome of the last initDatabase() call
+const migrationStats = {
+  total: 0,
+  applied: 0,
+  skipped: 0,
+  lastCheckedAt: null,
+  lastAppliedAt: null
+};
+
 // Transient PostgreSQL/TCP error codes that warrant a retry
 const TRANSIENT_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', '57P03', '08006']);
 
@@ -151,11 +173,9 @@ async function initDatabase() {
     if (applied.has(filename)) {
       const storedChecksum = applied.get(filename);
       if (storedChecksum !== checksum) {
-        const msg = `Migration content changed since last run (${filename}). ` +
-          'Re-running a previously applied migration is unsafe. ' +
-          'Create a new migration file to make incremental schema changes.';
-        console.error(msg);
-        throw new Error(msg);
+        const err = new MigrationContentDriftError(filename);
+        console.error(err.message);
+        throw err;
       }
       skippedCount++;
       continue;
@@ -172,11 +192,22 @@ async function initDatabase() {
     }
   }
 
+  const now = new Date().toISOString();
+  migrationStats.total = migrationFiles.length;
+  migrationStats.applied = newCount;
+  migrationStats.skipped = skippedCount;
+  migrationStats.lastCheckedAt = now;
+  if (newCount > 0) {
+    migrationStats.lastAppliedAt = now;
+  }
+
   console.log(`Migrations complete: ${newCount} applied, ${skippedCount} already up to date.`);
 }
 
 module.exports = {
   pool,
   initDatabase,
-  withRetry
+  withRetry,
+  MigrationContentDriftError,
+  migrationStats
 };
