@@ -14,6 +14,12 @@ const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+const {
+  AccountingPeriodLockedError,
+  assertDateUnlocked,
+  buildAccountingLockErrorPayload,
+  loadAccountingLockState
+} = require("../services/accountingLockService.js");
 
 const router = express.Router();
 const storageDir = path.join(process.cwd(), "storage", "receipts");
@@ -112,6 +118,16 @@ function moveFileIfExists(fromPath, toPath) {
   return true;
 }
 
+function handleReceiptMutationError(res, err, fallbackMessage) {
+  if (err instanceof AccountingPeriodLockedError) {
+    return res.status(err.status).json(buildAccountingLockErrorPayload(err));
+  }
+
+  return res.status(500).json({
+    error: fallbackMessage
+  });
+}
+
 /* =========================================================
    GET /receipts — List Receipts (Newest First)
    ========================================================= */
@@ -172,6 +188,24 @@ router.post("/", upload.single("receipt"), async (req, res) => {
 
     // optional
     const transactionId = req.body.transaction_id || null;
+    if (transactionId) {
+      const transactionResult = await pool.query(
+        `SELECT id, date
+           FROM transactions
+          WHERE id = $1
+            AND business_id = $2
+          LIMIT 1`,
+        [transactionId, businessId]
+      );
+
+      if (!transactionResult.rowCount) {
+        safeUnlink(req.file?.path);
+        return res.status(404).json({ error: "Transaction not found or does not belong to this business." });
+      }
+
+      const lockState = await loadAccountingLockState(pool, businessId);
+      assertDateUnlocked(lockState, transactionResult.rows[0].date);
+    }
 
     const receiptId = crypto.randomUUID();
     const storagePath = req.file.path;
@@ -206,7 +240,7 @@ router.post("/", upload.single("receipt"), async (req, res) => {
     // Orphan cleanup
     safeUnlink(req.file?.path);
 
-    return res.status(500).json({ error: "Failed to save receipt." });
+    return handleReceiptMutationError(res, err, "Failed to save receipt.");
   }
 });
 
@@ -226,11 +260,34 @@ router.patch("/:id/attach", async (req, res) => {
     }
 
     const transactionId = req.body.transaction_id;
+    const receiptResult = await pool.query(
+      `SELECT r.id,
+              r.transaction_id,
+              t.date AS transaction_date
+         FROM receipts r
+         LEFT JOIN transactions t
+           ON t.id = r.transaction_id
+          AND t.business_id = r.business_id
+        WHERE r.id = $1
+          AND r.business_id = $2
+        LIMIT 1`,
+      [receiptId, businessId]
+    );
+
+    if (!receiptResult.rowCount) {
+      return res.status(404).json({ error: "Receipt not found." });
+    }
+
+    const receipt = receiptResult.rows[0];
+    const lockState = await loadAccountingLockState(pool, businessId);
+    if (receipt.transaction_date) {
+      assertDateUnlocked(lockState, receipt.transaction_date);
+    }
 
     // If attaching to a transaction → verify ownership
     if (transactionId !== null) {
       const txCheck = await pool.query(
-        `SELECT id
+        `SELECT id, date
          FROM transactions
          WHERE id = $1 AND business_id = $2
          LIMIT 1`,
@@ -242,6 +299,8 @@ router.patch("/:id/attach", async (req, res) => {
           error: "Transaction not found or does not belong to this business."
         });
       }
+
+      assertDateUnlocked(lockState, txCheck.rows[0].date);
     }
 
     const result = await pool.query(
@@ -252,16 +311,10 @@ router.patch("/:id/attach", async (req, res) => {
       [transactionId, receiptId, businessId]
     );
 
-    if (!result.rowCount) {
-      return res.status(404).json({ error: "Receipt not found." });
-    }
-
     return res.json(result.rows[0]);
   } catch (err) {
     console.error("PATCH /receipts/:id/attach error:", err);
-    return res.status(500).json({
-      error: "Failed to update receipt attachment."
-    });
+    return handleReceiptMutationError(res, err, "Failed to update receipt attachment.");
   }
 });
 
@@ -324,17 +377,27 @@ router.delete("/:id", async (req, res) => {
     await client.query("BEGIN");
 
     const found = await client.query(
-      `SELECT storage_path
-       FROM receipts
-       WHERE id = $1 AND business_id = $2
-       FOR UPDATE
-       LIMIT 1`,
+      `SELECT r.storage_path,
+              t.date AS transaction_date
+         FROM receipts r
+         LEFT JOIN transactions t
+           ON t.id = r.transaction_id
+          AND t.business_id = r.business_id
+        WHERE r.id = $1
+          AND r.business_id = $2
+        FOR UPDATE
+        LIMIT 1`,
       [receiptId, businessId]
     );
 
     if (!found.rowCount) {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "Receipt not found." });
+    }
+
+    const lockState = await loadAccountingLockState(client, businessId);
+    if (found.rows[0]?.transaction_date) {
+      assertDateUnlocked(lockState, found.rows[0].transaction_date);
     }
 
     storagePath = found.rows[0]?.storage_path || null;
@@ -373,7 +436,7 @@ router.delete("/:id", async (req, res) => {
       }
     }
     console.error("DELETE /receipts/:id error:", err);
-    return res.status(500).json({ error: "Failed to delete receipt." });
+    return handleReceiptMutationError(res, err, "Failed to delete receipt.");
   } finally {
     client.release();
   }

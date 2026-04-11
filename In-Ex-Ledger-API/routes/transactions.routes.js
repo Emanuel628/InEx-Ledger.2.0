@@ -8,6 +8,7 @@ const { encrypt, decrypt } = require("../services/encryptionService.js");
 const {
   AccountingPeriodLockedError,
   assertDateUnlocked,
+  buildAccountingLockErrorPayload,
   loadAccountingLockState
 } = require("../services/accountingLockService.js");
 const { archiveTransaction } = require("../services/transactionAuditService.js");
@@ -363,12 +364,7 @@ async function assertUnlockedBusinessDates(businessId, ...dates) {
 
 function handleTransactionMutationError(res, err, fallbackMessage) {
   if (err instanceof AccountingPeriodLockedError) {
-    return res.status(err.status).json({
-      error: err.message,
-      code: err.code,
-      locked_through_date: err.lockedThroughDate,
-      transaction_date: err.transactionDate
-    });
+    return res.status(err.status).json(buildAccountingLockErrorPayload(err));
   }
 
   return res.status(500).json({ error: fallbackMessage });

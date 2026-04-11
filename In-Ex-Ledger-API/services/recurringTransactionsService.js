@@ -1,5 +1,10 @@
 const crypto = require("crypto");
 const { pool } = require("../db.js");
+const {
+  AccountingPeriodLockedError,
+  isDateLocked,
+  loadAccountingLockState
+} = require("./accountingLockService.js");
 
 const VALID_CADENCES = new Set(["weekly", "biweekly", "monthly", "quarterly", "yearly", "annually"]);
 
@@ -188,6 +193,7 @@ async function materializeTemplateRuns(businessId, templateId) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const lockState = await loadAccountingLockState(client, businessId);
 
     const templateResult = await client.query(
       `SELECT id, business_id, account_id, category_id, amount, type, description, note,
@@ -218,6 +224,12 @@ async function materializeTemplateRuns(businessId, templateId) {
 
     while (nextOccurrence && nextOccurrence <= today && (!endDate || nextOccurrence <= endDate)) {
       const occurrenceDate = formatIsoDate(nextOccurrence);
+      if (isDateLocked(occurrenceDate, lockState?.lockedThroughDate)) {
+        lastRunDate = nextOccurrence;
+        nextOccurrence = computeNextOccurrence(nextOccurrence, template.cadence);
+        continue;
+      }
+
       const runInsert = await client.query(
         `INSERT INTO recurring_transaction_runs
            (id, recurring_transaction_id, business_id, occurrence_date)
@@ -294,6 +306,7 @@ async function materializeNextTemplateRun(businessId, templateId) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const lockState = await loadAccountingLockState(client, businessId);
 
     const templateResult = await client.query(
       `SELECT id, business_id, account_id, category_id, amount, type, description, note,
@@ -324,6 +337,13 @@ async function materializeNextTemplateRun(businessId, templateId) {
     }
 
     const occurrenceDateText = formatIsoDate(occurrenceDate);
+    if (isDateLocked(occurrenceDateText, lockState?.lockedThroughDate)) {
+      throw new AccountingPeriodLockedError({
+        lockedThroughDate: lockState.lockedThroughDate,
+        transactionDate: occurrenceDateText
+      });
+    }
+
     const runInsert = await client.query(
       `INSERT INTO recurring_transaction_runs
          (id, recurring_transaction_id, business_id, occurrence_date)

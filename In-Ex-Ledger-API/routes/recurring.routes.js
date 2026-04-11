@@ -13,10 +13,25 @@ const {
   mapRecurringRow,
   computeNextRunDateForUpdate
 } = require("../services/recurringTransactionsService.js");
+const {
+  AccountingPeriodLockedError,
+  buildAccountingLockErrorPayload
+} = require("../services/accountingLockService.js");
 
 const router = express.Router();
 router.use(requireAuth);
 router.use(createDataApiLimiter({ max: 80 }));
+
+function handleRecurringMutationError(res, err, fallbackMessage) {
+  if (err instanceof AccountingPeriodLockedError) {
+    return res.status(err.status).json(buildAccountingLockErrorPayload(err));
+  }
+
+  const statusCode = err instanceof RecurringTemplateValidationError ? err.statusCode : 500;
+  return res.status(statusCode).json({
+    error: err.message || fallbackMessage
+  });
+}
 
 router.get("/", async (req, res) => {
   try {
@@ -92,10 +107,7 @@ router.post("/", async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("POST /recurring error:", err);
-    const statusCode = err instanceof RecurringTemplateValidationError ? err.statusCode : 500;
-    res.status(statusCode).json({
-      error: err.message || "Failed to create recurring transaction."
-    });
+    handleRecurringMutationError(res, err, "Failed to create recurring transaction.");
   } finally {
     client.release();
   }
@@ -172,10 +184,7 @@ router.put("/:id", async (req, res) => {
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("PUT /recurring/:id error:", err);
-    const statusCode = err instanceof RecurringTemplateValidationError ? err.statusCode : 500;
-    res.status(statusCode).json({
-      error: err.message || "Failed to update recurring transaction."
-    });
+    handleRecurringMutationError(res, err, "Failed to update recurring transaction.");
   } finally {
     client.release();
   }
@@ -232,10 +241,7 @@ router.post("/:id/run", async (req, res) => {
     });
   } catch (err) {
     console.error("POST /recurring/:id/run error:", err);
-    const statusCode = err instanceof RecurringTemplateValidationError ? err.statusCode : 500;
-    res.status(statusCode).json({
-      error: err.message || "Failed to post recurring transaction."
-    });
+    handleRecurringMutationError(res, err, "Failed to post recurring transaction.");
   }
 });
 

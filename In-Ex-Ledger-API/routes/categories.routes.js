@@ -7,6 +7,11 @@ const {
   resolveBusinessIdForUser,
   getBusinessScopeForUser
 } = require("../api/utils/resolveBusinessIdForUser.js");
+const {
+  AccountingPeriodLockedError,
+  buildAccountingLockErrorPayload,
+  loadAccountingLockState
+} = require("../services/accountingLockService.js");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -16,6 +21,14 @@ router.use(createDataApiLimiter());
 
 const VALID_KINDS = new Set(["income", "expense"]);
 const VALID_COLORS = new Set(["blue", "green", "amber", "pink", "red", "slate"]);
+
+function handleCategoryMutationError(res, err, fallbackMessage) {
+  if (err instanceof AccountingPeriodLockedError) {
+    return res.status(err.status).json(buildAccountingLockErrorPayload(err));
+  }
+
+  return res.status(500).json({ error: fallbackMessage });
+}
 
 /**
  * GET /api/categories
@@ -102,6 +115,36 @@ router.put("/:id", async (req, res) => {
     const newColor = color !== undefined ? (color ?? null) : current.color;
     const newTaxMapUs = tax_map_us !== undefined ? (tax_map_us ?? null) : current.tax_map_us;
     const newTaxMapCa = tax_map_ca !== undefined ? (tax_map_ca ?? null) : current.tax_map_ca;
+    const classificationChanged =
+      newKind !== current.kind
+      || newTaxMapUs !== current.tax_map_us
+      || newTaxMapCa !== current.tax_map_ca;
+
+    if (classificationChanged) {
+      const lockState = await loadAccountingLockState(pool, businessId);
+      if (lockState?.lockedThroughDate) {
+        const usage = await pool.query(
+          `SELECT date
+             FROM transactions
+            WHERE category_id = $1
+              AND business_id = $2
+              AND deleted_at IS NULL
+              AND (is_adjustment = false OR is_adjustment IS NULL)
+              AND (is_void = false OR is_void IS NULL)
+              AND date <= $3
+            ORDER BY date DESC
+            LIMIT 1`,
+          [req.params.id, businessId, lockState.lockedThroughDate]
+        );
+
+        if (usage.rowCount) {
+          throw new AccountingPeriodLockedError({
+            lockedThroughDate: lockState.lockedThroughDate,
+            transactionDate: usage.rows[0].date
+          });
+        }
+      }
+    }
 
     const result = await pool.query(
       `UPDATE categories
@@ -117,7 +160,7 @@ router.put("/:id", async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error("PUT /categories/:id error:", err.message);
-    res.status(500).json({ error: "Failed to update category." });
+    handleCategoryMutationError(res, err, "Failed to update category.");
   }
 });
 

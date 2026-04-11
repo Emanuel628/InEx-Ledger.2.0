@@ -120,7 +120,8 @@ async function deleteMileage(id) {
     method: "DELETE"
   });
   if (!response || !response.ok) {
-    showMileageToast(tx("mileage_error_delete"));
+    const errorPayload = await response?.json().catch(() => null);
+    showMileageToast(errorPayload?.error || tx("mileage_error_delete"));
     return;
   }
   await loadMileageRecords();

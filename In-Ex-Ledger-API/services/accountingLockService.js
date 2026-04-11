@@ -1,12 +1,25 @@
 class AccountingPeriodLockedError extends Error {
-  constructor({ lockedThroughDate, transactionDate }) {
-    super(`Transactions dated on or before ${lockedThroughDate} are locked for this business.`);
+  constructor({ lockedThroughDate, transactionDate = null }) {
+    super(`This accounting period is locked. Data dated on or before ${lockedThroughDate} cannot be changed.`);
     this.name = "AccountingPeriodLockedError";
     this.status = 409;
     this.code = "accounting_period_locked";
     this.lockedThroughDate = lockedThroughDate;
     this.transactionDate = transactionDate;
   }
+}
+
+function isAccountingPeriodLockedError(error) {
+  return error instanceof AccountingPeriodLockedError;
+}
+
+function buildAccountingLockErrorPayload(error) {
+  return {
+    error: error.message,
+    code: error.code,
+    locked_through_date: error.lockedThroughDate,
+    transaction_date: error.transactionDate || null
+  };
 }
 
 function normalizeDateOnly(value) {
@@ -100,6 +113,8 @@ async function saveAccountingLockState(pool, businessId, userId, payload = {}) {
 
 module.exports = {
   AccountingPeriodLockedError,
+  isAccountingPeriodLockedError,
+  buildAccountingLockErrorPayload,
   normalizeDateOnly,
   normalizeAccountingLockRow,
   isDateLocked,

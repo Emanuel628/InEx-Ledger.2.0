@@ -1748,7 +1748,7 @@ function renderTransactionsTable(filteredTransactions) {
       <td class="amount-cell"><span class="${amountClass}">${amountPrefix}${formatCurrency(Math.abs(Number(txn.amount) || 0), rowRegion)}</span></td>
       <td class="actions-cell">
         <button type="button" class="action-button" data-action="edit-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("common_edit", "Edit")}</button>
-        <button type="button" class="action-button delete" data-action="delete-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("common_delete", "Delete")}</button>
+        <button type="button" class="action-button delete" data-action="delete-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("transactions_archive_action", "Archive")}</button>
       </td>
     `;
     tbody.appendChild(row);

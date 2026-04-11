@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
   AccountingPeriodLockedError,
   assertDateUnlocked,
+  buildAccountingLockErrorPayload,
   isDateLocked,
   normalizeAccountingLockRow,
   normalizeDateOnly
@@ -53,6 +54,22 @@ test("assertDateUnlocked throws a typed lock error for protected periods", () =>
       return true;
     }
   );
+});
+
+test("buildAccountingLockErrorPayload returns the shared API contract", () => {
+  const payload = buildAccountingLockErrorPayload(
+    new AccountingPeriodLockedError({
+      lockedThroughDate: "2026-03-31",
+      transactionDate: "2026-03-30"
+    })
+  );
+
+  assert.deepEqual(payload, {
+    error: "This accounting period is locked. Data dated on or before 2026-03-31 cannot be changed.",
+    code: "accounting_period_locked",
+    locked_through_date: "2026-03-31",
+    transaction_date: "2026-03-30"
+  });
 });
 
 test("archiveTransaction updates transaction metadata instead of hard deleting rows", async () => {

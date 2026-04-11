@@ -7,12 +7,25 @@ const {
   resolveBusinessIdForUser,
   getBusinessScopeForUser
 } = require("../api/utils/resolveBusinessIdForUser.js");
+const {
+  AccountingPeriodLockedError,
+  buildAccountingLockErrorPayload,
+  loadAccountingLockState
+} = require("../services/accountingLockService.js");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const router = express.Router();
 router.use(requireAuth);
 router.use(createDataApiLimiter());
+
+function handleAccountMutationError(res, err, fallbackMessage) {
+  if (err instanceof AccountingPeriodLockedError) {
+    return res.status(err.status).json(buildAccountingLockErrorPayload(err));
+  }
+
+  return res.status(500).json({ error: fallbackMessage });
+}
 
 /**
  * GET all accounts for logged-in business
@@ -97,12 +110,39 @@ router.put("/:id", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     const existing = await pool.query(
-      "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
+      "SELECT id, type FROM accounts WHERE id = $1 AND business_id = $2",
       [req.params.id, businessId]
     );
 
     if (existing.rowCount === 0) {
       return res.status(404).json({ error: "Account not found or access denied." });
+    }
+
+    const current = existing.rows[0];
+    if (type && type !== current.type) {
+      const lockState = await loadAccountingLockState(pool, businessId);
+      if (lockState?.lockedThroughDate) {
+        const usage = await pool.query(
+          `SELECT date
+             FROM transactions
+            WHERE account_id = $1
+              AND business_id = $2
+              AND deleted_at IS NULL
+              AND (is_adjustment = false OR is_adjustment IS NULL)
+              AND (is_void = false OR is_void IS NULL)
+              AND date <= $3
+            ORDER BY date DESC
+            LIMIT 1`,
+          [req.params.id, businessId, lockState.lockedThroughDate]
+        );
+
+        if (usage.rowCount) {
+          throw new AccountingPeriodLockedError({
+            lockedThroughDate: lockState.lockedThroughDate,
+            transactionDate: usage.rows[0].date
+          });
+        }
+      }
     }
 
     const result = await pool.query(
@@ -122,7 +162,7 @@ router.put("/:id", async (req, res) => {
         error: "An account with this name already exists."
       });
     }
-    res.status(500).json({ error: "Failed to update account." });
+    handleAccountMutationError(res, err, "Failed to update account.");
   }
 });
 

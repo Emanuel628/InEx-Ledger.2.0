@@ -13,7 +13,7 @@
     "log_scan": "node scripts/log_scan.js",
     "test:rate-limiter": "node --test tests/rateLimiter.test.js",
     "test:subscription-service": "node --test tests/subscriptionService.test.js",
-    "test:accounting-controls": "node --test tests/accountingControls.test.js"
+    "test:accounting-controls": "node --test tests/accountingControls.test.js tests/accountingLockRoutes.test.js tests/recurringLockService.test.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
