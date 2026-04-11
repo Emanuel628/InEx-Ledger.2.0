@@ -175,7 +175,7 @@ router.put("/accounting-lock", async (req, res) => {
       lockedThroughDate: normalizedLockDate,
       note
     });
-    res.json({ lock });
+    res.json({ lock, locked: lock?.isLocked ?? false });
   } catch (err) {
     if (err.message === "Date value is invalid.") {
       return res.status(400).json({ error: "locked_through_date must be a valid date." });

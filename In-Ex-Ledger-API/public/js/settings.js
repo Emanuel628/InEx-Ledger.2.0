@@ -506,6 +506,7 @@ async function initAccountingLockPanel() {
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const isClearing = !dateInput.value;
     try {
       const response = await apiFetch("/api/business/accounting-lock", {
         method: "PUT",
@@ -514,7 +515,7 @@ async function initAccountingLockPanel() {
         },
         body: JSON.stringify({
           locked_through_date: dateInput.value || null,
-          note: noteInput.value.trim()
+          note: isClearing ? "" : noteInput.value.trim()
         })
       });
       const payload = await response?.json().catch(() => null);
@@ -523,8 +524,13 @@ async function initAccountingLockPanel() {
         return;
       }
 
+      if (isClearing) {
+        // Only clear the note field after a confirmed successful response so
+        // the UI is not wiped if the API call fails.
+        noteInput.value = "";
+      }
       renderStatus(payload?.lock || null);
-      showSettingsToast(t("settings_accounting_lock_saved"));
+      showSettingsToast(isClearing ? t("settings_accounting_lock_cleared") : t("settings_accounting_lock_saved"));
     } catch (error) {
       console.error("Failed to save accounting lock", error);
       showSettingsToast(t("settings_accounting_lock_save_error"));
