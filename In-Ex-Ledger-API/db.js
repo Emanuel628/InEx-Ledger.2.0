@@ -41,7 +41,9 @@ function buildSslConfig() {
   try {
     const url = new URL(process.env.DATABASE_URL || '');
     sslmodeFromUrl = url.searchParams.get('sslmode');
-  } catch (err) { /* invalid/missing DATABASE_URL — handled at pool creation */ }
+  } catch (err) {
+    console.warn(`[DB] Could not parse DATABASE_URL to read sslmode: ${err.message}`);
+  }
 
   if (sslmodeFromUrl === 'disable') {
     return false;
@@ -74,7 +76,13 @@ function buildSslConfig() {
     try {
       config.ca = fs.readFileSync(process.env.DB_SSL_CA_CERT, 'utf8');
     } catch (err) {
-      console.error(`[DB] Failed to read DB_SSL_CA_CERT: ${err.message}`);
+      const msg = `[DB] Failed to read DB_SSL_CA_CERT: ${err.message}`;
+      if (isProduction) {
+        // A missing CA cert in production is a deployment error — fail fast.
+        console.error(msg);
+        process.exit(1);
+      }
+      console.error(msg);
     }
   }
 
