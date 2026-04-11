@@ -192,9 +192,10 @@ async function initDatabase() {
   migrationStats.total = migrationFiles.length;
   migrationStats.applied = newCount;
   migrationStats.skipped = skippedCount;
-  migrationStats.lastCheckedAt = new Date().toISOString();
+  const now = new Date().toISOString();
+  migrationStats.lastCheckedAt = now;
   if (newCount > 0) {
-    migrationStats.lastAppliedAt = migrationStats.lastCheckedAt;
+    migrationStats.lastAppliedAt = now;
   }
 
   console.log(`Migrations complete: ${newCount} applied, ${skippedCount} already up to date.`);

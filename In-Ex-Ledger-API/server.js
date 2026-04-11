@@ -196,7 +196,14 @@ app.get('/health', (req, res) => {
   const rateLimiting = getRateLimiterHealth();
   const receiptStorage = getReceiptStorageStatus();
   const healthy = dbState === 'ready' && rateLimiting.mode !== 'degraded' && receiptStorage.mode !== 'degraded';
-  const overallStatus = healthy ? 'healthy' : (dbState === 'ready' ? 'degraded' : dbState);
+  let overallStatus;
+  if (healthy) {
+    overallStatus = 'healthy';
+  } else if (dbState === 'ready') {
+    overallStatus = 'degraded';
+  } else {
+    overallStatus = dbState;
+  }
   res.status(200).json({
     status: overallStatus,
     database: {
