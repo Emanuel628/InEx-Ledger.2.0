@@ -27,8 +27,8 @@
  *   14. Receipts routes — auth + CSRF guards
  *   15. CPA Access routes — auth + CSRF + MFA guards
  *   16. Accounting lock — loadAccountingLockState, saveAccountingLockState
- *   17. Transaction archive — assertDateUnlocked integration with accounting lock
- *   18. Transaction payload validation — validateTransactionPayload
+ *   17. assertDateUnlocked lock boundary validation (exact date, multi-date, no-lock edge cases)
+ *       + archiveTransaction null/whitespace handling (tested via fake pool)
  */
 
 "use strict";
@@ -1085,7 +1085,7 @@ test("saveAccountingLockState clears the lock when lockedThroughDate is null", a
 });
 
 // ---------------------------------------------------------------------------
-// 8. assertDateUnlocked + archiveTransaction interaction
+// 17. assertDateUnlocked + archiveTransaction interaction
 // ---------------------------------------------------------------------------
 
 test("assertDateUnlocked does not throw when lock state has no date (no lock active)", () => {
@@ -1107,6 +1107,47 @@ test("assertDateUnlocked throws AccountingPeriodLockedError for a date inside th
       assert.ok(err instanceof AccountingPeriodLockedError);
       assert.equal(err.status, 409);
       assert.equal(err.code, "accounting_period_locked");
+      return true;
+    }
+  );
+});
+
+test("assertDateUnlocked throws when the transaction date equals the lock date (exact boundary)", () => {
+  assert.throws(
+    () => assertDateUnlocked({ lockedThroughDate: "2026-03-31" }, "2026-03-31"),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      assert.equal(err.lockedThroughDate, "2026-03-31");
+      assert.equal(err.transactionDate, "2026-03-31");
+      return true;
+    }
+  );
+});
+
+test("multi-date lock check: date after lock passes, date inside lock throws (mimics PUT original+new date check)", () => {
+  const lockState = { lockedThroughDate: "2026-03-31" };
+
+  // First date (after lock) should pass
+  assert.doesNotThrow(() => assertDateUnlocked(lockState, "2026-04-01"));
+
+  // Second date (in lock period) should throw
+  assert.throws(
+    () => assertDateUnlocked(lockState, "2026-03-15"),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      return true;
+    }
+  );
+});
+
+test("multi-date lock check: both dates in locked period — first checked date throws immediately", () => {
+  const lockState = { lockedThroughDate: "2026-03-31" };
+
+  assert.throws(
+    () => assertDateUnlocked(lockState, "2026-03-01"),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      assert.equal(err.transactionDate, "2026-03-01");
       return true;
     }
   );
