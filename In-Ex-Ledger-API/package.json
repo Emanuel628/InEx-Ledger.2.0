@@ -19,7 +19,10 @@
     "test:subscription-service": "node --test tests/subscriptionService.test.js",
     "test:accounting-controls": "node --test tests/accountingControls.test.js",
     "test:auth-flows": "node --test tests/authFlows.test.js",
-    "test:critical-flows": "node --test tests/criticalFlows.test.js"
+    "test:critical-flows": "node --test tests/criticalFlows.test.js",
+    "test:harness": "node --test tests/testHarness.test.js",
+    "test:all": "node --test tests/rateLimiter.test.js tests/subscriptionService.test.js tests/accountingControls.test.js tests/authFlows.test.js tests/criticalFlows.test.js tests/testHarness.test.js",
+    "seed:dev": "node scripts/seed-dev.mjs"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

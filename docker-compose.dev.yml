@@ -1,0 +1,35 @@
+# Local development / test environment
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d   # start Postgres
+#   docker compose -f docker-compose.dev.yml down     # stop and remove containers
+#   docker compose -f docker-compose.dev.yml down -v  # also remove the data volume
+#
+# Once running, set DATABASE_URL in In-Ex-Ledger-API/.env:
+#   DATABASE_URL=postgresql://inex:inex@localhost:5432/inex_ledger
+#
+# Or use the test database:
+#   DATABASE_URL=postgresql://inex:inex@localhost:5432/inex_ledger_test
+
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: inex
+      POSTGRES_PASSWORD: inex
+      POSTGRES_DB: inex_ledger
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inex -d inex_ledger"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_dev_data:
