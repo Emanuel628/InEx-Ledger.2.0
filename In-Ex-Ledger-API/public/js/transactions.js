@@ -833,10 +833,10 @@ function openTransactionModal(transactionId) {
   const body = document.getElementById("transactionModalBody");
   activeModalTransactionId = transactionId;
   if (title) {
-    title.textContent = txT("transactions_delete_title", "Delete this transaction?");
+    title.textContent = txT("transactions_delete_title", "Archive this transaction?");
   }
   if (body) {
-    body.textContent = `${txT("transactions_delete_body_prefix", "This will permanently remove")} "${transaction.description || txT("transactions_delete_this", "this transaction")}" ${txT("transactions_delete_body_suffix", "from your ledger.")}`;
+    body.textContent = `${txT("transactions_delete_body_prefix", "This will archive")} "${transaction.description || txT("transactions_delete_this", "this transaction")}" ${txT("transactions_delete_body_suffix", "and exclude it from standard reports. It will remain in your audit history.")}`;
   }
   transactionModalElement.classList.remove("hidden");
 }

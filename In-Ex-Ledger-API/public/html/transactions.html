@@ -445,11 +445,11 @@
   <div id="transactionModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="transactionModalTitle" aria-describedby="transactionModalBody">
     <div class="transaction-modal-content danger-modal">
       <div class="danger-modal-icon" aria-hidden="true">!</div>
-      <h3 id="transactionModalTitle" data-i18n="transactions_delete_title">Delete this transaction?</h3>
-      <p id="transactionModalBody" data-i18n="transactions_delete_body_prefix">This will permanently remove the transaction from your ledger.</p>
+      <h3 id="transactionModalTitle" data-i18n="transactions_delete_title">Archive this transaction?</h3>
+      <p id="transactionModalBody" data-i18n="transactions_delete_body_prefix">This will archive the transaction. Archived transactions are excluded from standard reports and cannot be edited, but remain in your audit history.</p>
       <div class="modal-actions danger-actions">
         <button type="button" id="transactionModalClose" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
-        <button type="button" id="transactionModalDelete" class="modal-delete" data-i18n="common_delete">Delete</button>
+        <button type="button" id="transactionModalDelete" class="modal-delete" data-i18n="transactions_archive_confirm">Archive</button>
       </div>
     </div>
   </div>

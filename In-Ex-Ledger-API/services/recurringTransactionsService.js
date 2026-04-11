@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { pool } = require("../db.js");
+const { loadAccountingLockState, isDateLocked } = require("./accountingLockService.js");
 
 const VALID_CADENCES = new Set(["weekly", "biweekly", "monthly", "quarterly", "yearly", "annually"]);
 
@@ -210,6 +211,8 @@ async function materializeTemplateRuns(businessId, templateId) {
       return;
     }
 
+    const lockState = await loadAccountingLockState(pool, businessId);
+
     let nextOccurrence = parseIsoDate(template.next_run_date);
     const endDate = template.end_date ? parseIsoDate(template.end_date) : null;
     const today = utcToday();
@@ -218,6 +221,13 @@ async function materializeTemplateRuns(businessId, templateId) {
 
     while (nextOccurrence && nextOccurrence <= today && (!endDate || nextOccurrence <= endDate)) {
       const occurrenceDate = formatIsoDate(nextOccurrence);
+
+      // Skip occurrences that fall inside a locked accounting period.
+      if (isDateLocked(occurrenceDate, lockState?.lockedThroughDate)) {
+        nextOccurrence = computeNextOccurrence(nextOccurrence, template.cadence);
+        continue;
+      }
+
       const runInsert = await client.query(
         `INSERT INTO recurring_transaction_runs
            (id, recurring_transaction_id, business_id, occurrence_date)
@@ -324,6 +334,13 @@ async function materializeNextTemplateRun(businessId, templateId) {
     }
 
     const occurrenceDateText = formatIsoDate(occurrenceDate);
+
+    // Reject manual runs that would post into a locked accounting period.
+    const lockState = await loadAccountingLockState(pool, businessId);
+    if (isDateLocked(occurrenceDateText, lockState?.lockedThroughDate)) {
+      await client.query("ROLLBACK");
+      return { found: true, created: false, locked: true };
+    }
     const runInsert = await client.query(
       `INSERT INTO recurring_transaction_runs
          (id, recurring_transaction_id, business_id, occurrence_date)
