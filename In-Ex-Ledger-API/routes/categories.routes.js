@@ -9,6 +9,11 @@ const {
   resolveBusinessIdForUser,
   getBusinessScopeForUser
 } = require("../api/utils/resolveBusinessIdForUser.js");
+const {
+  loadAccountingLockState,
+  assertNoLockedPeriodTransactionsForCategory,
+  AccountingPeriodLockedError
+} = require("../services/accountingLockService.js");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -106,6 +111,18 @@ router.put("/:id", async (req, res) => {
     const newTaxMapUs = tax_map_us !== undefined ? (tax_map_us ?? null) : current.tax_map_us;
     const newTaxMapCa = tax_map_ca !== undefined ? (tax_map_ca ?? null) : current.tax_map_ca;
 
+    // Block classification changes that would retroactively alter locked-period history.
+    // Pure name or color changes are always permitted.
+    const classificationChanging =
+      newKind !== current.kind ||
+      newTaxMapUs !== current.tax_map_us ||
+      newTaxMapCa !== current.tax_map_ca;
+
+    if (classificationChanging) {
+      const lockState = await loadAccountingLockState(pool, businessId);
+      await assertNoLockedPeriodTransactionsForCategory(pool, businessId, req.params.id, lockState);
+    }
+
     const result = await pool.query(
       `UPDATE categories
        SET name = $1,
@@ -119,6 +136,13 @@ router.put("/:id", async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (err) {
+    if (err instanceof AccountingPeriodLockedError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        locked_through_date: err.lockedThroughDate
+      });
+    }
     logError("PUT /categories/:id error:", err.message);
     res.status(500).json({ error: "Failed to update category." });
   }

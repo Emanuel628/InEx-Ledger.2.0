@@ -9,6 +9,11 @@ const {
   resolveBusinessIdForUser,
   getBusinessScopeForUser
 } = require("../api/utils/resolveBusinessIdForUser.js");
+const {
+  loadAccountingLockState,
+  assertNoLockedPeriodTransactionsForAccount,
+  AccountingPeriodLockedError
+} = require("../services/accountingLockService.js");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -100,12 +105,19 @@ router.put("/:id", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     const existing = await pool.query(
-      "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
+      "SELECT id, type FROM accounts WHERE id = $1 AND business_id = $2",
       [req.params.id, businessId]
     );
 
     if (existing.rowCount === 0) {
       return res.status(404).json({ error: "Account not found or access denied." });
+    }
+
+    // Block account type reclassification if locked-period transactions reference this account.
+    // Pure name changes are always permitted.
+    if (type && type !== existing.rows[0].type) {
+      const lockState = await loadAccountingLockState(pool, businessId);
+      await assertNoLockedPeriodTransactionsForAccount(pool, businessId, req.params.id, lockState);
     }
 
     const result = await pool.query(
@@ -119,6 +131,13 @@ router.put("/:id", async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (err) {
+    if (err instanceof AccountingPeriodLockedError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        locked_through_date: err.lockedThroughDate
+      });
+    }
     logError("PUT account error:", err.message);
     if (err.code === "23505") {
       return res.status(409).json({

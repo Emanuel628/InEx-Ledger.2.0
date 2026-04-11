@@ -238,8 +238,10 @@ router.patch("/:id/attach", async (req, res) => {
 
     const transactionId = req.body.transaction_id;
 
-    // If attaching to a transaction → verify ownership and lock state
+    const lockState = await loadAccountingLockState(pool, businessId);
+
     if (transactionId !== null) {
+      // Attaching to a transaction → verify ownership and lock state
       const txCheck = await pool.query(
         `SELECT id, date
          FROM transactions
@@ -254,8 +256,23 @@ router.patch("/:id/attach", async (req, res) => {
         });
       }
 
-      const lockState = await loadAccountingLockState(pool, businessId);
       assertDateUnlocked(lockState, txCheck.rows[0].date);
+    } else {
+      // Detaching (null) → check if the receipt is currently linked to a locked-period transaction
+      const currentLink = await pool.query(
+        `SELECT t.date
+         FROM receipts r
+         JOIN transactions t ON t.id = r.transaction_id
+        WHERE r.id = $1
+          AND r.business_id = $2
+          AND r.transaction_id IS NOT NULL
+        LIMIT 1`,
+        [receiptId, businessId]
+      );
+
+      if (currentLink.rowCount) {
+        assertDateUnlocked(lockState, currentLink.rows[0].date);
+      }
     }
 
     const result = await pool.query(
@@ -345,9 +362,10 @@ router.delete("/:id", async (req, res) => {
     await client.query("BEGIN");
 
     const found = await client.query(
-      `SELECT storage_path
-       FROM receipts
-       WHERE id = $1 AND business_id = $2
+      `SELECT r.storage_path, t.date AS tx_date
+       FROM receipts r
+       LEFT JOIN transactions t ON t.id = r.transaction_id
+       WHERE r.id = $1 AND r.business_id = $2
        FOR UPDATE
        LIMIT 1`,
       [receiptId, businessId]
@@ -356,6 +374,22 @@ router.delete("/:id", async (req, res) => {
     if (!found.rowCount) {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "Receipt not found." });
+    }
+
+    // Block deleting a receipt that is evidence for a locked-period transaction
+    const txDate = found.rows[0]?.tx_date || null;
+    if (txDate) {
+      const lockState = await loadAccountingLockState(pool, businessId);
+      try {
+        assertDateUnlocked(lockState, txDate);
+      } catch (lockErr) {
+        await client.query("ROLLBACK");
+        return res.status(lockErr.status).json({
+          error: lockErr.message,
+          code: lockErr.code,
+          locked_through_date: lockErr.lockedThroughDate
+        });
+      }
     }
 
     storagePath = found.rows[0]?.storage_path || null;
