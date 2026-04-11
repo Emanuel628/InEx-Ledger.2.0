@@ -215,8 +215,8 @@ describe("buildMfaEmailContent", () => {
 
   it("returns French MFA enable content", () => {
     const { subject, heading } = buildMfaEmailContent("fr", "mfa_enable");
-    assert.ok(subject.includes("activation de l'AMF"));
-    assert.ok(heading.includes("activation de l'AMF"));
+    assert.ok(subject.includes("activation de l'A2F"));
+    assert.ok(heading.includes("activation de l'A2F"));
   });
 
   it("returns English MFA disable content", () => {
@@ -226,7 +226,7 @@ describe("buildMfaEmailContent", () => {
 
   it("returns French MFA disable content", () => {
     const { subject } = buildMfaEmailContent("fr", "mfa_disable");
-    assert.ok(subject.includes("désactivation de l'AMF"));
+    assert.ok(subject.includes("désactivation de l'A2F"));
   });
 
   it("falls back to signin content for unknown purpose", () => {

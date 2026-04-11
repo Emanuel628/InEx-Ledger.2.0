@@ -277,9 +277,9 @@ const MFA_CONTENT = {
       footer: "If you did not request this change, do not enter the code."
     },
     fr: {
-      subject: "Confirmez l'activation de l'AMF pour InEx Ledger",
-      heading: "Confirmez l'activation de l'AMF",
-      body: "Nous avons reçu une demande d'activation de l'authentification multifacteur pour votre compte. Entrez ce code dans les Paramètres pour confirmer qu'il s'agissait bien de vous.",
+      subject: "Confirmez l'activation de l'A2F pour InEx Ledger",
+      heading: "Confirmez l'activation de l'A2F",
+      body: "Nous avons reçu une demande d'activation de l'authentification à deux facteurs pour votre compte. Entrez ce code dans les Paramètres pour confirmer qu'il s'agissait bien de vous.",
       footer: "Si vous n'avez pas demandé ce changement, n'entrez pas le code."
     }
   },
@@ -291,9 +291,9 @@ const MFA_CONTENT = {
       footer: "If you did not request this change, do not enter the code."
     },
     fr: {
-      subject: "Confirmez la désactivation de l'AMF pour InEx Ledger",
-      heading: "Confirmez la désactivation de l'AMF",
-      body: "Nous avons reçu une demande de désactivation de l'authentification multifacteur pour votre compte. Entrez ce code dans les Paramètres pour confirmer qu'il s'agissait bien de vous.",
+      subject: "Confirmez la désactivation de l'A2F pour InEx Ledger",
+      heading: "Confirmez la désactivation de l'A2F",
+      body: "Nous avons reçu une demande de désactivation de l'authentification à deux facteurs pour votre compte. Entrez ce code dans les Paramètres pour confirmer qu'il s'agissait bien de vous.",
       footer: "Si vous n'avez pas demandé ce changement, n'entrez pas le code."
     }
   }
