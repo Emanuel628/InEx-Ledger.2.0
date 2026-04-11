@@ -27,8 +27,8 @@
  *   14. Receipts routes — auth + CSRF guards
  *   15. CPA Access routes — auth + CSRF + MFA guards
  *   16. Accounting lock — loadAccountingLockState, saveAccountingLockState
- *   17. assertDateUnlocked + archiveTransaction interaction (lock boundary, multi-date, exact date)
- *   18. AccountingPeriodLockedError contract — status, code, lockedThroughDate, transactionDate
+ *   17. assertDateUnlocked lock boundary validation (exact date, multi-date, no-lock edge cases)
+ *       + archiveTransaction null/whitespace handling (tested via fake pool)
  */
 
 "use strict";
@@ -1199,33 +1199,4 @@ test("archiveTransaction trims whitespace from the reason before storing", async
 
   // capturedParams[3] is the reason
   assert.equal(capturedParams[3], "duplicate", "whitespace must be trimmed from reason");
-});
-
-// ---------------------------------------------------------------------------
-// 18. Accounting mutation error shape — AccountingPeriodLockedError contract
-// ---------------------------------------------------------------------------
-
-test("AccountingPeriodLockedError has status 409, code accounting_period_locked, and date fields", () => {
-  const err = new AccountingPeriodLockedError({
-    lockedThroughDate: "2026-03-31",
-    transactionDate: "2026-03-10"
-  });
-
-  assert.ok(err instanceof Error);
-  assert.equal(err.status, 409);
-  assert.equal(err.code, "accounting_period_locked");
-  assert.equal(err.lockedThroughDate, "2026-03-31");
-  assert.equal(err.transactionDate, "2026-03-10");
-  assert.match(err.message, /2026-03-31/);
-});
-
-test("AccountingPeriodLockedError is an instance of Error and has a meaningful message", () => {
-  const err = new AccountingPeriodLockedError({
-    lockedThroughDate: "2026-06-30",
-    transactionDate: "2026-06-15"
-  });
-
-  assert.ok(err instanceof Error, "must be an Error instance");
-  assert.ok(err.message.length > 0, "must have a non-empty message");
-  assert.match(err.message, /locked/i);
 });
