@@ -519,3 +519,337 @@ test("materializeNextTemplateRun locked flag contract: isDateLocked returns fals
 
   assert.equal(isDateLocked(nextRunDate, lockedThrough), false, "run date outside locked period proceeds normally");
 });
+
+// ---------------------------------------------------------------------------
+// Mileage lock enforcement
+// ---------------------------------------------------------------------------
+
+test("mileage in locked period is blocked by assertDateUnlocked", () => {
+  const { assertDateUnlocked, AccountingPeriodLockedError } = require("../services/accountingLockService.js");
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+  const mileageDate = "2026-03-20";
+
+  assert.throws(
+    () => assertDateUnlocked(lockState, mileageDate),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      assert.equal(err.status, 409);
+      assert.equal(err.code, "accounting_period_locked");
+      assert.equal(err.lockedThroughDate, "2026-03-31");
+      return true;
+    }
+  );
+});
+
+test("mileage outside locked period is allowed by assertDateUnlocked", () => {
+  const { assertDateUnlocked } = require("../services/accountingLockService.js");
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+  const mileageDate = "2026-04-01";
+
+  assert.doesNotThrow(() => assertDateUnlocked(lockState, mileageDate));
+});
+
+test("mileage on exact lock boundary date is blocked", () => {
+  const { assertDateUnlocked, AccountingPeriodLockedError } = require("../services/accountingLockService.js");
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+
+  assert.throws(
+    () => assertDateUnlocked(lockState, "2026-03-31"),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      assert.equal(err.transactionDate, "2026-03-31");
+      return true;
+    }
+  );
+});
+
+test("mileage edit blocks both original date and new date in locked period", () => {
+  const { assertDateUnlocked, AccountingPeriodLockedError } = require("../services/accountingLockService.js");
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+
+  // Original date locked → blocked
+  assert.throws(
+    () => assertDateUnlocked(lockState, "2026-03-15"),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      return true;
+    }
+  );
+
+  // New date locked → also blocked
+  assert.throws(
+    () => assertDateUnlocked(lockState, "2026-02-10"),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      return true;
+    }
+  );
+
+  // New date unlocked + original date unlocked → allowed
+  assert.doesNotThrow(() => assertDateUnlocked(lockState, "2026-04-05"));
+});
+
+test("mileage delete is blocked when record date falls in locked period", () => {
+  const { assertDateUnlocked, AccountingPeriodLockedError } = require("../services/accountingLockService.js");
+
+  const lockState = { lockedThroughDate: "2026-01-31" };
+  const mileageDate = "2026-01-15";
+
+  assert.throws(
+    () => assertDateUnlocked(lockState, mileageDate),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      assert.equal(err.lockedThroughDate, "2026-01-31");
+      return true;
+    }
+  );
+});
+
+test("mileage operations allowed when no lock is configured", () => {
+  const { assertDateUnlocked } = require("../services/accountingLockService.js");
+
+  assert.doesNotThrow(() => assertDateUnlocked(null, "2026-01-01"));
+  assert.doesNotThrow(() => assertDateUnlocked({ lockedThroughDate: null }, "2026-01-01"));
+});
+
+// ---------------------------------------------------------------------------
+// Receipt detach / delete lock enforcement
+// ---------------------------------------------------------------------------
+
+test("receipt detach from locked-period transaction is blocked by assertDateUnlocked", () => {
+  const { assertDateUnlocked, AccountingPeriodLockedError } = require("../services/accountingLockService.js");
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+  const linkedTxDate = "2026-02-14";
+
+  assert.throws(
+    () => assertDateUnlocked(lockState, linkedTxDate),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      assert.equal(err.code, "accounting_period_locked");
+      assert.equal(err.lockedThroughDate, "2026-03-31");
+      return true;
+    }
+  );
+});
+
+test("receipt detach from unlocked transaction is allowed", () => {
+  const { assertDateUnlocked } = require("../services/accountingLockService.js");
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+  const linkedTxDate = "2026-04-10";
+
+  assert.doesNotThrow(() => assertDateUnlocked(lockState, linkedTxDate));
+});
+
+test("receipt delete is blocked when linked transaction falls in locked period", () => {
+  const { assertDateUnlocked, AccountingPeriodLockedError } = require("../services/accountingLockService.js");
+
+  const lockState = { lockedThroughDate: "2025-12-31" };
+  const linkedTxDate = "2025-11-05";
+
+  assert.throws(
+    () => assertDateUnlocked(lockState, linkedTxDate),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      assert.equal(err.status, 409);
+      return true;
+    }
+  );
+});
+
+test("receipt delete is allowed when not linked to any transaction (no lock check needed)", () => {
+  // When tx_date is null (no linked transaction), the route skips the lock check entirely.
+  // Verify that assertDateUnlocked is a no-op for null dates.
+  const { assertDateUnlocked } = require("../services/accountingLockService.js");
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+  assert.doesNotThrow(() => assertDateUnlocked(lockState, null));
+});
+
+// ---------------------------------------------------------------------------
+// Category classification lock enforcement
+// ---------------------------------------------------------------------------
+
+test("assertNoLockedPeriodTransactionsForCategory throws when category has locked-period transactions", async () => {
+  const {
+    assertNoLockedPeriodTransactionsForCategory,
+    AccountingPeriodLockedError
+  } = require("../services/accountingLockService.js");
+
+  const fakePool = {
+    async query() {
+      return { rows: [{ has_locked: true }], rowCount: 1 };
+    }
+  };
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+
+  await assert.rejects(
+    () => assertNoLockedPeriodTransactionsForCategory(fakePool, "biz_1", "cat_1", lockState),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      assert.equal(err.status, 409);
+      assert.equal(err.code, "accounting_period_locked");
+      assert.equal(err.lockedThroughDate, "2026-03-31");
+      return true;
+    }
+  );
+});
+
+test("assertNoLockedPeriodTransactionsForCategory does not throw when no locked-period transactions exist", async () => {
+  const {
+    assertNoLockedPeriodTransactionsForCategory
+  } = require("../services/accountingLockService.js");
+
+  const fakePool = {
+    async query() {
+      return { rows: [{ has_locked: false }], rowCount: 1 };
+    }
+  };
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+
+  await assert.doesNotReject(
+    () => assertNoLockedPeriodTransactionsForCategory(fakePool, "biz_1", "cat_1", lockState)
+  );
+});
+
+test("assertNoLockedPeriodTransactionsForCategory is a no-op when no lock is set", async () => {
+  const {
+    assertNoLockedPeriodTransactionsForCategory
+  } = require("../services/accountingLockService.js");
+
+  let queryCount = 0;
+  const fakePool = {
+    async query() {
+      queryCount++;
+      return { rows: [], rowCount: 0 };
+    }
+  };
+
+  await assert.doesNotReject(
+    () => assertNoLockedPeriodTransactionsForCategory(fakePool, "biz_1", "cat_1", null)
+  );
+  assert.equal(queryCount, 0, "no DB query should be issued when there is no lock");
+});
+
+test("assertNoLockedPeriodTransactionsForCategory SQL query checks correct columns", async () => {
+  const {
+    assertNoLockedPeriodTransactionsForCategory
+  } = require("../services/accountingLockService.js");
+
+  let capturedSql = "";
+  let capturedParams = null;
+
+  const fakePool = {
+    async query(sql, params) {
+      capturedSql = sql;
+      capturedParams = params;
+      return { rows: [{ has_locked: false }], rowCount: 1 };
+    }
+  };
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+  await assertNoLockedPeriodTransactionsForCategory(fakePool, "biz_x", "cat_x", lockState);
+
+  assert.match(capturedSql, /category_id/i);
+  assert.match(capturedSql, /deleted_at IS NULL/i);
+  assert.match(capturedSql, /is_adjustment/i);
+  assert.deepEqual(capturedParams, ["cat_x", "biz_x", "2026-03-31"]);
+});
+
+// ---------------------------------------------------------------------------
+// Account type lock enforcement
+// ---------------------------------------------------------------------------
+
+test("assertNoLockedPeriodTransactionsForAccount throws when account has locked-period transactions", async () => {
+  const {
+    assertNoLockedPeriodTransactionsForAccount,
+    AccountingPeriodLockedError
+  } = require("../services/accountingLockService.js");
+
+  const fakePool = {
+    async query() {
+      return { rows: [{ has_locked: true }], rowCount: 1 };
+    }
+  };
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+
+  await assert.rejects(
+    () => assertNoLockedPeriodTransactionsForAccount(fakePool, "biz_1", "acc_1", lockState),
+    (err) => {
+      assert.ok(err instanceof AccountingPeriodLockedError);
+      assert.equal(err.status, 409);
+      assert.equal(err.code, "accounting_period_locked");
+      return true;
+    }
+  );
+});
+
+test("assertNoLockedPeriodTransactionsForAccount does not throw when no locked-period transactions exist", async () => {
+  const {
+    assertNoLockedPeriodTransactionsForAccount
+  } = require("../services/accountingLockService.js");
+
+  const fakePool = {
+    async query() {
+      return { rows: [{ has_locked: false }], rowCount: 1 };
+    }
+  };
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+
+  await assert.doesNotReject(
+    () => assertNoLockedPeriodTransactionsForAccount(fakePool, "biz_1", "acc_1", lockState)
+  );
+});
+
+test("assertNoLockedPeriodTransactionsForAccount is a no-op when no lock is set", async () => {
+  const {
+    assertNoLockedPeriodTransactionsForAccount
+  } = require("../services/accountingLockService.js");
+
+  let queryCount = 0;
+  const fakePool = {
+    async query() {
+      queryCount++;
+      return { rows: [], rowCount: 0 };
+    }
+  };
+
+  await assert.doesNotReject(
+    () => assertNoLockedPeriodTransactionsForAccount(fakePool, "biz_1", "acc_1", null)
+  );
+  assert.equal(queryCount, 0, "no DB query should be issued when there is no lock");
+});
+
+test("assertNoLockedPeriodTransactionsForAccount SQL query checks correct columns", async () => {
+  const {
+    assertNoLockedPeriodTransactionsForAccount
+  } = require("../services/accountingLockService.js");
+
+  let capturedSql = "";
+  let capturedParams = null;
+
+  const fakePool = {
+    async query(sql, params) {
+      capturedSql = sql;
+      capturedParams = params;
+      return { rows: [{ has_locked: false }], rowCount: 1 };
+    }
+  };
+
+  const lockState = { lockedThroughDate: "2026-03-31" };
+  await assertNoLockedPeriodTransactionsForAccount(fakePool, "biz_y", "acc_y", lockState);
+
+  assert.match(capturedSql, /account_id/i);
+  assert.match(capturedSql, /deleted_at IS NULL/i);
+  assert.match(capturedSql, /is_adjustment/i);
+  assert.deepEqual(capturedParams, ["acc_y", "biz_y", "2026-03-31"]);
+});

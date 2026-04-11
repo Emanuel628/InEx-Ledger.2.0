@@ -98,6 +98,78 @@ async function saveAccountingLockState(pool, businessId, userId, payload = {}) {
   return normalizeAccountingLockRow(result.rows[0] || null);
 }
 
+/**
+ * Throws AccountingPeriodLockedError if any non-archived, non-adjustment
+ * transaction inside the locked period references the given category.
+ * Safe to call with a null/empty lockState (no-ops when no lock is active).
+ *
+ * @param {object} pool         - pg Pool
+ * @param {string} businessId
+ * @param {string} categoryId
+ * @param {object|null} lockState - result of loadAccountingLockState
+ */
+async function assertNoLockedPeriodTransactionsForCategory(pool, businessId, categoryId, lockState) {
+  const lockDate = normalizeDateOnly(lockState?.lockedThroughDate);
+  if (!lockDate || !categoryId) {
+    return;
+  }
+
+  const result = await pool.query(
+    `SELECT EXISTS(
+       SELECT 1 FROM transactions
+        WHERE category_id = $1
+          AND business_id = $2
+          AND date::date <= $3::date
+          AND deleted_at IS NULL
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+     ) AS has_locked`,
+    [categoryId, businessId, lockDate]
+  );
+
+  if (result.rows[0]?.has_locked) {
+    throw new AccountingPeriodLockedError({
+      lockedThroughDate: lockDate,
+      transactionDate: null
+    });
+  }
+}
+
+/**
+ * Throws AccountingPeriodLockedError if any non-archived, non-adjustment
+ * transaction inside the locked period references the given account.
+ * Safe to call with a null/empty lockState (no-ops when no lock is active).
+ *
+ * @param {object} pool         - pg Pool
+ * @param {string} businessId
+ * @param {string} accountId
+ * @param {object|null} lockState - result of loadAccountingLockState
+ */
+async function assertNoLockedPeriodTransactionsForAccount(pool, businessId, accountId, lockState) {
+  const lockDate = normalizeDateOnly(lockState?.lockedThroughDate);
+  if (!lockDate || !accountId) {
+    return;
+  }
+
+  const result = await pool.query(
+    `SELECT EXISTS(
+       SELECT 1 FROM transactions
+        WHERE account_id = $1
+          AND business_id = $2
+          AND date::date <= $3::date
+          AND deleted_at IS NULL
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+     ) AS has_locked`,
+    [accountId, businessId, lockDate]
+  );
+
+  if (result.rows[0]?.has_locked) {
+    throw new AccountingPeriodLockedError({
+      lockedThroughDate: lockDate,
+      transactionDate: null
+    });
+  }
+}
+
 module.exports = {
   AccountingPeriodLockedError,
   normalizeDateOnly,
@@ -105,5 +177,7 @@ module.exports = {
   isDateLocked,
   assertDateUnlocked,
   loadAccountingLockState,
-  saveAccountingLockState
+  saveAccountingLockState,
+  assertNoLockedPeriodTransactionsForCategory,
+  assertNoLockedPeriodTransactionsForAccount
 };

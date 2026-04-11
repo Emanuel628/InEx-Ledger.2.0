@@ -6,6 +6,11 @@ const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const {
+  AccountingPeriodLockedError,
+  loadAccountingLockState,
+  assertDateUnlocked
+} = require("../services/accountingLockService.js");
 
 const router = express.Router();
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -145,6 +150,8 @@ router.post("/", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const lockState = await loadAccountingLockState(pool, businessId);
+    assertDateUnlocked(lockState, mileageDate.slice(0, 10));
     const mileageColumns = await getMileageColumnMode();
     const insertSql = buildMileageInsertSql(mileageColumns);
     const insertValues = buildMileageInsertValues(
@@ -164,6 +171,14 @@ router.post("/", async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    if (err instanceof AccountingPeriodLockedError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        locked_through_date: err.lockedThroughDate,
+        transaction_date: err.transactionDate
+      });
+    }
     logError("POST /mileage error:", err);
     res.status(500).json({ error: "Failed to save mileage record." });
   }
@@ -391,14 +406,24 @@ router.put("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const mileageColumns = await getMileageColumnMode();
+    const dateCol = mileageDateSelect(mileageColumns);
 
     const existing = await pool.query(
-      "SELECT id FROM mileage WHERE id = $1 AND business_id = $2",
+      `SELECT id, ${dateCol} AS trip_date FROM mileage WHERE id = $1 AND business_id = $2`,
       [req.params.id, businessId]
     );
 
     if (existing.rowCount === 0) {
       return res.status(404).json({ error: "Mileage record not found." });
+    }
+
+    // Check lock: block editing a record whose original date falls in a locked period,
+    // and also block moving a record into a locked period.
+    const existingDate = existing.rows[0].trip_date;
+    const lockState = await loadAccountingLockState(pool, businessId);
+    assertDateUnlocked(lockState, existingDate);
+    if (mileageDate !== undefined) {
+      assertDateUnlocked(lockState, mileageDate.slice(0, 10));
     }
 
     // Build dynamic SET clause
@@ -459,6 +484,14 @@ router.put("/:id", async (req, res) => {
     row.trip_date = row.trip_date ?? row.date ?? null;
     res.json(row);
   } catch (err) {
+    if (err instanceof AccountingPeriodLockedError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        locked_through_date: err.lockedThroughDate,
+        transaction_date: err.transactionDate
+      });
+    }
     logError("PUT /mileage/:id error:", err.message);
     res.status(500).json({ error: "Failed to update mileage record." });
   }
@@ -473,15 +506,35 @@ router.delete("/:id", async (req, res) => {
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const result = await pool.query(
+    const mileageColumns = await getMileageColumnMode();
+    const dateCol = mileageDateSelect(mileageColumns);
+
+    const existing = await pool.query(
+      `SELECT id, ${dateCol} AS trip_date FROM mileage WHERE id = $1 AND business_id = $2 LIMIT 1`,
+      [req.params.id, businessId]
+    );
+
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ error: "Mileage record not found." });
+    }
+
+    const lockState = await loadAccountingLockState(pool, businessId);
+    assertDateUnlocked(lockState, existing.rows[0].trip_date);
+
+    await pool.query(
       "DELETE FROM mileage WHERE id = $1 AND business_id = $2",
       [req.params.id, businessId]
     );
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Mileage record not found." });
-    }
     res.json({ message: "Mileage record deleted." });
   } catch (err) {
+    if (err instanceof AccountingPeriodLockedError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        locked_through_date: err.lockedThroughDate,
+        transaction_date: err.transactionDate
+      });
+    }
     logError("DELETE /mileage/:id error:", err.message);
     res.status(500).json({ error: "Failed to delete mileage record." });
   }
