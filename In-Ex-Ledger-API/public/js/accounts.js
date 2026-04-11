@@ -154,7 +154,7 @@ async function renderAccountList() {
           <div class="account-name">${escapeHtml(account.name || tx("accounts_fallback_name"))}</div>
           <div class="account-type">${escapeHtml(formatAccountType(account.type))}</div>
         </div>
-        <button type="button" class="account-delete-btn" data-account-delete="${escapeHtml(account.id || "")}">${escapeHtml(tx("common_delete"))}</button>
+        <button type="button" class="account-delete-btn" data-account-delete="${escapeHtml(account.id || "")}" aria-label="${escapeHtml(tx("common_delete") + " " + (account.name || tx("accounts_fallback_name")))}">${escapeHtml(tx("common_delete"))}</button>
       </article>
     `).join("");
 

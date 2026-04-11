@@ -64,12 +64,12 @@
 
       <section class="category-card">
         <div class="category-card-head"><h2 data-i18n="categories_income_title">Income categories</h2></div>
-        <div id="incomeCategories" class="category-list"></div>
+        <div id="incomeCategories" class="category-list"><div class="category-empty category-loading"><p data-i18n="categories_loading">Loading categories...</p></div></div>
       </section>
 
       <section class="category-card">
         <div class="category-card-head"><h2 data-i18n="categories_expense_title">Expense categories</h2></div>
-        <div id="expenseCategories" class="category-list"></div>
+        <div id="expenseCategories" class="category-list"><div class="category-empty category-loading"><p data-i18n="categories_loading">Loading categories...</p></div></div>
       </section>
 
       <p id="categoryMessage" class="category-message"></p>
@@ -102,12 +102,12 @@
         <div class="form-field">
           <label class="field-label" data-i18n="categories_color">Color</label>
           <div class="swatch-row" id="categoryColorRow">
-            <button type="button" class="color-swatch is-active" data-color="blue" style="--swatch:#1a3a5c"></button>
-            <button type="button" class="color-swatch" data-color="green" style="--swatch:#1a5c35"></button>
-            <button type="button" class="color-swatch" data-color="amber" style="--swatch:#7a4f0a"></button>
-            <button type="button" class="color-swatch" data-color="pink" style="--swatch:#5c1a5a"></button>
-            <button type="button" class="color-swatch" data-color="red" style="--swatch:#8a1c1c"></button>
-            <button type="button" class="color-swatch" data-color="slate" style="--swatch:#4a5568"></button>
+            <button type="button" class="color-swatch is-active" data-color="blue" aria-label="Blue" aria-pressed="true" style="--swatch:#1a3a5c"></button>
+            <button type="button" class="color-swatch" data-color="green" aria-label="Green" aria-pressed="false" style="--swatch:#1a5c35"></button>
+            <button type="button" class="color-swatch" data-color="amber" aria-label="Amber" aria-pressed="false" style="--swatch:#7a4f0a"></button>
+            <button type="button" class="color-swatch" data-color="pink" aria-label="Pink" aria-pressed="false" style="--swatch:#5c1a5a"></button>
+            <button type="button" class="color-swatch" data-color="red" aria-label="Red" aria-pressed="false" style="--swatch:#8a1c1c"></button>
+            <button type="button" class="color-swatch" data-color="slate" aria-label="Slate" aria-pressed="false" style="--swatch:#4a5568"></button>
           </div>
           <input type="hidden" id="category-color" value="blue" />
         </div>
