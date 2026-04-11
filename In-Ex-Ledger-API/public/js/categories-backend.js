@@ -118,8 +118,12 @@ function wireCategoryModal() {
 
   document.querySelectorAll(".color-swatch").forEach((button) => {
     button.addEventListener("click", () => {
-      document.querySelectorAll(".color-swatch").forEach((item) => item.classList.remove("is-active"));
+      document.querySelectorAll(".color-swatch").forEach((item) => {
+        item.classList.remove("is-active");
+        item.setAttribute("aria-pressed", "false");
+      });
       button.classList.add("is-active");
+      button.setAttribute("aria-pressed", "true");
       if (colorInput) {
         colorInput.value = button.dataset.color || "blue";
       }
@@ -173,8 +177,15 @@ function closeCategoryModal() {
   if (message) message.textContent = "";
   document.getElementById("category-color").value = "blue";
   populateTaxLabelOptions("income");
-  document.querySelectorAll(".color-swatch").forEach((item) => item.classList.remove("is-active"));
-  document.querySelector('.color-swatch[data-color="blue"]')?.classList.add("is-active");
+  document.querySelectorAll(".color-swatch").forEach((item) => {
+    item.classList.remove("is-active");
+    item.setAttribute("aria-pressed", "false");
+  });
+  const blueBtn = document.querySelector('.color-swatch[data-color="blue"]');
+  if (blueBtn) {
+    blueBtn.classList.add("is-active");
+    blueBtn.setAttribute("aria-pressed", "true");
+  }
 }
 
 async function loadCategories() {
@@ -264,7 +275,7 @@ function renderCategoryGroup(containerId, type, emptyText) {
         <span class="category-pill pill-${escapeHtml(category.color || defaultColorForType(type))}">${escapeHtml(category.name)}</span>
         ${category.taxLabel ? `<div class="field-hint">${escapeHtml(formatTaxLabel(category.taxLabel))}</div>` : ""}
       </div>
-      <button type="button" class="category-delete" data-category-delete="${escapeHtml(category.id)}">${escapeHtml(tx("common_delete"))}</button>
+      <button type="button" class="category-delete" data-category-delete="${escapeHtml(category.id)}" aria-label="${escapeHtml(tx("common_delete") + " " + (category.name || tx("categories_fallback_name")))}">${escapeHtml(tx("common_delete"))}</button>
     </div>
   `).join("");
 
