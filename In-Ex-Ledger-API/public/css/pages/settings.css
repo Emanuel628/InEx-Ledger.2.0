@@ -2046,13 +2046,13 @@ body {
 }
 
 .settings-nav-item:hover {
-  background: var(--surface2, rgba(15, 23, 42, 0.04));
-  border-color: var(--border, rgba(148, 163, 184, 0.18));
+  background: transparent;
+  border-color: transparent;
   color: var(--ink, #0f172a);
 }
 
 .settings-nav-item.is-active {
-  background: var(--surface, #fff);
-  border-color: var(--border, rgba(148, 163, 184, 0.18));
+  background: transparent;
+  border-color: transparent;
   color: var(--accent2, #2563eb);
 }
