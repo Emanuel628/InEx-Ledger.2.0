@@ -129,6 +129,7 @@ async function renderAccountList() {
   if (message) {
     message.textContent = "";
   }
+  container.innerHTML = `<div class="accounts-empty accounts-loading">${escapeHtml(tx("accounts_loading"))}</div>`;
 
   try {
     const response = await apiFetch("/api/accounts");
