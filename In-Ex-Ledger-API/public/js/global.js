@@ -230,7 +230,7 @@ function injectMobileMenu() {
 
 function pollGlobalUnreadCount() {
   var token = "";
-  try { token = localStorage.getItem("token") || ""; } catch (_) {}
+  try { token = typeof window.getToken === "function" ? window.getToken() : ""; } catch (_) {}
   if (!token) return;
 
   fetch("/api/messages/unread-count", {
@@ -260,7 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
   pollGlobalUnreadCount();
   var _globalMsgPollTimer = setInterval(function () {
     var t = "";
-    try { t = localStorage.getItem("token") || ""; } catch (_) {}
+    try { t = typeof window.getToken === "function" ? window.getToken() : ""; } catch (_) {}
     if (!t) {
       clearInterval(_globalMsgPollTimer);
       return;

@@ -47,6 +47,11 @@ function createRouteApp(routePath, options = {}) {
         next();
       }
     }),
+    mockModule("../middleware/csrf.middleware.js", {
+      requireCsrfProtection(_req, _res, next) {
+        next();
+      }
+    }),
     mockModule("../middleware/rate-limit.middleware.js", {
       createDataApiLimiter() {
         return (_req, _res, next) => next();

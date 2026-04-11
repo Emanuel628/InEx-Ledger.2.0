@@ -8,6 +8,7 @@ const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const { Resend } = require("resend");
 const { signToken, verifyToken, requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const {
   createAuthLimiter,
   createMfaVerifyLimiter,
@@ -52,6 +53,7 @@ const mfaVerifyLimiter = createMfaVerifyLimiter();
    ========================================================= */
 const REFRESH_TOKEN_COOKIE = "refresh_token";
 const MFA_TRUST_COOKIE = "mfa_trust";
+const MFA_VERIFIED_COOKIE = "mfa_verified";
 const REFRESH_TOKEN_EXPIRY_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
 const REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 const MFA_TRUST_EXPIRY_DAYS = Number(process.env.MFA_TRUST_EXPIRY_DAYS) || 30;
@@ -149,9 +151,10 @@ function getAppBaseUrl(req) {
   if (configured) {
     return configured;
   }
-  const protocol = req.protocol;
-  const host = req.get("host");
-  return `${protocol}://${host}`;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("APP_BASE_URL must be configured in production.");
+  }
+  return `http://localhost:${process.env.PORT || 8080}`;
 }
 
 async function sendAppEmail({ to, subject, html, text }) {
@@ -205,7 +208,8 @@ async function revokeAllRefreshTokensForUser(userId) {
   ]);
 }
 
-async function issueAuthenticatedSession(res, user, businessIdOverride = null) {
+async function issueAuthenticatedSession(res, user, businessIdOverride = null, options = {}) {
+  const { mfaVerified = false } = options;
   const verified = Boolean(user.email_verified);
   const businessId = businessIdOverride || (await resolveBusinessIdForUser(user));
   const subscription = await getSubscriptionSnapshotForBusiness(businessId);
@@ -216,19 +220,26 @@ async function issueAuthenticatedSession(res, user, businessIdOverride = null) {
       role: user.role || "user",
       email_verified: verified,
       business_id: businessId,
-      mfa_enabled: !!user.mfa_enabled
+      mfa_enabled: !!user.mfa_enabled,
+      mfa_verified: !!mfaVerified
     },
     ACCESS_TOKEN_EXPIRY_SECONDS
   );
 
   const { token: refreshToken, expiresAt } = await createRefreshToken(user.id);
   setRefreshCookie(res, refreshToken, expiresAt);
+  if (user.mfa_enabled && mfaVerified) {
+    setMfaVerifiedCookie(res, expiresAt);
+  } else {
+    clearMfaVerifiedCookie(res);
+  }
 
   return {
     token,
     email_verified: verified,
     subscription,
     mfa_enabled: !!user.mfa_enabled,
+    mfa_verified: !!mfaVerified,
     message: verified ? undefined : "Please verify your email before requesting exports."
   };
 }
@@ -383,6 +394,21 @@ function clearMfaTrustCookie(res) {
   res.clearCookie(MFA_TRUST_COOKIE, COOKIE_OPTIONS);
 }
 
+function setMfaVerifiedCookie(res, expiresAt) {
+  res.cookie(MFA_VERIFIED_COOKIE, "1", {
+    ...COOKIE_OPTIONS,
+    expires: expiresAt
+  });
+}
+
+function clearMfaVerifiedCookie(res) {
+  res.clearCookie(MFA_VERIFIED_COOKIE, COOKIE_OPTIONS);
+}
+
+function hasVerifiedMfaCookie(req) {
+  return req.cookies?.[MFA_VERIFIED_COOKIE] === "1";
+}
+
 function hashRefreshToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
@@ -462,6 +488,7 @@ async function revokeTrustedMfaDevicesForUser(userId) {
 router.post("/register", authLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
+  const pipedaConsent = req.body?.pipeda_consent === true;
 
   // Optional geo-tagging fields for data residency tracking (PIPEDA / Quebec Law 25)
   const country = String(req.body?.country || "").trim().toUpperCase() || null;
@@ -473,6 +500,9 @@ router.post("/register", authLimiter, async (req, res) => {
 
   if (!isStrongPassword(password)) {
     return res.status(400).json({ error: "Password must be at least 8 characters and include an uppercase letter, number, and symbol." });
+  }
+  if (!pipedaConsent) {
+    return res.status(400).json({ error: "Consent is required to create an account." });
   }
 
   const hashedPassword = await hashPassword(password);
@@ -664,6 +694,7 @@ router.post("/login", authLimiter, async (req, res) => {
         await touchTrustedMfaDevice(trustedDevice.id);
       } else {
         clearMfaTrustCookie(res);
+        clearMfaVerifiedCookie(res);
       }
 
       if (!trustedDevice) {
@@ -679,9 +710,14 @@ router.post("/login", authLimiter, async (req, res) => {
           mfa_enabled: true
         });
       }
+
+      const session = await issueAuthenticatedSession(res, user, businessId, { mfaVerified: true });
+      res.status(200).json(session);
+      return;
     }
 
-    const session = await issueAuthenticatedSession(res, user, businessId);
+    clearMfaVerifiedCookie(res);
+    const session = await issueAuthenticatedSession(res, user, businessId, { mfaVerified: false });
     res.status(200).json(session);
   } catch (err) {
     console.error("Login error:", err);
@@ -692,7 +728,7 @@ router.post("/login", authLimiter, async (req, res) => {
 /**
  * POST /refresh
  */
-router.post("/refresh", async (req, res) => {
+router.post("/refresh", requireCsrfProtection, async (req, res) => {
   const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (!rawToken) {
     clearRefreshCookie(res);
@@ -727,6 +763,7 @@ router.post("/refresh", async (req, res) => {
       business_id: req.user?.business_id
     });
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    const mfaVerified = !!result.rows[0].mfa_enabled && hasVerifiedMfaCookie(req);
 
     const token = signToken(
       {
@@ -735,11 +772,17 @@ router.post("/refresh", async (req, res) => {
         role: result.rows[0].role || "user",
         email_verified: !!result.rows[0].email_verified,
         business_id: businessId,
-        mfa_enabled: !!result.rows[0].mfa_enabled
+        mfa_enabled: !!result.rows[0].mfa_enabled,
+        mfa_verified: mfaVerified
       },
       ACCESS_TOKEN_EXPIRY_SECONDS
     );
 
+    if (!mfaVerified) {
+      clearMfaVerifiedCookie(res);
+    } else {
+      setMfaVerifiedCookie(res, refreshData.expiresAt);
+    }
     res.status(200).json({ token, subscription });
   } catch (err) {
     console.error("Refresh token error:", err);
@@ -751,13 +794,15 @@ router.post("/refresh", async (req, res) => {
 /**
  * POST /logout
  */
-router.post("/logout", requireAuth, async (req, res) => {
+router.post("/logout", requireAuth, requireCsrfProtection, async (req, res) => {
   const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (rawToken) {
     const hashed = hashRefreshToken(rawToken);
     await revokeRefreshTokenByHash(hashed);
   }
   clearRefreshCookie(res);
+  clearMfaTrustCookie(res);
+  clearMfaVerifiedCookie(res);
   res.status(204).end();
 });
 
@@ -788,7 +833,7 @@ router.get("/verify-email", async (req, res) => {
   }
 });
 
-router.post("/change-password", authLimiter, requireAuth, requireMfa, async (req, res) => {
+router.post("/change-password", authLimiter, requireAuth, requireCsrfProtection, requireMfa, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   const newPassword = req.body?.newPassword;
   const confirmPassword = req.body?.confirmPassword;
@@ -828,6 +873,7 @@ router.post("/change-password", authLimiter, requireAuth, requireMfa, async (req
     await resetCurrentRefreshSession(res, user);
     await revokeTrustedMfaDevicesForUser(user.id);
     clearMfaTrustCookie(res);
+    clearMfaVerifiedCookie(res);
 
     return res.status(200).json({ success: true, message: "Password updated." });
   } catch (err) {
@@ -850,15 +896,15 @@ router.get("/mfa/status", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/mfa/setup", requireAuth, authLimiter, async (req, res) => {
+router.post("/mfa/setup", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
   return res.status(410).json({ error: "Authenticator app setup is no longer used." });
 });
 
-router.post("/mfa/setup/cancel", requireAuth, async (req, res) => {
+router.post("/mfa/setup/cancel", requireAuth, requireCsrfProtection, async (req, res) => {
   return res.status(200).json({ success: true });
 });
 
-router.post("/mfa/enable", requireAuth, authLimiter, async (req, res) => {
+router.post("/mfa/enable", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   const code = String(req.body?.code || "").trim();
   const mfaToken = String(req.body?.mfaToken || "").trim();
@@ -942,6 +988,7 @@ router.post("/mfa/enable", requireAuth, authLimiter, async (req, res) => {
     await resetCurrentRefreshSession(res, refreshedUser);
     await revokeTrustedMfaDevicesForUser(user.id);
     clearMfaTrustCookie(res);
+    clearMfaVerifiedCookie(res);
 
     return res.status(200).json({
       success: true,
@@ -954,7 +1001,7 @@ router.post("/mfa/enable", requireAuth, authLimiter, async (req, res) => {
   }
 });
 
-router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
+router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   const code = String(req.body?.code || "").trim();
   const mfaToken = String(req.body?.mfaToken || "").trim();
@@ -1038,6 +1085,7 @@ router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
     await resetCurrentRefreshSession(res, refreshedUser);
     await revokeTrustedMfaDevicesForUser(user.id);
     clearMfaTrustCookie(res);
+    clearMfaVerifiedCookie(res);
 
     return res.status(200).json({
       success: true,
@@ -1050,7 +1098,7 @@ router.post("/mfa/disable", requireAuth, mfaVerifyLimiter, async (req, res) => {
   }
 });
 
-router.post("/mfa/recovery-codes/regenerate", requireAuth, mfaVerifyLimiter, async (req, res) => {
+router.post("/mfa/recovery-codes/regenerate", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
   return res.status(410).json({ error: "Recovery codes are no longer used." });
 });
 
@@ -1098,7 +1146,12 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
       const trustedDevice = await createTrustedMfaDevice(refreshedUser, req);
       setMfaTrustCookie(res, trustedDevice.token, trustedDevice.expiresAt);
     }
-    const session = await issueAuthenticatedSession(res, refreshedUser, pending.business_id || null);
+    const session = await issueAuthenticatedSession(
+      res,
+      refreshedUser,
+      pending.business_id || null,
+      { mfaVerified: true }
+    );
     return res.status(200).json(session);
   } catch (err) {
     console.error("MFA verify error:", err);
@@ -1172,7 +1225,7 @@ router.post("/reset-password", passwordLimiter, async (req, res) => {
  * POST /request-email-change
  * Initiates email change: verifies current password, sends link to new address.
  */
-router.post("/request-email-change", requireAuth, authLimiter, async (req, res) => {
+router.post("/request-email-change", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
   const { newEmail, currentPassword } = req.body ?? {};
   const email = normalizeEmail(newEmail);
 

@@ -2,6 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createTransactionLimiter } = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser, getBusinessScopeForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { encrypt, decrypt } = require("../services/encryptionService.js");
@@ -24,6 +25,7 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 router.use(createTransactionLimiter());
 
 function deriveCategoryKindFromSlug(slug) {
@@ -65,7 +67,7 @@ function deriveCategoryNameFromSlug(slug) {
  * @returns {Promise<string|null>} Resolved category UUID, or null when
  *                                 categoryRef is empty.
  */
-async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
+async function resolveCategoryId(businessId, categoryRef, fallbackKind, db = pool) {
   const raw = String(categoryRef ?? "").trim();
   if (!raw) {
     return null;
@@ -78,7 +80,7 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
   const kind = deriveCategoryKindFromSlug(raw) || fallbackKind || "expense";
   const name = deriveCategoryNameFromSlug(raw);
 
-  const existing = await pool.query(
+  const existing = await db.query(
     "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
     [businessId, name]
   );
@@ -87,7 +89,7 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
     return existing.rows[0].id;
   }
 
-  const inserted = await pool.query(
+  const inserted = await db.query(
     `INSERT INTO categories (id, business_id, name, kind, created_at)
     VALUES ($1, $2, $3, $4, now())
     ON CONFLICT (business_id, lower(name)) DO NOTHING
@@ -99,7 +101,7 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
     return inserted.rows[0].id;
   }
 
-  const existingAfterInsert = await pool.query(
+  const existingAfterInsert = await db.query(
     "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
     [businessId, name]
   );
@@ -513,6 +515,7 @@ router.post("/", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
+  const client = await pool.connect();
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const businessTaxContext = await getBusinessRegionAndCurrency(businessId);
@@ -524,32 +527,37 @@ router.put("/:id", async (req, res) => {
     const { description, note } = req.body;
 
     // Verify the original transaction exists and belongs to this business
-    const originalResult = await pool.query(
+    await client.query("BEGIN");
+
+    const originalResult = await client.query(
       "SELECT id, date FROM transactions WHERE id = $1 AND business_id = $2 AND is_adjustment = false AND deleted_at IS NULL",
       [req.params.id, businessId]
     );
     if (originalResult.rowCount === 0) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ error: "Transaction not found." });
     }
     await assertUnlockedBusinessDates(businessId, originalResult.rows[0].date, date);
 
-    const accountCheck = await pool.query(
+    const accountCheck = await client.query(
       "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
       [account_id, businessId]
     );
     if (accountCheck.rowCount === 0) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ error: "account_id does not belong to your business" });
     }
 
-    const mappedCategoryId = await resolveCategoryId(businessId, category_id, type);
+    const mappedCategoryId = await resolveCategoryId(businessId, category_id, type, client);
     if (!mappedCategoryId) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ error: "category_id is invalid" });
     }
 
     const encryptedDescription = tryEncryptDescription(description);
 
     // Audit Pivot: insert a new adjustment row referencing the original transaction
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO transactions
         (id, business_id, account_id, category_id, amount, type, cleared,
          description, description_encrypted, date, note,
@@ -589,11 +597,19 @@ router.put("/:id", async (req, res) => {
         req.user.id
       ]
     );
+    await client.query("COMMIT");
 
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // ignore rollback errors; the original failure is more important
+    }
     console.error("PUT /transactions/:id error:", err);
     return handleTransactionMutationError(res, err, "Failed to update transaction.");
+  } finally {
+    client.release();
   }
 });
 

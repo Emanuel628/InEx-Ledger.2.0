@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createBillingMutationLimiter } = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const {
@@ -108,7 +109,11 @@ async function ensureStripeCustomer(businessId, user) {
 }
 
 function buildAppUrl(req, path) {
-  const base = process.env.APP_BASE_URL || `${req.protocol}://${req.get("host")}`;
+  const configuredBase = String(process.env.APP_BASE_URL || "").trim();
+  if (!configuredBase && process.env.NODE_ENV === "production") {
+    throw new Error("APP_BASE_URL must be configured in production.");
+  }
+  const base = configuredBase || `${req.protocol}://localhost:${process.env.PORT || 8080}`;
   return `${base.replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
@@ -123,7 +128,7 @@ router.get("/subscription", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/checkout-session", billingMutationLimiter, requireAuth, requireMfa, async (req, res) => {
+router.post("/checkout-session", billingMutationLimiter, requireAuth, requireCsrfProtection, requireMfa, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
@@ -146,11 +151,11 @@ router.post("/checkout-session", billingMutationLimiter, requireAuth, requireMfa
     res.status(200).json({ url: session.url, id: session.id });
   } catch (err) {
     console.error("POST /api/billing/checkout-session error:", err.message);
-    res.status(500).json({ error: err.message || "Failed to start checkout." });
+    res.status(500).json({ error: "Failed to start checkout." });
   }
 });
 
-router.post("/customer-portal", requireAuth, async (req, res) => {
+router.post("/customer-portal", requireAuth, requireCsrfProtection, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const customerId = await ensureStripeCustomer(businessId, req.user);
@@ -161,11 +166,11 @@ router.post("/customer-portal", requireAuth, async (req, res) => {
     res.status(200).json({ url: session.url });
   } catch (err) {
     console.error("POST /api/billing/customer-portal error:", err.message);
-    res.status(500).json({ error: err.message || "Failed to open billing portal." });
+    res.status(500).json({ error: "Failed to open billing portal." });
   }
 });
 
-router.post("/cancel", requireAuth, billingMutationLimiter, async (req, res) => {
+router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);

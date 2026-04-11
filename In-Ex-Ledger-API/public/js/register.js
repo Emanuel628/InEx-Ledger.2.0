@@ -110,7 +110,13 @@ async function handleRegisterSubmit(event) {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, country, province })
+      body: JSON.stringify({
+        email,
+        password,
+        country,
+        province,
+        pipeda_consent: !!tosConsentCheckbox?.checked
+      })
     });
 
     const regBody = await regResponse.json().catch(() => null);

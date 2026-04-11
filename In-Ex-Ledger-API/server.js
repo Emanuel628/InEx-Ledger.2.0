@@ -6,6 +6,7 @@ const path = require('path');
 const routes = require('./routes/index.js');
 const cookieParser = require('cookie-parser');
 const transactionsRouter = require('./routes/transactions.routes.js');
+const { ensureCsrfCookie } = require('./middleware/csrf.middleware.js');
 const { createGlobalLimiter } = require('./middleware/rateLimitTiers.js');
 const { initDatabase } = require('./db.js');
 
@@ -104,6 +105,8 @@ app.use(cors({
   },
   credentials: true
 }));
+app.use(cookieParser());
+app.use(ensureCsrfCookie);
 
 /* =========================================================
    MIDDLEWARE STACK
@@ -152,7 +155,6 @@ app.use(express.static(publicDir, {
 }));
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
-app.use(cookieParser());
 app.use('/api', createGlobalLimiter());
 
 /* =========================================================
@@ -161,11 +163,12 @@ app.use('/api', createGlobalLimiter());
 
 // Railway Deployment Healthcheck
 app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: dbState === 'ready' ? 'healthy' : 'starting',
+  const status = dbState === 'ready' ? 'healthy' : 'starting';
+  const responseCode = status === 'healthy' ? 200 : 503;
+  res.status(responseCode).json({
+    status,
     database: {
-      state: dbState,
-      lastError: dbLastError
+      state: dbState
     },
     uptime: process.uptime(),
     timestamp: new Date().toISOString()

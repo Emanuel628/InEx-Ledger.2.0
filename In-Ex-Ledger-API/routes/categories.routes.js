@@ -2,6 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const {
   resolveBusinessIdForUser,
@@ -17,6 +18,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 router.use(createDataApiLimiter());
 
 const VALID_KINDS = new Set(["income", "expense"]);
@@ -77,6 +79,9 @@ router.post("/", async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    if (err?.code === "23505") {
+      return res.status(409).json({ error: "A category with that name already exists." });
+    }
     console.error("POST /categories error:", err.message);
     res.status(500).json({ error: "Failed to create category." });
   }

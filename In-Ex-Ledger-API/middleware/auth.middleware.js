@@ -46,8 +46,8 @@ function verifyToken(token) {
 
   const [header, body, signature] = parts;
   const expected = signWithSecret(`${header}.${body}`);
-  const bufferSignature = Buffer.from(signature, "utf8");
-  const bufferExpected = Buffer.from(expected, "utf8");
+  const bufferSignature = Buffer.from(signature, "base64url");
+  const bufferExpected = Buffer.from(expected, "base64url");
   if (
     bufferSignature.length !== bufferExpected.length ||
     !crypto.timingSafeEqual(bufferSignature, bufferExpected)
@@ -95,10 +95,9 @@ function optionalAuth(req, res, next) {
 }
 
 /**
- * Middleware that requires MFA to be enabled on the authenticated user.
- * Must be placed after requireAuth.
- * Returns 403 with mfa_required: true when MFA is not yet configured,
- * so the client can redirect the user to the MFA setup page.
+ * Middleware for routes that require a recently MFA-verified session when the
+ * user has MFA enabled. Users without MFA enabled are allowed through so core
+ * account recovery flows do not dead-end behind "setup required" errors.
  */
 function requireMfa(req, res, next) {
   if (!req.user) {
@@ -106,10 +105,15 @@ function requireMfa(req, res, next) {
   }
 
   if (!req.user.mfa_enabled) {
+    return next();
+  }
+
+  if (!req.user.mfa_verified) {
     return res.status(403).json({
-      error: "MFA setup required",
+      error: "MFA verification required",
       mfa_required: true,
-      setup_url: "/settings#settings-security"
+      setup_url: "/settings#settings-security",
+      verification_required: true
     });
   }
 

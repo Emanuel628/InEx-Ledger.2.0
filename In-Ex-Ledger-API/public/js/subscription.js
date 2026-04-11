@@ -15,6 +15,18 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
+function isAllowedBillingRedirect(url) {
+  try {
+    const parsed = new URL(String(url || ""));
+    return (
+      parsed.protocol === "https:" &&
+      (parsed.hostname === "checkout.stripe.com" || parsed.hostname === "billing.stripe.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
 function fmtDate(ts) {
   if (!ts) return "-";
   const ms = typeof ts === "number" ? ts * 1000 : new Date(ts).getTime();
@@ -247,7 +259,10 @@ async function startCheckout() {
     if (!res) return;
     const payload = await res.json().catch(() => null);
     if (!res.ok) throw new Error(payload?.error || tx("subscription_checkout_error"));
-    if (payload?.url) window.location.href = payload.url;
+    if (!isAllowedBillingRedirect(payload?.url)) {
+      throw new Error(tx("subscription_checkout_error"));
+    }
+    window.location.href = payload.url;
   } catch (err) {
     showSubToast(err.message || tx("subscription_checkout_error"));
   }
@@ -262,7 +277,10 @@ async function openCustomerPortal() {
     if (!res) return;
     const payload = await res.json().catch(() => null);
     if (!res.ok) throw new Error(payload?.error || tx("subscription_portal_error"));
-    if (payload?.url) window.location.href = payload.url;
+    if (!isAllowedBillingRedirect(payload?.url)) {
+      throw new Error(tx("subscription_portal_error"));
+    }
+    window.location.href = payload.url;
   } catch (err) {
     showSubToast(err.message || tx("subscription_portal_error"));
   }

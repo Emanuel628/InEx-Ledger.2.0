@@ -24,6 +24,7 @@ const SETTINGS_PASSWORD_RULES = {
   special: (value) => /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(value)
 };
 const CA_PROVINCES = ["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"];
+const FISCAL_YEAR_MM_DD_REGEX = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const taxHelpers = window.LUNA_TAX || {};
 const resolveEstimatedTaxProfileHelper = taxHelpers.resolveEstimatedTaxProfile || ((region, province) => {
   const normalizedRegion = String(region || "").toUpperCase() === "CA" ? "CA" : "US";
@@ -136,10 +137,35 @@ function saveBusinessProfile(profile) {
 
 function formatFiscalYearSummary(value) {
   if (!value) return t("settings_overview_fiscal_not_set");
-  const date = new Date(value);
+  const normalized = FISCAL_YEAR_MM_DD_REGEX.test(String(value || ""))
+    ? `2000-${value}`
+    : value;
+  const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return value;
   const formatted = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   return interpolateTranslatedMessage("settings_overview_fiscal_year", { date: formatted });
+}
+
+function normalizeFiscalYearInputValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+  if (FISCAL_YEAR_MM_DD_REGEX.test(raw)) {
+    return `2000-${raw}`;
+  }
+  return raw;
+}
+
+function normalizeFiscalYearApiValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return null;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw.slice(5);
+  }
+  return raw;
 }
 
 function localizeBusinessType(type) {
@@ -576,7 +602,9 @@ async function loadBusinessProfile() {
       name: business?.name || fallback.name || "",
       type: business?.business_type || fallback.type || "sole_proprietor",
       ein: business?.tax_id || fallback.ein || "",
-      fiscalYearStart: business?.fiscal_year_start || fallback.fiscalYearStart || "",
+      fiscalYearStart: normalizeFiscalYearInputValue(
+        business?.fiscal_year_start || fallback.fiscalYearStart || ""
+      ),
       address: business?.address || fallback.address || ""
     };
     saveBusinessProfile(profile);
@@ -596,7 +624,7 @@ async function saveBusinessProfileToApi(profile) {
       },
       body: JSON.stringify({
         name: profile.name,
-        fiscal_year_start: profile.fiscalYearStart || null,
+        fiscal_year_start: normalizeFiscalYearApiValue(profile.fiscalYearStart),
         business_type: profile.type || null,
         tax_id: profile.ein || null,
         address: profile.address || null

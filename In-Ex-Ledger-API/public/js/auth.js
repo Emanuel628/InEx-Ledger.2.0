@@ -13,6 +13,8 @@ const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const SUBSCRIPTION_KEY = "lb_subscription";
 const ACTIVE_BUSINESS_ID_KEY = "lb_active_business_id";
 const ACTIVE_BUSINESS_NAME_KEY = "lb_business_name";
+const CSRF_COOKIE_NAME = "csrf_token";
+const CSRF_HEADER_NAME = "X-CSRF-Token";
 const ONBOARDING_PAGE = "/onboarding";
 const LOGIN_PAGE = "/login";
 const ACCOUNT_MENU_STYLE_ID = "luna-account-menu-style";
@@ -27,6 +29,16 @@ const ONBOARDING_RUNTIME_PAGES = new Set([
 
 if (!window.API_BASE) {
   window.API_BASE = "";
+}
+
+if (typeof window.__LUNA_ACCESS_TOKEN__ !== "string") {
+  window.__LUNA_ACCESS_TOKEN__ = "";
+}
+
+try {
+  localStorage.removeItem(TOKEN_KEY);
+} catch {
+  // Ignore storage access issues and rely on the refresh cookie.
 }
 
 function escapeHtml(str) {
@@ -287,15 +299,25 @@ function removeLegacyBusinessPills() {
 }
 
 function getToken() {
-  return localStorage.getItem(TOKEN_KEY) || "";
+  return String(window.__LUNA_ACCESS_TOKEN__ || "");
 }
 
 function setToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
+  window.__LUNA_ACCESS_TOKEN__ = String(token || "");
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Ignore storage access issues.
+  }
 }
 
 function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  window.__LUNA_ACCESS_TOKEN__ = "";
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Ignore storage access issues.
+  }
   clearSubscriptionState();
   clearAppState();
   if (window.__AUTH_GUARD_STATE__) {
@@ -306,6 +328,43 @@ function clearToken() {
 function authHeader() {
   const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function getCookieValue(name) {
+  const cookieString = String(document.cookie || "");
+  if (!cookieString || !name) {
+    return "";
+  }
+
+  const prefix = `${name}=`;
+  const match = cookieString
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix));
+
+  if (!match) {
+    return "";
+  }
+
+  return decodeURIComponent(match.slice(prefix.length));
+}
+
+function getCsrfToken() {
+  try {
+    return getCookieValue(CSRF_COOKIE_NAME);
+  } catch {
+    return "";
+  }
+}
+
+function csrfHeader(method = "GET") {
+  const normalizedMethod = String(method || "GET").toUpperCase();
+  if (normalizedMethod === "GET" || normalizedMethod === "HEAD" || normalizedMethod === "OPTIONS") {
+    return {};
+  }
+
+  const token = getCsrfToken();
+  return token ? { [CSRF_HEADER_NAME]: token } : {};
 }
 
 async function refreshAccessToken() {
@@ -319,7 +378,8 @@ async function refreshAccessToken() {
         method: "POST",
         credentials: "include",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...csrfHeader("POST")
         }
       });
 
@@ -465,7 +525,14 @@ async function requireValidSessionOrRedirect() {
 
 async function redirectIfAuthenticated() {
   try {
-    const response = await fetch(buildApiUrl("/api/me"), {
+    if (!getToken()) {
+      const refreshResult = await refreshAccessToken();
+      if (!refreshResult?.ok) {
+        return;
+      }
+    }
+
+    const fetchProfile = () => fetch(buildApiUrl("/api/me"), {
       method: "GET",
       credentials: "include",
       headers: {
@@ -473,6 +540,16 @@ async function redirectIfAuthenticated() {
         ...authHeader()
       }
     });
+
+    let response = await fetchProfile();
+    if (response.status === 401) {
+      const refreshResult = await refreshAccessToken();
+      if (!refreshResult?.ok) {
+        return;
+      }
+      response = await fetchProfile();
+    }
+
     if (response.status === 200) {
       const payload = await response.json().catch(() => null);
       window.__LUNA_ME__ = payload;
@@ -504,7 +581,8 @@ async function apiFetch(url, options = {}) {
     headers: {
       "Content-Type": "application/json",
       ...optionHeaders,
-      ...authHeader()
+      ...authHeader(),
+      ...csrfHeader(fetchOptions.method || "GET")
     }
   });
 
@@ -552,7 +630,10 @@ async function signOut() {
     await fetch(buildApiUrl("/api/auth/logout"), {
       method: "POST",
       credentials: "include",
-      headers: authHeader()
+      headers: {
+        ...authHeader(),
+        ...csrfHeader("POST")
+      }
     });
   } catch (err) {
     if (localStorage.getItem("debug") === "true") { console.error("Logout error:", err); }
@@ -1217,4 +1298,6 @@ document.addEventListener("keydown", (event) => {
     closeBusinessCreationModal();
   }
 });
+
+window.getToken = getToken;
 

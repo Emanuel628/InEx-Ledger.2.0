@@ -1,6 +1,7 @@
 const express = require("express");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const {
   normalizeDateOnly,
@@ -11,14 +12,26 @@ const { encryptTaxId, decryptTaxId } = require("../services/taxIdService.js");
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
+const FISCAL_YEAR_REGEX = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const BUSINESS_SELECT = `SELECT id, name, region, language, fiscal_year_start, province,
                                 business_type, tax_id, address, created_at
                          FROM businesses
                          WHERE id = $1`;
+
+function normalizeFiscalYearStart(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return null;
+  }
+
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw.slice(5) : raw;
+  return FISCAL_YEAR_REGEX.test(normalized) ? normalized : null;
+}
 
 function normalizeBusinessRow(row) {
   if (!row) {
@@ -107,6 +120,9 @@ router.put("/", async (req, res) => {
   if (language && !VALID_LANGUAGES.has(language)) {
     return res.status(400).json({ error: "language must be 'en', 'es', or 'fr'" });
   }
+  if (fiscal_year_start !== undefined && fiscal_year_start !== null && normalizeFiscalYearStart(fiscal_year_start) === null) {
+    return res.status(400).json({ error: "fiscal_year_start must use MM-DD format." });
+  }
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
@@ -138,7 +154,7 @@ router.put("/", async (req, res) => {
       name,
       region: resolvedRegion,
       language,
-      fiscal_year_start,
+      fiscal_year_start: normalizeFiscalYearStart(fiscal_year_start),
       province: resolvedProvince,
       business_type: resolvedBusinessType,
       tax_id: resolvedTaxId,
