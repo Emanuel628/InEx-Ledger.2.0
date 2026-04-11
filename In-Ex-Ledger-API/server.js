@@ -12,7 +12,7 @@ const {
   initializeRateLimiterProtection
 } = require('./middleware/rateLimiter.js');
 const { ensureCsrfCookie } = require('./middleware/csrf.middleware.js');
-const { initDatabase } = require('./db.js');
+const { initDatabase, MigrationContentDriftError, migrationStats } = require('./db.js');
 const { getReceiptStorageStatus, initializeReceiptStorage } = require('./services/receiptStorage.js');
 const { logInfo, logWarn, logError } = require('./utils/logger.js');
 
@@ -169,6 +169,12 @@ app.use('/api', (req, res, next) => {
       error: 'Service temporarily unavailable due to rate limiting requirements.'
     });
   }
+  if (dbState === 'failed') {
+    return res.status(503).json({
+      error: 'Service unavailable due to a configuration error. Administrator action required.',
+      database: { state: dbState }
+    });
+  }
   if (dbState !== 'ready') {
     return res.status(503).json({
       error: 'Service starting up. Please try again shortly.',
@@ -189,12 +195,22 @@ app.use('/api', (req, res, next) => {
 app.get('/health', (req, res) => {
   const rateLimiting = getRateLimiterHealth();
   const receiptStorage = getReceiptStorageStatus();
-  const healthy = dbState === 'ready' && rateLimiting.mode !== 'degraded' && receiptStorage.mode !== 'degraded';
+
+  let overallStatus;
+  if (dbState === 'ready' && rateLimiting.mode !== 'degraded' && receiptStorage.mode !== 'degraded') {
+    overallStatus = 'healthy';
+  } else if (dbState === 'ready') {
+    overallStatus = 'degraded';
+  } else {
+    overallStatus = dbState;
+  }
+
   res.status(200).json({
-    status: healthy ? 'healthy' : (dbState === 'ready' ? 'degraded' : 'starting'),
+    status: overallStatus,
     database: {
       state: dbState,
-      lastError: dbLastError
+      lastError: dbLastError,
+      migrations: migrationStats
     },
     receiptStorage,
     rateLimiting,
@@ -271,6 +287,12 @@ async function initializeDatabaseWithRetry() {
         logInfo('Database initialization completed.');
         return;
       } catch (err) {
+        if (err instanceof MigrationContentDriftError) {
+          dbState = 'failed';
+          dbLastError = err.message;
+          logError('Database initialization failed permanently (migration content drift):', { message: err.message });
+          return;
+        }
         dbState = 'retrying';
         dbLastError = err?.message || String(err);
         logError('Database initialization failed:', { message: err?.message || String(err) });
