@@ -19,6 +19,15 @@ const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForU
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const {
+  getPreferredLanguageForUser,
+  getPreferredLanguageForEmail,
+  buildWelcomeVerificationEmail,
+  buildVerificationEmail,
+  buildPasswordResetEmail,
+  buildEmailChangeEmail,
+  buildMfaEmailContent
+} = require("../services/emailI18nService.js");
 
 const router = express.Router();
 
@@ -304,13 +313,33 @@ async function createMfaEmailChallenge(user, req, options = {}) {
     businessId = null,
     tokenPurpose = "mfa_pending",
     tokenPayload = {},
-    subject = "Your InEx Ledger sign-in code",
-    heading = "Your sign-in verification code",
-    body = "We noticed a sign-in from a new or untrusted device. Enter this code to finish signing in.",
-    footer = "If this was not you, change your password immediately.",
-    locationLabel = "Sign-in page",
+    lang = "en",
+    mfaContentKey = "signin",
     locationPath = "/login"
   } = options;
+
+  // Merge caller-supplied text overrides with language-default content so that
+  // French users always receive French copy even for callers that do not
+  // explicitly set subject/heading/body/footer.
+  const defaultContent = buildMfaEmailContent(lang, mfaContentKey);
+  const subject = options.subject ?? defaultContent.subject;
+  const heading = options.heading ?? defaultContent.heading;
+  const body    = options.body    ?? defaultContent.body;
+  const footer  = options.footer  ?? defaultContent.footer;
+
+  // Localised page label for the footer line
+  const locationLabelFr = {
+    "/login":    "Page de connexion",
+    "/settings": "Paramètres"
+  };
+  const locationLabel = options.locationLabel
+    ?? (lang === "fr" ? (locationLabelFr[locationPath] ?? "InEx Ledger") : (mfaContentKey === "signin" ? "Sign-in page" : "Settings"));
+
+  const expiryLine =
+    lang === "fr"
+      ? `Ce code expire dans ${MFA_EMAIL_CODE_EXPIRY_MINUTES} minutes. ${footer}`
+      : `This code expires in ${MFA_EMAIL_CODE_EXPIRY_MINUTES} minutes. ${footer}`;
+
   const code = generateMfaEmailCode();
   const expiresAt = new Date(Date.now() + MFA_EMAIL_CODE_EXPIRY_MS);
   const challengeId = crypto.randomUUID();
@@ -340,7 +369,7 @@ async function createMfaEmailChallenge(user, req, options = {}) {
             ${code}
           </div>
           <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">
-            This code expires in ${MFA_EMAIL_CODE_EXPIRY_MINUTES} minutes. ${footer}
+            ${expiryLine}
           </p>
           <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">
             ${locationLabel}: ${appBaseUrl}${locationPath}
@@ -348,7 +377,7 @@ async function createMfaEmailChallenge(user, req, options = {}) {
         </div>
       </div>
     `,
-    text: `${heading}\n\n${body}\n\nCode: ${code}\n\nThis code expires in ${MFA_EMAIL_CODE_EXPIRY_MINUTES} minutes. ${footer}`
+    text: `${heading}\n\n${body}\n\nCode: ${code}\n\n${expiryLine}`
   });
 
   return createPendingMfaToken(user, businessId, challengeId, tokenPurpose, tokenPayload);
@@ -532,35 +561,11 @@ router.post("/register", authLimiter, async (req, res) => {
     try {
       const { token } = await createVerificationToken(email);
       const verificationLink = buildVerificationLink(req, token);
-
-      await sendAppEmail({
-        to: email,
-        subject: "Welcome to InEx Ledger - verify your email",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
-            <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
-              <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">Welcome to InEx Ledger</div>
-              <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">Your account is ready. One last step.</h1>
-            </div>
-            <div style="padding: 28px;">
-              <p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">
-                Thanks for signing up. Verify your email to unlock your workspace and start tracking income,
-                expenses, receipts, mileage, and tax-ready exports.
-              </p>
-              <div style="margin: 24px 0;">
-                <a href="${verificationLink}" style="display: inline-block; padding: 14px 22px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700;">
-                  Verify email
-                </a>
-              </div>
-              <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">
-                This verification link expires in 15 minutes. If the button does not work, copy and paste this link into your browser:
-              </p>
-              <p style="margin: 0; word-break: break-all; color: #1d4ed8; font-size: 13px;">${verificationLink}</p>
-            </div>
-          </div>
-        `,
-        text: `Welcome to InEx Ledger.\n\nVerify your email to activate your account:\n${verificationLink}\n\nThis link expires in 15 minutes.`
-      });
+      // For new registrations the business language hasn't been set yet via
+      // onboarding, so we infer language from province: QC defaults to French.
+      const registrationLang = (country === "CA" && province === "QC") ? "fr" : "en";
+      const emailContent = buildWelcomeVerificationEmail(registrationLang, verificationLink);
+      await sendAppEmail({ to: email, ...emailContent });
     } catch (emailErr) {
       logError("Email failed to send, but account was created:", emailErr);
     }
@@ -600,34 +605,9 @@ router.post("/send-verification", authLimiter, async (req, res) => {
 
     const { token, expiresAt } = await createVerificationToken(email);
     const verificationLink = buildVerificationLink(req, token);
-
-    await sendAppEmail({
-      to: email,
-      subject: "Verify your InEx Ledger email",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
-          <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
-            <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger</div>
-            <h1 style="margin: 12px 0 0; font-size: 26px; line-height: 1.15;">Verify your email</h1>
-          </div>
-          <div style="padding: 28px;">
-            <p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">
-              Click the button below to verify your email address and finish setting up your account.
-            </p>
-            <div style="margin: 24px 0;">
-              <a href="${verificationLink}" style="display: inline-block; padding: 14px 22px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700;">
-                Verify email
-              </a>
-            </div>
-            <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">
-              This verification link expires in 15 minutes. If you did not create this account, you can ignore this email.
-            </p>
-            <p style="margin: 0; word-break: break-all; color: #1d4ed8; font-size: 13px;">${verificationLink}</p>
-          </div>
-        </div>
-      `,
-      text: `Verify your InEx Ledger email.\n\nUse this link to verify your account:\n${verificationLink}\n\nThis link expires in 15 minutes.`
-    });
+    const lang = await getPreferredLanguageForEmail(email);
+    const emailContent = buildVerificationEmail(lang, verificationLink);
+    await sendAppEmail({ to: email, ...emailContent });
 
     res.status(200).json({ message: "Verification link sent to your email." });
   } catch (err) {
@@ -688,9 +668,11 @@ router.post("/login", authLimiter, async (req, res) => {
       }
 
       if (!trustedDevice) {
+        const userLang = await getPreferredLanguageForUser(user.id);
         const mfaToken = await createMfaEmailChallenge(user, req, {
           businessId,
-          locationLabel: "Sign-in page",
+          lang: userLang,
+          mfaContentKey: "signin",
           locationPath: "/login"
         });
         return res.status(200).json({
@@ -899,14 +881,12 @@ router.post("/mfa/enable", requireAuth, requireCsrfProtection, authLimiter, asyn
     }
 
     if (!code || !mfaToken) {
+      const userLang = await getPreferredLanguageForUser(user.id);
       const pendingToken = await createMfaEmailChallenge(user, req, {
         tokenPurpose: "mfa_settings_enable",
         tokenPayload: { target_state: true },
-        subject: "Confirm MFA setup for InEx Ledger",
-        heading: "Confirm MFA setup",
-        body: "We received a request to turn on multi-factor authentication for your account. Enter this code in Settings to confirm it was really you.",
-        footer: "If you did not request this change, do not enter the code.",
-        locationLabel: "Settings",
+        lang: userLang,
+        mfaContentKey: "mfa_enable",
         locationPath: "/settings"
       });
 
@@ -995,14 +975,12 @@ router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter
     }
 
     if (!code || !mfaToken) {
+      const userLang = await getPreferredLanguageForUser(user.id);
       const pendingToken = await createMfaEmailChallenge(user, req, {
         tokenPurpose: "mfa_settings_disable",
         tokenPayload: { target_state: false },
-        subject: "Confirm MFA removal for InEx Ledger",
-        heading: "Confirm MFA removal",
-        body: "We received a request to turn off multi-factor authentication for your account. Enter this code in Settings to confirm it was really you.",
-        footer: "If you did not request this change, do not enter the code.",
-        locationLabel: "Settings",
+        lang: userLang,
+        mfaContentKey: "mfa_disable",
         locationPath: "/settings"
       });
 
@@ -1141,36 +1119,9 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
       const resetLink = buildPasswordResetLink(req, token);
 
       try {
-        await sendAppEmail({
-          to: email,
-          subject: "Reset your InEx Ledger password",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
-            <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
-              <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger security</div>
-              <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">Reset your password</h1>
-            </div>
-            <div style="padding: 28px;">
-              <p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">
-                We received a request to reset the password for your InEx Ledger account. Click the button below to choose a new password.
-              </p>
-              <div style="margin: 24px 0;">
-                <a href="${resetLink}" style="display: inline-block; padding: 14px 22px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700;">
-                  Reset password
-                </a>
-              </div>
-              <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">
-                This link expires in 20 minutes. If the button does not work, copy and paste this link into your browser:
-              </p>
-              <p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${resetLink}</p>
-              <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">
-                If you did not request a password reset, you can safely ignore this email.
-              </p>
-            </div>
-          </div>
-        `,
-        text: `Reset your InEx Ledger password\n\nWe received a request to reset the password for your account. Use this link to choose a new password:\n${resetLink}\n\nThis link expires in 20 minutes.\n\nIf you did not request a password reset, you can safely ignore this email.`
-        });
+        const lang = await getPreferredLanguageForEmail(email);
+        const emailContent = buildPasswordResetEmail(lang, resetLink);
+        await sendAppEmail({ to: email, ...emailContent });
       } catch (emailErr) {
         logError("[forgot-password] failed to send reset email to", email, ":", emailErr?.message || emailErr);
         // Continue — do not expose email delivery failure to the caller
@@ -1249,36 +1200,9 @@ router.post("/request-email-change", requireAuth, requireCsrfProtection, authLim
     );
 
     const confirmLink = `${getAppBaseUrl(req)}/api/auth/confirm-email-change?token=${token}`;
-    await sendAppEmail({
-      to: email,
-      subject: "Confirm your new InEx Ledger email address",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
-          <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
-            <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger account</div>
-            <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">Confirm your new email</h1>
-          </div>
-          <div style="padding: 28px;">
-            <p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">
-              We received a request to change the email address on your InEx Ledger account. Click the button below to confirm this change.
-            </p>
-            <div style="margin: 24px 0;">
-              <a href="${confirmLink}" style="display: inline-block; padding: 14px 22px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700;">
-                Confirm email change
-              </a>
-            </div>
-            <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">
-              This link expires in 30 minutes. If the button does not work, copy and paste this link into your browser:
-            </p>
-            <p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${confirmLink}</p>
-            <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">
-              Your email address will not change until you click the link above. If you did not request this change, you can safely ignore this email.
-            </p>
-          </div>
-        </div>
-      `,
-      text: `Confirm your new InEx Ledger email address\n\nWe received a request to change the email address on your account. Use this link to confirm the change:\n${confirmLink}\n\nThis link expires in 30 minutes.\n\nYour email address will not change until you click the link. If you did not request this change, you can safely ignore this email.`
-    });
+    const lang = await getPreferredLanguageForUser(req.user.id);
+    const emailContent = buildEmailChangeEmail(lang, confirmLink);
+    await sendAppEmail({ to: email, ...emailContent });
 
     res.json({ message: "Confirmation email sent to your new address." });
   } catch (err) {
