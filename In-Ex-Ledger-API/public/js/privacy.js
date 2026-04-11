@@ -8,5 +8,7 @@ function init() {
   if (typeof t === "function") {
     document.title = `InEx Ledger - ${t("footer_privacy")}`;
   }
-  console.log("Privacy page loaded.");
+  if (typeof initPublicLanguageSwitcher === "function") {
+    initPublicLanguageSwitcher(function () { return "footer_privacy"; });
+  }
 }

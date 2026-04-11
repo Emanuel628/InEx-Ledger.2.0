@@ -10,5 +10,7 @@ function init() {
   if (typeof t === "function") {
     document.title = `InEx Ledger - ${t("legal_title")}`;
   }
-  console.log("Legal page loaded.");
+  if (typeof initPublicLanguageSwitcher === "function") {
+    initPublicLanguageSwitcher(function () { return "legal_title"; });
+  }
 }

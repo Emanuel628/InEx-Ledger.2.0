@@ -11,3 +11,18 @@ main {
 p {
   line-height: 1.6;
 }
+
+/* Language switcher shown in footer of public legal pages */
+.public-lang-switcher {
+  margin-top: 12px;
+}
+
+.lang-select-public {
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border, #d1d5db);
+  background: var(--surface, #fff);
+  color: var(--text, #0f172a);
+  cursor: pointer;
+}
