@@ -11,6 +11,7 @@
 
 const express = require('express');
 const { requireAuth, requireMfa } = require('../middleware/auth.middleware.js');
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js');
 const {
   verifyCpaLicense,
@@ -24,6 +25,7 @@ const router = express.Router();
 router.use(createDataApiLimiter({ max: 60 }));
 router.use(requireAuth);
 router.use(requireMfa);
+router.use(requireCsrfProtection);
 
 // Verification calls hit an external API – apply a conservative rate limit.
 const verifyLimiter = createDataApiLimiter({ windowMs: 15 * 60 * 1000, max: 10 });

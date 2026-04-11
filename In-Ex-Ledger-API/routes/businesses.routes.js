@@ -2,6 +2,7 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const { pool } = require("../db.js");
 const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createBusinessDeleteLimiter } = require("../middleware/rateLimitTiers.js");
 const {
   resolveBusinessIdForUser,
@@ -13,6 +14,7 @@ const { decryptTaxId } = require("../services/taxIdService.js");
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 
 const businessDeleteLimiter = createBusinessDeleteLimiter();
 

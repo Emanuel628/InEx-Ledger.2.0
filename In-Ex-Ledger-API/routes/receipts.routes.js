@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const express = require("express");
 const multer = require("multer");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createReceiptLimiter } = require("../middleware/rateLimitTiers.js");
 const {
   resolveBusinessIdForUser,
@@ -20,11 +21,16 @@ const {
   buildAccountingLockErrorPayload,
   loadAccountingLockState
 } = require("../services/accountingLockService.js");
+const {
+  resolvePathWithinDir,
+  buildAttachmentDisposition
+} = require("../utils/downloadSecurity.js");
 
 const router = express.Router();
 const storageDir = path.join(process.cwd(), "storage", "receipts");
 fs.mkdirSync(storageDir, { recursive: true });
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 router.use(createReceiptLimiter());
 
 /* =========================================================
@@ -101,6 +107,61 @@ async function sha256File(storagePath) {
   });
 }
 
+async function readFileSignature(storagePath, size = 32) {
+  const handle = await fs.promises.open(storagePath, "r");
+  try {
+    const buffer = Buffer.alloc(size);
+    const { bytesRead } = await handle.read(buffer, 0, size, 0);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
+  }
+}
+
+function detectReceiptMimeType(signature) {
+  if (signature.length >= 5 && signature.subarray(0, 5).toString("utf8") === "%PDF-") {
+    return "application/pdf";
+  }
+  if (signature.length >= 3 && signature[0] === 0xff && signature[1] === 0xd8 && signature[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    signature.length >= 8 &&
+    signature[0] === 0x89 &&
+    signature[1] === 0x50 &&
+    signature[2] === 0x4e &&
+    signature[3] === 0x47 &&
+    signature[4] === 0x0d &&
+    signature[5] === 0x0a &&
+    signature[6] === 0x1a &&
+    signature[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+  if (
+    signature.length >= 12 &&
+    signature.subarray(0, 4).toString("ascii") === "RIFF" &&
+    signature.subarray(8, 12).toString("ascii") === "WEBP"
+  ) {
+    return "image/webp";
+  }
+  if (signature.length >= 12 && signature.subarray(4, 8).toString("ascii") === "ftyp") {
+    const brand = signature.subarray(8, 12).toString("ascii");
+    if (["heic", "heix", "hevc", "hevx"].includes(brand)) {
+      return "image/heic";
+    }
+    if (["mif1", "msf1", "heif"].includes(brand)) {
+      return "image/heif";
+    }
+  }
+  return null;
+}
+
+async function validateReceiptMagicBytes(storagePath) {
+  const signature = await readFileSignature(storagePath);
+  return detectReceiptMimeType(signature);
+}
+
 function safeUnlink(filePath) {
   if (!filePath) return;
   try {
@@ -116,6 +177,10 @@ function moveFileIfExists(fromPath, toPath) {
   }
   fs.renameSync(fromPath, toPath);
   return true;
+}
+
+function getSafeReceiptStoragePath(storagePath) {
+  return resolvePathWithinDir(storageDir, storagePath);
 }
 
 function handleReceiptMutationError(res, err, fallbackMessage) {
@@ -150,7 +215,6 @@ router.get("/", async (req, res) => {
         r.transaction_id,
         r.filename,
         r.mime_type,
-        r.storage_path,
         r.created_at,
         r.file_hash
       FROM receipts r
@@ -179,6 +243,12 @@ router.post("/", upload.single("receipt"), async (req, res) => {
   }
 
   try {
+    const detectedMimeType = await validateReceiptMagicBytes(req.file.path);
+    if (!detectedMimeType) {
+      safeUnlink(req.file?.path);
+      return res.status(400).json({ error: "Unsupported or malformed receipt file." });
+    }
+
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "receipts")) {
@@ -194,6 +264,9 @@ router.post("/", upload.single("receipt"), async (req, res) => {
            FROM transactions
           WHERE id = $1
             AND business_id = $2
+            AND deleted_at IS NULL
+            AND (is_adjustment = false OR is_adjustment IS NULL)
+            AND (is_void = false OR is_void IS NULL)
           LIMIT 1`,
         [transactionId, businessId]
       );
@@ -221,7 +294,7 @@ router.post("/", upload.single("receipt"), async (req, res) => {
         businessId,
         transactionId,
         req.file.originalname,
-        req.file.mimetype,
+        detectedMimeType,
         storagePath,
         fileHash
       ]
@@ -230,7 +303,7 @@ router.post("/", upload.single("receipt"), async (req, res) => {
     return res.status(201).json({
       id: receiptId,
       filename: req.file.originalname,
-      mime_type: req.file.mimetype,
+      mime_type: detectedMimeType,
       transaction_id: transactionId,
       url: `/api/receipts/${receiptId}`
     });
@@ -289,7 +362,11 @@ router.patch("/:id/attach", async (req, res) => {
       const txCheck = await pool.query(
         `SELECT id, date
          FROM transactions
-         WHERE id = $1 AND business_id = $2
+         WHERE id = $1
+           AND business_id = $2
+           AND deleted_at IS NULL
+           AND (is_adjustment = false OR is_adjustment IS NULL)
+           AND (is_void = false OR is_void IS NULL)
          LIMIT 1`,
         [transactionId, businessId]
       );
@@ -339,8 +416,9 @@ router.get("/:id", async (req, res) => {
     }
 
     const { filename, mime_type, storage_path } = result.rows[0];
+    const safeStoragePath = getSafeReceiptStoragePath(storage_path);
 
-    if (!storage_path || !fs.existsSync(storage_path)) {
+    if (!safeStoragePath || !fs.existsSync(safeStoragePath)) {
       return res.status(404).json({ error: "Receipt file missing." });
     }
 
@@ -350,10 +428,10 @@ router.get("/:id", async (req, res) => {
     res.setHeader("Expires", "0");
 
     res.setHeader("Content-Type", mime_type || "application/octet-stream");
-    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader("Content-Disposition", buildAttachmentDisposition(filename, `receipt-${req.params.id}`));
 
 
-    return res.sendFile(storage_path);
+    return res.sendFile(safeStoragePath);
   } catch (err) {
     console.error("GET /receipts/:id error:", err);
     return res.status(500).json({ error: "Failed to load receipt." });
@@ -400,7 +478,7 @@ router.delete("/:id", async (req, res) => {
       assertDateUnlocked(lockState, found.rows[0].transaction_date);
     }
 
-    storagePath = found.rows[0]?.storage_path || null;
+    storagePath = getSafeReceiptStoragePath(found.rows[0]?.storage_path || null);
     pendingDeletePath = storagePath
       ? `${storagePath}.pending-delete-${receiptId}`
       : null;

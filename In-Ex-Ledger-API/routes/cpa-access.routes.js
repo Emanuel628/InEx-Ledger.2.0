@@ -1,6 +1,8 @@
 const express = require("express");
 const fs = require("fs");
+const path = require("path");
 const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const {
   listOwnedCpaGrants,
@@ -16,10 +18,16 @@ const {
 } = require("../services/cpaAccessService.js");
 const { pool } = require("../db.js");
 const { buildRedactedStream } = require("../services/exportStorage.js");
+const {
+  resolvePathWithinDir,
+  buildAttachmentDisposition
+} = require("../utils/downloadSecurity.js");
 
 const router = express.Router();
+const receiptStorageDir = path.join(process.cwd(), "storage", "receipts");
 router.use(requireAuth);
 router.use(requireMfa);
+router.use(requireCsrfProtection);
 router.use(createDataApiLimiter({ max: 60 }));
 
 function getClientIp(req) {
@@ -94,6 +102,9 @@ router.get("/portfolio/:ownerUserId/summary", async (req, res) => {
                 COUNT(*)::int AS count
            FROM transactions
           WHERE business_id = ANY($1::uuid[])
+            AND deleted_at IS NULL
+            AND (is_adjustment = false OR is_adjustment IS NULL)
+            AND (is_void = false OR is_void IS NULL)
           GROUP BY business_id, type`,
         [ids]
       ),
@@ -230,9 +241,12 @@ router.get("/portfolio/:ownerUserId/transactions", async (req, res) => {
               t.created_at
          FROM transactions t
          JOIN businesses b ON b.id = t.business_id
-         LEFT JOIN accounts a ON a.id = t.account_id
-         LEFT JOIN categories c ON c.id = t.category_id
-        WHERE t.business_id = ANY($1::uuid[])
+        LEFT JOIN accounts a ON a.id = t.account_id
+        LEFT JOIN categories c ON c.id = t.category_id
+       WHERE t.business_id = ANY($1::uuid[])
+         AND t.deleted_at IS NULL
+         AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
+         AND (t.is_void = false OR t.is_void IS NULL)
         ORDER BY t.date DESC, t.created_at DESC
         LIMIT $2 OFFSET $3`,
       [portfolio.business_ids, limit, offset]
@@ -241,7 +255,10 @@ router.get("/portfolio/:ownerUserId/transactions", async (req, res) => {
     const countResult = await pool.query(
       `SELECT COUNT(*)::int AS count
          FROM transactions
-        WHERE business_id = ANY($1::uuid[])`,
+        WHERE business_id = ANY($1::uuid[])
+          AND deleted_at IS NULL
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND (is_void = false OR is_void IS NULL)`,
       [portfolio.business_ids]
     );
 
@@ -337,7 +354,8 @@ router.get("/portfolio/:ownerUserId/receipts/:receiptId", async (req, res) => {
     }
 
     const receipt = result.rows[0];
-    if (!receipt.storage_path || !fs.existsSync(receipt.storage_path)) {
+    const safeStoragePath = resolvePathWithinDir(receiptStorageDir, receipt.storage_path);
+    if (!safeStoragePath || !fs.existsSync(safeStoragePath)) {
       return res.status(404).json({ error: "Receipt file missing." });
     }
 
@@ -356,12 +374,12 @@ router.get("/portfolio/:ownerUserId/receipts/:receiptId", async (req, res) => {
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
     res.setHeader("Content-Type", receipt.mime_type || "application/octet-stream");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename*=UTF-8''${encodeURIComponent(receipt.filename || `receipt-${receiptId}`)}`
-    );
+    res.setHeader("Content-Disposition", buildAttachmentDisposition(
+      receipt.filename,
+      `receipt-${receiptId}`
+    ));
 
-    return res.sendFile(receipt.storage_path);
+    return res.sendFile(safeStoragePath);
   } catch (error) {
     console.error("GET /api/cpa-access/portfolio/:ownerUserId/receipts/:receiptId error:", error.message);
     return res.status(500).json({ error: "Failed to download CPA receipt." });
@@ -588,7 +606,10 @@ router.get("/portfolio/:ownerUserId/exports/:exportId/redacted", async (req, res
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Cache-Control", "private, max-age=0, no-store");
-    res.setHeader("Content-Disposition", `attachment; filename="inex-ledger-cpa-export-${exportId}.pdf"`);
+    res.setHeader("Content-Disposition", buildAttachmentDisposition(
+      `inex-ledger-cpa-export-${exportId}.pdf`,
+      "inex-ledger-cpa-export.pdf"
+    ));
     buildRedactedStream(res, result.rows[0].file_path);
   } catch (error) {
     console.error("GET /api/cpa-access/portfolio/:ownerUserId/exports/:exportId/redacted error:", error.message);

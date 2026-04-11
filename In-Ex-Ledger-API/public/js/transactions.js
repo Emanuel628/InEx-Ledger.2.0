@@ -2366,11 +2366,19 @@ async function uploadReceipt(transactionId, file) {
   }
 
   try {
+    const headers = {
+      ...authHeader()
+    };
+    if (typeof getCsrfToken === "function") {
+      const csrfToken = getCsrfToken();
+      if (csrfToken) {
+        headers["X-CSRF-Token"] = csrfToken;
+      }
+    }
     const response = await fetch(buildApiUrl("/api/receipts"), {
       method: "POST",
-      headers: {
-        ...authHeader()
-      },
+      credentials: "include",
+      headers,
       body: formData
     });
 

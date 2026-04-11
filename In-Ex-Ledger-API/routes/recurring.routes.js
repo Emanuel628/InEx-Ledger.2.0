@@ -2,6 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const {
@@ -20,6 +21,7 @@ const {
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 router.use(createDataApiLimiter({ max: 80 }));
 
 function handleRecurringMutationError(res, err, fallbackMessage) {

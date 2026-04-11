@@ -1,6 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const {
   createExportGrantLimiter,
   createSecureExportLimiter
@@ -16,12 +17,14 @@ const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+const { buildAttachmentDisposition } = require("../utils/downloadSecurity.js");
 
 const exportGrantLimiter = createExportGrantLimiter();
 const secureExportLimiter = createSecureExportLimiter();
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 
 function requireEmailVerified(req, res, next) {
   if (!req.user?.email_verified) {
@@ -33,6 +36,10 @@ function requireEmailVerified(req, res, next) {
 router.use(requireEmailVerified);
 
 const EXPORT_TTL_MS = Number(process.env.EXPORT_GRANT_TTL_MS || 60_000);
+
+function buildExportFilename(startDate, endDate) {
+  return `inex-ledger-export-${startDate}_to_${endDate}.pdf`;
+}
 
 function validateDateRange(range) {
   if (!range || typeof range !== "object") return null;
@@ -122,7 +129,7 @@ router.post("/exports/generate", exportGrantLimiter, async (req, res) => {
 
   try {
     const jobId = crypto.randomUUID();
-    const filename = `inex-ledger-export-${grantPayload.dateRange.startDate}_to_${grantPayload.dateRange.endDate}.pdf`;
+    const filename = buildExportFilename(grantPayload.dateRange.startDate, grantPayload.dateRange.endDate);
     const job = {
       jobId,
       businessId,
@@ -173,7 +180,7 @@ router.post("/exports/generate", exportGrantLimiter, async (req, res) => {
     );
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", buildAttachmentDisposition(filename, "inex-ledger-export.pdf"));
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
     return res.send(workerResult.fullPdfBuffer);
   } catch (err) {
@@ -193,7 +200,7 @@ router.get("/exports/history", async (req, res) => {
     }
     const result = await pool.query(
       `SELECT e.id, e.start_date, e.end_date, e.created_at, e.export_type, e.include_tax_id,
-              e.content_hash, e.file_path, m.language, m.currency, m.page_count
+              e.content_hash, m.language, m.currency, m.page_count
        FROM exports e
        LEFT JOIN export_metadata m ON m.export_id = e.id
        WHERE e.business_id = $1
@@ -204,7 +211,7 @@ router.get("/exports/history", async (req, res) => {
     const history = result.rows.map((entry) => ({
       ...entry,
       storage_type: "redacted-only",
-      full_version_available: true
+      full_version_available: false
     }));
     return res.json(history);
   } catch (err) {
@@ -224,7 +231,10 @@ router.get("/exports/history/:id/redacted", async (req, res) => {
     }
     const { id } = req.params;
     const { rows } = await pool.query(
-      `SELECT file_path FROM exports WHERE id = $1 AND business_id = $2 LIMIT 1`,
+      `SELECT file_path, start_date, end_date
+         FROM exports
+        WHERE id = $1 AND business_id = $2
+        LIMIT 1`,
       [id, businessId]
     );
 
@@ -234,6 +244,13 @@ router.get("/exports/history/:id/redacted", async (req, res) => {
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Cache-Control", "private, max-age=0, no-store");
+    res.setHeader(
+      "Content-Disposition",
+      buildAttachmentDisposition(
+        buildExportFilename(rows[0].start_date, rows[0].end_date),
+        `inex-ledger-export-${id}.pdf`
+      )
+    );
     buildRedactedStream(res, rows[0].file_path);
   } catch (err) {
     logError("Redacted download error", { err: err.message });
@@ -271,7 +288,7 @@ router.post("/exports/secure-export", secureExportLimiter, async (req, res) => {
     const templateVersion = req.body?.templateVersion || "v1";
 
     const jobId = crypto.randomUUID();
-    const filename = `inex-ledger-export-${dateRange.startDate}_to_${dateRange.endDate}.pdf`;
+    const filename = buildExportFilename(dateRange.startDate, dateRange.endDate);
 
     const job = {
       jobId,
@@ -305,7 +322,7 @@ router.post("/exports/secure-export", secureExportLimiter, async (req, res) => {
     );
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", buildAttachmentDisposition(filename, "inex-ledger-export.pdf"));
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
     return res.send(workerResult.fullPdfBuffer);
   } catch (err) {

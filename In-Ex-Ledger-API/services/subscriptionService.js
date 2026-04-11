@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const { pool } = require("../db.js");
 
 const DEFAULT_TRIAL_DAYS = Number(process.env.DEFAULT_TRIAL_DAYS || 30);
+const SUBSCRIPTION_PAST_DUE_GRACE_DAYS = Number(process.env.SUBSCRIPTION_PAST_DUE_GRACE_DAYS || 7);
 const PLAN_FREE = "free";
 const PLAN_V1 = "v1";
 
@@ -51,11 +52,21 @@ function deriveEffectiveState(row) {
   const now = Date.now();
   const trialEndsAt = row?.trial_ends_at ? new Date(row.trial_ends_at) : null;
   const currentPeriodEnd = row?.current_period_end ? new Date(row.current_period_end) : null;
+  const pastDueGraceEndsAt = currentPeriodEnd
+    ? addDays(currentPeriodEnd, SUBSCRIPTION_PAST_DUE_GRACE_DAYS)
+    : null;
   const isTrialing = Boolean(row?.status === "trialing" && trialEndsAt && trialEndsAt.getTime() > now);
   const isActivePaid =
-    Boolean((row?.status === "active" || row?.status === "past_due") &&
+    Boolean(row?.status === "active" &&
     row?.plan_code === PLAN_V1 &&
     (!currentPeriodEnd || currentPeriodEnd.getTime() > now));
+  const isPastDueGrace =
+    Boolean(
+      row?.status === "past_due" &&
+      row?.plan_code === PLAN_V1 &&
+      pastDueGraceEndsAt &&
+      pastDueGraceEndsAt.getTime() > now
+    );
   const isGracePeriod =
     Boolean(row?.cancel_at_period_end &&
     row?.plan_code === PLAN_V1 &&
@@ -68,12 +79,15 @@ function deriveEffectiveState(row) {
   if (isTrialing) {
     effectiveTier = PLAN_V1;
     effectiveStatus = "trialing";
-  } else if (isActivePaid || isGracePeriod) {
+  } else if (isActivePaid || isGracePeriod || isPastDueGrace) {
     effectiveTier = PLAN_V1;
-    effectiveStatus = row.status;
+    effectiveStatus = isPastDueGrace ? "past_due_grace" : row.status;
   } else if (row?.status === "trialing" && trialEndsAt && trialEndsAt.getTime() <= now) {
     effectiveTier = PLAN_FREE;
     effectiveStatus = "trial_expired";
+  } else if (row?.status === "past_due") {
+    effectiveTier = PLAN_FREE;
+    effectiveStatus = "past_due_expired";
   } else if (row?.plan_code === PLAN_FREE) {
     effectiveTier = PLAN_FREE;
     effectiveStatus = row?.status || "free";
@@ -88,7 +102,7 @@ function deriveEffectiveState(row) {
     effectiveTier,
     effectiveStatus,
     isTrialing,
-    isPaid: Boolean(isActivePaid || isGracePeriod),
+    isPaid: Boolean(isActivePaid || isGracePeriod || isPastDueGrace),
     cancelAtPeriodEnd: Boolean(row?.cancel_at_period_end),
     stripeCustomerId: row?.stripe_customer_id || null,
     stripeSubscriptionId: row?.stripe_subscription_id || null,
@@ -96,7 +110,8 @@ function deriveEffectiveState(row) {
     trialStartedAt: row?.trial_started_at || null,
     trialEndsAt: row?.trial_ends_at || null,
     currentPeriodStart: row?.current_period_start || null,
-    currentPeriodEnd: row?.current_period_end || null
+    currentPeriodEnd: row?.current_period_end || null,
+    pastDueGraceEndsAt: isPastDueGrace ? pastDueGraceEndsAt?.toISOString() || null : null
   };
 }
 

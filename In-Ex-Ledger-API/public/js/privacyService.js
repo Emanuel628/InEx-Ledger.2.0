@@ -27,12 +27,24 @@
     }
   }
 
-  function authHeaders() {
+  function authHeaders(method = "GET") {
     const headers = { "Content-Type": "application/json" };
     if (typeof getToken === "function") {
       const token = getToken();
       if (token) {
         headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    const normalizedMethod = String(method || "GET").toUpperCase();
+    if (
+      normalizedMethod !== "GET" &&
+      normalizedMethod !== "HEAD" &&
+      normalizedMethod !== "OPTIONS" &&
+      typeof getCsrfToken === "function"
+    ) {
+      const csrfToken = getCsrfToken();
+      if (csrfToken) {
+        headers["X-CSRF-Token"] = csrfToken;
       }
     }
     return headers;
@@ -70,7 +82,7 @@
   async function getPrivacySettings() {
     if (await apiAvailable()) {
       const res = await fetch(buildApiUrl("/api/privacy/settings"), {
-        headers: authHeaders()
+        headers: authHeaders("GET")
       });
       if (res.ok) {
         return res.json();
@@ -86,8 +98,8 @@
 
     if (await apiAvailable()) {
       await fetch(buildApiUrl("/api/privacy/settings"), {
-        method: "PUT",
-        headers: authHeaders(),
+        method: "POST",
+        headers: authHeaders("POST"),
         body: JSON.stringify({
           dataSharingOptOut: !!merged.dataSharingOptOut,
           consentGiven: !!merged.consentGiven,
@@ -131,7 +143,9 @@
 
     if (await apiAvailable()) {
       const res = await fetch(buildApiUrl("/api/privacy/export"), {
-        headers: authHeaders()
+        method: "POST",
+        headers: authHeaders("POST"),
+        body: JSON.stringify({ format: "json" })
       });
 
       if (res.ok) {
@@ -169,7 +183,7 @@
     if (await apiAvailable()) {
       const res = await fetch(buildApiUrl("/api/privacy/delete"), {
         method: "POST",
-        headers: authHeaders(),
+        headers: authHeaders("POST"),
         body: JSON.stringify({ scope: "business_data" })
       });
       if (res.ok) {

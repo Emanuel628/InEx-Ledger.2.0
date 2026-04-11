@@ -5,6 +5,17 @@ let receiptRecords = [];
 let transactionMap = {};
 let activeReceiptLinkId = null;
 
+function receiptMutationHeaders() {
+  const headers = { ...authHeader() };
+  if (typeof getCsrfToken === "function") {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      headers["X-CSRF-Token"] = csrfToken;
+    }
+  }
+  return headers;
+}
+
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
@@ -58,9 +69,7 @@ async function uploadReceipt(file) {
   const response = await fetch(buildApiUrl("/api/receipts"), {
     method: "POST",
     credentials: "include",
-    headers: {
-      ...authHeader()
-    },
+    headers: receiptMutationHeaders(),
     body: formData
   });
 

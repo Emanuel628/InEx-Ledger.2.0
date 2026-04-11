@@ -2,6 +2,7 @@ const express = require("express");
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const {
   resolveBusinessIdForUser,
@@ -17,6 +18,7 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 router.use(createDataApiLimiter());
 
 function handleAccountMutationError(res, err, fallbackMessage) {
@@ -25,6 +27,35 @@ function handleAccountMutationError(res, err, fallbackMessage) {
   }
 
   return res.status(500).json({ error: fallbackMessage });
+}
+
+function normalizeAccountName(name) {
+  return typeof name === "string" ? name.trim() : "";
+}
+
+async function findConflictingAccountName(businessId, name, excludeId = null) {
+  const normalizedName = normalizeAccountName(name);
+  if (!normalizedName) {
+    return false;
+  }
+
+  const sql = excludeId
+    ? `SELECT 1
+         FROM accounts
+        WHERE business_id = $1
+          AND LOWER(name) = LOWER($2)
+          AND id <> $3
+        LIMIT 1`
+    : `SELECT 1
+         FROM accounts
+        WHERE business_id = $1
+          AND LOWER(name) = LOWER($2)
+        LIMIT 1`;
+  const params = excludeId
+    ? [businessId, normalizedName, excludeId]
+    : [businessId, normalizedName];
+  const result = await pool.query(sql, params);
+  return result.rowCount > 0;
 }
 
 /**
@@ -53,7 +84,8 @@ router.get("/", async (req, res) => {
  * CREATE new account
  */
 router.post("/", async (req, res) => {
-  const { name, type } = req.body;
+  const { type } = req.body;
+  const name = normalizeAccountName(req.body?.name);
 
   const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card"];
 
@@ -67,6 +99,11 @@ router.post("/", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    if (await findConflictingAccountName(businessId, name)) {
+      return res.status(409).json({
+        error: "An account with this name already exists."
+      });
+    }
 
     const result = await pool.query(
       `INSERT INTO accounts (id, business_id, name, type)
@@ -94,7 +131,8 @@ router.put("/:id", async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: "Invalid account ID." });
   }
-  const { name, type } = req.body;
+  const { type } = req.body;
+  const name = req.body?.name;
 
   const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card"];
 
@@ -119,6 +157,15 @@ router.put("/:id", async (req, res) => {
     }
 
     const current = existing.rows[0];
+    const nextName = name !== undefined ? normalizeAccountName(name) : current.name;
+    if (name !== undefined && !nextName) {
+      return res.status(400).json({ error: "Account name and type are required." });
+    }
+    if (await findConflictingAccountName(businessId, nextName, req.params.id)) {
+      return res.status(409).json({
+        error: "An account with this name already exists."
+      });
+    }
     if (type && type !== current.type) {
       const lockState = await loadAccountingLockState(pool, businessId);
       if (lockState?.lockedThroughDate) {
@@ -151,7 +198,7 @@ router.put("/:id", async (req, res) => {
               type = COALESCE($2, type)
         WHERE id = $3 AND business_id = $4
         RETURNING *`,
-      [name || null, type || null, req.params.id, businessId]
+      [name !== undefined ? nextName : null, type || null, req.params.id, businessId]
     );
 
     res.json(result.rows[0]);

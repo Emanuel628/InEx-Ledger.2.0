@@ -9,6 +9,7 @@ const transactionsRouter = require('./routes/transactions.routes.js');
 const { ensureCsrfCookie } = require('./middleware/csrf.middleware.js');
 const { createGlobalLimiter } = require('./middleware/rateLimitTiers.js');
 const { initDatabase } = require('./db.js');
+const { logInfo, logWarn, logError } = require('./utils/logger.js');
 
 const app = express();
 const publicDir = path.join(process.cwd(), 'public');
@@ -65,18 +66,27 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000'
 ];
 
-console.log('SYSTEM START: INEX_LEDGER_PROD_2026');
-
 const PORT = process.env.PORT || 8080;
 const DB_RETRY_DELAY_MS = Number(process.env.DB_RETRY_DELAY_MS || 15000);
-console.log(`NETWORK: Port assigned: ${PORT}`);
-console.log('SECURITY: JWT_SECRET detected:', !!process.env.JWT_SECRET);
+logInfo('System start', {
+  port: PORT,
+  jwtSecretConfigured: !!process.env.JWT_SECRET
+});
 
 let dbState = 'starting';
 let dbLastError = null;
 let dbInitPromise = null;
 
-app.set('trust proxy', 1);
+function resolveTrustProxySetting() {
+  const configured = String(process.env.TRUST_PROXY_HOPS || '').trim();
+  if (!configured) {
+    return 1;
+  }
+  const asNumber = Number(configured);
+  return Number.isInteger(asNumber) && asNumber >= 0 ? asNumber : 1;
+}
+
+app.set('trust proxy', resolveTrustProxySetting());
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -99,7 +109,7 @@ app.use(cors({
     if (ALLOWED_ORIGINS.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
-      console.warn(`CORS: Blocked request from ${origin}`);
+      logWarn('CORS blocked request', { origin });
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -165,14 +175,7 @@ app.use('/api', createGlobalLimiter());
 app.get('/health', (req, res) => {
   const status = dbState === 'ready' ? 'healthy' : 'starting';
   const responseCode = status === 'healthy' ? 200 : 503;
-  res.status(responseCode).json({
-    status,
-    database: {
-      state: dbState
-    },
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString()
-  });
+  res.status(responseCode).json({ status });
 });
 
 app.get('/favicon.ico', (req, res) => {
@@ -197,11 +200,11 @@ app.get('/index.html', (req, res) => {
 
 // Transaction management
 app.use('/api/transactions', transactionsRouter);
-console.log('MOUNTED: /api/transactions');
+logInfo('Mounted route', { path: '/api/transactions' });
 
 // Core auth and index routes
 app.use('/api', routes);
-console.log('MOUNTED: /api (Core Routes)');
+logInfo('Mounted route', { path: '/api' });
 
 /* =========================================================
    404 & ERROR HANDLERS (must come after all routes)
@@ -213,7 +216,7 @@ app.use((req, res) => {
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
+  logError('Unhandled error', { err: err?.message || String(err), path: req.originalUrl });
   const status = err.status || err.statusCode || 500;
   const message = status < 500 ? err.message : 'Internal server error';
   res.status(status).json({ error: message });
@@ -234,13 +237,13 @@ async function initializeDatabaseWithRetry() {
         await initDatabase();
         dbState = 'ready';
         dbLastError = null;
-        console.log('Database initialization completed.');
+        logInfo('Database initialization completed');
         return;
       } catch (err) {
         dbState = 'retrying';
         dbLastError = err?.message || String(err);
-        console.error('Database initialization failed:', err);
-        console.log(`Retrying database initialization in ${DB_RETRY_DELAY_MS}ms.`);
+        logError('Database initialization failed', { err: err?.message || String(err) });
+        logInfo('Retrying database initialization', { delayMs: DB_RETRY_DELAY_MS });
         await new Promise((resolve) => setTimeout(resolve, DB_RETRY_DELAY_MS));
       }
     }
@@ -256,9 +259,9 @@ function registerShutdownHandlers() {
      ========================================================= */
 
   process.on('SIGTERM', () => {
-    console.log('SIGTERM: Shutdown signal received.');
+    logInfo('SIGTERM received');
     server.close(() => {
-      console.log('Server closed safely.');
+      logInfo('Server closed safely');
       process.exit(0);
     });
   });
@@ -266,7 +269,7 @@ function registerShutdownHandlers() {
 
 async function start() {
   server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`READY: InEx Ledger API live on port ${PORT}`);
+    logInfo('API ready', { port: PORT });
   });
 
   registerShutdownHandlers();

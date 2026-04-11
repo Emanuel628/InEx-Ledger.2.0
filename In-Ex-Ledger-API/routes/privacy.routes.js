@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const express = require("express");
 const { pool } = require("../db.js");
 const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError } = require("../utils/logger.js");
@@ -9,6 +10,7 @@ const { decrypt } = require("../services/encryptionService.js");
 
 const router = express.Router();
 router.use(requireAuth);
+router.use(requireCsrfProtection);
 router.use(createDataApiLimiter());
 
 const MAX_USER_AGENT_LENGTH = 512;
@@ -225,11 +227,13 @@ router.post("/export", requireMfa, async (req, res) => {
                 t.note,
                 t.cleared,
                 t.created_at
-           FROM transactions t
-           LEFT JOIN accounts   a ON a.id = t.account_id
-           LEFT JOIN categories c ON c.id = t.category_id
-          WHERE t.business_id = $1
+          FROM transactions t
+          LEFT JOIN accounts   a ON a.id = t.account_id
+          LEFT JOIN categories c ON c.id = t.category_id
+         WHERE t.business_id = $1
             AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
+            AND t.deleted_at IS NULL
+            AND (t.is_void = false OR t.is_void IS NULL)
           ORDER BY t.date DESC`,
         [businessId]
       ),
@@ -246,11 +250,13 @@ router.post("/export", requireMfa, async (req, res) => {
                 t.note,
                 t.adjusted_at,
                 t.created_at
-           FROM transactions t
-           LEFT JOIN accounts   a ON a.id = t.account_id
-           LEFT JOIN categories c ON c.id = t.category_id
-          WHERE t.business_id = $1
+          FROM transactions t
+          LEFT JOIN accounts   a ON a.id = t.account_id
+          LEFT JOIN categories c ON c.id = t.category_id
+         WHERE t.business_id = $1
             AND t.is_adjustment = true
+            AND t.deleted_at IS NULL
+            AND (t.is_void = false OR t.is_void IS NULL)
           ORDER BY t.adjusted_at DESC`,
         [businessId]
       ),

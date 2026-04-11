@@ -206,7 +206,7 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
     res.status(200).json({ subscription: updated });
   } catch (err) {
     console.error("POST /api/billing/cancel error:", err.message);
-    res.status(500).json({ error: err.message || "Failed to cancel subscription." });
+    res.status(500).json({ error: "Failed to cancel subscription." });
   }
 });
 
@@ -254,7 +254,7 @@ router.get("/history", billingReadLimiter, requireAuth, async (req, res) => {
     res.status(200).json({ invoices });
   } catch (err) {
     console.error("GET /api/billing/history error:", err.message);
-    res.status(500).json({ error: err.message || "Failed to load billing history." });
+    res.status(500).json({ error: "Failed to load billing history." });
   }
 });
 

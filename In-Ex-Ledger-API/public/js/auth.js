@@ -1300,4 +1300,5 @@ document.addEventListener("keydown", (event) => {
 });
 
 window.getToken = getToken;
+window.getCsrfToken = getCsrfToken;
 

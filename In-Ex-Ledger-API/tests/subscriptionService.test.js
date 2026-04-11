@@ -95,3 +95,33 @@ test("deriveEffectiveState keeps explicit free plans on free", () => {
   assert.equal(snapshot.isPaid, false);
   assert.equal(snapshot.isTrialing, false);
 });
+
+test("deriveEffectiveState keeps past-due subscriptions active only within grace", () => {
+  const snapshot = deriveEffectiveState({
+    id: "sub_past_due_grace",
+    business_id: "biz_past_due_grace",
+    provider: "stripe",
+    plan_code: PLAN_V1,
+    status: "past_due",
+    current_period_end: isoDateFromNow(-2)
+  });
+
+  assert.equal(snapshot.effectiveTier, PLAN_V1);
+  assert.equal(snapshot.effectiveStatus, "past_due_grace");
+  assert.equal(snapshot.isPaid, true);
+});
+
+test("deriveEffectiveState downgrades past-due subscriptions after grace expires", () => {
+  const snapshot = deriveEffectiveState({
+    id: "sub_past_due_expired",
+    business_id: "biz_past_due_expired",
+    provider: "stripe",
+    plan_code: PLAN_V1,
+    status: "past_due",
+    current_period_end: isoDateFromNow(-14)
+  });
+
+  assert.equal(snapshot.effectiveTier, PLAN_FREE);
+  assert.equal(snapshot.effectiveStatus, "past_due_expired");
+  assert.equal(snapshot.isPaid, false);
+});

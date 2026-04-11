@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const { resolvePathWithinDir } = require("../utils/downloadSecurity.js");
 
 const EXPORT_STORAGE_DIR = path.resolve(process.cwd(), "storage", "exports");
 
@@ -21,11 +22,12 @@ async function saveRedactedPdf(jobId, buffer) {
 }
 
 function buildRedactedStream(res, filePath) {
-  if (!fs.existsSync(filePath)) {
+  const safeFilePath = resolvePathWithinDir(EXPORT_STORAGE_DIR, filePath);
+  if (!safeFilePath || !fs.existsSync(safeFilePath)) {
     throw new Error("Redacted export not found.");
   }
 
-  const stream = fs.createReadStream(filePath);
+  const stream = fs.createReadStream(safeFilePath);
   stream.on("error", (err) => {
     stream.destroy();
     if (!res.headersSent) {
