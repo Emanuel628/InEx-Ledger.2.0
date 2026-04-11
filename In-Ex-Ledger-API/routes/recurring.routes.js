@@ -218,6 +218,13 @@ router.post("/:id/run", async (req, res) => {
       return res.status(404).json({ error: "Recurring transaction not found." });
     }
 
+    if (result.locked) {
+      return res.status(409).json({
+        error: "This occurrence falls inside a locked accounting period and cannot be posted.",
+        code: "accounting_period_locked"
+      });
+    }
+
     const template = await pool.query(
       `SELECT id, business_id, account_id, category_id, amount, type, description, note,
               cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,

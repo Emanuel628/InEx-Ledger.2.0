@@ -20,6 +20,10 @@ const {
   getReceiptStorageDir,
   requirePersistentReceiptStorage
 } = require("../services/receiptStorage.js");
+const {
+  loadAccountingLockState,
+  assertDateUnlocked
+} = require("../services/accountingLockService.js");
 
 const router = express.Router();
 const storageDir = getReceiptStorageDir();
@@ -234,10 +238,10 @@ router.patch("/:id/attach", async (req, res) => {
 
     const transactionId = req.body.transaction_id;
 
-    // If attaching to a transaction → verify ownership
+    // If attaching to a transaction → verify ownership and lock state
     if (transactionId !== null) {
       const txCheck = await pool.query(
-        `SELECT id
+        `SELECT id, date
          FROM transactions
          WHERE id = $1 AND business_id = $2
          LIMIT 1`,
@@ -249,6 +253,9 @@ router.patch("/:id/attach", async (req, res) => {
           error: "Transaction not found or does not belong to this business."
         });
       }
+
+      const lockState = await loadAccountingLockState(pool, businessId);
+      assertDateUnlocked(lockState, txCheck.rows[0].date);
     }
 
     const result = await pool.query(
@@ -265,6 +272,13 @@ router.patch("/:id/attach", async (req, res) => {
 
     return res.json(result.rows[0]);
   } catch (err) {
+    if (err.name === "AccountingPeriodLockedError") {
+      return res.status(409).json({
+        error: err.message,
+        code: err.code,
+        locked_through_date: err.lockedThroughDate
+      });
+    }
     logError("PATCH /receipts/:id/attach error:", err);
     return res.status(500).json({
       error: "Failed to update receipt attachment."
