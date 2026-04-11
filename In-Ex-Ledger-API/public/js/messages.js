@@ -31,6 +31,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   schedulePoll();
 });
 
+function messagesApiFetch(url, options = {}) {
+  return apiFetch(url, { ...options, redirectOnUnauthorized: false });
+}
+
 // ─────────────────────────────────────────────
 // Tab bar wiring
 // ─────────────────────────────────────────────
@@ -99,7 +103,7 @@ async function loadMessages(tab) {
       url = `/api/messages/inbox?limit=${PAGE_SIZE}`;
     }
 
-    const res = await apiFetch(url);
+    const res = await messagesApiFetch(url);
     if (!res || !res.ok) throw new Error("Failed to load messages");
 
     const { messages } = await res.json();
@@ -203,7 +207,7 @@ function wireDetailPanel() {
 
 async function openMessageDetail(id) {
   try {
-    const res = await apiFetch(`/api/messages/${encodeURIComponent(id)}`);
+    const res = await messagesApiFetch(`/api/messages/${encodeURIComponent(id)}`);
     if (!res || !res.ok) throw new Error("Failed");
     const { message: m } = await res.json();
 
@@ -270,7 +274,7 @@ async function sendReply() {
   if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
 
   try {
-    const res = await apiFetch("/api/messages", {
+    const res = await messagesApiFetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -303,7 +307,7 @@ async function sendReply() {
 // ─────────────────────────────────────────────
 async function archiveMessage(id, closeDetail) {
   try {
-    const res = await apiFetch(`/api/messages/${encodeURIComponent(id)}/archive`, { method: "PATCH" });
+    const res = await messagesApiFetch(`/api/messages/${encodeURIComponent(id)}/archive`, { method: "PATCH" });
     if (!res || !res.ok) throw new Error("Failed");
     const data = await res.json();
     showToast(data.archived ? "Message archived." : "Message unarchived.");
@@ -319,7 +323,7 @@ async function archiveMessage(id, closeDetail) {
 // ─────────────────────────────────────────────
 async function deleteMessage(id, closeDetail) {
   try {
-    const res = await apiFetch(`/api/messages/${encodeURIComponent(id)}`, { method: "DELETE" });
+    const res = await messagesApiFetch(`/api/messages/${encodeURIComponent(id)}`, { method: "DELETE" });
     if (!res || !res.ok) throw new Error("Failed");
     showToast("Message deleted.");
     if (closeDetail) closeMessageDetail();
@@ -334,7 +338,7 @@ async function deleteMessage(id, closeDetail) {
 // ─────────────────────────────────────────────
 async function loadContacts() {
   try {
-    const res = await apiFetch("/api/messages/contacts");
+    const res = await messagesApiFetch("/api/messages/contacts");
     if (!res || !res.ok) return;
     const { contacts } = await res.json();
     _contacts = contacts || [];
@@ -431,7 +435,7 @@ async function sendComposedMessage() {
   if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = "Sending…"; }
 
   try {
-    const res = await apiFetch("/api/messages", {
+    const res = await messagesApiFetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ receiver_id: receiverId, message_type: messageType, subject: subject || undefined, body })
@@ -458,7 +462,7 @@ async function sendComposedMessage() {
 // ─────────────────────────────────────────────
 async function updateUnreadBadge() {
   try {
-    const res = await apiFetch("/api/messages/unread-count");
+    const res = await messagesApiFetch("/api/messages/unread-count");
     if (!res || !res.ok) return;
     const { count } = await res.json();
     setUnreadBadge(count);

@@ -9,7 +9,6 @@
     "test:region-tax": "node scripts/test-region-tax.mjs",
     "test:accounts-put": "node scripts/test-accounts-put.mjs",
     "test:mileage-put": "node scripts/test-mileage-put.mjs",
-    "test:goals-api": "node scripts/test-goals-api.mjs",
     "verify:redacted-storage": "node scripts/verify-redacted-storage.mjs",
     "log_scan": "node scripts/log_scan.js",
     "test:rate-limiter": "node --test tests/rateLimiter.test.js",

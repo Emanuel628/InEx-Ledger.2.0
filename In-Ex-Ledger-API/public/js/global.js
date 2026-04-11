@@ -228,38 +228,6 @@ function injectMobileMenu() {
   });
 }
 
-function injectHelpNavLink() {
-  document.querySelectorAll(".app-topbar .topbar-nav").forEach((nav) => {
-    if (nav.querySelector('[data-nav-help="true"]')) {
-      return;
-    }
-
-    const link = document.createElement("a");
-    link.href = "help";
-    link.setAttribute("data-nav-help", "true");
-    link.setAttribute("data-i18n", "nav_help");
-    link.innerHTML = '<span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 3.5h6a1 1 0 0 1 1 1V13h-6a1 1 0 0 1-1-1z"></path><path d="M9.5 4.5H12a1 1 0 0 1 1 1V13h-3.5"></path><path d="M6 7.5h2.5M6 10h2.5"></path></svg></span><span>Help</span>';
-    nav.appendChild(link);
-  });
-}
-
-function injectMessagesNavLink() {
-  document.querySelectorAll(".app-topbar .topbar-nav").forEach((nav) => {
-    if (nav.querySelector('[data-nav-messages="true"]')) {
-      return;
-    }
-
-    const link = document.createElement("a");
-    link.href = "messages";
-    link.setAttribute("data-nav-messages", "true");
-    link.innerHTML =
-      '<span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4z"></path><path d="M2 4l6 5 6-5"></path></svg></span>' +
-      '<span>Messages</span>' +
-      '<span class="nav-msg-badge" aria-label="unread messages" style="display:none"></span>';
-    nav.appendChild(link);
-  });
-}
-
 function pollGlobalUnreadCount() {
   var token = "";
   try { token = localStorage.getItem("token") || ""; } catch (_) {}
@@ -283,9 +251,7 @@ function pollGlobalUnreadCount() {
 
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
-  injectHelpNavLink();
-  injectMessagesNavLink();
-  injectMobileMenu();   // clones nav after Help/Messages are injected
+  injectMobileMenu();
   highlightNavigation(); // runs on all nav a elements including the drawer
   applyDateInputConstraints();
   injectMobileDesktopLink();

@@ -205,7 +205,6 @@ function updateAuthenticatedChrome(profile = {}) {
 
   persistBusinessContext(profile);
   ensureLegacyUserPills();
-  ensureBusinessPills(profile);
 
   document.querySelectorAll(".user-name").forEach((node) => {
     node.textContent = displayName;
@@ -216,7 +215,6 @@ function updateAuthenticatedChrome(profile = {}) {
     node.setAttribute("aria-label", `${displayName} initials`);
   });
 
-  initBusinessMenus(profile);
   initAccountMenus(displayName, profile);
 }
 
@@ -445,19 +443,24 @@ async function redirectIfAuthenticated() {
 }
 
 async function apiFetch(url, options = {}) {
+  const {
+    redirectOnUnauthorized = true,
+    headers: optionHeaders = {},
+    ...fetchOptions
+  } = options;
   const apiUrl = buildApiUrl(url);
   const headers = {
     "Content-Type": "application/json",
-    ...(options.headers || {}),
+    ...optionHeaders,
     ...authHeader()
   };
   const response = await fetch(apiUrl, {
-    ...options,
+    ...fetchOptions,
     credentials: "include",
     headers
   });
 
-  if (response.status === 401) {
+  if (response.status === 401 && redirectOnUnauthorized) {
     clearToken();
     window.location.href = LOGIN_PAGE;
     return null;
@@ -610,8 +613,10 @@ function initAccountMenus(displayName = "User", profile = {}) {
   ensureAccountMenuStyles();
   ensureBusinessCreationModal();
   const activeBusiness = getActiveBusiness(profile);
+  const businesses = getBusinessCollection(profile);
   const assignedCpaPortfolios = getAssignedCpaPortfolios(profile);
   const hasCpaWorkspace = assignedCpaPortfolios.length > 0;
+  const businessCountLabel = `${businesses.length} business${businesses.length === 1 ? "" : "es"}`;
 
   document.querySelectorAll(".user-pill").forEach((pill, index) => {
     let menu = pill.querySelector(".account-menu");
@@ -637,7 +642,27 @@ function initAccountMenus(displayName = "User", profile = {}) {
       <div class="account-menu-section">
         <div class="account-menu-caption">${typeof t === "function" ? t("auth_signed_in_as") : "Signed in as"}</div>
         <div class="account-menu-current">${escapeHtml(displayName)}</div>
-        <div class="account-menu-hint">${escapeHtml(activeBusiness?.name || (typeof t === "function" ? t("common_business") : "Business"))}</div>
+      </div>
+      <div class="account-menu-section">
+        <div class="account-menu-caption">Active business</div>
+        <div class="account-menu-current">${escapeHtml(activeBusiness?.name || (typeof t === "function" ? t("common_business") : "Business"))}</div>
+        <div class="account-menu-hint">${businessCountLabel}</div>
+      </div>
+      <div class="account-menu-section">
+        ${businesses.map((business) => `
+          <button
+            type="button"
+            class="account-menu-item business-menu-item ${business.is_active ? "is-active" : ""}"
+            data-business-switch="${escapeHtml(business.id)}"
+            role="menuitem"
+          >
+            <span class="business-menu-copy">
+              <span class="account-menu-label">${escapeHtml(business.name || "Business")}</span>
+              <span class="account-menu-hint">${escapeHtml(business.region || "US")}</span>
+            </span>
+            ${business.is_active ? '<span class="business-menu-state">Current</span>' : ""}
+          </button>
+        `).join("")}
       </div>
       ${hasCpaWorkspace ? `
       <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="cpa-workspace" role="menuitem">
@@ -656,6 +681,15 @@ function initAccountMenus(displayName = "User", profile = {}) {
 
     menu.onclick = async (event) => {
       event.stopPropagation();
+
+      const switchId = event.target.closest("[data-business-switch]")?.getAttribute("data-business-switch");
+      if (switchId) {
+        event.preventDefault();
+        closeAllAccountMenus();
+        await switchActiveBusiness(switchId);
+        return;
+      }
+
       const action = event.target.closest("[data-account-menu-action]")?.getAttribute("data-account-menu-action");
       if (!action) {
         return;
