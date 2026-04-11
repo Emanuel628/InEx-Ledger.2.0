@@ -19,7 +19,7 @@ ENV RECEIPT_STORAGE_PERSISTENT=true
 # Set to "false" only when connecting to Postgres with a self-signed certificate chain
 # (e.g. a private CA).  Never set NODE_TLS_REJECT_UNAUTHORIZED=0 as a workaround.
 # For self-signed CAs, supply DB_SSL_CA_CERT=/path/to/ca.pem at runtime instead.
-ENV DB_SSL_REJECT_UNAUTHORIZED=true
+
 
 # Ensure the receipts directory exists at image build time
 RUN mkdir -p /app/storage/receipts
