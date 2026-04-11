@@ -47,8 +47,8 @@ function verifyToken(token) {
 
   const [header, body, signature] = parts;
   const expected = signWithSecret(`${header}.${body}`);
-  const bufferSignature = Buffer.from(signature, "utf8");
-  const bufferExpected = Buffer.from(expected, "utf8");
+  const bufferSignature = Buffer.from(signature, "base64url");
+  const bufferExpected = Buffer.from(expected, "base64url");
   if (
     bufferSignature.length !== bufferExpected.length ||
     !crypto.timingSafeEqual(bufferSignature, bufferExpected)
