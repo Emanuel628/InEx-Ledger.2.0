@@ -81,6 +81,7 @@ let categoryRecords = [];
 let currentRegion = null;
 let unattachedReceiptsCount = 0;
 let categoriesServerAvailable = true;
+let categoriesLoading = false;
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
@@ -177,6 +178,10 @@ function closeCategoryModal() {
 }
 
 async function loadCategories() {
+  categoriesLoading = categoryRecords.length === 0;
+  if (categoriesLoading) {
+    renderCategoryLists();
+  }
   try {
     const response = await apiFetch("/api/categories");
     if (!response || !response.ok) {
@@ -194,6 +199,7 @@ async function loadCategories() {
     categoryRecords = getCategories();
     categoriesServerAvailable = false;
   }
+  categoriesLoading = false;
   showCategoriesOfflineBanner(!categoriesServerAvailable);
   renderCategoryLists();
 }
@@ -234,6 +240,11 @@ function renderCategoryLists() {
 function renderCategoryGroup(containerId, type, emptyText) {
   const container = document.getElementById(containerId);
   if (!container) return;
+
+  if (categoriesLoading) {
+    container.innerHTML = `<div class="category-empty category-loading"><p>${escapeHtml(tx("categories_loading"))}</p></div>`;
+    return;
+  }
 
   const categories = categoryRecords.filter((item) => item.type === type);
   if (!categories.length) {

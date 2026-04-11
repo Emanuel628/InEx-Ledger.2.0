@@ -4,6 +4,8 @@ let receiptsToastTimer = null;
 let receiptRecords = [];
 let transactionMap = {};
 let activeReceiptLinkId = null;
+let receiptsLoading = false;
+let receiptsLoadFailed = false;
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
@@ -122,10 +124,16 @@ function readTransactionMapFromStorage() {
 }
 
 async function loadReceipts() {
+  receiptsLoading = receiptRecords.length === 0;
+  receiptsLoadFailed = false;
+  if (receiptsLoading) {
+    renderReceipts(receiptRecords);
+  }
   try {
     const response = await apiFetch("/api/receipts");
     if (!response) {
       receiptRecords = [];
+      receiptsLoadFailed = true;
       renderReceipts(receiptRecords);
       return;
     }
@@ -143,12 +151,15 @@ async function loadReceipts() {
       : [];
 
     receiptRecords = remoteReceipts;
-
+    receiptsLoadFailed = false;
     renderReceipts(receiptRecords);
   } catch (error) {
     console.error("Failed to load receipts:", error);
     receiptRecords = [];
+    receiptsLoadFailed = true;
     renderReceipts(receiptRecords);
+  } finally {
+    receiptsLoading = false;
   }
 }
 
@@ -160,10 +171,41 @@ function renderReceipts(receipts) {
     return;
   }
 
+  if (receiptsLoading) {
+    tableBody.innerHTML = "";
+    if (emptyState) {
+      emptyState.hidden = false;
+      updateReceiptsEmptyState(
+        emptyState,
+        tx("receipts_loading_title"),
+        tx("receipts_loading_body")
+      );
+    }
+    return;
+  }
+
+  if (receiptsLoadFailed) {
+    tableBody.innerHTML = "";
+    if (emptyState) {
+      emptyState.hidden = false;
+      updateReceiptsEmptyState(
+        emptyState,
+        tx("receipts_load_error_title"),
+        tx("receipts_load_error_body")
+      );
+    }
+    return;
+  }
+
   if (!receipts.length) {
     tableBody.innerHTML = "";
     if (emptyState) {
       emptyState.hidden = false;
+      updateReceiptsEmptyState(
+        emptyState,
+        tx("receipts_empty_title"),
+        tx("receipts_empty_body")
+      );
     }
     return;
   }
@@ -221,6 +263,17 @@ function renderReceipts(receipts) {
       await deleteReceiptRecord(receiptId);
     });
   });
+}
+
+function updateReceiptsEmptyState(node, title, body) {
+  const titleNode = node.querySelector("h3");
+  const bodyNode = node.querySelector("p");
+  if (titleNode) {
+    titleNode.textContent = title;
+  }
+  if (bodyNode) {
+    bodyNode.textContent = body;
+  }
 }
 
 function renderTransactionCell(transactionId) {

@@ -60,7 +60,7 @@
       <div class="page-header">
         <div>
           <h1 class="page-title">Transactions</h1>
-          <p class="page-subtitle">2026 fiscal year � Chase Business + N accounts</p>
+          <p class="page-subtitle">Active business ledger · current reporting period</p>
           <p class="page-context-note" id="transactionsTaxContext">Tax form context</p>
         </div>
         <div class="page-header-actions">
@@ -136,7 +136,7 @@
         </div>
         <div class="upsell-actions">
           <button data-upgrade data-i18n="transactions_upsell_cta">Upgrade to V1</button>
-          <button type="button" class="upsell-dismiss" aria-label="Dismiss">�</button>
+          <button type="button" class="upsell-dismiss" aria-label="Dismiss">×</button>
         </div>
       </section>
 
@@ -144,15 +144,31 @@
         <div class="transactions-toolbar">
           <h2 class="transactions-panel-title">Recorded transactions</h2>
           <div class="toolbar-search">
-            <span class="toolbar-search-icon">?</span>
+            <span class="toolbar-search-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16">
+                <circle cx="7" cy="7" r="5"></circle>
+                <line x1="10.5" y1="10.5" x2="14" y2="14"></line>
+              </svg>
+            </span>
             <input
               type="search"
               id="transactionSearch"
               placeholder="Search transactions..."
               data-i18n-placeholder="transactions_search_placeholder"
+              data-i18n-aria-label="transactions_search_label"
+              aria-label="Search transactions"
             />
           </div>
-          <button type="button" class="toolbar-filter-button">? Filter</button>
+          <button type="button" class="toolbar-filter-button">
+            <span class="toolbar-filter-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16">
+                <path d="M3 4h10"></path>
+                <path d="M5 8h6"></path>
+                <path d="M7 12h2"></path>
+              </svg>
+            </span>
+            Filter
+          </button>
           <select id="transactionCategoryFilter" class="toolbar-select">
             <option value="" data-i18n="transactions_filter_all_categories">All categories</option>
           </select>
@@ -461,6 +477,5 @@
 <script src="../js/transactions.js?v=20260405c"></script>
 </body>
 </html>
-
 
 

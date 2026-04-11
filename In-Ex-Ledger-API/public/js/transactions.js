@@ -1478,11 +1478,13 @@ function renderTransactionList(filteredTransactions) {
       txn.type === "income" ? "transaction_type_income" : "transaction_type_expense";
     const typeLabel =
       typeof t === "function" ? t(typeKey) : txn.type === "income" ? "Income" : "Expense";
+    const receiptLabel = txT("transactions_receipt_attached", "Receipt attached");
+    const noteLabel = txT("transactions_note_attached", "Note attached");
     const receiptClip = txn.receiptId
-      ? '<span class="tx-clip" title="Receipt attached">dY"Z</span>'
+      ? `<span class="tx-clip" aria-hidden="true" title="${escapeHtml(receiptLabel)}">📎</span><span class="sr-only">${escapeHtml(receiptLabel)}</span>`
       : "";
     const noteIndicator = txn.note
-      ? '<span class="tx-note-indicator" title="Note attached">📄</span>'
+      ? `<span class="tx-note-indicator" aria-hidden="true" title="${escapeHtml(noteLabel)}">📝</span><span class="sr-only">${escapeHtml(noteLabel)}</span>`
       : "";
     row.innerHTML = `
       <td>${escapeHtml(txn.date)}</td>
