@@ -42,6 +42,10 @@ if (!window.__AUTH_GUARD_STATE__) {
   window.__AUTH_GUARD_STATE__ = { running: false, count: 0, lastError: null };
 }
 
+if (!window.__AUTH_REFRESH_STATE__) {
+  window.__AUTH_REFRESH_STATE__ = { pending: null };
+}
+
 function getApiBase() {
   return window.API_BASE;
 }
@@ -205,6 +209,7 @@ function updateAuthenticatedChrome(profile = {}) {
 
   persistBusinessContext(profile);
   ensureLegacyUserPills();
+  removeLegacyBusinessPills();
 
   document.querySelectorAll(".user-name").forEach((node) => {
     node.textContent = displayName;
@@ -275,34 +280,9 @@ function ensureLegacyUserPills() {
   header.appendChild(pill);
 }
 
-function ensureBusinessPills(profile = {}) {
-  const activeBusiness = getActiveBusiness(profile);
-  if (!activeBusiness) {
-    return;
-  }
-
-  document.querySelectorAll(".user-pill").forEach((userPill, index) => {
-    const parent = userPill.parentElement;
-    if (!parent) {
-      return;
-    }
-
-    let businessPill = parent.querySelector(`.business-pill[data-business-pill-index="${index}"]`);
-    if (!businessPill) {
-      businessPill = document.createElement("div");
-      businessPill.className = "business-pill";
-      businessPill.dataset.businessPillIndex = String(index);
-      businessPill.innerHTML = `
-        <span class="business-pill-icon" aria-hidden="true">B</span>
-        <span class="business-pill-copy">
-          <span class="business-pill-label">Business</span>
-          <span class="business-pill-name">Business</span>
-        </span>
-      `;
-      parent.insertBefore(businessPill, userPill);
-    }
-
-    businessPill.querySelector(".business-pill-name").textContent = activeBusiness.name || "Business";
+function removeLegacyBusinessPills() {
+  document.querySelectorAll(".business-pill").forEach((pill) => {
+    pill.remove();
   });
 }
 
@@ -328,6 +308,54 @@ function authHeader() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+async function refreshAccessToken() {
+  if (window.__AUTH_REFRESH_STATE__?.pending) {
+    return window.__AUTH_REFRESH_STATE__.pending;
+  }
+
+  window.__AUTH_REFRESH_STATE__.pending = (async () => {
+    try {
+      const response = await fetch(buildApiUrl("/api/auth/refresh"), {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.status === 401) {
+        clearToken();
+        return { ok: false, unauthorized: true, status: 401 };
+      }
+
+      if (response.status !== 200) {
+        return { ok: false, unauthorized: false, status: response.status };
+      }
+
+      const payload = await response.json().catch(() => null);
+      const token = String(payload?.token || "").trim();
+      if (!token) {
+        clearToken();
+        return { ok: false, unauthorized: true, status: 200 };
+      }
+
+      setToken(token);
+      if (payload?.subscription) {
+        applySubscriptionState(payload.subscription);
+      }
+
+      return { ok: true, token, status: 200 };
+    } catch (err) {
+      if (localStorage.getItem("debug") === "true") { console.error("[AUTH] Token refresh failed:", err); }
+      return { ok: false, unauthorized: false, network: true, status: null };
+    } finally {
+      window.__AUTH_REFRESH_STATE__.pending = null;
+    }
+  })();
+
+  return window.__AUTH_REFRESH_STATE__.pending;
+}
+
 function mapAuthError(status, apiError) {
   const errorMessage = typeof apiError === "string" ? apiError : apiError?.error;
   if (status === 401) {
@@ -350,17 +378,22 @@ async function requireValidSessionOrRedirect() {
   window.__AUTH_GUARD_STATE__.running = true;
   window.__AUTH_GUARD_STATE__.count += 1;
 
-  const token = getToken();
-
-  if (!token) {
-    window.__AUTH_GUARD_STATE__.running = false;
-    window.location.href = LOGIN_PAGE;
-    return;
+  if (!getToken()) {
+    const refreshResult = await refreshAccessToken();
+    if (!refreshResult?.ok) {
+      window.__AUTH_GUARD_STATE__.running = false;
+      if (refreshResult?.unauthorized) {
+        window.location.href = LOGIN_PAGE;
+        return;
+      }
+      window.__AUTH_GUARD_STATE__.lastError = refreshResult?.network ? "network" : `refresh_${refreshResult?.status || "unknown"}`;
+      return false;
+    }
   }
 
   try {
     const meUrl = buildApiUrl("/api/me");
-    const response = await fetch(meUrl, {
+    const fetchProfile = () => fetch(meUrl, {
       method: "GET",
       credentials: "include",
       headers: {
@@ -368,6 +401,23 @@ async function requireValidSessionOrRedirect() {
         ...authHeader()
       }
     });
+    let response = await fetchProfile();
+
+    if (response.status === 401) {
+      const refreshResult = await refreshAccessToken();
+      if (!refreshResult?.ok) {
+        window.__AUTH_GUARD_STATE__.running = false;
+        if (refreshResult?.unauthorized) {
+          window.__AUTH_GUARD_STATE__.lastError = "expired";
+          window.location.href = `${LOGIN_PAGE}?reason=expired`;
+          return;
+        }
+        window.__AUTH_GUARD_STATE__.lastError = refreshResult?.network ? "network" : `refresh_${refreshResult?.status || "unknown"}`;
+        return false;
+      }
+
+      response = await fetchProfile();
+    }
 
     if (response.status === 200) {
       const payload = await response.json().catch(() => null);
@@ -407,10 +457,9 @@ async function requireValidSessionOrRedirect() {
     window.__AUTH_GUARD_STATE__.lastError = `me_${response.status}`;
   } catch (err) {
     if (localStorage.getItem("debug") === "true") { console.error("[AUTH] Session validation failed:", err); }
-    clearToken();
     window.__AUTH_GUARD_STATE__.running = false;
     window.__AUTH_GUARD_STATE__.lastError = "network";
-    window.location.href = `${LOGIN_PAGE}?reason=network`;
+    return false;
   }
 }
 
@@ -449,21 +498,26 @@ async function apiFetch(url, options = {}) {
     ...fetchOptions
   } = options;
   const apiUrl = buildApiUrl(url);
-  const headers = {
-    "Content-Type": "application/json",
-    ...optionHeaders,
-    ...authHeader()
-  };
-  const response = await fetch(apiUrl, {
+  const runRequest = () => fetch(apiUrl, {
     ...fetchOptions,
     credentials: "include",
-    headers
+    headers: {
+      "Content-Type": "application/json",
+      ...optionHeaders,
+      ...authHeader()
+    }
   });
 
+  let response = await runRequest();
+
   if (response.status === 401 && redirectOnUnauthorized) {
-    clearToken();
-    window.location.href = LOGIN_PAGE;
-    return null;
+    const refreshResult = await refreshAccessToken();
+    if (refreshResult?.ok) {
+      response = await runRequest();
+    } else if (refreshResult?.unauthorized) {
+      window.location.href = LOGIN_PAGE;
+      return null;
+    }
   }
 
   return response;
@@ -536,79 +590,6 @@ function wireMenuTrigger(trigger, menu) {
   });
 }
 
-function initBusinessMenus(profile = {}) {
-  ensureAccountMenuStyles();
-  ensureBusinessCreationModal();
-  const businesses = getBusinessCollection(profile);
-  const activeBusiness = getActiveBusiness(profile);
-  const businessCountLabel = `${businesses.length} business${businesses.length === 1 ? "" : "es"}`;
-
-  document.querySelectorAll(".business-pill").forEach((pill, index) => {
-    const menuId = `businessMenu-${index + 1}`;
-    let menu = pill.querySelector(".business-menu");
-    if (!menu) {
-      pill.classList.add("menu-trigger");
-      pill.setAttribute("role", "button");
-      pill.setAttribute("tabindex", "0");
-      pill.setAttribute("aria-haspopup", "menu");
-      pill.setAttribute("aria-expanded", "false");
-      pill.setAttribute("aria-controls", menuId);
-
-      menu = document.createElement("div");
-      menu.className = "account-menu business-menu hidden";
-      menu.id = menuId;
-      menu.setAttribute("role", "menu");
-      pill.appendChild(menu);
-      wireMenuTrigger(pill, menu);
-    }
-
-    menu.innerHTML = `
-      <div class="account-menu-section">
-        <div class="account-menu-caption">Active business</div>
-        <div class="account-menu-current">${escapeHtml(activeBusiness?.name || "Business")}</div>
-        <div class="account-menu-hint">${businessCountLabel}</div>
-      </div>
-      <div class="account-menu-section">
-        ${businesses.map((business) => `
-          <button
-            type="button"
-            class="account-menu-item business-menu-item ${business.is_active ? "is-active" : ""}"
-            data-business-switch="${escapeHtml(business.id)}"
-            role="menuitem"
-          >
-            <span class="business-menu-copy">
-              <span class="account-menu-label">${escapeHtml(business.name || "Business")}</span>
-              <span class="account-menu-hint">${escapeHtml(business.region || "US")}</span>
-            </span>
-            ${business.is_active ? '<span class="business-menu-state">Current</span>' : ""}
-          </button>
-        `).join("")}
-      </div>
-      <button type="button" class="account-menu-item account-menu-secondary" data-business-create="true" role="menuitem">
-        <span class="account-menu-label">Add another business</span>
-        <span class="account-menu-hint">Create and switch instantly</span>
-      </button>
-    `;
-
-    menu.onclick = async (event) => {
-      event.stopPropagation();
-      const switchId = event.target.closest("[data-business-switch]")?.getAttribute("data-business-switch");
-      if (switchId) {
-        event.preventDefault();
-        closeAllAccountMenus();
-        await switchActiveBusiness(switchId);
-        return;
-      }
-
-      if (event.target.closest("[data-business-create]")) {
-        event.preventDefault();
-        closeAllAccountMenus();
-        openBusinessCreationModal();
-      }
-    };
-  });
-}
-
 function initAccountMenus(displayName = "User", profile = {}) {
   ensureAccountMenuStyles();
   ensureBusinessCreationModal();
@@ -637,6 +618,10 @@ function initAccountMenus(displayName = "User", profile = {}) {
       pill.appendChild(menu);
       wireMenuTrigger(pill, menu);
     }
+
+    // Re-rendering authenticated chrome should always reset the menu closed.
+    menu.classList.add("hidden");
+    pill.setAttribute("aria-expanded", "false");
 
     menu.innerHTML = `
       <div class="account-menu-section">

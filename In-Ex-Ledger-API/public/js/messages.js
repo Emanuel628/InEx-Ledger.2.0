@@ -16,7 +16,10 @@ let _contacts = [];
 // Bootstrap
 // ─────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", async () => {
-  await requireValidSessionOrRedirect();
+  const sessionReady = await requireValidSessionOrRedirect();
+  if (sessionReady === false) {
+    return;
+  }
   if (typeof enforceTrial === "function") enforceTrial();
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
