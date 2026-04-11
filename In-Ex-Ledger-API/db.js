@@ -5,11 +5,98 @@ const crypto = require('crypto');
 
 const { Pool } = pg;
 
-// Validate SSL configuration explicitly
+// ── SSL configuration ───────────────────────────────────────────────────────
+//
+// Controls (evaluated in priority order):
+//
+//   DB_SSL=disable | false   → SSL disabled entirely (local dev / private nets)
+//   DB_SSL=true | require    → SSL enabled, honours DB_SSL_REJECT_UNAUTHORIZED
+//   sslmode=disable (in DATABASE_URL querystring) → SSL disabled
+//   sslmode=require | verify-full (in DATABASE_URL querystring) → SSL enabled
+//   NODE_ENV=production      → SSL enabled by default (no DB_SSL needed)
+//   (none of the above)      → SSL disabled (dev/test default)
+//
+// DB_SSL_REJECT_UNAUTHORIZED:
+//   "true"  → strict CA-chain validation (production default, recommended for
+//              managed Postgres services such as Railway, Supabase, RDS)
+//   "false" → allow self-signed / private CA chains — must be set EXPLICITLY;
+//              never use NODE_TLS_REJECT_UNAUTHORIZED=0 as a workaround
+//
+// DB_SSL_CA_CERT:
+//   Absolute path to a PEM-encoded CA certificate bundle.  Use this when
+//   connecting to Postgres with a private CA instead of disabling validation.
+//
 const isProduction = process.env.NODE_ENV === 'production';
-const sslConfig = isProduction
-  ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true' }
-  : false;
+
+function buildSslConfig() {
+  const dbSslEnv = (process.env.DB_SSL || '').trim().toLowerCase();
+
+  // ── Explicit disable ──────────────────────────────────────────────────────
+  if (dbSslEnv === 'disable' || dbSslEnv === 'false') {
+    return false;
+  }
+
+  // ── sslmode from DATABASE_URL querystring ─────────────────────────────────
+  let sslmodeFromUrl = null;
+  try {
+    const url = new URL(process.env.DATABASE_URL || '');
+    sslmodeFromUrl = url.searchParams.get('sslmode');
+  } catch (err) {
+    console.warn(`[DB] Could not parse DATABASE_URL to read sslmode: ${err.message}`);
+  }
+
+  if (sslmodeFromUrl === 'disable') {
+    return false;
+  }
+
+  // ── Decide whether SSL should be enabled ─────────────────────────────────
+  const sslEnabled =
+    dbSslEnv === 'true' || dbSslEnv === 'require' ||
+    sslmodeFromUrl === 'require' || sslmodeFromUrl === 'verify-full' ||
+    isProduction;
+
+  if (!sslEnabled) {
+    return false;
+  }
+
+  // ── rejectUnauthorized ────────────────────────────────────────────────────
+  // Default: true in production (strict CA validation), false in other envs.
+  // Override with DB_SSL_REJECT_UNAUTHORIZED=false only for self-signed chains.
+  const rejectUnauthorizedDefault = isProduction ? 'true' : 'false';
+  const rejectUnauthorized =
+    (process.env.DB_SSL_REJECT_UNAUTHORIZED !== undefined
+      ? process.env.DB_SSL_REJECT_UNAUTHORIZED
+      : rejectUnauthorizedDefault
+    ).trim().toLowerCase() === 'true';
+
+  const config = { rejectUnauthorized };
+
+  // ── Optional custom CA certificate ───────────────────────────────────────
+  if (process.env.DB_SSL_CA_CERT) {
+    try {
+      config.ca = fs.readFileSync(process.env.DB_SSL_CA_CERT, 'utf8');
+    } catch (err) {
+      const msg = `[DB] Failed to read DB_SSL_CA_CERT: ${err.message}`;
+      if (isProduction) {
+        // A missing CA cert in production is a deployment error — fail fast.
+        console.error(msg);
+        process.exit(1);
+      }
+      console.error(msg);
+    }
+  }
+
+  return config;
+}
+
+const sslConfig = buildSslConfig();
+
+// Log effective SSL settings at startup (no secrets printed)
+const sslSummary =
+  sslConfig === false
+    ? 'disabled'
+    : `enabled (rejectUnauthorized=${sslConfig.rejectUnauthorized}, customCA=${!!sslConfig.ca})`;
+console.log(`[DB] SSL config: ${sslSummary}`);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
