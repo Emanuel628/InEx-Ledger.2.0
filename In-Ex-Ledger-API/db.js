@@ -118,6 +118,23 @@ async function runMigration(filename, sql, checksum) {
   }
 }
 
+// Sentinel error class for content-drift — lets server.js detect it without string matching
+class MigrationContentDriftError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'MigrationContentDriftError';
+  }
+}
+
+// Cached stats updated by initDatabase() — safe to read any time after startup
+const migrationStats = {
+  total: 0,
+  applied: 0,
+  skipped: 0,
+  lastAppliedAt: null,
+  lastCheckedAt: null
+};
+
 // Migration Runner with explicit tracking
 async function initDatabase() {
   const migrationsDir = path.join(__dirname, 'db', 'migrations');
@@ -138,7 +155,7 @@ async function initDatabase() {
   }
 
   await bootstrapMigrationsTable();
-  const applied = await getAppliedMigrations();
+  const appliedMap = await getAppliedMigrations();
 
   let newCount = 0;
   let skippedCount = 0;
@@ -148,14 +165,14 @@ async function initDatabase() {
     const sql = fs.readFileSync(filePath, 'utf8');
     const checksum = computeChecksum(sql);
 
-    if (applied.has(filename)) {
-      const storedChecksum = applied.get(filename);
+    if (appliedMap.has(filename)) {
+      const storedChecksum = appliedMap.get(filename);
       if (storedChecksum !== checksum) {
         const msg = `Migration content changed since last run (${filename}). ` +
           'Re-running a previously applied migration is unsafe. ' +
           'Create a new migration file to make incremental schema changes.';
         console.error(msg);
-        throw new Error(msg);
+        throw new MigrationContentDriftError(msg);
       }
       skippedCount++;
       continue;
@@ -172,11 +189,21 @@ async function initDatabase() {
     }
   }
 
+  migrationStats.total = migrationFiles.length;
+  migrationStats.applied = newCount;
+  migrationStats.skipped = skippedCount;
+  migrationStats.lastCheckedAt = new Date().toISOString();
+  if (newCount > 0) {
+    migrationStats.lastAppliedAt = migrationStats.lastCheckedAt;
+  }
+
   console.log(`Migrations complete: ${newCount} applied, ${skippedCount} already up to date.`);
 }
 
 module.exports = {
   pool,
   initDatabase,
-  withRetry
+  withRetry,
+  migrationStats,
+  MigrationContentDriftError
 };
