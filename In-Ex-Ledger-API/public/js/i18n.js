@@ -1837,7 +1837,6 @@ const TRANSLATIONS = {
     transactions_delete_this: 'esta transacción',
     transactions_archive_confirm: 'Archivar',
     transactions_search_label: 'Buscar transacciones',
-    transactions_delete_this: 'esta transacción',
     transactions_select_account: 'Selecciona una cuenta',
     transactions_select_category: 'Selecciona una categoría',
     transactions_all_categories: 'Todas las categorías',
