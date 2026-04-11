@@ -12,7 +12,7 @@ const {
   initializeRateLimiterProtection
 } = require('./middleware/rateLimiter.js');
 const { ensureCsrfCookie } = require('./middleware/csrf.middleware.js');
-const { initDatabase } = require('./db.js');
+const { initDatabase, migrationStats, MigrationContentDriftError } = require('./db.js');
 const { getReceiptStorageStatus, initializeReceiptStorage } = require('./services/receiptStorage.js');
 const { logInfo, logWarn, logError } = require('./utils/logger.js');
 
@@ -169,6 +169,12 @@ app.use('/api', (req, res, next) => {
       error: 'Service temporarily unavailable due to rate limiting requirements.'
     });
   }
+  if (dbState === 'failed') {
+    return res.status(503).json({
+      error: 'Service unavailable due to a database initialization error. Please contact support.',
+      database: { state: dbState }
+    });
+  }
   if (dbState !== 'ready') {
     return res.status(503).json({
       error: 'Service starting up. Please try again shortly.',
@@ -190,11 +196,20 @@ app.get('/health', (req, res) => {
   const rateLimiting = getRateLimiterHealth();
   const receiptStorage = getReceiptStorageStatus();
   const healthy = dbState === 'ready' && rateLimiting.mode !== 'degraded' && receiptStorage.mode !== 'degraded';
+  let overallStatus;
+  if (healthy) {
+    overallStatus = 'healthy';
+  } else if (dbState === 'ready') {
+    overallStatus = 'degraded';
+  } else {
+    overallStatus = dbState;
+  }
   res.status(200).json({
-    status: healthy ? 'healthy' : (dbState === 'ready' ? 'degraded' : 'starting'),
+    status: overallStatus,
     database: {
       state: dbState,
-      lastError: dbLastError
+      lastError: dbLastError,
+      migrations: migrationStats
     },
     receiptStorage,
     rateLimiting,
@@ -271,9 +286,18 @@ async function initializeDatabaseWithRetry() {
         logInfo('Database initialization completed.');
         return;
       } catch (err) {
+        const message = err?.message || String(err);
+        // Content-drift errors are programmer mistakes that will never self-heal
+        // — retrying endlessly is pointless and noisy.
+        if (err instanceof MigrationContentDriftError) {
+          dbState = 'failed';
+          dbLastError = message;
+          logError('Database initialization failed with a non-retryable error. Manual intervention required.', { message });
+          return;
+        }
         dbState = 'retrying';
-        dbLastError = err?.message || String(err);
-        logError('Database initialization failed:', { message: err?.message || String(err) });
+        dbLastError = message;
+        logError('Database initialization failed:', { message });
         logInfo(`Retrying database initialization in ${DB_RETRY_DELAY_MS}ms.`);
         await new Promise((resolve) => setTimeout(resolve, DB_RETRY_DELAY_MS));
       }
