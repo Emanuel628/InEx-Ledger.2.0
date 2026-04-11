@@ -21,7 +21,8 @@
     "test:auth-flows": "node --test tests/authFlows.test.js",
     "test:critical-flows": "node --test tests/criticalFlows.test.js",
     "test:harness": "node --test tests/testHarness.test.js",
-    "test:all": "node --test tests/rateLimiter.test.js tests/subscriptionService.test.js tests/accountingControls.test.js tests/authFlows.test.js tests/criticalFlows.test.js tests/testHarness.test.js",
+    "test:integration": "node --test tests/integrationFlows.test.js",
+    "test:all": "node --test tests/rateLimiter.test.js tests/subscriptionService.test.js tests/accountingControls.test.js tests/authFlows.test.js tests/criticalFlows.test.js tests/testHarness.test.js tests/integrationFlows.test.js",
     "seed:dev": "node scripts/seed-dev.mjs"
   },
   "dependencies": {
