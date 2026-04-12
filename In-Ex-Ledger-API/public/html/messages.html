@@ -68,15 +68,17 @@
       </div>
 
       <div class="messages-tabs" role="tablist">
-        <button type="button" class="messages-tab is-active" id="tabInbox" role="tab" aria-selected="true" data-tab="inbox">
+        <button type="button" class="messages-tab is-active" id="tabInbox" role="tab" aria-selected="true" aria-controls="messagesPanel" tabindex="0" data-tab="inbox">
           Inbox<span class="messages-tab-badge" id="inboxBadge" hidden></span>
         </button>
-        <button type="button" class="messages-tab" id="tabSent" role="tab" aria-selected="false" data-tab="sent">Sent</button>
-        <button type="button" class="messages-tab" id="tabArchived" role="tab" aria-selected="false" data-tab="archived">Archived</button>
+        <button type="button" class="messages-tab" id="tabSent" role="tab" aria-selected="false" aria-controls="messagesPanel" tabindex="-1" data-tab="sent">Sent</button>
+        <button type="button" class="messages-tab" id="tabArchived" role="tab" aria-selected="false" aria-controls="messagesPanel" tabindex="-1" data-tab="archived">Archived</button>
       </div>
 
-      <div class="messages-list" id="messagesList">
+      <div class="messages-list" id="messagesPanel" role="tabpanel" aria-labelledby="tabInbox">
+        <div class="messages-list" id="messagesList">
         <div class="messages-loading">Loading messages…</div>
+        </div>
       </div>
     </div>
   </main>

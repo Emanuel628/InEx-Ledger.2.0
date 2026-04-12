@@ -42,12 +42,22 @@ function wireTabBar() {
 
 function switchTab(tab) {
   _currentTab = tab;
+  let activeTabId = "tabInbox";
 
   document.querySelectorAll(".messages-tab").forEach((btn) => {
     const isActive = btn.getAttribute("data-tab") === tab;
     btn.classList.toggle("is-active", isActive);
     btn.setAttribute("aria-selected", String(isActive));
+    btn.tabIndex = isActive ? 0 : -1;
+    if (isActive && btn.id) {
+      activeTabId = btn.id;
+    }
   });
+
+  const panel = document.getElementById("messagesPanel");
+  if (panel) {
+    panel.setAttribute("aria-labelledby", activeTabId);
+  }
 
   document.querySelectorAll(".app-sidebar .sidebar-link[data-tab]").forEach((a) => {
     a.classList.toggle("is-active", a.getAttribute("data-tab") === tab);
@@ -457,13 +467,24 @@ async function sendComposedMessage() {
 // Unread badge & polling
 // ─────────────────────────────────────────────
 async function updateUnreadBadge() {
+  if (typeof getToken === "function" && !getToken()) {
+    stopPoll();
+    return false;
+  }
+
   try {
     const res = await apiFetch("/api/messages/unread-count");
-    if (!res || !res.ok) return;
+    if (!res) {
+      stopPoll();
+      return false;
+    }
+    if (!res.ok) return true;
     const { count } = await res.json();
     setUnreadBadge(count);
+    return true;
   } catch {
     // non-fatal
+    return true;
   }
 }
 
@@ -491,8 +512,21 @@ function setUnreadBadge(count) {
 }
 
 function schedulePoll() {
-  if (_pollTimer) clearInterval(_pollTimer);
-  _pollTimer = setInterval(updateUnreadBadge, POLL_INTERVAL_MS);
+  stopPoll();
+  _pollTimer = setInterval(() => {
+    void updateUnreadBadge().then((shouldContinue) => {
+      if (shouldContinue === false) {
+        stopPoll();
+      }
+    });
+  }, POLL_INTERVAL_MS);
+}
+
+function stopPoll() {
+  if (_pollTimer) {
+    clearInterval(_pollTimer);
+    _pollTimer = null;
+  }
 }
 
 

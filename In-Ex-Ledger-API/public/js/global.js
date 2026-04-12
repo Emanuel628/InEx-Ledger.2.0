@@ -154,9 +154,16 @@ function injectSkipLink() {
     main.id = "main-content";
   }
 
+  const targetHref = "#" + main.id;
+  const existingLink = Array.from(document.querySelectorAll(".skip-link"))
+    .find((link) => link.getAttribute("href") === targetHref);
+  if (existingLink) {
+    return;
+  }
+
   const link = document.createElement("a");
   link.className = "skip-link";
-  link.href = "#" + main.id;
+  link.href = targetHref;
   link.setAttribute("data-i18n", "a11y_skip_to_main");
   link.textContent = "Skip to main content";
   document.body.insertBefore(link, document.body.firstChild);
@@ -279,21 +286,48 @@ function injectMessagesNavLink() {
 function pollGlobalUnreadCount() {
   var token = "";
   try { token = localStorage.getItem("token") || ""; } catch (_) {}
-  if (!token) return;
+  if (!token) return Promise.resolve(false);
 
-  fetch("/api/messages/unread-count", {
+  if (typeof apiFetch === "function") {
+    return apiFetch("/api/messages/unread-count")
+      .then(function (response) {
+        if (!response) return false;
+        if (!response.ok) return true;
+        return response.json().then(function (data) {
+          if (!data) return true;
+          var count = data.count || 0;
+          document.querySelectorAll(".nav-msg-badge").forEach(function (badge) {
+            badge.setAttribute("data-count", String(count));
+            badge.textContent = count > 99 ? "99+" : (count > 0 ? String(count) : "");
+          });
+          return true;
+        });
+      })
+      .catch(function () { return true; });
+  }
+
+  return fetch("/api/messages/unread-count", {
     headers: { Authorization: "Bearer " + token }
   })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (data) {
-      if (!data) return;
-      var count = data.count || 0;
-      document.querySelectorAll(".nav-msg-badge").forEach(function (badge) {
-        badge.setAttribute("data-count", String(count));
-        badge.textContent = count > 99 ? "99+" : (count > 0 ? String(count) : "");
+    .then(function (response) {
+      if (response.status === 401) {
+        if (typeof clearToken === "function") {
+          clearToken();
+        }
+        return false;
+      }
+      if (!response.ok) return true;
+      return response.json().then(function (data) {
+        if (!data) return true;
+        var count = data.count || 0;
+        document.querySelectorAll(".nav-msg-badge").forEach(function (badge) {
+          badge.setAttribute("data-count", String(count));
+          badge.textContent = count > 99 ? "99+" : (count > 0 ? String(count) : "");
+        });
+        return true;
       });
     })
-    .catch(function () {});
+    .catch(function () { return true; });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -307,15 +341,26 @@ document.addEventListener("DOMContentLoaded", () => {
   injectMobileDesktopLink();
 
   // Poll unread message count for the nav badge every 60 s
-  pollGlobalUnreadCount();
-  var _globalMsgPollTimer = setInterval(function () {
-    var t = "";
-    try { t = localStorage.getItem("token") || ""; } catch (_) {}
-    if (!t) {
+  var _globalMsgPollTimer = null;
+  function stopGlobalUnreadPolling() {
+    if (_globalMsgPollTimer) {
       clearInterval(_globalMsgPollTimer);
-      return;
+      _globalMsgPollTimer = null;
     }
-    pollGlobalUnreadCount();
+  }
+
+  void pollGlobalUnreadCount().then(function (shouldContinue) {
+    if (shouldContinue === false) {
+      stopGlobalUnreadPolling();
+    }
+  });
+
+  _globalMsgPollTimer = setInterval(function () {
+    void pollGlobalUnreadCount().then(function (shouldContinue) {
+      if (shouldContinue === false) {
+        stopGlobalUnreadPolling();
+      }
+    });
   }, 60000);
 });
 
