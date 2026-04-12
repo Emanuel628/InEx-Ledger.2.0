@@ -53,11 +53,9 @@ function clearLoginFields() {
   const resetFieldValues = () => {
     if (emailField) {
       emailField.value = "";
-      emailField.setAttribute("autocomplete", "off");
     }
     if (passwordField) {
       passwordField.value = "";
-      passwordField.setAttribute("autocomplete", "current-password");
     }
   };
   loginForm?.reset();
