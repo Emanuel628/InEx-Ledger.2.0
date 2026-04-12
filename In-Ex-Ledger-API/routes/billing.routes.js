@@ -255,7 +255,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       "subscription_data[metadata][additional_businesses]": additionalBusinesses
     };
 
-    if (priceSelection.addonPriceId && additionalBusinesses > 0) {
+    if (priceSelection.addonPriceId) {
       sessionPayload["line_items[1][price]"] = priceSelection.addonPriceId;
       sessionPayload["line_items[1][quantity]"] = additionalBusinesses;
       sessionPayload["metadata[addon_price_id]"] = priceSelection.addonPriceId;

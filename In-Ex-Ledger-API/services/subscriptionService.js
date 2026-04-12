@@ -162,7 +162,7 @@ async function updateStripeCustomerForBusiness(businessId, stripeCustomerId) {
 async function syncStripeSubscriptionForBusiness(businessId, subscription) {
   const { basePriceIds, addonPriceIds, metadataByPriceId } = buildStripePriceLookup();
   const items = Array.isArray(subscription?.items?.data) ? subscription.items.data : [];
-  const baseItem = items.find((item) => basePriceIds.has(item?.price?.id)) || items[0] || null;
+  const baseItem = items.find((item) => basePriceIds.has(item?.price?.id)) || null;
   const addonItem = items.find((item) => addonPriceIds.has(item?.price?.id)) || null;
   const stripeMetadata = subscription?.metadata || {};
   const basePriceMeta = baseItem?.price?.id ? metadataByPriceId.get(baseItem.price.id) : null;

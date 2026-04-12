@@ -334,7 +334,6 @@ async function loadSubscription() {
         planProBtn.disabled = false;
         planProBtn.textContent = tx("subscription_pro_cta");
         planProBtn.dataset.planDisabled = "false";
-        planProBtn.onclick = startCheckout;
       }
       planProBtn.dataset.defaultLabel = planProBtn.textContent;
     }
@@ -472,6 +471,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   initSubNav();
   initPricingControls();
+
+  const planProBtn = document.getElementById("planProBtn");
+  planProBtn?.addEventListener("click", startCheckout);
 
   const manageBillingBtn = document.getElementById("subManageBillingBtn");
   manageBillingBtn?.addEventListener("click", openCustomerPortal);
