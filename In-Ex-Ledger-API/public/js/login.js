@@ -48,6 +48,7 @@ function resetLoginFieldsIfNeeded() {
 }
 
 function clearLoginFields() {
+  const form = loginForm || document.getElementById("loginForm");
   const emailField = document.getElementById("email");
   const passwordField = document.getElementById("password");
   const resetFieldValues = () => {
@@ -58,14 +59,10 @@ function clearLoginFields() {
       passwordField.value = "";
     }
   };
-  loginForm?.reset();
+  form?.reset();
   resetFieldValues();
   // Retry once to counter browser autofill that may run after initial load.
-  window.setTimeout(() => {
-    if ((emailField && emailField.value) || (passwordField && passwordField.value)) {
-      resetFieldValues();
-    }
-  }, AUTOFILL_CLEAR_DELAY_MS);
+  window.setTimeout(resetFieldValues, AUTOFILL_CLEAR_DELAY_MS);
 }
 
 async function handleLoginSubmit(event) {
