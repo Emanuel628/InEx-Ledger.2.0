@@ -15,6 +15,7 @@ const ACTIVE_BUSINESS_ID_KEY = "lb_active_business_id";
 const ACTIVE_BUSINESS_NAME_KEY = "lb_business_name";
 const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
+const LOGIN_RESET_KEY = "lb_login_reset";
 const ONBOARDING_PAGE = "/onboarding";
 const LOGIN_PAGE = "/login";
 const ONBOARDING_RUNTIME_PAGES = new Set([
@@ -55,6 +56,24 @@ function clearAppState() {
   ].forEach(
     (key) => localStorage.removeItem(key)
   );
+}
+
+function markLoginReset() {
+  try {
+    sessionStorage.setItem(LOGIN_RESET_KEY, "true");
+  } catch (_) {}
+}
+
+function consumeLoginResetFlag() {
+  try {
+    const shouldReset = sessionStorage.getItem(LOGIN_RESET_KEY) === "true";
+    if (shouldReset) {
+      sessionStorage.removeItem(LOGIN_RESET_KEY);
+    }
+    return shouldReset;
+  } catch (_) {
+    return false;
+  }
 }
 
 function applySubscriptionState(subscription) {
@@ -458,6 +477,7 @@ async function apiFetch(url, options = {}) {
   });
 
   if (response.status === 401) {
+    markLoginReset();
     clearToken();
     window.location.href = LOGIN_PAGE;
     return null;
@@ -503,6 +523,7 @@ async function signOut() {
   } catch (err) {
     if (localStorage.getItem("debug") === "true") { console.error("Logout error:", err); }
   }
+  markLoginReset();
   clearToken();
   window.location.href = "/";
 }
@@ -903,4 +924,3 @@ document.addEventListener("keydown", (event) => {
     closeBusinessCreationModal();
   }
 });
-

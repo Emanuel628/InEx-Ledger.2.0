@@ -14,6 +14,7 @@ function tx(key) {
 }
 const OFFLINE_ERROR_MESSAGE = "login_error_offline";
 const EXPIRED_SESSION_MESSAGE = "login_error_expired";
+const AUTOFILL_CLEAR_DELAY_MS = 200;
 
 redirectIfAuthenticated();
 
@@ -29,7 +30,40 @@ document.addEventListener("DOMContentLoaded", () => {
   loginForm.addEventListener("submit", handleLoginSubmit);
   wireShowPasswordToggle(document);
   showLoginReasonMessage();
+  resetLoginFieldsIfNeeded();
 });
+
+window.addEventListener("pageshow", () => {
+  resetLoginFieldsIfNeeded();
+});
+
+function resetLoginFieldsIfNeeded() {
+  const shouldReset = typeof consumeLoginResetFlag === "function"
+    ? consumeLoginResetFlag()
+    : false;
+  if (!shouldReset) {
+    return;
+  }
+  clearLoginFields();
+}
+
+function clearLoginFields() {
+  const form = loginForm || document.getElementById("loginForm");
+  const emailField = document.getElementById("email");
+  const passwordField = document.getElementById("password");
+  const resetFieldValues = () => {
+    if (emailField) {
+      emailField.value = "";
+    }
+    if (passwordField) {
+      passwordField.value = "";
+    }
+  };
+  form?.reset();
+  resetFieldValues();
+  // Retry once to counter browser autofill that may run after initial load.
+  window.setTimeout(resetFieldValues, AUTOFILL_CLEAR_DELAY_MS);
+}
 
 async function handleLoginSubmit(event) {
   event.preventDefault();
@@ -151,4 +185,3 @@ function wireShowPasswordToggle(container = document) {
     passwordField.type = toggle.checked ? "text" : "password";
   });
 }
-

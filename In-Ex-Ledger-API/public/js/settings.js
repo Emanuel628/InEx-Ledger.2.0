@@ -2042,6 +2042,9 @@ async function revokeAllSessionsFromSettings(button) {
     }
 
     clearAccountDeletionState();
+    if (typeof markLoginReset === "function") {
+      markLoginReset();
+    }
     showSettingsToast(t("sessions_all_revoked"));
     window.setTimeout(() => {
       window.location.href = "/login";
@@ -2220,5 +2223,4 @@ function showSettingsToast(message) {
     toast.classList.add("hidden");
   }, SETTINGS_TOAST_MS);
 }
-
 

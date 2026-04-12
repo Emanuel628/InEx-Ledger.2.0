@@ -165,6 +165,9 @@ async function revokeAllSessions() {
 
     showSessionsToast(tx("sessions_all_revoked") || "All sessions revoked. Signing out…");
     window.setTimeout(() => {
+      if (typeof markLoginReset === "function") {
+        markLoginReset();
+      }
       window.location.href = "/login";
     }, 1200);
   } catch (err) {
