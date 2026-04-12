@@ -368,14 +368,59 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
     );
 
     if (businessIds.length) {
-      // Must delete recurring runs and templates before accounts/categories
-      // because recurring_transactions has ON DELETE RESTRICT on account_id and category_id.
+      // Delete child rows in dependency order so that ON DELETE RESTRICT
+      // foreign keys (recurring_transactions.account_id/category_id and
+      // transactions.account_id/category_id) are never violated.
+      //
+      // Order:
+      //   1. Recurring runs & templates (RESTRICT on account_id/category_id)
+      //   2. Transactions (RESTRICT on account_id/category_id blocks steps 3/4
+      //      unless transactions are removed first)
+      //   3. Receipts (receipts.transaction_id is ON DELETE SET NULL, so the FK
+      //      is already nulled by step 2; deleting receipts here is an explicit
+      //      clean-up before the business row is removed)
+      //   4. Mileage, exports, subscriptions, CPA grants (no dependencies on
+      //      each other or on the tables deleted in steps 1–3; safe in any order)
+      //   5. Accounts, categories (safe to delete once all transactions are gone)
+      //   6. Delete the business rows (any remaining CASCADE cleans up leftovers)
       await client.query(
         "DELETE FROM recurring_transaction_runs WHERE business_id = ANY($1::uuid[])",
         [businessIds]
       );
       await client.query(
         "DELETE FROM recurring_transactions WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
+      );
+      await client.query(
+        "DELETE FROM transactions WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
+      );
+      await client.query(
+        "DELETE FROM receipts WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
+      );
+      await client.query(
+        "DELETE FROM mileage WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
+      );
+      await client.query(
+        "DELETE FROM exports WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
+      );
+      await client.query(
+        "DELETE FROM business_subscriptions WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
+      );
+      await client.query(
+        "DELETE FROM cpa_access_grants WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
+      );
+      await client.query(
+        "DELETE FROM accounts WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
+      );
+      await client.query(
+        "DELETE FROM categories WHERE business_id = ANY($1::uuid[])",
         [businessIds]
       );
       await client.query(
@@ -427,7 +472,13 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
     if (transactionOpen) {
       await client.query("ROLLBACK");
     }
-    logError("DELETE /me error:", err.message);
+    logError("DELETE /me error:", {
+      message: err.message,
+      code: err.code,
+      detail: err.detail,
+      constraint: err.constraint,
+      table: err.table
+    });
     res.status(500).json({ error: "Failed to delete account." });
   } finally {
     client.release();

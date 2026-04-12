@@ -256,3 +256,79 @@ test("account deletion still returns success when receipt cleanup fails after co
     fixture.cleanup();
   }
 });
+
+test("account deletion deletes transactions before accounts and categories (ON DELETE RESTRICT)", async () => {
+  const fixture = loadMeRouter({});
+
+  try {
+    const app = buildApp(fixture.router, fixture.state);
+    const response = await request(app)
+      .delete("/api/me")
+      .send({ password: "CorrectHorseBatteryStaple1!" });
+
+    assert.equal(response.status, 200);
+
+    const deleteSqls = fixture.state.queries
+      .filter(({ sql }) => /^\s*DELETE/i.test(sql))
+      .map(({ sql }) => sql.trim());
+
+    const txIdx = deleteSqls.findIndex((sql) => /DELETE FROM transactions\b/i.test(sql));
+    const accIdx = deleteSqls.findIndex((sql) => /DELETE FROM accounts\b/i.test(sql));
+    const catIdx = deleteSqls.findIndex((sql) => /DELETE FROM categories\b/i.test(sql));
+    const bizIdx = deleteSqls.findIndex((sql) => /DELETE FROM businesses\b/i.test(sql));
+    const userIdx = deleteSqls.findIndex((sql) => /DELETE FROM users\b/i.test(sql));
+
+    assert.ok(txIdx !== -1, "route must DELETE transactions");
+    assert.ok(accIdx !== -1, "route must DELETE accounts");
+    assert.ok(catIdx !== -1, "route must DELETE categories");
+    assert.ok(bizIdx !== -1, "route must DELETE businesses");
+    assert.ok(userIdx !== -1, "route must DELETE users");
+
+    assert.ok(
+      txIdx < accIdx,
+      "transactions must be deleted before accounts to avoid ON DELETE RESTRICT violation"
+    );
+    assert.ok(
+      txIdx < catIdx,
+      "transactions must be deleted before categories to avoid ON DELETE RESTRICT violation"
+    );
+    assert.ok(
+      bizIdx < userIdx,
+      "businesses must be deleted before the user row"
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("account deletion returns 400 when password is missing", async () => {
+  const fixture = loadMeRouter({});
+
+  try {
+    const app = buildApp(fixture.router, fixture.state);
+    const response = await request(app)
+      .delete("/api/me")
+      .send({});
+
+    assert.equal(response.status, 400);
+    assert.ok(response.body.error, "response must include error message");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("account deletion returns 401 when password is incorrect", async () => {
+  const fixture = loadMeRouter({ passwordMatches: false });
+
+  try {
+    const app = buildApp(fixture.router, fixture.state);
+    const response = await request(app)
+      .delete("/api/me")
+      .send({ password: "WrongPassword1!" });
+
+    assert.equal(response.status, 401);
+    assert.ok(response.body.error, "response must include error message");
+  } finally {
+    fixture.cleanup();
+  }
+});
