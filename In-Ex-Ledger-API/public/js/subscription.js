@@ -1,5 +1,14 @@
 const SUB_TOAST_MS = 3000;
 let subToastTimer = null;
+const BILLING_INTERVALS = ["monthly", "yearly"];
+const BILLING_CURRENCIES = ["usd", "cad"];
+const MAX_ADDITIONAL_BUSINESSES = 100;
+const pricingState = {
+  billingInterval: "monthly",
+  currency: "usd",
+  additionalBusinesses: 0,
+  isCheckoutLoading: false
+};
 
 function showSubToast(message) {
   const toast = document.getElementById("subToast");
@@ -23,8 +32,138 @@ function fmtDate(ts) {
 }
 
 function fmtAmount(amount, currency) {
-  const val = (Number(amount || 0) / 100).toFixed(2);
-  return `${(currency || "usd").toUpperCase()} $${val}`;
+  const normalizedCurrency = String(currency || "usd").toUpperCase();
+  const value = Number(amount || 0) / 100;
+  if (!Number.isFinite(value)) return "-";
+  const locale = normalizedCurrency === "CAD" ? "en-CA" : "en-US";
+  try {
+    return new Intl.NumberFormat(locale, { style: "currency", currency: normalizedCurrency }).format(value);
+  } catch (err) {
+    return `${normalizedCurrency} ${value.toFixed(2)}`;
+  }
+}
+
+function resolveDefaultCurrency() {
+  const region = String(localStorage.getItem("lb_region") || window.LUNA_REGION || "").toLowerCase();
+  return region === "ca" ? "cad" : "usd";
+}
+
+function clampAdditionalBusinesses(value) {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(Math.max(Math.trunc(value), 0), MAX_ADDITIONAL_BUSINESSES);
+}
+
+function updatePricingUI() {
+  const intervalButtons = Array.from(document.querySelectorAll("[data-billing-interval]"));
+  const currencyButtons = Array.from(document.querySelectorAll("[data-currency]"));
+  const additionalInput = document.getElementById("additionalBusinessesInput");
+  const planPriceLabel = document.getElementById("planProPriceLabel");
+  const summaryPlan = document.getElementById("subPricePlan");
+  const summaryAddon = document.getElementById("subPriceAddon");
+  const summaryTotal = document.getElementById("subPriceTotal");
+  const decrementBtn = document.querySelector("[data-qty-action='decrease']");
+  const incrementBtn = document.querySelector("[data-qty-action='increase']");
+
+  intervalButtons.forEach((btn) =>
+    btn.classList.toggle("is-active", btn.dataset.billingInterval === pricingState.billingInterval)
+  );
+  currencyButtons.forEach((btn) =>
+    btn.classList.toggle("is-active", btn.dataset.currency === pricingState.currency)
+  );
+
+  if (additionalInput) {
+    additionalInput.value = String(pricingState.additionalBusinesses);
+  }
+  if (decrementBtn) {
+    decrementBtn.disabled = pricingState.additionalBusinesses <= 0;
+  }
+  if (incrementBtn) {
+    incrementBtn.disabled = pricingState.additionalBusinesses >= MAX_ADDITIONAL_BUSINESSES;
+  }
+
+  const intervalLabel =
+    pricingState.billingInterval === "yearly"
+      ? tx("subscription_billing_yearly")
+      : tx("subscription_billing_monthly");
+  const planSummaryText = `${pricingState.currency.toUpperCase()} · ${intervalLabel}`;
+
+  if (planPriceLabel) {
+    planPriceLabel.textContent = planSummaryText;
+  }
+  if (summaryPlan) {
+    summaryPlan.textContent = planSummaryText;
+  }
+  if (summaryAddon) {
+    summaryAddon.textContent = String(pricingState.additionalBusinesses);
+  }
+  if (summaryTotal) {
+    summaryTotal.textContent = tx("subscription_price_at_checkout");
+  }
+}
+
+function initPricingControls() {
+  pricingState.currency = resolveDefaultCurrency();
+  pricingState.billingInterval = "monthly";
+  pricingState.additionalBusinesses = 0;
+
+  document.querySelectorAll("[data-billing-interval]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const interval = String(btn.dataset.billingInterval || "").toLowerCase();
+      if (!BILLING_INTERVALS.includes(interval)) return;
+      pricingState.billingInterval = interval;
+      updatePricingUI();
+    });
+  });
+
+  document.querySelectorAll("[data-currency]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const currency = String(btn.dataset.currency || "").toLowerCase();
+      if (!BILLING_CURRENCIES.includes(currency)) return;
+      pricingState.currency = currency;
+      updatePricingUI();
+    });
+  });
+
+  const additionalInput = document.getElementById("additionalBusinessesInput");
+  if (additionalInput) {
+    additionalInput.addEventListener("input", () => {
+      const value = clampAdditionalBusinesses(Number(additionalInput.value));
+      pricingState.additionalBusinesses = value;
+      updatePricingUI();
+    });
+    additionalInput.addEventListener("change", () => {
+      const value = clampAdditionalBusinesses(Number(additionalInput.value));
+      pricingState.additionalBusinesses = value;
+      updatePricingUI();
+    });
+  }
+
+  document.querySelectorAll("[data-qty-action]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.qtyAction;
+      const delta = action === "increase" ? 1 : action === "decrease" ? -1 : 0;
+      pricingState.additionalBusinesses = clampAdditionalBusinesses(
+        pricingState.additionalBusinesses + delta
+      );
+      updatePricingUI();
+    });
+  });
+
+  updatePricingUI();
+}
+
+function setCheckoutLoading(isLoading) {
+  pricingState.isCheckoutLoading = isLoading;
+  const planProBtn = document.getElementById("planProBtn");
+  if (!planProBtn) return;
+  const defaultLabel = planProBtn.dataset.defaultLabel || planProBtn.textContent || "";
+  if (isLoading) {
+    planProBtn.disabled = true;
+    planProBtn.textContent = tx("subscription_checkout_loading");
+  } else {
+    planProBtn.disabled = planProBtn.dataset.planDisabled === "true";
+    planProBtn.textContent = defaultLabel;
+  }
 }
 
 function initSubNav() {
@@ -151,11 +290,13 @@ async function loadSubscription() {
       if (sub.effectiveTier === "v1" && !sub.cancelAtPeriodEnd) {
         planProBtn.disabled = true;
         planProBtn.textContent = tx("subscription_current_plan");
+        planProBtn.dataset.planDisabled = "true";
       } else {
         planProBtn.disabled = false;
         planProBtn.textContent = tx("subscription_pro_cta");
-        planProBtn.addEventListener("click", startCheckout);
+        planProBtn.dataset.planDisabled = "false";
       }
+      planProBtn.dataset.defaultLabel = planProBtn.textContent;
     }
 
     if (planFreeBtn) {
@@ -238,16 +379,32 @@ async function loadBillingHistory() {
 
 async function startCheckout() {
   try {
+    if (pricingState.isCheckoutLoading) return;
+    setCheckoutLoading(true);
+    const checkoutPayload = {
+      billingInterval: pricingState.billingInterval,
+      currency: pricingState.currency,
+      additionalBusinesses: pricingState.additionalBusinesses
+    };
     const res = await apiFetch("/api/billing/checkout-session", {
       method: "POST",
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(checkoutPayload)
     });
-    if (!res) return;
+    if (!res) {
+      setCheckoutLoading(false);
+      return;
+    }
     const payload = await res.json().catch(() => null);
     if (!res.ok) throw new Error(payload?.error || tx("subscription_checkout_error"));
-    if (payload?.url) window.location.href = payload.url;
+    if (payload?.url) {
+      window.location.href = payload.url;
+      return;
+    }
+    setCheckoutLoading(false);
   } catch (err) {
     showSubToast(err.message || tx("subscription_checkout_error"));
+    setCheckoutLoading(false);
   }
 }
 
@@ -274,6 +431,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
   initSubNav();
+  initPricingControls();
+
+  const planProBtn = document.getElementById("planProBtn");
+  planProBtn?.addEventListener("click", startCheckout);
 
   const manageBillingBtn = document.getElementById("subManageBillingBtn");
   manageBillingBtn?.addEventListener("click", openCustomerPortal);
@@ -321,4 +482,3 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadSubscription();
   await loadBillingHistory();
 });
-
