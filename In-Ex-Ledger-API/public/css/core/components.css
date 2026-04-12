@@ -7,6 +7,10 @@
   align-items: center;
 }
 
+.trial-banner[hidden] {
+  display: none;
+}
+
 .offline-banner {
   padding: 10px 16px;
   background: #7c2d12;
@@ -265,7 +269,10 @@ h2 + p {
 
 /* ── Field Validation Tooltip Bubble ─────────────────────── */
 .field-tooltip-bubble {
-  position: fixed;
+  position: relative;
+  display: inline-flex;
+  margin-top: 8px;
+  max-width: min(280px, 100%);
   background: #ffffff;
   color: #1a1a2e;
   padding: 8px 13px;
@@ -275,7 +282,7 @@ h2 + p {
   line-height: 1.4;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14), 0 1px 4px rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(0, 0, 0, 0.07);
-  white-space: nowrap;
+  white-space: normal;
   z-index: 9999;
   pointer-events: none;
   animation: tooltip-fade-in 0.15s ease;
@@ -334,4 +341,54 @@ h2 + p {
   letter-spacing: 0.07em;
   color: var(--ink2);
   text-transform: uppercase;
+}
+
+.cookie-consent-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--surface, #fff);
+  border-top: 1px solid var(--border, #e0e0e0);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+  font-size: 0.875rem;
+}
+
+.cookie-consent-message {
+  flex: 1 1 200px;
+  min-width: 200px;
+}
+
+.cookie-consent-link {
+  margin-left: 4px;
+  color: var(--accent2, #2563a8);
+  text-decoration: none;
+}
+
+.cookie-consent-link:hover {
+  text-decoration: underline;
+}
+
+.cookie-consent-button {
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.cookie-consent-button-accept {
+  background: var(--accent2, #2563a8);
+  color: #fff;
+}
+
+.cookie-consent-button-decline {
+  background: transparent;
+  border: 1px solid var(--border, #e0e0e0);
+  color: var(--ink2);
 }

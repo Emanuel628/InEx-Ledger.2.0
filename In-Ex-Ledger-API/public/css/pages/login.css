@@ -150,6 +150,10 @@ main {
   line-height: 1.4;
 }
 
+.auth-error.is-success {
+  color: #1a7a4a;
+}
+
 .auth-error[hidden] {
   display: none;
 }

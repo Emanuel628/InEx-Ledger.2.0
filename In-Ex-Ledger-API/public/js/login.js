@@ -106,21 +106,26 @@ function showLoginReasonMessage() {
   } else if (reason === "network") {
     showLoginError(tx(OFFLINE_ERROR_MESSAGE));
   } else if (params.get("verified") === "true") {
-    showLoginError(tx("login_success_verified"));
-    loginErrorElement.style.color = "#22c55e";
+    showLoginMessage(tx("login_success_verified"), "is-success");
   } else if (params.get("email_changed") === "true") {
-    showLoginError(tx("login_success_email_changed"));
-    loginErrorElement.style.color = "#22c55e";
+    showLoginMessage(tx("login_success_email_changed"), "is-success");
   }
 }
 
 function showLoginError(message) {
+  showLoginMessage(message, message ? "is-error" : "");
+}
+
+function showLoginMessage(message, tone = "") {
   if (!loginErrorElement) {
     return;
   }
   loginErrorElement.textContent = message || "";
   loginErrorElement.hidden = !message;
-  loginErrorElement.style.color = message ? "#b91c1c" : "";
+  loginErrorElement.classList.remove("is-error", "is-success");
+  if (tone) {
+    loginErrorElement.classList.add(tone);
+  }
 }
 
 function clearLoginError() {

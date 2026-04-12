@@ -217,7 +217,7 @@ function injectMobileMenu() {
     btn.setAttribute("aria-expanded", "true");
     btn.setAttribute("aria-label", "Close navigation menu");
     btn.innerHTML = CLOSE_SVG;
-    document.body.style.overflow = "hidden";
+    document.body.classList.add("body--nav-open");
   }
 
   function closeMenu() {
@@ -226,7 +226,7 @@ function injectMobileMenu() {
     btn.setAttribute("aria-expanded", "false");
     btn.setAttribute("aria-label", "Open navigation menu");
     btn.innerHTML = HAMBURGER_SVG;
-    document.body.style.overflow = "";
+    document.body.classList.remove("body--nav-open");
   }
 
   btn.addEventListener("click", function () {
@@ -373,17 +373,9 @@ window.LUNA_TAX = {
     tooltip.id = "field-tooltip-bubble";
     tooltip.className = "field-tooltip-bubble";
     tooltip.textContent = message || "Please fill in this required field.";
-    document.body.appendChild(tooltip);
-
-    const rect = fieldElement.getBoundingClientRect();
-    const TOOLTIP_MAX_WIDTH = 280;
-    let left = rect.left;
-    if (left + TOOLTIP_MAX_WIDTH > window.innerWidth - 8) {
-      left = Math.max(8, window.innerWidth - TOOLTIP_MAX_WIDTH - 8);
-    }
-    tooltip.style.position = "fixed";
-    tooltip.style.top = (rect.bottom + 8) + "px";
-    tooltip.style.left = left + "px";
+    const parent = fieldElement.parentNode;
+    if (!parent) return;
+    parent.insertBefore(tooltip, fieldElement.nextSibling);
 
     try {
       fieldElement.focus({ preventScroll: true });
@@ -449,49 +441,33 @@ window.LUNA_TAX = {
   function buildBanner() {
     var banner = document.createElement('div');
     banner.id = 'cookie-consent-banner';
+    banner.className = 'cookie-consent-banner';
     banner.setAttribute('role', 'region');
     banner.setAttribute('aria-label', 'Cookie consent');
-    banner.style.cssText = [
-      'position:fixed',
-      'bottom:0',
-      'left:0',
-      'right:0',
-      'z-index:10000',
-      'background:var(--surface,#fff)',
-      'border-top:1px solid var(--border,#e0e0e0)',
-      'padding:12px 16px',
-      'display:flex',
-      'flex-wrap:wrap',
-      'align-items:center',
-      'gap:8px',
-      'font-size:0.875rem',
-      'box-shadow:0 -2px 8px rgba(0,0,0,0.08)'
-    ].join(';');
 
     var msg = document.createElement('span');
-    msg.style.flex = '1';
-    msg.style.minWidth = '200px';
+    msg.className = 'cookie-consent-message';
     msg.setAttribute('data-i18n', 'cookie_banner_message');
     msg.textContent = tBanner('cookie_banner_message',
       'We use essential cookies for authentication and preferences. If we ever add analytics or non-essential tracking, we will ask for your consent first.');
 
     var privacyLink = document.createElement('a');
+    privacyLink.className = 'cookie-consent-link';
     privacyLink.href = '/privacy';
     privacyLink.setAttribute('data-i18n', 'cookie_banner_privacy_link');
     privacyLink.textContent = tBanner('cookie_banner_privacy_link', 'Privacy Policy');
-    privacyLink.style.marginLeft = '4px';
 
     var btnAccept = document.createElement('button');
     btnAccept.type = 'button';
+    btnAccept.className = 'cookie-consent-button cookie-consent-button-accept';
     btnAccept.setAttribute('data-i18n', 'cookie_banner_accept');
     btnAccept.textContent = tBanner('cookie_banner_accept', 'Accept');
-    btnAccept.style.cssText = 'padding:6px 14px;border-radius:4px;border:none;background:var(--accent2,#2563a8);color:#fff;cursor:pointer;font-size:0.875rem;font-weight:600;';
 
     var btnDecline = document.createElement('button');
     btnDecline.type = 'button';
+    btnDecline.className = 'cookie-consent-button cookie-consent-button-decline';
     btnDecline.setAttribute('data-i18n', 'cookie_banner_decline');
     btnDecline.textContent = tBanner('cookie_banner_decline', 'Decline');
-    btnDecline.style.cssText = 'padding:6px 14px;border-radius:4px;border:1px solid var(--border,#e0e0e0);background:transparent;cursor:pointer;font-size:0.875rem;';
 
     btnAccept.addEventListener('click', function () {
       setConsentRecord('accepted');

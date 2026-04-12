@@ -180,6 +180,10 @@ body[data-theme="light"] main {
   background-image: none;
 }
 
+body.body--nav-open {
+  overflow: hidden;
+}
+
 body[data-theme="light"] .primary-btn,
 body[data-theme="light"] .btn-primary,
 body[data-theme="light"] button.primary {

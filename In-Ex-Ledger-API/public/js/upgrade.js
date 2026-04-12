@@ -6,10 +6,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (tier === "free") {
     if (freeSection) {
-      freeSection.style.display = "block";
+      freeSection.hidden = false;
     }
     if (v1Section) {
-      v1Section.style.display = "none";
+      v1Section.hidden = true;
     }
 
     if (upgradeBtn) {
@@ -19,14 +19,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   } else {
     if (freeSection) {
-      freeSection.style.display = "none";
+      freeSection.hidden = true;
     }
     if (v1Section) {
-      v1Section.style.display = "block";
+      v1Section.hidden = false;
     }
 
     if (upgradeBtn) {
-      upgradeBtn.style.display = "none";
+      upgradeBtn.hidden = true;
     }
   }
 });

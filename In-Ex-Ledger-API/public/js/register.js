@@ -188,8 +188,8 @@ function showRegisterError(message) {
     return;
   }
 
-  registerErrorElement.textContent = message;
-  registerErrorElement.style.display = message ? "block" : "none";
+  registerErrorElement.textContent = message || "";
+  registerErrorElement.hidden = !message;
 }
 
 function hideRegisterError() {
@@ -248,7 +248,7 @@ function updateStrengthMeter() {
       segment.classList.remove("is-weak", "is-fair", "is-strong");
     });
     strengthText.textContent = "";
-    strengthText.style.color = "";
+    strengthText.classList.remove("is-weak", "is-fair", "is-strong");
     return;
   }
 
@@ -277,7 +277,8 @@ function updateStrengthMeter() {
       ? "register_strength_label_good"
       : "register_strength_label_weak";
   strengthText.textContent = t(labelKey);
-  strengthText.style.color = color;
+  strengthText.classList.remove("is-weak", "is-fair", "is-strong");
+  strengthText.classList.add(segmentClass);
 }
 
 function updateMatchMessage() {

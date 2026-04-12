@@ -44,6 +44,104 @@ function validateDateRange(range) {
   return { startDate, endDate };
 }
 
+function buildExportMetadataRows(exportId, metadata) {
+  return [
+    ["start_date", metadata.startDate],
+    ["end_date", metadata.endDate],
+    ["include_tax_id", metadata.includeTaxId ? "true" : "false"],
+    ["grant_jti", metadata.grantJti || ""],
+    ["content_hash", metadata.contentHash || ""],
+    ["file_path", metadata.filePath || ""],
+    ["language", metadata.language || "en"],
+    ["currency", metadata.currency || "USD"],
+    ["page_count", String(Number(metadata.pageCount) || 0)],
+    ["notes", metadata.notes || ""],
+    ["full_version_available", "true"]
+  ]
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .map(([key, value]) => [crypto.randomUUID(), exportId, key, String(value)]);
+}
+
+async function storeCompletedExport({
+  businessId,
+  userId,
+  exportType = "pdf",
+  startDate,
+  endDate,
+  includeTaxId,
+  grantJti,
+  contentHash,
+  filePath,
+  language,
+  currency,
+  pageCount,
+  notes
+}) {
+  const exportId = crypto.randomUUID();
+  const metadataRows = buildExportMetadataRows(exportId, {
+    startDate,
+    endDate,
+    includeTaxId,
+    grantJti,
+    contentHash,
+    filePath,
+    language,
+    currency,
+    pageCount,
+    notes
+  });
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `INSERT INTO exports (id, business_id, user_id, type)
+       VALUES ($1, $2, $3, $4)`,
+      [exportId, businessId, userId, exportType]
+    );
+
+    if (metadataRows.length) {
+      const values = [];
+      const placeholders = metadataRows.map((row, index) => {
+        const base = index * 4;
+        values.push(...row);
+        return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`;
+      });
+      await client.query(
+        `INSERT INTO export_metadata (id, export_id, key, value)
+         VALUES ${placeholders.join(", ")}`,
+        values
+      );
+    }
+
+    await client.query("COMMIT");
+    return exportId;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function normalizeExportHistoryEntry(entry) {
+  return {
+    id: entry.id,
+    start_date: entry.start_date || null,
+    end_date: entry.end_date || null,
+    created_at: entry.created_at,
+    export_type: entry.export_type || "pdf",
+    include_tax_id: String(entry.include_tax_id || "").toLowerCase() === "true",
+    content_hash: entry.content_hash || null,
+    file_path: entry.file_path || null,
+    language: entry.language || "en",
+    currency: entry.currency || "USD",
+    page_count: Number(entry.page_count) || 0,
+    storage_type: "redacted-only",
+    full_version_available: String(entry.full_version_available || "true").toLowerCase() !== "false"
+  };
+}
+
 router.post("/request-grant", exportGrantLimiter, async (req, res) => {
   const sanitizedBody = sanitizePayload(req.body);
   try {
@@ -141,38 +239,21 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     const workerResult = await dispatchPdfJob(job);
     const redactedBuffer = workerResult.redactedPdfBuffer || Buffer.alloc(0);
     const { filePath, hash } = await saveRedactedPdf(jobId, redactedBuffer);
-    const exportId = crypto.randomUUID();
-
-    await pool.query(
-      `INSERT INTO exports (id, business_id, user_id, export_type, start_date, end_date, include_tax_id, grant_jti, content_hash, file_path)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [
-        exportId,
-        businessId,
-        user.id,
-        "pdf",
-        grantPayload.dateRange.startDate,
-        grantPayload.dateRange.endDate,
-        grantPayload.includeTaxId,
-        grantPayload.jti,
-        hash,
-        filePath
-      ]
-    );
-
-    const metadataId = crypto.randomUUID();
-    await pool.query(
-      `INSERT INTO export_metadata (id, export_id, language, currency, page_count, notes)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [
-        metadataId,
-        exportId,
-        job.exportLang,
-        job.currency,
-        Number(workerResult.metadata?.pageCount) || 0,
-        workerResult.metadata?.notes || "Generated via trusted worker"
-      ]
-    );
+    await storeCompletedExport({
+      businessId,
+      userId: user.id,
+      exportType: "pdf",
+      startDate: grantPayload.dateRange.startDate,
+      endDate: grantPayload.dateRange.endDate,
+      includeTaxId: grantPayload.includeTaxId,
+      grantJti: grantPayload.jti,
+      contentHash: hash,
+      filePath,
+      language: job.exportLang,
+      currency: job.currency,
+      pageCount: Number(workerResult.metadata?.pageCount) || 0,
+      notes: workerResult.metadata?.notes || "Generated via trusted worker"
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -194,20 +275,39 @@ router.get("/history", exportGrantLimiter, async (req, res) => {
       return res.status(402).json({ error: "Export history requires an active InEx Ledger V1 plan." });
     }
     const result = await pool.query(
-      `SELECT e.id, e.start_date, e.end_date, e.created_at, e.export_type, e.include_tax_id,
-              e.content_hash, e.file_path, m.language, m.currency, m.page_count
-       FROM exports e
-       LEFT JOIN export_metadata m ON m.export_id = e.id
-       WHERE e.business_id = $1
-       ORDER BY e.created_at DESC
-       LIMIT 50`,
+      `SELECT e.id,
+              e.created_at,
+              e.type AS export_type,
+              m.start_date,
+              m.end_date,
+              m.include_tax_id,
+              m.content_hash,
+              m.file_path,
+              m.language,
+              COALESCE(m.currency, CASE WHEN b.region = 'CA' THEN 'CAD' ELSE 'USD' END) AS currency,
+              m.page_count,
+              m.full_version_available
+         FROM exports e
+         JOIN businesses b ON b.id = e.business_id
+         LEFT JOIN LATERAL (
+           SELECT MAX(CASE WHEN key = 'start_date' THEN value END) AS start_date,
+                  MAX(CASE WHEN key = 'end_date' THEN value END) AS end_date,
+                  MAX(CASE WHEN key = 'include_tax_id' THEN value END) AS include_tax_id,
+                  MAX(CASE WHEN key = 'content_hash' THEN value END) AS content_hash,
+                  MAX(CASE WHEN key = 'file_path' THEN value END) AS file_path,
+                  MAX(CASE WHEN key = 'language' THEN value END) AS language,
+                  MAX(CASE WHEN key = 'currency' THEN value END) AS currency,
+                  MAX(CASE WHEN key = 'page_count' THEN value END) AS page_count,
+                  MAX(CASE WHEN key = 'full_version_available' THEN value END) AS full_version_available
+             FROM export_metadata
+            WHERE export_id = e.id
+         ) m ON TRUE
+        WHERE e.business_id = $1
+        ORDER BY e.created_at DESC
+        LIMIT 50`,
       [businessId]
     );
-    const history = result.rows.map((entry) => ({
-      ...entry,
-      storage_type: "redacted-only",
-      full_version_available: true
-    }));
+    const history = result.rows.map(normalizeExportHistoryEntry);
     return res.json(history);
   } catch (err) {
     logError("Export history error", { err: err.message });
@@ -226,11 +326,20 @@ router.get("/history/:id/redacted", exportGrantLimiter, async (req, res) => {
     }
     const { id } = req.params;
     const { rows } = await pool.query(
-      `SELECT file_path FROM exports WHERE id = $1 AND business_id = $2 LIMIT 1`,
+      `SELECT m.file_path
+         FROM exports e
+         LEFT JOIN LATERAL (
+           SELECT MAX(CASE WHEN key = 'file_path' THEN value END) AS file_path
+             FROM export_metadata
+            WHERE export_id = e.id
+         ) m ON TRUE
+        WHERE e.id = $1
+          AND e.business_id = $2
+        LIMIT 1`,
       [id, businessId]
     );
 
-    if (!rows.length) {
+    if (!rows.length || !rows[0].file_path) {
       return res.status(404).json({ error: "Export not found." });
     }
 
@@ -291,20 +400,21 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     const workerResult = await dispatchPdfJob(job);
     const redactedBuffer = workerResult.redactedPdfBuffer || Buffer.alloc(0);
     const { filePath, hash } = await saveRedactedPdf(jobId, redactedBuffer);
-    const exportId = crypto.randomUUID();
-
-    await pool.query(
-      `INSERT INTO exports (id, business_id, user_id, export_type, start_date, end_date, include_tax_id, grant_jti, content_hash, file_path)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [exportId, businessId, user.id, "pdf", dateRange.startDate, dateRange.endDate, includeTaxId, null, hash, filePath]
-    );
-
-    const metadataId = crypto.randomUUID();
-    await pool.query(
-      `INSERT INTO export_metadata (id, export_id, language, currency, page_count, notes)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [metadataId, exportId, exportLang, currency, Number(workerResult.metadata?.pageCount) || 0, workerResult.metadata?.notes || "Generated via secure export modal"]
-    );
+    await storeCompletedExport({
+      businessId,
+      userId: user.id,
+      exportType: "pdf",
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+      includeTaxId,
+      grantJti: null,
+      contentHash: hash,
+      filePath,
+      language: exportLang,
+      currency,
+      pageCount: Number(workerResult.metadata?.pageCount) || 0,
+      notes: workerResult.metadata?.notes || "Generated via secure export modal"
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

@@ -80,7 +80,7 @@ function renderDashboard(data) {
         <td class="${netClass}">${fmt(m.net)}</td>
       </tr>`;
     }).join("");
-    document.getElementById("monthlyCard").style.display = "";
+    document.getElementById("monthlyCard").hidden = false;
   }
 
   // Top income sources bar chart
@@ -88,8 +88,7 @@ function renderDashboard(data) {
     const maxIncome = Math.max(...top_income_sources.map((s) => s.total), 1);
     const topIncomeChart = document.getElementById("topIncomeChart");
     topIncomeChart.innerHTML = top_income_sources.map((s) => barRow(s.category, s.total, maxIncome, "income")).join("");
-    applyBarWidths(topIncomeChart);
-    document.getElementById("topIncomeCard").style.display = "";
+    document.getElementById("topIncomeCard").hidden = false;
   }
 
   // Top expense categories bar chart
@@ -97,8 +96,7 @@ function renderDashboard(data) {
     const maxExpense = Math.max(...top_expense_categories.map((s) => s.total), 1);
     const topExpenseChart = document.getElementById("topExpenseChart");
     topExpenseChart.innerHTML = top_expense_categories.map((s) => barRow(s.category, s.total, maxExpense, "expense")).join("");
-    applyBarWidths(topExpenseChart);
-    document.getElementById("topExpenseCard").style.display = "";
+    document.getElementById("topExpenseCard").hidden = false;
   }
 }
 
@@ -114,15 +112,14 @@ function barRow(label, value, max, type) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return `<div class="bar-row">
     <span class="bar-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
-    <div class="bar-track"><div class="bar-fill ${escapeHtml(type)}" data-bar-pct="${pct}"></div></div>
+    <div class="bar-track"><div class="bar-fill ${escapeHtml(type)} ${resolveBarPctClass(pct)}"></div></div>
     <span class="bar-amount">${fmt(value)}</span>
   </div>`;
 }
 
-function applyBarWidths(container) {
-  container.querySelectorAll(".bar-fill[data-bar-pct]").forEach((el) => {
-    el.style.width = `${el.dataset.barPct}%`;
-  });
+function resolveBarPctClass(pct) {
+  const rounded = Math.max(0, Math.min(100, Math.round(Number(pct || 0) / 5) * 5));
+  return `pct-${rounded}`;
 }
 
 // ---------------------------------------------------------------------------

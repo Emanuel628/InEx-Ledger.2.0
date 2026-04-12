@@ -86,6 +86,12 @@
   background: var(--surface2);
 }
 
+.analytics-dual-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
 .analytics-page-header {
   margin-bottom: 20px;
 }
@@ -224,6 +230,28 @@
   background: var(--red);
 }
 
+.bar-fill.pct-0 { width: 0; }
+.bar-fill.pct-5 { width: 5%; }
+.bar-fill.pct-10 { width: 10%; }
+.bar-fill.pct-15 { width: 15%; }
+.bar-fill.pct-20 { width: 20%; }
+.bar-fill.pct-25 { width: 25%; }
+.bar-fill.pct-30 { width: 30%; }
+.bar-fill.pct-35 { width: 35%; }
+.bar-fill.pct-40 { width: 40%; }
+.bar-fill.pct-45 { width: 45%; }
+.bar-fill.pct-50 { width: 50%; }
+.bar-fill.pct-55 { width: 55%; }
+.bar-fill.pct-60 { width: 60%; }
+.bar-fill.pct-65 { width: 65%; }
+.bar-fill.pct-70 { width: 70%; }
+.bar-fill.pct-75 { width: 75%; }
+.bar-fill.pct-80 { width: 80%; }
+.bar-fill.pct-85 { width: 85%; }
+.bar-fill.pct-90 { width: 90%; }
+.bar-fill.pct-95 { width: 95%; }
+.bar-fill.pct-100 { width: 100%; }
+
 .bar-amount {
   width: 80px;
   text-align: right;
@@ -259,6 +287,10 @@
 
 .monthly-table tr:last-child td {
   border-bottom: none;
+}
+
+.analytics-whatif-table {
+  margin-top: 12px;
 }
 
 .net-positive {
@@ -469,6 +501,10 @@
   }
 
   .whatif-form {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-dual-grid {
     grid-template-columns: 1fr;
   }
 

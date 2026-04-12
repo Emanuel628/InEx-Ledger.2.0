@@ -69,7 +69,7 @@
           <div class="analytics-loading">Loading dashboard…</div>
         </div>
 
-        <div class="analytics-card" id="monthlyCard" style="display:none">
+        <div class="analytics-card" id="monthlyCard" hidden>
           <h2>Monthly Breakdown (last 12 months)</h2>
           <table class="monthly-table" id="monthlyTable">
             <thead>
@@ -84,12 +84,12 @@
           </table>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-          <div class="analytics-card" id="topIncomeCard" style="display:none">
+        <div class="analytics-dual-grid">
+          <div class="analytics-card" id="topIncomeCard" hidden>
             <h2>Top Income Sources</h2>
             <div id="topIncomeChart" class="bar-chart"></div>
           </div>
-          <div class="analytics-card" id="topExpenseCard" style="display:none">
+          <div class="analytics-card" id="topExpenseCard" hidden>
             <h2>Top Expense Categories</h2>
             <div id="topExpenseChart" class="bar-chart"></div>
           </div>
@@ -142,7 +142,7 @@
 
           <div class="whatif-results" id="whatifResults">
             <div id="whatifMessages"></div>
-            <table class="monthly-table" style="margin-top:12px">
+            <table class="monthly-table analytics-whatif-table">
               <thead><tr><th></th><th>Baseline</th><th>Scenario</th><th>Change</th></tr></thead>
               <tbody id="whatifTable"></tbody>
             </table>

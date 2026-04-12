@@ -194,16 +194,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const hasTransactions = (ledgerState.transactions || []).length > 0;
 
   if (cockpit) {
-    cockpit.style.display = tier === "free" || !hasTransactions ? "none" : "flex";
+    cockpit.hidden = tier === "free" || !hasTransactions;
   }
 
   if (upsell) {
     const shouldShowUpsell = tier === "free" && hasTransactions && !upsellDismissed;
-    upsell.style.display = shouldShowUpsell ? "block" : "none";
+    upsell.hidden = !shouldShowUpsell;
     const dismissButton = upsell.querySelector(".upsell-dismiss");
     if (dismissButton) {
       dismissButton.addEventListener("click", () => {
-        upsell.style.display = "none";
+        upsell.hidden = true;
         localStorage.setItem("lb_transactions_upsell_hidden", "true");
       });
     }
@@ -1841,11 +1841,11 @@ function renderTotals() {
       : `${txT("exports_tax_context_prefix", "Tax form context")}: ${getTaxFormContext().label} ${txT("transactions_estimate", "estimate")}`;
   }
   if (cockpit) {
-    cockpit.style.display = tier === "free" || !hasTransactions || isAllScope ? "none" : "flex";
+    cockpit.hidden = tier === "free" || !hasTransactions || isAllScope;
   }
   if (upsell) {
     const upsellDismissed = localStorage.getItem("lb_transactions_upsell_hidden") === "true";
-    upsell.style.display = tier === "free" && hasTransactions && !upsellDismissed ? "block" : "none";
+    upsell.hidden = !(tier === "free" && hasTransactions && !upsellDismissed);
   }
   updateReceiptsDot();
   maybePlaySlotAnimation();
@@ -2337,7 +2337,7 @@ function initReceiptInput() {
   receiptInputElement = document.createElement("input");
   receiptInputElement.type = "file";
   receiptInputElement.accept = "image/*,application/pdf";
-  receiptInputElement.style.display = "none";
+  receiptInputElement.className = "receipt-upload-input";
   receiptInputElement.addEventListener("change", async () => {
     const transactionId = receiptInputElement.dataset.transactionId || "";
     const file = receiptInputElement.files?.[0];
@@ -2415,15 +2415,12 @@ function maybePlaySlotAnimation() {
   }
 
   elements.forEach((el) => {
-    const duration = 0.35 + Math.random() * 0.35;
-    el.style.setProperty("--slot-duration", `${duration}s`);
     el.classList.add("slot-spin");
   });
 
   setTimeout(() => {
     elements.forEach((el) => {
       el.classList.remove("slot-spin");
-      el.style.removeProperty("--slot-duration");
     });
   }, 900);
 

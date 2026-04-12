@@ -29,7 +29,7 @@ function renderTrialBanner(containerId) {
   const shouldShowActiveTrial = tier === "trial" && !isTrialExpired();
   if (!shouldShowActiveTrial) {
     container.innerHTML = "";
-    container.style.display = "none";
+    container.hidden = true;
     return;
   }
 
@@ -40,7 +40,7 @@ function renderTrialBanner(containerId) {
     `;
   };
 
-  container.style.display = "";
+  container.hidden = false;
   updateMessage();
   const id = setInterval(() => {
     if (isTrialExpired()) {

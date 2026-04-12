@@ -449,7 +449,7 @@ async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBod
     // Show cancel button only for active paid plans that aren't already canceling
     const canCancel = sub.isPaid && !sub.cancelAtPeriodEnd;
     if (cancelRow) {
-      cancelRow.style.display = canCancel ? "" : "none";
+      cancelRow.hidden = !canCancel;
     }
 
     // Update cancel modal body with period end date
@@ -679,8 +679,7 @@ async function initPreferences() {
   const syncProvinceVisibility = (region) => {
     if (!provinceRow) return;
     const isCanada = normalizeSettingsRegion(region) === "ca";
-    provinceRow.classList.toggle("hidden", !isCanada);
-    provinceRow.style.display = isCanada ? "flex" : "none";
+    provinceRow.hidden = !isCanada;
     if (provinceSelect) {
       provinceSelect.disabled = !isCanada;
     }
@@ -974,8 +973,7 @@ async function initCpaAccess() {
 
   const syncBusinessVisibility = () => {
     const scopedToAll = scopeSelect.value === "all";
-    businessWrap.classList.toggle("hidden", scopedToAll);
-    businessWrap.style.display = scopedToAll ? "none" : "";
+    businessWrap.hidden = scopedToAll;
     businessSelect.disabled = scopedToAll;
   };
 
@@ -1290,8 +1288,7 @@ function refreshSettingsLocalizedState() {
   if (provinceRow) {
     const isCanada =
       (pendingPreferences?.region || preferenceBaseline?.region || normalizeSettingsRegion(businessSettingsState.region)) === "ca";
-    provinceRow.classList.toggle("hidden", !isCanada);
-    provinceRow.style.display = isCanada ? "flex" : "none";
+    provinceRow.hidden = !isCanada;
   }
   if (provinceSelect) {
     const isCanada =
@@ -1562,11 +1559,14 @@ function initSecurityForm() {
     const password = newInput.value;
     const score = getPasswordScore(password);
     const label = getStrengthLabel(score);
-    let color = "#b91c1c";
-    if (label === "Fair") color = "#92600a";
-    if (label === "Strong") color = "#1a7a4a";
-    strengthMeter.style.width = getStrengthWidth(score);
-    strengthMeter.style.backgroundColor = color;
+    const tone =
+      label === "Strong"
+        ? "is-strong"
+        : label === "Fair"
+        ? "is-fair"
+        : "is-weak";
+    strengthMeter.classList.remove("score-0", "score-1", "score-2", "score-3", "is-weak", "is-fair", "is-strong");
+    strengthMeter.classList.add(`score-${Math.max(0, Math.min(3, score))}`, tone);
     const labelKey =
       label === "Strong"
         ? "settings_password_strong"
@@ -1574,7 +1574,8 @@ function initSecurityForm() {
         ? "settings_password_fair"
         : "settings_password_weak";
     strengthText.textContent = t(labelKey);
-    strengthText.style.color = color;
+    strengthText.classList.remove("is-weak", "is-fair", "is-strong");
+    strengthText.classList.add(tone);
   };
 
   const updateRequirements = () => {
@@ -1586,16 +1587,17 @@ function initSecurityForm() {
   };
 
   const updateMatch = () => {
+    matchMessage.classList.remove("is-error", "is-success");
     if (!newInput.value || !confirmInput.value) {
       matchMessage.textContent = "";
       return;
     }
     if (newInput.value !== confirmInput.value) {
       matchMessage.textContent = t("register_password_match_error");
-      matchMessage.style.color = "#b91c1c";
+      matchMessage.classList.add("is-error");
     } else {
       matchMessage.textContent = t("register_password_match_success");
-      matchMessage.style.color = "#1a7a4a";
+      matchMessage.classList.add("is-success");
     }
   };
 
@@ -1998,13 +2000,6 @@ function getStrengthLabel(score) {
   if (score >= 3) return t("settings_password_strong");
   if (score >= 2) return t("settings_password_fair");
   return t("settings_password_weak");
-}
-
-function getStrengthWidth(score) {
-  if (score >= 3) return "100%";
-  if (score >= 2) return "66.6667%";
-  if (score >= 1) return "33.3333%";
-  return "0%";
 }
 
 function clearBusinessDataState() {

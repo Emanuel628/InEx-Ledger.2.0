@@ -57,6 +57,18 @@
   margin-top: 0;
 }
 
+.password-strength-text.is-weak {
+  color: #b91c1c;
+}
+
+.password-strength-text.is-fair {
+  color: #92600a;
+}
+
+.password-strength-text.is-strong {
+  color: #1a7a4a;
+}
+
 .password-match-message {
   margin-top: 2px;
   font-size: 12px;

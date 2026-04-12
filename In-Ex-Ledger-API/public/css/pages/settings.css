@@ -1545,12 +1545,54 @@ body {
   background: var(--red);
 }
 
+.settings-password-meter .meter-bar.score-0 {
+  width: 0;
+}
+
+.settings-password-meter .meter-bar.score-1 {
+  width: 33.3333%;
+}
+
+.settings-password-meter .meter-bar.score-2 {
+  width: 66.6667%;
+}
+
+.settings-password-meter .meter-bar.score-3 {
+  width: 100%;
+}
+
+.settings-password-meter .meter-bar.is-weak {
+  background: #b91c1c;
+}
+
+.settings-password-meter .meter-bar.is-fair {
+  background: #92600a;
+}
+
+.settings-password-meter .meter-bar.is-strong {
+  background: #1a7a4a;
+}
+
 .password-strength-text,
 .password-match-message,
 .password-requirements li,
 .security-show-password,
 .session-note {
   color: var(--ink3);
+}
+
+.password-strength-text.is-weak,
+.password-match-message.is-error {
+  color: #b91c1c;
+}
+
+.password-strength-text.is-fair {
+  color: #92600a;
+}
+
+.password-strength-text.is-strong,
+.password-match-message.is-success {
+  color: #1a7a4a;
 }
 
 .security-show-password {
@@ -1822,6 +1864,10 @@ body {
   border-radius: 7px;
   font-size: 13px;
   font-weight: 500;
+}
+
+.modal-delete-accent {
+  background: var(--accent, #2563eb);
 }
 
 .modal-delete:disabled {

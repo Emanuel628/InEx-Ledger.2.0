@@ -428,17 +428,26 @@ router.get("/portfolio/:ownerUserId/exports", async (req, res) => {
               b.name AS business_name,
               b.region AS business_region,
               b.province AS business_province,
-              e.export_type,
-              e.start_date,
-              e.end_date,
-              e.include_tax_id,
               e.created_at,
+              e.type AS export_type,
+              m.start_date,
+              m.end_date,
+              m.include_tax_id,
               m.language,
-              m.currency,
+              COALESCE(m.currency, CASE WHEN b.region = 'CA' THEN 'CAD' ELSE 'USD' END) AS currency,
               m.page_count
          FROM exports e
          JOIN businesses b ON b.id = e.business_id
-         LEFT JOIN export_metadata m ON m.export_id = e.id
+         LEFT JOIN LATERAL (
+           SELECT MAX(CASE WHEN key = 'start_date' THEN value END) AS start_date,
+                  MAX(CASE WHEN key = 'end_date' THEN value END) AS end_date,
+                  MAX(CASE WHEN key = 'include_tax_id' THEN value END) AS include_tax_id,
+                  MAX(CASE WHEN key = 'language' THEN value END) AS language,
+                  MAX(CASE WHEN key = 'currency' THEN value END) AS currency,
+                  MAX(CASE WHEN key = 'page_count' THEN value END) AS page_count
+             FROM export_metadata
+            WHERE export_id = e.id
+         ) m ON TRUE
         WHERE e.business_id = ANY($1::uuid[])
         ORDER BY e.created_at DESC
         LIMIT 100`,
@@ -566,15 +575,20 @@ router.get("/portfolio/:ownerUserId/exports/:exportId/redacted", async (req, res
     const result = await pool.query(
       `SELECT e.id,
               e.business_id,
-              e.file_path
+              m.file_path
          FROM exports e
+         LEFT JOIN LATERAL (
+           SELECT MAX(CASE WHEN key = 'file_path' THEN value END) AS file_path
+             FROM export_metadata
+            WHERE export_id = e.id
+         ) m ON TRUE
         WHERE e.id = $1
           AND e.business_id = ANY($2::uuid[])
         LIMIT 1`,
       [exportId, portfolio.business_ids]
     );
 
-    if (!result.rowCount) {
+    if (!result.rowCount || !result.rows[0].file_path) {
       return res.status(404).json({ error: "Export not found in granted scope." });
     }
 

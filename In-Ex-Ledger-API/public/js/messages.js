@@ -236,7 +236,7 @@ async function openMessageDetail(id) {
     if (replyInput) replyInput.value = "";
 
     // Hide reply button for sent messages (can still reply via compose)
-    if (detailReplyBtn) detailReplyBtn.style.display = isSent ? "none" : "";
+    if (detailReplyBtn) detailReplyBtn.hidden = isSent;
 
     const overlay = document.getElementById("messageDetailOverlay");
     if (overlay) overlay.classList.remove("hidden");
@@ -486,7 +486,7 @@ function setUnreadBadge(count) {
   document.querySelectorAll(".nav-msg-badge").forEach((badge) => {
     badge.setAttribute("data-count", String(count));
     badge.textContent = count > 99 ? "99+" : String(count);
-    badge.style.display = count > 0 ? "" : "none";
+    badge.hidden = count <= 0;
   });
 }
 
