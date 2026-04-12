@@ -292,6 +292,7 @@ module.exports = {
   pool,
   initDatabase,
   withRetry,
+  computeChecksum,
   migrationStats,
   MigrationContentDriftError
 };

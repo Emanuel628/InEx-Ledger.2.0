@@ -56,6 +56,7 @@ const ALLOWED_EXTENSIONS = new Set([
 ]);
 
 const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /* =========================================================
    Multer Config (Disk + UUID)
@@ -104,6 +105,10 @@ async function sha256File(storagePath) {
     stream.on("end", () => resolve(hash.digest("hex")));
     stream.on("error", reject);
   });
+}
+
+function isUuid(value) {
+  return typeof value === "string" && UUID_RE.test(value);
 }
 
 function safeUnlink(filePath) {
@@ -181,8 +186,40 @@ router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), asyn
       return res.status(402).json({ error: "Receipt uploads require an active InEx Ledger V1 plan." });
     }
 
-    // optional
-    const transactionId = req.body.transaction_id || null;
+    let transactionId = req.body.transaction_id;
+    if (typeof transactionId === "string") {
+      transactionId = transactionId.trim();
+    }
+    if (!transactionId) {
+      transactionId = null;
+    }
+
+    if (transactionId !== null) {
+      if (!isUuid(transactionId)) {
+        safeUnlink(req.file?.path);
+        return res.status(400).json({
+          error: "transaction_id must be a valid UUID when provided."
+        });
+      }
+
+      const txCheck = await pool.query(
+        `SELECT id, date
+         FROM transactions
+         WHERE id = $1 AND business_id = $2
+         LIMIT 1`,
+        [transactionId, businessId]
+      );
+
+      if (!txCheck.rowCount) {
+        safeUnlink(req.file?.path);
+        return res.status(404).json({
+          error: "Transaction not found or does not belong to this business."
+        });
+      }
+
+      const lockState = await loadAccountingLockState(pool, businessId);
+      assertDateUnlocked(lockState, txCheck.rows[0].date);
+    }
 
     const receiptId = crypto.randomUUID();
     const storagePath = req.file.path;
@@ -212,6 +249,14 @@ router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), asyn
       url: `/api/receipts/${receiptId}`
     });
   } catch (err) {
+    if (err.name === "AccountingPeriodLockedError") {
+      safeUnlink(req.file?.path);
+      return res.status(409).json({
+        error: err.message,
+        code: err.code,
+        locked_through_date: err.lockedThroughDate
+      });
+    }
     logError("POST /receipts error:", err);
 
     // Orphan cleanup

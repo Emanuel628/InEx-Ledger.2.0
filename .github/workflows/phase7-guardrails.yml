@@ -58,6 +58,10 @@ jobs:
         working-directory: In-Ex-Ledger-API
         run: node -e "const { initDatabase } = require('./db.js'); initDatabase().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });"
 
+      - name: Verify migration checksums
+        working-directory: In-Ex-Ledger-API
+        run: npm run migrations:verify-checksums
+
       - name: Run export grant guard
         working-directory: In-Ex-Ledger-API
         run: npm run test:export-grant
@@ -70,13 +74,9 @@ jobs:
         working-directory: In-Ex-Ledger-API
         run: npm run verify:redacted-storage
 
-      - name: Run auth-flows tests
+      - name: Run full API guardrail suite
         working-directory: In-Ex-Ledger-API
-        run: npm run test:auth-flows
-
-      - name: Run critical-flows tests
-        working-directory: In-Ex-Ledger-API
-        run: npm run test:critical-flows
+        run: npm run test:all
 
       - name: Check frontend bundle drift
         run: node scripts/check-bundle-drift.js

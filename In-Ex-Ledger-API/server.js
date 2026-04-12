@@ -13,6 +13,7 @@ const {
 } = require('./middleware/rateLimiter.js');
 const { ensureCsrfCookie } = require('./middleware/csrf.middleware.js');
 const { initDatabase, migrationStats, MigrationContentDriftError } = require('./db.js');
+const { buildHealthCheckResponse } = require('./services/healthCheckService.js');
 const { getReceiptStorageStatus, initializeReceiptStorage } = require('./services/receiptStorage.js');
 const { logInfo, logWarn, logError } = require('./utils/logger.js');
 
@@ -195,27 +196,14 @@ app.use('/api', (req, res, next) => {
 app.get('/health', (req, res) => {
   const rateLimiting = getRateLimiterHealth();
   const receiptStorage = getReceiptStorageStatus();
-  const healthy = dbState === 'ready' && rateLimiting.mode !== 'degraded' && receiptStorage.mode !== 'degraded';
-  let overallStatus;
-  if (healthy) {
-    overallStatus = 'healthy';
-  } else if (dbState === 'ready') {
-    overallStatus = 'degraded';
-  } else {
-    overallStatus = dbState;
-  }
-  res.status(200).json({
-    status: overallStatus,
-    database: {
-      state: dbState,
-      lastError: dbLastError,
-      migrations: migrationStats
-    },
-    receiptStorage,
+  const health = buildHealthCheckResponse({
+    dbState,
+    dbLastError,
+    migrationStats,
     rateLimiting,
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString()
+    receiptStorage
   });
+  res.status(health.statusCode).json(health.body);
 });
 
 app.get('/favicon.ico', (req, res) => {
@@ -340,7 +328,14 @@ async function start() {
   void initializeDatabaseWithRetry();
 }
 
-start().catch((err) => {
-  logError('Server startup failed', { message: err?.message || String(err) });
-  process.exit(1);
-});
+if (require.main === module) {
+  start().catch((err) => {
+    logError('Server startup failed', { message: err?.message || String(err) });
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  app,
+  start
+};

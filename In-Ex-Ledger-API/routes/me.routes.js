@@ -305,6 +305,7 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
   const { password } = req.body ?? {};
   const client = await pool.connect();
   let transactionOpen = false;
+  let storagePaths = [];
 
   try {
     if (!password) {
@@ -339,7 +340,7 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
           AND r.storage_path IS NOT NULL`,
       [req.user.id]
     );
-    const storagePaths = receiptFiles.rows
+    storagePaths = receiptFiles.rows
       .map((row) => row.storage_path)
       .filter((filePath) => isManagedReceiptPath(filePath));
 
@@ -378,6 +379,10 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
         [businessIds]
       );
       await client.query(
+        "UPDATE users SET active_business_id = NULL WHERE id = $1",
+        [req.user.id]
+      );
+      await client.query(
         "DELETE FROM businesses WHERE user_id = $1",
         [req.user.id]
       );
@@ -405,17 +410,16 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
     await client.query("COMMIT");
     transactionOpen = false;
 
-    await Promise.all(
+    const unlinkResults = await Promise.allSettled(
       storagePaths.map(async (filePath) => {
-        try {
-          await fs.promises.unlink(filePath);
-        } catch (unlinkErr) {
-          if (unlinkErr.code !== "ENOENT") {
-            logError("DELETE /me: failed to unlink receipt file:", filePath, unlinkErr);
-          }
-        }
+        await fs.promises.unlink(filePath);
       })
     );
+    unlinkResults.forEach((result, index) => {
+      if (result.status === "rejected" && result.reason?.code !== "ENOENT") {
+        logError("DELETE /me: failed to unlink receipt file:", storagePaths[index], result.reason);
+      }
+    });
 
     res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
     res.status(200).json({ message: "Account and data deleted" });
