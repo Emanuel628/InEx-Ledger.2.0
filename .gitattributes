@@ -1,0 +1,2 @@
+# Migration files are checksum-validated at startup; keep line endings stable.
+In-Ex-Ledger-API/db/migrations/*.sql text eol=lf
