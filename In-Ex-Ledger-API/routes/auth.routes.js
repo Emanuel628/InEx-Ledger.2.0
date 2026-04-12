@@ -65,7 +65,7 @@ const REFRESH_TOKEN_COOKIE = "refresh_token";
 const MFA_TRUST_COOKIE = "mfa_trust";
 const REFRESH_TOKEN_EXPIRY_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
 const REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-const MFA_TRUST_EXPIRY_DAYS = Number(process.env.MFA_TRUST_EXPIRY_DAYS) || 30;
+const MFA_TRUST_EXPIRY_DAYS = Number(process.env.MFA_TRUST_EXPIRY_DAYS) || 14;
 const MFA_TRUST_EXPIRY_MS = MFA_TRUST_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 const MFA_EMAIL_CODE_EXPIRY_MINUTES = Number(process.env.MFA_EMAIL_CODE_EXPIRY_MINUTES) || 10;
 const MFA_EMAIL_CODE_EXPIRY_MS = MFA_EMAIL_CODE_EXPIRY_MINUTES * 60 * 1000;
@@ -853,14 +853,6 @@ router.get("/mfa/status", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/mfa/setup", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
-  return res.status(410).json({ error: "Authenticator app setup is no longer used." });
-});
-
-router.post("/mfa/setup/cancel", requireAuth, requireCsrfProtection, async (req, res) => {
-  return res.status(200).json({ success: true });
-});
-
 router.post("/mfa/enable", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   const code = String(req.body?.code || "").trim();
@@ -1047,10 +1039,6 @@ router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter
     logError("MFA disable error:", err);
     return res.status(500).json({ error: "Unable to disable MFA." });
   }
-});
-
-router.post("/mfa/recovery-codes/regenerate", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
-  return res.status(410).json({ error: "Recovery codes are no longer used." });
 });
 
 router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {

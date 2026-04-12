@@ -1,20 +1,28 @@
 const SENSITIVE_KEYS = new Set([
-  "taxid",
-  "taxid_jwe",
-  "ein",
-  "bn",
-  "tax_id",
-  "tax-id",
-  "ssn",
-  "sin"
+  // Tax identifiers — snake_case, camelCase, hyphen, JWE variants
+  "taxid", "taxid_jwe", "tax_id", "tax_id_jwe", "tax-id",
+  "taxId", "taxIdJwe", "taxIdjwe",
+  // US / Canada employer / business numbers
+  "ein", "ein_jwe", "einJwe",
+  "bn", "bn_jwe", "bnJwe",
+  // Social / national identifiers
+  "ssn", "ssn_jwe", "ssnJwe",
+  "sin", "sin_jwe", "sinJwe",
+  // Generic secrets / credentials that must never reach logs
+  "password", "password_hash", "passwordHash",
+  "token", "access_token", "refresh_token", "accessToken", "refreshToken",
+  "secret", "api_key", "apiKey", "private_key", "privateKey",
+  "credit_card", "creditCard", "card_number", "cardNumber", "cvv", "cvc"
 ]);
 
 const STRING_PATTERNS = [
   /taxId/gi,
   /tax_id/gi,
   /taxid/gi,
-  /ein/gi,
-  /bn/gi
+  /\bein\b/gi,
+  /\bbn\b/gi,
+  /\bssn\b/gi,
+  /\bsin\b/gi
 ];
 
 function maskString(value) {

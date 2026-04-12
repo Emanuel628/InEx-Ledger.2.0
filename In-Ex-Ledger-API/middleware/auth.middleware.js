@@ -88,7 +88,7 @@ function optionalAuth(req, res, next) {
     try {
       req.user = verifyToken(authHeader.slice("Bearer ".length).trim());
     } catch (err) {
-      // ignore invalid tokens
+      logWarn("optionalAuth: rejected invalid token —", err.message);
     }
   }
 

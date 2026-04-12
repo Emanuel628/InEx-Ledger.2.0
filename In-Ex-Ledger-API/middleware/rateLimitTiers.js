@@ -21,7 +21,7 @@ function createAuthLimiter() {
 
 function createPasswordLimiter() {
   return createRouteLimiter({
-    windowMs: 60 * 60 * 1000,
+    windowMs: 15 * 60 * 1000, // 15 minutes (was 1 hour — 5 attempts/hour was too permissive)
     max: 5,
     keyPrefix: "rl:auth:password",
     keyStrategy: "ip",
