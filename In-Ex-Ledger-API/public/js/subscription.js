@@ -420,7 +420,7 @@ async function startCheckout() {
   try {
     if (pricingState.isCheckoutLoading) return;
     setCheckoutLoading(true);
-    const requestBody = {
+    const checkoutPayload = {
       billingInterval: pricingState.billingInterval,
       currency: pricingState.currency,
       additionalBusinesses: pricingState.additionalBusinesses
@@ -428,16 +428,16 @@ async function startCheckout() {
     const res = await apiFetch("/api/billing/checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(checkoutPayload)
     });
     if (!res) {
       setCheckoutLoading(false);
       return;
     }
-    const responsePayload = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(responsePayload?.error || tx("subscription_checkout_error"));
-    if (responsePayload?.url) {
-      window.location.href = responsePayload.url;
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(payload?.error || tx("subscription_checkout_error"));
+    if (payload?.url) {
+      window.location.href = payload.url;
       return;
     }
     setCheckoutLoading(false);

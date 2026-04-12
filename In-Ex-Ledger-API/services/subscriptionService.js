@@ -167,10 +167,10 @@ async function syncStripeSubscriptionForBusiness(businessId, subscription) {
   const stripeMetadata = subscription?.metadata || {};
   const basePriceMeta = baseItem?.price?.id ? metadataByPriceId.get(baseItem.price.id) : null;
   const addonPriceMeta = addonItem?.price?.id ? metadataByPriceId.get(addonItem.price.id) : null;
-  const addonQuantity = Number.isSafeInteger(Number(addonItem?.quantity)) ? Number(addonItem.quantity) : null;
-  const metadataQuantity = Number.isSafeInteger(Number(stripeMetadata.additional_businesses))
-    ? Number(stripeMetadata.additional_businesses)
-    : null;
+  const addonQuantityValue = Number(addonItem?.quantity);
+  const addonQuantity = Number.isSafeInteger(addonQuantityValue) ? addonQuantityValue : null;
+  const metadataQuantityValue = Number(stripeMetadata.additional_businesses);
+  const metadataQuantity = Number.isSafeInteger(metadataQuantityValue) ? metadataQuantityValue : null;
   const additionalBusinesses = addonQuantity ?? metadataQuantity ?? 0;
   const billingInterval =
     stripeMetadata.billing_interval || basePriceMeta?.billingInterval || addonPriceMeta?.billingInterval || null;
