@@ -213,7 +213,7 @@ router.get("/portfolio/:ownerUserId/transactions", async (req, res) => {
       return;
     }
 
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 100, 1), 500);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const result = await pool.query(
       `SELECT t.id,
@@ -281,6 +281,9 @@ router.get("/portfolio/:ownerUserId/receipts", async (req, res) => {
       return;
     }
 
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
     const result = await pool.query(
       `SELECT r.id,
               r.business_id,
@@ -292,7 +295,15 @@ router.get("/portfolio/:ownerUserId/receipts", async (req, res) => {
          FROM receipts r
          JOIN businesses b ON b.id = r.business_id
         WHERE r.business_id = ANY($1::uuid[])
-        ORDER BY b.name ASC, r.created_at DESC NULLS LAST`,
+        ORDER BY b.name ASC, r.created_at DESC NULLS LAST
+        LIMIT $2 OFFSET $3`,
+      [portfolio.business_ids, limit, offset]
+    );
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS count
+         FROM receipts
+        WHERE business_id = ANY($1::uuid[])`,
       [portfolio.business_ids]
     );
 
@@ -303,11 +314,19 @@ router.get("/portfolio/:ownerUserId/receipts", async (req, res) => {
       action: "portfolio_receipts_viewed",
       metadata: {
         grant_scope: portfolio.grant_scope,
-        business_ids: portfolio.business_ids
+        business_ids: portfolio.business_ids,
+        limit,
+        offset
       }
     });
 
-    res.json({ receipts: result.rows, businesses: portfolio.businesses });
+    res.json({
+      receipts: result.rows,
+      total: Number(countResult.rows[0]?.count || 0),
+      limit,
+      offset,
+      businesses: portfolio.businesses
+    });
   } catch (error) {
     logError("GET /api/cpa-access/portfolio/:ownerUserId/receipts error:", error.message);
     res.status(500).json({ error: "Failed to load CPA receipts." });

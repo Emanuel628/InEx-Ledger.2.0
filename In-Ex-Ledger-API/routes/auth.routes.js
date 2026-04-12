@@ -1202,9 +1202,12 @@ router.post("/request-email-change", requireAuth, requireCsrfProtection, authLim
     const confirmLink = `${getAppBaseUrl(req)}/api/auth/confirm-email-change?token=${token}`;
     const lang = await getPreferredLanguageForUser(req.user.id);
     const emailContent = buildEmailChangeEmail(lang, confirmLink);
-    await sendAppEmail({ to: email, ...emailContent });
+    // Send to the CURRENT address so only the real account owner can approve
+    // the change. Sending to the new address would let an attacker who stole
+    // a session redirect the account to their own email.
+    await sendAppEmail({ to: user.email, ...emailContent });
 
-    res.json({ message: "Confirmation email sent to your new address." });
+    res.json({ message: "A confirmation link has been sent to your current email address." });
   } catch (err) {
     logError("Request email change error:", err);
     res.status(500).json({ error: "Failed to initiate email change." });
