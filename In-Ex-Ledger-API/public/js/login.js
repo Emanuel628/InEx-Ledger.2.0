@@ -14,6 +14,7 @@ function tx(key) {
 }
 const OFFLINE_ERROR_MESSAGE = "login_error_offline";
 const EXPIRED_SESSION_MESSAGE = "login_error_expired";
+const LOGIN_RESET_KEY = "lb_login_reset";
 
 redirectIfAuthenticated();
 
@@ -29,7 +30,49 @@ document.addEventListener("DOMContentLoaded", () => {
   loginForm.addEventListener("submit", handleLoginSubmit);
   wireShowPasswordToggle(document);
   showLoginReasonMessage();
+  resetLoginFieldsIfNeeded();
 });
+
+window.addEventListener("pageshow", () => {
+  resetLoginFieldsIfNeeded();
+});
+
+function resetLoginFieldsIfNeeded() {
+  const shouldReset = typeof consumeLoginResetFlag === "function"
+    ? consumeLoginResetFlag()
+    : shouldConsumeLoginResetFlag();
+  if (!shouldReset) {
+    return;
+  }
+  clearLoginFields();
+  window.setTimeout(clearLoginFields, 60);
+}
+
+function shouldConsumeLoginResetFlag() {
+  try {
+    const shouldReset = sessionStorage.getItem(LOGIN_RESET_KEY) === "true";
+    if (shouldReset) {
+      sessionStorage.removeItem(LOGIN_RESET_KEY);
+    }
+    return shouldReset;
+  } catch (_) {
+    return false;
+  }
+}
+
+function clearLoginFields() {
+  const emailField = document.getElementById("email");
+  const passwordField = document.getElementById("password");
+  loginForm?.reset();
+  if (emailField) {
+    emailField.value = "";
+    emailField.setAttribute("autocomplete", "off");
+  }
+  if (passwordField) {
+    passwordField.value = "";
+    passwordField.setAttribute("autocomplete", "new-password");
+  }
+}
 
 async function handleLoginSubmit(event) {
   event.preventDefault();
@@ -151,4 +194,3 @@ function wireShowPasswordToggle(container = document) {
     passwordField.type = toggle.checked ? "text" : "password";
   });
 }
-
