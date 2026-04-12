@@ -14,6 +14,7 @@ function tx(key) {
 }
 const OFFLINE_ERROR_MESSAGE = "login_error_offline";
 const EXPIRED_SESSION_MESSAGE = "login_error_expired";
+const AUTOFILL_CLEAR_DELAY_MS = 200;
 
 redirectIfAuthenticated();
 
@@ -56,16 +57,17 @@ function clearLoginFields() {
     }
     if (passwordField) {
       passwordField.value = "";
-      passwordField.setAttribute("autocomplete", "new-password");
+      passwordField.setAttribute("autocomplete", "current-password");
     }
   };
   loginForm?.reset();
   resetFieldValues();
+  // Retry once to counter browser autofill that may run after initial load.
   window.setTimeout(() => {
     if ((emailField && emailField.value) || (passwordField && passwordField.value)) {
       resetFieldValues();
     }
-  }, 120);
+  }, AUTOFILL_CLEAR_DELAY_MS);
 }
 
 async function handleLoginSubmit(event) {
