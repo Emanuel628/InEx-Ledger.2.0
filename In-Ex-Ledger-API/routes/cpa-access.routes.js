@@ -2,7 +2,11 @@ const express = require("express");
 const fs = require("fs");
 const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
-const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
+const { createDataApiLimiter, createRouteLimiter } = require("../middleware/rate-limit.middleware.js");
+
+// Tighter limiter for sensitive audit-log and grant-mutation endpoints
+const cpaAuditLimiter = createRouteLimiter({ windowMs: 60 * 1000, max: 10, keyPrefix: "rl:cpa:audit" });
+const cpaGrantMutationLimiter = createRouteLimiter({ windowMs: 60 * 1000, max: 20, keyPrefix: "rl:cpa:grant" });
 const {
   listOwnedCpaGrants,
   listOwnedCpaAuditLogs,
@@ -49,7 +53,7 @@ router.get("/grants/assigned", async (req, res) => {
   }
 });
 
-router.get("/audit", async (req, res) => {
+router.get("/audit", cpaAuditLimiter, async (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
     const logs = await listOwnedCpaAuditLogs(req.user.id, limit);
@@ -70,9 +74,21 @@ router.get("/portfolio", async (req, res) => {
   }
 });
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function resolveGrantedPortfolioOr404(req, res) {
   const ownerUserId = String(req.params.ownerUserId || "").trim();
   const businessId = String(req.query.business_id || "").trim();
+
+  if (!UUID_RE.test(ownerUserId)) {
+    res.status(400).json({ error: "Invalid owner user ID." });
+    return null;
+  }
+  if (businessId && !UUID_RE.test(businessId)) {
+    res.status(400).json({ error: "Invalid business ID." });
+    return null;
+  }
+
   const portfolio = await resolveAccessiblePortfolioForUser(req.user, ownerUserId, businessId);
   if (!portfolio) {
     res.status(404).json({ error: "CPA portfolio access not found." });
@@ -632,7 +648,7 @@ router.get("/portfolio/:ownerUserId/exports/:exportId/redacted", async (req, res
   }
 });
 
-router.post("/grants", async (req, res) => {
+router.post("/grants", cpaGrantMutationLimiter, async (req, res) => {
   try {
     const grant = await createCpaGrant(req.user, req.body, getClientIp(req));
     const grants = await listOwnedCpaGrants(req.user.id);
@@ -649,7 +665,7 @@ router.post("/grants", async (req, res) => {
   }
 });
 
-router.post("/grants/:id/accept", async (req, res) => {
+router.post("/grants/:id/accept", cpaGrantMutationLimiter, async (req, res) => {
   try {
     const accepted = await acceptAssignedCpaGrant(req.user, req.params.id, getClientIp(req));
     if (!accepted) {
@@ -663,7 +679,7 @@ router.post("/grants/:id/accept", async (req, res) => {
   }
 });
 
-router.delete("/grants/:id", async (req, res) => {
+router.delete("/grants/:id", cpaGrantMutationLimiter, async (req, res) => {
   try {
     const revoked = await revokeOwnedCpaGrant(req.user.id, req.params.id, getClientIp(req));
     if (!revoked) {
@@ -676,7 +692,7 @@ router.delete("/grants/:id", async (req, res) => {
   }
 });
 
-router.delete("/grants/:id/permanent", async (req, res) => {
+router.delete("/grants/:id/permanent", cpaGrantMutationLimiter, async (req, res) => {
   try {
     const deleted = await deleteOwnedRevokedCpaGrant(req.user.id, req.params.id, getClientIp(req));
     if (!deleted) {

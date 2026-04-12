@@ -57,6 +57,28 @@ async function resolveBusinessIdForUser(user) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+
+    // Advisory lock on the user's numeric hash prevents two concurrent requests
+    // from both reaching this branch and creating duplicate businesses.
+    const lockKey = BigInt("0x" + crypto.createHash("sha256").update(String(user.id)).digest("hex").slice(0, 15));
+    await client.query("SELECT pg_advisory_xact_lock($1)", [String(lockKey)]);
+
+    // Re-check inside the lock in case another request just created the business
+    const recheck = await client.query(
+      `SELECT b.id
+         FROM users u
+         JOIN businesses b ON b.id = u.active_business_id AND b.user_id = u.id
+        WHERE u.id = $1
+        LIMIT 1`,
+      [user.id]
+    );
+    if (recheck.rowCount > 0) {
+      await client.query("COMMIT");
+      const id = recheck.rows[0].id;
+      user.business_id = id;
+      return id;
+    }
+
     await client.query(
       `INSERT INTO businesses (id, user_id, name, region, language)
        VALUES ($1, $2, $3, 'US', 'en')`,
