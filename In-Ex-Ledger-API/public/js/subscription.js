@@ -3,17 +3,6 @@ let subToastTimer = null;
 const BILLING_INTERVALS = ["monthly", "yearly"];
 const BILLING_CURRENCIES = ["usd", "cad"];
 const MAX_ADDITIONAL_BUSINESSES = 100;
-const PRICE_TABLE = {
-  usd: {
-    monthly: { base: null, addon: null },
-    yearly: { base: null, addon: null }
-  },
-  cad: {
-    monthly: { base: null, addon: null },
-    yearly: { base: null, addon: null }
-  }
-};
-
 const pricingState = {
   billingInterval: "monthly",
   currency: "usd",
@@ -64,17 +53,6 @@ function clampAdditionalBusinesses(value) {
   return Math.min(Math.max(Math.trunc(value), 0), MAX_ADDITIONAL_BUSINESSES);
 }
 
-function getPricingConfig(currency, interval) {
-  return PRICE_TABLE?.[currency]?.[interval] || {};
-}
-
-function formatPriceAmount(amount, currency, fallback) {
-  if (Number.isFinite(amount)) {
-    return fmtAmount(amount, currency);
-  }
-  return fallback || tx("subscription_price_at_checkout");
-}
-
 function updatePricingUI() {
   const intervalButtons = Array.from(document.querySelectorAll("[data-billing-interval]"));
   const currencyButtons = Array.from(document.querySelectorAll("[data-currency]"));
@@ -103,9 +81,6 @@ function updatePricingUI() {
     incrementBtn.disabled = pricingState.additionalBusinesses >= MAX_ADDITIONAL_BUSINESSES;
   }
 
-  const pricingConfig = getPricingConfig(pricingState.currency, pricingState.billingInterval);
-  const baseAmount = pricingConfig.base;
-  const addonUnit = pricingConfig.addon;
   const intervalLabel =
     pricingState.billingInterval === "yearly"
       ? tx("subscription_billing_yearly")
@@ -113,30 +88,16 @@ function updatePricingUI() {
   const planSummaryText = `${pricingState.currency.toUpperCase()} · ${intervalLabel}`;
 
   if (planPriceLabel) {
-    planPriceLabel.textContent = formatPriceAmount(baseAmount, pricingState.currency, planSummaryText);
+    planPriceLabel.textContent = planSummaryText;
   }
   if (summaryPlan) {
     summaryPlan.textContent = planSummaryText;
   }
   if (summaryAddon) {
-    const addonTotal =
-      Number.isFinite(addonUnit) && pricingState.additionalBusinesses > 0
-        ? fmtAmount(addonUnit * pricingState.additionalBusinesses, pricingState.currency)
-        : null;
-    summaryAddon.textContent = addonTotal
-      ? `${pricingState.additionalBusinesses} · ${addonTotal}`
-      : String(pricingState.additionalBusinesses);
+    summaryAddon.textContent = String(pricingState.additionalBusinesses);
   }
   if (summaryTotal) {
-    if (Number.isFinite(baseAmount)) {
-      const totalAmount =
-        Number.isFinite(addonUnit)
-          ? baseAmount + addonUnit * pricingState.additionalBusinesses
-          : baseAmount;
-      summaryTotal.textContent = fmtAmount(totalAmount, pricingState.currency);
-    } else {
-      summaryTotal.textContent = tx("subscription_price_at_checkout");
-    }
+    summaryTotal.textContent = tx("subscription_price_at_checkout");
   }
 }
 

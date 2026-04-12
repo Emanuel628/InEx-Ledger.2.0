@@ -11,6 +11,7 @@ const {
   syncStripeSubscriptionForBusiness,
   setFreePlanForBusiness
 } = require("../services/subscriptionService.js");
+const { buildStripePriceEnvMap } = require("../services/stripePriceConfig.js");
 const { pool } = require("../db.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
@@ -25,27 +26,7 @@ const BILLING_INTERVALS = new Set(["monthly", "yearly"]);
 const BILLING_CURRENCIES = new Set(["usd", "cad"]);
 const MAX_ADDITIONAL_BUSINESSES = 100;
 
-const BASE_PRICE_ENV = {
-  monthly: {
-    usd: "STRIPE_PRICE_V1_MONTHLY_US",
-    cad: "STRIPE_PRICE_V1_MONTHLY_CA"
-  },
-  yearly: {
-    usd: "STRIPE_PRICE_V1_YEARLY_US",
-    cad: "STRIPE_PRICE_V1_YEARLY_CA"
-  }
-};
-
-const ADDON_PRICE_ENV = {
-  monthly: {
-    usd: "STRIPE_PRICE_ADDITIONAL_BUSINESS_MONTHLY_US",
-    cad: "STRIPE_PRICE_ADDITIONAL_BUSINESS_MONTHLY_CA"
-  },
-  yearly: {
-    usd: "STRIPE_PRICE_ADDITIONAL_BUSINESS_YEARLY_US",
-    cad: "STRIPE_PRICE_ADDITIONAL_BUSINESS_YEARLY_CA"
-  }
-};
+const { base: BASE_PRICE_ENV, addon: ADDON_PRICE_ENV } = buildStripePriceEnvMap();
 
 class BillingValidationError extends Error {
   constructor(message) {

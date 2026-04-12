@@ -1,45 +1,11 @@
 const crypto = require("crypto");
 const { pool } = require("../db.js");
+const { buildStripePriceLookup } = require("./stripePriceConfig.js");
 
 const DEFAULT_TRIAL_DAYS = Number(process.env.DEFAULT_TRIAL_DAYS || 30);
 const PLAN_FREE = "free";
 const PLAN_V1 = "v1";
 
-const STRIPE_PRICE_LOOKUP = [
-  { env: "STRIPE_PRICE_V1_MONTHLY_US", billingInterval: "monthly", currency: "usd", type: "base" },
-  { env: "STRIPE_PRICE_V1_YEARLY_US", billingInterval: "yearly", currency: "usd", type: "base" },
-  { env: "STRIPE_PRICE_V1_MONTHLY_CA", billingInterval: "monthly", currency: "cad", type: "base" },
-  { env: "STRIPE_PRICE_V1_YEARLY_CA", billingInterval: "yearly", currency: "cad", type: "base" },
-  { env: "STRIPE_PRICE_ADDITIONAL_BUSINESS_MONTHLY_US", billingInterval: "monthly", currency: "usd", type: "addon" },
-  { env: "STRIPE_PRICE_ADDITIONAL_BUSINESS_YEARLY_US", billingInterval: "yearly", currency: "usd", type: "addon" },
-  { env: "STRIPE_PRICE_ADDITIONAL_BUSINESS_MONTHLY_CA", billingInterval: "monthly", currency: "cad", type: "addon" },
-  { env: "STRIPE_PRICE_ADDITIONAL_BUSINESS_YEARLY_CA", billingInterval: "yearly", currency: "cad", type: "addon" }
-];
-
-function buildStripePriceLookup() {
-  const basePriceIds = new Set();
-  const addonPriceIds = new Set();
-  const metadataByPriceId = new Map();
-
-  STRIPE_PRICE_LOOKUP.forEach((entry) => {
-    const priceId = process.env[entry.env];
-    if (!priceId) {
-      return;
-    }
-    if (entry.type === "addon") {
-      addonPriceIds.add(priceId);
-    } else {
-      basePriceIds.add(priceId);
-    }
-    metadataByPriceId.set(priceId, {
-      billingInterval: entry.billingInterval,
-      currency: entry.currency,
-      type: entry.type
-    });
-  });
-
-  return { basePriceIds, addonPriceIds, metadataByPriceId };
-}
 
 function addDays(date, days) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
