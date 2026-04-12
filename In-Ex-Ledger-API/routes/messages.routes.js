@@ -79,14 +79,14 @@ router.get("/contacts", async (req, res) => {
               SELECT 1 FROM cpa_access_grants g
                JOIN businesses b ON b.id = g.business_id
               WHERE b.user_id = $1
-                AND g.cpa_user_id = u.id
+                AND g.grantee_user_id = u.id
                 AND g.status IN ('active', 'pending')
             )
             -- Businesses this user (acting as CPA) was granted access to
             OR EXISTS (
               SELECT 1 FROM cpa_access_grants g
                JOIN businesses b ON b.id = g.business_id
-              WHERE g.cpa_user_id = $1
+              WHERE g.grantee_user_id = $1
                 AND b.user_id = u.id
                 AND g.status IN ('active', 'pending')
             )
