@@ -150,6 +150,133 @@
   font-size: 12px;
 }
 
+.sub-plan-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sub-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sub-control-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.sub-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-alt, var(--card-bg));
+  border: 1px solid var(--border-subtle);
+  width: fit-content;
+}
+
+.sub-toggle-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.sub-toggle-btn.is-active {
+  background: var(--primary, #2563eb);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+}
+
+.sub-quantity-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-alt, var(--card-bg));
+  width: fit-content;
+}
+
+.sub-quantity-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface, #fff);
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.sub-quantity-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.sub-quantity-input {
+  width: 64px;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sub-quantity-input:focus {
+  outline: none;
+}
+
+.sub-control-help {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sub-price-summary {
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  padding: 12px;
+  background: var(--surface-alt, var(--card-bg));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sub-price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.sub-price-total {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sub-price-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 /* Billing History */
 .billing-history-list {
   margin-top: 8px;
@@ -217,4 +344,3 @@
   font-size: 14px;
   padding: 16px 0;
 }
-

@@ -5,6 +5,42 @@ const DEFAULT_TRIAL_DAYS = Number(process.env.DEFAULT_TRIAL_DAYS || 30);
 const PLAN_FREE = "free";
 const PLAN_V1 = "v1";
 
+const STRIPE_PRICE_LOOKUP = [
+  { env: "STRIPE_PRICE_V1_MONTHLY_US", billingInterval: "monthly", currency: "usd", type: "base" },
+  { env: "STRIPE_PRICE_V1_YEARLY_US", billingInterval: "yearly", currency: "usd", type: "base" },
+  { env: "STRIPE_PRICE_V1_MONTHLY_CA", billingInterval: "monthly", currency: "cad", type: "base" },
+  { env: "STRIPE_PRICE_V1_YEARLY_CA", billingInterval: "yearly", currency: "cad", type: "base" },
+  { env: "STRIPE_PRICE_ADDITIONAL_BUSINESS_MONTHLY_US", billingInterval: "monthly", currency: "usd", type: "addon" },
+  { env: "STRIPE_PRICE_ADDITIONAL_BUSINESS_YEARLY_US", billingInterval: "yearly", currency: "usd", type: "addon" },
+  { env: "STRIPE_PRICE_ADDITIONAL_BUSINESS_MONTHLY_CA", billingInterval: "monthly", currency: "cad", type: "addon" },
+  { env: "STRIPE_PRICE_ADDITIONAL_BUSINESS_YEARLY_CA", billingInterval: "yearly", currency: "cad", type: "addon" }
+];
+
+function buildStripePriceLookup() {
+  const basePriceIds = new Set();
+  const addonPriceIds = new Set();
+  const metadataByPriceId = new Map();
+
+  STRIPE_PRICE_LOOKUP.forEach((entry) => {
+    const priceId = process.env[entry.env];
+    if (!priceId) {
+      return;
+    }
+    if (entry.type === "addon") {
+      addonPriceIds.add(priceId);
+    } else {
+      basePriceIds.add(priceId);
+    }
+    metadataByPriceId.set(priceId, {
+      billingInterval: entry.billingInterval,
+      currency: entry.currency,
+      type: entry.type
+    });
+  });
+
+  return { basePriceIds, addonPriceIds, metadataByPriceId };
+}
+
 function addDays(date, days) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
@@ -124,8 +160,23 @@ async function updateStripeCustomerForBusiness(businessId, stripeCustomerId) {
 }
 
 async function syncStripeSubscriptionForBusiness(businessId, subscription) {
+  const { basePriceIds, addonPriceIds, metadataByPriceId } = buildStripePriceLookup();
   const items = Array.isArray(subscription?.items?.data) ? subscription.items.data : [];
-  const primaryItem = items[0] || {};
+  const baseItem = items.find((item) => basePriceIds.has(item?.price?.id)) || items[0] || null;
+  const addonItem = items.find((item) => addonPriceIds.has(item?.price?.id)) || null;
+  const stripeMetadata = subscription?.metadata || {};
+  const basePriceMeta = baseItem?.price?.id ? metadataByPriceId.get(baseItem.price.id) : null;
+  const addonPriceMeta = addonItem?.price?.id ? metadataByPriceId.get(addonItem.price.id) : null;
+  const addonQuantity = Number.isSafeInteger(Number(addonItem?.quantity)) ? Number(addonItem.quantity) : null;
+  const metadataQuantity = Number.isSafeInteger(Number(stripeMetadata.additional_businesses))
+    ? Number(stripeMetadata.additional_businesses)
+    : null;
+  const additionalBusinesses = addonQuantity ?? metadataQuantity ?? 0;
+  const billingInterval =
+    stripeMetadata.billing_interval || basePriceMeta?.billingInterval || addonPriceMeta?.billingInterval || null;
+  const currency =
+    stripeMetadata.currency || basePriceMeta?.currency || addonPriceMeta?.currency || null;
+  const addonPriceId = addonItem?.price?.id || stripeMetadata.addon_price_id || null;
   const trialEndsAt = subscription?.trial_end ? new Date(subscription.trial_end * 1000) : null;
   const currentPeriodStart = subscription?.current_period_start
     ? new Date(subscription.current_period_start * 1000)
@@ -158,13 +209,19 @@ async function syncStripeSubscriptionForBusiness(businessId, subscription) {
       subscription?.status || "active",
       subscription?.customer || null,
       subscription?.id || null,
-      primaryItem?.price?.id || null,
+      baseItem?.price?.id || null,
       trialEndsAt,
       currentPeriodStart,
       currentPeriodEnd,
       Boolean(subscription?.cancel_at_period_end),
       canceledAt,
-      JSON.stringify({ raw_status: subscription?.status || null })
+      JSON.stringify({
+        raw_status: subscription?.status || null,
+        billing_interval: billingInterval,
+        currency,
+        additional_businesses: additionalBusinesses,
+        addon_price_id: addonPriceId
+      })
     ]
   );
 }

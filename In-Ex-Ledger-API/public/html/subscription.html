@@ -102,7 +102,7 @@
         <div class="sub-plan-card sub-plan-featured" id="planPro">
           <div class="sub-plan-header">
             <h3 class="sub-plan-name" data-i18n="subscription_pro_title">Pro</h3>
-            <p class="sub-plan-price" data-i18n="subscription_pro_price">$12 / month</p>
+            <p class="sub-plan-price" id="planProPriceLabel" data-i18n="subscription_pro_price_placeholder">Pricing shown at checkout</p>
           </div>
           <ul class="sub-plan-features">
             <li data-i18n="subscription_pro_1">Unlimited transactions</li>
@@ -110,6 +110,55 @@
             <li data-i18n="subscription_pro_3">Priority support</li>
             <li data-i18n="subscription_pro_4">Advanced exports (as released)</li>
           </ul>
+          <div class="sub-plan-controls">
+            <div class="sub-control-group">
+              <span class="sub-control-label" data-i18n="subscription_billing_interval_label">Billing interval</span>
+              <div class="sub-toggle" role="group" aria-label="Billing interval">
+                <button type="button" class="sub-toggle-btn" data-billing-interval="monthly" data-i18n="subscription_billing_monthly">Monthly</button>
+                <button type="button" class="sub-toggle-btn" data-billing-interval="yearly" data-i18n="subscription_billing_yearly">Yearly</button>
+              </div>
+            </div>
+            <div class="sub-control-group">
+              <span class="sub-control-label" data-i18n="subscription_currency_label">Currency</span>
+              <div class="sub-toggle" role="group" aria-label="Currency">
+                <button type="button" class="sub-toggle-btn" data-currency="usd" data-i18n="subscription_currency_usd">USD</button>
+                <button type="button" class="sub-toggle-btn" data-currency="cad" data-i18n="subscription_currency_cad">CAD</button>
+              </div>
+            </div>
+            <div class="sub-control-group">
+              <label class="sub-control-label" for="additionalBusinessesInput" data-i18n="subscription_additional_businesses_label">Additional businesses</label>
+              <div class="sub-quantity-control">
+                <button type="button" class="sub-quantity-btn" data-qty-action="decrease" aria-label="Decrease">−</button>
+                <input
+                  id="additionalBusinessesInput"
+                  class="sub-quantity-input"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value="0"
+                  inputmode="numeric"
+                />
+                <button type="button" class="sub-quantity-btn" data-qty-action="increase" aria-label="Increase">+</button>
+              </div>
+              <p class="sub-control-help" data-i18n="subscription_additional_businesses_help">Add extra businesses to your subscription.</p>
+            </div>
+          </div>
+          <div class="sub-price-summary" id="subPriceSummary">
+            <div class="sub-price-row">
+              <span class="sub-price-label" data-i18n="subscription_price_summary_plan">Plan</span>
+              <span class="sub-price-value" id="subPricePlan">—</span>
+            </div>
+            <div class="sub-price-row">
+              <span class="sub-price-label" data-i18n="subscription_price_summary_addon">Additional businesses</span>
+              <span class="sub-price-value" id="subPriceAddon">0</span>
+            </div>
+            <div class="sub-price-row sub-price-total">
+              <span class="sub-price-label" data-i18n="subscription_price_summary_total">Estimated total</span>
+              <span class="sub-price-value" id="subPriceTotal">—</span>
+            </div>
+            <p class="sub-price-note" data-i18n="subscription_price_summary_note">Final pricing is confirmed at checkout.</p>
+          </div>
           <button type="button" id="planProBtn" class="settings-primary-btn" data-i18n="subscription_pro_cta">Upgrade to Pro</button>
         </div>
       </div>
@@ -165,4 +214,3 @@
 <script src="../js/subscription.js?v=20260405c"></script>
 </body>
 </html>
-

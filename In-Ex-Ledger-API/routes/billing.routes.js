@@ -21,6 +21,39 @@ const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2024-06-20";
 
 const billingMutationLimiter = createBillingMutationLimiter();
 
+const BILLING_INTERVALS = new Set(["monthly", "yearly"]);
+const BILLING_CURRENCIES = new Set(["usd", "cad"]);
+const MAX_ADDITIONAL_BUSINESSES = 100;
+
+const BASE_PRICE_ENV = {
+  monthly: {
+    usd: "STRIPE_PRICE_V1_MONTHLY_US",
+    cad: "STRIPE_PRICE_V1_MONTHLY_CA"
+  },
+  yearly: {
+    usd: "STRIPE_PRICE_V1_YEARLY_US",
+    cad: "STRIPE_PRICE_V1_YEARLY_CA"
+  }
+};
+
+const ADDON_PRICE_ENV = {
+  monthly: {
+    usd: "STRIPE_PRICE_ADDITIONAL_BUSINESS_MONTHLY_US",
+    cad: "STRIPE_PRICE_ADDITIONAL_BUSINESS_MONTHLY_CA"
+  },
+  yearly: {
+    usd: "STRIPE_PRICE_ADDITIONAL_BUSINESS_YEARLY_US",
+    cad: "STRIPE_PRICE_ADDITIONAL_BUSINESS_YEARLY_CA"
+  }
+};
+
+class BillingValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "BillingValidationError";
+  }
+}
+
 const billingReadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 60,
@@ -36,12 +69,74 @@ function getStripeSecretKey() {
   return process.env.STRIPE_SECRET_KEY;
 }
 
-function getStripePriceId() {
-  const priceId = process.env.STRIPE_PRICE_V1_MONTHLY;
-  if (!priceId) {
-    throw new Error("STRIPE_PRICE_V1_MONTHLY is not configured");
+function requireEnvValue(name) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is not configured`);
   }
-  return priceId;
+  return value;
+}
+
+function normalizeBillingInterval(input) {
+  if (!input) {
+    return "monthly";
+  }
+  const value = String(input).toLowerCase();
+  if (!BILLING_INTERVALS.has(value)) {
+    throw new BillingValidationError("Invalid billing interval.");
+  }
+  return value;
+}
+
+function normalizeCurrency(input) {
+  if (!input) {
+    return "usd";
+  }
+  const value = String(input).toLowerCase();
+  if (!BILLING_CURRENCIES.has(value)) {
+    throw new BillingValidationError("Invalid currency.");
+  }
+  return value;
+}
+
+function normalizeAdditionalBusinesses(input) {
+  if (input === undefined || input === null || input === "") {
+    return 0;
+  }
+  const value = Number(input);
+  if (!Number.isSafeInteger(value)) {
+    throw new BillingValidationError("Additional businesses must be a whole number.");
+  }
+  if (value < 0 || value > MAX_ADDITIONAL_BUSINESSES) {
+    throw new BillingValidationError(
+      `Additional businesses must be between 0 and ${MAX_ADDITIONAL_BUSINESSES}.`
+    );
+  }
+  return value;
+}
+
+function resolveStripePriceSelection({ billingInterval, currency, additionalBusinesses }) {
+  const interval = normalizeBillingInterval(billingInterval);
+  const normalizedCurrency = normalizeCurrency(currency);
+  const baseEnv = BASE_PRICE_ENV[interval]?.[normalizedCurrency];
+  if (!baseEnv) {
+    throw new BillingValidationError("Unsupported billing interval or currency.");
+  }
+  const basePriceId = requireEnvValue(baseEnv);
+  let addonPriceId = null;
+  if (additionalBusinesses > 0) {
+    const addonEnv = ADDON_PRICE_ENV[interval]?.[normalizedCurrency];
+    if (!addonEnv) {
+      throw new BillingValidationError("Additional business pricing is not configured.");
+    }
+    addonPriceId = requireEnvValue(addonEnv);
+  }
+  return {
+    billingInterval: interval,
+    currency: normalizedCurrency,
+    basePriceId,
+    addonPriceId
+  };
 }
 
 function encodeFormBody(payload) {
@@ -133,22 +228,47 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       return res.status(409).json({ error: "Business is already on an active paid plan." });
     }
 
+    const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
+    const priceSelection = resolveStripePriceSelection({
+      billingInterval: req.body?.billingInterval,
+      currency: req.body?.currency,
+      additionalBusinesses
+    });
+
     const customerId = await ensureStripeCustomer(businessId, req.user);
-    const session = await stripeRequest("/checkout/sessions", {
+    const sessionPayload = {
       mode: "subscription",
       customer: customerId,
-      "line_items[0][price]": getStripePriceId(),
+      "line_items[0][price]": priceSelection.basePriceId,
       "line_items[0][quantity]": 1,
       success_url: buildAppUrl(req, "/subscription?checkout=success"),
       cancel_url: buildAppUrl(req, "/subscription?checkout=cancel"),
       "metadata[business_id]": businessId,
-      "metadata[user_id]": req.user.id
-    });
+      "metadata[user_id]": req.user.id,
+      "metadata[plan_code]": "v1",
+      "metadata[billing_interval]": priceSelection.billingInterval,
+      "metadata[currency]": priceSelection.currency,
+      "metadata[additional_businesses]": additionalBusinesses,
+      "subscription_data[metadata][plan_code]": "v1",
+      "subscription_data[metadata][billing_interval]": priceSelection.billingInterval,
+      "subscription_data[metadata][currency]": priceSelection.currency,
+      "subscription_data[metadata][additional_businesses]": additionalBusinesses
+    };
+
+    if (priceSelection.addonPriceId && additionalBusinesses > 0) {
+      sessionPayload["line_items[1][price]"] = priceSelection.addonPriceId;
+      sessionPayload["line_items[1][quantity]"] = additionalBusinesses;
+      sessionPayload["metadata[addon_price_id]"] = priceSelection.addonPriceId;
+      sessionPayload["subscription_data[metadata][addon_price_id]"] = priceSelection.addonPriceId;
+    }
+
+    const session = await stripeRequest("/checkout/sessions", sessionPayload);
 
     res.status(200).json({ url: session.url, id: session.id });
   } catch (err) {
     logError("POST /api/billing/checkout-session error:", err.message);
-    res.status(500).json({ error: err.message || "Failed to start checkout." });
+    const status = err instanceof BillingValidationError ? 400 : 500;
+    res.status(status).json({ error: err.message || "Failed to start checkout." });
   }
 });
 
