@@ -224,8 +224,10 @@ test("requireAuth returns 401 for a malformed token", () => {
 // 3. requireMfa Middleware
 // ---------------------------------------------------------------------------
 
-test("requireMfa calls next() when mfa_enabled is true", () => {
-  const req = createReq({ user: { id: "user_mfa", mfa_enabled: true } });
+test("requireMfa calls next() when MFA is enabled and verified for this session", () => {
+  const req = createReq({
+    user: { id: "user_mfa", mfa_enabled: true, mfa_authenticated: true }
+  });
   req.headers = {};
   const res = createRes();
   let called = false;
@@ -234,7 +236,7 @@ test("requireMfa calls next() when mfa_enabled is true", () => {
     called = true;
   });
 
-  assert.ok(called, "next() must be called when MFA is enabled");
+  assert.ok(called, "next() must be called when MFA is enabled and session is MFA-authenticated");
   assert.equal(res.statusCode, 200);
 });
 
@@ -251,6 +253,21 @@ test("requireMfa returns 403 with mfa_required flag when mfa_enabled is false", 
   assert.equal(res.statusCode, 403);
   assert.equal(res.body?.mfa_required, true);
   assert.ok(res.body?.setup_url, "setup_url must be present in the response");
+});
+
+test("requireMfa returns 403 with mfa_required flag when MFA is enabled but session is not MFA-authenticated", () => {
+  const req = { headers: {}, user: { id: "user_no_session_mfa", mfa_enabled: true } };
+  const res = createRes();
+  let called = false;
+
+  requireMfa(req, res, () => {
+    called = true;
+  });
+
+  assert.ok(!called, "next() must not be called");
+  assert.equal(res.statusCode, 403);
+  assert.equal(res.body?.mfa_required, true);
+  assert.equal(res.body?.reauthenticate, true);
 });
 
 test("requireMfa returns 401 when req.user is absent", () => {

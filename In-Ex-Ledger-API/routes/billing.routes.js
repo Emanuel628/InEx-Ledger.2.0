@@ -212,8 +212,11 @@ async function ensureStripeCustomer(businessId, user) {
   return customer.id;
 }
 
-function buildAppUrl(req, path) {
-  const base = process.env.APP_BASE_URL || `${req.protocol}://${req.get("host")}`;
+function buildAppUrl(path) {
+  const base = String(process.env.APP_BASE_URL || "").trim();
+  if (!base) {
+    throw new Error("APP_BASE_URL is not configured");
+  }
   return `${base.replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
@@ -249,8 +252,8 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       customer: customerId,
       "line_items[0][price]": priceSelection.basePriceId,
       "line_items[0][quantity]": 1,
-      success_url: buildAppUrl(req, "/subscription?checkout=success"),
-      cancel_url: buildAppUrl(req, "/subscription?checkout=cancel"),
+      success_url: buildAppUrl("/subscription?checkout=success"),
+      cancel_url: buildAppUrl("/subscription?checkout=cancel"),
       "metadata[business_id]": businessId,
       "metadata[user_id]": req.user.id,
       "metadata[plan_code]": "v1",
@@ -276,7 +279,9 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
   } catch (err) {
     logError("POST /api/billing/checkout-session error:", err.message);
     const status = err instanceof BillingValidationError ? 400 : 500;
-    res.status(status).json({ error: err.message || "Failed to start checkout." });
+    res.status(status).json({
+      error: status === 400 ? err.message : "Failed to start checkout."
+    });
   }
 });
 
@@ -286,12 +291,12 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
     const customerId = await ensureStripeCustomer(businessId, req.user);
     const session = await stripeRequest("/billing_portal/sessions", {
       customer: customerId,
-      return_url: buildAppUrl(req, "/subscription")
+      return_url: buildAppUrl("/subscription")
     });
     res.status(200).json({ url: session.url });
   } catch (err) {
     logError("POST /api/billing/customer-portal error:", err.message);
-    res.status(500).json({ error: err.message || "Failed to open billing portal." });
+    res.status(500).json({ error: "Failed to open billing portal." });
   }
 });
 
@@ -331,7 +336,7 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
     res.status(200).json({ subscription: updated });
   } catch (err) {
     logError("POST /api/billing/cancel error:", err.message);
-    res.status(500).json({ error: err.message || "Failed to cancel subscription." });
+    res.status(500).json({ error: "Failed to cancel subscription." });
   }
 });
 
@@ -379,7 +384,7 @@ router.get("/history", billingReadLimiter, requireAuth, async (req, res) => {
     res.status(200).json({ invoices });
   } catch (err) {
     logError("GET /api/billing/history error:", err.message);
-    res.status(500).json({ error: err.message || "Failed to load billing history." });
+    res.status(500).json({ error: "Failed to load billing history." });
   }
 });
 

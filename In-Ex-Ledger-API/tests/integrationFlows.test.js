@@ -64,6 +64,7 @@ function makeMfaToken() {
     id: "user-mfa",
     email: "mfa@example.com",
     mfa_enabled: true,
+    mfa_authenticated: true
   });
 }
 

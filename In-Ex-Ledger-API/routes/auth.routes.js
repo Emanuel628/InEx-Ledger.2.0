@@ -246,7 +246,8 @@ async function issueAuthenticatedSession(res, user, businessIdOverride = null) {
       role: user.role || "user",
       email_verified: verified,
       business_id: businessId,
-      mfa_enabled: !!user.mfa_enabled
+      mfa_enabled: !!user.mfa_enabled,
+      mfa_authenticated: !!user.mfa_enabled
     },
     ACCESS_TOKEN_EXPIRY_SECONDS
   );
@@ -738,7 +739,8 @@ router.post("/refresh", requireCsrfProtection, async (req, res) => {
         role: result.rows[0].role || "user",
         email_verified: !!result.rows[0].email_verified,
         business_id: businessId,
-        mfa_enabled: !!result.rows[0].mfa_enabled
+        mfa_enabled: !!result.rows[0].mfa_enabled,
+        mfa_authenticated: !!result.rows[0].mfa_enabled
       },
       ACCESS_TOKEN_EXPIRY_SECONDS
     );

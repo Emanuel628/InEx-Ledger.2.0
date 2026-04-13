@@ -145,6 +145,7 @@ function makeMfaToken(extra = {}) {
     id: "user-mfa-001",
     email: "mfa@inexledger.local",
     mfa_enabled: true,
+    mfa_authenticated: true,
     ...extra,
   });
 }

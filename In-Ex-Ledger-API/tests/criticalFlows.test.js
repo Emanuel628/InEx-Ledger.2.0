@@ -70,7 +70,12 @@ function makeToken(extra = {}) {
 }
 
 function makeMfaToken() {
-  return signToken({ id: "user-mfa", email: "mfa@example.com", mfa_enabled: true });
+  return signToken({
+    id: "user-mfa",
+    email: "mfa@example.com",
+    mfa_enabled: true,
+    mfa_authenticated: true
+  });
 }
 
 function csrfHeaders(token) {
