@@ -43,6 +43,33 @@ const billingReadLimiter = rateLimit({
   message: { error: "Too many requests, please try again later." }
 });
 
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: () => "stripe-webhook"
+});
+
+// In-memory idempotency cache: event.id → timestamp processed
+const _processedWebhookIds = new Map();
+const _WEBHOOK_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
+
+function isWebhookAlreadyProcessed(eventId) {
+  const ts = _processedWebhookIds.get(eventId);
+  return !!(ts && Date.now() - ts < _WEBHOOK_IDEMPOTENCY_TTL_MS);
+}
+
+function markWebhookProcessed(eventId) {
+  _processedWebhookIds.set(eventId, Date.now());
+  if (_processedWebhookIds.size > 2000) {
+    const cutoff = Date.now() - _WEBHOOK_IDEMPOTENCY_TTL_MS;
+    for (const [id, ts] of _processedWebhookIds) {
+      if (ts < cutoff) _processedWebhookIds.delete(id);
+    }
+  }
+}
+
 function getStripeSecretKey() {
   if (!process.env.STRIPE_SECRET_KEY) {
     throw new Error("STRIPE_SECRET_KEY is not configured");
@@ -389,34 +416,99 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
   }
 }
 
-router.post("/webhook", async (req, res) => {
+router.post("/webhook", webhookLimiter, async (req, res) => {
+  // Signature verification — only 400 on invalid signature, never on internal errors
   try {
     verifyWebhookSignature(req.body, req.headers["stripe-signature"]);
-    const event = JSON.parse(req.body.toString("utf8"));
-    const object = event?.data?.object || {};
+  } catch (err) {
+    logWarn("Stripe webhook signature rejected:", err.message);
+    return res.status(400).json({ error: "Invalid webhook signature" });
+  }
 
-    if (event.type === "customer.subscription.created" || event.type === "customer.subscription.updated") {
+  let event;
+  try {
+    event = JSON.parse(req.body.toString("utf8"));
+  } catch (err) {
+    logWarn("Stripe webhook payload parse error:", err.message);
+    return res.status(400).json({ error: "Invalid webhook payload" });
+  }
+
+  // Always acknowledge to Stripe — internal processing errors must not return 4xx
+  res.status(200).json({ received: true });
+
+  // Idempotency: skip duplicate deliveries
+  if (isWebhookAlreadyProcessed(event.id)) {
+    logInfo("Stripe webhook duplicate skipped:", event.id, event.type);
+    return;
+  }
+  markWebhookProcessed(event.id);
+
+  const object = event?.data?.object || {};
+
+  try {
+    if (
+      event.type === "customer.subscription.created" ||
+      event.type === "customer.subscription.updated"
+    ) {
       const businessId =
         object?.metadata?.business_id ||
         (await findBusinessByStripeCustomerId(object.customer));
       if (businessId) {
         await syncStripeSubscriptionForBusiness(businessId, object);
+        logInfo("Stripe subscription synced:", event.type, "business:", businessId);
       }
-    }
-
-    if (event.type === "customer.subscription.deleted") {
+    } else if (event.type === "customer.subscription.deleted") {
       const businessId =
         object?.metadata?.business_id ||
         (await findBusinessByStripeCustomerId(object.customer));
       if (businessId) {
         await setFreePlanForBusiness(businessId);
+        logInfo("Stripe subscription deleted — set free plan for business:", businessId);
       }
+    } else if (event.type === "checkout.session.completed") {
+      const subscriptionId = object?.subscription;
+      const businessId = object?.metadata?.business_id;
+      if (subscriptionId && businessId) {
+        const subResponse = await fetch(
+          `${STRIPE_API_BASE}/subscriptions/${subscriptionId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${getStripeSecretKey()}`,
+              "Stripe-Version": STRIPE_API_VERSION
+            }
+          }
+        );
+        const sub = await subResponse.json().catch(() => null);
+        if (sub && !sub.error) {
+          await syncStripeSubscriptionForBusiness(businessId, sub);
+          logInfo("Stripe checkout.session.completed synced for business:", businessId);
+        }
+      }
+    } else if (event.type === "invoice.payment_failed") {
+      // Stripe also fires customer.subscription.updated (status → past_due) which
+      // handles the DB sync. Log here for observability and alerting.
+      const customerId = object?.customer;
+      const businessId = customerId
+        ? await findBusinessByStripeCustomerId(customerId)
+        : null;
+      logWarn(
+        "Stripe invoice.payment_failed — business:",
+        businessId || "unknown",
+        "invoice:",
+        object?.id
+      );
+    } else if (event.type === "invoice.payment_succeeded") {
+      logInfo("Stripe invoice.payment_succeeded:", object?.id);
     }
-
-    res.status(200).json({ received: true });
   } catch (err) {
-    logError("Stripe webhook error:", err.message);
-    res.status(400).json({ error: err.message || "Invalid webhook" });
+    logError(
+      "Stripe webhook processing error — event:",
+      event.id,
+      "type:",
+      event.type,
+      "error:",
+      err.message
+    );
   }
 });
 

@@ -21,11 +21,15 @@ async function saveRedactedPdf(jobId, buffer) {
 }
 
 function buildRedactedStream(res, filePath) {
-  if (!fs.existsSync(filePath)) {
+  const resolvedPath = path.resolve(filePath);
+  if (!resolvedPath.startsWith(EXPORT_STORAGE_DIR + path.sep) && resolvedPath !== EXPORT_STORAGE_DIR) {
+    throw new Error("Invalid export path");
+  }
+  if (!fs.existsSync(resolvedPath)) {
     throw new Error("Redacted export not found.");
   }
 
-  const stream = fs.createReadStream(filePath);
+  const stream = fs.createReadStream(resolvedPath);
   stream.on("error", (err) => {
     stream.destroy();
     if (!res.headersSent) {

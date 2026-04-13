@@ -53,8 +53,32 @@ async function hydrateExportData() {
     hydrateAccountsCache(),
     hydrateCategoriesCache(),
     hydrateReceiptsCache(),
-    hydrateBusinessProfileCache()
+    hydrateBusinessProfileCache(),
+    hydrateMileageCache()
   ]);
+}
+
+async function hydrateMileageCache() {
+  try {
+    const response = await apiFetch("/api/mileage?limit=500");
+    if (!response || !response.ok) {
+      return;
+    }
+    const payload = await response.json().catch(() => null);
+    const records = Array.isArray(payload?.data) ? payload.data : [];
+    const normalized = records.map((item) => ({
+      id: item.id,
+      businessId: item.business_id || "",
+      date: item.trip_date || "",
+      purpose: item.purpose || "",
+      destination: item.destination || "",
+      miles: item.miles != null ? Number(item.miles) : null,
+      km: item.km != null ? Number(item.km) : null
+    }));
+    localStorage.setItem(MILEAGE_KEY, JSON.stringify(normalized));
+  } catch (error) {
+    console.warn("[Exports] Unable to hydrate mileage", error);
+  }
 }
 
 async function hydrateBusinessList() {
@@ -690,7 +714,9 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
     const taxId = includeTaxId
       ? businessProfile.ein || businessProfile.taxId || localStorage.getItem(region === "ca" ? "lb_bn" : "lb_ein") || ""
       : "";
-    const pdfBytes = buildPdfExport({
+    let pdfBytes;
+    try {
+      pdfBytes = buildPdfExport({
       transactions: batch.transactions,
       accounts: getAccounts().filter((account) => !batch.businessId || account.businessId === batch.businessId),
       categories: getCategories().filter((category) => !batch.businessId || category.businessId === batch.businessId),
@@ -708,6 +734,11 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
       region,
       province
     });
+    } catch (pdfErr) {
+      console.error("[Exports] PDF generation failed:", pdfErr);
+      showExportToast(tx("exports_error_generic") || "PDF export failed. Please try again.");
+      return;
+    }
     const filename = explicitFilename && batches.length === 1
       ? explicitFilename
       : makePdfFilename(startDate, endDate, batch);

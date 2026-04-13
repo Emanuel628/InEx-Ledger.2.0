@@ -30,6 +30,9 @@ async function callWorker(job) {
     }
 
     const payload = await response.json();
+    if (!payload.fullPdf || !payload.redactedPdf) {
+      throw new Error("Worker response missing PDF data");
+    }
     return {
       fullPdfBuffer: Buffer.from(payload.fullPdf, "base64"),
       redactedPdfBuffer: Buffer.from(payload.redactedPdf, "base64"),
