@@ -72,7 +72,10 @@ function loadMeRouter(options = {}) {
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
       return {
         requireAuth(req, _res, next) {
-          req.user = { id: state.userId };
+          req.user = { id: state.userId, mfa_enabled: true };
+          next();
+        },
+        requireMfa(_req, _res, next) {
           next();
         }
       };

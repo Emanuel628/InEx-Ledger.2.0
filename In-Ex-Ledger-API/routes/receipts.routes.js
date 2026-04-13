@@ -157,6 +157,7 @@ router.get("/", async (req, res) => {
       JOIN businesses b ON b.id = r.business_id
       WHERE r.business_id = ANY($1::uuid[])
       ORDER BY b.name ASC, r.created_at DESC NULLS LAST
+      LIMIT 500
     `;
     const result = await pool.query(sql, [scope.businessIds]);
 

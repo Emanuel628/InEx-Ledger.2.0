@@ -31,7 +31,8 @@ router.get("/", async (req, res) => {
               created_at, updated_at
        FROM recurring_transactions
        WHERE business_id = $1
-       ORDER BY active DESC, next_run_date ASC, created_at DESC`,
+       ORDER BY active DESC, next_run_date ASC, created_at DESC
+       LIMIT 500`,
       [businessId]
     );
 

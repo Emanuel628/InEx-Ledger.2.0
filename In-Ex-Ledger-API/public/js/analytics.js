@@ -52,7 +52,8 @@ async function loadDashboard() {
     const data = await res.json();
     renderDashboard(data);
   } catch (err) {
-    document.getElementById("kpiRow").innerHTML = '<div class="analytics-empty">Unable to load dashboard data. Add some transactions to get started.</div>';
+    const kpiRowEl = document.getElementById("kpiRow");
+    if (kpiRowEl) kpiRowEl.innerHTML = '<div class="analytics-empty">Unable to load dashboard data. Add some transactions to get started.</div>';
   }
 }
 
@@ -61,6 +62,7 @@ function renderDashboard(data) {
 
   // KPI cards
   const kpiRow = document.getElementById("kpiRow");
+  if (!kpiRow) return;
   kpiRow.innerHTML = [
     kpiCard("Avg Monthly Income", fmt(summary.avg_monthly_income), "trailing 12 months"),
     kpiCard("Avg Monthly Expenses", fmt(summary.avg_monthly_expense), "trailing 12 months"),
