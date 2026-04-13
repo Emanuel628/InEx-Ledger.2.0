@@ -6,6 +6,10 @@ function isTrialExpired() {
   return false;
 }
 
+function trialTx(key) {
+  return typeof window.t === "function" ? window.t(key) : key;
+}
+
 function enforceTrial() {
   if (isTrialExpired()) {
     window.location.href = "subscription";
@@ -36,7 +40,7 @@ function renderTrialBanner(containerId) {
   const updateMessage = () => {
     const formatted = formatTrialRemaining();
     container.innerHTML = `
-      <p>${formatted} <a href="subscription">Manage plan</a>.</p>
+      <p>${formatted} <a href="subscription">${trialTx("trial_manage_plan")}</a>.</p>
     `;
   };
 
@@ -53,7 +57,7 @@ function renderTrialBanner(containerId) {
   container.dataset.countdownInterval = id.toString();
 }
 
-function startTrial(durationDays = 30) {
+function startTrial(durationDays = DEFAULT_TRIAL_DAYS) {
   const now = Date.now();
   const endsAt = now + durationDays * 24 * 60 * 60 * 1000;
 

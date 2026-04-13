@@ -20,7 +20,6 @@ document.addEventListener("DOMContentLoaded", () => {
   continueButton = document.getElementById("continueToLoginButton");
   pendingEmail = localStorage.getItem("pendingVerificationEmail") || "";
 
-  console.log("Verify email page loaded.");
   wireActions();
 
   if (pendingEmail) {

@@ -63,7 +63,11 @@ async function submitEmailChange(form, statusEl) {
 
 function setStatus(target, message, isSuccess) {
   target.textContent = message;
-  target.classList.toggle("success", !!isSuccess);
-  target.classList.toggle("error", !isSuccess);
+  if (!message) {
+    target.classList.remove("success", "error");
+  } else {
+    target.classList.toggle("success", !!isSuccess);
+    target.classList.toggle("error", !isSuccess);
+  }
   target.hidden = !message;
 }

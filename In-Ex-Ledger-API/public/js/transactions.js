@@ -1217,7 +1217,7 @@ function prefillTransactionForm(transaction) {
     indirectTaxRecoverableInput.checked = transaction.indirectTaxRecoverable === true || transaction.indirect_tax_recoverable === true;
   }
   if (reviewStatusSelect) {
-    reviewStatusSelect.value = transaction.reviewStatus || transaction.review_status || "needs_review";
+    reviewStatusSelect.value = transaction.reviewStatus || transaction.review_status || "";
   }
   if (reviewNotesInput) {
     reviewNotesInput.value = transaction.reviewNotes || transaction.review_notes || "";
@@ -1823,7 +1823,8 @@ function renderTotals() {
     incomeDelta.innerHTML = `<span class="stat-delta-positive">${formatPercentChange(comparison.income)}</span> ${txT("transactions_vs_last_year", "vs last year")}`;
   }
   if (expensesDelta) {
-    expensesDelta.innerHTML = `<span class="stat-delta-positive">${formatPercentChange(comparison.expenses)}</span> ${txT("transactions_vs_last_year", "vs last year")}`;
+    const expenseDeltaClass = comparison.expenses > 0 ? "stat-delta-negative" : "stat-delta-positive";
+    expensesDelta.innerHTML = `<span class="${expenseDeltaClass}">${formatPercentChange(comparison.expenses)}</span> ${txT("transactions_vs_last_year", "vs last year")}`;
   }
   if (transactionCountValue) {
     transactionCountValue.textContent = String(transactionsCount);

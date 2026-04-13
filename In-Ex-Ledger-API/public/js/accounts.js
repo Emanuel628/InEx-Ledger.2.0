@@ -180,17 +180,22 @@ async function deleteAccount(accountId) {
     return;
   }
 
-  const response = await apiFetch(`/api/accounts/${accountId}`, {
-    method: "DELETE"
-  });
+  try {
+    const response = await apiFetch(`/api/accounts/${accountId}`, {
+      method: "DELETE"
+    });
 
-  if (!response || !response.ok) {
+    if (!response || !response.ok) {
+      showAccountsToast(tx("accounts_error_delete"));
+      return;
+    }
+
+    showAccountsToast(tx("accounts_deleted"));
+    await renderAccountList();
+  } catch (error) {
+    console.error("Delete account failed:", error);
     showAccountsToast(tx("accounts_error_delete"));
-    return;
   }
-
-  showAccountsToast(tx("accounts_deleted"));
-  await renderAccountList();
 }
 
 function syncAccountsCache(accounts) {
