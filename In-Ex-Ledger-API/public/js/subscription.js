@@ -264,7 +264,8 @@ async function loadSubscription() {
       statusBlock.innerHTML = `<div class="sub-status-inner ${statusClass}">${statusHtml}</div>`;
     }
 
-    // Cancel modal body
+    // Cancel modal body — sub.currentPeriodEnd is a Unix timestamp (seconds).
+    // fmtDate() handles seconds→ms conversion, so use it instead of new Date().
     if (cancelModalBody && sub.currentPeriodEnd) {
       const endDate = fmtDate(sub.currentPeriodEnd);
       cancelModalBody.textContent = typeof window.t === "function"

@@ -43,6 +43,7 @@ function validateDateRange(range) {
   const { startDate, endDate } = range;
   if (!startDate || !endDate) return null;
   if (!DATE_PATTERN.test(startDate) || !DATE_PATTERN.test(endDate)) return null;
+  if (isNaN(new Date(startDate).getTime()) || isNaN(new Date(endDate).getTime())) return null;
   if (startDate > endDate) return null;
   return { startDate, endDate };
 }

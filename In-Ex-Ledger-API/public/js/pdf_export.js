@@ -333,6 +333,9 @@ function buildMileagePage(mileage, labels) {
     return [];
   }
 
+  // The API returns `miles` and `km` as separate numeric fields per record
+  // (a trip can have both if the user entered both units). There is no `unit`
+  // discriminator field, so we sum each column across all records.
   const totalMiles = mileage
     .reduce((sum, record) => sum + Math.abs(Number(record.miles) || 0), 0);
   const totalKilometers = mileage
