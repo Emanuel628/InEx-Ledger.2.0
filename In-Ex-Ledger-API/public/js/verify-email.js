@@ -68,15 +68,22 @@ async function resendVerification() {
   }
 
   try {
-    const response = await fetch("/api/auth/send-verification", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email })
-    });
+    const fetchFn = typeof apiFetch === "function" ? apiFetch : null;
+    const response = fetchFn
+      ? await fetchFn("/api/auth/send-verification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email })
+        })
+      : await fetch("/api/auth/send-verification", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email })
+        });
 
-    const payload = await response.json().catch(() => null);
+    const payload = await response?.json().catch(() => null);
 
-    if (!response.ok) {
+    if (!response || !response.ok) {
       updateStatus(
         payload?.error || tx("verify_email_status_resend_error"),
         true
@@ -100,5 +107,5 @@ async function resendVerification() {
 }
 
 function goToLogin() {
-  window.location.href = "login";
+  window.location.href = "/login";
 }

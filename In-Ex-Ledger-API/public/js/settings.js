@@ -966,6 +966,7 @@ async function initCpaAccess() {
   const currentListNode = document.getElementById("cpaCurrentAccessList");
   const historyListNode = document.getElementById("cpaAccessHistoryList");
   const auditNode = document.getElementById("cpaAuditActivityList");
+  const submitBtn = form?.querySelector("button[type='submit']") || form?.querySelector("button");
 
   if (!form || !emailInput || !scopeSelect || !businessSelect || !businessWrap || !currentListNode || !historyListNode) {
     return;
@@ -1183,6 +1184,7 @@ async function initCpaAccess() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     setMessage("");
+    if (submitBtn) submitBtn.disabled = true;
 
     const payload = {
       email: emailInput.value.trim(),
@@ -1190,27 +1192,34 @@ async function initCpaAccess() {
       business_id: scopeSelect.value === "all" ? null : businessSelect.value || null
     };
 
-    const response = await apiFetch("/api/cpa-access/grants", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
+    try {
+      const response = await apiFetch("/api/cpa-access/grants", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
 
-    if (!response || !response.ok) {
-      const body = await response?.json().catch(() => null);
-      setMessage(body?.error || t("settings_cpa_create_error"), "is-error");
-      return;
+      if (!response || !response.ok) {
+        const body = await response?.json().catch(() => null);
+        setMessage(body?.error || t("settings_cpa_create_error"), "is-error");
+        return;
+      }
+
+      emailInput.value = "";
+      scopeSelect.value = "business";
+      syncBusinessVisibility();
+      setMessage(t("settings_cpa_created"), "is-success");
+      showSettingsToast(t("settings_cpa_created"));
+      await renderOwnedGrants();
+      await renderAuditActivity();
+    } catch (error) {
+      console.error("CPA invite failed", error);
+      setMessage(t("settings_cpa_create_error"), "is-error");
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
     }
-
-    emailInput.value = "";
-    scopeSelect.value = "business";
-    syncBusinessVisibility();
-    setMessage(t("settings_cpa_created"), "is-success");
-    showSettingsToast(t("settings_cpa_created"));
-    await renderOwnedGrants();
-    await renderAuditActivity();
   });
 
   await loadBusinessOptions();
@@ -1701,6 +1710,7 @@ function initSecurityForm() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     setMfaMessage("");
+    if (submitButton) submitButton.disabled = true;
 
     try {
       const response = await apiFetch("/api/auth/change-password", {
@@ -1730,6 +1740,8 @@ function initSecurityForm() {
     } catch (error) {
       console.error("Password update failed", error);
       showSettingsToast(t("settings_password_update_error"));
+    } finally {
+      if (submitButton) updateSubmitState();
     }
   });
 
@@ -1988,11 +2000,12 @@ function initSettingsNav() {
 }
 
 function getPasswordScore(password) {
-  let score = 0;
-  if (password.length >= 8) score++;
-  if (/[\d\W_]/.test(password)) score++;
-  if (password.length >= 12 && /[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
-  return score;
+  const rules = Object.values(SETTINGS_PASSWORD_RULES);
+  const passed = rules.filter((rule) => rule(password)).length;
+  if (passed >= rules.length) return 3;
+  if (passed >= 3) return 2;
+  if (passed >= 2) return 1;
+  return 0;
 }
 
 function getStrengthLabel(score) {

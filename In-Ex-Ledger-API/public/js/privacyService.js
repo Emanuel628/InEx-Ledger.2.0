@@ -88,11 +88,10 @@
   async function setPrivacySettings(partial) {
     const base = readLocalSettings();
     const merged = { ...base, ...partial };
-    persistLocalSettings(merged);
 
     if (await apiAvailable()) {
       try {
-        await fetch(buildApiUrl("/api/privacy/settings"), {
+        const res = await fetch(buildApiUrl("/api/privacy/settings"), {
           method: "PUT",
           headers: authHeaders("PUT"),
           credentials: "include",
@@ -104,11 +103,16 @@
             privacyVersion: merged.privacyVersion
           })
         });
+        if (!res.ok) {
+          // Server rejected the change — do not update local state.
+          return base;
+        }
       } catch (err) {
-        // settings already persisted locally; network failure is non-fatal
+        // Network failure is non-fatal; fall through to persist locally.
       }
     }
 
+    persistLocalSettings(merged);
     return merged;
   }
 

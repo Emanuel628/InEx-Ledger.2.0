@@ -45,7 +45,16 @@ const _PDF_LABELS = {
     receipts_index_title: "Índice de recibos",
     mileage_summary_title: "Resumen de kilometraje",
     mileage_note_csv:
-      "El registro completo de kilometraje está disponible en el CSV."
+      "El registro completo de kilometraje está disponible en el CSV.",
+    cpa_edge_cases_title: "Resumen de casos especiales para el CPA",
+    cpa_edge_cases_none: "No se detectaron partidas especiales en este período.",
+    cpa_edge_case_foreign_currency: "Entradas en moneda extranjera",
+    cpa_edge_case_capital_item: "Bienes de capital",
+    cpa_edge_case_split_use: "Entradas de uso mixto o personal",
+    cpa_edge_case_indirect_tax: "Entradas de impuesto indirecto",
+    cpa_edge_case_needs_review: "Transacciones con indicadores especiales",
+    cpa_edge_case_reason: "Razón",
+    cpa_edge_case_transaction: "Transacción"
   },
   fr: {
     report_title: "Rapport d’exportation",
@@ -65,7 +74,16 @@ const _PDF_LABELS = {
     receipts_index_title: "Index des reçus",
     mileage_summary_title: "Résumé du kilométrage",
     mileage_note_csv:
-      "Le journal complet du kilométrage est disponible dans l’export CSV."
+      "Le journal complet du kilométrage est disponible dans l’export CSV.",
+    cpa_edge_cases_title: "Résumé des cas particuliers pour le CPA",
+    cpa_edge_cases_none: "Aucun élément particulier détecté pour cette période.",
+    cpa_edge_case_foreign_currency: "Entrées en devise étrangère",
+    cpa_edge_case_capital_item: "Éléments d’actif immobilisé",
+    cpa_edge_case_split_use: "Entrées à usage mixte ou personnel",
+    cpa_edge_case_indirect_tax: "Entrées de taxe indirecte",
+    cpa_edge_case_needs_review: "Transactions avec indicateurs particuliers",
+    cpa_edge_case_reason: "Raison",
+    cpa_edge_case_transaction: "Transaction"
   }
 };
 

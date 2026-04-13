@@ -1163,7 +1163,7 @@ router.post("/reset-password", passwordLimiter, async (req, res) => {
  * POST /request-email-change
  * Initiates email change: verifies current password, sends link to new address.
  */
-router.post("/request-email-change", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
+router.post("/request-email-change", requireAuth, requireCsrfProtection, authLimiter, requireMfa, async (req, res) => {
   const { newEmail, currentPassword } = req.body ?? {};
   const email = normalizeEmail(newEmail);
 

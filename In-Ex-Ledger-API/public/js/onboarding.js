@@ -58,13 +58,14 @@ function initOnboardingTours() {
     return;
   }
 
+  if (window.__LUNA_ME__) {
+    maybeShowOnboardingTour(path, window.__LUNA_ME__);
+    return;
+  }
+
   window.addEventListener("lunaProfileReady", (event) => {
     maybeShowOnboardingTour(path, event.detail);
   }, { once: true });
-
-  if (window.__LUNA_ME__) {
-    maybeShowOnboardingTour(path, window.__LUNA_ME__);
-  }
 }
 
 if (document.readyState === "loading") {

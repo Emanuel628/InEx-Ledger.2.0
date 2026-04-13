@@ -430,6 +430,14 @@ function computeNextRunDateForUpdate(normalized, previousTemplate) {
     return { nextRunDate: formatIsoDate(candidate), active: false };
   }
 
+  // Safety guard: if the candidate is still in the past (edge case where
+  // endDate stopped loop advancement and the >endDate check above did not fire
+  // because candidate == endDate), mark the template inactive to prevent
+  // unexpected immediate materialisation.
+  if (normalized.active && candidate && candidate < today) {
+    return { nextRunDate: formatIsoDate(candidate), active: false };
+  }
+
   return {
     nextRunDate: formatIsoDate(candidate || today),
     active: normalized.active

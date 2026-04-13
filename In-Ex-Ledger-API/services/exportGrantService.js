@@ -7,7 +7,7 @@ const EXPORT_GRANT_TTL_MS = Number(process.env.EXPORT_GRANT_TTL_MS || 60_000);
 const ACTION_SCOPE = "generate_pdf";
 
 if (!EXPORT_GRANT_SECRET) {
-  logWarn("EXPORT_GRANT_SECRET is not configured; export grants cannot be issued.");
+  throw new Error("EXPORT_GRANT_SECRET environment variable is required. Set it before starting the server.");
 }
 
 function ensureSecret() {

@@ -29,8 +29,8 @@ async function requestPasswordReset(form) {
     return;
   }
 
+  if (!button) return;
   button.disabled = true;
-  setStatus("", true, statusEl);
 
   try {
     const response = await fetch(typeof buildApiUrl === "function" ? buildApiUrl("/api/auth/forgot-password") : "/api/auth/forgot-password", {
@@ -58,7 +58,7 @@ async function requestPasswordReset(form) {
     console.error(err);
     setStatus(tx("common_server_unreachable"), false, statusEl);
   } finally {
-    button.disabled = false;
+    if (button) button.disabled = false;
   }
 }
 

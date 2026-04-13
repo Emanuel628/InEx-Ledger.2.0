@@ -159,7 +159,7 @@ router.delete("/:id", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     const usage = await pool.query(
-      "SELECT COUNT(*) FROM transactions WHERE account_id = $1 AND business_id = $2",
+      "SELECT COUNT(*) FROM transactions WHERE account_id = $1 AND business_id = $2 AND deleted_at IS NULL",
       [req.params.id, businessId]
     );
     if (parseInt(usage.rows[0]?.count || "0", 10) > 0) {

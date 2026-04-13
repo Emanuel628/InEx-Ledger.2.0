@@ -65,7 +65,7 @@ function renderDashboard(data) {
     kpiCard("Avg Monthly Income", fmt(summary.avg_monthly_income), "trailing 12 months"),
     kpiCard("Avg Monthly Expenses", fmt(summary.avg_monthly_expense), "trailing 12 months"),
     kpiCard("12-Month Net", fmt(summary.net), summary.net >= 0 ? "profit" : "deficit", summary.net >= 0 ? "" : "kpi-value--negative"),
-    kpiCard("Est. Tax Liability", summary.estimated_tax_liability_pct.toFixed(1) + "%", "of net income (approx)")
+    kpiCard("Est. Tax Liability", (summary.estimated_tax_liability_pct ?? 0).toFixed(1) + "%", "of net income (approx)")
   ].join("");
 
   // Monthly breakdown table

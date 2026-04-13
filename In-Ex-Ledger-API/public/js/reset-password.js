@@ -17,7 +17,8 @@ function init() {
 
   if (!token) {
     setStatus(tx("reset_password_error_invalid"), false, statusEl);
-    form.querySelector("button").disabled = true;
+    const disableBtn = form.querySelector("button");
+    if (disableBtn) disableBtn.disabled = true;
     return;
   }
 
@@ -44,7 +45,7 @@ async function resetPassword(form, token, statusEl) {
     return;
   }
 
-  button.disabled = true;
+  if (button) button.disabled = true;
 
   try {
     const response = await fetch(
@@ -73,7 +74,7 @@ async function resetPassword(form, token, statusEl) {
     console.error(err);
     setStatus(tx("common_server_unreachable"), false, statusEl);
   } finally {
-    button.disabled = false;
+    if (button) button.disabled = false;
   }
 }
 

@@ -234,6 +234,14 @@ router.post("/onboarding/tour", async (req, res) => {
     return res.status(400).json({ error: "Page is required." });
   }
 
+  const VALID_TOUR_PAGES = new Set([
+    "transactions", "accounts", "categories", "receipts", "mileage", "exports",
+    "analytics", "goals", "tax", "settings", "billing", "messages"
+  ]);
+  if (!VALID_TOUR_PAGES.has(page)) {
+    return res.status(400).json({ error: "Invalid page value." });
+  }
+
   try {
     const current = await pool.query(
       "SELECT onboarding_tour_seen FROM users WHERE id = $1 LIMIT 1",

@@ -21,4 +21,8 @@ function wireTaxWidget() {
   });
 }
 
-wireTaxWidget();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", wireTaxWidget);
+} else {
+  wireTaxWidget();
+}

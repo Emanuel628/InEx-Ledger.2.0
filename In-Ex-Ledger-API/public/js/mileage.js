@@ -39,7 +39,7 @@ function wireMileageForm() {
     const distance = parseFloat(document.getElementById("mileageDistance")?.value || "");
 
     if (!date || !purpose || !Number.isFinite(distance) || distance <= 0) {
-      if (message) message.textContent = t("mileage_error_required_fields");
+      if (message) message.textContent = tx("mileage_error_required_fields");
       return;
     }
 
@@ -75,10 +75,14 @@ function wireMileageForm() {
 
 function refreshMileageLabels() {
   const useKilometers = shouldUseKilometers();
-  document.getElementById("mileageUnitNote").textContent = useKilometers ? t("mileage_unit_note_ca") : t("mileage_unit_note_us");
-  document.getElementById("mileageSubtext").textContent = useKilometers ? t("mileage_subtext_ca") : t("mileage_subtext_us");
-  document.getElementById("distanceLabel").textContent = useKilometers ? t("mileage_label_kilometers") : t("mileage_label_miles");
-  document.getElementById("distanceHeader").textContent = useKilometers ? t("mileage_table_km") : t("mileage_table_miles");
+  const mileageUnitNote = document.getElementById("mileageUnitNote");
+  const mileageSubtext = document.getElementById("mileageSubtext");
+  const distanceLabel = document.getElementById("distanceLabel");
+  const distanceHeader = document.getElementById("distanceHeader");
+  if (mileageUnitNote) mileageUnitNote.textContent = useKilometers ? tx("mileage_unit_note_ca") : tx("mileage_unit_note_us");
+  if (mileageSubtext) mileageSubtext.textContent = useKilometers ? tx("mileage_subtext_ca") : tx("mileage_subtext_us");
+  if (distanceLabel) distanceLabel.textContent = useKilometers ? tx("mileage_label_kilometers") : tx("mileage_label_miles");
+  if (distanceHeader) distanceHeader.textContent = useKilometers ? tx("mileage_table_km") : tx("mileage_table_miles");
   renderMileageTable();
 }
 

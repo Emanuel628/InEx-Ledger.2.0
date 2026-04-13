@@ -385,9 +385,11 @@ async function hydrateBusinessProfileCache() {
 function setupExportForm() {
   const form = document.getElementById("exportForm");
   const historyRows = document.getElementById("exportHistoryRows");
+  const ytdYear = new Date().getUTCFullYear();
+  const defaultPreset = `${ytdYear}-ytd`;
 
-  applyDatePreset("2026-ytd");
-  updatePresetChipState("2026-ytd");
+  applyDatePreset(defaultPreset);
+  updatePresetChipState(defaultPreset);
 
   ["period-start", "period-end", "exportAccountFilter", "exportCategoryFilter", "exportLanguage", "exportIncludeTaxId", "exportScope"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", () => {
@@ -474,10 +476,21 @@ function applyDatePreset(preset) {
     return;
   }
 
+  const today = new Date();
+  const ytdYear = today.getUTCFullYear();
+  const ytdMonth = String(today.getUTCMonth() + 1).padStart(2, "0");
+  const ytdDay = String(today.getUTCDate()).padStart(2, "0");
+  const ytdToday = `${ytdYear}-${ytdMonth}-${ytdDay}`;
+  const prevYear = ytdYear - 1;
+
   const ranges = {
+    [`${prevYear}-tax-year`]: [`${prevYear}-01-01`, `${prevYear}-12-31`],
     "2025-tax-year": ["2025-01-01", "2025-12-31"],
-    "2026-ytd": ["2026-01-01", "2026-04-04"],
+    [`${ytdYear}-ytd`]: [`${ytdYear}-01-01`, ytdToday],
+    "2026-ytd": [`${ytdYear}-01-01`, ytdToday],
+    [`q1-${ytdYear}`]: [`${ytdYear}-01-01`, `${ytdYear}-03-31`],
     "q1-2026": ["2026-01-01", "2026-03-31"],
+    [`q4-${prevYear}`]: [`${prevYear}-10-01`, `${prevYear}-12-31`],
     "q4-2025": ["2025-10-01", "2025-12-31"]
   };
 
@@ -485,7 +498,7 @@ function applyDatePreset(preset) {
     return;
   }
 
-  const [startDate, endDate] = ranges[preset] || ranges["2026-ytd"];
+  const [startDate, endDate] = ranges[preset] || ranges[`${ytdYear}-ytd`] || [ranges["2026-ytd"][0], ytdToday];
   startInput.value = startDate;
   endInput.value = endDate;
 }

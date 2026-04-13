@@ -455,7 +455,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     cancelModalConfirm.disabled = true;
     try {
       const res = await apiFetch("/api/billing/cancel", { method: "POST" });
-      const payload = await res?.json().catch(() => null);
+      const payload = await res?.json()?.catch(() => null);
       if (!res || !res.ok) {
         showSubToast(payload?.error || tx("settings_cancel_sub_error"));
         cancelModalConfirm.disabled = false;

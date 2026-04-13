@@ -119,7 +119,9 @@ function renderSessionsList(sessions) {
     btn.addEventListener("click", async () => {
       const sessionId = btn.getAttribute("data-session-revoke");
       if (!sessionId) return;
+      btn.disabled = true;
       await revokeSession(sessionId);
+      btn.disabled = false;
     });
   });
 }
