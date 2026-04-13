@@ -311,7 +311,18 @@ function scenarioRow(label, base, projected, type) {
 // ---------------------------------------------------------------------------
 function fmt(value) {
   const n = Number(value) || 0;
-  return "$" + Math.abs(n).toLocaleString("en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const rawRegion =
+    (typeof localStorage !== "undefined" && (localStorage.getItem("lb_region") || localStorage.getItem("region"))) ||
+    (typeof window !== "undefined" && window.LUNA_REGION) ||
+    "";
+  const currency = String(rawRegion).toLowerCase() === "ca" ? "CAD" : "USD";
+  const locale = (typeof navigator !== "undefined" && navigator.language) || "en-US";
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(Math.abs(n));
 }
 
 function parseFloatOrNull(str) {

@@ -303,7 +303,7 @@ async function hydrateCategoriesCache() {
         businessId: category.businessId || category.business_id || "",
         businessName: category.businessName || category.business_name || "",
         name: category.name,
-        type: category.kind,
+        type: category.kind || category.type || "",
         taxLabel: category.tax_map_us || category.tax_map_ca || ""
       }));
       localStorage.setItem(CATEGORIES_KEY, JSON.stringify(normalized));
@@ -913,7 +913,8 @@ function formatOptionalCsvNumber(value, preservePrecision = false) {
 }
 
 function downloadFile(content, filename, type) {
-  const blob = content instanceof Uint8Array ? new Blob([content], { type }) : new Blob([content], { type });
+  const blobData = content instanceof Uint8Array ? content.buffer : content;
+  const blob = new Blob([blobData], { type });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

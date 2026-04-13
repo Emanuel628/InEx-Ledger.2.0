@@ -83,7 +83,7 @@ async function handleLoginSubmit(event) {
   }
 
   if (!isValidEmail(email)) {
-    showLoginError(tx("register_alert_valid_email"));
+    showLoginError(tx("login_alert_valid_email"));
     return;
   }
 

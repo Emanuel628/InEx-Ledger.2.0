@@ -1685,7 +1685,23 @@ function initSecurityForm() {
       enabled: false,
       delivery: "email"
     }));
+    if (mfaEnabledToggle) {
+      mfaEnabledToggle.disabled = false;
+    }
     updateMfaUi();
+  };
+
+  const setMfaUnknown = () => {
+    if (mfaEnabledToggle) {
+      mfaEnabledToggle.disabled = true;
+      mfaEnabledToggle.indeterminate = true;
+    }
+    if (mfaPrimaryButton) {
+      mfaPrimaryButton.disabled = true;
+    }
+    if (mfaHelperNote) {
+      mfaHelperNote.textContent = t("settings_mfa_status_unknown");
+    }
   };
 
   [currentInput, newInput, confirmInput].forEach((input) => {
@@ -1927,6 +1943,7 @@ function initSecurityForm() {
   loadMfaStatus().catch((error) => {
     console.error("Failed to initialize MFA settings", error);
     setMfaMessage(t("settings_mfa_status_error"), "is-error");
+    setMfaUnknown();
   });
 }
 
@@ -2098,6 +2115,7 @@ function initDangerZone() {
 
   const openModal = (action) => {
     dangerAction = action;
+    if (confirmInput) confirmInput.value = "";
     if (action === "delete_account") {
       title.textContent = t("settings_delete_account_modal_title");
       body.textContent = t("settings_delete_account_modal_body");

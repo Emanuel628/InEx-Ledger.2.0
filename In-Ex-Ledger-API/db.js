@@ -107,33 +107,25 @@ pool.on('error', (err) => {
   console.error('Unexpected database pool error:', err.message);
 });
 
-if (!isProduction) {
-  try {
-    const dbUrl = new URL(process.env.DATABASE_URL);
-    console.log('=== DB URL PARSED ===');
-    console.log('HOST:', dbUrl.host);
-    console.log('USER:', dbUrl.username);
-    console.log('DB NAME:', dbUrl.pathname.replace('/', ''));
-    console.log('========================');
-  } catch (e) {
-    console.error('Failed to parse DATABASE_URL variable.');
-  }
-}
-
+// Detailed connection metadata is only logged when LOG_DB_IDENTITY=true is set
+// explicitly. Never enable this in production — host/user/IP must not appear in logs.
 async function logDbIdentity() {
+  if (process.env.LOG_DB_IDENTITY !== 'true') {
+    return;
+  }
+  if (isProduction) {
+    console.warn('[DB] logDbIdentity: disabled in production to prevent credential exposure.');
+    return;
+  }
   try {
     const res = await pool.query(
       'SELECT current_database(), current_schema(), inet_server_addr(), inet_server_port()'
     );
     const row = res.rows[0];
-    console.log('=== DB PHYSICAL IDENTITY ===');
-    console.log('DB NAME:', row.current_database);
-    console.log('SCHEMA:', row.current_schema);
-    console.log('SERVER IP:', row.inet_server_addr);
-    console.log('DB PORT:', row.inet_server_port);
-    console.log('===============================');
+    console.log('[DB] identity — database:', row.current_database, '| schema:', row.current_schema,
+      '| server:', row.inet_server_addr, '| port:', row.inet_server_port);
   } catch (err) {
-    console.error('DB IDENTITY ERROR:', err.message);
+    console.error('[DB] logDbIdentity error:', err.message);
   }
 }
 
