@@ -34,7 +34,8 @@ router.get("/", async (req, res) => {
        FROM accounts a
        JOIN businesses b ON b.id = a.business_id
        WHERE a.business_id = ANY($1::uuid[])
-       ORDER BY b.name ASC, a.created_at DESC`,
+       ORDER BY b.name ASC, a.created_at DESC
+       LIMIT 500`,
       [scope.businessIds]
     );
     res.json(result.rows);

@@ -36,7 +36,8 @@ router.get("/", async (req, res) => {
        FROM categories c
        JOIN businesses b ON b.id = c.business_id
        WHERE c.business_id = ANY($1::uuid[])
-       ORDER BY b.name ASC, c.kind, c.name`,
+       ORDER BY b.name ASC, c.kind, c.name
+       LIMIT 500`,
       [scope.businessIds]
     );
     res.json(result.rows);

@@ -53,6 +53,10 @@ video {
   display: none !important;
 }
 
+.hidden {
+  display: none !important;
+}
+
 /* ── Accessibility utilities ────────────────────────────── */
 
 /* Visually hidden but accessible to screen readers */
