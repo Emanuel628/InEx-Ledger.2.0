@@ -280,7 +280,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
   }
 });
 
-router.post("/customer-portal", requireAuth, requireCsrfProtection, async (req, res) => {
+router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfa, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const customerId = await ensureStripeCustomer(businessId, req.user);

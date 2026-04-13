@@ -6,7 +6,7 @@ const { pool } = require("../db.js");
 const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
-const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError } = require("../utils/logger.js");
 const { decrypt } = require("../services/encryptionService.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
@@ -198,11 +198,12 @@ router.post("/export", requireMfa, async (req, res) => {
   }
 
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    const allBusinesses = await listBusinessesForUser(req.user.id);
+    const businessIds = allBusinesses.map((b) => b.id);
 
     const [
       userResult,
-      businessResult,
+      businessesResult,
       txResult,
       adjustmentsResult,
       accountsResult,
@@ -214,8 +215,8 @@ router.post("/export", requireMfa, async (req, res) => {
         [req.user.id]
       ),
       pool.query(
-        "SELECT id, name, region, language, created_at FROM businesses WHERE id = $1",
-        [businessId]
+        "SELECT id, name, region, language, created_at FROM businesses WHERE id = ANY($1::uuid[])",
+        [businessIds]
       ),
       // Standard (non-adjustment) transactions
       pool.query(
@@ -229,14 +230,15 @@ router.post("/export", requireMfa, async (req, res) => {
                 t.date,
                 t.note,
                 t.cleared,
+                t.business_id,
                 t.created_at
            FROM transactions t
            LEFT JOIN accounts   a ON a.id = t.account_id
            LEFT JOIN categories c ON c.id = t.category_id
-          WHERE t.business_id = $1
+          WHERE t.business_id = ANY($1::uuid[])
             AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
           ORDER BY t.date DESC`,
-        [businessId]
+        [businessIds]
       ),
       // Adjustment / audit-pivot entries
       pool.query(
@@ -249,23 +251,24 @@ router.post("/export", requireMfa, async (req, res) => {
                 t.description,
                 t.date,
                 t.note,
+                t.business_id,
                 t.adjusted_at,
                 t.created_at
            FROM transactions t
            LEFT JOIN accounts   a ON a.id = t.account_id
            LEFT JOIN categories c ON c.id = t.category_id
-          WHERE t.business_id = $1
+          WHERE t.business_id = ANY($1::uuid[])
             AND t.is_adjustment = true
           ORDER BY t.adjusted_at DESC`,
-        [businessId]
+        [businessIds]
       ),
       pool.query(
-        "SELECT id, name, type, created_at FROM accounts WHERE business_id = $1",
-        [businessId]
+        "SELECT id, name, type, business_id, created_at FROM accounts WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
       ),
       pool.query(
-        "SELECT id, name, kind, created_at FROM categories WHERE business_id = $1",
-        [businessId]
+        "SELECT id, name, kind, business_id, created_at FROM categories WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
       ),
       // User's own governance audit log
       pool.query(
@@ -286,7 +289,7 @@ router.post("/export", requireMfa, async (req, res) => {
       format,
       ipAddress,
       userAgent,
-      metadata: { businessId }
+      metadata: { businessIds }
     });
 
     if (format === "csv") {
@@ -322,7 +325,7 @@ router.post("/export", requireMfa, async (req, res) => {
       exportedAt: new Date().toISOString(),
       schemaVersion: "phase5-v1",
       user: userResult.rows[0],
-      business: businessResult.rows[0],
+      businesses: businessesResult.rows,
       accounts: accountsResult.rows,
       categories: categoriesResult.rows,
       transactions: txResult.rows.map((t) => {

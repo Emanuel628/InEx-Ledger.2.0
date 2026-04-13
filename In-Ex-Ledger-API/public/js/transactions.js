@@ -349,7 +349,7 @@ function syncTransactionScopeUi() {
 
 
 function wireTransactionForm() {
-  const form = document.querySelector("form");
+  const form = document.getElementById("transactionForm");
   const accountHelp = document.getElementById("accountHelp");
   const categoryHelp = document.getElementById("categoryHelp");
   const typeSelect = document.getElementById("txType");
@@ -489,6 +489,17 @@ function wireTransactionForm() {
       if (savedTransaction?.id && pendingTransactionReceiptFile) {
         const uploaded = await uploadReceipt(savedTransaction.id, pendingTransactionReceiptFile);
         if (!uploaded) {
+          // Transaction was saved; only the receipt attachment failed.
+          // Close the drawer and surface a recoverable warning.
+          markAccountAsUsed(accountId);
+          try {
+            await loadTransactions();
+          } catch (reloadError) {
+            console.warn("[Transactions] Save succeeded but refresh failed", reloadError);
+          }
+          form.reset();
+          closeTransactionDrawer();
+          setTransactionFormMessage(txT("transactions_warning_receipt_upload", "Transaction saved, but the receipt could not be uploaded. You can attach it later."));
           return;
         }
       }
@@ -594,6 +605,9 @@ function wireRecurringForm() {
 
       await Promise.all([loadRecurringTemplates(), loadTransactions()]);
       closeRecurringDrawer();
+    } catch (error) {
+      console.error("Recurring template save failed:", error);
+      setRecurringFormMessage(txT("transactions_error_save", "Unable to save recurring template."));
     } finally {
       if (submitButton) {
         submitButton.disabled = false;
@@ -1215,7 +1229,7 @@ function prefillTransactionForm(transaction) {
 }
 
 function resetTransactionForm() {
-  const form = document.querySelector("form");
+  const form = document.getElementById("transactionForm");
   if (form) {
     form.reset();
   }
@@ -2044,8 +2058,10 @@ function updateReceiptsDot() {
 }
 
 function mapById(items) {
-  return items.reduce((acc, item) => {
-    acc[item.id] = item;
+  return (items || []).reduce((acc, item) => {
+    if (item?.id) {
+      acc[item.id] = item;
+    }
     return acc;
   }, {});
 }
@@ -2130,6 +2146,9 @@ function mergeSavedTransactionIntoLedger(transaction, context = {}) {
 function validateTransactionForm({ date, description, amount, accountId, categoryId, type }) {
   if (!date) {
     return { message: txT("transactions_validation_date", "Choose a date for the transaction."), fieldId: "date" };
+  }
+  if (!description || !description.trim()) {
+    return { message: txT("transactions_validation_description", "Enter a description for the transaction."), fieldId: "description" };
   }
   if (Number.isNaN(amount) || amount <= 0) {
     return { message: txT("transactions_validation_amount", "Amount must be greater than zero."), fieldId: "amount" };

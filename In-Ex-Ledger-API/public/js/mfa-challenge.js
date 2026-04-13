@@ -10,7 +10,7 @@ const pendingMfaEmail = sessionStorage.getItem("lb_pending_mfa_email") || "";
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!pendingMfaToken) {
-    window.location.href = "login";
+    window.location.href = "/login";
     return;
   }
 
@@ -25,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
   mfaChallengeForm?.addEventListener("submit", handleMfaChallengeSubmit);
   document.getElementById("mfaChallengeBack")?.addEventListener("click", () => {
     clearPendingMfaState();
-    window.location.href = "login";
+    window.location.href = "/login";
   });
 });
 
@@ -49,19 +49,29 @@ async function handleMfaChallengeSubmit(event) {
   submitButton?.setAttribute("disabled", "true");
 
   try {
-    const response = await fetch(buildApiUrl("/api/auth/mfa/verify"), {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mfaToken: pendingMfaToken,
-        code,
-        trustDevice
-      })
-    });
+    const response = await (typeof apiFetch === "function"
+      ? apiFetch("/api/auth/mfa/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mfaToken: pendingMfaToken,
+            code,
+            trustDevice
+          })
+        })
+      : fetch(buildApiUrl("/api/auth/mfa/verify"), {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mfaToken: pendingMfaToken,
+            code,
+            trustDevice
+          })
+        }));
 
-    const data = await response.json().catch(() => null);
-    if (!response.ok || !data?.token) {
+    const data = await response?.json().catch(() => null);
+    if (!response || !response.ok || !data?.token) {
       showMfaChallengeError(data?.error || tx("mfa_challenge_error_verify"));
       return;
     }
@@ -71,7 +81,7 @@ async function handleMfaChallengeSubmit(event) {
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }
-    window.location.href = "transactions";
+    window.location.href = "/transactions";
   } catch (error) {
     console.error("MFA challenge request failed:", error);
     showMfaChallengeError(tx("login_error_offline"));

@@ -275,6 +275,10 @@ router.patch("/:id/attach", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const receiptId = req.params.id;
 
+    if (!UUID_RE.test(receiptId)) {
+      return res.status(400).json({ error: "Invalid receipt ID." });
+    }
+
     if (!("transaction_id" in (req.body || {}))) {
       return res.status(400).json({
         error: "transaction_id must be provided (uuid or null)."
@@ -282,6 +286,14 @@ router.patch("/:id/attach", async (req, res) => {
     }
 
     const transactionId = req.body.transaction_id;
+
+    if (transactionId !== null && transactionId !== undefined) {
+      if (typeof transactionId !== "string" || !UUID_RE.test(transactionId)) {
+        return res.status(400).json({
+          error: "transaction_id must be a valid UUID when provided."
+        });
+      }
+    }
 
     const lockState = await loadAccountingLockState(pool, businessId);
 

@@ -363,7 +363,15 @@ function mapAuthError(status, apiError) {
 
 async function requireValidSessionOrRedirect() {
   if (window.__AUTH_GUARD_STATE__.running) {
-    return;
+    // Wait for the in-flight check to settle, then return its result.
+    return new Promise((resolve) => {
+      const poll = setInterval(() => {
+        if (!window.__AUTH_GUARD_STATE__.running) {
+          clearInterval(poll);
+          resolve(window.__AUTH_GUARD_STATE__.lastError ? undefined : true);
+        }
+      }, 50);
+    });
   }
 
   window.__AUTH_GUARD_STATE__.running = true;
@@ -424,6 +432,7 @@ async function requireValidSessionOrRedirect() {
 
     window.__AUTH_GUARD_STATE__.running = false;
     window.__AUTH_GUARD_STATE__.lastError = `me_${response.status}`;
+    window.location.href = `${LOGIN_PAGE}?reason=error`;
   } catch (err) {
     if (localStorage.getItem("debug") === "true") { console.error("[AUTH] Session validation failed:", err); }
     window.__AUTH_GUARD_STATE__.running = false;

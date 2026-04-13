@@ -39,4 +39,8 @@ function wireFilterActions() {
   }
 }
 
-wireFilterActions();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", wireFilterActions);
+} else {
+  wireFilterActions();
+}

@@ -520,6 +520,9 @@ router.post("/", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid transaction ID." });
+  }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const businessTaxContext = await getBusinessRegionAndCurrency(businessId);
@@ -605,9 +608,11 @@ router.put("/:id", async (req, res) => {
 });
 
 router.delete("/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid transaction ID." });
+  }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const existing = await pool.query(
       "SELECT id, date FROM transactions WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL AND (is_adjustment = false OR is_adjustment IS NULL) AND (is_void = false OR is_void IS NULL) LIMIT 1",
       [req.params.id, businessId]
     );
@@ -637,6 +642,9 @@ router.delete("/:id", async (req, res) => {
 });
 
 router.patch("/:id/cleared", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid transaction ID." });
+  }
   if (typeof req.body?.cleared !== "boolean") {
     return res.status(400).json({ error: "cleared must be true or false" });
   }

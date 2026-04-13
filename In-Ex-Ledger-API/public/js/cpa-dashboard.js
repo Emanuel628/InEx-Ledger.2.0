@@ -61,7 +61,7 @@ async function initCpaDashboard() {
       activePortfolio.grant_scope === "all" ? "All granted businesses" : "Granted business";
     businessSelect.appendChild(allOption);
 
-    activePortfolio.businesses.forEach((business) => {
+    (activePortfolio.businesses || []).forEach((business) => {
       const option = document.createElement("option");
       option.value = business.id;
       option.textContent = business.name || "Business";
@@ -108,7 +108,7 @@ async function initCpaDashboard() {
   populateBusinessSelect();
   if (requestedBusiness) {
     const activePortfolio = getActivePortfolio();
-    if (activePortfolio.businesses.some((business) => business.id === requestedBusiness)) {
+    if (activePortfolio && (activePortfolio.businesses || []).some((business) => business.id === requestedBusiness)) {
       businessSelect.value = requestedBusiness;
     }
   }

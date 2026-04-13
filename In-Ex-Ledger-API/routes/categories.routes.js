@@ -89,6 +89,9 @@ router.put("/:id", async (req, res) => {
   if (kind && !VALID_KINDS.has(kind)) {
     return res.status(400).json({ error: "kind must be 'income' or 'expense'" });
   }
+  if (name !== undefined && (!name || typeof name !== "string" || !name.trim())) {
+    return res.status(400).json({ error: "name cannot be empty" });
+  }
   if (color !== undefined && color !== null && !VALID_COLORS.has(color)) {
     return res.status(400).json({ error: "color is invalid" });
   }
@@ -167,7 +170,7 @@ router.delete("/:id", async (req, res) => {
     }
 
     const usage = await pool.query(
-      "SELECT COUNT(*) FROM transactions WHERE category_id = $1 AND business_id = $2",
+      "SELECT COUNT(*) FROM transactions WHERE category_id = $1 AND business_id = $2 AND deleted_at IS NULL",
       [req.params.id, businessId]
     );
     if (parseInt(usage.rows[0]?.count || "0", 10) > 0) {

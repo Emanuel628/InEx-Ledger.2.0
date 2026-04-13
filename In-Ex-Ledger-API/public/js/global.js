@@ -291,8 +291,8 @@ function pollGlobalUnreadCount() {
   if (typeof apiFetch === "function") {
     return apiFetch("/api/messages/unread-count")
       .then(function (response) {
-        if (!response) return false;
-        if (!response.ok) return true;
+        if (!response) return false;  // null = auth redirect occurred; stop polling
+        if (!response.ok) return !response || response.status === 401 ? false : true;
         return response.json().then(function (data) {
           if (!data) return true;
           var count = data.count || 0;
