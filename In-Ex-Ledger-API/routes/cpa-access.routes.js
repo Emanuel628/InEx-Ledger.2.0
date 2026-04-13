@@ -419,11 +419,38 @@ router.get("/portfolio/:ownerUserId/mileage", async (req, res) => {
       return;
     }
 
+    // Detect which date column(s) exist (trip_date was added in a later migration;
+    // older schemas may only have date).
+    const colResult = await pool.query(
+      `SELECT column_name
+         FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'mileage'
+          AND column_name IN ('date', 'trip_date')`
+    );
+    const existingCols = new Set(colResult.rows.map((r) => r.column_name));
+    const hasTripDate = existingCols.has("trip_date");
+    const hasDate = existingCols.has("date");
+
+    // Use hard-coded column references to avoid any SQL injection risk.
+    let dateSelectExpr;
+    let dateOrderExpr;
+    if (hasTripDate && hasDate) {
+      dateSelectExpr = "COALESCE(m.trip_date, m.date)";
+      dateOrderExpr = "COALESCE(m.trip_date, m.date)";
+    } else if (hasTripDate) {
+      dateSelectExpr = "m.trip_date";
+      dateOrderExpr = "m.trip_date";
+    } else {
+      dateSelectExpr = "m.date";
+      dateOrderExpr = "m.date";
+    }
+
     const result = await pool.query(
       `SELECT m.id,
               m.business_id,
               b.name AS business_name,
-              m.trip_date,
+              ${dateSelectExpr} AS trip_date,
               m.purpose,
               m.destination,
               m.miles,
@@ -434,7 +461,7 @@ router.get("/portfolio/:ownerUserId/mileage", async (req, res) => {
          FROM mileage m
          JOIN businesses b ON b.id = m.business_id
         WHERE m.business_id = ANY($1::uuid[])
-        ORDER BY m.trip_date DESC, m.created_at DESC`,
+        ORDER BY ${dateOrderExpr} DESC, m.created_at DESC`,
       [portfolio.business_ids]
     );
 

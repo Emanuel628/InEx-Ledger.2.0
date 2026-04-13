@@ -5,7 +5,7 @@ const path = require("path");
 const bcrypt = require("bcrypt");
 const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
-const { requireAuth } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
@@ -301,7 +301,7 @@ router.put("/", async (req, res) => {
   }
 });
 
-router.delete("/", accountDeleteLimiter, async (req, res) => {
+router.delete("/", accountDeleteLimiter, requireMfa, async (req, res) => {
   const { password } = req.body ?? {};
   const client = await pool.connect();
   let transactionOpen = false;

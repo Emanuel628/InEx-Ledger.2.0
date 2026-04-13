@@ -13,7 +13,7 @@
   };
 
   async function apiAvailable() {
-    if (typeof apiReady === "boolean") {
+    if (apiReady === true) {
       return apiReady;
     }
 
@@ -22,7 +22,6 @@
       apiReady = res.ok;
       return apiReady;
     } catch (err) {
-      apiReady = false;
       return false;
     }
   }
@@ -72,11 +71,15 @@
 
   async function getPrivacySettings() {
     if (await apiAvailable()) {
-      const res = await fetch(buildApiUrl("/api/privacy/settings"), {
-        headers: authHeaders()
-      });
-      if (res.ok) {
-        return res.json();
+      try {
+        const res = await fetch(buildApiUrl("/api/privacy/settings"), {
+          headers: authHeaders()
+        });
+        if (res.ok) {
+          return res.json();
+        }
+      } catch (err) {
+        // fall through to local settings
       }
     }
     return readLocalSettings();
@@ -88,18 +91,22 @@
     persistLocalSettings(merged);
 
     if (await apiAvailable()) {
-      await fetch(buildApiUrl("/api/privacy/settings"), {
-        method: "PUT",
-        headers: authHeaders("PUT"),
-        credentials: "include",
-        body: JSON.stringify({
-          dataSharingOptOut: !!merged.dataSharingOptOut,
-          consentGiven: !!merged.consentGiven,
-          consentAt: merged.consentAt,
-          termsVersion: merged.termsVersion,
-          privacyVersion: merged.privacyVersion
-        })
-      });
+      try {
+        await fetch(buildApiUrl("/api/privacy/settings"), {
+          method: "PUT",
+          headers: authHeaders("PUT"),
+          credentials: "include",
+          body: JSON.stringify({
+            dataSharingOptOut: !!merged.dataSharingOptOut,
+            consentGiven: !!merged.consentGiven,
+            consentAt: merged.consentAt,
+            termsVersion: merged.termsVersion,
+            privacyVersion: merged.privacyVersion
+          })
+        });
+      } catch (err) {
+        // settings already persisted locally; network failure is non-fatal
+      }
     }
 
     return merged;
@@ -134,16 +141,20 @@
         .slice(0, 10)}.json`;
 
     if (await apiAvailable()) {
-      const res = await fetch(buildApiUrl("/api/privacy/export"), {
-        method: "POST",
-        headers: authHeaders("POST"),
-        credentials: "include"
-      });
+      try {
+        const res = await fetch(buildApiUrl("/api/privacy/export"), {
+          method: "POST",
+          headers: authHeaders("POST"),
+          credentials: "include"
+        });
 
-      if (res.ok) {
-        const blob = await res.blob();
-        downloadBlob(blob, fileName);
-        return;
+        if (res.ok) {
+          const blob = await res.blob();
+          downloadBlob(blob, fileName);
+          return;
+        }
+      } catch (err) {
+        // fall through to local export
       }
     }
 
@@ -173,14 +184,18 @@
 
   async function deleteBusinessData() {
     if (await apiAvailable()) {
-      const res = await fetch(buildApiUrl("/api/privacy/delete"), {
-        method: "POST",
-        headers: authHeaders("POST"),
-        credentials: "include",
-        body: JSON.stringify({ scope: "business_data" })
-      });
-      if (res.ok) {
-        return res.json();
+      try {
+        const res = await fetch(buildApiUrl("/api/privacy/delete"), {
+          method: "POST",
+          headers: authHeaders("POST"),
+          credentials: "include",
+          body: JSON.stringify({ scope: "business_data" })
+        });
+        if (res.ok) {
+          return res.json();
+        }
+      } catch (err) {
+        // fall through to local deletion
       }
     }
 

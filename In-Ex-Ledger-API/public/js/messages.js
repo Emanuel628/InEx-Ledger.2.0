@@ -97,6 +97,7 @@ function wireSidebar() {
 // ─────────────────────────────────────────────
 async function loadMessages(tab) {
   const list = document.getElementById("messagesList");
+  if (!list) return;
   list.innerHTML = '<div class="messages-loading">Loading messages…</div>';
 
   try {
