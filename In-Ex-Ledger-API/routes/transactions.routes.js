@@ -613,6 +613,7 @@ router.delete("/:id", async (req, res) => {
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const existing = await pool.query(
       "SELECT id, date FROM transactions WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL AND (is_adjustment = false OR is_adjustment IS NULL) AND (is_void = false OR is_void IS NULL) LIMIT 1",
       [req.params.id, businessId]
     );
