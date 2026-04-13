@@ -63,6 +63,9 @@ async function ensureBusinessSubscription(businessId) {
       LIMIT 1`,
     [businessId]
   );
+  if (!fallback.rowCount) {
+    throw new Error(`ensureBusinessSubscription: no subscription row found for business ${businessId} after conflict`);
+  }
   return fallback.rows[0];
 }
 
