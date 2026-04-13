@@ -134,11 +134,17 @@ function saveBusinessProfile(profile) {
   localStorage.setItem(BUSINESS_PROFILE_KEY, JSON.stringify(profile));
 }
 
+function resolveDisplayLocale() {
+  const lang = (window.LUNA_LANGUAGE || "en").toLowerCase();
+  const region = (window.LUNA_REGION || "us").toUpperCase();
+  return `${lang}-${region}`;
+}
+
 function formatFiscalYearSummary(value) {
   if (!value) return t("settings_overview_fiscal_not_set");
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  const formatted = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const formatted = date.toLocaleDateString(resolveDisplayLocale(), { month: "short", day: "numeric" });
   return interpolateTranslatedMessage("settings_overview_fiscal_year", { date: formatted });
 }
 
@@ -430,13 +436,13 @@ async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBod
     const tierLabel = sub.effectiveTier === "v1" ? "Pro" : "Free";
     let statusText = "";
     if (sub.isTrialing && sub.trialEndsAt) {
-      const endDate = new Date(sub.trialEndsAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const endDate = new Date(sub.trialEndsAt).toLocaleDateString(resolveDisplayLocale(), { month: "short", day: "numeric", year: "numeric" });
       statusText = interpolateTranslatedMessage("settings_sub_status_trial", { date: endDate });
     } else if (sub.cancelAtPeriodEnd && sub.currentPeriodEnd) {
-      const endDate = new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const endDate = new Date(sub.currentPeriodEnd).toLocaleDateString(resolveDisplayLocale(), { month: "short", day: "numeric", year: "numeric" });
       statusText = interpolateTranslatedMessage("settings_sub_status_canceling", { date: endDate });
     } else if (sub.isPaid && sub.currentPeriodEnd) {
-      const renewDate = new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      const renewDate = new Date(sub.currentPeriodEnd).toLocaleDateString(resolveDisplayLocale(), { month: "short", day: "numeric", year: "numeric" });
       statusText = interpolateTranslatedMessage("settings_sub_status_active", { plan: tierLabel, date: renewDate });
     } else {
       statusText = interpolateTranslatedMessage("settings_sub_status_free", { plan: tierLabel });
@@ -454,7 +460,7 @@ async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBod
 
     // Update cancel modal body with period end date
     if (cancelModalBody && sub.currentPeriodEnd) {
-      const endDate = new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+      const endDate = new Date(sub.currentPeriodEnd).toLocaleDateString(resolveDisplayLocale(), { month: "long", day: "numeric", year: "numeric" });
       cancelModalBody.textContent = interpolateTranslatedMessage("settings_cancel_sub_modal_body_date", { date: endDate });
     }
   } catch (err) {
@@ -1236,7 +1242,7 @@ function formatSettingsDate(value) {
   if (Number.isNaN(date.getTime())) {
     return value;
   }
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return date.toLocaleDateString(resolveDisplayLocale(), { month: "short", day: "numeric", year: "numeric" });
 }
 
 function formatSettingsDateTime(value) {
@@ -1247,7 +1253,7 @@ function formatSettingsDateTime(value) {
   if (Number.isNaN(date.getTime())) {
     return String(value);
   }
-  return date.toLocaleString("en-US", {
+  return date.toLocaleString(resolveDisplayLocale(), {
     month: "short",
     day: "numeric",
     year: "numeric",

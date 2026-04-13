@@ -3,6 +3,9 @@ const { pool } = require("../db.js");
 const { loadAccountingLockState, isDateLocked } = require("./accountingLockService.js");
 
 const VALID_CADENCES = new Set(["weekly", "biweekly", "monthly", "quarterly", "yearly", "annually"]);
+// Maximum number of missed occurrences to materialise in a single catch-up run.
+// Prevents runaway transaction creation when next_run_date is far in the past.
+const MAX_CATCHUP_RUNS = 52;
 
 class RecurringTemplateValidationError extends Error {
   constructor(message) {
@@ -218,8 +221,14 @@ async function materializeTemplateRuns(businessId, templateId) {
     const today = utcToday();
     let lastRunDate = template.last_run_date ? parseIsoDate(template.last_run_date) : null;
     let createdAny = false;
+    let catchupCount = 0;
 
     while (nextOccurrence && nextOccurrence <= today && (!endDate || nextOccurrence <= endDate)) {
+      if (catchupCount >= MAX_CATCHUP_RUNS) {
+        // Cap reached: leave next_run_date pointing at the current occurrence so
+        // the remaining backlog is processed on the next scheduled run.
+        break;
+      }
       const occurrenceDate = formatIsoDate(nextOccurrence);
 
       // Skip occurrences that fall inside a locked accounting period.
@@ -270,6 +279,7 @@ async function materializeTemplateRuns(businessId, templateId) {
       }
 
       lastRunDate = nextOccurrence;
+      catchupCount++;
       nextOccurrence = computeNextOccurrence(nextOccurrence, template.cadence);
     }
 

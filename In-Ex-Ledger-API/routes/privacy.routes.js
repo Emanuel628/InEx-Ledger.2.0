@@ -208,7 +208,10 @@ router.post("/export", requireMfa, async (req, res) => {
       adjustmentsResult,
       accountsResult,
       categoriesResult,
-      auditLogResult
+      auditLogResult,
+      mileageResult,
+      recurringResult,
+      privacySettingsResult
     ] = await Promise.all([
       pool.query(
         "SELECT id, email, full_name, display_name, created_at FROM users WHERE id = $1",
@@ -277,6 +280,30 @@ router.post("/export", requireMfa, async (req, res) => {
           WHERE user_id = $1
           ORDER BY created_at DESC`,
         [req.user.id]
+      ),
+      // Mileage records
+      pool.query(
+        `SELECT id, business_id, trip_date, purpose, destination, miles, km,
+                odometer_start, odometer_end, created_at
+           FROM mileage
+          WHERE business_id = ANY($1::uuid[])
+          ORDER BY trip_date DESC`,
+        [businessIds]
+      ),
+      // Recurring transaction templates
+      pool.query(
+        `SELECT id, business_id, amount, type, description, note, cadence,
+                start_date, end_date, next_run_date, last_run_date,
+                cleared_default, active, created_at, updated_at
+           FROM recurring_transactions
+          WHERE business_id = ANY($1::uuid[])
+          ORDER BY created_at DESC`,
+        [businessIds]
+      ),
+      // Privacy preferences
+      pool.query(
+        "SELECT data_sharing_opt_out, consent_given, analytics_opt_in, updated_at FROM user_privacy_settings WHERE user_id = $1",
+        [req.user.id]
       )
     ]);
 
@@ -336,6 +363,9 @@ router.post("/export", requireMfa, async (req, res) => {
         return rest;
       }),
       adjustmentHistory: adjustmentsResult.rows,
+      mileage: mileageResult.rows,
+      recurringTransactions: recurringResult.rows,
+      privacySettings: privacySettingsResult.rows[0] || null,
       auditLog: auditLogResult.rows
     };
 
@@ -418,6 +448,16 @@ router.post("/erase", requireMfa, async (req, res) => {
           SET description           = NULL,
               description_encrypted = NULL,
               note                  = NULL
+        WHERE business_id = $1`,
+      [businessId]
+    );
+
+    // Scrub free-text PII fields from mileage records while retaining
+    // the distance/date data needed for tax deduction records.
+    await client.query(
+      `UPDATE mileage
+          SET purpose     = 'ERASED',
+              destination = NULL
         WHERE business_id = $1`,
       [businessId]
     );
