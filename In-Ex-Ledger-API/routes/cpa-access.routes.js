@@ -252,6 +252,9 @@ router.get("/portfolio/:ownerUserId/transactions", async (req, res) => {
          LEFT JOIN accounts a ON a.id = t.account_id
          LEFT JOIN categories c ON c.id = t.category_id
         WHERE t.business_id = ANY($1::uuid[])
+          AND t.deleted_at IS NULL
+          AND (t.is_void = false OR t.is_void IS NULL)
+          AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
         ORDER BY t.date DESC, t.created_at DESC
         LIMIT $2 OFFSET $3`,
       [portfolio.business_ids, limit, offset]
@@ -260,7 +263,10 @@ router.get("/portfolio/:ownerUserId/transactions", async (req, res) => {
     const countResult = await pool.query(
       `SELECT COUNT(*)::int AS count
          FROM transactions
-        WHERE business_id = ANY($1::uuid[])`,
+        WHERE business_id = ANY($1::uuid[])
+          AND deleted_at IS NULL
+          AND (is_void = false OR is_void IS NULL)
+          AND (is_adjustment = false OR is_adjustment IS NULL)`,
       [portfolio.business_ids]
     );
 

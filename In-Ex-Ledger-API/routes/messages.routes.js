@@ -255,11 +255,52 @@ router.post("/", async (req, res) => {
   try {
     // Verify receiver exists
     const receiverCheck = await pool.query(
-      "SELECT id FROM users WHERE id = $1 LIMIT 1",
+      "SELECT id, role FROM users WHERE id = $1 LIMIT 1",
       [receiverId]
     );
     if (!receiverCheck.rowCount) {
       return res.status(404).json({ error: "Receiver not found." });
+    }
+
+    // Enforce contact allowlist: sender must be permitted to contact the receiver.
+    // Mirrors the logic in GET /contacts.
+    const receiver = receiverCheck.rows[0];
+    const isSupportStaff = receiver.role === "it_support" || receiver.role === "admin";
+    if (!isSupportStaff) {
+      const contactCheck = await pool.query(
+        `SELECT 1
+           FROM users u
+          WHERE u.id = $2
+            AND (
+              -- Receiver is a CPA granted access to one of sender's businesses
+              EXISTS (
+                SELECT 1 FROM cpa_access_grants g
+                 JOIN businesses b ON b.id = g.business_id
+                WHERE b.user_id = $1
+                  AND g.grantee_user_id = u.id
+                  AND g.status IN ('active', 'pending')
+              )
+              -- Receiver is a client whose business sender (acting as CPA) was granted access to
+              OR EXISTS (
+                SELECT 1 FROM cpa_access_grants g
+                 JOIN businesses b ON b.id = g.business_id
+                WHERE g.grantee_user_id = $1
+                  AND b.user_id = u.id
+                  AND g.status IN ('active', 'pending')
+              )
+              -- Prior message exchange exists (reply flow)
+              OR EXISTS (
+                SELECT 1 FROM messages m
+                WHERE (m.sender_id = $1 AND m.receiver_id = u.id)
+                   OR (m.receiver_id = $1 AND m.sender_id = u.id)
+              )
+            )
+          LIMIT 1`,
+        [req.user.id, receiverId]
+      );
+      if (!contactCheck.rowCount) {
+        return res.status(403).json({ error: "You are not permitted to message this user." });
+      }
     }
 
     // Verify parent message exists and belongs to this conversation (if provided)

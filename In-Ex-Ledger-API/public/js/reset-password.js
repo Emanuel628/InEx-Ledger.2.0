@@ -31,8 +31,8 @@ async function resetPassword(form, token, statusEl) {
   const button = form.querySelector("button");
   const passwordInput = form.querySelector('input[name="password"]');
   const confirmInput = form.querySelector('input[name="confirmPassword"]');
-  const password = passwordInput?.value.trim();
-  const confirm = confirmInput?.value.trim();
+  const password = passwordInput?.value;
+  const confirm = confirmInput?.value;
 
   if (!password || !confirm) {
     setStatus(tx("reset_password_error_missing"), false, statusEl);
