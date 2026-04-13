@@ -225,14 +225,19 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
   }
 
   try {
+    const grantStartDate = grantPayload.dateRange?.startDate;
+    const grantEndDate = grantPayload.dateRange?.endDate;
+    if (!DATE_PATTERN.test(grantStartDate) || !DATE_PATTERN.test(grantEndDate)) {
+      return res.status(400).json({ error: "Grant token contains invalid date range." });
+    }
     const jobId = crypto.randomUUID();
-    const filename = `inex-ledger-export-${grantPayload.dateRange.startDate}_to_${grantPayload.dateRange.endDate}.pdf`;
+    const filename = `inex-ledger-export-${grantStartDate}_to_${grantEndDate}.pdf`;
     const job = {
       jobId,
       businessId,
       userId: user.id,
-      startDate: grantPayload.dateRange.startDate,
-      endDate: grantPayload.dateRange.endDate,
+      startDate: grantStartDate,
+      endDate: grantEndDate,
       includeTaxId: grantPayload.includeTaxId,
       taxId_jwe: grantPayload.includeTaxId ? req.body.taxId_jwe : undefined,
       exportLang: grantPayload.metadata?.language || "en",
@@ -247,8 +252,8 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       businessId,
       userId: user.id,
       exportType: "pdf",
-      startDate: grantPayload.dateRange.startDate,
-      endDate: grantPayload.dateRange.endDate,
+      startDate: grantStartDate,
+      endDate: grantEndDate,
       includeTaxId: grantPayload.includeTaxId,
       grantJti: grantPayload.jti,
       contentHash: hash,
