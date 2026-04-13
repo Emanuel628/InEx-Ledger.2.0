@@ -2,8 +2,6 @@
 
 function buildHealthCheckResponse({
   dbState,
-  dbLastError,
-  migrationStats,
   rateLimiting,
   receiptStorage,
   uptimeSeconds = process.uptime(),
@@ -28,9 +26,7 @@ function buildHealthCheckResponse({
     body: {
       status: overallStatus,
       database: {
-        state: dbState,
-        lastError: dbLastError,
-        migrations: migrationStats
+        state: dbState
       },
       receiptStorage,
       rateLimiting,

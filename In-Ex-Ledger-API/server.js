@@ -73,7 +73,7 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000'
 ];
 
-console.log('SYSTEM START: INEX_LEDGER_PROD_2026');
+logInfo('SYSTEM START: INEX_LEDGER_PROD_2026');
 
 const PORT = process.env.PORT || 8080;
 const DB_RETRY_DELAY_MS = Number(process.env.DB_RETRY_DELAY_MS || 15000);
@@ -198,8 +198,6 @@ app.get('/health', (req, res) => {
   const receiptStorage = getReceiptStorageStatus();
   const health = buildHealthCheckResponse({
     dbState,
-    dbLastError,
-    migrationStats,
     rateLimiting,
     receiptStorage
   });

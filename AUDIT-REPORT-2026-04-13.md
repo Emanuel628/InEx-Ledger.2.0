@@ -1,6 +1,8 @@
 # InEx Ledger 2.0 — Full Audit Report
 
+
 **Date:** 2026-04-13  
+> Archived snapshot only. Several findings below were fixed after this report was generated, so do not use it as the current repo status.
 **Scope:** Frontend + backend static audit (no runtime testing)
 
 ---
@@ -307,3 +309,4 @@ Network errors raise unhandled rejections with no user feedback.
 8. **FH-2** — Edit button opens delete modal.
 9. **FH-3** — Network hiccups force-logout users.
 10. **FM-26 / FM-27** — Filters and tax widget never initialize because scripts run before DOM.
+> Archived snapshot only. Several findings below were fixed after this report was generated, so do not use it as the current repo status.

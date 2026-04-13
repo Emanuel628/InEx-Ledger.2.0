@@ -300,7 +300,7 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
   }
 });
 
-router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
+router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfa, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);

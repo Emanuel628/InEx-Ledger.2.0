@@ -8,8 +8,6 @@ const { buildHealthCheckResponse } = require("../services/healthCheckService.js"
 test("health check returns 200 only when all critical systems are healthy", () => {
   const response = buildHealthCheckResponse({
     dbState: "ready",
-    dbLastError: null,
-    migrationStats: { total: 10, applied: 0, skipped: 10 },
     rateLimiting: { mode: "redis", available: true },
     receiptStorage: { mode: "enforced", available: true },
     uptimeSeconds: 12.34,
@@ -24,8 +22,6 @@ test("health check returns 200 only when all critical systems are healthy", () =
 test("health check returns 503 when dependencies are degraded even if the database is ready", () => {
   const response = buildHealthCheckResponse({
     dbState: "ready",
-    dbLastError: null,
-    migrationStats: { total: 10, applied: 0, skipped: 10 },
     rateLimiting: { mode: "degraded", available: false },
     receiptStorage: { mode: "enforced", available: true },
     uptimeSeconds: 12.34,
@@ -39,8 +35,6 @@ test("health check returns 503 when dependencies are degraded even if the databa
 test("health check returns 503 while startup or retry states are still in progress", () => {
   const response = buildHealthCheckResponse({
     dbState: "retrying",
-    dbLastError: "connection refused",
-    migrationStats: { total: 10, applied: 0, skipped: 9 },
     rateLimiting: { mode: "memory", available: true },
     receiptStorage: { mode: "enforced", available: true },
     uptimeSeconds: 12.34,
@@ -49,5 +43,5 @@ test("health check returns 503 while startup or retry states are still in progre
 
   assert.equal(response.statusCode, 503);
   assert.equal(response.body.status, "retrying");
-  assert.equal(response.body.database.lastError, "connection refused");
+  assert.deepEqual(response.body.database, { state: "retrying" });
 });

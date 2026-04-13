@@ -34,8 +34,6 @@ function requireEmailVerified(req, res, next) {
 
 router.use(requireEmailVerified);
 
-const EXPORT_TTL_MS = Number(process.env.EXPORT_GRANT_TTL_MS || 60_000);
-
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function validateDateRange(range) {
@@ -137,7 +135,6 @@ function normalizeExportHistoryEntry(entry) {
     export_type: entry.export_type || "pdf",
     include_tax_id: String(entry.include_tax_id || "").toLowerCase() === "true",
     content_hash: entry.content_hash || null,
-    file_path: entry.file_path || null,
     language: entry.language || "en",
     currency: entry.currency || "USD",
     page_count: Number(entry.page_count) || 0,
@@ -175,7 +172,7 @@ router.post("/request-grant", exportGrantLimiter, async (req, res) => {
       templateVersion: req.body?.templateVersion || "v1"
     };
 
-    const grant = issueExportGrant({
+    const grant = await issueExportGrant({
       businessId,
       userId: user.id,
       exportType,
@@ -203,7 +200,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
   let grantPayload;
   const sanitizedBody = sanitizePayload(req.body);
   try {
-    grantPayload = verifyExportGrant(token);
+    grantPayload = await verifyExportGrant(token);
   } catch (err) {
     return res.status(401).json({ error: err.message || "Invalid grant token." });
   }
@@ -291,7 +288,6 @@ router.get("/history", exportGrantLimiter, async (req, res) => {
               m.end_date,
               m.include_tax_id,
               m.content_hash,
-              m.file_path,
               m.language,
               COALESCE(m.currency, CASE WHEN b.region = 'CA' THEN 'CAD' ELSE 'USD' END) AS currency,
               m.page_count,
@@ -303,7 +299,6 @@ router.get("/history", exportGrantLimiter, async (req, res) => {
                   MAX(CASE WHEN key = 'end_date' THEN value END) AS end_date,
                   MAX(CASE WHEN key = 'include_tax_id' THEN value END) AS include_tax_id,
                   MAX(CASE WHEN key = 'content_hash' THEN value END) AS content_hash,
-                  MAX(CASE WHEN key = 'file_path' THEN value END) AS file_path,
                   MAX(CASE WHEN key = 'language' THEN value END) AS language,
                   MAX(CASE WHEN key = 'currency' THEN value END) AS currency,
                   MAX(CASE WHEN key = 'page_count' THEN value END) AS page_count,

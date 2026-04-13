@@ -81,6 +81,42 @@ test("deriveEffectiveState preserves grace-period access for canceling subscript
   assert.equal(snapshot.cancelAtPeriodEnd, true);
 });
 
+test("deriveEffectiveState keeps past_due subscriptions active only during the configured grace period", () => {
+  const snapshot = deriveEffectiveState({
+    id: "sub_past_due_grace",
+    business_id: "biz_past_due_grace",
+    provider: "stripe",
+    plan_code: PLAN_V1,
+    status: "past_due",
+    current_period_end: isoDateFromNow(3),
+    metadata_json: {
+      past_due_started_at: isoDateFromNow(-2)
+    }
+  });
+
+  assert.equal(snapshot.effectiveTier, PLAN_V1);
+  assert.equal(snapshot.effectiveStatus, "past_due");
+  assert.equal(snapshot.isPaid, true);
+});
+
+test("deriveEffectiveState downgrades past_due subscriptions after the grace period expires", () => {
+  const snapshot = deriveEffectiveState({
+    id: "sub_past_due_expired",
+    business_id: "biz_past_due_expired",
+    provider: "stripe",
+    plan_code: PLAN_V1,
+    status: "past_due",
+    current_period_end: isoDateFromNow(3),
+    metadata_json: {
+      past_due_started_at: isoDateFromNow(-10)
+    }
+  });
+
+  assert.equal(snapshot.effectiveTier, PLAN_FREE);
+  assert.equal(snapshot.effectiveStatus, "past_due");
+  assert.equal(snapshot.isPaid, false);
+});
+
 test("deriveEffectiveState keeps explicit free plans on free", () => {
   const snapshot = deriveEffectiveState({
     id: "sub_free",

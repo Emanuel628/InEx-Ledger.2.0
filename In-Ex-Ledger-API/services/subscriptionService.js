@@ -3,12 +3,24 @@ const { pool } = require("../db.js");
 const { buildStripePriceLookup } = require("./stripePriceConfig.js");
 
 const DEFAULT_TRIAL_DAYS = Number(process.env.DEFAULT_TRIAL_DAYS || 30);
+const BILLING_PAST_DUE_GRACE_DAYS = Number(process.env.BILLING_PAST_DUE_GRACE_DAYS || 7);
 const PLAN_FREE = "free";
 const PLAN_V1 = "v1";
 
 
 function addDays(date, days) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function normalizeDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function resolvePastDueStartedAt(row) {
+  const metadata = row?.metadata_json && typeof row.metadata_json === "object" ? row.metadata_json : {};
+  return normalizeDate(metadata.past_due_started_at);
 }
 
 async function ensureBusinessSubscription(businessId) {
@@ -71,13 +83,20 @@ async function ensureBusinessSubscription(businessId) {
 
 function deriveEffectiveState(row) {
   const now = Date.now();
-  const trialEndsAt = row?.trial_ends_at ? new Date(row.trial_ends_at) : null;
-  const currentPeriodEnd = row?.current_period_end ? new Date(row.current_period_end) : null;
+  const trialEndsAt = normalizeDate(row?.trial_ends_at);
+  const currentPeriodEnd = normalizeDate(row?.current_period_end);
+  const pastDueStartedAt = resolvePastDueStartedAt(row);
+  const pastDueGraceEndsAt = pastDueStartedAt ? addDays(pastDueStartedAt, BILLING_PAST_DUE_GRACE_DAYS) : null;
   const isTrialing = Boolean(row?.status === "trialing" && trialEndsAt && trialEndsAt.getTime() > now);
   const isActivePaid =
-    Boolean((row?.status === "active" || row?.status === "past_due") &&
+    Boolean(row?.status === "active" &&
     row?.plan_code === PLAN_V1 &&
     (!currentPeriodEnd || currentPeriodEnd.getTime() > now));
+  const isPastDueGracePeriod =
+    Boolean(row?.status === "past_due" &&
+    row?.plan_code === PLAN_V1 &&
+    pastDueGraceEndsAt &&
+    pastDueGraceEndsAt.getTime() > now);
   const isGracePeriod =
     Boolean(row?.cancel_at_period_end &&
     row?.plan_code === PLAN_V1 &&
@@ -90,7 +109,7 @@ function deriveEffectiveState(row) {
   if (isTrialing) {
     effectiveTier = PLAN_V1;
     effectiveStatus = "trialing";
-  } else if (isActivePaid || isGracePeriod) {
+  } else if (isActivePaid || isGracePeriod || isPastDueGracePeriod) {
     effectiveTier = PLAN_V1;
     effectiveStatus = row.status;
   } else if (row?.status === "trialing" && trialEndsAt && trialEndsAt.getTime() <= now) {
@@ -110,7 +129,7 @@ function deriveEffectiveState(row) {
     effectiveTier,
     effectiveStatus,
     isTrialing,
-    isPaid: Boolean(isActivePaid || isGracePeriod),
+    isPaid: Boolean(isActivePaid || isGracePeriod || isPastDueGracePeriod),
     cancelAtPeriodEnd: Boolean(row?.cancel_at_period_end),
     stripeCustomerId: row?.stripe_customer_id || null,
     stripeSubscriptionId: row?.stripe_subscription_id || null,
@@ -171,8 +190,19 @@ async function syncStripeSubscriptionForBusiness(businessId, subscription) {
     ? new Date(subscription.current_period_end * 1000)
     : null;
   const canceledAt = subscription?.canceled_at ? new Date(subscription.canceled_at * 1000) : null;
+  const currentSnapshot = await ensureBusinessSubscription(businessId);
+  const currentMetadata =
+    currentSnapshot?.metadata_json && typeof currentSnapshot.metadata_json === "object"
+      ? currentSnapshot.metadata_json
+      : {};
+  const nextStatus = subscription?.status || "active";
+  const pastDueStartedAt =
+    nextStatus === "past_due"
+      ? currentSnapshot?.status === "past_due" && currentMetadata.past_due_started_at
+        ? currentMetadata.past_due_started_at
+        : new Date().toISOString()
+      : null;
 
-  await ensureBusinessSubscription(businessId);
   await pool.query(
     `UPDATE business_subscriptions
         SET plan_code = $2,
@@ -192,7 +222,7 @@ async function syncStripeSubscriptionForBusiness(businessId, subscription) {
     [
       businessId,
       PLAN_V1,
-      subscription?.status || "active",
+      nextStatus,
       subscription?.customer || null,
       subscription?.id || null,
       baseItem?.price?.id || null,
@@ -206,7 +236,8 @@ async function syncStripeSubscriptionForBusiness(businessId, subscription) {
         billing_interval: billingInterval,
         currency,
         additional_businesses: additionalBusinesses,
-        addon_price_id: addonPriceId
+        addon_price_id: addonPriceId,
+        past_due_started_at: pastDueStartedAt
       })
     ]
   );

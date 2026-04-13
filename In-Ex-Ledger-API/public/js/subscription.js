@@ -53,6 +53,19 @@ function clampAdditionalBusinesses(value) {
   return Math.min(Math.max(Math.trunc(value), 0), MAX_ADDITIONAL_BUSINESSES);
 }
 
+function isAllowedBillingRedirect(url) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.protocol === "https:" && (
+      parsed.hostname === "checkout.stripe.com" ||
+      parsed.hostname === "billing.stripe.com"
+    );
+  } catch (_) {
+    return false;
+  }
+}
+
 function updatePricingUI() {
   const intervalButtons = Array.from(document.querySelectorAll("[data-billing-interval]"));
   const currencyButtons = Array.from(document.querySelectorAll("[data-currency]"));
@@ -398,6 +411,9 @@ async function startCheckout() {
     const payload = await res.json().catch(() => null);
     if (!res.ok) throw new Error(payload?.error || tx("subscription_checkout_error"));
     if (payload?.url) {
+      if (!isAllowedBillingRedirect(payload.url)) {
+        throw new Error(tx("subscription_checkout_error"));
+      }
       window.location.href = payload.url;
       return;
     }
@@ -417,7 +433,12 @@ async function openCustomerPortal() {
     if (!res) return;
     const payload = await res.json().catch(() => null);
     if (!res.ok) throw new Error(payload?.error || tx("subscription_portal_error"));
-    if (payload?.url) window.location.href = payload.url;
+    if (payload?.url) {
+      if (!isAllowedBillingRedirect(payload.url)) {
+        throw new Error(tx("subscription_portal_error"));
+      }
+      window.location.href = payload.url;
+    }
   } catch (err) {
     showSubToast(err.message || tx("subscription_portal_error"));
   }

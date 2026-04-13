@@ -1,19 +1,22 @@
 const crypto = require("crypto");
 const { pool } = require("../db.js");
-const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { logWarn } = require("../utils/logger.js");
 
-const EXPORT_GRANT_SECRET = process.env.EXPORT_GRANT_SECRET;
 const EXPORT_GRANT_TTL_MS = Number(process.env.EXPORT_GRANT_TTL_MS || 60_000);
 const ACTION_SCOPE = "generate_pdf";
 
-if (!EXPORT_GRANT_SECRET) {
-  throw new Error("EXPORT_GRANT_SECRET environment variable is required. Set it before starting the server.");
-}
+let warnedAboutMissingSecret = false;
 
 function ensureSecret() {
+  const EXPORT_GRANT_SECRET = process.env.EXPORT_GRANT_SECRET;
   if (!EXPORT_GRANT_SECRET) {
+    if (!warnedAboutMissingSecret) {
+      warnedAboutMissingSecret = true;
+      logWarn("EXPORT_GRANT_SECRET is not configured; export grant endpoints will reject requests.");
+    }
     throw new Error("EXPORT_GRANT_SECRET environment variable is required.");
   }
+  return EXPORT_GRANT_SECRET;
 }
 
 function encodeSegment(value) {
@@ -26,6 +29,7 @@ function decodeSegment(value) {
 }
 
 function signWithGrantSecret(message) {
+  const EXPORT_GRANT_SECRET = ensureSecret();
   return crypto.createHmac("sha256", EXPORT_GRANT_SECRET).update(message).digest("base64url");
 }
 

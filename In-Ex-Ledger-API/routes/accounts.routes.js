@@ -16,6 +16,7 @@ const {
 } = require("../services/accountingLockService.js");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card", "cash", "loan"];
 
 const router = express.Router();
 router.use(requireAuth);
@@ -50,8 +51,6 @@ router.get("/", async (req, res) => {
  */
 router.post("/", async (req, res) => {
   const { name, type } = req.body;
-
-  const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card"];
 
   if (!name || !type) {
     return res.status(400).json({ error: "Account name and type are required." });
@@ -91,8 +90,6 @@ router.put("/:id", async (req, res) => {
     return res.status(400).json({ error: "Invalid account ID." });
   }
   const { name, type } = req.body;
-
-  const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card"];
 
   if (!name && !type) {
     return res.status(400).json({ error: "At least one of name or type is required." });
