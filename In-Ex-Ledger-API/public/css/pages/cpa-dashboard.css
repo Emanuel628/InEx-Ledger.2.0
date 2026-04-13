@@ -441,3 +441,18 @@
   font-weight: 800;
   margin-bottom: 4px;
 }
+
+.cpa-list-truncation {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--ink3);
+  text-align: center;
+}
+
+.cpa-truncation-row td {
+  font-size: 12px;
+  color: var(--ink3);
+  text-align: center;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
