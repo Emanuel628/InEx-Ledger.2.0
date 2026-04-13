@@ -92,8 +92,14 @@ async function initCpaDashboard() {
     const businessSummaries = Array.isArray(summaryPayload?.business_summaries) ? summaryPayload.business_summaries : [];
     renderSummary(summaryPayload?.summary || {}, summaryPayload?.grant_scope || "business", businessSummaries);
     renderBusinessContext(businessSummaries, businessSelect.value);
-    renderTransactions(Array.isArray(transactionsPayload?.data) ? transactionsPayload.data : []);
-    renderReceipts(Array.isArray(receiptsPayload?.receipts) ? receiptsPayload.receipts : []);
+    renderTransactions(
+      Array.isArray(transactionsPayload?.data) ? transactionsPayload.data : [],
+      Number(transactionsPayload?.total ?? (transactionsPayload?.data?.length || 0))
+    );
+    renderReceipts(
+      Array.isArray(receiptsPayload?.receipts) ? receiptsPayload.receipts : [],
+      Number(receiptsPayload?.total ?? (receiptsPayload?.receipts?.length || 0))
+    );
     renderMileage(Array.isArray(mileagePayload?.data) ? mileagePayload.data : []);
     renderExports(Array.isArray(exportsPayload?.exports) ? exportsPayload.exports : []);
     renderAuditLog(Array.isArray(auditPayload?.logs) ? auditPayload.logs : []);
@@ -263,7 +269,7 @@ function renderBusinessContext(businessSummaries, selectedBusinessId) {
   }).join("");
 }
 
-function renderTransactions(transactions) {
+function renderTransactions(transactions, total) {
   const body = document.getElementById("cpaTransactionsBody");
   if (!body) {
     return;
@@ -274,7 +280,10 @@ function renderTransactions(transactions) {
     return;
   }
 
-  body.innerHTML = transactions.slice(0, 12).map((transaction) => {
+  const PREVIEW = 12;
+  const shown = Math.min(transactions.length, PREVIEW);
+  const grandTotal = Math.max(total || 0, transactions.length);
+  body.innerHTML = transactions.slice(0, PREVIEW).map((transaction) => {
     const currency = inferCurrencyFromRegion(transaction.business_region);
     return `
       <tr>
@@ -287,9 +296,13 @@ function renderTransactions(transactions) {
       </tr>
     `;
   }).join("");
+
+  if (grandTotal > shown) {
+    body.innerHTML += `<tr class="cpa-truncation-row"><td colspan="6">Showing ${shown} of ${grandTotal} transactions</td></tr>`;
+  }
 }
 
-function renderReceipts(receipts) {
+function renderReceipts(receipts, total) {
   const list = document.getElementById("cpaReceiptsList");
   if (!list) {
     return;
@@ -299,8 +312,10 @@ function renderReceipts(receipts) {
     list.innerHTML = '<div class="cpa-list-empty">No receipts found.</div>';
     return;
   }
-
-  list.innerHTML = receipts.slice(0, 8).map((receipt) => `
+  const PREVIEW = 8;
+  const shown = Math.min(receipts.length, PREVIEW);
+  const grandTotal = Math.max(total || 0, receipts.length);
+  let html = receipts.slice(0, PREVIEW).map((receipt) => `
     <div class="cpa-list-item cpa-list-item-action">
       <div class="cpa-list-copy">
         <p class="cpa-list-title">${escapeHtml(receipt.filename || "Receipt")}</p>
@@ -317,6 +332,11 @@ function renderReceipts(receipts) {
       </div>
     </div>
   `).join("");
+
+  if (grandTotal > shown) {
+    html += `<p class="cpa-list-truncation">Showing ${shown} of ${grandTotal} receipts</p>`;
+  }
+  list.innerHTML = html;
 }
 
 function renderMileage(mileageRecords) {
@@ -330,7 +350,10 @@ function renderMileage(mileageRecords) {
     return;
   }
 
-  list.innerHTML = mileageRecords.slice(0, 8).map((entry) => {
+  const PREVIEW = 8;
+  const shown = Math.min(mileageRecords.length, PREVIEW);
+  const grandTotal = mileageRecords.length;
+  let html = mileageRecords.slice(0, PREVIEW).map((entry) => {
     const distance = Number(entry.km) > 0
       ? `${Number(entry.km).toFixed(1)} km`
       : `${Number(entry.miles || 0).toFixed(1)} mi`;
@@ -342,7 +365,13 @@ function renderMileage(mileageRecords) {
       </div>
     `;
   }).join("");
+
+  if (grandTotal > shown) {
+    html += `<p class="cpa-list-truncation">Showing ${shown} of ${grandTotal} mileage records</p>`;
+  }
+  list.innerHTML = html;
 }
+
 function renderExports(exportsList) {
   const list = document.getElementById("cpaExportsList");
   if (!list) {
@@ -354,7 +383,10 @@ function renderExports(exportsList) {
     return;
   }
 
-  list.innerHTML = exportsList.slice(0, 8).map((entry) => {
+  const PREVIEW = 8;
+  const shown = Math.min(exportsList.length, PREVIEW);
+  const grandTotal = exportsList.length;
+  let html = exportsList.slice(0, PREVIEW).map((entry) => {
     const currency = entry.currency || inferCurrencyFromRegion(entry.business_region);
     const taxLabel = inferTaxFormLabel(entry.business_region);
     return `
@@ -374,6 +406,11 @@ function renderExports(exportsList) {
       </div>
     `;
   }).join("");
+
+  if (grandTotal > shown) {
+    html += `<p class="cpa-list-truncation">Showing ${shown} of ${grandTotal} exports</p>`;
+  }
+  list.innerHTML = html;
 }
 
 function renderAuditLog(logs) {
