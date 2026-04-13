@@ -298,10 +298,20 @@ function getToken() {
 
   try {
     const legacyToken = localStorage.getItem(TOKEN_KEY) || "";
-    if (legacyToken) {
-      sessionStorage.setItem(TOKEN_KEY, legacyToken);
-      localStorage.removeItem(TOKEN_KEY);
+    if (!legacyToken) {
+      return "";
     }
+    try {
+      sessionStorage.setItem(TOKEN_KEY, legacyToken);
+    } catch (_) {
+      if (localStorage.getItem("debug") === "true") {
+        console.warn("[AUTH] Unable to migrate token to sessionStorage.");
+      }
+      return "";
+    }
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch (_) {}
     return legacyToken;
   } catch (_) {
     return "";

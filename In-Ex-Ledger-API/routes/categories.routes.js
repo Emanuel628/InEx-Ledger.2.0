@@ -25,12 +25,16 @@ router.use(createDataApiLimiter());
 const VALID_KINDS = new Set(["income", "expense"]);
 const VALID_COLORS = new Set(["blue", "green", "amber", "pink", "red", "slate"]);
 const PG_UNIQUE_VIOLATION = "23505";
+const CATEGORY_NAME_UNIQUE_CONSTRAINTS = new Set([
+  "categories_business_name_unique",
+  "categories_business_name_unique_ci"
+]);
 
 function isCategoryNameConflict(err) {
   return (
     err?.code === PG_UNIQUE_VIOLATION &&
     typeof err?.constraint === "string" &&
-    err.constraint.startsWith("categories_business_name_unique")
+    CATEGORY_NAME_UNIQUE_CONSTRAINTS.has(err.constraint)
   );
 }
 

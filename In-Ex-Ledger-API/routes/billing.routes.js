@@ -213,7 +213,7 @@ async function ensureStripeCustomer(businessId, user) {
 }
 
 function buildAppUrl(path) {
-  const base = String(process.env.APP_BASE_URL || "").trim();
+  const base = (process.env.APP_BASE_URL || "").trim();
   if (!base) {
     throw new Error("APP_BASE_URL is not configured");
   }

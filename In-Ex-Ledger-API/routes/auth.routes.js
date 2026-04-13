@@ -235,7 +235,12 @@ async function revokeAllRefreshTokensForUser(userId) {
   ]);
 }
 
-async function issueAuthenticatedSession(res, user, businessIdOverride = null) {
+async function issueAuthenticatedSession(
+  res,
+  user,
+  businessIdOverride = null,
+  { mfaAuthenticated = false } = {}
+) {
   const verified = Boolean(user.email_verified);
   const businessId = businessIdOverride || (await resolveBusinessIdForUser(user));
   const subscription = await getSubscriptionSnapshotForBusiness(businessId);
@@ -247,12 +252,14 @@ async function issueAuthenticatedSession(res, user, businessIdOverride = null) {
       email_verified: verified,
       business_id: businessId,
       mfa_enabled: !!user.mfa_enabled,
-      mfa_authenticated: !!user.mfa_enabled
+      mfa_authenticated: !!mfaAuthenticated
     },
     ACCESS_TOKEN_EXPIRY_SECONDS
   );
 
-  const { token: refreshToken, expiresAt } = await createRefreshToken(user.id);
+  const { token: refreshToken, expiresAt } = await createRefreshToken(user.id, {
+    mfaAuthenticated: !!mfaAuthenticated
+  });
   setRefreshCookie(res, refreshToken, expiresAt);
 
   return {
@@ -266,7 +273,9 @@ async function issueAuthenticatedSession(res, user, businessIdOverride = null) {
 
 async function resetCurrentRefreshSession(res, user) {
   await revokeAllRefreshTokensForUser(user.id);
-  const { token, expiresAt } = await createRefreshToken(user.id);
+  const { token, expiresAt } = await createRefreshToken(user.id, {
+    mfaAuthenticated: !!user.mfa_enabled
+  });
   setRefreshCookie(res, token, expiresAt);
 }
 
@@ -442,14 +451,14 @@ function hashMfaTrustToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-async function createRefreshToken(userId) {
+async function createRefreshToken(userId, { mfaAuthenticated = false } = {}) {
   const token = crypto.randomBytes(REFRESH_TOKEN_BYTE_LENGTH).toString("hex");
   const hashed = hashRefreshToken(token);
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
   await pool.query(
-    `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at)
-     VALUES ($1, $2, $3, $4)`,
-    [crypto.randomUUID(), userId, hashed, expiresAt]
+    `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, mfa_authenticated)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [crypto.randomUUID(), userId, hashed, expiresAt, !!mfaAuthenticated]
   );
   return { token, expiresAt };
 }
@@ -659,11 +668,13 @@ router.post("/login", authLimiter, async (req, res) => {
 
     const verified = Boolean(user.email_verified);
     const businessId = await resolveBusinessIdForUser(user);
+    let mfaAuthenticated = false;
 
     if (user.mfa_enabled) {
       const trustedDevice = await resolveTrustedMfaDevice(req.cookies?.[MFA_TRUST_COOKIE], user.id);
       if (trustedDevice) {
         await touchTrustedMfaDevice(trustedDevice.id);
+        mfaAuthenticated = true;
       } else {
         clearMfaTrustCookie(res);
       }
@@ -685,7 +696,9 @@ router.post("/login", authLimiter, async (req, res) => {
       }
     }
 
-    const session = await issueAuthenticatedSession(res, user, businessId);
+    const session = await issueAuthenticatedSession(res, user, businessId, {
+      mfaAuthenticated
+    });
     res.status(200).json(session);
   } catch (err) {
     logError("Login error:", err);
@@ -707,7 +720,7 @@ router.post("/refresh", requireCsrfProtection, async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT rt.user_id, u.email, u.role, u.email_verified
+      `SELECT rt.user_id, rt.mfa_authenticated, u.email, u.role, u.email_verified
               , u.mfa_enabled
        FROM refresh_tokens rt
        JOIN users u ON u.id = rt.user_id
@@ -722,7 +735,9 @@ router.post("/refresh", requireCsrfProtection, async (req, res) => {
     }
 
     await revokeRefreshTokenByHash(hashed);
-    const refreshData = await createRefreshToken(result.rows[0].user_id);
+    const refreshData = await createRefreshToken(result.rows[0].user_id, {
+      mfaAuthenticated: !!result.rows[0].mfa_authenticated
+    });
     setRefreshCookie(res, refreshData.token, refreshData.expiresAt);
 
     const businessId = await resolveBusinessIdForUser({
@@ -740,7 +755,7 @@ router.post("/refresh", requireCsrfProtection, async (req, res) => {
         email_verified: !!result.rows[0].email_verified,
         business_id: businessId,
         mfa_enabled: !!result.rows[0].mfa_enabled,
-        mfa_authenticated: !!result.rows[0].mfa_enabled
+        mfa_authenticated: !!result.rows[0].mfa_authenticated
       },
       ACCESS_TOKEN_EXPIRY_SECONDS
     );
@@ -1087,7 +1102,9 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
       const trustedDevice = await createTrustedMfaDevice(refreshedUser, req);
       setMfaTrustCookie(res, trustedDevice.token, trustedDevice.expiresAt);
     }
-    const session = await issueAuthenticatedSession(res, refreshedUser, pending.business_id || null);
+    const session = await issueAuthenticatedSession(res, refreshedUser, pending.business_id || null, {
+      mfaAuthenticated: true
+    });
     return res.status(200).json(session);
   } catch (err) {
     logError("MFA verify error:", err);
