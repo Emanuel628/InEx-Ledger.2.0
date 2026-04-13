@@ -42,11 +42,28 @@ async function ensureBusinessSubscription(businessId) {
         current_period_end
      )
      VALUES ($1, $2, 'stripe', $3, 'trialing', $4, $5, $4, $5)
+     ON CONFLICT (business_id) DO NOTHING
      RETURNING *`,
     [crypto.randomUUID(), businessId, PLAN_V1, now, trialEndsAt]
   );
 
-  return inserted.rows[0];
+  if (inserted.rowCount) {
+    return inserted.rows[0];
+  }
+
+  // A concurrent request inserted the row between our SELECT and INSERT.
+  // Fetch and return the row that won the race.
+  const fallback = await pool.query(
+    `SELECT id, business_id, provider, plan_code, status, stripe_customer_id,
+            stripe_subscription_id, stripe_price_id, trial_started_at, trial_ends_at,
+            current_period_start, current_period_end, cancel_at_period_end, canceled_at,
+            metadata_json
+       FROM business_subscriptions
+      WHERE business_id = $1
+      LIMIT 1`,
+    [businessId]
+  );
+  return fallback.rows[0];
 }
 
 function deriveEffectiveState(row) {

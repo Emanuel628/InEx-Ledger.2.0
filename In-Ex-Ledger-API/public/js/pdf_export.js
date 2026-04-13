@@ -466,8 +466,9 @@ function getEdgeCaseReasons(txn, baseCurrency) {
   if (Number(txn.indirectTaxAmount ?? txn.indirect_tax_amount) > 0) {
     reasons.push("Indirect tax");
   }
-  if (String(txn.reviewStatus || txn.review_status || "needs_review").toLowerCase() !== "ready") {
-    reasons.push(String(txn.reviewStatus || txn.review_status || "Needs review").replace(/_/g, " "));
+  const reviewStatus = txn.reviewStatus || txn.review_status;
+  if (reviewStatus && String(reviewStatus).toLowerCase() !== "ready") {
+    reasons.push(String(reviewStatus).replace(/_/g, " "));
   }
   return reasons;
 }

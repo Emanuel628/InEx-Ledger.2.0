@@ -2,9 +2,9 @@ const crypto = require("crypto");
 const { pool } = require("../../db.js");
 
 const defaultAccounts = [
-  { name: "Checking", type: "asset" },
-  { name: "Cash", type: "asset" },
-  { name: "Credit Card", type: "liability" },
+  { name: "Checking", type: "checking" },
+  { name: "Cash", type: "checking" },
+  { name: "Credit Card", type: "credit_card" },
 ];
 
 const defaultCategoriesUS = [
