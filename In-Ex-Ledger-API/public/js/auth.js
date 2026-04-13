@@ -289,15 +289,51 @@ function ensureLegacyUserPills() {
 
 
 function getToken() {
-  return localStorage.getItem(TOKEN_KEY) || "";
+  try {
+    const sessionToken = sessionStorage.getItem(TOKEN_KEY) || "";
+    if (sessionToken) {
+      return sessionToken;
+    }
+  } catch (_) {}
+
+  try {
+    const legacyToken = localStorage.getItem(TOKEN_KEY) || "";
+    if (!legacyToken) {
+      return "";
+    }
+    try {
+      sessionStorage.setItem(TOKEN_KEY, legacyToken);
+    } catch (_) {
+      if (localStorage.getItem("debug") === "true") {
+        console.warn("[AUTH] Unable to migrate token to sessionStorage.");
+      }
+      return "";
+    }
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch (_) {}
+    return legacyToken;
+  } catch (_) {
+    return "";
+  }
 }
 
 function setToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
+  try {
+    sessionStorage.setItem(TOKEN_KEY, token);
+  } catch (_) {}
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch (_) {}
 }
 
 function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  try {
+    sessionStorage.removeItem(TOKEN_KEY);
+  } catch (_) {}
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch (_) {}
   clearSubscriptionState();
   clearAppState();
   if (window.__AUTH_GUARD_STATE__) {

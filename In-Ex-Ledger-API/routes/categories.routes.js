@@ -24,6 +24,19 @@ router.use(createDataApiLimiter());
 
 const VALID_KINDS = new Set(["income", "expense"]);
 const VALID_COLORS = new Set(["blue", "green", "amber", "pink", "red", "slate"]);
+const PG_UNIQUE_VIOLATION = "23505";
+const CATEGORY_NAME_UNIQUE_CONSTRAINTS = new Set([
+  "categories_business_name_unique",
+  "categories_business_name_unique_ci"
+]);
+
+function isCategoryNameConflict(err) {
+  return (
+    err?.code === PG_UNIQUE_VIOLATION &&
+    typeof err?.constraint === "string" &&
+    CATEGORY_NAME_UNIQUE_CONSTRAINTS.has(err.constraint)
+  );
+}
 
 /**
  * GET /api/categories
@@ -73,6 +86,9 @@ router.post("/", async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
+    if (isCategoryNameConflict(err)) {
+      return res.status(409).json({ error: "A category with this name already exists." });
+    }
     logError("POST /categories error:", err.message);
     res.status(500).json({ error: "Failed to create category." });
   }
@@ -140,6 +156,9 @@ router.put("/:id", async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch (err) {
+    if (isCategoryNameConflict(err)) {
+      return res.status(409).json({ error: "A category with this name already exists." });
+    }
     if (err instanceof AccountingPeriodLockedError) {
       return res.status(err.status).json({
         error: err.message,
