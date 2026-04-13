@@ -395,6 +395,7 @@ function wireTransactionForm() {
     const indirectTaxRecoverableInput = document.getElementById("transactionIndirectTaxRecoverable");
     const reviewStatusSelect = document.getElementById("transactionReviewStatus");
     const reviewNotesInput = document.getElementById("transactionReviewNotes");
+    const noteInput = document.getElementById("transactionNote");
 
     const date = dateInput.value;
     const description = descriptionInput.value.trim();
@@ -439,7 +440,7 @@ function wireTransactionForm() {
         type,
         description,
         date,
-        note: "",
+        note: noteInput?.value.trim() || "",
         cleared,
         currency: currencySelect?.value || getTransactionDefaultCurrency(),
         source_amount: normalizeNumberOrEmpty(sourceAmountInput?.value),
@@ -1151,6 +1152,7 @@ function prefillTransactionForm(transaction) {
   const indirectTaxRecoverableInput = document.getElementById("transactionIndirectTaxRecoverable");
   const reviewStatusSelect = document.getElementById("transactionReviewStatus");
   const reviewNotesInput = document.getElementById("transactionReviewNotes");
+  const noteInput = document.getElementById("transactionNote");
 
   if (dateInput) {
     dateInput.value = transaction.date || "";
@@ -1205,6 +1207,9 @@ function prefillTransactionForm(transaction) {
   }
   if (reviewNotesInput) {
     reviewNotesInput.value = transaction.reviewNotes || transaction.review_notes || "";
+  }
+  if (noteInput) {
+    noteInput.value = transaction.note || "";
   }
   syncEdgeCaseUi();
 }
@@ -1525,7 +1530,7 @@ function renderTransactionList(filteredTransactions) {
     const editButton = row.querySelector('[data-action="edit-transaction"]');
     if (editButton) {
       editButton.addEventListener("click", () => {
-        openTransactionModal(txn.id);
+        handleEditEntry(txn.id);
       });
     }
   });

@@ -93,7 +93,7 @@ router.get("/dashboard", async (req, res) => {
        FROM transactions
        WHERE business_id = $1
          AND date >= $2
-         AND is_adjustment = false
+         AND (is_adjustment = false OR is_adjustment IS NULL)
          AND deleted_at IS NULL
          AND (is_void = false OR is_void IS NULL)
        GROUP BY month, type
@@ -111,7 +111,7 @@ router.get("/dashboard", async (req, res) => {
        WHERE t.business_id = $1
          AND t.type = 'income'
          AND t.date >= $2
-         AND t.is_adjustment = false
+         AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
          AND t.deleted_at IS NULL
          AND (t.is_void = false OR t.is_void IS NULL)
        GROUP BY c.name
@@ -130,7 +130,7 @@ router.get("/dashboard", async (req, res) => {
        WHERE t.business_id = $1
          AND t.type = 'expense'
          AND t.date >= $2
-         AND t.is_adjustment = false
+         AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
          AND t.deleted_at IS NULL
          AND (t.is_void = false OR t.is_void IS NULL)
        GROUP BY c.name
@@ -213,7 +213,7 @@ router.get("/cash-flow", async (req, res) => {
        FROM transactions
        WHERE business_id = $1
          AND date >= $2
-         AND is_adjustment = false
+         AND (is_adjustment = false OR is_adjustment IS NULL)
          AND deleted_at IS NULL
          AND (is_void = false OR is_void IS NULL)
        GROUP BY month, type`,
@@ -292,8 +292,10 @@ router.get("/cash-flow", async (req, res) => {
     for (let i = 1; i <= 3; i++) {
       const projDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
       const label = projDate.toISOString().slice(0, 7);
-      // Projected income: historical average (non-recurring) + known recurring income
-      const projectedIncome = avgHistIncome + recurringMonthlyIncome;
+      // Projected income: use historical average as the baseline.
+      // avgHistIncome already includes recurring income, so adding recurringMonthlyIncome
+      // would double-count it.
+      const projectedIncome = avgHistIncome;
       // Projected expense: use historical average as the baseline
       const projectedExpense = avgHistExpense;
       const projectedNet = projectedIncome - projectedExpense;
@@ -351,7 +353,7 @@ router.get("/seasonal", async (req, res) => {
        FROM transactions
        WHERE business_id = $1
          AND type = 'income'
-         AND is_adjustment = false
+         AND (is_adjustment = false OR is_adjustment IS NULL)
          AND deleted_at IS NULL
          AND (is_void = false OR is_void IS NULL)
        GROUP BY month_num, month_name
@@ -469,7 +471,7 @@ router.post("/whatif", async (req, res) => {
        FROM transactions
        WHERE business_id = $1
          AND date >= $2
-         AND is_adjustment = false
+         AND (is_adjustment = false OR is_adjustment IS NULL)
          AND deleted_at IS NULL
          AND (is_void = false OR is_void IS NULL)`,
       [businessId, since]

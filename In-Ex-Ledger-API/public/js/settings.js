@@ -68,7 +68,7 @@ const SETTINGS_BUSINESS_TYPE_KEYS = {
 };
 
 let privacySettings = {
-  dataSharingOptOut: false,
+  dataSharingOptOut: null,
   consentGiven: false,
   analyticsOptIn: false,
   dataResidency: "US"
@@ -1558,19 +1558,18 @@ function initSecurityForm() {
   const updateStrength = () => {
     const password = newInput.value;
     const score = getPasswordScore(password);
-    const label = getStrengthLabel(score);
     const tone =
-      label === "Strong"
+      score >= 3
         ? "is-strong"
-        : label === "Fair"
+        : score >= 2
         ? "is-fair"
         : "is-weak";
     strengthMeter.classList.remove("score-0", "score-1", "score-2", "score-3", "is-weak", "is-fair", "is-strong");
     strengthMeter.classList.add(`score-${Math.max(0, Math.min(3, score))}`, tone);
     const labelKey =
-      label === "Strong"
+      score >= 3
         ? "settings_password_strong"
-        : label === "Fair"
+        : score >= 2
         ? "settings_password_fair"
         : "settings_password_weak";
     strengthText.textContent = t(labelKey);

@@ -276,7 +276,7 @@ function updateStrengthMeter() {
       : label === "Fair"
       ? "register_strength_label_good"
       : "register_strength_label_weak";
-  strengthText.textContent = t(labelKey);
+  strengthText.textContent = tx(labelKey);
   strengthText.classList.remove("is-weak", "is-fair", "is-strong");
   strengthText.classList.add(segmentClass);
 }
@@ -302,8 +302,8 @@ function updateMatchMessage() {
 
   const match = password === confirm;
   matchMessage.textContent = match
-    ? t("register_password_match_success")
-    : t("register_password_match_error");
+    ? tx("register_password_match_success")
+    : tx("register_password_match_error");
   matchMessage.classList.add(match ? "is-ok" : "is-bad");
 }
 

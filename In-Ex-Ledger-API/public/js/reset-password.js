@@ -2,7 +2,7 @@
    Reset Password Page JS
    ========================================================= */
 
-init();
+document.addEventListener("DOMContentLoaded", init);
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;

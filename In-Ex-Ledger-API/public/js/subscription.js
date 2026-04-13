@@ -266,7 +266,7 @@ async function loadSubscription() {
 
     // Cancel modal body
     if (cancelModalBody && sub.currentPeriodEnd) {
-      const endDate = new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+      const endDate = fmtDate(sub.currentPeriodEnd);
       cancelModalBody.textContent = typeof window.t === "function"
         ? window.t("settings_cancel_sub_modal_body_date").replace("{date}", endDate)
         : `Your subscription will remain active until ${endDate}. You will lose access to premium features after that date.`;
@@ -306,7 +306,6 @@ async function loadSubscription() {
       } else if (sub.stripeCustomerId) {
         planFreeBtn.disabled = false;
         planFreeBtn.textContent = tx("subscription_manage_billing");
-        planFreeBtn.addEventListener("click", openCustomerPortal);
       } else {
         planFreeBtn.disabled = true;
         planFreeBtn.textContent = tx("subscription_starter_cta");
@@ -435,6 +434,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const planProBtn = document.getElementById("planProBtn");
   planProBtn?.addEventListener("click", startCheckout);
+
+  const planFreeBtn = document.getElementById("planFreeBtn");
+  planFreeBtn?.addEventListener("click", openCustomerPortal);
 
   const manageBillingBtn = document.getElementById("subManageBillingBtn");
   manageBillingBtn?.addEventListener("click", openCustomerPortal);

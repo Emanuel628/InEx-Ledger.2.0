@@ -1143,7 +1143,15 @@ router.post("/reset-password", passwordLimiter, async (req, res) => {
 
   try {
     const hashedPassword = await hashPassword(password);
-    await pool.query("UPDATE users SET password_hash = $1 WHERE email = $2", [hashedPassword, email]);
+    const userResult = await pool.query(
+      "UPDATE users SET password_hash = $1 WHERE email = $2 RETURNING id",
+      [hashedPassword, email]
+    );
+    if (userResult.rowCount) {
+      const userId = userResult.rows[0].id;
+      await pool.query("UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false", [userId]);
+      await pool.query("DELETE FROM mfa_trusted_devices WHERE user_id = $1", [userId]);
+    }
     return res.status(200).json({ message: "Password updated successfully." });
   } catch (err) {
     logError("Reset password error:", err);

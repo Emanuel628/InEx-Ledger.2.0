@@ -426,7 +426,6 @@ async function requireValidSessionOrRedirect() {
     window.__AUTH_GUARD_STATE__.lastError = `me_${response.status}`;
   } catch (err) {
     if (localStorage.getItem("debug") === "true") { console.error("[AUTH] Session validation failed:", err); }
-    clearToken();
     window.__AUTH_GUARD_STATE__.running = false;
     window.__AUTH_GUARD_STATE__.lastError = "network";
     window.location.href = `${LOGIN_PAGE}?reason=network`;

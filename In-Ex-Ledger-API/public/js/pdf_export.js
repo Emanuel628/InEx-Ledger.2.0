@@ -334,14 +334,12 @@ function buildMileagePage(mileage, labels) {
   }
 
   const totalMiles = mileage
-    .filter((record) => record.unit === "miles")
     .reduce((sum, record) => sum + Math.abs(Number(record.miles) || 0), 0);
   const totalKilometers = mileage
-    .filter((record) => record.unit === "km")
-    .reduce((sum, record) => sum + Math.abs(Number(record.kilometers) || 0), 0);
+    .reduce((sum, record) => sum + Math.abs(Number(record.km) || 0), 0);
   const totalDistance = mileage.reduce((sum, record) => {
-    const start = Number(record.odoStart);
-    const end = Number(record.odoEnd);
+    const start = Number(record.odometer_start);
+    const end = Number(record.odometer_end);
     if (Number.isFinite(start) && Number.isFinite(end)) {
       return sum + Math.abs(end - start);
     }

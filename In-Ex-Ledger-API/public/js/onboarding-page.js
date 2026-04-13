@@ -48,20 +48,20 @@ function hydrateOnboardingDefaults(profile = {}) {
       (typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en");
   }
 
-  document.getElementById("onboardingBusinessName").value =
-    onboardingData.business_name || business.name || "";
-  document.getElementById("onboardingBusinessType").value =
-    onboardingData.business_type || business.business_type || "sole_proprietor";
-  document.getElementById("onboardingRegion").value =
-    onboardingData.region || business.region || "US";
-  document.getElementById("onboardingProvince").value =
-    onboardingData.province || business.province || "";
-  document.getElementById("onboardingStarterAccountType").value =
-    onboardingData.starter_account_type || "checking";
-  document.getElementById("onboardingStarterAccountName").value =
-    onboardingData.starter_account_name || tx("onboarding_default_account_name");
-  document.getElementById("onboardingStartFocus").value =
-    onboardingData.start_focus || "transactions";
+  const elBusinessName = document.getElementById("onboardingBusinessName");
+  if (elBusinessName) elBusinessName.value = onboardingData.business_name || business.name || "";
+  const elBusinessType = document.getElementById("onboardingBusinessType");
+  if (elBusinessType) elBusinessType.value = onboardingData.business_type || business.business_type || "sole_proprietor";
+  const elRegion = document.getElementById("onboardingRegion");
+  if (elRegion) elRegion.value = onboardingData.region || business.region || "US";
+  const elProvince = document.getElementById("onboardingProvince");
+  if (elProvince) elProvince.value = onboardingData.province || business.province || "";
+  const elStarterAccountType = document.getElementById("onboardingStarterAccountType");
+  if (elStarterAccountType) elStarterAccountType.value = onboardingData.starter_account_type || "checking";
+  const elStarterAccountName = document.getElementById("onboardingStarterAccountName");
+  if (elStarterAccountName) elStarterAccountName.value = onboardingData.starter_account_name || tx("onboarding_default_account_name");
+  const elStartFocus = document.getElementById("onboardingStartFocus");
+  if (elStartFocus) elStartFocus.value = onboardingData.start_focus || "transactions";
 
   syncProvinceField();
 }

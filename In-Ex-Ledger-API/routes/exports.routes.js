@@ -36,10 +36,13 @@ router.use(requireEmailVerified);
 
 const EXPORT_TTL_MS = Number(process.env.EXPORT_GRANT_TTL_MS || 60_000);
 
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 function validateDateRange(range) {
   if (!range || typeof range !== "object") return null;
   const { startDate, endDate } = range;
   if (!startDate || !endDate) return null;
+  if (!DATE_PATTERN.test(startDate) || !DATE_PATTERN.test(endDate)) return null;
   if (startDate > endDate) return null;
   return { startDate, endDate };
 }
