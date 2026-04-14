@@ -49,10 +49,10 @@ function loadMeRouter(options = {}) {
                   }
                   return { rows: [], rowCount: 0 };
                 }
-                if (/SELECT conname\s+FROM pg_constraint/i.test(sql)) {
+                if (/SELECT EXISTS\(\s*SELECT 1\s+FROM pg_constraint/i.test(sql)) {
                   return {
-                    rows: state.legacyConstraints.map((conname) => ({ conname })),
-                    rowCount: state.legacyConstraints.length
+                    rows: [{ has_legacy_constraints: state.legacyConstraints.length > 0 }],
+                    rowCount: 1
                   };
                 }
                 if (/SELECT id, email, password_hash FROM users/i.test(sql)) {
@@ -464,9 +464,9 @@ test("account deletion fails fast when legacy cpa_audit_logs constraints still e
 
     assert.equal(response.status, 500);
     assert.match(response.body?.detail || "", /045_drop_cpa_audit_user_fks\.sql/i);
-    assert.equal(
-      fixture.state.queries.some(({ sql }) => /DELETE FROM users WHERE id = \$1 RETURNING id/i.test(sql)),
-      false
+    assert.ok(
+      !fixture.state.queries.some(({ sql }) => /DELETE FROM users WHERE id = \$1 RETURNING id/i.test(sql)),
+      "route must stop before deleting users when legacy constraints still exist"
     );
   } finally {
     fixture.cleanup();

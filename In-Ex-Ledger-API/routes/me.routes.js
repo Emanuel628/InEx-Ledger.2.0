@@ -402,12 +402,14 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
     }
 
     const legacyConstraintResult = await client.query(
-      `SELECT conname
-         FROM pg_constraint
-        WHERE conname = ANY($1::text[])`,
+      `SELECT EXISTS(
+         SELECT 1
+           FROM pg_constraint
+          WHERE conname = ANY($1::text[])
+       ) AS has_legacy_constraints`,
       [LEGACY_CPA_AUDIT_USER_CONSTRAINTS]
     );
-    if (legacyConstraintResult.rowCount) {
+    if (legacyConstraintResult.rows[0]?.has_legacy_constraints) {
       await client.query("ROLLBACK");
       transactionOpen = false;
       return res.status(500).json({
