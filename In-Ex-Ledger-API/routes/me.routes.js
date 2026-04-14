@@ -32,6 +32,10 @@ const VALID_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash
 const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const REFRESH_TOKEN_COOKIE = "refresh_token";
+const LEGACY_CPA_AUDIT_USER_CONSTRAINTS = [
+  "cpa_audit_logs_owner_user_id_fkey",
+  "cpa_audit_logs_actor_user_id_fkey"
+];
 
 function normalizeOnboardingPayload(user) {
   return {
@@ -392,7 +396,23 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
       );
     } catch (error) {
       logWarn("DELETE /me: unable to drop legacy CPA audit constraints", {
-        message: error.message
+        message: error.message,
+        code: error.code
+      });
+    }
+
+    const legacyConstraintResult = await client.query(
+      `SELECT conname
+         FROM pg_constraint
+        WHERE conname = ANY($1::text[])`,
+      [LEGACY_CPA_AUDIT_USER_CONSTRAINTS]
+    );
+    if (legacyConstraintResult.rowCount) {
+      await client.query("ROLLBACK");
+      transactionOpen = false;
+      return res.status(500).json({
+        error: "Failed to delete account.",
+        detail: "Database migration 045_drop_cpa_audit_user_fks.sql must be applied before account deletion can succeed."
       });
     }
 

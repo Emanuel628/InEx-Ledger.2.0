@@ -2412,7 +2412,7 @@ function initDangerZone() {
               resetDeleteAccountMfaState();
               mfaWrap?.classList.remove("hidden");
             }
-            showSettingsToast(payload?.error || t("settings_delete_account_error"));
+            showSettingsToast(payload?.detail || payload?.error || t("settings_delete_account_error"));
             confirmButton.disabled = false;
             return;
           }
