@@ -355,10 +355,18 @@ async function renderBusinessList() {
         const bizId = btn.getAttribute("data-business-switch");
         btn.disabled = true;
         try {
+          if (typeof switchActiveBusiness === "function") {
+            await switchActiveBusiness(bizId);
+            return;
+          }
           const res = await apiFetch(`/api/businesses/${bizId}/activate`, { method: "POST" });
           if (!res || !res.ok) throw new Error();
-          showSettingsToast(t("settings_business_switched"));
-          await renderBusinessList();
+          const payload = await res.json().catch(() => null);
+          const refreshed = await refreshSettingsBusinessContext(payload, bizId);
+          if (!refreshed) {
+            showSettingsToast(t("settings_business_switched"));
+            await renderBusinessList();
+          }
         } catch {
           showSettingsToast(t("settings_business_switch_error"));
           btn.disabled = false;
@@ -377,6 +385,55 @@ async function renderBusinessList() {
     console.error("Failed to render business list", err);
     wrap.innerHTML = `<p class="settings-helper-note">${escapeHtml(t("settings_businesses_load_error"))}</p>`;
   }
+}
+
+function purgeSettingsUserNamespacedCache() {
+  const userId =
+    window.lunaStorage?.resolveStorageUserId?.(window.__LUNA_ME__)
+    || window.__LUNA_ME__?.id
+    || window.__LUNA_ME__?.user_id
+    || window.__LUNA_ME__?.userId
+    || "";
+  if (!userId) {
+    return;
+  }
+  const namespacePrefix = `lb:${userId}:`;
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith(namespacePrefix))
+      .forEach((key) => localStorage.removeItem(key));
+  } catch (_) {}
+}
+
+async function refreshSettingsBusinessContext(payload, fallbackBusinessId = "") {
+  const activeBusiness = payload?.active_business || null;
+  if (activeBusiness?.id && typeof applyActivatedBusinessContext === "function") {
+    applyActivatedBusinessContext(activeBusiness);
+    window.location.reload();
+    return true;
+  }
+
+  const activeBusinessId = activeBusiness?.id || payload?.active_business_id || fallbackBusinessId || "";
+  if (!activeBusinessId) {
+    return false;
+  }
+
+  if (typeof switchActiveBusiness === "function") {
+    await switchActiveBusiness(activeBusinessId);
+    return true;
+  }
+
+  if (window.lunaStorage?.purgeLegacyKeys) {
+    window.lunaStorage.purgeLegacyKeys();
+  }
+  purgeSettingsUserNamespacedCache();
+  localStorage.setItem("lb_active_business_id", activeBusinessId);
+  localStorage.setItem("lb_business_name", activeBusiness?.name || t("common_business"));
+  if (window.__LUNA_ME__ && typeof window.__LUNA_ME__ === "object") {
+    window.__LUNA_ME__.active_business_id = activeBusinessId;
+  }
+  window.location.reload();
+  return true;
 }
 
 function openAddBusinessModal() {
@@ -398,6 +455,24 @@ function openAddBusinessModal() {
         showSettingsToast(err?.error || t("settings_add_business_error"));
         return;
       }
+      const payload = await res.json().catch(() => null);
+      const createdBusinessId = payload?.business?.id || payload?.id || "";
+      const activatedViaCreate = await refreshSettingsBusinessContext(payload, createdBusinessId);
+      if (activatedViaCreate) {
+        return;
+      }
+
+      if (createdBusinessId) {
+        const activateRes = await apiFetch(`/api/businesses/${createdBusinessId}/activate`, { method: "POST" });
+        if (activateRes?.ok) {
+          const activatePayload = await activateRes.json().catch(() => null);
+          const refreshed = await refreshSettingsBusinessContext(activatePayload, createdBusinessId);
+          if (refreshed) {
+            return;
+          }
+        }
+      }
+
       showSettingsToast(t("settings_business_added"));
       await renderBusinessList();
     } catch {

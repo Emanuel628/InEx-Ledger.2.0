@@ -1,4 +1,4 @@
-const CATEGORIES_STORAGE_KEY = "lb_categories";
+const CATEGORIES_STORAGE_KEY = "ledger_categories";
 const CATEGORIES_TOAST_MS = 3000;
 
 const CATEGORY_TAX_OPTIONS = {
@@ -82,9 +82,43 @@ let currentRegion = null;
 let unattachedReceiptsCount = 0;
 let categoriesServerAvailable = true;
 let categoriesLoading = false;
+let legacyCategoriesStoragePurged = false;
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
+}
+
+function resolveCategoriesStorageUserId() {
+  return window.__LUNA_ME__?.id || window.__LUNA_ME__?.user_id || window.__LUNA_ME__?.userId || "";
+}
+
+function resolveCategoriesStorageBusinessId() {
+  return window.__LUNA_ME__?.active_business_id
+    || localStorage.getItem("lb_active_business_id")
+    || "";
+}
+
+function ensureCategoriesLegacyStoragePurged() {
+  if (legacyCategoriesStoragePurged) {
+    return;
+  }
+  legacyCategoriesStoragePurged = true;
+  if (window.lunaStorage?.purgeLegacyKeys) {
+    window.lunaStorage.purgeLegacyKeys();
+  }
+}
+
+function getCategoriesStorageKey() {
+  ensureCategoriesLegacyStoragePurged();
+  if (window.lunaStorage?.getKey) {
+    return window.lunaStorage.getKey(CATEGORIES_STORAGE_KEY);
+  }
+  const userId = resolveCategoriesStorageUserId();
+  const businessId = resolveCategoriesStorageBusinessId();
+  if (!userId || !businessId) {
+    return null;
+  }
+  return `lb:${userId}:${businessId}:${CATEGORIES_STORAGE_KEY}`;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -203,7 +237,10 @@ async function loadCategories() {
       categories = await migrateLegacyCategories();
     }
     categoryRecords = Array.isArray(categories) ? categories.map(normalizeCategory) : [];
-    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categoryRecords));
+    const storageKey = getCategoriesStorageKey();
+    if (storageKey) {
+      localStorage.setItem(storageKey, JSON.stringify(categoryRecords));
+    }
     categoriesServerAvailable = true;
   } catch (error) {
     console.error("Failed to load categories:", error);
@@ -423,7 +460,11 @@ function formatTaxLabel(value) {
 
 function getCategories() {
   try {
-    return JSON.parse(localStorage.getItem(CATEGORIES_STORAGE_KEY) || "[]");
+    const storageKey = getCategoriesStorageKey();
+    if (!storageKey) {
+      return [];
+    }
+    return JSON.parse(localStorage.getItem(storageKey) || "[]");
   } catch {
     return [];
   }

@@ -886,6 +886,42 @@ function closeBusinessCreationModal() {
   }
 }
 
+function purgeUserBusinessCache(profile = window.__LUNA_ME__) {
+  purgeLegacySensitiveStorage();
+  const userId = resolveStorageUserId(profile);
+  if (!userId) {
+    return;
+  }
+  const namespacePrefix = `lb:${userId}:`;
+  try {
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith(namespacePrefix))
+      .forEach((key) => localStorage.removeItem(key));
+  } catch (_) {}
+}
+
+function applyActivatedBusinessContext(activeBusiness) {
+  if (!activeBusiness?.id) {
+    return;
+  }
+  purgeUserBusinessCache();
+  localStorage.setItem(ACTIVE_BUSINESS_ID_KEY, activeBusiness.id);
+  localStorage.setItem(
+    ACTIVE_BUSINESS_NAME_KEY,
+    activeBusiness.name || (typeof t === "function" ? t("common_business") : "Business")
+  );
+  if (window.__LUNA_ME__ && typeof window.__LUNA_ME__ === "object") {
+    window.__LUNA_ME__.active_business_id = activeBusiness.id;
+    window.__LUNA_ME__.active_business = activeBusiness;
+    if (Array.isArray(window.__LUNA_ME__.businesses)) {
+      window.__LUNA_ME__.businesses = window.__LUNA_ME__.businesses.map((business) => ({
+        ...business,
+        is_active: business?.id === activeBusiness.id
+      }));
+    }
+  }
+}
+
 async function submitBusinessCreation() {
   const nameInput = document.getElementById("businessNameInput");
   const regionInput = document.getElementById("businessRegionInput");
@@ -928,10 +964,7 @@ async function submitBusinessCreation() {
 
     const payload = await response.json().catch(() => null);
     const activeBusiness = payload?.active_business || null;
-    if (activeBusiness?.id) {
-      localStorage.setItem(ACTIVE_BUSINESS_ID_KEY, activeBusiness.id);
-      localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || (typeof t === "function" ? t("common_business") : "Business"));
-    }
+    applyActivatedBusinessContext(activeBusiness);
     closeBusinessCreationModal();
     window.location.reload();
   } finally {
@@ -954,10 +987,7 @@ async function switchActiveBusiness(businessId) {
 
   const payload = await response.json().catch(() => null);
   const activeBusiness = payload?.active_business || null;
-  if (activeBusiness?.id) {
-    localStorage.setItem(ACTIVE_BUSINESS_ID_KEY, activeBusiness.id);
-    localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || (typeof t === "function" ? t("common_business") : "Business"));
-  }
+  applyActivatedBusinessContext(activeBusiness);
   window.location.reload();
 }
 

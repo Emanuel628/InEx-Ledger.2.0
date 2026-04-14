@@ -6,11 +6,47 @@
   { value: "cash", labelKey: "accounts_type_cash" }
 ];
 const ACCOUNTS_TOAST_MS = 3000;
+const ACCOUNTS_STORAGE_KEY = "ledger_accounts";
+const RECEIPTS_STORAGE_KEY = "ledger_receipts";
 
 let accountsToastTimer = null;
+let legacyAccountsStoragePurged = false;
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
+}
+
+function resolveAccountsStorageUserId() {
+  return window.__LUNA_ME__?.id || window.__LUNA_ME__?.user_id || window.__LUNA_ME__?.userId || "";
+}
+
+function resolveAccountsStorageBusinessId() {
+  return window.__LUNA_ME__?.active_business_id
+    || localStorage.getItem("lb_active_business_id")
+    || "";
+}
+
+function ensureAccountsLegacyStoragePurged() {
+  if (legacyAccountsStoragePurged) {
+    return;
+  }
+  legacyAccountsStoragePurged = true;
+  if (window.lunaStorage?.purgeLegacyKeys) {
+    window.lunaStorage.purgeLegacyKeys();
+  }
+}
+
+function getAccountsStorageKey(key) {
+  ensureAccountsLegacyStoragePurged();
+  if (window.lunaStorage?.getKey) {
+    return window.lunaStorage.getKey(key);
+  }
+  const userId = resolveAccountsStorageUserId();
+  const businessId = resolveAccountsStorageBusinessId();
+  if (!userId || !businessId || !key) {
+    return null;
+  }
+  return `lb:${userId}:${businessId}:${key}`;
 }
 
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
@@ -200,7 +236,10 @@ async function deleteAccount(accountId) {
 
 function syncAccountsCache(accounts) {
   const normalized = Array.isArray(accounts) ? accounts : [];
-  localStorage.setItem("lb_accounts", JSON.stringify(normalized));
+  const storageKey = getAccountsStorageKey(ACCOUNTS_STORAGE_KEY);
+  if (storageKey) {
+    localStorage.setItem(storageKey, JSON.stringify(normalized));
+  }
   window.dispatchEvent(new CustomEvent("accountsUpdated", { detail: normalized }));
 }
 
@@ -216,7 +255,10 @@ function updateReceiptsDot() {
   }
 
   try {
-    const receipts = JSON.parse(localStorage.getItem("lb_receipts") || "[]");
+    const storageKey = getAccountsStorageKey(RECEIPTS_STORAGE_KEY);
+    const receipts = storageKey
+      ? JSON.parse(localStorage.getItem(storageKey) || "[]")
+      : [];
     dot.hidden = !receipts.some((receipt) => !receipt.transactionId && !receipt.transaction_id);
   } catch {
     dot.hidden = true;
