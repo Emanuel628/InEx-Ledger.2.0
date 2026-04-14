@@ -12,7 +12,7 @@ const { getSubscriptionSnapshotForBusiness } = require("../services/subscription
 const { listAssignedCpaGrants, listAccessibleBusinessScopeForUser } = require("../services/cpaAccessService.js");
 const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
-const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { logError, logInfo } = require("../utils/logger.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
 
 const router = express.Router();
@@ -386,19 +386,6 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
       await client.query("ROLLBACK");
       transactionOpen = false;
       return res.status(401).json({ error: "Incorrect password." });
-    }
-
-    try {
-      await client.query(
-        `ALTER TABLE IF EXISTS cpa_audit_logs
-           DROP CONSTRAINT IF EXISTS cpa_audit_logs_owner_user_id_fkey,
-           DROP CONSTRAINT IF EXISTS cpa_audit_logs_actor_user_id_fkey`
-      );
-    } catch (error) {
-      logWarn("DELETE /me: unable to drop legacy CPA audit constraints", {
-        message: error.message,
-        code: error.code
-      });
     }
 
     const legacyConstraintResult = await client.query(
