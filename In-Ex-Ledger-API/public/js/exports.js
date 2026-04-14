@@ -992,6 +992,7 @@ function downloadFile(content, filename, type) {
 
 function appendExportHistory(entry) {
   const scope = entry?.scope || getExportScope();
+  // Track namespace on each entry to prevent cross-account history reuse during migrations.
   const namespace = getExportHistoryNamespace(scope);
   const history = getLocalExportHistory(scope);
   history.unshift({ ...entry, namespace });

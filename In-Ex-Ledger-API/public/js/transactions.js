@@ -55,7 +55,7 @@ let transactionModalElement = null;
 let activeModalTransactionId = null;
 let editingTransactionId = null;
 let transactionsLoading = false;
-let transactionsLoadFailed = false;
+let hasTransactionsLoadFailed = false;
 const SLOT_ANIMATION_KEY = "lb_transactions_slot_played";
 let slotAnimationPlayed = false;
 const missingAccountWarnings = new Set();
@@ -767,7 +767,7 @@ function updateHelpText(accountHelp, categoryHelp) {
 async function loadTransactions() {
   setTransactionsLoading(true);
   try {
-    transactionsLoadFailed = false;
+    hasTransactionsLoadFailed = false;
     const transactions = await fetchTransactionsForPage();
     let receiptSnapshot = { byTransactionId: {}, unattachedCount: 0 };
     try {
@@ -784,7 +784,7 @@ async function loadTransactions() {
     saveTransactions(ledgerState.transactions);
   } catch (error) {
     console.error("Failed to load transactions:", error);
-    transactionsLoadFailed = true;
+    hasTransactionsLoadFailed = true;
     ledgerState.transactions = [];
     unattachedReceiptsCount = 0;
     clearStorageArray(STORAGE_KEYS.transactions);
@@ -1543,7 +1543,6 @@ function renderTransactionList(filteredTransactions) {
     return;
   }
 
- 
   const accountsById = mapById(getAccounts());
   const categoriesById = mapById(getCategories());
   tbody.innerHTML = "";
@@ -1748,7 +1747,7 @@ function renderTransactionsTable(filteredTransactions) {
     return;
   }
 
-  if (transactionsLoadFailed && filteredTransactions === undefined) {
+  if (hasTransactionsLoadFailed && filteredTransactions === undefined) {
     tbody.innerHTML = `<tr><td colspan="8" class="placeholder">${txT("transactions_error_load", "Unable to load transactions. Please refresh.")}</td></tr>`;
     return;
   }
