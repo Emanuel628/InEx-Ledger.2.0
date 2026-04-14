@@ -1,7 +1,7 @@
 /* taxReminders.js — Quarterly estimated tax due-date banners for freelancers */
 
 (function () {
-  // Base statutory dates; weekend handling shifts Saturday/Sunday deadlines to Monday.
+  // Base statutory dates (e.g., US Q2 is June 15); weekend handling shifts Saturday/Sunday deadlines to Monday.
   const US_DEADLINES = [
     { month: 4,  day: 15, quarter: "Q1" },
     { month: 6,  day: 15, quarter: "Q2" },
@@ -18,10 +18,12 @@
   const DISMISS_KEY = "inex_tax_reminder_dismissed";
   const LEAD_DAYS   = 21; // show banner this many days before deadline
   const DAY_MS = 24 * 60 * 60 * 1000;
+  const ESTIMATE_UNAVAILABLE_PATTERN = /not shown|switch to one business/i;
+  const DISMISS_SYMBOL = "×";
 
   function getRegion() {
     try {
-      const fromWindow = typeof window !== "undefined" ? window.LUNA_REGION : "";
+      const fromWindow = window.LUNA_REGION;
       const fromScopedStorage = localStorage.getItem("lb_region");
       const fromLegacyStorage = localStorage.getItem("region");
       const region = String(fromWindow || fromScopedStorage || fromLegacyStorage || "US").toUpperCase();
@@ -56,7 +58,9 @@
   }
 
   function formatDismissKey(deadline, quarter) {
-    return `${deadline.getFullYear()}-${deadline.getMonth() + 1}-${deadline.getDate()}-${quarter}`;
+    const month = String(deadline.getMonth() + 1).padStart(2, "0");
+    const day = String(deadline.getDate()).padStart(2, "0");
+    return `${deadline.getFullYear()}-${month}-${day}-${quarter}`;
   }
 
   function nextDeadline(deadlines) {
@@ -66,7 +70,7 @@
       const targetYear = d.nextYear ? year + 1 : year;
       const baseDeadline = new Date(targetYear, d.month - 1, d.day);
       const deadline = shiftWeekendDeadline(baseDeadline);
-      const diffDays = Math.round((startOfDay(deadline) - now) / DAY_MS);
+      const diffDays = Math.ceil((startOfDay(deadline) - now) / DAY_MS);
       if (diffDays >= 0 && diffDays <= LEAD_DAYS) {
         return { ...d, deadline, diffDays, key: formatDismissKey(deadline, d.quarter) };
       }
@@ -79,7 +83,7 @@
     if (!taxEstimate) return "";
     const value = String(taxEstimate.textContent || "").trim();
     if (!value) return "";
-    if (/not shown|switch to one business/i.test(value)) return "";
+    if (ESTIMATE_UNAVAILABLE_PATTERN.test(value)) return "";
     return value;
   }
 
@@ -133,7 +137,7 @@
     dismissButton.type = "button";
     dismissButton.className = "trial-banner-dismiss";
     dismissButton.setAttribute("aria-label", "Dismiss tax reminder");
-    dismissButton.textContent = "✕";
+    dismissButton.textContent = DISMISS_SYMBOL;
     dismissButton.addEventListener("click", () => {
       dismiss(upcoming.key);
       banner.remove();
