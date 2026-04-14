@@ -1350,8 +1350,8 @@ function applyFilters() {
   if (term) {
     filtered = filtered.filter((tx) => {
       const desc = (tx.description || "").toLowerCase();
-      const cat = (tx.categoryName || "").toLowerCase();
-      const acct = (tx.accountName || "").toLowerCase();
+      const cat = (tx.categoryName || getCategoryName(tx.categoryId) || "").toLowerCase();
+      const acct = (tx.accountName || getAccountName(tx.accountId) || "").toLowerCase();
       const dest = (tx.destination || "").toLowerCase();
       const notes = (tx.note || "").toLowerCase();
       const review = (tx.reviewNotes || "").toLowerCase();
@@ -1544,6 +1544,8 @@ function renderTransactionList(filteredTransactions) {
   }
 
  
+  const accountsById = mapById(getAccounts());
+  const categoriesById = mapById(getCategories());
   tbody.innerHTML = "";
   transactions.forEach((txn) => {
     const row = document.createElement("tr");
@@ -1567,8 +1569,8 @@ function renderTransactionList(filteredTransactions) {
         <span class="tx-type-pill">${typeLabel}</span>
         ${escapeHtml(txn.description)}${noteIndicator}${receiptClip}
       </td>
-      <td>${escapeHtml(txn.accountName || "-")}</td>
-      <td>${escapeHtml(txn.categoryName || "-")}</td>
+      <td>${escapeHtml(txn.accountName || accountsById[txn.accountId]?.name || "-")}</td>
+      <td>${escapeHtml(txn.categoryName || categoriesById[txn.categoryId]?.name || "-")}</td>
       <td>${formatCurrency(txn.amount)}</td>
       <td>
         <button
@@ -1762,13 +1764,15 @@ function renderTransactionsTable(filteredTransactions) {
     return;
   }
 
+  const accountsById = mapById(getAccounts());
+  const categoriesById = mapById(getCategories());
   const isAllScope = getTransactionScope() === "all";
   tbody.innerHTML = "";
 
   transactions.forEach((txn) => {
     const row = document.createElement("tr");
-    const categoryName = txn.categoryName || "-";
-    const accountName = txn.accountName || "-";
+    const categoryName = txn.categoryName || categoriesById[txn.categoryId]?.name || "-";
+    const accountName = txn.accountName || accountsById[txn.accountId]?.name || "-";
     const rowRegion = String(
       getBusinessById(txn.businessId)?.region || businessTaxProfile.region || getResolvedRegion()
     ).toUpperCase() === "CA"
