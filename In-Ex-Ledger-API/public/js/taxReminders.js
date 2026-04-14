@@ -1,8 +1,7 @@
 /* taxReminders.js — Quarterly estimated tax due-date banners for freelancers */
 
 (function () {
-  // US: Apr 15, Jun 16, Sep 15, Jan 15
-  // CA: Mar 17, Jun 16, Sep 15, Dec 15
+  // Base statutory dates (e.g., US Q2 is June 15); weekend handling shifts Saturday/Sunday deadlines to Monday.
   const US_DEADLINES = [
     { month: 4,  day: 15, quarter: "Q1" },
     { month: 6,  day: 15, quarter: "Q2" },
@@ -18,10 +17,17 @@
 
   const DISMISS_KEY = "inex_tax_reminder_dismissed";
   const LEAD_DAYS   = 21; // show banner this many days before deadline
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const ESTIMATE_UNAVAILABLE_PATTERN = /not shown|switch to one business/i;
+  const DISMISS_SYMBOL = "×";
 
   function getRegion() {
     try {
-      return (localStorage.getItem("region") || "US").toUpperCase();
+      const fromWindow = window.LUNA_REGION;
+      const fromScopedStorage = localStorage.getItem("lb_region");
+      const fromLegacyStorage = localStorage.getItem("region");
+      const region = String(fromWindow || fromScopedStorage || fromLegacyStorage || "US").toUpperCase();
+      return region === "CA" ? "CA" : "US";
     } catch (_) { return "US"; }
   }
 
@@ -37,18 +43,48 @@
     } catch (_) {}
   }
 
+  function startOfDay(value) {
+    const date = new Date(value);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+
+  function shiftWeekendDeadline(deadline) {
+    const shifted = new Date(deadline);
+    const dayOfWeek = shifted.getDay();
+    if (dayOfWeek === 6) shifted.setDate(shifted.getDate() + 2);
+    if (dayOfWeek === 0) shifted.setDate(shifted.getDate() + 1);
+    return shifted;
+  }
+
+  function formatDismissKey(deadline, quarter) {
+    const month = String(deadline.getMonth() + 1).padStart(2, "0");
+    const day = String(deadline.getDate()).padStart(2, "0");
+    return `${deadline.getFullYear()}-${month}-${day}-${quarter}`;
+  }
+
   function nextDeadline(deadlines) {
-    const now = new Date();
+    const now = startOfDay(new Date());
     const year = now.getFullYear();
     for (const d of deadlines) {
       const targetYear = d.nextYear ? year + 1 : year;
-      const deadline = new Date(targetYear, d.month - 1, d.day);
-      const diffDays = Math.ceil((deadline - now) / 86400000);
+      const baseDeadline = new Date(targetYear, d.month - 1, d.day);
+      const deadline = shiftWeekendDeadline(baseDeadline);
+      const diffDays = Math.ceil((startOfDay(deadline) - now) / DAY_MS);
       if (diffDays >= 0 && diffDays <= LEAD_DAYS) {
-        return { ...d, deadline, diffDays, key: `${targetYear}-${d.quarter}` };
+        return { ...d, deadline, diffDays, key: formatDismissKey(deadline, d.quarter) };
       }
     }
     return null;
+  }
+
+  function getEstimatedAmount() {
+    const taxEstimate = document.getElementById("taxOwed");
+    if (!taxEstimate) return "";
+    const value = String(taxEstimate.textContent || "").trim();
+    if (!value) return "";
+    if (ESTIMATE_UNAVAILABLE_PATTERN.test(value)) return "";
+    return value;
   }
 
   function renderBanner(upcoming, region) {
@@ -57,9 +93,12 @@
 
     const container = document.getElementById("trialBanner");
     if (!container) return;
+    const existingTaxReminder = container.querySelector(".tax-reminder-banner");
+    if (existingTaxReminder) existingTaxReminder.remove();
 
     const dateStr = upcoming.deadline.toLocaleDateString("en-US", { month: "long", day: "numeric" });
     const daysMsg = upcoming.diffDays === 0 ? "today" : `in ${upcoming.diffDays} day${upcoming.diffDays === 1 ? "" : "s"}`;
+    const estimatedAmount = getEstimatedAmount();
 
     let payLink, payText;
     if (region === "CA") {
@@ -73,21 +112,39 @@
     const banner = document.createElement("div");
     banner.className = "trial-banner trial-banner--warning tax-reminder-banner";
     banner.setAttribute("role", "alert");
-    banner.innerHTML =
-      `<span class="trial-banner-text">` +
-        `<strong>${upcoming.quarter} estimated taxes are due ${dateStr}</strong> — ${daysMsg}. ` +
-        `<a href="${payLink}" target="_blank" rel="noopener noreferrer">${payText}</a>` +
-      `</span>` +
-      `<button type="button" class="trial-banner-dismiss" aria-label="Dismiss tax reminder">&#x2715;</button>`;
+    const text = document.createElement("span");
+    text.className = "trial-banner-text";
 
-    banner.querySelector(".trial-banner-dismiss").addEventListener("click", () => {
+    const title = document.createElement("strong");
+    title.textContent = `${upcoming.quarter} estimated taxes are due ${dateStr}`;
+    text.appendChild(title);
+    text.appendChild(document.createTextNode(` — ${daysMsg}.`));
+
+    if (estimatedAmount) {
+      text.appendChild(document.createTextNode(` Current estimated amount: ${estimatedAmount}.`));
+    }
+
+    text.appendChild(document.createTextNode(" "));
+    const link = document.createElement("a");
+    link.href = payLink;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = payText;
+    text.appendChild(link);
+    banner.appendChild(text);
+
+    const dismissButton = document.createElement("button");
+    dismissButton.type = "button";
+    dismissButton.className = "trial-banner-dismiss";
+    dismissButton.setAttribute("aria-label", "Dismiss tax reminder");
+    dismissButton.textContent = DISMISS_SYMBOL;
+    dismissButton.addEventListener("click", () => {
       dismiss(upcoming.key);
       banner.remove();
     });
+    banner.appendChild(dismissButton);
 
-    // Insert before any existing trial banner content
-    container.innerHTML = "";
-    container.appendChild(banner);
+    container.insertBefore(banner, container.firstChild);
   }
 
   function initTaxReminder() {
