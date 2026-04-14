@@ -270,6 +270,9 @@ async function issueAuthenticatedSession(
   { mfaAuthenticated = false } = {}
 ) {
   const verified = Boolean(user.email_verified);
+  if (!verified) {
+    throw new Error("EMAIL_NOT_VERIFIED");
+  }
   const businessId = businessIdOverride || (await resolveBusinessIdForUser(user));
   const subscription = await getSubscriptionSnapshotForBusiness(businessId);
   const token = signToken(
@@ -295,7 +298,7 @@ async function issueAuthenticatedSession(
     email_verified: verified,
     subscription,
     mfa_enabled: !!user.mfa_enabled,
-    message: verified ? undefined : "Please verify your email before requesting exports."
+    message: undefined
   };
 }
 
@@ -719,7 +722,7 @@ router.post("/send-verification", authLimiter, async (req, res) => {
 
 /**
  * POST /login
- * Added strict check for email_verified status.
+ * Requires verified email before issuing a session.
  */
 router.post("/login", authLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
@@ -758,6 +761,11 @@ router.post("/login", authLimiter, async (req, res) => {
     }
 
     const verified = Boolean(user.email_verified);
+    if (!verified) {
+      clearRefreshCookie(res);
+      clearMfaTrustCookie(res);
+      return res.status(403).json({ error: "Please verify your email before signing in." });
+    }
     const businessId = await resolveBusinessIdForUser(user);
     const deviceContext = buildSignInDeviceContext(user, req);
     const recognizedDevice = deviceContext
@@ -856,6 +864,11 @@ router.post("/refresh", requireCsrfProtection, async (req, res) => {
     if (!result.rowCount) {
       clearRefreshCookie(res);
       return res.status(401).json({ error: "Invalid refresh token" });
+    }
+    if (!result.rows[0].email_verified) {
+      await revokeRefreshTokenByHash(hashed);
+      clearRefreshCookie(res);
+      return res.status(403).json({ error: "Please verify your email before signing in." });
     }
 
     await revokeRefreshTokenByHash(hashed);
@@ -1252,6 +1265,11 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
     });
     return res.status(200).json(session);
   } catch (err) {
+    if (err?.message === "EMAIL_NOT_VERIFIED") {
+      clearRefreshCookie(res);
+      clearMfaTrustCookie(res);
+      return res.status(403).json({ error: "Please verify your email before signing in." });
+    }
     logError("MFA verify error:", err);
     return res.status(401).json({ error: "Invalid or expired MFA session." });
   }

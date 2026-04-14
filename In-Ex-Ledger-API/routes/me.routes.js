@@ -51,7 +51,7 @@ router.use(createDataApiLimiter());
 
 router.get("/", async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
     const result = await pool.query(
       `SELECT id, email, role, email_verified, mfa_enabled, full_name, display_name,
               country, province, data_residency, created_at,
@@ -155,11 +155,17 @@ router.put("/onboarding", async (req, res) => {
   }
 
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
     const client = await pool.connect();
 
     try {
       await client.query("BEGIN");
+
+      const currentUserState = await client.query(
+        "SELECT onboarding_completed FROM users WHERE id = $1 LIMIT 1",
+        [req.user.id]
+      );
+      const onboardingCompleted = !!currentUserState.rows[0]?.onboarding_completed;
 
       await client.query(
         `UPDATE businesses
@@ -175,13 +181,11 @@ router.put("/onboarding", async (req, res) => {
         [businessName, businessType, region, language, province || null, businessId]
       );
 
-      const accountCheck = await client.query(
-        "SELECT COUNT(*)::int AS count FROM accounts WHERE business_id = $1",
-        [businessId]
-      );
-      const hasAccounts = Number(accountCheck.rows[0]?.count || 0) > 0;
-
-      if (!hasAccounts) {
+      if (!onboardingCompleted) {
+        await client.query("DELETE FROM accounts WHERE business_id = $1", [businessId]);
+      }
+      const accountCheck = await client.query("SELECT 1 FROM accounts WHERE business_id = $1 LIMIT 1", [businessId]);
+      if (!accountCheck.rowCount) {
         await client.query(
           `INSERT INTO accounts (id, business_id, name, type)
            VALUES ($1, $2, $3, $4)`,

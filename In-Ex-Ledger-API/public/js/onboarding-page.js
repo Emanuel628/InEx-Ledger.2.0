@@ -30,6 +30,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   hydrateOnboardingDefaults(profile);
   document.getElementById("onboardingRegion")?.addEventListener("change", syncProvinceField);
+  document.getElementById("onboardingLanguage")?.addEventListener("change", handleOnboardingLanguageChange);
+  window.addEventListener("lunaLanguageChanged", applyOnboardingStaticCopy);
   wireWorkTypeTiles();
   onboardingForm.addEventListener("submit", handleOnboardingSubmit);
 });
@@ -176,4 +178,17 @@ function applyOnboardingStaticCopy() {
   intro?.querySelector("h1")?.replaceChildren(tx("onboarding_title"));
   intro?.querySelector("p")?.replaceChildren(tx("onboarding_intro"));
   document.title = `InEx Ledger - ${tx("onboarding_page_title")}`;
+}
+
+function handleOnboardingLanguageChange(event) {
+  const languageSelect = event?.target;
+  const nextLanguage = String(languageSelect?.value || "").trim() || "en";
+  if (typeof setCurrentLanguage === "function") {
+    const normalized = setCurrentLanguage(nextLanguage);
+    if (languageSelect) {
+      languageSelect.value = normalized;
+    }
+  } else {
+    applyOnboardingStaticCopy();
+  }
 }

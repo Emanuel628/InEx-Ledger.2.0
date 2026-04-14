@@ -404,3 +404,64 @@ test("new-device sign-in requires 6-digit email verification before issuing sess
     fixture.cleanup();
   }
 });
+
+test("login rejects unverified users before issuing any session", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+  fixture.state.user.email_verified = false;
+
+  try {
+    const app = buildApp(fixture.router);
+    const loginResponse = await request(app)
+      .post("/api/auth/login")
+      .set("User-Agent", "TestBrowser/1.0")
+      .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
+
+    assert.equal(loginResponse.status, 403);
+    assert.equal(loginResponse.body?.token, undefined);
+    assert.equal(loginResponse.body?.mfa_token, undefined);
+    assert.match(String(loginResponse.body?.error || ""), /verify your email/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("mfa verification refuses to issue session when user becomes unverified", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const loginResponse = await request(app)
+      .post("/api/auth/login")
+      .set("User-Agent", "TestBrowser/1.0")
+      .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
+
+    assert.equal(loginResponse.status, 200);
+    assert.equal(loginResponse.body?.mfa_required, true);
+    const verificationEmail = fixture.state.sentEmails[0];
+    const codeMatch = String(verificationEmail.text || "").match(/Code:\s*(\d{6})/);
+    assert.ok(codeMatch, "verification email should contain a 6-digit code");
+
+    fixture.state.user.email_verified = false;
+
+    const verifyResponse = await request(app)
+      .post("/api/auth/mfa/verify")
+      .set("User-Agent", "TestBrowser/1.0")
+      .send({
+        mfaToken: loginResponse.body.mfa_token,
+        code: codeMatch[1],
+        trustDevice: false
+      });
+
+    assert.equal(verifyResponse.status, 403);
+    assert.equal(verifyResponse.body?.token, undefined);
+    assert.match(String(verifyResponse.body?.error || ""), /verify your email/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
