@@ -81,6 +81,13 @@ const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECON
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
 const MAX_MFA_ATTEMPTS = 8;
 
+class EmailNotVerifiedError extends Error {
+  constructor() {
+    super("Email is not verified");
+    this.name = "EmailNotVerifiedError";
+  }
+}
+
 
 /* =========================================================
    3. TOKEN MANAGEMENT (DB-backed)
@@ -271,7 +278,7 @@ async function issueAuthenticatedSession(
 ) {
   const verified = Boolean(user.email_verified);
   if (!verified) {
-    throw new Error("EMAIL_NOT_VERIFIED");
+    throw new EmailNotVerifiedError();
   }
   const businessId = businessIdOverride || (await resolveBusinessIdForUser(user));
   const subscription = await getSubscriptionSnapshotForBusiness(businessId);
@@ -1264,7 +1271,7 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
     });
     return res.status(200).json(session);
   } catch (err) {
-    if (err?.message === "EMAIL_NOT_VERIFIED") {
+    if (err instanceof EmailNotVerifiedError) {
       clearRefreshCookie(res);
       clearMfaTrustCookie(res);
       return res.status(403).json({ error: "Please verify your email before signing in." });
