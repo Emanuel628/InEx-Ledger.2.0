@@ -83,6 +83,31 @@ main {
   margin-top: 0;
 }
 
+.auth-form .form-field {
+  margin-bottom: 0;
+  gap: 6px;
+}
+
+.auth-form .form-field > :is(input, select, textarea) {
+  margin-bottom: 0;
+}
+
+.auth-form :is(input, select) {
+  min-height: 40px;
+}
+
+.auth-form textarea {
+  min-height: 70px;
+}
+
+.auth-form label {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink2);
+}
+
 .auth-helper {
   margin: 0;
   font-size: 13px;
