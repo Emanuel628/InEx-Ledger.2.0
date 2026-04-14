@@ -52,9 +52,11 @@ const webhookLimiter = rateLimit({
 });
 
 const _WEBHOOK_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
+const _WEBHOOK_IDEMPOTENCY_CLEANUP_PROBABILITY = 0.01;
 
 async function reserveWebhookEvent(eventId) {
   if (!eventId) {
+    logWarn("Stripe webhook missing event id; skipping processing");
     return false;
   }
 
@@ -65,12 +67,14 @@ async function reserveWebhookEvent(eventId) {
     [eventId]
   );
 
-  // Opportunistic TTL cleanup to keep this table bounded.
-  await pool.query(
-    `DELETE FROM stripe_webhook_events
-      WHERE processed_at < NOW() - ($1::bigint * INTERVAL '1 millisecond')`,
-    [_WEBHOOK_IDEMPOTENCY_TTL_MS]
-  );
+  // Opportunistic TTL cleanup to keep this table bounded with minimal overhead.
+  if (Math.random() < _WEBHOOK_IDEMPOTENCY_CLEANUP_PROBABILITY) {
+    await pool.query(
+      `DELETE FROM stripe_webhook_events
+        WHERE processed_at < NOW() - ($1::bigint * INTERVAL '1 millisecond')`,
+      [_WEBHOOK_IDEMPOTENCY_TTL_MS]
+    );
+  }
 
   return insertResult.rowCount > 0;
 }
