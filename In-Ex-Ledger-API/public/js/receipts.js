@@ -337,7 +337,7 @@ async function saveReceiptLink(receiptId, transactionId) {
   });
 
   if (!response || !response.ok) {
-    const errorPayload = await response?.json().catch(() => null);
+    const errorPayload = response ? await response.json().catch(() => null) : null;
     showReceiptsToast(errorPayload?.error || tx("receipts_error_link"));
     return;
   }
@@ -368,7 +368,7 @@ async function deleteReceiptRecord(receiptId) {
   });
 
   if (!response || !response.ok) {
-    const errorPayload = await response?.json().catch(() => null);
+    const errorPayload = response ? await response.json().catch(() => null) : null;
     showReceiptsToast(errorPayload?.error || tx("receipts_error_delete"));
     return;
   }

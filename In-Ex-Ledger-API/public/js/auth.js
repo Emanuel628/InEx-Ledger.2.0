@@ -960,7 +960,7 @@ async function submitBusinessCreation() {
     });
 
     if (!response || !response.ok) {
-      const payload = await response?.json().catch(() => null);
+      const payload = response ? await response.json().catch(() => null) : null;
       if (error) {
         error.textContent = payload?.error || (typeof t === "function" ? t("auth_error_create_business") : "Unable to create business.");
       }
@@ -985,7 +985,7 @@ async function switchActiveBusiness(businessId) {
   });
 
   if (!response || !response.ok) {
-    const payload = await response?.json().catch(() => null);
+    const payload = response ? await response.json().catch(() => null) : null;
     showAccountMenuNotice(payload?.error || (typeof t === "function" ? t("auth_error_switch_business") : "Unable to switch businesses."));
     return false;
   }

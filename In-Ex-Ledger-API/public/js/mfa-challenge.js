@@ -70,7 +70,7 @@ async function handleMfaChallengeSubmit(event) {
           })
         }));
 
-    const data = await response?.json().catch(() => null);
+    const data = response ? await response.json().catch(() => null) : null;
     if (!response || !response.ok || !data?.token) {
       showMfaChallengeError(data?.error || tx("mfa_challenge_error_verify"));
       return;

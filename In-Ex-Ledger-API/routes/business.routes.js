@@ -85,7 +85,7 @@ router.get("/", async (req, res) => {
     res.json(await fetchBusinessRow(businessId));
   } catch (err) {
     logError("GET /business error:", err.message);
-    res.status(500).json({ error: err.message || "Failed to load business profile." });
+    res.status(500).json({ error: "Failed to load business profile." });
   }
 });
 
@@ -150,7 +150,7 @@ router.put("/", async (req, res) => {
     res.json(updated);
   } catch (err) {
     logError("PUT /business error:", err.message);
-    res.status(500).json({ error: err.message || "Failed to update business profile." });
+    res.status(500).json({ error: "Failed to update business profile." });
   }
 });
 
@@ -161,7 +161,7 @@ router.get("/accounting-lock", async (req, res) => {
     res.json({ lock });
   } catch (err) {
     logError("GET /business/accounting-lock error:", err.message);
-    res.status(500).json({ error: err.message || "Failed to load accounting lock." });
+    res.status(500).json({ error: "Failed to load accounting lock." });
   }
 });
 
@@ -181,7 +181,7 @@ router.put("/accounting-lock", async (req, res) => {
       return res.status(400).json({ error: "locked_through_date must be a valid date." });
     }
     logError("PUT /business/accounting-lock error:", err.message);
-    res.status(500).json({ error: err.message || "Failed to update accounting lock." });
+    res.status(500).json({ error: "Failed to update accounting lock." });
   }
 });
 

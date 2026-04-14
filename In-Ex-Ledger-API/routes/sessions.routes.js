@@ -19,6 +19,7 @@ const sessionsMutationLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many requests. Please try again later." }
 });
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
@@ -50,9 +51,13 @@ router.get("/", async (req, res) => {
  */
 router.delete("/:id", sessionsMutationLimiter, async (req, res) => {
   try {
+    const sessionId = String(req.params.id || "").trim();
+    if (!UUID_RE.test(sessionId)) {
+      return res.status(400).json({ error: "Invalid session ID." });
+    }
     const result = await pool.query(
       "UPDATE refresh_tokens SET revoked = true WHERE id = $1 AND user_id = $2 RETURNING id",
-      [req.params.id, req.user.id]
+      [sessionId, req.user.id]
     );
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Session not found." });

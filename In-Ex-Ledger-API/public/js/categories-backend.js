@@ -191,7 +191,7 @@ function wireCategoryModal() {
     });
 
     if (!response || !response.ok) {
-      const errorPayload = await response?.json().catch(() => null);
+      const errorPayload = response ? await response.json().catch(() => null) : null;
       if (message) message.textContent = errorPayload?.error || tx("categories_error_add");
       return;
     }
@@ -331,7 +331,7 @@ async function handleCategoryDelete(categoryId) {
   const response = await apiFetch(`/api/categories/${categoryId}`, { method: "DELETE" });
 
   if (!response || !response.ok) {
-    const errorPayload = await response?.json().catch(() => null);
+    const errorPayload = response ? await response.json().catch(() => null) : null;
     if (message) message.textContent = errorPayload?.error || tx("categories_error_delete");
     return;
   }
@@ -420,7 +420,7 @@ async function migrateLegacyCategories() {
     });
 
     if (!response || !response.ok) {
-      const errorPayload = await response?.json().catch(() => null);
+      const errorPayload = response ? await response.json().catch(() => null) : null;
       throw new Error(errorPayload?.error || tx("categories_error_migrate"));
     }
   }

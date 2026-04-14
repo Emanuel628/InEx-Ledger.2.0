@@ -61,7 +61,7 @@ function wireMileageForm() {
     });
 
     if (!response || !response.ok) {
-      const errorPayload = await response?.json().catch(() => null);
+      const errorPayload = response ? await response.json().catch(() => null) : null;
       if (message) message.textContent = errorPayload?.error || tx("mileage_error_save");
       return;
     }

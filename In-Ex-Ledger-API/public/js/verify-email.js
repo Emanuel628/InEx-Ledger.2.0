@@ -80,7 +80,7 @@ async function resendVerification() {
           body: JSON.stringify({ email })
         });
 
-    const payload = await response?.json().catch(() => null);
+    const payload = response ? await response.json().catch(() => null) : null;
 
     if (!response || !response.ok) {
       updateStatus(

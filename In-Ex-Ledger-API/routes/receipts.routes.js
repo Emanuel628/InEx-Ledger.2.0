@@ -18,6 +18,7 @@ const {
 } = require("../services/subscriptionService.js");
 const {
   getReceiptStorageDir,
+  isManagedReceiptPath,
   requirePersistentReceiptStorage
 } = require("../services/receiptStorage.js");
 const {
@@ -368,13 +369,17 @@ router.patch("/:id/attach", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const receiptId = String(req.params.id || "").trim();
+    if (!isUuid(receiptId)) {
+      return res.status(400).json({ error: "Invalid receipt ID." });
+    }
 
     const result = await pool.query(
       `SELECT filename, mime_type, storage_path
        FROM receipts
        WHERE id = $1 AND business_id = $2
        LIMIT 1`,
-      [req.params.id, businessId]
+      [receiptId, businessId]
     );
 
     if (!result.rowCount) {
@@ -382,8 +387,17 @@ router.get("/:id", async (req, res) => {
     }
 
     const { filename, mime_type, storage_path } = result.rows[0];
+    const resolvedStoragePath = path.resolve(storage_path || "");
 
-    if (!storage_path || !fs.existsSync(storage_path)) {
+    if (!isManagedReceiptPath(resolvedStoragePath)) {
+      logWarn("Blocked receipt download for unmanaged storage path", {
+        receiptId,
+        businessId
+      });
+      return res.status(404).json({ error: "Receipt file missing." });
+    }
+
+    if (!fs.existsSync(resolvedStoragePath)) {
       return res.status(404).json({ error: "Receipt file missing." });
     }
 
@@ -396,7 +410,7 @@ router.get("/:id", async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
 
 
-    return res.sendFile(storage_path);
+    return res.sendFile(resolvedStoragePath);
   } catch (err) {
     logError("GET /receipts/:id error:", err);
     return res.status(500).json({ error: "Failed to load receipt." });
@@ -416,6 +430,9 @@ router.delete("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const receiptId = req.params.id;
+    if (!isUuid(receiptId)) {
+      return res.status(400).json({ error: "Invalid receipt ID." });
+    }
 
     await client.query("BEGIN");
 
