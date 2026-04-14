@@ -4,7 +4,8 @@ const STORAGE_KEYS = {
   transactions: "ledger_transactions",
   receipts: "ledger_receipts",
   businesses: "ledger_businesses",
-  scope: "ledger_transactions_scope"
+  scope: "ledger_transactions_scope",
+  upsellHidden: "ledger_transactions_upsell_hidden"
 };
 
 const ledgerState = {
@@ -139,6 +140,18 @@ function getScopedStorageKey(key, scopeOverride) {
   return getNamespacedStorageKey(key, resolveStorageBusinessIdForScope(scope));
 }
 
+function isTransactionsUpsellDismissed() {
+  const upsellKey = getPreferenceStorageKey(STORAGE_KEYS.upsellHidden);
+  return !!upsellKey && localStorage.getItem(upsellKey) === "true";
+}
+
+function setTransactionsUpsellDismissed() {
+  const upsellKey = getPreferenceStorageKey(STORAGE_KEYS.upsellHidden);
+  if (upsellKey) {
+    localStorage.setItem(upsellKey, "true");
+  }
+}
+
 function getResolvedRegion() {
   const raw =
     localStorage.getItem("lb_region") ||
@@ -240,7 +253,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tier = effectiveTier();
   const cockpit = document.getElementById("tax-cockpit");
   const upsell = document.getElementById("tax-upsell");
-  const upsellDismissed = localStorage.getItem("lb_transactions_upsell_hidden") === "true";
+  const upsellDismissed = isTransactionsUpsellDismissed();
   const hasTransactions = (ledgerState.transactions || []).length > 0;
 
   if (cockpit) {
@@ -254,7 +267,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (dismissButton) {
       dismissButton.addEventListener("click", () => {
         upsell.hidden = true;
-        localStorage.setItem("lb_transactions_upsell_hidden", "true");
+        setTransactionsUpsellDismissed();
       });
     }
   }
@@ -1939,7 +1952,7 @@ function renderTotals() {
     cockpit.hidden = tier === "free" || !hasTransactions || isAllScope;
   }
   if (upsell) {
-    const upsellDismissed = localStorage.getItem("lb_transactions_upsell_hidden") === "true";
+    const upsellDismissed = isTransactionsUpsellDismissed();
     upsell.hidden = !(tier === "free" && hasTransactions && !upsellDismissed);
   }
   updateReceiptsDot();

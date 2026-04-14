@@ -1,9 +1,9 @@
 (function () {
   const STORAGE_KEY = "lb_privacy_settings";
   const BUSINESS_KEYS = [
-    "lb_transactions",
-    "lb_receipts",
-    "lb_recurring"
+    "ledger_transactions",
+    "ledger_receipts",
+    "ledger_recurring"
   ];
   let apiReady;
   const API_BASE = "";
@@ -117,7 +117,11 @@
   }
 
   function readJsonArray(key) {
-    const raw = localStorage.getItem(key);
+    const storageKey = resolveBusinessStorageKey(key);
+    if (!storageKey) {
+      return [];
+    }
+    const raw = localStorage.getItem(storageKey);
     if (!raw) {
       return [];
     }
@@ -126,6 +130,21 @@
     } catch (err) {
       return [];
     }
+  }
+
+  function resolveBusinessStorageKey(key) {
+    if (!key) {
+      return null;
+    }
+    if (window.lunaStorage?.getKey) {
+      return window.lunaStorage.getKey(key);
+    }
+    const userId = window.__LUNA_ME__?.id || window.__LUNA_ME__?.user_id || window.__LUNA_ME__?.userId || "";
+    const businessId = window.__LUNA_ME__?.active_business_id || localStorage.getItem("lb_active_business_id") || "";
+    if (!userId || !businessId) {
+      return null;
+    }
+    return `lb:${userId}:${businessId}:${key}`;
   }
 
   function downloadBlob(blob, fileName) {
@@ -164,9 +183,9 @@
 
     const payload = {
       privacy: readLocalSettings(),
-      transactions: readJsonArray("lb_transactions"),
-      receipts: readJsonArray("lb_receipts"),
-      recurring: readJsonArray("lb_recurring"),
+      transactions: readJsonArray("ledger_transactions"),
+      receipts: readJsonArray("ledger_receipts"),
+      recurring: readJsonArray("ledger_recurring"),
       meta: {
         exportedAt: new Date().toISOString(),
         app: "InEx Ledger"
@@ -204,7 +223,10 @@
     }
 
     BUSINESS_KEYS.forEach((key) => {
-      localStorage.removeItem(key);
+      const storageKey = resolveBusinessStorageKey(key);
+      if (storageKey) {
+        localStorage.removeItem(storageKey);
+      }
     });
 
     const requestId = newRequestId();
