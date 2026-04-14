@@ -2,12 +2,6 @@
    Settings & Account Pages
    ========================= */
 
-main {
-  max-width: 880px;
-  margin: 0 auto;
-  padding: 16px 16px 120px;
-}
-
 .settings-header {
   display: flex;
   align-items: center;
@@ -414,22 +408,6 @@ main {
   margin: 0;
 }
 
-.units-block {
-  margin-top: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.units-block .theme-toggle {
-  justify-content: flex-start;
-}
-
-.form-label {
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
 .units-toggle {
   margin-left: auto;
 }
@@ -464,26 +442,6 @@ main {
 
 .safe-action:hover {
   border-color: var(--accent);
-}
-
-.settings-save-bar {
-  position: fixed;
-  left: 50%;
-  bottom: 20px;
-  transform: translateX(-50%) translateY(0);
-  background: var(--card-bg);
-  border: 1px solid var(--border-subtle);
-  border-radius: 16px;
-  padding: 12px 20px;
-  box-shadow: 0 15px 45px rgba(0, 0, 0, 0.25);
-  z-index: 30;
-  transition: transform 180ms ease, opacity 180ms ease;
-}
-
-.settings-save-bar.hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-50%) translateY(110%);
 }
 
 .settings-trial-banner {
@@ -624,97 +582,6 @@ main {
    Settings Hub Layout
    ========================= */
 
-body {
-  background:
-    linear-gradient(180deg, rgba(37, 99, 235, 0.04), transparent 180px),
-    #f4f7fb;
-}
-
-.settings-shell {
-  width: min(1320px, calc(100% - 32px));
-  margin: 24px auto 0;
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-
-.settings-sidebar {
-  position: sticky;
-  top: 88px;
-}
-
-.settings-sidebar-card {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 24px;
-  padding: 20px 16px;
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
-}
-
-.settings-sidebar-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
-  margin-bottom: 14px;
-}
-
-.settings-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.settings-nav-item {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  color: #475569;
-  text-align: left;
-  font-weight: 600;
-  font-size: 14px;
-  padding: 11px 12px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease, transform 120ms ease;
-}
-
-.settings-nav-item:hover {
-  background: rgba(37, 99, 235, 0.08);
-  color: #0f172a;
-}
-
-.settings-nav-item.is-active {
-  background: #e8f0ff;
-  color: #2563eb;
-}
-
-.settings-nav-danger {
-  color: #c2410c;
-}
-
-.settings-sidebar-trial-card {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(148, 163, 184, 0.18);
-}
-
-.settings-trial-banner {
-  position: static;
-  top: auto;
-  padding: 12px 14px;
-  border: 1px solid rgba(96, 165, 250, 0.24);
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(219, 234, 254, 0.95), rgba(239, 246, 255, 0.95));
-  text-align: left;
-}
-
-.settings-main {
-  max-width: none;
-  margin: 0;
-  padding: 0 0 120px;
-}
-
 .settings-overview {
   margin-bottom: 24px;
 }
@@ -834,14 +701,6 @@ body {
   gap: 16px;
 }
 
-.settings-panel {
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 24px;
-  padding: 20px;
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
-}
-
 #settings-business { order: 1; }
 #settings-billing { order: 2; }
 #settings-cpa-access { order: 3; }
@@ -889,24 +748,6 @@ body {
 .settings-subpanel-head p {
   margin: 4px 0 0;
   font-size: 13px;
-  color: #64748b;
-}
-
-.settings-row {
-  align-items: center;
-  gap: 14px;
-  padding: 14px 0;
-}
-
-.settings-row + .settings-row {
-  border-top: 1px solid rgba(226, 232, 240, 0.92);
-}
-
-.settings-row-title {
-  color: #0f172a;
-}
-
-.settings-row-desc {
   color: #64748b;
 }
 
@@ -999,16 +840,6 @@ body {
   font-size: 14px;
 }
 
-.settings-save-bar {
-  background: rgba(15, 23, 42, 0.96);
-  border: 1px solid rgba(30, 41, 59, 0.94);
-  color: #f8fafc;
-}
-
-.settings-save-bar .settings-save-copy span {
-  color: rgba(248, 250, 252, 0.82);
-}
-
 @media (max-width: 1180px) {
   .settings-detail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1053,109 +884,6 @@ body {
     justify-content: flex-start;
   }
 }
-/* =========================
-   Settings Layout Shell (Step 1)
-   ========================= */
-
-.settings-sidebar {
-  position: sticky;
-  top: 20px;
-  height: fit-content;
-}
-
-.settings-sidebar-card {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 18px;
-  box-shadow: var(--shadow-sm);
-}
-
-.settings-sidebar-title {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 700;
-  color: var(--text-muted);
-  margin: 2px 0 12px;
-}
-
-.settings-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.settings-sidebar-actions {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-
-.settings-sidebar-action {
-  width: 100%;
-  min-height: 42px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--bg-surface);
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-}
-
-.settings-sidebar-action:hover {
-  background: var(--surface2);
-}
-
-.settings-nav-item {
-  width: 100%;
-  text-align: left;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-main);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.settings-nav-item:hover {
-  background: var(--bg-surface);
-  border-color: var(--border);
-}
-
-.settings-nav-item.is-active {
-  background: rgba(99, 102, 241, 0.12);
-  border-color: rgba(99, 102, 241, 0.22);
-  color: var(--primary);
-}
-
-.settings-nav-danger {
-  margin-top: 10px;
-  color: var(--danger);
-}
-
-.settings-main {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 26px;
-}
-
-@media (max-width: 920px) {
-  .settings-shell {
-    grid-template-columns: 1fr;
-    padding: 24px 16px 64px;
-  }
-  .settings-sidebar {
-    position: relative;
-    top: auto;
-  }
-}
-
 /* =========================
    Settings Panel Surface System (Step 2)
    ========================= */
@@ -1904,23 +1632,6 @@ body {
 }
 
 @media (max-width: 1024px) {
-  .settings-topbar {
-    height: auto;
-    padding: 12px 16px;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .topbar-left {
-    width: 100%;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  .topbar-nav {
-    display: none;
-  }
-
   .settings-shell {
     grid-template-columns: 1fr;
   }
@@ -1932,24 +1643,6 @@ body {
 }
 
 @media (max-width: 720px) {
-  .settings-topbar {
-    padding: 10px 12px;
-    flex-direction: column;
-  }
-
-  .topbar-left {
-    gap: 12px;
-  }
-
-  .user-pill {
-    align-self: flex-start;
-    max-width: 100%;
-  }
-
-  .topbar-brand-text {
-    font-size: 14px;
-  }
-
   .settings-sidebar-card,
   .settings-card,
   .danger-card {
@@ -1990,7 +1683,6 @@ body {
   }
 
   .settings-nav-item,
-  .settings-sidebar-action,
   .settings-primary-btn,
   .sign-out-btn,
   .cpa-access-revoke,
