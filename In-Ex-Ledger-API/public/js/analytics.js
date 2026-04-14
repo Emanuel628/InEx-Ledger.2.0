@@ -63,11 +63,14 @@ function renderDashboard(data) {
   // KPI cards
   const kpiRow = document.getElementById("kpiRow");
   if (!kpiRow) return;
+  const isCA = summary.region === "CA";
+  const seTaxLabel = isCA ? "Est. CPP Contribution" : "Est. SE Tax Owed";
+  const seTaxNote = isCA ? "Canada Pension Plan (self-employed)" : "Self-employment tax (approx.)";
   kpiRow.innerHTML = [
     kpiCard("Avg Monthly Income", fmt(summary.avg_monthly_income), "trailing 12 months"),
     kpiCard("Avg Monthly Expenses", fmt(summary.avg_monthly_expense), "trailing 12 months"),
-    kpiCard("12-Month Net", fmt(summary.net), summary.net >= 0 ? "profit" : "deficit", summary.net >= 0 ? "" : "kpi-value--negative"),
-    kpiCard("Est. Tax Liability", (summary.estimated_tax_liability_pct ?? 0).toFixed(1) + "%", "of net income (approx)")
+    kpiCard("Your Profit", fmt(summary.net), summary.net >= 0 ? "profit" : "deficit", summary.net >= 0 ? "" : "kpi-value--negative"),
+    kpiCard(seTaxLabel, fmt(summary.se_tax_estimate ?? 0), seTaxNote)
   ].join("");
 
   // Monthly breakdown table

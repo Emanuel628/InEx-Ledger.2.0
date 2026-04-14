@@ -214,6 +214,22 @@
                   <label for="amount" class="form-label" data-i18n="transaction_label_amount">Amount</label>
                   <input class="form-control" type="number" id="amount" name="amount" step="0.01" required />
                 </div>
+                <!-- Payer / 1099 fields — shown only for income transactions -->
+                <div class="form-field income-only-field" id="payerNameField">
+                  <label for="payerName" class="form-label" data-i18n="transaction_payer_label">Payer / Platform</label>
+                  <input class="form-control" type="text" id="payerName" name="payer_name" list="payerNameSuggestions" data-i18n-placeholder="transaction_payer_placeholder" placeholder="e.g. Uber, Fiverr, Stripe" />
+                  <datalist id="payerNameSuggestions"></datalist>
+                </div>
+                <div class="form-field income-only-field" id="taxFormTypeField">
+                  <label for="taxFormType" class="form-label" data-i18n="transaction_tax_form_label">Reported on tax form?</label>
+                  <select class="form-control" id="taxFormType" name="tax_form_type">
+                    <option value="" data-i18n="transaction_tax_form_none">Not applicable</option>
+                    <option value="1099-NEC" data-i18n="transaction_tax_form_1099nec" data-region-show="us">1099-NEC</option>
+                    <option value="1099-K" data-i18n="transaction_tax_form_1099k" data-region-show="us">1099-K</option>
+                    <option value="T4A" data-i18n="transaction_tax_form_t4a" data-region-show="ca">T4A (Canada)</option>
+                    <option value="none">None / Not reported</option>
+                  </select>
+                </div>
                 <div class="form-field form-field-full">
                   <label for="transactionNote" class="form-label">Internal note</label>
                   <input class="form-control" type="text" id="transactionNote" name="transactionNote" placeholder="Optional short note" />
@@ -468,6 +484,7 @@
 <script src="../js/i18n.js?v=20260405c"></script>
 <script src="../js/auth.js?v=20260405c"></script>
 <script src="../js/trial.js?v=20260405c"></script>
+<script src="../js/taxReminders.js?v=20260405c"></script>
 <script src="../js/transactions.js?v=20260405c"></script>
 </body>
 </html>

@@ -39,21 +39,27 @@
 
       <form id="onboardingForm" class="onboarding-card">
         <div class="onboarding-grid">
-          <div class="form-field">
-            <label for="onboardingBusinessName" data-i18n="onboarding_business_name">Business name</label>
-            <input type="text" id="onboardingBusinessName" autocomplete="organization" required data-i18n-placeholder="onboarding_business_name_placeholder" placeholder="Enter your business name" />
+
+          <!-- Work type tiles -->
+          <div class="form-field form-field-full">
+            <label class="field-label" data-i18n="onboarding_work_type_label">What kind of work do you do?</label>
+            <div class="onboarding-work-tiles" id="onboardingWorkTiles">
+              <button type="button" class="work-tile" data-work="gig" data-i18n="onboarding_work_type_gig">Rideshare / Delivery</button>
+              <button type="button" class="work-tile" data-work="creative" data-i18n="onboarding_work_type_creative">Creative / Consulting</button>
+              <button type="button" class="work-tile" data-work="trade" data-i18n="onboarding_work_type_trade">Trades / Home Services</button>
+              <button type="button" class="work-tile is-selected" data-work="other" data-i18n="onboarding_work_type_other">Other independent work</button>
+            </div>
+            <input type="hidden" id="onboardingWorkType" value="other" />
           </div>
+
           <div class="form-field">
-            <label for="onboardingBusinessType" data-i18n="onboarding_business_type">Business type</label>
-            <select id="onboardingBusinessType" required>
-              <option value="sole_proprietor" data-i18n="settings_business_type_sole_prop">Sole proprietor</option>
-              <option value="llc" data-i18n="settings_business_type_llc">LLC</option>
-              <option value="s_corp" data-i18n="settings_business_type_scorp">S-Corp</option>
-              <option value="partnership" data-i18n="settings_business_type_partnership">Partnership</option>
-            </select>
+            <label for="onboardingBusinessName" data-i18n="onboarding_business_name">Your name or trade name</label>
+            <input type="text" id="onboardingBusinessName" autocomplete="name" required data-i18n-placeholder="onboarding_business_name_placeholder" placeholder="e.g. Jane Smith or Jane's Design" />
           </div>
+          <!-- business_type hidden — always sole_proprietor for freelancers; user can change in Settings -->
+          <input type="hidden" id="onboardingBusinessType" value="sole_proprietor" />
           <div class="form-field">
-            <label for="onboardingRegion" data-i18n="onboarding_region">Region</label>
+            <label for="onboardingRegion" data-i18n="onboarding_region">Where do you file taxes?</label>
             <select id="onboardingRegion" required>
               <option value="US" data-i18n="region_us">United States</option>
               <option value="CA" data-i18n="region_ca">Canada</option>
@@ -83,7 +89,7 @@
             <select id="onboardingLanguage" data-language-select required></select>
           </div>
           <div class="form-field">
-            <label for="onboardingStarterAccountType" data-i18n="onboarding_first_account_type">First account type</label>
+            <label for="onboardingStarterAccountType" data-i18n="onboarding_first_account_type">Primary account type</label>
             <select id="onboardingStarterAccountType" required>
               <option value="checking" data-i18n="accounts_type_checking">Checking</option>
               <option value="savings" data-i18n="accounts_type_savings">Savings</option>
@@ -93,13 +99,13 @@
             </select>
           </div>
           <div class="form-field">
-            <label for="onboardingStarterAccountName" data-i18n="onboarding_first_account_name">First account name</label>
+            <label for="onboardingStarterAccountName" data-i18n="onboarding_first_account_name">Account nickname</label>
             <input type="text" id="onboardingStarterAccountName" required />
           </div>
           <div class="form-field form-field-full">
             <label for="onboardingStartFocus" data-i18n="onboarding_start_focus">What do you want to do first?</label>
             <select id="onboardingStartFocus" required>
-              <option value="transactions" data-i18n="onboarding_focus_transactions">Start logging transactions</option>
+              <option value="transactions" data-i18n="onboarding_focus_transactions">Log income &amp; expenses</option>
               <option value="receipts" data-i18n="onboarding_focus_receipts">Upload receipts</option>
               <option value="mileage" data-i18n="onboarding_focus_mileage">Track mileage</option>
               <option value="exports" data-i18n="onboarding_focus_exports">Review exports</option>

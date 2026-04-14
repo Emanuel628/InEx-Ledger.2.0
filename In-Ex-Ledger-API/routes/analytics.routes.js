@@ -82,6 +82,11 @@ function validateOptionalNumber(value, fieldName, { min = null, max = null } = {
 router.get("/dashboard", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const businessRow = await pool.query(
+      "SELECT region FROM businesses WHERE id = $1",
+      [businessId]
+    );
+    const region = businessRow.rows[0]?.region || "US";
     const since = monthStartOffset(11);
 
     // Monthly income / expense totals
@@ -167,6 +172,20 @@ router.get("/dashboard", async (req, res) => {
       ? Math.min(100, Math.max(0, (Math.max(netIncome, 0) * 0.25) / totalIncome * 100))
       : 0;
 
+    // Self-employment tax estimate (freelancer-facing)
+    // US: SE net = net × 0.9235; SE tax = SE net × 0.153 (covers SS + Medicare both halves)
+    // CA: CPP = (net − $3,500 exemption) × 0.1188 (2024 combined self-employed rate)
+    let seTaxEstimate = 0;
+    if (netIncome > 0) {
+      if (region === "CA") {
+        const cppBase = Math.max(0, netIncome - 3500);
+        seTaxEstimate = cppBase * 0.1188;
+      } else {
+        const seNet = netIncome * 0.9235;
+        seTaxEstimate = seNet * 0.153;
+      }
+    }
+
     res.json({
       period_months: 12,
       since,
@@ -176,7 +195,9 @@ router.get("/dashboard", async (req, res) => {
         net: Number(netIncome.toFixed(2)),
         avg_monthly_income: Number(avgMonthlyIncome.toFixed(2)),
         avg_monthly_expense: Number(avgMonthlyExpense.toFixed(2)),
-        estimated_tax_liability_pct: Number(estimatedTaxPct.toFixed(1))
+        estimated_tax_liability_pct: Number(estimatedTaxPct.toFixed(1)),
+        se_tax_estimate: Number(seTaxEstimate.toFixed(2)),
+        region
       },
       monthly_breakdown: months,
       top_income_sources: topIncomeResult.rows.map((r) => ({
