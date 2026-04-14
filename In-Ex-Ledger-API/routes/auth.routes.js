@@ -133,6 +133,7 @@ async function consumeVerificationToken(token) {
    4. PASSWORD RESET UTILITIES (DB-backed)
    ========================================================= */
 async function createPasswordResetToken(email) {
+  // 32 bytes => 256-bit token entropy, encoded as a 64-char hex string.
   const token = crypto.randomBytes(32).toString("hex");
   const tokenHash = hashValue(token);
   const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
@@ -151,6 +152,7 @@ async function consumePasswordResetToken(token) {
   await pool.query("DELETE FROM password_reset_tokens WHERE expires_at <= NOW()");
   const result = await pool.query(
     `DELETE FROM password_reset_tokens
+      -- TODO(2026-07): remove token::text fallback after all pre-migration UUID reset tokens have expired.
       WHERE (token_hash = $1 OR token::text = $2)
         AND expires_at > NOW()
       RETURNING email`,
@@ -554,9 +556,9 @@ async function trackSignInDeviceAndNotify(user, req) {
               updated_at = NOW(),
               sign_in_count = sign_in_count + 1,
               ip_hash = COALESCE($3, ip_hash),
-              user_agent = COALESCE($4, user_agent)
+              user_agent = $4
         WHERE user_id = $1 AND fingerprint_hash = $2`,
-      [user.id, fingerprintHash, ipHash, userAgent || null]
+      [user.id, fingerprintHash, ipHash, userAgent]
     );
     return;
   }
@@ -571,7 +573,7 @@ async function trackSignInDeviceAndNotify(user, req) {
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       ON CONFLICT (user_id, fingerprint_hash) DO NOTHING
       RETURNING id`,
-    [crypto.randomUUID(), user.id, fingerprintHash, ipHash, userAgent || null, city, country]
+    [crypto.randomUUID(), user.id, fingerprintHash, ipHash, userAgent, city, country]
   );
   if (inserted.rowCount === 0) {
     return;
@@ -580,9 +582,9 @@ async function trackSignInDeviceAndNotify(user, req) {
   const lang = await getPreferredLanguageForUser(user.id);
   const { token } = await createPasswordResetToken(user.email);
   const resetLink = buildPasswordResetLink(req, token);
-  const signInTime = new Date().toISOString();
+  const signInTimeIso = new Date().toISOString();
   const alertEmail = buildNewSignInAlertEmail(lang, {
-    signInTime,
+    signInTime: signInTimeIso,
     city,
     country,
     resetLink
