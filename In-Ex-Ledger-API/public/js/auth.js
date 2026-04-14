@@ -13,11 +13,41 @@ const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const SUBSCRIPTION_KEY = "lb_subscription";
 const ACTIVE_BUSINESS_ID_KEY = "lb_active_business_id";
 const ACTIVE_BUSINESS_NAME_KEY = "lb_business_name";
+const USER_ID_KEY = "lb_user_id";
 const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
 const LOGIN_RESET_KEY = "lb_login_reset";
 const ONBOARDING_PAGE = "/onboarding";
 const LOGIN_PAGE = "/login";
+const CLIENT_CACHE_KEYS = [
+  "lb_accounts",
+  "lb_categories",
+  "lb_transactions",
+  "lb_transactions_scope",
+  "lb_transactions_upsell_hidden",
+  "lb_receipts",
+  "lb_mileage",
+  "lb_recurring",
+  "lb_businesses",
+  "lb_business_profile",
+  "lb_business_settings",
+  "lb_export_history",
+  "lb_export_language",
+  "lb_export_scope",
+  "lb_region",
+  "lb_province",
+  "lb_ein",
+  "lb_bn",
+  "lb_legal_name",
+  "lb_dba",
+  "lb_naics",
+  ACTIVE_BUSINESS_ID_KEY,
+  ACTIVE_BUSINESS_NAME_KEY,
+  USER_ID_KEY
+];
+const CLIENT_CACHE_PREFIXES = [
+  "lb_export_history__"
+];
 const ONBOARDING_RUNTIME_PAGES = new Set([
   "/transactions",
   "/accounts",
@@ -30,7 +60,6 @@ const ONBOARDING_RUNTIME_PAGES = new Set([
 if (!window.API_BASE) {
   window.API_BASE = "";
 }
-
 
 if (!window.__AUTH_GUARD_STATE__) {
   window.__AUTH_GUARD_STATE__ = { running: false, count: 0, lastError: null };
@@ -45,17 +74,33 @@ function buildApiUrl(path = "") {
   return /^https?:\/\//i.test(path) && path ? path : `${base}${path}`;
 }
 
+function removePrefixedLocalStorageKeys(prefixes = []) {
+  if (!Array.isArray(prefixes) || !prefixes.length) {
+    return;
+  }
+
+  try {
+    const keysToRemove = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key) {
+        continue;
+      }
+      if (prefixes.some((prefix) => key.startsWith(prefix))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  } catch (_) {}
+}
+
 function clearAppState() {
-  [
-    "lb_accounts",
-    "lb_categories",
-    "lb_transactions",
-    "lb_transactions_upsell_hidden",
-    ACTIVE_BUSINESS_ID_KEY,
-    ACTIVE_BUSINESS_NAME_KEY
-  ].forEach(
-    (key) => localStorage.removeItem(key)
-  );
+  CLIENT_CACHE_KEYS.forEach((key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch (_) {}
+  });
+  removePrefixedLocalStorageKeys(CLIENT_CACHE_PREFIXES);
 }
 
 function markLoginReset() {
@@ -176,6 +221,14 @@ function getAssignedCpaPortfolios(profile = {}) {
   return Array.isArray(profile.assigned_cpa_portfolios) ? profile.assigned_cpa_portfolios : [];
 }
 
+function persistAuthenticatedUser(profile = {}) {
+  const userId = String(profile?.id || "").trim();
+  if (!userId) {
+    return;
+  }
+  localStorage.setItem(USER_ID_KEY, userId);
+}
+
 /**
  * Sync region and province from the active business to localStorage and
  * window globals so region-hardening functions have the correct context.
@@ -215,6 +268,7 @@ function updateAuthenticatedChrome(profile = {}) {
   const displayName = getUserDisplayName(profile);
   const initials = getUserInitials(profile);
 
+  persistAuthenticatedUser(profile);
   persistBusinessContext(profile);
   ensureLegacyUserPills();
 
@@ -286,7 +340,6 @@ function ensureLegacyUserPills() {
 
   header.appendChild(pill);
 }
-
 
 function getToken() {
   try {
@@ -399,7 +452,6 @@ function mapAuthError(status, apiError) {
 
 async function requireValidSessionOrRedirect() {
   if (window.__AUTH_GUARD_STATE__.running) {
-    // Wait for the in-flight check to settle, then return its result.
     return new Promise((resolve) => {
       const poll = setInterval(() => {
         if (!window.__AUTH_GUARD_STATE__.running) {
@@ -442,7 +494,6 @@ async function requireValidSessionOrRedirect() {
       if (payload) {
         updateAuthenticatedChrome(payload);
       }
-      // Sync region and province from active business profile
       syncRegionFromProfile(payload);
       if (shouldRedirectToOnboarding(payload)) {
         window.__AUTH_GUARD_STATE__.running = false;
@@ -470,7 +521,9 @@ async function requireValidSessionOrRedirect() {
     window.__AUTH_GUARD_STATE__.lastError = `me_${response.status}`;
     window.location.href = `${LOGIN_PAGE}?reason=error`;
   } catch (err) {
-    if (localStorage.getItem("debug") === "true") { console.error("[AUTH] Session validation failed:", err); }
+    if (localStorage.getItem("debug") === "true") {
+      console.error("[AUTH] Session validation failed:", err);
+    }
     window.__AUTH_GUARD_STATE__.running = false;
     window.__AUTH_GUARD_STATE__.lastError = "network";
     window.location.href = `${LOGIN_PAGE}?reason=network`;
@@ -501,7 +554,9 @@ async function redirectIfAuthenticated() {
       window.location.href = payload?.onboarding?.completed ? "/transactions" : ONBOARDING_PAGE;
     }
   } catch (err) {
-    if (localStorage.getItem("debug") === "true") { console.error("[AUTH] redirectIfAuthenticated failed:", err); }
+    if (localStorage.getItem("debug") === "true") {
+      console.error("[AUTH] redirectIfAuthenticated failed:", err);
+    }
   }
 }
 
@@ -565,7 +620,9 @@ async function signOut() {
       }
     });
   } catch (err) {
-    if (localStorage.getItem("debug") === "true") { console.error("Logout error:", err); }
+    if (localStorage.getItem("debug") === "true") {
+      console.error("Logout error:", err);
+    }
   }
   markLoginReset();
   clearToken();
@@ -850,6 +907,7 @@ async function submitBusinessCreation() {
 
     const payload = await response.json().catch(() => null);
     const activeBusiness = payload?.active_business || null;
+    clearAppState();
     if (activeBusiness?.id) {
       localStorage.setItem(ACTIVE_BUSINESS_ID_KEY, activeBusiness.id);
       localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || (typeof t === "function" ? t("common_business") : "Business"));
@@ -876,6 +934,7 @@ async function switchActiveBusiness(businessId) {
 
   const payload = await response.json().catch(() => null);
   const activeBusiness = payload?.active_business || null;
+  clearAppState();
   if (activeBusiness?.id) {
     localStorage.setItem(ACTIVE_BUSINESS_ID_KEY, activeBusiness.id);
     localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || (typeof t === "function" ? t("common_business") : "Business"));
