@@ -10,10 +10,11 @@ function buildBusinessName(user) {
   return "My Business";
 }
 
-async function resolveBusinessIdForUser(user) {
+async function resolveBusinessIdForUser(user, options = {}) {
   if (!user?.id) {
     throw new Error("User is required to resolve business");
   }
+  const allowAccountSeed = options?.seedDefaults !== false;
 
   const active = await pool.query(
     `SELECT b.id
@@ -90,12 +91,19 @@ async function resolveBusinessIdForUser(user) {
       [businessId, user.id]
     );
 
+    const userState = await client.query(
+      "SELECT onboarding_completed FROM users WHERE id = $1 LIMIT 1",
+      [user.id]
+    );
+    const onboardingCompleted = !!userState.rows[0]?.onboarding_completed;
     const { rows: existingAccounts } = await client.query(
       "SELECT 1 FROM accounts WHERE business_id = $1 LIMIT 1",
       [businessId]
     );
 
-    if (existingAccounts.length === 0) {
+    if (!allowAccountSeed) {
+      // Caller intentionally deferred account seeding.
+    } else if (onboardingCompleted && existingAccounts.length === 0) {
       await seedDefaultsForBusiness(client, businessId);
     }
 
