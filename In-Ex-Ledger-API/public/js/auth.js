@@ -894,9 +894,14 @@ function purgeUserBusinessCache(profile = window.__LUNA_ME__) {
   }
   const namespacePrefix = `lb:${userId}:`;
   try {
-    Object.keys(localStorage)
-      .filter((key) => key.startsWith(namespacePrefix))
-      .forEach((key) => localStorage.removeItem(key));
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(namespacePrefix)) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
   } catch (_) {}
 }
 
@@ -982,13 +987,14 @@ async function switchActiveBusiness(businessId) {
   if (!response || !response.ok) {
     const payload = await response?.json().catch(() => null);
     showAccountMenuNotice(payload?.error || (typeof t === "function" ? t("auth_error_switch_business") : "Unable to switch businesses."));
-    return;
+    return false;
   }
 
   const payload = await response.json().catch(() => null);
   const activeBusiness = payload?.active_business || null;
   applyActivatedBusinessContext(activeBusiness);
   window.location.reload();
+  return true;
 }
 
 function showAccountMenuNotice(message) {

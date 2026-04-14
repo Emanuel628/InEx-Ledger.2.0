@@ -356,7 +356,10 @@ async function renderBusinessList() {
         btn.disabled = true;
         try {
           if (typeof switchActiveBusiness === "function") {
-            await switchActiveBusiness(bizId);
+            const switched = await switchActiveBusiness(bizId);
+            if (!switched) {
+              throw new Error("switch_failed");
+            }
             return;
           }
           const res = await apiFetch(`/api/businesses/${bizId}/activate`, { method: "POST" });
@@ -387,24 +390,6 @@ async function renderBusinessList() {
   }
 }
 
-function purgeSettingsUserNamespacedCache() {
-  const userId =
-    window.lunaStorage?.resolveStorageUserId?.(window.__LUNA_ME__)
-    || window.__LUNA_ME__?.id
-    || window.__LUNA_ME__?.user_id
-    || window.__LUNA_ME__?.userId
-    || "";
-  if (!userId) {
-    return;
-  }
-  const namespacePrefix = `lb:${userId}:`;
-  try {
-    Object.keys(localStorage)
-      .filter((key) => key.startsWith(namespacePrefix))
-      .forEach((key) => localStorage.removeItem(key));
-  } catch (_) {}
-}
-
 async function refreshSettingsBusinessContext(payload, fallbackBusinessId = "") {
   const activeBusiness = payload?.active_business || null;
   if (activeBusiness?.id && typeof applyActivatedBusinessContext === "function") {
@@ -419,21 +404,11 @@ async function refreshSettingsBusinessContext(payload, fallbackBusinessId = "") 
   }
 
   if (typeof switchActiveBusiness === "function") {
-    await switchActiveBusiness(activeBusinessId);
-    return true;
+    const switched = await switchActiveBusiness(activeBusinessId);
+    return switched === true;
   }
 
-  if (window.lunaStorage?.purgeLegacyKeys) {
-    window.lunaStorage.purgeLegacyKeys();
-  }
-  purgeSettingsUserNamespacedCache();
-  localStorage.setItem("lb_active_business_id", activeBusinessId);
-  localStorage.setItem("lb_business_name", activeBusiness?.name || t("common_business"));
-  if (window.__LUNA_ME__ && typeof window.__LUNA_ME__ === "object") {
-    window.__LUNA_ME__.active_business_id = activeBusinessId;
-  }
-  window.location.reload();
-  return true;
+  return false;
 }
 
 function openAddBusinessModal() {
