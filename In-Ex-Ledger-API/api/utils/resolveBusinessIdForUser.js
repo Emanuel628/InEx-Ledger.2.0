@@ -101,7 +101,9 @@ async function resolveBusinessIdForUser(user, options = {}) {
       [businessId]
     );
 
-    if (allowAccountSeed && onboardingCompleted && existingAccounts.length === 0) {
+    if (!allowAccountSeed) {
+      // Caller intentionally deferred account seeding.
+    } else if (onboardingCompleted && existingAccounts.length === 0) {
       await seedDefaultsForBusiness(client, businessId);
     }
 

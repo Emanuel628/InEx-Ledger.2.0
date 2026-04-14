@@ -185,7 +185,7 @@ router.put("/onboarding", async (req, res) => {
         await client.query("DELETE FROM accounts WHERE business_id = $1", [businessId]);
       }
       const accountCheck = await client.query("SELECT 1 FROM accounts WHERE business_id = $1 LIMIT 1", [businessId]);
-      if (!accountCheck.rowCount) {
+      if (!onboardingCompleted && !accountCheck.rowCount) {
         await client.query(
           `INSERT INTO accounts (id, business_id, name, type)
            VALUES ($1, $2, $3, $4)`,
