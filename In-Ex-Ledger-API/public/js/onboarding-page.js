@@ -30,6 +30,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   hydrateOnboardingDefaults(profile);
   document.getElementById("onboardingRegion")?.addEventListener("change", syncProvinceField);
+  wireWorkTypeTiles();
   onboardingForm.addEventListener("submit", handleOnboardingSubmit);
 });
 
@@ -50,8 +51,13 @@ function hydrateOnboardingDefaults(profile = {}) {
 
   const elBusinessName = document.getElementById("onboardingBusinessName");
   if (elBusinessName) elBusinessName.value = onboardingData.business_name || business.name || "";
-  const elBusinessType = document.getElementById("onboardingBusinessType");
-  if (elBusinessType) elBusinessType.value = onboardingData.business_type || business.business_type || "sole_proprietor";
+  // business_type is always sole_proprietor for the freelancer fast-path
+  const savedWorkType = onboardingData.work_type || "other";
+  const elWorkType = document.getElementById("onboardingWorkType");
+  if (elWorkType) elWorkType.value = savedWorkType;
+  document.querySelectorAll(".work-tile").forEach((btn) => {
+    btn.classList.toggle("is-selected", btn.dataset.work === savedWorkType);
+  });
   const elRegion = document.getElementById("onboardingRegion");
   if (elRegion) elRegion.value = onboardingData.region || business.region || "US";
   const elProvince = document.getElementById("onboardingProvince");
@@ -75,7 +81,8 @@ async function handleOnboardingSubmit(event) {
   const submitButton = onboardingForm.querySelector("button[type=\"submit\"]");
   const payload = {
     business_name: document.getElementById("onboardingBusinessName")?.value.trim() || "",
-    business_type: document.getElementById("onboardingBusinessType")?.value || "",
+    work_type: document.getElementById("onboardingWorkType")?.value || "other",
+    business_type: "sole_proprietor",
     region: document.getElementById("onboardingRegion")?.value || "US",
     province: document.getElementById("onboardingProvince")?.value || "",
     language: document.getElementById("onboardingLanguage")?.value || "en",
@@ -125,6 +132,18 @@ async function handleOnboardingSubmit(event) {
     submitButton?.removeAttribute("disabled");
     onboardingSubmitting = false;
   }
+}
+
+function wireWorkTypeTiles() {
+  const tiles = document.querySelectorAll(".work-tile");
+  const hidden = document.getElementById("onboardingWorkType");
+  tiles.forEach((tile) => {
+    tile.addEventListener("click", () => {
+      tiles.forEach((t) => t.classList.remove("is-selected"));
+      tile.classList.add("is-selected");
+      if (hidden) hidden.value = tile.dataset.work;
+    });
+  });
 }
 
 function setOnboardingMessage(message = "") {

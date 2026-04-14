@@ -31,6 +31,39 @@
   font-weight: 500;
 }
 
+/* Tax reminder banner — amber warning variant */
+.trial-banner--warning {
+  background: #fffbeb;
+  border-bottom: 1px solid #fcd34d;
+  color: #92400e;
+  font-size: 13px;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 16px;
+}
+
+.trial-banner--warning a {
+  color: #b45309;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.trial-banner-text {
+  flex: 1;
+  text-align: left;
+}
+
+.trial-banner-dismiss {
+  background: none;
+  border: none;
+  color: #92400e;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+
 .box-shadow-soft {
   box-shadow: var(--shadow-card);
 }

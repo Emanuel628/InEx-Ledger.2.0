@@ -455,6 +455,9 @@ router.post("/", async (req, res) => {
 
     const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
     const { description, note } = req.body;
+    const payerName = type === "income" ? (String(req.body.payer_name || "").trim().slice(0, 200) || null) : null;
+    const validTaxForms = new Set(["1099-NEC", "1099-K", "T4A", "none"]);
+    const taxFormType = type === "income" && validTaxForms.has(req.body.tax_form_type) ? req.body.tax_form_type : null;
     await assertUnlockedBusinessDates(businessId, date);
     const encryptedDescription = tryEncryptDescription(description);
 
@@ -480,9 +483,11 @@ router.post("/", async (req, res) => {
       `INSERT INTO transactions
         (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted, date, note,
          currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
-         indirect_tax_amount, indirect_tax_recoverable, personal_use_pct, review_status, review_notes)
+         indirect_tax_amount, indirect_tax_recoverable, personal_use_pct, review_status, review_notes,
+         payer_name, tax_form_type)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-               $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+               $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
+               $23, $24)
        RETURNING *`,
       [
         crypto.randomUUID(),
@@ -508,7 +513,9 @@ router.post("/", async (req, res) => {
         validation.normalized.indirect_tax_recoverable,
         validation.normalized.personal_use_pct,
         validation.normalized.review_status || "ready",
-        validation.normalized.review_notes
+        validation.normalized.review_notes,
+        payerName,
+        taxFormType
       ]
     );
 

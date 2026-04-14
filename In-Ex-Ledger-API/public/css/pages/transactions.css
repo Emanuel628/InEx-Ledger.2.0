@@ -2115,3 +2115,11 @@ body {
     font-size: 13px;
   }
 }
+
+/* Payer / 1099 fields — hidden by default, shown for income intent */
+.income-only-field {
+  display: none;
+}
+.transaction-modal[data-intent="income"] .income-only-field {
+  display: block;
+}

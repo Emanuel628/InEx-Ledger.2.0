@@ -452,7 +452,9 @@ function wireTransactionForm() {
         indirect_tax_recoverable: !!indirectTaxRecoverableInput?.checked,
         personal_use_pct: normalizeNumberOrEmpty(personalUseInput?.value),
         review_status: reviewStatusSelect?.value || "",
-        review_notes: reviewNotesInput?.value.trim() || ""
+        review_notes: reviewNotesInput?.value.trim() || "",
+        payer_name: type === "income" ? (document.getElementById("payerName")?.value.trim() || "") : "",
+        tax_form_type: type === "income" ? (document.getElementById("taxFormType")?.value || "") : ""
       };
 
       const endpoint = editingTransactionId
@@ -2485,6 +2487,15 @@ function setTransactionType(intent) {
     const matches = (button.dataset.intent === "income" ? "income" : "expense") === intent;
     button.classList.toggle("is-active", matches);
   });
+  // Show payer/1099 fields only for income
+  const modal = document.querySelector(".transaction-modal");
+  if (modal) modal.dataset.intent = intent;
+  if (intent !== "income") {
+    const payerName = document.getElementById("payerName");
+    const taxFormType = document.getElementById("taxFormType");
+    if (payerName) payerName.value = "";
+    if (taxFormType) taxFormType.value = "";
+  }
 }
 function resolveTransactionAccountName(transaction, accountsById) {
   if (transaction.account_name) {
