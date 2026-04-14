@@ -384,6 +384,18 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
       return res.status(401).json({ error: "Incorrect password." });
     }
 
+    try {
+      await client.query(
+        `ALTER TABLE IF EXISTS cpa_audit_logs
+           DROP CONSTRAINT IF EXISTS cpa_audit_logs_owner_user_id_fkey,
+           DROP CONSTRAINT IF EXISTS cpa_audit_logs_actor_user_id_fkey`
+      );
+    } catch (error) {
+      logWarn("DELETE /me: unable to drop legacy CPA audit constraints", {
+        message: error.message
+      });
+    }
+
     const receiptFiles = await client.query(
       `SELECT r.storage_path
          FROM receipts r
