@@ -12,7 +12,8 @@ const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const {
   createAuthLimiter,
   createMfaVerifyLimiter,
-  createPasswordLimiter
+  createPasswordLimiter,
+  createTokenRefreshLimiter
 } = require("../middleware/rateLimitTiers.js");
 const { pool } = require("../db.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
@@ -64,6 +65,7 @@ const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FRO
 const authLimiter = createAuthLimiter();
 const passwordLimiter = createPasswordLimiter();
 const mfaVerifyLimiter = createMfaVerifyLimiter();
+const tokenRefreshLimiter = createTokenRefreshLimiter();
 
 /* =========================================================
    3. CONSTANTS & COOKIE CONFIGURATION
@@ -310,8 +312,10 @@ async function issueAuthenticatedSession(
 
 async function resetCurrentRefreshSession(res, user) {
   await revokeAllRefreshTokensForUser(user.id);
+  // Always false: password change / MFA toggle voids the previous MFA
+  // authentication — the user must re-verify via the MFA challenge flow.
   const { token, expiresAt } = await createRefreshToken(user.id, {
-    mfaAuthenticated: !!user.mfa_enabled
+    mfaAuthenticated: false
   });
   setRefreshCookie(res, token, expiresAt);
 }
@@ -770,7 +774,10 @@ router.post("/login", authLimiter, async (req, res) => {
     if (!verified) {
       clearRefreshCookie(res);
       clearMfaTrustCookie(res);
-      return res.status(403).json({ error: "Please verify your email before signing in." });
+      return res.status(403).json({
+        error: "Please verify your email address before signing in. Check your inbox for a verification link.",
+        code: "email_not_verified"
+      });
     }
     const businessId = await resolveBusinessIdForUser(user);
     const deviceContext = buildSignInDeviceContext(user, req);
@@ -847,7 +854,7 @@ router.post("/login", authLimiter, async (req, res) => {
 /**
  * POST /refresh
  */
-router.post("/refresh", requireCsrfProtection, async (req, res) => {
+router.post("/refresh", tokenRefreshLimiter, requireCsrfProtection, async (req, res) => {
   const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (!rawToken) {
     clearRefreshCookie(res);
