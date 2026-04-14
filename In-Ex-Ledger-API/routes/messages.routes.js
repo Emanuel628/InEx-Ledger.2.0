@@ -15,6 +15,11 @@ const VALID_MESSAGE_TYPES = new Set(["cpa", "it_support", "general", "support_re
 const MAX_SUBJECT_LEN = 200;
 const MAX_BODY_LEN = 10000;
 const MAX_PAGE_SIZE = 50;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value) {
+  return typeof value === "string" && UUID_RE.test(value);
+}
 
 function mapMessageRow(row, viewerId) {
   const isSender = row.sender_id === viewerId;
@@ -184,6 +189,10 @@ router.get("/sent", async (req, res) => {
 // Fetches a single message and marks it as read if the current user is the receiver.
 router.get("/:id", async (req, res) => {
   try {
+    const messageId = String(req.params.id || "").trim();
+    if (!isUuid(messageId)) {
+      return res.status(400).json({ error: "Invalid message ID." });
+    }
     const { rows } = await pool.query(
       `SELECT m.*,
               COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
@@ -199,7 +208,7 @@ router.get("/:id", async (req, res) => {
             OR (m.sender_id = $2 AND m.is_deleted_by_sender = FALSE)
           )
         LIMIT 1`,
-      [req.params.id, req.user.id]
+      [messageId, req.user.id]
     );
 
     if (!rows.length) {
@@ -236,6 +245,9 @@ router.post("/", async (req, res) => {
   if (!receiverId) {
     return res.status(400).json({ error: "receiver_id is required." });
   }
+  if (!isUuid(receiverId)) {
+    return res.status(400).json({ error: "receiver_id must be a valid UUID." });
+  }
   if (receiverId === req.user.id) {
     return res.status(400).json({ error: "You cannot send a message to yourself." });
   }
@@ -250,6 +262,9 @@ router.post("/", async (req, res) => {
   }
   if (subject && subject.length > MAX_SUBJECT_LEN) {
     return res.status(400).json({ error: `Subject must not exceed ${MAX_SUBJECT_LEN} characters.` });
+  }
+  if (parentId && !isUuid(parentId)) {
+    return res.status(400).json({ error: "parent_id must be a valid UUID when provided." });
   }
 
   try {
@@ -360,6 +375,10 @@ router.post("/", async (req, res) => {
 // PATCH /api/messages/:id/read
 router.patch("/:id/read", async (req, res) => {
   try {
+    const messageId = String(req.params.id || "").trim();
+    if (!isUuid(messageId)) {
+      return res.status(400).json({ error: "Invalid message ID." });
+    }
     const result = await pool.query(
       `UPDATE messages
           SET is_read = TRUE, updated_at = NOW()
@@ -367,7 +386,7 @@ router.patch("/:id/read", async (req, res) => {
           AND receiver_id = $2
           AND is_deleted_by_receiver = FALSE
         RETURNING id, is_read`,
-      [req.params.id, req.user.id]
+      [messageId, req.user.id]
     );
 
     if (!result.rowCount) {
@@ -385,6 +404,10 @@ router.patch("/:id/read", async (req, res) => {
 // Toggles archive status for the current user.
 router.patch("/:id/archive", async (req, res) => {
   try {
+    const messageId = String(req.params.id || "").trim();
+    if (!isUuid(messageId)) {
+      return res.status(400).json({ error: "Invalid message ID." });
+    }
     // Determine which column to toggle
     const msgCheck = await pool.query(
       `SELECT id, sender_id, receiver_id,
@@ -393,7 +416,7 @@ router.patch("/:id/archive", async (req, res) => {
         WHERE id = $1
           AND (sender_id = $2 OR receiver_id = $2)
         LIMIT 1`,
-      [req.params.id, req.user.id]
+      [messageId, req.user.id]
     );
 
     if (!msgCheck.rowCount) {
@@ -428,6 +451,10 @@ router.patch("/:id/archive", async (req, res) => {
 // Implemented as setting review_resolved flag via archived_by_sender (sender side).
 router.patch("/:id/resolve", async (req, res) => {
   try {
+    const messageId = String(req.params.id || "").trim();
+    if (!isUuid(messageId)) {
+      return res.status(400).json({ error: "Invalid message ID." });
+    }
     const result = await pool.query(
       `UPDATE messages
           SET is_archived_by_sender = TRUE, updated_at = NOW()
@@ -435,7 +462,7 @@ router.patch("/:id/resolve", async (req, res) => {
           AND sender_id = $2
           AND is_deleted_by_sender = FALSE
         RETURNING id`,
-      [req.params.id, req.user.id]
+      [messageId, req.user.id]
     );
 
     if (!result.rowCount) {
@@ -453,13 +480,17 @@ router.patch("/:id/resolve", async (req, res) => {
 // Soft-deletes the message for the current user.
 router.delete("/:id", async (req, res) => {
   try {
+    const messageId = String(req.params.id || "").trim();
+    if (!isUuid(messageId)) {
+      return res.status(400).json({ error: "Invalid message ID." });
+    }
     const msgCheck = await pool.query(
       `SELECT id, sender_id, receiver_id
          FROM messages
         WHERE id = $1
           AND (sender_id = $2 OR receiver_id = $2)
         LIMIT 1`,
-      [req.params.id, req.user.id]
+      [messageId, req.user.id]
     );
 
     if (!msgCheck.rowCount) {

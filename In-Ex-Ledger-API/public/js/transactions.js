@@ -547,7 +547,7 @@ function wireTransactionForm() {
       });
 
       if (!response || !response.ok) {
-        const errorPayload = await response?.json().catch(() => null);
+        const errorPayload = response ? await response.json().catch(() => null) : null;
         setTransactionFormMessage(errorPayload?.error || txT("transactions_error_save", "Unable to save transaction."));
         return;
       }
@@ -677,7 +677,7 @@ function wireRecurringForm() {
       });
 
       if (!response || !response.ok) {
-        const errorPayload = await response?.json().catch(() => null);
+        const errorPayload = response ? await response.json().catch(() => null) : null;
         setRecurringFormMessage(errorPayload?.error || "Unable to save recurring template.");
         return;
       }
@@ -1009,7 +1009,7 @@ async function toggleRecurringTemplateStatus(templateId, active) {
   });
 
   if (!response || !response.ok) {
-    const errorPayload = await response?.json().catch(() => null);
+    const errorPayload = response ? await response.json().catch(() => null) : null;
     setRecurringFormMessage(errorPayload?.error || "Unable to update recurring status.");
     return;
   }
@@ -1023,7 +1023,7 @@ async function runRecurringTemplate(templateId) {
   });
 
   if (!response || !response.ok) {
-    const errorPayload = await response?.json().catch(() => null);
+    const errorPayload = response ? await response.json().catch(() => null) : null;
     setRecurringFormMessage(errorPayload?.error || "Unable to post recurring transaction.");
     return;
   }
@@ -1053,7 +1053,7 @@ async function deleteRecurringTemplate(templateId) {
   });
 
   if (!response || !response.ok) {
-    const errorPayload = await response?.json().catch(() => null);
+    const errorPayload = response ? await response.json().catch(() => null) : null;
     setRecurringFormMessage(errorPayload?.error || "Unable to delete recurring template.");
     return;
   }
@@ -1406,7 +1406,7 @@ async function handleTransactionDelete(transactionId) {
   });
 
   if (!response || !response.ok) {
-    const errorPayload = await response?.json().catch(() => null);
+    const errorPayload = response ? await response.json().catch(() => null) : null;
     setTransactionFormMessage(errorPayload?.error || txT("transactions_error_delete", "Unable to delete transaction."));
     closeTransactionModal();
     return;
@@ -1430,7 +1430,7 @@ async function toggleTransactionCleared(transactionId, nextCleared) {
   });
 
   if (!response || !response.ok) {
-    const errorPayload = await response?.json().catch(() => null);
+    const errorPayload = response ? await response.json().catch(() => null) : null;
     setTransactionFormMessage(
       errorPayload?.error || txT("transactions_error_update_cleared", "Unable to update reconciliation status.")
     );

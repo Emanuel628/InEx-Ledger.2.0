@@ -293,7 +293,7 @@ async function sendReply() {
     });
 
     if (!res || !res.ok) {
-      const err = await res?.json().catch(() => ({}));
+      const err = res ? await res.json().catch(() => ({})) : {};
       throw new Error(err.error || "Failed to send reply");
     }
 
@@ -449,7 +449,7 @@ async function sendComposedMessage() {
     });
 
     if (!res || !res.ok) {
-      const err = await res?.json().catch(() => ({}));
+      const err = res ? await res.json().catch(() => ({})) : {};
       if (errorEl) errorEl.textContent = err.error || "Failed to send message.";
       return;
     }
@@ -548,7 +548,9 @@ function formatRelativeDate(iso) {
 
 function getCurrentUserId() {
   try {
-    const token = localStorage.getItem("token");
+    const token = typeof getToken === "function"
+      ? getToken()
+      : (sessionStorage.getItem("token") || localStorage.getItem("token"));
     if (!token) return null;
     const parts = token.split(".");
     if (parts.length < 2) return null;

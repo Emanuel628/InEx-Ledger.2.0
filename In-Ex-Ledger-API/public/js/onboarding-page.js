@@ -113,7 +113,7 @@ async function handleOnboardingSubmit(event) {
       },
       body: JSON.stringify(payload)
     });
-    const result = await response?.json().catch(() => null);
+    const result = response ? await response.json().catch(() => null) : null;
 
     if (!response || !response.ok) {
       setOnboardingMessage(result?.error || tx("onboarding_error_finish"));

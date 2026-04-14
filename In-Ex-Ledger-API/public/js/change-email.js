@@ -45,7 +45,7 @@ async function submitEmailChange(form, statusEl) {
       })
     });
 
-    const payload = await response?.json().catch(() => null);
+    const payload = response ? await response.json().catch(() => null) : null;
     if (!response || !response.ok) {
       setStatus(statusEl, payload?.error || tx("change_email_error_request"), false);
       return;

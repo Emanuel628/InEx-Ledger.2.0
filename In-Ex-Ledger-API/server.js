@@ -117,6 +117,9 @@ app.use(cors({
 /* =========================================================
    MIDDLEWARE STACK
    ========================================================= */
+app.use(cookieParser());
+app.use(ensureCsrfCookie);
+
 for (const [legacyPath, nextPath] of LEGACY_HTML_REDIRECTS.entries()) {
   app.get(legacyPath, (req, res) => {
     res.redirect(302, nextPath);
@@ -150,8 +153,6 @@ for (const pageName of htmlPageNames) {
     res.redirect(301, canonicalPath);
   });
 }
-app.use(cookieParser());
-app.use(ensureCsrfCookie);
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use('/html', express.static(htmlDir, {
   index: false,

@@ -1,5 +1,6 @@
 const express = require("express");
 const fs = require("fs");
+const path = require("path");
 const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter, createRouteLimiter } = require("../middleware/rate-limit.middleware.js");
@@ -19,6 +20,7 @@ const {
   acceptAssignedCpaGrant,
   logCpaAuditEvent
 } = require("../services/cpaAccessService.js");
+const { isManagedReceiptPath } = require("../services/receiptStorage.js");
 const { pool } = require("../db.js");
 const { buildRedactedStream } = require("../services/exportStorage.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
@@ -381,7 +383,17 @@ router.get("/portfolio/:ownerUserId/receipts/:receiptId", async (req, res) => {
     }
 
     const receipt = result.rows[0];
-    if (!receipt.storage_path || !fs.existsSync(receipt.storage_path)) {
+    const resolvedStoragePath = path.resolve(receipt.storage_path || "");
+    if (!isManagedReceiptPath(resolvedStoragePath)) {
+      logWarn("Blocked CPA receipt download for unmanaged storage path", {
+        receiptId,
+        ownerUserId: portfolio.owner_user_id,
+        actorUserId: req.user.id
+      });
+      return res.status(404).json({ error: "Receipt file missing." });
+    }
+
+    if (!fs.existsSync(resolvedStoragePath)) {
       return res.status(404).json({ error: "Receipt file missing." });
     }
 
@@ -405,7 +417,7 @@ router.get("/portfolio/:ownerUserId/receipts/:receiptId", async (req, res) => {
       `attachment; filename*=UTF-8''${encodeURIComponent(receipt.filename || `receipt-${receiptId}`)}`
     );
 
-    return res.sendFile(receipt.storage_path);
+    return res.sendFile(resolvedStoragePath);
   } catch (error) {
     logError("GET /api/cpa-access/portfolio/:ownerUserId/receipts/:receiptId error:", error.message);
     return res.status(500).json({ error: "Failed to download CPA receipt." });

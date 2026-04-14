@@ -426,7 +426,7 @@ function openAddBusinessModal() {
         body: JSON.stringify({ name: name.trim(), region: "US", language: "en" })
       });
       if (!res || !res.ok) {
-        const err = await res?.json().catch(() => null);
+        const err = res ? await res.json().catch(() => null) : null;
         showSettingsToast(err?.error || t("settings_add_business_error"));
         return;
       }
@@ -502,7 +502,7 @@ async function initAccountSettings() {
     cancelModalConfirm.disabled = true;
     try {
       const res = await apiFetch("/api/billing/cancel", { method: "POST" });
-      const payload = await res?.json().catch(() => null);
+      const payload = res ? await res.json().catch(() => null) : null;
       if (!res || !res.ok) {
         showSettingsToast(payload?.error || t("settings_cancel_sub_error"));
         cancelModalConfirm.disabled = false;
@@ -627,7 +627,7 @@ async function initAccountingLockPanel() {
           note: isClearing ? "" : noteInput.value.trim()
         })
       });
-      const payload = await response?.json().catch(() => null);
+      const payload = response ? await response.json().catch(() => null) : null;
       if (!response || !response.ok) {
         showSettingsToast(payload?.error || t("settings_accounting_lock_save_error"));
         return;
@@ -658,7 +658,7 @@ async function initAccountingLockPanel() {
           note: ""
         })
       });
-      const payload = await response?.json().catch(() => null);
+      const payload = response ? await response.json().catch(() => null) : null;
       if (!response || !response.ok) {
         showSettingsToast(payload?.error || t("settings_accounting_lock_save_error"));
         return;
@@ -1317,7 +1317,7 @@ async function initCpaAccess() {
       });
 
       if (!response || !response.ok) {
-        const body = await response?.json().catch(() => null);
+        const body = response ? await response.json().catch(() => null) : null;
         setMessage(body?.error || t("settings_cpa_create_error"), "is-error");
         return;
       }
@@ -1574,7 +1574,7 @@ async function saveBusinessSettings({ region, language, province }) {
       })
     });
     if (!response || !response.ok) {
-      const errorPayload = await response?.json().catch(() => null);
+      const errorPayload = response ? await response.json().catch(() => null) : null;
       console.error("Business settings API rejected save", errorPayload || response?.status);
       return {
         ok: false,
@@ -1856,7 +1856,7 @@ function initSecurityForm() {
         })
       });
 
-      const payload = await response?.json().catch(() => null);
+      const payload = response ? await response.json().catch(() => null) : null;
       if (!response || !response.ok) {
         showSettingsToast(payload?.error || t("settings_password_update_error"));
         return;
@@ -1908,7 +1908,7 @@ function initSecurityForm() {
             currentPassword: mfaCurrentPassword?.value || ""
           })
         });
-        const payload = await response?.json().catch(() => null);
+        const payload = response ? await response.json().catch(() => null) : null;
 
         if (!response || !response.ok) {
           setMfaMessage(payload?.error || t("settings_mfa_enable_error"), "is-error");
@@ -1948,7 +1948,7 @@ function initSecurityForm() {
             mfaToken: mfaPendingToken
           })
         });
-        const payload = await response?.json().catch(() => null);
+        const payload = response ? await response.json().catch(() => null) : null;
 
         if (!response || !response.ok) {
           setMfaMessage(payload?.error || t("settings_mfa_enable_error"), "is-error");
@@ -1978,7 +1978,7 @@ function initSecurityForm() {
             currentPassword: mfaCurrentPassword?.value || ""
           })
         });
-        const payload = await response?.json().catch(() => null);
+        const payload = response ? await response.json().catch(() => null) : null;
 
         if (!response || !response.ok) {
           setMfaMessage(payload?.error || t("settings_mfa_disable_error"), "is-error");
@@ -2018,7 +2018,7 @@ function initSecurityForm() {
             mfaToken: mfaPendingToken
           })
         });
-        const payload = await response?.json().catch(() => null);
+        const payload = response ? await response.json().catch(() => null) : null;
 
         if (!response || !response.ok) {
           setMfaMessage(payload?.error || t("settings_mfa_disable_error"), "is-error");
@@ -2187,7 +2187,7 @@ async function revokeAllSessionsFromSettings(button) {
     const response = await apiFetch("/api/sessions", {
       method: "DELETE"
     });
-    const payload = await response?.json().catch(() => null);
+    const payload = response ? await response.json().catch(() => null) : null;
 
     if (!response || !response.ok) {
       showSettingsToast(payload?.error || t("sessions_error_revoke_all"));
@@ -2247,7 +2247,7 @@ function initDangerZone() {
   const loadDeleteAccountMfaState = async () => {
     try {
       const response = await apiFetch("/api/auth/mfa/status");
-      const payload = await response?.json().catch(() => null);
+      const payload = response ? await response.json().catch(() => null) : null;
       if (!response || !response.ok) {
         deleteAccountMfaEnabled = false;
         return;
@@ -2346,7 +2346,7 @@ function initDangerZone() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ password })
           });
-          const payload = await res?.json().catch(() => null);
+          const payload = res ? await res.json().catch(() => null) : null;
           if (!res || !res.ok) {
             showSettingsToast(payload?.error || t("settings_delete_business_error"));
             confirmButton.disabled = false;
@@ -2455,7 +2455,7 @@ function initDangerZone() {
               ...(mfaReauthToken ? { mfaReauthToken } : {})
             })
           });
-          const payload = await response?.json().catch(() => null);
+          const payload = response ? await response.json().catch(() => null) : null;
 
           if (!response || !response.ok) {
             if (payload?.reauthenticate) {
