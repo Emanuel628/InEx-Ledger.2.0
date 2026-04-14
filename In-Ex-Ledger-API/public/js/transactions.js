@@ -1,10 +1,10 @@
 const STORAGE_KEYS = {
-  accounts: "accounts",
-  categories: "categories",
-  transactions: "transactions",
-  receipts: "receipts",
-  businesses: "businesses",
-  scope: "transactions_scope"
+  accounts: "ledger_accounts",
+  categories: "ledger_categories",
+  transactions: "ledger_transactions",
+  receipts: "ledger_receipts",
+  businesses: "ledger_businesses",
+  scope: "ledger_transactions_scope"
 };
 
 const ledgerState = {
@@ -122,8 +122,11 @@ function getNamespacedStorageKey(key, businessId) {
   if (window.lunaStorage?.getKey) {
     return window.lunaStorage.getKey(key, { businessId });
   }
-  const userId = resolveStorageUserId() || "unknown";
-  const resolvedBusinessId = businessId || "unknown";
+  const userId = resolveStorageUserId();
+  const resolvedBusinessId = businessId || "";
+  if (!userId || !resolvedBusinessId || !key) {
+    return null;
+  }
   return `lb:${userId}:${resolvedBusinessId}:${key}`;
 }
 
@@ -275,10 +278,13 @@ async function hydrateTransactionBusinessContext() {
       activeBusinessId: payload?.active_business_id || "",
       businesses: Array.isArray(payload?.businesses) ? payload.businesses : []
     };
-    localStorage.setItem(
-      getNamespacedStorageKey(STORAGE_KEYS.businesses, "all"),
-      JSON.stringify(transactionBusinessContext)
-    );
+    const businessesKey = getNamespacedStorageKey(STORAGE_KEYS.businesses, "all");
+    if (businessesKey) {
+      localStorage.setItem(
+        businessesKey,
+        JSON.stringify(transactionBusinessContext)
+      );
+    }
   } catch (error) {
     console.warn("[Transactions] Unable to hydrate businesses", error);
   }
@@ -290,7 +296,8 @@ function initTransactionScopeSelect() {
     return;
   }
 
-  setTransactionScope(select, localStorage.getItem(getPreferenceStorageKey(STORAGE_KEYS.scope)));
+  const scopeKey = getPreferenceStorageKey(STORAGE_KEYS.scope);
+  setTransactionScope(select, scopeKey ? localStorage.getItem(scopeKey) : null);
   syncTransactionScopeUi();
   select.addEventListener("change", async () => {
     setTransactionScope(select, select.value);
@@ -310,7 +317,8 @@ function getTransactionScope() {
   if (select?.value === "all") {
     return "all";
   }
-  return localStorage.getItem(getPreferenceStorageKey(STORAGE_KEYS.scope)) === "all" ? "all" : "active";
+  const scopeKey = getPreferenceStorageKey(STORAGE_KEYS.scope);
+  return scopeKey && localStorage.getItem(scopeKey) === "all" ? "all" : "active";
 }
 
 function setTransactionScope(select, value) {
@@ -318,7 +326,10 @@ function setTransactionScope(select, value) {
   if (select) {
     select.value = normalized;
   }
-  localStorage.setItem(getPreferenceStorageKey(STORAGE_KEYS.scope), normalized);
+  const scopeKey = getPreferenceStorageKey(STORAGE_KEYS.scope);
+  if (scopeKey) {
+    localStorage.setItem(scopeKey, normalized);
+  }
 }
 
 function buildTransactionScopeQuery() {
@@ -330,9 +341,10 @@ function getStoredBusinesses() {
     return transactionBusinessContext.businesses;
   }
   try {
-    const parsed = JSON.parse(
-      localStorage.getItem(getNamespacedStorageKey(STORAGE_KEYS.businesses, "all")) || "null"
-    );
+    const businessesKey = getNamespacedStorageKey(STORAGE_KEYS.businesses, "all");
+    const parsed = businessesKey
+      ? JSON.parse(localStorage.getItem(businessesKey) || "null")
+      : null;
     if (parsed && Array.isArray(parsed.businesses)) {
       transactionBusinessContext = parsed;
       return parsed.businesses;
@@ -1956,7 +1968,9 @@ async function loadBusinessTaxProfile() {
     return;
   }
 
-  businessTaxProfile = resolveEstimatedTaxProfileHelper("US", "");
+  const fallbackRegion = String(window.LUNA_REGION || "us").toUpperCase();
+  const fallbackProvince = String(window.LUNA_PROVINCE || "").toUpperCase();
+  businessTaxProfile = resolveEstimatedTaxProfileHelper(fallbackRegion, fallbackProvince);
 
   try {
     const response = await apiFetch("/api/business");

@@ -5,7 +5,7 @@ const REGION_DISPLAY = {
 
 const SETTINGS_DEFAULT_THEME = typeof DEFAULT_THEME !== "undefined" ? DEFAULT_THEME : "light";
 const SETTINGS_THEME_VERSION = typeof THEME_VERSION !== "undefined" ? THEME_VERSION : "2";
-const BUSINESS_PROFILE_KEY = "business_profile";
+const BUSINESS_PROFILE_KEY = "ledger_business_profile";
 const SETTINGS_TOAST_MS = 3000;
 const SETTINGS_DELETE_DATA_KEYS = [
   "lb_accounts",
@@ -127,8 +127,11 @@ function getSettingsStorageKey(key, businessId = resolveSettingsBusinessId()) {
   if (window.lunaStorage?.getKey) {
     return window.lunaStorage.getKey(key, { businessId });
   }
-  const userId = resolveSettingsUserId() || "unknown";
-  const resolvedBusinessId = businessId || "unknown";
+  const userId = resolveSettingsUserId();
+  const resolvedBusinessId = businessId || "";
+  if (!userId || !resolvedBusinessId || !key) {
+    return null;
+  }
   return `lb:${userId}:${resolvedBusinessId}:${key}`;
 }
 
@@ -167,14 +170,21 @@ function resolveSavedTheme() {
 
 function getBusinessProfile() {
   try {
-    return JSON.parse(localStorage.getItem(getBusinessProfileStorageKey()) || "null") || {};
+    const storageKey = getBusinessProfileStorageKey();
+    if (!storageKey) {
+      return {};
+    }
+    return JSON.parse(localStorage.getItem(storageKey) || "null") || {};
   } catch {
     return {};
   }
 }
 
 function saveBusinessProfile(profile) {
-  localStorage.setItem(getBusinessProfileStorageKey(), JSON.stringify(profile));
+  const storageKey = getBusinessProfileStorageKey();
+  if (storageKey) {
+    localStorage.setItem(storageKey, JSON.stringify(profile));
+  }
 }
 
 function resolveDisplayLocale() {
@@ -2092,10 +2102,11 @@ function clearBusinessDataState() {
     window.lunaStorage.purgeSensitiveStorage();
   } else {
     try {
-      Object.keys(localStorage).forEach((key) => {
-        if (key.startsWith("lb_") || key.startsWith("lb:")) {
-          localStorage.removeItem(key);
-        }
+      const keysToRemove = Object.keys(localStorage).filter(
+        (key) => key.startsWith("lb_") || key.startsWith("lb:")
+      );
+      keysToRemove.forEach((key) => {
+        localStorage.removeItem(key);
       });
     } catch (_) {}
   }

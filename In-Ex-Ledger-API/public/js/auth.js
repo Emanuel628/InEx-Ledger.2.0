@@ -64,8 +64,11 @@ function resolveStorageBusinessId(explicitBusinessId) {
 }
 
 function getStorageNamespace(options = {}) {
-  const userId = resolveStorageUserId(options.profile) || "unknown";
-  const businessId = resolveStorageBusinessId(options.businessId) || "unknown";
+  const userId = resolveStorageUserId(options.profile);
+  const businessId = resolveStorageBusinessId(options.businessId);
+  if (!userId || !businessId) {
+    return null;
+  }
   return `lb:${userId}:${businessId}`;
 }
 
@@ -81,7 +84,11 @@ function purgeLegacySensitiveStorage() {
 
 function getNamespacedStorageKey(key, options = {}) {
   purgeLegacySensitiveStorage();
-  return `${getStorageNamespace(options)}:${key}`;
+  const namespace = getStorageNamespace(options);
+  if (!namespace || !key) {
+    return null;
+  }
+  return `${namespace}:${key}`;
 }
 
 function purgeSensitiveStorage() {

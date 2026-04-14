@@ -1,13 +1,13 @@
-﻿const EXPORT_HISTORY_KEY = "export_history";
-const TRANSACTIONS_KEY = "transactions";
-const ACCOUNTS_KEY = "accounts";
-const CATEGORIES_KEY = "categories";
-const RECEIPTS_KEY = "receipts";
-const MILEAGE_KEY = "mileage";
-const BUSINESSES_KEY = "businesses";
-const EXPORT_LANG_KEY = "export_language";
-const EXPORT_SCOPE_KEY = "export_scope";
-const BUSINESS_PROFILE_KEY = "business_profile";
+﻿const EXPORT_HISTORY_KEY = "ledger_export_history";
+const TRANSACTIONS_KEY = "ledger_transactions";
+const ACCOUNTS_KEY = "ledger_accounts";
+const CATEGORIES_KEY = "ledger_categories";
+const RECEIPTS_KEY = "ledger_receipts";
+const MILEAGE_KEY = "ledger_mileage";
+const BUSINESSES_KEY = "ledger_businesses";
+const EXPORT_LANG_KEY = "ledger_export_language";
+const EXPORT_SCOPE_KEY = "ledger_export_scope";
+const BUSINESS_PROFILE_KEY = "ledger_business_profile";
 const VALID_EXPORT_LANGS = ["en", "es", "fr"];
 const DEFAULT_EXPORT_LANG = "en";
 const PDF_FORMAT = "pdf";
@@ -56,8 +56,11 @@ function getExportStorageKey(key, businessId) {
   if (window.lunaStorage?.getKey) {
     return window.lunaStorage.getKey(key, { businessId });
   }
-  const userId = resolveExportUserId() || "unknown";
-  const resolvedBusinessId = businessId || "unknown";
+  const userId = resolveExportUserId();
+  const resolvedBusinessId = businessId || "";
+  if (!userId || !resolvedBusinessId || !key) {
+    return null;
+  }
   return `lb:${userId}:${resolvedBusinessId}:${key}`;
 }
 
@@ -74,8 +77,11 @@ function getExportHistoryNamespace(scopeOverride) {
   if (window.lunaStorage?.getNamespace) {
     return window.lunaStorage.getNamespace({ businessId });
   }
-  const userId = resolveExportUserId() || "unknown";
-  return `lb:${userId}:${businessId || "unknown"}`;
+  const userId = resolveExportUserId();
+  if (!userId || !businessId) {
+    return null;
+  }
+  return `lb:${userId}:${businessId}`;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -144,10 +150,13 @@ async function hydrateBusinessList() {
       activeBusinessId: payload?.active_business_id || "",
       businesses: Array.isArray(payload?.businesses) ? payload.businesses : []
     };
-    localStorage.setItem(
-      getExportStorageKey(BUSINESSES_KEY, "all"),
-      JSON.stringify(exportContext)
-    );
+    const businessesKey = getExportStorageKey(BUSINESSES_KEY, "all");
+    if (businessesKey) {
+      localStorage.setItem(
+        businessesKey,
+        JSON.stringify(exportContext)
+      );
+    }
   } catch (error) {
     console.warn("[Exports] Unable to hydrate businesses", error);
   }
@@ -159,7 +168,8 @@ function initExportScopeSelect() {
     return;
   }
 
-  setExportScope(select, localStorage.getItem(getExportPreferenceKey(EXPORT_SCOPE_KEY)));
+  const scopeKey = getExportPreferenceKey(EXPORT_SCOPE_KEY);
+  setExportScope(select, scopeKey ? localStorage.getItem(scopeKey) : null);
   syncExportScopeUi();
   select.addEventListener("change", async () => {
     setExportScope(select, select.value);
@@ -177,7 +187,8 @@ function getExportScope() {
   if (select?.value === "all") {
     return "all";
   }
-  return localStorage.getItem(getExportPreferenceKey(EXPORT_SCOPE_KEY)) === "all" ? "all" : "active";
+  const scopeKey = getExportPreferenceKey(EXPORT_SCOPE_KEY);
+  return scopeKey && localStorage.getItem(scopeKey) === "all" ? "all" : "active";
 }
 
 function setExportScope(select, value) {
@@ -185,7 +196,10 @@ function setExportScope(select, value) {
   if (select) {
     select.value = normalized;
   }
-  localStorage.setItem(getExportPreferenceKey(EXPORT_SCOPE_KEY), normalized);
+  const scopeKey = getExportPreferenceKey(EXPORT_SCOPE_KEY);
+  if (scopeKey) {
+    localStorage.setItem(scopeKey, normalized);
+  }
 }
 
 function buildScopeQuery() {
@@ -197,9 +211,10 @@ function getStoredBusinesses() {
     return exportContext.businesses;
   }
   try {
-    const parsed = JSON.parse(
-      localStorage.getItem(getExportStorageKey(BUSINESSES_KEY, "all")) || "null"
-    );
+    const businessesKey = getExportStorageKey(BUSINESSES_KEY, "all");
+    const parsed = businessesKey
+      ? JSON.parse(localStorage.getItem(businessesKey) || "null")
+      : null;
     if (parsed && Array.isArray(parsed.businesses)) {
       exportContext = parsed;
       return parsed.businesses;
@@ -405,17 +420,20 @@ async function hydrateReceiptsCache() {
 
 async function hydrateBusinessProfileCache() {
   if (getExportScope() === "all") {
-    localStorage.setItem(
-      getExportStorageKey(BUSINESS_PROFILE_KEY, "all"),
-      JSON.stringify({
-        name: tx("exports_scope_all"),
-        type: "",
-        ein: "",
-        taxId: "",
-        fiscalYearStart: "",
-        address: ""
-      })
-    );
+    const profileKey = getExportStorageKey(BUSINESS_PROFILE_KEY, "all");
+    if (profileKey) {
+      localStorage.setItem(
+        profileKey,
+        JSON.stringify({
+          name: tx("exports_scope_all"),
+          type: "",
+          ein: "",
+          taxId: "",
+          fiscalYearStart: "",
+          address: ""
+        })
+      );
+    }
     return;
   }
 
@@ -430,17 +448,20 @@ async function hydrateBusinessProfileCache() {
       clearStorageArray(BUSINESS_PROFILE_KEY, "active");
       return;
     }
-    localStorage.setItem(
-      getExportDataKey(BUSINESS_PROFILE_KEY, "active"),
-      JSON.stringify({
-        name: business.name || "",
-        type: business.business_type || "",
-        ein: business.tax_id || "",
-        taxId: business.tax_id || "",
-        fiscalYearStart: business.fiscal_year_start || "",
-        address: business.address || ""
-      })
-    );
+    const profileKey = getExportDataKey(BUSINESS_PROFILE_KEY, "active");
+    if (profileKey) {
+      localStorage.setItem(
+        profileKey,
+        JSON.stringify({
+          name: business.name || "",
+          type: business.business_type || "",
+          ein: business.tax_id || "",
+          taxId: business.tax_id || "",
+          fiscalYearStart: business.fiscal_year_start || "",
+          address: business.address || ""
+        })
+      );
+    }
   } catch (error) {
     console.warn("[Exports] Unable to hydrate business profile", error);
     clearStorageArray(BUSINESS_PROFILE_KEY, "active");
@@ -590,12 +611,15 @@ function initExportLanguageSelect() {
   }
 
   const appLang = localStorage.getItem("lb_language") || DEFAULT_EXPORT_LANG;
-  const saved = clampExportLang(localStorage.getItem(getExportPreferenceKey(EXPORT_LANG_KEY)) || appLang);
+  const langKey = getExportPreferenceKey(EXPORT_LANG_KEY);
+  const saved = clampExportLang((langKey ? localStorage.getItem(langKey) : null) || appLang);
   select.value = saved;
   select.addEventListener("change", () => {
     const next = clampExportLang(select.value);
     select.value = next;
-    localStorage.setItem(getExportPreferenceKey(EXPORT_LANG_KEY), next);
+    if (langKey) {
+      localStorage.setItem(langKey, next);
+    }
   });
 }
 
@@ -994,11 +1018,15 @@ function appendExportHistory(entry) {
   const scope = entry?.scope || getExportScope();
   // Track namespace on each entry to prevent cross-account history reuse during migrations.
   const namespace = getExportHistoryNamespace(scope);
+  const storageKey = getExportDataKey(EXPORT_HISTORY_KEY, scope);
+  if (!namespace || !storageKey) {
+    return;
+  }
   const history = getLocalExportHistory(scope);
   history.unshift({ ...entry, namespace });
   // Keep at most 50 local entries (CSV exports are not stored server-side)
   localStorage.setItem(
-    getExportDataKey(EXPORT_HISTORY_KEY, scope),
+    storageKey,
     JSON.stringify(history.slice(0, 50))
   );
 }
@@ -1146,8 +1174,9 @@ function getCurrentExportLanguage() {
   if (select?.value) {
     return clampExportLang(select.value);
   }
+  const langKey = getExportPreferenceKey(EXPORT_LANG_KEY);
   return clampExportLang(
-    localStorage.getItem(getExportPreferenceKey(EXPORT_LANG_KEY))
+    (langKey ? localStorage.getItem(langKey) : null)
       || localStorage.getItem("lb_language")
       || DEFAULT_EXPORT_LANG
   );
@@ -1161,8 +1190,12 @@ function clampExportLang(value) {
 function getLocalExportHistory(scopeOverride) {
   const scope = scopeOverride || getExportScope();
   const namespace = getExportHistoryNamespace(scope);
+  const storageKey = getExportDataKey(EXPORT_HISTORY_KEY, scope);
+  if (!namespace || !storageKey) {
+    return [];
+  }
   try {
-    const history = JSON.parse(localStorage.getItem(getExportDataKey(EXPORT_HISTORY_KEY, scope)) || "[]");
+    const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
     return history.filter((entry) => entry?.namespace === namespace);
   } catch {
     return [];
@@ -1470,7 +1503,11 @@ function mapById(items) {
 
 function readBusinessProfile() {
   try {
-    return JSON.parse(localStorage.getItem(getExportDataKey(BUSINESS_PROFILE_KEY)) || "null") || {};
+    const storageKey = getExportDataKey(BUSINESS_PROFILE_KEY);
+    if (!storageKey) {
+      return {};
+    }
+    return JSON.parse(localStorage.getItem(storageKey) || "null") || {};
   } catch {
     return {};
   }
@@ -1498,7 +1535,11 @@ function getMileage() {
 
 function readStorageArray(key) {
   try {
-    return JSON.parse(localStorage.getItem(getExportDataKey(key)) || "[]");
+    const storageKey = getExportDataKey(key);
+    if (!storageKey) {
+      return [];
+    }
+    return JSON.parse(localStorage.getItem(storageKey) || "[]");
   } catch {
     return [];
   }
