@@ -315,7 +315,7 @@ router.put("/", async (req, res) => {
 
 router.delete("/", accountDeleteLimiter, async (req, res) => {
   const { password } = req.body ?? {};
-  const mfaReauthToken = String(req.body?.mfaReauthToken || "").trim();
+  const providedMfaReauthToken = String(req.body?.mfaReauthToken || "").trim();
   const client = await pool.connect();
   let transactionOpen = false;
   let storagePaths = [];
@@ -326,7 +326,7 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
     }
 
     if (req.user?.mfa_enabled) {
-      if (!mfaReauthToken) {
+      if (!providedMfaReauthToken) {
         return res.status(403).json({
           error: "MFA verification required before deleting your account.",
           mfa_required: true,
@@ -338,7 +338,7 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
 
       let reauthPayload;
       try {
-        reauthPayload = verifyToken(mfaReauthToken);
+        reauthPayload = verifyToken(providedMfaReauthToken);
       } catch (error) {
         return res.status(403).json({
           error: "MFA verification expired. Re-authenticate and try again.",

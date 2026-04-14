@@ -2108,6 +2108,7 @@ function initDangerZone() {
   const deleteDataButton = document.getElementById("deleteMyDataBtn");
   const deleteAccountButton = document.getElementById("deleteAccountTrigger");
   let deleteAccountMfaEnabled = null;
+  let deleteAccountMfaStatusPromise = null;
   let deleteAccountMfaToken = "";
   let deleteAccountMfaReauthToken = "";
 
@@ -2158,7 +2159,9 @@ function initDangerZone() {
       if (passwordWrap) passwordWrap.classList.remove("hidden");
       deleteAccountMfaEnabled = null;
       resetDeleteAccountMfaState();
-      void loadDeleteAccountMfaState();
+      deleteAccountMfaStatusPromise = loadDeleteAccountMfaState().finally(() => {
+        deleteAccountMfaStatusPromise = null;
+      });
       if (passwordInput) passwordInput.value = "";
       confirmButton.disabled = true;
     } else {
@@ -2249,7 +2252,11 @@ function initDangerZone() {
 
         try {
           if (deleteAccountMfaEnabled === null) {
-            await loadDeleteAccountMfaState();
+            if (deleteAccountMfaStatusPromise) {
+              await deleteAccountMfaStatusPromise;
+            } else {
+              await loadDeleteAccountMfaState();
+            }
           }
 
           let mfaReauthToken = deleteAccountMfaReauthToken;
@@ -2331,8 +2338,7 @@ function initDangerZone() {
 
           if (!response || !response.ok) {
             if (payload?.reauthenticate) {
-              deleteAccountMfaToken = "";
-              deleteAccountMfaReauthToken = "";
+              resetDeleteAccountMfaState();
               mfaWrap?.classList.remove("hidden");
             }
             showSettingsToast(payload?.error || t("settings_delete_account_error"));
