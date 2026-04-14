@@ -6,7 +6,7 @@ const { pool } = require("../db.js");
 const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
-const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError } = require("../utils/logger.js");
 const { decrypt } = require("../services/encryptionService.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
@@ -393,14 +393,15 @@ router.post("/erase", requireMfa, async (req, res) => {
   const ipAddress = req.ip || req.connection?.remoteAddress || null;
   const userAgent = req.get("user-agent") || null;
 
-  // Resolve the business ID before starting the transaction so it does not
+  // Resolve businesses before starting the transaction so it does not
   // execute inside the transaction (avoids lock contention and keeps the
   // transaction focused on the write operations).
-  let businessId;
+  let businessIds = [];
   try {
-    businessId = await resolveBusinessIdForUser(req.user);
+    const businesses = await listBusinessesForUser(userId);
+    businessIds = businesses.map((business) => business.id);
   } catch (err) {
-    logError("POST /privacy/erase: could not resolve business", { userId, err: err.message });
+    logError("POST /privacy/erase: could not resolve businesses", { userId, err: err.message });
     return res.status(500).json({ error: "Erasure failed. Please try again or contact support." });
   }
 
@@ -444,23 +445,23 @@ router.post("/erase", requireMfa, async (req, res) => {
     // Scrub PII-containing free-text fields from transactions while keeping
     // the financial record (id, amount, date, category, type) intact.
     await client.query(
-      `UPDATE transactions
-          SET description           = NULL,
-              description_encrypted = NULL,
-              note                  = NULL
-        WHERE business_id = $1`,
-      [businessId]
-    );
+        `UPDATE transactions
+            SET description           = NULL,
+                description_encrypted = NULL,
+                note                  = NULL
+          WHERE business_id = ANY($1::uuid[])`,
+       [businessIds]
+     );
 
     // Scrub free-text PII fields from mileage records while retaining
     // the distance/date data needed for tax deduction records.
     await client.query(
-      `UPDATE mileage
-          SET purpose     = 'ERASED',
-              destination = NULL
-        WHERE business_id = $1`,
-      [businessId]
-    );
+        `UPDATE mileage
+            SET purpose     = 'ERASED',
+                destination = NULL
+          WHERE business_id = ANY($1::uuid[])`,
+       [businessIds]
+     );
 
     await client.query("COMMIT");
 

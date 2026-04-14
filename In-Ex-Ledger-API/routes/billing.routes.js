@@ -51,23 +51,32 @@ const webhookLimiter = rateLimit({
   keyGenerator: () => "stripe-webhook"
 });
 
-// In-memory idempotency cache: event.id → timestamp processed
-const _processedWebhookIds = new Map();
 const _WEBHOOK_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
+const _WEBHOOK_IDEMPOTENCY_CLEANUP_PROBABILITY = 0.01;
 
-function isWebhookAlreadyProcessed(eventId) {
-  const ts = _processedWebhookIds.get(eventId);
-  return !!(ts && Date.now() - ts < _WEBHOOK_IDEMPOTENCY_TTL_MS);
-}
-
-function markWebhookProcessed(eventId) {
-  _processedWebhookIds.set(eventId, Date.now());
-  if (_processedWebhookIds.size > 2000) {
-    const cutoff = Date.now() - _WEBHOOK_IDEMPOTENCY_TTL_MS;
-    for (const [id, ts] of _processedWebhookIds) {
-      if (ts < cutoff) _processedWebhookIds.delete(id);
-    }
+async function reserveWebhookEvent(eventId) {
+  if (!eventId) {
+    logWarn("Stripe webhook missing event id; skipping processing");
+    return false;
   }
+
+  const insertResult = await pool.query(
+    `INSERT INTO stripe_webhook_events (event_id, processed_at)
+     VALUES ($1, NOW())
+     ON CONFLICT (event_id) DO NOTHING`,
+    [eventId]
+  );
+
+  // Opportunistic TTL cleanup to keep this table bounded with minimal overhead.
+  if (Math.random() < _WEBHOOK_IDEMPOTENCY_CLEANUP_PROBABILITY) {
+    await pool.query(
+      `DELETE FROM stripe_webhook_events
+        WHERE processed_at < NOW() - ($1::bigint * INTERVAL '1 millisecond')`,
+      [_WEBHOOK_IDEMPOTENCY_TTL_MS]
+    );
+  }
+
+  return insertResult.rowCount > 0;
 }
 
 function getStripeSecretKey() {
@@ -441,12 +450,20 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
   // Always acknowledge to Stripe — internal processing errors must not return 4xx
   res.status(200).json({ received: true });
 
-  // Idempotency: skip duplicate deliveries
-  if (isWebhookAlreadyProcessed(event.id)) {
-    logInfo("Stripe webhook duplicate skipped:", event.id, event.type);
+  // Idempotency: reserve event ID in the database and skip duplicates.
+  try {
+    const reserved = await reserveWebhookEvent(event.id);
+    if (!reserved) {
+      logInfo("Stripe webhook duplicate skipped:", event.id, event.type);
+      return;
+    }
+  } catch (err) {
+    logError("Stripe webhook idempotency reservation failed:", {
+      eventId: event.id,
+      err: err.message
+    });
     return;
   }
-  markWebhookProcessed(event.id);
 
   const object = event?.data?.object || {};
 
