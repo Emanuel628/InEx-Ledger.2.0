@@ -279,14 +279,16 @@ function buildNewSignInAlertEmail(lang, options = {}) {
   const city = String(options.city || "").trim();
   const country = String(options.country || "").trim();
   const location = [city, country].filter(Boolean).join(", ") || s.unknownLocation;
+  const escapedSignInTime = escapeHtml(signInTime);
+  const escapedLocation = escapeHtml(location);
   const resetLink = sanitizeHttpUrl(options.resetLink);
 
   const html = wrapEmailHtml(
     `<div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">${s.eyebrow}</div>
      <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${s.heading}</h1>`,
     `<p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">${s.body}</p>
-     <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;"><strong>${s.signInTimeLabel}:</strong> ${escapeHtml(signInTime)}</p>
-     <p style="margin: 0 0 14px; color: #475569; font-size: 13px; line-height: 1.6;"><strong>${s.locationLabel}:</strong> ${escapeHtml(location)}</p>
+     <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;"><strong>${s.signInTimeLabel}:</strong> ${escapedSignInTime}</p>
+     <p style="margin: 0 0 14px; color: #475569; font-size: 13px; line-height: 1.6;"><strong>${s.locationLabel}:</strong> ${escapedLocation}</p>
      <p style="margin: 0 0 14px; color: #991b1b; font-size: 14px; line-height: 1.6; font-weight: 600;">${s.warning}</p>
      ${resetLink ? ctaButton(resetLink, s.buttonLabel) : ""}
      ${resetLink ? `<p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${escapeHtml(resetLink)}</p>` : ""}

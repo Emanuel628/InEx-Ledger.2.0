@@ -582,18 +582,12 @@ async function insertRecognizedSignInDevice(user, deviceContext) {
   const city = location?.city || null;
   const country = location?.country || null;
 
-  await pool.query(
+  const inserted = await pool.query(
     `INSERT INTO recognized_signin_devices
        (id, user_id, fingerprint_hash, ip_hash, user_agent, last_city, last_country)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (user_id, fingerprint_hash) DO UPDATE
-       SET last_seen_at = NOW(),
-           updated_at = NOW(),
-           sign_in_count = recognized_signin_devices.sign_in_count + 1,
-           ip_hash = COALESCE(EXCLUDED.ip_hash, recognized_signin_devices.ip_hash),
-           user_agent = EXCLUDED.user_agent,
-           last_city = COALESCE(EXCLUDED.last_city, recognized_signin_devices.last_city),
-           last_country = COALESCE(EXCLUDED.last_country, recognized_signin_devices.last_country)`,
+       ON CONFLICT (user_id, fingerprint_hash) DO NOTHING
+       RETURNING id`,
     [
       crypto.randomUUID(),
       user.id,
@@ -604,6 +598,9 @@ async function insertRecognizedSignInDevice(user, deviceContext) {
       country
     ]
   );
+  if (!inserted.rowCount) {
+    await touchRecognizedSignInDevice(user.id, deviceContext);
+  }
 }
 
 /* =========================================================
@@ -769,29 +766,6 @@ router.post("/login", authLimiter, async (req, res) => {
     const needsDeviceVerification = !recognizedDevice && !!deviceContext;
     let mfaAuthenticated = false;
 
-    if (needsDeviceVerification) {
-      const userLang = await getPreferredLanguageForUser(user.id);
-      const pendingToken = await createMfaEmailChallenge(user, req, {
-        businessId,
-        tokenPurpose: "device_signin_pending",
-        tokenPayload: {
-          device_fingerprint_hash: deviceContext.fingerprintHash,
-          device_ip_hash: deviceContext.ipHash,
-          device_user_agent: deviceContext.userAgent
-        },
-        lang: userLang,
-        mfaContentKey: "signin",
-        locationPath: "/login"
-      });
-      return res.status(200).json({
-        mfa_required: true,
-        mfa_token: pendingToken,
-        email_verified: verified,
-        mfa_enabled: !!user.mfa_enabled,
-        device_verification_required: true
-      });
-    }
-
     if (user.mfa_enabled) {
       const trustedDevice = await resolveTrustedMfaDevice(req.cookies?.[MFA_TRUST_COOKIE], user.id);
       if (trustedDevice) {
@@ -816,6 +790,27 @@ router.post("/login", authLimiter, async (req, res) => {
           mfa_enabled: true
         });
       }
+    } else if (needsDeviceVerification) {
+      const userLang = await getPreferredLanguageForUser(user.id);
+      const pendingToken = await createMfaEmailChallenge(user, req, {
+        businessId,
+        tokenPurpose: "device_signin_pending",
+        tokenPayload: {
+          device_fingerprint_hash: deviceContext.fingerprintHash,
+          device_ip_hash: deviceContext.ipHash,
+          device_user_agent: deviceContext.userAgent
+        },
+        lang: userLang,
+        mfaContentKey: "signin",
+        locationPath: "/login"
+      });
+      return res.status(200).json({
+        mfa_required: true,
+        mfa_token: pendingToken,
+        email_verified: verified,
+        mfa_enabled: false,
+        device_verification_required: true
+      });
     }
 
     const session = await issueAuthenticatedSession(res, user, businessId, {
@@ -1231,13 +1226,16 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
     await consumeMfaEmailChallenge(challenge.id);
     const refreshedUser = await findUserById(user.id);
     if (pending.purpose === "device_signin_pending") {
-      const deviceContext = buildSignInDeviceContext(refreshedUser, req) || {};
-      const fingerprintHash = String(
-        pending.device_fingerprint_hash || deviceContext.fingerprintHash || ""
-      ).trim();
-      if (!fingerprintHash) {
+      if (refreshedUser.mfa_enabled) {
         return res.status(401).json({ error: "Invalid MFA session." });
       }
+      const deviceContext = buildSignInDeviceContext(refreshedUser, req) || {};
+      const tokenFingerprintHash = String(pending.device_fingerprint_hash || "").trim();
+      const currentFingerprintHash = String(deviceContext.fingerprintHash || "").trim();
+      if (!tokenFingerprintHash || !currentFingerprintHash || tokenFingerprintHash !== currentFingerprintHash) {
+        return res.status(401).json({ error: "Invalid MFA session." });
+      }
+      const fingerprintHash = tokenFingerprintHash;
       await insertRecognizedSignInDevice(refreshedUser, {
         userAgent: String(pending.device_user_agent || deviceContext.userAgent || ""),
         ipAddress: deviceContext.ipAddress || null,
@@ -1250,7 +1248,7 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
       setMfaTrustCookie(res, trustedDevice.token, trustedDevice.expiresAt);
     }
     const session = await issueAuthenticatedSession(res, refreshedUser, pending.business_id || null, {
-      mfaAuthenticated: !!refreshedUser.mfa_enabled
+      mfaAuthenticated: pending.purpose === "mfa_pending"
     });
     return res.status(200).json(session);
   } catch (err) {
