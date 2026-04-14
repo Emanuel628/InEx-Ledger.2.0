@@ -24,10 +24,11 @@
     "test:subscription-service": "node --test tests/subscriptionService.test.js",
     "test:accounting-controls": "node --test tests/accountingControls.test.js",
     "test:auth-flows": "node --test tests/authFlows.test.js",
+    "test:sign-in-security": "node --test tests/signInSecurityService.test.js",
     "test:critical-flows": "node --test tests/criticalFlows.test.js",
     "test:harness": "node --test tests/testHarness.test.js",
     "test:integration": "node --test tests/integrationFlows.test.js",
-    "test:all": "node --test tests/csrfProtection.test.js tests/csrfE2E.test.js tests/accountDeletion.test.js tests/healthCheckService.test.js tests/receiptStorage.test.js tests/receiptUploadValidation.test.js tests/rateLimiter.test.js tests/subscriptionService.test.js tests/accountingControls.test.js tests/authFlows.test.js tests/criticalFlows.test.js tests/testHarness.test.js tests/integrationFlows.test.js",
+    "test:all": "node --test tests/csrfProtection.test.js tests/csrfE2E.test.js tests/accountDeletion.test.js tests/healthCheckService.test.js tests/receiptStorage.test.js tests/receiptUploadValidation.test.js tests/rateLimiter.test.js tests/subscriptionService.test.js tests/accountingControls.test.js tests/authFlows.test.js tests/signInSecurityService.test.js tests/criticalFlows.test.js tests/testHarness.test.js tests/integrationFlows.test.js",
     "seed:dev": "node scripts/seed-dev.mjs"
   },
   "dependencies": {

@@ -11,6 +11,7 @@
  * buildWelcomeVerificationEmail(lang, verificationLink)  → { subject, html, text }
  * buildVerificationEmail(lang, verificationLink)         → { subject, html, text }
  * buildPasswordResetEmail(lang, resetLink)               → { subject, html, text }
+ * buildNewSignInAlertEmail(lang, options)                → { subject, html, text }
  * buildEmailChangeEmail(lang, confirmLink)               → { subject, html, text }
  * buildMfaEmailContent(lang, opts)                       → { subject, heading, body, footer }
  */
@@ -207,6 +208,69 @@ function buildPasswordResetEmail(lang, resetLink) {
 }
 
 /* =========================================================
+   New sign-in alert email
+   ========================================================= */
+const NEW_SIGNIN_ALERT = {
+  en: {
+    subject: "New sign-in detected on your InEx Ledger account",
+    eyebrow: "InEx Ledger security",
+    heading: "New sign-in detected",
+    body: "We noticed a sign-in from a new device on your account.",
+    signInTimeLabel: "Sign-in time",
+    locationLabel: "Location",
+    unknownLocation: "Unknown location",
+    warning: "Was this not you? Reset your password immediately to secure your account.",
+    buttonLabel: "Reset password now",
+    footer: "If this was you, you can ignore this message.",
+    text: ({ signInTime, location, resetLink }) =>
+      `New sign-in detected on your InEx Ledger account.\n\nSign-in time: ${signInTime}\nLocation: ${location}\n\nWas this not you? Reset your password immediately:\n${resetLink}\n\nIf this was you, you can ignore this message.`
+  },
+  fr: {
+    subject: "Nouvelle connexion détectée sur votre compte InEx Ledger",
+    eyebrow: "Sécurité InEx Ledger",
+    heading: "Nouvelle connexion détectée",
+    body: "Nous avons détecté une connexion depuis un nouvel appareil sur votre compte.",
+    signInTimeLabel: "Heure de connexion",
+    locationLabel: "Emplacement",
+    unknownLocation: "Emplacement inconnu",
+    warning: "Ce n'était pas vous? Réinitialisez votre mot de passe immédiatement pour sécuriser votre compte.",
+    buttonLabel: "Réinitialiser le mot de passe",
+    footer: "Si c'était bien vous, vous pouvez ignorer ce message.",
+    text: ({ signInTime, location, resetLink }) =>
+      `Nouvelle connexion détectée sur votre compte InEx Ledger.\n\nHeure de connexion: ${signInTime}\nEmplacement: ${location}\n\nCe n'était pas vous? Réinitialisez votre mot de passe immédiatement:\n${resetLink}\n\nSi c'était bien vous, vous pouvez ignorer ce message.`
+  }
+};
+
+function buildNewSignInAlertEmail(lang, options = {}) {
+  const l = normalizeEmailLang(lang);
+  const s = NEW_SIGNIN_ALERT[l];
+
+  const signInTime = String(options.signInTime || "").trim() || new Date().toISOString();
+  const city = String(options.city || "").trim();
+  const country = String(options.country || "").trim();
+  const location = [city, country].filter(Boolean).join(", ") || s.unknownLocation;
+  const resetLink = String(options.resetLink || "").trim();
+
+  const html = wrapEmailHtml(
+    `<div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">${s.eyebrow}</div>
+     <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${s.heading}</h1>`,
+    `<p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">${s.body}</p>
+     <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;"><strong>${s.signInTimeLabel}:</strong> ${signInTime}</p>
+     <p style="margin: 0 0 14px; color: #475569; font-size: 13px; line-height: 1.6;"><strong>${s.locationLabel}:</strong> ${location}</p>
+     <p style="margin: 0 0 14px; color: #991b1b; font-size: 14px; line-height: 1.6; font-weight: 600;">${s.warning}</p>
+     ${resetLink ? ctaButton(resetLink, s.buttonLabel) : ""}
+     ${resetLink ? `<p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${resetLink}</p>` : ""}
+     <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">${s.footer}</p>`
+  );
+
+  return {
+    subject: s.subject,
+    html,
+    text: s.text({ signInTime, location, resetLink })
+  };
+}
+
+/* =========================================================
    Email address change confirmation
    ========================================================= */
 const EMAIL_CHANGE = {
@@ -318,6 +382,7 @@ module.exports = {
   buildWelcomeVerificationEmail,
   buildVerificationEmail,
   buildPasswordResetEmail,
+  buildNewSignInAlertEmail,
   buildEmailChangeEmail,
   buildMfaEmailContent,
   normalizeEmailLang

@@ -36,6 +36,7 @@ const {
   buildWelcomeVerificationEmail,
   buildVerificationEmail,
   buildPasswordResetEmail,
+  buildNewSignInAlertEmail,
   buildEmailChangeEmail,
   buildMfaEmailContent
 } = require("../services/emailI18nService.js");
@@ -165,6 +166,36 @@ describe("buildPasswordResetEmail", () => {
     assert.ok(html.includes("Réinitialisez votre mot de passe"));
     assert.ok(text.includes("mot de passe"));
     assert.ok(html.includes(link));
+  });
+});
+
+/* ================================================================== */
+
+describe("buildNewSignInAlertEmail", () => {
+  const link = "https://app.inexledger.com/reset-password?token=security";
+  const options = {
+    signInTime: "2026-04-14T11:00:00.000Z",
+    city: "Montreal",
+    country: "Canada",
+    resetLink: link
+  };
+
+  it("returns English content with time and location details", () => {
+    const { subject, html, text } = buildNewSignInAlertEmail("en", options);
+    assert.ok(subject.includes("New sign-in detected"));
+    assert.ok(html.includes("Sign-in time"));
+    assert.ok(html.includes("Montreal, Canada"));
+    assert.ok(html.includes("Was this not you?"));
+    assert.ok(html.includes(link));
+    assert.ok(text.includes("Sign-in time"));
+  });
+
+  it("returns French content with warning and reset guidance", () => {
+    const { subject, html, text } = buildNewSignInAlertEmail("fr", options);
+    assert.ok(subject.includes("Nouvelle connexion"));
+    assert.ok(html.includes("Heure de connexion"));
+    assert.ok(html.includes("Ce n'était pas vous"));
+    assert.ok(text.includes("Réinitialisez votre mot de passe"));
   });
 });
 

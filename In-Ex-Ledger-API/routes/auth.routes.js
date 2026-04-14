@@ -25,9 +25,17 @@ const {
   buildWelcomeVerificationEmail,
   buildVerificationEmail,
   buildPasswordResetEmail,
+  buildNewSignInAlertEmail,
   buildEmailChangeEmail,
   buildMfaEmailContent
 } = require("../services/emailI18nService.js");
+const {
+  normalizeUserAgent,
+  extractClientIp,
+  hashValue,
+  buildDeviceFingerprint,
+  fetchIpLocation
+} = require("../services/signInSecurityService.js");
 
 const router = express.Router();
 
@@ -125,21 +133,30 @@ async function consumeVerificationToken(token) {
    4. PASSWORD RESET UTILITIES (DB-backed)
    ========================================================= */
 async function createPasswordResetToken(email) {
-  const token = crypto.randomUUID();
+  // 32 bytes => 256-bit token entropy, encoded as a 64-char hex string.
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashValue(token);
   const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
   await pool.query("DELETE FROM password_reset_tokens WHERE email = $1", [email]);
   await pool.query(
-    "INSERT INTO password_reset_tokens (token, email, expires_at) VALUES ($1, $2, $3)",
-    [token, email, expiresAt]
+    "INSERT INTO password_reset_tokens (email, expires_at, token_hash) VALUES ($1, $2, $3)",
+    [email, expiresAt, tokenHash]
   );
   return { token, expiresAt };
 }
 
 async function consumePasswordResetToken(token) {
+  const rawToken = String(token || "").trim();
+  if (!rawToken) return null;
+  const tokenHash = hashValue(rawToken);
   await pool.query("DELETE FROM password_reset_tokens WHERE expires_at <= NOW()");
   const result = await pool.query(
-    "DELETE FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW() RETURNING email",
-    [token]
+    `DELETE FROM password_reset_tokens
+      -- TODO(2026-07): remove token::text fallback after all pre-migration UUID reset tokens have expired.
+      WHERE (token_hash = $1 OR token::text = $2)
+        AND expires_at > NOW()
+      RETURNING email`,
+    [tokenHash, rawToken]
   );
   return result.rows[0]?.email ?? null;
 }
@@ -512,6 +529,73 @@ async function revokeTrustedMfaDevicesForUser(userId) {
   await pool.query("DELETE FROM mfa_trusted_devices WHERE user_id = $1", [userId]);
 }
 
+async function trackSignInDeviceAndNotify(user, req) {
+  if (!user?.id || !user?.email) return;
+
+  const userAgent = normalizeUserAgent(req.get("user-agent"));
+  const ipAddress = extractClientIp(req);
+  const fingerprintHash = buildDeviceFingerprint({
+    userId: user.id,
+    userAgent,
+    ipAddress
+  });
+  const ipHash = ipAddress ? hashValue(ipAddress) : null;
+
+  const existing = await pool.query(
+    `SELECT id
+       FROM recognized_signin_devices
+      WHERE user_id = $1 AND fingerprint_hash = $2
+      LIMIT 1`,
+    [user.id, fingerprintHash]
+  );
+
+  if (existing.rowCount > 0) {
+    await pool.query(
+      `UPDATE recognized_signin_devices
+          SET last_seen_at = NOW(),
+              updated_at = NOW(),
+              sign_in_count = sign_in_count + 1,
+              ip_hash = COALESCE($3, ip_hash),
+              user_agent = $4
+        WHERE user_id = $1 AND fingerprint_hash = $2`,
+      [user.id, fingerprintHash, ipHash, userAgent]
+    );
+    return;
+  }
+
+  const location = await fetchIpLocation(ipAddress);
+  const city = location?.city || null;
+  const country = location?.country || null;
+
+  const inserted = await pool.query(
+    `INSERT INTO recognized_signin_devices
+      (id, user_id, fingerprint_hash, ip_hash, user_agent, last_city, last_country)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (user_id, fingerprint_hash) DO NOTHING
+      RETURNING id`,
+    [crypto.randomUUID(), user.id, fingerprintHash, ipHash, userAgent, city, country]
+  );
+  if (inserted.rowCount === 0) {
+    return;
+  }
+
+  const lang = await getPreferredLanguageForUser(user.id);
+  const { token } = await createPasswordResetToken(user.email);
+  const resetLink = buildPasswordResetLink(req, token);
+  const signInTimeIso = new Date().toISOString();
+  const alertEmail = buildNewSignInAlertEmail(lang, {
+    signInTime: signInTimeIso,
+    city,
+    country,
+    resetLink
+  });
+
+  await sendAppEmail({
+    to: user.email,
+    ...alertEmail
+  });
+}
+
 /* =========================================================
    7. ROUTES
    ========================================================= */
@@ -699,6 +783,11 @@ router.post("/login", authLimiter, async (req, res) => {
     const session = await issueAuthenticatedSession(res, user, businessId, {
       mfaAuthenticated
     });
+    try {
+      await trackSignInDeviceAndNotify(user, req);
+    } catch (securitySignalErr) {
+      logWarn("Sign-in device tracking warning:", securitySignalErr?.message || securitySignalErr);
+    }
     res.status(200).json(session);
   } catch (err) {
     logError("Login error:", err);
@@ -1105,6 +1194,11 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
     const session = await issueAuthenticatedSession(res, refreshedUser, pending.business_id || null, {
       mfaAuthenticated: true
     });
+    try {
+      await trackSignInDeviceAndNotify(refreshedUser, req);
+    } catch (securitySignalErr) {
+      logWarn("Sign-in device tracking warning:", securitySignalErr?.message || securitySignalErr);
+    }
     return res.status(200).json(session);
   } catch (err) {
     logError("MFA verify error:", err);
