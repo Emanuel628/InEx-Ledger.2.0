@@ -1,5 +1,5 @@
 const express = require("express");
-const bcrypt = require("bcrypt");
+const fs = require("fs");
 const { pool } = require("../db.js");
 const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
@@ -11,6 +11,8 @@ const {
   createBusinessForUser
 } = require("../api/utils/resolveBusinessIdForUser.js");
 const { decryptTaxId } = require("../services/taxIdService.js");
+const { verifyPassword } = require("../utils/authUtils.js");
+const { isManagedReceiptPath } = require("../services/receiptStorage.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
@@ -170,7 +172,7 @@ router.delete("/:id", businessDeleteLimiter, requireMfa, async (req, res) => {
     if (!userRow.rowCount) {
       return res.status(404).json({ error: "User not found." });
     }
-    const match = await bcrypt.compare(password, userRow.rows[0].password_hash);
+    const { match } = await verifyPassword(password, userRow.rows[0].password_hash);
     if (!match) {
       return res.status(401).json({ error: "Incorrect password." });
     }
@@ -178,8 +180,18 @@ router.delete("/:id", businessDeleteLimiter, requireMfa, async (req, res) => {
     // Delete in a transaction. Must clear recurring_transactions before accounts/categories
     // because of ON DELETE RESTRICT on account_id and category_id.
     const client = await pool.connect();
+    let storagePaths = [];
     try {
       await client.query("BEGIN");
+
+      // Collect receipt file paths before deleting DB rows.
+      const receiptFiles = await client.query(
+        "SELECT storage_path FROM receipts WHERE business_id = $1 AND storage_path IS NOT NULL",
+        [businessId]
+      );
+      storagePaths = receiptFiles.rows
+        .map((row) => row.storage_path)
+        .filter((filePath) => isManagedReceiptPath(filePath));
 
       // Clear runs first (CASCADE would handle this, but be explicit)
       await client.query(
@@ -211,6 +223,21 @@ router.delete("/:id", businessDeleteLimiter, requireMfa, async (req, res) => {
       );
 
       await client.query("COMMIT");
+
+      await Promise.all(
+        storagePaths.map(async (filePath) => {
+          try {
+            await fs.promises.unlink(filePath);
+          } catch (unlinkErr) {
+            if (unlinkErr.code !== "ENOENT") {
+              logError("DELETE /businesses/:id: failed to unlink receipt file", {
+                filePath,
+                err: unlinkErr.message
+              });
+            }
+          }
+        })
+      );
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;

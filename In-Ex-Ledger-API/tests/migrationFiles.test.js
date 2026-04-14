@@ -21,3 +21,12 @@ test("migration 048 idempotently drops legacy cpa_audit_logs user FKs", () => {
   assert.match(sql, /ALTER TABLE IF EXISTS cpa_audit_logs\s+DROP CONSTRAINT IF EXISTS cpa_audit_logs_owner_user_id_fkey;/i);
   assert.match(sql, /ALTER TABLE IF EXISTS cpa_audit_logs\s+DROP CONSTRAINT IF EXISTS cpa_audit_logs_actor_user_id_fkey;/i);
 });
+
+test("migration 049 creates persistent Stripe webhook idempotency table", () => {
+  const sql = fs.readFileSync(path.join(migrationsDir, "049_create_stripe_webhook_events.sql"), "utf8");
+
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS stripe_webhook_events/i);
+  assert.match(sql, /event_id\s+TEXT\s+PRIMARY KEY/i);
+  assert.match(sql, /processed_at\s+TIMESTAMPTZ\s+NOT NULL\s+DEFAULT NOW\(\)/i);
+  assert.match(sql, /CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_processed_at/i);
+});
