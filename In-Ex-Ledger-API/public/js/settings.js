@@ -2099,14 +2099,42 @@ function initDangerZone() {
   const body = document.getElementById("dangerModalBody");
   const confirmWrap = document.getElementById("dangerModalConfirmWrap");
   const passwordWrap = document.getElementById("dangerModalPasswordWrap");
+  const mfaWrap = document.getElementById("dangerModalMfaWrap");
   const confirmInput = document.getElementById("dangerModalConfirmInput");
   const passwordInput = document.getElementById("dangerModalPasswordInput");
+  const mfaInput = document.getElementById("dangerModalMfaInput");
   const confirmButton = document.getElementById("dangerModalConfirm");
   const cancelButton = document.getElementById("dangerModalCancel");
   const deleteDataButton = document.getElementById("deleteMyDataBtn");
   const deleteAccountButton = document.getElementById("deleteAccountTrigger");
+  let deleteAccountMfaEnabled = null;
+  let deleteAccountMfaToken = "";
+  let deleteAccountMfaReauthToken = "";
 
   if (!modal) return;
+
+  const resetDeleteAccountMfaState = () => {
+    deleteAccountMfaToken = "";
+    deleteAccountMfaReauthToken = "";
+    if (mfaInput) {
+      mfaInput.value = "";
+    }
+    mfaWrap?.classList.add("hidden");
+  };
+
+  const loadDeleteAccountMfaState = async () => {
+    try {
+      const response = await apiFetch("/api/auth/mfa/status");
+      const payload = await response?.json().catch(() => null);
+      if (!response || !response.ok) {
+        deleteAccountMfaEnabled = false;
+        return;
+      }
+      deleteAccountMfaEnabled = !!payload?.enabled;
+    } catch (_error) {
+      deleteAccountMfaEnabled = false;
+    }
+  };
 
   const closeModal = () => {
     modal.classList.add("hidden");
@@ -2114,6 +2142,7 @@ function initDangerZone() {
     pendingDeleteBusinessId = null;
     if (confirmInput) confirmInput.value = "";
     if (passwordInput) passwordInput.value = "";
+    resetDeleteAccountMfaState();
     confirmWrap.classList.add("hidden");
     if (passwordWrap) passwordWrap.classList.add("hidden");
     confirmButton.disabled = false;
@@ -2127,6 +2156,9 @@ function initDangerZone() {
       body.textContent = t("settings_delete_account_modal_body");
       confirmWrap.classList.remove("hidden");
       if (passwordWrap) passwordWrap.classList.remove("hidden");
+      deleteAccountMfaEnabled = null;
+      resetDeleteAccountMfaState();
+      void loadDeleteAccountMfaState();
       if (passwordInput) passwordInput.value = "";
       confirmButton.disabled = true;
     } else {
@@ -2134,6 +2166,7 @@ function initDangerZone() {
       body.textContent = t("settings_delete_business_data_modal_body_full");
       confirmWrap.classList.add("hidden");
       if (passwordWrap) passwordWrap.classList.add("hidden");
+      resetDeleteAccountMfaState();
       confirmButton.disabled = false;
     }
     modal.classList.remove("hidden");
@@ -2151,6 +2184,7 @@ function initDangerZone() {
 
   confirmInput?.addEventListener("input", updateDeleteAccountButtonState);
   passwordInput?.addEventListener("input", updateDeleteAccountButtonState);
+  mfaInput?.addEventListener("input", updateDeleteAccountButtonState);
 
   confirmButton?.addEventListener("click", () => {
     void (async () => {
@@ -2212,16 +2246,95 @@ function initDangerZone() {
           passwordInput?.focus();
           return;
         }
-        confirmButton.disabled = true;
+
         try {
+          if (deleteAccountMfaEnabled === null) {
+            await loadDeleteAccountMfaState();
+          }
+
+          let mfaReauthToken = deleteAccountMfaReauthToken;
+          if (deleteAccountMfaEnabled) {
+            if (!deleteAccountMfaReauthToken) {
+              confirmButton.disabled = true;
+              const reauthPayload = {
+                currentPassword: password
+              };
+              if (deleteAccountMfaToken) {
+                const code = mfaInput?.value?.trim() || "";
+                if (!code) {
+                  showSettingsToast(t("mfa_challenge_error_missing"));
+                  confirmButton.disabled = false;
+                  mfaInput?.focus();
+                  return;
+                }
+                reauthPayload.code = code;
+                reauthPayload.mfaToken = deleteAccountMfaToken;
+              }
+
+              const reauthResponse = await apiFetch("/api/auth/mfa/reauth", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(reauthPayload)
+              });
+              const reauthResult = await reauthResponse?.json().catch(() => null);
+              if (!reauthResponse || !reauthResponse.ok) {
+                if (reauthResponse?.status === 401 || reauthResponse?.status === 403) {
+                  deleteAccountMfaToken = "";
+                  deleteAccountMfaReauthToken = "";
+                  if (mfaInput) {
+                    mfaInput.value = "";
+                  }
+                }
+                showSettingsToast(reauthResult?.error || t("settings_delete_account_error"));
+                confirmButton.disabled = false;
+                return;
+              }
+
+              if (reauthResult?.pending_verification && reauthResult?.mfa_token) {
+                deleteAccountMfaToken = reauthResult.mfa_token;
+                deleteAccountMfaReauthToken = "";
+                mfaWrap?.classList.remove("hidden");
+                showSettingsToast(reauthResult?.message || t("settings_mfa_enable_verify_message"));
+                confirmButton.disabled = false;
+                mfaInput?.focus();
+                return;
+              }
+
+              if (!reauthResult?.reauth_token) {
+                showSettingsToast(reauthResult?.error || t("settings_delete_account_error"));
+                confirmButton.disabled = false;
+                return;
+              }
+
+              deleteAccountMfaReauthToken = reauthResult.reauth_token;
+              deleteAccountMfaToken = "";
+              mfaReauthToken = reauthResult.reauth_token;
+              mfaWrap?.classList.add("hidden");
+              if (mfaInput) {
+                mfaInput.value = "";
+              }
+            } else {
+              mfaReauthToken = deleteAccountMfaReauthToken;
+            }
+          }
+
+          confirmButton.disabled = true;
           const response = await apiFetch("/api/me", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ password })
+            body: JSON.stringify({
+              password,
+              ...(mfaReauthToken ? { mfaReauthToken } : {})
+            })
           });
           const payload = await response?.json().catch(() => null);
 
           if (!response || !response.ok) {
+            if (payload?.reauthenticate) {
+              deleteAccountMfaToken = "";
+              deleteAccountMfaReauthToken = "";
+              mfaWrap?.classList.remove("hidden");
+            }
             showSettingsToast(payload?.error || t("settings_delete_account_error"));
             confirmButton.disabled = false;
             return;
@@ -2259,4 +2372,3 @@ function showSettingsToast(message) {
     toast.classList.add("hidden");
   }, SETTINGS_TOAST_MS);
 }
-

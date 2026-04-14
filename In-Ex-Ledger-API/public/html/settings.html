@@ -615,6 +615,10 @@
         <label for="dangerModalPasswordInput" data-i18n="settings_enter_password_confirm">Enter your password to confirm</label>
         <input type="password" id="dangerModalPasswordInput" autocomplete="current-password" />
       </div>
+      <div id="dangerModalMfaWrap" class="danger-confirm-wrap hidden">
+        <label for="dangerModalMfaInput" data-i18n="settings_mfa_code_label">Verification code</label>
+        <input type="text" id="dangerModalMfaInput" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
+      </div>
       <div class="modal-actions danger-actions">
         <button type="button" id="dangerModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
         <button type="button" id="dangerModalConfirm" class="modal-delete" data-i18n="common_delete">Delete</button>
@@ -671,6 +675,5 @@
   <script src="../js/settings.js?v=20260405c"></script>
 </body>
 </html>
-
 
 

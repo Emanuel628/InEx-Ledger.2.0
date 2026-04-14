@@ -1013,6 +1013,102 @@ router.get("/mfa/status", requireAuth, async (req, res) => {
   }
 });
 
+router.post("/mfa/reauth", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
+  const currentPassword = req.body?.currentPassword;
+  const code = String(req.body?.code || "").trim();
+  const mfaToken = String(req.body?.mfaToken || "").trim();
+  if (!currentPassword) {
+    return res.status(400).json({ error: "Current password is required." });
+  }
+
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (!user.mfa_enabled) {
+      return res.status(400).json({ error: "MFA is not enabled for this account." });
+    }
+
+    const { match } = await verifyPassword(currentPassword, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "Current password is incorrect." });
+    }
+
+    if (!code || !mfaToken) {
+      const userLang = await getPreferredLanguageForUser(user.id);
+      const pendingToken = await createMfaEmailChallenge(user, req, {
+        tokenPurpose: "mfa_sensitive_reauth",
+        tokenPayload: { reason: "account_delete" },
+        lang: userLang,
+        mfaContentKey: "signin",
+        locationPath: "/settings"
+      });
+
+      return res.status(200).json({
+        pending_verification: true,
+        mfa_token: pendingToken,
+        message: "We emailed you a verification code. Enter it to continue account deletion."
+      });
+    }
+
+    let pending;
+    try {
+      pending = verifyToken(mfaToken);
+    } catch (error) {
+      return res.status(401).json({ error: "Verification session expired. Start again." });
+    }
+
+    if (
+      pending.purpose !== "mfa_sensitive_reauth" ||
+      pending.id !== user.id ||
+      pending.email !== user.email ||
+      pending.reason !== "account_delete"
+    ) {
+      return res.status(401).json({ error: "Verification session expired. Start again." });
+    }
+
+    const challenge = await findActiveMfaEmailChallenge(pending.challenge_id, user.id);
+    if (!challenge) {
+      return res.status(401).json({ error: "Verification code expired. Start again." });
+    }
+
+    if (Number(challenge.attempt_count || 0) >= MAX_MFA_ATTEMPTS) {
+      return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
+    }
+
+    if (hashMfaEmailCode(code) !== String(challenge.code_hash || "")) {
+      const nextAttemptCount = Number(challenge.attempt_count || 0) + 1;
+      await recordFailedMfaEmailAttempt(challenge.id);
+      if (nextAttemptCount >= MAX_MFA_ATTEMPTS) {
+        return res.status(429).json({ error: "Too many invalid verification attempts. Start again." });
+      }
+      return res.status(401).json({ error: "Invalid verification code." });
+    }
+
+    await consumeMfaEmailChallenge(challenge.id);
+    const reauthToken = signToken(
+      {
+        purpose: "mfa_sensitive_reauth",
+        reason: "account_delete",
+        id: user.id,
+        email: user.email
+      },
+      MFA_PENDING_TOKEN_EXPIRY_SECONDS
+    );
+
+    return res.status(200).json({
+      success: true,
+      reauthenticated: true,
+      reauth_token: reauthToken,
+      message: "MFA verification complete. You can now delete your account."
+    });
+  } catch (err) {
+    logError("MFA reauth error:", err);
+    return res.status(500).json({ error: "Unable to verify MFA right now." });
+  }
+});
+
 router.post("/mfa/enable", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   const code = String(req.body?.code || "").trim();

@@ -108,16 +108,18 @@ function requireMfa(req, res, next) {
 
   if (!req.user.mfa_enabled) {
     return res.status(403).json({
-      error: "MFA setup required",
+      error: "MFA setup required for this action.",
       mfa_required: true,
+      requirement: "setup",
       setup_url: "/settings#settings-security"
     });
   }
 
   if (!req.user.mfa_authenticated) {
     return res.status(403).json({
-      error: "MFA verification required",
+      error: "MFA verification required for this action.",
       mfa_required: true,
+      requirement: "verification",
       reauthenticate: true
     });
   }
