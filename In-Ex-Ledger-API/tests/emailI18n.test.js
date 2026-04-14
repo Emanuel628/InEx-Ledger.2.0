@@ -167,6 +167,14 @@ describe("buildPasswordResetEmail", () => {
     assert.ok(text.includes("mot de passe"));
     assert.ok(html.includes(link));
   });
+
+  it("escapes/sanitizes unsafe reset link content in HTML", () => {
+    const unsafe = `https://app.inexledger.com/reset?token="><img src=x onerror=alert(1)>`;
+    const { html } = buildPasswordResetEmail("en", unsafe);
+    assert.ok(html.includes("https://app.inexledger.com/reset?token="));
+    assert.ok(!html.includes("<img"));
+    assert.ok(!html.includes(`"><img`));
+  });
 });
 
 /* ================================================================== */
@@ -196,6 +204,17 @@ describe("buildNewSignInAlertEmail", () => {
     assert.ok(html.includes("Heure de connexion"));
     assert.ok(html.includes("Ce n'était pas vous"));
     assert.ok(text.includes("Réinitialisez votre mot de passe"));
+  });
+
+  it("escapes sign-in time and location HTML fields", () => {
+    const { html } = buildNewSignInAlertEmail("en", {
+      signInTime: `2026-04-14T11:00:00.000Z<script>alert(1)</script>`,
+      city: `Montreal<script>alert(1)</script>`,
+      country: `Canada`,
+      resetLink: link
+    });
+    assert.ok(!html.includes("<script>"));
+    assert.ok(html.includes("&lt;script&gt;alert(1)&lt;/script&gt;"));
   });
 });
 

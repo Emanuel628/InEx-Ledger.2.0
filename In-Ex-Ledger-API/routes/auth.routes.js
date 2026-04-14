@@ -25,7 +25,6 @@ const {
   buildWelcomeVerificationEmail,
   buildVerificationEmail,
   buildPasswordResetEmail,
-  buildNewSignInAlertEmail,
   buildEmailChangeEmail,
   buildMfaEmailContent
 } = require("../services/emailI18nService.js");
@@ -173,13 +172,25 @@ function buildPasswordResetLink(req, token) {
 }
 
 function getAppBaseUrl(req) {
-  const configured = String(process.env.APP_BASE_URL || "").trim().replace(/\/+$/, "");
-  if (configured) {
-    return configured;
+  const configured = String(process.env.APP_BASE_URL || process.env.FRONTEND_URL || "")
+    .trim()
+    .replace(/\/+$/, "");
+  if (!configured) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("APP_BASE_URL must be configured in production");
+    }
+    return "http://localhost:8080";
   }
-  const protocol = req.protocol;
-  const host = req.get("host");
-  return `${protocol}://${host}`;
+  let parsed;
+  try {
+    parsed = new URL(configured);
+  } catch (_) {
+    throw new Error("APP_BASE_URL must be a valid absolute URL");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("APP_BASE_URL must use http or https");
+  }
+  return configured;
 }
 
 async function sendAppEmail({ to, subject, html, text }, { retries = 2, retryDelayMs = 500 } = {}) {
@@ -529,9 +540,8 @@ async function revokeTrustedMfaDevicesForUser(userId) {
   await pool.query("DELETE FROM mfa_trusted_devices WHERE user_id = $1", [userId]);
 }
 
-async function trackSignInDeviceAndNotify(user, req) {
-  if (!user?.id || !user?.email) return;
-
+function buildSignInDeviceContext(user, req) {
+  if (!user?.id) return null;
   const userAgent = normalizeUserAgent(req.get("user-agent"));
   const ipAddress = extractClientIp(req);
   const fingerprintHash = buildDeviceFingerprint({
@@ -540,60 +550,57 @@ async function trackSignInDeviceAndNotify(user, req) {
     ipAddress
   });
   const ipHash = ipAddress ? hashValue(ipAddress) : null;
+  return { userAgent, ipAddress, fingerprintHash, ipHash };
+}
 
+async function getRecognizedSignInDevice(userId, fingerprintHash) {
   const existing = await pool.query(
     `SELECT id
        FROM recognized_signin_devices
-      WHERE user_id = $1 AND fingerprint_hash = $2
-      LIMIT 1`,
-    [user.id, fingerprintHash]
+       WHERE user_id = $1 AND fingerprint_hash = $2
+       LIMIT 1`,
+    [userId, fingerprintHash]
   );
+  return existing.rows[0] || null;
+}
 
-  if (existing.rowCount > 0) {
-    await pool.query(
-      `UPDATE recognized_signin_devices
-          SET last_seen_at = NOW(),
-              updated_at = NOW(),
-              sign_in_count = sign_in_count + 1,
-              ip_hash = COALESCE($3, ip_hash),
-              user_agent = $4
-        WHERE user_id = $1 AND fingerprint_hash = $2`,
-      [user.id, fingerprintHash, ipHash, userAgent]
-    );
-    return;
-  }
+async function touchRecognizedSignInDevice(userId, deviceContext) {
+  await pool.query(
+    `UPDATE recognized_signin_devices
+        SET last_seen_at = NOW(),
+            updated_at = NOW(),
+            sign_in_count = sign_in_count + 1,
+            ip_hash = COALESCE($3, ip_hash),
+            user_agent = $4
+      WHERE user_id = $1 AND fingerprint_hash = $2`,
+    [userId, deviceContext.fingerprintHash, deviceContext.ipHash, deviceContext.userAgent]
+  );
+}
 
-  const location = await fetchIpLocation(ipAddress);
+async function insertRecognizedSignInDevice(user, deviceContext) {
+  const location = await fetchIpLocation(deviceContext.ipAddress);
   const city = location?.city || null;
   const country = location?.country || null;
 
   const inserted = await pool.query(
     `INSERT INTO recognized_signin_devices
-      (id, user_id, fingerprint_hash, ip_hash, user_agent, last_city, last_country)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      ON CONFLICT (user_id, fingerprint_hash) DO NOTHING
-      RETURNING id`,
-    [crypto.randomUUID(), user.id, fingerprintHash, ipHash, userAgent, city, country]
+       (id, user_id, fingerprint_hash, ip_hash, user_agent, last_city, last_country)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (user_id, fingerprint_hash) DO NOTHING
+       RETURNING id`,
+    [
+      crypto.randomUUID(),
+      user.id,
+      deviceContext.fingerprintHash,
+      deviceContext.ipHash,
+      deviceContext.userAgent,
+      city,
+      country
+    ]
   );
-  if (inserted.rowCount === 0) {
-    return;
+  if (!inserted.rowCount) {
+    await touchRecognizedSignInDevice(user.id, deviceContext);
   }
-
-  const lang = await getPreferredLanguageForUser(user.id);
-  const { token } = await createPasswordResetToken(user.email);
-  const resetLink = buildPasswordResetLink(req, token);
-  const signInTimeIso = new Date().toISOString();
-  const alertEmail = buildNewSignInAlertEmail(lang, {
-    signInTime: signInTimeIso,
-    city,
-    country,
-    resetLink
-  });
-
-  await sendAppEmail({
-    to: user.email,
-    ...alertEmail
-  });
 }
 
 /* =========================================================
@@ -752,6 +759,11 @@ router.post("/login", authLimiter, async (req, res) => {
 
     const verified = Boolean(user.email_verified);
     const businessId = await resolveBusinessIdForUser(user);
+    const deviceContext = buildSignInDeviceContext(user, req);
+    const recognizedDevice = deviceContext
+      ? await getRecognizedSignInDevice(user.id, deviceContext.fingerprintHash)
+      : null;
+    const needsDeviceVerification = !recognizedDevice && !!deviceContext;
     let mfaAuthenticated = false;
 
     if (user.mfa_enabled) {
@@ -778,15 +790,38 @@ router.post("/login", authLimiter, async (req, res) => {
           mfa_enabled: true
         });
       }
+    } else if (needsDeviceVerification) {
+      const userLang = await getPreferredLanguageForUser(user.id);
+      const pendingToken = await createMfaEmailChallenge(user, req, {
+        businessId,
+        tokenPurpose: "device_signin_pending",
+        tokenPayload: {
+          device_fingerprint_hash: deviceContext.fingerprintHash,
+          device_ip_hash: deviceContext.ipHash,
+          device_user_agent: deviceContext.userAgent
+        },
+        lang: userLang,
+        mfaContentKey: "signin",
+        locationPath: "/login"
+      });
+      return res.status(200).json({
+        mfa_required: true,
+        mfa_token: pendingToken,
+        email_verified: verified,
+        mfa_enabled: false,
+        device_verification_required: true
+      });
     }
 
     const session = await issueAuthenticatedSession(res, user, businessId, {
       mfaAuthenticated
     });
-    try {
-      await trackSignInDeviceAndNotify(user, req);
-    } catch (securitySignalErr) {
-      logWarn("Sign-in device tracking warning:", securitySignalErr?.message || securitySignalErr);
+    if (recognizedDevice && deviceContext) {
+      try {
+        await touchRecognizedSignInDevice(user.id, deviceContext);
+      } catch (securitySignalErr) {
+        logWarn("Sign-in device tracking warning:", securitySignalErr?.message || securitySignalErr);
+      }
     }
     res.status(200).json(session);
   } catch (err) {
@@ -1158,12 +1193,15 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
 
   try {
     const pending = verifyToken(mfaToken);
-    if (pending.purpose !== "mfa_pending" || !pending.id) {
+    if (!pending.id || (pending.purpose !== "mfa_pending" && pending.purpose !== "device_signin_pending")) {
       return res.status(401).json({ error: "Invalid MFA session." });
     }
 
     const user = await findUserById(pending.id);
-    if (!user || user.email !== pending.email || !user.mfa_enabled) {
+    if (!user || user.email !== pending.email) {
+      return res.status(401).json({ error: "MFA session is no longer valid." });
+    }
+    if (pending.purpose === "mfa_pending" && !user.mfa_enabled) {
       return res.status(401).json({ error: "MFA session is no longer valid." });
     }
 
@@ -1187,18 +1225,31 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
 
     await consumeMfaEmailChallenge(challenge.id);
     const refreshedUser = await findUserById(user.id);
-    if (trustDevice) {
+    if (pending.purpose === "device_signin_pending") {
+      if (refreshedUser.mfa_enabled) {
+        return res.status(401).json({ error: "Invalid MFA session." });
+      }
+      const deviceContext = buildSignInDeviceContext(refreshedUser, req) || {};
+      const tokenFingerprintHash = String(pending.device_fingerprint_hash || "").trim();
+      const currentFingerprintHash = String(deviceContext.fingerprintHash || "").trim();
+      if (!tokenFingerprintHash || !currentFingerprintHash || tokenFingerprintHash !== currentFingerprintHash) {
+        return res.status(401).json({ error: "Invalid MFA session." });
+      }
+      const fingerprintHash = tokenFingerprintHash;
+      await insertRecognizedSignInDevice(refreshedUser, {
+        userAgent: String(pending.device_user_agent || deviceContext.userAgent || ""),
+        ipAddress: deviceContext.ipAddress || null,
+        fingerprintHash,
+        ipHash: pending.device_ip_hash ? String(pending.device_ip_hash) : (deviceContext.ipHash || null)
+      });
+    }
+    if (trustDevice && refreshedUser.mfa_enabled) {
       const trustedDevice = await createTrustedMfaDevice(refreshedUser, req);
       setMfaTrustCookie(res, trustedDevice.token, trustedDevice.expiresAt);
     }
     const session = await issueAuthenticatedSession(res, refreshedUser, pending.business_id || null, {
-      mfaAuthenticated: true
+      mfaAuthenticated: pending.purpose === "mfa_pending"
     });
-    try {
-      await trackSignInDeviceAndNotify(refreshedUser, req);
-    } catch (securitySignalErr) {
-      logWarn("Sign-in device tracking warning:", securitySignalErr?.message || securitySignalErr);
-    }
     return res.status(200).json(session);
   } catch (err) {
     logError("MFA verify error:", err);

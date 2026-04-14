@@ -19,10 +19,35 @@
 const { pool } = require("../db.js");
 
 const SUPPORTED = new Set(["en", "fr"]);
+const HTML_ESCAPE_MAP = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;"
+};
 
 function normalizeEmailLang(lang) {
   const l = String(lang || "").toLowerCase().trim();
   return SUPPORTED.has(l) ? l : "en";
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => HTML_ESCAPE_MAP[char] || char);
+}
+
+function sanitizeHttpUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return "";
+    }
+    return parsed.toString();
+  } catch (_) {
+    return "";
+  }
 }
 
 /**
@@ -81,7 +106,9 @@ function wrapEmailHtml(headerHtml, bodyHtml) {
 }
 
 function ctaButton(href, label) {
-  return `<div style="margin: 24px 0;"><a href="${href}" style="display: inline-block; padding: 14px 22px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700;">${label}</a></div>`;
+  const safeHref = sanitizeHttpUrl(href);
+  if (!safeHref) return "";
+  return `<div style="margin: 24px 0;"><a href="${escapeHtml(safeHref)}" style="display: inline-block; padding: 14px 22px; background: #2563eb; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700;">${escapeHtml(label)}</a></div>`;
 }
 
 /* =========================================================
@@ -113,15 +140,16 @@ const WELCOME_VERIFY = {
 function buildWelcomeVerificationEmail(lang, verificationLink) {
   const l = normalizeEmailLang(lang);
   const s = WELCOME_VERIFY[l];
+  const safeVerificationLink = sanitizeHttpUrl(verificationLink);
   const html = wrapEmailHtml(
     `<div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">${s.eyebrow}</div>
      <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${s.heading}</h1>`,
     `<p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">${s.body}</p>
-     ${ctaButton(verificationLink, s.buttonLabel)}
+     ${ctaButton(safeVerificationLink, s.buttonLabel)}
      <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">${s.expiry}</p>
-     <p style="margin: 0; word-break: break-all; color: #1d4ed8; font-size: 13px;">${verificationLink}</p>`
+     <p style="margin: 0; word-break: break-all; color: #1d4ed8; font-size: 13px;">${escapeHtml(safeVerificationLink)}</p>`
   );
-  return { subject: s.subject, html, text: s.text(verificationLink) };
+  return { subject: s.subject, html, text: s.text(safeVerificationLink) };
 }
 
 /* =========================================================
@@ -153,15 +181,16 @@ const RESEND_VERIFY = {
 function buildVerificationEmail(lang, verificationLink) {
   const l = normalizeEmailLang(lang);
   const s = RESEND_VERIFY[l];
+  const safeVerificationLink = sanitizeHttpUrl(verificationLink);
   const html = wrapEmailHtml(
     `<div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">${s.eyebrow}</div>
      <h1 style="margin: 12px 0 0; font-size: 26px; line-height: 1.15;">${s.heading}</h1>`,
     `<p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">${s.body}</p>
-     ${ctaButton(verificationLink, s.buttonLabel)}
+     ${ctaButton(safeVerificationLink, s.buttonLabel)}
      <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">${s.expiry}</p>
-     <p style="margin: 0; word-break: break-all; color: #1d4ed8; font-size: 13px;">${verificationLink}</p>`
+     <p style="margin: 0; word-break: break-all; color: #1d4ed8; font-size: 13px;">${escapeHtml(safeVerificationLink)}</p>`
   );
-  return { subject: s.subject, html, text: s.text(verificationLink) };
+  return { subject: s.subject, html, text: s.text(safeVerificationLink) };
 }
 
 /* =========================================================
@@ -195,16 +224,17 @@ const PASSWORD_RESET = {
 function buildPasswordResetEmail(lang, resetLink) {
   const l = normalizeEmailLang(lang);
   const s = PASSWORD_RESET[l];
+  const safeResetLink = sanitizeHttpUrl(resetLink);
   const html = wrapEmailHtml(
     `<div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">${s.eyebrow}</div>
      <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${s.heading}</h1>`,
     `<p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">${s.body}</p>
-     ${ctaButton(resetLink, s.buttonLabel)}
+     ${ctaButton(safeResetLink, s.buttonLabel)}
      <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">${s.expiry}</p>
-     <p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${resetLink}</p>
+     <p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${escapeHtml(safeResetLink)}</p>
      <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">${s.ignore}</p>`
   );
-  return { subject: s.subject, html, text: s.text(resetLink) };
+  return { subject: s.subject, html, text: s.text(safeResetLink) };
 }
 
 /* =========================================================
@@ -249,17 +279,19 @@ function buildNewSignInAlertEmail(lang, options = {}) {
   const city = String(options.city || "").trim();
   const country = String(options.country || "").trim();
   const location = [city, country].filter(Boolean).join(", ") || s.unknownLocation;
-  const resetLink = String(options.resetLink || "").trim();
+  const escapedSignInTime = escapeHtml(signInTime);
+  const escapedLocation = escapeHtml(location);
+  const resetLink = sanitizeHttpUrl(options.resetLink);
 
   const html = wrapEmailHtml(
     `<div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">${s.eyebrow}</div>
      <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${s.heading}</h1>`,
     `<p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">${s.body}</p>
-     <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;"><strong>${s.signInTimeLabel}:</strong> ${signInTime}</p>
-     <p style="margin: 0 0 14px; color: #475569; font-size: 13px; line-height: 1.6;"><strong>${s.locationLabel}:</strong> ${location}</p>
+     <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;"><strong>${s.signInTimeLabel}:</strong> ${escapedSignInTime}</p>
+     <p style="margin: 0 0 14px; color: #475569; font-size: 13px; line-height: 1.6;"><strong>${s.locationLabel}:</strong> ${escapedLocation}</p>
      <p style="margin: 0 0 14px; color: #991b1b; font-size: 14px; line-height: 1.6; font-weight: 600;">${s.warning}</p>
      ${resetLink ? ctaButton(resetLink, s.buttonLabel) : ""}
-     ${resetLink ? `<p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${resetLink}</p>` : ""}
+     ${resetLink ? `<p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${escapeHtml(resetLink)}</p>` : ""}
      <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">${s.footer}</p>`
   );
 
@@ -301,16 +333,17 @@ const EMAIL_CHANGE = {
 function buildEmailChangeEmail(lang, confirmLink) {
   const l = normalizeEmailLang(lang);
   const s = EMAIL_CHANGE[l];
+  const safeConfirmLink = sanitizeHttpUrl(confirmLink);
   const html = wrapEmailHtml(
     `<div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">${s.eyebrow}</div>
      <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${s.heading}</h1>`,
     `<p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">${s.body}</p>
-     ${ctaButton(confirmLink, s.buttonLabel)}
+     ${ctaButton(safeConfirmLink, s.buttonLabel)}
      <p style="margin: 0 0 10px; color: #475569; font-size: 13px; line-height: 1.6;">${s.expiry}</p>
-     <p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${confirmLink}</p>
+     <p style="margin: 0 0 14px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${escapeHtml(safeConfirmLink)}</p>
      <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">${s.ignore}</p>`
   );
-  return { subject: s.subject, html, text: s.text(confirmLink) };
+  return { subject: s.subject, html, text: s.text(safeConfirmLink) };
 }
 
 /* =========================================================
