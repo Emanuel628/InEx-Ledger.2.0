@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>InEx Ledger - Simple Accounting for 1099 Workers</title>
+  <title>InEx Ledger — 1099 & Freelancer Bookkeeping, Built for Tax Time</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="InEx Ledger is a simple accounting tool for 1099 workers and freelancers. Track income and expenses, upload receipts, and export clean records for tax time." />
-  <meta property="og:title" content="InEx Ledger - Simple Accounting for 1099 Workers" />
-  <meta property="og:description" content="Track income and expenses, upload receipts, and export clean records for tax time. Built for freelancers and independent contractors." />
+  <meta name="description" content="InEx Ledger tracks every dollar you earn as a freelancer or gig worker, estimates your quarterly taxes, tags your 1099 payers, and exports clean records for your CPA. Built for independent contractors in the US and Canada." />
+  <meta property="og:title" content="InEx Ledger — Built for Freelancers &amp; 1099 Workers" />
+  <meta property="og:description" content="Track income, log expenses, capture receipts, and see your estimated SE tax — all in one calm place. No accounting degree required." />
   <meta property="og:url" content="https://inexledger.com" />
   <meta property="og:type" content="website" />
 
@@ -35,53 +35,218 @@
 </header>
 
 <main id="main-content">
+
+  <!-- ═══════════════════ HERO ═══════════════════ -->
   <section class="hero">
-    <h1 data-i18n-region="landing_hero_title">Track your 1099 money without the headache</h1>
-    <p data-i18n-region="landing_hero_subtitle">
-      A simple, calm ledger for freelancers and contractors to track income &amp; expenses
-      and export clean records for tax time.
+    <div class="hero-kicker">Built for freelancers &amp; independent contractors</div>
+    <h1>Know exactly what you owe before tax season surprises you</h1>
+    <p>
+      Uber drivers, DoorDash couriers, freelance designers, consultants, and tradespeople
+      use InEx Ledger to track every dollar they earn, log every write-off, and walk into
+      tax season with clean numbers — not a shoebox of receipts.
     </p>
-
     <div class="hero-actions">
-      <a class="button primary" href="/register" data-i18n="landing_start_trial">Start free trial</a>
+      <a class="button primary" href="/register" data-i18n="landing_start_trial">Start free — 30 days on us</a>
+    </div>
+    <p class="hero-signin">Already have an account? <a href="/login">Sign in</a></p>
+  </section>
+
+  <!-- ═══════════════════ SOCIAL PROOF STRIP ═══════════════════ -->
+  <section class="proof-strip">
+    <ul class="proof-list">
+      <li><span class="proof-icon">&#10003;</span> Works for US 1099-NEC &amp; Canadian T4A filers</li>
+      <li><span class="proof-icon">&#10003;</span> Calculates estimated self-employment tax in real time</li>
+      <li><span class="proof-icon">&#10003;</span> Reminds you 3 weeks before each quarterly deadline</li>
+      <li><span class="proof-icon">&#10003;</span> No accounting degree required</li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════ WHO IT'S FOR ═══════════════════ -->
+  <section class="persona-section">
+    <h2>Who uses InEx Ledger?</h2>
+    <p class="section-subtitle">
+      If you get paid by clients, platforms, or customers — and receive a 1099-NEC, 1099-K, or T4A at year-end — this was built for you.
+    </p>
+    <div class="persona-grid">
+      <div class="persona-card">
+        <div class="persona-icon" aria-hidden="true">&#128663;</div>
+        <h3>Rideshare &amp; Delivery</h3>
+        <p>Uber, Lyft, DoorDash, Instacart. Track mileage at the IRS standard rate, log every deposit, and reconcile your 1099-K or 1099-NEC payer by payer.</p>
+      </div>
+      <div class="persona-card">
+        <div class="persona-icon" aria-hidden="true">&#128187;</div>
+        <h3>Freelancers &amp; Consultants</h3>
+        <p>Designers, developers, writers, coaches, and marketers. Invoice multiple clients, tag each one as a payer, and export a tidy summary for your CPA.</p>
+      </div>
+      <div class="persona-card">
+        <div class="persona-icon" aria-hidden="true">&#128295;</div>
+        <h3>Trades &amp; Home Services</h3>
+        <p>Plumbers, electricians, cleaners, and handypeople. Log material costs, capture receipts, and see your net profit after expenses — not just gross revenue.</p>
+      </div>
+      <div class="persona-card">
+        <div class="persona-icon" aria-hidden="true">&#128188;</div>
+        <h3>Any Independent Contractor</h3>
+        <p>Side hustle, part-time gig, or full-time self-employment. If you're filing Schedule C (US) or T2125 (Canada), InEx Ledger gives you the numbers you need.</p>
+      </div>
     </div>
   </section>
 
-  <section class="feature-grid">
-    <article class="feature-card">
-      <h2 data-i18n="landing_feature_income">Track income &amp; expenses</h2>
-      <p data-i18n="landing_feature_income_subline">
-        Log your work money, purchases, and write-offs in one clean place.
-      </p>
-    </article>
-    <article class="feature-card">
-      <h2 data-i18n="landing_feature_tax">Stay tax-ready</h2>
-      <p data-i18n="landing_feature_tax_subline">
-        Keep your records organized so tax time is fast, simple, and stress-free.
-      </p>
-    </article>
-    <article class="feature-card">
-      <h2 data-i18n="landing_feature_export">Export for your CPA</h2>
-      <p data-i18n="landing_feature_export_subline">
-        Generate a CSV your accountant can actually use.
-      </p>
-    </article>
+  <!-- ═══════════════════ FEATURES ═══════════════════ -->
+  <section class="feature-section">
+    <h2>Everything you need to stay tax-ready year-round</h2>
+    <p class="section-subtitle">No bloat, no jargon. Just the tools an independent worker actually uses.</p>
+    <div class="feature-grid">
+
+      <article class="feature-card">
+        <div class="feature-card-icon" aria-hidden="true">&#128181;</div>
+        <h3>Log income &amp; expenses</h3>
+        <p>
+          Record every payment you receive and every dollar you spend. Categorize as you go so your year-end summary is already done when April arrives.
+        </p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-card-icon" aria-hidden="true">&#128203;</div>
+        <h3>1099-NEC &amp; T4A payer tracking</h3>
+        <p>
+          Tag each income transaction with the client or platform that paid you. At year-end, compare what each payer reported on their form against what you actually deposited — spot discrepancies before your return is filed.
+        </p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-card-icon" aria-hidden="true">&#128663;</div>
+        <h3>Mileage tracking</h3>
+        <p>
+          Log business miles and let InEx Ledger multiply them by the current IRS standard rate (67¢/mile for 2024). The biggest deduction most gig workers leave on the table, captured in seconds.
+        </p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-card-icon" aria-hidden="true">&#128444;</div>
+        <h3>Receipt capture</h3>
+        <p>
+          Upload a photo or PDF and attach it directly to a transaction. No more lost receipts, no more "I'll find it later." Every expense is backed by evidence when it's time to file.
+        </p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-card-icon" aria-hidden="true">&#128200;</div>
+        <h3>Self-employment tax estimate</h3>
+        <p>
+          See your estimated SE tax (US: 15.3% of net × 92.35%) or CPP contribution (Canada) right on your dashboard. Updated every time you log a transaction — no spreadsheet math required.
+        </p>
+      </article>
+
+      <article class="feature-card">
+        <div class="feature-card-icon" aria-hidden="true">&#128196;</div>
+        <h3>Export for your CPA</h3>
+        <p>
+          Generate a clean CSV or PDF that groups income by payer and expenses by category. Hand it to your accountant and spend less time explaining — and less money in billable hours.
+        </p>
+      </article>
+
+    </div>
   </section>
 
+  <!-- ═══════════════════ TAX REMINDERS CALLOUT ═══════════════════ -->
+  <section class="callout-section">
+    <div class="callout-content">
+      <div class="callout-text">
+        <h2>Never miss a quarterly tax deadline again</h2>
+        <p>
+          Self-employed workers in the US owe estimated taxes four times a year — April 15, June 15, September 15, and January 15.
+          Miss one and the IRS charges penalties <em>on top of</em> what you owe.
+        </p>
+        <p>
+          InEx Ledger shows you a reminder banner 21 days before each deadline, with your current estimated amount and a direct link to IRS Direct Pay or CRA My Account.
+          The first year you catch a deadline you would have missed, the app pays for itself.
+        </p>
+      </div>
+      <div class="callout-aside">
+        <div class="deadline-card">
+          <div class="deadline-card-title">2024 US quarterly deadlines</div>
+          <ul class="deadline-list">
+            <li><span class="deadline-q">Q1</span> April 15</li>
+            <li><span class="deadline-q">Q2</span> June 15</li>
+            <li><span class="deadline-q">Q3</span> September 15</li>
+            <li><span class="deadline-q">Q4</span> January 15, 2025</li>
+          </ul>
+          <div class="deadline-card-title deadline-card-title--ca">2024 Canada instalment dates</div>
+          <ul class="deadline-list">
+            <li><span class="deadline-q">Q1</span> March 15</li>
+            <li><span class="deadline-q">Q2</span> June 15</li>
+            <li><span class="deadline-q">Q3</span> September 15</li>
+            <li><span class="deadline-q">Q4</span> December 15</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ NEWS / RECENT UPDATES ═══════════════════ -->
+  <section class="news-section">
+    <div class="news-header">
+      <h2>Recent updates</h2>
+      <span class="news-header-note">We ship fast. Here's what's new.</span>
+    </div>
+    <ul class="news-list">
+      <li class="news-item">
+        <span class="news-badge news-badge--new">New</span>
+        <div class="news-item-body">
+          <strong>1099-NEC &amp; T4A payer tracking</strong>
+          <p>Tag each income transaction with the client or platform that paid you. Reconcile your actual deposits against what payers report on their forms — built directly into the transaction log.</p>
+        </div>
+        <span class="news-date">April 2026</span>
+      </li>
+      <li class="news-item">
+        <span class="news-badge news-badge--new">New</span>
+        <div class="news-item-body">
+          <strong>Self-employment tax estimate widget</strong>
+          <p>Your dashboard now shows an estimated SE tax (US) or CPP contribution (Canada) calculated from your current year profit. Updates live as you log transactions.</p>
+        </div>
+        <span class="news-date">April 2026</span>
+      </li>
+      <li class="news-item">
+        <span class="news-badge news-badge--new">New</span>
+        <div class="news-item-body">
+          <strong>Quarterly tax deadline reminders</strong>
+          <p>Dismissible banners appear 21 days before each US or Canadian quarterly estimated-tax deadline — with your estimated amount and a direct payment link.</p>
+        </div>
+        <span class="news-date">April 2026</span>
+      </li>
+      <li class="news-item">
+        <span class="news-badge news-badge--improved">Improved</span>
+        <div class="news-item-body">
+          <strong>Freelancer-first onboarding</strong>
+          <p>New work-type tiles (Rideshare &amp; Delivery, Creative &amp; Consulting, Trades &amp; Services) replace the old business-type form. Get set up in under 60 seconds.</p>
+        </div>
+        <span class="news-date">April 2026</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- ═══════════════════ INCLUDED ═══════════════════ -->
   <section class="included-card">
-    <h2 data-i18n="landing_included_title">What's included in V1 (today)</h2>
+    <h2 data-i18n="landing_included_title">What's included in V1 (live today)</h2>
     <div class="included-grid">
-      <span class="included-pill" data-i18n="landing_included_item1">Account creation &amp; sign-in</span>
-      <span class="included-pill" data-i18n="landing_included_item2">Transaction ledger (income &amp; expenses)</span>
-      <span class="included-pill" data-i18n-region="landing_included_item3">Basic organization built for 1099 workers</span>
-      <span class="included-pill" data-i18n="landing_included_item4">CSV export for tax prep</span>
-      <span class="included-pill" data-i18n="landing_included_item5">30-day free trial (then choose a plan)</span>
+      <span class="included-pill">Income &amp; expense ledger</span>
+      <span class="included-pill">1099-NEC &amp; T4A payer tagging</span>
+      <span class="included-pill">Mileage tracking (IRS / CRA rates)</span>
+      <span class="included-pill">Receipt uploads &amp; document storage</span>
+      <span class="included-pill">SE tax &amp; CPP estimate dashboard</span>
+      <span class="included-pill">Quarterly deadline reminders</span>
+      <span class="included-pill">CSV &amp; PDF export for your CPA</span>
+      <span class="included-pill">CPA access with read-only share link</span>
+      <span class="included-pill">MFA &amp; accounting period locks</span>
+      <span class="included-pill">US &amp; Canada multi-region support</span>
+      <span class="included-pill">30-day free trial</span>
     </div>
   </section>
 
+  <!-- ═══════════════════ PRICING ═══════════════════ -->
   <section class="pricing-section">
-    <h2>Choose your rollout path</h2>
-    <p class="pricing-subtitle">Start with a 30-day free trial. Compare the current V1 platform with the upcoming V2 upgrade path.</p>
+    <h2>Simple, honest pricing</h2>
+    <p class="pricing-subtitle">Start with a 30-day free trial. No credit card required to begin. Cancel any time.</p>
     <div class="pricing-billing-controls" aria-label="Billing frequency">
       <div class="pricing-billing-copy">
         <span class="pricing-billing-label">Billing</span>
@@ -89,10 +254,10 @@
       </div>
       <div class="pricing-toggle" role="group" aria-label="Select billing frequency">
         <button type="button" class="pricing-toggle-btn is-active" data-billing-toggle="monthly" aria-pressed="true">Monthly</button>
-        <button type="button" class="pricing-toggle-btn" data-billing-toggle="yearly" aria-pressed="false">Yearly</button>
+        <button type="button" class="pricing-toggle-btn" data-billing-toggle="yearly" aria-pressed="false">Yearly (save 15%)</button>
       </div>
     </div>
-    <p class="pricing-baseline-note">Starter stays available at $0 for light use. The cards below show the paid V1 and V2 tracks.</p>
+    <p class="pricing-baseline-note">A free Starter tier is always available for light use. The plans below unlock the full toolset.</p>
     <div class="pricing-grid pricing-grid-versions">
       <article
         class="pricing-card pricing-card-featured"
@@ -109,17 +274,19 @@
             <span class="pricing-amount" data-price-amount>$12</span>
             <span class="pricing-period" data-price-period>/ month</span>
           </div>
-          <p class="pricing-tier-desc">The live product today: clean bookkeeping, tax-ready exports, receipt capture, CPA sharing, and a calmer settings experience.</p>
+          <p class="pricing-tier-desc">Everything you need to track your freelance income, stay on top of quarterly taxes, and hand your CPA a clean export — without learning accounting software.</p>
           <p class="pricing-billing-note" data-price-note>Billed monthly at $12.00.</p>
         </div>
         <ul class="pricing-feature-list">
           <li>Unlimited income and expense tracking</li>
+          <li>1099-NEC &amp; T4A payer tagging and reconciliation</li>
+          <li>Mileage tracking at the current IRS / CRA rate</li>
           <li>Receipt uploads and document retention</li>
-          <li>CPA access with invite, history, and audit views</li>
-          <li>Advanced exports for filing and handoff</li>
+          <li>SE tax estimate &amp; quarterly reminders</li>
+          <li>CSV &amp; PDF export + CPA read-only access</li>
           <li>Privacy controls, MFA, and accounting period locks</li>
         </ul>
-        <a href="/register" class="pricing-cta-btn pricing-cta-primary">Start V1 free trial</a>
+        <a href="/register" class="pricing-cta-btn pricing-cta-primary">Start free trial — no card needed</a>
       </article>
 
       <article
@@ -137,16 +304,16 @@
             <span class="pricing-amount" data-price-amount>$24</span>
             <span class="pricing-period" data-price-period>/ month</span>
           </div>
-          <p class="pricing-tier-desc">The next major release layers automation and operator controls on top of V1 without turning the app into accounting clutter.</p>
+          <p class="pricing-tier-desc">Bank imports, smart categorization, and deeper reporting — layered on top of V1 without adding complexity.</p>
           <p class="pricing-billing-note" data-price-note>Planned monthly price: $24.00.</p>
         </div>
         <ul class="pricing-feature-list">
           <li>Connected bank imports with review-first matching</li>
-          <li>Smarter categorization suggestions and recurring rules</li>
+          <li>Smart categorization suggestions and recurring rules</li>
+          <li>Schedule C / T2125 category mapping with tax line badges</li>
           <li>Multi-business workspace with cleaner separation</li>
           <li>Deeper reporting, cash snapshots, and year-end summaries</li>
-          <li>Stronger CPA and operator collaboration flows</li>
-          <li>More automation around receipts, reimbursements, and review queues</li>
+          <li>Advanced CPA and operator collaboration flows</li>
         </ul>
         <div class="pricing-cta-btn pricing-cta-disabled" aria-disabled="true">V2 waitlist opening soon</div>
       </article>
@@ -155,18 +322,7 @@
       Prices shown in USD. Annual billing reflects a 15% discount. Cancel any time from Settings. <a href="/subscription">See full plan details &rarr;</a>
     </p>
   </section>
-  <section>
-    <h2 data-i18n="landing_coming_title">What's coming in V2</h2>
-    <p data-i18n="landing_coming_subline">
-      V2 adds automation and power features - without losing the calm simplicity.
-    </p>
-    <ul>
-      <li data-i18n="landing_coming_item1">Bank sync (automatic imports)</li>
-      <li data-i18n="landing_coming_item2">Smarter categorization suggestions</li>
-      <li data-i18n="landing_coming_item3">Receipt capture improvements</li>
-      <li data-i18n="landing_coming_item4">More exports & reports</li>
-    </ul>
-  </section>
+
 </main>
 
 <footer>
@@ -180,7 +336,7 @@
     <strong>Privacy Officer:</strong> InEx Ledger Privacy Team &mdash;
     <a href="mailto:privacy@inexledger.com?subject=Privacy%20Request%20for%20InEx%20Ledger">privacy@inexledger.com</a>
   </p>
-  <p>&copy; 2026 InEx Ledger</p>
+  <p>&copy; 2026 InEx Ledger &mdash; Built for freelancers &amp; independent contractors</p>
 </footer>
 
 <script src="../js/escape-html.js?v=20260410a"></script>
