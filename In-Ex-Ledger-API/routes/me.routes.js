@@ -5,7 +5,7 @@ const path = require("path");
 const bcrypt = require("bcrypt");
 const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");
-const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { requireAuth, verifyToken } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
@@ -313,8 +313,9 @@ router.put("/", async (req, res) => {
   }
 });
 
-router.delete("/", accountDeleteLimiter, requireMfa, async (req, res) => {
+router.delete("/", accountDeleteLimiter, async (req, res) => {
   const { password } = req.body ?? {};
+  const providedMfaReauthToken = String(req.body?.mfaReauthToken || "").trim();
   const client = await pool.connect();
   let transactionOpen = false;
   let storagePaths = [];
@@ -322,6 +323,45 @@ router.delete("/", accountDeleteLimiter, requireMfa, async (req, res) => {
   try {
     if (!password) {
       return res.status(400).json({ error: "Password is required to delete your account." });
+    }
+
+    if (req.user?.mfa_enabled) {
+      if (!providedMfaReauthToken) {
+        return res.status(403).json({
+          error: "MFA verification required before deleting your account.",
+          mfa_required: true,
+          requirement: "verification",
+          reauthenticate: true,
+          reauth_endpoint: "/api/auth/mfa/reauth"
+        });
+      }
+
+      let reauthPayload;
+      try {
+        reauthPayload = verifyToken(providedMfaReauthToken);
+      } catch (error) {
+        return res.status(403).json({
+          error: "MFA verification expired. Re-authenticate and try again.",
+          mfa_required: true,
+          requirement: "verification",
+          reauthenticate: true,
+          reauth_endpoint: "/api/auth/mfa/reauth"
+        });
+      }
+
+      if (
+        reauthPayload?.purpose !== "mfa_sensitive_reauth" ||
+        reauthPayload?.reason !== "account_delete" ||
+        reauthPayload?.id !== req.user.id
+      ) {
+        return res.status(403).json({
+          error: "MFA verification invalid for account deletion. Re-authenticate and try again.",
+          mfa_required: true,
+          requirement: "verification",
+          reauthenticate: true,
+          reauth_endpoint: "/api/auth/mfa/reauth"
+        });
+      }
     }
 
     await client.query("BEGIN");
@@ -491,7 +531,21 @@ router.delete("/", accountDeleteLimiter, requireMfa, async (req, res) => {
       constraint: err.constraint,
       table: err.table
     });
-    res.status(500).json({ error: "Failed to delete account." });
+    const cpaAuditConstraint = String(err?.constraint || "");
+    if (
+      err?.code === "23503" &&
+      /cpa_audit_logs_(owner_user_id|actor_user_id)_fkey/i.test(cpaAuditConstraint)
+    ) {
+      return res.status(500).json({
+        error: "Failed to delete account.",
+        detail: "Database migration 045_drop_cpa_audit_user_fks.sql must be applied before account deletion can succeed."
+      });
+    }
+
+    res.status(500).json({
+      error: "Failed to delete account.",
+      detail: err?.code ? `Database error code: ${err.code}` : "Unexpected server error."
+    });
   } finally {
     client.release();
   }

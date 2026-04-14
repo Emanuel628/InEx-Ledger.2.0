@@ -21,7 +21,10 @@ function loadMeRouter(options = {}) {
     userDeleteCount: options.userDeleteCount ?? 1,
     passwordMatches: options.passwordMatches ?? true,
     unlinkCalls: [],
-    clearedCookie: null
+    clearedCookie: null,
+    mfaEnabled: options.mfaEnabled ?? false,
+    validMfaReauthToken: options.validMfaReauthToken || "valid-delete-reauth-token",
+    deleteError: options.deleteError || null
   };
 
   Module._load = function(requestName, parent, isMain) {
@@ -55,6 +58,12 @@ function loadMeRouter(options = {}) {
                   };
                 }
                 if (/DELETE FROM users WHERE id = \$1 RETURNING id/i.test(sql)) {
+                  if (state.deleteError) {
+                    const error = new Error(state.deleteError.message || "delete failed");
+                    if (state.deleteError.code) error.code = state.deleteError.code;
+                    if (state.deleteError.constraint) error.constraint = state.deleteError.constraint;
+                    throw error;
+                  }
                   return {
                     rows: state.userDeleteCount ? [{ id: state.userId }] : [],
                     rowCount: state.userDeleteCount
@@ -72,11 +81,23 @@ function loadMeRouter(options = {}) {
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
       return {
         requireAuth(req, _res, next) {
-          req.user = { id: state.userId, mfa_enabled: true };
+          req.user = { id: state.userId, mfa_enabled: state.mfaEnabled };
           next();
         },
         requireMfa(_req, _res, next) {
           next();
+        },
+        verifyToken(token) {
+          if (token === state.validMfaReauthToken) {
+            return {
+              purpose: "mfa_sensitive_reauth",
+              reason: "account_delete",
+              id: state.userId
+            };
+          }
+          const error = new Error("invalid token");
+          error.code = "TOKEN_INVALID";
+          throw error;
         }
       };
     }
@@ -331,6 +352,84 @@ test("account deletion returns 401 when password is incorrect", async () => {
 
     assert.equal(response.status, 401);
     assert.ok(response.body.error, "response must include error message");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("account deletion returns 403 when MFA reauthentication token is missing", async () => {
+  const fixture = loadMeRouter({ mfaEnabled: true });
+
+  try {
+    const app = buildApp(fixture.router, fixture.state);
+    const response = await request(app)
+      .delete("/api/me")
+      .send({ password: "CorrectHorseBatteryStaple1!" });
+
+    assert.equal(response.status, 403);
+    assert.equal(response.body?.mfa_required, true);
+    assert.equal(response.body?.reauthenticate, true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("account deletion succeeds for MFA-enabled users when mfaReauthToken is provided", async () => {
+  const fixture = loadMeRouter({ mfaEnabled: true });
+
+  try {
+    const app = buildApp(fixture.router, fixture.state);
+    const response = await request(app)
+      .delete("/api/me")
+      .send({
+        password: "CorrectHorseBatteryStaple1!",
+        mfaReauthToken: fixture.state.validMfaReauthToken
+      });
+
+    assert.equal(response.status, 200);
+    assert.match(response.body.message, /deleted/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("account deletion returns 403 when MFA reauthentication token is invalid", async () => {
+  const fixture = loadMeRouter({ mfaEnabled: true });
+
+  try {
+    const app = buildApp(fixture.router, fixture.state);
+    const response = await request(app)
+      .delete("/api/me")
+      .send({
+        password: "CorrectHorseBatteryStaple1!",
+        mfaReauthToken: "invalid-token"
+      });
+
+    assert.equal(response.status, 403);
+    assert.equal(response.body?.mfa_required, true);
+    assert.equal(response.body?.reauthenticate, true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("account deletion returns migration hint when cpa_audit_logs foreign key blocks deletion", async () => {
+  const fixture = loadMeRouter({
+    deleteError: {
+      code: "23503",
+      constraint: "cpa_audit_logs_owner_user_id_fkey",
+      message: "insert or update on table violates foreign key constraint"
+    }
+  });
+
+  try {
+    const app = buildApp(fixture.router, fixture.state);
+    const response = await request(app)
+      .delete("/api/me")
+      .send({ password: "CorrectHorseBatteryStaple1!" });
+
+    assert.equal(response.status, 500);
+    assert.match(response.body?.detail || "", /045_drop_cpa_audit_user_fks\.sql/i);
   } finally {
     fixture.cleanup();
   }
