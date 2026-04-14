@@ -26,6 +26,22 @@ const ONBOARDING_RUNTIME_PAGES = new Set([
   "/mileage",
   "/exports"
 ]);
+const LEGACY_SENSITIVE_STORAGE_KEYS = [
+  "lb_accounts",
+  "lb_categories",
+  "lb_transactions",
+  "lb_receipts",
+  "lb_mileage",
+  "lb_recurring",
+  "lb_businesses",
+  "lb_business_profile",
+  "lb_export_history",
+  "lb_export_scope",
+  "lb_export_language",
+  "lb_transactions_scope",
+  "lb_business_settings"
+];
+const SENSITIVE_STORAGE_PREFIXES = ["lb_", "lb:"];
 
 if (!window.API_BASE) {
   window.API_BASE = "";
@@ -35,6 +51,68 @@ if (!window.API_BASE) {
 if (!window.__AUTH_GUARD_STATE__) {
   window.__AUTH_GUARD_STATE__ = { running: false, count: 0, lastError: null };
 }
+
+function resolveStorageUserId(profile = window.__LUNA_ME__) {
+  return profile?.id || profile?.user_id || profile?.userId || profile?.uid || "";
+}
+
+function resolveStorageBusinessId(explicitBusinessId) {
+  if (explicitBusinessId) {
+    return explicitBusinessId;
+  }
+  return localStorage.getItem(ACTIVE_BUSINESS_ID_KEY) || "";
+}
+
+function getStorageNamespace(options = {}) {
+  const userId = resolveStorageUserId(options.profile);
+  const businessId = resolveStorageBusinessId(options.businessId);
+  if (!userId || !businessId) {
+    return null;
+  }
+  return `lb:${userId}:${businessId}`;
+}
+
+function purgeLegacySensitiveStorage() {
+  if (window.__LUNA_LEGACY_STORAGE_PURGED__) {
+    return;
+  }
+  window.__LUNA_LEGACY_STORAGE_PURGED__ = true;
+  try {
+    LEGACY_SENSITIVE_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+  } catch (_) {}
+}
+
+function getNamespacedStorageKey(key, options = {}) {
+  purgeLegacySensitiveStorage();
+  const namespace = getStorageNamespace(options);
+  if (!namespace || !key) {
+    return null;
+  }
+  return `${namespace}:${key}`;
+}
+
+function purgeSensitiveStorage() {
+  try {
+    const keys = Object.keys(localStorage);
+    keys.forEach((key) => {
+      if (SENSITIVE_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+        localStorage.removeItem(key);
+      }
+    });
+  } catch (_) {}
+}
+
+if (!window.lunaStorage) {
+  window.lunaStorage = {};
+}
+Object.assign(window.lunaStorage, {
+  getNamespace: getStorageNamespace,
+  getKey: getNamespacedStorageKey,
+  purgeLegacyKeys: purgeLegacySensitiveStorage,
+  purgeSensitiveStorage,
+  resolveStorageUserId,
+  resolveStorageBusinessId
+});
 
 function getApiBase() {
   return window.API_BASE;
@@ -46,16 +124,16 @@ function buildApiUrl(path = "") {
 }
 
 function clearAppState() {
-  [
-    "lb_accounts",
-    "lb_categories",
-    "lb_transactions",
-    "lb_transactions_upsell_hidden",
-    ACTIVE_BUSINESS_ID_KEY,
-    ACTIVE_BUSINESS_NAME_KEY
-  ].forEach(
-    (key) => localStorage.removeItem(key)
-  );
+  try {
+    purgeSensitiveStorage();
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem(ACTIVE_BUSINESS_ID_KEY);
+    localStorage.removeItem(ACTIVE_BUSINESS_NAME_KEY);
+    localStorage.removeItem("lb_transactions_upsell_hidden");
+  } catch (_) {}
+  try {
+    sessionStorage.clear();
+  } catch (_) {}
 }
 
 function markLoginReset() {

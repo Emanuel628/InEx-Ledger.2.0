@@ -81,7 +81,7 @@ async function uploadReceipt(file) {
 }
 
 async function loadTransactionMap() {
-  transactionMap = readTransactionMapFromStorage();
+  transactionMap = {};
 
   try {
     const response = await apiFetch("/api/transactions");
@@ -106,20 +106,6 @@ async function loadTransactionMap() {
     }, {});
   } catch (error) {
     console.error("Failed to load transactions for receipts page:", error);
-  }
-}
-
-function readTransactionMapFromStorage() {
-  try {
-    const transactions = JSON.parse(localStorage.getItem("lb_transactions") || "[]");
-    return transactions.reduce((accumulator, transaction) => {
-      if (transaction?.id) {
-        accumulator[transaction.id] = transaction;
-      }
-      return accumulator;
-    }, {});
-  } catch {
-    return {};
   }
 }
 

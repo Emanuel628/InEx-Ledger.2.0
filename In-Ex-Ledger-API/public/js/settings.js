@@ -5,7 +5,7 @@ const REGION_DISPLAY = {
 
 const SETTINGS_DEFAULT_THEME = typeof DEFAULT_THEME !== "undefined" ? DEFAULT_THEME : "light";
 const SETTINGS_THEME_VERSION = typeof THEME_VERSION !== "undefined" ? THEME_VERSION : "2";
-const BUSINESS_PROFILE_KEY = "lb_business_profile";
+const BUSINESS_PROFILE_KEY = "ledger_business_profile";
 const SETTINGS_TOAST_MS = 3000;
 const SETTINGS_DELETE_DATA_KEYS = [
   "lb_accounts",
@@ -14,7 +14,14 @@ const SETTINGS_DELETE_DATA_KEYS = [
   "lb_receipts",
   "lb_mileage",
   "lb_recurring",
+  "lb_businesses",
+  "lb_business_profile",
+  "lb_business_settings",
   "lb_export_history",
+  "lb_export_scope",
+  "lb_export_language",
+  "lb_active_business_id",
+  "lb_business_name",
   "lb_transactions_upsell_hidden"
 ];
 const SETTINGS_PASSWORD_RULES = {
@@ -93,6 +100,45 @@ let settingsOverviewState = {
 
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
+let legacySettingsStoragePurged = false;
+
+function resolveSettingsUserId() {
+  return window.__LUNA_ME__?.id || window.__LUNA_ME__?.user_id || window.__LUNA_ME__?.userId || "";
+}
+
+function resolveSettingsBusinessId() {
+  return window.__LUNA_ME__?.active_business_id
+    || localStorage.getItem("lb_active_business_id")
+    || "";
+}
+
+function ensureSettingsLegacyPurged() {
+  if (legacySettingsStoragePurged) {
+    return;
+  }
+  legacySettingsStoragePurged = true;
+  if (window.lunaStorage?.purgeLegacyKeys) {
+    window.lunaStorage.purgeLegacyKeys();
+  }
+}
+
+function getSettingsStorageKey(key, businessId = resolveSettingsBusinessId()) {
+  ensureSettingsLegacyPurged();
+  if (window.lunaStorage?.getKey) {
+    return window.lunaStorage.getKey(key, { businessId });
+  }
+  const userId = resolveSettingsUserId();
+  const resolvedBusinessId = businessId || "";
+  if (!userId || !resolvedBusinessId || !key) {
+    return null;
+  }
+  return `lb:${userId}:${resolvedBusinessId}:${key}`;
+}
+
+function getBusinessProfileStorageKey() {
+  return getSettingsStorageKey(BUSINESS_PROFILE_KEY);
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
@@ -124,14 +170,21 @@ function resolveSavedTheme() {
 
 function getBusinessProfile() {
   try {
-    return JSON.parse(localStorage.getItem(BUSINESS_PROFILE_KEY) || "null") || {};
+    const storageKey = getBusinessProfileStorageKey();
+    if (!storageKey) {
+      return {};
+    }
+    return JSON.parse(localStorage.getItem(storageKey) || "null") || {};
   } catch {
     return {};
   }
 }
 
 function saveBusinessProfile(profile) {
-  localStorage.setItem(BUSINESS_PROFILE_KEY, JSON.stringify(profile));
+  const storageKey = getBusinessProfileStorageKey();
+  if (storageKey) {
+    localStorage.setItem(storageKey, JSON.stringify(profile));
+  }
 }
 
 function resolveDisplayLocale() {
@@ -575,27 +628,33 @@ async function initAccountingLockPanel() {
 }
 
 async function loadBusinessProfile() {
-  const fallback = getBusinessProfile();
+  const emptyProfile = {
+    name: "",
+    type: "sole_proprietor",
+    ein: "",
+    fiscalYearStart: "",
+    address: ""
+  };
 
   try {
     const response = await apiFetch("/api/business");
     if (!response || !response.ok) {
-      return fallback;
+      return emptyProfile;
     }
 
     const business = await response.json().catch(() => null);
     const profile = {
-      name: business?.name || fallback.name || "",
-      type: business?.business_type || fallback.type || "sole_proprietor",
-      ein: business?.tax_id || fallback.ein || "",
-      fiscalYearStart: business?.fiscal_year_start || fallback.fiscalYearStart || "",
-      address: business?.address || fallback.address || ""
+      name: business?.name || "",
+      type: business?.business_type || "sole_proprietor",
+      ein: business?.tax_id || "",
+      fiscalYearStart: business?.fiscal_year_start || "",
+      address: business?.address || ""
     };
     saveBusinessProfile(profile);
     return profile;
   } catch (error) {
     console.error("Failed to load business profile", error);
-    return fallback;
+    return emptyProfile;
   }
 }
 
@@ -2039,6 +2098,18 @@ function getStrengthLabel(score) {
 
 function clearBusinessDataState() {
   SETTINGS_DELETE_DATA_KEYS.forEach((key) => localStorage.removeItem(key));
+  if (window.lunaStorage?.purgeSensitiveStorage) {
+    window.lunaStorage.purgeSensitiveStorage();
+  } else {
+    try {
+      const keysToRemove = Object.keys(localStorage).filter(
+        (key) => key.startsWith("lb_") || key.startsWith("lb:")
+      );
+      keysToRemove.forEach((key) => {
+        localStorage.removeItem(key);
+      });
+    } catch (_) {}
+  }
 }
 
 function clearAccountDeletionState() {

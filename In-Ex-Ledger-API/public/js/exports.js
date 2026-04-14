@@ -1,13 +1,13 @@
-﻿const EXPORT_HISTORY_KEY = "lb_export_history";
-const TRANSACTIONS_KEY = "lb_transactions";
-const ACCOUNTS_KEY = "lb_accounts";
-const CATEGORIES_KEY = "lb_categories";
-const RECEIPTS_KEY = "lb_receipts";
-const MILEAGE_KEY = "lb_mileage";
-const BUSINESSES_KEY = "lb_businesses";
-const EXPORT_LANG_KEY = "lb_export_language";
-const EXPORT_SCOPE_KEY = "lb_export_scope";
-const BUSINESS_PROFILE_KEY = "lb_business_profile";
+﻿const EXPORT_HISTORY_KEY = "ledger_export_history";
+const TRANSACTIONS_KEY = "ledger_transactions";
+const ACCOUNTS_KEY = "ledger_accounts";
+const CATEGORIES_KEY = "ledger_categories";
+const RECEIPTS_KEY = "ledger_receipts";
+const MILEAGE_KEY = "ledger_mileage";
+const BUSINESSES_KEY = "ledger_businesses";
+const EXPORT_LANG_KEY = "ledger_export_language";
+const EXPORT_SCOPE_KEY = "ledger_export_scope";
+const BUSINESS_PROFILE_KEY = "ledger_business_profile";
 const VALID_EXPORT_LANGS = ["en", "es", "fr"];
 const DEFAULT_EXPORT_LANG = "en";
 const PDF_FORMAT = "pdf";
@@ -25,6 +25,63 @@ let exportContext = {
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
+}
+
+let legacyExportStoragePurged = false;
+
+function resolveExportUserId() {
+  return window.__LUNA_ME__?.id || window.__LUNA_ME__?.user_id || window.__LUNA_ME__?.userId || "";
+}
+
+function resolveExportBusinessId() {
+  return exportContext.activeBusinessId || localStorage.getItem("lb_active_business_id") || "";
+}
+
+function resolveExportBusinessIdForScope(scope) {
+  return scope === "all" ? "all" : resolveExportBusinessId();
+}
+
+function ensureExportLegacyPurged() {
+  if (legacyExportStoragePurged) {
+    return;
+  }
+  legacyExportStoragePurged = true;
+  if (window.lunaStorage?.purgeLegacyKeys) {
+    window.lunaStorage.purgeLegacyKeys();
+  }
+}
+
+function getExportStorageKey(key, businessId) {
+  ensureExportLegacyPurged();
+  if (window.lunaStorage?.getKey) {
+    return window.lunaStorage.getKey(key, { businessId });
+  }
+  const userId = resolveExportUserId();
+  const resolvedBusinessId = businessId || "";
+  if (!userId || !resolvedBusinessId || !key) {
+    return null;
+  }
+  return `lb:${userId}:${resolvedBusinessId}:${key}`;
+}
+
+function getExportPreferenceKey(key) {
+  return getExportStorageKey(key, resolveExportBusinessId());
+}
+
+function getExportDataKey(key, scopeOverride) {
+  return getExportStorageKey(key, resolveExportBusinessIdForScope(scopeOverride || getExportScope()));
+}
+
+function getExportHistoryNamespace(scopeOverride) {
+  const businessId = resolveExportBusinessIdForScope(scopeOverride || getExportScope());
+  if (window.lunaStorage?.getNamespace) {
+    return window.lunaStorage.getNamespace({ businessId });
+  }
+  const userId = resolveExportUserId();
+  if (!userId || !businessId) {
+    return null;
+  }
+  return `lb:${userId}:${businessId}`;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -75,9 +132,10 @@ async function hydrateMileageCache() {
       miles: item.miles != null ? Number(item.miles) : null,
       km: item.km != null ? Number(item.km) : null
     }));
-    localStorage.setItem(MILEAGE_KEY, JSON.stringify(normalized));
+    setStorageArray(MILEAGE_KEY, normalized);
   } catch (error) {
     console.warn("[Exports] Unable to hydrate mileage", error);
+    clearStorageArray(MILEAGE_KEY);
   }
 }
 
@@ -92,7 +150,13 @@ async function hydrateBusinessList() {
       activeBusinessId: payload?.active_business_id || "",
       businesses: Array.isArray(payload?.businesses) ? payload.businesses : []
     };
-    localStorage.setItem(BUSINESSES_KEY, JSON.stringify(exportContext));
+    const businessesKey = getExportStorageKey(BUSINESSES_KEY, "all");
+    if (businessesKey) {
+      localStorage.setItem(
+        businessesKey,
+        JSON.stringify(exportContext)
+      );
+    }
   } catch (error) {
     console.warn("[Exports] Unable to hydrate businesses", error);
   }
@@ -104,7 +168,8 @@ function initExportScopeSelect() {
     return;
   }
 
-  setExportScope(select, localStorage.getItem(EXPORT_SCOPE_KEY));
+  const scopeKey = getExportPreferenceKey(EXPORT_SCOPE_KEY);
+  setExportScope(select, scopeKey ? localStorage.getItem(scopeKey) : null);
   syncExportScopeUi();
   select.addEventListener("change", async () => {
     setExportScope(select, select.value);
@@ -122,7 +187,8 @@ function getExportScope() {
   if (select?.value === "all") {
     return "all";
   }
-  return localStorage.getItem(EXPORT_SCOPE_KEY) === "all" ? "all" : "active";
+  const scopeKey = getExportPreferenceKey(EXPORT_SCOPE_KEY);
+  return scopeKey && localStorage.getItem(scopeKey) === "all" ? "all" : "active";
 }
 
 function setExportScope(select, value) {
@@ -130,7 +196,10 @@ function setExportScope(select, value) {
   if (select) {
     select.value = normalized;
   }
-  localStorage.setItem(EXPORT_SCOPE_KEY, normalized);
+  const scopeKey = getExportPreferenceKey(EXPORT_SCOPE_KEY);
+  if (scopeKey) {
+    localStorage.setItem(scopeKey, normalized);
+  }
 }
 
 function buildScopeQuery() {
@@ -142,7 +211,10 @@ function getStoredBusinesses() {
     return exportContext.businesses;
   }
   try {
-    const parsed = JSON.parse(localStorage.getItem(BUSINESSES_KEY) || "null");
+    const businessesKey = getExportStorageKey(BUSINESSES_KEY, "all");
+    const parsed = businessesKey
+      ? JSON.parse(localStorage.getItem(businessesKey) || "null")
+      : null;
     if (parsed && Array.isArray(parsed.businesses)) {
       exportContext = parsed;
       return parsed.businesses;
@@ -226,6 +298,7 @@ async function hydrateTransactionsCache() {
     const response = await apiFetch(`/api/transactions${buildScopeQuery()}`);
     if (!response || !response.ok) {
       transactionsCacheFresh = false;
+      clearStorageArray(TRANSACTIONS_KEY);
       return;
     }
     const payload = await response.json().catch(() => null);
@@ -262,11 +335,12 @@ async function hydrateTransactionsCache() {
       reviewStatus: transaction.reviewStatus || transaction.review_status || "",
       reviewNotes: transaction.reviewNotes || transaction.review_notes || ""
     }));
-    localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(normalized));
+    setStorageArray(TRANSACTIONS_KEY, normalized);
     transactionsCacheFresh = true;
   } catch (error) {
     transactionsCacheFresh = false;
     console.warn("[Exports] Unable to hydrate transactions", error);
+    clearStorageArray(TRANSACTIONS_KEY);
   }
 }
 
@@ -283,10 +357,11 @@ async function hydrateAccountsCache() {
         businessId: account.businessId || account.business_id || "",
         businessName: account.businessName || account.business_name || ""
       }));
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(normalized));
+      setStorageArray(ACCOUNTS_KEY, normalized);
     }
   } catch (error) {
     console.warn("[Exports] Unable to hydrate accounts", error);
+    clearStorageArray(ACCOUNTS_KEY);
   }
 }
 
@@ -306,10 +381,11 @@ async function hydrateCategoriesCache() {
         type: category.kind || category.type || "",
         taxLabel: category.tax_map_us || category.tax_map_ca || ""
       }));
-      localStorage.setItem(CATEGORIES_KEY, JSON.stringify(normalized));
+      setStorageArray(CATEGORIES_KEY, normalized);
     }
   } catch (error) {
     console.warn("[Exports] Unable to hydrate categories", error);
+    clearStorageArray(CATEGORIES_KEY);
   }
 }
 
@@ -335,50 +411,60 @@ async function hydrateReceiptsCache() {
       mimeType: receipt.mime_type || ""
     }));
     unattachedReceiptsCount = normalized.filter((receipt) => !receipt.transactionId).length;
-    localStorage.setItem(RECEIPTS_KEY, JSON.stringify(normalized));
+    setStorageArray(RECEIPTS_KEY, normalized);
   } catch (error) {
     console.warn("[Exports] Unable to hydrate receipts", error);
+    clearStorageArray(RECEIPTS_KEY);
   }
 }
 
 async function hydrateBusinessProfileCache() {
   if (getExportScope() === "all") {
-    localStorage.setItem(
-      BUSINESS_PROFILE_KEY,
-      JSON.stringify({
-        name: tx("exports_scope_all"),
-        type: "",
-        ein: "",
-        taxId: "",
-        fiscalYearStart: "",
-        address: ""
-      })
-    );
+    const profileKey = getExportStorageKey(BUSINESS_PROFILE_KEY, "all");
+    if (profileKey) {
+      localStorage.setItem(
+        profileKey,
+        JSON.stringify({
+          name: tx("exports_scope_all"),
+          type: "",
+          ein: "",
+          taxId: "",
+          fiscalYearStart: "",
+          address: ""
+        })
+      );
+    }
     return;
   }
 
   try {
     const response = await apiFetch("/api/business");
     if (!response || !response.ok) {
+      clearStorageArray(BUSINESS_PROFILE_KEY, "active");
       return;
     }
     const business = await response.json().catch(() => null);
     if (!business) {
+      clearStorageArray(BUSINESS_PROFILE_KEY, "active");
       return;
     }
-    localStorage.setItem(
-      BUSINESS_PROFILE_KEY,
-      JSON.stringify({
-        name: business.name || "",
-        type: business.business_type || "",
-        ein: business.tax_id || "",
-        taxId: business.tax_id || "",
-        fiscalYearStart: business.fiscal_year_start || "",
-        address: business.address || ""
-      })
-    );
+    const profileKey = getExportDataKey(BUSINESS_PROFILE_KEY, "active");
+    if (profileKey) {
+      localStorage.setItem(
+        profileKey,
+        JSON.stringify({
+          name: business.name || "",
+          type: business.business_type || "",
+          ein: business.tax_id || "",
+          taxId: business.tax_id || "",
+          fiscalYearStart: business.fiscal_year_start || "",
+          address: business.address || ""
+        })
+      );
+    }
   } catch (error) {
     console.warn("[Exports] Unable to hydrate business profile", error);
+    clearStorageArray(BUSINESS_PROFILE_KEY, "active");
   }
 }
 
@@ -525,12 +611,15 @@ function initExportLanguageSelect() {
   }
 
   const appLang = localStorage.getItem("lb_language") || DEFAULT_EXPORT_LANG;
-  const saved = clampExportLang(localStorage.getItem(EXPORT_LANG_KEY) || appLang);
+  const langKey = getExportPreferenceKey(EXPORT_LANG_KEY);
+  const saved = clampExportLang((langKey ? localStorage.getItem(langKey) : null) || appLang);
   select.value = saved;
   select.addEventListener("change", () => {
     const next = clampExportLang(select.value);
     select.value = next;
-    localStorage.setItem(EXPORT_LANG_KEY, next);
+    if (langKey) {
+      localStorage.setItem(langKey, next);
+    }
   });
 }
 
@@ -547,7 +636,7 @@ function initBusinessTaxId() {
 
   const profile = readBusinessProfile();
   const region = getRegion();
-  const taxId = profile.ein || profile.taxId || localStorage.getItem(region === "ca" ? "lb_bn" : "lb_ein") || "";
+  const taxId = profile.ein || profile.taxId || "";
   taxIdNode.textContent = taxId || tx("exports_tax_id_not_set");
 }
 
@@ -725,7 +814,7 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
     const batchProvince = batch.province || (region === "ca" ? getProvince() : "");
     const province = String(batchProvince).toUpperCase();
     const taxId = includeTaxId
-      ? businessProfile.ein || businessProfile.taxId || localStorage.getItem(region === "ca" ? "lb_bn" : "lb_ein") || ""
+      ? businessProfile.ein || businessProfile.taxId || ""
       : "";
     let pdfBytes;
     try {
@@ -739,11 +828,11 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
       endDate,
       exportLang,
       currency: getCurrencyForRegion(region),
-      legalName: localStorage.getItem("lb_legal_name") || businessProfile.name || "",
-      businessName: businessProfile.name || batch.businessName || localStorage.getItem("lb_business_name") || "",
-      operatingName: localStorage.getItem("lb_dba") || "",
+      legalName: businessProfile.name || "",
+      businessName: businessProfile.name || batch.businessName || "",
+      operatingName: "",
       taxId,
-      naics: localStorage.getItem("lb_naics") || "",
+      naics: "",
       region,
       province
     });
@@ -926,10 +1015,20 @@ function downloadFile(content, filename, type) {
 }
 
 function appendExportHistory(entry) {
-  const history = getLocalExportHistory();
-  history.unshift(entry);
+  const scope = entry?.scope || getExportScope();
+  // Track namespace on each entry to prevent cross-account history reuse during migrations.
+  const namespace = getExportHistoryNamespace(scope);
+  const storageKey = getExportDataKey(EXPORT_HISTORY_KEY, scope);
+  if (!namespace || !storageKey) {
+    return;
+  }
+  const history = getLocalExportHistory(scope);
+  history.unshift({ ...entry, namespace });
   // Keep at most 50 local entries (CSV exports are not stored server-side)
-  localStorage.setItem(EXPORT_HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
+  localStorage.setItem(
+    storageKey,
+    JSON.stringify(history.slice(0, 50))
+  );
 }
 
 async function fetchBackendExportHistory() {
@@ -1075,7 +1174,12 @@ function getCurrentExportLanguage() {
   if (select?.value) {
     return clampExportLang(select.value);
   }
-  return clampExportLang(localStorage.getItem(EXPORT_LANG_KEY) || localStorage.getItem("lb_language") || DEFAULT_EXPORT_LANG);
+  const langKey = getExportPreferenceKey(EXPORT_LANG_KEY);
+  return clampExportLang(
+    (langKey ? localStorage.getItem(langKey) : null)
+      || localStorage.getItem("lb_language")
+      || DEFAULT_EXPORT_LANG
+  );
 }
 
 function clampExportLang(value) {
@@ -1083,9 +1187,16 @@ function clampExportLang(value) {
   return VALID_EXPORT_LANGS.includes(normalized) ? normalized : DEFAULT_EXPORT_LANG;
 }
 
-function getLocalExportHistory() {
+function getLocalExportHistory(scopeOverride) {
+  const scope = scopeOverride || getExportScope();
+  const namespace = getExportHistoryNamespace(scope);
+  const storageKey = getExportDataKey(EXPORT_HISTORY_KEY, scope);
+  if (!namespace || !storageKey) {
+    return [];
+  }
   try {
-    return JSON.parse(localStorage.getItem(EXPORT_HISTORY_KEY) || "[]");
+    const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    return history.filter((entry) => entry?.namespace === namespace);
   } catch {
     return [];
   }
@@ -1392,7 +1503,11 @@ function mapById(items) {
 
 function readBusinessProfile() {
   try {
-    return JSON.parse(localStorage.getItem(BUSINESS_PROFILE_KEY) || "null") || {};
+    const storageKey = getExportDataKey(BUSINESS_PROFILE_KEY);
+    if (!storageKey) {
+      return {};
+    }
+    return JSON.parse(localStorage.getItem(storageKey) || "null") || {};
   } catch {
     return {};
   }
@@ -1420,10 +1535,30 @@ function getMileage() {
 
 function readStorageArray(key) {
   try {
-    return JSON.parse(localStorage.getItem(key) || "[]");
+    const storageKey = getExportDataKey(key);
+    if (!storageKey) {
+      return [];
+    }
+    return JSON.parse(localStorage.getItem(storageKey) || "[]");
   } catch {
     return [];
   }
+}
+
+function setStorageArray(key, value, scopeOverride) {
+  const storageKey = getExportDataKey(key, scopeOverride);
+  if (!storageKey) {
+    return;
+  }
+  localStorage.setItem(storageKey, JSON.stringify(value));
+}
+
+function clearStorageArray(key, scopeOverride) {
+  const storageKey = getExportDataKey(key, scopeOverride);
+  if (!storageKey) {
+    return;
+  }
+  localStorage.removeItem(storageKey);
 }
 
 // ─── Secure Export Modal ──────────────────────────────────────────────────────

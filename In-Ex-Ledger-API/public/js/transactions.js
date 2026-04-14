@@ -1,10 +1,10 @@
 const STORAGE_KEYS = {
-  accounts: "lb_accounts",
-  categories: "lb_categories",
-  transactions: "lb_transactions",
-  receipts: "lb_receipts",
-  businesses: "lb_businesses",
-  scope: "lb_transactions_scope"
+  accounts: "ledger_accounts",
+  categories: "ledger_categories",
+  transactions: "ledger_transactions",
+  receipts: "ledger_receipts",
+  businesses: "ledger_businesses",
+  scope: "ledger_transactions_scope"
 };
 
 const ledgerState = {
@@ -55,6 +55,7 @@ let transactionModalElement = null;
 let activeModalTransactionId = null;
 let editingTransactionId = null;
 let transactionsLoading = false;
+let hasTransactionsLoadFailed = false;
 const SLOT_ANIMATION_KEY = "lb_transactions_slot_played";
 let slotAnimationPlayed = false;
 const missingAccountWarnings = new Set();
@@ -88,6 +89,55 @@ let transactionBusinessContext = {
   businesses: []
 };
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
+
+let legacyTransactionStoragePurged = false;
+
+function resolveStorageUserId() {
+  return window.__LUNA_ME__?.id || window.__LUNA_ME__?.user_id || window.__LUNA_ME__?.userId || "";
+}
+
+function resolveStorageBusinessId() {
+  return transactionBusinessContext.activeBusinessId
+    || window.__LUNA_ME__?.active_business_id
+    || localStorage.getItem("lb_active_business_id")
+    || "";
+}
+
+function resolveStorageBusinessIdForScope(scope) {
+  return scope === "all" ? "all" : resolveStorageBusinessId();
+}
+
+function ensureLegacyStoragePurged() {
+  if (legacyTransactionStoragePurged) {
+    return;
+  }
+  legacyTransactionStoragePurged = true;
+  if (window.lunaStorage?.purgeLegacyKeys) {
+    window.lunaStorage.purgeLegacyKeys();
+  }
+}
+
+function getNamespacedStorageKey(key, businessId) {
+  ensureLegacyStoragePurged();
+  if (window.lunaStorage?.getKey) {
+    return window.lunaStorage.getKey(key, { businessId });
+  }
+  const userId = resolveStorageUserId();
+  const resolvedBusinessId = businessId || "";
+  if (!userId || !resolvedBusinessId || !key) {
+    return null;
+  }
+  return `lb:${userId}:${resolvedBusinessId}:${key}`;
+}
+
+function getPreferenceStorageKey(key) {
+  return getNamespacedStorageKey(key, resolveStorageBusinessId());
+}
+
+function getScopedStorageKey(key, scopeOverride) {
+  const scope = scopeOverride || getTransactionScope();
+  return getNamespacedStorageKey(key, resolveStorageBusinessIdForScope(scope));
+}
 
 function getResolvedRegion() {
   const raw =
@@ -228,7 +278,13 @@ async function hydrateTransactionBusinessContext() {
       activeBusinessId: payload?.active_business_id || "",
       businesses: Array.isArray(payload?.businesses) ? payload.businesses : []
     };
-    localStorage.setItem(STORAGE_KEYS.businesses, JSON.stringify(transactionBusinessContext));
+    const businessesKey = getNamespacedStorageKey(STORAGE_KEYS.businesses, "all");
+    if (businessesKey) {
+      localStorage.setItem(
+        businessesKey,
+        JSON.stringify(transactionBusinessContext)
+      );
+    }
   } catch (error) {
     console.warn("[Transactions] Unable to hydrate businesses", error);
   }
@@ -240,7 +296,8 @@ function initTransactionScopeSelect() {
     return;
   }
 
-  setTransactionScope(select, localStorage.getItem(STORAGE_KEYS.scope));
+  const scopeKey = getPreferenceStorageKey(STORAGE_KEYS.scope);
+  setTransactionScope(select, scopeKey ? localStorage.getItem(scopeKey) : null);
   syncTransactionScopeUi();
   select.addEventListener("change", async () => {
     setTransactionScope(select, select.value);
@@ -260,7 +317,8 @@ function getTransactionScope() {
   if (select?.value === "all") {
     return "all";
   }
-  return localStorage.getItem(STORAGE_KEYS.scope) === "all" ? "all" : "active";
+  const scopeKey = getPreferenceStorageKey(STORAGE_KEYS.scope);
+  return scopeKey && localStorage.getItem(scopeKey) === "all" ? "all" : "active";
 }
 
 function setTransactionScope(select, value) {
@@ -268,7 +326,10 @@ function setTransactionScope(select, value) {
   if (select) {
     select.value = normalized;
   }
-  localStorage.setItem(STORAGE_KEYS.scope, normalized);
+  const scopeKey = getPreferenceStorageKey(STORAGE_KEYS.scope);
+  if (scopeKey) {
+    localStorage.setItem(scopeKey, normalized);
+  }
 }
 
 function buildTransactionScopeQuery() {
@@ -280,7 +341,10 @@ function getStoredBusinesses() {
     return transactionBusinessContext.businesses;
   }
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEYS.businesses) || "null");
+    const businessesKey = getNamespacedStorageKey(STORAGE_KEYS.businesses, "all");
+    const parsed = businessesKey
+      ? JSON.parse(localStorage.getItem(businessesKey) || "null")
+      : null;
     if (parsed && Array.isArray(parsed.businesses)) {
       transactionBusinessContext = parsed;
       return parsed.businesses;
@@ -715,6 +779,7 @@ function updateHelpText(accountHelp, categoryHelp) {
 async function loadTransactions() {
   setTransactionsLoading(true);
   try {
+    hasTransactionsLoadFailed = false;
     const transactions = await fetchTransactionsForPage();
     let receiptSnapshot = { byTransactionId: {}, unattachedCount: 0 };
     try {
@@ -731,7 +796,10 @@ async function loadTransactions() {
     saveTransactions(ledgerState.transactions);
   } catch (error) {
     console.error("Failed to load transactions:", error);
-    ledgerState.transactions = getTransactions();
+    hasTransactionsLoadFailed = true;
+    ledgerState.transactions = [];
+    unattachedReceiptsCount = 0;
+    clearStorageArray(STORAGE_KEYS.transactions);
   } finally {
     renderAccountOptions();
     renderCategoryOptions();
@@ -1294,8 +1362,8 @@ function applyFilters() {
   if (term) {
     filtered = filtered.filter((tx) => {
       const desc = (tx.description || "").toLowerCase();
-      const cat = (getCategoryName(tx.categoryId) || "").toLowerCase();
-      const acct = (getAccountName(tx.accountId) || "").toLowerCase();
+      const cat = (tx.categoryName || getCategoryName(tx.categoryId) || "").toLowerCase();
+      const acct = (tx.accountName || getAccountName(tx.accountId) || "").toLowerCase();
       const dest = (tx.destination || "").toLowerCase();
       const notes = (tx.note || "").toLowerCase();
       const review = (tx.reviewNotes || "").toLowerCase();
@@ -1399,24 +1467,25 @@ async function refreshAccountOptions() {
 }
 
 async function fetchAccountsForTransactions() {
-  const fallback = getAccounts();
-
   try {
     const response = await apiFetch(`/api/accounts${buildTransactionScopeQuery()}`);
     if (!response || !response.ok) {
-      return fallback;
+      clearStorageArray(STORAGE_KEYS.accounts);
+      return [];
     }
 
     const accounts = await response.json();
     if (!Array.isArray(accounts)) {
-      return fallback;
+      clearStorageArray(STORAGE_KEYS.accounts);
+      return [];
     }
 
-    localStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(accounts));
+    setStorageArray(STORAGE_KEYS.accounts, accounts);
     return accounts;
   } catch (error) {
     console.warn("[Transactions] Unable to refresh accounts", error);
-    return fallback;
+    clearStorageArray(STORAGE_KEYS.accounts);
+    return [];
   }
 }
 
@@ -1430,7 +1499,7 @@ function populateCategoriesFromStorage() {
   const select = document.getElementById("txCategory") || document.getElementById("category");
   if (!select) return;
 
-  const categories = JSON.parse(localStorage.getItem(STORAGE_KEYS.categories) || "[]");
+  const categories = getCategories();
   select.innerHTML = `<option value="">${txT("transactions_select_category", "Select category")}</option>`;
   categories.forEach((category) => {
     const option = document.createElement("option");
@@ -1488,8 +1557,6 @@ function renderTransactionList(filteredTransactions) {
 
   const accountsById = mapById(getAccounts());
   const categoriesById = mapById(getCategories());
-
-  
   tbody.innerHTML = "";
   transactions.forEach((txn) => {
     const row = document.createElement("tr");
@@ -1513,8 +1580,8 @@ function renderTransactionList(filteredTransactions) {
         <span class="tx-type-pill">${typeLabel}</span>
         ${escapeHtml(txn.description)}${noteIndicator}${receiptClip}
       </td>
-      <td>${escapeHtml(accountsById[txn.accountId]?.name || "-")}</td>
-      <td>${escapeHtml(categoriesById[txn.categoryId]?.name || "-")}</td>
+      <td>${escapeHtml(txn.accountName || accountsById[txn.accountId]?.name || "-")}</td>
+      <td>${escapeHtml(txn.categoryName || categoriesById[txn.categoryId]?.name || "-")}</td>
       <td>${formatCurrency(txn.amount)}</td>
       <td>
         <button
@@ -1554,22 +1621,22 @@ function renderTransactionList(filteredTransactions) {
 
 async function refreshCategoryOptions() {
   const categories = await fetchCategoriesForTransactions();
-  localStorage.setItem(STORAGE_KEYS.categories, JSON.stringify(categories));
+  setStorageArray(STORAGE_KEYS.categories, categories);
   populateCategoriesFromStorage();
 }
 
 async function fetchCategoriesForTransactions() {
-  const fallback = getCategories();
-
   try {
     const response = await apiFetch(`/api/categories${buildTransactionScopeQuery()}`);
     if (!response || !response.ok) {
-      return fallback;
+      clearStorageArray(STORAGE_KEYS.categories);
+      return [];
     }
 
     const categories = await response.json().catch(() => []);
     if (!Array.isArray(categories)) {
-      return fallback;
+      clearStorageArray(STORAGE_KEYS.categories);
+      return [];
     }
 
     return categories.map((category) => ({
@@ -1583,7 +1650,8 @@ async function fetchCategoriesForTransactions() {
     }));
   } catch (error) {
     console.warn("[Transactions] Unable to refresh categories", error);
-    return fallback;
+    clearStorageArray(STORAGE_KEYS.categories);
+    return [];
   }
 }
 
@@ -1688,6 +1756,11 @@ function renderTransactionsTable(filteredTransactions) {
 
   if (transactionsLoading && filteredTransactions === undefined) {
     tbody.innerHTML = `<tr><td colspan="8" class="placeholder">${txT("transactions_loading", "Loading transactions...")}</td></tr>`;
+    return;
+  }
+
+  if (hasTransactionsLoadFailed && filteredTransactions === undefined) {
+    tbody.innerHTML = `<tr><td colspan="8" class="placeholder">${txT("transactions_error_load", "Unable to load transactions. Please refresh.")}</td></tr>`;
     return;
   }
 
@@ -1895,18 +1968,8 @@ async function loadBusinessTaxProfile() {
     return;
   }
 
-  let fallbackSettings = {};
-  try {
-    fallbackSettings = JSON.parse(localStorage.getItem("lb_business_settings") || "null") || {};
-  } catch {
-    fallbackSettings = {};
-  }
-  const fallbackRegion = String(
-    fallbackSettings.region || localStorage.getItem("lb_region") || window.LUNA_REGION || "us"
-  ).toUpperCase();
-  const fallbackProvince = String(
-    fallbackSettings.province || window.LUNA_PROVINCE || localStorage.getItem("lb_province") || ""
-  ).toUpperCase();
+  const fallbackRegion = String(window.LUNA_REGION || "us").toUpperCase();
+  const fallbackProvince = String(window.LUNA_PROVINCE || "").toUpperCase();
   businessTaxProfile = resolveEstimatedTaxProfileHelper(fallbackRegion, fallbackProvince);
 
   try {
@@ -2089,11 +2152,12 @@ function markAccountAsUsed(accountId) {
     }
     return account;
   });
-  localStorage.setItem(STORAGE_KEYS.accounts, JSON.stringify(updated));
+  setStorageArray(STORAGE_KEYS.accounts, updated);
 }
 
-function readStorageArray(key) {
-  const raw = localStorage.getItem(key);
+function readStorageArray(key, scopeOverride) {
+  const storageKey = getScopedStorageKey(key, scopeOverride);
+  const raw = storageKey ? localStorage.getItem(storageKey) : null;
   if (!raw) {
     return [];
   }
@@ -2104,8 +2168,24 @@ function readStorageArray(key) {
   }
 }
 
+function setStorageArray(key, value, scopeOverride) {
+  const storageKey = getScopedStorageKey(key, scopeOverride);
+  if (!storageKey) {
+    return;
+  }
+  localStorage.setItem(storageKey, JSON.stringify(value));
+}
+
+function clearStorageArray(key, scopeOverride) {
+  const storageKey = getScopedStorageKey(key, scopeOverride);
+  if (!storageKey) {
+    return;
+  }
+  localStorage.removeItem(storageKey);
+}
+
 function saveTransactions(transactions) {
-  localStorage.setItem(STORAGE_KEYS.transactions, JSON.stringify(transactions));
+  setStorageArray(STORAGE_KEYS.transactions, transactions);
 }
 
 function setTransactionsLoading(isLoading) {
