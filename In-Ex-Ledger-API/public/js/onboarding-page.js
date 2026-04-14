@@ -188,7 +188,6 @@ function handleOnboardingLanguageChange(event) {
     if (languageSelect) {
       languageSelect.value = normalized;
     }
-  } else {
-    applyOnboardingStaticCopy();
   }
+  applyOnboardingStaticCopy();
 }

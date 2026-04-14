@@ -297,8 +297,7 @@ async function issueAuthenticatedSession(
     token,
     email_verified: verified,
     subscription,
-    mfa_enabled: !!user.mfa_enabled,
-    message: undefined
+    mfa_enabled: !!user.mfa_enabled
   };
 }
 
