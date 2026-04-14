@@ -13,8 +13,8 @@
 -- deleted (the UUID columns become orphaned references, which is intentional
 -- and consistent with how migration 036 handled the business_id FK).
 
-ALTER TABLE cpa_audit_logs
+ALTER TABLE IF EXISTS cpa_audit_logs
   DROP CONSTRAINT IF EXISTS cpa_audit_logs_owner_user_id_fkey;
 
-ALTER TABLE cpa_audit_logs
+ALTER TABLE IF EXISTS cpa_audit_logs
   DROP CONSTRAINT IF EXISTS cpa_audit_logs_actor_user_id_fkey;

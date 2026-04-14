@@ -24,7 +24,9 @@ function loadMeRouter(options = {}) {
     clearedCookie: null,
     mfaEnabled: options.mfaEnabled ?? false,
     validMfaReauthToken: options.validMfaReauthToken || "valid-delete-reauth-token",
-    deleteError: options.deleteError || null
+    deleteError: options.deleteError || null,
+    legacyConstraints: options.legacyConstraints || [],
+    constraintDropError: options.constraintDropError || null
   };
 
   Module._load = function(requestName, parent, isMain) {
@@ -38,6 +40,20 @@ function loadMeRouter(options = {}) {
 
                 if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") {
                   return { rows: [], rowCount: 0 };
+                }
+                if (/ALTER TABLE IF EXISTS cpa_audit_logs/i.test(sql)) {
+                  if (state.constraintDropError) {
+                    const error = new Error(state.constraintDropError.message || "alter table failed");
+                    if (state.constraintDropError.code) error.code = state.constraintDropError.code;
+                    throw error;
+                  }
+                  return { rows: [], rowCount: 0 };
+                }
+                if (/SELECT EXISTS\(\s*SELECT 1\s+FROM pg_constraint/i.test(sql)) {
+                  return {
+                    rows: [{ has_legacy_constraints: state.legacyConstraints.length > 0 }],
+                    rowCount: 1
+                  };
                 }
                 if (/SELECT id, email, password_hash FROM users/i.test(sql)) {
                   return {
@@ -430,6 +446,28 @@ test("account deletion returns migration hint when cpa_audit_logs foreign key bl
 
     assert.equal(response.status, 500);
     assert.match(response.body?.detail || "", /045_drop_cpa_audit_user_fks\.sql/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("account deletion fails fast when legacy cpa_audit_logs constraints still exist", async () => {
+  const fixture = loadMeRouter({
+    legacyConstraints: ["cpa_audit_logs_owner_user_id_fkey"]
+  });
+
+  try {
+    const app = buildApp(fixture.router, fixture.state);
+    const response = await request(app)
+      .delete("/api/me")
+      .send({ password: "CorrectHorseBatteryStaple1!" });
+
+    assert.equal(response.status, 500);
+    assert.match(response.body?.detail || "", /045_drop_cpa_audit_user_fks\.sql/i);
+    assert.ok(
+      !fixture.state.queries.some(({ sql }) => /DELETE FROM users WHERE id = \$1 RETURNING id/i.test(sql)),
+      "route must stop before deleting users when legacy constraints still exist"
+    );
   } finally {
     fixture.cleanup();
   }
