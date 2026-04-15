@@ -797,7 +797,6 @@ function initSidebarTypeFilter() {
     document.querySelectorAll("[data-sidebar-filter]").forEach((link) => {
       const filterType = link.getAttribute("data-sidebar-filter") || "all";
       const isActive = filterType === transactionFilters.type;
-      link.classList.toggle("nav-link-active", isActive);
       link.classList.toggle("is-active", isActive);
     });
   };
