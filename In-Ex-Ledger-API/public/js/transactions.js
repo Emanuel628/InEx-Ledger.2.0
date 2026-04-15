@@ -404,7 +404,6 @@ function syncTransactionScopeUi() {
   }
 
   addButtons.filter(Boolean).forEach((button) => {
-    button.disabled = isAllScope;
     button.title = isAllScope
       ? txT("transactions_scope_switch_to_active", "Switch to Active business to add or edit transactions.")
       : "";
@@ -422,6 +421,26 @@ function syncTransactionScopeUi() {
   if (taxContext && isAllScope && hasMixedCurrenciesInScope()) {
     taxContext.textContent = txT("transactions_tax_context_multi", "Tax form context: Multi-business reporting view");
   }
+}
+
+async function ensureActiveScopeForAdd() {
+  if (getTransactionScope() !== "all") {
+    return true;
+  }
+  const select = document.getElementById("transactionsScope");
+  if (!select) {
+    return false;
+  }
+  setTransactionScope(select, "active");
+  syncTransactionScopeUi();
+  await loadBusinessTaxProfile();
+  await refreshAccountOptions();
+  await refreshCategoryOptions();
+  await loadTransactions();
+  if (getTransactionScope() === "active") {
+    await loadRecurringTemplates();
+  }
+  return true;
 }
 
 
@@ -613,7 +632,11 @@ function setupTransactionDrawer() {
   }
 
   [transactionToggleElement, transactionPageToggleElement].filter(Boolean).forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
+      const canOpen = await ensureActiveScopeForAdd();
+      if (!canOpen) {
+        return;
+      }
       if (transactionDrawerElement.hasAttribute("hidden")) {
         openTransactionDrawer();
       } else {
