@@ -1949,7 +1949,8 @@ function renderTotals() {
       : `${txT("exports_tax_context_prefix", "Tax form context")}: ${getTaxFormContext().label} ${txT("transactions_estimate", "estimate")}`;
   }
   if (cockpit) {
-    cockpit.hidden = tier === "free" || !hasTransactions || isAllScope;
+  cockpit.hidden = !hasTransactions || isAllScope;
+  }
   }
   if (upsell) {
     const upsellDismissed = isTransactionsUpsellDismissed();
