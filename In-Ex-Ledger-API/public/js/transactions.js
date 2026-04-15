@@ -423,7 +423,7 @@ function syncTransactionScopeUi() {
   }
 }
 
-async function ensureActiveScopeForAdd() {
+async function switchToActiveScopeIfNeeded() {
   if (getTransactionScope() !== "all") {
     return true;
   }
@@ -633,7 +633,7 @@ function setupTransactionDrawer() {
 
   [transactionToggleElement, transactionPageToggleElement].filter(Boolean).forEach((button) => {
     button.addEventListener("click", async () => {
-      const canOpen = await ensureActiveScopeForAdd();
+      const canOpen = await switchToActiveScopeIfNeeded();
       if (!canOpen) {
         return;
       }
