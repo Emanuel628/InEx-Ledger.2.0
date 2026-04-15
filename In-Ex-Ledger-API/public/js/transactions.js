@@ -1974,7 +1974,7 @@ function renderTotals() {
   if (cockpit) {
   cockpit.hidden = !hasTransactions || isAllScope;
   }
-  }
+  
   if (upsell) {
     const upsellDismissed = isTransactionsUpsellDismissed();
     upsell.hidden = !(tier === "free" && hasTransactions && !upsellDismissed);
