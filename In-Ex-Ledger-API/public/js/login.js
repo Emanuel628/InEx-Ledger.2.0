@@ -108,7 +108,7 @@ async function handleLoginSubmit(event) {
     if (data?.mfa_required && data?.mfa_token) {
       sessionStorage.setItem("lb_pending_mfa_token", data.mfa_token);
       sessionStorage.setItem("lb_pending_mfa_email", email);
-      window.location.href = "mfa-challenge";
+      window.location.href = "/mfa-challenge";
       return;
     }
 
@@ -121,7 +121,7 @@ async function handleLoginSubmit(event) {
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }
-    window.location.href = "transactions";
+    window.location.href = "/transactions";
   } catch (err) {
     console.error("Login request failed:", err);
     showLoginError(tx(OFFLINE_ERROR_MESSAGE));

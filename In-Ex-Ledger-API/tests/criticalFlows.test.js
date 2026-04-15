@@ -208,6 +208,22 @@ test("privacy: POST /delete rejects missing CSRF token (403)", async () => {
   assert.equal(res.status, 403);
 });
 
+test("privacy: POST /delete requires MFA (403 mfa_required) when MFA is not enabled", async () => {
+  const privacyRouter = require("../routes/privacy.routes.js");
+  const app = buildApp(privacyRouter, "/api/privacy");
+  const authToken = makeToken({ mfa_enabled: false });
+  const csrf = generateCsrfToken();
+
+  const res = await request(app)
+    .post("/api/privacy/delete")
+    .set("Authorization", `Bearer ${authToken}`)
+    .set(CSRF_HEADER_NAME, csrf)
+    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
+    .send({ password: "example-password" });
+  assert.equal(res.status, 403);
+  assert.equal(res.body?.mfa_required, true);
+});
+
 // ---------------------------------------------------------------------------
 // 3. Password Change (auth.routes.js POST /change-password)
 // ---------------------------------------------------------------------------

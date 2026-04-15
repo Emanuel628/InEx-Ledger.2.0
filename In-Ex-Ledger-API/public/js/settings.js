@@ -2289,9 +2289,10 @@ function initDangerZone() {
       title.textContent = t("settings_delete_business_data_modal_title");
       body.textContent = t("settings_delete_business_data_modal_body_full");
       confirmWrap.classList.add("hidden");
-      if (passwordWrap) passwordWrap.classList.add("hidden");
+      if (passwordWrap) passwordWrap.classList.remove("hidden");
       resetDeleteAccountMfaState();
-      confirmButton.disabled = false;
+      if (passwordInput) passwordInput.value = "";
+      confirmButton.disabled = true;
     }
     modal.classList.remove("hidden");
   };
@@ -2303,6 +2304,10 @@ function initDangerZone() {
   const updateDeleteAccountButtonState = () => {
     if (dangerAction === "delete_account") {
       confirmButton.disabled = confirmInput?.value !== "DELETE" || !passwordInput?.value;
+      return;
+    }
+    if (dangerAction === "delete_data") {
+      confirmButton.disabled = !passwordInput?.value;
     }
   };
 
@@ -2313,20 +2318,26 @@ function initDangerZone() {
   confirmButton?.addEventListener("click", () => {
     void (async () => {
       if (dangerAction === "delete_data") {
+        const password = passwordInput?.value || "";
+        if (!password) {
+          showSettingsToast(t("settings_enter_password_confirm"));
+          passwordInput?.focus();
+          return;
+        }
         confirmButton.disabled = true;
         try {
           if (
             typeof privacyService === "object" &&
             typeof privacyService.deleteBusinessData === "function"
           ) {
-            await privacyService.deleteBusinessData();
+            await privacyService.deleteBusinessData({ password });
           }
           clearBusinessDataState();
           showSettingsToast(t("settings_business_data_deleted"));
           closeModal();
         } catch (err) {
           console.error("Business data deletion failed", err);
-          showSettingsToast(t("settings_delete_business_error"));
+          showSettingsToast(err?.message || t("settings_delete_business_error"));
           confirmButton.disabled = false;
         }
         return;

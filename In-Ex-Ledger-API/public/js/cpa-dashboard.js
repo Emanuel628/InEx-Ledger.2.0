@@ -13,9 +13,22 @@ async function initCpaDashboard() {
     return;
   }
 
+  const showLoadError = (message) => {
+    const title = emptyState.querySelector("h2");
+    const body = emptyState.querySelector("p");
+    if (title) {
+      title.textContent = "Unable to load CPA workspace";
+    }
+    if (body) {
+      body.textContent = message || "One or more requests failed. Please refresh and try again.";
+    }
+    workspace.classList.add("hidden");
+    emptyState.classList.remove("hidden");
+  };
+
   const meResponse = await apiFetch("/api/me");
   if (!meResponse || !meResponse.ok) {
-    emptyState.classList.remove("hidden");
+    showLoadError("Your CPA workspace could not be loaded.");
     return;
   }
 
@@ -73,36 +86,55 @@ async function initCpaDashboard() {
     const ownerUserId = ownerSelect.value;
     const query = businessSelect.value ? `?business_id=${encodeURIComponent(businessSelect.value)}` : "";
 
-    const [summaryResponse, transactionsResponse, receiptsResponse, mileageResponse, exportsResponse, auditResponse] = await Promise.all([
-      apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/summary${query}`),
-      apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/transactions${query}`),
-      apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/receipts${query}`),
-      apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/mileage${query}`),
-      apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/exports${query}`),
-      apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/audit${query}`)
-    ]);
+    try {
+      const [summaryResponse, transactionsResponse, receiptsResponse, mileageResponse, exportsResponse, auditResponse] = await Promise.all([
+        apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/summary${query}`),
+        apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/transactions${query}`),
+        apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/receipts${query}`),
+        apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/mileage${query}`),
+        apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/exports${query}`),
+        apiFetch(`/api/cpa-access/portfolio/${encodeURIComponent(ownerUserId)}/audit${query}`)
+      ]);
 
-    const summaryPayload = summaryResponse && summaryResponse.ok ? await summaryResponse.json().catch(() => null) : null;
-    const transactionsPayload = transactionsResponse && transactionsResponse.ok ? await transactionsResponse.json().catch(() => null) : null;
-    const receiptsPayload = receiptsResponse && receiptsResponse.ok ? await receiptsResponse.json().catch(() => null) : null;
-    const mileagePayload = mileageResponse && mileageResponse.ok ? await mileageResponse.json().catch(() => null) : null;
-    const exportsPayload = exportsResponse && exportsResponse.ok ? await exportsResponse.json().catch(() => null) : null;
-    const auditPayload = auditResponse && auditResponse.ok ? await auditResponse.json().catch(() => null) : null;
+      const failedResponse = [
+        summaryResponse,
+        transactionsResponse,
+        receiptsResponse,
+        mileageResponse,
+        exportsResponse,
+        auditResponse
+      ].find((response) => !response || !response.ok);
+      if (failedResponse) {
+        throw new Error("Failed to load one or more CPA data sources.");
+      }
 
-    const businessSummaries = Array.isArray(summaryPayload?.business_summaries) ? summaryPayload.business_summaries : [];
-    renderSummary(summaryPayload?.summary || {}, summaryPayload?.grant_scope || "business", businessSummaries);
-    renderBusinessContext(businessSummaries, businessSelect.value);
-    renderTransactions(
-      Array.isArray(transactionsPayload?.data) ? transactionsPayload.data : [],
-      Number(transactionsPayload?.total ?? (transactionsPayload?.data?.length || 0))
-    );
-    renderReceipts(
-      Array.isArray(receiptsPayload?.receipts) ? receiptsPayload.receipts : [],
-      Number(receiptsPayload?.total ?? (receiptsPayload?.receipts?.length || 0))
-    );
-    renderMileage(Array.isArray(mileagePayload?.data) ? mileagePayload.data : []);
-    renderExports(Array.isArray(exportsPayload?.exports) ? exportsPayload.exports : []);
-    renderAuditLog(Array.isArray(auditPayload?.logs) ? auditPayload.logs : []);
+      const summaryPayload = await summaryResponse.json().catch(() => null);
+      const transactionsPayload = await transactionsResponse.json().catch(() => null);
+      const receiptsPayload = await receiptsResponse.json().catch(() => null);
+      const mileagePayload = await mileageResponse.json().catch(() => null);
+      const exportsPayload = await exportsResponse.json().catch(() => null);
+      const auditPayload = await auditResponse.json().catch(() => null);
+
+      const businessSummaries = Array.isArray(summaryPayload?.business_summaries) ? summaryPayload.business_summaries : [];
+      renderSummary(summaryPayload?.summary || {}, summaryPayload?.grant_scope || "business", businessSummaries);
+      renderBusinessContext(businessSummaries, businessSelect.value);
+      renderTransactions(
+        Array.isArray(transactionsPayload?.data) ? transactionsPayload.data : [],
+        Number(transactionsPayload?.total ?? (transactionsPayload?.data?.length || 0))
+      );
+      renderReceipts(
+        Array.isArray(receiptsPayload?.receipts) ? receiptsPayload.receipts : [],
+        Number(receiptsPayload?.total ?? (receiptsPayload?.receipts?.length || 0))
+      );
+      renderMileage(Array.isArray(mileagePayload?.data) ? mileagePayload.data : []);
+      renderExports(Array.isArray(exportsPayload?.exports) ? exportsPayload.exports : []);
+      renderAuditLog(Array.isArray(auditPayload?.logs) ? auditPayload.logs : []);
+      emptyState.classList.add("hidden");
+      workspace.classList.remove("hidden");
+    } catch (error) {
+      console.error("[CPA] Workspace load failed", error);
+      showLoadError("One or more dashboard requests failed. Please try again.");
+    }
   };
 
   populateOwnerSelect();
@@ -565,6 +597,5 @@ function getDownloadFilename(response, fallback) {
   }
   return fallback;
 }
-
 
 
