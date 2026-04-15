@@ -503,7 +503,8 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
         "DELETE FROM cpa_access_grants WHERE business_id = ANY($1::uuid[])",
         [businessIds]
       );
-
+      await client.query("DELETE FROM accounts WHERE business_id = ANY($1::uuid[])",[businessIds]
+      );
       await client.query(
         "DELETE FROM categories WHERE business_id = ANY($1::uuid[])",
         [businessIds]
