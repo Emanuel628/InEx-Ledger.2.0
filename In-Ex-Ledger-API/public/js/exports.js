@@ -8,8 +8,54 @@ const CSV_BASIC_FORMAT = "csv_basic";
 let serverHistoryCache = null;
 let isFetchingHistory = false;
 
-document.addEventListener("DOMContentLoaded", () => {
+
+let exportSubscriptionRefreshPromise = null;
+let lastKnownExportTier = "free";
+
+async function refreshExportSubscriptionState(force = false) {
+  if (!force && exportSubscriptionRefreshPromise) {
+    return exportSubscriptionRefreshPromise;
+  }
+
+  const refreshTask = (async () => {
+    try {
+      const response = await apiFetch("/api/billing/subscription");
+      if (!response || !response.ok) {
+        const cachedTier = typeof effectiveTier === "function" ? effectiveTier() : "free";
+        lastKnownExportTier = cachedTier;
+        return cachedTier;
+      }
+
+      const payload = await response.json().catch(() => null);
+      const subscription =
+        payload?.subscription && typeof payload.subscription === "object"
+          ? payload.subscription
+          : null;
+
+      if (subscription && typeof applySubscriptionState === "function") {
+        applySubscriptionState(subscription);
+      }
+
+      const resolvedTier = typeof effectiveTier === "function" ? effectiveTier() : "free";
+      lastKnownExportTier = resolvedTier;
+      return resolvedTier;
+    } catch (error) {
+      console.warn("[Exports] Unable to refresh subscription state", error);
+      const cachedTier = typeof effectiveTier === "function" ? effectiveTier() : "free";
+      lastKnownExportTier = cachedTier;
+      return cachedTier;
+    } finally {
+      exportSubscriptionRefreshPromise = null;
+    }
+  })();
+
+  exportSubscriptionRefreshPromise = refreshTask;
+  return refreshTask;
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
   if (typeof requireAuth === "function") requireAuth();
+  await refreshExportSubscriptionState(true);
   wireExportForm();
   initExportLanguageSelect();
   setupPdfButton();
@@ -64,18 +110,35 @@ function setupTaxIdControls() {
   });
 }
 
-async function setupPdfButton() {
+function setupPdfButton() {
   const btn = document.getElementById("exportPdfBtn");
   const note = document.getElementById("exportPdfNote");
   if (!btn) return;
-  const tier = typeof effectiveTier === "function" ? effectiveTier() : "free";
-  const isV1 = tier === "v1";
-  btn.disabled = !isV1;
-  if (note) {
-    note.hidden = isV1;
+
+  const syncPdfState = async ({ force = false } = {}) => {
+    const tier = await refreshExportSubscriptionState(force);
+    const isV1 = tier === "v1";
+    btn.disabled = !isV1;
+    if (note) {
+      note.hidden = isV1;
+    }
+    return isV1;
+  };
+
+  void syncPdfState({ force: true });
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("lunaProfileReady", () => {
+      void syncPdfState({ force: true });
+    });
   }
+
   btn.addEventListener("click", async () => {
-    if (!isV1) return;
+    const isV1 = await syncPdfState({ force: true });
+    if (!isV1) {
+      setFormMessage("PDF exports require an active InEx Ledger V1 plan.");
+      return;
+    }
     const range = getValidatedExportRange();
     if (!range) return;
     await startPdfExport(range, { recordHistory: true });
