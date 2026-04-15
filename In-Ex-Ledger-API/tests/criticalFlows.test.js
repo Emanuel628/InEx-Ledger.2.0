@@ -224,6 +224,21 @@ test("privacy: POST /delete requires MFA (403 mfa_required) when MFA is not enab
   assert.equal(res.body?.mfa_required, true);
 });
 
+test("privacy: POST /delete requires password even when MFA-authenticated", async () => {
+  const privacyRouter = require("../routes/privacy.routes.js");
+  const app = buildApp(privacyRouter, "/api/privacy");
+  const authToken = makeMfaToken();
+  const csrf = generateCsrfToken();
+
+  const res = await request(app)
+    .post("/api/privacy/delete")
+    .set("Authorization", `Bearer ${authToken}`)
+    .set(CSRF_HEADER_NAME, csrf)
+    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
+    .send({});
+  assert.equal(res.status, 400);
+});
+
 // ---------------------------------------------------------------------------
 // 3. Password Change (auth.routes.js POST /change-password)
 // ---------------------------------------------------------------------------

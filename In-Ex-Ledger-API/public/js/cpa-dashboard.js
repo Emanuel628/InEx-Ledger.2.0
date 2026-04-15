@@ -3,6 +3,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initCpaDashboard();
 });
 
+function cpaTx(key, fallback) {
+  if (typeof window.t === "function") {
+    const translated = window.t(key);
+    return translated && translated !== key ? translated : fallback;
+  }
+  return fallback;
+}
+
 async function initCpaDashboard() {
   const ownerSelect = document.getElementById("cpaOwnerSelect");
   const businessSelect = document.getElementById("cpaBusinessSelect");
@@ -17,10 +25,13 @@ async function initCpaDashboard() {
     const title = emptyState.querySelector("h2");
     const body = emptyState.querySelector("p");
     if (title) {
-      title.textContent = "Unable to load CPA workspace";
+      title.textContent = cpaTx("cpa_load_error_title", "Unable to load CPA workspace");
     }
     if (body) {
-      body.textContent = message || "One or more requests failed. Please refresh and try again.";
+      body.textContent = message || cpaTx(
+        "cpa_load_error_body",
+        "One or more requests failed. Please refresh and try again."
+      );
     }
     workspace.classList.add("hidden");
     emptyState.classList.remove("hidden");
@@ -28,7 +39,7 @@ async function initCpaDashboard() {
 
   const meResponse = await apiFetch("/api/me");
   if (!meResponse || !meResponse.ok) {
-    showLoadError("Your CPA workspace could not be loaded.");
+    showLoadError(cpaTx("cpa_load_error_workspace", "Your CPA workspace could not be loaded."));
     return;
   }
 
@@ -133,7 +144,7 @@ async function initCpaDashboard() {
       workspace.classList.remove("hidden");
     } catch (error) {
       console.error("[CPA] Workspace load failed", error);
-      showLoadError("One or more dashboard requests failed. Please try again.");
+      showLoadError(cpaTx("cpa_load_error_body", "One or more dashboard requests failed. Please try again."));
     }
   };
 
@@ -597,5 +608,4 @@ function getDownloadFilename(response, fallback) {
   }
   return fallback;
 }
-
 
