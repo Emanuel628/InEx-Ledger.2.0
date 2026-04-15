@@ -1923,16 +1923,16 @@ function renderTotals() {
 
   const tier = effectiveTier();
   const hasTransactions = transactionsCount > 0;
-  if (!isAllScope && tier !== "free" && taxLabel && setAsideLabel) {
-    const taxableIncome = Math.max(0, totals.income - totals.expenses);
-    const estimatedTax = taxableIncome * businessTaxProfile.rate;
-    const monthlySetAside = estimatedTax / 12;
-    taxLabel.textContent = formatCurrency(estimatedTax, scopeRegion);
-    setAsideLabel.textContent = formatCurrency(monthlySetAside, scopeRegion);
-  } else if (taxLabel && setAsideLabel) {
-    taxLabel.textContent = isAllScope ? txT("transactions_tax_not_shown", "Not shown") : formatCurrency(0, scopeRegion);
-    setAsideLabel.textContent = isAllScope ? txT("transactions_tax_switch_one_business", "Switch to one business") : formatCurrency(0, scopeRegion);
-  }
+  if (!isAllScope && taxLabel && setAsideLabel) {
+  const taxableIncome = Math.max(0, totals.income - totals.expenses);
+  const estimatedTax = taxableIncome * businessTaxProfile.rate;
+  const monthlySetAside = estimatedTax / 12;
+  taxLabel.textContent = formatCurrency(estimatedTax, scopeRegion);
+  setAsideLabel.textContent = formatCurrency(monthlySetAside, scopeRegion);
+} else if (taxLabel && setAsideLabel) {
+  taxLabel.textContent = isAllScope ? txT("transactions_tax_not_shown", "Not shown") : formatCurrency(0, scopeRegion);
+  setAsideLabel.textContent = isAllScope ? txT("transactions_tax_switch_one_business", "Switch to one business") : formatCurrency(0, scopeRegion);
+}
   if (taxBannerLabel) {
     taxBannerLabel.textContent = isAllScope
       ? txT("transactions_tax_estimated_owed", "Estimated tax owed")
