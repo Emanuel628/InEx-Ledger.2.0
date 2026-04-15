@@ -23,6 +23,14 @@ const BUSINESS_SELECT = `SELECT id, name, region, language, fiscal_year_start, p
                          FROM businesses
                          WHERE id = $1`;
 
+function normalizeOptionalTrimmedString(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 function normalizeBusinessRow(row) {
   if (!row) {
     return row;
@@ -46,7 +54,8 @@ async function fetchBusinessRow(businessId) {
 
 async function updateBusinessRow(businessId, payload) {
   const { name, region, language, fiscal_year_start, province, business_type, tax_id, address } = payload;
-  const encryptedTaxId = tax_id?.trim() ? encryptTaxId(tax_id.trim()) : null;
+  const normalizedTaxId = normalizeOptionalTrimmedString(tax_id);
+  const encryptedTaxId = normalizedTaxId ? encryptTaxId(normalizedTaxId) : null;
   const result = await pool.query(
     `UPDATE businesses
      SET name = COALESCE($1, name),
@@ -61,7 +70,7 @@ async function updateBusinessRow(businessId, payload) {
      RETURNING id, name, region, language, fiscal_year_start, province,
                business_type, tax_id, address, created_at`,
     [
-      name?.trim() || null,
+      normalizeOptionalTrimmedString(name),
       region || null,
       language || null,
       fiscal_year_start || null,
@@ -132,10 +141,10 @@ router.put("/", async (req, res) => {
 
     const body = req.body ?? {};
     const resolvedBusinessType = 'business_type' in body
-      ? (business_type?.trim() || null)
+      ? normalizeOptionalTrimmedString(business_type)
       : current.business_type;
     const resolvedTaxId = 'tax_id' in body ? (tax_id || null) : current.tax_id;
-    const resolvedAddress = 'address' in body ? (address?.trim() || null) : current.address;
+    const resolvedAddress = 'address' in body ? normalizeOptionalTrimmedString(address) : current.address;
 
     const updated = await updateBusinessRow(businessId, {
       name,

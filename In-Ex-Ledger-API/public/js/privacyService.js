@@ -205,32 +205,36 @@
     return `local-${Date.now()}`;
   }
 
-  async function deleteBusinessData() {
+  async function deleteBusinessData(options = {}) {
+    const password = typeof options?.password === "string" ? options.password : "";
     if (await apiAvailable()) {
-      try {
-        const res = await fetch(buildApiUrl("/api/privacy/delete"), {
-          method: "POST",
-          headers: authHeaders("POST"),
-          credentials: "include",
-          body: JSON.stringify({ scope: "business_data" })
-        });
-        if (res.ok) {
-          return res.json();
-        }
-      } catch (err) {
-        // fall through to local deletion
+      const res = await fetch(buildApiUrl("/api/privacy/delete"), {
+        method: "POST",
+        headers: authHeaders("POST"),
+        credentials: "include",
+        body: JSON.stringify({ scope: "business_data", password })
+      });
+      if (res.ok) {
+        return res.json();
       }
+
+      const payload = await res.json().catch(() => null);
+      throw new Error(payload?.error || "Failed to delete business data.");
     }
 
-    BUSINESS_KEYS.forEach((key) => {
-      const storageKey = resolveBusinessStorageKey(key);
-      if (storageKey) {
-        localStorage.removeItem(storageKey);
-      }
-    });
+    try {
+      BUSINESS_KEYS.forEach((key) => {
+        const storageKey = resolveBusinessStorageKey(key);
+        if (storageKey) {
+          localStorage.removeItem(storageKey);
+        }
+      });
 
-    const requestId = newRequestId();
-    return { requestId, status: "deleted" };
+      const requestId = newRequestId();
+      return { requestId, status: "deleted" };
+    } catch (err) {
+      throw new Error("Failed to delete local business data.");
+    }
   }
 
   window.privacyService = {

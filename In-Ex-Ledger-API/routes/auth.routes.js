@@ -866,16 +866,21 @@ router.post("/refresh", tokenRefreshLimiter, requireCsrfProtection, async (req, 
 
   try {
     const result = await pool.query(
-      `SELECT rt.user_id, rt.mfa_authenticated, u.email, u.role, u.email_verified
-              , u.mfa_enabled
-       FROM refresh_tokens rt
-       JOIN users u ON u.id = rt.user_id
-       WHERE rt.token_hash = $1 AND rt.revoked = false AND rt.expires_at > NOW()
-       LIMIT 1`,
+      `SELECT rt.user_id, rt.mfa_authenticated, u.email, u.role, u.email_verified, u.is_erased
+               , u.mfa_enabled
+        FROM refresh_tokens rt
+        JOIN users u ON u.id = rt.user_id
+        WHERE rt.token_hash = $1 AND rt.revoked = false AND rt.expires_at > NOW()
+        LIMIT 1`,
       [hashed]
     );
 
     if (!result.rowCount) {
+      clearRefreshCookie(res);
+      return res.status(401).json({ error: "Invalid refresh token" });
+    }
+    if (result.rows[0].is_erased) {
+      await revokeAllRefreshTokensForUser(result.rows[0].user_id);
       clearRefreshCookie(res);
       return res.status(401).json({ error: "Invalid refresh token" });
     }

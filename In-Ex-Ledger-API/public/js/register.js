@@ -152,7 +152,7 @@ async function handleRegisterSubmit(event) {
     persistRegionAndLanguage();
     await persistConsent();
     localStorage.setItem("pendingVerificationEmail", email);
-    window.location.href = "verify-email?email=sent";
+    window.location.href = "/verify-email?email=sent";
   } catch (err) {
     console.error("Register request failed:", err);
     showRegisterError(tx(OFFLINE_ERROR_MESSAGE));
@@ -424,4 +424,3 @@ async function persistConsent() {
     });
   }
 }
-

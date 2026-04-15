@@ -37,6 +37,14 @@ const LEGACY_CPA_AUDIT_USER_CONSTRAINTS = [
   "cpa_audit_logs_actor_user_id_fkey"
 ];
 
+function normalizeOptionalTrimmedString(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 function normalizeOnboardingPayload(user) {
   return {
     completed: !!user?.onboarding_completed,
@@ -303,8 +311,8 @@ router.put("/", async (req, res) => {
        WHERE id = $3
        RETURNING id, email, full_name, display_name, created_at`,
       [
-        'full_name' in body ? (body.full_name?.trim() || null) : null,
-        'display_name' in body ? (body.display_name?.trim() || null) : null,
+        'full_name' in body ? normalizeOptionalTrimmedString(body.full_name) : null,
+        'display_name' in body ? normalizeOptionalTrimmedString(body.display_name) : null,
         req.user.id,
         'full_name' in body,
         'display_name' in body

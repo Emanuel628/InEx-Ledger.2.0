@@ -30,6 +30,14 @@ const CATEGORY_NAME_UNIQUE_CONSTRAINTS = new Set([
   "categories_business_name_unique_ci"
 ]);
 
+function normalizeOptionalTrimmedString(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 function isCategoryNameConflict(err) {
   return (
     err?.code === PG_UNIQUE_VIOLATION &&
@@ -125,7 +133,7 @@ router.put("/:id", async (req, res) => {
     }
 
     const current = existing.rows[0];
-    const newName = name !== undefined ? (name?.trim() || null) : current.name;
+    const newName = name !== undefined ? normalizeOptionalTrimmedString(name) : current.name;
     const newKind = kind !== undefined ? (kind ?? null) : current.kind;
     const newColor = color !== undefined ? (color ?? null) : current.color;
     const newTaxMapUs = tax_map_us !== undefined ? (tax_map_us ?? null) : current.tax_map_us;

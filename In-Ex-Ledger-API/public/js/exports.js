@@ -788,6 +788,7 @@ function exportCsv(startDate, endDate, recordHistory = true, explicitFilename, t
 async function exportPdf(startDate, endDate, recordHistory = true, explicitFilename, exportLangOverride) {
   if (typeof buildPdfExport !== "function") {
     console.warn("PDF export helper is not available.");
+    showExportToast(tx("exports_error_generic") || "PDF export is unavailable. Please refresh and try again.");
     return;
   }
 
