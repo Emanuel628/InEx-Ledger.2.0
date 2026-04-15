@@ -2337,7 +2337,7 @@ function initDangerZone() {
           closeModal();
         } catch (err) {
           console.error("Business data deletion failed", err);
-          showSettingsToast(err?.message || t("settings_delete_business_error"));
+          showSettingsToast(t("settings_delete_business_error"));
           confirmButton.disabled = false;
         }
         return;
