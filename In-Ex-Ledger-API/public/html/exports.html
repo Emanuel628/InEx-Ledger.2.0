@@ -148,19 +148,38 @@
             <p class="helper-text" data-i18n="exports_language_help">Affects PDF wording only - numbers and dates are universal.</p>
           </div>
 
-          <div class="field-label" data-i18n="exports_tax_id_label">Business tax ID</div>
-          <div class="tax-id-row">
-            <div class="tax-id-value-wrap">
-              <span id="exportTaxIdValue" class="tax-id-value" data-i18n="exports_tax_id_not_set">Not set</span>
-              <span class="tax-id-note" data-i18n="exports_tax_id_note">(from your profile)</span>
-            </div>
-            <a href="settings#settings-business" class="tax-id-link" data-i18n="exports_edit_in_settings">Edit in Settings</a>
-          </div>
-
           <label class="checkbox-row" for="exportIncludeTaxId">
             <input type="checkbox" id="exportIncludeTaxId" />
             <span data-i18n="exports_include_tax_id">Include tax ID on exported document</span>
           </label>
+
+          <div id="exportInlineTaxId" class="export-inline-taxid" hidden>
+            <p class="secure-export-ephemeral-note">&#x1F512; <span data-i18n="secure_export_modal_ephemeral">Encrypted &amp; Ephemeral: This data is processed in-memory and never stored on our servers.</span></p>
+            <label class="field-label" for="exportInlineTaxIdInput" data-i18n="secure_export_modal_input_label">Enter your Tax ID (SSN/SIN/BN):</label>
+            <div class="secure-export-input-row">
+              <input
+                id="exportInlineTaxIdInput"
+                type="password"
+                maxlength="20"
+                autocomplete="off"
+                spellcheck="false"
+                class="secure-export-tax-input"
+                data-i18n-placeholder="secure_export_modal_input_placeholder"
+                placeholder="XXX-XX-XXXX"
+              />
+              <button type="button" id="exportInlineTaxIdToggle" class="secure-export-toggle-btn" data-i18n="secure_export_modal_show">Show</button>
+            </div>
+            <div class="secure-export-legal">
+              <p class="secure-export-legal-title" data-i18n="secure_export_modal_legal_title">Acknowledgment and Authorization</p>
+              <p class="secure-export-legal-body" data-i18n="secure_export_modal_legal_body">I certify that I am authorized to use this tax identification number and that all provided data is accurate. I acknowledge that InEx Ledger is a record-keeping tool and does not provide professional tax, legal, or accounting advice.</p>
+              <p id="exportInlineTaxIdCanadaText" class="secure-export-legal-body secure-export-canada-text hidden" data-i18n="secure_export_modal_canada_text">I further acknowledge my responsibility for determining GST/HST registration requirements and ensuring the accuracy of all entries for CRA Form T2125.</p>
+            </div>
+            <label class="secure-export-checkbox-row" for="exportInlineTaxIdCheckbox">
+              <input type="checkbox" id="exportInlineTaxIdCheckbox" />
+              <span data-i18n="secure_export_modal_checkbox_label">I certify I am authorized to use this tax identification number and I have read and agree to the acknowledgment above.</span>
+            </label>
+            <p id="exportInlineTaxIdError" class="secure-export-error hidden" role="alert" aria-live="polite"></p>
+          </div>
 
           <div class="summary-panel" id="exportSummaryPanel">
             <div class="summary-row"><span data-i18n="exports_summary_scope">Scope</span><strong id="exportSummaryScope">Active business</strong></div>
@@ -200,55 +219,6 @@
       <svg viewBox="0 0 16 16" fill="none"><polyline points="2 8 6 12 14 4"></polyline></svg>
     </span>
     <span id="exportToastMessage" data-i18n="exports_generated">Export generated</span>
-  </div>
-
-  <!-- Secure Export Modal -->
-  <div id="secureExportModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="secureExportModalTitle">
-    <div class="transaction-modal-content secure-export-modal-content">
-      <div class="secure-export-modal-header">
-        <span class="secure-export-lock-icon" aria-hidden="true">&#x1F512;</span>
-        <h3 id="secureExportModalTitle" data-i18n="secure_export_modal_title">Secure Export</h3>
-      </div>
-      <p class="secure-export-ephemeral-note" data-i18n="secure_export_modal_ephemeral">Encrypted &amp; Ephemeral: This data is processed in-memory and never stored on our servers.</p>
-
-      <label class="field-label" for="secureExportTaxId" data-i18n="secure_export_modal_input_label">Enter your Tax ID (SSN/SIN/BN):</label>
-      <div class="secure-export-input-row">
-        <input
-          id="secureExportTaxId"
-          type="password"
-          maxlength="20"
-          autocomplete="off"
-          spellcheck="false"
-          class="secure-export-tax-input"
-          data-i18n-placeholder="secure_export_modal_input_placeholder"
-          placeholder="XXX-XX-XXXX"
-        />
-        <button type="button" id="secureExportToggleBtn" class="secure-export-toggle-btn" aria-label="Toggle tax ID visibility" data-i18n="secure_export_modal_show">Show</button>
-      </div>
-
-      <div class="secure-export-legal">
-        <p class="secure-export-legal-title" data-i18n="secure_export_modal_legal_title">Acknowledgment and Authorization</p>
-        <p class="secure-export-legal-body" data-i18n="secure_export_modal_legal_body">I certify that I am authorized to use this tax identification number and that all provided data is accurate. I acknowledge that InEx Ledger is a record-keeping tool and does not provide professional tax, legal, or accounting advice.</p>
-        <p id="secureExportCanadaText" class="secure-export-legal-body secure-export-canada-text hidden" data-i18n="secure_export_modal_canada_text">I further acknowledge my responsibility for determining GST/HST registration requirements and ensuring the accuracy of all entries for CRA Form T2125.</p>
-      </div>
-
-      <label class="secure-export-checkbox-row" for="secureExportCheckbox">
-        <input type="checkbox" id="secureExportCheckbox" />
-        <span data-i18n="secure_export_modal_checkbox_label">I certify I am authorized to use this tax identification number and I have read and agree to the acknowledgment above.</span>
-      </label>
-
-      <p class="small-note exports-cross-border-note">
-        &#x26A0;&#xFE0F; <span data-i18n="exports_cross_border_note">Your data may be processed in the United States and is subject to U.S. laws, including the U.S.A. Patriot Act. By exporting, you acknowledge this cross-border transfer.</span>
-        <a href="/privacy" target="_blank" rel="noopener" data-i18n="exports_cross_border_privacy_link">Privacy Policy</a>
-      </p>
-
-      <p id="secureExportError" class="secure-export-error hidden" role="alert" aria-live="polite"></p>
-
-      <div class="modal-actions">
-        <button type="button" id="secureExportCancelBtn" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
-        <button type="button" id="secureExportGenerateBtn" class="export-btn export-btn-primary" disabled data-i18n="secure_export_modal_generate_btn">Generate Export</button>
-      </div>
-    </div>
   </div>
 
   <script src="../js/escape-html.js?v=20260410a"></script>

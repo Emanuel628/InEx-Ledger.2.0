@@ -27,7 +27,7 @@ const accountDeleteLimiter = rateLimit({
 
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
-const VALID_BUSINESS_TYPES = new Set(["sole_proprietor", "llc", "s_corp", "partnership"]);
+const VALID_BUSINESS_TYPES = new Set(["sole_proprietor", "llc", "s_corp", "partnership", "corporation"]);
 const VALID_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash", "loan"]);
 const MAX_CUSTOM_ACCOUNT_TYPE_LEN = 50;
 const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
