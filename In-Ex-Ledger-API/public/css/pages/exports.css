@@ -762,3 +762,16 @@
 .secure-export-canada-text.hidden {
   display: none;
 }
+
+.secure-export-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.secure-export-checkbox-row span {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
