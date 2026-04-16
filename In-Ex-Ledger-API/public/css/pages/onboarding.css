@@ -123,6 +123,10 @@
   font-weight: 600;
 }
 
+.custom-account-type-input {
+  margin-top: 8px;
+}
+
 .onboarding-actions {
   margin-top: 22px;
 }
