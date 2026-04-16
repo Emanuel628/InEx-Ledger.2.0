@@ -451,6 +451,45 @@ test("account deletion returns migration hint when cpa_audit_logs foreign key bl
   }
 });
 
+test("account deletion returns 500 with database error code when XX000 internal error occurs", async () => {
+  const fixture = loadMeRouter({
+    deleteError: {
+      code: "XX000",
+      message: "internal error"
+    }
+  });
+
+  try {
+    const app = buildApp(fixture.router, fixture.state);
+    const response = await request(app)
+      .delete("/api/me")
+      .send({ password: "CorrectHorseBatteryStaple1!" });
+
+    assert.equal(response.status, 500);
+    assert.match(response.body?.detail || "", /XX000/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("account deletion does not issue UPDATE to cpa_audit_logs (DO INSTEAD NOTHING rule blocks it)", async () => {
+  const fixture = loadMeRouter({});
+
+  try {
+    const app = buildApp(fixture.router, fixture.state);
+    await request(app)
+      .delete("/api/me")
+      .send({ password: "CorrectHorseBatteryStaple1!" });
+
+    assert.ok(
+      !fixture.state.queries.some(({ sql }) => /UPDATE cpa_audit_logs/i.test(sql)),
+      "route must not attempt to UPDATE cpa_audit_logs (immutable table with DO INSTEAD NOTHING rule)"
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("account deletion fails fast when legacy cpa_audit_logs constraints still exist", async () => {
   const fixture = loadMeRouter({
     legacyConstraints: ["cpa_audit_logs_owner_user_id_fkey"]

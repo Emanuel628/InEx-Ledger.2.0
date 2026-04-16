@@ -492,17 +492,7 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
         "DELETE FROM business_subscriptions WHERE business_id = ANY($1::uuid[])",
         [businessIds]
       );
-      await client.query( `UPDATE cpa_audit_logs
-        SET grant_id = NULL
-        WHERE grant_id IN (
-        SELECT id
-        FROM cpa_access_grants
-        WHERE owner_user_id = $1 OR grantee_user_id = $1 OR business_id = ANY($2::uuid[])
-        )`,
-        [req.user.id, businessIds]
-        );
-    
-      await client.query("DELETE FROM accounts WHERE business_id = ANY($1::uuid[])",[businessIds]
+      await client.query("DELETE FROM accounts WHERE business_id = ANY($1::uuid[])", [businessIds]
       );
       await client.query(
         "DELETE FROM categories WHERE business_id = ANY($1::uuid[])",
