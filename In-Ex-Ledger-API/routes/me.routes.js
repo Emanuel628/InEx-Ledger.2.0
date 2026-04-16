@@ -29,6 +29,7 @@ const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const VALID_BUSINESS_TYPES = new Set(["sole_proprietor", "llc", "s_corp", "partnership"]);
 const VALID_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash", "loan"]);
+const MAX_CUSTOM_ACCOUNT_TYPE_LEN = 50;
 const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const REFRESH_TOKEN_COOKIE = "refresh_token";
@@ -156,7 +157,7 @@ router.put("/onboarding", async (req, res) => {
   if (region === "CA" && !CA_PROVINCES.has(province)) {
     return res.status(400).json({ error: "Choose a valid province." });
   }
-  if (!VALID_ACCOUNT_TYPES.has(starterAccountType)) {
+  if (!starterAccountType || starterAccountType.length > MAX_CUSTOM_ACCOUNT_TYPE_LEN) {
     return res.status(400).json({ error: "Choose a starter account type." });
   }
   if (!starterAccountName) {

@@ -294,7 +294,10 @@ function updateAuthenticatedChrome(profile = {}) {
   const initials = getUserInitials(profile);
 
   persistBusinessContext(profile);
-  ensureLegacyUserPills();
+  // Onboarding is a clean setup wizard — skip the header user pill there.
+  if (!isOnboardingRoute()) {
+    ensureLegacyUserPills();
+  }
 
   document.querySelectorAll(".user-name").forEach((node) => {
     node.textContent = displayName;

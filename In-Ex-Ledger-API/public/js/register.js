@@ -10,7 +10,6 @@ let form = null;
 let registerErrorElement = null;
 let isSubmittingRegister = false;
 let languageSelect = null;
-let countrySelect = null;
 let tosConsentCheckbox = null;
 let tosConsentMessage = null;
 function tx(key) {
@@ -27,7 +26,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   registerErrorElement = document.getElementById("registerError");
   languageSelect = document.getElementById("languageSelectRegister");
-  countrySelect = document.getElementById("countrySelectRegister");
   tosConsentCheckbox = document.getElementById("tosConsent");
   tosConsentMessage = document.getElementById("tosConsentMessage");
   hideRegisterError();
@@ -38,33 +36,10 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       legacyPopulateLanguageOptions();
     }
-    languageSelect.addEventListener("change", persistRegionAndLanguage);
+    languageSelect.addEventListener("change", persistLanguage);
   }
 
-  if (countrySelect) {
-    countrySelect.addEventListener("change", () => {
-      const provinceField = document.getElementById("provinceField");
-      if (provinceField) {
-        if (countrySelect.value === "CA") {
-          provinceField.removeAttribute("hidden");
-        } else {
-          provinceField.setAttribute("hidden", "");
-        }
-      }
-      persistRegionAndLanguage();
-    });
-
-    // Initialize province field visibility based on the default country selection
-    const provinceField = document.getElementById("provinceField");
-    if (provinceField) {
-      if (countrySelect.value === "CA") {
-        provinceField.removeAttribute("hidden");
-      } else {
-        provinceField.setAttribute("hidden", "");
-      }
-    }
-  }
-  persistRegionAndLanguage();
+  persistLanguage();
 
   form.addEventListener("submit", handleRegisterSubmit);
   wireShowPasswordToggle(document);
@@ -130,16 +105,11 @@ async function handleRegisterSubmit(event) {
   submitButton?.setAttribute("disabled", "true");
 
   try {
-    const country = countrySelect?.value || "US";
-    const province = country === "CA"
-      ? (document.getElementById("provinceSelectRegister")?.value || null)
-      : null;
-
     const regResponse = await fetch(buildApiUrl("/api/auth/register"), {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, country, province })
+      body: JSON.stringify({ email, password })
     });
 
     const regBody = await regResponse.json().catch(() => null);
@@ -149,7 +119,7 @@ async function handleRegisterSubmit(event) {
       return;
     }
 
-    persistRegionAndLanguage();
+    persistLanguage();
     await persistConsent();
     localStorage.setItem("pendingVerificationEmail", email);
     window.location.href = "/verify-email?email=sent";
@@ -357,16 +327,10 @@ function legacyPopulateLanguageOptions() {
   });
 }
 
-function persistRegionAndLanguage() {
-  const selectedRegion = (countrySelect?.value === "CA") ? "ca" : "us";
+function persistLanguage() {
   const selectedLanguage =
     (languageSelect && languageSelect.value) ||
     (typeof getCurrentLanguage === "function" ? getCurrentLanguage() : "en");
-
-  localStorage.setItem("lb_region", selectedRegion);
-  window.LUNA_REGION = selectedRegion;
-  const fallbackRegion = selectedRegion === "ca" ? "CA" : "US";
-  localStorage.setItem("region", fallbackRegion);
 
   if (typeof setCurrentLanguage === "function") {
     setCurrentLanguage(selectedLanguage);
