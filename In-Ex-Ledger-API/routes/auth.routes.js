@@ -967,14 +967,22 @@ router.get("/verify-email", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "UPDATE users SET email_verified = true WHERE email = $1 RETURNING id",
+      `UPDATE users
+          SET email_verified = true
+        WHERE email = $1
+    RETURNING id, email, email_verified, mfa_enabled, role, created_at, is_erased`,
       [email]
     );
 
     if (result.rowCount === 0) return res.status(404).send("User not found.");
 
-    // Redirect to login with a success parameter
-    return res.redirect("/login?verified=true");
+    const session = await issueAuthenticatedSession(res, result.rows[0]);
+    const redirectHash = new URLSearchParams({
+      verified: "true",
+      token: session.token
+    }).toString();
+
+    return res.redirect(`/verify-email#${redirectHash}`);
   } catch (err) {
     logError("Verification error:", err);
     return res.status(500).send("Verification failed.");

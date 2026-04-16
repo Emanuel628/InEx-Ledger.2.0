@@ -1623,9 +1623,13 @@ function isValidTaxId(value) {
   const v = value.trim();
   // US SSN: 9 digits or XXX-XX-XXXX
   const SSN_RE = /^(\d{3}-\d{2}-\d{4}|\d{9})$/;
+  // US EIN: 9 digits or XX-XXXXXXX
+  const EIN_RE = /^(\d{2}-\d{7}|\d{9})$/;
   // Canada SIN: 9 digits or XXX-XXX-XXX
   const SIN_RE = /^(\d{3}-\d{3}-\d{3}|\d{9})$/;
-  return SSN_RE.test(v) || SIN_RE.test(v);
+  // Canada BN: 9-digit program account or full 15-char account like 123456789RT0001
+  const BN_RE = /^(\d{9}|(?:\d{9}[A-Za-z]{2}\d{4})|(?:\d{9}\s?[A-Za-z]{2}\s?\d{4})|(?:\d{9}-[A-Za-z]{2}-\d{4}))$/;
+  return SSN_RE.test(v) || EIN_RE.test(v) || SIN_RE.test(v) || BN_RE.test(v);
 }
 
 async function submitSecureExport(taxId, startDate, endDate) {
@@ -1680,18 +1684,5 @@ async function submitSecureExport(taxId, startDate, endDate) {
   URL.revokeObjectURL(url);
 
   showExportToast(tx("exports_generated_pdf"));
-
-  const historyEntry = {
-    id: `exp_${Date.now()}`,
-    startDate,
-    endDate,
-    exportedAt: new Date().toISOString(),
-    filename: `inex-ledger-secure-export-${startDate}_to_${endDate}.pdf`,
-    tier: "v1",
-    format: PDF_FORMAT,
-    exportLang,
-    scope
-  };
-  appendExportHistory(historyEntry);
-  renderExportHistory();
+  await renderExportHistory();
 }

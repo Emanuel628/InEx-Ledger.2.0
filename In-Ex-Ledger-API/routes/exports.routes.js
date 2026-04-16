@@ -11,6 +11,7 @@ const { issueExportGrant, verifyExportGrant } = require("../services/exportGrant
 const { saveRedactedPdf, buildRedactedStream } = require("../services/exportStorage.js");
 const { decryptJwe } = require("../services/jweDecryptService.js");
 const { buildPdfExport } = require("../services/pdfGeneratorService.js");
+const { dispatchPdfJob } = require("../services/pdfWorkerClient.js");
 const { pool } = require("../db.js");
 const { logError } = require("../utils/logger.js");
 const { sanitizePayload } = require("../utils/logSanitizer.js");
@@ -59,7 +60,7 @@ function buildExportMetadataRows(exportId, metadata) {
     ["currency", metadata.currency || "USD"],
     ["page_count", String(Number(metadata.pageCount) || 0)],
     ["notes", metadata.notes || ""],
-    ["full_version_available", "true"]
+    ["full_version_available", metadata.fullVersionAvailable ? "true" : "false"]
   ]
     .filter(([, value]) => value !== undefined && value !== null && value !== "")
     .map(([key, value]) => [crypto.randomUUID(), exportId, key, String(value)]);
@@ -78,7 +79,8 @@ async function storeCompletedExport({
   language,
   currency,
   pageCount,
-  notes
+  notes,
+  fullVersionAvailable = false
 }) {
   const exportId = crypto.randomUUID();
   const metadataRows = buildExportMetadataRows(exportId, {
@@ -91,7 +93,8 @@ async function storeCompletedExport({
     language,
     currency,
     pageCount,
-    notes
+    notes,
+    fullVersionAvailable
   });
   const client = await pool.connect();
 
@@ -259,7 +262,8 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       language: job.exportLang,
       currency: job.currency,
       pageCount: Number(workerResult.metadata?.pageCount) || 0,
-      notes: workerResult.metadata?.notes || "Generated via trusted worker"
+      notes: workerResult.metadata?.notes || "Generated via trusted worker",
+      fullVersionAvailable: false
     });
 
     res.setHeader("Content-Type", "application/pdf");
@@ -478,7 +482,8 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       language: exportLang,
       currency,
       pageCount: 0,
-      notes: "Generated via secure export"
+      notes: "Generated via secure export",
+      fullVersionAvailable: false
     });
 
     res.setHeader("Content-Type", "application/pdf");

@@ -22,6 +22,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   wireActions();
 
+  if (consumeVerifiedSessionFromHash()) {
+    return;
+  }
+
   if (pendingEmail) {
     updateStatus(tx("verify_email_status_sent"));
   } else {
@@ -55,6 +59,36 @@ function updateStatus(message, isError = false) {
 function renderVerificationLink(url) {
   if (!linkNode) return;
   linkNode.textContent = url || "";
+}
+
+function consumeVerifiedSessionFromHash() {
+  const hash = String(window.location.hash || "").replace(/^#/, "");
+  if (!hash) {
+    return false;
+  }
+
+  const params = new URLSearchParams(hash);
+  const token = params.get("token");
+  if (!token) {
+    return false;
+  }
+
+  try {
+    if (typeof setToken === "function") {
+      setToken(token);
+    } else {
+      sessionStorage.setItem("token", token);
+    }
+    localStorage.removeItem("pendingVerificationEmail");
+  } catch (_) {
+    updateStatus(tx("verify_email_status_success"), true);
+    return true;
+  }
+
+  updateStatus(tx("verify_email_status_success"));
+  window.history.replaceState({}, document.title, "/verify-email");
+  window.location.replace("/transactions");
+  return true;
 }
 
 async function resendVerification() {

@@ -8,7 +8,7 @@ class PdfCanvas {
     const formattedY = Number.isFinite(y) ? y.toFixed(2) : "0.00";
     this.commands.push(`/F1 ${size} Tf`);
     this.commands.push(`1 0 0 1 ${formattedX} ${formattedY} Tm`);
-    this.commands.push(`${pdfHex(text)} Tj`);
+    this.commands.push(`${pdfLiteral(text)} Tj`);
   }
 
   addFooter(pageNumber, totalPages) {
@@ -550,14 +550,39 @@ function chunkArray(items, size) {
   return result;
 }
 
-function pdfHex(text) {
-  const normalized = String(text || "");
-  let hex = "FEFF";
-  for (const char of normalized) {
-    const code = char.codePointAt(0);
-    hex += code.toString(16).padStart(4, "0");
-  }
-  return `<${hex.toUpperCase()}>`;
+function normalizePdfText(text) {
+  return String(text || "")
+    .replace(/\u00df/g, "ss")
+    .replace(/\u00c6/g, "AE")
+    .replace(/\u00e6/g, "ae")
+    .replace(/\u0152/g, "OE")
+    .replace(/\u0153/g, "oe")
+    .replace(/\u00d8/g, "O")
+    .replace(/\u00f8/g, "o")
+    .replace(/\u0141/g, "L")
+    .replace(/\u0142/g, "l")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u2013|\u2014|\u2212/g, "-")
+    .replace(/\u2018|\u2019/g, "'")
+    .replace(/\u201c|\u201d/g, '"')
+    .replace(/\u2026/g, "...")
+    .replace(/\u2022/g, "*")
+    .replace(/\u00a0/g, " ")
+    .replace(/[^\x20-\x7E\n]/g, "?");
+}
+
+function escapePdfLiteral(text) {
+  return normalizePdfText(text)
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)")
+    .replace(/\n/g, "\\n");
+}
+
+function pdfLiteral(text) {
+  return `(${escapePdfLiteral(text)})`;
 }
 
 function createPdfBytes(pageContents) {
