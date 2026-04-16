@@ -519,8 +519,26 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
         object?.metadata?.business_id ||
         (await findBusinessByStripeCustomerId(object.customer));
       if (businessId) {
-        await setFreePlanForBusiness(businessId);
-        logInfo("Stripe subscription deleted — set free plan for business:", businessId);
+        // Stripe fires customer.subscription.deleted both for immediate
+        // cancellations and for cancel-at-period-end subscriptions that have
+        // now lapsed.  For immediate cancellations the current_period_end is
+        // still in the future — the user paid through that date and must keep
+        // access.  Sync the canceled state so deriveEffectiveState can use
+        // isCanceledWithRemainingAccess to preserve V1 access until the period
+        // end.  Only call setFreePlanForBusiness when the period has already
+        // passed (i.e., the subscription truly expired).
+        const periodEndSeconds = object?.current_period_end;
+        const periodEndMs = periodEndSeconds ? periodEndSeconds * 1000 : 0;
+        if (periodEndMs > Date.now()) {
+          await syncStripeSubscriptionForBusiness(businessId, object);
+          logInfo(
+            "Stripe subscription deleted mid-period — synced canceled state, access preserved until period end for business:",
+            businessId
+          );
+        } else {
+          await setFreePlanForBusiness(businessId);
+          logInfo("Stripe subscription deleted — set free plan for business:", businessId);
+        }
       }
     } else if (event.type === "checkout.session.completed") {
       const subscriptionId = object?.subscription;

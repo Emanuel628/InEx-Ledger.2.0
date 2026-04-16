@@ -150,6 +150,58 @@ test("deriveEffectiveState downgrades past_due subscriptions after the grace per
   assert.equal(snapshot.isPaid, false);
 });
 
+test("deriveEffectiveState preserves v1 access for canceled subscriptions with remaining period", () => {
+  // Stripe fires customer.subscription.updated (status → "canceled") when a
+  // subscription is cancelled immediately mid-period.  The user paid through
+  // current_period_end and must keep access until then.
+  const snapshot = deriveEffectiveState({
+    id: "sub_canceled_midperiod",
+    business_id: "biz_canceled_midperiod",
+    provider: "stripe",
+    plan_code: PLAN_V1,
+    status: "canceled",
+    current_period_end: isoDateFromNow(29),
+    cancel_at_period_end: false
+  });
+
+  assert.equal(snapshot.effectiveTier, PLAN_V1);
+  assert.equal(snapshot.effectiveStatus, "canceled");
+  assert.equal(snapshot.isPaid, true);
+  assert.equal(snapshot.isCanceledWithRemainingAccess, true);
+  assert.equal(snapshot.cancelAtPeriodEnd, false);
+});
+
+test("deriveEffectiveState downgrades canceled subscriptions to free once period has lapsed", () => {
+  const snapshot = deriveEffectiveState({
+    id: "sub_canceled_expired",
+    business_id: "biz_canceled_expired",
+    provider: "stripe",
+    plan_code: PLAN_V1,
+    status: "canceled",
+    current_period_end: isoDateFromNow(-1),
+    cancel_at_period_end: false
+  });
+
+  assert.equal(snapshot.effectiveTier, PLAN_FREE);
+  assert.equal(snapshot.isPaid, false);
+  assert.equal(snapshot.isCanceledWithRemainingAccess, false);
+});
+
+test("deriveEffectiveState does not set isCanceledWithRemainingAccess for free plan rows", () => {
+  const snapshot = deriveEffectiveState({
+    id: "sub_free2",
+    business_id: "biz_free2",
+    provider: "stripe",
+    plan_code: PLAN_FREE,
+    status: "canceled",
+    current_period_end: isoDateFromNow(10)
+  });
+
+  assert.equal(snapshot.effectiveTier, PLAN_FREE);
+  assert.equal(snapshot.isPaid, false);
+  assert.equal(snapshot.isCanceledWithRemainingAccess, false);
+});
+
 test("deriveEffectiveState keeps explicit free plans on free", () => {
   const snapshot = deriveEffectiveState({
     id: "sub_free",
