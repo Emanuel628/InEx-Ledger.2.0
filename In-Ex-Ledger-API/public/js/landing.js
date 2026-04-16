@@ -1,33 +1,56 @@
-function formatLandingPrice(value) {
+function resolveLandingCurrency() {
+  const region = String(
+    (typeof window.getCurrentRegion === "function" && window.getCurrentRegion()) ||
+    localStorage.getItem("lb_region") ||
+    window.LUNA_REGION ||
+    ""
+  ).toLowerCase();
+  return region === "ca" ? "cad" : "usd";
+}
+
+function formatLandingPrice(value, currency) {
   const amount = Number(value || 0);
-  return `$${amount.toFixed(amount % 1 === 0 ? 0 : 2)}`;
+  const sym = (currency || "usd").toLowerCase() === "cad" ? "CA$" : "$";
+  return `${sym}${amount.toFixed(amount % 1 === 0 ? 0 : 2)}`;
 }
 
 function updateLandingPricing(billingMode) {
   const isYearly = billingMode === "yearly";
+  const currency = resolveLandingCurrency();
+  const isCAD = currency === "cad";
 
   document.querySelectorAll("[data-pricing-card]").forEach((card) => {
     const amountNode = card.querySelector("[data-price-amount]");
     const periodNode = card.querySelector("[data-price-period]");
     const noteNode = card.querySelector("[data-price-note]");
-    const monthlyPrice = Number(card.getAttribute("data-price-monthly") || 0);
-    const yearlyMonthlyPrice = Number(card.getAttribute("data-price-yearly-monthly") || 0);
-    const yearlyTotalPrice = Number(card.getAttribute("data-price-yearly-total") || 0);
+
+    const monthlyPrice = Number(
+      (isCAD ? card.getAttribute("data-price-monthly-cad") : null) ||
+      card.getAttribute("data-price-monthly") || 0
+    );
+    const yearlyMonthlyPrice = Number(
+      (isCAD ? card.getAttribute("data-price-yearly-monthly-cad") : null) ||
+      card.getAttribute("data-price-yearly-monthly") || 0
+    );
+    const yearlyTotalPrice = Number(
+      (isCAD ? card.getAttribute("data-price-yearly-total-cad") : null) ||
+      card.getAttribute("data-price-yearly-total") || 0
+    );
 
     if (amountNode) {
       amountNode.textContent = isYearly
-        ? formatLandingPrice(yearlyMonthlyPrice)
-        : formatLandingPrice(monthlyPrice);
+        ? formatLandingPrice(yearlyMonthlyPrice, currency)
+        : formatLandingPrice(monthlyPrice, currency);
     }
 
     if (periodNode) {
-      periodNode.textContent = "/ month";
+      periodNode.textContent = "/ month" + (isCAD ? " CAD" : "");
     }
 
     if (noteNode) {
       noteNode.textContent = isYearly
-        ? `Billed annually at ${formatLandingPrice(yearlyTotalPrice)}. Save 15%.`
-        : `Billed monthly at ${formatLandingPrice(monthlyPrice)}.`;
+        ? `Billed annually at ${formatLandingPrice(yearlyTotalPrice, currency)}. Save 15%.`
+        : `Billed monthly at ${formatLandingPrice(monthlyPrice, currency)}.`;
     }
   });
 }

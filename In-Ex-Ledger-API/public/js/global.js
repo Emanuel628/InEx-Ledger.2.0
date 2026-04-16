@@ -480,11 +480,17 @@ window.LUNA_TAX = {
   }
 
   function setConsentRecord(decision) {
-    localStorage.setItem(CONSENT_KEY, JSON.stringify({
-      decision: decision,
-      version: CONSENT_VERSION,
-      at: new Date().toISOString()
-    }));
+    var record = { decision: decision, version: CONSENT_VERSION, at: new Date().toISOString() };
+    localStorage.setItem(CONSENT_KEY, JSON.stringify(record));
+    // Persist to DB for compliance audit trail (best-effort, fire-and-forget)
+    try {
+      var fetchFn = typeof apiFetch === 'function' ? apiFetch : window.fetch.bind(window);
+      fetchFn('/api/consent/cookie', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: decision, version: CONSENT_VERSION })
+      }).catch(function () { /* ignore — localStorage record is the source of truth */ });
+    } catch (_) { /* ignore */ }
   }
 
   function needsBanner() {
