@@ -11,4 +11,8 @@ function init() {
   if (typeof initPublicLanguageSwitcher === "function") {
     initPublicLanguageSwitcher(function () { return "footer_privacy"; });
   }
+  if (typeof applyRegionHardening === "function") {
+    applyRegionHardening();
+    window.addEventListener("lunaRegionChanged", () => applyRegionHardening());
+  }
 }

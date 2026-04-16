@@ -334,6 +334,14 @@ function pollGlobalUnreadCount() {
     .catch(function () { return true; });
 }
 
+function applyMileageNavLabel() {
+  const isKm = localStorage.getItem("lb_unit_metric") === "true";
+  const label = isKm ? "Kilometres" : "Mileage";
+  document.querySelectorAll('[data-i18n="nav_mileage"]').forEach((el) => {
+    el.textContent = label;
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
   injectSkipLink();
@@ -343,6 +351,9 @@ document.addEventListener("DOMContentLoaded", () => {
   highlightNavigation(); // runs on all nav a elements including the drawer
   applyDateInputConstraints();
   injectMobileDesktopLink();
+  applyMileageNavLabel();
+  window.addEventListener("lunaDistanceUnitChanged", applyMileageNavLabel);
+  window.addEventListener("lunaLanguageChanged", applyMileageNavLabel);
 
   // Poll unread message count for the nav badge every 60 s
   var _globalMsgPollTimer = null;

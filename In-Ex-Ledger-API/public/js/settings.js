@@ -284,20 +284,37 @@ async function initBusinessProfileForm() {
   const profile = await loadBusinessProfile();
   document.getElementById("business-name").value = profile.name || "";
   document.getElementById("business-type-select").value = profile.type || "sole_proprietor";
-  document.getElementById("businessEin").value = profile.ein || "";
   document.getElementById("fiscal-year").value = profile.fiscalYearStart || "";
-  document.getElementById("business-address").value = profile.address || "";
+
+  // Parse stored newline-delimited address string back into structured fields
+  const addrParts = (profile.address || "").split("\n");
+  document.getElementById("address-line1").value = addrParts[0] || "";
+  document.getElementById("address-line2").value = addrParts[1] || "";
+  document.getElementById("address-city").value = addrParts[2] || "";
+  document.getElementById("address-state").value = addrParts[3] || "";
+  document.getElementById("address-postal").value = addrParts[4] || "";
+  document.getElementById("address-country").value = addrParts[5] || "";
+
   settingsOverviewState.businessProfile = profile;
   syncSettingsOverviewSummaries();
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const addressParts = [
+      document.getElementById("address-line1").value.trim(),
+      document.getElementById("address-line2").value.trim(),
+      document.getElementById("address-city").value.trim(),
+      document.getElementById("address-state").value.trim(),
+      document.getElementById("address-postal").value.trim(),
+      document.getElementById("address-country").value.trim()
+    ];
+    // Strip trailing empty parts so we don't store trailing newlines
+    while (addressParts.length && !addressParts[addressParts.length - 1]) addressParts.pop();
     const nextProfile = {
       name: document.getElementById("business-name").value.trim(),
       type: document.getElementById("business-type-select").value,
-      ein: document.getElementById("businessEin").value.trim(),
       fiscalYearStart: document.getElementById("fiscal-year").value,
-      address: document.getElementById("business-address").value.trim()
+      address: addressParts.join("\n")
     };
 
     const saved = await saveBusinessProfileToApi(nextProfile);
@@ -681,7 +698,6 @@ async function loadBusinessProfile() {
   const emptyProfile = {
     name: "",
     type: "sole_proprietor",
-    ein: "",
     fiscalYearStart: "",
     address: ""
   };
@@ -696,7 +712,6 @@ async function loadBusinessProfile() {
     const profile = {
       name: business?.name || "",
       type: business?.business_type || "sole_proprietor",
-      ein: business?.tax_id || "",
       fiscalYearStart: business?.fiscal_year_start || "",
       address: business?.address || ""
     };
@@ -719,7 +734,6 @@ async function saveBusinessProfileToApi(profile) {
         name: profile.name,
         fiscal_year_start: profile.fiscalYearStart || null,
         business_type: profile.type || null,
-        tax_id: profile.ein || null,
         address: profile.address || null
       })
     });
@@ -794,7 +808,7 @@ async function initPreferences() {
   const syncProvinceVisibility = (region) => {
     if (!provinceRow) return;
     const isCanada = normalizeSettingsRegion(region) === "ca";
-    provinceRow.hidden = !isCanada;
+    provinceRow.classList.toggle("hidden", !isCanada);
     if (provinceSelect) {
       provinceSelect.disabled = !isCanada;
     }
@@ -873,7 +887,15 @@ async function initPreferences() {
   }
 
   if (darkModeToggle) {
-    darkModeToggle.addEventListener("change", updatePendingPreferences);
+    darkModeToggle.addEventListener("change", () => {
+      const theme = darkModeToggle.checked ? "dark" : "light";
+      if (typeof setGlobalTheme === "function") {
+        setGlobalTheme(theme);
+      } else {
+        document.documentElement.setAttribute("data-theme", theme);
+      }
+      updatePendingPreferences();
+    });
   }
 
   if (distanceSelect) {
@@ -1412,7 +1434,7 @@ function refreshSettingsLocalizedState() {
   if (provinceRow) {
     const isCanada =
       (pendingPreferences?.region || preferenceBaseline?.region || normalizeSettingsRegion(businessSettingsState.region)) === "ca";
-    provinceRow.hidden = !isCanada;
+    provinceRow.classList.toggle("hidden", !isCanada);
   }
   if (provinceSelect) {
     const isCanada =
