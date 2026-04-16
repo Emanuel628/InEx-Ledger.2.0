@@ -86,14 +86,23 @@
       rawSymKey
     );
 
+    const header = {
+      alg: "RSA-OAEP-256",
+      enc: "A256GCM",
+      typ: "JWE",
+      kid
+    };
+    const encodedHeader = base64UrlEncode(new TextEncoder().encode(JSON.stringify(header)));
+    const aad = new TextEncoder().encode(encodedHeader);
+
     const iv = window.crypto.getRandomValues(new Uint8Array(12));
-    const encoder = new TextEncoder();
-    const taxIdBytes = encoder.encode(taxId);
+    const taxIdBytes = new TextEncoder().encode(taxId);
     const ciphertextWithTag = await subtle.encrypt(
       {
         name: "AES-GCM",
         iv,
-        tagLength: 128
+        tagLength: 128,
+        additionalData: aad
       },
       symKey,
       taxIdBytes
@@ -104,15 +113,8 @@
     const tagBytes = ciphertextBytes.slice(ciphertextBytes.length - tagLength);
     const ciphertext = ciphertextBytes.slice(0, ciphertextBytes.length - tagLength);
 
-    const header = {
-      alg: "RSA-OAEP-256",
-      enc: "A256GCM",
-      typ: "JWE",
-      kid
-    };
-
     const segments = [
-      base64UrlEncode(new TextEncoder().encode(JSON.stringify(header))),
+      encodedHeader,
       base64UrlEncode(encryptedKeyBuffer),
       base64UrlEncode(iv),
       base64UrlEncode(ciphertext),
