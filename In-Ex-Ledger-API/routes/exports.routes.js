@@ -8,8 +8,9 @@ const {
 } = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { issueExportGrant, verifyExportGrant } = require("../services/exportGrantService.js");
-const { dispatchPdfJob } = require("../services/pdfWorkerClient.js");
 const { saveRedactedPdf, buildRedactedStream } = require("../services/exportStorage.js");
+const { decryptJwe } = require("../services/jweDecryptService.js");
+const { buildPdfExport } = require("../services/pdfGeneratorService.js");
 const { pool } = require("../db.js");
 const { logError } = require("../utils/logger.js");
 const { sanitizePayload } = require("../utils/logSanitizer.js");
@@ -439,32 +440,30 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       taxLabel: region === "ca" ? (c.tax_map_ca || "") : (c.tax_map_us || "")
     }));
 
-    const jobId = crypto.randomUUID();
-    const filename = `inex-ledger-export-${dateRange.startDate}_to_${dateRange.endDate}.pdf`;
+    const taxId = includeTaxId ? decryptJwe(req.body.taxId_jwe) : "";
 
-    const job = {
-      jobId,
-      businessId,
-      userId: user.id,
-      startDate: dateRange.startDate,
-      endDate: dateRange.endDate,
-      includeTaxId,
-      taxId_jwe: includeTaxId ? req.body.taxId_jwe : undefined,
-      exportLang,
-      currency,
-      templateVersion,
-      businessName: business.name || "",
-      region,
-      province: business.province || "",
+    const sharedOptions = {
       transactions: txResult.rows,
       accounts: accountResult.rows,
       categories,
       receipts: receiptResult.rows,
-      mileage: mileageResult.rows
+      mileage: mileageResult.rows,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+      exportLang,
+      currency,
+      businessName: business.name || "",
+      legalName: business.name || "",
+      operatingName: "",
+      region,
+      province: business.province || ""
     };
 
-    const workerResult = await dispatchPdfJob(job);
-    const redactedBuffer = workerResult.redactedPdfBuffer || Buffer.alloc(0);
+    const fullPdfBuffer = buildPdfExport({ ...sharedOptions, taxId });
+    const redactedBuffer = buildPdfExport({ ...sharedOptions, taxId: "" });
+
+    const jobId = crypto.randomUUID();
+    const filename = `inex-ledger-export-${dateRange.startDate}_to_${dateRange.endDate}.pdf`;
     const { filePath, hash } = await saveRedactedPdf(jobId, redactedBuffer);
     await storeCompletedExport({
       businessId,
@@ -478,14 +477,14 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       filePath,
       language: exportLang,
       currency,
-      pageCount: Number(workerResult.metadata?.pageCount) || 0,
-      notes: workerResult.metadata?.notes || "Generated via secure export modal"
+      pageCount: 0,
+      notes: "Generated via secure export"
     });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
-    return res.send(workerResult.fullPdfBuffer);
+    return res.send(fullPdfBuffer);
   } catch (err) {
     logError("Secure export error", { body: sanitizedBody, err: err.message });
     return res.status(500).json({ error: "Failed to generate secure export." });
