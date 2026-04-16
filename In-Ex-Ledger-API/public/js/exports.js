@@ -95,10 +95,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   populateExportFilters();
   initExportLanguageSelect();
   initPresetChips();
-  initBusinessTaxId();
   setupExportForm();
   setupPdfButton();
-  initSecureExportModal();
+  wireInlineTaxId();
   await refreshReceiptsDot();
   updateExportSummary();
   renderExportHistory();
@@ -255,7 +254,7 @@ function hasMixedCurrenciesInScope() {
 function syncExportScopeUi() {
   const scopeHelp = document.getElementById("exportScopeHelp");
   const taxIdCheckbox = document.getElementById("exportIncludeTaxId");
-  const taxIdValue = document.getElementById("exportTaxIdValue");
+  const inlineTaxId = document.getElementById("exportInlineTaxId");
   const pdfNote = document.getElementById("exportPdfNote");
   const scope = getExportScope();
   const mixedCurrencies = hasMixedCurrenciesInScope();
@@ -271,13 +270,14 @@ function syncExportScopeUi() {
     taxIdCheckbox.disabled = scope === "all";
     if (scope === "all") {
       taxIdCheckbox.checked = false;
+      if (inlineTaxId) {
+        inlineTaxId.hidden = true;
+        const inp = document.getElementById("exportInlineTaxIdInput");
+        if (inp) inp.value = "";
+        const cb = document.getElementById("exportInlineTaxIdCheckbox");
+        if (cb) cb.checked = false;
+      }
     }
-  }
-
-  if (taxIdValue && scope === "all") {
-    taxIdValue.textContent = tx("exports_per_business");
-  } else if (taxIdValue) {
-    initBusinessTaxId();
   }
 
   if (pdfNote) {
@@ -526,7 +526,7 @@ function setupPdfButton() {
 
   syncPdfState();
 
-  button.addEventListener("click", () => {
+  button.addEventListener("click", async () => {
     if (!syncPdfState()) {
       return;
     }
@@ -537,7 +537,41 @@ function setupPdfButton() {
     const scope = getExportScope();
     const includeTaxId = scope !== "all" && !!document.getElementById("exportIncludeTaxId")?.checked;
     if (includeTaxId) {
-      openSecureExportModal(range.startDate, range.endDate);
+      const taxIdInput = document.getElementById("exportInlineTaxIdInput");
+      const agreementCheckbox = document.getElementById("exportInlineTaxIdCheckbox");
+      const errorEl = document.getElementById("exportInlineTaxIdError");
+      const setError = (msg) => {
+        if (errorEl) { errorEl.textContent = msg; errorEl.classList.remove("hidden"); }
+      };
+      const clearError = () => {
+        if (errorEl) { errorEl.textContent = ""; errorEl.classList.add("hidden"); }
+      };
+      clearError();
+      const taxId = taxIdInput?.value?.trim() || "";
+      if (!taxId) {
+        setError(tx("secure_export_modal_error_taxid"));
+        taxIdInput?.focus();
+        return;
+      }
+      if (!isValidTaxId(taxId)) {
+        setError(tx("secure_export_modal_error_taxid_format"));
+        taxIdInput?.focus();
+        return;
+      }
+      if (!agreementCheckbox?.checked) {
+        setError(tx("secure_export_modal_error_checkbox"));
+        return;
+      }
+      button.disabled = true;
+      try {
+        await submitSecureExport(taxId, range.startDate, range.endDate);
+        if (taxIdInput) taxIdInput.value = "";
+      } catch (err) {
+        if (taxIdInput) taxIdInput.value = "";
+        setError(err?.message || tx("secure_export_modal_error_generic"));
+      } finally {
+        syncPdfState();
+      }
     } else {
       exportPdf(range.startDate, range.endDate);
     }
@@ -623,21 +657,43 @@ function initExportLanguageSelect() {
   });
 }
 
-function initBusinessTaxId() {
-  const taxIdNode = document.getElementById("exportTaxIdValue");
-  if (!taxIdNode) {
+function wireInlineTaxId() {
+  const checkbox = document.getElementById("exportIncludeTaxId");
+  const section = document.getElementById("exportInlineTaxId");
+  const input = document.getElementById("exportInlineTaxIdInput");
+  const toggle = document.getElementById("exportInlineTaxIdToggle");
+
+  if (!checkbox || !section) {
     return;
   }
 
-  if (getExportScope() === "all") {
-    taxIdNode.textContent = tx("exports_per_business");
-    return;
-  }
+  checkbox.addEventListener("change", () => {
+    const show = checkbox.checked;
+    section.hidden = !show;
+    if (!show && input) {
+      input.value = "";
+      input.type = "password";
+      if (toggle) toggle.textContent = tx("secure_export_modal_show");
+      const cb = document.getElementById("exportInlineTaxIdCheckbox");
+      if (cb) cb.checked = false;
+      const errorEl = document.getElementById("exportInlineTaxIdError");
+      if (errorEl) { errorEl.textContent = ""; errorEl.classList.add("hidden"); }
+    }
+    if (show) {
+      const canadaText = document.getElementById("exportInlineTaxIdCanadaText");
+      if (canadaText) {
+        canadaText.classList.toggle("hidden", getRegion() !== "ca");
+      }
+      input?.focus();
+    }
+  });
 
-  const profile = readBusinessProfile();
-  const region = getRegion();
-  const taxId = profile.ein || profile.taxId || "";
-  taxIdNode.textContent = taxId || tx("exports_tax_id_not_set");
+  toggle?.addEventListener("click", () => {
+    if (!input) return;
+    const isPassword = input.type === "password";
+    input.type = isPassword ? "text" : "password";
+    if (toggle) toggle.textContent = isPassword ? tx("secure_export_modal_hide") : tx("secure_export_modal_show");
+  });
 }
 
 function getValidatedExportRange() {
@@ -1562,165 +1618,6 @@ function clearStorageArray(key, scopeOverride) {
   localStorage.removeItem(storageKey);
 }
 
-// ─── Secure Export Modal ──────────────────────────────────────────────────────
-
-let secureExportPendingRange = null;
-
-function openSecureExportModal(startDate, endDate) {
-  const modal = document.getElementById("secureExportModal");
-  const input = document.getElementById("secureExportTaxId");
-  const checkbox = document.getElementById("secureExportCheckbox");
-  const generateBtn = document.getElementById("secureExportGenerateBtn");
-  const errorEl = document.getElementById("secureExportError");
-  const canadaText = document.getElementById("secureExportCanadaText");
-  const toggleBtn = document.getElementById("secureExportToggleBtn");
-
-  if (!modal) {
-    return;
-  }
-
-  secureExportPendingRange = { startDate, endDate };
-
-  // Reset state
-  if (input) {
-    input.value = "";
-    input.type = "password";
-  }
-  if (checkbox) {
-    checkbox.checked = false;
-  }
-  if (generateBtn) {
-    generateBtn.disabled = true;
-  }
-  if (errorEl) {
-    errorEl.textContent = "";
-    errorEl.classList.add("hidden");
-  }
-  if (toggleBtn) {
-    toggleBtn.textContent = tx("secure_export_modal_show");
-  }
-
-  // Show Canada-specific text if the business region is Canada
-  if (canadaText) {
-    const region = getRegion();
-    if (region === "ca") {
-      canadaText.classList.remove("hidden");
-    } else {
-      canadaText.classList.add("hidden");
-    }
-  }
-
-  modal.classList.remove("hidden");
-  input?.focus();
-}
-
-function closeSecureExportModal() {
-  const modal = document.getElementById("secureExportModal");
-  const input = document.getElementById("secureExportTaxId");
-  if (!modal) {
-    return;
-  }
-
-  // Wipe ephemeral data immediately on close
-  if (input) {
-    input.value = "";
-  }
-
-  modal.classList.add("hidden");
-  secureExportPendingRange = null;
-}
-
-function initSecureExportModal() {
-  const modal = document.getElementById("secureExportModal");
-  const input = document.getElementById("secureExportTaxId");
-  const checkbox = document.getElementById("secureExportCheckbox");
-  const generateBtn = document.getElementById("secureExportGenerateBtn");
-  const cancelBtn = document.getElementById("secureExportCancelBtn");
-  const toggleBtn = document.getElementById("secureExportToggleBtn");
-  const errorEl = document.getElementById("secureExportError");
-
-  if (!modal) {
-    return;
-  }
-
-  // Cancel / backdrop close
-  cancelBtn?.addEventListener("click", closeSecureExportModal);
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      closeSecureExportModal();
-    }
-  });
-
-  // Escape key closes
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modal.classList.contains("hidden")) {
-      closeSecureExportModal();
-    }
-  });
-
-  // Show/hide toggle
-  toggleBtn?.addEventListener("click", () => {
-    if (!input) {
-      return;
-    }
-    const isHidden = input.type === "password";
-    input.type = isHidden ? "text" : "password";
-    toggleBtn.textContent = isHidden ? tx("secure_export_modal_hide") : tx("secure_export_modal_show");
-  });
-
-  // Enable generate button only when input is non-empty, format is valid, and checkbox is checked
-  const syncGenerateBtn = () => {
-    if (generateBtn) {
-      const val = input?.value?.trim() || "";
-      generateBtn.disabled = !val || !isValidTaxId(val) || !checkbox?.checked;
-    }
-  };
-  input?.addEventListener("input", syncGenerateBtn);
-  checkbox?.addEventListener("change", syncGenerateBtn);
-
-  // Generate export
-  generateBtn?.addEventListener("click", async () => {
-    if (!secureExportPendingRange) {
-      return;
-    }
-    const taxId = input?.value?.trim() || "";
-    if (!taxId) {
-      showSecureExportError(tx("secure_export_modal_error_taxid"));
-      return;
-    }
-    if (!isValidTaxId(taxId)) {
-      showSecureExportError(tx("secure_export_modal_error_taxid_format"));
-      return;
-    }
-    if (!checkbox?.checked) {
-      showSecureExportError(tx("secure_export_modal_error_checkbox"));
-      return;
-    }
-
-    generateBtn.disabled = true;
-    if (errorEl) {
-      errorEl.textContent = "";
-      errorEl.classList.add("hidden");
-    }
-
-    try {
-      await submitSecureExport(taxId, secureExportPendingRange.startDate, secureExportPendingRange.endDate);
-      // Wipe input immediately after API call regardless of outcome
-      if (input) {
-        input.value = "";
-      }
-      closeSecureExportModal();
-    } catch (err) {
-      // Input cleared even on error — no residual sensitive data
-      if (input) {
-        input.value = "";
-      }
-      generateBtn.disabled = false;
-      showSecureExportError(err?.message || tx("secure_export_modal_error_generic"));
-    }
-  });
-}
-
 function isValidTaxId(value) {
   if (!value) return false;
   const v = value.trim();
@@ -1729,15 +1626,6 @@ function isValidTaxId(value) {
   // Canada SIN: 9 digits or XXX-XXX-XXX
   const SIN_RE = /^(\d{3}-\d{3}-\d{3}|\d{9})$/;
   return SSN_RE.test(v) || SIN_RE.test(v);
-}
-
-function showSecureExportError(message) {
-  const errorEl = document.getElementById("secureExportError");
-  if (!errorEl) {
-    return;
-  }
-  errorEl.textContent = message || tx("secure_export_modal_error_generic");
-  errorEl.classList.remove("hidden");
 }
 
 async function submitSecureExport(taxId, startDate, endDate) {
