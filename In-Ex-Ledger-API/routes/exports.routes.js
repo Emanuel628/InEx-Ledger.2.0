@@ -385,6 +385,60 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     const currency = req.body?.currency || "USD";
     const templateVersion = req.body?.templateVersion || "v1";
 
+    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult] =
+      await Promise.all([
+        pool.query(
+          `SELECT id, account_id, category_id, amount, type, description, date, note,
+                  currency, source_amount, exchange_rate, tax_treatment,
+                  indirect_tax_amount, indirect_tax_recoverable, personal_use_pct,
+                  review_status
+           FROM transactions
+           WHERE business_id = $1
+             AND date >= $2 AND date <= $3
+             AND deleted_at IS NULL
+             AND (is_void = false OR is_void IS NULL)
+             AND (is_adjustment = false OR is_adjustment IS NULL)
+           ORDER BY date ASC, created_at ASC`,
+          [businessId, dateRange.startDate, dateRange.endDate]
+        ),
+        pool.query(
+          `SELECT id, name, type FROM accounts WHERE business_id = $1`,
+          [businessId]
+        ),
+        pool.query(
+          `SELECT id, name, kind, tax_map_us, tax_map_ca FROM categories WHERE business_id = $1`,
+          [businessId]
+        ),
+        pool.query(
+          `SELECT r.id, r.transaction_id, r.filename
+           FROM receipts r
+           JOIN transactions t ON t.id = r.transaction_id
+           WHERE r.business_id = $1
+             AND t.date >= $2 AND t.date <= $3
+             AND t.deleted_at IS NULL`,
+          [businessId, dateRange.startDate, dateRange.endDate]
+        ),
+        pool.query(
+          `SELECT id, trip_date, purpose, destination, miles, km, odometer_start, odometer_end
+           FROM mileage
+           WHERE business_id = $1
+             AND trip_date >= $2 AND trip_date <= $3
+           ORDER BY trip_date ASC`,
+          [businessId, dateRange.startDate, dateRange.endDate]
+        ),
+        pool.query(
+          `SELECT name, region, province FROM businesses WHERE id = $1`,
+          [businessId]
+        )
+      ]);
+
+    const business = bizResult.rows[0] || {};
+    const region = String(business.region || "us").toLowerCase();
+    const categories = categoryResult.rows.map((c) => ({
+      ...c,
+      taxLabel: region === "ca" ? (c.tax_map_ca || "") : (c.tax_map_us || "")
+    }));
+
     const jobId = crypto.randomUUID();
     const filename = `inex-ledger-export-${dateRange.startDate}_to_${dateRange.endDate}.pdf`;
 
@@ -398,7 +452,15 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       taxId_jwe: includeTaxId ? req.body.taxId_jwe : undefined,
       exportLang,
       currency,
-      templateVersion
+      templateVersion,
+      businessName: business.name || "",
+      region,
+      province: business.province || "",
+      transactions: txResult.rows,
+      accounts: accountResult.rows,
+      categories,
+      receipts: receiptResult.rows,
+      mileage: mileageResult.rows
     };
 
     const workerResult = await dispatchPdfJob(job);
