@@ -38,4 +38,4 @@ Stripe billing requires `STRIPE_SECRET_KEY`, `STRIPE_PRICE_V1_MONTHLY`, and `STR
 
 ## License
 
-All rights reserved. 
+PRIVATE - All rights reserved. 
