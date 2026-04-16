@@ -785,7 +785,18 @@ router.post("/login", authLimiter, async (req, res) => {
     const recognizedDevice = deviceContext
       ? await getRecognizedSignInDevice(user.id, deviceContext.fingerprintHash)
       : null;
-    const needsDeviceVerification = !recognizedDevice && !!deviceContext;
+
+    // Skip device verification on the very first sign-in (no devices registered yet).
+    // Device verification is meant to protect established accounts from new-device
+    // logins — it creates a bad UX loop for brand-new accounts that just verified
+    // their email and are trying to sign in for the first time.
+    const existingDeviceCount = await pool.query(
+      "SELECT 1 FROM recognized_signin_devices WHERE user_id = $1 LIMIT 1",
+      [user.id]
+    );
+    const isFirstSignIn = existingDeviceCount.rowCount === 0;
+
+    const needsDeviceVerification = !recognizedDevice && !!deviceContext && !isFirstSignIn;
     let mfaAuthenticated = false;
 
     if (user.mfa_enabled) {
@@ -838,7 +849,13 @@ router.post("/login", authLimiter, async (req, res) => {
     const session = await issueAuthenticatedSession(res, user, businessId, {
       mfaAuthenticated
     });
-    if (recognizedDevice && deviceContext) {
+    if (isFirstSignIn && deviceContext) {
+      try {
+        await insertRecognizedSignInDevice(user, deviceContext);
+      } catch (securitySignalErr) {
+        logWarn("First sign-in device registration warning:", securitySignalErr?.message || securitySignalErr);
+      }
+    } else if (recognizedDevice && deviceContext) {
       try {
         await touchRecognizedSignInDevice(user.id, deviceContext);
       } catch (securitySignalErr) {
