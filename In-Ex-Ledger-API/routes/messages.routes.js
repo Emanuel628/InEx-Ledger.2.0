@@ -109,14 +109,26 @@ router.get("/contacts", async (req, res) => {
       [req.user.id]
     );
 
-    res.json({
-      contacts: rows.map((r) => ({
-        id: r.id,
-        name: r.name,
-        email: r.email,
-        role: r.role
-      }))
-    });
+    const contacts = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      role: r.role
+    }));
+
+    // Always ensure InEx Ledger Support appears as a reachable contact,
+    // even if no it_support/admin users exist in the DB yet.
+    const hasSupportContact = contacts.some((c) => c.role === "it_support" || c.role === "admin");
+    if (!hasSupportContact) {
+      contacts.unshift({
+        id: "system:support",
+        name: "InEx Ledger Support",
+        email: "support@inexledger.com",
+        role: "it_support"
+      });
+    }
+
+    res.json({ contacts });
   } catch (err) {
     logError("GET /messages/contacts error:", err.message);
     res.status(500).json({ error: "Failed to fetch contacts." });

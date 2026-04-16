@@ -20,6 +20,7 @@ const cpaAccessRoutes = require('./cpa-access.routes.js');
 const cpaVerificationRoutes = require('./cpa-verification.routes.js');
 const analyticsRoutes = require('./analytics.routes.js');
 const messagesRoutes = require('./messages.routes.js');
+const consentRoutes = require('./consent.routes.js');
 
 router.use('/auth', authRoutes);
 router.use('/accounts', accountsRoutes);
@@ -40,5 +41,6 @@ router.use('/cpa-access', cpaAccessRoutes);
 router.use('/cpa-verification', cpaVerificationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/messages', messagesRoutes);
+router.use('/consent', consentRoutes);
 
 module.exports = router;

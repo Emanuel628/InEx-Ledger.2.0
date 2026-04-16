@@ -334,6 +334,14 @@ function pollGlobalUnreadCount() {
     .catch(function () { return true; });
 }
 
+function applyMileageNavLabel() {
+  const isKm = localStorage.getItem("lb_unit_metric") === "true";
+  const label = isKm ? "Kilometres" : "Mileage";
+  document.querySelectorAll('[data-i18n="nav_mileage"]').forEach((el) => {
+    el.textContent = label;
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
   injectSkipLink();
@@ -343,6 +351,9 @@ document.addEventListener("DOMContentLoaded", () => {
   highlightNavigation(); // runs on all nav a elements including the drawer
   applyDateInputConstraints();
   injectMobileDesktopLink();
+  applyMileageNavLabel();
+  window.addEventListener("lunaDistanceUnitChanged", applyMileageNavLabel);
+  window.addEventListener("lunaLanguageChanged", applyMileageNavLabel);
 
   // Poll unread message count for the nav badge every 60 s
   var _globalMsgPollTimer = null;
@@ -469,11 +480,17 @@ window.LUNA_TAX = {
   }
 
   function setConsentRecord(decision) {
-    localStorage.setItem(CONSENT_KEY, JSON.stringify({
-      decision: decision,
-      version: CONSENT_VERSION,
-      at: new Date().toISOString()
-    }));
+    var record = { decision: decision, version: CONSENT_VERSION, at: new Date().toISOString() };
+    localStorage.setItem(CONSENT_KEY, JSON.stringify(record));
+    // Persist to DB for compliance audit trail (best-effort, fire-and-forget)
+    try {
+      var fetchFn = typeof apiFetch === 'function' ? apiFetch : window.fetch.bind(window);
+      fetchFn('/api/consent/cookie', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision: decision, version: CONSENT_VERSION })
+      }).catch(function () { /* ignore — localStorage record is the source of truth */ });
+    } catch (_) { /* ignore */ }
   }
 
   function needsBanner() {

@@ -166,16 +166,21 @@
               </select>
             </div>
             <div class="form-field">
-              <label for="businessEin" data-i18n-region="settings_label_tax_id">EIN</label>
-              <input type="text" id="businessEin" name="business_ein" placeholder="XX-XXXXXXX" autocomplete="off" />
-            </div>
-            <div class="form-field">
               <label for="fiscal-year" data-i18n="settings_label_fiscal_year_start">Fiscal year start</label>
               <input type="date" id="fiscal-year" name="fiscal_year_start" />
             </div>
             <div class="form-field form-field-full">
-              <label for="business-address" data-i18n="settings_label_business_address">Business address</label>
-              <textarea id="business-address" name="business_address" rows="3"></textarea>
+              <label data-i18n="settings_label_business_address">Business address</label>
+              <div class="address-grid">
+                <input type="text" id="address-line1" name="address_line1" data-i18n-placeholder="settings_address_line1" placeholder="Street address" />
+                <input type="text" id="address-line2" name="address_line2" data-i18n-placeholder="settings_address_line2" placeholder="Apt, suite, unit (optional)" />
+                <input type="text" id="address-city" name="address_city" data-i18n-placeholder="settings_address_city" placeholder="City" />
+                <div class="address-row-inline">
+                  <input type="text" id="address-state" name="address_state" data-i18n-placeholder="settings_address_state" placeholder="State / Province" />
+                  <input type="text" id="address-postal" name="address_postal" data-i18n-placeholder="settings_address_postal" placeholder="Postal / ZIP code" />
+                </div>
+                <input type="text" id="address-country" name="address_country" data-i18n-placeholder="settings_address_country" placeholder="Country" />
+              </div>
             </div>
           </div>
           <button type="submit" class="settings-primary-btn" data-i18n="settings_save_changes">Save changes</button>
@@ -245,24 +250,6 @@
           </div>
         </div>
 
-        <div class="settings-subpanel">
-          <div class="settings-subpanel-head">
-            <h3 data-i18n="settings_tax_information_title">Tax information</h3>
-          </div>
-          <div class="settings-row" data-region-show="us">
-            <div class="settings-row-copy">
-              <div class="settings-row-title" data-i18n="settings_ssn_row_title">Social Security Number (SSN)</div>
-              <div class="settings-row-desc" data-i18n="settings_ssn_row_desc">Used on U.S. federal tax filings for sole proprietors. Stored encrypted.</div>
-            </div>
-          </div>
-
-          <div class="settings-row" data-region-show="ca">
-            <div class="settings-row-copy">
-              <div class="settings-row-title" data-i18n="settings_sin_row_title">Social Insurance Number (SIN)</div>
-              <div class="settings-row-desc" data-i18n="settings_sin_row_desc">Used on Canadian T1 and T2125 filings. Stored encrypted.</div>
-            </div>
-          </div>
-        </div>
       </section>
 
       <section class="settings-card settings-panel" id="settings-cpa-access">

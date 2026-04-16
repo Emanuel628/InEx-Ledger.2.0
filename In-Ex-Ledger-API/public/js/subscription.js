@@ -115,9 +115,21 @@ function updatePricingUI() {
 }
 
 function initPricingControls() {
-  pricingState.currency = resolveDefaultCurrency();
+  const lockedCurrency = resolveDefaultCurrency();
+  pricingState.currency = lockedCurrency;
   pricingState.billingInterval = "monthly";
   pricingState.additionalBusinesses = 0;
+
+  // Lock currency to the user's region — prevent cross-region price selection
+  document.querySelectorAll("[data-currency]").forEach((btn) => {
+    const btnCurrency = String(btn.dataset.currency || "").toLowerCase();
+    if (btnCurrency !== lockedCurrency) {
+      btn.disabled = true;
+      btn.title = btn.dataset.currency === "cad"
+        ? "CAD pricing is available for Canadian accounts only"
+        : "USD pricing is available for US accounts only";
+    }
+  });
 
   document.querySelectorAll("[data-billing-interval]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -130,6 +142,7 @@ function initPricingControls() {
 
   document.querySelectorAll("[data-currency]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (btn.disabled) return;
       const currency = String(btn.dataset.currency || "").toLowerCase();
       if (!BILLING_CURRENCIES.includes(currency)) return;
       pricingState.currency = currency;
