@@ -106,6 +106,16 @@ function deriveEffectiveState(row) {
     row?.plan_code === PLAN_V1 &&
     currentPeriodEnd &&
     currentPeriodEnd.getTime() > now);
+  // Stripe fires customer.subscription.updated (status → "canceled") when a
+  // subscription is cancelled immediately mid-period, before current_period_end.
+  // Neither isActivePaid (requires "active") nor isGracePeriod (requires
+  // cancel_at_period_end) matches this state, so without this check the user
+  // would lose access immediately even though they paid through period end.
+  const isCanceledWithRemainingAccess =
+    Boolean(row?.status === "canceled" &&
+    row?.plan_code === PLAN_V1 &&
+    currentPeriodEnd &&
+    currentPeriodEnd.getTime() > now);
 
   let effectiveTier = PLAN_FREE;
   let effectiveStatus = row?.status || "inactive";
@@ -113,7 +123,7 @@ function deriveEffectiveState(row) {
   if (isTrialing) {
     effectiveTier = PLAN_V1;
     effectiveStatus = "trialing";
-  } else if (isActivePaid || isGracePeriod || isPastDueGracePeriod) {
+  } else if (isActivePaid || isGracePeriod || isPastDueGracePeriod || isCanceledWithRemainingAccess) {
     effectiveTier = PLAN_V1;
     effectiveStatus = row.status;
   } else if (row?.status === "trialing" && resolvedTrialEndsAt && resolvedTrialEndsAt.getTime() <= now) {
@@ -133,7 +143,8 @@ function deriveEffectiveState(row) {
     effectiveTier,
     effectiveStatus,
     isTrialing,
-    isPaid: Boolean(isActivePaid || isGracePeriod || isPastDueGracePeriod),
+    isPaid: Boolean(isActivePaid || isGracePeriod || isPastDueGracePeriod || isCanceledWithRemainingAccess),
+    isCanceledWithRemainingAccess,
     cancelAtPeriodEnd: Boolean(row?.cancel_at_period_end),
     stripeCustomerId: row?.stripe_customer_id || null,
     stripeSubscriptionId: row?.stripe_subscription_id || null,
