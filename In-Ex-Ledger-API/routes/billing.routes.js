@@ -240,6 +240,41 @@ router.get("/subscription", requireAuth, async (req, res) => {
   }
 });
 
+// ── Mock V1 (dev/staging only) ────────────────────────────────────────────────
+// These two routes let developers activate V1 access without going through
+// Stripe. Gate them behind ENABLE_MOCK_BILLING=true so they are unreachable
+// in production.
+
+router.get("/mock-v1", async (_req, res) => {
+  res.json({ enabled: process.env.ENABLE_MOCK_BILLING === "true" });
+});
+
+router.post("/mock-v1", requireAuth, requireCsrfProtection, async (req, res) => {
+  if (process.env.ENABLE_MOCK_BILLING !== "true") {
+    return res.status(403).json({ error: "Mock billing is not enabled in this environment." });
+  }
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    await pool.query(
+      `UPDATE business_subscriptions
+          SET plan_code = 'v1',
+              status    = 'active',
+              current_period_start = NOW(),
+              current_period_end   = NOW() + INTERVAL '2 years',
+              cancel_at_period_end = false,
+              updated_at = NOW()
+        WHERE business_id = $1`,
+      [businessId]
+    );
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    logInfo("Mock V1 activated for business", businessId);
+    res.json({ subscription });
+  } catch (err) {
+    logError("POST /api/billing/mock-v1 error:", err.message);
+    res.status(500).json({ error: "Failed to activate mock V1." });
+  }
+});
+
 router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfa, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
