@@ -30,3 +30,9 @@ test("migration 049 creates persistent Stripe webhook idempotency table", () => 
   assert.match(sql, /processed_at\s+TIMESTAMPTZ\s+NOT NULL\s+DEFAULT NOW\(\)/i);
   assert.match(sql, /CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_processed_at/i);
 });
+
+test("migration 050 drops cpa_audit_logs grant_id FK to prevent XX000 on account deletion", () => {
+  const sql = fs.readFileSync(path.join(migrationsDir, "050_drop_cpa_audit_grant_id_fk.sql"), "utf8");
+
+  assert.match(sql, /ALTER TABLE IF EXISTS cpa_audit_logs\s+DROP CONSTRAINT IF EXISTS cpa_audit_logs_grant_id_fkey;/i);
+});
