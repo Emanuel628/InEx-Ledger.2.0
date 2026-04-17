@@ -8,7 +8,7 @@ const {
 } = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { issueExportGrant, verifyExportGrant } = require("../services/exportGrantService.js");
-const { saveRedactedPdf, buildRedactedStream } = require("../services/exportStorage.js");
+const { saveRedactedPdf, buildRedactedStream, deleteExportFile } = require("../services/exportStorage.js");
 const { decryptJwe } = require("../services/jweDecryptService.js");
 const { buildPdfExport } = require("../services/pdfGeneratorService.js");
 const { pool } = require("../db.js");
@@ -488,6 +488,54 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
   } catch (err) {
     logError("Secure export error", { body: sanitizedBody, err: err.message });
     return res.status(500).json({ error: "Failed to generate secure export." });
+  }
+});
+
+router.delete("/history/:id", exportGrantLimiter, async (req, res) => {
+  try {
+    const user = req.user;
+    user.business_id = await resolveBusinessIdForUser(user);
+    const businessId = user.business_id;
+
+    const { rows } = await pool.query(
+      `SELECT m.file_path
+         FROM exports e
+         LEFT JOIN LATERAL (
+           SELECT MAX(CASE WHEN key = 'file_path' THEN value END) AS file_path
+             FROM export_metadata
+            WHERE export_id = e.id
+         ) m ON TRUE
+        WHERE e.id = $1
+          AND e.business_id = $2
+        LIMIT 1`,
+      [req.params.id, businessId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "Export not found." });
+    }
+
+    if (rows[0].file_path) {
+      await deleteExportFile(rows[0].file_path).catch(() => {});
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("DELETE FROM export_metadata WHERE export_id = $1", [req.params.id]);
+      await client.query("DELETE FROM exports WHERE id = $1 AND business_id = $2", [req.params.id, businessId]);
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    return res.json({ message: "Export deleted." });
+  } catch (err) {
+    logError("Export delete error", { err: err.message });
+    return res.status(500).json({ error: "Failed to delete export." });
   }
 });
 
