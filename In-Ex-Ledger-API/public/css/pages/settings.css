@@ -2346,3 +2346,155 @@ body {
     flex-direction: column;
   }
 }
+
+/* ── Diagnostics section ───────────────────────────────────────────────────── */
+
+.diag-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.diag-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.diag-row:last-child {
+  border-bottom: none;
+}
+
+.diag-row.hidden {
+  display: none;
+}
+
+.diag-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink2);
+  flex-shrink: 0;
+  min-width: 110px;
+}
+
+.diag-value {
+  font-size: 13px;
+  color: var(--ink);
+  text-align: right;
+  word-break: break-word;
+}
+
+/* Status colours */
+.diag-ok {
+  color: var(--green);
+  font-weight: 500;
+}
+
+.diag-warn {
+  color: var(--amber);
+  font-weight: 500;
+}
+
+.diag-err {
+  color: var(--red);
+  font-weight: 500;
+}
+
+/* Recent errors list */
+.diag-errors-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diag-error-item {
+  padding: 10px 12px;
+  background: var(--surface2);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--amber);
+}
+
+.diag-error-msg {
+  font-size: 13px;
+  color: var(--ink);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.diag-error-meta {
+  font-size: 11px;
+  color: var(--ink3);
+  margin-top: 3px;
+}
+
+.diag-empty {
+  font-size: 13px;
+  color: var(--ink3);
+  padding: 8px 0;
+}
+
+/* Actions row */
+.diag-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Clipboard feedback */
+.diag-copy-feedback {
+  font-size: 13px;
+  color: var(--green);
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+.diag-copy-feedback.hidden {
+  display: none;
+}
+
+/* Support guidance card */
+.diag-support-guidance {
+  margin-top: 20px;
+  padding: 16px;
+  background: var(--surface2);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.diag-support-guidance h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--ink);
+}
+
+.diag-support-guidance p {
+  font-size: 13px;
+  color: var(--ink2);
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.diag-support-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.diag-support-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+/* Legal boundary note */
+.diag-legal-note {
+  font-size: 12px;
+  color: var(--ink3);
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  line-height: 1.6;
+}

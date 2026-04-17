@@ -100,6 +100,35 @@ let settingsOverviewState = {
 
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
+// ── Diagnostics: rolling error buffer ────────────────────────────────────────
+// Captures safe summaries of client-side errors for the Diagnostics section.
+// Stack traces, tokens, and raw objects are never stored.
+const _diagErrorBuffer = [];
+const _DIAG_ERROR_MAX = 10;
+
+function _diagCaptureError(message, source) {
+  const raw = String(message || "Unknown error").slice(0, 300);
+  // Strip anything that looks like a credential or token
+  const safe = raw
+    .replace(/Bearer\s+\S+/gi, "[token]")
+    .replace(/sk_[a-z0-9_]+/gi, "[key]")
+    .replace(/whsec_[a-z0-9_]+/gi, "[key]")
+    .replace(/eyJ[a-zA-Z0-9_-]{10,}/g, "[jwt]");
+  _diagErrorBuffer.unshift({ message: safe, time: new Date().toISOString(), source: source || "script" });
+  if (_diagErrorBuffer.length > _DIAG_ERROR_MAX) {
+    _diagErrorBuffer.length = _DIAG_ERROR_MAX;
+  }
+}
+
+window.addEventListener("error", (event) => {
+  _diagCaptureError(event.message, "script");
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  const msg = event.reason?.message || String(event.reason || "Unhandled promise rejection");
+  _diagCaptureError(msg, "promise");
+});
+
 let legacySettingsStoragePurged = false;
 
 function resolveSettingsUserId() {
@@ -153,6 +182,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initPreferences();
   initSecurityForm();
   initDangerZone();
+  initDiagnostics();
   syncSettingsOverviewSummaries();
   window.addEventListener("lunaLanguageChanged", refreshSettingsLocalizedState);
   window.addEventListener("lunaRegionChanged", refreshSettingsLocalizedState);
@@ -2518,6 +2548,243 @@ function initDangerZone() {
       closeModal();
     })();
   });
+}
+
+// ── Diagnostics ───────────────────────────────────────────────────────────────
+
+let _diagServerData = null;
+
+function _diagParseBrowser(ua) {
+  if (/Firefox\/(\d+)/.test(ua)) return `Firefox ${RegExp.$1}`;
+  if (/Edg\/(\d+)/.test(ua)) return `Edge ${RegExp.$1}`;
+  if (/OPR\/(\d+)/.test(ua)) return `Opera ${RegExp.$1}`;
+  if (/Chrome\/(\d+)/.test(ua)) return `Chrome ${RegExp.$1}`;
+  if (/Safari\//.test(ua) && !/Chrome/.test(ua)) return "Safari";
+  return "Other";
+}
+
+function _diagParseOs(ua) {
+  if (/iPhone|iPad|iPod/.test(ua)) return "iOS";
+  if (/Android/.test(ua)) return "Android";
+  if (/Windows NT/.test(ua)) return "Windows";
+  if (/Mac OS X/.test(ua)) return "macOS";
+  if (/Linux/.test(ua)) return "Linux";
+  return "Other";
+}
+
+function _diagDeviceClass() {
+  const w = window.innerWidth;
+  if (w < 480) return `Mobile (${w}px)`;
+  if (w < 1024) return `Tablet (${w}px)`;
+  return `Desktop (${w}px)`;
+}
+
+function _diagStatusHtml(ok, okLabel, failLabel) {
+  const label = ok ? (okLabel || "Yes") : (failLabel || "No");
+  const cls = ok ? "diag-ok" : "diag-warn";
+  return `<span class="${escapeHtml(cls)}">${escapeHtml(label)}</span>`;
+}
+
+function _diagTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "—";
+  } catch {
+    return "—";
+  }
+}
+
+async function _diagFetchServer() {
+  try {
+    const res = await apiFetch("/api/diagnostics");
+    if (!res || !res.ok) return null;
+    return await res.json().catch(() => null);
+  } catch {
+    return null;
+  }
+}
+
+function _diagRenderErrors() {
+  const list = document.getElementById("diagErrorsList");
+  if (!list) return;
+  if (!_diagErrorBuffer.length) {
+    list.innerHTML = `<p class="diag-empty">No errors recorded in this session.</p>`;
+    return;
+  }
+  list.innerHTML = _diagErrorBuffer.map((err) => `
+    <div class="diag-error-item">
+      <div class="diag-error-msg">${escapeHtml(err.message)}</div>
+      <div class="diag-error-meta">${escapeHtml(new Date(err.time).toLocaleTimeString())}${err.source !== "script" ? ` &middot; ${escapeHtml(err.source)}` : ""}</div>
+    </div>
+  `).join("");
+}
+
+function _diagRender(serverData) {
+  const now = new Date();
+  const ua = navigator.userAgent;
+  const account = serverData?.account || {};
+  const exportData = serverData?.export || {};
+
+  // A. App Info
+  const envEl = document.getElementById("diagEnv");
+  const genEl = document.getElementById("diagGeneratedAt");
+  if (envEl) envEl.textContent = serverData?.environment || "—";
+  if (genEl) genEl.textContent = now.toLocaleTimeString();
+
+  // B. Session & Account
+  const signedInEl = document.getElementById("diagSignedIn");
+  const emailVerEl = document.getElementById("diagEmailVerified");
+  const mfaEl = document.getElementById("diagMfa");
+  const bizEl = document.getElementById("diagBusiness");
+  const planEl = document.getElementById("diagPlan");
+
+  if (signedInEl) signedInEl.innerHTML = _diagStatusHtml(!!window.__LUNA_ME__, "Active", "Not signed in");
+  if (emailVerEl) emailVerEl.innerHTML = _diagStatusHtml(!!account.email_verified, "Verified", "Not verified");
+  if (mfaEl) mfaEl.innerHTML = _diagStatusHtml(!!account.mfa_enabled, "Enabled", "Disabled");
+  if (bizEl) {
+    const ctx = account.business_context || "unknown";
+    bizEl.textContent = ctx.charAt(0).toUpperCase() + ctx.slice(1);
+  }
+  if (planEl) {
+    const planLabel = account.plan === "v1" ? "V1" : (account.plan || "Free");
+    const status = account.plan_status || "";
+    planEl.textContent = status && status !== "unknown" ? `${planLabel} (${status})` : planLabel;
+  }
+
+  // C. Export Health
+  const pdfEl = document.getElementById("diagPdfAvail");
+  const secureEl = document.getElementById("diagSecureAvail");
+  const emailVerifRow = document.getElementById("diagEmailVerifRow");
+  if (pdfEl) pdfEl.innerHTML = _diagStatusHtml(!!exportData.pdf_available, "Available", "Unavailable");
+  if (secureEl) secureEl.innerHTML = _diagStatusHtml(!!exportData.secure_export_available, "Available", "Unavailable");
+  if (emailVerifRow) emailVerifRow.classList.toggle("hidden", !exportData.email_verification_required);
+
+  // D. Client Context
+  const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  setText("diagBrowser", _diagParseBrowser(ua));
+  setText("diagOs", _diagParseOs(ua));
+  setText("diagViewport", _diagDeviceClass());
+  setText("diagLocale", navigator.language || "—");
+  setText("diagTimezone", _diagTimezone());
+  setText("diagPage", window.location.pathname + (window.location.hash || ""));
+  const onlineEl = document.getElementById("diagOnline");
+  if (onlineEl) onlineEl.innerHTML = _diagStatusHtml(navigator.onLine, "Online", "Offline");
+
+  // E. Recent Errors
+  _diagRenderErrors();
+
+  // Overview summary card
+  const overviewSummary = document.getElementById("overviewDiagnosticsSummary");
+  if (overviewSummary) {
+    const planDisplay = account.plan === "v1" ? "V1" : (account.plan || "Free");
+    const exportStatus = exportData.pdf_available ? "Exports available" : "Exports limited";
+    overviewSummary.textContent = `${planDisplay} • ${exportStatus}`;
+  }
+}
+
+function _diagBuildSupportPayload(serverData) {
+  const account = serverData?.account || {};
+  const exportData = serverData?.export || {};
+  return {
+    app: {
+      name: "InEx Ledger",
+      environment: serverData?.environment || "unknown"
+    },
+    account: {
+      email_verified: !!account.email_verified,
+      mfa_enabled: !!account.mfa_enabled,
+      business_context: account.business_context || "unknown",
+      plan: account.plan || "free",
+      plan_status: account.plan_status || "unknown"
+    },
+    session: {
+      status: window.__LUNA_ME__ ? "active" : "not_authenticated"
+    },
+    export: {
+      pdf_available: !!exportData.pdf_available,
+      secure_export_available: !!exportData.secure_export_available,
+      email_verification_required: !!exportData.email_verification_required
+    },
+    client: {
+      browser: _diagParseBrowser(navigator.userAgent),
+      os: _diagParseOs(navigator.userAgent),
+      viewport: _diagDeviceClass(),
+      locale: navigator.language || "unknown",
+      timezone: _diagTimezone(),
+      route: window.location.pathname + (window.location.hash || ""),
+      online: navigator.onLine
+    },
+    recent_errors: _diagErrorBuffer.slice(0, 5).map((err) => ({
+      message: err.message,
+      time: err.time
+    })),
+    support_context: {
+      generated_at: new Date().toISOString()
+    }
+  };
+}
+
+async function _diagCopyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Fallback for restricted contexts
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.cssText = "position:fixed;opacity:0;pointer-events:none";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function initDiagnostics() {
+  const section = document.getElementById("settings-diagnostics");
+  if (!section) return;
+
+  // Render immediately with client-side data, then update with server data
+  _diagRender(_diagServerData);
+
+  _diagFetchServer().then((serverData) => {
+    _diagServerData = serverData;
+    _diagRender(_diagServerData);
+  }).catch(() => {
+    // Server data unavailable — client-side context still renders
+  });
+
+  const refreshBtn = document.getElementById("diagRefresh");
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", () => {
+      refreshBtn.disabled = true;
+      _diagFetchServer().then((serverData) => {
+        _diagServerData = serverData;
+        _diagRender(_diagServerData);
+      }).finally(() => {
+        refreshBtn.disabled = false;
+      });
+    });
+  }
+
+  const copyBtn = document.getElementById("diagCopySupportInfo");
+  const copyFeedback = document.getElementById("diagCopyFeedback");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", async () => {
+      const payload = _diagBuildSupportPayload(_diagServerData);
+      const text = JSON.stringify(payload, null, 2);
+      const ok = await _diagCopyToClipboard(text);
+      if (copyFeedback) {
+        copyFeedback.textContent = ok ? "Support info copied to clipboard." : "Copy failed — please copy the text manually.";
+        copyFeedback.classList.remove("hidden");
+        setTimeout(() => copyFeedback.classList.add("hidden"), 3500);
+      }
+    });
+  }
 }
 
 function showSettingsToast(message) {
