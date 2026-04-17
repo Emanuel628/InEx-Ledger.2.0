@@ -51,7 +51,9 @@ const webhookLimiter = rateLimit({
   keyGenerator: () => "stripe-webhook"
 });
 
-const _WEBHOOK_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
+// Stripe can retry failed deliveries for up to 72 h; keep IDs for 7 days so a
+// late retry is never treated as a new event.
+const _WEBHOOK_IDEMPOTENCY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const _WEBHOOK_IDEMPOTENCY_CLEANUP_PROBABILITY = 0.01;
 
 async function reserveWebhookEvent(eventId) {
@@ -279,8 +281,16 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    if (subscription.isPaid && !subscription.cancelAtPeriodEnd) {
-      return res.status(409).json({ error: "Business is already on an active paid plan." });
+    // Block when any live Stripe subscription exists — including subscriptions
+    // scheduled to cancel at period end (cancel_at_period_end=true).  Allowing
+    // checkout in that state creates a second parallel subscription and double
+    // billing.  isCanceledWithRemainingAccess means Stripe already deleted the
+    // subscription; the user may create a new one while keeping access through
+    // the paid period.
+    if (subscription.isPaid && !subscription.isCanceledWithRemainingAccess) {
+      return res.status(409).json({
+        error: "Business is already on an active paid plan. Use the billing portal to manage your subscription."
+      });
     }
 
     const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
@@ -444,9 +454,13 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
     .split(",")
     .map((part) => part.trim());
   const timestamp = parts.find((part) => part.startsWith("t="))?.slice(2);
-  const v1 = parts.find((part) => part.startsWith("v1="))?.slice(3);
+  // Collect ALL v1= values — Stripe sends multiple signatures during secret
+  // rotation and the webhook is valid if any one of them matches.
+  const v1Signatures = parts
+    .filter((part) => part.startsWith("v1="))
+    .map((part) => part.slice(3));
 
-  if (!timestamp || !v1) {
+  if (!timestamp || v1Signatures.length === 0) {
     throw new Error("Missing Stripe signature");
   }
 
@@ -458,9 +472,12 @@ function verifyWebhookSignature(rawBody, signatureHeader) {
 
   const payload = `${timestamp}.${rawBody.toString("utf8")}`;
   const expected = crypto.createHmac("sha256", secret).update(payload).digest("hex");
-  const actual = Buffer.from(v1, "utf8");
   const compare = Buffer.from(expected, "utf8");
-  if (actual.length !== compare.length || !crypto.timingSafeEqual(actual, compare)) {
+  const isValid = v1Signatures.some((v1) => {
+    const actual = Buffer.from(v1, "utf8");
+    return actual.length === compare.length && crypto.timingSafeEqual(actual, compare);
+  });
+  if (!isValid) {
     throw new Error("Invalid Stripe signature");
   }
 }
@@ -482,21 +499,25 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
     return res.status(400).json({ error: "Invalid webhook payload" });
   }
 
-  // Always acknowledge to Stripe — internal processing errors must not return 4xx
-  res.status(200).json({ received: true });
-
-  // Idempotency: reserve event ID in the database and skip duplicates.
+  // Idempotency: reserve event ID before acknowledging. This ensures that if
+  // the DB is temporarily unavailable, Stripe receives a non-2xx response and
+  // retries the delivery instead of silently losing the event.
+  let reserved;
   try {
-    const reserved = await reserveWebhookEvent(event.id);
-    if (!reserved) {
-      logInfo("Stripe webhook duplicate skipped:", event.id, event.type);
-      return;
-    }
+    reserved = await reserveWebhookEvent(event.id);
   } catch (err) {
     logError("Stripe webhook idempotency reservation failed:", {
       eventId: event.id,
       err: err.message
     });
+    return res.status(500).json({ error: "Webhook processing temporarily unavailable" });
+  }
+
+  // Acknowledge to Stripe only after idempotency is secured.
+  res.status(200).json({ received: true });
+
+  if (!reserved) {
+    logInfo("Stripe webhook duplicate skipped:", event.id, event.type);
     return;
   }
 
