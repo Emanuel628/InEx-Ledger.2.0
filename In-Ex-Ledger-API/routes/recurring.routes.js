@@ -7,6 +7,10 @@ const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
+  getSubscriptionSnapshotForBusiness,
+  hasFeatureAccess
+} = require("../services/subscriptionService.js");
+const {
   RecurringTemplateValidationError,
   normalizeRecurringPayload,
   materializeTemplateRuns,
@@ -20,6 +24,19 @@ const router = express.Router();
 router.use(requireAuth);
 router.use(requireCsrfProtection);
 router.use(createDataApiLimiter({ max: 80 }));
+
+router.use(async (req, res, next) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    if (!hasFeatureAccess(subscription, "recurring_transactions")) {
+      return res.status(402).json({ error: "Recurring transactions require an active V1 plan." });
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get("/", async (req, res) => {
   try {
