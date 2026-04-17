@@ -264,8 +264,13 @@ async function setFreePlanForBusiness(businessId) {
     `UPDATE business_subscriptions
         SET plan_code = $2,
             status = 'free',
+            stripe_subscription_id = NULL,
+            stripe_price_id = NULL,
+            current_period_start = NULL,
+            current_period_end = NULL,
             cancel_at_period_end = false,
             canceled_at = NOW(),
+            metadata_json = NULL,
             updated_at = NOW()
       WHERE business_id = $1`,
     [businessId, PLAN_FREE]
