@@ -9,7 +9,7 @@ const {
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { issueExportGrant, verifyExportGrant } = require("../services/exportGrantService.js");
 const { saveRedactedPdf, buildRedactedStream, deleteExportFile } = require("../services/exportStorage.js");
-const { decryptJwe } = require("../services/jweDecryptService.js");
+const { decryptJwe, isPrivateKeyConfigured } = require("../services/jweDecryptService.js");
 const { buildPdfExport } = require("../services/pdfGeneratorService.js");
 const { pool } = require("../db.js");
 const { logError } = require("../utils/logger.js");
@@ -235,6 +235,11 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     const currency = grantPayload.metadata?.currency || "USD";
     const includeTaxId = grantPayload.includeTaxId;
 
+    if (includeTaxId && !isPrivateKeyConfigured()) {
+      logError("Export generate: EXPORT_PRIVATE_KEY_JWK is not configured");
+      return res.status(503).json({ error: "Tax ID export is not available — server key not configured. Contact support." });
+    }
+
     const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult] =
       await Promise.all([
         pool.query(
@@ -439,6 +444,10 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     const includeTaxId = Boolean(req.body?.includeTaxId);
     if (includeTaxId && !req.body?.taxId_jwe) {
       return res.status(400).json({ error: "taxId_jwe is required when includeTaxId is true." });
+    }
+    if (includeTaxId && !isPrivateKeyConfigured()) {
+      logError("Secure export: EXPORT_PRIVATE_KEY_JWK is not configured");
+      return res.status(503).json({ error: "Tax ID export is not available — server key not configured. Contact support." });
     }
 
     const exportLang = req.body?.language || "en";

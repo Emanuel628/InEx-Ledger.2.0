@@ -45,4 +45,8 @@ function decryptJwe(jweToken) {
   return plaintext.toString('utf8');
 }
 
-module.exports = { decryptJwe };
+function isPrivateKeyConfigured() {
+  return !!process.env.EXPORT_PRIVATE_KEY_JWK;
+}
+
+module.exports = { decryptJwe, isPrivateKeyConfigured };
