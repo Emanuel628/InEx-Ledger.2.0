@@ -41,4 +41,17 @@ function buildRedactedStream(res, filePath) {
   stream.pipe(res);
 }
 
-module.exports = { saveRedactedPdf, buildRedactedStream };
+async function deleteExportFile(filePath) {
+  if (!filePath) return;
+  const resolvedPath = path.resolve(filePath);
+  if (!resolvedPath.startsWith(EXPORT_STORAGE_DIR + path.sep) && resolvedPath !== EXPORT_STORAGE_DIR) {
+    throw new Error("Invalid export path");
+  }
+  try {
+    await fs.promises.unlink(resolvedPath);
+  } catch (err) {
+    if (err.code !== "ENOENT") throw err;
+  }
+}
+
+module.exports = { saveRedactedPdf, buildRedactedStream, deleteExportFile };
