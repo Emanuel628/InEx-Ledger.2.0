@@ -555,7 +555,14 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
     return res.send(fullPdfBuffer);
   } catch (err) {
-    logError("Secure export error", { body: sanitizedBody, err: err.message });
+    logError("Secure export error", { body: sanitizedBody, err: err.message, stack: err.stack });
+    const msg = err.message || "";
+    if (msg.includes("not configured")) {
+      return res.status(503).json({ error: "Tax ID export is not available — server key not configured. Contact support." });
+    }
+    if (msg.includes("Invalid JWE") || msg.includes("bad decrypt") || msg.includes("Unsupported state") || msg.includes("EVP_") || msg.includes("wrong final block")) {
+      return res.status(400).json({ error: "Tax ID could not be decrypted. The export key pair may be misconfigured — check that EXPORT_PUBLIC_KEY_JWK and EXPORT_PRIVATE_KEY_JWK are from the same generated pair." });
+    }
     return res.status(500).json({ error: "Failed to generate secure export." });
   }
 });
