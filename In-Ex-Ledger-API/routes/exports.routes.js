@@ -11,7 +11,6 @@ const { issueExportGrant, verifyExportGrant } = require("../services/exportGrant
 const { saveRedactedPdf, buildRedactedStream, deleteExportFile } = require("../services/exportStorage.js");
 const { decryptJwe } = require("../services/jweDecryptService.js");
 const { buildPdfExport } = require("../services/pdfGeneratorService.js");
-const { dispatchPdfJob } = require("../services/pdfWorkerClient.js");
 const { pool } = require("../db.js");
 const { logError } = require("../utils/logger.js");
 const { sanitizePayload } = require("../utils/logSanitizer.js");
@@ -231,23 +230,79 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     if (!DATE_PATTERN.test(grantStartDate) || !DATE_PATTERN.test(grantEndDate)) {
       return res.status(400).json({ error: "Grant token contains invalid date range." });
     }
-    const jobId = crypto.randomUUID();
-    const filename = `inex-ledger-export-${grantStartDate}_to_${grantEndDate}.pdf`;
-    const job = {
-      jobId,
-      businessId,
-      userId: user.id,
+
+    const exportLang = grantPayload.metadata?.language || "en";
+    const currency = grantPayload.metadata?.currency || "USD";
+    const includeTaxId = grantPayload.includeTaxId;
+
+    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult] =
+      await Promise.all([
+        pool.query(
+          `SELECT id, account_id, category_id, amount, type, description, date, note,
+                  currency, source_amount, exchange_rate, tax_treatment,
+                  indirect_tax_amount, indirect_tax_recoverable, personal_use_pct,
+                  review_status
+           FROM transactions
+           WHERE business_id = $1
+             AND date >= $2 AND date <= $3
+             AND deleted_at IS NULL
+             AND (is_void = false OR is_void IS NULL)
+             AND (is_adjustment = false OR is_adjustment IS NULL)
+           ORDER BY date ASC, created_at ASC`,
+          [businessId, grantStartDate, grantEndDate]
+        ),
+        pool.query(`SELECT id, name, type FROM accounts WHERE business_id = $1`, [businessId]),
+        pool.query(
+          `SELECT id, name, kind, tax_map_us, tax_map_ca FROM categories WHERE business_id = $1`,
+          [businessId]
+        ),
+        pool.query(
+          `SELECT r.id, r.transaction_id, r.filename
+           FROM receipts r
+           JOIN transactions t ON t.id = r.transaction_id
+           WHERE r.business_id = $1 AND t.date >= $2 AND t.date <= $3 AND t.deleted_at IS NULL`,
+          [businessId, grantStartDate, grantEndDate]
+        ),
+        pool.query(
+          `SELECT id, trip_date, purpose, destination, miles, km, odometer_start, odometer_end
+           FROM mileage WHERE business_id = $1 AND trip_date >= $2 AND trip_date <= $3
+           ORDER BY trip_date ASC`,
+          [businessId, grantStartDate, grantEndDate]
+        ),
+        pool.query(`SELECT name, region, province FROM businesses WHERE id = $1`, [businessId])
+      ]);
+
+    const business = bizResult.rows[0] || {};
+    const region = String(business.region || "us").toLowerCase();
+    const categories = categoryResult.rows.map((c) => ({
+      ...c,
+      taxLabel: region === "ca" ? (c.tax_map_ca || "") : (c.tax_map_us || "")
+    }));
+
+    const taxId = includeTaxId ? decryptJwe(req.body.taxId_jwe) : "";
+
+    const sharedOptions = {
+      transactions: txResult.rows,
+      accounts: accountResult.rows,
+      categories,
+      receipts: receiptResult.rows,
+      mileage: mileageResult.rows,
       startDate: grantStartDate,
       endDate: grantEndDate,
-      includeTaxId: grantPayload.includeTaxId,
-      taxId_jwe: grantPayload.includeTaxId ? req.body.taxId_jwe : undefined,
-      exportLang: grantPayload.metadata?.language || "en",
-      currency: grantPayload.metadata?.currency || "USD",
-      templateVersion: grantPayload.metadata?.templateVersion || "v1"
+      exportLang,
+      currency,
+      businessName: business.name || "",
+      legalName: business.name || "",
+      operatingName: "",
+      region,
+      province: business.province || ""
     };
 
-    const workerResult = await dispatchPdfJob(job);
-    const redactedBuffer = workerResult.redactedPdfBuffer || Buffer.alloc(0);
+    const fullPdfBuffer = buildPdfExport({ ...sharedOptions, taxId });
+    const redactedBuffer = buildPdfExport({ ...sharedOptions, taxId: "" });
+
+    const jobId = crypto.randomUUID();
+    const filename = `inex-ledger-export-${grantStartDate}_to_${grantEndDate}.pdf`;
     const { filePath, hash } = await saveRedactedPdf(jobId, redactedBuffer);
     await storeCompletedExport({
       businessId,
@@ -255,21 +310,21 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       exportType: "pdf",
       startDate: grantStartDate,
       endDate: grantEndDate,
-      includeTaxId: grantPayload.includeTaxId,
+      includeTaxId,
       grantJti: grantPayload.jti,
       contentHash: hash,
       filePath,
-      language: job.exportLang,
-      currency: job.currency,
-      pageCount: Number(workerResult.metadata?.pageCount) || 0,
-      notes: workerResult.metadata?.notes || "Generated via trusted worker",
+      language: exportLang,
+      currency,
+      pageCount: 0,
+      notes: "Generated via grant",
       fullVersionAvailable: false
     });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
-    return res.send(workerResult.fullPdfBuffer);
+    return res.send(fullPdfBuffer);
   } catch (err) {
     logError("Export generation error", { body: sanitizedBody, err: err.message });
     return res.status(500).json({ error: "Failed to generate export." });
