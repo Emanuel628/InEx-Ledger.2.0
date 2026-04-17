@@ -5,6 +5,10 @@ const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const {
+  getSubscriptionSnapshotForBusiness,
+  hasFeatureAccess
+} = require("../services/subscriptionService.js");
 const WEEKS_PER_MONTH = 52 / 12;
 const BIWEEKS_PER_MONTH = 26 / 12;
 const MAX_ANALYTICS_AMOUNT = 999999999.99;
@@ -82,6 +86,8 @@ function validateOptionalNumber(value, fieldName, { min = null, max = null } = {
 router.get("/dashboard", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    const hasTaxEstimates = hasFeatureAccess(subscription, "tax_estimates");
     const businessRow = await pool.query(
       "SELECT region FROM businesses WHERE id = $1",
       [businessId]
@@ -195,8 +201,8 @@ router.get("/dashboard", async (req, res) => {
         net: Number(netIncome.toFixed(2)),
         avg_monthly_income: Number(avgMonthlyIncome.toFixed(2)),
         avg_monthly_expense: Number(avgMonthlyExpense.toFixed(2)),
-        estimated_tax_liability_pct: Number(estimatedTaxPct.toFixed(1)),
-        se_tax_estimate: Number(seTaxEstimate.toFixed(2)),
+        estimated_tax_liability_pct: hasTaxEstimates ? Number(estimatedTaxPct.toFixed(1)) : null,
+        se_tax_estimate: hasTaxEstimates ? Number(seTaxEstimate.toFixed(2)) : null,
         region
       },
       monthly_breakdown: months,

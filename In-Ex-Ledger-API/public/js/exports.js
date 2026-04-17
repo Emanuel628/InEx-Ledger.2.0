@@ -496,14 +496,26 @@ function setupExportForm() {
   });
 
   historyRows?.addEventListener("click", (event) => {
-    const target = event.target instanceof HTMLElement ? event.target.closest(".history-download") : null;
-    if (!target) {
+    if (!(event.target instanceof HTMLElement)) return;
+
+    const deleteBtn = event.target.closest(".history-delete");
+    if (deleteBtn) {
+      const backendId = deleteBtn.dataset.deleteBackendId;
+      const localId = deleteBtn.dataset.deleteLocalId;
+      if (backendId) {
+        deleteBackendExport(backendId, deleteBtn.closest(".history-item"));
+      } else if (localId) {
+        deleteLocalExportEntry(localId);
+      }
       return;
     }
-    if (target.dataset.backendId) {
-      downloadBackendExport(target.dataset.backendId);
+
+    const downloadBtn = event.target.closest(".history-download");
+    if (!downloadBtn) return;
+    if (downloadBtn.dataset.backendId) {
+      downloadBackendExport(downloadBtn.dataset.backendId);
     } else {
-      replayHistoryEntry(target.dataset.historyId);
+      replayHistoryEntry(downloadBtn.dataset.historyId);
     }
   });
 }
@@ -1158,10 +1170,15 @@ async function renderExportHistory() {
         <div class="history-meta">${escapeHtml(formatHistoryDate(entry.exportedAt))}</div>
         <div class="history-size">${escapeHtml(formatHistorySize(entry.format))}</div>
         <div class="history-download-cell">
-          <button type="button" class="history-download" ${dataAttr}>
-            <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v7M5 7l3 3 3-3"></path><line x1="3" y1="13" x2="13" y2="13"></line></svg>
-            <span>${actionLabel}</span>
-          </button>
+          <div class="history-actions">
+            <button type="button" class="history-download" ${dataAttr}>
+              <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v7M5 7l3 3 3-3"></path><line x1="3" y1="13" x2="13" y2="13"></line></svg>
+              <span>${actionLabel}</span>
+            </button>
+            <button type="button" class="history-delete" data-delete-backend-id="${isBackend ? escapeHtml(entry.id) : ""}" data-delete-local-id="${!isBackend ? escapeHtml(entry.id || "") : ""}" aria-label="Delete export">
+              <svg viewBox="0 0 16 16" fill="none"><polyline points="2 4 14 4"></polyline><path d="M5 4V2h6v2M6 7v5M10 7v5"></path><path d="M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"></path></svg>
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -1191,6 +1208,39 @@ async function downloadBackendExport(exportId) {
     console.error("Backend export download failed:", err);
     showExportToast(tx("exports_history_download_error") || "Download failed");
   }
+}
+
+async function deleteBackendExport(exportId, rowEl) {
+  if (!exportId) return;
+  try {
+    const response = await apiFetch(`/api/exports/history/${encodeURIComponent(exportId)}`, { method: "DELETE" });
+    if (!response || !response.ok) {
+      showExportToast(tx("exports_history_delete_error") || "Delete failed");
+      return;
+    }
+    rowEl?.remove();
+    const historyRows = document.getElementById("exportHistoryRows");
+    if (historyRows && !historyRows.querySelector(".history-item")) {
+      historyRows.innerHTML = `<div class="history-empty">${escapeHtml(tx("exports_no_history"))}</div>`;
+    }
+    showExportToast(tx("exports_history_deleted") || "Export deleted");
+  } catch (err) {
+    console.error("Backend export delete failed:", err);
+    showExportToast(tx("exports_history_delete_error") || "Delete failed");
+  }
+}
+
+function deleteLocalExportEntry(entryId) {
+  if (!entryId) return;
+  const scope = getExportScope();
+  const storageKey = getExportDataKey(EXPORT_HISTORY_KEY, scope);
+  if (!storageKey) return;
+  try {
+    const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    localStorage.setItem(storageKey, JSON.stringify(history.filter((e) => e.id !== entryId)));
+  } catch {}
+  renderExportHistory();
+  showExportToast(tx("exports_history_deleted") || "Export deleted");
 }
 
 async function replayHistoryEntry(entryId) {
