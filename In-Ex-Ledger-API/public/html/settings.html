@@ -52,6 +52,7 @@
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-security" data-i18n="settings_nav_security">Security</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-preferences" data-i18n="settings_nav_preferences">Preferences</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-privacy-data" data-i18n="settings_nav_privacy_data">Privacy &amp; Data</button>
+          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-diagnostics">Diagnostics</button>
           <button class="settings-nav-item settings-nav-danger" type="button" data-settings-nav-item data-settings-target="settings-danger-zone" data-i18n="settings_nav_danger_zone">Danger Zone</button>
         </nav>
         <div class="settings-sidebar-trial-card">
@@ -127,6 +128,16 @@
               <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
             </div>
             <p id="overviewPrivacySummary" class="settings-summary-meta" data-i18n="settings_overview_privacy_loading">Loading privacy details...</p>
+          </button>
+          <button class="settings-summary-card" type="button" data-settings-target="settings-diagnostics">
+            <div class="settings-summary-card-head">
+              <div>
+                <h2>Diagnostics</h2>
+                <p>App, session, and export health for support troubleshooting.</p>
+              </div>
+              <span class="settings-summary-action">View</span>
+            </div>
+            <p id="overviewDiagnosticsSummary" class="settings-summary-meta">Loading diagnostics…</p>
           </button>
         </div>
 
@@ -536,6 +547,155 @@
           </div>
 
           <p id="mfaMessage" class="settings-inline-message"></p>
+        </div>
+      </section>
+
+      <section class="settings-card settings-panel" id="settings-diagnostics">
+        <div class="settings-panel-head card-head">
+          <h2 class="card-title">Diagnostics</h2>
+          <p class="card-desc">Safe app state and support information. No passwords, tokens, or secrets are shown here.</p>
+        </div>
+
+        <!-- A. App Info -->
+        <div class="settings-subpanel">
+          <div class="settings-subpanel-head">
+            <h3>App Info</h3>
+          </div>
+          <div class="diag-grid">
+            <div class="diag-row">
+              <span class="diag-label">App</span>
+              <span class="diag-value">InEx Ledger</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">Environment</span>
+              <span class="diag-value" id="diagEnv">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">Generated</span>
+              <span class="diag-value" id="diagGeneratedAt">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- B. Session & Account -->
+        <div class="settings-subpanel">
+          <div class="settings-subpanel-head">
+            <h3>Session &amp; Account</h3>
+          </div>
+          <div class="diag-grid">
+            <div class="diag-row">
+              <span class="diag-label">Signed in</span>
+              <span class="diag-value" id="diagSignedIn">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">Email verified</span>
+              <span class="diag-value" id="diagEmailVerified">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">MFA</span>
+              <span class="diag-value" id="diagMfa">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">Business</span>
+              <span class="diag-value" id="diagBusiness">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">Plan</span>
+              <span class="diag-value" id="diagPlan">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- C. Export Health -->
+        <div class="settings-subpanel">
+          <div class="settings-subpanel-head">
+            <h3>Export Health</h3>
+          </div>
+          <div class="diag-grid">
+            <div class="diag-row">
+              <span class="diag-label">PDF exports</span>
+              <span class="diag-value" id="diagPdfAvail">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">Secure export</span>
+              <span class="diag-value" id="diagSecureAvail">—</span>
+            </div>
+            <div class="diag-row hidden" id="diagEmailVerifRow">
+              <span class="diag-label">Note</span>
+              <span class="diag-value diag-warn">Email verification required to unlock exports</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- D. Client Context -->
+        <div class="settings-subpanel">
+          <div class="settings-subpanel-head">
+            <h3>Client Context</h3>
+          </div>
+          <div class="diag-grid">
+            <div class="diag-row">
+              <span class="diag-label">Browser</span>
+              <span class="diag-value" id="diagBrowser">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">OS</span>
+              <span class="diag-value" id="diagOs">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">Viewport</span>
+              <span class="diag-value" id="diagViewport">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">Locale</span>
+              <span class="diag-value" id="diagLocale">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">Timezone</span>
+              <span class="diag-value" id="diagTimezone">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">Page</span>
+              <span class="diag-value" id="diagPage">—</span>
+            </div>
+            <div class="diag-row">
+              <span class="diag-label">Network</span>
+              <span class="diag-value" id="diagOnline">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- E. Recent Errors -->
+        <div class="settings-subpanel">
+          <div class="settings-subpanel-head">
+            <h3>Recent Errors</h3>
+            <p>Client-side errors from this session only. No stack traces or sensitive data are included.</p>
+          </div>
+          <div id="diagErrorsList" class="diag-errors-list">
+            <p class="diag-empty">No errors recorded in this session.</p>
+          </div>
+        </div>
+
+        <!-- F. Actions -->
+        <div class="settings-subpanel">
+          <div class="settings-subpanel-head">
+            <h3>Support Actions</h3>
+          </div>
+          <div class="diag-actions">
+            <button type="button" id="diagCopySupportInfo" class="settings-primary-btn">Copy support info</button>
+            <button type="button" id="diagRefresh" class="settings-secondary-btn">Refresh diagnostics</button>
+          </div>
+          <p class="diag-copy-feedback hidden" id="diagCopyFeedback" role="status" aria-live="polite">Support info copied to clipboard.</p>
+
+          <div class="diag-support-guidance">
+            <h4>Need more help?</h4>
+            <p>Contact support and include what you were trying to do, the page you were on, any error message, and a screenshot if possible.</p>
+            <div class="diag-support-links">
+              <a href="help" class="settings-secondary-btn diag-support-link">Open help guide</a>
+              <a href="mailto:support@inexledger.com" class="settings-secondary-btn diag-support-link" id="diagContactSupport">Email support</a>
+            </div>
+          </div>
+
+          <p class="diag-legal-note">Diagnostics is for product troubleshooting only. For tax or accounting guidance, contact your CPA. For legal advice, contact a qualified attorney.</p>
         </div>
       </section>
       </div>
