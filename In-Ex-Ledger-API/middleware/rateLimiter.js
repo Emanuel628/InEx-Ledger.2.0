@@ -103,6 +103,21 @@ function buildNormalizedPrefix(keyPrefix) {
   return keyPrefix.endsWith(":") ? keyPrefix : `${keyPrefix}:`;
 }
 
+function buildFallbackHealthState({ lastError, redisConfigured }) {
+  const enabled = isRateLimitingEnabled();
+  const required = isRateLimitingRequired();
+  const fallbackActive = enabled && required;
+
+  return {
+    available: fallbackActive ? true : !required,
+    enabled,
+    lastError,
+    mode: fallbackActive ? "enforced" : (required ? "degraded" : "disabled"),
+    redisConfigured,
+    redisConnected: false
+  };
+}
+
 async function ensureRedisClient() {
   if (redisClientOverride) {
     markLimiterHealth({
@@ -131,14 +146,12 @@ async function ensureRedisClient() {
 
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) {
-    markLimiterHealth({
-      available: !isRateLimitingRequired(),
-      enabled: isRateLimitingEnabled(),
-      lastError: "REDIS_URL is not configured",
-      mode: isRateLimitingRequired() ? "degraded" : "disabled",
-      redisConfigured: false,
-      redisConnected: false
-    });
+    markLimiterHealth(
+      buildFallbackHealthState({
+        lastError: "REDIS_URL is not configured; using in-memory store",
+        redisConfigured: false
+      })
+    );
     return null;
   }
 
@@ -146,14 +159,12 @@ async function ensureRedisClient() {
     const client = createClient({ url: redisUrl });
     client.on("error", (err) => {
       logWarn("Redis client error", { err: err.message });
-      markLimiterHealth({
-        available: !isRateLimitingRequired(),
-        enabled: isRateLimitingEnabled(),
-        lastError: err.message,
-        mode: isRateLimitingRequired() ? "degraded" : "disabled",
-        redisConfigured: true,
-        redisConnected: false
-      });
+      markLimiterHealth(
+        buildFallbackHealthState({
+          lastError: err.message,
+          redisConfigured: true
+        })
+      );
     });
     client.on("ready", () => {
       markLimiterHealth({
@@ -166,14 +177,12 @@ async function ensureRedisClient() {
       });
     });
     client.on("end", () => {
-      markLimiterHealth({
-        available: !isRateLimitingRequired(),
-        enabled: isRateLimitingEnabled(),
-        lastError: "Redis connection ended",
-        mode: isRateLimitingRequired() ? "degraded" : "disabled",
-        redisConfigured: true,
-        redisConnected: false
-      });
+      markLimiterHealth(
+        buildFallbackHealthState({
+          lastError: "Redis connection ended",
+          redisConfigured: true
+        })
+      );
     });
     redisClientPromise = client
       .connect()
@@ -193,14 +202,12 @@ async function ensureRedisClient() {
         logWarn("Unable to connect to Redis for rate limiting", {
           err: err.message
         });
-        markLimiterHealth({
-          available: !isRateLimitingRequired(),
-          enabled: isRateLimitingEnabled(),
-          lastError: err.message,
-          mode: isRateLimitingRequired() ? "degraded" : "disabled",
-          redisConfigured: true,
-          redisConnected: false
-        });
+        markLimiterHealth(
+          buildFallbackHealthState({
+            lastError: err.message,
+            redisConfigured: true
+          })
+        );
         return null;
       });
   }
@@ -421,11 +428,15 @@ async function createLimiter({
   const client = await ensureRedisClient();
   if (!client) {
     if (required) {
-      logWarn("Redis unavailable; rate limiting will use in-memory store", { tier: keyPrefix });
+      if (process.env.REDIS_URL) {
+        logWarn("Redis unavailable; rate limiting will use in-memory store", { tier: keyPrefix });
+      }
       markLimiterHealth({
         available: true,
         enabled: true,
-        lastError: "Redis unavailable; rate limiting using in-memory store",
+        lastError: process.env.REDIS_URL
+          ? "Redis unavailable; rate limiting using in-memory store"
+          : "REDIS_URL is not configured; using in-memory store",
         mode: "enforced",
         redisConfigured: Boolean(process.env.REDIS_URL),
         redisConnected: false
@@ -526,13 +537,18 @@ async function initializeRateLimiterProtection() {
 
   const client = await ensureRedisClient();
   if (!client) {
-    logWarn("Redis unavailable; rate limiting will use in-memory store per limiter", {
-      redisConfigured: Boolean(process.env.REDIS_URL)
-    });
+    logWarn(
+      process.env.REDIS_URL
+        ? "Redis unavailable; rate limiting will use in-memory store per limiter"
+        : "REDIS_URL is not configured; rate limiting will use in-memory store per limiter",
+      { redisConfigured: Boolean(process.env.REDIS_URL) }
+    );
     markLimiterHealth({
       available: true,
       enabled: true,
-      lastError: "Redis unavailable; rate limiting using in-memory store",
+      lastError: process.env.REDIS_URL
+        ? "Redis unavailable; rate limiting using in-memory store"
+        : "REDIS_URL is not configured; using in-memory store",
       mode: required ? "enforced" : "enabled",
       redisConfigured: Boolean(process.env.REDIS_URL),
       redisConnected: false

@@ -7,6 +7,7 @@ const request = require("supertest");
 const {
   createLimiter,
   getRateLimiterHealth,
+  initializeRateLimiterProtection,
   resetRateLimiterHealthForTests,
   setRedisClientOverride
 } = require("../middleware/rateLimiter.js");
@@ -104,6 +105,18 @@ test("production limiter uses in-memory store when Redis is unavailable", async 
   const health = getRateLimiterHealth();
   assert.strictEqual(health.mode, "enforced");
   assert.strictEqual(health.available, true);
+});
+
+test("production rate limiter health stays enforced during startup when Redis is not configured", async () => {
+  process.env.NODE_ENV = "production";
+  process.env.RATE_LIMIT_ENABLED = "true";
+  delete process.env.REDIS_URL;
+
+  const health = await initializeRateLimiterProtection();
+  assert.strictEqual(health.mode, "enforced");
+  assert.strictEqual(health.available, true);
+  assert.strictEqual(health.redisConfigured, false);
+  assert.strictEqual(health.redisConnected, false);
 });
 
 test("Retry-After header appears on 429 responses", async () => {
