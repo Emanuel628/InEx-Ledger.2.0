@@ -273,16 +273,12 @@ async function revokeAllRefreshTokensForUser(userId) {
   ]);
 }
 
-async function issueAuthenticatedSession(
-  res,
-  user,
-  businessIdOverride = null,
-  { mfaAuthenticated = false } = {}
-) {
+async function buildAuthenticatedAccessPayload(user, businessIdOverride = null, { mfaAuthenticated = false } = {}) {
   const verified = Boolean(user.email_verified);
   if (!verified) {
     throw new EmailNotVerifiedError();
   }
+
   const businessId = businessIdOverride || (await resolveBusinessIdForUser(user));
   const subscription = await getSubscriptionSnapshotForBusiness(businessId);
   const token = signToken(
@@ -298,11 +294,6 @@ async function issueAuthenticatedSession(
     ACCESS_TOKEN_EXPIRY_SECONDS
   );
 
-  const { token: refreshToken, expiresAt } = await createRefreshToken(user.id, {
-    mfaAuthenticated: !!mfaAuthenticated
-  });
-  setRefreshCookie(res, refreshToken, expiresAt);
-
   return {
     token,
     email_verified: verified,
@@ -311,14 +302,33 @@ async function issueAuthenticatedSession(
   };
 }
 
-async function resetCurrentRefreshSession(res, user) {
+async function issueAuthenticatedSession(
+  res,
+  user,
+  businessIdOverride = null,
+  { mfaAuthenticated = false } = {}
+) {
+  const accessPayload = await buildAuthenticatedAccessPayload(user, businessIdOverride, {
+    mfaAuthenticated
+  });
+
+  const { token: refreshToken, expiresAt } = await createRefreshToken(user.id, {
+    mfaAuthenticated: !!mfaAuthenticated
+  });
+  setRefreshCookie(res, refreshToken, expiresAt);
+
+  return accessPayload;
+}
+
+async function resetCurrentRefreshSession(res, user, { mfaAuthenticated = false } = {}) {
   await revokeAllRefreshTokensForUser(user.id);
-  // Always false: password change / MFA toggle voids the previous MFA
-  // authentication — the user must re-verify via the MFA challenge flow.
+  // The caller decides whether the rotated session should remain MFA-authenticated
+  // after the refresh-token rotation.
   const { token, expiresAt } = await createRefreshToken(user.id, {
-    mfaAuthenticated: false
+    mfaAuthenticated: !!mfaAuthenticated
   });
   setRefreshCookie(res, token, expiresAt);
+  return buildAuthenticatedAccessPayload(user, null, { mfaAuthenticated });
 }
 
 function ensureArrayValue(value) {
@@ -977,6 +987,14 @@ router.get("/verify-email", async (req, res) => {
     if (result.rowCount === 0) return res.status(404).send("User not found.");
 
     const session = await issueAuthenticatedSession(res, result.rows[0]);
+    const deviceContext = buildSignInDeviceContext(result.rows[0], req);
+    if (deviceContext && !result.rows[0].mfa_enabled) {
+      try {
+        await insertRecognizedSignInDevice(result.rows[0], deviceContext);
+      } catch (securitySignalErr) {
+        logWarn("Verified-email device registration warning:", securitySignalErr?.message || securitySignalErr);
+      }
+    }
     const redirectHash = new URLSearchParams({
       verified: "true",
       token: session.token
@@ -1026,11 +1044,18 @@ router.post("/change-password", authLimiter, requireAuth, requireCsrfProtection,
 
     const nextHash = await hashPassword(newPassword);
     await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [nextHash, user.id]);
-    await resetCurrentRefreshSession(res, user);
+    const session = await resetCurrentRefreshSession(res, user, {
+      mfaAuthenticated: !!req.user?.mfa_authenticated
+    });
     await revokeTrustedMfaDevicesForUser(user.id);
     clearMfaTrustCookie(res);
 
-    return res.status(200).json({ success: true, message: "Password updated." });
+    return res.status(200).json({
+      success: true,
+      message: "Password updated.",
+      token: session.token,
+      subscription: session.subscription
+    });
   } catch (err) {
     logError("Change password error:", err);
     return res.status(500).json({ error: "Unable to update password." });
@@ -1235,14 +1260,18 @@ router.post("/mfa/enable", requireAuth, requireCsrfProtection, authLimiter, asyn
     );
 
     const refreshedUser = await findUserById(user.id);
-    await resetCurrentRefreshSession(res, refreshedUser);
+    const session = await resetCurrentRefreshSession(res, refreshedUser, {
+      mfaAuthenticated: true
+    });
     await revokeTrustedMfaDevicesForUser(user.id);
     clearMfaTrustCookie(res);
 
     return res.status(200).json({
       success: true,
       message: "MFA enabled.",
-      status: buildMfaStatusPayload(refreshedUser)
+      status: buildMfaStatusPayload(refreshedUser),
+      token: session.token,
+      subscription: session.subscription
     });
   } catch (err) {
     logError("MFA enable error:", err);
@@ -1329,14 +1358,16 @@ router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter
     );
 
     const refreshedUser = await findUserById(user.id);
-    await resetCurrentRefreshSession(res, refreshedUser);
+    const session = await resetCurrentRefreshSession(res, refreshedUser);
     await revokeTrustedMfaDevicesForUser(user.id);
     clearMfaTrustCookie(res);
 
     return res.status(200).json({
       success: true,
       message: "MFA disabled.",
-      status: buildMfaStatusPayload(refreshedUser)
+      status: buildMfaStatusPayload(refreshedUser),
+      token: session.token,
+      subscription: session.subscription
     });
   } catch (err) {
     logError("MFA disable error:", err);

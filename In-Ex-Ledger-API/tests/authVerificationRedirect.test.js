@@ -15,7 +15,8 @@ function loadAuthRouter() {
   const originalLoad = Module._load.bind(Module);
   const state = {
     consumedToken: null,
-    refreshTokenInsert: null
+    refreshTokenInsert: null,
+    recognizedDeviceInsert: null
   };
 
   Module._load = function(requestName, parent, isMain) {
@@ -65,6 +66,11 @@ function loadAuthRouter() {
             if (/INSERT INTO refresh_tokens/i.test(sql)) {
               state.refreshTokenInsert = params;
               return { rows: [], rowCount: 1 };
+            }
+
+            if (/INSERT INTO recognized_signin_devices/i.test(sql)) {
+              state.recognizedDeviceInsert = params;
+              return { rows: [{ id: "recognized_device_1" }], rowCount: 1 };
             }
 
             throw new Error(`Unhandled SQL in test stub: ${sql}`);
@@ -205,6 +211,7 @@ test("verify-email marks the user verified and redirects into an authenticated s
     assert.equal(decoded.business_id, "biz_verified_1");
     assert.equal(decoded.mfa_enabled, false);
     assert.ok(Array.isArray(fixture.state.refreshTokenInsert), "refresh token should be persisted");
+    assert.ok(Array.isArray(fixture.state.recognizedDeviceInsert), "verified-email sign-in should register the current device");
   } finally {
     fixture.cleanup();
   }

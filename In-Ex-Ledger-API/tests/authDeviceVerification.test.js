@@ -8,6 +8,15 @@ const express = require("express");
 const request = require("supertest");
 const cookieParser = require("cookie-parser");
 
+process.env.JWT_SECRET = process.env.JWT_SECRET || "test-auth-device-verification-secret";
+
+const { signToken, verifyToken } = require("../middleware/auth.middleware.js");
+const {
+  CSRF_COOKIE_NAME,
+  CSRF_HEADER_NAME,
+  generateCsrfToken
+} = require("../middleware/csrf.middleware.js");
+
 const AUTH_ROUTE_PATH = require.resolve("../routes/auth.routes.js");
 
 function makeHash(value) {
@@ -50,6 +59,7 @@ function loadAuthRouter(options = {}) {
       is_erased: false
     },
     businessId: "00000000-0000-4000-8000-0000000000b1",
+    hasRecognizedDeviceHistory: options.hasRecognizedDeviceHistory ?? true,
     recognizedDevice: !!options.recognizedDevice,
     pendingChallengeId: null,
     pendingChallengeCodeHash: null,
@@ -91,6 +101,12 @@ function loadAuthRouter(options = {}) {
               return { rows: [], rowCount: 1 };
             }
 
+            if (/SELECT 1 FROM recognized_signin_devices WHERE user_id = \$1 LIMIT 1/i.test(sql)) {
+              return state.hasRecognizedDeviceHistory
+                ? { rows: [{ "?column?": 1 }], rowCount: 1 }
+                : { rows: [], rowCount: 0 };
+            }
+
             if (/SELECT id\s+FROM recognized_signin_devices/i.test(sql)) {
               return state.recognizedDevice
                 ? { rows: [{ id: "recognized-device-1" }], rowCount: 1 }
@@ -98,11 +114,13 @@ function loadAuthRouter(options = {}) {
             }
 
             if (/UPDATE recognized_signin_devices\s+SET last_seen_at/i.test(sql)) {
+              state.hasRecognizedDeviceHistory = true;
               state.recognizedDevice = true;
               return { rows: [], rowCount: 1 };
             }
 
             if (/INSERT INTO recognized_signin_devices/i.test(sql)) {
+              state.hasRecognizedDeviceHistory = true;
               state.recognizedDevice = true;
               return { rows: [], rowCount: 1 };
             }
@@ -139,6 +157,15 @@ function loadAuthRouter(options = {}) {
               return { rows: [], rowCount: 1 };
             }
 
+            if (/UPDATE users\s+SET mfa_enabled = true/i.test(sql)) {
+              state.user = {
+                ...state.user,
+                mfa_enabled: true,
+                mfa_enabled_at: state.user.mfa_enabled_at || new Date().toISOString()
+              };
+              return { rows: [], rowCount: 1 };
+            }
+
             if (/INSERT INTO refresh_tokens/i.test(sql)) {
               return { rows: [], rowCount: 1 };
             }
@@ -166,6 +193,9 @@ function loadAuthRouter(options = {}) {
           return (_req, _res, next) => next();
         },
         createPasswordLimiter() {
+          return (_req, _res, next) => next();
+        },
+        createTokenRefreshLimiter() {
           return (_req, _res, next) => next();
         }
       };
@@ -331,6 +361,14 @@ function buildApp(router) {
   return app;
 }
 
+function makeCsrfHeaders() {
+  const token = generateCsrfToken();
+  return {
+    [CSRF_HEADER_NAME]: token,
+    Cookie: `${CSRF_COOKIE_NAME}=${token}`
+  };
+}
+
 test("forgot-password does not trust Host header when APP_BASE_URL is unset", async () => {
   const fixture = loadAuthRouter({
     nodeEnv: "development"
@@ -461,6 +499,61 @@ test("mfa verification refuses to issue session when user becomes unverified", a
     assert.equal(verifyResponse.status, 403);
     assert.equal(verifyResponse.body?.token, undefined);
     assert.match(String(verifyResponse.body?.error || ""), /verify your email/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("mfa enable returns a fresh MFA-authenticated access token for subsequent protected actions", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const authToken = signToken({
+      id: fixture.state.user.id,
+      email: fixture.state.user.email,
+      email_verified: true,
+      business_id: fixture.state.businessId,
+      mfa_enabled: false,
+      mfa_authenticated: false
+    });
+    const csrfHeaders = makeCsrfHeaders();
+
+    const startResponse = await request(app)
+      .post("/api/auth/mfa/enable")
+      .set("Authorization", `Bearer ${authToken}`)
+      .set(csrfHeaders)
+      .send({ currentPassword: "CorrectPassword1!" });
+
+    assert.equal(startResponse.status, 200);
+    assert.equal(startResponse.body?.pending_verification, true);
+    assert.ok(startResponse.body?.mfa_token, "pending MFA token should be returned");
+
+    const verificationEmail = fixture.state.sentEmails.at(-1);
+    const codeMatch = String(verificationEmail?.text || "").match(/Code:\s*(\d{6})/);
+    assert.ok(codeMatch, "verification email should contain a 6-digit code");
+
+    const finishResponse = await request(app)
+      .post("/api/auth/mfa/enable")
+      .set("Authorization", `Bearer ${authToken}`)
+      .set(csrfHeaders)
+      .send({
+        currentPassword: "CorrectPassword1!",
+        code: codeMatch[1],
+        mfaToken: startResponse.body.mfa_token
+      });
+
+    assert.equal(finishResponse.status, 200);
+    assert.equal(finishResponse.body?.success, true);
+    assert.ok(finishResponse.body?.token, "completed MFA enable should return a fresh access token");
+
+    const decoded = verifyToken(finishResponse.body.token);
+    assert.equal(decoded.mfa_enabled, true);
+    assert.equal(decoded.mfa_authenticated, true);
+    assert.equal(fixture.state.user.mfa_enabled, true);
   } finally {
     fixture.cleanup();
   }

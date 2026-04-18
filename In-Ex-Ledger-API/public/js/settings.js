@@ -1914,6 +1914,12 @@ function initSecurityForm() {
         return;
       }
 
+      if (payload?.token && typeof setToken === "function") {
+        setToken(payload.token);
+      }
+      if (payload?.subscription && typeof applySubscriptionState === "function") {
+        applySubscriptionState(payload.subscription);
+      }
       showSettingsToast(payload?.message || t("settings_password_updated"));
       form.reset();
       updateStrength();
@@ -2007,6 +2013,12 @@ function initSecurityForm() {
           return;
         }
 
+        if (payload?.token && typeof setToken === "function") {
+          setToken(payload.token);
+        }
+        if (payload?.subscription && typeof applySubscriptionState === "function") {
+          applySubscriptionState(payload.subscription);
+        }
         mfaStatus = payload?.status || { enabled: true, delivery: "email" };
         mfaMode = "idle";
         updateMfaUi();
@@ -2077,6 +2089,12 @@ function initSecurityForm() {
           return;
         }
 
+        if (payload?.token && typeof setToken === "function") {
+          setToken(payload.token);
+        }
+        if (payload?.subscription && typeof applySubscriptionState === "function") {
+          applySubscriptionState(payload.subscription);
+        }
         mfaStatus = payload?.status || { enabled: false, delivery: "email" };
         mfaMode = "idle";
         updateMfaUi();
