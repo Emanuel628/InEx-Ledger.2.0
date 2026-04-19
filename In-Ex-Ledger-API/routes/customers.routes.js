@@ -1,57 +1,97 @@
 // Customers API routes (V2/Business)
 const express = require('express');
 const router = express.Router();
+
 const customerService = require('../services/customerService');
 
-// Placeholder: List customers (GET /customers)
-router.get('/', async (req, res) => {
-	// TODO: Add business context and entitlement checks
+// Feature flag and entitlement middleware
+function requireV2BusinessEnabled(req, res, next) {
+	if (process.env.ENABLE_V2_BUSINESS !== 'true') {
+		return res.status(403).json({ error: 'V2/Business features are not enabled.' });
+	}
+	// TODO: Add real entitlement checks here (e.g., req.user.entitlements)
+	next();
+}
+
+// List customers (GET /customers)
+router.get('/', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
 	try {
-		// Placeholder: return empty array
-		res.json([]);
+		const customers = await customerService.listCustomers(businessId);
+		res.json(customers);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to load customers.' });
 	}
 });
 
-// Placeholder: Create customer (POST /customers)
-router.post('/', async (req, res) => {
-	// TODO: Add validation, business context, and entitlement checks
+// Create customer (POST /customers)
+router.post('/', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
+	if (!req.body?.name) {
+		return res.status(400).json({ error: 'Customer name is required.' });
+	}
 	try {
-		// Placeholder: echo back posted data
-		res.status(201).json({ ...req.body, id: 'stub-id' });
+		const customer = await customerService.createCustomer(businessId, req.body);
+		res.status(201).json(customer);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to create customer.' });
 	}
 });
 
-// Placeholder: Get customer by ID (GET /customers/:id)
-router.get('/:id', async (req, res) => {
-	// TODO: Add business context and entitlement checks
+// Get customer by ID (GET /customers/:id)
+router.get('/:id', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
 	try {
-		// Placeholder: return stub customer
-		res.json({ id: req.params.id, name: 'Stub Customer' });
+		const customer = await customerService.getCustomer(businessId, req.params.id);
+		if (!customer) {
+			return res.status(404).json({ error: 'Customer not found.' });
+		}
+		res.json(customer);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to load customer.' });
 	}
 });
 
-// Placeholder: Update customer (PUT /customers/:id)
-router.put('/:id', async (req, res) => {
-	// TODO: Add validation, business context, and entitlement checks
+// Update customer (PUT /customers/:id)
+router.put('/:id', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
+	if (!req.body?.name) {
+		return res.status(400).json({ error: 'Customer name is required.' });
+	}
 	try {
-		// Placeholder: echo back updated data
-		res.json({ ...req.body, id: req.params.id });
+		const customer = await customerService.updateCustomer(businessId, req.params.id, req.body);
+		if (!customer) {
+			return res.status(404).json({ error: 'Customer not found.' });
+		}
+		res.json(customer);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to update customer.' });
 	}
 });
 
-// Placeholder: Delete customer (DELETE /customers/:id)
-router.delete('/:id', async (req, res) => {
-	// TODO: Add business context and entitlement checks
+// Delete customer (DELETE /customers/:id)
+router.delete('/:id', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
 	try {
-		// Placeholder: return success
+		const deleted = await customerService.deleteCustomer(businessId, req.params.id);
+		if (!deleted) {
+			return res.status(404).json({ error: 'Customer not found.' });
+		}
 		res.json({ success: true });
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to delete customer.' });

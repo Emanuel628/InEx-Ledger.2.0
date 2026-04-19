@@ -1,57 +1,99 @@
 // Vendors API routes (V2/Business)
 const express = require('express');
 const router = express.Router();
+
 const vendorService = require('../services/vendorService');
 
-// Placeholder: List vendors (GET /vendors)
-router.get('/', async (req, res) => {
-	// TODO: Add business context and entitlement checks
+// Feature flag and entitlement middleware
+function requireV2BusinessEnabled(req, res, next) {
+	if (process.env.ENABLE_V2_BUSINESS !== 'true') {
+		return res.status(403).json({ error: 'V2/Business features are not enabled.' });
+	}
+	// TODO: Add real entitlement checks here (e.g., req.user.entitlements)
+	next();
+}
+
+// List vendors (GET /vendors)
+router.get('/', requireV2BusinessEnabled, async (req, res) => {
+	// TODO: Replace with real business context and entitlement checks
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
 	try {
-		// Placeholder: return empty array
-		res.json([]);
+		const vendors = await vendorService.listVendors(businessId);
+		res.json(vendors);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to load vendors.' });
 	}
 });
 
-// Placeholder: Create vendor (POST /vendors)
-router.post('/', async (req, res) => {
+// Create vendor (POST /vendors)
+router.post('/', requireV2BusinessEnabled, async (req, res) => {
 	// TODO: Add validation, business context, and entitlement checks
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
+	if (!req.body?.name) {
+		return res.status(400).json({ error: 'Vendor name is required.' });
+	}
 	try {
-		// Placeholder: echo back posted data
-		res.status(201).json({ ...req.body, id: 'stub-id' });
+		const vendor = await vendorService.createVendor(businessId, req.body);
+		res.status(201).json(vendor);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to create vendor.' });
 	}
 });
 
-// Placeholder: Get vendor by ID (GET /vendors/:id)
-router.get('/:id', async (req, res) => {
-	// TODO: Add business context and entitlement checks
+// Get vendor by ID (GET /vendors/:id)
+router.get('/:id', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
 	try {
-		// Placeholder: return stub vendor
-		res.json({ id: req.params.id, name: 'Stub Vendor' });
+		const vendor = await vendorService.getVendor(businessId, req.params.id);
+		if (!vendor) {
+			return res.status(404).json({ error: 'Vendor not found.' });
+		}
+		res.json(vendor);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to load vendor.' });
 	}
 });
 
-// Placeholder: Update vendor (PUT /vendors/:id)
-router.put('/:id', async (req, res) => {
-	// TODO: Add validation, business context, and entitlement checks
+// Update vendor (PUT /vendors/:id)
+router.put('/:id', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
+	if (!req.body?.name) {
+		return res.status(400).json({ error: 'Vendor name is required.' });
+	}
 	try {
-		// Placeholder: echo back updated data
-		res.json({ ...req.body, id: req.params.id });
+		const vendor = await vendorService.updateVendor(businessId, req.params.id, req.body);
+		if (!vendor) {
+			return res.status(404).json({ error: 'Vendor not found.' });
+		}
+		res.json(vendor);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to update vendor.' });
 	}
 });
 
-// Placeholder: Delete vendor (DELETE /vendors/:id)
-router.delete('/:id', async (req, res) => {
-	// TODO: Add business context and entitlement checks
+// Delete vendor (DELETE /vendors/:id)
+router.delete('/:id', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
 	try {
-		// Placeholder: return success
+		const deleted = await vendorService.deleteVendor(businessId, req.params.id);
+		if (!deleted) {
+			return res.status(404).json({ error: 'Vendor not found.' });
+		}
 		res.json({ success: true });
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to delete vendor.' });

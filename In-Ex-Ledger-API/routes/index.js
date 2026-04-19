@@ -1,3 +1,20 @@
+const arApService = require('../services/arApService');
+// AR/AP summary endpoint (feature-flagged)
+router.get('/arap-summary', async (req, res) => {
+	if (process.env.ENABLE_V2_BUSINESS !== 'true') {
+		return res.status(403).json({ error: 'V2/Business features are not enabled.' });
+	}
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
+	try {
+		const summary = await arApService.getArApSummary(businessId);
+		res.json(summary);
+	} catch (err) {
+		res.status(500).json({ error: 'Failed to load AR/AP summary.' });
+	}
+});
 // V2/Business modules (feature-flagged)
 const vendorsRoutes = require('./vendors.routes');
 const customersRoutes = require('./customers.routes');

@@ -1,57 +1,97 @@
 // Bills API routes (V2/Business)
 const express = require('express');
 const router = express.Router();
+
 const billService = require('../services/billService');
 
-// Placeholder: List bills (GET /bills)
-router.get('/', async (req, res) => {
-	// TODO: Add business context and entitlement checks
+// Feature flag and entitlement middleware
+function requireV2BusinessEnabled(req, res, next) {
+	if (process.env.ENABLE_V2_BUSINESS !== 'true') {
+		return res.status(403).json({ error: 'V2/Business features are not enabled.' });
+	}
+	// TODO: Add real entitlement checks here (e.g., req.user.entitlements)
+	next();
+}
+
+// List bills (GET /bills)
+router.get('/', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
 	try {
-		// Placeholder: return empty array
-		res.json([]);
+		const bills = await billService.listBills(businessId);
+		res.json(bills);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to load bills.' });
 	}
 });
 
-// Placeholder: Create bill (POST /bills)
-router.post('/', async (req, res) => {
-	// TODO: Add validation, business context, and entitlement checks
+// Create bill (POST /bills)
+router.post('/', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
+	if (!req.body?.vendor_id || !req.body?.number || !req.body?.status || !req.body?.issue_date || !req.body?.total_amount || !req.body?.currency) {
+		return res.status(400).json({ error: 'Missing required bill fields.' });
+	}
 	try {
-		// Placeholder: echo back posted data
-		res.status(201).json({ ...req.body, id: 'stub-id' });
+		const bill = await billService.createBill(businessId, req.body);
+		res.status(201).json(bill);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to create bill.' });
 	}
 });
 
-// Placeholder: Get bill by ID (GET /bills/:id)
-router.get('/:id', async (req, res) => {
-	// TODO: Add business context and entitlement checks
+// Get bill by ID (GET /bills/:id)
+router.get('/:id', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
 	try {
-		// Placeholder: return stub bill
-		res.json({ id: req.params.id, number: 'BILL-0001' });
+		const bill = await billService.getBill(businessId, req.params.id);
+		if (!bill) {
+			return res.status(404).json({ error: 'Bill not found.' });
+		}
+		res.json(bill);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to load bill.' });
 	}
 });
 
-// Placeholder: Update bill (PUT /bills/:id)
-router.put('/:id', async (req, res) => {
-	// TODO: Add validation, business context, and entitlement checks
+// Update bill (PUT /bills/:id)
+router.put('/:id', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
+	if (!req.body?.vendor_id || !req.body?.number || !req.body?.status || !req.body?.issue_date || !req.body?.total_amount || !req.body?.currency) {
+		return res.status(400).json({ error: 'Missing required bill fields.' });
+	}
 	try {
-		// Placeholder: echo back updated data
-		res.json({ ...req.body, id: req.params.id });
+		const bill = await billService.updateBill(businessId, req.params.id, req.body);
+		if (!bill) {
+			return res.status(404).json({ error: 'Bill not found.' });
+		}
+		res.json(bill);
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to update bill.' });
 	}
 });
 
-// Placeholder: Delete bill (DELETE /bills/:id)
-router.delete('/:id', async (req, res) => {
-	// TODO: Add business context and entitlement checks
+// Delete bill (DELETE /bills/:id)
+router.delete('/:id', requireV2BusinessEnabled, async (req, res) => {
+	const businessId = req.user?.business_id || req.user?.active_business_id || null;
+	if (!businessId) {
+		return res.status(400).json({ error: 'Missing business context.' });
+	}
 	try {
-		// Placeholder: return success
+		const deleted = await billService.deleteBill(businessId, req.params.id);
+		if (!deleted) {
+			return res.status(404).json({ error: 'Bill not found.' });
+		}
 		res.json({ success: true });
 	} catch (err) {
 		res.status(500).json({ error: 'Failed to delete bill.' });
