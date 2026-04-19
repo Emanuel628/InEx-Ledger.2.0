@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ProjectService = require('../services/projectService');
-const { requireV2BusinessEnabled, requireV2Entitlement } = require('./middleware/requireV2BusinessEnabled');
+const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
 
 // All routes require V2 feature flag and entitlement
 router.use(requireV2BusinessEnabled, requireV2Entitlement);
