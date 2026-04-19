@@ -43,14 +43,26 @@ function fmtAmount(amount, currency) {
   }
 }
 
-function resolveDefaultCurrency() {
-  const region = String(localStorage.getItem("lb_region") || window.LUNA_REGION || "").toLowerCase();
-  return region === "ca" ? "cad" : "usd";
-}
-
 function clampAdditionalBusinesses(value) {
   if (!Number.isFinite(value)) return 0;
   return Math.min(Math.max(Math.trunc(value), 0), MAX_ADDITIONAL_BUSINESSES);
+}
+
+async function loadVerifiedPricingContext() {
+  try {
+    const res = await apiFetch("/api/billing/pricing-context");
+    if (!res || !res.ok) {
+      return pricingState.currency;
+    }
+    const payload = await res.json().catch(() => null);
+    const currency = String(payload?.currency || "").toLowerCase();
+    if (BILLING_CURRENCIES.includes(currency)) {
+      pricingState.currency = currency;
+    }
+  } catch (_) {
+    // Fall back to the default pricing table currency.
+  }
+  return pricingState.currency;
 }
 
 function isAllowedBillingRedirect(url) {
@@ -68,7 +80,6 @@ function isAllowedBillingRedirect(url) {
 
 function updatePricingUI() {
   const intervalButtons = Array.from(document.querySelectorAll("[data-billing-interval]"));
-  const currencyButtons = Array.from(document.querySelectorAll("[data-currency]"));
   const additionalInput = document.getElementById("additionalBusinessesInput");
   const planPriceLabel = document.getElementById("planProPriceLabel");
   const summaryPlan = document.getElementById("subPricePlan");
@@ -79,9 +90,6 @@ function updatePricingUI() {
 
   intervalButtons.forEach((btn) =>
     btn.classList.toggle("is-active", btn.dataset.billingInterval === pricingState.billingInterval)
-  );
-  currencyButtons.forEach((btn) =>
-    btn.classList.toggle("is-active", btn.dataset.currency === pricingState.currency)
   );
 
   if (additionalInput) {
@@ -98,7 +106,7 @@ function updatePricingUI() {
     pricingState.billingInterval === "yearly"
       ? tx("subscription_billing_yearly")
       : tx("subscription_billing_monthly");
-  const planSummaryText = `${pricingState.currency.toUpperCase()} · ${intervalLabel}`;
+  const planSummaryText = `${pricingState.currency.toUpperCase()} - ${intervalLabel}`;
 
   if (planPriceLabel) {
     planPriceLabel.textContent = planSummaryText;
@@ -114,38 +122,16 @@ function updatePricingUI() {
   }
 }
 
-function initPricingControls() {
-  const lockedCurrency = resolveDefaultCurrency();
-  pricingState.currency = lockedCurrency;
+async function initPricingControls() {
   pricingState.billingInterval = "monthly";
   pricingState.additionalBusinesses = 0;
-
-  // Lock currency to the user's region — prevent cross-region price selection
-  document.querySelectorAll("[data-currency]").forEach((btn) => {
-    const btnCurrency = String(btn.dataset.currency || "").toLowerCase();
-    if (btnCurrency !== lockedCurrency) {
-      btn.disabled = true;
-      btn.title = btn.dataset.currency === "cad"
-        ? "CAD pricing is available for Canadian accounts only"
-        : "USD pricing is available for US accounts only";
-    }
-  });
+  await loadVerifiedPricingContext();
 
   document.querySelectorAll("[data-billing-interval]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const interval = String(btn.dataset.billingInterval || "").toLowerCase();
       if (!BILLING_INTERVALS.includes(interval)) return;
       pricingState.billingInterval = interval;
-      updatePricingUI();
-    });
-  });
-
-  document.querySelectorAll("[data-currency]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      if (btn.disabled) return;
-      const currency = String(btn.dataset.currency || "").toLowerCase();
-      if (!BILLING_CURRENCIES.includes(currency)) return;
-      pricingState.currency = currency;
       updatePricingUI();
     });
   });
@@ -406,10 +392,10 @@ async function loadBillingHistory() {
 async function startCheckout() {
   try {
     if (pricingState.isCheckoutLoading) return;
+    await loadVerifiedPricingContext();
     setCheckoutLoading(true);
     const checkoutPayload = {
       billingInterval: pricingState.billingInterval,
-      currency: pricingState.currency,
       additionalBusinesses: pricingState.additionalBusinesses
     };
     const res = await apiFetch("/api/billing/checkout-session", {
@@ -465,7 +451,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
   initSubNav();
-  initPricingControls();
+  await initPricingControls();
 
   const planProBtn = document.getElementById("planProBtn");
   planProBtn?.addEventListener("click", startCheckout);
@@ -519,3 +505,5 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadSubscription();
   await loadBillingHistory();
 });
+
+

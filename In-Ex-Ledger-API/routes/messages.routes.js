@@ -109,24 +109,14 @@ router.get("/contacts", async (req, res) => {
       [req.user.id]
     );
 
-    const contacts = rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      email: r.email,
-      role: r.role
-    }));
-
-    // Always ensure InEx Ledger Support appears as a reachable contact,
-    // even if no it_support/admin users exist in the DB yet.
-    const hasSupportContact = contacts.some((c) => c.role === "it_support" || c.role === "admin");
-    if (!hasSupportContact) {
-      contacts.unshift({
-        id: "system:support",
-        name: "InEx Ledger Support",
-        email: "support@inexledger.com",
-        role: "it_support"
-      });
-    }
+    const contacts = rows
+      .filter((r) => isUuid(r.id))
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        email: r.email,
+        role: r.role
+      }));
 
     res.json({ contacts });
   } catch (err) {
@@ -194,6 +184,43 @@ router.get("/sent", async (req, res) => {
   } catch (err) {
     logError("GET /messages/sent error:", err.message);
     res.status(500).json({ error: "Failed to fetch sent messages." });
+  }
+});
+
+// GET /api/messages/archived
+// Returns archived messages for both inbox and sent conversations.
+router.get("/archived", async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), MAX_PAGE_SIZE);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+    const { rows } = await pool.query(
+      `SELECT m.*,
+              COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
+              s.email AS sender_email,
+              COALESCE(r.display_name, r.full_name, r.email) AS receiver_name,
+              r.email AS receiver_email
+         FROM messages m
+         JOIN users s ON s.id = m.sender_id
+         JOIN users r ON r.id = m.receiver_id
+        WHERE (
+          m.receiver_id = $1
+          AND m.is_deleted_by_receiver = FALSE
+          AND m.is_archived_by_receiver = TRUE
+        ) OR (
+          m.sender_id = $1
+          AND m.is_deleted_by_sender = FALSE
+          AND m.is_archived_by_sender = TRUE
+        )
+        ORDER BY m.created_at DESC
+        LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+
+    res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
+  } catch (err) {
+    logError("GET /messages/archived error:", err.message);
+    res.status(500).json({ error: "Failed to fetch archived messages." });
   }
 });
 

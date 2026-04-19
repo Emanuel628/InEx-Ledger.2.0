@@ -278,8 +278,25 @@ function injectMessagesNavLink() {
     link.innerHTML =
       '<span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4z"></path><path d="M2 4l6 5 6-5"></path></svg></span>' +
       '<span>Messages</span>' +
-      '<span class="nav-msg-badge" aria-label="unread messages" data-count="0"></span>';
+      '<span class="nav-msg-badge" data-count="0" hidden></span>';
     nav.appendChild(link);
+  });
+}
+
+function updateNavMessageBadges(count) {
+  document.querySelectorAll(".nav-msg-badge").forEach(function (badge) {
+    badge.setAttribute("data-count", String(count));
+    badge.textContent = "";
+    badge.hidden = count <= 0;
+
+    if (count > 0) {
+      var label = count === 1 ? "1 unread message" : count + " unread messages";
+      badge.setAttribute("aria-label", label);
+      badge.title = label;
+    } else {
+      badge.removeAttribute("aria-label");
+      badge.removeAttribute("title");
+    }
   });
 }
 
@@ -300,10 +317,7 @@ function pollGlobalUnreadCount() {
         return response.json().then(function (data) {
           if (!data) return true;
           var count = data.count || 0;
-          document.querySelectorAll(".nav-msg-badge").forEach(function (badge) {
-            badge.setAttribute("data-count", String(count));
-            badge.textContent = count > 99 ? "99+" : (count > 0 ? String(count) : "");
-          });
+          updateNavMessageBadges(count);
           return true;
         });
       })
@@ -324,10 +338,7 @@ function pollGlobalUnreadCount() {
       return response.json().then(function (data) {
         if (!data) return true;
         var count = data.count || 0;
-        document.querySelectorAll(".nav-msg-badge").forEach(function (badge) {
-          badge.setAttribute("data-count", String(count));
-          badge.textContent = count > 99 ? "99+" : (count > 0 ? String(count) : "");
-        });
+        updateNavMessageBadges(count);
         return true;
       });
     })

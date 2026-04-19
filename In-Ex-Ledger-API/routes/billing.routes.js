@@ -12,6 +12,10 @@ const {
   setFreePlanForBusiness
 } = require("../services/subscriptionService.js");
 const { buildStripePriceEnvMap } = require("../services/stripePriceConfig.js");
+const {
+  normalizeIpAddress,
+  fetchIpLocation
+} = require("../services/signInSecurityService.js");
 const { pool } = require("../db.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
@@ -25,8 +29,10 @@ const billingMutationLimiter = createBillingMutationLimiter();
 const BILLING_INTERVALS = new Set(["monthly", "yearly"]);
 const BILLING_CURRENCIES = new Set(["usd", "cad"]);
 const MAX_ADDITIONAL_BUSINESSES = 100;
+const BILLING_CONTEXT_CACHE_TTL_MS = 15 * 60 * 1000;
 
 const { base: BASE_PRICE_ENV, addon: ADDON_PRICE_ENV } = buildStripePriceEnvMap();
+const billingContextCache = new Map();
 
 class BillingValidationError extends Error {
   constructor(message) {
@@ -132,6 +138,59 @@ function normalizeAdditionalBusinesses(input) {
     );
   }
   return value;
+}
+
+function getVerifiedClientIp(req) {
+  return normalizeIpAddress(req?.ip || req?.socket?.remoteAddress || "");
+}
+
+function normalizeCountryCode(country) {
+  const value = String(country || "").trim().toLowerCase();
+  if (!value) {
+    return null;
+  }
+  if (value === "ca" || value === "canada") {
+    return "ca";
+  }
+  if (
+    value === "us" ||
+    value === "usa" ||
+    value === "united states" ||
+    value === "united states of america"
+  ) {
+    return "us";
+  }
+  return null;
+}
+
+function resolveCurrencyForCountry(countryCode) {
+  return countryCode === "ca" ? "cad" : "usd";
+}
+
+async function resolveBillingContext(req) {
+  const ipAddress = getVerifiedClientIp(req);
+  const cached = ipAddress ? billingContextCache.get(ipAddress) : null;
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
+  const location = await fetchIpLocation(ipAddress);
+  const countryCode = normalizeCountryCode(location?.country);
+  const context = {
+    ipAddress: ipAddress || null,
+    countryCode,
+    currency: resolveCurrencyForCountry(countryCode),
+    source: countryCode ? "ip_geolocation" : "default_usd"
+  };
+
+  if (ipAddress) {
+    billingContextCache.set(ipAddress, {
+      value: context,
+      expiresAt: Date.now() + BILLING_CONTEXT_CACHE_TTL_MS
+    });
+  }
+
+  return context;
 }
 
 function resolveStripePriceSelection({ billingInterval, currency, additionalBusinesses }) {
@@ -242,6 +301,20 @@ router.get("/subscription", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/pricing-context", billingReadLimiter, async (req, res) => {
+  try {
+    const context = await resolveBillingContext(req);
+    res.json({
+      currency: context.currency,
+      country_code: context.countryCode,
+      source: context.source
+    });
+  } catch (err) {
+    logError("GET /api/billing/pricing-context error:", err.message);
+    res.status(500).json({ error: "Failed to load pricing context." });
+  }
+});
+
 // ── Mock V1 (dev/staging only) ────────────────────────────────────────────────
 // These two routes let developers activate V1 access without going through
 // Stripe. Gate them behind ENABLE_MOCK_BILLING=true so they are unreachable
@@ -294,9 +367,24 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
     }
 
     const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
+    const billingContext = await resolveBillingContext(req);
+    const requestedCurrency = String(req.body?.currency || "").trim().toLowerCase();
+    if (
+      requestedCurrency &&
+      BILLING_CURRENCIES.has(requestedCurrency) &&
+      requestedCurrency !== billingContext.currency
+    ) {
+      logWarn("Ignored client-supplied billing currency in favor of verified billing context", {
+        userId: req.user?.id,
+        businessId,
+        requestedCurrency,
+        resolvedCurrency: billingContext.currency,
+        billingSource: billingContext.source
+      });
+    }
     const priceSelection = resolveStripePriceSelection({
       billingInterval: req.body?.billingInterval,
-      currency: req.body?.currency,
+      currency: billingContext.currency,
       additionalBusinesses
     });
 
@@ -313,10 +401,14 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       "metadata[plan_code]": "v1",
       "metadata[billing_interval]": priceSelection.billingInterval,
       "metadata[currency]": priceSelection.currency,
+      "metadata[currency_source]": billingContext.source,
+      "metadata[country_code]": billingContext.countryCode || "unknown",
       "metadata[additional_businesses]": additionalBusinesses,
       "subscription_data[metadata][plan_code]": "v1",
       "subscription_data[metadata][billing_interval]": priceSelection.billingInterval,
       "subscription_data[metadata][currency]": priceSelection.currency,
+      "subscription_data[metadata][currency_source]": billingContext.source,
+      "subscription_data[metadata][country_code]": billingContext.countryCode || "unknown",
       "subscription_data[metadata][additional_businesses]": additionalBusinesses
     };
 

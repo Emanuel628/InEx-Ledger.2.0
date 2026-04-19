@@ -15,6 +15,8 @@ const pricingState = {
   additionalBusinesses: 0
 };
 
+const BILLING_CURRENCIES = ["usd", "cad"];
+
 function formatMoney(currency, amount) {
   return new Intl.NumberFormat(currency === "cad" ? "en-CA" : "en-US", {
     style: "currency",
@@ -42,6 +44,26 @@ function setActiveToggle(selector, activeValue, attrName) {
   document.querySelectorAll(selector).forEach((btn) => {
     btn.classList.toggle("is-active", btn.getAttribute(attrName) === activeValue);
   });
+}
+
+async function loadVerifiedPricingContext() {
+  try {
+    const res = await fetch("/api/billing/pricing-context", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+    if (!res.ok) {
+      return pricingState.currency;
+    }
+    const payload = await res.json().catch(() => null);
+    const currency = String(payload?.currency || "").toLowerCase();
+    if (BILLING_CURRENCIES.includes(currency)) {
+      pricingState.currency = currency;
+    }
+  } catch (_) {
+    // Fall back to the default pricing table currency.
+  }
+  return pricingState.currency;
 }
 
 function updateCtaLabels() {
@@ -105,7 +127,6 @@ function renderPricing() {
   }
 
   setActiveToggle("[data-interval]", pricingState.interval, "data-interval");
-  setActiveToggle("[data-currency]", pricingState.currency, "data-currency");
 }
 
 function clampAdditionalBusinesses(value) {
@@ -121,7 +142,6 @@ function persistPendingChoice() {
     JSON.stringify({
       plan: "v1",
       billingInterval: pricingState.interval,
-      currency: pricingState.currency,
       additionalBusinesses: pricingState.additionalBusinesses
     })
   );
@@ -138,6 +158,7 @@ async function launchCheckout() {
   }
 
   try {
+    await loadVerifiedPricingContext();
     if (button) {
       button.disabled = true;
       button.textContent = "Launching secure checkout…";
@@ -148,7 +169,6 @@ async function launchCheckout() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         billingInterval: pricingState.interval,
-        currency: pricingState.currency,
         additionalBusinesses: pricingState.additionalBusinesses
       })
     });
@@ -200,13 +220,6 @@ function wireToggles() {
       renderPricing();
     });
   });
-
-  document.querySelectorAll("[data-currency]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      pricingState.currency = btn.getAttribute("data-currency") || "usd";
-      renderPricing();
-    });
-  });
 }
 
 function wireAdditionalBusinesses() {
@@ -227,10 +240,12 @@ function wireAdditionalBusinesses() {
   plus?.addEventListener("click", () => sync(pricingState.additionalBusinesses + 1));
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   wirePrimaryButtons();
   wireToggles();
   wireAdditionalBusinesses();
   updateCtaLabels();
+  await loadVerifiedPricingContext();
   renderPricing();
 });
+

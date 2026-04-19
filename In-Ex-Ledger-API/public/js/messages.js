@@ -4,6 +4,7 @@ const TOAST_MS = 3500;
 const POLL_INTERVAL_MS = 30000; // 30 s polling for unread count
 const PAGE_SIZE = 25;
 const PREVIEW_MAX_LENGTH = 80;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 let _toastTimer = null;
 let _pollTimer = null;
@@ -11,6 +12,16 @@ let _currentTab = "inbox"; // inbox | sent | archived
 let _currentMsgId = null;
 let _currentMsgReceiverId = null;
 let _contacts = [];
+
+function isUuid(value) {
+  return typeof value === "string" && UUID_RE.test(value);
+}
+
+function findSupportContact() {
+  return _contacts.find((contact) =>
+    isUuid(contact?.id) && (contact.role === "it_support" || contact.role === "admin")
+  ) || null;
+}
 
 // ─────────────────────────────────────────────
 // Bootstrap
@@ -88,7 +99,16 @@ function wireSidebar() {
 
   document.getElementById("sidebarSupport")?.addEventListener("click", (e) => {
     e.preventDefault();
-    openComposeModal({ type: "support_request", subject: "Support Request" });
+    const supportContact = findSupportContact();
+    if (!supportContact) {
+      showToast("Support messaging is unavailable right now. Use support@inexledger.com.");
+      return;
+    }
+    openComposeModal({
+      to: supportContact.id,
+      type: "support_request",
+      subject: "Support Request"
+    });
   });
 }
 
@@ -105,7 +125,7 @@ async function loadMessages(tab) {
     if (tab === "sent") {
       url = `/api/messages/sent?limit=${PAGE_SIZE}`;
     } else if (tab === "archived") {
-      url = `/api/messages/inbox?archived=true&limit=${PAGE_SIZE}`;
+      url = `/api/messages/archived?limit=${PAGE_SIZE}`;
     } else {
       url = `/api/messages/inbox?limit=${PAGE_SIZE}`;
     }
@@ -275,7 +295,10 @@ async function sendReply() {
     showFieldTooltip(input, "Please write a reply before sending.");
     return;
   }
-  if (!_currentMsgReceiverId) return;
+  if (!isUuid(_currentMsgReceiverId)) {
+    showToast("Reply recipient is invalid. Reopen the message and try again.");
+    return;
+  }
 
   const btn = document.getElementById("replySendBtn");
   if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
@@ -368,6 +391,7 @@ function populateContactSelect(select) {
     select.appendChild(opt);
   }
   _contacts.forEach((c) => {
+    if (!isUuid(c.id)) return;
     const opt = document.createElement("option");
     opt.value = c.id;
     const roleTag = c.role && c.role !== "user" ? ` (${c.role.replace("_", " ")})` : "";
@@ -429,6 +453,11 @@ async function sendComposedMessage() {
 
   if (!receiverId) {
     if (errorEl) errorEl.textContent = "Please select a recipient.";
+    toEl?.focus();
+    return;
+  }
+  if (!isUuid(receiverId)) {
+    if (errorEl) errorEl.textContent = "Please select a valid recipient.";
     toEl?.focus();
     return;
   }
@@ -507,8 +536,16 @@ function setUnreadBadge(count) {
   // Update any injected nav badges (other pages)
   document.querySelectorAll(".nav-msg-badge").forEach((badge) => {
     badge.setAttribute("data-count", String(count));
-    badge.textContent = count > 99 ? "99+" : String(count);
+    badge.textContent = "";
     badge.hidden = count <= 0;
+    const label = count === 1 ? "1 unread message" : `${count} unread messages`;
+    if (count > 0) {
+      badge.setAttribute("aria-label", label);
+      badge.title = label;
+    } else {
+      badge.removeAttribute("aria-label");
+      badge.removeAttribute("title");
+    }
   });
 }
 
