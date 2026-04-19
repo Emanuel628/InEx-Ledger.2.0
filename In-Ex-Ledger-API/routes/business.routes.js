@@ -93,8 +93,8 @@ router.get("/", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     res.json(await fetchBusinessRow(businessId));
   } catch (err) {
-    logError("GET /business error:", err.message);
-    res.status(500).json({ error: "Failed to load business profile." });
+    logError("GET /business error:", err.stack || err);
+    res.status(500).json({ error: "A server error occurred while loading the business profile. Please try again or contact support if the problem persists." });
   }
 });
 
@@ -158,8 +158,8 @@ router.put("/", async (req, res) => {
     });
     res.json(updated);
   } catch (err) {
-    logError("PUT /business error:", err.message);
-    res.status(500).json({ error: "Failed to update business profile." });
+    logError("PUT /business error:", err.stack || err);
+    res.status(500).json({ error: "A server error occurred while updating the business profile. Please try again or contact support if the problem persists." });
   }
 });
 
@@ -169,8 +169,8 @@ router.get("/accounting-lock", async (req, res) => {
     const lock = await loadAccountingLockState(pool, businessId);
     res.json({ lock });
   } catch (err) {
-    logError("GET /business/accounting-lock error:", err.message);
-    res.status(500).json({ error: "Failed to load accounting lock." });
+    logError("GET /business/accounting-lock error:", err.stack || err);
+    res.status(500).json({ error: "A server error occurred while loading the accounting lock. Please try again or contact support if the problem persists." });
   }
 });
 
@@ -189,8 +189,8 @@ router.put("/accounting-lock", async (req, res) => {
     if (err.message === "Date value is invalid.") {
       return res.status(400).json({ error: "locked_through_date must be a valid date." });
     }
-    logError("PUT /business/accounting-lock error:", err.message);
-    res.status(500).json({ error: "Failed to update accounting lock." });
+    logError("PUT /business/accounting-lock error:", err.stack || err);
+    res.status(500).json({ error: "A server error occurred while updating the accounting lock. Please try again or contact support if the problem persists." });
   }
 });
 
