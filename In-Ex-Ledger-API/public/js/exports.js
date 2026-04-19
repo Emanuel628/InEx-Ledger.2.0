@@ -16,6 +16,7 @@ const CSV_BASIC_FORMAT = "csv_basic";
 const EXPORT_TOAST_MS = 3000;
 
 let exportToastTimer = null;
+let resetInlineTaxIdState = () => {};
 let unattachedReceiptsCount = 0;
 let transactionsCacheFresh = false;
 let exportContext = {
@@ -577,7 +578,11 @@ function setupPdfButton() {
       button.disabled = true;
       try {
         await submitSecureExport(taxId, range.startDate, range.endDate);
-        if (taxIdInput) taxIdInput.value = "";
+        if (typeof resetInlineTaxIdState === "function") {
+          resetInlineTaxIdState({ hideSection: true });
+        } else if (taxIdInput) {
+          taxIdInput.value = "";
+        }
       } catch (err) {
         if (taxIdInput) taxIdInput.value = "";
         setError(err?.message || tx("secure_export_modal_error_generic"));
@@ -679,19 +684,33 @@ function wireInlineTaxId() {
     return;
   }
 
+  resetInlineTaxIdState = ({ hideSection = false } = {}) => {
+    if (input) {
+      input.value = "";
+      input.type = "password";
+    }
+    if (toggle) toggle.textContent = tx("secure_export_modal_show");
+    const cb = document.getElementById("exportInlineTaxIdCheckbox");
+    if (cb) cb.checked = false;
+    const errorEl = document.getElementById("exportInlineTaxIdError");
+    if (errorEl) {
+      errorEl.textContent = "";
+      errorEl.classList.add("hidden");
+    }
+    if (hideSection) {
+      section.hidden = true;
+      checkbox.checked = false;
+    }
+  };
+
   checkbox.addEventListener("change", () => {
     const show = checkbox.checked;
     section.hidden = !show;
-    if (!show && input) {
-      input.value = "";
-      input.type = "password";
-      if (toggle) toggle.textContent = tx("secure_export_modal_show");
-      const cb = document.getElementById("exportInlineTaxIdCheckbox");
-      if (cb) cb.checked = false;
-      const errorEl = document.getElementById("exportInlineTaxIdError");
-      if (errorEl) { errorEl.textContent = ""; errorEl.classList.add("hidden"); }
+    if (!show) {
+      resetInlineTaxIdState();
     }
     if (show) {
+      resetInlineTaxIdState();
       const canadaText = document.getElementById("exportInlineTaxIdCanadaText");
       if (canadaText) {
         canadaText.classList.toggle("hidden", getRegion() !== "ca");

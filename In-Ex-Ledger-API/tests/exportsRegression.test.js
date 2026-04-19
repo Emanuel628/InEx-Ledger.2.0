@@ -54,7 +54,6 @@ function buildTestPdf() {
 function loadExportsRouter(options = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = {
-    dispatchedJob: null,
     savedRedacted: null,
     insertedExport: null,
     insertedMetadata: null,
@@ -78,13 +77,39 @@ function loadExportsRouter(options = {}) {
     }
   };
 
-  const workerResult = options.workerResult || {
-    fullPdfBuffer: Buffer.from("%PDF-full%"),
-    redactedPdfBuffer: Buffer.from("%PDF-redacted%"),
-    metadata: {
-      pageCount: 3,
-      notes: "Generated via test worker"
-    }
+  const exportData = {
+    transactions: [
+      {
+        id: "tx_income",
+        account_id: "acc_main",
+        category_id: "cat_income",
+        amount: "1200.00",
+        type: "income",
+        description: "Client A",
+        date: "2026-04-01",
+        note: "Invoice (April)",
+        currency: "USD"
+      },
+      {
+        id: "tx_expense",
+        account_id: "acc_main",
+        category_id: "cat_expense",
+        amount: "200.00",
+        type: "expense",
+        description: "Office Depot",
+        date: "2026-04-02",
+        note: "Supplies",
+        currency: "USD"
+      }
+    ],
+    accounts: [{ id: "acc_main", name: "Checking", type: "bank" }],
+    categories: [
+      { id: "cat_income", name: "Income", kind: "income", tax_map_us: "Gross receipts", tax_map_ca: "" },
+      { id: "cat_expense", name: "Office Supplies", kind: "expense", tax_map_us: "Office Supplies", tax_map_ca: "" }
+    ],
+    receipts: [],
+    mileage: [],
+    business: { name: "Acme", region: "us", province: "" }
   };
 
   Module._load = function(requestName, parent, isMain) {
@@ -145,7 +170,7 @@ function loadExportsRouter(options = {}) {
     }
     if (requestName === "../services/jweDecryptService.js" || /jweDecryptService\.js$/.test(requestName)) {
       return {
-        decryptJwe: async () => "12-3456789"
+        decryptJwe: () => "12-3456789"
       };
     }
     if (requestName === "../services/pdfGeneratorService.js" || /pdfGeneratorService\.js$/.test(requestName)) {
@@ -153,17 +178,30 @@ function loadExportsRouter(options = {}) {
         buildPdfExport
       };
     }
-    if (requestName === "../services/pdfWorkerClient.js" || /pdfWorkerClient\.js$/.test(requestName)) {
-      return {
-        async dispatchPdfJob(job) {
-          state.dispatchedJob = job;
-          return workerResult;
-        }
-      };
-    }
     if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
       return {
         pool: {
+          async query(sql) {
+            if (/FROM transactions/i.test(sql)) {
+              return { rows: exportData.transactions };
+            }
+            if (/FROM accounts/i.test(sql)) {
+              return { rows: exportData.accounts };
+            }
+            if (/FROM categories/i.test(sql)) {
+              return { rows: exportData.categories };
+            }
+            if (/FROM receipts/i.test(sql)) {
+              return { rows: exportData.receipts };
+            }
+            if (/FROM mileage/i.test(sql)) {
+              return { rows: exportData.mileage };
+            }
+            if (/FROM businesses/i.test(sql)) {
+              return { rows: [exportData.business] };
+            }
+            throw new Error(`Unhandled pool SQL: ${sql}`);
+          },
           async connect() {
             return {
               async query(sql, params) {
@@ -253,7 +291,7 @@ test("buildPdfExport writes literal Helvetica text commands instead of UTF-16 he
   assert.doesNotMatch(pdf, /[^\x00-\x7F]/);
 });
 
-test("exports generate route dispatches worker job and returns the full PDF buffer", async () => {
+test("exports generate route returns the inline PDF buffer and stores only the redacted copy", async () => {
   const fixture = loadExportsRouter();
 
   try {
@@ -269,13 +307,13 @@ test("exports generate route dispatches worker job and returns the full PDF buff
 
     assert.equal(response.status, 200);
     assert.equal(response.headers["content-type"], "application/pdf");
-    assert.deepEqual(response.body, Buffer.from("%PDF-full%"));
-    assert.ok(fixture.state.dispatchedJob, "worker job should be dispatched");
-    assert.equal(fixture.state.dispatchedJob.taxId_jwe, "encrypted_tax_id");
-    assert.deepEqual(fixture.state.savedRedacted, {
-      jobId: fixture.state.dispatchedJob.jobId,
-      buffer: Buffer.from("%PDF-redacted%")
-    });
+    assert.ok(Buffer.isBuffer(response.body));
+    assert.match(response.body.toString("latin1"), /^%PDF-/);
+    assert.match(response.body.toString("latin1"), /\(Tax ID: 12-3456789\) Tj/);
+    assert.ok(fixture.state.savedRedacted?.jobId, "redacted export should be saved");
+    assert.ok(Buffer.isBuffer(fixture.state.savedRedacted?.buffer));
+    assert.match(fixture.state.savedRedacted.buffer.toString("latin1"), /^%PDF-/);
+    assert.doesNotMatch(fixture.state.savedRedacted.buffer.toString("latin1"), /\(Tax ID: 12-3456789\) Tj/);
     assert.ok(Array.isArray(fixture.state.insertedExport), "export row should be inserted");
     assert.ok(Array.isArray(fixture.state.insertedMetadata), "metadata rows should be inserted");
     assert.ok(
