@@ -1,10 +1,10 @@
-// GET /check-email-verified
+// Mounted at /check-email-verified
 // Returns { verified: true/false } for a given email
 const express = require('express');
 const router = express.Router();
 const { pool } = require('../db.js');
 
-router.get('/check-email-verified', async (req, res) => {
+router.get('/', async (req, res) => {
   const email = String(req.query.email || '').trim().toLowerCase();
   if (!email) return res.status(400).json({ error: 'Email is required' });
   try {
