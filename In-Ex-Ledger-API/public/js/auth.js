@@ -17,6 +17,7 @@ const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
 const LOGIN_RESET_KEY = "lb_login_reset";
 const ONBOARDING_PAGE = "/onboarding";
+const GUIDED_ONBOARDING_STEPS = new Set(["categories", "accounts", "transactions"]);
 const LOGIN_PAGE = "/login";
 const ONBOARDING_RUNTIME_PAGES = new Set([
   "/transactions",
@@ -324,6 +325,21 @@ function shouldRedirectToOnboarding(profile = {}) {
   return !profile?.onboarding?.completed && !isOnboardingRoute();
 }
 
+function resolvePostOnboardingPath(profile = {}) {
+  const onboardingData = profile?.onboarding?.data || {};
+  const guidedStep = String(onboardingData.guided_setup_step || "").trim().toLowerCase();
+  if (onboardingData.guided_setup_active && GUIDED_ONBOARDING_STEPS.has(guidedStep)) {
+    return `/${guidedStep}`;
+  }
+
+  const startFocus = String(onboardingData.start_focus || "").trim().toLowerCase();
+  if (startFocus) {
+    return `/${startFocus}`;
+  }
+
+  return "/transactions";
+}
+
 function maybeLoadOnboardingRuntime(profile = {}) {
   const path = getNormalizedPathname();
   if (!profile?.onboarding?.completed || !ONBOARDING_RUNTIME_PAGES.has(path)) {
@@ -333,14 +349,14 @@ function maybeLoadOnboardingRuntime(profile = {}) {
   if (!document.querySelector('link[data-onboarding-runtime="true"]')) {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "/css/pages/onboarding.css";
+    link.href = "/css/pages/onboarding.css?v=20260419a";
     link.dataset.onboardingRuntime = "true";
     document.head.appendChild(link);
   }
 
   if (!document.querySelector('script[data-onboarding-runtime="true"]')) {
     const script = document.createElement("script");
-    script.src = "/js/onboarding.js?v=20260405c";
+    script.src = "/js/onboarding.js?v=20260419a";
     script.dataset.onboardingRuntime = "true";
     document.body.appendChild(script);
   }
@@ -579,7 +595,7 @@ async function redirectIfAuthenticated() {
         updateAuthenticatedChrome(payload);
       }
       syncRegionFromProfile(payload);
-      window.location.href = payload?.onboarding?.completed ? "/transactions" : ONBOARDING_PAGE;
+      window.location.href = payload?.onboarding?.completed ? resolvePostOnboardingPath(payload) : ONBOARDING_PAGE;
     }
   } catch (err) {
     if (localStorage.getItem("debug") === "true") { console.error("[AUTH] redirectIfAuthenticated failed:", err); }

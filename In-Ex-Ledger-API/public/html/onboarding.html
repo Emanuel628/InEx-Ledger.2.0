@@ -5,7 +5,7 @@
   <title>InEx Ledger - Getting Started</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css" />
-  <link rel="stylesheet" href="/css/pages/onboarding.css" />
+  <link rel="stylesheet" href="/css/pages/onboarding.css?v=20260419a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -27,20 +27,18 @@
     <section class="onboarding-shell">
       <div class="onboarding-intro">
         <span class="onboarding-kicker" data-i18n="onboarding_kicker">Get set up</span>
-        <h1>Let’s make your workspace usable in one pass.</h1>
-        <p>Tell us the basics, we’ll set your defaults, create your first account, and point you to the right starting page.</p>
+        <h1>Let's make your workspace usable in one pass.</h1>
+        <p>Tell us the basics, we'll set your defaults, create your first account, and walk you through categories, accounts, and transactions.</p>
         <ol class="onboarding-steps">
           <li data-i18n="onboarding_step_1">Business basics</li>
           <li data-i18n="onboarding_step_2">Regional defaults</li>
           <li data-i18n="onboarding_step_3">First account</li>
-          <li data-i18n="onboarding_step_4">Your starting workflow</li>
+          <li data-i18n="onboarding_step_4">Guided setup</li>
         </ol>
       </div>
 
       <form id="onboardingForm" class="onboarding-card">
         <div class="onboarding-grid">
-
-          <!-- Work type tiles -->
           <div class="form-field form-field-full">
             <label class="field-label" data-i18n="onboarding_work_type_label">What kind of work do you do?</label>
             <div class="onboarding-work-tiles" id="onboardingWorkTiles">
@@ -56,7 +54,6 @@
             <label for="onboardingBusinessName" data-i18n="onboarding_business_name">Your name or trade name</label>
             <input type="text" id="onboardingBusinessName" autocomplete="name" required data-i18n-placeholder="onboarding_business_name_placeholder" placeholder="e.g. Jane Smith or Jane's Design" />
           </div>
-          <!-- business_type hidden — always sole_proprietor for freelancers; user can change in Settings -->
           <input type="hidden" id="onboardingBusinessType" value="sole_proprietor" />
           <div class="form-field">
             <label for="onboardingRegion" data-i18n="onboarding_region">Where do you file taxes?</label>
@@ -107,15 +104,6 @@
             <label for="onboardingStarterAccountName" data-i18n="onboarding_first_account_name">Account nickname</label>
             <input type="text" id="onboardingStarterAccountName" required />
           </div>
-          <div class="form-field form-field-full">
-            <label for="onboardingStartFocus" data-i18n="onboarding_start_focus">What do you want to do first?</label>
-            <select id="onboardingStartFocus" required>
-              <option value="transactions" data-i18n="onboarding_focus_transactions">Log income &amp; expenses</option>
-              <option value="receipts" data-i18n="onboarding_focus_receipts">Upload receipts</option>
-              <option value="mileage" data-i18n="onboarding_focus_mileage">Track mileage</option>
-              <option value="exports" data-i18n="onboarding_focus_exports">Review exports</option>
-            </select>
-          </div>
         </div>
 
         <p id="onboardingMessage" class="auth-error" role="alert" aria-live="polite" hidden></p>
@@ -128,9 +116,10 @@
   </main>
 
   <script src="../js/escape-html.js?v=20260410a"></script>
-<script src="../js/global.js?v=20260405c"></script>
-  <script src="../js/i18n.js?v=20260405c"></script>
-  <script src="../js/auth.js?v=20260405c"></script>
-  <script src="../js/onboarding-page.js?v=20260405c"></script>
+  <script src="../js/global.js?v=20260405c"></script>
+  <script src="../js/i18n.js?v=20260419a"></script>
+  <script src="../js/auth.js?v=20260419a"></script>
+  <script src="../js/onboarding-page.js?v=20260419a"></script>
 </body>
 </html>
+

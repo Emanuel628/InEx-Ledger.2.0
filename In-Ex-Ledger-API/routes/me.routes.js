@@ -28,9 +28,9 @@ const accountDeleteLimiter = rateLimit({
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const VALID_BUSINESS_TYPES = new Set(["sole_proprietor", "llc", "s_corp", "partnership", "corporation"]);
-const VALID_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash", "loan"]);
 const MAX_CUSTOM_ACCOUNT_TYPE_LEN = 50;
-const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
+const GUIDED_SETUP_STEPS = ["categories", "accounts", "transactions"];
+const VALID_GUIDED_SETUP_ACTIONS = new Set(["next", "skip", "finish"]);
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const REFRESH_TOKEN_COOKIE = "refresh_token";
 const LEGACY_CPA_AUDIT_USER_CONSTRAINTS = [
@@ -56,6 +56,14 @@ function normalizeOnboardingPayload(user) {
         ? user.onboarding_tour_seen
         : {}
   };
+}
+
+function resolveNextGuidedSetupStep(currentStep) {
+  const currentIndex = GUIDED_SETUP_STEPS.indexOf(currentStep);
+  if (currentIndex === -1) {
+    return GUIDED_SETUP_STEPS[0];
+  }
+  return GUIDED_SETUP_STEPS[currentIndex + 1] || null;
 }
 
 router.use(requireAuth);
@@ -140,7 +148,6 @@ router.put("/onboarding", async (req, res) => {
   const language = String(req.body?.language || "").trim();
   const starterAccountType = String(req.body?.starter_account_type || "").trim();
   const starterAccountName = String(req.body?.starter_account_name || "").trim();
-  const startFocus = String(req.body?.start_focus || "").trim();
 
   if (!businessName) {
     return res.status(400).json({ error: "Business name is required." });
@@ -163,10 +170,6 @@ router.put("/onboarding", async (req, res) => {
   if (!starterAccountName) {
     return res.status(400).json({ error: "Starter account name is required." });
   }
-  if (!VALID_START_FOCUS.has(startFocus)) {
-    return res.status(400).json({ error: "Choose what you want to do first." });
-  }
-
   try {
     const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
     const client = await pool.connect();
@@ -214,7 +217,8 @@ router.put("/onboarding", async (req, res) => {
         language,
         starter_account_type: starterAccountType,
         starter_account_name: starterAccountName,
-        start_focus: startFocus
+        guided_setup_active: true,
+        guided_setup_step: GUIDED_SETUP_STEPS[0]
       };
 
       const updated = await client.query(
@@ -231,7 +235,7 @@ router.put("/onboarding", async (req, res) => {
 
       return res.status(200).json({
         onboarding: normalizeOnboardingPayload(updated.rows[0]),
-        redirect_to: `/${startFocus}`
+        redirect_to: `/${GUIDED_SETUP_STEPS[0]}`
       });
     } catch (err) {
       await client.query("ROLLBACK");
@@ -242,6 +246,92 @@ router.put("/onboarding", async (req, res) => {
   } catch (err) {
     logError("PUT /me/onboarding error:", err.message);
     return res.status(500).json({ error: "Failed to save onboarding." });
+  }
+});
+
+router.post("/onboarding/guide", async (req, res) => {
+  const action = String(req.body?.action || "").trim().toLowerCase();
+  const page = String(req.body?.page || "").trim().toLowerCase();
+
+  if (!VALID_GUIDED_SETUP_ACTIONS.has(action)) {
+    return res.status(400).json({ error: "Invalid onboarding guide action." });
+  }
+  if (page && !GUIDED_SETUP_STEPS.includes(page)) {
+    return res.status(400).json({ error: "Invalid onboarding guide page." });
+  }
+
+  try {
+    const current = await pool.query(
+      `SELECT onboarding_completed, onboarding_data, onboarding_tour_seen
+         FROM users
+        WHERE id = $1
+        LIMIT 1`,
+      [req.user.id]
+    );
+    if (!current.rowCount) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    if (!current.rows[0]?.onboarding_completed) {
+      return res.status(400).json({ error: "Finish onboarding before using the guided setup flow." });
+    }
+
+    const currentData =
+      current.rows[0]?.onboarding_data && typeof current.rows[0].onboarding_data === "object"
+        ? { ...current.rows[0].onboarding_data }
+        : {};
+    const currentTourSeen =
+      current.rows[0]?.onboarding_tour_seen && typeof current.rows[0].onboarding_tour_seen === "object"
+        ? { ...current.rows[0].onboarding_tour_seen }
+        : {};
+    const effectivePage =
+      page || (GUIDED_SETUP_STEPS.includes(currentData.guided_setup_step) ? currentData.guided_setup_step : GUIDED_SETUP_STEPS[0]);
+    const timestamp = new Date().toISOString();
+
+    let redirectTo = "/transactions";
+    if (action === "skip") {
+      GUIDED_SETUP_STEPS.forEach((step) => {
+        currentTourSeen[step] = true;
+      });
+      currentData.guided_setup_active = false;
+      currentData.guided_setup_step = "skipped";
+      currentData.guided_setup_completed_at = timestamp;
+      currentData.guided_setup_skipped_at = timestamp;
+    } else if (action === "finish") {
+      currentTourSeen[effectivePage] = true;
+      currentData.guided_setup_active = false;
+      currentData.guided_setup_step = "complete";
+      currentData.guided_setup_completed_at = timestamp;
+    } else {
+      currentTourSeen[effectivePage] = true;
+      const nextStep = resolveNextGuidedSetupStep(effectivePage);
+      if (nextStep) {
+        currentData.guided_setup_active = true;
+        currentData.guided_setup_step = nextStep;
+        redirectTo = `/${nextStep}`;
+      } else {
+        currentData.guided_setup_active = false;
+        currentData.guided_setup_step = "complete";
+        currentData.guided_setup_completed_at = timestamp;
+      }
+    }
+
+    const updated = await pool.query(
+      `UPDATE users
+          SET onboarding_data = $1::jsonb,
+              onboarding_tour_seen = $2::jsonb
+        WHERE id = $3
+        RETURNING onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen`,
+      [JSON.stringify(currentData), JSON.stringify(currentTourSeen), req.user.id]
+    );
+
+    return res.status(200).json({
+      onboarding: normalizeOnboardingPayload(updated.rows[0]),
+      redirect_to: redirectTo
+    });
+  } catch (err) {
+    logError("POST /me/onboarding/guide error:", err.message);
+    return res.status(500).json({ error: "Failed to update guided onboarding." });
   }
 });
 

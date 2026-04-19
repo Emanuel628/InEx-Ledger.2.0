@@ -2,6 +2,7 @@ let onboardingForm = null;
 let onboardingMessage = null;
 let onboardingSubmitting = false;
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
+const GUIDED_SETUP_STEPS = new Set(["categories", "accounts", "transactions"]);
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
@@ -22,9 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const profile = window.__LUNA_ME__ || null;
   if (profile?.onboarding?.completed) {
-    window.location.href = profile?.onboarding?.data?.start_focus
-      ? `/${profile.onboarding.data.start_focus}`
-      : "/transactions";
+    window.location.href = resolveOnboardingDestination(profile);
     return;
   }
 
@@ -74,8 +73,6 @@ function hydrateOnboardingDefaults(profile = {}) {
 
   const elStarterAccountName = document.getElementById("onboardingStarterAccountName");
   if (elStarterAccountName) elStarterAccountName.value = onboardingData.starter_account_name || "";
-  const elStartFocus = document.getElementById("onboardingStartFocus");
-  if (elStartFocus) elStartFocus.value = onboardingData.start_focus || "transactions";
 
   syncProvinceField();
 }
@@ -106,8 +103,7 @@ async function handleOnboardingSubmit(event) {
     province: document.getElementById("onboardingProvince")?.value || "",
     language: savedLanguage,
     starter_account_type: effectiveAccountType,
-    starter_account_name: document.getElementById("onboardingStarterAccountName")?.value.trim() || "",
-    start_focus: document.getElementById("onboardingStartFocus")?.value || "transactions"
+    starter_account_name: document.getElementById("onboardingStarterAccountName")?.value.trim() || ""
   };
 
   if (payload.region !== "CA") {
@@ -147,7 +143,9 @@ async function handleOnboardingSubmit(event) {
     if (typeof setCurrentLanguage === "function") {
       setCurrentLanguage(payload.language);
     }
-    window.location.href = result?.redirect_to || "/transactions";
+    window.location.href =
+      result?.redirect_to ||
+      resolveOnboardingDestination({ onboarding: result?.onboarding || null });
   } catch (error) {
     console.error("Onboarding save failed:", error);
     setOnboardingMessage(tx("onboarding_error_finish"));
@@ -197,7 +195,7 @@ function syncProvinceField() {
 function applyOnboardingStaticCopy() {
   const intro = document.querySelector(".onboarding-intro");
   intro?.querySelector("h1")?.replaceChildren(tx("onboarding_title"));
-  intro?.querySelector("p")?.replaceChildren(tx("onboarding_intro"));
+  intro?.querySelector("p")?.replaceChildren(tx("onboarding_intro_guided"));
   document.title = `InEx Ledger - ${tx("onboarding_page_title")}`;
 }
 
@@ -212,4 +210,19 @@ function wireCustomAccountType() {
     customInput.required = isCustom;
     if (!isCustom) customInput.value = "";
   });
+}
+
+function resolveOnboardingDestination(profile = {}) {
+  const onboardingData = profile?.onboarding?.data || {};
+  const guidedSetupStep = String(onboardingData.guided_setup_step || "").trim().toLowerCase();
+  if (onboardingData.guided_setup_active && GUIDED_SETUP_STEPS.has(guidedSetupStep)) {
+    return `/${guidedSetupStep}`;
+  }
+
+  const startFocus = String(onboardingData.start_focus || "").trim().toLowerCase();
+  if (startFocus) {
+    return `/${startFocus}`;
+  }
+
+  return "/transactions";
 }
