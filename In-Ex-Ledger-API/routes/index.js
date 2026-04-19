@@ -1,3 +1,6 @@
+
+const express = require('express');
+const router = express.Router();
 const arApService = require('../services/arApService');
 // AR/AP summary endpoint (feature-flagged)
 router.get('/arap-summary', async (req, res) => {
@@ -20,6 +23,7 @@ const vendorsRoutes = require('./vendors.routes');
 const customersRoutes = require('./customers.routes');
 const invoicesRoutes = require('./invoices.routes');
 const billsRoutes = require('./bills.routes');
+const projectsRoutes = require('./projects.routes');
 // Feature flag for V2/Business modules
 const ENABLE_V2_BUSINESS = process.env.ENABLE_V2_BUSINESS === 'true';
 
@@ -28,9 +32,8 @@ if (ENABLE_V2_BUSINESS) {
 	router.use('/customers', customersRoutes);
 	router.use('/invoices', invoicesRoutes);
 	router.use('/bills', billsRoutes);
+	router.use('/projects', projectsRoutes);
 }
-const express = require('express');
-const router = express.Router();
 
 const authRoutes = require('./auth.routes.js');
 const accountsRoutes = require('./accounts.routes.js');
