@@ -240,6 +240,17 @@ function getBusinessesInScope() {
   return active ? [active] : businesses.slice(0, 1);
 }
 
+function syncExportScopeOptionLabel() {
+  const select = document.getElementById("exportScope");
+  const activeOption = select?.querySelector('option[value="active"]');
+  if (!activeOption) {
+    return;
+  }
+
+  const activeBusiness = getBusinessById(getActiveBusinessId()) || getStoredBusinesses()[0] || null;
+  activeOption.textContent = activeBusiness?.name || tx("exports_scope_active_short");
+}
+
 function getBusinessCurrency(businessId) {
   const region = String(getBusinessById(businessId)?.region || "").toLowerCase() === "ca" ? "ca" : "us";
   return getCurrencyForRegion(region);
@@ -259,6 +270,8 @@ function syncExportScopeUi() {
   const pdfNote = document.getElementById("exportPdfNote");
   const scope = getExportScope();
   const mixedCurrencies = hasMixedCurrenciesInScope();
+
+  syncExportScopeOptionLabel();
 
   if (scopeHelp) {
     scopeHelp.textContent =

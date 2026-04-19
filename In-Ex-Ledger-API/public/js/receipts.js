@@ -20,7 +20,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireReceiptLinkModal();
   await loadTransactionMap();
   await loadReceipts();
-  syncTierNotice();
   updateReceiptsDot();
 });
 
@@ -68,7 +67,6 @@ async function uploadReceipt(file) {
   });
 
   if (response.status === 402) {
-    syncTierNotice(true);
     throw new Error(tx("receipts_error_v1_required"));
   }
 
@@ -407,19 +405,11 @@ async function openReceiptPreview(receiptId, filename) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
-function syncTierNotice(forceShow = false) {
-  const notice = document.getElementById("receiptTierNotice");
-  if (!notice) {
-    return;
-  }
-  notice.hidden = !(forceShow || effectiveTier() !== "v1");
-}
-
 function ensureV1Tier() {
   if (effectiveTier() === "v1") {
     return true;
   }
-  syncTierNotice(true);
+  showReceiptsToast(tx("receipts_error_v1_required"));
   return false;
 }
 

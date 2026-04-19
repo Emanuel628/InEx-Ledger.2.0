@@ -381,6 +381,21 @@ function getBusinessesInScope() {
   return activeBusiness ? [activeBusiness] : businesses.slice(0, 1);
 }
 
+function syncTransactionScopeOptionLabel() {
+  const select = document.getElementById("transactionsScope");
+  const activeOption = select?.querySelector('option[value="active"]');
+  if (!activeOption) {
+    return;
+  }
+
+  const activeBusiness =
+    getBusinessById(transactionBusinessContext.activeBusinessId || localStorage.getItem("lb_active_business_id") || "") ||
+    getStoredBusinesses()[0] ||
+    null;
+
+  activeOption.textContent = activeBusiness?.name || txT("exports_scope_active_short", "Active business");
+}
+
 function hasMixedCurrenciesInScope() {
   const currencies = new Set(
     getBusinessesInScope().map((business) =>
@@ -396,6 +411,8 @@ function syncTransactionScopeUi() {
   const recurringPanel = document.querySelector(".recurring-panel");
   const subtitle = document.querySelector(".page-subtitle");
   const taxContext = document.getElementById("transactionsTaxContext");
+
+  syncTransactionScopeOptionLabel();
 
   if (subtitle) {
     subtitle.textContent = isAllScope
