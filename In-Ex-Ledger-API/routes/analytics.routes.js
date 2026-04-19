@@ -216,8 +216,8 @@ router.get("/dashboard", async (req, res) => {
       }))
     });
   } catch (err) {
-    logError("GET /analytics/dashboard error:", err);
-    res.status(500).json({ error: "Failed to load dashboard analytics." });
+    logError("GET /analytics/dashboard error:", err.stack || err);
+    res.status(500).json({ error: "A server error occurred while loading dashboard analytics. Please try again or contact support if the problem persists." });
   }
 });
 
@@ -355,8 +355,8 @@ router.get("/cash-flow", async (req, res) => {
       projections
     });
   } catch (err) {
-    logError("GET /analytics/cash-flow error:", err);
-    res.status(500).json({ error: "Failed to load cash flow projection." });
+    logError("GET /analytics/cash-flow error:", err.stack || err);
+    res.status(500).json({ error: "A server error occurred while loading cash flow projection. Please try again or contact support if the problem persists." });
   }
 });
 
@@ -430,8 +430,8 @@ router.get("/seasonal", async (req, res) => {
       insights
     });
   } catch (err) {
-    logError("GET /analytics/seasonal error:", err);
-    res.status(500).json({ error: "Failed to load seasonal analysis." });
+    logError("GET /analytics/seasonal error:", err.stack || err);
+    res.status(500).json({ error: "A server error occurred while loading seasonal analysis. Please try again or contact support if the problem persists." });
   }
 });
 
@@ -574,8 +574,8 @@ router.post("/whatif", async (req, res) => {
       messages
     });
   } catch (err) {
-    logError("POST /analytics/whatif error:", err);
-    res.status(500).json({ error: "Failed to compute what-if scenario." });
+    logError("POST /analytics/whatif error:", err.stack || err);
+    res.status(500).json({ error: "A server error occurred while computing the what-if scenario. Please try again or contact support if the problem persists." });
   }
 });
 
