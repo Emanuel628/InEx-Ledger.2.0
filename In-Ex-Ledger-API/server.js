@@ -1,4 +1,17 @@
-﻿const express = require('express');
+﻿// Startup check for required environment variables
+const REQUIRED_ENV_VARS = [
+  'DATABASE_URL',
+  'JWT_SECRET',
+  'APP_BASE_URL',
+  'RESEND_API_KEY',
+  // Add more as needed
+];
+const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
+if (missingVars.length > 0) {
+  logError('Startup failed: Missing required environment variables:', missingVars);
+  process.exit(1);
+}
+const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const fs = require('fs');
