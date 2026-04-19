@@ -4,12 +4,13 @@ const CATEGORIES_TOAST_MS = 3000;
 const CATEGORY_TAX_OPTIONS = {
   US: {
     income: [
-      { value: "gross_receipts_sales", label: "Gross receipts or sales" },
-      { value: "returns_allowances", label: "Returns and allowances" },
-      { value: "other_business_income", label: "Other business income" },
-      { value: "interest_income", label: "Interest income" },
-      { value: "refunds_credits", label: "Refunds and tax credits" },
-      { value: "other_income", label: "Other income" }
+      { value: "gross_receipts_sales", label: "Gross receipts or sales", line: "1" },
+      { value: "returns_allowances", label: "Returns and allowances", line: "2" },
+      { value: "other_income", label: "Other income", line: "6" },
+      { value: "nonemployee_compensation", label: "Nonemployee compensation (1099-NEC)", line: "1099-NEC" },
+      { value: "payment_card_income", label: "Payment card / third-party network income (1099-K)", line: "1099-K" },
+      { value: "misc_income", label: "Other miscellaneous income (1099-MISC)", line: "1099-MISC" },
+      { value: "cash_unreported_income", label: "Cash / unreported income", line: "Cash" }
     ],
     expense: [
       { value: "advertising", label: "Advertising", line: "8" },
@@ -37,36 +38,29 @@ const CATEGORY_TAX_OPTIONS = {
   },
   CA: {
     income: [
-      { value: "sales", label: "Sales" },
-      { value: "commissions_fees", label: "Commissions and fees" },
-      { value: "gst_hst_collected", label: "GST/HST/PST/QST collected" },
-      { value: "bad_debts_recovered", label: "Bad debts recovered" },
-      { value: "subsidies_grants", label: "Subsidies and grants" },
-      { value: "other_income", label: "Other income" }
+      { value: "t2125_8000", label: "Gross professional fees", line: "T2125 Line 8000" },
+      { value: "t2125_8290", label: "Other income", line: "T2125 Line 8290" },
+      { value: "t4a_20", label: "Self-employment commissions (T4A Box 20)", line: "T4A Box 20" },
+      { value: "t4a_28", label: "Other income (T4A Box 28)", line: "T4A Box 28" },
+      { value: "cash_income", label: "Cash income", line: "Cash" }
     ],
     expense: [
-      { value: "advertising", label: "Advertising" },
-      { value: "meals_entertainment", label: "Meals and entertainment" },
-      { value: "insurance", label: "Insurance" },
-      { value: "interest_bank_charges", label: "Interest and bank charges" },
-      { value: "business_tax_fees_licenses_memberships", label: "Business tax, fees, licenses, memberships" },
-      { value: "office_expense", label: "Office expenses" },
-      { value: "supplies", label: "Supplies" },
-      { value: "legal_accounting", label: "Legal, accounting, and professional fees" },
-      { value: "management_admin", label: "Management and administration fees" },
-      { value: "rent", label: "Rent" },
-      { value: "maintenance_repairs", label: "Maintenance and repairs" },
-      { value: "salaries_wages_benefits", label: "Salaries, wages, and benefits" },
-      { value: "property_taxes", label: "Property taxes" },
-      { value: "travel", label: "Travel" },
-      { value: "utilities", label: "Utilities" },
-      { value: "delivery_freight", label: "Delivery, freight, and express" },
-      { value: "motor_vehicle", label: "Motor vehicle" },
-      { value: "capital_cost_allowance", label: "Capital cost allowance" },
-      { value: "home_office", label: "Business-use-of-home expenses" },
-      { value: "professional_fees", label: "Professional fees" },
-      { value: "gst_hst_paid", label: "GST/HST/PST/QST paid" },
-      { value: "other_expense", label: "Other expense" }
+      { value: "ca_8810", label: "Advertising", line: "8810" },
+      { value: "ca_8820", label: "Meals and entertainment (50%)", line: "8820" },
+      { value: "ca_8860", label: "Bad debts", line: "8860" },
+      { value: "ca_8871", label: "Insurance", line: "8871" },
+      { value: "ca_8910", label: "Interest", line: "8910" },
+      { value: "ca_8960", label: "Legal and accounting fees", line: "8960" },
+      { value: "ca_9060", label: "Salaries, wages, benefits", line: "9060" },
+      { value: "ca_9130", label: "Rent", line: "9130" },
+      { value: "ca_9140", label: "Repairs and maintenance", line: "9140" },
+      { value: "ca_9180", label: "Telephone and utilities", line: "9180" },
+      { value: "ca_9200", label: "Travel", line: "9200" },
+      { value: "ca_9220", label: "Fuel costs", line: "9220" },
+      { value: "ca_9270", label: "Other expenses", line: "9270" },
+      { value: "ca_9281", label: "Motor vehicle expenses", line: "9281" },
+      { value: "ca_9936", label: "Capital cost allowance (CCA)", line: "9936" },
+      { value: "ca_9943", label: "Business-use-of-home expenses", line: "9943" }
     ]
   }
 };
