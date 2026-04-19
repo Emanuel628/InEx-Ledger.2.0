@@ -62,26 +62,30 @@ const defaultCategoriesCA = [
 ];
 
 function getDefaultCategoriesForRegion(region = "US") {
-  return String(region || "").toUpperCase() === "CA"
-    ? defaultCategoriesCA
-    : defaultCategoriesUS;
+  const regionCode = String(region || "").toUpperCase();
+  if (regionCode === "CA") return defaultCategoriesCA;
+  if (regionCode === "US") return defaultCategoriesUS;
+  throw new Error(`Unknown or missing region: ${region}`);
 }
 
 async function resolveBusinessRegion(targetDb, businessId) {
-  let region = "US";
+  let region = null;
   try {
     const bizResult = await targetDb.query(
       "SELECT region FROM businesses WHERE id = $1",
       [businessId]
     );
     if (bizResult.rowCount > 0) {
-      const resolved = (bizResult.rows[0].region || "US").toUpperCase();
-      if (resolved === "CA") {
-        region = "CA";
+      const resolved = (bizResult.rows[0].region || "").toUpperCase();
+      if (resolved === "CA" || resolved === "US") {
+        region = resolved;
       }
     }
-  } catch (_) {
-    // fall back to US defaults if we can't read the region
+  } catch (err) {
+    console.error("[resolveBusinessRegion] Error fetching region:", err);
+  }
+  if (!region) {
+    throw new Error("Business region is missing or invalid. Cannot proceed.");
   }
   return region;
 }

@@ -442,6 +442,7 @@ async function loadBusinessRegion() {
     const response = await apiFetch("/api/business");
     if (!response || !response.ok) {
       currentRegion = null;
+      showCategoriesToast("Error: Unable to load business region. Please set your region in Settings.");
       return;
     }
     const business = await response.json();
@@ -451,9 +452,14 @@ async function loadBusinessRegion() {
       localStorage.setItem("lb_region", region.toLowerCase());
       window.LUNA_REGION = region.toLowerCase();
       return;
+    } else {
+      currentRegion = null;
+      showCategoriesToast("Error: Business region is missing or invalid. Please set your region in Settings.");
+      return;
     }
   } catch (error) {
     console.warn("[Categories] Unable to load business region", error);
+    showCategoriesToast("Error: Unable to load business region. Please set your region in Settings.");
   }
   currentRegion = null;
 }
