@@ -12,32 +12,27 @@ const CATEGORY_TAX_OPTIONS = {
       { value: "other_income", label: "Other income" }
     ],
     expense: [
-      { value: "advertising", label: "Advertising" },
-      { value: "car_truck", label: "Car and truck expenses" },
-      { value: "commissions_fees", label: "Commissions and fees" },
-      { value: "contract_labor", label: "Contract labor" },
-      { value: "depletion", label: "Depletion" },
-      { value: "depreciation_section179", label: "Depreciation and Section 179" },
-      { value: "employee_benefit_programs", label: "Employee benefit programs" },
-      { value: "insurance_other_than_health", label: "Insurance (other than health)" },
-      { value: "interest_mortgage", label: "Interest: mortgage" },
-      { value: "interest_other", label: "Interest: other" },
-      { value: "legal_professional", label: "Legal and professional services" },
-      { value: "office_expense", label: "Office expense" },
-      { value: "pension_profit_sharing", label: "Pension and profit-sharing plans" },
-      { value: "rent_lease_vehicles", label: "Rent or lease: vehicles, machinery, equipment" },
-      { value: "rent_lease_other", label: "Rent or lease: other business property" },
-      { value: "repairs_maintenance", label: "Repairs and maintenance" },
-      { value: "supplies", label: "Supplies" },
-      { value: "taxes_licenses", label: "Taxes and licenses" },
-      { value: "travel", label: "Travel" },
-      { value: "meals", label: "Meals" },
-      { value: "utilities", label: "Utilities" },
-      { value: "wages", label: "Wages" },
-      { value: "home_office", label: "Business use of home" },
-      { value: "bank_fees", label: "Bank and payment processing fees" },
-      { value: "software_subscriptions", label: "Software and subscriptions" },
-      { value: "other_expense", label: "Other expense" }
+      { value: "advertising", label: "Advertising", line: "8" },
+      { value: "car_truck", label: "Car and truck expenses", line: "9" },
+      { value: "commissions_fees", label: "Commissions and fees", line: "10" },
+      { value: "contract_labor", label: "Contract labor", line: "11" },
+      { value: "depletion", label: "Depletion", line: "12" },
+      { value: "depreciation_section179", label: "Depreciation and section 179 expense deduction", line: "13" },
+      { value: "employee_benefit_programs", label: "Employee benefit programs", line: "14" },
+      { value: "insurance_other_than_health", label: "Insurance (other than health)", line: "15" },
+      { value: "interest_mortgage", label: "Interest: mortgage (paid to banks, etc.)", line: "16a" },
+      { value: "interest_other", label: "Interest: other", line: "16b" },
+      { value: "legal_professional", label: "Legal and professional services", line: "17" },
+      { value: "office_expense", label: "Office expense", line: "18" },
+      { value: "pension_profit_sharing", label: "Pension and profit-sharing plans", line: "19" },
+      { value: "rent_lease_vehicles", label: "Rent or lease: vehicles, machinery, equipment", line: "20a" },
+      { value: "rent_lease_other", label: "Rent or lease: other business property", line: "20b" },
+      { value: "repairs_maintenance", label: "Repairs and maintenance", line: "21" },
+      { value: "supplies", label: "Supplies", line: "22" },
+      { value: "taxes_licenses", label: "Taxes and licenses", line: "23" },
+      { value: "travel", label: "Travel, meals, and entertainment: travel", line: "24a" },
+      { value: "meals", label: "Travel, meals, and entertainment: meals", line: "24b" },
+      { value: "utilities", label: "Utilities", line: "25" }
     ]
   },
   CA: {
@@ -396,19 +391,54 @@ function populateTaxLabelOptions(type) {
   options.forEach((option) => {
     const node = document.createElement("option");
     node.value = option.value;
-    node.textContent = option.label;
+    // Show as "{label} — {line}" if line exists
+    node.textContent = option.line ? `${option.label} — ${option.line}` : option.label;
+    node.setAttribute("data-line", option.line || "");
+    node.setAttribute("data-label", option.label);
     select.appendChild(node);
   });
   select.value = options.some((option) => option.value === previous) ? previous : "";
   select.disabled = !currentRegion || options.length === 0;
 
+  // Show/hide description hint below select
   if (hint) {
-    if (currentRegion === "CA") {
-      hint.textContent = tx("categories_tax_hint_ca");
-    } else if (currentRegion === "US") {
-      hint.textContent = tx("categories_tax_hint_us");
+    if (select.value) {
+      // Find selected option's description
+      const selected = options.find(opt => opt.value === select.value);
+      if (selected && selected.line) {
+        hint.textContent = `Schedule C Line ${selected.line}: ${selected.label}`;
+        hint.style.display = "block";
+      } else {
+        hint.textContent = "";
+        hint.style.display = "none";
+      }
     } else {
-      hint.textContent = tx("categories_tax_hint_region");
+      hint.textContent = "";
+      hint.style.display = "none";
+    }
+  }
+
+  // Listen for select change to update hint
+  select.onchange = function() {
+    if (hint) {
+      const selected = options.find(opt => opt.value === select.value);
+      if (selected && selected.line) {
+        hint.textContent = `Schedule C Line ${selected.line}: ${selected.label}`;
+        hint.style.display = "block";
+      } else {
+        hint.textContent = "";
+        hint.style.display = "none";
+      }
+    }
+  };
+
+  // Hide field if type is income
+  const formField = select.closest('.form-field');
+  if (formField) {
+    if (type === "income") {
+      formField.style.display = "none";
+    } else {
+      formField.style.display = "";
     }
   }
 }
