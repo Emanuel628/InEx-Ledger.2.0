@@ -146,9 +146,13 @@ async function withRetry(fn, retries = 3, delayMs = 500) {
   }
 }
 
+function normalizeChecksumContent(content) {
+  return String(content).replace(/\r\n/g, '\n');
+}
+
 // Compute a SHA-256 checksum of migration SQL content for drift detection
 function computeChecksum(content) {
-  return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+  return crypto.createHash('sha256').update(normalizeChecksumContent(content), 'utf8').digest('hex');
 }
 
 // Create the schema_migrations tracking table if it does not already exist
@@ -285,6 +289,7 @@ module.exports = {
   initDatabase,
   withRetry,
   computeChecksum,
+  normalizeChecksumContent,
   migrationStats,
   MigrationContentDriftError
 };

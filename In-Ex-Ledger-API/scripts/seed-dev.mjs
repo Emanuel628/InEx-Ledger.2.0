@@ -165,10 +165,15 @@ async function runMigrations(pool) {
     .filter((f) => f.endsWith(".sql"))
     .sort();
 
+  const normalizeChecksumContent = (content) => String(content).replace(/\r\n/g, "\n");
+
   let ran = 0;
   for (const file of files) {
     const sql = fs.readFileSync(path.join(migrationsDir, file), "utf8");
-    const checksum = crypto.createHash("sha256").update(sql, "utf8").digest("hex");
+    const checksum = crypto
+      .createHash("sha256")
+      .update(normalizeChecksumContent(sql), "utf8")
+      .digest("hex");
 
     if (applied.has(file)) {
       if (applied.get(file) !== checksum) {

@@ -4,6 +4,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
+
+const { computeChecksum } = require("../db.js");
 
 const migrationsDir = path.join(__dirname, "..", "db", "migrations");
 
@@ -35,4 +38,13 @@ test("migration 050 drops cpa_audit_logs grant_id FK to prevent XX000 on account
   const sql = fs.readFileSync(path.join(migrationsDir, "050_drop_cpa_audit_grant_id_fk.sql"), "utf8");
 
   assert.match(sql, /ALTER TABLE IF EXISTS cpa_audit_logs\s+DROP CONSTRAINT IF EXISTS cpa_audit_logs_grant_id_fkey;/i);
+});
+
+test("migration checksum hashing is stable across LF and CRLF line endings", () => {
+  const lfSql = "CREATE TABLE test (\n  id INT\n);\n";
+  const crlfSql = lfSql.replace(/\n/g, "\r\n");
+  const expected = crypto.createHash("sha256").update(lfSql, "utf8").digest("hex");
+
+  assert.equal(computeChecksum(lfSql), expected);
+  assert.equal(computeChecksum(crlfSql), expected);
 });
