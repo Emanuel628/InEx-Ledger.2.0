@@ -3,22 +3,13 @@ const express = require('express');
 const router = express.Router();
 
 const invoiceService = require('../services/invoiceService');
+const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
 
-// Feature flag and entitlement middleware
-function requireV2BusinessEnabled(req, res, next) {
-	if (process.env.ENABLE_V2_BUSINESS !== 'true') {
-		return res.status(403).json({ error: 'V2/Business features are not enabled.' });
-	}
-	// TODO: Add real entitlement checks here (e.g., req.user.entitlements)
-	next();
-}
+router.use(requireV2BusinessEnabled, requireV2Entitlement);
 
 // List invoices (GET /invoices)
-router.get('/', requireV2BusinessEnabled, async (req, res) => {
-	const businessId = req.user?.business_id || req.user?.active_business_id || null;
-	if (!businessId) {
-		return res.status(400).json({ error: 'Missing business context.' });
-	}
+router.get('/', async (req, res) => {
+	const businessId = req.business.id;
 	try {
 		const invoices = await invoiceService.listInvoices(businessId);
 		res.json(invoices);
@@ -28,11 +19,8 @@ router.get('/', requireV2BusinessEnabled, async (req, res) => {
 });
 
 // Create invoice (POST /invoices)
-router.post('/', requireV2BusinessEnabled, async (req, res) => {
-	const businessId = req.user?.business_id || req.user?.active_business_id || null;
-	if (!businessId) {
-		return res.status(400).json({ error: 'Missing business context.' });
-	}
+router.post('/', async (req, res) => {
+	const businessId = req.business.id;
 	if (!req.body?.customer_id || !req.body?.number || !req.body?.status || !req.body?.issue_date || !req.body?.total_amount || !req.body?.currency) {
 		return res.status(400).json({ error: 'Missing required invoice fields.' });
 	}
@@ -45,11 +33,8 @@ router.post('/', requireV2BusinessEnabled, async (req, res) => {
 });
 
 // Get invoice by ID (GET /invoices/:id)
-router.get('/:id', requireV2BusinessEnabled, async (req, res) => {
-	const businessId = req.user?.business_id || req.user?.active_business_id || null;
-	if (!businessId) {
-		return res.status(400).json({ error: 'Missing business context.' });
-	}
+router.get('/:id', async (req, res) => {
+	const businessId = req.business.id;
 	try {
 		const invoice = await invoiceService.getInvoice(businessId, req.params.id);
 		if (!invoice) {
@@ -62,11 +47,8 @@ router.get('/:id', requireV2BusinessEnabled, async (req, res) => {
 });
 
 // Update invoice (PUT /invoices/:id)
-router.put('/:id', requireV2BusinessEnabled, async (req, res) => {
-	const businessId = req.user?.business_id || req.user?.active_business_id || null;
-	if (!businessId) {
-		return res.status(400).json({ error: 'Missing business context.' });
-	}
+router.put('/:id', async (req, res) => {
+	const businessId = req.business.id;
 	if (!req.body?.customer_id || !req.body?.number || !req.body?.status || !req.body?.issue_date || !req.body?.total_amount || !req.body?.currency) {
 		return res.status(400).json({ error: 'Missing required invoice fields.' });
 	}
@@ -82,11 +64,8 @@ router.put('/:id', requireV2BusinessEnabled, async (req, res) => {
 });
 
 // Delete invoice (DELETE /invoices/:id)
-router.delete('/:id', requireV2BusinessEnabled, async (req, res) => {
-	const businessId = req.user?.business_id || req.user?.active_business_id || null;
-	if (!businessId) {
-		return res.status(400).json({ error: 'Missing business context.' });
-	}
+router.delete('/:id', async (req, res) => {
+	const businessId = req.business.id;
 	try {
 		const deleted = await invoiceService.deleteInvoice(businessId, req.params.id);
 		if (!deleted) {

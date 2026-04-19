@@ -34,6 +34,16 @@ const app = express();
 const publicDir = path.join(process.cwd(), 'public');
 const htmlDir = path.join(publicDir, 'html');
 let globalLimiter = null;
+const ENABLE_V2_BUSINESS = process.env.ENABLE_V2_BUSINESS === 'true';
+const V2_HTML_PAGES = new Set([
+  'ar-ap',
+  'billable-expenses',
+  'bills',
+  'customers',
+  'invoices',
+  'projects',
+  'vendors'
+]);
 const htmlPageNames = fs.readdirSync(htmlDir)
   .filter((name) => name.toLowerCase().endsWith('.html'))
   .map((name) => path.basename(name, '.html'));
@@ -74,6 +84,31 @@ function setStaticAssetCacheHeaders(res, filePath) {
 
 function getCanonicalPagePath(pageName) {
   return pageName === 'landing' ? '/' : `/${pageName}`;
+}
+
+function isBlockedV2PageRequest(requestPath) {
+  if (ENABLE_V2_BUSINESS) {
+    return false;
+  }
+
+  const normalizedPath = String(requestPath || '')
+    .toLowerCase()
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '');
+
+  if (!normalizedPath) {
+    return false;
+  }
+
+  const candidate = normalizedPath.startsWith('html/')
+    ? normalizedPath.slice('html/'.length)
+    : normalizedPath;
+  const pageName = candidate.endsWith('.html')
+    ? candidate.slice(0, -'.html'.length)
+    : candidate;
+
+  return V2_HTML_PAGES.has(pageName);
 }
 
 function sendCanonicalPage(pageName, req, res) {
@@ -146,7 +181,18 @@ for (const [legacyPath, nextPath] of LEGACY_HTML_REDIRECTS.entries()) {
     res.redirect(302, nextPath);
   });
 }
+
+app.use((req, res, next) => {
+  if (isBlockedV2PageRequest(req.path)) {
+    return res.status(404).send('Not Found');
+  }
+  next();
+});
+
 for (const pageName of htmlPageNames) {
+  if (!ENABLE_V2_BUSINESS && V2_HTML_PAGES.has(pageName)) {
+    continue;
+  }
   const canonicalPath = getCanonicalPagePath(pageName);
   if (pageName === 'landing') {
     app.get('/landing', (req, res) => {

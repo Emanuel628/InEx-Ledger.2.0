@@ -1,37 +1,3 @@
-// === V2/Business Upgrade Modal Logic ===
-document.addEventListener("DOMContentLoaded", function () {
-  const upgradeBtn = document.getElementById("upgradeToV2Btn");
-  const modal = document.getElementById("upgradeV2Modal");
-  const cancelBtn = document.getElementById("upgradeV2ModalCancel");
-  const confirmBtn = document.getElementById("upgradeV2ModalConfirm");
-  if (upgradeBtn && modal && cancelBtn && confirmBtn) {
-    upgradeBtn.addEventListener("click", function () {
-      modal.classList.remove("hidden");
-    });
-    cancelBtn.addEventListener("click", function () {
-      modal.classList.add("hidden");
-    });
-    confirmBtn.addEventListener("click", async function () {
-      confirmBtn.disabled = true;
-      confirmBtn.textContent = "Upgrading...";
-      try {
-        // Call backend to upgrade account to V2/Business
-        const res = await apiFetch("/api/billing/upgrade-v2-business", { method: "POST" });
-        if (res && res.ok) {
-          showSubToast("Your account has been upgraded to Business (V2). All features are now unlocked.");
-          modal.classList.add("hidden");
-          await loadSubscription();
-        } else {
-          showSubToast("Upgrade failed. Please try again or contact support.");
-        }
-      } catch (err) {
-        showSubToast("Upgrade failed. Please try again or contact support.");
-      }
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = "Upgrade Now";
-    });
-  }
-});
 const SUB_TOAST_MS = 3000;
 let subToastTimer = null;
 const billingPricingUtils = window.billingPricing || {};
@@ -650,18 +616,4 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   currentSubscription = await loadSubscription();
   await loadBillingHistory();
-    setupMockUpgradeButton();
 });
-
-
-// setV2BusinessUnlocked is only needed for demo/mock logic. If needed, import from global.js or define here only if not present.
-
-function showMockUpgradeToast(message) {
-  const toast = document.getElementById("mockUpgradeToast");
-  const msg = document.getElementById("mockUpgradeToastMessage");
-  if (!toast || !msg) return;
-  msg.textContent = message;
-  toast.classList.remove("hidden");
-  setTimeout(() => toast.classList.add("hidden"), 3000);
-}
-

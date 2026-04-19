@@ -2,15 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const arApService = require('../services/arApService');
+const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled.js');
 // AR/AP summary endpoint (feature-flagged)
-router.get('/arap-summary', async (req, res) => {
-	if (process.env.ENABLE_V2_BUSINESS !== 'true') {
-		return res.status(403).json({ error: 'V2/Business features are not enabled.' });
-	}
-	const businessId = req.user?.business_id || req.user?.active_business_id || null;
-	if (!businessId) {
-		return res.status(400).json({ error: 'Missing business context.' });
-	}
+router.get('/arap-summary', requireV2BusinessEnabled, requireV2Entitlement, async (req, res) => {
+	const businessId = req.business.id;
 	try {
 		const summary = await arApService.getArApSummary(businessId);
 		res.json(summary);
