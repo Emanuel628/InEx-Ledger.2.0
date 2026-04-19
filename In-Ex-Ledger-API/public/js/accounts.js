@@ -54,7 +54,6 @@ console.log("[AUTH] Protected page loaded:", window.location.pathname);
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
-  if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
   wireAccountForm();
   await renderAccountList();

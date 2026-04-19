@@ -5,15 +5,12 @@
   <title>Subscription | InEx Ledger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- Global + page CSS -->
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/css/pages/settings.css" />
   <link rel="stylesheet" href="/css/pages/subscription.css" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
-
-<div id="trialBanner" class="trial-banner settings-trial-banner"></div>
 
 <header class="app-topbar settings-topbar">
   <div class="topbar-left">
@@ -29,13 +26,13 @@
       <span class="topbar-brand-text">InEx Ledger</span>
     </a>
     <nav class="topbar-nav" aria-label="Primary">
-      <a href="transactions"><span class="nav-icon" aria-hidden="true">▦</span><span data-i18n="nav_transactions">Transactions</span></a>
-      <a href="accounts"><span class="nav-icon" aria-hidden="true">▣</span><span data-i18n="nav_accounts">Accounts</span></a>
-      <a href="categories"><span class="nav-icon" aria-hidden="true">◔</span><span data-i18n="nav_categories">Categories</span></a>
-      <a href="receipts"><span class="nav-icon" aria-hidden="true">▤</span><span data-i18n="nav_receipts">Receipts</span></a>
-      <a href="mileage"><span class="nav-icon" aria-hidden="true">⊙</span><span data-i18n="nav_mileage">Mileage</span></a>
-      <a href="exports"><span class="nav-icon" aria-hidden="true">↗</span><span data-i18n="nav_exports">Exports</span></a>
-      <a href="settings"><span class="nav-icon" aria-hidden="true">⚙</span><span data-i18n="nav_settings">Settings</span></a>
+      <a href="transactions"><span class="nav-icon" aria-hidden="true">&#x25A6;</span><span data-i18n="nav_transactions">Transactions</span></a>
+      <a href="accounts"><span class="nav-icon" aria-hidden="true">&#x25A3;</span><span data-i18n="nav_accounts">Accounts</span></a>
+      <a href="categories"><span class="nav-icon" aria-hidden="true">&#x25D4;</span><span data-i18n="nav_categories">Categories</span></a>
+      <a href="receipts"><span class="nav-icon" aria-hidden="true">&#x25A4;</span><span data-i18n="nav_receipts">Receipts</span></a>
+      <a href="mileage"><span class="nav-icon" aria-hidden="true">&#x2299;</span><span data-i18n="nav_mileage">Mileage</span></a>
+      <a href="exports"><span class="nav-icon" aria-hidden="true">&#x2197;</span><span data-i18n="nav_exports">Exports</span></a>
+      <a href="settings"><span class="nav-icon" aria-hidden="true">&#x2699;</span><span data-i18n="nav_settings">Settings</span></a>
     </nav>
   </div>
   <div class="user-pill">
@@ -54,14 +51,12 @@
         <button class="settings-nav-item" type="button" data-settings-target="sub-history-section" data-i18n="sub_mgmt_nav_history">Billing history</button>
       </nav>
       <div class="settings-sidebar-actions">
-        <a href="settings" class="settings-sidebar-action" data-i18n="sub_mgmt_back_settings">← Back to settings</a>
+        <a href="settings" class="settings-sidebar-action" data-i18n="sub_mgmt_back_settings">&#x2190; Back to settings</a>
       </div>
     </div>
   </aside>
 
   <main id="main-content" class="settings-main">
-
-    <!-- Current Status Card -->
     <section class="settings-card" id="sub-status-section">
       <div class="card-head">
         <h2 class="card-title" data-i18n="sub_mgmt_status_title">Subscription status</h2>
@@ -69,16 +64,15 @@
       </div>
 
       <div class="sub-status-block" id="subStatusBlock">
-        <div class="sub-status-loading" data-i18n="settings_loading">Loading…</div>
+        <div class="sub-status-loading" data-i18n="settings_loading">Loading...</div>
       </div>
 
       <div class="settings-row sub-actions-row">
         <button type="button" id="subManageBillingBtn" class="settings-secondary-btn hidden" data-i18n="subscription_manage_billing">Manage billing</button>
-        <button type="button" id="subCancelBtn" class="danger-outline-btn hidden" data-i18n="settings_cancel_subscription_btn">Cancel subscription…</button>
+        <button type="button" id="subCancelBtn" class="danger-outline-btn hidden" data-i18n="settings_cancel_subscription_btn">Cancel subscription...</button>
       </div>
     </section>
 
-    <!-- Plans Section -->
     <section class="settings-card" id="sub-plans-section">
       <div class="card-head">
         <h2 class="card-title" data-i18n="sub_mgmt_plans_title">Available plans</h2>
@@ -96,13 +90,15 @@
             <li data-i18n="subscription_starter_2">Up to 50 transactions / month</li>
             <li data-i18n="subscription_starter_3">CSV export</li>
           </ul>
-          <button type="button" id="planFreeBtn" class="settings-secondary-btn" data-i18n="subscription_starter_cta">Stay on Starter</button>
+          <p class="sub-plan-note" data-i18n="subscription_starter_note">One business included. Switch back to free anytime.</p>
+          <button type="button" id="planFreeBtn" class="settings-secondary-btn" data-i18n="subscription_starter_cta">Select Free tier</button>
         </div>
 
         <div class="sub-plan-card sub-plan-featured" id="planPro">
           <div class="sub-plan-header">
             <h3 class="sub-plan-name" data-i18n="subscription_pro_title">Pro</h3>
-            <p class="sub-plan-price" id="planProPriceLabel" data-i18n="subscription_pro_price_placeholder">Pricing shown at checkout</p>
+            <p class="sub-plan-price" id="planProPriceLabel">$12 / month</p>
+            <p class="sub-plan-note" id="planProAddonPriceLabel">Additional businesses from $5 each / month</p>
           </div>
           <ul class="sub-plan-features">
             <li data-i18n="subscription_pro_1">Unlimited transactions</li>
@@ -121,7 +117,7 @@
             <div class="sub-control-group">
               <label class="sub-control-label" for="additionalBusinessesInput" data-i18n="subscription_additional_businesses_label">Additional businesses</label>
               <div class="sub-quantity-control">
-                <button type="button" class="sub-quantity-btn" data-qty-action="decrease" aria-label="Decrease">−</button>
+                <button type="button" class="sub-quantity-btn" data-qty-action="decrease" aria-label="Decrease">-</button>
                 <input
                   id="additionalBusinessesInput"
                   class="sub-quantity-input"
@@ -140,7 +136,7 @@
           <div class="sub-price-summary" id="subPriceSummary">
             <div class="sub-price-row">
               <span class="sub-price-label" data-i18n="subscription_price_summary_plan">Plan</span>
-              <span class="sub-price-value" id="subPricePlan">—</span>
+              <span class="sub-price-value" id="subPricePlan">-</span>
             </div>
             <div class="sub-price-row">
               <span class="sub-price-label" data-i18n="subscription_price_summary_addon">Additional businesses</span>
@@ -148,30 +144,43 @@
             </div>
             <div class="sub-price-row sub-price-total">
               <span class="sub-price-label" data-i18n="subscription_price_summary_total">Estimated total</span>
-              <span class="sub-price-value" id="subPriceTotal">—</span>
+              <span class="sub-price-value" id="subPriceTotal">-</span>
             </div>
-            <p class="sub-price-note" data-i18n="subscription_price_summary_note">Final pricing is confirmed at checkout.</p>
+            <p class="sub-price-note" id="subPriceNote" data-i18n="subscription_price_summary_note">Final pricing is confirmed at checkout.</p>
           </div>
           <button type="button" id="planProBtn" class="settings-primary-btn" data-i18n="subscription_pro_cta">Upgrade to Pro</button>
+        </div>
+
+        <div class="sub-plan-card sub-plan-coming-soon" id="planV2">
+          <div class="sub-plan-header">
+            <div class="sub-plan-title-row">
+              <h3 class="sub-plan-name" data-i18n="subscription_v2_title_short">V2</h3>
+              <span class="sub-plan-badge" data-i18n="subscription_v2_badge">Coming soon</span>
+            </div>
+            <p class="sub-plan-note" data-i18n="subscription_v2_intro_short">A preview of the next release tier.</p>
+          </div>
+          <ul class="sub-plan-features">
+            <li data-i18n="subscription_v2_feature_1">Automated categorization suggestions</li>
+            <li data-i18n="subscription_v2_feature_2">Recurring workflow automations</li>
+            <li data-i18n="subscription_v2_feature_3">Deeper analytics and forecasting</li>
+            <li data-i18n="subscription_v2_feature_4">More collaboration controls and approvals</li>
+          </ul>
         </div>
       </div>
     </section>
 
-    <!-- Billing History -->
     <section class="settings-card" id="sub-history-section">
       <div class="card-head">
         <h2 class="card-title" data-i18n="sub_mgmt_history_title">Billing history</h2>
         <p class="card-desc" data-i18n="sub_mgmt_history_desc">Past payments and invoices.</p>
       </div>
       <div id="billingHistoryList" class="billing-history-list">
-        <div class="sub-status-loading" data-i18n="settings_loading">Loading…</div>
+        <div class="sub-status-loading" data-i18n="settings_loading">Loading...</div>
       </div>
     </section>
-
   </main>
 </div>
 
-<!-- Cancel Subscription Modal -->
 <div id="subCancelModal" class="transaction-modal hidden">
   <div class="transaction-modal-content danger-modal">
     <div class="danger-modal-icon" aria-hidden="true">
@@ -186,6 +195,24 @@
     <div class="modal-actions danger-actions">
       <button type="button" id="subCancelModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
       <button type="button" id="subCancelModalConfirm" class="modal-delete" data-i18n="settings_cancel_sub_confirm_btn">Yes, cancel subscription</button>
+    </div>
+  </div>
+</div>
+
+<div id="subFreeModal" class="transaction-modal hidden">
+  <div class="transaction-modal-content danger-modal">
+    <div class="danger-modal-icon" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="none">
+        <path d="M8 3L14 13H2L8 3Z"></path>
+        <line x1="8" y1="7" x2="8" y2="10"></line>
+        <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
+      </svg>
+    </div>
+    <h3 data-i18n="subscription_free_confirm_title">Switch to Free tier?</h3>
+    <p id="subFreeModalBody" data-i18n="subscription_free_confirm_body_generic">This business will move to the Free tier.</p>
+    <div class="modal-actions danger-actions">
+      <button type="button" id="subFreeModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
+      <button type="button" id="subFreeModalConfirm" class="modal-delete" data-i18n="subscription_free_confirm_action">Confirm Free tier</button>
     </div>
   </div>
 </div>
@@ -205,6 +232,7 @@
 <script src="../js/auth.js?v=20260405c"></script>
 <script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/taxReminders.js?v=20260405c"></script>
-<script src="../js/subscription.js?v=20260405c"></script>
+<script src="../js/billing-pricing.js?v=20260419a"></script>
+<script src="../js/subscription.js?v=20260419a"></script>
 </body>
 </html>

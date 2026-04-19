@@ -1,7 +1,8 @@
 const SUB_TOAST_MS = 3000;
 let subToastTimer = null;
-const BILLING_INTERVALS = ["monthly", "yearly"];
-const BILLING_CURRENCIES = ["usd", "cad"];
+const billingPricingUtils = window.billingPricing || {};
+const BILLING_INTERVALS = billingPricingUtils.BILLING_INTERVALS || ["monthly", "yearly"];
+const BILLING_CURRENCIES = billingPricingUtils.BILLING_CURRENCIES || ["usd", "cad"];
 const MAX_ADDITIONAL_BUSINESSES = 100;
 const pricingState = {
   billingInterval: "monthly",
@@ -9,6 +10,7 @@ const pricingState = {
   additionalBusinesses: 0,
   isCheckoutLoading: false
 };
+let currentSubscription = null;
 
 function showSubToast(message) {
   const toast = document.getElementById("subToast");
@@ -38,9 +40,45 @@ function fmtAmount(amount, currency) {
   const locale = normalizedCurrency === "CAD" ? "en-CA" : "en-US";
   try {
     return new Intl.NumberFormat(locale, { style: "currency", currency: normalizedCurrency }).format(value);
-  } catch (err) {
+  } catch (_) {
     return `${normalizedCurrency} ${value.toFixed(2)}`;
   }
+}
+
+function formatMoney(currency, amount) {
+  if (typeof billingPricingUtils.formatMoney === "function") {
+    return billingPricingUtils.formatMoney(currency, amount);
+  }
+  return fmtAmount(Math.round(Number(amount || 0) * 100), currency);
+}
+
+function getPricingDetails() {
+  if (typeof billingPricingUtils.getPricing === "function") {
+    return billingPricingUtils.getPricing(pricingState.currency, pricingState.billingInterval);
+  }
+  return { base: 0, addon: 0, labelKey: "subscription_billing_monthly" };
+}
+
+function getAddonTotalAmount() {
+  if (typeof billingPricingUtils.getAddonTotal === "function") {
+    return billingPricingUtils.getAddonTotal(
+      pricingState.currency,
+      pricingState.billingInterval,
+      pricingState.additionalBusinesses
+    );
+  }
+  return 0;
+}
+
+function getGrandTotalAmount() {
+  if (typeof billingPricingUtils.getGrandTotal === "function") {
+    return billingPricingUtils.getGrandTotal(
+      pricingState.currency,
+      pricingState.billingInterval,
+      pricingState.additionalBusinesses
+    );
+  }
+  return 0;
 }
 
 function clampAdditionalBusinesses(value) {
@@ -82,9 +120,11 @@ function updatePricingUI() {
   const intervalButtons = Array.from(document.querySelectorAll("[data-billing-interval]"));
   const additionalInput = document.getElementById("additionalBusinessesInput");
   const planPriceLabel = document.getElementById("planProPriceLabel");
+  const addonPriceLabel = document.getElementById("planProAddonPriceLabel");
   const summaryPlan = document.getElementById("subPricePlan");
   const summaryAddon = document.getElementById("subPriceAddon");
   const summaryTotal = document.getElementById("subPriceTotal");
+  const summaryNote = document.getElementById("subPriceNote");
   const decrementBtn = document.querySelector("[data-qty-action='decrease']");
   const incrementBtn = document.querySelector("[data-qty-action='increase']");
 
@@ -102,23 +142,41 @@ function updatePricingUI() {
     incrementBtn.disabled = pricingState.additionalBusinesses >= MAX_ADDITIONAL_BUSINESSES;
   }
 
-  const intervalLabel =
+  const pricing = getPricingDetails();
+  const noteIntervalLabel = tx(pricing.labelKey || "subscription_billing_monthly").toLowerCase();
+  const intervalPriceLabel = tx(
     pricingState.billingInterval === "yearly"
-      ? tx("subscription_billing_yearly")
-      : tx("subscription_billing_monthly");
-  const planSummaryText = `${pricingState.currency.toUpperCase()} - ${intervalLabel}`;
+      ? "subscription_interval_suffix_yearly"
+      : "subscription_interval_suffix_monthly"
+  );
+  const baseText = formatMoney(pricingState.currency, pricing.base);
+  const addonUnitText = formatMoney(pricingState.currency, pricing.addon);
+  const addonTotalText = formatMoney(pricingState.currency, getAddonTotalAmount());
+  const totalText = formatMoney(pricingState.currency, getGrandTotalAmount());
+  const planSummaryText = `${baseText} ${intervalPriceLabel}`;
 
   if (planPriceLabel) {
     planPriceLabel.textContent = planSummaryText;
+  }
+  if (addonPriceLabel) {
+    addonPriceLabel.textContent = tx("subscription_additional_businesses_from")
+      .replace("{price}", `${addonUnitText} ${intervalPriceLabel}`);
   }
   if (summaryPlan) {
     summaryPlan.textContent = planSummaryText;
   }
   if (summaryAddon) {
-    summaryAddon.textContent = String(pricingState.additionalBusinesses);
+    summaryAddon.textContent = pricingState.additionalBusinesses > 0
+      ? `${pricingState.additionalBusinesses} x ${addonUnitText} = ${addonTotalText}`
+      : tx("subscription_additional_businesses_none");
   }
   if (summaryTotal) {
-    summaryTotal.textContent = tx("subscription_price_at_checkout");
+    summaryTotal.textContent = totalText;
+  }
+  if (summaryNote) {
+    summaryNote.textContent = tx("subscription_price_summary_note_verified")
+      .replace("{interval}", noteIntervalLabel)
+      .replace("{currency}", pricingState.currency.toUpperCase());
   }
 }
 
@@ -139,13 +197,11 @@ async function initPricingControls() {
   const additionalInput = document.getElementById("additionalBusinessesInput");
   if (additionalInput) {
     additionalInput.addEventListener("input", () => {
-      const value = clampAdditionalBusinesses(Number(additionalInput.value));
-      pricingState.additionalBusinesses = value;
+      pricingState.additionalBusinesses = clampAdditionalBusinesses(Number(additionalInput.value));
       updatePricingUI();
     });
     additionalInput.addEventListener("change", () => {
-      const value = clampAdditionalBusinesses(Number(additionalInput.value));
-      pricingState.additionalBusinesses = value;
+      pricingState.additionalBusinesses = clampAdditionalBusinesses(Number(additionalInput.value));
       updatePricingUI();
     });
   }
@@ -154,9 +210,7 @@ async function initPricingControls() {
     btn.addEventListener("click", () => {
       const action = btn.dataset.qtyAction;
       const delta = action === "increase" ? 1 : action === "decrease" ? -1 : 0;
-      pricingState.additionalBusinesses = clampAdditionalBusinesses(
-        pricingState.additionalBusinesses + delta
-      );
+      pricingState.additionalBusinesses = clampAdditionalBusinesses(pricingState.additionalBusinesses + delta);
       updatePricingUI();
     });
   });
@@ -178,13 +232,23 @@ function setCheckoutLoading(isLoading) {
   }
 }
 
+function updatePlanCardState(sub) {
+  const planFree = document.getElementById("planFree");
+  const planPro = document.getElementById("planPro");
+  const isCurrentFree = !sub || sub.effectiveTier !== "v1" || !!sub.cancelAtPeriodEnd;
+  const isCurrentPro = !!sub && sub.effectiveTier === "v1" && !sub.cancelAtPeriodEnd;
+
+  planFree?.classList.toggle("is-current", isCurrentFree);
+  planPro?.classList.toggle("is-current", isCurrentPro);
+}
+
 function initSubNav() {
   const navButtons = Array.from(document.querySelectorAll("[data-settings-target]"));
   if (!navButtons.length) return;
 
   const targets = navButtons
     .map((btn) => ({ btn, target: document.getElementById(btn.dataset.settingsTarget || "") }))
-    .filter((e) => e.target);
+    .filter((entry) => entry.target);
 
   const setActive = (id) => {
     navButtons.forEach((btn) => btn.classList.toggle("is-active", btn.dataset.settingsTarget === id));
@@ -201,7 +265,7 @@ function initSubNav() {
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
-          .filter((e) => e.isIntersecting)
+          .filter((entry) => entry.isIntersecting)
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
         if (visible?.target?.id) setActive(visible.target.id);
       },
@@ -209,6 +273,16 @@ function initSubNav() {
     );
     targets.forEach(({ target }) => observer.observe(target));
   }
+}
+
+function buildFreeTierConfirmationMessage(sub) {
+  if (sub?.isPaid && sub?.currentPeriodEnd) {
+    return tx("subscription_free_confirm_body_paid").replace("{date}", fmtDate(sub.currentPeriodEnd));
+  }
+  if (sub?.isTrialing) {
+    return tx("subscription_free_confirm_body_trial");
+  }
+  return tx("subscription_free_confirm_body_generic");
 }
 
 async function loadSubscription() {
@@ -238,9 +312,9 @@ async function loadSubscription() {
       return null;
     }
 
-    // Render the status block
+    currentSubscription = sub;
+
     if (statusBlock) {
-      const tierLabel = sub.effectiveTier === "v1" ? "Pro" : "Free";
       let statusHtml = "";
       let statusClass = "sub-status-free";
 
@@ -276,8 +350,6 @@ async function loadSubscription() {
       statusBlock.innerHTML = `<div class="sub-status-inner ${statusClass}">${statusHtml}</div>`;
     }
 
-    // Cancel modal body — sub.currentPeriodEnd is a Unix timestamp (seconds).
-    // fmtDate() handles seconds→ms conversion, so use it instead of new Date().
     if (cancelModalBody && sub.currentPeriodEnd) {
       const endDate = fmtDate(sub.currentPeriodEnd);
       cancelModalBody.textContent = typeof window.t === "function"
@@ -285,7 +357,6 @@ async function loadSubscription() {
         : `Your subscription will remain active until ${endDate}. You will lose access to premium features after that date.`;
     }
 
-    // Show/hide action buttons
     if (manageBillingBtn) {
       manageBillingBtn.classList.toggle("hidden", !sub.stripeCustomerId);
     }
@@ -293,12 +364,12 @@ async function loadSubscription() {
       cancelBtn.classList.toggle("hidden", !(sub.isPaid && !sub.cancelAtPeriodEnd));
     }
 
-    // Apply subscription state for plan buttons
     if (typeof applySubscriptionState === "function") {
       applySubscriptionState(sub);
     }
 
-    // Set up plan buttons
+    updatePlanCardState(sub);
+
     if (planProBtn) {
       if (sub.effectiveTier === "v1" && !sub.cancelAtPeriodEnd) {
         planProBtn.disabled = true;
@@ -313,14 +384,14 @@ async function loadSubscription() {
     }
 
     if (planFreeBtn) {
-      if (sub.effectiveTier !== "v1" && !sub.cancelAtPeriodEnd) {
+      if (sub.cancelAtPeriodEnd) {
+        planFreeBtn.disabled = true;
+        planFreeBtn.textContent = tx("subscription_free_pending");
+      } else if (sub.effectiveTier !== "v1") {
         planFreeBtn.disabled = true;
         planFreeBtn.textContent = tx("subscription_current_plan");
-      } else if (sub.stripeCustomerId) {
-        planFreeBtn.disabled = false;
-        planFreeBtn.textContent = tx("subscription_manage_billing");
       } else {
-        planFreeBtn.disabled = true;
+        planFreeBtn.disabled = false;
         planFreeBtn.textContent = tx("subscription_starter_cta");
       }
     }
@@ -394,19 +465,20 @@ async function startCheckout() {
     if (pricingState.isCheckoutLoading) return;
     await loadVerifiedPricingContext();
     setCheckoutLoading(true);
-    const checkoutPayload = {
-      billingInterval: pricingState.billingInterval,
-      additionalBusinesses: pricingState.additionalBusinesses
-    };
+
     const res = await apiFetch("/api/billing/checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(checkoutPayload)
+      body: JSON.stringify({
+        billingInterval: pricingState.billingInterval,
+        additionalBusinesses: pricingState.additionalBusinesses
+      })
     });
     if (!res) {
       setCheckoutLoading(false);
       return;
     }
+
     const payload = await res.json().catch(() => null);
     if (!res.ok) throw new Error(payload?.error || tx("subscription_checkout_error"));
     if (payload?.url) {
@@ -416,6 +488,7 @@ async function startCheckout() {
       window.location.href = payload.url;
       return;
     }
+
     setCheckoutLoading(false);
   } catch (err) {
     showSubToast(err.message || tx("subscription_checkout_error"));
@@ -443,12 +516,53 @@ async function openCustomerPortal() {
   }
 }
 
+function wireFreeTierModal() {
+  const modal = document.getElementById("subFreeModal");
+  const body = document.getElementById("subFreeModalBody");
+  const cancelBtn = document.getElementById("subFreeModalCancel");
+  const confirmBtn = document.getElementById("subFreeModalConfirm");
+  const planFreeBtn = document.getElementById("planFreeBtn");
+
+  if (!modal || !body || !cancelBtn || !confirmBtn || !planFreeBtn) {
+    return;
+  }
+
+  const closeModal = () => modal.classList.add("hidden");
+
+  cancelBtn.addEventListener("click", closeModal);
+  planFreeBtn.addEventListener("click", () => {
+    if (!currentSubscription || planFreeBtn.disabled) {
+      return;
+    }
+    body.textContent = buildFreeTierConfirmationMessage(currentSubscription);
+    modal.classList.remove("hidden");
+  });
+
+  confirmBtn.addEventListener("click", async () => {
+    confirmBtn.disabled = true;
+    try {
+      const res = await apiFetch("/api/billing/cancel", { method: "POST" });
+      const payload = await res?.json()?.catch(() => null);
+      if (!res || !res.ok) {
+        throw new Error(payload?.error || tx("settings_cancel_sub_error"));
+      }
+      closeModal();
+      showSubToast(tx("subscription_free_selection_success"));
+      currentSubscription = await loadSubscription();
+      await loadBillingHistory();
+    } catch (err) {
+      showSubToast(err.message || tx("settings_cancel_sub_error"));
+    } finally {
+      confirmBtn.disabled = false;
+    }
+  });
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   if (typeof requireValidSessionOrRedirect === "function") {
     await requireValidSessionOrRedirect();
   }
   if (typeof enforceTrial === "function") enforceTrial();
-  if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
   initSubNav();
   await initPricingControls();
@@ -456,13 +570,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const planProBtn = document.getElementById("planProBtn");
   planProBtn?.addEventListener("click", startCheckout);
 
-  const planFreeBtn = document.getElementById("planFreeBtn");
-  planFreeBtn?.addEventListener("click", openCustomerPortal);
-
   const manageBillingBtn = document.getElementById("subManageBillingBtn");
   manageBillingBtn?.addEventListener("click", openCustomerPortal);
 
-  // Cancel subscription flow
+  wireFreeTierModal();
+
   const cancelBtn = document.getElementById("subCancelBtn");
   const cancelModal = document.getElementById("subCancelModal");
   const cancelModalCancel = document.getElementById("subCancelModalCancel");
@@ -483,7 +595,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       cancelModal?.classList.add("hidden");
       showSubToast(tx("settings_cancel_sub_success"));
-      await loadSubscription();
+      currentSubscription = await loadSubscription();
+      await loadBillingHistory();
       cancelModalConfirm.disabled = false;
     } catch (err) {
       console.error("Cancel subscription failed", err);
@@ -492,7 +605,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // Handle checkout=success / checkout=cancel query params
   const params = new URLSearchParams(window.location.search);
   if (params.get("checkout") === "success") {
     showSubToast(tx("sub_mgmt_checkout_success"));
@@ -502,8 +614,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.history.replaceState({}, "", window.location.pathname);
   }
 
-  await loadSubscription();
+  currentSubscription = await loadSubscription();
   await loadBillingHistory();
 });
-
-

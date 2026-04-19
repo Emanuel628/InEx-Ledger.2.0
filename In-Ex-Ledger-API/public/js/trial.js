@@ -18,44 +18,6 @@ function enforceTrial() {
 
 const DEFAULT_TRIAL_DAYS = 30;
 
-function renderTrialBanner(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) {
-    return;
-  }
-
-  if (container.dataset.countdownInterval) {
-    clearInterval(Number(container.dataset.countdownInterval));
-    delete container.dataset.countdownInterval;
-  }
-
-  const tier = localStorage.getItem(TIER_KEY);
-  const shouldShowActiveTrial = tier === "trial" && !isTrialExpired();
-  if (!shouldShowActiveTrial) {
-    container.innerHTML = "";
-    container.hidden = true;
-    return;
-  }
-
-  const updateMessage = () => {
-    const formatted = formatTrialRemaining();
-    container.innerHTML = `
-      <p>${formatted} <a href="subscription">${trialTx("trial_manage_plan")}</a>.</p>
-    `;
-  };
-
-  container.hidden = false;
-  updateMessage();
-  const id = setInterval(() => {
-    if (isTrialExpired()) {
-      clearInterval(id);
-      renderTrialBanner(containerId);
-      return;
-    }
-    updateMessage();
-  }, 60 * 1000);
-  container.dataset.countdownInterval = id.toString();
-}
 
 function startTrial(durationDays = DEFAULT_TRIAL_DAYS) {
   const now = Date.now();

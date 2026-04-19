@@ -87,12 +87,34 @@
     return value;
   }
 
+  function resolveBannerHost() {
+    const existing = document.querySelector("[data-page-alerts]");
+    if (existing) return existing;
+
+    const host = document.createElement("div");
+    host.dataset.pageAlerts = "true";
+
+    const topbar = document.querySelector("header.app-topbar, .app-topbar, .topbar");
+    if (topbar?.parentNode) {
+      topbar.parentNode.insertBefore(host, topbar.nextSibling);
+      return host;
+    }
+
+    const main = document.querySelector("main, .settings-shell, .subscription-shell, .page-shell");
+    if (main?.parentNode) {
+      main.parentNode.insertBefore(host, main);
+      return host;
+    }
+
+    document.body.insertBefore(host, document.body.firstChild);
+    return host;
+  }
+
   function renderBanner(upcoming, region) {
     const dismissed = getDismissed();
     if (dismissed.includes(upcoming.key)) return;
 
-    const container = document.getElementById("trialBanner");
-    if (!container) return;
+    const container = resolveBannerHost();
     const existingTaxReminder = container.querySelector(".tax-reminder-banner");
     if (existingTaxReminder) existingTaxReminder.remove();
 

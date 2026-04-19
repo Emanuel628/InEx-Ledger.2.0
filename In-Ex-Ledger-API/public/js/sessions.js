@@ -180,7 +180,6 @@ async function revokeAllSessions() {
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
-  if (typeof renderTrialBanner === "function") renderTrialBanner("trialBanner");
 
   await loadSessions();
 

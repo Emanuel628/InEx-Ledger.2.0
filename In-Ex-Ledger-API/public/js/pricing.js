@@ -1,33 +1,24 @@
-const PRICING_TABLE = {
-  usd: {
-    monthly: { base: 12, addon: 5, label: "per month" },
-    yearly: { base: 122.4, addon: 51, label: "per year" }
-  },
-  cad: {
-    monthly: { base: 17, addon: 7, label: "per month" },
-    yearly: { base: 175, addon: 72, label: "per year" }
-  }
-};
-
 const pricingState = {
   currency: "usd",
   interval: "monthly",
   additionalBusinesses: 0
 };
 
-const BILLING_CURRENCIES = ["usd", "cad"];
+const billingPricingUtils = window.billingPricing || {};
+const BILLING_CURRENCIES = billingPricingUtils.BILLING_CURRENCIES || ["usd", "cad"];
 
 function formatMoney(currency, amount) {
-  return new Intl.NumberFormat(currency === "cad" ? "en-CA" : "en-US", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-    maximumFractionDigits: 2
-  }).format(amount);
+  if (typeof billingPricingUtils.formatMoney === "function") {
+    return billingPricingUtils.formatMoney(currency, amount);
+  }
+  return String(amount || 0);
 }
 
 function getCurrentPricing() {
-  return PRICING_TABLE[pricingState.currency][pricingState.interval];
+  if (typeof billingPricingUtils.getPricing === "function") {
+    return billingPricingUtils.getPricing(pricingState.currency, pricingState.interval);
+  }
+  return { base: 0, addon: 0, label: "per month" };
 }
 
 function getAddonTotal() {

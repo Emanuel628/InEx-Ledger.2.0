@@ -7,8 +7,4 @@ document.addEventListener("DOMContentLoaded", () => {
   if (typeof enforceTrial === "function") {
     enforceTrial();
   }
-
-  if (typeof renderTrialBanner === "function") {
-    renderTrialBanner("trialBanner");
-  }
 });

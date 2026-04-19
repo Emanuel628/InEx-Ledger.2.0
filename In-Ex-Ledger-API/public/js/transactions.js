@@ -213,10 +213,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     enforceTrial();
   }
 
-  if (typeof renderTrialBanner === "function") {
-    renderTrialBanner("trialBanner");
-  }
-
   await hydrateTransactionBusinessContext();
   initTransactionScopeSelect();
   setupTransactionDrawer();
