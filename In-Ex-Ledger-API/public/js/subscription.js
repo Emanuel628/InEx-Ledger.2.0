@@ -32,8 +32,6 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 });
-// Expose for global use
-window.isV2BusinessUnlocked = isV2BusinessUnlocked;
 const SUB_TOAST_MS = 3000;
 let subToastTimer = null;
 const billingPricingUtils = window.billingPricing || {};
@@ -655,22 +653,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupMockUpgradeButton();
 });
 
-// === MOCK UPGRADE TO V2/BUSINESS ===
-const V2_BUSINESS_UNLOCK_KEY = "lb_v2_business_unlocked";
 
-function isV2BusinessUnlocked() {
-  try {
-    return localStorage.getItem(V2_BUSINESS_UNLOCK_KEY) === "true";
-  } catch (_) {
-    return false;
-  }
-}
-
-function setV2BusinessUnlocked(value = true) {
-  try {
-    localStorage.setItem(V2_BUSINESS_UNLOCK_KEY, value ? "true" : "false");
-  } catch (_) {}
-}
+// setV2BusinessUnlocked is only needed for demo/mock logic. If needed, import from global.js or define here only if not present.
 
 function showMockUpgradeToast(message) {
   const toast = document.getElementById("mockUpgradeToast");
