@@ -67,7 +67,7 @@ function updateCtaLabels() {
   ].filter(Boolean);
 
   const buttonText = isAuthed
-    ? "Upgrade to V1 now"
+    ? "Upgrade to Pro now"
     : "Start free 30-day trial";
 
   primaryButtons.forEach((btn) => {
@@ -77,15 +77,15 @@ function updateCtaLabels() {
   const helper = document.getElementById("planHelperText");
   if (helper) {
     helper.textContent = isAuthed
-      ? "You’re signed in. This button launches secure checkout for your selected V1 setup."
-      : "Create your account to begin the free 30-day trial. You can upgrade to paid V1 from this page once you’re signed in.";
+      ? "You’re signed in. This button launches secure checkout for your selected Pro setup."
+      : "Create your account to begin the free 30-day trial. You can upgrade to paid Pro from this page once you’re signed in.";
   }
 
   const footnote = document.getElementById("heroFootnote");
   if (footnote) {
     footnote.textContent = isAuthed
       ? "Signed in already? Pick your billing setup below and launch checkout."
-      : "Start free first. Upgrade to V1 when you’re ready for the premium bookkeeping toolkit.";
+      : "Start free first. Upgrade to Pro when you’re ready for the premium bookkeeping toolkit.";
   }
 }
 
@@ -113,8 +113,8 @@ function renderPricing() {
     const intervalLabel = pricingState.interval === "yearly" ? "yearly" : "monthly";
     totalFootnote.textContent =
       pricingState.additionalBusinesses > 0
-        ? `Base V1 ${intervalLabel} pricing plus ${pricingState.additionalBusinesses} additional business ${pricingState.additionalBusinesses === 1 ? "slot" : "slots"} at ${addonUnitText} each.`
-        : `Base V1 ${intervalLabel} pricing only. Start with a 30-day free trial by creating your account.`;
+        ? `Base Pro ${intervalLabel} pricing plus ${pricingState.additionalBusinesses} additional business ${pricingState.additionalBusinesses === 1 ? "slot" : "slots"} at ${addonUnitText} each.`
+        : `Base Pro ${intervalLabel} pricing only. Start with a 30-day free trial by creating your account.`;
   }
 
   setActiveToggle("[data-interval]", pricingState.interval, "data-interval");

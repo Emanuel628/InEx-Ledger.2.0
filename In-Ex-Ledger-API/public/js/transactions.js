@@ -24,6 +24,7 @@ const transactionFilters = {
 
 const DRAWER_OPEN_LABEL = "+ Add new";
 const DRAWER_CLOSE_LABEL = "Close";
+const CUSTOM_CATEGORY_OPTION_VALUE = "__custom__";
 const txT = (key, fallback) => {
   if (typeof t !== "function") return fallback !== undefined ? fallback : key;
   const result = t(key);
@@ -462,15 +463,20 @@ function wireTransactionForm() {
   const accountHelp = document.getElementById("accountHelp");
   const categoryHelp = document.getElementById("categoryHelp");
   const typeSelect = document.getElementById("txType");
+  const categorySelect = document.getElementById("category");
   const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
 
   updateHelpText(accountHelp, categoryHelp);
   initTransactionReceiptField();
   wireEdgeCaseFields();
+  categorySelect?.addEventListener("change", () => {
+    syncCustomCategoryField("category", "customCategoryName");
+  });
   typeSelect?.addEventListener("change", () => {
     if (!taxTreatmentSelect) {
       return;
     }
+    populateCategoriesFromStorage();
     if (typeSelect.value === "income") {
       taxTreatmentSelect.value = "income";
     } else if (taxTreatmentSelect.value === "income") {
@@ -510,8 +516,8 @@ function wireTransactionForm() {
     const description = descriptionInput.value.trim();
     const amount = parseFloat(amountInput.value);
     const accountId = accountSelect.value;
-    const categoryId = categorySelect.value;
     const type = typeSelect?.value === "income" ? "income" : "expense";
+    const categoryId = resolveSelectedCategoryValue("category", "customCategoryName");
     const cleared = !!clearedInput?.checked;
 
     const validationError = validateTransactionForm({
@@ -591,7 +597,7 @@ function wireTransactionForm() {
       if (savedTransaction?.id) {
         mergeSavedTransactionIntoLedger(savedTransaction, {
           accountName: getSelectedOptionLabel(accountSelect),
-          categoryName: getSelectedOptionLabel(categorySelect)
+          categoryName: getSelectedCategoryLabel(categorySelect, "customCategoryName")
         });
         applyFilters();
         renderTotals();
@@ -663,20 +669,30 @@ function setupTransactionDrawer() {
 
 function wireRecurringForm() {
   const form = document.getElementById("recurringForm");
+  const typeSelect = document.getElementById("recurringType");
+  const categorySelect = document.getElementById("recurringCategory");
   if (!form) {
     return;
   }
 
+  typeSelect?.addEventListener("change", () => {
+    renderRecurringCategoryOptions();
+  });
+  categorySelect?.addEventListener("change", () => {
+    syncCustomCategoryField("recurringCategory", "recurringCustomCategoryName");
+  });
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
+    const recurringType = document.getElementById("recurringType")?.value || "expense";
     const payload = {
-      type: document.getElementById("recurringType")?.value || "expense",
+      type: recurringType,
       cadence: document.getElementById("recurringCadence")?.value || "monthly",
       description: document.getElementById("recurringDescription")?.value.trim() || "",
       amount: parseFloat(document.getElementById("recurringAmount")?.value || ""),
       account_id: document.getElementById("recurringAccount")?.value || "",
-      category_id: document.getElementById("recurringCategory")?.value || "",
+      category_id: resolveSelectedCategoryValue("recurringCategory", "recurringCustomCategoryName"),
       start_date: document.getElementById("recurringStartDate")?.value || "",
       end_date: document.getElementById("recurringEndDate")?.value || "",
       note: document.getElementById("recurringNote")?.value.trim() || "",
@@ -1018,11 +1034,13 @@ function handleEditRecurringTemplate(templateId) {
 
   editingRecurringTemplateId = templateId;
   document.getElementById("recurringType").value = template.type || "expense";
+  renderRecurringCategoryOptions();
   document.getElementById("recurringCadence").value = template.cadence || "monthly";
   document.getElementById("recurringDescription").value = template.description || "";
   document.getElementById("recurringAmount").value = template.amount ?? "";
   document.getElementById("recurringAccount").value = template.account_id || "";
   document.getElementById("recurringCategory").value = template.category_id || "";
+  syncCustomCategoryField("recurringCategory", "recurringCustomCategoryName");
   document.getElementById("recurringStartDate").value = template.start_date || "";
   document.getElementById("recurringEndDate").value = template.end_date || "";
   document.getElementById("recurringNote").value = template.note || "";
@@ -1133,6 +1151,8 @@ function resetRecurringForm() {
   editingRecurringTemplateId = null;
   document.getElementById("recurringType").value = "expense";
   document.getElementById("recurringCadence").value = "monthly";
+  renderRecurringCategoryOptions();
+  clearCustomCategoryField("recurringCategory", "recurringCustomCategoryName");
   const submitButton = document.getElementById("recurringSubmit");
   if (submitButton) {
     submitButton.textContent = txT("transactions_recurring_save_submit", "Save recurring template");
@@ -1184,14 +1204,17 @@ function renderRecurringCategoryOptions() {
     return;
   }
   const currentValue = select.value;
+  const type = document.getElementById("recurringType")?.value || "expense";
   select.innerHTML = `<option value="">${txT("transactions_select_category", "Select category")}</option>`;
-  getCategories().forEach((category) => {
+  getCategories().filter((category) => category.type === type).forEach((category) => {
     const option = document.createElement("option");
     option.value = category.id || category.name;
     option.textContent = category.name;
     select.appendChild(option);
   });
-  select.value = currentValue || "";
+  appendCustomCategoryOption(select, type);
+  select.value = hasOptionWithValue(select, currentValue) ? currentValue : "";
+  syncCustomCategoryField("recurringCategory", "recurringCustomCategoryName");
 }
 
 function renderRecurringTemplates() {
@@ -1299,6 +1322,7 @@ function prefillTransactionForm(transaction) {
     accountSelect.value = transaction.accountId || "";
   }
   if (categorySelect) {
+    populateCategoriesFromStorage();
     categorySelect.value = transaction.categoryId || "";
   }
   if (typeSelect) {
@@ -1355,6 +1379,7 @@ function resetTransactionForm() {
   updateTransactionReceiptLabel();
   editingTransactionId = null;
   setEditingMode(false);
+  clearCustomCategoryField("category", "customCategoryName");
   setTransactionAdvancedDefaults();
   const message = document.getElementById("transactionFormMessage");
   if (message) {
@@ -1547,16 +1572,21 @@ function populateCategoriesFromStorage() {
   const select = document.getElementById("txCategory") || document.getElementById("category");
   if (!select) return;
 
+  const currentValue = select.value;
+  const type = document.getElementById("txType")?.value || "expense";
   const categories = getCategories();
   select.innerHTML = `<option value="">${txT("transactions_select_category", "Select category")}</option>`;
-  categories.forEach((category) => {
+  categories.filter((category) => category.type === type).forEach((category) => {
     const option = document.createElement("option");
     option.value = category.id || category.name;
     option.textContent = category.name;
     select.appendChild(option);
   });
+  appendCustomCategoryOption(select, type);
 
-  select.disabled = categories.length === 0;
+  select.disabled = false;
+  select.value = hasOptionWithValue(select, currentValue) ? currentValue : "";
+  syncCustomCategoryField("category", "customCategoryName");
 
   populateTransactionCategoryFilter();
 }
@@ -1671,6 +1701,7 @@ async function refreshCategoryOptions() {
   const categories = await fetchCategoriesForTransactions();
   setStorageArray(STORAGE_KEYS.categories, categories);
   populateCategoriesFromStorage();
+  renderRecurringCategoryOptions();
 }
 
 async function fetchCategoriesForTransactions() {
@@ -2254,6 +2285,59 @@ function getSelectedOptionLabel(select) {
   return option ? String(option.textContent || "").trim() : "";
 }
 
+function getSelectedCategoryLabel(select, inputId) {
+  if (select?.value === CUSTOM_CATEGORY_OPTION_VALUE) {
+    return String(document.getElementById(inputId)?.value || "").trim();
+  }
+  return getSelectedOptionLabel(select);
+}
+
+function resolveSelectedCategoryValue(selectId, inputId) {
+  const select = document.getElementById(selectId);
+  if (!select) {
+    return "";
+  }
+  if (select.value === CUSTOM_CATEGORY_OPTION_VALUE) {
+    return String(document.getElementById(inputId)?.value || "").trim();
+  }
+  return String(select.value || "").trim();
+}
+
+function hasOptionWithValue(select, value) {
+  return !!Array.from(select?.options || []).find((option) => option.value === value);
+}
+
+function appendCustomCategoryOption(select, type) {
+  const option = document.createElement("option");
+  option.value = CUSTOM_CATEGORY_OPTION_VALUE;
+  option.textContent = type === "income"
+    ? txT("transactions_custom_income_category", "Custom income category...")
+    : txT("transactions_custom_expense_category", "Custom expense category...");
+  select.appendChild(option);
+}
+
+function syncCustomCategoryField(selectId, inputId) {
+  const select = document.getElementById(selectId);
+  const input = document.getElementById(inputId);
+  if (!select || !input) {
+    return;
+  }
+  const isCustom = select.value === CUSTOM_CATEGORY_OPTION_VALUE;
+  input.hidden = !isCustom;
+  input.required = isCustom;
+  if (!isCustom) {
+    input.value = "";
+  }
+}
+
+function clearCustomCategoryField(selectId, inputId) {
+  const select = document.getElementById(selectId);
+  if (select) {
+    select.value = "";
+  }
+  syncCustomCategoryField(selectId, inputId);
+}
+
 function mergeSavedTransactionIntoLedger(transaction, context = {}) {
   if (!transaction?.id) {
     return;
@@ -2289,7 +2373,11 @@ function validateTransactionForm({ date, description, amount, accountId, categor
     return { message: txT("transactions_validation_account", "Select an account."), fieldId: "account" };
   }
   if (!categoryId) {
-    return { message: txT("transactions_validation_category", "Select a category."), fieldId: "category" };
+    const categorySelect = document.getElementById("category");
+    return {
+      message: txT("transactions_validation_category", "Select a category."),
+      fieldId: categorySelect?.value === CUSTOM_CATEGORY_OPTION_VALUE ? "customCategoryName" : "category"
+    };
   }
   if (!type) {
     return { message: txT("transactions_validation_type", "Choose a transaction type."), fieldId: "txType" };

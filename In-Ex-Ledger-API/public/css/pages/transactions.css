@@ -439,6 +439,11 @@ form {
   font-size: 1rem;
 }
 
+#customCategoryName,
+#recurringCustomCategoryName {
+  margin-top: 10px;
+}
+
 .transactions-card input:focus,
 .transactions-card select:focus,
 .tx-card input:focus,

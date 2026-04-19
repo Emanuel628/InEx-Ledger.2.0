@@ -30,7 +30,7 @@ router.use(async (req, res, next) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "recurring_transactions")) {
-      return res.status(402).json({ error: "Recurring transactions require an active V1 plan." });
+      return res.status(402).json({ error: "Recurring transactions require an active Pro plan." });
     }
     next();
   } catch (err) {

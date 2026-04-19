@@ -185,7 +185,7 @@ router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), asyn
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "receipts")) {
       safeUnlink(req.file?.path);
-      return res.status(402).json({ error: "Receipt uploads require an active InEx Ledger V1 plan." });
+      return res.status(402).json({ error: "Receipt uploads require an active InEx Ledger Pro plan." });
     }
 
     let transactionId = req.body.transaction_id;

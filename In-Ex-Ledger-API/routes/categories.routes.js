@@ -14,6 +14,7 @@ const {
   assertNoLockedPeriodTransactionsForCategory,
   AccountingPeriodLockedError
 } = require("../services/accountingLockService.js");
+const { seedDefaultCategoriesForBusiness } = require("../api/utils/seedDefaultsForBusiness.js");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -99,6 +100,20 @@ router.post("/", async (req, res) => {
     }
     logError("POST /categories error:", err.message);
     res.status(500).json({ error: "Failed to create category." });
+  }
+});
+
+router.post("/defaults", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const inserted = await seedDefaultCategoriesForBusiness(pool, businessId);
+    return res.status(200).json({
+      inserted_count: inserted.length,
+      categories: inserted
+    });
+  } catch (err) {
+    logError("POST /categories/defaults error:", err.message);
+    return res.status(500).json({ error: "Failed to add default categories." });
   }
 });
 

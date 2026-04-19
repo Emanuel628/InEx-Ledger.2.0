@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     errEl.hidden = false;
                   }
                   btn.disabled = false;
-                  btn.textContent = "Activate V1 for testing";
+                  btn.textContent = "Activate Pro for testing";
                 }
               } catch {
                 if (errEl) {
@@ -52,7 +52,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   errEl.hidden = false;
                 }
                 btn.disabled = false;
-                btn.textContent = "Activate V1 for testing";
+                btn.textContent = "Activate Pro for testing";
               }
             });
           }

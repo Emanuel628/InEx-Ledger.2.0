@@ -172,7 +172,7 @@ router.post("/request-grant", exportGrantLimiter, async (req, res) => {
     }
 
     if (exportType === "pdf" && !hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(402).json({ error: "PDF exports require an active InEx Ledger V1 plan." });
+      return res.status(402).json({ error: "PDF exports require an active InEx Ledger Pro plan." });
     }
 
     if (includeTaxId && exportType !== "pdf") {
@@ -353,7 +353,7 @@ router.get("/history", exportGrantLimiter, async (req, res) => {
     const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(402).json({ error: "Export history requires an active InEx Ledger V1 plan." });
+      return res.status(402).json({ error: "Export history requires an active InEx Ledger Pro plan." });
     }
     const result = await pool.query(
       `SELECT e.id,
@@ -401,7 +401,7 @@ router.get("/history/:id/redacted", exportGrantLimiter, async (req, res) => {
     const businessId = user.business_id;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(402).json({ error: "Export history requires an active InEx Ledger V1 plan." });
+      return res.status(402).json({ error: "Export history requires an active InEx Ledger Pro plan." });
     }
     const { id } = req.params;
     const { rows } = await pool.query(
@@ -448,7 +448,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
 
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(402).json({ error: "PDF exports require an active InEx Ledger V1 plan." });
+      return res.status(402).json({ error: "PDF exports require an active InEx Ledger Pro plan." });
     }
 
     const includeTaxId = Boolean(req.body?.includeTaxId);

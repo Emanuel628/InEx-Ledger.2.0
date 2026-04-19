@@ -129,12 +129,12 @@
         <div>
           <h2 data-i18n="transactions_upsell_title">Unlock Real-Time Tax Estimates</h2>
           <p data-i18n="transactions_upsell_body">
-            Upgrade to V1 to see your live estimated tax owed and monthly
+            Upgrade to Pro to see your live estimated tax owed and monthly
             set-aside.
           </p>
         </div>
         <div class="upsell-actions">
-          <button data-upgrade data-i18n="transactions_upsell_cta">Upgrade to V1</button>
+          <button data-upgrade data-i18n="transactions_upsell_cta">Upgrade to Pro</button>
           <button type="button" class="upsell-dismiss" aria-label="Dismiss">×</button>
         </div>
       </section>
@@ -208,6 +208,7 @@
                   <select id="category" class="form-control" name="category" required>
                     <option value="">Select category</option>
                   </select>
+                  <input class="form-control" type="text" id="customCategoryName" data-i18n-placeholder="transactions_custom_category_placeholder" placeholder="Enter custom category name" hidden />
                 </div>
                 <div class="form-field">
                   <label for="amount" class="form-label" data-i18n="transaction_label_amount">Amount</label>
@@ -415,6 +416,7 @@
                   <select id="recurringCategory" class="form-control" required>
                     <option value="">Select category</option>
                   </select>
+                  <input id="recurringCustomCategoryName" class="form-control" type="text" data-i18n-placeholder="transactions_custom_category_placeholder" placeholder="Enter custom category name" hidden />
                 </div>
                 <div class="form-field">
                   <label for="recurringStartDate" class="form-label">Start date</label>

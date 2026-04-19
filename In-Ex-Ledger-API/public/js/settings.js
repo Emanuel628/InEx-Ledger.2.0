@@ -552,7 +552,7 @@ async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBod
       return;
     }
 
-    const tierLabel = sub.effectiveTier === "v1" ? "Pro" : "Free";
+    const tierLabel = sub.effectiveTier === "v1" ? "Pro" : "Basic";
     let statusText = "";
     if (sub.isTrialing && sub.trialEndsAt) {
       const endDate = new Date(sub.trialEndsAt).toLocaleDateString(resolveDisplayLocale(), { month: "short", day: "numeric", year: "numeric" });

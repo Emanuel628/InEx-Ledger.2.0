@@ -127,6 +127,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await loadBusinessRegion();
   wireCategoryModal();
+  wireDefaultCategorySeed();
   await loadCategories();
   await refreshReceiptsDot();
 });
@@ -221,6 +222,46 @@ function closeCategoryModal() {
   }
 }
 
+function wireDefaultCategorySeed() {
+  const button = document.getElementById("seedDefaultCategoriesBtn");
+  if (!button) {
+    return;
+  }
+
+  button.addEventListener("click", async () => {
+    const message = document.getElementById("categoryMessage");
+    button.disabled = true;
+    if (message) {
+      message.textContent = "";
+    }
+
+    try {
+      const response = await apiFetch("/api/categories/defaults", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      const payload = response ? await response.json().catch(() => null) : null;
+
+      if (!response || !response.ok) {
+        throw new Error(payload?.error || tx("categories_error_defaults"));
+      }
+
+      await loadCategories();
+      showCategoriesToast(
+        (payload?.inserted_count || 0) > 0
+          ? tx("categories_defaults_added")
+          : tx("categories_defaults_already_present")
+      );
+    } catch (error) {
+      if (message) {
+        message.textContent = error?.message || tx("categories_error_defaults");
+      }
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
 async function loadCategories() {
   categoriesLoading = categoryRecords.length === 0;
   if (categoriesLoading) {
@@ -264,8 +305,12 @@ function showCategoriesOfflineBanner(show) {
   banner.textContent = show ? tx("categories_offline_warning") : "";
 
   const addButton = document.getElementById("showCategoryModal");
+  const defaultsButton = document.getElementById("seedDefaultCategoriesBtn");
   if (addButton) {
     addButton.disabled = show;
+  }
+  if (defaultsButton) {
+    defaultsButton.disabled = show;
   }
 }
 

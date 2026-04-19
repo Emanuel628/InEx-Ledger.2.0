@@ -61,14 +61,13 @@ const defaultCategoriesCA = [
   { name: "Other Expense", kind: "expense", color: "slate", tax_map_ca: "other_expense" },
 ];
 
-async function seedDefaultsForBusiness(db = pool, businessId) {
-  if (!businessId) {
-    throw new Error("seedDefaultsForBusiness requires a businessId");
-  }
+function getDefaultCategoriesForRegion(region = "US") {
+  return String(region || "").toUpperCase() === "CA"
+    ? defaultCategoriesCA
+    : defaultCategoriesUS;
+}
 
-  const targetDb = db ?? pool;
-
-  // Determine the business region so we can seed region-specific categories
+async function resolveBusinessRegion(targetDb, businessId) {
   let region = "US";
   try {
     const bizResult = await targetDb.query(
@@ -76,29 +75,34 @@ async function seedDefaultsForBusiness(db = pool, businessId) {
       [businessId]
     );
     if (bizResult.rowCount > 0) {
-      const r = (bizResult.rows[0].region || "US").toUpperCase();
-      if (r === "CA") region = "CA";
+      const resolved = (bizResult.rows[0].region || "US").toUpperCase();
+      if (resolved === "CA") {
+        region = "CA";
+      }
     }
   } catch (_) {
     // fall back to US defaults if we can't read the region
   }
+  return region;
+}
 
-  for (const account of defaultAccounts) {
-    await targetDb.query(
-      `
-      INSERT INTO accounts (id, business_id, name, type, created_at)
-      VALUES ($1, $2, $3, $4, now())
-      `,
-      [crypto.randomUUID(), businessId, account.name, account.type]
-    );
+async function seedDefaultCategoriesForBusiness(db = pool, businessId) {
+  if (!businessId) {
+    throw new Error("seedDefaultCategoriesForBusiness requires a businessId");
   }
 
-  const categories = region === "CA" ? defaultCategoriesCA : defaultCategoriesUS;
+  const targetDb = db ?? pool;
+  const region = await resolveBusinessRegion(targetDb, businessId);
+  const categories = getDefaultCategoriesForRegion(region);
+  const inserted = [];
+
   for (const category of categories) {
-    await targetDb.query(
+    const result = await targetDb.query(
       `
       INSERT INTO categories (id, business_id, name, kind, color, tax_map_us, tax_map_ca, is_default, created_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, true, now())
+      ON CONFLICT DO NOTHING
+      RETURNING id, business_id, name, kind, color, tax_map_us, tax_map_ca, is_default, created_at
       `,
       [
         crypto.randomUUID(),
@@ -110,7 +114,34 @@ async function seedDefaultsForBusiness(db = pool, businessId) {
         category.tax_map_ca || null
       ]
     );
+    if (result.rowCount) {
+      inserted.push(result.rows[0]);
+    }
   }
+
+  return inserted;
 }
 
-module.exports = { seedDefaultsForBusiness };
+async function seedDefaultsForBusiness(db = pool, businessId) {
+  if (!businessId) {
+    throw new Error("seedDefaultsForBusiness requires a businessId");
+  }
+
+  const targetDb = db ?? pool;
+
+  const region = await resolveBusinessRegion(targetDb, businessId);
+
+  for (const account of defaultAccounts) {
+    await targetDb.query(
+      `
+      INSERT INTO accounts (id, business_id, name, type, created_at)
+      VALUES ($1, $2, $3, $4, now())
+      `,
+      [crypto.randomUUID(), businessId, account.name, account.type]
+    );
+  }
+
+  await seedDefaultCategoriesForBusiness(targetDb, businessId);
+}
+
+module.exports = { seedDefaultsForBusiness, seedDefaultCategoriesForBusiness, getDefaultCategoriesForRegion };
