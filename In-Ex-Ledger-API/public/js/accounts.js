@@ -49,7 +49,7 @@ function getAccountsStorageKey(key) {
   return `lb:${userId}:${businessId}:${key}`;
 }
 
-console.log("[AUTH] Protected page loaded:", window.location.pathname);
+
 
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
@@ -228,7 +228,6 @@ async function deleteAccount(accountId) {
     showAccountsToast(tx("accounts_deleted"));
     await renderAccountList();
   } catch (error) {
-    console.error("Delete account failed:", error);
     showAccountsToast(tx("accounts_error_delete"));
   }
 }

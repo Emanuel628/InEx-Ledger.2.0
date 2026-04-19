@@ -5,7 +5,7 @@
     "ledger_receipts",
     "ledger_recurring"
   ];
-  let apiReady;
+  let apiReady = undefined;
   const API_BASE = "";
   const buildApiUrl = (path) => {
     if (typeof path !== "string") return API_BASE;
@@ -13,15 +13,21 @@
   };
 
   async function apiAvailable() {
+    // Always retry if last check failed, only cache success
     if (apiReady === true) {
-      return apiReady;
+      return true;
     }
-
     try {
-        const res = await fetch(buildApiUrl("/health"));
-      apiReady = res.ok;
-      return apiReady;
+      const res = await fetch(buildApiUrl("/health"));
+      if (res.ok) {
+        apiReady = true;
+        return true;
+      } else {
+        apiReady = undefined;
+        return false;
+      }
     } catch (err) {
+      apiReady = undefined;
       return false;
     }
   }
@@ -70,17 +76,21 @@
   }
 
   async function getPrivacySettings() {
-    if (await apiAvailable()) {
-      try {
-        const res = await fetch(buildApiUrl("/api/privacy/settings"), {
-          headers: authHeaders()
-        });
-        if (res.ok) {
-          return res.json();
+    try {
+      if (await apiAvailable()) {
+        try {
+          const res = await fetch(buildApiUrl("/api/privacy/settings"), {
+            headers: authHeaders()
+          });
+          if (res.ok) {
+            return res.json();
+          }
+        } catch (err) {
+          // fall through to local settings
         }
-      } catch (err) {
-        // fall through to local settings
       }
+    } catch (err) {
+      // Defensive: should never throw
     }
     return readLocalSettings();
   }
@@ -88,30 +98,32 @@
   async function setPrivacySettings(partial) {
     const base = readLocalSettings();
     const merged = { ...base, ...partial };
-
-    if (await apiAvailable()) {
-      try {
-        const res = await fetch(buildApiUrl("/api/privacy/settings"), {
-          method: "PUT",
-          headers: authHeaders("PUT"),
-          credentials: "include",
-          body: JSON.stringify({
-            dataSharingOptOut: !!merged.dataSharingOptOut,
-            consentGiven: !!merged.consentGiven,
-            consentAt: merged.consentAt,
-            termsVersion: merged.termsVersion,
-            privacyVersion: merged.privacyVersion
-          })
-        });
-        if (!res.ok) {
-          // Server rejected the change — do not update local state.
-          return base;
+    try {
+      if (await apiAvailable()) {
+        try {
+          const res = await fetch(buildApiUrl("/api/privacy/settings"), {
+            method: "PUT",
+            headers: authHeaders("PUT"),
+            credentials: "include",
+            body: JSON.stringify({
+              dataSharingOptOut: !!merged.dataSharingOptOut,
+              consentGiven: !!merged.consentGiven,
+              consentAt: merged.consentAt,
+              termsVersion: merged.termsVersion,
+              privacyVersion: merged.privacyVersion
+            })
+          });
+          if (!res.ok) {
+            // Server rejected the change — do not update local state.
+            return base;
+          }
+        } catch (err) {
+          // Network failure is non-fatal; fall through to persist locally.
         }
-      } catch (err) {
-        // Network failure is non-fatal; fall through to persist locally.
       }
+    } catch (err) {
+      // Defensive: should never throw
     }
-
     persistLocalSettings(merged);
     return merged;
   }
@@ -160,27 +172,28 @@
 
   async function exportMyData() {
     const fileName = `inex-ledger-my-data-${new Date()
-        .toISOString()
-        .slice(0, 10)}.json`;
-
-    if (await apiAvailable()) {
-      try {
-        const res = await fetch(buildApiUrl("/api/privacy/export"), {
-          method: "POST",
-          headers: authHeaders("POST"),
-          credentials: "include"
-        });
-
-        if (res.ok) {
-          const blob = await res.blob();
-          downloadBlob(blob, fileName);
-          return;
+      .toISOString()
+      .slice(0, 10)}.json`;
+    try {
+      if (await apiAvailable()) {
+        try {
+          const res = await fetch(buildApiUrl("/api/privacy/export"), {
+            method: "POST",
+            headers: authHeaders("POST"),
+            credentials: "include"
+          });
+          if (res.ok) {
+            const blob = await res.blob();
+            downloadBlob(blob, fileName);
+            return;
+          }
+        } catch (err) {
+          // fall through to local export
         }
-      } catch (err) {
-        // fall through to local export
       }
+    } catch (err) {
+      // Defensive: should never throw
     }
-
     const payload = {
       privacy: readLocalSettings(),
       transactions: readJsonArray("ledger_transactions"),
@@ -191,7 +204,6 @@
         app: "InEx Ledger"
       }
     };
-
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json"
     });
@@ -207,21 +219,27 @@
 
   async function deleteBusinessData(options = {}) {
     const password = typeof options?.password === "string" ? options.password : "";
-    if (await apiAvailable()) {
-      const res = await fetch(buildApiUrl("/api/privacy/delete"), {
-        method: "POST",
-        headers: authHeaders("POST"),
-        credentials: "include",
-        body: JSON.stringify({ scope: "business_data", password })
-      });
-      if (res.ok) {
-        return res.json();
+    try {
+      if (await apiAvailable()) {
+        try {
+          const res = await fetch(buildApiUrl("/api/privacy/delete"), {
+            method: "POST",
+            headers: authHeaders("POST"),
+            credentials: "include",
+            body: JSON.stringify({ scope: "business_data", password })
+          });
+          if (res.ok) {
+            return res.json();
+          }
+          const payload = await res.json().catch(() => null);
+          throw new Error(payload?.error || "Failed to delete business data.");
+        } catch (err) {
+          // fall through to local delete
+        }
       }
-
-      const payload = await res.json().catch(() => null);
-      throw new Error(payload?.error || "Failed to delete business data.");
+    } catch (err) {
+      // Defensive: should never throw
     }
-
     try {
       BUSINESS_KEYS.forEach((key) => {
         const storageKey = resolveBusinessStorageKey(key);
@@ -229,7 +247,6 @@
           localStorage.removeItem(storageKey);
         }
       });
-
       const requestId = newRequestId();
       return { requestId, status: "deleted" };
     } catch (err) {
