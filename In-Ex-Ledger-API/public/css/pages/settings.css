@@ -1620,12 +1620,7 @@ body {
   display: none;
 }
 
-.toast-check {
-  width: 16px;
-  height: 16px;
-  display: inline-flex;
-  flex-shrink: 0;
-}
+
 
 @media (max-width: 1024px) {
   .settings-shell {
