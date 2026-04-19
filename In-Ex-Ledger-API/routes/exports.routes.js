@@ -65,6 +65,16 @@ function buildExportMetadataRows(exportId, metadata) {
     .map(([key, value]) => [crypto.randomUUID(), exportId, key, String(value)]);
 }
 
+function createPdfReportId(rawDate = new Date()) {
+  const date = rawDate instanceof Date ? rawDate : new Date(rawDate);
+  const stamp = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0")
+  ].join("");
+  return `EXP-${stamp}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
+}
+
 async function storeCompletedExport({
   businessId,
   userId,
@@ -281,6 +291,9 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
 
     const taxId = includeTaxId ? decryptJwe(req.body.taxId_jwe) : "";
 
+    const generatedAt = new Date().toISOString();
+    const reportId = createPdfReportId(generatedAt);
+
     const sharedOptions = {
       transactions: txResult.rows,
       accounts: accountResult.rows,
@@ -294,6 +307,8 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       businessName: business.name || "",
       legalName: business.name || "",
       operatingName: "",
+      generatedAt,
+      reportId,
       region,
       province: business.province || ""
     };
@@ -501,6 +516,9 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
 
     const taxId = includeTaxId ? decryptJwe(req.body.taxId_jwe) : "";
 
+    const generatedAt = new Date().toISOString();
+    const reportId = createPdfReportId(generatedAt);
+
     const sharedOptions = {
       transactions: txResult.rows,
       accounts: accountResult.rows,
@@ -514,6 +532,8 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       businessName: business.name || "",
       legalName: business.name || "",
       operatingName: "",
+      generatedAt,
+      reportId,
       region,
       province: business.province || ""
     };

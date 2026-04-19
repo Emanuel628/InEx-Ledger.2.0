@@ -913,6 +913,8 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
     const region = String(batch.region || getRegion()).toLowerCase();
     const batchProvince = batch.province || (region === "ca" ? getProvince() : "");
     const province = String(batchProvince).toUpperCase();
+    const generatedAt = new Date().toISOString();
+    const reportId = `EXP-${generatedAt.slice(0, 10).replace(/-/g, "")}-${Math.random().toString(16).slice(2, 6).toUpperCase().padStart(4, "0")}`;
     const taxId = includeTaxId
       ? businessProfile.ein || businessProfile.taxId || ""
       : "";
@@ -933,6 +935,8 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
       operatingName: "",
       taxId,
       naics: "",
+      generatedAt,
+      reportId,
       region,
       province
     });

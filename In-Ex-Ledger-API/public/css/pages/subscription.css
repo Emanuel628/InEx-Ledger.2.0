@@ -167,6 +167,12 @@
   text-transform: uppercase;
 }
 
+.sub-plan-badge-featured {
+  background: #fff3c4;
+  color: #92400e;
+  border-color: #f5d56b;
+}
+
 .sub-plan-features {
   list-style: none;
   padding: 0;

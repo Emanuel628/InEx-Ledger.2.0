@@ -45,6 +45,8 @@ function buildTestPdf() {
     businessName: "Acme",
     operatingName: "Café Étude",
     taxId: "12-3456789",
+    generatedAt: "2026-04-30T15:45:00.000Z",
+    reportId: "EXP-20260430-TEST",
     naics: "541611",
     region: "us",
     province: ""
@@ -283,10 +285,15 @@ test("buildPdfExport writes literal Helvetica text commands instead of UTF-16 he
   const pdf = buildTestPdf().toString("latin1");
 
   assert.match(pdf, /\/BaseFont \/Helvetica/);
-  assert.match(pdf, /\(Business export summary\) Tj/);
+  assert.match(pdf, /\(Bookkeeping Export for CPA Review\) Tj/);
+  assert.match(pdf, /\(Secure Export\) Tj/);
+  assert.match(pdf, /\(Export ID: EXP-20260430-TEST\) Tj/);
   assert.match(pdf, /\(Tax ID: 12-3456789\) Tj/);
   assert.match(pdf, /\(Legal business name: Jose Consulting\) Tj/);
   assert.match(pdf, /\(Operating name \\\(DBA\\\): Cafe Etude\) Tj/);
+  assert.match(pdf, /\(Category Totals and Suggested Tax Mapping\) Tj/);
+  assert.match(pdf, /\(Detailed Transaction Ledger\) Tj/);
+  assert.match(pdf, /\(Review Items and Exceptions\) Tj/);
   assert.doesNotMatch(pdf, /<FEFF/i);
   assert.doesNotMatch(pdf, /[^\x00-\x7F]/);
 });
@@ -310,9 +317,11 @@ test("exports generate route returns the inline PDF buffer and stores only the r
     assert.ok(Buffer.isBuffer(response.body));
     assert.match(response.body.toString("latin1"), /^%PDF-/);
     assert.match(response.body.toString("latin1"), /\(Tax ID: 12-3456789\) Tj/);
+    assert.match(response.body.toString("latin1"), /\(Secure Export\) Tj/);
     assert.ok(fixture.state.savedRedacted?.jobId, "redacted export should be saved");
     assert.ok(Buffer.isBuffer(fixture.state.savedRedacted?.buffer));
     assert.match(fixture.state.savedRedacted.buffer.toString("latin1"), /^%PDF-/);
+    assert.match(fixture.state.savedRedacted.buffer.toString("latin1"), /\(Redacted Export\) Tj/);
     assert.doesNotMatch(fixture.state.savedRedacted.buffer.toString("latin1"), /\(Tax ID: 12-3456789\) Tj/);
     assert.ok(Array.isArray(fixture.state.insertedExport), "export row should be inserted");
     assert.ok(Array.isArray(fixture.state.insertedMetadata), "metadata rows should be inserted");
