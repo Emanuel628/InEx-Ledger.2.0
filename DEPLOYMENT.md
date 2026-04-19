@@ -90,8 +90,9 @@ Use this checklist every time you deploy to production to ensure nothing is miss
 |---------|--------|--------|
 | Stripe production secrets configured in Railway | Pending | Live billing activation |
 | Stripe webhook endpoint verified against production deploy | Pending | Subscription sync reliability |
-| Full end-to-end regression coverage for auth, billing, settings | Pending | Safer releases |
-| Locked accounting periods | Pending | Audit-grade accounting controls |
-| Immutable delete/archive path for transactions | Pending | Audit-grade accounting controls |
+| Full auth, billing, onboarding, and settings regression suite wired into `npm run test:all` | Completed | Safer local releases |
+| Live deployed Stripe checkout and portal smoke test | Pending | Final billing release verification |
+| Locked accounting periods broadened to every required mutation surface | Pending | Audit-grade accounting controls |
+| Archived transaction history reporting/audit views | Pending | Audit-grade accounting controls |
 
-> Billing code, MFA, and server-side subscription state already exist in the app. The remaining work is production configuration, verification, and audit hardening.
+> Billing code, MFA, server-side subscription state, transaction archive deletes, accounting lock controls, and the full repo regression suite already exist in the app. The remaining work is production configuration, live verification, and audit hardening/reporting.

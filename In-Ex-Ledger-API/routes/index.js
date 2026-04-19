@@ -21,6 +21,7 @@ const cpaVerificationRoutes = require('./cpa-verification.routes.js');
 const analyticsRoutes = require('./analytics.routes.js');
 const messagesRoutes = require('./messages.routes.js');
 const consentRoutes = require('./consent.routes.js');
+const checkEmailVerifiedRoutes = require('./check-email-verified.routes.js');
 
 router.use('/auth', authRoutes);
 router.use('/accounts', accountsRoutes);
@@ -42,5 +43,6 @@ router.use('/cpa-verification', cpaVerificationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/messages', messagesRoutes);
 router.use('/consent', consentRoutes);
+router.use('/check-email-verified', checkEmailVerifiedRoutes);
 
 module.exports = router;

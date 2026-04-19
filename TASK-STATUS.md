@@ -22,7 +22,8 @@
 
 - Configure real production Stripe secrets in Railway.
 - Verify the Stripe webhook endpoint against the production deploy.
-- Expand automated coverage for auth, billing, and settings-critical flows.
+- Run the production checkout and billing portal flows against live Stripe after the Railway secrets are set.
+- Keep expanding automated coverage for end-to-end auth, billing, and settings-critical flows.
 - Add audit-grade accounting controls:
   - apply period-lock enforcement to additional mutation surfaces beyond transactions when needed
   - add dedicated reporting/audit views for archived transaction history
@@ -39,8 +40,7 @@ The production billing flow needs these Railway variables set:
 
 ## Verification Commands
 
-- `node --test tests/rateLimiter.test.js`
-- `node --test tests/subscriptionService.test.js`
+- `npm run test:all`
 - `npm run log_scan`
 - `npm run verify:redacted-storage`
 
@@ -85,15 +85,12 @@ The production billing flow needs these Railway variables set:
 | CI fix | `db.js` | SSL only enabled when `NODE_ENV === "production"` |
 | CI fix | `test-export-grant.mjs` | Added `await` to async token function calls |
 
-## Still Pending
+## Follow-Up Backlog
 
 | # | Fix | Notes |
 |---|-----|-------|
-| 20 | Integrate Stripe payment processor | Blocks 21, 31, 38 |
-| 21 | Add real billing/cancel section to `settings.html` | Depends on Stripe (20) |
-| 31 | Replace localStorage tier enforcement with server-side | Depends on Stripe (20) |
-| 38 | Remove mock subscription, enforce tiers server-side | Depends on Stripe (20) |
-| L4 | Add screenshot or demo to `landing.html` | |
-| Audit | Immutable transaction history (edits create reversals, not overwrites) | |
-| Audit | Locked accounting periods | |
-| Audit | Audit trail for logins and data changes | |
+| Billing | Set live Railway Stripe env vars and verify webhook delivery end to end | Operational work; app routes and server-side subscription state already exist |
+| Coverage | Keep auth, billing, onboarding, and settings-critical tests in the main regression suite | `npm run test:all` now runs the full 21-file test set under `--experimental-test-isolation=none` |
+| L4 | Add screenshot or demo to `landing.html` | Marketing/UX improvement |
+| Audit | Extend period-lock enforcement to any remaining mutation surfaces that need it | Core transaction/mileage/archive lock controls already exist |
+| Audit | Add dedicated reporting/audit views for archived transaction history | Improves auditability of append-only/delete-archive flows |

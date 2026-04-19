@@ -28,10 +28,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (pendingEmail) {
     updateStatus(tx("verify_email_status_sent"));
+    startVerificationPolling();
   } else {
     updateStatus(tx("verify_email_status_register"), true);
   }
 });
+// Polls the backend every 3 seconds to check if the email is verified
+function startVerificationPolling() {
+  if (!pendingEmail) return;
+  let polling = true;
+  async function poll() {
+    if (!polling) return;
+    try {
+      const response = await fetch(`/api/check-email-verified?email=${encodeURIComponent(pendingEmail)}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.verified) {
+          polling = false;
+          localStorage.removeItem("pendingVerificationEmail");
+          updateStatus(tx("verify_email_status_success"));
+          setTimeout(() => {
+            window.location.replace("/login");
+          }, 1200);
+          return;
+        }
+      }
+    } catch (e) {
+      // ignore errors, keep polling
+    }
+    setTimeout(poll, 3000);
+  }
+  poll();
+}
 
 function wireActions() {
   [resendButton, resendLinkTrigger].forEach((element) => {
