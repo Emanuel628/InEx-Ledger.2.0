@@ -92,6 +92,11 @@
           </ul>
           <p class="sub-plan-note" data-i18n="subscription_starter_note">One business included. Switch back to Basic anytime.</p>
           <button type="button" id="planFreeBtn" class="settings-secondary-btn" data-i18n="subscription_starter_cta">Select Basic</button>
+            <div class="sub-plan-actions">
+              <button type="button" id="mockUpgradeV2Btn" class="settings-primary-btn" style="margin-top: 1em;">
+                <span>Mock Upgrade to Business (V2)</span>
+              </button>
+            </div>
         </div>
 
         <div class="sub-plan-card sub-plan-featured" id="planPro">
@@ -239,6 +244,14 @@
     </svg>
   </span>
   <span id="subToastMessage">Saved</span>
+  <span id="mockUpgradeToast" class="settings-toast hidden" role="status" aria-live="polite" style="position: fixed; bottom: 2em; left: 50%; transform: translateX(-50%); z-index: 9999;">
+    <span class="toast-check" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="none">
+        <polyline points="2 8 6 12 14 4"></polyline>
+      </svg>
+    </span>
+    <span id="mockUpgradeToastMessage">Business (V2) features unlocked for demo!</span>
+  </span>
 </div>
 
 <script src="../js/escape-html.js?v=20260410a"></script>

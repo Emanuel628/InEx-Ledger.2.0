@@ -1,3 +1,5 @@
+// Expose for global use
+window.isV2BusinessUnlocked = isV2BusinessUnlocked;
 const SUB_TOAST_MS = 3000;
 let subToastTimer = null;
 const billingPricingUtils = window.billingPricing || {};
@@ -616,4 +618,46 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   currentSubscription = await loadSubscription();
   await loadBillingHistory();
+    setupMockUpgradeButton();
 });
+
+// === MOCK UPGRADE TO V2/BUSINESS ===
+const V2_BUSINESS_UNLOCK_KEY = "lb_v2_business_unlocked";
+
+function isV2BusinessUnlocked() {
+  try {
+    return localStorage.getItem(V2_BUSINESS_UNLOCK_KEY) === "true";
+  } catch (_) {
+    return false;
+  }
+}
+
+function setV2BusinessUnlocked(value = true) {
+  try {
+    localStorage.setItem(V2_BUSINESS_UNLOCK_KEY, value ? "true" : "false");
+  } catch (_) {}
+}
+
+function showMockUpgradeToast(message) {
+  const toast = document.getElementById("mockUpgradeToast");
+  const msg = document.getElementById("mockUpgradeToastMessage");
+  if (!toast || !msg) return;
+  msg.textContent = message;
+  toast.classList.remove("hidden");
+  setTimeout(() => toast.classList.add("hidden"), 3000);
+}
+
+function setupMockUpgradeButton() {
+  const btn = document.getElementById("mockUpgradeV2Btn");
+  if (!btn) return;
+  btn.addEventListener("click", function () {
+    setV2BusinessUnlocked(true);
+    showMockUpgradeToast("Business (V2) features unlocked for demo!");
+    btn.disabled = true;
+    btn.textContent = "Unlocked!";
+  });
+  if (isV2BusinessUnlocked()) {
+    btn.disabled = true;
+    btn.textContent = "Unlocked!";
+  }
+}
