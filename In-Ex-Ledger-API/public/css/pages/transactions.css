@@ -896,26 +896,48 @@ body {
   gap: 4px;
 }
 
-.sidebar-link {
+.app-sidebar .sidebar-nav > .sidebar-link,
+.app-sidebar .sidebar-nav > a.sidebar-link,
+.app-sidebar nav.sidebar-nav > a.sidebar-link {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
   border-radius: 8px;
   font-size: 13px;
-  color: var(--ink2);
+  color: var(--ink2) !important;
   text-decoration: none;
-}
-
-.sidebar-link:hover {
-  background: var(--surface2);
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.sidebar-link.is-active {
   background: transparent;
-  color: var(--accent2);
+}
+
+.app-sidebar .sidebar-nav > .sidebar-link:visited,
+.app-sidebar .sidebar-nav > a.sidebar-link:visited,
+.app-sidebar nav.sidebar-nav > a.sidebar-link:visited {
+  color: var(--ink2) !important;
+}
+
+.app-sidebar .sidebar-nav > .sidebar-link span,
+.app-sidebar .sidebar-nav > .sidebar-link .sidebar-icon,
+.app-sidebar .sidebar-nav > a.sidebar-link span,
+.app-sidebar .sidebar-nav > a.sidebar-link .sidebar-icon,
+.app-sidebar nav.sidebar-nav > a.sidebar-link span,
+.app-sidebar nav.sidebar-nav > a.sidebar-link .sidebar-icon {
+  color: inherit !important;
+}
+
+.app-sidebar .sidebar-nav > .sidebar-link:hover,
+.app-sidebar .sidebar-nav > a.sidebar-link:hover,
+.app-sidebar nav.sidebar-nav > a.sidebar-link:hover {
+  background: var(--surface2);
+  color: var(--ink) !important;
+  text-decoration: none;
+}
+
+.app-sidebar .sidebar-nav > .sidebar-link.is-active,
+.app-sidebar .sidebar-nav > a.sidebar-link.is-active,
+.app-sidebar nav.sidebar-nav > a.sidebar-link.is-active {
+  background: transparent;
+  color: var(--accent2) !important;
   font-weight: 600;
 }
 
