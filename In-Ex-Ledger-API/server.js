@@ -42,10 +42,18 @@ const LEGACY_HTML_REDIRECTS = new Map([
   ['/mfa.html', '/settings#settings-security']
 ]);
 
-function setNoCacheHtmlHeaders(res, filePath) {
-  if (!String(filePath || '').toLowerCase().endsWith('.html')) {
+function setStaticAssetCacheHeaders(res, filePath) {
+  const normalizedPath = String(filePath || '').toLowerCase();
+  const shouldBypassCache =
+    normalizedPath.endsWith('.html')
+    || normalizedPath.endsWith('.css')
+    || normalizedPath.endsWith('.js')
+    || normalizedPath.endsWith('.mjs');
+
+  if (!shouldBypassCache) {
     return;
   }
+
   res.setHeader('Cache-Control', 'private, no-store, max-age=0, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
@@ -58,7 +66,7 @@ function getCanonicalPagePath(pageName) {
 function sendCanonicalPage(pageName, req, res) {
   const fileName = `${pageName}.html`;
   const filePath = path.join(htmlDir, fileName);
-  setNoCacheHtmlHeaders(res, filePath);
+  setStaticAssetCacheHeaders(res, filePath);
   res.sendFile(filePath);
 }
 
@@ -156,11 +164,11 @@ for (const pageName of htmlPageNames) {
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use('/html', express.static(htmlDir, {
   index: false,
-  setHeaders: setNoCacheHtmlHeaders
+  setHeaders: setStaticAssetCacheHeaders
 }));
 app.use(express.static(publicDir, {
   index: false,
-  setHeaders: setNoCacheHtmlHeaders
+  setHeaders: setStaticAssetCacheHeaders
 }));
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
