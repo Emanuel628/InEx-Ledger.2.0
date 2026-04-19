@@ -24,6 +24,7 @@ const customersRoutes = require('./customers.routes');
 const invoicesRoutes = require('./invoices.routes');
 const billsRoutes = require('./bills.routes');
 const projectsRoutes = require('./projects.routes');
+const billableExpensesRoutes = require('./billable-expenses.routes');
 // Feature flag for V2/Business modules
 const ENABLE_V2_BUSINESS = process.env.ENABLE_V2_BUSINESS === 'true';
 
@@ -33,6 +34,7 @@ if (ENABLE_V2_BUSINESS) {
 	router.use('/invoices', invoicesRoutes);
 	router.use('/bills', billsRoutes);
 	router.use('/projects', projectsRoutes);
+	router.use('/billable-expenses', billableExpensesRoutes);
 }
 
 const authRoutes = require('./auth.routes.js');
