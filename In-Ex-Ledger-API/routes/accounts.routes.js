@@ -41,8 +41,8 @@ router.get("/", async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
-    logError("GET accounts error:", err.message);
-    res.status(500).json({ error: "Failed to retrieve accounts from DB." });
+    logError("GET accounts error:", err.stack || err);
+    res.status(500).json({ error: "A server error occurred while retrieving accounts. Please try again or contact support if the problem persists." });
   }
 });
 
@@ -72,13 +72,13 @@ router.post("/", async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    logError("POST account error:", err.message);
+    logError("POST account error:", err.stack || err);
     if (err.code === "23505") {
       return res.status(409).json({
-        error: "An account with this name already exists."
+        error: "An account with this name already exists. Please choose a different name."
       });
     }
-    res.status(500).json({ error: "Failed to save account to DB." });
+    res.status(500).json({ error: "A server error occurred while saving the account. Please try again or contact support if the problem persists." });
   }
 });
 
@@ -136,13 +136,13 @@ router.put("/:id", async (req, res) => {
         locked_through_date: err.lockedThroughDate
       });
     }
-    logError("PUT account error:", err.message);
+    logError("PUT account error:", err.stack || err);
     if (err.code === "23505") {
       return res.status(409).json({
-        error: "An account with this name already exists."
+        error: "An account with this name already exists. Please choose a different name."
       });
     }
-    res.status(500).json({ error: "Failed to update account." });
+    res.status(500).json({ error: "A server error occurred while updating the account. Please try again or contact support if the problem persists." });
   }
 });
 
