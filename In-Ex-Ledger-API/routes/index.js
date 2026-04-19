@@ -1,3 +1,17 @@
+// V2/Business modules (feature-flagged)
+const vendorsRoutes = require('./vendors.routes');
+const customersRoutes = require('./customers.routes');
+const invoicesRoutes = require('./invoices.routes');
+const billsRoutes = require('./bills.routes');
+// Feature flag for V2/Business modules
+const ENABLE_V2_BUSINESS = process.env.ENABLE_V2_BUSINESS === 'true';
+
+if (ENABLE_V2_BUSINESS) {
+	router.use('/vendors', vendorsRoutes);
+	router.use('/customers', customersRoutes);
+	router.use('/invoices', invoicesRoutes);
+	router.use('/bills', billsRoutes);
+}
 const express = require('express');
 const router = express.Router();
 
