@@ -1,7 +1,7 @@
 const _PDF_LABELS = {
   en: {
     report_title: 'Bookkeeping Export for CPA Review',
-    report_subtitle_secure: 'Contains full taxpayer identification for confidential professional use.',
+    report_subtitle_secure: 'Contains taxpayer identification provided for confidential professional use.',
     report_subtitle_redacted: 'Taxpayer identification withheld for general sharing.',
     badge_secure: 'Secure Export',
     badge_redacted: 'Redacted Export',
@@ -12,8 +12,8 @@ const _PDF_LABELS = {
     review_flags_title: 'Quick Review Flags',
     legal_name: 'Legal business name',
     business_name: 'Operating name (DBA)',
-    tax_id: 'Tax ID',
-    tax_id_redacted: 'Tax ID (redacted)',
+    tax_id: 'Taxpayer ID (provided for this export)',
+    tax_id_redacted: 'Taxpayer ID (redacted)',
     tax_id_withheld: 'Withheld',
     reporting_period: 'Reporting period',
     business_activity_code: 'Business activity code',

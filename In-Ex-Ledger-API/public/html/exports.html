@@ -154,7 +154,7 @@
 
           <div id="exportInlineTaxId" class="export-inline-taxid" hidden>
             <p class="secure-export-ephemeral-note">&#x1F512; <span data-i18n="secure_export_modal_ephemeral">Encrypted &amp; Ephemeral: This data is processed in-memory and never stored on our servers.</span></p>
-            <label class="field-label" for="exportInlineTaxIdInput" data-i18n="secure_export_modal_input_label">Enter your Tax ID (SSN/SIN/BN):</label>
+            <label class="field-label" for="exportInlineTaxIdInput" data-i18n="secure_export_modal_input_label">Enter taxpayer ID for this export:</label>
             <div class="secure-export-input-row">
               <input
                 id="exportInlineTaxIdInput"
@@ -166,18 +166,18 @@
                 spellcheck="false"
                 class="secure-export-tax-input"
                 data-i18n-placeholder="secure_export_modal_input_placeholder"
-                placeholder="SSN, EIN, SIN, or BN"
+                placeholder="Taxpayer ID for this export"
               />
               <button type="button" id="exportInlineTaxIdToggle" class="secure-export-toggle-btn" data-i18n="secure_export_modal_show">Show</button>
             </div>
             <div class="secure-export-legal">
               <p class="secure-export-legal-title" data-i18n="secure_export_modal_legal_title">Acknowledgment and Authorization</p>
-              <p class="secure-export-legal-body" data-i18n="secure_export_modal_legal_body">I certify that I am authorized to use this tax identification number and that all provided data is accurate. I acknowledge that InEx Ledger is a record-keeping tool and does not provide professional tax, legal, or accounting advice.</p>
+              <p class="secure-export-legal-body" data-i18n="secure_export_modal_legal_body">I certify that I am authorized to provide this taxpayer identification for this export and that all provided data is accurate. I acknowledge that InEx Ledger is a record-keeping tool and does not provide professional tax, legal, or accounting advice.</p>
               <p id="exportInlineTaxIdCanadaText" class="secure-export-legal-body secure-export-canada-text hidden" data-i18n="secure_export_modal_canada_text">I further acknowledge my responsibility for determining GST/HST registration requirements and ensuring the accuracy of all entries for CRA Form T2125.</p>
             </div>
             <label class="secure-export-checkbox-row" for="exportInlineTaxIdCheckbox">
               <input type="checkbox" id="exportInlineTaxIdCheckbox" />
-              <span data-i18n="secure_export_modal_checkbox_label">I certify I am authorized to use this tax identification number and I have read and agree to the acknowledgment above.</span>
+              <span data-i18n="secure_export_modal_checkbox_label">I certify I am authorized to provide this taxpayer identification for this export and I have read and agree to the acknowledgment above.</span>
             </label>
             <p id="exportInlineTaxIdError" class="secure-export-error hidden" role="alert" aria-live="polite"></p>
           </div>
