@@ -681,17 +681,3 @@ function showMockUpgradeToast(message) {
   setTimeout(() => toast.classList.add("hidden"), 3000);
 }
 
-function setupMockUpgradeButton() {
-  const btn = document.getElementById("mockUpgradeV2Btn");
-  if (!btn) return;
-  btn.addEventListener("click", function () {
-    setV2BusinessUnlocked(true);
-    showMockUpgradeToast("Business (V2) features unlocked for demo!");
-    btn.disabled = true;
-    btn.textContent = "Unlocked!";
-  });
-  if (isV2BusinessUnlocked()) {
-    btn.disabled = true;
-    btn.textContent = "Unlocked!";
-  }
-}
