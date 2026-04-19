@@ -1,3 +1,51 @@
+        <div class="sub-plan-card sub-plan-coming-soon" id="planV2">
+          <div class="sub-plan-header">
+            <div class="sub-plan-title-row">
+              <h3 class="sub-plan-name" data-i18n="subscription_v2_title_short">Business</h3>
+              <span class="sub-plan-badge" data-i18n="subscription_v2_badge">Coming soon</span>
+            </div>
+            <p class="sub-plan-note" data-i18n="subscription_v2_intro_short">A preview of the next release tier.</p>
+          </div>
+          <ul class="sub-plan-features">
+            <li data-i18n="subscription_v2_feature_1">Customer management</li>
+            <li data-i18n="subscription_v2_feature_2">Vendor management</li>
+            <li data-i18n="subscription_v2_feature_3">Invoicing</li>
+            <li data-i18n="subscription_v2_feature_4">Bill management</li>
+            <li data-i18n="subscription_v2_feature_5">Accounts receivable</li>
+            <li data-i18n="subscription_v2_feature_6">Accounts payable</li>
+            <li data-i18n="subscription_v2_feature_7">Bank reconciliation</li>
+            <li data-i18n="subscription_v2_feature_8">Expanded financial reports</li>
+            <li data-i18n="subscription_v2_feature_9">Project / job tracking</li>
+            <li data-i18n="subscription_v2_feature_10">Billable expense tracking</li>
+            <li data-i18n="subscription_v2_feature_11">Recurring invoices and bills</li>
+            <li data-i18n="subscription_v2_feature_12">Accountant-ready exports</li>
+            <li data-i18n="subscription_v2_feature_13">Advanced tax category mapping</li>
+            <li data-i18n="subscription_v2_feature_14">Review flags and exception tracking</li>
+            <li data-i18n="subscription_v2_feature_15">Multi-user access and permissions</li>
+            <li data-i18n="subscription_v2_feature_16">Inventory support (planned)</li>
+          </ul>
+          <div class="sub-plan-actions">
+            <button type="button" id="upgradeToV2Btn" class="settings-primary-btn" style="margin-top: 1em;">
+              <span>Upgrade to Business (V2)</span>
+            </button>
+          </div>
+        </div>
+<div id="upgradeV2Modal" class="transaction-modal hidden">
+  <div class="transaction-modal-content">
+    <div class="modal-icon" aria-hidden="true">
+      <svg viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/>
+        <path d="M5 8l2 2 4-4" stroke="currentColor" stroke-width="1.5" fill="none"/>
+      </svg>
+    </div>
+    <h3>Upgrade to Business (V2)?</h3>
+    <p>This will immediately upgrade your account to the Business (V2) tier and unlock all features for demo/testing.</p>
+    <div class="modal-actions">
+      <button type="button" id="upgradeV2ModalCancel" class="modal-cancel">Cancel</button>
+      <button type="button" id="upgradeV2ModalConfirm" class="modal-upgrade settings-primary-btn">Upgrade Now</button>
+    </div>
+  </div>
+</div>
 <!DOCTYPE html>
 <html lang="en">
 <head>
