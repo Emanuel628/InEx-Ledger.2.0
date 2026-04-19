@@ -1,6 +1,6 @@
 // V2/Business feature flag and entitlement middleware
 
-const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
+const { getSubscriptionSnapshotForBusiness } = require("../../services/subscriptionService.js");
 const { resolveBusinessIdForUser } = require("./resolveBusinessIdForUser.js");
 
 async function requireV2BusinessEnabled(req, res, next) {
