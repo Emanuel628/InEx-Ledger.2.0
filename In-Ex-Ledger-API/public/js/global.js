@@ -363,11 +363,696 @@ function applyMileageNavLabel() {
   });
 }
 
+const DYNAMIC_SIDEBAR_FAVORITES_KEY = "lb_dynamic_sidebar_favorites";
+const DYNAMIC_SIDEBAR_DEFAULT_FAVORITES = ["transactions", "receipts", "mileage", "accounts", "categories"];
+
+const DYNAMIC_SIDEBAR_FEATURES = [
+  {
+    id: "transactions",
+    label: "Transactions",
+    route: "transactions",
+    group: "Core",
+    actionLabel: "Add transaction",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg>'
+  },
+  {
+    id: "receipts",
+    label: "Receipts",
+    route: "receipts",
+    group: "Core",
+    actionLabel: "Upload receipt",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg>'
+  },
+  {
+    id: "mileage",
+    label: "Mileage",
+    route: "mileage",
+    group: "Core",
+    actionLabel: "Add trip",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg>'
+  },
+  {
+    id: "accounts",
+    label: "Accounts",
+    route: "accounts",
+    group: "Core",
+    actionLabel: "Add account",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg>'
+  },
+  {
+    id: "categories",
+    label: "Categories",
+    route: "categories",
+    group: "Core",
+    actionLabel: "Add category",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg>'
+  },
+  {
+    id: "analytics",
+    label: "Analytics",
+    route: "analytics",
+    group: "Core",
+    actionLabel: "Open analytics",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg>'
+  },
+  {
+    id: "exports",
+    label: "Exports",
+    route: "exports",
+    group: "Core",
+    actionLabel: "Create export",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg>'
+  },
+  {
+    id: "customers",
+    label: "Customers",
+    route: "customers",
+    group: "Business",
+    actionLabel: "Open customers",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.5"></circle><path d="M2.5 13a3.5 3.5 0 0 1 7 0"></path><path d="M10.5 4.5a2 2 0 0 1 0 4M11.5 10.5A3 3 0 0 1 14 13"></path></svg>'
+  },
+  {
+    id: "invoices",
+    label: "Invoices",
+    route: "invoices",
+    group: "Business",
+    actionLabel: "Open invoices",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg>'
+  },
+  {
+    id: "bills",
+    label: "Bills",
+    route: "bills",
+    group: "Business",
+    actionLabel: "Open bills",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M4 2.5h8v11l-2-1-2 1-2-1-2 1v-11z"></path><path d="M6 6h4M6 9h3"></path></svg>'
+  },
+  {
+    id: "vendors",
+    label: "Vendors",
+    route: "vendors",
+    group: "Business",
+    actionLabel: "Open vendors",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 7h10v6H3z"></path><path d="M4 7V4h8v3M6 10h4"></path></svg>'
+  },
+  {
+    id: "projects",
+    label: "Projects",
+    route: "projects",
+    group: "Business",
+    actionLabel: "Open projects",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M6 4l1-1h3l1 1"></path></svg>'
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    route: "settings",
+    group: "System",
+    actionLabel: "Open settings",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg>'
+  }
+];
+
+function initDynamicSidebar() {
+  const shell = document.querySelector("main.app-shell");
+  const sidebar = shell?.querySelector(".app-sidebar");
+  if (!shell || !sidebar) return;
+
+  const featureMap = new Map(DYNAMIC_SIDEBAR_FEATURES.map((feature) => [feature.id, feature]));
+  let favorites = getDynamicSidebarFavorites(featureMap);
+  let draggedFeatureId = "";
+
+  sidebar.className = "app-sidebar app-sidebar--dynamic";
+  sidebar.setAttribute("aria-label", "Favorites");
+
+  const quickPanel = ensureDynamicSidebarQuickPanel();
+
+  function render() {
+    favorites = favorites.filter((id) => featureMap.has(id));
+    const favoriteMarkup = favorites.map((id) => renderDynamicSidebarFavorite(featureMap.get(id))).join("");
+    const groupedLibrary = DYNAMIC_SIDEBAR_FEATURES.reduce((groups, feature) => {
+      if (!groups[feature.group]) groups[feature.group] = [];
+      groups[feature.group].push(feature);
+      return groups;
+    }, {});
+
+    sidebar.innerHTML = `
+      <div class="dynamic-sidebar-header">
+        <div>
+          <div class="sidebar-section-label">Favorites</div>
+        </div>
+        <button type="button" class="dynamic-sidebar-manage" data-sidebar-manage aria-expanded="false">Add</button>
+      </div>
+      <nav class="sidebar-nav dynamic-sidebar-favorites" data-sidebar-favorites aria-label="Favorite actions">
+        ${favoriteMarkup}
+      </nav>
+      <div class="dynamic-sidebar-empty" data-sidebar-empty${favorites.length ? " hidden" : ""}>No favorites</div>
+      <div class="dynamic-sidebar-library" data-sidebar-library hidden>
+        ${Object.keys(groupedLibrary).map((group) => `
+          <div class="dynamic-sidebar-library-group">
+            <div class="sidebar-section-label">${escapeDynamicSidebarHtml(group)}</div>
+            ${groupedLibrary[group].map((feature) => renderDynamicSidebarLibraryItem(feature, favorites.includes(feature.id))).join("")}
+          </div>
+        `).join("")}
+      </div>
+    `;
+
+    wireDynamicSidebarEvents();
+  }
+
+  function wireDynamicSidebarEvents() {
+    const manageButton = sidebar.querySelector("[data-sidebar-manage]");
+    const library = sidebar.querySelector("[data-sidebar-library]");
+    const favoritesNav = sidebar.querySelector("[data-sidebar-favorites]");
+
+    manageButton?.addEventListener("click", () => {
+      const nextHidden = !library?.hidden;
+      if (library) library.hidden = nextHidden;
+      manageButton.setAttribute("aria-expanded", String(!nextHidden));
+      manageButton.textContent = nextHidden ? "Add" : "Done";
+    });
+
+    favoritesNav?.addEventListener("dragover", (event) => {
+      if (!draggedFeatureId) return;
+      event.preventDefault();
+      favoritesNav.classList.add("is-drag-target");
+    });
+
+    favoritesNav?.addEventListener("dragleave", () => {
+      favoritesNav.classList.remove("is-drag-target");
+    });
+
+    favoritesNav?.addEventListener("drop", (event) => {
+      if (!draggedFeatureId || !featureMap.has(draggedFeatureId)) return;
+      event.preventDefault();
+      favoritesNav.classList.remove("is-drag-target");
+      const beforeId = event.target.closest("[data-favorite-id]")?.getAttribute("data-favorite-id") || "";
+      addOrMoveDynamicSidebarFavorite(draggedFeatureId, beforeId);
+    });
+
+    sidebar.querySelectorAll("[data-feature-id]").forEach((item) => {
+      item.addEventListener("dragstart", (event) => {
+        draggedFeatureId = item.getAttribute("data-feature-id") || "";
+        event.dataTransfer?.setData("text/plain", draggedFeatureId);
+        event.dataTransfer?.setDragImage?.(item, 12, 12);
+      });
+      item.addEventListener("dragend", () => {
+        draggedFeatureId = "";
+        favoritesNav?.classList.remove("is-drag-target");
+      });
+    });
+
+    sidebar.querySelectorAll("[data-sidebar-add]").forEach((button) => {
+      button.addEventListener("click", () => {
+        addOrMoveDynamicSidebarFavorite(button.getAttribute("data-sidebar-add") || "");
+      });
+    });
+
+    sidebar.querySelectorAll("[data-sidebar-remove]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const id = button.getAttribute("data-sidebar-remove") || "";
+        favorites = favorites.filter((favoriteId) => favoriteId !== id);
+        saveDynamicSidebarFavorites(favorites);
+        closeDynamicSidebarQuickPanel(quickPanel);
+        render();
+      });
+    });
+
+    sidebar.querySelectorAll("[data-sidebar-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const feature = featureMap.get(button.getAttribute("data-sidebar-action") || "");
+        if (feature) openDynamicSidebarQuickPanel(feature, button, quickPanel);
+      });
+    });
+  }
+
+  function addOrMoveDynamicSidebarFavorite(id, beforeId = "") {
+    if (!featureMap.has(id)) return;
+    favorites = favorites.filter((favoriteId) => favoriteId !== id);
+    const beforeIndex = beforeId ? favorites.indexOf(beforeId) : -1;
+    if (beforeIndex >= 0) {
+      favorites.splice(beforeIndex, 0, id);
+    } else {
+      favorites.push(id);
+    }
+    saveDynamicSidebarFavorites(favorites);
+    render();
+  }
+
+  render();
+}
+
+function getDynamicSidebarFavorites(featureMap) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DYNAMIC_SIDEBAR_FAVORITES_KEY) || "null");
+    if (Array.isArray(parsed)) {
+      const valid = parsed.filter((id) => featureMap.has(id));
+      if (valid.length) return Array.from(new Set(valid));
+    }
+  } catch (_) {}
+  return DYNAMIC_SIDEBAR_DEFAULT_FAVORITES.filter((id) => featureMap.has(id));
+}
+
+function saveDynamicSidebarFavorites(favorites) {
+  try {
+    localStorage.setItem(DYNAMIC_SIDEBAR_FAVORITES_KEY, JSON.stringify(Array.from(new Set(favorites))));
+  } catch (_) {}
+}
+
+function renderDynamicSidebarFavorite(feature) {
+  if (!feature) return "";
+  const receiptDot = feature.id === "receipts" ? '<span id="receiptsDot" class="sidebar-dot" hidden></span>' : "";
+  return `
+    <div class="dynamic-sidebar-favorite" draggable="true" data-feature-id="${escapeDynamicSidebarAttr(feature.id)}" data-favorite-id="${escapeDynamicSidebarAttr(feature.id)}">
+      <button type="button" class="sidebar-link dynamic-sidebar-link" data-sidebar-action="${escapeDynamicSidebarAttr(feature.id)}">
+        <span class="sidebar-icon" aria-hidden="true">${feature.icon}</span>
+        <span>${escapeDynamicSidebarHtml(feature.label)}</span>
+        ${receiptDot}
+      </button>
+      <button type="button" class="dynamic-sidebar-remove" data-sidebar-remove="${escapeDynamicSidebarAttr(feature.id)}" aria-label="Remove ${escapeDynamicSidebarAttr(feature.label)}">&times;</button>
+    </div>
+  `;
+}
+
+function renderDynamicSidebarLibraryItem(feature, isAdded) {
+  return `
+    <div class="dynamic-sidebar-library-item" draggable="true" data-feature-id="${escapeDynamicSidebarAttr(feature.id)}">
+      <span class="sidebar-icon" aria-hidden="true">${feature.icon}</span>
+      <span>${escapeDynamicSidebarHtml(feature.label)}</span>
+      <button type="button" data-sidebar-add="${escapeDynamicSidebarAttr(feature.id)}"${isAdded ? " disabled" : ""}>${isAdded ? "Added" : "Add"}</button>
+    </div>
+  `;
+}
+
+function ensureDynamicSidebarQuickPanel() {
+  let panel = document.getElementById("dynamicSidebarQuickPanel");
+  if (panel) return panel;
+  panel = document.createElement("aside");
+  panel.id = "dynamicSidebarQuickPanel";
+  panel.className = "dynamic-sidebar-quick-panel";
+  panel.setAttribute("aria-label", "Quick action");
+  panel.hidden = true;
+  document.body.appendChild(panel);
+
+  document.addEventListener("click", (event) => {
+    if (panel.hidden) return;
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (target && (panel.contains(target) || target.closest("[data-sidebar-action]"))) return;
+    closeDynamicSidebarQuickPanel(panel);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeDynamicSidebarQuickPanel(panel);
+  });
+  return panel;
+}
+
+function openDynamicSidebarQuickPanel(feature, anchor, panel) {
+  const anchorRect = anchor.getBoundingClientRect();
+  panel.hidden = false;
+  panel.style.top = `${Math.max(68, Math.min(anchorRect.top, window.innerHeight - 420))}px`;
+  panel.innerHTML = `
+    <div class="dynamic-sidebar-quick-header">
+      <div>
+        <div class="dynamic-sidebar-quick-kicker">${escapeDynamicSidebarHtml(feature.group)}</div>
+        <h2>${escapeDynamicSidebarHtml(feature.label)}</h2>
+      </div>
+      <button type="button" data-quick-close aria-label="Close quick action">&times;</button>
+    </div>
+    <div class="dynamic-sidebar-quick-body" data-quick-body></div>
+  `;
+  panel.querySelector("[data-quick-close]")?.addEventListener("click", () => closeDynamicSidebarQuickPanel(panel));
+  renderDynamicSidebarQuickAction(feature, panel.querySelector("[data-quick-body]"));
+}
+
+function closeDynamicSidebarQuickPanel(panel) {
+  if (!panel) return;
+  panel.hidden = true;
+  panel.innerHTML = "";
+}
+
+function renderDynamicSidebarQuickAction(feature, body) {
+  if (!body) return;
+  if (feature.id === "transactions") {
+    renderQuickTransactionForm(body, feature);
+    return;
+  }
+  if (feature.id === "receipts") {
+    renderQuickReceiptForm(body, feature);
+    return;
+  }
+  if (feature.id === "mileage") {
+    renderQuickMileageForm(body, feature);
+    return;
+  }
+  if (feature.id === "accounts") {
+    renderQuickAccountForm(body, feature);
+    return;
+  }
+  if (feature.id === "categories") {
+    renderQuickCategoryForm(body, feature);
+    return;
+  }
+  renderDynamicSidebarOpenPage(body, feature);
+}
+
+function renderDynamicSidebarOpenPage(body, feature) {
+  body.innerHTML = `
+    <div class="dynamic-sidebar-action-stack">
+      <a class="dynamic-sidebar-primary-action" href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(feature.actionLabel || "Open")}</a>
+    </div>
+  `;
+}
+
+function renderQuickTransactionForm(body, feature) {
+  const today = new Date().toISOString().slice(0, 10);
+  body.innerHTML = `
+    <form class="dynamic-sidebar-form" data-quick-transaction-form>
+      <label>Date<input name="date" type="date" value="${today}" required></label>
+      <label>Type<select name="type"><option value="expense">Expense</option><option value="income">Income</option></select></label>
+      <label>Description<input name="description" type="text" autocomplete="off" required></label>
+      <label>Amount<input name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label>
+      <label>Account<select name="account_id" required><option value="">Loading...</option></select></label>
+      <label>Category<select name="category_id" required><option value="">Loading...</option></select></label>
+      <label>Note<textarea name="note" rows="2"></textarea></label>
+      <div class="dynamic-sidebar-form-actions">
+        <a href="${escapeDynamicSidebarAttr(feature.route)}">Open page</a>
+        <button type="submit">${escapeDynamicSidebarHtml(feature.actionLabel)}</button>
+      </div>
+      <div class="dynamic-sidebar-form-message" data-quick-message></div>
+    </form>
+  `;
+
+  const form = body.querySelector("[data-quick-transaction-form]");
+  const accountSelect = form?.elements.account_id;
+  const categorySelect = form?.elements.category_id;
+  const typeSelect = form?.elements.type;
+  let categories = [];
+
+  Promise.all([
+    dynamicSidebarFetchJson("/api/accounts"),
+    dynamicSidebarFetchJson("/api/categories")
+  ]).then(([accountsPayload, categoriesPayload]) => {
+    const accounts = Array.isArray(accountsPayload) ? accountsPayload : accountsPayload?.accounts || [];
+    categories = Array.isArray(categoriesPayload) ? categoriesPayload : categoriesPayload?.categories || [];
+    accountSelect.innerHTML = `<option value="">Select account</option>${accounts.map((account) => `<option value="${escapeDynamicSidebarAttr(account.id)}">${escapeDynamicSidebarHtml(account.name || "Account")}</option>`).join("")}`;
+    updateQuickTransactionCategories(categorySelect, categories, typeSelect.value);
+  }).catch(() => {
+    setDynamicSidebarMessage(form, "Unable to load accounts or categories.");
+  });
+
+  typeSelect?.addEventListener("change", () => {
+    updateQuickTransactionCategories(categorySelect, categories, typeSelect.value);
+  });
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    setDynamicSidebarMessage(form, "");
+    try {
+      const response = await dynamicSidebarApiFetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: form.elements.date.value,
+          type: form.elements.type.value,
+          description: form.elements.description.value.trim(),
+          amount: form.elements.amount.value,
+          account_id: form.elements.account_id.value,
+          category_id: form.elements.category_id.value,
+          note: form.elements.note.value.trim(),
+          cleared: false,
+          currency: getDynamicSidebarCurrency(),
+          tax_treatment: form.elements.type.value === "income" ? "income" : "operating"
+        })
+      });
+      await assertDynamicSidebarResponse(response, "Unable to save transaction.");
+      form.reset();
+      form.elements.date.value = today;
+      setDynamicSidebarMessage(form, "Saved.");
+      dispatchDynamicSidebarSaved("transactions");
+    } catch (error) {
+      setDynamicSidebarMessage(form, error.message || "Unable to save transaction.");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+function updateQuickTransactionCategories(select, categories, type) {
+  if (!select) return;
+  const normalizedType = type === "income" ? "income" : "expense";
+  const options = categories.filter((category) => (category.kind || category.type) === normalizedType);
+  select.innerHTML = `<option value="">Select category</option>${options.map((category) => `<option value="${escapeDynamicSidebarAttr(category.id)}">${escapeDynamicSidebarHtml(category.name || "Category")}</option>`).join("")}`;
+}
+
+function renderQuickReceiptForm(body, feature) {
+  body.innerHTML = `
+    <form class="dynamic-sidebar-form" data-quick-receipt-form>
+      <label>Receipt file<input name="receipt" type="file" accept="image/*,application/pdf" required></label>
+      <div class="dynamic-sidebar-form-actions">
+        <a href="${escapeDynamicSidebarAttr(feature.route)}">Open page</a>
+        <button type="submit">${escapeDynamicSidebarHtml(feature.actionLabel)}</button>
+      </div>
+      <div class="dynamic-sidebar-form-message" data-quick-message></div>
+    </form>
+  `;
+  const form = body.querySelector("[data-quick-receipt-form]");
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const file = form.elements.receipt.files?.[0];
+    if (!file) return;
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    setDynamicSidebarMessage(form, "");
+    try {
+      const formData = new FormData();
+      formData.append("receipt", file);
+      const response = await fetch(typeof buildApiUrl === "function" ? buildApiUrl("/api/receipts") : "/api/receipts", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          ...(typeof authHeader === "function" ? authHeader() : {}),
+          ...(typeof csrfHeader === "function" ? csrfHeader("POST") : {})
+        },
+        body: formData
+      });
+      await assertDynamicSidebarResponse(response, "Unable to upload receipt.");
+      form.reset();
+      setDynamicSidebarMessage(form, "Uploaded.");
+      dispatchDynamicSidebarSaved("receipts");
+    } catch (error) {
+      setDynamicSidebarMessage(form, error.message || "Unable to upload receipt.");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+function renderQuickMileageForm(body, feature) {
+  const today = new Date().toISOString().slice(0, 10);
+  const distanceName = localStorage.getItem("lb_unit_metric") === "true" ? "km" : "miles";
+  const distanceLabel = distanceName === "km" ? "Kilometres" : "Miles";
+  body.innerHTML = `
+    <form class="dynamic-sidebar-form" data-quick-mileage-form>
+      <label>Date<input name="date" type="date" value="${today}" required></label>
+      <label>Purpose<input name="purpose" type="text" autocomplete="off" required></label>
+      <label>Destination<input name="destination" type="text" autocomplete="off"></label>
+      <label>${distanceLabel}<input name="distance" type="number" min="0.1" step="0.1" inputmode="decimal" required></label>
+      <div class="dynamic-sidebar-form-actions">
+        <a href="${escapeDynamicSidebarAttr(feature.route)}">Open page</a>
+        <button type="submit">${escapeDynamicSidebarHtml(feature.actionLabel)}</button>
+      </div>
+      <div class="dynamic-sidebar-form-message" data-quick-message></div>
+    </form>
+  `;
+  const form = body.querySelector("[data-quick-mileage-form]");
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    setDynamicSidebarMessage(form, "");
+    try {
+      const response = await dynamicSidebarApiFetch("/api/mileage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trip_date: form.elements.date.value,
+          purpose: form.elements.purpose.value.trim(),
+          destination: form.elements.destination.value.trim(),
+          [distanceName]: form.elements.distance.value
+        })
+      });
+      await assertDynamicSidebarResponse(response, "Unable to save trip.");
+      form.reset();
+      form.elements.date.value = today;
+      setDynamicSidebarMessage(form, "Saved.");
+      dispatchDynamicSidebarSaved("mileage");
+    } catch (error) {
+      setDynamicSidebarMessage(form, error.message || "Unable to save trip.");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+function renderQuickAccountForm(body, feature) {
+  body.innerHTML = `
+    <form class="dynamic-sidebar-form" data-quick-account-form>
+      <label>Name<input name="name" type="text" autocomplete="off" required></label>
+      <label>Type<select name="type" required>
+        <option value="checking">Checking</option>
+        <option value="savings">Savings</option>
+        <option value="credit_card">Credit card</option>
+        <option value="loan">Loan</option>
+        <option value="cash">Cash</option>
+      </select></label>
+      <div class="dynamic-sidebar-form-actions">
+        <a href="${escapeDynamicSidebarAttr(feature.route)}">Open page</a>
+        <button type="submit">${escapeDynamicSidebarHtml(feature.actionLabel)}</button>
+      </div>
+      <div class="dynamic-sidebar-form-message" data-quick-message></div>
+    </form>
+  `;
+  const form = body.querySelector("[data-quick-account-form]");
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    setDynamicSidebarMessage(form, "");
+    try {
+      const response = await dynamicSidebarApiFetch("/api/accounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.elements.name.value.trim(),
+          type: form.elements.type.value
+        })
+      });
+      await assertDynamicSidebarResponse(response, "Unable to save account.");
+      form.reset();
+      setDynamicSidebarMessage(form, "Saved.");
+      dispatchDynamicSidebarSaved("accounts");
+    } catch (error) {
+      setDynamicSidebarMessage(form, error.message || "Unable to save account.");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+function renderQuickCategoryForm(body, feature) {
+  body.innerHTML = `
+    <form class="dynamic-sidebar-form" data-quick-category-form>
+      <label>Name<input name="name" type="text" autocomplete="off" required></label>
+      <label>Type<select name="kind" required>
+        <option value="expense">Expense</option>
+        <option value="income">Income</option>
+      </select></label>
+      <div class="dynamic-sidebar-form-actions">
+        <a href="${escapeDynamicSidebarAttr(feature.route)}">Open page</a>
+        <button type="submit">${escapeDynamicSidebarHtml(feature.actionLabel)}</button>
+      </div>
+      <div class="dynamic-sidebar-form-message" data-quick-message></div>
+    </form>
+  `;
+  const form = body.querySelector("[data-quick-category-form]");
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    setDynamicSidebarMessage(form, "");
+    try {
+      const kind = form.elements.kind.value;
+      const response = await dynamicSidebarApiFetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.elements.name.value.trim(),
+          kind,
+          color: kind === "income" ? "green" : "blue"
+        })
+      });
+      await assertDynamicSidebarResponse(response, "Unable to save category.");
+      form.reset();
+      setDynamicSidebarMessage(form, "Saved.");
+      dispatchDynamicSidebarSaved("categories");
+    } catch (error) {
+      setDynamicSidebarMessage(form, error.message || "Unable to save category.");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+async function dynamicSidebarApiFetch(url, options = {}) {
+  if (typeof apiFetch === "function") {
+    return apiFetch(url, options);
+  }
+  return fetch(url, {
+    credentials: "include",
+    ...options
+  });
+}
+
+async function dynamicSidebarFetchJson(url) {
+  const response = await dynamicSidebarApiFetch(url);
+  await assertDynamicSidebarResponse(response, "Unable to load data.");
+  return response.json().catch(() => []);
+}
+
+async function assertDynamicSidebarResponse(response, fallback) {
+  if (!response || !response.ok) {
+    const payload = response ? await response.json().catch(() => null) : null;
+    throw new Error(payload?.error || fallback);
+  }
+}
+
+function setDynamicSidebarMessage(form, message) {
+  const node = form?.querySelector("[data-quick-message]");
+  if (node) node.textContent = message || "";
+}
+
+function dispatchDynamicSidebarSaved(featureId) {
+  window.dispatchEvent(new CustomEvent("lunaQuickAddSaved", { detail: { featureId } }));
+  const feature = DYNAMIC_SIDEBAR_FEATURES.find((item) => item.id === featureId);
+  if (feature && getDynamicSidebarRoute(window.location.pathname) === getDynamicSidebarRoute(feature.route)) {
+    window.setTimeout(() => window.location.reload(), 550);
+  }
+}
+
+function getDynamicSidebarCurrency() {
+  const region = String(localStorage.getItem("lb_region") || localStorage.getItem("region") || window.LUNA_REGION || "us").toLowerCase();
+  return region === "ca" || region === "canada" ? "CAD" : "USD";
+}
+
+function getDynamicSidebarRoute(value) {
+  const raw = String(value || "").split(/[?#]/)[0];
+  const segment = raw.split("/").filter(Boolean).pop() || "";
+  return segment.replace(/\.html$/i, "");
+}
+
+function escapeDynamicSidebarHtml(value) {
+  if (typeof escapeHtml === "function") return escapeHtml(value);
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function escapeDynamicSidebarAttr(value) {
+  return escapeDynamicSidebarHtml(value);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
   injectSkipLink();
   injectHelpNavLink();
   injectMessagesNavLink();
+  initDynamicSidebar();
   injectMobileMenu();   // clones nav after Help/Messages are injected
   highlightNavigation(); // runs on all nav a elements including the drawer
   applyDateInputConstraints();
