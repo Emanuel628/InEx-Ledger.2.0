@@ -53,6 +53,8 @@ if (!window.__AUTH_GUARD_STATE__) {
   window.__AUTH_GUARD_STATE__ = { running: false, count: 0, lastError: null };
 }
 
+let pendingRefreshPromise = null;
+
 function resolveStorageUserId(profile = window.__LUNA_ME__) {
   return profile?.id || profile?.user_id || profile?.userId || profile?.uid || "";
 }
@@ -485,6 +487,9 @@ function mapAuthError(status, apiError) {
   if (status === 401) {
     return typeof t === "function" ? t("login_error_invalid_credentials") : "Invalid email or password.";
   }
+  if (status === 423) {
+    return errorMessage || "Too many failed sign-in attempts. Try again later or use account recovery.";
+  }
   if (status === 409) {
     return typeof t === "function" ? t("register_error_email_exists") : "An account with this email already exists.";
   }
@@ -492,6 +497,46 @@ function mapAuthError(status, apiError) {
     return typeof t === "function" ? t("common_error_too_many_attempts") : (errorMessage || "Too many attempts. Try again later.");
   }
   return errorMessage || (typeof t === "function" ? t("common_error") : "Something went wrong. Please try again.");
+}
+
+async function refreshAccessToken() {
+  if (pendingRefreshPromise) {
+    return pendingRefreshPromise;
+  }
+
+  pendingRefreshPromise = (async () => {
+    try {
+      const response = await fetch(buildApiUrl("/api/auth/refresh"), {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...csrfHeader("POST")
+        }
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const payload = await response.json().catch(() => null);
+      if (!payload?.token) {
+        return false;
+      }
+
+      setToken(payload.token);
+      if (payload?.subscription) {
+        applySubscriptionState(payload.subscription);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      pendingRefreshPromise = null;
+    }
+  })();
+
+  return pendingRefreshPromise;
 }
 
 async function requireValidSessionOrRedirect() {
@@ -518,9 +563,9 @@ async function requireValidSessionOrRedirect() {
     return;
   }
 
-  try {
+  const loadProfile = async () => {
     const meUrl = buildApiUrl("/api/me");
-    const response = await fetch(meUrl, {
+    return fetch(meUrl, {
       method: "GET",
       credentials: "include",
       headers: {
@@ -528,6 +573,16 @@ async function requireValidSessionOrRedirect() {
         ...authHeader()
       }
     });
+  };
+
+  try {
+    let response = await loadProfile();
+    if (response.status === 401) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        response = await loadProfile();
+      }
+    }
 
     if (response.status === 200) {
       const payload = await response.json().catch(() => null);
@@ -576,7 +631,7 @@ async function requireValidSessionOrRedirect() {
 
 async function redirectIfAuthenticated() {
   try {
-    const response = await fetch(buildApiUrl("/api/me"), {
+    const loadProfile = () => fetch(buildApiUrl("/api/me"), {
       method: "GET",
       credentials: "include",
       headers: {
@@ -584,6 +639,13 @@ async function redirectIfAuthenticated() {
         ...authHeader()
       }
     });
+    let response = await loadProfile();
+    if (response.status === 401) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        response = await loadProfile();
+      }
+    }
     if (response.status === 200) {
       const payload = await response.json().catch(() => null);
       window.__LUNA_ME__ = payload;
@@ -605,17 +667,28 @@ async function redirectIfAuthenticated() {
 async function apiFetch(url, options = {}) {
   const apiUrl = buildApiUrl(url);
   const method = String(options.method || "GET").toUpperCase();
-  const headers = {
+  const buildHeaders = () => ({
     "Content-Type": "application/json",
     ...(options.headers || {}),
     ...authHeader(),
     ...csrfHeader(method)
-  };
-  const response = await fetch(apiUrl, {
+  });
+  let response = await fetch(apiUrl, {
     ...options,
     credentials: "include",
-    headers
+    headers: buildHeaders()
   });
+
+  if (response.status === 401) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      response = await fetch(apiUrl, {
+        ...options,
+        credentials: "include",
+        headers: buildHeaders()
+      });
+    }
+  }
 
   if (response.status === 401) {
     markLoginReset();

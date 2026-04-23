@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof enforceTrial === "function") enforceTrial();
 
   wireReceiptUpload();
+  wireReceiptRefresh();
   wireReceiptLinkModal();
   await loadTransactionMap();
   await loadReceipts();
@@ -107,6 +108,7 @@ async function loadTransactionMap() {
 }
 
 async function loadReceipts() {
+  setReceiptRefreshBusy(true);
   receiptsLoading = receiptRecords.length === 0;
   receiptsLoadFailed = false;
   if (receiptsLoading) {
@@ -143,7 +145,31 @@ async function loadReceipts() {
     renderReceipts(receiptRecords);
   } finally {
     receiptsLoading = false;
+    setReceiptRefreshBusy(false);
   }
+}
+
+function wireReceiptRefresh() {
+  const refreshButton = document.getElementById("receiptRefreshButton");
+  refreshButton?.addEventListener("click", async () => {
+    try {
+      await loadTransactionMap();
+      await loadReceipts();
+      showReceiptsToast("Receipts refreshed.");
+    } catch (error) {
+      console.error("Receipt refresh failed:", error);
+      showReceiptsToast(tx("receipts_error_load"));
+    }
+  });
+}
+
+function setReceiptRefreshBusy(isBusy) {
+  const refreshButton = document.getElementById("receiptRefreshButton");
+  if (!refreshButton) {
+    return;
+  }
+  refreshButton.disabled = !!isBusy;
+  refreshButton.textContent = isBusy ? "Refreshing..." : "Refresh";
 }
 
 function renderReceipts(receipts) {

@@ -34,7 +34,7 @@
       </nav>
     </div>
     <div class="user-pill">
-      <span class="user-avatar">IL</span>
+      <span class="user-avatar">U</span>
       <span class="user-name">InEx Ledger</span>
     </div>
   </header>
@@ -494,6 +494,28 @@
           </fieldset>
         </form>
         </div>
+        <div class="settings-subpanel recovery-email-block">
+          <div class="settings-subpanel-head">
+            <h3>Recovery email</h3>
+            <p class="session-note">Use a separate email address for account recovery and MFA lockouts.</p>
+          </div>
+          <div class="settings-form-grid">
+            <div class="form-field form-field-full">
+              <label for="recovery-email">Recovery email</label>
+              <input type="email" id="recovery-email" autocomplete="email" placeholder="name@example.com" />
+            </div>
+            <div class="form-field form-field-full">
+              <label for="recovery-email-password">Current password</label>
+              <input type="password" id="recovery-email-password" autocomplete="current-password" />
+            </div>
+          </div>
+          <div class="settings-inline-actions">
+            <button type="button" id="recoveryEmailSaveButton" class="settings-primary-btn">Save recovery email</button>
+            <a href="/account-recovery" class="settings-secondary-btn">Use account recovery</a>
+          </div>
+          <p id="recoveryEmailStatus" class="settings-helper-note">No recovery email verified yet.</p>
+          <p id="recoveryEmailMessage" class="settings-inline-message"></p>
+        </div>
         <div class="settings-subpanel session-block">
           <h3 data-i18n="settings_session_title">Session</h3>
           <div class="session-actions">
@@ -651,12 +673,12 @@
   </div>
 
   <script src="../js/escape-html.js?v=20260410a"></script>
-<script src="../js/global.js?v=20260405c"></script>
+<script src="../js/global.js?v=20260423a"></script>
   <script src="../js/i18n.js?v=20260405c"></script>
-  <script src="../js/auth.js?v=20260405c"></script>
+  <script src="../js/auth.js?v=20260423a"></script>
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
   <script src="../js/privacyService.js?v=20260405c"></script>
-  <script src="../js/settings.js?v=20260405c"></script>
+  <script src="../js/settings.js?v=20260423a"></script>
 </body>
 </html>

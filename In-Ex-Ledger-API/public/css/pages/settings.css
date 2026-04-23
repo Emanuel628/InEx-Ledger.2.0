@@ -1304,6 +1304,10 @@ body {
   color: var(--ink3);
 }
 
+.recovery-email-block {
+  margin-top: 20px;
+}
+
 .password-strength-text.is-weak,
 .password-match-message.is-error {
   color: #b91c1c;
@@ -2016,6 +2020,10 @@ body {
 .settings-page .settings-inline-message {
   font-size: 14px;
   line-height: 1.6;
+}
+
+.settings-page .recovery-email-block {
+  margin-top: 0;
 }
 
 .settings-page .settings-form-grid,

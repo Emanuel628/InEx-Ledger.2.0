@@ -437,9 +437,15 @@ router.delete("/:id", async (req, res) => {
     await client.query("BEGIN");
 
     const found = await client.query(
-      `SELECT r.storage_path, t.date AS tx_date
+      `SELECT r.storage_path,
+              (
+                SELECT t.date
+                  FROM transactions t
+                 WHERE t.id = r.transaction_id
+                   AND t.business_id = r.business_id
+                 LIMIT 1
+              ) AS tx_date
        FROM receipts r
-       LEFT JOIN transactions t ON t.id = r.transaction_id
        WHERE r.id = $1 AND r.business_id = $2
        FOR UPDATE
        LIMIT 1`,

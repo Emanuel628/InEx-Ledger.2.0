@@ -86,6 +86,35 @@ function applyDateInputConstraints() {
   });
 }
 
+function markRequiredFields() {
+  document.querySelectorAll("input[required], select[required], textarea[required]").forEach((field) => {
+    field.setAttribute("aria-required", "true");
+    const parentLabel = field.closest("label");
+    if (parentLabel) {
+      parentLabel.classList.add("is-required");
+      return;
+    }
+
+    const fieldId = field.getAttribute("id");
+    if (!fieldId) {
+      return;
+    }
+    const label = document.querySelector(`label[for="${fieldId}"]`);
+    label?.classList.add("is-required");
+  });
+}
+
+function disableNumberInputWheel() {
+  document.querySelectorAll('input[type="number"]').forEach((input) => {
+    input.addEventListener("wheel", (event) => {
+      if (document.activeElement !== input) {
+        return;
+      }
+      event.preventDefault();
+    }, { passive: false });
+  });
+}
+
 function normalizeEstimatedTaxRegion(region) {
   const normalized = String(region || "").trim().toLowerCase();
   if (normalized === "ca" || normalized === "canada") {
@@ -1056,6 +1085,8 @@ document.addEventListener("DOMContentLoaded", () => {
   injectMobileMenu();   // clones nav after Help/Messages are injected
   highlightNavigation(); // runs on all nav a elements including the drawer
   applyDateInputConstraints();
+  markRequiredFields();
+  disableNumberInputWheel();
   injectMobileDesktopLink();
   applyMileageNavLabel();
   window.addEventListener("lunaDistanceUnitChanged", applyMileageNavLabel);

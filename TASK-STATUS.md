@@ -94,3 +94,4 @@ The production billing flow needs these Railway variables set:
 | L4 | Add screenshot or demo to `landing.html` | Marketing/UX improvement |
 | Audit | Extend period-lock enforcement to any remaining mutation surfaces that need it | Core transaction/mileage/archive lock controls already exist |
 | Audit | Add dedicated reporting/audit views for archived transaction history | Improves auditability of append-only/delete-archive flows |
+| Mileage | Expand mileage with expense and maintenance tracking plus filterable history and summary cards | Requested follow-up; model after the transactions page history and summary surface |

@@ -74,7 +74,7 @@ router.get("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
     const result = await pool.query(
-      `SELECT id, email, role, email_verified, mfa_enabled, full_name, display_name,
+      `SELECT id, email, role, email_verified, mfa_enabled, recovery_email, recovery_email_verified, full_name, display_name,
               country, province, data_residency, created_at,
               onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen,
               cpa_license_number, cpa_license_verified, cpa_license_status,

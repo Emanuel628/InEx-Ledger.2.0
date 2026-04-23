@@ -107,6 +107,14 @@ label {
   line-height: 1.2;
 }
 
+label.is-required::after,
+.form-label.is-required::after,
+.field-label.is-required::after {
+  content: " *";
+  color: var(--red);
+  letter-spacing: 0;
+}
+
 .form-control {
   width: 100%;
 }
@@ -123,6 +131,16 @@ textarea {
   color: var(--ink);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
   margin-top: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),

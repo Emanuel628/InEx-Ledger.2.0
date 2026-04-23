@@ -97,7 +97,10 @@ class EmailNotVerifiedError extends Error {
    ========================================================= */
 const VERIFICATION_TOKEN_TTL_MS = 15 * 60 * 1000;
 const PASSWORD_RESET_TTL_MS = 20 * 60 * 1000;
+const RECOVERY_EMAIL_TOKEN_TTL_MS = 30 * 60 * 1000;
 const MFA_PENDING_TOKEN_EXPIRY_SECONDS = 5 * 60;
+const MAX_LOGIN_ATTEMPTS = Number(process.env.MAX_LOGIN_ATTEMPTS) || 5;
+const LOGIN_LOCKOUT_MINUTES = Number(process.env.LOGIN_LOCKOUT_MINUTES) || 15;
 
 function normalizeEmail(email) {
   const normalized = String(email ?? "").trim().toLowerCase();
@@ -168,6 +171,37 @@ async function consumePasswordResetToken(token) {
     [tokenHash, rawToken]
   );
   return result.rows[0]?.email ?? null;
+}
+
+async function createRecoveryEmailToken(userId, email) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashValue(token);
+  const expiresAt = new Date(Date.now() + RECOVERY_EMAIL_TOKEN_TTL_MS);
+  await pool.query("DELETE FROM recovery_email_tokens WHERE user_id = $1", [userId]);
+  await pool.query(
+    `INSERT INTO recovery_email_tokens (id, user_id, email, token_hash, expires_at)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [crypto.randomUUID(), userId, email, tokenHash, expiresAt]
+  );
+  return { token, expiresAt };
+}
+
+async function consumeRecoveryEmailToken(token) {
+  const rawToken = String(token || "").trim();
+  if (!rawToken) {
+    return null;
+  }
+  const tokenHash = hashValue(rawToken);
+  await pool.query("DELETE FROM recovery_email_tokens WHERE expires_at <= NOW()");
+  const result = await pool.query(
+    `DELETE FROM recovery_email_tokens
+      WHERE token_hash = $1
+        AND consumed_at IS NULL
+        AND expires_at > NOW()
+      RETURNING user_id, email`,
+    [tokenHash]
+  );
+  return result.rows[0] || null;
 }
 
 /* =========================================================
@@ -253,7 +287,11 @@ function isStrongPassword(password) {
 
 async function findUserByEmail(email) {
   const result = await pool.query(
-    "SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at, is_erased FROM users WHERE email = $1 LIMIT 1",
+    `SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at,
+            is_erased, recovery_email, recovery_email_verified, failed_login_attempts, login_locked_until
+       FROM users
+      WHERE email = $1
+      LIMIT 1`,
     [email]
   );
   return result.rows[0] || null;
@@ -261,7 +299,11 @@ async function findUserByEmail(email) {
 
 async function findUserById(userId) {
   const result = await pool.query(
-    "SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at, is_erased FROM users WHERE id = $1 LIMIT 1",
+    `SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at,
+            is_erased, recovery_email, recovery_email_verified, failed_login_attempts, login_locked_until
+       FROM users
+      WHERE id = $1
+      LIMIT 1`,
     [userId]
   );
   return result.rows[0] || null;
@@ -362,7 +404,73 @@ function buildMfaStatusPayload(user) {
   return {
     enabled: !!user?.mfa_enabled,
     enabled_at: user?.mfa_enabled_at || null,
-    delivery: "email"
+    delivery: "email",
+    recovery_email_masked: maskEmailAddress(user?.recovery_email),
+    recovery_email_verified: !!user?.recovery_email_verified
+  };
+}
+
+function maskEmailAddress(email) {
+  const normalized = normalizeEmail(email);
+  if (!normalized) {
+    return "";
+  }
+  const [local, domain] = normalized.split("@");
+  const localPrefix = local.length <= 2 ? local[0] || "*" : `${local.slice(0, 2)}${"*".repeat(Math.max(local.length - 2, 2))}`;
+  const domainParts = domain.split(".");
+  const domainName = domainParts.shift() || "";
+  const maskedDomain = domainName.length <= 2
+    ? `${domainName[0] || "*"}*`
+    : `${domainName.slice(0, 2)}${"*".repeat(Math.max(domainName.length - 2, 2))}`;
+  return `${localPrefix}@${[maskedDomain, ...domainParts].join(".")}`;
+}
+
+function buildRecoveryEmailVerificationLink(req, token) {
+  return `${getAppBaseUrl(req)}/api/auth/confirm-recovery-email?token=${token}`;
+}
+
+function getLoginLockExpiry(user) {
+  const value = user?.login_locked_until ? new Date(user.login_locked_until) : null;
+  if (!value || Number.isNaN(value.getTime())) {
+    return null;
+  }
+  return value;
+}
+
+function isLoginLocked(user) {
+  const lockedUntil = getLoginLockExpiry(user);
+  return !!lockedUntil && lockedUntil.getTime() > Date.now();
+}
+
+async function clearLoginFailureState(userId) {
+  await pool.query(
+    `UPDATE users
+        SET failed_login_attempts = 0,
+            login_locked_until = NULL
+      WHERE id = $1`,
+    [userId]
+  );
+}
+
+async function recordFailedLoginAttempt(user) {
+  const expiredLock = user?.login_locked_until && !isLoginLocked(user);
+  const currentAttempts = expiredLock ? 0 : Number(user?.failed_login_attempts || 0);
+  const nextAttempts = currentAttempts + 1;
+  const lockedUntil = nextAttempts >= MAX_LOGIN_ATTEMPTS
+    ? new Date(Date.now() + LOGIN_LOCKOUT_MINUTES * 60 * 1000)
+    : null;
+
+  await pool.query(
+    `UPDATE users
+        SET failed_login_attempts = $2,
+            login_locked_until = $3
+      WHERE id = $1`,
+    [user.id, lockedUntil ? 0 : nextAttempts, lockedUntil]
+  );
+
+  return {
+    lockedUntil,
+    attemptsRemaining: lockedUntil ? 0 : Math.max(MAX_LOGIN_ATTEMPTS - nextAttempts, 0)
   };
 }
 
@@ -764,9 +872,29 @@ router.post("/login", authLimiter, async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    if (isLoginLocked(user)) {
+      return res.status(423).json({
+        error: "Too many failed sign-in attempts. Try again later or use account recovery.",
+        code: "account_locked",
+        locked_until: getLoginLockExpiry(user)?.toISOString() || null
+      });
+    }
+
     const { match, legacy } = await verifyPassword(password, user.password_hash);
     if (!match) {
+      const failureState = await recordFailedLoginAttempt(user);
+      if (failureState.lockedUntil) {
+        return res.status(423).json({
+          error: "Too many failed sign-in attempts. Try again later or use account recovery.",
+          code: "account_locked",
+          locked_until: failureState.lockedUntil.toISOString()
+        });
+      }
       return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    if (Number(user.failed_login_attempts || 0) > 0 || user.login_locked_until) {
+      await clearLoginFailureState(user.id);
     }
 
     if (legacy) {
@@ -1486,6 +1614,46 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
   }
 });
 
+router.post("/account-recovery", passwordLimiter, async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
+  const recoveryEmail = normalizeEmail(req.body?.recoveryEmail);
+  if (!email || !recoveryEmail) {
+    return res.status(400).json({ error: "Primary and recovery email are required." });
+  }
+
+  try {
+    const userResult = await pool.query(
+      `SELECT id, email
+         FROM users
+        WHERE email = $1
+          AND recovery_email = $2
+          AND recovery_email_verified = true
+        LIMIT 1`,
+      [email, recoveryEmail]
+    );
+
+    if (userResult.rowCount > 0) {
+      const { token } = await createPasswordResetToken(email);
+      const resetLink = buildPasswordResetLink(req, token);
+
+      try {
+        const lang = await getPreferredLanguageForEmail(email);
+        const emailContent = buildPasswordResetEmail(lang, resetLink);
+        await sendAppEmail({ to: recoveryEmail, ...emailContent });
+      } catch (emailErr) {
+        logError("[account-recovery] failed to send reset email to", recoveryEmail, ":", emailErr?.message || emailErr);
+      }
+    }
+
+    return res.status(200).json({
+      message: "If the account and recovery email match, a reset link was sent."
+    });
+  } catch (err) {
+    logError("Account recovery error:", err);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+});
+
 /**
  * POST /reset-password
  */
@@ -1506,7 +1674,12 @@ router.post("/reset-password", passwordLimiter, async (req, res) => {
   try {
     const hashedPassword = await hashPassword(password);
     const userResult = await pool.query(
-      "UPDATE users SET password_hash = $1 WHERE email = $2 RETURNING id",
+      `UPDATE users
+          SET password_hash = $1,
+              failed_login_attempts = 0,
+              login_locked_until = NULL
+        WHERE email = $2
+      RETURNING id`,
       [hashedPassword, email]
     );
     if (userResult.rowCount) {
@@ -1518,6 +1691,75 @@ router.post("/reset-password", passwordLimiter, async (req, res) => {
   } catch (err) {
     logError("Reset password error:", err);
     res.status(500).json({ error: "Failed to reset password." });
+  }
+});
+
+router.post("/recovery-email/request", requireAuth, requireCsrfProtection, authLimiter, requireMfa, async (req, res) => {
+  const recoveryEmail = normalizeEmail(req.body?.recoveryEmail);
+  const currentPassword = req.body?.currentPassword;
+
+  if (!recoveryEmail || !currentPassword) {
+    return res.status(400).json({ error: "Recovery email and current password are required." });
+  }
+
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (recoveryEmail === normalizeEmail(user.email)) {
+      return res.status(400).json({ error: "Recovery email must be different from your sign-in email." });
+    }
+
+    const { match } = await verifyPassword(currentPassword, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "Current password is incorrect." });
+    }
+
+    const { token } = await createRecoveryEmailToken(user.id, recoveryEmail);
+    const confirmLink = buildRecoveryEmailVerificationLink(req, token);
+    const lang = await getPreferredLanguageForUser(user.id);
+    const isFrench = lang === "fr";
+    await sendAppEmail({
+      to: recoveryEmail,
+      subject: isFrench ? "Confirmez votre courriel de récupération" : "Confirm your recovery email",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
+          <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
+            <div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">InEx Ledger security</div>
+            <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${isFrench ? "Confirmez votre courriel de récupération" : "Confirm your recovery email"}</h1>
+          </div>
+          <div style="padding: 28px;">
+            <p style="margin: 0 0 16px; color: #0f172a; font-size: 15px; line-height: 1.6;">
+              ${isFrench
+                ? "Cliquez sur le lien ci-dessous pour confirmer ce courriel comme courriel de récupération pour votre compte InEx Ledger."
+                : "Use the link below to confirm this address as the recovery email for your InEx Ledger account."}
+            </p>
+            <p style="margin: 0 0 18px;">
+              <a href="${confirmLink}" style="display: inline-block; padding: 12px 16px; border-radius: 10px; background: #2563a8; color: #ffffff; text-decoration: none; font-weight: 600;">
+                ${isFrench ? "Confirmer le courriel de récupération" : "Confirm recovery email"}
+              </a>
+            </p>
+            <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">
+              ${isFrench
+                ? "Ce lien expire dans 30 minutes. Si vous n’avez pas demandé ce changement, ignorez ce courriel."
+                : "This link expires in 30 minutes. If you did not request this change, ignore this email."}
+            </p>
+          </div>
+        </div>
+      `,
+      text: isFrench
+        ? `Confirmez votre courriel de récupération\n\nUtilisez ce lien dans les 30 minutes : ${confirmLink}`
+        : `Confirm your recovery email\n\nUse this link within 30 minutes: ${confirmLink}`
+    });
+
+    return res.status(200).json({
+      message: "Check your recovery email for a confirmation link."
+    });
+  } catch (err) {
+    logError("Recovery email request error:", err);
+    return res.status(500).json({ error: "Unable to save recovery email." });
   }
 });
 
@@ -1599,6 +1841,33 @@ router.get("/confirm-email-change", async (req, res) => {
   } catch (err) {
     logError("Confirm email change error:", err);
     res.status(500).send("Email change failed.");
+  }
+});
+
+router.get("/confirm-recovery-email", async (req, res) => {
+  const token = req.query?.token;
+  if (!token) {
+    return res.status(400).send("Token is required.");
+  }
+
+  try {
+    const result = await consumeRecoveryEmailToken(token);
+    if (!result?.user_id || !result?.email) {
+      return res.status(400).send("Invalid or expired link.");
+    }
+
+    await pool.query(
+      `UPDATE users
+          SET recovery_email = $1,
+              recovery_email_verified = true
+        WHERE id = $2`,
+      [normalizeEmail(result.email), result.user_id]
+    );
+
+    return res.redirect("/settings?recovery_email_verified=true#settings-security");
+  } catch (err) {
+    logError("Confirm recovery email error:", err);
+    return res.status(500).send("Recovery email confirmation failed.");
   }
 });
 
