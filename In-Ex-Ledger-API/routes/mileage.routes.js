@@ -17,6 +17,8 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3
 const MILES_TO_KM = 1.609344;
 const MAX_DISTANCE_VALUE = 50000;
 const MAX_ODOMETER_VALUE = 9999999.99;
+const MAX_COST_AMOUNT = 1000000;
+const VALID_VEHICLE_COST_TYPES = new Set(["expense", "maintenance"]);
 const MILEAGE_SCHEMA_CACHE_MS = 5 * 60 * 1000;
 let cachedMileageColumnMode = null;
 let cachedMileageColumnFetchedAt = 0;
@@ -39,6 +41,50 @@ function parseOptionalNumber(value, field, max) {
   }
 
   return { value: parsed };
+}
+
+function normalizeVehicleCostType(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeVehicleCostPayload(body = {}) {
+  const entryType = normalizeVehicleCostType(body.entry_type);
+  const entryDate = typeof body.entry_date === "string" ? body.entry_date.trim() : "";
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const vendor = typeof body.vendor === "string" ? body.vendor.trim() : "";
+  const notes = typeof body.notes === "string" ? body.notes.trim() : "";
+  const parsedAmount = parseOptionalNumber(body.amount, "amount", MAX_COST_AMOUNT);
+
+  if (!VALID_VEHICLE_COST_TYPES.has(entryType)) {
+    return { error: "entry_type must be expense or maintenance." };
+  }
+
+  if (!entryDate || Number.isNaN(Date.parse(entryDate))) {
+    return { error: "entry_date must be a valid date." };
+  }
+
+  if (!title) {
+    return { error: "title is required." };
+  }
+
+  if (parsedAmount.error) {
+    return { error: parsedAmount.error };
+  }
+
+  if (parsedAmount.value === null || parsedAmount.value <= 0) {
+    return { error: "amount must be greater than 0." };
+  }
+
+  return {
+    value: {
+      entryType,
+      entryDate,
+      title,
+      vendor: vendor || null,
+      notes: notes || null,
+      amount: Number(parsedAmount.value.toFixed(2))
+    }
+  };
 }
 
 /**
@@ -77,6 +123,126 @@ router.get("/", async (req, res) => {
   } catch (err) {
     logError("GET /mileage error:", err.message);
     res.status(500).json({ error: "Failed to load mileage records." });
+  }
+});
+
+router.get("/summary", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const mileageColumns = await getMileageColumnMode();
+    const dateSelect = mileageDateSelect(mileageColumns);
+
+    const [mileageResult, costsResult] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) AS trip_count,
+                COALESCE(SUM(COALESCE(miles, 0)), 0) AS total_miles,
+                COALESCE(SUM(COALESCE(km, 0)), 0) AS total_km,
+                MAX(${dateSelect}) AS last_trip_date
+           FROM mileage
+          WHERE business_id = $1`,
+        [businessId]
+      ),
+      pool.query(
+        `SELECT COALESCE(SUM(CASE WHEN entry_type = 'expense' THEN amount ELSE 0 END), 0) AS expense_total,
+                COALESCE(SUM(CASE WHEN entry_type = 'maintenance' THEN amount ELSE 0 END), 0) AS maintenance_total,
+                COUNT(*) AS cost_count,
+                MAX(entry_date) AS last_cost_date
+           FROM vehicle_costs
+          WHERE business_id = $1`,
+        [businessId]
+      )
+    ]);
+
+    const mileageRow = mileageResult.rows[0] || {};
+    const costRow = costsResult.rows[0] || {};
+    return res.json({
+      trip_count: Number(mileageRow.trip_count || 0),
+      total_miles: Number(mileageRow.total_miles || 0),
+      total_km: Number(mileageRow.total_km || 0),
+      vehicle_expense_total: Number(costRow.expense_total || 0),
+      maintenance_total: Number(costRow.maintenance_total || 0),
+      cost_count: Number(costRow.cost_count || 0),
+      last_trip_date: mileageRow.last_trip_date || null,
+      last_cost_date: costRow.last_cost_date || null
+    });
+  } catch (err) {
+    logError("GET /mileage/summary error:", err.message);
+    return res.status(500).json({ error: "Failed to load mileage summary." });
+  }
+});
+
+router.get("/costs", async (req, res) => {
+  const typeFilter = normalizeVehicleCostType(req.query.type);
+  if (typeFilter && !VALID_VEHICLE_COST_TYPES.has(typeFilter)) {
+    return res.status(400).json({ error: "Invalid vehicle cost type." });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 200, 1), 500);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const values = [businessId];
+    let whereSql = "WHERE business_id = $1";
+
+    if (typeFilter) {
+      values.push(typeFilter);
+      whereSql += ` AND entry_type = $${values.length}`;
+    }
+
+    values.push(limit, offset);
+    const result = await pool.query(
+      `SELECT id, business_id, entry_type, entry_date, title, vendor, amount, notes, created_at
+         FROM vehicle_costs
+         ${whereSql}
+        ORDER BY entry_date DESC, created_at DESC
+        LIMIT $${values.length - 1} OFFSET $${values.length}`,
+      values
+    );
+
+    return res.json({ data: result.rows, limit, offset });
+  } catch (err) {
+    logError("GET /mileage/costs error:", err.message);
+    return res.status(500).json({ error: "Failed to load vehicle costs." });
+  }
+});
+
+router.post("/costs", async (req, res) => {
+  const normalized = normalizeVehicleCostPayload(req.body);
+  if (normalized.error) {
+    return res.status(400).json({ error: normalized.error });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const lockState = await loadAccountingLockState(pool, businessId);
+    assertDateUnlocked(lockState, normalized.value.entryDate.slice(0, 10));
+    const result = await pool.query(
+      `INSERT INTO vehicle_costs (id, business_id, entry_type, entry_date, title, vendor, amount, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, business_id, entry_type, entry_date, title, vendor, amount, notes, created_at`,
+      [
+        crypto.randomUUID(),
+        businessId,
+        normalized.value.entryType,
+        normalized.value.entryDate,
+        normalized.value.title,
+        normalized.value.vendor,
+        normalized.value.amount,
+        normalized.value.notes
+      ]
+    );
+    return res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err instanceof AccountingPeriodLockedError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        locked_through_date: err.lockedThroughDate,
+        transaction_date: err.transactionDate
+      });
+    }
+    logError("POST /mileage/costs error:", err.message);
+    return res.status(500).json({ error: "Failed to save vehicle cost." });
   }
 });
 
@@ -323,6 +489,47 @@ function normalizeMileageDistances(miles, km) {
     km
   };
 }
+
+router.delete("/costs/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid vehicle cost ID." });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const existing = await pool.query(
+      `SELECT id, entry_date
+         FROM vehicle_costs
+        WHERE id = $1 AND business_id = $2
+        LIMIT 1`,
+      [req.params.id, businessId]
+    );
+
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ error: "Vehicle cost not found." });
+    }
+
+    const lockState = await loadAccountingLockState(pool, businessId);
+    assertDateUnlocked(lockState, existing.rows[0].entry_date);
+
+    await pool.query(
+      "DELETE FROM vehicle_costs WHERE id = $1 AND business_id = $2",
+      [req.params.id, businessId]
+    );
+    return res.json({ message: "Vehicle cost deleted." });
+  } catch (err) {
+    if (err instanceof AccountingPeriodLockedError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        locked_through_date: err.lockedThroughDate,
+        transaction_date: err.transactionDate
+      });
+    }
+    logError("DELETE /mileage/costs/:id error:", err.message);
+    return res.status(500).json({ error: "Failed to delete vehicle cost." });
+  }
+});
 
 /**
  * PUT /api/mileage/:id

@@ -394,6 +394,7 @@ function applyMileageNavLabel() {
 
 const DYNAMIC_SIDEBAR_FAVORITES_KEY = "lb_dynamic_sidebar_favorites";
 const DYNAMIC_SIDEBAR_DEFAULT_FAVORITES = ["transactions", "receipts", "mileage", "accounts", "categories"];
+let dynamicSidebarSaveTimer = null;
 
 const DYNAMIC_SIDEBAR_FEATURES = [
   {
@@ -508,7 +509,7 @@ function initDynamicSidebar() {
   if (!shell || !sidebar) return;
 
   const featureMap = new Map(DYNAMIC_SIDEBAR_FEATURES.map((feature) => [feature.id, feature]));
-  let favorites = getDynamicSidebarFavorites(featureMap);
+  let favorites = getDynamicSidebarFavorites(featureMap, window.__LUNA_ME__?.ui_preferences);
   let draggedFeatureId = "";
 
   sidebar.className = "app-sidebar app-sidebar--dynamic";
@@ -630,11 +631,45 @@ function initDynamicSidebar() {
   }
 
   render();
+
+  const applyProfileFavorites = (profile) => {
+    const nextFavorites = getDynamicSidebarFavorites(featureMap, profile?.ui_preferences);
+    if (JSON.stringify(nextFavorites) === JSON.stringify(favorites)) {
+      return;
+    }
+    favorites = nextFavorites;
+    render();
+  };
+
+  if (window.__LUNA_ME__) {
+    applyProfileFavorites(window.__LUNA_ME__);
+  }
+
+  window.addEventListener("lunaProfileReady", (event) => {
+    applyProfileFavorites(event.detail);
+  });
 }
 
-function getDynamicSidebarFavorites(featureMap) {
+function resolveDynamicSidebarFavoritesStorageKey() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(DYNAMIC_SIDEBAR_FAVORITES_KEY) || "null");
+    const namespacedKey = window.lunaStorage?.getKey?.("dynamic_sidebar_favorites", { profile: window.__LUNA_ME__ });
+    return namespacedKey || DYNAMIC_SIDEBAR_FAVORITES_KEY;
+  } catch (_) {
+    return DYNAMIC_SIDEBAR_FAVORITES_KEY;
+  }
+}
+
+function getDynamicSidebarFavorites(featureMap, uiPreferences = null) {
+  const profileFavorites = uiPreferences?.dynamic_sidebar_favorites;
+  if (Array.isArray(profileFavorites)) {
+    const valid = profileFavorites.filter((id) => featureMap.has(id));
+    if (valid.length) {
+      return Array.from(new Set(valid));
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(localStorage.getItem(resolveDynamicSidebarFavoritesStorageKey()) || "null");
     if (Array.isArray(parsed)) {
       const valid = parsed.filter((id) => featureMap.has(id));
       if (valid.length) return Array.from(new Set(valid));
@@ -644,9 +679,46 @@ function getDynamicSidebarFavorites(featureMap) {
 }
 
 function saveDynamicSidebarFavorites(favorites) {
+  const dedupedFavorites = Array.from(new Set(favorites));
   try {
-    localStorage.setItem(DYNAMIC_SIDEBAR_FAVORITES_KEY, JSON.stringify(Array.from(new Set(favorites))));
+    localStorage.setItem(resolveDynamicSidebarFavoritesStorageKey(), JSON.stringify(dedupedFavorites));
   } catch (_) {}
+  queueDynamicSidebarFavoritesSave(dedupedFavorites);
+}
+
+function queueDynamicSidebarFavoritesSave(favorites) {
+  if (dynamicSidebarSaveTimer) {
+    window.clearTimeout(dynamicSidebarSaveTimer);
+  }
+
+  dynamicSidebarSaveTimer = window.setTimeout(async () => {
+    dynamicSidebarSaveTimer = null;
+    if (typeof apiFetch !== "function" || !window.__LUNA_ME__?.id) {
+      return;
+    }
+
+    try {
+      const response = await apiFetch("/api/me/preferences", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          dynamic_sidebar_favorites: favorites
+        })
+      });
+      if (!response || !response.ok) {
+        return;
+      }
+      const payload = await response.json().catch(() => null);
+      if (window.__LUNA_ME__) {
+        window.__LUNA_ME__.ui_preferences = payload?.ui_preferences || {
+          ...(window.__LUNA_ME__.ui_preferences || {}),
+          dynamic_sidebar_favorites: favorites
+        };
+      }
+    } catch (_) {}
+  }, 200);
 }
 
 function renderDynamicSidebarFavorite(feature) {

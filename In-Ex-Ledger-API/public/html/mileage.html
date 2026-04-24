@@ -5,7 +5,7 @@
   <title>InEx Ledger - Mileage</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css" />
-  <link rel="stylesheet" href="/css/pages/mileage.css" />
+  <link rel="stylesheet" href="/css/pages/mileage.css?v=20260423a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -49,31 +49,111 @@
 
     <div class="app-content mileage-content">
       <section class="mileage-header-card">
-        <h1 data-i18n="mileage_page_title">Track business mileage</h1>
-        <p id="mileageUnitNote">Keep a simple log for US tax reporting.</p>
+        <div>
+          <h1>Vehicle log</h1>
+          <p id="mileageUnitNote">Track trips, vehicle expenses, and maintenance from one place.</p>
+        </div>
+        <p class="mileage-header-note" id="mileageSubtext">Using miles by default. Change units in Settings if needed.</p>
+      </section>
+
+      <section class="mileage-summary-grid" aria-label="Mileage summary">
+        <article class="mileage-summary-card">
+          <div class="mileage-summary-label">Trips</div>
+          <div class="mileage-summary-value" id="mileageSummaryTrips">0</div>
+          <div class="mileage-summary-meta" id="mileageSummaryTripsMeta">No trips logged</div>
+        </article>
+        <article class="mileage-summary-card">
+          <div class="mileage-summary-label">Distance</div>
+          <div class="mileage-summary-value" id="mileageSummaryDistance">0.0 mi</div>
+          <div class="mileage-summary-meta" id="mileageSummaryDistanceMeta">Across all recorded trips</div>
+        </article>
+        <article class="mileage-summary-card">
+          <div class="mileage-summary-label">Vehicle expenses</div>
+          <div class="mileage-summary-value" id="mileageSummaryExpenses">$0.00</div>
+          <div class="mileage-summary-meta" id="mileageSummaryExpensesMeta">Fuel, parking, tolls, and similar costs</div>
+        </article>
+        <article class="mileage-summary-card">
+          <div class="mileage-summary-label">Maintenance</div>
+          <div class="mileage-summary-value" id="mileageSummaryMaintenance">$0.00</div>
+          <div class="mileage-summary-meta" id="mileageSummaryMaintenanceMeta">Service and repair spend</div>
+        </article>
       </section>
 
       <section class="mileage-card">
-        <div class="mileage-card-head"><h2 data-i18n="mileage_title">Record a trip</h2><p id="mileageSubtext">Using miles (U.S. default). Change in Settings if needed.</p></div>
-        <form id="mileageForm" class="mileage-form">
-          <div class="mileage-grid">
-            <div class="form-field"><label class="field-label" for="mileageDate" data-i18n="mileage_label_date">Date</label><input type="date" id="mileageDate" required class="form-control" /></div>
-            <div class="form-field"><label class="field-label" for="mileagePurpose" data-i18n="mileage_label_purpose">Purpose</label><input type="text" id="mileagePurpose" required class="form-control" /></div>
-            <div class="form-field"><label class="field-label" for="mileageDestination" data-i18n="mileage_label_destination_optional">Destination</label><input type="text" id="mileageDestination" class="form-control" /></div>
-            <div class="form-field"><label class="field-label" for="mileageDistance" id="distanceLabel" data-i18n="mileage_label_miles">Miles</label><input type="number" id="mileageDistance" min="0.1" step="0.1" required class="form-control" /></div>
+        <div class="mileage-card-head mileage-card-head--stack">
+          <div>
+            <h2>Add activity</h2>
+            <p class="mileage-card-copy">Record a trip or keep a vehicle-cost trail without leaving the page.</p>
           </div>
-          <button type="submit" class="mileage-save-btn" data-i18n="mileage_button_add">Add mileage</button>
-          <p id="mileageFormMessage" class="mileage-message"></p>
+          <div class="mileage-mode-toggle" role="tablist" aria-label="Entry mode">
+            <button type="button" class="mileage-mode-button is-active" data-entry-mode="trip">Trip</button>
+            <button type="button" class="mileage-mode-button" data-entry-mode="expense">Expense</button>
+            <button type="button" class="mileage-mode-button" data-entry-mode="maintenance">Maintenance</button>
+          </div>
+        </div>
+
+        <form id="mileageForm" class="mileage-form" data-entry-panel="trip">
+          <div class="mileage-grid">
+            <div class="form-field"><label class="field-label" for="mileageDate">Date</label><input type="date" id="mileageDate" required class="form-control" /></div>
+            <div class="form-field"><label class="field-label" for="mileagePurpose">Purpose</label><input type="text" id="mileagePurpose" required class="form-control" placeholder="Client meeting, supply run, pickup" /></div>
+            <div class="form-field"><label class="field-label" for="mileageDestination">Destination</label><input type="text" id="mileageDestination" class="form-control" placeholder="Austin, Office Depot, Job site" /></div>
+            <div class="form-field"><label class="field-label" for="mileageDistance" id="distanceLabel">Miles</label><input type="number" id="mileageDistance" min="0.1" step="0.1" required class="form-control" /></div>
+          </div>
+          <div class="mileage-form-actions">
+            <button type="submit" class="mileage-save-btn">Add trip</button>
+            <p id="mileageFormMessage" class="mileage-message"></p>
+          </div>
+        </form>
+
+        <form id="vehicleCostForm" class="mileage-form" data-entry-panel="cost" hidden>
+          <input type="hidden" id="vehicleCostType" value="expense" />
+          <div class="mileage-grid">
+            <div class="form-field"><label class="field-label" for="vehicleCostDate">Date</label><input type="date" id="vehicleCostDate" required class="form-control" /></div>
+            <div class="form-field"><label class="field-label" for="vehicleCostTitle" id="vehicleCostTitleLabel">Expense title</label><input type="text" id="vehicleCostTitle" required class="form-control" placeholder="Fuel, parking, oil change" /></div>
+            <div class="form-field"><label class="field-label" for="vehicleCostVendor">Vendor</label><input type="text" id="vehicleCostVendor" class="form-control" placeholder="Shell, Pep Boys, City Garage" /></div>
+            <div class="form-field"><label class="field-label" for="vehicleCostAmount">Amount</label><input type="number" id="vehicleCostAmount" min="0.01" step="0.01" required class="form-control" /></div>
+            <div class="form-field form-field--wide"><label class="field-label" for="vehicleCostNotes">Notes</label><textarea id="vehicleCostNotes" class="form-control" rows="3" placeholder="Optional service or purchase note"></textarea></div>
+          </div>
+          <div class="mileage-form-actions">
+            <button type="submit" class="mileage-save-btn" id="vehicleCostSubmit">Add expense</button>
+            <p id="vehicleCostFormMessage" class="mileage-message"></p>
+          </div>
         </form>
       </section>
 
       <section class="mileage-card">
-        <div class="mileage-card-head"><h2 data-i18n="mileage_logged_title">Logged mileage</h2></div>
-        <table class="mileage-table" id="mileageTable">
-          <thead><tr><th data-i18n="mileage_table_date">Date</th><th data-i18n="mileage_table_purpose">Purpose</th><th data-i18n="mileage_table_destination">Destination</th><th id="distanceHeader" data-i18n="mileage_table_miles">Miles</th><th data-i18n="mileage_table_actions">Actions</th></tr></thead>
-          <tbody id="mileageTableBody"></tbody>
-        </table>
-        <p id="mileageEmpty" class="mileage-empty" data-i18n="mileage_empty">No mileage logged yet.</p>
+        <div class="mileage-card-head mileage-card-head--stack">
+          <div>
+            <h2>History</h2>
+            <p class="mileage-card-copy">Filter trips, vehicle expenses, and maintenance in one timeline.</p>
+          </div>
+          <div class="mileage-history-toolbar">
+            <div class="mileage-search">
+              <input type="search" id="mileageSearch" placeholder="Search purpose, vendor, destination, or notes" aria-label="Search mileage history" />
+            </div>
+            <select id="mileageHistoryFilter" class="mileage-filter-select" aria-label="Filter history type">
+              <option value="all">All activity</option>
+              <option value="trip">Trips</option>
+              <option value="expense">Expenses</option>
+              <option value="maintenance">Maintenance</option>
+            </select>
+          </div>
+        </div>
+        <div class="mileage-table-wrap">
+          <table class="mileage-table" id="mileageHistoryTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Details</th>
+                <th id="distanceHeader">Distance / Amount</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="mileageTableBody"></tbody>
+          </table>
+        </div>
+        <p id="mileageEmpty" class="mileage-empty">No activity matches the current filters.</p>
       </section>
     </div>
   </main>
@@ -81,11 +161,11 @@
   <div id="mileageToast" class="mileage-toast hidden" role="status" aria-live="polite"><span class="toast-check" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><polyline points="2 8 6 12 14 4"></polyline></svg></span><span id="mileageToastMessage" data-i18n="mileage_added">Mileage added</span></div>
 
   <script src="../js/escape-html.js?v=20260410a"></script>
-<script src="../js/global.js?v=20260405c"></script>
+<script src="../js/global.js?v=20260423d"></script>
   <script src="../js/i18n.js?v=20260405c"></script>
   <script src="../js/auth.js?v=20260405c"></script>
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
-  <script src="../js/mileage.js?v=20260405c"></script>
+  <script src="../js/mileage.js?v=20260423a"></script>
 </body>
 </html>

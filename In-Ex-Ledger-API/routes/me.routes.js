@@ -46,6 +46,29 @@ function normalizeOptionalTrimmedString(value) {
   return trimmed || null;
 }
 
+function normalizeUiPreferences(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return {};
+  }
+
+  const next = {};
+
+  if ("dynamic_sidebar_favorites" in input) {
+    const rawFavorites = Array.isArray(input.dynamic_sidebar_favorites)
+      ? input.dynamic_sidebar_favorites
+      : [];
+    next.dynamic_sidebar_favorites = Array.from(
+      new Set(
+        rawFavorites
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+      )
+    ).slice(0, 12);
+  }
+
+  return next;
+}
+
 function normalizeOnboardingPayload(user) {
   return {
     completed: !!user?.onboarding_completed,
@@ -75,6 +98,7 @@ router.get("/", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
     const result = await pool.query(
       `SELECT id, email, role, email_verified, mfa_enabled, recovery_email, recovery_email_verified, full_name, display_name,
+              ui_preferences,
               country, province, data_residency, created_at,
               onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen,
               cpa_license_number, cpa_license_verified, cpa_license_status,
@@ -413,6 +437,28 @@ router.put("/", async (req, res) => {
   } catch (err) {
     logError("PUT /me error:", err.message);
     res.status(500).json({ error: "Failed to update profile." });
+  }
+});
+
+router.put("/preferences", async (req, res) => {
+  const updates = normalizeUiPreferences(req.body);
+  if (!Object.keys(updates).length) {
+    return res.status(400).json({ error: "No valid preferences provided." });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE users
+          SET ui_preferences = COALESCE(ui_preferences, '{}'::jsonb) || $1::jsonb
+        WHERE id = $2
+        RETURNING ui_preferences`,
+      [JSON.stringify(updates), req.user.id]
+    );
+
+    return res.status(200).json({ ui_preferences: result.rows[0]?.ui_preferences || {} });
+  } catch (err) {
+    logError("PUT /me/preferences error:", err.message);
+    return res.status(500).json({ error: "Failed to update preferences." });
   }
 });
 

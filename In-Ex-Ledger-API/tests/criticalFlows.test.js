@@ -404,6 +404,28 @@ test("me: PUT / (settings update) rejects missing CSRF token (403)", async () =>
   assert.equal(res.status, 403);
 });
 
+test("me: PUT /preferences rejects unauthenticated requests (401)", async () => {
+  const meRouter = require("../routes/me.routes.js");
+  const app = buildApp(meRouter, "/api/me");
+
+  const res = await request(app)
+    .put("/api/me/preferences")
+    .send({ dynamic_sidebar_favorites: ["transactions"] });
+  assert.equal(res.status, 401);
+});
+
+test("me: PUT /preferences rejects missing CSRF token (403)", async () => {
+  const meRouter = require("../routes/me.routes.js");
+  const app = buildApp(meRouter, "/api/me");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .put("/api/me/preferences")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ dynamic_sidebar_favorites: ["transactions"] });
+  assert.equal(res.status, 403);
+});
+
 test("me: DELETE / (account deletion) rejects unauthenticated requests (401)", async () => {
   const meRouter = require("../routes/me.routes.js");
   const app = buildApp(meRouter, "/api/me");
@@ -849,6 +871,45 @@ test("mileage: DELETE /:id rejects missing CSRF token (403)", async () => {
 
   const res = await request(app)
     .delete("/api/mileage/some-mil-id")
+    .set("Authorization", `Bearer ${authToken}`);
+  assert.equal(res.status, 403);
+});
+
+test("mileage: POST /costs rejects unauthenticated requests (401)", async () => {
+  const milRouter = require("../routes/mileage.routes.js");
+  const app = buildApp(milRouter, "/api/mileage");
+
+  const res = await request(app).post("/api/mileage/costs").send({ amount: 10 });
+  assert.equal(res.status, 401);
+});
+
+test("mileage: POST /costs rejects missing CSRF token (403)", async () => {
+  const milRouter = require("../routes/mileage.routes.js");
+  const app = buildApp(milRouter, "/api/mileage");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .post("/api/mileage/costs")
+    .set("Authorization", `Bearer ${authToken}`)
+    .send({ amount: 10 });
+  assert.equal(res.status, 403);
+});
+
+test("mileage: DELETE /costs/:id rejects unauthenticated requests (401)", async () => {
+  const milRouter = require("../routes/mileage.routes.js");
+  const app = buildApp(milRouter, "/api/mileage");
+
+  const res = await request(app).delete("/api/mileage/costs/some-cost-id");
+  assert.equal(res.status, 401);
+});
+
+test("mileage: DELETE /costs/:id rejects missing CSRF token (403)", async () => {
+  const milRouter = require("../routes/mileage.routes.js");
+  const app = buildApp(milRouter, "/api/mileage");
+  const authToken = makeToken();
+
+  const res = await request(app)
+    .delete("/api/mileage/costs/some-cost-id")
     .set("Authorization", `Bearer ${authToken}`);
   assert.equal(res.status, 403);
 });
