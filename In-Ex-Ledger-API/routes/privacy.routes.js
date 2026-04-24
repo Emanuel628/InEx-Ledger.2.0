@@ -220,6 +220,7 @@ router.post("/export", requireMfa, async (req, res) => {
       categoriesResult,
       auditLogResult,
       mileageResult,
+      vehicleCostResult,
       recurringResult,
       privacySettingsResult
     ] = await Promise.all([
@@ -300,6 +301,14 @@ router.post("/export", requireMfa, async (req, res) => {
           ORDER BY trip_date DESC`,
         [businessIds]
       ),
+      // Vehicle expense and maintenance records
+      pool.query(
+        `SELECT id, business_id, entry_type, entry_date, title, vendor, amount, notes, created_at
+           FROM vehicle_costs
+          WHERE business_id = ANY($1::uuid[])
+          ORDER BY entry_date DESC, created_at DESC`,
+        [businessIds]
+      ),
       // Recurring transaction templates
       pool.query(
         `SELECT id, business_id, amount, type, description, note, cadence,
@@ -374,6 +383,7 @@ router.post("/export", requireMfa, async (req, res) => {
       }),
       adjustmentHistory: adjustmentsResult.rows,
       mileage: mileageResult.rows,
+      vehicleCosts: vehicleCostResult.rows,
       recurringTransactions: recurringResult.rows,
       privacySettings: privacySettingsResult.rows[0] || null,
       auditLog: auditLogResult.rows
@@ -586,6 +596,7 @@ router.post("/delete", requireMfa, async (req, res) => {
     await client.query("DELETE FROM transactions WHERE business_id = ANY($1::uuid[])", [businessIds]);
     await client.query("DELETE FROM receipts WHERE business_id = ANY($1::uuid[])", [businessIds]);
     await client.query("DELETE FROM mileage WHERE business_id = ANY($1::uuid[])", [businessIds]);
+    await client.query("DELETE FROM vehicle_costs WHERE business_id = ANY($1::uuid[])", [businessIds]);
     await client.query("DELETE FROM exports WHERE business_id = ANY($1::uuid[])", [businessIds]);
     await client.query("DELETE FROM accounts WHERE business_id = ANY($1::uuid[])", [businessIds]);
     await client.query("DELETE FROM categories WHERE business_id = ANY($1::uuid[])", [businessIds]);

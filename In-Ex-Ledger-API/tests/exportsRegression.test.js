@@ -59,7 +59,8 @@ function loadExportsRouter(options = {}) {
     savedRedacted: null,
     insertedExport: null,
     insertedMetadata: null,
-    released: false
+    released: false,
+    vehicleCostQueryCount: 0
   };
 
   const grantPayload = options.grantPayload || {
@@ -111,6 +112,17 @@ function loadExportsRouter(options = {}) {
     ],
     receipts: [],
     mileage: [],
+    vehicleCosts: [
+      {
+        id: "vc_1",
+        entry_type: "expense",
+        entry_date: "2026-04-03",
+        title: "Fuel",
+        vendor: "Shell",
+        amount: "45.00",
+        notes: "Client travel"
+      }
+    ],
     business: { name: "Acme", region: "us", province: "" }
   };
 
@@ -198,6 +210,10 @@ function loadExportsRouter(options = {}) {
             }
             if (/FROM mileage/i.test(sql)) {
               return { rows: exportData.mileage };
+            }
+            if (/FROM vehicle_costs/i.test(sql)) {
+              state.vehicleCostQueryCount += 1;
+              return { rows: exportData.vehicleCosts };
             }
             if (/FROM businesses/i.test(sql)) {
               return { rows: [exportData.business] };
@@ -318,6 +334,7 @@ test("exports generate route returns the inline PDF buffer and stores only the r
     assert.match(response.body.toString("latin1"), /^%PDF-/);
     assert.match(response.body.toString("latin1"), /\(Tax ID: 12-3456789\) Tj/);
     assert.match(response.body.toString("latin1"), /\(Secure Export\) Tj/);
+    assert.equal(fixture.state.vehicleCostQueryCount > 0, true, "vehicle costs should be included in export queries");
     assert.ok(fixture.state.savedRedacted?.jobId, "redacted export should be saved");
     assert.ok(Buffer.isBuffer(fixture.state.savedRedacted?.buffer));
     assert.match(fixture.state.savedRedacted.buffer.toString("latin1"), /^%PDF-/);

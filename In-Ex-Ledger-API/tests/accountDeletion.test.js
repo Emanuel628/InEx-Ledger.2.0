@@ -264,6 +264,10 @@ test("account deletion executes the hard delete and returns success", async () =
       fixture.state.queries.some(({ sql }) => /DELETE FROM businesses WHERE user_id = \$1/i.test(sql)),
       "route must delete owned businesses before deleting the user"
     );
+    assert.ok(
+      fixture.state.queries.some(({ sql }) => /DELETE FROM vehicle_costs WHERE business_id = ANY\(\$1::uuid\[\]\)/i.test(sql)),
+      "route must delete vehicle costs before deleting the business"
+    );
     assert.deepEqual(fixture.state.unlinkCalls, ["C:\\managed\\receipt-1.pdf"]);
     assert.equal(fixture.state.clearedCookie?.name, "refresh_token");
   } finally {

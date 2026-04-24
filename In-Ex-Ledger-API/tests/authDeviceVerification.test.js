@@ -74,14 +74,14 @@ function loadAuthRouter(options = {}) {
           async query(sql, params = []) {
             state.capturedQueries.push({ sql, params });
 
-            if (/SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at, is_erased FROM users WHERE email = \$1/i.test(sql)) {
+            if (/SELECT id,\s*email,\s*password_hash,\s*email_verified,\s*mfa_enabled,\s*mfa_enabled_at,\s*role,\s*created_at,[\s\S]*?FROM users[\s\S]*?WHERE email = \$1/i.test(sql)) {
               if (String(params[0] || "").toLowerCase() === state.user.email) {
                 return { rows: [state.user], rowCount: 1 };
               }
               return { rows: [], rowCount: 0 };
             }
 
-            if (/SELECT id, email, password_hash, email_verified, mfa_enabled, mfa_enabled_at, role, created_at, is_erased FROM users WHERE id = \$1/i.test(sql)) {
+            if (/SELECT id,\s*email,\s*password_hash,\s*email_verified,\s*mfa_enabled,\s*mfa_enabled_at,\s*role,\s*created_at,[\s\S]*?FROM users[\s\S]*?WHERE id = \$1/i.test(sql)) {
               return params[0] === state.user.id
                 ? { rows: [state.user], rowCount: 1 }
                 : { rows: [], rowCount: 0 };

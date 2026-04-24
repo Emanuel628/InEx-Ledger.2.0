@@ -458,7 +458,8 @@ router.get("/portfolio/:ownerUserId/mileage", async (req, res) => {
       dateOrderExpr = "m.date";
     }
 
-    const result = await pool.query(
+    const [result, vehicleCostResult] = await Promise.all([
+      pool.query(
       `SELECT m.id,
               m.business_id,
               b.name AS business_name,
@@ -470,12 +471,30 @@ router.get("/portfolio/:ownerUserId/mileage", async (req, res) => {
               m.odometer_start,
               m.odometer_end,
               m.created_at
-         FROM mileage m
+        FROM mileage m
          JOIN businesses b ON b.id = m.business_id
         WHERE m.business_id = ANY($1::uuid[])
         ORDER BY ${dateOrderExpr} DESC, m.created_at DESC`,
       [portfolio.business_ids]
-    );
+      ),
+      pool.query(
+        `SELECT vc.id,
+                vc.business_id,
+                b.name AS business_name,
+                vc.entry_type,
+                vc.entry_date,
+                vc.title,
+                vc.vendor,
+                vc.amount,
+                vc.notes,
+                vc.created_at
+           FROM vehicle_costs vc
+           JOIN businesses b ON b.id = vc.business_id
+          WHERE vc.business_id = ANY($1::uuid[])
+          ORDER BY vc.entry_date DESC, vc.created_at DESC`,
+        [portfolio.business_ids]
+      )
+    ]);
 
     await logCpaAuditEvent({
       actorUserId: req.user.id,
@@ -488,7 +507,7 @@ router.get("/portfolio/:ownerUserId/mileage", async (req, res) => {
       }
     });
 
-    res.json({ data: result.rows, businesses: portfolio.businesses });
+    res.json({ data: result.rows, vehicle_costs: vehicleCostResult.rows, businesses: portfolio.businesses });
   } catch (error) {
     logError("GET /api/cpa-access/portfolio/:ownerUserId/mileage error:", error.message);
     res.status(500).json({ error: "Failed to load CPA mileage." });

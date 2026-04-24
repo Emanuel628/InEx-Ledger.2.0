@@ -245,7 +245,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     const currency = grantPayload.metadata?.currency || "USD";
     const includeTaxId = grantPayload.includeTaxId;
 
-    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult] =
+    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult] =
       await Promise.all([
         pool.query(
           `SELECT id, account_id, category_id, amount, type, description, date, note,
@@ -279,6 +279,13 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
            ORDER BY trip_date ASC`,
           [businessId, grantStartDate, grantEndDate]
         ),
+        pool.query(
+          `SELECT id, entry_type, entry_date, title, vendor, amount, notes, created_at
+           FROM vehicle_costs
+           WHERE business_id = $1 AND entry_date >= $2 AND entry_date <= $3
+           ORDER BY entry_date ASC, created_at ASC`,
+          [businessId, grantStartDate, grantEndDate]
+        ),
         pool.query(`SELECT name, region, province FROM businesses WHERE id = $1`, [businessId])
       ]);
 
@@ -300,6 +307,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       categories,
       receipts: receiptResult.rows,
       mileage: mileageResult.rows,
+      vehicleCosts: vehicleCostResult.rows,
       startDate: grantStartDate,
       endDate: grantEndDate,
       exportLang,
@@ -460,7 +468,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     const currency = req.body?.currency || "USD";
     const templateVersion = req.body?.templateVersion || "v1";
 
-    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult] =
+    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult] =
       await Promise.all([
         pool.query(
           `SELECT id, account_id, category_id, amount, type, description, date, note,
@@ -502,6 +510,14 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
           [businessId, dateRange.startDate, dateRange.endDate]
         ),
         pool.query(
+          `SELECT id, entry_type, entry_date, title, vendor, amount, notes, created_at
+           FROM vehicle_costs
+           WHERE business_id = $1
+             AND entry_date >= $2 AND entry_date <= $3
+           ORDER BY entry_date ASC, created_at ASC`,
+          [businessId, dateRange.startDate, dateRange.endDate]
+        ),
+        pool.query(
           `SELECT name, region, province FROM businesses WHERE id = $1`,
           [businessId]
         )
@@ -525,6 +541,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       categories,
       receipts: receiptResult.rows,
       mileage: mileageResult.rows,
+      vehicleCosts: vehicleCostResult.rows,
       startDate: dateRange.startDate,
       endDate: dateRange.endDate,
       exportLang,

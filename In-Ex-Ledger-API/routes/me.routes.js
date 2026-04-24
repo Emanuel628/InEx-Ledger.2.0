@@ -622,6 +622,10 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
         [businessIds]
       );
       await client.query(
+        "DELETE FROM vehicle_costs WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
+      );
+      await client.query(
         "DELETE FROM exports WHERE business_id = ANY($1::uuid[])",
         [businessIds]
       );
