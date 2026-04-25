@@ -92,13 +92,27 @@ function validateInvoicePayload(body) {
 }
 
 async function generateInvoiceNumber(businessId) {
-  const result = await pool.query(
-    "SELECT COUNT(*) FROM invoices_v1 WHERE business_id = $1",
-    [businessId]
-  );
-  const count = Number(result.rows[0]?.count ?? 0) + 1;
   const year = new Date().getFullYear();
-  return `INV-${year}-${String(count).padStart(4, "0")}`;
+  const result = await pool.query(
+    `SELECT COALESCE(
+       MAX(
+         CASE
+           WHEN invoice_number ~ $2 THEN substring(invoice_number from $3)::integer
+           ELSE NULL
+         END
+       ),
+       0
+     ) AS max_number
+     FROM invoices_v1
+     WHERE business_id = $1`,
+    [
+      businessId,
+      `^INV-${year}-[0-9]+$`,
+      `^INV-${year}-([0-9]+)$`
+    ]
+  );
+  const nextNumber = Number(result.rows[0]?.max_number ?? 0) + 1;
+  return `INV-${year}-${String(nextNumber).padStart(4, "0")}`;
 }
 
 /* ── GET /api/invoices-v1 ── list invoices */
@@ -147,25 +161,41 @@ router.post("/", async (req, res) => {
     const { customer_name, customer_email, issue_date, due_date, currency,
             line_items, subtotal, tax_rate, tax_amount, total_amount, notes } = validation.normalized;
 
-    const invoiceNumber = await generateInvoiceNumber(businessId);
     const status = String(req.body.status || "draft").toLowerCase();
     const finalStatus = VALID_STATUSES.has(status) ? status : "draft";
+    let createdInvoice = null;
 
-    const result = await pool.query(
-      `INSERT INTO invoices_v1
-        (id, business_id, invoice_number, customer_name, customer_email,
-         issue_date, due_date, status, currency, line_items,
-         subtotal, tax_rate, tax_amount, total_amount, notes, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,now(),now())
-       RETURNING *`,
-      [
-        crypto.randomUUID(), businessId, invoiceNumber, customer_name, customer_email,
-        issue_date, due_date, finalStatus, currency, JSON.stringify(line_items),
-        subtotal, tax_rate, tax_amount, total_amount, notes
-      ]
-    );
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const invoiceNumber = await generateInvoiceNumber(businessId);
+      try {
+        const result = await pool.query(
+          `INSERT INTO invoices_v1
+            (id, business_id, invoice_number, customer_name, customer_email,
+             issue_date, due_date, status, currency, line_items,
+             subtotal, tax_rate, tax_amount, total_amount, notes, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,now(),now())
+           RETURNING *`,
+          [
+            crypto.randomUUID(), businessId, invoiceNumber, customer_name, customer_email,
+            issue_date, due_date, finalStatus, currency, JSON.stringify(line_items),
+            subtotal, tax_rate, tax_amount, total_amount, notes
+          ]
+        );
+        createdInvoice = result.rows[0];
+        break;
+      } catch (err) {
+        if (err?.code === "23505") {
+          continue;
+        }
+        throw err;
+      }
+    }
 
-    res.status(201).json(result.rows[0]);
+    if (!createdInvoice) {
+      return res.status(409).json({ error: "Could not generate a unique invoice number. Please try again." });
+    }
+
+    res.status(201).json(createdInvoice);
   } catch (err) {
     logError("POST /invoices-v1 error:", err);
     res.status(500).json({ error: "Failed to create invoice." });

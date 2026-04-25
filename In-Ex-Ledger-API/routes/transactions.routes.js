@@ -717,40 +717,68 @@ const csvUpload = multer({
 });
 
 /**
- * Parses raw CSV text into an array of row objects keyed by lowercased header names.
- * Handles quoted fields containing commas and line breaks.
+ * Parses raw CSV text into an array of row objects keyed by normalized header names.
+ * Supports quoted commas, escaped quotes, and embedded newlines inside quoted fields.
  */
 function parseCsv(text) {
-  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-  const nonEmpty = lines.filter((l) => l.trim());
-  if (nonEmpty.length < 2) return [];
-
-  function splitRow(line) {
-    const cells = [];
-    let cur = "";
-    let inQuote = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
-        else { inQuote = !inQuote; }
-      } else if (ch === "," && !inQuote) {
-        cells.push(cur.trim());
-        cur = "";
-      } else {
-        cur += ch;
-      }
-    }
-    cells.push(cur.trim());
-    return cells;
+  const source = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (!source.trim()) {
+    return [];
   }
 
-  const headers = splitRow(nonEmpty[0]).map((h) => h.toLowerCase().replace(/[^a-z0-9_$]/g, "_"));
-  return nonEmpty.slice(1).map((line) => {
-    const cells = splitRow(line);
-    const row = {};
-    headers.forEach((h, i) => { row[h] = cells[i] ?? ""; });
-    return row;
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let inQuote = false;
+
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+
+    if (ch === '"') {
+      if (inQuote && source[i + 1] === '"') {
+        cell += '"';
+        i += 1;
+      } else {
+        inQuote = !inQuote;
+      }
+      continue;
+    }
+
+    if (ch === "," && !inQuote) {
+      row.push(cell.trim());
+      cell = "";
+      continue;
+    }
+
+    if (ch === "\n" && !inQuote) {
+      row.push(cell.trim());
+      cell = "";
+      if (row.some((value) => String(value || "").trim())) {
+        rows.push(row);
+      }
+      row = [];
+      continue;
+    }
+
+    cell += ch;
+  }
+
+  row.push(cell.trim());
+  if (row.some((value) => String(value || "").trim())) {
+    rows.push(row);
+  }
+
+  if (rows.length < 2) {
+    return [];
+  }
+
+  const headers = rows[0].map((header) => String(header || "").toLowerCase().replace(/[^a-z0-9_$]/g, "_"));
+  return rows.slice(1).map((cells) => {
+    const mapped = {};
+    headers.forEach((header, index) => {
+      mapped[header] = cells[index] ?? "";
+    });
+    return mapped;
   });
 }
 
@@ -994,3 +1022,9 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
 });
 
 module.exports = router;
+module.exports.__private = {
+  parseCsv,
+  normalizeDate,
+  detectColumns,
+  extractRowData
+};

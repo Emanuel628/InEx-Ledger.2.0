@@ -522,6 +522,9 @@ router.delete("/:id", async (req, res) => {
    ========================================================= */
 
 const ANTHROPIC_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const ANTHROPIC_RECEIPT_OCR_MODEL = String(
+  process.env.ANTHROPIC_RECEIPT_OCR_MODEL || "claude-3-5-haiku-20241022"
+).trim();
 
 async function extractReceiptDataWithClaude(filePath, mimeType) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -529,11 +532,17 @@ async function extractReceiptDataWithClaude(filePath, mimeType) {
     return { available: false, reason: "OCR is not configured on this server. Set ANTHROPIC_API_KEY to enable receipt scanning." };
   }
 
-  const resolvedMime = ANTHROPIC_MEDIA_TYPES.has(mimeType) ? mimeType : "image/jpeg";
+  const resolvedMime = String(mimeType || "").trim().toLowerCase();
+  if (!ANTHROPIC_MEDIA_TYPES.has(resolvedMime)) {
+    return {
+      available: false,
+      reason: "Receipt scan currently supports JPG, PNG, GIF, and WEBP images only."
+    };
+  }
   const imageData = fs.readFileSync(filePath).toString("base64");
 
   const requestBody = JSON.stringify({
-    model: "claude-haiku-4-5-20251001",
+    model: ANTHROPIC_RECEIPT_OCR_MODEL,
     max_tokens: 512,
     messages: [{
       role: "user",
@@ -644,7 +653,14 @@ router.post("/:id/extract", async (req, res) => {
     }
 
     if (mime_type === "application/pdf") {
-      return res.status(422).json({ available: false, reason: "PDF receipts cannot be scanned. Please use an image file (JPG, PNG, WEBP)." });
+      return res.status(422).json({ available: false, reason: "PDF receipts cannot be scanned. Please use an image file (JPG, PNG, GIF, or WEBP)." });
+    }
+
+    if (!ANTHROPIC_MEDIA_TYPES.has(String(mime_type || "").trim().toLowerCase())) {
+      return res.status(422).json({
+        available: false,
+        reason: "Receipt scan currently supports JPG, PNG, GIF, and WEBP images only."
+      });
     }
 
     const ocrResult = await extractReceiptDataWithClaude(resolvedPath, mime_type);
@@ -656,3 +672,8 @@ router.post("/:id/extract", async (req, res) => {
 });
 
 module.exports = router;
+module.exports.__private = {
+  extractReceiptDataWithClaude,
+  ANTHROPIC_MEDIA_TYPES,
+  ANTHROPIC_RECEIPT_OCR_MODEL
+};
