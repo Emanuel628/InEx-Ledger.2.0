@@ -169,10 +169,14 @@
 }
 
 .exports-grid > .exports-card {
-  height: 100%;
   display: flex;
   flex-direction: column;
+  min-height: 100%;
   }
+  
+.exports-grid > .exports-card:last-child .summary-panel {
+  flex: 1;
+}
 
 .exports-card,
 .history-card {
