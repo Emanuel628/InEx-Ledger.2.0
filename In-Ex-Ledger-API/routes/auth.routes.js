@@ -425,6 +425,10 @@ function maskEmailAddress(email) {
   return `${localPrefix}@${[maskedDomain, ...domainParts].join(".")}`;
 }
 
+function maskEmail(email) {
+  return maskEmailAddress(email);
+}
+
 function buildRecoveryEmailVerificationLink(req, token) {
   return `${getAppBaseUrl(req)}/api/auth/confirm-recovery-email?token=${token}`;
 }
@@ -856,6 +860,7 @@ router.post("/send-verification", authLimiter, async (req, res) => {
 router.post("/login", authLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
+  const clientIp = extractClientIp(req);
 
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
@@ -865,14 +870,29 @@ router.post("/login", authLimiter, async (req, res) => {
     const user = await findUserByEmail(email);
 
     if (!user) {
+      logWarn("Failed login for unknown email", {
+        email: maskEmail(email),
+        ip: clientIp
+      });
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     if (user.is_erased) {
+      logWarn("Failed login for erased account", {
+        userId: user.id,
+        email: maskEmail(email),
+        ip: clientIp
+      });
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     if (isLoginLocked(user)) {
+      logWarn("Blocked login for locked account", {
+        userId: user.id,
+        email: maskEmail(email),
+        ip: clientIp,
+        lockedUntil: getLoginLockExpiry(user)?.toISOString() || null
+      });
       return res.status(423).json({
         error: "Too many failed sign-in attempts. Try again later or use account recovery.",
         code: "account_locked",
@@ -883,6 +903,21 @@ router.post("/login", authLimiter, async (req, res) => {
     const { match, legacy } = await verifyPassword(password, user.password_hash);
     if (!match) {
       const failureState = await recordFailedLoginAttempt(user);
+      if (failureState.lockedUntil) {
+        logWarn("Account locked after failed login attempts", {
+          userId: user.id,
+          email: maskEmail(email),
+          ip: clientIp,
+          lockedUntil: failureState.lockedUntil.toISOString()
+        });
+      } else {
+        logWarn("Failed login attempt", {
+          userId: user.id,
+          email: maskEmail(email),
+          ip: clientIp,
+          attemptsRemaining: failureState.attemptsRemaining
+        });
+      }
       if (failureState.lockedUntil) {
         return res.status(423).json({
           error: "Too many failed sign-in attempts. Try again later or use account recovery.",
@@ -987,6 +1022,13 @@ router.post("/login", authLimiter, async (req, res) => {
     const session = await issueAuthenticatedSession(res, user, businessId, {
       mfaAuthenticated
     });
+    logInfo("User login succeeded", {
+      userId: user.id,
+      businessId,
+      mfaAuthenticated,
+      recognizedDevice: !!recognizedDevice,
+      firstSignIn: isFirstSignIn
+    });
     if (isFirstSignIn && deviceContext) {
       try {
         await insertRecognizedSignInDevice(user, deviceContext);
@@ -1088,6 +1130,10 @@ router.post("/logout", requireAuth, requireCsrfProtection, async (req, res) => {
     const hashed = hashRefreshToken(rawToken);
     await revokeRefreshTokenByHash(hashed);
   }
+  logInfo("User logout", {
+    userId: req.user?.id || null,
+    businessId: req.user?.business_id || null
+  });
   clearRefreshCookie(res);
   res.status(204).end();
 });
@@ -1177,6 +1223,11 @@ router.post("/change-password", authLimiter, requireAuth, requireCsrfProtection,
     });
     await revokeTrustedMfaDevicesForUser(user.id);
     clearMfaTrustCookie(res);
+    logInfo("Password changed", {
+      userId: user.id,
+      businessId: req.user?.business_id || null,
+      via: "authenticated_change"
+    });
 
     return res.status(200).json({
       success: true,
@@ -1393,6 +1444,10 @@ router.post("/mfa/enable", requireAuth, requireCsrfProtection, authLimiter, asyn
     });
     await revokeTrustedMfaDevicesForUser(user.id);
     clearMfaTrustCookie(res);
+    logInfo("MFA enabled", {
+      userId: user.id,
+      businessId: req.user?.business_id || null
+    });
 
     return res.status(200).json({
       success: true,
@@ -1489,6 +1544,10 @@ router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter
     const session = await resetCurrentRefreshSession(res, refreshedUser);
     await revokeTrustedMfaDevicesForUser(user.id);
     clearMfaTrustCookie(res);
+    logInfo("MFA disabled", {
+      userId: user.id,
+      businessId: req.user?.business_id || null
+    });
 
     return res.status(200).json({
       success: true,
@@ -1595,6 +1654,10 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
     if (userResult.rowCount > 0) {
       const { token } = await createPasswordResetToken(email);
       const resetLink = buildPasswordResetLink(req, token);
+      logInfo("Password reset requested", {
+        email: maskEmail(email),
+        delivery: "primary_email"
+      });
 
       try {
         const lang = await getPreferredLanguageForEmail(email);
@@ -1635,6 +1698,11 @@ router.post("/account-recovery", passwordLimiter, async (req, res) => {
     if (userResult.rowCount > 0) {
       const { token } = await createPasswordResetToken(email);
       const resetLink = buildPasswordResetLink(req, token);
+      logInfo("Account recovery password reset requested", {
+        email: maskEmail(email),
+        recoveryEmail: maskEmail(recoveryEmail),
+        delivery: "recovery_email"
+      });
 
       try {
         const lang = await getPreferredLanguageForEmail(email);
@@ -1686,6 +1754,10 @@ router.post("/reset-password", passwordLimiter, async (req, res) => {
       const userId = userResult.rows[0].id;
       await pool.query("UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false", [userId]);
       await pool.query("DELETE FROM mfa_trusted_devices WHERE user_id = $1", [userId]);
+      logInfo("Password reset completed", {
+        userId,
+        email: maskEmail(email)
+      });
     }
     return res.status(200).json({ message: "Password updated successfully." });
   } catch (err) {

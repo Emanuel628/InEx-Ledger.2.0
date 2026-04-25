@@ -420,6 +420,13 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
     }
 
     const session = await stripeRequest("/checkout/sessions", sessionPayload);
+    logInfo("Billing checkout session created", {
+      userId: req.user?.id,
+      businessId,
+      currency: priceSelection.currency,
+      billingInterval: priceSelection.billingInterval,
+      additionalBusinesses
+    });
 
     res.status(200).json({ url: session.url, id: session.id });
   } catch (err) {
@@ -438,6 +445,10 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
     const session = await stripeRequest("/billing_portal/sessions", {
       customer: customerId,
       return_url: buildAppUrl("/subscription")
+    });
+    logInfo("Billing portal session created", {
+      userId: req.user?.id,
+      businessId
     });
     res.status(200).json({ url: session.url });
   } catch (err) {
@@ -479,6 +490,12 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
     }
 
     const updated = await getSubscriptionSnapshotForBusiness(businessId);
+    logInfo("Billing cancellation scheduled", {
+      userId: req.user?.id,
+      businessId,
+      stripeSubscriptionId: subscription.stripeSubscriptionId || null,
+      cancelAtPeriodEnd: true
+    });
     res.status(200).json({ subscription: updated });
   } catch (err) {
     logError("POST /api/billing/cancel error:", err.message);

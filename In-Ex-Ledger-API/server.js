@@ -154,6 +154,21 @@ app.use(helmet({
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"]
     }
+  },
+  frameguard: {
+    action: 'deny'
+  },
+  referrerPolicy: {
+    policy: 'same-origin'
+  },
+  permissionsPolicy: {
+    features: {
+      camera: ["'none'"],
+      microphone: ["'none'"],
+      geolocation: ["'none'"],
+      payment: ["'self'"],
+      usb: ["'none'"]
+    }
   }
 }));
 app.use(cors({

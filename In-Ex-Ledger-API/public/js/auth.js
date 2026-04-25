@@ -631,6 +631,11 @@ async function requireValidSessionOrRedirect() {
 
 async function redirectIfAuthenticated() {
   try {
+    const existingToken = getToken();
+    if (!existingToken) {
+      return;
+    }
+
     const loadProfile = () => fetch(buildApiUrl("/api/me"), {
       method: "GET",
       credentials: "include",

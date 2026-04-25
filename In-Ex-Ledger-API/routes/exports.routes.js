@@ -12,7 +12,7 @@ const { saveRedactedPdf, buildRedactedStream, deleteExportFile } = require("../s
 const { decryptJwe } = require("../services/jweDecryptService.js");
 const { buildPdfExport } = require("../services/pdfGeneratorService.js");
 const { pool } = require("../db.js");
-const { logError } = require("../utils/logger.js");
+const { logError, logInfo } = require("../utils/logger.js");
 const { sanitizePayload } = require("../utils/logSanitizer.js");
 const {
   getSubscriptionSnapshotForBusiness,
@@ -200,6 +200,15 @@ router.post("/history", exportGrantLimiter, async (req, res) => {
       filename,
       notes: batchMode ? "Client-generated batch export history entry" : "Client-generated export history entry",
       fullVersionAvailable: format !== "pdf"
+    });
+    logInfo("Export history recorded", {
+      userId: user.id,
+      businessId,
+      exportId,
+      format,
+      scope,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate
     });
 
     return res.status(201).json({ id: exportId });
@@ -396,6 +405,14 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       notes: "Generated via grant",
       fullVersionAvailable: false
     });
+    logInfo("Secure export PDF generated via grant", {
+      userId: user.id,
+      businessId,
+      startDate: grantStartDate,
+      endDate: grantEndDate,
+      includeTaxId,
+      exportLang
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -489,6 +506,11 @@ router.get("/history/:id/redacted", exportGrantLimiter, async (req, res) => {
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Cache-Control", "private, max-age=0, no-store");
+    logInfo("Redacted export downloaded", {
+      userId: user.id,
+      businessId,
+      exportId: id
+    });
     buildRedactedStream(res, rows[0].file_path);
   } catch (err) {
     logError("Redacted download error", { err: err.message });
@@ -634,6 +656,14 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       notes: "Generated via secure export",
       fullVersionAvailable: false
     });
+    logInfo("Secure export PDF generated", {
+      userId: user.id,
+      businessId,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+      includeTaxId,
+      exportLang
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -685,6 +715,12 @@ router.delete("/history/:id", exportGrantLimiter, async (req, res) => {
     } finally {
       client.release();
     }
+
+    logInfo("Export deleted", {
+      userId: user.id,
+      businessId,
+      exportId: req.params.id
+    });
 
     return res.json({ message: "Export deleted." });
   } catch (err) {

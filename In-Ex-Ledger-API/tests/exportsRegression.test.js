@@ -240,7 +240,8 @@ function loadExportsRouter(options = {}) {
     }
     if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
       return {
-        logError() {}
+        logError() {},
+        logInfo() {}
       };
     }
     if (requestName === "../utils/logSanitizer.js" || /logSanitizer\.js$/.test(requestName)) {
