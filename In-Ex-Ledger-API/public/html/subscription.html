@@ -156,6 +156,7 @@
                <!-- Mock Upgrade to Business (V2) button removed -->
           </div>
           <button type="button" id="planProBtn" class="settings-primary-btn" data-i18n="subscription_pro_cta">Upgrade to Pro</button>
+          <p class="sub-plan-checkout-note">You will review and pay securely in Stripe checkout.</p>
         </div>
 
           <div class="sub-plan-card sub-plan-coming-soon" id="planV2">
@@ -200,6 +201,58 @@
       </div>
     </section>
   </main>
+</div>
+
+<div id="subCheckoutModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="subCheckoutModalTitle">
+  <div class="transaction-modal-content sub-checkout-modal">
+    <div class="sub-checkout-head">
+      <div class="sub-checkout-kicker">Secure checkout</div>
+      <h3 id="subCheckoutModalTitle">Review your subscription</h3>
+      <p class="sub-checkout-copy">You will be redirected to Stripe to enter payment details and complete your subscription securely.</p>
+    </div>
+
+    <div class="sub-checkout-card">
+      <div class="sub-checkout-row">
+        <span class="sub-checkout-label">Plan</span>
+        <strong id="subCheckoutPlanLabel">Pro</strong>
+      </div>
+      <div class="sub-checkout-row">
+        <span class="sub-checkout-label">Billing</span>
+        <strong id="subCheckoutIntervalLabel">Monthly</strong>
+      </div>
+      <div class="sub-checkout-row">
+        <span class="sub-checkout-label">Currency</span>
+        <strong id="subCheckoutCurrencyLabel">USD</strong>
+      </div>
+      <div class="sub-checkout-row">
+        <span class="sub-checkout-label">Additional businesses</span>
+        <strong id="subCheckoutAddonCount">0</strong>
+      </div>
+      <div class="sub-checkout-row">
+        <span class="sub-checkout-label">Plan total</span>
+        <strong id="subCheckoutBaseTotal">-</strong>
+      </div>
+      <div class="sub-checkout-row">
+        <span class="sub-checkout-label">Add-on total</span>
+        <strong id="subCheckoutAddonTotal">-</strong>
+      </div>
+      <div class="sub-checkout-row sub-checkout-row-total">
+        <span class="sub-checkout-label">Estimated total</span>
+        <strong id="subCheckoutGrandTotal">-</strong>
+      </div>
+    </div>
+
+    <div class="sub-checkout-points">
+      <div class="sub-checkout-point">Hosted securely by Stripe</div>
+      <div class="sub-checkout-point">Final taxes and payment details are confirmed there</div>
+      <div class="sub-checkout-point">You can return here if you cancel before paying</div>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" id="subCheckoutCancel" class="modal-cancel">Cancel</button>
+      <button type="button" id="subCheckoutConfirm" class="drawer-submit">Continue to secure checkout</button>
+    </div>
+  </div>
 </div>
 
 <div id="subCancelModal" class="transaction-modal hidden">
@@ -250,6 +303,6 @@
 <script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/taxReminders.js?v=20260405c"></script>
 <script src="../js/billing-pricing.js?v=20260419a"></script>
-<script src="../js/subscription.js?v=20260419a"></script>
+<script src="../js/subscription.js?v=20260425b"></script>
 </body>
 </html>

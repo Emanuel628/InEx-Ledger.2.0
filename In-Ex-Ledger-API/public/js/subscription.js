@@ -221,14 +221,28 @@ async function initPricingControls() {
 function setCheckoutLoading(isLoading) {
   pricingState.isCheckoutLoading = isLoading;
   const planProBtn = document.getElementById("planProBtn");
-  if (!planProBtn) return;
-  const defaultLabel = planProBtn.dataset.defaultLabel || planProBtn.textContent || "";
+  const checkoutConfirmBtn = document.getElementById("subCheckoutConfirm");
+  const defaultLabel = planProBtn?.dataset.defaultLabel || planProBtn?.textContent || "";
+  const defaultCheckoutLabel =
+    checkoutConfirmBtn?.dataset.defaultLabel || checkoutConfirmBtn?.textContent || "";
   if (isLoading) {
-    planProBtn.disabled = true;
-    planProBtn.textContent = tx("subscription_checkout_loading");
+    if (planProBtn) {
+      planProBtn.disabled = true;
+      planProBtn.textContent = tx("subscription_checkout_loading");
+    }
+    if (checkoutConfirmBtn) {
+      checkoutConfirmBtn.disabled = true;
+      checkoutConfirmBtn.textContent = tx("subscription_checkout_loading");
+    }
   } else {
-    planProBtn.disabled = planProBtn.dataset.planDisabled === "true";
-    planProBtn.textContent = defaultLabel;
+    if (planProBtn) {
+      planProBtn.disabled = planProBtn.dataset.planDisabled === "true";
+      planProBtn.textContent = defaultLabel;
+    }
+    if (checkoutConfirmBtn) {
+      checkoutConfirmBtn.disabled = false;
+      checkoutConfirmBtn.textContent = defaultCheckoutLabel;
+    }
   }
 }
 
@@ -460,6 +474,81 @@ async function loadBillingHistory() {
   }
 }
 
+function populateCheckoutModal() {
+  const intervalLabel = tx(
+    pricingState.billingInterval === "yearly"
+      ? "subscription_billing_yearly"
+      : "subscription_billing_monthly"
+  );
+  const currencyLabel = String(pricingState.currency || "usd").toUpperCase();
+  const pricing = getPricingDetails();
+  const baseTotal = formatMoney(pricingState.currency, pricing.base);
+  const addonTotal = formatMoney(pricingState.currency, getAddonTotalAmount());
+  const grandTotal = formatMoney(pricingState.currency, getGrandTotalAmount());
+
+  const planEl = document.getElementById("subCheckoutPlanLabel");
+  const intervalEl = document.getElementById("subCheckoutIntervalLabel");
+  const currencyEl = document.getElementById("subCheckoutCurrencyLabel");
+  const addonCountEl = document.getElementById("subCheckoutAddonCount");
+  const baseTotalEl = document.getElementById("subCheckoutBaseTotal");
+  const addonTotalEl = document.getElementById("subCheckoutAddonTotal");
+  const grandTotalEl = document.getElementById("subCheckoutGrandTotal");
+
+  if (planEl) planEl.textContent = "Pro";
+  if (intervalEl) intervalEl.textContent = intervalLabel;
+  if (currencyEl) currencyEl.textContent = currencyLabel;
+  if (addonCountEl) {
+    addonCountEl.textContent = pricingState.additionalBusinesses > 0
+      ? String(pricingState.additionalBusinesses)
+      : "None";
+  }
+  if (baseTotalEl) baseTotalEl.textContent = baseTotal;
+  if (addonTotalEl) addonTotalEl.textContent = pricingState.additionalBusinesses > 0 ? addonTotal : formatMoney(pricingState.currency, 0);
+  if (grandTotalEl) grandTotalEl.textContent = grandTotal;
+}
+
+function openCheckoutModal() {
+  if (pricingState.isCheckoutLoading) {
+    return;
+  }
+  const modal = document.getElementById("subCheckoutModal");
+  if (!modal) {
+    void startCheckout();
+    return;
+  }
+  populateCheckoutModal();
+  modal.classList.remove("hidden");
+}
+
+function closeCheckoutModal() {
+  document.getElementById("subCheckoutModal")?.classList.add("hidden");
+}
+
+function wireCheckoutModal() {
+  const modal = document.getElementById("subCheckoutModal");
+  const cancelBtn = document.getElementById("subCheckoutCancel");
+  const confirmBtn = document.getElementById("subCheckoutConfirm");
+
+  if (!modal || !cancelBtn || !confirmBtn) {
+    return;
+  }
+
+  confirmBtn.dataset.defaultLabel = confirmBtn.textContent || "";
+
+  cancelBtn.addEventListener("click", closeCheckoutModal);
+  confirmBtn.addEventListener("click", startCheckout);
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      closeCheckoutModal();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !modal.classList.contains("hidden") && !pricingState.isCheckoutLoading) {
+      closeCheckoutModal();
+    }
+  });
+}
+
 async function startCheckout() {
   try {
     if (pricingState.isCheckoutLoading) return;
@@ -485,6 +574,7 @@ async function startCheckout() {
       if (!isAllowedBillingRedirect(payload.url)) {
         throw new Error(tx("subscription_checkout_error"));
       }
+      closeCheckoutModal();
       window.location.href = payload.url;
       return;
     }
@@ -568,7 +658,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initPricingControls();
 
   const planProBtn = document.getElementById("planProBtn");
-  planProBtn?.addEventListener("click", startCheckout);
+  planProBtn?.addEventListener("click", openCheckoutModal);
+  wireCheckoutModal();
 
   const manageBillingBtn = document.getElementById("subManageBillingBtn");
   manageBillingBtn?.addEventListener("click", openCustomerPortal);
