@@ -242,7 +242,18 @@
   gap: 14px;
   align-items: start;
 }
-
+-------------------
+.exports-card input,
+.exports-card select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0.5px solid var(--border2);
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface2)
+}
+-------------------
 .exports-card input,
 .exports-card select {
   width: 100%;
