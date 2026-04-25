@@ -519,3 +519,99 @@
 .monthly-table--spaced { margin-top: 16px; }
 .insight-list--spaced { margin-top: 16px; }
 .whatif-error { color: var(--red); }
+
+/* ── This Month card ───────────────────────────────────── */
+.analytics-this-month {
+  padding: 20px 24px;
+}
+.this-month-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.this-month-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.this-month-progress {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.this-month-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.this-month-item {
+  background: var(--surface-2, #f9f9f9);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.this-month-val {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.this-month-val.income  { color: var(--color-income, #27ae60); }
+.this-month-val.expense { color: var(--color-expense, #e74c3c); }
+.this-month-val.net-pos { color: var(--color-income, #27ae60); }
+.this-month-val.net-neg { color: var(--color-expense, #e74c3c); }
+.this-month-key {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pct-badge {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.pct-badge--up   { background: #e6f9ed; color: #1a8040; }
+.pct-badge--down { background: #fff0ec; color: #c0392b; }
+
+/* ── SVG Trend chart ───────────────────────────────────── */
+.sparkline-wrap {
+  width: 100%;
+  overflow: hidden;
+}
+.trend-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.chart-tick {
+  font-size: 10px;
+  fill: var(--text-secondary);
+}
+.chart-dot--income {
+  fill: var(--color-income, #27ae60);
+  stroke: var(--surface, #fff);
+  stroke-width: 1.5;
+  cursor: default;
+}
+.sparkline-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+.legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.legend-income  { background: var(--color-income, #27ae60); }
+.legend-expense { background: var(--color-expense, #e74c3c); }
+
+@media (max-width: 600px) {
+  .this-month-grid { grid-template-columns: 1fr; }
+}

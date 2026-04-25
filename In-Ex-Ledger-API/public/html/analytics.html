@@ -71,6 +71,27 @@
           <div class="analytics-loading">Loading dashboard…</div>
         </div>
 
+        <!-- This Month card -->
+        <div class="analytics-card analytics-this-month" id="thisMonthCard" hidden>
+          <div class="this-month-header">
+            <h2 id="thisMonthLabel">This Month</h2>
+            <span class="this-month-progress" id="thisMonthProgress"></span>
+          </div>
+          <div class="this-month-grid" id="thisMonthGrid"></div>
+        </div>
+
+        <!-- Trend sparkline -->
+        <div class="analytics-card" id="trendCard" hidden>
+          <h2>12-Month Income &amp; Expense Trend</h2>
+          <div class="sparkline-wrap">
+            <svg id="trendChart" class="trend-chart" role="img" aria-label="Income and expense trend"></svg>
+          </div>
+          <div class="sparkline-legend">
+            <span class="legend-dot legend-income"></span><span>Income</span>
+            <span class="legend-dot legend-expense"></span><span>Expenses</span>
+          </div>
+        </div>
+
         <div class="analytics-card" id="monthlyCard" hidden>
           <h2>Monthly Breakdown (last 12 months)</h2>
           <table class="monthly-table" id="monthlyTable">

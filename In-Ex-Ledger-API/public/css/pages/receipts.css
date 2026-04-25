@@ -478,3 +478,58 @@
     flex-direction: column;
   }
 }
+
+/* ── OCR Scan button & modal ─────────────────────────────── */
+.receipt-scan-btn {
+  padding: 3px 10px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--accent, #0070f3);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.receipt-scan-btn:hover {
+  background: var(--accent, #0070f3);
+  color: #fff;
+  border-color: var(--accent, #0070f3);
+}
+
+.ocr-modal-content {
+  max-width: 420px;
+  padding: 28px 28px 24px;
+}
+.ocr-modal-title {
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.ocr-modal-body {
+  min-height: 60px;
+  margin-bottom: 16px;
+}
+.ocr-field {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.ocr-field:last-child { border-bottom: none; }
+.ocr-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.ocr-val {
+  text-align: right;
+  color: var(--text);
+}
+.ocr-unavailable {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-style: italic;
+}

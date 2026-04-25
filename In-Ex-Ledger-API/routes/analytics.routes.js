@@ -192,6 +192,52 @@ router.get("/dashboard", async (req, res) => {
       }
     }
 
+    // Current month vs prior month comparison
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const priorMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10);
+    const priorMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0, 10);
+
+    const currentMonthResult = await pool.query(
+      `SELECT type, SUM(amount) AS total
+       FROM transactions
+       WHERE business_id = $1 AND date >= $2
+         AND (is_adjustment = false OR is_adjustment IS NULL)
+         AND deleted_at IS NULL AND (is_void = false OR is_void IS NULL)
+       GROUP BY type`,
+      [businessId, currentMonthStart]
+    );
+
+    const priorMonthResult = await pool.query(
+      `SELECT type, SUM(amount) AS total
+       FROM transactions
+       WHERE business_id = $1 AND date >= $2 AND date <= $3
+         AND (is_adjustment = false OR is_adjustment IS NULL)
+         AND deleted_at IS NULL AND (is_void = false OR is_void IS NULL)
+       GROUP BY type`,
+      [businessId, priorMonthStart, priorMonthEnd]
+    );
+
+    function rowsToMonthSummary(rows) {
+      let income = 0; let expense = 0;
+      for (const r of rows) {
+        if (r.type === "income") income = Number(r.total);
+        else if (r.type === "expense") expense = Number(r.total);
+      }
+      return { income, expense, net: income - expense };
+    }
+
+    function pctChange(current, prior) {
+      if (prior === 0) return current > 0 ? 100 : 0;
+      return Number(((current - prior) / prior * 100).toFixed(1));
+    }
+
+    const currentMonth = rowsToMonthSummary(currentMonthResult.rows);
+    const priorMonth = rowsToMonthSummary(priorMonthResult.rows);
+
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dayOfMonth = now.getDate();
+
     res.json({
       period_months: 12,
       since,
@@ -204,6 +250,17 @@ router.get("/dashboard", async (req, res) => {
         estimated_tax_liability_pct: hasTaxEstimates ? Number(estimatedTaxPct.toFixed(1)) : null,
         se_tax_estimate: hasTaxEstimates ? Number(seTaxEstimate.toFixed(2)) : null,
         region
+      },
+      current_month: {
+        label: monthKey(now.getFullYear(), now.getMonth() + 1),
+        income: Number(currentMonth.income.toFixed(2)),
+        expense: Number(currentMonth.expense.toFixed(2)),
+        net: Number(currentMonth.net.toFixed(2)),
+        days_elapsed: dayOfMonth,
+        days_in_month: daysInMonth,
+        income_vs_prior_pct: pctChange(currentMonth.income, priorMonth.income),
+        expense_vs_prior_pct: pctChange(currentMonth.expense, priorMonth.expense),
+        net_vs_prior_pct: pctChange(currentMonth.net, priorMonth.net)
       },
       monthly_breakdown: months,
       top_income_sources: topIncomeResult.rows.map((r) => ({

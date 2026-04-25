@@ -57,7 +57,7 @@ async function loadDashboard() {
 }
 
 function renderDashboard(data) {
-  const { summary, monthly_breakdown, top_income_sources, top_expense_categories } = data;
+  const { summary, monthly_breakdown, top_income_sources, top_expense_categories, current_month } = data;
 
   // KPI cards
   const kpiRow = document.getElementById("kpiRow");
@@ -71,6 +71,14 @@ function renderDashboard(data) {
     kpiCard("Your Profit", fmt(summary.net), summary.net >= 0 ? "profit" : "deficit", summary.net >= 0 ? "" : "kpi-value--negative"),
     kpiCard(seTaxLabel, fmt(summary.se_tax_estimate ?? 0), seTaxNote)
   ].join("");
+
+  // This Month card
+  if (current_month) renderThisMonth(current_month);
+
+  // 12-month trend sparkline
+  if (monthly_breakdown && monthly_breakdown.length) {
+    renderTrendChart(monthly_breakdown);
+  }
 
   // Monthly breakdown table
   if (monthly_breakdown && monthly_breakdown.length) {
@@ -102,6 +110,116 @@ function renderDashboard(data) {
     topExpenseChart.innerHTML = top_expense_categories.map((s) => barRow(s.category, s.total, maxExpense, "expense")).join("");
     document.getElementById("topExpenseCard").hidden = false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// This Month card
+// ---------------------------------------------------------------------------
+function renderThisMonth(cm) {
+  const card = document.getElementById("thisMonthCard");
+  const grid = document.getElementById("thisMonthGrid");
+  const label = document.getElementById("thisMonthLabel");
+  const progress = document.getElementById("thisMonthProgress");
+  if (!card || !grid) return;
+
+  label.textContent = `This Month (${escapeHtml(cm.label)})`;
+  const pct = Math.round((cm.days_elapsed / cm.days_in_month) * 100);
+  progress.textContent = `${cm.days_elapsed} of ${cm.days_in_month} days`;
+
+  function pctBadge(pct, inverse) {
+    if (pct === 0) return "";
+    const positive = inverse ? pct < 0 : pct > 0;
+    const cls = positive ? "pct-badge--up" : "pct-badge--down";
+    const sign = pct > 0 ? "+" : "";
+    return `<span class="pct-badge ${cls}">${sign}${pct}%</span>`;
+  }
+
+  grid.innerHTML = [
+    `<div class="this-month-item">
+      <div class="this-month-val income">${fmt(cm.income)}</div>
+      <div class="this-month-key">Income ${pctBadge(cm.income_vs_prior_pct, false)}</div>
+    </div>`,
+    `<div class="this-month-item">
+      <div class="this-month-val expense">${fmt(cm.expense)}</div>
+      <div class="this-month-key">Expenses ${pctBadge(cm.expense_vs_prior_pct, true)}</div>
+    </div>`,
+    `<div class="this-month-item">
+      <div class="this-month-val ${cm.net >= 0 ? "net-pos" : "net-neg"}">${fmt(cm.net)}</div>
+      <div class="this-month-key">Net ${pctBadge(cm.net_vs_prior_pct, false)}</div>
+    </div>`
+  ].join("");
+
+  card.hidden = false;
+}
+
+// ---------------------------------------------------------------------------
+// SVG sparkline trend chart
+// ---------------------------------------------------------------------------
+function renderTrendChart(months) {
+  const card = document.getElementById("trendCard");
+  const svg = document.getElementById("trendChart");
+  if (!card || !svg || !months.length) return;
+
+  const W = 600;
+  const H = 120;
+  const PAD = { top: 10, right: 16, bottom: 28, left: 48 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+
+  const maxVal = Math.max(...months.map((m) => Math.max(m.income, m.expense)), 1);
+  const n = months.length;
+
+  function xPos(i) {
+    return PAD.left + (i / (n - 1)) * chartW;
+  }
+  function yPos(v) {
+    return PAD.top + chartH - (v / maxVal) * chartH;
+  }
+  function polyline(points) {
+    return points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  }
+
+  const incomePoints = months.map((m, i) => [xPos(i), yPos(m.income)]);
+  const expensePoints = months.map((m, i) => [xPos(i), yPos(m.expense)]);
+
+  // Y-axis ticks
+  const tickCount = 4;
+  let yTicks = "";
+  for (let t = 0; t <= tickCount; t++) {
+    const val = (maxVal / tickCount) * t;
+    const y = yPos(val).toFixed(1);
+    yTicks += `<line x1="${PAD.left - 4}" y1="${y}" x2="${W - PAD.right}" y2="${y}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3 3"/>`;
+    yTicks += `<text x="${PAD.left - 8}" y="${y}" text-anchor="end" dominant-baseline="middle" class="chart-tick">${fmtCompact(val)}</text>`;
+  }
+
+  // X-axis month labels (every 3rd to avoid overlap)
+  let xLabels = "";
+  months.forEach((m, i) => {
+    if (i % 3 === 0 || i === n - 1) {
+      const x = xPos(i).toFixed(1);
+      const short = m.month.slice(5);
+      xLabels += `<text x="${x}" y="${H - 4}" text-anchor="middle" class="chart-tick">${escapeHtml(short)}</text>`;
+    }
+  });
+
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  svg.innerHTML = `
+    <g class="chart-grid">${yTicks}</g>
+    <g class="chart-labels">${xLabels}</g>
+    <polyline class="chart-line chart-line--expense" points="${polyline(expensePoints)}" fill="none" stroke="var(--color-expense,#e74c3c)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <polyline class="chart-line chart-line--income" points="${polyline(incomePoints)}" fill="none" stroke="var(--color-income,#27ae60)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${incomePoints.map(([x, y], i) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" class="chart-dot chart-dot--income"><title>${escapeHtml(months[i].month)}: ${fmt(months[i].income)}</title></circle>`).join("")}
+  `;
+
+  card.hidden = false;
+}
+
+function fmtCompact(value) {
+  const n = Number(value) || 0;
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(0)}k`;
+  return n.toFixed(0);
 }
 
 function kpiCard(label, value, note, extraClass) {

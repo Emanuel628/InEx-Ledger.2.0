@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const https = require("https");
 const express = require("express");
 const multer = require("multer");
 const { requireAuth } = require("../middleware/auth.middleware.js");
@@ -512,6 +513,145 @@ router.delete("/:id", async (req, res) => {
     return res.status(500).json({ error: "Failed to delete receipt." });
   } finally {
     client.release();
+  }
+});
+
+/* =========================================================
+   POST /receipts/:id/extract — OCR via Claude vision API
+   Requires ANTHROPIC_API_KEY env var; gracefully degrades if absent.
+   ========================================================= */
+
+const ANTHROPIC_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+async function extractReceiptDataWithClaude(filePath, mimeType) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return { available: false, reason: "OCR is not configured on this server. Set ANTHROPIC_API_KEY to enable receipt scanning." };
+  }
+
+  const resolvedMime = ANTHROPIC_MEDIA_TYPES.has(mimeType) ? mimeType : "image/jpeg";
+  const imageData = fs.readFileSync(filePath).toString("base64");
+
+  const requestBody = JSON.stringify({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 512,
+    messages: [{
+      role: "user",
+      content: [
+        {
+          type: "image",
+          source: { type: "base64", media_type: resolvedMime, data: imageData }
+        },
+        {
+          type: "text",
+          text: `Extract the key financial details from this receipt image and respond ONLY with a JSON object. Use this exact shape:
+{
+  "merchant": "store or vendor name",
+  "date": "YYYY-MM-DD or null",
+  "total": number or null,
+  "subtotal": number or null,
+  "tax": number or null,
+  "currency": "CAD or USD or null",
+  "description": "brief description of what was purchased (max 120 chars)"
+}
+If a field cannot be determined, use null. Do not include any other text.`
+        }
+      ]
+    }]
+  });
+
+  return new Promise((resolve) => {
+    const options = {
+      hostname: "api.anthropic.com",
+      path: "/v1/messages",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Length": Buffer.byteLength(requestBody)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let body = "";
+      res.on("data", (chunk) => { body += chunk; });
+      res.on("end", () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed.error) {
+            resolve({ available: false, reason: `Anthropic API error: ${parsed.error.message || parsed.error.type}` });
+            return;
+          }
+          const text = parsed.content?.[0]?.text || "";
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (!jsonMatch) {
+            resolve({ available: true, extracted: null, raw: text });
+            return;
+          }
+          const extracted = JSON.parse(jsonMatch[0]);
+          resolve({ available: true, extracted });
+        } catch (parseErr) {
+          resolve({ available: true, extracted: null, raw: body });
+        }
+      });
+    });
+
+    req.on("error", (err) => {
+      resolve({ available: false, reason: `Network error calling OCR service: ${err.message}` });
+    });
+
+    req.setTimeout(15000, () => {
+      req.destroy();
+      resolve({ available: false, reason: "OCR service timed out." });
+    });
+
+    req.write(requestBody);
+    req.end();
+  });
+}
+
+router.post("/:id/extract", async (req, res) => {
+  const receiptId = String(req.params.id || "").trim();
+  if (!isUuid(receiptId)) {
+    return res.status(400).json({ error: "Invalid receipt ID." });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+
+    const result = await pool.query(
+      `SELECT filename, mime_type, storage_path
+       FROM receipts
+       WHERE id = $1 AND business_id = $2
+       LIMIT 1`,
+      [receiptId, businessId]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ error: "Receipt not found." });
+    }
+
+    const { mime_type, storage_path } = result.rows[0];
+    const resolvedPath = path.resolve(storage_path || "");
+
+    if (!isManagedReceiptPath(resolvedPath)) {
+      return res.status(404).json({ error: "Receipt file missing." });
+    }
+
+    if (!fs.existsSync(resolvedPath)) {
+      return res.status(404).json({ error: "Receipt file missing." });
+    }
+
+    if (mime_type === "application/pdf") {
+      return res.status(422).json({ available: false, reason: "PDF receipts cannot be scanned. Please use an image file (JPG, PNG, WEBP)." });
+    }
+
+    const ocrResult = await extractReceiptDataWithClaude(resolvedPath, mime_type);
+    return res.json(ocrResult);
+  } catch (err) {
+    logError("POST /receipts/:id/extract error:", err);
+    return res.status(500).json({ error: "Failed to extract receipt data." });
   }
 });
 

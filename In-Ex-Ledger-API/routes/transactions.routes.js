@@ -1,5 +1,6 @@
 const express = require("express");
 const crypto = require("crypto");
+const multer = require("multer");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
@@ -13,6 +14,10 @@ const {
 } = require("../services/accountingLockService.js");
 const { archiveTransaction } = require("../services/transactionAuditService.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const {
+  getSubscriptionSnapshotForBusiness,
+  hasFeatureAccess
+} = require("../services/subscriptionService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -689,6 +694,302 @@ router.patch("/:id/cleared", async (req, res) => {
   } catch (err) {
     logError("PATCH /transactions/:id/cleared error:", err);
     return handleTransactionMutationError(res, err, "Failed to update cleared status.");
+  }
+});
+
+/* =========================================================
+   CSV IMPORT  —  POST /transactions/import/csv
+   ========================================================= */
+
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter(_req, file, cb) {
+    const ok = file.mimetype === "text/csv"
+      || file.mimetype === "application/csv"
+      || file.mimetype === "text/plain"
+      || file.originalname.toLowerCase().endsWith(".csv");
+    if (!ok) {
+      return cb(new Error("Only CSV files are accepted."));
+    }
+    cb(null, true);
+  }
+});
+
+/**
+ * Parses raw CSV text into an array of row objects keyed by lowercased header names.
+ * Handles quoted fields containing commas and line breaks.
+ */
+function parseCsv(text) {
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  const nonEmpty = lines.filter((l) => l.trim());
+  if (nonEmpty.length < 2) return [];
+
+  function splitRow(line) {
+    const cells = [];
+    let cur = "";
+    let inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuote && line[i + 1] === '"') { cur += '"'; i++; }
+        else { inQuote = !inQuote; }
+      } else if (ch === "," && !inQuote) {
+        cells.push(cur.trim());
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    cells.push(cur.trim());
+    return cells;
+  }
+
+  const headers = splitRow(nonEmpty[0]).map((h) => h.toLowerCase().replace(/[^a-z0-9_$]/g, "_"));
+  return nonEmpty.slice(1).map((line) => {
+    const cells = splitRow(line);
+    const row = {};
+    headers.forEach((h, i) => { row[h] = cells[i] ?? ""; });
+    return row;
+  });
+}
+
+const DATE_PATTERNS = [
+  /^(\d{4})-(\d{2})-(\d{2})$/,          // YYYY-MM-DD
+  /^(\d{2})\/(\d{2})\/(\d{4})$/,         // MM/DD/YYYY
+  /^(\d{2})-(\d{2})-(\d{4})$/,           // MM-DD-YYYY
+  /^(\d{2})\/(\d{2})\/(\d{2})$/,         // MM/DD/YY
+];
+
+function normalizeDate(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+
+  const [m1] = DATE_PATTERNS;
+  if (m1.test(s)) return s; // already YYYY-MM-DD
+
+  // MM/DD/YYYY
+  const mm = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mm) return `${mm[3]}-${mm[1].padStart(2, "0")}-${mm[2].padStart(2, "0")}`;
+
+  // MM-DD-YYYY
+  const md = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (md) return `${md[3]}-${md[1].padStart(2, "0")}-${md[2].padStart(2, "0")}`;
+
+  // MM/DD/YY
+  const ms = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (ms) {
+    const yr = Number(ms[3]) >= 50 ? `19${ms[3]}` : `20${ms[3]}`;
+    return `${yr}-${ms[1].padStart(2, "0")}-${ms[2].padStart(2, "0")}`;
+  }
+
+  const parsed = Date.parse(s);
+  if (!Number.isNaN(parsed)) return new Date(parsed).toISOString().slice(0, 10);
+  return null;
+}
+
+/**
+ * Tries to detect date/amount/description columns from CSV headers.
+ * Supports common Canadian bank export formats (BMO, TD, RBC, Scotiabank, CIBC, etc.)
+ */
+function detectColumns(headers) {
+  const h = headers.map((x) => x.toLowerCase());
+  const find = (...candidates) => candidates.find((c) => h.includes(c)) || null;
+
+  const dateCol = find("date", "transaction_date", "trans__date", "posted_date", "date_");
+  const descCol = find(
+    "description", "transaction_description", "transaction_description_1",
+    "payee", "merchant", "memo", "details", "narrative", "trans__description"
+  );
+  const amountCol = find("amount", "transaction_amount", "net_amount");
+  const withdrawalCol = find("withdrawal", "debit", "withdrawals", "cheques_and_other_deductions");
+  const depositCol = find("deposit", "credit", "deposits", "deposits_and_other_credits");
+
+  return { dateCol, descCol, amountCol, withdrawalCol, depositCol };
+}
+
+function extractRowData(row, cols) {
+  let amount = null;
+  let type = null;
+
+  if (cols.amountCol && row[cols.amountCol] !== undefined && row[cols.amountCol] !== "") {
+    const raw = String(row[cols.amountCol]).replace(/[$, ]/g, "");
+    const n = Number.parseFloat(raw);
+    if (Number.isFinite(n)) {
+      amount = Math.abs(n);
+      type = n < 0 ? "expense" : "income";
+    }
+  } else {
+    const withdrawal = String(row[cols.withdrawalCol] || "").replace(/[$, ]/g, "");
+    const deposit = String(row[cols.depositCol] || "").replace(/[$, ]/g, "");
+    const wAmt = Number.parseFloat(withdrawal);
+    const dAmt = Number.parseFloat(deposit);
+    if (Number.isFinite(dAmt) && dAmt > 0) {
+      amount = dAmt;
+      type = "income";
+    } else if (Number.isFinite(wAmt) && wAmt > 0) {
+      amount = wAmt;
+      type = "expense";
+    }
+  }
+
+  const description = String(
+    row[cols.descCol] ||
+    row["transaction_description_1"] ||
+    row["description_1"] ||
+    row["details"] ||
+    ""
+  ).trim().slice(0, 500);
+
+  const date = normalizeDate(row[cols.dateCol]);
+
+  return { amount, type, description, date };
+}
+
+router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "CSV file is required." });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    if (!hasFeatureAccess(subscription, "receipts")) {
+      return res.status(402).json({ error: "CSV import requires an active InEx Ledger Pro plan." });
+    }
+
+    const accountId = String(req.body?.account_id || "").trim();
+    if (!accountId || !UUID_REGEX.test(accountId)) {
+      return res.status(400).json({ error: "account_id is required and must be a valid UUID." });
+    }
+
+    const accountCheck = await pool.query(
+      "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
+      [accountId, businessId]
+    );
+    if (accountCheck.rowCount === 0) {
+      return res.status(400).json({ error: "account_id does not belong to your business." });
+    }
+
+    const { region, currency: fallbackCurrency } = await getBusinessRegionAndCurrency(businessId);
+    const lockState = await loadAccountingLockState(pool, businessId);
+
+    const csvText = req.file.buffer.toString("utf-8");
+    const rows = parseCsv(csvText);
+    if (rows.length === 0) {
+      return res.status(400).json({ error: "CSV file is empty or could not be parsed." });
+    }
+
+    const headers = Object.keys(rows[0]);
+    const cols = detectColumns(headers);
+
+    if (!cols.dateCol) {
+      return res.status(400).json({ error: "Could not detect a date column. Expected a column named 'date', 'transaction_date', or similar." });
+    }
+    if (!cols.descCol) {
+      return res.status(400).json({ error: "Could not detect a description column. Expected 'description', 'payee', 'memo', or similar." });
+    }
+    if (!cols.amountCol && !cols.withdrawalCol && !cols.depositCol) {
+      return res.status(400).json({ error: "Could not detect an amount column. Expected 'amount', 'withdrawal', 'deposit', or similar." });
+    }
+
+    // Pre-load or resolve a default category for each type
+    const defaultCategoryMap = {};
+    for (const kind of ["income", "expense"]) {
+      const catName = kind === "income" ? "Imported Income" : "Imported Expense";
+      let cat = await pool.query(
+        "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
+        [businessId, catName]
+      );
+      if (!cat.rowCount) {
+        cat = await pool.query(
+          `INSERT INTO categories (id, business_id, name, kind, created_at)
+           VALUES ($1, $2, $3, $4, now())
+           ON CONFLICT (business_id, lower(name)) DO NOTHING
+           RETURNING id`,
+          [crypto.randomUUID(), businessId, catName, kind]
+        );
+        if (!cat.rowCount) {
+          cat = await pool.query(
+            "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
+            [businessId, catName]
+          );
+        }
+      }
+      defaultCategoryMap[kind] = cat.rows[0]?.id;
+    }
+
+    const results = { imported: 0, skipped: 0, errors: [] };
+    const MAX_ROWS = 1000;
+    const rowsToProcess = rows.slice(0, MAX_ROWS);
+
+    for (let i = 0; i < rowsToProcess.length; i++) {
+      const row = rowsToProcess[i];
+      const { amount, type, description, date } = extractRowData(row, cols);
+
+      if (!date || !amount || !type || amount <= 0 || !description) {
+        results.skipped++;
+        continue;
+      }
+
+      try {
+        assertDateUnlocked(lockState, date);
+      } catch {
+        results.errors.push({ row: i + 2, reason: `Row ${i + 2}: date ${date} falls within a locked accounting period` });
+        results.skipped++;
+        continue;
+      }
+
+      const categoryId = defaultCategoryMap[type];
+      if (!categoryId) {
+        results.errors.push({ row: i + 2, reason: `Row ${i + 2}: could not resolve default ${type} category` });
+        results.skipped++;
+        continue;
+      }
+
+      const encryptedDescription = tryEncryptDescription(description);
+      const taxTreatment = type === "income" ? "income" : "operating";
+
+      try {
+        await pool.query(
+          `INSERT INTO transactions
+            (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted,
+             date, currency, tax_treatment, review_status, converted_amount)
+           VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8, $9, $10, $11, 'needs_review', $5)`,
+          [
+            crypto.randomUUID(),
+            businessId,
+            accountId,
+            categoryId,
+            amount,
+            type,
+            description,
+            encryptedDescription,
+            date,
+            fallbackCurrency,
+            taxTreatment
+          ]
+        );
+        results.imported++;
+      } catch (insertErr) {
+        results.errors.push({ row: i + 2, reason: `Row ${i + 2}: ${insertErr.message}` });
+        results.skipped++;
+      }
+    }
+
+    if (rows.length > MAX_ROWS) {
+      results.truncated = true;
+      results.truncated_at = MAX_ROWS;
+    }
+
+    res.status(200).json({
+      message: `Import complete. ${results.imported} transaction(s) imported, ${results.skipped} skipped.`,
+      ...results
+    });
+  } catch (err) {
+    logError("POST /transactions/import/csv error:", err);
+    res.status(500).json({ error: "CSV import failed." });
   }
 });
 

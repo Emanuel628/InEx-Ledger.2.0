@@ -2672,3 +2672,165 @@ function resolveTransactionCategoryName(transaction, categoriesById) {
   }
   return "-";
 }
+
+/* =========================================================
+   CSV Import
+   ========================================================= */
+
+function initCsvImport() {
+  const importBtn = document.getElementById("importCsvBtn");
+  const modal = document.getElementById("csvImportModal");
+  const cancelBtn = document.getElementById("csvImportCancel");
+  const startBtn = document.getElementById("csvImportStart");
+  const doneBtn = document.getElementById("csvImportDone");
+  const accountSelect = document.getElementById("csvImportAccount");
+
+  if (!importBtn || !modal) return;
+
+  // Populate account dropdown from already-loaded ledger state
+  function populateCsvAccounts() {
+    const accounts = ledgerState.accounts || [];
+    accountSelect.innerHTML = '<option value="">Select account…</option>' +
+      accounts.map((a) => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name)}</option>`).join("");
+  }
+
+  importBtn.addEventListener("click", () => {
+    populateCsvAccounts();
+    document.getElementById("csvImportStep1").hidden = false;
+    document.getElementById("csvImportStep2").hidden = true;
+    document.getElementById("csvImportError").hidden = true;
+    document.getElementById("csvImportFile").value = "";
+    modal.classList.remove("hidden");
+    modal.focus();
+  });
+
+  cancelBtn.addEventListener("click", () => modal.classList.add("hidden"));
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) modal.classList.add("hidden");
+  });
+
+  modal.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") modal.classList.add("hidden");
+  });
+
+  doneBtn.addEventListener("click", () => {
+    modal.classList.add("hidden");
+    loadTransactions();
+  });
+
+  startBtn.addEventListener("click", async () => {
+    const accountId = accountSelect.value;
+    const fileInput = document.getElementById("csvImportFile");
+    const errorEl = document.getElementById("csvImportError");
+
+    errorEl.hidden = true;
+
+    if (!accountId) {
+      errorEl.textContent = "Please select a destination account.";
+      errorEl.hidden = false;
+      return;
+    }
+
+    if (!fileInput.files || !fileInput.files[0]) {
+      errorEl.textContent = "Please select a CSV file.";
+      errorEl.hidden = false;
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+    formData.append("account_id", accountId);
+
+    startBtn.disabled = true;
+    startBtn.textContent = "Importing…";
+
+    try {
+      const res = await apiFetch("/api/transactions/import/csv", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        errorEl.textContent = data.error || "Import failed.";
+        errorEl.hidden = false;
+        return;
+      }
+
+      const resultEl = document.getElementById("csvImportResult");
+      const errRows = (data.errors || []).slice(0, 10);
+      const truncNote = data.truncated ? `<p class="csv-import-note">Only the first ${data.truncated_at} rows were processed.</p>` : "";
+      resultEl.innerHTML = `
+        <div class="csv-import-success">
+          <div class="csv-stat"><span class="csv-stat-num">${escapeHtml(String(data.imported))}</span> imported</div>
+          <div class="csv-stat"><span class="csv-stat-num">${escapeHtml(String(data.skipped))}</span> skipped</div>
+        </div>
+        ${truncNote}
+        ${errRows.length ? `<ul class="csv-error-list">${errRows.map((e) => `<li>${escapeHtml(e.reason)}</li>`).join("")}</ul>` : ""}
+        <p class="csv-import-note">Imported transactions are flagged <strong>Needs Review</strong> — check the category assignments before reporting.</p>
+      `;
+      document.getElementById("csvImportStep1").hidden = true;
+      document.getElementById("csvImportStep2").hidden = false;
+    } catch (err) {
+      errorEl.textContent = "An unexpected error occurred. Please try again.";
+      errorEl.hidden = false;
+    } finally {
+      startBtn.disabled = false;
+      startBtn.textContent = "Import";
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  initCsvImport();
+  initOcrPrefill();
+});
+
+function initOcrPrefill() {
+  const params = new URLSearchParams(window.location.search);
+  const ocrAmount = params.get("ocr_amount");
+  const ocrDate = params.get("ocr_date");
+  const ocrDesc = params.get("ocr_desc");
+  const ocrMerchant = params.get("ocr_merchant");
+  const ocrCurrency = params.get("ocr_currency");
+
+  if (!ocrAmount && !ocrDate && !ocrDesc && !ocrMerchant) return;
+
+  // Wait for the drawer to initialise then pre-fill and open it
+  const tryPrefill = () => {
+    const toggle = document.getElementById("addTxToggle");
+    const amountEl = document.getElementById("amount");
+    const dateEl = document.getElementById("date");
+    const descEl = document.getElementById("description");
+    if (!toggle || !amountEl) return false;
+
+    // Set expense intent
+    const expenseBtn = document.querySelector('[data-intent="expense"]');
+    expenseBtn?.click();
+
+    if (ocrAmount) amountEl.value = ocrAmount;
+    if (ocrDate) dateEl.value = ocrDate;
+    if (ocrDesc) descEl.value = ocrDesc;
+    else if (ocrMerchant) descEl.value = ocrMerchant;
+
+    // Open drawer
+    if (transactionDrawerElement && transactionDrawerElement.hidden) {
+      toggle.click();
+    }
+
+    // Clean URL
+    const clean = new URL(window.location.href);
+    ["ocr_amount", "ocr_date", "ocr_desc", "ocr_merchant", "ocr_currency"].forEach((k) => clean.searchParams.delete(k));
+    window.history.replaceState({}, "", clean.toString());
+    return true;
+  };
+
+  // Retry up to 20 times (50ms each = 1s) waiting for form elements to mount
+  let attempts = 0;
+  const interval = setInterval(() => {
+    attempts++;
+    if (tryPrefill() || attempts >= 20) clearInterval(interval);
+  }, 50);
+}

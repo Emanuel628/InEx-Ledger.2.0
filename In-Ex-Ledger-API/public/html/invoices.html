@@ -5,12 +5,14 @@
   <title>Invoices | InEx Ledger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/pages/invoices.css" />
 </head>
 <body>
   <a href="#main-content" class="skip-link">Skip to main content</a>
+
   <header class="app-topbar">
     <div class="topbar-left">
-      <a class="topbar-brand" href="/" aria-label="InEx Ledger home">
+      <a class="topbar-brand" href="transactions" aria-label="InEx Ledger home">
         <span class="brand-mark brand-mark-topbar" aria-hidden="true">
           <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
@@ -21,28 +23,219 @@
         </span>
         <span class="topbar-brand-text">InEx Ledger</span>
       </a>
+      <nav class="topbar-nav" aria-label="Primary">
+        <a href="transactions"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>Transactions</span></a>
+        <a href="accounts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg></span><span>Accounts</span></a>
+        <a href="receipts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span>Receipts</span></a>
+        <a href="invoices" class="is-active"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg></span><span>Invoices</span></a>
+        <a href="analytics"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Analytics</span></a>
+        <a href="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg></span><span>Settings</span></a>
+      </nav>
     </div>
+    <div class="user-pill"><span class="user-avatar" id="topbarAvatar">U</span><span class="user-name" id="topbarName">InEx Ledger</span></div>
   </header>
+
   <main id="main-content" class="app-shell">
     <aside class="app-sidebar" aria-label="Sidebar">
-      <div class="sidebar-section-label">Business (V2)</div>
-      <nav class="sidebar-nav sidebar-nav--locked">
-        <a href="#" class="sidebar-link sidebar-link--locked is-active" tabindex="-1">
-          <span class="sidebar-icon" aria-hidden="true">
-            <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>
-          </span>
-          <span>Invoices</span>
-          <span class="sidebar-lock" title="Upgrade required" aria-label="Upgrade required"><svg viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="M5.5 7V5.5A2.5 2.5 0 0 1 8 3a2.5 2.5 0 0 1 2.5 2.5V7" stroke="currentColor" stroke-width="1.2"/><rect x="3.5" y="7" width="9" height="6" rx="1.5" stroke="currentColor" stroke-width="1.2"/></svg></span>
-          <span class="sidebar-upgrade-badge">Upgrade</span>
+      <div class="sidebar-section-label">Invoices</div>
+      <nav class="sidebar-nav">
+        <a href="invoices" class="sidebar-link is-active" id="sidebarAll">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg></span>
+          <span>All invoices</span>
+        </a>
+        <a href="invoices?status=draft" class="sidebar-link" id="sidebarDraft">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke-dasharray="3 2"/></svg></span>
+          <span>Drafts</span>
+        </a>
+        <a href="invoices?status=sent" class="sidebar-link" id="sidebarSent">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 8l10-6-4 6 4 6z"/></svg></span>
+          <span>Sent</span>
+        </a>
+        <a href="invoices?status=paid" class="sidebar-link" id="sidebarPaid">
+          <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-6"/></svg></span>
+          <span>Paid</span>
         </a>
       </nav>
+      <div class="sidebar-section-label">Reports</div>
+      <nav class="sidebar-nav">
+        <a href="analytics" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Analytics</span></a>
+        <a href="exports" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Exports</span></a>
+      </nav>
     </aside>
-    <section class="business-locked-content">
-      <div class="locked-panel">
-        <h1>Invoices (V2)</h1>
-        <p>This module is available on InEx Ledger Business. <span class="sidebar-upgrade-badge">Upgrade</span> to unlock full AR/AP, CRM, and more.</p>
+
+    <div class="app-content">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Invoices</h1>
+          <p class="page-subtitle">Create and send invoices to your clients</p>
+        </div>
+        <div class="page-header-actions">
+          <button id="newInvoiceBtn" class="page-add-button" type="button">+ New invoice</button>
+        </div>
       </div>
-    </section>
+
+      <!-- Summary stats -->
+      <section class="stats-row" id="invoiceStats">
+        <article class="stat-card">
+          <div class="stat-label">Outstanding</div>
+          <div class="stat-value stat-value-income" id="statOutstanding">$0.00</div>
+          <div class="stat-delta">Sent, awaiting payment</div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-label">Paid (30 days)</div>
+          <div class="stat-value" id="statPaid30">$0.00</div>
+          <div class="stat-delta">Last 30 days</div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-label">Drafts</div>
+          <div class="stat-value" id="statDrafts">0</div>
+          <div class="stat-delta">Not yet sent</div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-label">Total invoices</div>
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-delta" id="statOverdue"></div>
+        </article>
+      </section>
+
+      <!-- Invoice list -->
+      <section class="transactions-panel">
+        <div class="transactions-toolbar">
+          <h2 class="transactions-panel-title">Invoice list</h2>
+          <select id="invoiceStatusFilter" class="toolbar-select">
+            <option value="">All statuses</option>
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
+            <option value="paid">Paid</option>
+            <option value="void">Void</option>
+          </select>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="transactions-table invoices-table">
+            <thead>
+              <tr>
+                <th>Invoice #</th>
+                <th>Client</th>
+                <th>Issue date</th>
+                <th>Due date</th>
+                <th>Status</th>
+                <th class="col-amount">Amount</th>
+                <th class="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="invoiceTableBody">
+              <tr><td colspan="7" class="placeholder">Loading invoices…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   </main>
+
+  <!-- Invoice Create/Edit Panel (slide-in) -->
+  <div id="invoicePanel" class="invoice-panel" hidden aria-label="Invoice editor">
+    <div class="invoice-panel-inner">
+      <div class="invoice-panel-header">
+        <h2 id="invoicePanelTitle" class="invoice-panel-title">New Invoice</h2>
+        <button type="button" id="invoicePanelClose" class="invoice-panel-close" aria-label="Close">×</button>
+      </div>
+
+      <form id="invoiceForm" novalidate>
+        <div class="invoice-form-grid">
+          <div class="form-field">
+            <label for="invClientName" class="form-label">Client name <span class="required">*</span></label>
+            <input id="invClientName" type="text" class="form-control" placeholder="e.g. Smith Renovations" required />
+          </div>
+          <div class="form-field">
+            <label for="invClientEmail" class="form-label">Client email</label>
+            <input id="invClientEmail" type="email" class="form-control" placeholder="client@example.com" />
+          </div>
+          <div class="form-field">
+            <label for="invIssueDate" class="form-label">Issue date <span class="required">*</span></label>
+            <input id="invIssueDate" type="date" class="form-control" required />
+          </div>
+          <div class="form-field">
+            <label for="invDueDate" class="form-label">Due date</label>
+            <input id="invDueDate" type="date" class="form-control" />
+          </div>
+          <div class="form-field">
+            <label for="invCurrency" class="form-label">Currency</label>
+            <select id="invCurrency" class="form-control">
+              <option value="CAD">CAD</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="invTaxRate" class="form-label">Tax rate (%)</label>
+            <input id="invTaxRate" type="number" class="form-control" placeholder="e.g. 13 for 13% HST" min="0" max="100" step="0.001" value="0" />
+          </div>
+        </div>
+
+        <!-- Line items -->
+        <div class="invoice-line-items">
+          <div class="invoice-line-header">
+            <span class="line-col-desc">Description</span>
+            <span class="line-col-qty">Qty</span>
+            <span class="line-col-rate">Unit price</span>
+            <span class="line-col-amt">Amount</span>
+            <span class="line-col-del"></span>
+          </div>
+          <div id="lineItemRows"></div>
+          <button type="button" id="addLineItemBtn" class="invoice-add-line">+ Add line item</button>
+        </div>
+
+        <!-- Totals -->
+        <div class="invoice-totals">
+          <div class="invoice-total-row">
+            <span>Subtotal</span>
+            <span id="invSubtotal">$0.00</span>
+          </div>
+          <div class="invoice-total-row">
+            <span id="invTaxLabel">Tax (0%)</span>
+            <span id="invTaxAmount">$0.00</span>
+          </div>
+          <div class="invoice-total-row invoice-total-row--grand">
+            <span>Total</span>
+            <span id="invTotal">$0.00</span>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="invNotes" class="form-label">Notes</label>
+          <textarea id="invNotes" class="form-control" rows="3" placeholder="Payment terms, bank details, thank you message…"></textarea>
+        </div>
+
+        <p id="invoiceFormError" class="error-text" hidden></p>
+
+        <div class="tx-actions invoice-form-actions">
+          <button type="button" id="invoiceSaveDraft" class="modal-cancel">Save as draft</button>
+          <button type="submit" id="invoiceSubmit" class="drawer-submit">Save &amp; send</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete confirm modal -->
+  <div id="invoiceDeleteModal" class="transaction-modal hidden" role="dialog" aria-modal="true">
+    <div class="transaction-modal-content danger-modal">
+      <div class="danger-modal-icon" aria-hidden="true">!</div>
+      <h3>Delete this invoice?</h3>
+      <p>Only draft invoices can be deleted. This cannot be undone.</p>
+      <div class="modal-actions danger-actions">
+        <button type="button" id="invoiceDeleteCancel" class="modal-cancel">Cancel</button>
+        <button type="button" id="invoiceDeleteConfirm" class="modal-delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/escape-html.js?v=20260410a"></script>
+  <script src="/js/global.js?v=20260425a"></script>
+  <script src="/js/i18n.js?v=20260407a"></script>
+  <script src="/js/auth.js?v=20260407a"></script>
+  <script src="/js/trial.js?v=20260407a"></script>
+  <script src="/js/invoices.js?v=20260425a"></script>
 </body>
 </html>

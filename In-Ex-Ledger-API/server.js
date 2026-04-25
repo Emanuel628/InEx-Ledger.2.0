@@ -41,10 +41,9 @@ const V2_HTML_PAGES = new Set([
   'billable-expenses',
   'bills',
   'customers',
-  'invoices',
   'projects',
   'vendors'
-]);
+]); // 'invoices' removed: now served as a V1 Pro feature
 const htmlPageNames = fs.readdirSync(htmlDir)
   .filter((name) => name.toLowerCase().endsWith('.html'))
   .map((name) => path.basename(name, '.html'));

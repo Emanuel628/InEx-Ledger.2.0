@@ -235,6 +235,9 @@ function renderReceipts(receipts) {
         <td data-label="${escapeHtml(tx("common_actions"))}">
           <div class="receipt-row-actions">
             <button type="button" class="receipt-link-btn" data-receipt-link="${escapeHtml(receipt.id || "")}">${escapeHtml(tx("receipts_link_action"))}</button>
+            ${!receipt.mime_type || receipt.mime_type !== "application/pdf"
+              ? `<button type="button" class="receipt-scan-btn" data-receipt-scan="${escapeHtml(receipt.id || "")}" title="Extract data from this receipt">Scan</button>`
+              : ""}
             <button type="button" class="receipt-delete-btn" data-receipt-delete="${escapeHtml(receipt.id || "")}">${escapeHtml(tx("common_delete"))}</button>
           </div>
         </td>
@@ -270,6 +273,13 @@ function renderReceipts(receipts) {
     button.addEventListener("click", async () => {
       const receiptId = button.getAttribute("data-receipt-delete") || "";
       await deleteReceiptRecord(receiptId);
+    });
+  });
+
+  tableBody.querySelectorAll("[data-receipt-scan]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const receiptId = button.getAttribute("data-receipt-scan") || "";
+      await openOcrPanel(receiptId);
     });
   });
 }
@@ -472,4 +482,116 @@ function showReceiptsToast(message) {
   receiptsToastTimer = window.setTimeout(() => {
     toast.classList.add("hidden");
   }, RECEIPTS_TOAST_MS);
+}
+
+/* =========================================================
+   Receipt OCR — "Scan" button
+   ========================================================= */
+
+let ocrModal = null;
+
+function getOrCreateOcrModal() {
+  if (ocrModal) return ocrModal;
+
+  const el = document.createElement("div");
+  el.id = "receiptOcrModal";
+  el.className = "transaction-modal hidden";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-modal", "true");
+  el.setAttribute("aria-labelledby", "ocrModalTitle");
+  el.innerHTML = `
+    <div class="transaction-modal-content ocr-modal-content">
+      <h3 id="ocrModalTitle" class="ocr-modal-title">Receipt Scan</h3>
+      <div id="ocrModalBody" class="ocr-modal-body">
+        <div class="analytics-loading">Scanning receipt…</div>
+      </div>
+      <div class="modal-actions" id="ocrModalActions" hidden>
+        <button type="button" id="ocrCreateTxBtn" class="drawer-submit">Create transaction</button>
+        <button type="button" id="ocrCloseBtn" class="modal-cancel">Close</button>
+      </div>
+      <div class="modal-actions" id="ocrCloseOnly">
+        <button type="button" id="ocrCloseBtnOnly" class="modal-cancel">Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(el);
+
+  el.addEventListener("click", (e) => {
+    if (e.target === el) el.classList.add("hidden");
+  });
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") el.classList.add("hidden");
+  });
+  el.querySelector("#ocrCloseBtn")?.addEventListener("click", () => el.classList.add("hidden"));
+  el.querySelector("#ocrCloseBtnOnly")?.addEventListener("click", () => el.classList.add("hidden"));
+
+  ocrModal = el;
+  return el;
+}
+
+async function openOcrPanel(receiptId) {
+  const modal = getOrCreateOcrModal();
+  const body = modal.querySelector("#ocrModalBody");
+  const actions = modal.querySelector("#ocrModalActions");
+  const closeOnly = modal.querySelector("#ocrCloseOnly");
+  const createBtn = modal.querySelector("#ocrCreateTxBtn");
+
+  body.innerHTML = '<div class="analytics-loading">Scanning receipt…</div>';
+  actions.hidden = true;
+  closeOnly.hidden = false;
+  modal.classList.remove("hidden");
+
+  try {
+    const res = await apiFetch(`/api/receipts/${receiptId}/extract`, { method: "POST" });
+    const data = await res.json();
+
+    if (!res.ok) {
+      body.innerHTML = `<p class="error-text">${escapeHtml(data.error || "Scan failed.")}</p>`;
+      return;
+    }
+
+    if (!data.available) {
+      body.innerHTML = `<p class="ocr-unavailable">${escapeHtml(data.reason || "OCR is not available.")}</p>`;
+      return;
+    }
+
+    const ext = data.extracted;
+    if (!ext) {
+      body.innerHTML = `<p class="ocr-unavailable">Could not extract readable data from this receipt.</p>`;
+      return;
+    }
+
+    const rows = [
+      ext.merchant ? `<div class="ocr-field"><span class="ocr-label">Merchant</span><span class="ocr-val">${escapeHtml(ext.merchant)}</span></div>` : "",
+      ext.date ? `<div class="ocr-field"><span class="ocr-label">Date</span><span class="ocr-val">${escapeHtml(ext.date)}</span></div>` : "",
+      ext.total !== null && ext.total !== undefined ? `<div class="ocr-field"><span class="ocr-label">Total</span><span class="ocr-val">${escapeHtml(String(ext.total))} ${escapeHtml(ext.currency || "")}</span></div>` : "",
+      ext.tax !== null && ext.tax !== undefined ? `<div class="ocr-field"><span class="ocr-label">Tax</span><span class="ocr-val">${escapeHtml(String(ext.tax))}</span></div>` : "",
+      ext.description ? `<div class="ocr-field"><span class="ocr-label">Description</span><span class="ocr-val">${escapeHtml(ext.description)}</span></div>` : ""
+    ].filter(Boolean).join("");
+
+    body.innerHTML = rows || "<p>No data extracted.</p>";
+    actions.hidden = false;
+    closeOnly.hidden = true;
+
+    // Remove previous listener to avoid stacking
+    const newBtn = createBtn.cloneNode(true);
+    createBtn.parentNode.replaceChild(newBtn, createBtn);
+    newBtn.addEventListener("click", () => {
+      modal.classList.add("hidden");
+      prefillTransactionFromOcr(ext);
+    });
+  } catch (err) {
+    body.innerHTML = `<p class="error-text">An error occurred while scanning. Please try again.</p>`;
+  }
+}
+
+function prefillTransactionFromOcr(extracted) {
+  // Navigate to transactions and fire a custom event so transactions.js can pick it up
+  const params = new URLSearchParams();
+  if (extracted.description) params.set("ocr_desc", extracted.description);
+  if (extracted.merchant) params.set("ocr_merchant", extracted.merchant);
+  if (extracted.total !== null && extracted.total !== undefined) params.set("ocr_amount", String(extracted.total));
+  if (extracted.date) params.set("ocr_date", extracted.date);
+  if (extracted.currency) params.set("ocr_currency", extracted.currency);
+  window.location.href = `transactions?${params.toString()}`;
 }

@@ -1,0 +1,178 @@
+/* invoices.css — Pro-plan invoicing page */
+
+/* ── Status badges ──────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.badge-draft  { background: var(--surface-2, #f5f5f5); color: var(--text-secondary); }
+.badge-sent   { background: #e8f4fd; color: #1a6fa8; }
+.badge-paid   { background: #e6f9ed; color: #1a8040; }
+.badge-void   { background: #f5f5f5; color: #999; text-decoration: line-through; }
+.badge-overdue { background: #fff0ec; color: #c0392b; margin-left: 6px; }
+
+/* ── Invoice number column ─────────────────────────────── */
+.inv-number {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ── Invoice slide-in panel ────────────────────────────── */
+.invoice-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(560px, 100vw);
+  background: var(--surface, #fff);
+  border-left: 1px solid var(--border);
+  box-shadow: -4px 0 24px rgba(0,0,0,0.10);
+  z-index: 300;
+  overflow-y: auto;
+}
+.invoice-panel-inner {
+  padding: 28px 28px 40px;
+}
+.invoice-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.invoice-panel-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+.invoice-panel-close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.invoice-panel-close:hover { background: var(--surface-2, #f5f5f5); }
+
+/* ── Form grid ─────────────────────────────────────────── */
+.invoice-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+  margin-bottom: 24px;
+}
+@media (max-width: 520px) {
+  .invoice-form-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Line items ────────────────────────────────────────── */
+.invoice-line-items {
+  margin-bottom: 16px;
+}
+.invoice-line-header,
+.invoice-line-row {
+  display: grid;
+  grid-template-columns: 1fr 70px 100px 90px 28px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.invoice-line-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  padding: 0 0 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.line-col-desc { /* flex takes remaining */}
+.line-col-qty, .line-col-rate { text-align: right; }
+.line-col-amt { text-align: right; }
+.line-amt {
+  font-size: 13px;
+  text-align: right;
+  color: var(--text);
+  white-space: nowrap;
+}
+.line-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 4px;
+}
+.line-remove:hover { color: var(--error, #c0392b); background: #fff0ec; }
+
+.invoice-add-line {
+  background: none;
+  border: 1.5px dashed var(--border);
+  border-radius: 6px;
+  padding: 6px 14px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.invoice-add-line:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Totals ────────────────────────────────────────────── */
+.invoice-totals {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-bottom: 20px;
+}
+.invoice-total-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 4px 0;
+  color: var(--text-secondary);
+}
+.invoice-total-row--grand {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.invoice-form-actions {
+  margin-top: 24px;
+  gap: 10px;
+}
+
+/* ── Action button variants ─────────────────────────────── */
+.action-send { color: #1a6fa8; }
+.action-pay  { color: #1a8040; }
+.action-delete { color: var(--error, #c0392b); }
+
+/* ── Overdue delta warning ──────────────────────────────── */
+.stat-delta--warn {
+  color: #c0392b;
+  font-weight: 600;
+}
+
+/* ── Responsive table ─────────────────────────────────── */
+@media (max-width: 680px) {
+  .invoices-table th:nth-child(3),
+  .invoices-table td:nth-child(3),
+  .invoices-table th:nth-child(4),
+  .invoices-table td:nth-child(4) {
+    display: none;
+  }
+}
