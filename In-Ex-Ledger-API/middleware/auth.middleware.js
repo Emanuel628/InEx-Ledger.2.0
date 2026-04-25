@@ -127,4 +127,39 @@ function requireMfa(req, res, next) {
   next();
 }
 
-module.exports = { signToken, verifyToken, requireAuth, optionalAuth, requireMfa };
+/**
+ * Middleware for sensitive actions that should require MFA re-verification only
+ * when the user has already chosen to enable MFA on their account.
+ *
+ * This prevents non-linear flows where users are forced to turn MFA on just to
+ * complete an otherwise valid password-confirmed action.
+ */
+function requireMfaIfEnabled(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  if (!req.user.mfa_enabled) {
+    return next();
+  }
+
+  if (!req.user.mfa_authenticated) {
+    return res.status(403).json({
+      error: "MFA verification required for this action.",
+      mfa_required: true,
+      requirement: "verification",
+      reauthenticate: true
+    });
+  }
+
+  next();
+}
+
+module.exports = {
+  signToken,
+  verifyToken,
+  requireAuth,
+  optionalAuth,
+  requireMfa,
+  requireMfaIfEnabled
+};
