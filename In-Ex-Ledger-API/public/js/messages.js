@@ -586,7 +586,7 @@ function getCurrentUserId() {
   try {
     const token = typeof getToken === "function"
       ? getToken()
-      : (sessionStorage.getItem("token") || localStorage.getItem("token"));
+      : sessionStorage.getItem("token");
     if (!token) return null;
     const parts = token.split(".");
     if (parts.length < 2) return null;
