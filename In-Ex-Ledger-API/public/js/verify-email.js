@@ -99,6 +99,7 @@ function consumeVerifiedSessionFromHash() {
 
   const params = new URLSearchParams(hash);
   const token = params.get("token");
+  const next = params.get("next") || "/onboarding";
   if (!token) {
     return false;
   }
@@ -118,7 +119,7 @@ function consumeVerifiedSessionFromHash() {
 
   updateStatus(tx("verify_email_status_success"));
   window.history.replaceState({}, document.title, "/verify-email");
-  window.location.replace("/transactions");
+  window.location.replace(next);
   return true;
 }
 

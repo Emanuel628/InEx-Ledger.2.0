@@ -6,6 +6,15 @@ const DEFAULT_TRIAL_DAYS = Number(process.env.DEFAULT_TRIAL_DAYS || 30);
 const BILLING_PAST_DUE_GRACE_DAYS = Number(process.env.BILLING_PAST_DUE_GRACE_DAYS || 7);
 const PLAN_FREE = "free";
 const PLAN_V1 = "v1";
+const PLAN_BASIC = PLAN_FREE;
+const PLAN_PRO = PLAN_V1;
+const PLAN_BUSINESS = "business";
+
+function getPlanDisplayName(tier) {
+  if (tier === PLAN_V1) return "Pro";
+  if (tier === PLAN_BUSINESS) return "Business";
+  return "Basic";
+}
 
 
 function addDays(date, days) {
@@ -139,8 +148,10 @@ function deriveEffectiveState(row) {
     businessId: row?.business_id || null,
     provider: row?.provider || "stripe",
     planCode: row?.plan_code || PLAN_FREE,
+    planName: getPlanDisplayName(row?.plan_code || PLAN_FREE),
     status: row?.status || "inactive",
     effectiveTier,
+    effectiveTierName: getPlanDisplayName(effectiveTier),
     effectiveStatus,
     isTrialing,
     isPaid: Boolean(isActivePaid || isGracePeriod || isPastDueGracePeriod || isCanceledWithRemainingAccess),
@@ -297,11 +308,15 @@ function hasFeatureAccess(subscription, feature) {
 module.exports = {
   PLAN_FREE,
   PLAN_V1,
+  PLAN_BASIC,
+  PLAN_PRO,
+  PLAN_BUSINESS,
   ensureBusinessSubscription,
   deriveEffectiveState,
   getSubscriptionSnapshotForBusiness,
   updateStripeCustomerForBusiness,
   syncStripeSubscriptionForBusiness,
   setFreePlanForBusiness,
-  hasFeatureAccess
+  hasFeatureAccess,
+  getPlanDisplayName
 };

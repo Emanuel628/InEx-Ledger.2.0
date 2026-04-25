@@ -451,6 +451,18 @@ async function loadSubscription() {
   }
 }
 
+async function waitForSubscriptionActivation() {
+  const maxAttempts = 8;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const sub = await loadSubscription();
+    if (sub?.effectiveTier === "v1" && (sub.isPaid || sub.isTrialing)) {
+      return sub;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  return loadSubscription();
+}
+
 async function loadBillingHistory() {
   const list = document.getElementById("billingHistoryList");
   if (!list) return;
@@ -733,6 +745,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (params.get("checkout") === "success") {
     showSubToast(tx("sub_mgmt_checkout_success"));
     window.history.replaceState({}, "", window.location.pathname);
+    currentSubscription = await waitForSubscriptionActivation();
+    await loadBillingHistory();
+    return;
   } else if (params.get("checkout") === "cancel") {
     showSubToast(tx("sub_mgmt_checkout_cancelled"));
     window.history.replaceState({}, "", window.location.pathname);

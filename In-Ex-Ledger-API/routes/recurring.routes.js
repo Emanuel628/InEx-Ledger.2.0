@@ -10,6 +10,7 @@ const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+const { BasicPlanLimitError } = require("../services/basicPlanUsageService.js");
 const {
   RecurringTemplateValidationError,
   normalizeRecurringPayload,
@@ -260,9 +261,13 @@ router.post("/:id/run", async (req, res) => {
     });
   } catch (err) {
     logError("POST /recurring/:id/run error:", err);
-    const statusCode = err instanceof RecurringTemplateValidationError ? err.statusCode : 500;
+    const statusCode =
+      err instanceof RecurringTemplateValidationError || err instanceof BasicPlanLimitError
+        ? err.statusCode
+        : 500;
     res.status(statusCode).json({
-      error: err.message || "Failed to post recurring transaction."
+      error: err.message || "Failed to post recurring transaction.",
+      ...(err instanceof BasicPlanLimitError ? { code: err.code, ...err.details } : {})
     });
   }
 });

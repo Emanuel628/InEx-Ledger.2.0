@@ -65,12 +65,15 @@ function renderDashboard(data) {
   const isCA = summary.region === "CA";
   const seTaxLabel = isCA ? "Est. CPP Contribution" : "Est. SE Tax Owed";
   const seTaxNote = isCA ? "Canada Pension Plan (self-employed)" : "Self-employment tax (approx.)";
-  kpiRow.innerHTML = [
+  const cards = [
     kpiCard("Avg Monthly Income", fmt(summary.avg_monthly_income), "trailing 12 months"),
     kpiCard("Avg Monthly Expenses", fmt(summary.avg_monthly_expense), "trailing 12 months"),
-    kpiCard("Your Profit", fmt(summary.net), summary.net >= 0 ? "profit" : "deficit", summary.net >= 0 ? "" : "kpi-value--negative"),
-    kpiCard(seTaxLabel, fmt(summary.se_tax_estimate ?? 0), seTaxNote)
-  ].join("");
+    kpiCard("Your Profit", fmt(summary.net), summary.net >= 0 ? "profit" : "deficit", summary.net >= 0 ? "" : "kpi-value--negative")
+  ];
+  if (summary.has_tax_estimates) {
+    cards.push(kpiCard(seTaxLabel, fmt(summary.se_tax_estimate ?? 0), seTaxNote));
+  }
+  kpiRow.innerHTML = cards.join("");
 
   // This Month card
   if (current_month) renderThisMonth(current_month);

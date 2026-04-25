@@ -1210,7 +1210,8 @@ router.get("/verify-email", async (req, res) => {
     }
     const redirectHash = new URLSearchParams({
       verified: "true",
-      token: session.token
+      token: session.token,
+      next: "/onboarding"
     }).toString();
 
     return res.redirect(`/verify-email#${redirectHash}`);

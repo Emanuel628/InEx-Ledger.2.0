@@ -200,6 +200,7 @@ test("verify-email marks the user verified and redirects into an authenticated s
     const hash = location.split("#")[1] || "";
     const params = new URLSearchParams(hash);
     assert.equal(params.get("verified"), "true");
+    assert.equal(params.get("next"), "/onboarding");
 
     const accessToken = params.get("token");
     assert.ok(accessToken, "redirect hash should contain an access token");

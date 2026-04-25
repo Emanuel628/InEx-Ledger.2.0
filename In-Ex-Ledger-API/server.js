@@ -32,7 +32,7 @@ const { logInfo, logWarn, logError } = require('./utils/logger.js');
 
 const app = express();
 app.disable('x-powered-by');
-const publicDir = path.join(process.cwd(), 'public');
+const publicDir = path.join(__dirname, 'public');
 const htmlDir = path.join(publicDir, 'html');
 let globalLimiter = null;
 const ENABLE_V2_BUSINESS = process.env.ENABLE_V2_BUSINESS === 'true';

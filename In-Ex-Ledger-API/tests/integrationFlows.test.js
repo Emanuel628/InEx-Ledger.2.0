@@ -642,10 +642,10 @@ test("businesses: POST with invalid language returns 400", async () => {
 // 9. MFA guard — routes that require MFA return 403 + mfa_required
 // ---------------------------------------------------------------------------
 
-test("businesses: DELETE requires MFA — 403 with mfa_required when MFA not enabled", async () => {
+test("businesses: DELETE requires MFA verification when MFA is enabled", async () => {
   const router = require("../routes/businesses.routes.js");
   const app = buildApp(router, "/api/businesses");
-  const token = makeToken({ mfa_enabled: false });
+  const token = makeToken({ mfa_enabled: true, mfa_authenticated: false });
   const csrf = generateCsrfToken();
 
   const res = await request(app)

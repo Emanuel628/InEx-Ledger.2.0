@@ -18,6 +18,10 @@ const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+const {
+  BasicPlanLimitError,
+  assertCanCreateTransactions
+} = require("../services/basicPlanUsageService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -379,6 +383,14 @@ function handleTransactionMutationError(res, err, fallbackMessage) {
     });
   }
 
+  if (err instanceof BasicPlanLimitError) {
+    return res.status(err.statusCode).json({
+      error: err.message,
+      code: err.code,
+      ...err.details
+    });
+  }
+
   return res.status(500).json({ error: fallbackMessage });
 }
 
@@ -452,6 +464,7 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    await assertCanCreateTransactions(pool, businessId, 1);
     const businessTaxContext = await getBusinessRegionAndCurrency(businessId);
     const validation = validateTransactionPayload(req.body, businessTaxContext.currency);
     if (!validation.valid) {
@@ -951,6 +964,8 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     const results = { imported: 0, skipped: 0, errors: [] };
     const MAX_ROWS = 1000;
     const rowsToProcess = rows.slice(0, MAX_ROWS);
+    const allowance = await assertCanCreateTransactions(pool, businessId, 0);
+    let remainingBasicSlots = Number.isFinite(allowance.remaining) ? allowance.remaining : Number.POSITIVE_INFINITY;
 
     for (let i = 0; i < rowsToProcess.length; i++) {
       const row = rowsToProcess[i];
@@ -972,6 +987,15 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       const categoryId = defaultCategoryMap[type];
       if (!categoryId) {
         results.errors.push({ row: i + 2, reason: `Row ${i + 2}: could not resolve default ${type} category` });
+        results.skipped++;
+        continue;
+      }
+
+      if (remainingBasicSlots <= 0) {
+        results.errors.push({
+          row: i + 2,
+          reason: `Row ${i + 2}: Basic includes up to 50 transactions per month. Upgrade to Pro to import more this month.`
+        });
         results.skipped++;
         continue;
       }
@@ -1000,7 +1024,18 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
           ]
         );
         results.imported++;
+        if (Number.isFinite(remainingBasicSlots)) {
+          remainingBasicSlots -= 1;
+        }
       } catch (insertErr) {
+        if (insertErr instanceof BasicPlanLimitError) {
+          results.errors.push({
+            row: i + 2,
+            reason: `Row ${i + 2}: ${insertErr.message}`
+          });
+          results.skipped++;
+          continue;
+        }
         results.errors.push({ row: i + 2, reason: `Row ${i + 2}: ${insertErr.message}` });
         results.skipped++;
       }

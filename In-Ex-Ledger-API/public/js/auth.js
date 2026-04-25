@@ -13,6 +13,7 @@ const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const SUBSCRIPTION_KEY = "lb_subscription";
 const ACTIVE_BUSINESS_ID_KEY = "lb_active_business_id";
 const ACTIVE_BUSINESS_NAME_KEY = "lb_business_name";
+const CPA_UI_ENABLED = false;
 const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
 const LOGIN_RESET_KEY = "lb_login_reset";
@@ -47,6 +48,10 @@ const SENSITIVE_STORAGE_PREFIXES = ["lb_", "lb:"];
 if (!window.API_BASE) {
   window.API_BASE = "";
 }
+
+window.__LUNA_FLAGS__ = Object.assign({}, window.__LUNA_FLAGS__, {
+  cpaUiEnabled: CPA_UI_ENABLED
+});
 
 
 if (!window.__AUTH_GUARD_STATE__) {
@@ -325,6 +330,12 @@ function isOnboardingRoute(pathname = getNormalizedPathname()) {
 
 function shouldRedirectToOnboarding(profile = {}) {
   return !profile?.onboarding?.completed && !isOnboardingRoute();
+}
+
+function getPlanDisplayNameFromCode(tier) {
+  if (tier === "v1") return "Pro";
+  if (tier === "v2" || tier === "business") return "Business";
+  return "Basic";
 }
 
 function resolvePostOnboardingPath(profile = {}) {
@@ -760,7 +771,7 @@ function initAccountMenus(displayName = "User", profile = {}) {
   const activeBusiness = getActiveBusiness(profile);
   const businesses = getBusinessCollection(profile);
   const assignedCpaPortfolios = getAssignedCpaPortfolios(profile);
-  const hasCpaWorkspace = assignedCpaPortfolios.length > 0;
+  const hasCpaWorkspace = CPA_UI_ENABLED && assignedCpaPortfolios.length > 0;
   const businessCountLabel = `${businesses.length} business${businesses.length === 1 ? "" : "es"}`;
 
   document.querySelectorAll(".user-pill").forEach((pill, index) => {
@@ -1107,9 +1118,13 @@ function effectiveTier() {
   return tier;
 }
 
+function effectivePlanName() {
+  return getPlanDisplayNameFromCode(effectiveTier());
+}
+
 function requireTier(minTier) {
   const tier = effectiveTier();
-  const order = ["free", "v1", "v2"];
+  const order = ["free", "v1", "v2", "business"];
   const currentIndex = order.indexOf(tier);
   const requiredIndex = order.indexOf(minTier);
 
@@ -1121,6 +1136,8 @@ function requireTier(minTier) {
     window.location.href = "/upgrade";
   }
 }
+
+window.effectivePlanName = effectivePlanName;
 
 function requireAuthAndTier(minTier) {
   requireAuth();

@@ -777,8 +777,13 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
       }
     } else if (event.type === "checkout.session.completed") {
       const subscriptionId = object?.subscription;
-      const businessId = object?.metadata?.business_id;
+      const businessId =
+        object?.metadata?.business_id ||
+        (object?.customer ? await findBusinessByStripeCustomerId(object.customer) : null);
       if (subscriptionId && businessId) {
+        if (object?.customer) {
+          await updateStripeCustomerForBusiness(businessId, object.customer);
+        }
         const subResponse = await fetch(
           `${STRIPE_API_BASE}/subscriptions/${subscriptionId}`,
           {
@@ -794,6 +799,27 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
           logInfo("Stripe checkout.session.completed synced for business:", businessId);
         }
       }
+    } else if (event.type === "invoice.payment_succeeded") {
+      const subscriptionId = object?.subscription;
+      const businessId = object?.customer
+        ? await findBusinessByStripeCustomerId(object.customer)
+        : null;
+      if (subscriptionId && businessId) {
+        const subResponse = await fetch(
+          `${STRIPE_API_BASE}/subscriptions/${subscriptionId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${getStripeSecretKey()}`,
+              "Stripe-Version": STRIPE_API_VERSION
+            }
+          }
+        );
+        const sub = await subResponse.json().catch(() => null);
+        if (sub && !sub.error) {
+          await syncStripeSubscriptionForBusiness(businessId, sub);
+          logInfo("Stripe invoice.payment_succeeded synced for business:", businessId);
+        }
+      }
     } else if (event.type === "invoice.payment_failed") {
       // Stripe also fires customer.subscription.updated (status → past_due) which
       // handles the DB sync. Log here for observability and alerting.
@@ -807,8 +833,6 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
         "invoice:",
         object?.id
       );
-    } else if (event.type === "invoice.payment_succeeded") {
-      logInfo("Stripe invoice.payment_succeeded:", object?.id);
     }
     return res.status(200).json({ received: true });
   } catch (err) {

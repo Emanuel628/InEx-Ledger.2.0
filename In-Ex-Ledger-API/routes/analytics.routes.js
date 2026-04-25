@@ -249,6 +249,7 @@ router.get("/dashboard", async (req, res) => {
         avg_monthly_expense: Number(avgMonthlyExpense.toFixed(2)),
         estimated_tax_liability_pct: hasTaxEstimates ? Number(estimatedTaxPct.toFixed(1)) : null,
         se_tax_estimate: hasTaxEstimates ? Number(seTaxEstimate.toFixed(2)) : null,
+        has_tax_estimates: hasTaxEstimates,
         region
       },
       current_month: {

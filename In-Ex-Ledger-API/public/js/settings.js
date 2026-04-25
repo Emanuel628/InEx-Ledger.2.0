@@ -97,6 +97,22 @@ let settingsOverviewState = {
   mfaEnabled: false
 };
 
+function isCpaUiEnabled() {
+  return window.__LUNA_FLAGS__?.cpaUiEnabled === true;
+}
+
+function hideCpaSettingsUi() {
+  document.querySelectorAll('[data-settings-target="settings-cpa-access"]').forEach((node) => {
+    node.hidden = true;
+    node.classList.add("hidden");
+  });
+  const cpaPanel = document.getElementById("settings-cpa-access");
+  if (cpaPanel) {
+    cpaPanel.hidden = true;
+    cpaPanel.classList.add("hidden");
+  }
+}
+
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -108,7 +124,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initBusinessProfileForm();
   await initAccountingLockPanel();
   await initAccountSettings();
-  await initCpaAccess();
+  if (isCpaUiEnabled()) {
+    await initCpaAccess();
+  } else {
+    hideCpaSettingsUi();
+  }
   await initPreferences();
   initSecurityForm();
   initDangerZone();
@@ -199,6 +219,9 @@ function syncSettingsOverviewSummaries() {
   }
 
   if (cpaNode) {
+    if (!isCpaUiEnabled()) {
+      cpaNode.closest(".settings-summary-card")?.classList.add("hidden");
+    }
     const activeLabel = settingsOverviewState.cpaActiveCount === 1
       ? t("settings_overview_active_grant_singular")
       : t("settings_overview_active_grant_plural");
@@ -1061,6 +1084,10 @@ async function initPreferences() {
 }
 
 async function initCpaAccess() {
+  if (!isCpaUiEnabled()) {
+    hideCpaSettingsUi();
+    return;
+  }
   const form = document.getElementById("cpaAccessForm");
   const emailInput = document.getElementById("cpaAccessEmail");
   const scopeSelect = document.getElementById("cpaAccessScope");

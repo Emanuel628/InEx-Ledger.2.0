@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { loadAccountingLockState, isDateLocked } = require("./accountingLockService.js");
+const { assertCanCreateTransactions } = require("./basicPlanUsageService.js");
 
 const VALID_CADENCES = new Set(["weekly", "biweekly", "monthly", "quarterly", "yearly", "annually"]);
 // Maximum number of missed occurrences to materialise in a single catch-up run.
@@ -214,6 +215,9 @@ async function materializeTemplateRuns(businessId, templateId) {
       return;
     }
 
+    const allowance = await assertCanCreateTransactions(client, businessId, 0);
+    let remainingBasicSlots = Number.isFinite(allowance.remaining) ? allowance.remaining : Number.POSITIVE_INFINITY;
+
     const lockState = await loadAccountingLockState(pool, businessId);
 
     let nextOccurrence = parseIsoDate(template.next_run_date);
@@ -235,6 +239,10 @@ async function materializeTemplateRuns(businessId, templateId) {
       if (isDateLocked(occurrenceDate, lockState?.lockedThroughDate)) {
         nextOccurrence = computeNextOccurrence(nextOccurrence, template.cadence);
         continue;
+      }
+
+      if (remainingBasicSlots <= 0) {
+        break;
       }
 
       const runInsert = await client.query(
@@ -276,6 +284,9 @@ async function materializeTemplateRuns(businessId, templateId) {
           [transactionInsert.rows[0].id, runInsert.rows[0].id]
         );
         createdAny = true;
+        if (Number.isFinite(remainingBasicSlots)) {
+          remainingBasicSlots -= 1;
+        }
       }
 
       lastRunDate = nextOccurrence;
@@ -335,6 +346,8 @@ async function materializeNextTemplateRun(businessId, templateId) {
       await client.query("ROLLBACK");
       return { found: true, created: false };
     }
+
+    await assertCanCreateTransactions(client, businessId, 1);
 
     const occurrenceDate = parseIsoDate(template.next_run_date);
     const endDate = template.end_date ? parseIsoDate(template.end_date) : null;

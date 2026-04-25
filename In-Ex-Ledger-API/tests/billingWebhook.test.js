@@ -46,18 +46,41 @@ function loadBillingRouter(options = {}) {
   const state = {
     syncCalls: [],
     freePlanCalls: [],
+    customerUpdates: [],
     reserveResult: options.reserveResult ?? true,
     releaseCalls: [],
-    processingError: options.processingError || null
+    processingError: options.processingError || null,
+    customerBusinessId: options.customerBusinessId || "biz_test_001"
   };
 
   const originalLoad = Module._load.bind(Module);
+  const originalFetch = global.fetch;
+  global.fetch = async (url) => {
+    if (String(url).includes("/subscriptions/")) {
+      return {
+        ok: true,
+        async json() {
+          return {
+            id: "sub_test123",
+            customer: "cus_test123",
+            status: "active",
+            cancel_at_period_end: false,
+            current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
+            current_period_start: Math.floor(Date.now() / 1000) - 15 * 24 * 60 * 60,
+            metadata: { business_id: state.customerBusinessId },
+            items: { data: [] }
+          };
+        }
+      };
+    }
+    throw new Error(`Unexpected fetch in billingWebhook test: ${url}`);
+  };
 
   Module._load = function (requestName, parent, isMain) {
     if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
       return {
         pool: {
-          async query(sql) {
+          async query(sql, params = []) {
             // stripe_webhook_events INSERT
             if (/INSERT INTO stripe_webhook_events/i.test(sql)) {
               return { rowCount: state.reserveResult ? 1 : 0 };
@@ -65,6 +88,9 @@ function loadBillingRouter(options = {}) {
             if (/DELETE FROM stripe_webhook_events/i.test(sql)) {
               state.releaseCalls.push(sql);
               return { rowCount: 1 };
+            }
+            if (/SELECT business_id\s+FROM business_subscriptions\s+WHERE stripe_customer_id = \$1/i.test(sql)) {
+              return { rows: state.customerBusinessId ? [{ business_id: state.customerBusinessId }] : [], rowCount: state.customerBusinessId ? 1 : 0 };
             }
             return { rows: [], rowCount: 0 };
           }
@@ -78,7 +104,9 @@ function loadBillingRouter(options = {}) {
     ) {
       return {
         getSubscriptionSnapshotForBusiness: async () => ({}),
-        updateStripeCustomerForBusiness: async () => {},
+        updateStripeCustomerForBusiness: async (bizId, customerId) => {
+          state.customerUpdates.push({ bizId, customerId });
+        },
         syncStripeSubscriptionForBusiness: async (bizId, sub) => {
           if (state.processingError === "sync") {
             throw new Error("sync failed");
@@ -114,7 +142,7 @@ function loadBillingRouter(options = {}) {
     ) {
       return {
         requireAuth: (_req, _res, next) => next(),
-        requireMfa: (_req, _res, next) => next()
+        requireMfaIfEnabled: (_req, _res, next) => next()
       };
     }
 
@@ -154,6 +182,7 @@ function loadBillingRouter(options = {}) {
 
   delete require.cache[BILLING_ROUTE_PATH];
   process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
+  process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_billing_webhook";
 
   try {
     const router = require("../routes/billing.routes.js");
@@ -175,12 +204,16 @@ function loadBillingRouter(options = {}) {
       cleanup() {
         delete require.cache[BILLING_ROUTE_PATH];
         Module._load = originalLoad;
+        global.fetch = originalFetch;
         delete process.env.STRIPE_WEBHOOK_SECRET;
+        delete process.env.STRIPE_SECRET_KEY;
       }
     };
   } catch (err) {
     Module._load = originalLoad;
+    global.fetch = originalFetch;
     delete process.env.STRIPE_WEBHOOK_SECRET;
+    delete process.env.STRIPE_SECRET_KEY;
     throw err;
   }
 }
@@ -324,6 +357,53 @@ test("webhook: processing failures return 500 so Stripe can retry and release th
     assert.equal(res.status, 500);
     assert.equal(fixture.state.releaseCalls.length, 1, "reserved webhook id should be released on processing failure");
     assert.equal(fixture.state.syncCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("webhook: checkout.session.completed syncs the paid subscription and stores the Stripe customer id", async () => {
+  const fixture = loadBillingRouter();
+
+  try {
+    const { event } = buildWebhookEvent("checkout.session.completed", {
+      id: "cs_test_123",
+      object: "checkout.session",
+      subscription: "sub_test123",
+      customer: "cus_test123",
+      metadata: { business_id: "biz_test_001" }
+    });
+
+    const res = await sendWebhook(fixture.app, event);
+    assert.equal(res.status, 200);
+
+    assert.equal(fixture.state.customerUpdates.length, 1);
+    assert.deepEqual(fixture.state.customerUpdates[0], {
+      bizId: "biz_test_001",
+      customerId: "cus_test123"
+    });
+    assert.equal(fixture.state.syncCalls.length, 1);
+    assert.equal(fixture.state.syncCalls[0].bizId, "biz_test_001");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("webhook: invoice.payment_succeeded re-syncs the subscription using the stored Stripe customer mapping", async () => {
+  const fixture = loadBillingRouter({ customerBusinessId: "biz_test_lookup" });
+
+  try {
+    const { event } = buildWebhookEvent("invoice.payment_succeeded", {
+      id: "in_test_123",
+      object: "invoice",
+      subscription: "sub_test123",
+      customer: "cus_test123"
+    });
+
+    const res = await sendWebhook(fixture.app, event);
+    assert.equal(res.status, 200);
+    assert.equal(fixture.state.syncCalls.length, 1);
+    assert.equal(fixture.state.syncCalls[0].bizId, "biz_test_lookup");
   } finally {
     fixture.cleanup();
   }

@@ -247,11 +247,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tier = effectiveTier();
   const cockpit = document.getElementById("tax-cockpit");
   const upsell = document.getElementById("tax-upsell");
+  const advancedDetails = document.getElementById("transactionAdvancedDetails");
   const upsellDismissed = isTransactionsUpsellDismissed();
   const hasTransactions = (ledgerState.transactions || []).length > 0;
 
   if (cockpit) {
     cockpit.hidden = tier === "free" || !hasTransactions;
+  }
+  if (advancedDetails) {
+    advancedDetails.hidden = tier === "free";
+    if (tier === "free") {
+      advancedDetails.removeAttribute("open");
+    }
   }
 
   if (upsell) {
@@ -1382,7 +1389,7 @@ function setTransactionAdvancedDefaults() {
     indirectTaxNote.textContent =
       getResolvedRegion() === "ca"
         ? "Use this for GST/HST/QST that must be reviewed or recovered."
-        : "Use this for sales tax or other indirect taxes that need CPA review.";
+        : "Use this for sales tax or other indirect taxes that need review.";
   }
   syncEdgeCaseUi();
 }
@@ -1982,7 +1989,7 @@ function renderTotals() {
       : `${txT("exports_tax_context_prefix", "Tax form context")}: ${getTaxFormContext().label} ${txT("transactions_estimate", "estimate")}`;
   }
   if (cockpit) {
-  cockpit.hidden = !hasTransactions || isAllScope;
+  cockpit.hidden = tier === "free" || !hasTransactions || isAllScope;
   }
   
   if (upsell) {
