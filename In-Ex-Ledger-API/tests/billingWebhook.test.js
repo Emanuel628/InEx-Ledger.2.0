@@ -46,7 +46,9 @@ function loadBillingRouter(options = {}) {
   const state = {
     syncCalls: [],
     freePlanCalls: [],
-    reserveResult: options.reserveResult ?? true
+    reserveResult: options.reserveResult ?? true,
+    releaseCalls: [],
+    processingError: options.processingError || null
   };
 
   const originalLoad = Module._load.bind(Module);
@@ -59,6 +61,10 @@ function loadBillingRouter(options = {}) {
             // stripe_webhook_events INSERT
             if (/INSERT INTO stripe_webhook_events/i.test(sql)) {
               return { rowCount: state.reserveResult ? 1 : 0 };
+            }
+            if (/DELETE FROM stripe_webhook_events/i.test(sql)) {
+              state.releaseCalls.push(sql);
+              return { rowCount: 1 };
             }
             return { rows: [], rowCount: 0 };
           }
@@ -74,9 +80,15 @@ function loadBillingRouter(options = {}) {
         getSubscriptionSnapshotForBusiness: async () => ({}),
         updateStripeCustomerForBusiness: async () => {},
         syncStripeSubscriptionForBusiness: async (bizId, sub) => {
+          if (state.processingError === "sync") {
+            throw new Error("sync failed");
+          }
           state.syncCalls.push({ bizId, sub });
         },
         setFreePlanForBusiness: async (bizId) => {
+          if (state.processingError === "free") {
+            throw new Error("free failed");
+          }
           state.freePlanCalls.push({ bizId });
         }
       };
@@ -293,6 +305,25 @@ test("webhook: duplicate events are skipped (idempotency)", async () => {
 
     assert.equal(fixture.state.syncCalls.length, 0, "duplicate event must not trigger service calls");
     assert.equal(fixture.state.freePlanCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("webhook: processing failures return 500 so Stripe can retry and release the reservation", async () => {
+  const fixture = loadBillingRouter({ processingError: "sync" });
+
+  try {
+    const futureTs = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+    const { event } = buildWebhookEvent("customer.subscription.updated", {
+      status: "active",
+      current_period_end: futureTs
+    });
+
+    const res = await sendWebhook(fixture.app, event);
+    assert.equal(res.status, 500);
+    assert.equal(fixture.state.releaseCalls.length, 1, "reserved webhook id should be released on processing failure");
+    assert.equal(fixture.state.syncCalls.length, 0);
   } finally {
     fixture.cleanup();
   }

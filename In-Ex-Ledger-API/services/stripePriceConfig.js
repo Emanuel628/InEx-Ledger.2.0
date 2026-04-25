@@ -1,8 +1,8 @@
 const STRIPE_PRICE_ENTRIES = [
-  { env: "STRIPE_BIZ_M_US", billingInterval: "monthly", currency: "usd", type: "base" },
-  { env: "STRIPE_BIZ_Y_US", billingInterval: "yearly", currency: "usd", type: "base" },
-  { env: "STRIPE_BIZ_M_CA", billingInterval: "monthly", currency: "cad", type: "base" },
-  { env: "STRIPE_BIZ_Y_CA", billingInterval: "yearly", currency: "cad", type: "base" },
+  { env: "STRIPE_PRO_M_US", billingInterval: "monthly", currency: "usd", type: "base" },
+  { env: "STRIPE_PRO_Y_US", billingInterval: "yearly", currency: "usd", type: "base" },
+  { env: "STRIPE_PRO_M_CA", billingInterval: "monthly", currency: "cad", type: "base" },
+  { env: "STRIPE_PRO_Y_CA", billingInterval: "yearly", currency: "cad", type: "base" },
   { env: "STRIPE_ADDL_M_US", billingInterval: "monthly", currency: "usd", type: "addon" },
   { env: "STRIPE_ADDL_Y_US", billingInterval: "yearly", currency: "usd", type: "addon" },
   { env: "STRIPE_ADDL_M_CA", billingInterval: "monthly", currency: "cad", type: "addon" },

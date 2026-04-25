@@ -30,9 +30,11 @@ const BILLING_INTERVALS = new Set(["monthly", "yearly"]);
 const BILLING_CURRENCIES = new Set(["usd", "cad"]);
 const MAX_ADDITIONAL_BUSINESSES = 100;
 const BILLING_CONTEXT_CACHE_TTL_MS = 15 * 60 * 1000;
+const STRIPE_PRICE_CACHE_TTL_MS = 15 * 60 * 1000;
 
 const { base: BASE_PRICE_ENV, addon: ADDON_PRICE_ENV } = buildStripePriceEnvMap();
 const billingContextCache = new Map();
+const stripePriceCache = new Map();
 
 class BillingValidationError extends Error {
   constructor(message) {
@@ -85,6 +87,18 @@ async function reserveWebhookEvent(eventId) {
   }
 
   return insertResult.rowCount > 0;
+}
+
+async function releaseWebhookEvent(eventId) {
+  if (!eventId) {
+    return;
+  }
+
+  await pool.query(
+    `DELETE FROM stripe_webhook_events
+      WHERE event_id = $1`,
+    [eventId]
+  );
 }
 
 function getStripeSecretKey() {
@@ -246,6 +260,74 @@ async function stripeRequest(path, payload) {
   return json;
 }
 
+async function stripeGet(path) {
+  const response = await fetch(`${STRIPE_API_BASE}${path}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${getStripeSecretKey()}`,
+      "Stripe-Version": STRIPE_API_VERSION
+    }
+  });
+
+  const json = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(json?.error?.message || `Stripe request failed (${response.status})`);
+  }
+
+  return json;
+}
+
+function parseStripeUnitAmount(price) {
+  const raw = price?.unit_amount_decimal ?? price?.unit_amount;
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) {
+    throw new Error("Stripe price is missing a valid unit amount");
+  }
+  return numeric / 100;
+}
+
+async function fetchStripePrice(priceId) {
+  const cached = stripePriceCache.get(priceId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
+  const price = await stripeGet(`/prices/${encodeURIComponent(priceId)}`);
+  stripePriceCache.set(priceId, {
+    value: price,
+    expiresAt: Date.now() + STRIPE_PRICE_CACHE_TTL_MS
+  });
+  return price;
+}
+
+async function buildVerifiedPricingTable(currency) {
+  const normalizedCurrency = normalizeCurrency(currency);
+  const monthlyBaseEnv = BASE_PRICE_ENV.monthly?.[normalizedCurrency];
+  const yearlyBaseEnv = BASE_PRICE_ENV.yearly?.[normalizedCurrency];
+  const monthlyAddonEnv = ADDON_PRICE_ENV.monthly?.[normalizedCurrency];
+  const yearlyAddonEnv = ADDON_PRICE_ENV.yearly?.[normalizedCurrency];
+
+  const [monthlyBasePrice, yearlyBasePrice, monthlyAddonPrice, yearlyAddonPrice] = await Promise.all([
+    fetchStripePrice(requireEnvValue(monthlyBaseEnv)),
+    fetchStripePrice(requireEnvValue(yearlyBaseEnv)),
+    fetchStripePrice(requireEnvValue(monthlyAddonEnv)),
+    fetchStripePrice(requireEnvValue(yearlyAddonEnv))
+  ]);
+
+  return {
+    monthly: {
+      base: parseStripeUnitAmount(monthlyBasePrice),
+      addon: parseStripeUnitAmount(monthlyAddonPrice),
+      labelKey: "subscription_billing_monthly"
+    },
+    yearly: {
+      base: parseStripeUnitAmount(yearlyBasePrice),
+      addon: parseStripeUnitAmount(yearlyAddonPrice),
+      labelKey: "subscription_billing_yearly"
+    }
+  };
+}
+
 async function findBusinessByStripeCustomerId(stripeCustomerId) {
   const result = await pool.query(
     `SELECT business_id
@@ -287,6 +369,16 @@ function buildAppUrl(path) {
   if (!base) {
     throw new Error("APP_BASE_URL is not configured");
   }
+  const parsed = new URL(base);
+  const isLocalhost =
+    parsed.hostname === "localhost" ||
+    parsed.hostname === "127.0.0.1" ||
+    parsed.hostname === "[::1]";
+
+  if (parsed.protocol !== "https:" && !isLocalhost) {
+    throw new Error("APP_BASE_URL must use HTTPS");
+  }
+
   return `${base.replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
@@ -312,6 +404,22 @@ router.get("/pricing-context", billingReadLimiter, async (req, res) => {
   } catch (err) {
     logError("GET /api/billing/pricing-context error:", err.message);
     res.status(500).json({ error: "Failed to load pricing context." });
+  }
+});
+
+router.get("/pricing", billingReadLimiter, async (req, res) => {
+  try {
+    const context = await resolveBillingContext(req);
+    const pricing = await buildVerifiedPricingTable(context.currency);
+    res.json({
+      currency: context.currency,
+      country_code: context.countryCode,
+      source: context.source,
+      pricing
+    });
+  } catch (err) {
+    logError("GET /api/billing/pricing error:", err.message);
+    res.status(500).json({ error: "Failed to load billing pricing." });
   }
 });
 
@@ -622,12 +730,9 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
     return res.status(500).json({ error: "Webhook processing temporarily unavailable" });
   }
 
-  // Acknowledge to Stripe only after idempotency is secured.
-  res.status(200).json({ received: true });
-
   if (!reserved) {
     logInfo("Stripe webhook duplicate skipped:", event.id, event.type);
-    return;
+    return res.status(200).json({ received: true, duplicate: true });
   }
 
   const object = event?.data?.object || {};
@@ -705,7 +810,16 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
     } else if (event.type === "invoice.payment_succeeded") {
       logInfo("Stripe invoice.payment_succeeded:", object?.id);
     }
+    return res.status(200).json({ received: true });
   } catch (err) {
+    try {
+      await releaseWebhookEvent(event.id);
+    } catch (releaseErr) {
+      logError("Stripe webhook idempotency release failed:", {
+        eventId: event.id,
+        err: releaseErr.message
+      });
+    }
     logError(
       "Stripe webhook processing error — event:",
       event.id,
@@ -714,6 +828,7 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
       "error:",
       err.message
     );
+    return res.status(500).json({ error: "Webhook processing failed" });
   }
 });
 

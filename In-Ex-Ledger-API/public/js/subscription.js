@@ -8,7 +8,8 @@ const pricingState = {
   billingInterval: "monthly",
   currency: "usd",
   additionalBusinesses: 0,
-  isCheckoutLoading: false
+  isCheckoutLoading: false,
+  verifiedPricing: null
 };
 let currentSubscription = null;
 
@@ -53,6 +54,9 @@ function formatMoney(currency, amount) {
 }
 
 function getPricingDetails() {
+  if (pricingState.verifiedPricing?.[pricingState.billingInterval]) {
+    return pricingState.verifiedPricing[pricingState.billingInterval];
+  }
   if (typeof billingPricingUtils.getPricing === "function") {
     return billingPricingUtils.getPricing(pricingState.currency, pricingState.billingInterval);
   }
@@ -60,6 +64,10 @@ function getPricingDetails() {
 }
 
 function getAddonTotalAmount() {
+  if (pricingState.verifiedPricing?.[pricingState.billingInterval]) {
+    const pricing = getPricingDetails();
+    return pricing.addon * pricingState.additionalBusinesses;
+  }
   if (typeof billingPricingUtils.getAddonTotal === "function") {
     return billingPricingUtils.getAddonTotal(
       pricingState.currency,
@@ -71,6 +79,10 @@ function getAddonTotalAmount() {
 }
 
 function getGrandTotalAmount() {
+  if (pricingState.verifiedPricing?.[pricingState.billingInterval]) {
+    const pricing = getPricingDetails();
+    return pricing.base + getAddonTotalAmount();
+  }
   if (typeof billingPricingUtils.getGrandTotal === "function") {
     return billingPricingUtils.getGrandTotal(
       pricingState.currency,
@@ -99,6 +111,26 @@ async function loadVerifiedPricingContext() {
     }
   } catch (_) {
     // Fall back to the default pricing table currency.
+  }
+  return pricingState.currency;
+}
+
+async function loadVerifiedPricing() {
+  try {
+    const res = await apiFetch("/api/billing/pricing");
+    if (!res || !res.ok) {
+      return loadVerifiedPricingContext();
+    }
+    const payload = await res.json().catch(() => null);
+    const currency = String(payload?.currency || "").toLowerCase();
+    if (BILLING_CURRENCIES.includes(currency)) {
+      pricingState.currency = currency;
+    }
+    if (payload?.pricing?.monthly && payload?.pricing?.yearly) {
+      pricingState.verifiedPricing = payload.pricing;
+    }
+  } catch (_) {
+    return loadVerifiedPricingContext();
   }
   return pricingState.currency;
 }
@@ -183,7 +215,8 @@ function updatePricingUI() {
 async function initPricingControls() {
   pricingState.billingInterval = "monthly";
   pricingState.additionalBusinesses = 0;
-  await loadVerifiedPricingContext();
+  pricingState.verifiedPricing = null;
+  await loadVerifiedPricing();
 
   document.querySelectorAll("[data-billing-interval]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -538,7 +571,7 @@ function wireCheckoutModal() {
   cancelBtn.addEventListener("click", closeCheckoutModal);
   confirmBtn.addEventListener("click", startCheckout);
   modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
+    if (event.target === modal && !pricingState.isCheckoutLoading) {
       closeCheckoutModal();
     }
   });

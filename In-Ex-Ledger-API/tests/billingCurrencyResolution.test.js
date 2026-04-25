@@ -53,12 +53,12 @@ function loadBillingRouter({ country = "Canada" } = {}) {
         buildStripePriceEnvMap: () => ({
           base: {
             monthly: {
-              usd: "STRIPE_BIZ_M_US",
-              cad: "STRIPE_BIZ_M_CA"
+              usd: "STRIPE_PRO_M_US",
+              cad: "STRIPE_PRO_M_CA"
             },
             yearly: {
-              usd: "STRIPE_BIZ_Y_US",
-              cad: "STRIPE_BIZ_Y_CA"
+              usd: "STRIPE_PRO_Y_US",
+              cad: "STRIPE_PRO_Y_CA"
             }
           },
           addon: {
@@ -140,10 +140,10 @@ function loadBillingRouter({ country = "Canada" } = {}) {
 
   process.env.STRIPE_SECRET_KEY = "sk_test_billing";
   process.env.APP_BASE_URL = "https://app.inexledger.test";
-  process.env.STRIPE_BIZ_M_US = "price_month_usd";
-  process.env.STRIPE_BIZ_M_CA = "price_month_cad";
-  process.env.STRIPE_BIZ_Y_US = "price_year_usd";
-  process.env.STRIPE_BIZ_Y_CA = "price_year_cad";
+  process.env.STRIPE_PRO_M_US = "price_month_usd";
+  process.env.STRIPE_PRO_M_CA = "price_month_cad";
+  process.env.STRIPE_PRO_Y_US = "price_year_usd";
+  process.env.STRIPE_PRO_Y_CA = "price_year_cad";
   process.env.STRIPE_ADDL_M_US = "price_addon_month_usd";
   process.env.STRIPE_ADDL_M_CA = "price_addon_month_cad";
   process.env.STRIPE_ADDL_Y_US = "price_addon_year_usd";
@@ -154,6 +154,28 @@ function loadBillingRouter({ country = "Canada" } = {}) {
       url,
       body: options.body ? new URLSearchParams(options.body) : null
     });
+
+    if (String(url).includes("/prices/")) {
+      const priceId = String(url).split("/prices/")[1];
+      const catalog = {
+        price_month_usd: { id: "price_month_usd", unit_amount: 1200 },
+        price_month_cad: { id: "price_month_cad", unit_amount: 1700 },
+        price_year_usd: { id: "price_year_usd", unit_amount: 12240 },
+        price_year_cad: { id: "price_year_cad", unit_amount: 17500 },
+        price_addon_month_usd: { id: "price_addon_month_usd", unit_amount: 500 },
+        price_addon_month_cad: { id: "price_addon_month_cad", unit_amount: 700 },
+        price_addon_year_usd: { id: "price_addon_year_usd", unit_amount: 5100 },
+        price_addon_year_cad: { id: "price_addon_year_cad", unit_amount: 7200 }
+      };
+      const price = catalog[priceId];
+      if (!price) {
+        throw new Error(`Unexpected Stripe price lookup: ${url}`);
+      }
+      return {
+        ok: true,
+        json: async () => price
+      };
+    }
 
     if (String(url).endsWith("/customers")) {
       return {
@@ -192,10 +214,10 @@ function loadBillingRouter({ country = "Canada" } = {}) {
         global.fetch = originalFetch;
         delete process.env.STRIPE_SECRET_KEY;
         delete process.env.APP_BASE_URL;
-        delete process.env.STRIPE_BIZ_M_US;
-        delete process.env.STRIPE_BIZ_M_CA;
-        delete process.env.STRIPE_BIZ_Y_US;
-        delete process.env.STRIPE_BIZ_Y_CA;
+        delete process.env.STRIPE_PRO_M_US;
+        delete process.env.STRIPE_PRO_M_CA;
+        delete process.env.STRIPE_PRO_Y_US;
+        delete process.env.STRIPE_PRO_Y_CA;
         delete process.env.STRIPE_ADDL_M_US;
         delete process.env.STRIPE_ADDL_M_CA;
         delete process.env.STRIPE_ADDL_Y_US;
@@ -220,6 +242,22 @@ test("billing pricing context resolves CAD from verified IP geolocation", async 
       country_code: "ca",
       source: "ip_geolocation"
     });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing pricing returns Stripe-backed monthly and yearly amounts for the resolved currency", async () => {
+  const fixture = loadBillingRouter({ country: "Canada" });
+
+  try {
+    const res = await request(fixture.app).get("/api/billing/pricing");
+    assert.equal(res.status, 200);
+    assert.equal(res.body.currency, "cad");
+    assert.equal(res.body.pricing.monthly.base, 17);
+    assert.equal(res.body.pricing.monthly.addon, 7);
+    assert.equal(res.body.pricing.yearly.base, 175);
+    assert.equal(res.body.pricing.yearly.addon, 72);
   } finally {
     fixture.cleanup();
   }
@@ -251,6 +289,28 @@ test("billing checkout ignores client currency and uses verified region currency
     assert.equal(checkoutRequest.body.get("metadata[country_code]"), "ca");
     assert.equal(checkoutRequest.body.get("metadata[currency_source]"), "ip_geolocation");
   } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout rejects insecure APP_BASE_URL values", async () => {
+  const fixture = loadBillingRouter({ country: "United States" });
+  const originalBaseUrl = process.env.APP_BASE_URL;
+
+  try {
+    process.env.APP_BASE_URL = "http://app.inexledger.test";
+
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 0
+      });
+
+    assert.equal(res.status, 500);
+    assert.equal(res.body.error, "Failed to start checkout.");
+  } finally {
+    process.env.APP_BASE_URL = originalBaseUrl;
     fixture.cleanup();
   }
 });
