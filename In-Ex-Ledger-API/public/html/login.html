@@ -30,15 +30,15 @@
     <section class="auth-card">
       <h2 data-i18n="login_title">Sign in</h2>
 
-      <form id="loginForm" method="post" class="auth-form">
+      <form id="loginForm" method="post" class="auth-form" autocomplete="off">
         <div class="form-field">
           <label for="email" data-i18n="login_email_label">Email address</label>
-          <input type="email" id="email" name="email" required autocomplete="email" class="form-control" />
+          <input type="email" id="email" name="login_email" required autocomplete="off" autocapitalize="none" spellcheck="false" class="form-control" readonly onfocus="this.removeAttribute('readonly');" />
         </div>
 
         <div class="form-field">
           <label for="password" data-i18n="login_password_label">Password</label>
-          <input type="password" id="password" name="password" required autocomplete="current-password" class="form-control" />
+          <input type="password" id="password" name="login_password" required autocomplete="new-password" class="form-control" readonly onfocus="this.removeAttribute('readonly');" />
         </div>
 
         <label class="show-password-toggle">

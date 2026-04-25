@@ -14,7 +14,7 @@ function tx(key) {
 }
 const OFFLINE_ERROR_MESSAGE = "login_error_offline";
 const EXPIRED_SESSION_MESSAGE = "login_error_expired";
-const AUTOFILL_CLEAR_DELAY_MS = 200;
+const AUTOFILL_CLEAR_RETRY_DELAYS_MS = [200, 600, 1200];
 
 redirectIfAuthenticated();
 
@@ -29,11 +29,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loginForm.addEventListener("submit", handleLoginSubmit);
   wireShowPasswordToggle(document);
+  wireAutofillSuppression();
   showLoginReasonMessage();
+  clearLoginFields({ force: true });
   resetLoginFieldsIfNeeded();
 });
 
 window.addEventListener("pageshow", () => {
+  clearLoginFields({ force: true });
   resetLoginFieldsIfNeeded();
 });
 
@@ -44,14 +47,17 @@ function resetLoginFieldsIfNeeded() {
   if (!shouldReset) {
     return;
   }
-  clearLoginFields();
+  clearLoginFields({ force: true });
 }
 
-function clearLoginFields() {
+function clearLoginFields({ force = false } = {}) {
   const form = loginForm || document.getElementById("loginForm");
   const emailField = document.getElementById("email");
   const passwordField = document.getElementById("password");
   const resetFieldValues = () => {
+    if (!force && document.activeElement && [emailField, passwordField].includes(document.activeElement)) {
+      return;
+    }
     if (emailField) {
       emailField.value = "";
     }
@@ -61,8 +67,22 @@ function clearLoginFields() {
   };
   form?.reset();
   resetFieldValues();
-  // Retry once to counter browser autofill that may run after initial load.
-  window.setTimeout(resetFieldValues, AUTOFILL_CLEAR_DELAY_MS);
+  AUTOFILL_CLEAR_RETRY_DELAYS_MS.forEach((delay) => {
+    window.setTimeout(resetFieldValues, delay);
+  });
+}
+
+function wireAutofillSuppression() {
+  const emailField = document.getElementById("email");
+  const passwordField = document.getElementById("password");
+  [emailField, passwordField].forEach((field) => {
+    if (!field) {
+      return;
+    }
+    field.addEventListener("focus", () => {
+      field.removeAttribute("readonly");
+    });
+  });
 }
 
 async function handleLoginSubmit(event) {
