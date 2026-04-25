@@ -53,22 +53,22 @@ function loadBillingRouter({ country = "Canada" } = {}) {
         buildStripePriceEnvMap: () => ({
           base: {
             monthly: {
-              usd: "STRIPE_PRO_M_US",
-              cad: "STRIPE_PRO_M_CA"
-            },
-            yearly: {
-              usd: "STRIPE_PRO_Y_US",
-              cad: "STRIPE_PRO_Y_CA"
-            }
-          },
-          addon: {
-            monthly: {
               usd: "STRIPE_BIZ_M_US",
               cad: "STRIPE_BIZ_M_CA"
             },
             yearly: {
               usd: "STRIPE_BIZ_Y_US",
               cad: "STRIPE_BIZ_Y_CA"
+            }
+          },
+          addon: {
+            monthly: {
+              usd: "STRIPE_ADDL_M_US",
+              cad: "STRIPE_ADDL_M_CA"
+            },
+            yearly: {
+              usd: "STRIPE_ADDL_Y_US",
+              cad: "STRIPE_ADDL_Y_CA"
             }
           }
         })
@@ -140,14 +140,14 @@ function loadBillingRouter({ country = "Canada" } = {}) {
 
   process.env.STRIPE_SECRET_KEY = "sk_test_billing";
   process.env.APP_BASE_URL = "https://app.inexledger.test";
-  process.env.STRIPE_PRO_M_US = "price_month_usd";
-  process.env.STRIPE_PRO_M_CA = "price_month_cad";
-  process.env.STRIPE_PRO_Y_US = "price_year_usd";
-  process.env.STRIPE_PRO_Y_CA = "price_year_cad";
-  process.env.STRIPE_BIZ_M_US = "price_addon_month_usd";
-  process.env.STRIPE_BIZ_M_CA = "price_addon_month_cad";
-  process.env.STRIPE_BIZ_Y_US = "price_addon_year_usd";
-  process.env.STRIPE_BIZ_Y_CA = "price_addon_year_cad";
+  process.env.STRIPE_BIZ_M_US = "price_month_usd";
+  process.env.STRIPE_BIZ_M_CA = "price_month_cad";
+  process.env.STRIPE_BIZ_Y_US = "price_year_usd";
+  process.env.STRIPE_BIZ_Y_CA = "price_year_cad";
+  process.env.STRIPE_ADDL_M_US = "price_addon_month_usd";
+  process.env.STRIPE_ADDL_M_CA = "price_addon_month_cad";
+  process.env.STRIPE_ADDL_Y_US = "price_addon_year_usd";
+  process.env.STRIPE_ADDL_Y_CA = "price_addon_year_cad";
 
   global.fetch = async (url, options = {}) => {
     state.stripeRequests.push({
@@ -192,14 +192,14 @@ function loadBillingRouter({ country = "Canada" } = {}) {
         global.fetch = originalFetch;
         delete process.env.STRIPE_SECRET_KEY;
         delete process.env.APP_BASE_URL;
-        delete process.env.STRIPE_PRO_M_US;
-        delete process.env.STRIPE_PRO_M_CA;
-        delete process.env.STRIPE_PRO_Y_US;
-        delete process.env.STRIPE_PRO_Y_CA;
         delete process.env.STRIPE_BIZ_M_US;
         delete process.env.STRIPE_BIZ_M_CA;
         delete process.env.STRIPE_BIZ_Y_US;
         delete process.env.STRIPE_BIZ_Y_CA;
+        delete process.env.STRIPE_ADDL_M_US;
+        delete process.env.STRIPE_ADDL_M_CA;
+        delete process.env.STRIPE_ADDL_Y_US;
+        delete process.env.STRIPE_ADDL_Y_CA;
       }
     };
   } catch (err) {
