@@ -1150,10 +1150,6 @@ body[data-theme="light"] select option {
 }
 
 /* ── Quick-add panel scroll fade (N-02) ──────────────────── */
-.dynamic-sidebar-quick-panel {
-  position: relative;
-  z-index: 70;
-}
 .dynamic-sidebar-quick-panel::after {
   content: "";
   position: sticky;
