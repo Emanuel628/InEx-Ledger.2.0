@@ -107,6 +107,14 @@ function loadAuthRouter(options = {}) {
               return { rows: [], rowCount: 1 };
             }
 
+            if (/DELETE FROM verification_tokens WHERE email = \$1/i.test(sql)) {
+              return { rows: [], rowCount: 0 };
+            }
+
+            if (/INSERT INTO verification_tokens/i.test(sql)) {
+              return { rows: [], rowCount: 1 };
+            }
+
             if (/SELECT 1 FROM recognized_signin_devices WHERE user_id = \$1 LIMIT 1/i.test(sql)) {
               return state.hasRecognizedDeviceHistory
                 ? { rows: [{ "?column?": 1 }], rowCount: 1 }
@@ -415,11 +423,38 @@ test("send-verification does not leak whether an email exists", async () => {
     assert.equal(response.status, 200);
     assert.match(String(response.body?.message || ""), /if the email is registered/i);
     assert.equal(fixture.state.sentEmails.length, 0);
-    assert.ok(response.body?.verification_state, "verification state token should be returned");
+    assert.equal(response.body?.verification_state, undefined);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("send-verification accepts a signed verification state for legitimate resend flow", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+  fixture.state.user.email_verified = false;
+
+  try {
+    const app = buildApp(fixture.router);
+    const verificationState = signToken({
+      purpose: "verify_email_status",
+      email: fixture.state.user.email
+    });
+
+    const response = await request(app)
+      .post("/api/auth/send-verification")
+      .send({ verificationState });
+
+    assert.equal(response.status, 200);
+    assert.match(String(response.body?.message || ""), /if the email is registered/i);
+    assert.equal(fixture.state.sentEmails.length, 1);
+    assert.ok(response.body?.verification_state, "signed state should be rotated for the legitimate flow");
 
     const decoded = verifyToken(response.body.verification_state);
     assert.equal(decoded.purpose, "verify_email_status");
-    assert.equal(decoded.email, "unknown@example.com");
+    assert.equal(decoded.email, fixture.state.user.email);
   } finally {
     fixture.cleanup();
   }

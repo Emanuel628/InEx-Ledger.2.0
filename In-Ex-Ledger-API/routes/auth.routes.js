@@ -855,10 +855,12 @@ router.post("/register", authLimiter, async (req, res) => {
 router.post("/send-verification", authLimiter, async (req, res) => {
   let email = normalizeEmail(req.body?.email);
   const verificationState = String(req.body?.verificationState || "").trim();
+  let resolvedFromState = false;
 
   if (!email && verificationState) {
     try {
       email = decodeVerificationStatusToken(verificationState);
+      resolvedFromState = !!email;
     } catch (_) {
       email = "";
     }
@@ -882,7 +884,7 @@ router.post("/send-verification", authLimiter, async (req, res) => {
 
     res.status(200).json({
       message: "If the email is registered and still pending verification, a verification link was sent.",
-      verification_state: createVerificationStatusToken(email)
+      ...(resolvedFromState ? { verification_state: createVerificationStatusToken(email) } : {})
     });
   } catch (err) {
     logError("Send verification error:", err);
