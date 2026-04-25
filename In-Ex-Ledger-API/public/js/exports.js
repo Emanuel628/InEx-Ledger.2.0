@@ -23,15 +23,17 @@ let exportContext = {
   activeBusinessId: "",
   businesses: []
 };
+let exportState = {
+  transactions: [],
+  accounts: [],
+  categories: [],
+  receipts: [],
+  mileage: [],
+  businessProfile: {}
+};
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
-}
-
-let legacyExportStoragePurged = false;
-
-function resolveExportUserId() {
-  return window.__LUNA_ME__?.id || window.__LUNA_ME__?.user_id || window.__LUNA_ME__?.userId || "";
 }
 
 function resolveExportBusinessId() {
@@ -42,47 +44,16 @@ function resolveExportBusinessIdForScope(scope) {
   return scope === "all" ? "all" : resolveExportBusinessId();
 }
 
-function ensureExportLegacyPurged() {
-  if (legacyExportStoragePurged) {
-    return;
-  }
-  legacyExportStoragePurged = true;
-  if (window.lunaStorage?.purgeLegacyKeys) {
-    window.lunaStorage.purgeLegacyKeys();
-  }
-}
-
-function getExportStorageKey(key, businessId) {
-  ensureExportLegacyPurged();
+function getExportPreferenceKey(key) {
+  const businessId = resolveExportBusinessId();
   if (window.lunaStorage?.getKey) {
     return window.lunaStorage.getKey(key, { businessId });
   }
-  const userId = resolveExportUserId();
-  const resolvedBusinessId = businessId || "";
-  if (!userId || !resolvedBusinessId || !key) {
+  const userId = window.__LUNA_ME__?.id || window.__LUNA_ME__?.user_id || window.__LUNA_ME__?.userId || "";
+  if (!userId || !businessId || !key) {
     return null;
   }
-  return `lb:${userId}:${resolvedBusinessId}:${key}`;
-}
-
-function getExportPreferenceKey(key) {
-  return getExportStorageKey(key, resolveExportBusinessId());
-}
-
-function getExportDataKey(key, scopeOverride) {
-  return getExportStorageKey(key, resolveExportBusinessIdForScope(scopeOverride || getExportScope()));
-}
-
-function getExportHistoryNamespace(scopeOverride) {
-  const businessId = resolveExportBusinessIdForScope(scopeOverride || getExportScope());
-  if (window.lunaStorage?.getNamespace) {
-    return window.lunaStorage.getNamespace({ businessId });
-  }
-  const userId = resolveExportUserId();
-  if (!userId || !businessId) {
-    return null;
-  }
-  return `lb:${userId}:${businessId}`;
+  return `lb:${userId}:${businessId}:${key}`;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -118,11 +89,12 @@ async function hydrateMileageCache() {
   try {
     const response = await apiFetch("/api/mileage?limit=500");
     if (!response || !response.ok) {
+      exportState.mileage = [];
       return;
     }
     const payload = await response.json().catch(() => null);
     const records = Array.isArray(payload?.data) ? payload.data : [];
-    const normalized = records.map((item) => ({
+    exportState.mileage = records.map((item) => ({
       id: item.id,
       businessId: item.business_id || "",
       date: item.trip_date || "",
@@ -131,10 +103,9 @@ async function hydrateMileageCache() {
       miles: item.miles != null ? Number(item.miles) : null,
       km: item.km != null ? Number(item.km) : null
     }));
-    setStorageArray(MILEAGE_KEY, normalized);
   } catch (error) {
     console.warn("[Exports] Unable to hydrate mileage", error);
-    clearStorageArray(MILEAGE_KEY);
+    exportState.mileage = [];
   }
 }
 
@@ -149,13 +120,6 @@ async function hydrateBusinessList() {
       activeBusinessId: payload?.active_business_id || "",
       businesses: Array.isArray(payload?.businesses) ? payload.businesses : []
     };
-    const businessesKey = getExportStorageKey(BUSINESSES_KEY, "all");
-    if (businessesKey) {
-      localStorage.setItem(
-        businessesKey,
-        JSON.stringify(exportContext)
-      );
-    }
   } catch (error) {
     console.warn("[Exports] Unable to hydrate businesses", error);
   }
@@ -206,20 +170,7 @@ function buildScopeQuery() {
 }
 
 function getStoredBusinesses() {
-  if (Array.isArray(exportContext.businesses) && exportContext.businesses.length) {
-    return exportContext.businesses;
-  }
-  try {
-    const businessesKey = getExportStorageKey(BUSINESSES_KEY, "all");
-    const parsed = businessesKey
-      ? JSON.parse(localStorage.getItem(businessesKey) || "null")
-      : null;
-    if (parsed && Array.isArray(parsed.businesses)) {
-      exportContext = parsed;
-      return parsed.businesses;
-    }
-  } catch {}
-  return [];
+  return Array.isArray(exportContext.businesses) ? exportContext.businesses : [];
 }
 
 function getActiveBusinessId() {
@@ -311,7 +262,7 @@ async function hydrateTransactionsCache() {
     const response = await apiFetch(`/api/transactions${buildScopeQuery()}`);
     if (!response || !response.ok) {
       transactionsCacheFresh = false;
-      clearStorageArray(TRANSACTIONS_KEY);
+      exportState.transactions = [];
       return;
     }
     const payload = await response.json().catch(() => null);
@@ -322,7 +273,7 @@ async function hydrateTransactionsCache() {
       : Array.isArray(payload?.data)
       ? payload.data
       : [];
-    const normalized = transactions.map((transaction) => ({
+    exportState.transactions = transactions.map((transaction) => ({
       id: transaction.id,
       businessId: transaction.businessId || transaction.business_id || "",
       businessName: transaction.businessName || transaction.business_name || "",
@@ -348,12 +299,11 @@ async function hydrateTransactionsCache() {
       reviewStatus: transaction.reviewStatus || transaction.review_status || "",
       reviewNotes: transaction.reviewNotes || transaction.review_notes || ""
     }));
-    setStorageArray(TRANSACTIONS_KEY, normalized);
     transactionsCacheFresh = true;
   } catch (error) {
     transactionsCacheFresh = false;
     console.warn("[Exports] Unable to hydrate transactions", error);
-    clearStorageArray(TRANSACTIONS_KEY);
+    exportState.transactions = [];
   }
 }
 
@@ -365,16 +315,17 @@ async function hydrateAccountsCache() {
     }
     const accounts = await response.json().catch(() => []);
     if (Array.isArray(accounts)) {
-      const normalized = accounts.map((account) => ({
+      exportState.accounts = accounts.map((account) => ({
         ...account,
         businessId: account.businessId || account.business_id || "",
         businessName: account.businessName || account.business_name || ""
       }));
-      setStorageArray(ACCOUNTS_KEY, normalized);
+      return;
     }
+    exportState.accounts = [];
   } catch (error) {
     console.warn("[Exports] Unable to hydrate accounts", error);
-    clearStorageArray(ACCOUNTS_KEY);
+    exportState.accounts = [];
   }
 }
 
@@ -386,7 +337,7 @@ async function hydrateCategoriesCache() {
     }
     const categories = await response.json().catch(() => []);
     if (Array.isArray(categories)) {
-      const normalized = categories.map((category) => ({
+      exportState.categories = categories.map((category) => ({
         id: category.id,
         businessId: category.businessId || category.business_id || "",
         businessName: category.businessName || category.business_name || "",
@@ -394,11 +345,12 @@ async function hydrateCategoriesCache() {
         type: category.kind || category.type || "",
         taxLabel: category.tax_map_us || category.tax_map_ca || ""
       }));
-      setStorageArray(CATEGORIES_KEY, normalized);
+      return;
     }
+    exportState.categories = [];
   } catch (error) {
     console.warn("[Exports] Unable to hydrate categories", error);
-    clearStorageArray(CATEGORIES_KEY);
+    exportState.categories = [];
   }
 }
 
@@ -414,7 +366,7 @@ async function hydrateReceiptsCache() {
       : Array.isArray(payload?.receipts)
       ? payload.receipts
       : [];
-    const normalized = receipts.map((receipt) => ({
+    exportState.receipts = receipts.map((receipt) => ({
       id: receipt.id,
       businessId: receipt.businessId || receipt.business_id || "",
       businessName: receipt.businessName || receipt.business_name || "",
@@ -423,61 +375,49 @@ async function hydrateReceiptsCache() {
       transactionId: receipt.transaction_id || "",
       mimeType: receipt.mime_type || ""
     }));
-    unattachedReceiptsCount = normalized.filter((receipt) => !receipt.transactionId).length;
-    setStorageArray(RECEIPTS_KEY, normalized);
+    unattachedReceiptsCount = exportState.receipts.filter((receipt) => !receipt.transactionId).length;
   } catch (error) {
     console.warn("[Exports] Unable to hydrate receipts", error);
-    clearStorageArray(RECEIPTS_KEY);
+    exportState.receipts = [];
+    unattachedReceiptsCount = 0;
   }
 }
 
 async function hydrateBusinessProfileCache() {
   if (getExportScope() === "all") {
-    const profileKey = getExportStorageKey(BUSINESS_PROFILE_KEY, "all");
-    if (profileKey) {
-      localStorage.setItem(
-        profileKey,
-        JSON.stringify({
-          name: tx("exports_scope_all"),
-          type: "",
-          ein: "",
-          taxId: "",
-          fiscalYearStart: "",
-          address: ""
-        })
-      );
-    }
+    exportState.businessProfile = {
+      name: tx("exports_scope_all"),
+      type: "",
+      ein: "",
+      taxId: "",
+      fiscalYearStart: "",
+      address: ""
+    };
     return;
   }
 
   try {
     const response = await apiFetch("/api/business");
     if (!response || !response.ok) {
-      clearStorageArray(BUSINESS_PROFILE_KEY, "active");
+      exportState.businessProfile = {};
       return;
     }
     const business = await response.json().catch(() => null);
     if (!business) {
-      clearStorageArray(BUSINESS_PROFILE_KEY, "active");
+      exportState.businessProfile = {};
       return;
     }
-    const profileKey = getExportDataKey(BUSINESS_PROFILE_KEY, "active");
-    if (profileKey) {
-      localStorage.setItem(
-        profileKey,
-        JSON.stringify({
-          name: business.name || "",
-          type: business.business_type || "",
-          ein: business.tax_id || "",
-          taxId: business.tax_id || "",
-          fiscalYearStart: business.fiscal_year_start || "",
-          address: business.address || ""
-        })
-      );
-    }
+    exportState.businessProfile = {
+      name: business.name || "",
+      type: business.business_type || "",
+      ein: business.tax_id || "",
+      taxId: business.tax_id || "",
+      fiscalYearStart: business.fiscal_year_start || "",
+      address: business.address || ""
+    };
   } catch (error) {
     console.warn("[Exports] Unable to hydrate business profile", error);
-    clearStorageArray(BUSINESS_PROFILE_KEY, "active");
+    exportState.businessProfile = {};
   }
 }
 
@@ -499,13 +439,13 @@ function setupExportForm() {
     });
   });
 
-  form?.addEventListener("submit", (event) => {
+  form?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const range = getValidatedExportRange();
     if (!range) {
       return;
     }
-    exportCsv(range.startDate, range.endDate);
+    await exportCsv(range.startDate, range.endDate);
   });
 
   historyRows?.addEventListener("click", (event) => {
@@ -514,21 +454,20 @@ function setupExportForm() {
     const deleteBtn = event.target.closest(".history-delete");
     if (deleteBtn) {
       const backendId = deleteBtn.dataset.deleteBackendId;
-      const localId = deleteBtn.dataset.deleteLocalId;
       if (backendId) {
         deleteBackendExport(backendId, deleteBtn.closest(".history-item"));
-      } else if (localId) {
-        deleteLocalExportEntry(localId);
       }
       return;
     }
 
     const downloadBtn = event.target.closest(".history-download");
     if (!downloadBtn) return;
-    if (downloadBtn.dataset.backendId) {
-      downloadBackendExport(downloadBtn.dataset.backendId);
-    } else {
-      replayHistoryEntry(downloadBtn.dataset.historyId);
+    if (downloadBtn.dataset.historyId) {
+      if ((downloadBtn.dataset.historyFormat || PDF_FORMAT) === PDF_FORMAT) {
+        downloadBackendExport(downloadBtn.dataset.historyId);
+      } else {
+        replayHistoryEntry(downloadBtn.dataset.historyId);
+      }
     }
   });
 }
@@ -602,7 +541,7 @@ function setupPdfButton() {
         syncPdfState();
       }
     } else {
-      exportPdf(range.startDate, range.endDate);
+      await exportPdf(range.startDate, range.endDate);
     }
   });
 }
@@ -827,7 +766,7 @@ function updateExportSummary() {
   summaryNet.textContent = formatMoney(net, currencyRegion);
 }
 
-function exportCsv(startDate, endDate, recordHistory = true, explicitFilename, tierOverride, exportLangOverride) {
+async function exportCsv(startDate, endDate, recordHistory = true, explicitFilename, tierOverride, exportLangOverride) {
   if (!transactionsCacheFresh) {
     showExportToast(tx("exports_error_stale_data"));
     return;
@@ -879,8 +818,8 @@ function exportCsv(startDate, endDate, recordHistory = true, explicitFilename, t
   showExportToast(batches.length > 1 ? `${tx("exports_exported_prefix")} ${batches.length} CSV ${tx("exports_exported_suffix")}` : tx("exports_generated_csv"));
 
   if (recordHistory) {
-    historyEntries.forEach((entry) => appendExportHistory(entry));
-    renderExportHistory();
+    await Promise.all(historyEntries.map((entry) => recordExportHistory(entry)));
+    await renderExportHistory();
   }
 }
 
@@ -971,8 +910,8 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
   showExportToast(batches.length > 1 ? `${tx("exports_exported_prefix")} ${batches.length} PDF ${tx("exports_exported_suffix")}` : tx("exports_generated_pdf"));
 
   if (recordHistory) {
-    historyEntries.forEach((entry) => appendExportHistory(entry));
-    renderExportHistory();
+    await Promise.all(historyEntries.map((entry) => recordExportHistory(entry)));
+    await renderExportHistory();
   }
 }
 
@@ -1118,21 +1057,29 @@ function downloadFile(content, filename, type) {
   URL.revokeObjectURL(url);
 }
 
-function appendExportHistory(entry) {
-  const scope = entry?.scope || getExportScope();
-  // Track namespace on each entry to prevent cross-account history reuse during migrations.
-  const namespace = getExportHistoryNamespace(scope);
-  const storageKey = getExportDataKey(EXPORT_HISTORY_KEY, scope);
-  if (!namespace || !storageKey) {
-    return;
+async function recordExportHistory(entry) {
+  try {
+    const response = await apiFetch("/api/exports/history", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        format: entry.format,
+        startDate: entry.startDate,
+        endDate: entry.endDate,
+        language: entry.exportLang || DEFAULT_EXPORT_LANG,
+        scope: entry.scope || getExportScope(),
+        filename: entry.filename || "",
+        businessId: entry.businessId || "",
+        batchMode: !!entry.batchMode
+      })
+    });
+    return !!(response && response.ok);
+  } catch (error) {
+    console.warn("[Exports] Unable to record export history", error);
+    return false;
   }
-  const history = getLocalExportHistory(scope);
-  history.unshift({ ...entry, namespace });
-  // Keep at most 50 local entries (CSV exports are not stored server-side)
-  localStorage.setItem(
-    storageKey,
-    JSON.stringify(history.slice(0, 50))
-  );
 }
 
 async function fetchBackendExportHistory() {
@@ -1150,9 +1097,10 @@ async function fetchBackendExportHistory() {
       startDate: row.start_date,
       endDate: row.end_date,
       exportedAt: row.created_at,
-      filename: `export_${row.start_date}_to_${row.end_date}.pdf`,
-      format: PDF_FORMAT,
+      filename: row.filename || buildHistoryFilename(row),
+      format: row.export_type || PDF_FORMAT,
       exportLang: row.language || "en",
+      scope: row.scope || "active",
       source: "backend"
     }));
   } catch {
@@ -1166,17 +1114,7 @@ async function renderExportHistory() {
     return;
   }
 
-  const [backendEntries, localEntries] = await Promise.all([
-    fetchBackendExportHistory(),
-    Promise.resolve(getLocalExportHistory())
-  ]);
-
-  // Merge: backend PDF entries take precedence; avoid duplicates by id
-  const backendIds = new Set(backendEntries.map((e) => e.id));
-  const merged = [
-    ...backendEntries,
-    ...localEntries.filter((e) => !backendIds.has(e.id))
-  ]
+  const merged = (await fetchBackendExportHistory())
     .sort((left, right) => new Date(right.exportedAt) - new Date(left.exportedAt))
     .slice(0, 10);
 
@@ -1188,13 +1126,10 @@ async function renderExportHistory() {
   historyRows.innerHTML = merged.map((entry) => {
     const descriptor = describeHistoryEntry(entry);
     const formatClass = descriptor.formatLabel === "PDF" ? "pdf" : "csv";
-    const isBackend = entry.source === "backend";
-    const actionLabel = isBackend
+    const actionLabel = entry.format === PDF_FORMAT
       ? escapeHtml(tx("exports_history_download_redacted") || "Download")
       : escapeHtml(tx("exports_history_download_label"));
-    const dataAttr = isBackend
-      ? `data-backend-id="${escapeHtml(entry.id)}"`
-      : `data-history-id="${escapeHtml(entry.id || "")}"`;
+    const dataAttr = `data-history-id="${escapeHtml(entry.id || "")}" data-history-format="${escapeHtml(entry.format || PDF_FORMAT)}"`;
     return `
       <div class="history-item">
         <div class="history-file">
@@ -1210,7 +1145,7 @@ async function renderExportHistory() {
               <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v7M5 7l3 3 3-3"></path><line x1="3" y1="13" x2="13" y2="13"></line></svg>
               <span>${actionLabel}</span>
             </button>
-            <button type="button" class="history-delete" data-delete-backend-id="${isBackend ? escapeHtml(entry.id) : ""}" data-delete-local-id="${!isBackend ? escapeHtml(entry.id || "") : ""}" aria-label="Delete export">
+            <button type="button" class="history-delete" data-delete-backend-id="${escapeHtml(entry.id || "")}" aria-label="Delete export">
               <svg viewBox="0 0 16 16" fill="none"><polyline points="2 4 14 4"></polyline><path d="M5 4V2h6v2M6 7v5M10 7v5"></path><path d="M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"></path></svg>
             </button>
           </div>
@@ -1265,24 +1200,11 @@ async function deleteBackendExport(exportId, rowEl) {
   }
 }
 
-function deleteLocalExportEntry(entryId) {
-  if (!entryId) return;
-  const scope = getExportScope();
-  const storageKey = getExportDataKey(EXPORT_HISTORY_KEY, scope);
-  if (!storageKey) return;
-  try {
-    const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
-    localStorage.setItem(storageKey, JSON.stringify(history.filter((e) => e.id !== entryId)));
-  } catch {}
-  renderExportHistory();
-  showExportToast(tx("exports_history_deleted") || "Export deleted");
-}
-
 async function replayHistoryEntry(entryId) {
   if (!entryId) {
     return;
   }
-  const entry = getLocalExportHistory().find((record) => record.id === entryId);
+  const entry = (await fetchBackendExportHistory()).find((record) => record.id === entryId);
   if (!entry) {
     return;
   }
@@ -1295,12 +1217,12 @@ async function replayHistoryEntry(entryId) {
   updateExportSummary();
 
   if (entry.format === PDF_FORMAT) {
-    exportPdf(entry.startDate, entry.endDate, false, entry.filename, entry.exportLang);
+    await exportPdf(entry.startDate, entry.endDate, false, entry.filename, entry.exportLang);
     return;
   }
 
   const tier = entry.tier || (entry.format === CSV_FULL_FORMAT ? "v1" : "free");
-  exportCsv(entry.startDate, entry.endDate, false, entry.filename, tier, entry.exportLang);
+  await exportCsv(entry.startDate, entry.endDate, false, entry.filename, tier, entry.exportLang);
 }
 
 function describeHistoryEntry(entry) {
@@ -1329,19 +1251,15 @@ function clampExportLang(value) {
   return VALID_EXPORT_LANGS.includes(normalized) ? normalized : DEFAULT_EXPORT_LANG;
 }
 
-function getLocalExportHistory(scopeOverride) {
-  const scope = scopeOverride || getExportScope();
-  const namespace = getExportHistoryNamespace(scope);
-  const storageKey = getExportDataKey(EXPORT_HISTORY_KEY, scope);
-  if (!namespace || !storageKey) {
-    return [];
+function buildHistoryFilename(entry) {
+  const format = entry?.export_type || entry?.format || PDF_FORMAT;
+  if (format === PDF_FORMAT) {
+    return `export_${entry.start_date}_to_${entry.end_date}.pdf`;
   }
-  try {
-    const history = JSON.parse(localStorage.getItem(storageKey) || "[]");
-    return history.filter((entry) => entry?.namespace === namespace);
-  } catch {
-    return [];
+  if (format === CSV_FULL_FORMAT) {
+    return `export_${entry.start_date}_to_${entry.end_date}.csv`;
   }
+  return `basic_export_${entry.start_date}_to_${entry.end_date}.csv`;
 }
 
 function filterTransactions(startDate, endDate) {
@@ -1644,63 +1562,27 @@ function mapById(items) {
 }
 
 function readBusinessProfile() {
-  try {
-    const storageKey = getExportDataKey(BUSINESS_PROFILE_KEY);
-    if (!storageKey) {
-      return {};
-    }
-    return JSON.parse(localStorage.getItem(storageKey) || "null") || {};
-  } catch {
-    return {};
-  }
+  return exportState.businessProfile || {};
 }
 
 function getTransactions() {
-  return readStorageArray(TRANSACTIONS_KEY);
+  return Array.isArray(exportState.transactions) ? exportState.transactions : [];
 }
 
 function getAccounts() {
-  return readStorageArray(ACCOUNTS_KEY);
+  return Array.isArray(exportState.accounts) ? exportState.accounts : [];
 }
 
 function getCategories() {
-  return readStorageArray(CATEGORIES_KEY);
+  return Array.isArray(exportState.categories) ? exportState.categories : [];
 }
 
 function getReceipts() {
-  return readStorageArray(RECEIPTS_KEY);
+  return Array.isArray(exportState.receipts) ? exportState.receipts : [];
 }
 
 function getMileage() {
-  return readStorageArray(MILEAGE_KEY);
-}
-
-function readStorageArray(key) {
-  try {
-    const storageKey = getExportDataKey(key);
-    if (!storageKey) {
-      return [];
-    }
-    return JSON.parse(localStorage.getItem(storageKey) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function setStorageArray(key, value, scopeOverride) {
-  const storageKey = getExportDataKey(key, scopeOverride);
-  if (!storageKey) {
-    return;
-  }
-  localStorage.setItem(storageKey, JSON.stringify(value));
-}
-
-function clearStorageArray(key, scopeOverride) {
-  const storageKey = getExportDataKey(key, scopeOverride);
-  if (!storageKey) {
-    return;
-  }
-  localStorage.removeItem(storageKey);
+  return Array.isArray(exportState.mileage) ? exportState.mileage : [];
 }
 
 function isValidTaxId(value) {

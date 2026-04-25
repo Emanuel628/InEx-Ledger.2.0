@@ -650,15 +650,6 @@ function initDynamicSidebar() {
   });
 }
 
-function resolveDynamicSidebarFavoritesStorageKey() {
-  try {
-    const namespacedKey = window.lunaStorage?.getKey?.("dynamic_sidebar_favorites", { profile: window.__LUNA_ME__ });
-    return namespacedKey || DYNAMIC_SIDEBAR_FAVORITES_KEY;
-  } catch (_) {
-    return DYNAMIC_SIDEBAR_FAVORITES_KEY;
-  }
-}
-
 function getDynamicSidebarFavorites(featureMap, uiPreferences = null) {
   const profileFavorites = uiPreferences?.dynamic_sidebar_favorites;
   if (Array.isArray(profileFavorites)) {
@@ -667,22 +658,11 @@ function getDynamicSidebarFavorites(featureMap, uiPreferences = null) {
       return Array.from(new Set(valid));
     }
   }
-
-  try {
-    const parsed = JSON.parse(localStorage.getItem(resolveDynamicSidebarFavoritesStorageKey()) || "null");
-    if (Array.isArray(parsed)) {
-      const valid = parsed.filter((id) => featureMap.has(id));
-      if (valid.length) return Array.from(new Set(valid));
-    }
-  } catch (_) {}
   return DYNAMIC_SIDEBAR_DEFAULT_FAVORITES.filter((id) => featureMap.has(id));
 }
 
 function saveDynamicSidebarFavorites(favorites) {
   const dedupedFavorites = Array.from(new Set(favorites));
-  try {
-    localStorage.setItem(resolveDynamicSidebarFavoritesStorageKey(), JSON.stringify(dedupedFavorites));
-  } catch (_) {}
   queueDynamicSidebarFavoritesSave(dedupedFavorites);
 }
 

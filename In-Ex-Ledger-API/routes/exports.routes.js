@@ -58,6 +58,8 @@ function buildExportMetadataRows(exportId, metadata) {
     ["language", metadata.language || "en"],
     ["currency", metadata.currency || "USD"],
     ["page_count", String(Number(metadata.pageCount) || 0)],
+    ["scope", metadata.scope || "active"],
+    ["filename", metadata.filename || ""],
     ["notes", metadata.notes || ""],
     ["full_version_available", metadata.fullVersionAvailable ? "true" : "false"]
   ]
@@ -88,6 +90,8 @@ async function storeCompletedExport({
   language,
   currency,
   pageCount,
+  scope,
+  filename,
   notes,
   fullVersionAvailable = false
 }) {
@@ -102,6 +106,8 @@ async function storeCompletedExport({
     language,
     currency,
     pageCount,
+    scope,
+    filename,
     notes,
     fullVersionAvailable
   });
@@ -151,10 +157,57 @@ function normalizeExportHistoryEntry(entry) {
     language: entry.language || "en",
     currency: entry.currency || "USD",
     page_count: Number(entry.page_count) || 0,
+    scope: entry.scope || "active",
+    filename: entry.filename || null,
     storage_type: "redacted-only",
     full_version_available: String(entry.full_version_available || "true").toLowerCase() !== "false"
   };
 }
+
+router.post("/history", exportGrantLimiter, async (req, res) => {
+  try {
+    const user = req.user;
+    user.business_id = await resolveBusinessIdForUser(user);
+    const businessId = user.business_id;
+    const format = String(req.body?.format || "").toLowerCase();
+    const dateRange = validateDateRange(req.body);
+    const language = String(req.body?.language || "en").toLowerCase();
+    const scope = req.body?.scope === "all" ? "all" : "active";
+    const filename = String(req.body?.filename || "").trim();
+    const batchMode = req.body?.batchMode === true;
+
+    if (!dateRange) {
+      return res.status(400).json({ error: "Valid startDate and endDate are required." });
+    }
+    if (![ "pdf", "csv_full", "csv_basic" ].includes(format)) {
+      return res.status(400).json({ error: "Unsupported export format." });
+    }
+
+    const exportId = await storeCompletedExport({
+      businessId,
+      userId: user.id,
+      exportType: format,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+      includeTaxId: false,
+      grantJti: null,
+      contentHash: null,
+      filePath: null,
+      language,
+      currency: null,
+      pageCount: 0,
+      scope,
+      filename,
+      notes: batchMode ? "Client-generated batch export history entry" : "Client-generated export history entry",
+      fullVersionAvailable: format !== "pdf"
+    });
+
+    return res.status(201).json({ id: exportId });
+  } catch (err) {
+    logError("Export history create error", { err: err.message });
+    return res.status(500).json({ error: "Unable to record export history." });
+  }
+});
 
 router.post("/request-grant", exportGrantLimiter, async (req, res) => {
   const sanitizedBody = sanitizePayload(req.body);
@@ -374,6 +427,8 @@ router.get("/history", exportGrantLimiter, async (req, res) => {
               m.language,
               COALESCE(m.currency, CASE WHEN b.region = 'CA' THEN 'CAD' ELSE 'USD' END) AS currency,
               m.page_count,
+              m.scope,
+              m.filename,
               m.full_version_available
          FROM exports e
          JOIN businesses b ON b.id = e.business_id
@@ -385,6 +440,8 @@ router.get("/history", exportGrantLimiter, async (req, res) => {
                   MAX(CASE WHEN key = 'language' THEN value END) AS language,
                   MAX(CASE WHEN key = 'currency' THEN value END) AS currency,
                   MAX(CASE WHEN key = 'page_count' THEN value END) AS page_count,
+                  MAX(CASE WHEN key = 'scope' THEN value END) AS scope,
+                  MAX(CASE WHEN key = 'filename' THEN value END) AS filename,
                   MAX(CASE WHEN key = 'full_version_available' THEN value END) AS full_version_available
              FROM export_metadata
             WHERE export_id = e.id

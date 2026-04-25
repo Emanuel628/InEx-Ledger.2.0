@@ -6,50 +6,11 @@
   { value: "cash", labelKey: "accounts_type_cash" }
 ];
 const ACCOUNTS_TOAST_MS = 3000;
-const ACCOUNTS_STORAGE_KEY = "ledger_accounts";
-const RECEIPTS_STORAGE_KEY = "ledger_receipts";
-
 let accountsToastTimer = null;
-let legacyAccountsStoragePurged = false;
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
-
-function resolveAccountsStorageUserId() {
-  return window.__LUNA_ME__?.id || window.__LUNA_ME__?.user_id || window.__LUNA_ME__?.userId || "";
-}
-
-function resolveAccountsStorageBusinessId() {
-  return window.__LUNA_ME__?.active_business_id
-    || localStorage.getItem("lb_active_business_id")
-    || "";
-}
-
-function ensureAccountsLegacyStoragePurged() {
-  if (legacyAccountsStoragePurged) {
-    return;
-  }
-  legacyAccountsStoragePurged = true;
-  if (window.lunaStorage?.purgeLegacyKeys) {
-    window.lunaStorage.purgeLegacyKeys();
-  }
-}
-
-function getAccountsStorageKey(key) {
-  ensureAccountsLegacyStoragePurged();
-  if (window.lunaStorage?.getKey) {
-    return window.lunaStorage.getKey(key);
-  }
-  const userId = resolveAccountsStorageUserId();
-  const businessId = resolveAccountsStorageBusinessId();
-  if (!userId || !businessId || !key) {
-    return null;
-  }
-  return `lb:${userId}:${businessId}:${key}`;
-}
-
-
 
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
@@ -234,10 +195,6 @@ async function deleteAccount(accountId) {
 
 function syncAccountsCache(accounts) {
   const normalized = Array.isArray(accounts) ? accounts : [];
-  const storageKey = getAccountsStorageKey(ACCOUNTS_STORAGE_KEY);
-  if (storageKey) {
-    localStorage.setItem(storageKey, JSON.stringify(normalized));
-  }
   window.dispatchEvent(new CustomEvent("accountsUpdated", { detail: normalized }));
 }
 
@@ -246,16 +203,23 @@ function formatAccountType(value) {
   return tx(type?.labelKey) || value || tx("accounts_fallback_name");
 }
 
-function updateReceiptsDot() {
+async function updateReceiptsDot() {
   const dot = document.getElementById("receiptsDot");
   if (!dot) {
     return;
   }
 
   try {
-    const storageKey = getAccountsStorageKey(RECEIPTS_STORAGE_KEY);
-    const receipts = storageKey
-      ? JSON.parse(localStorage.getItem(storageKey) || "[]")
+    const response = await apiFetch("/api/receipts");
+    if (!response || !response.ok) {
+      dot.hidden = true;
+      return;
+    }
+    const payload = await response.json().catch(() => []);
+    const receipts = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.receipts)
+      ? payload.receipts
       : [];
     dot.hidden = !receipts.some((receipt) => !receipt.transactionId && !receipt.transaction_id);
   } catch {

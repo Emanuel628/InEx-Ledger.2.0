@@ -1,5 +1,3 @@
-const MILEAGE_STORAGE_KEY = "lb_mileage";
-const VEHICLE_COST_STORAGE_KEY = "lb_vehicle_costs";
 const METRIC_STORAGE_KEY = "lb_unit_metric";
 const MILES_TO_KM = 1.609344;
 const MILEAGE_TOAST_MS = 3000;
@@ -232,15 +230,10 @@ async function loadMileageRecords() {
       km: entry.km != null ? Number(entry.km) : null,
       created_at: entry.created_at || null
     }));
-    localStorage.setItem(MILEAGE_STORAGE_KEY, JSON.stringify(mileageRecords));
     mileageServerAvailable = true;
   } catch (error) {
     console.error("Failed to load mileage:", error);
-    try {
-      mileageRecords = JSON.parse(localStorage.getItem(MILEAGE_STORAGE_KEY) || "[]");
-    } catch {
-      mileageRecords = [];
-    }
+    mileageRecords = [];
     mileageServerAvailable = false;
   }
   showMileageOfflineBanner(!mileageServerAvailable);
@@ -268,14 +261,9 @@ async function loadVehicleCosts() {
       notes: entry.notes || "",
       created_at: entry.created_at || null
     }));
-    localStorage.setItem(VEHICLE_COST_STORAGE_KEY, JSON.stringify(vehicleCosts));
   } catch (error) {
     console.error("Failed to load vehicle costs:", error);
-    try {
-      vehicleCosts = JSON.parse(localStorage.getItem(VEHICLE_COST_STORAGE_KEY) || "[]");
-    } catch {
-      vehicleCosts = [];
-    }
+    vehicleCosts = [];
   }
 }
 

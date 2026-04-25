@@ -5,7 +5,6 @@ const REGION_DISPLAY = {
 
 const SETTINGS_DEFAULT_THEME = typeof DEFAULT_THEME !== "undefined" ? DEFAULT_THEME : "light";
 const SETTINGS_THEME_VERSION = typeof THEME_VERSION !== "undefined" ? THEME_VERSION : "2";
-const BUSINESS_PROFILE_KEY = "ledger_business_profile";
 const SETTINGS_TOAST_MS = 3000;
 const SETTINGS_DELETE_DATA_KEYS = [
   "lb_accounts",
@@ -100,45 +99,6 @@ let settingsOverviewState = {
 
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
-let legacySettingsStoragePurged = false;
-
-function resolveSettingsUserId() {
-  return window.__LUNA_ME__?.id || window.__LUNA_ME__?.user_id || window.__LUNA_ME__?.userId || "";
-}
-
-function resolveSettingsBusinessId() {
-  return window.__LUNA_ME__?.active_business_id
-    || localStorage.getItem("lb_active_business_id")
-    || "";
-}
-
-function ensureSettingsLegacyPurged() {
-  if (legacySettingsStoragePurged) {
-    return;
-  }
-  legacySettingsStoragePurged = true;
-  if (window.lunaStorage?.purgeLegacyKeys) {
-    window.lunaStorage.purgeLegacyKeys();
-  }
-}
-
-function getSettingsStorageKey(key, businessId = resolveSettingsBusinessId()) {
-  ensureSettingsLegacyPurged();
-  if (window.lunaStorage?.getKey) {
-    return window.lunaStorage.getKey(key, { businessId });
-  }
-  const userId = resolveSettingsUserId();
-  const resolvedBusinessId = businessId || "";
-  if (!userId || !resolvedBusinessId || !key) {
-    return null;
-  }
-  return `lb:${userId}:${resolvedBusinessId}:${key}`;
-}
-
-function getBusinessProfileStorageKey() {
-  return getSettingsStorageKey(BUSINESS_PROFILE_KEY);
-}
-
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
@@ -168,22 +128,11 @@ function resolveSavedTheme() {
 }
 
 function getBusinessProfile() {
-  try {
-    const storageKey = getBusinessProfileStorageKey();
-    if (!storageKey) {
-      return {};
-    }
-    return JSON.parse(localStorage.getItem(storageKey) || "null") || {};
-  } catch {
-    return {};
-  }
+  return settingsOverviewState.businessProfile || {};
 }
 
 function saveBusinessProfile(profile) {
-  const storageKey = getBusinessProfileStorageKey();
-  if (storageKey) {
-    localStorage.setItem(storageKey, JSON.stringify(profile));
-  }
+  settingsOverviewState.businessProfile = profile || null;
 }
 
 function resolveDisplayLocale() {
@@ -968,10 +917,15 @@ async function initPreferences() {
 
   if (downloadBtn) {
     downloadBtn.addEventListener("click", async () => {
-      if (typeof privacyService === "object" && typeof privacyService.exportMyData === "function") {
-        await privacyService.exportMyData();
+      try {
+        if (typeof privacyService === "object" && typeof privacyService.exportMyData === "function") {
+          await privacyService.exportMyData();
+        }
+        showSettingsToast(t("settings_data_export_started"));
+      } catch (error) {
+        console.error("Failed to export personal data", error);
+        showSettingsToast(error?.message || t("settings_data_export_error"));
       }
-      showSettingsToast(t("settings_data_export_started"));
     });
   }
 

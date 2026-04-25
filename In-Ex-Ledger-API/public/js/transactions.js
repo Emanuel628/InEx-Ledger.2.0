@@ -1,15 +1,12 @@
 const STORAGE_KEYS = {
-  accounts: "ledger_accounts",
-  categories: "ledger_categories",
-  transactions: "ledger_transactions",
-  receipts: "ledger_receipts",
-  businesses: "ledger_businesses",
   scope: "ledger_transactions_scope",
   upsellHidden: "ledger_transactions_upsell_hidden"
 };
 
 const ledgerState = {
-  transactions: []
+  transactions: [],
+  accounts: [],
+  categories: []
 };
 
 const recurringState = {
@@ -288,13 +285,6 @@ async function hydrateTransactionBusinessContext() {
       activeBusinessId: payload?.active_business_id || "",
       businesses: Array.isArray(payload?.businesses) ? payload.businesses : []
     };
-    const businessesKey = getNamespacedStorageKey(STORAGE_KEYS.businesses, "all");
-    if (businessesKey) {
-      localStorage.setItem(
-        businessesKey,
-        JSON.stringify(transactionBusinessContext)
-      );
-    }
   } catch (error) {
     console.warn("[Transactions] Unable to hydrate businesses", error);
   }
@@ -347,20 +337,9 @@ function buildTransactionScopeQuery() {
 }
 
 function getStoredBusinesses() {
-  if (Array.isArray(transactionBusinessContext.businesses) && transactionBusinessContext.businesses.length) {
-    return transactionBusinessContext.businesses;
-  }
-  try {
-    const businessesKey = getNamespacedStorageKey(STORAGE_KEYS.businesses, "all");
-    const parsed = businessesKey
-      ? JSON.parse(localStorage.getItem(businessesKey) || "null")
-      : null;
-    if (parsed && Array.isArray(parsed.businesses)) {
-      transactionBusinessContext = parsed;
-      return parsed.businesses;
-    }
-  } catch {}
-  return [];
+  return Array.isArray(transactionBusinessContext.businesses)
+    ? transactionBusinessContext.businesses
+    : [];
 }
 
 function getBusinessById(businessId) {
@@ -858,13 +837,11 @@ async function loadTransactions() {
       receiptId: receiptSnapshot.byTransactionId[transaction.id] || transaction.receiptId || ""
     }));
     unattachedReceiptsCount = receiptSnapshot.unattachedCount;
-    saveTransactions(ledgerState.transactions);
   } catch (error) {
     console.error("Failed to load transactions:", error);
     hasTransactionsLoadFailed = true;
     ledgerState.transactions = [];
     unattachedReceiptsCount = 0;
-    clearStorageArray(STORAGE_KEYS.transactions);
   } finally {
     renderAccountOptions();
     renderCategoryOptions();
@@ -999,23 +976,18 @@ function closeTransactionModal() {
 }
 
 function updateTransactionNote(transactionId, note) {
-  const transactions = getTransactions();
-  const updated = transactions.map((txn) => {
+  const updated = (ledgerState.transactions || []).map((txn) => {
     if (txn.id === transactionId) {
       return { ...txn, note };
     }
     return txn;
   });
   ledgerState.transactions = updated;
-  saveTransactions(updated);
   applyFilters();
 }
 
 function handleEditEntry(transactionId) {
-  const transactions = ledgerState.transactions.length
-    ? ledgerState.transactions
-    : getTransactions();
-  const transaction = transactions.find((txn) => txn.id === transactionId);
+  const transaction = (ledgerState.transactions || []).find((txn) => txn.id === transactionId);
   if (!transaction) {
     return;
   }
@@ -1532,6 +1504,7 @@ function populateAccountsFromStorage(accounts = []) {
 
 async function refreshAccountOptions() {
   const accounts = await fetchAccountsForTransactions();
+  ledgerState.accounts = accounts;
   populateAccountsFromStorage(accounts);
   updateHelpText(
     document.getElementById("accountHelp"),
@@ -1543,21 +1516,17 @@ async function fetchAccountsForTransactions() {
   try {
     const response = await apiFetch(`/api/accounts${buildTransactionScopeQuery()}`);
     if (!response || !response.ok) {
-      clearStorageArray(STORAGE_KEYS.accounts);
       return [];
     }
 
     const accounts = await response.json();
     if (!Array.isArray(accounts)) {
-      clearStorageArray(STORAGE_KEYS.accounts);
       return [];
     }
 
-    setStorageArray(STORAGE_KEYS.accounts, accounts);
     return accounts;
   } catch (error) {
     console.warn("[Transactions] Unable to refresh accounts", error);
-    clearStorageArray(STORAGE_KEYS.accounts);
     return [];
   }
 }
@@ -1699,7 +1668,7 @@ function renderTransactionList(filteredTransactions) {
 
 async function refreshCategoryOptions() {
   const categories = await fetchCategoriesForTransactions();
-  setStorageArray(STORAGE_KEYS.categories, categories);
+  ledgerState.categories = categories;
   populateCategoriesFromStorage();
   renderRecurringCategoryOptions();
 }
@@ -1708,13 +1677,11 @@ async function fetchCategoriesForTransactions() {
   try {
     const response = await apiFetch(`/api/categories${buildTransactionScopeQuery()}`);
     if (!response || !response.ok) {
-      clearStorageArray(STORAGE_KEYS.categories);
       return [];
     }
 
     const categories = await response.json().catch(() => []);
     if (!Array.isArray(categories)) {
-      clearStorageArray(STORAGE_KEYS.categories);
       return [];
     }
 
@@ -1729,7 +1696,6 @@ async function fetchCategoriesForTransactions() {
     }));
   } catch (error) {
     console.warn("[Transactions] Unable to refresh categories", error);
-    clearStorageArray(STORAGE_KEYS.categories);
     return [];
   }
 }
@@ -2213,59 +2179,24 @@ function mapById(items) {
 }
 
 function getAccounts() {
-  return readStorageArray(STORAGE_KEYS.accounts);
+  return Array.isArray(ledgerState.accounts) ? ledgerState.accounts : [];
 }
 
 function getCategories() {
-  return readStorageArray(STORAGE_KEYS.categories);
+  return Array.isArray(ledgerState.categories) ? ledgerState.categories : [];
 }
 
 function getTransactions() {
-  return readStorageArray(STORAGE_KEYS.transactions);
+  return Array.isArray(ledgerState.transactions) ? ledgerState.transactions : [];
 }
 
 function markAccountAsUsed(accountId) {
-  const accounts = readStorageArray(STORAGE_KEYS.accounts);
-  const updated = accounts.map((account) => {
+  ledgerState.accounts = getAccounts().map((account) => {
     if (account.id === accountId) {
       return { ...account, used: true };
     }
     return account;
   });
-  setStorageArray(STORAGE_KEYS.accounts, updated);
-}
-
-function readStorageArray(key, scopeOverride) {
-  const storageKey = getScopedStorageKey(key, scopeOverride);
-  const raw = storageKey ? localStorage.getItem(storageKey) : null;
-  if (!raw) {
-    return [];
-  }
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-function setStorageArray(key, value, scopeOverride) {
-  const storageKey = getScopedStorageKey(key, scopeOverride);
-  if (!storageKey) {
-    return;
-  }
-  localStorage.setItem(storageKey, JSON.stringify(value));
-}
-
-function clearStorageArray(key, scopeOverride) {
-  const storageKey = getScopedStorageKey(key, scopeOverride);
-  if (!storageKey) {
-    return;
-  }
-  localStorage.removeItem(storageKey);
-}
-
-function saveTransactions(transactions) {
-  setStorageArray(STORAGE_KEYS.transactions, transactions);
 }
 
 function setTransactionsLoading(isLoading) {
@@ -2355,8 +2286,6 @@ function mergeSavedTransactionIntoLedger(transaction, context = {}) {
   } else {
     ledgerState.transactions.unshift(nextTransaction);
   }
-
-  saveTransactions(ledgerState.transactions);
 }
 
 function validateTransactionForm({ date, description, amount, accountId, categoryId, type }) {
