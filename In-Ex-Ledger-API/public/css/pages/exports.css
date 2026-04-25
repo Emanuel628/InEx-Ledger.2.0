@@ -165,7 +165,14 @@
   grid-template-columns: 1fr 1fr;
   gap: 20px;
   margin-bottom: 20px;
+  align-items: stretch;
 }
+
+.exports-grid > .exports-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  }
 
 .exports-card,
 .history-card {
