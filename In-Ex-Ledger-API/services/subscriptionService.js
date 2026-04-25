@@ -270,7 +270,7 @@ async function setFreePlanForBusiness(businessId) {
             current_period_end = NULL,
             cancel_at_period_end = false,
             canceled_at = NOW(),
-            metadata_json = NULL,
+            metadata_json = '{}'::jsonb,
             updated_at = NOW()
       WHERE business_id = $1`,
     [businessId, PLAN_FREE]
