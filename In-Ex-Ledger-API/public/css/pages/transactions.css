@@ -2187,3 +2187,223 @@ body {
   color: var(--text-secondary);
   margin: 8px 0 0;
 }
+
+/* ── C-04: Income/Expense intent buttons ─────────────────── */
+.txn-intent-btn.income-intent {
+  background: #dcfce7;
+  color: #166534;
+  border: 1.5px solid #86efac;
+  font-weight: 600;
+}
+.txn-intent-btn.income-intent:hover,
+.txn-intent-btn.income-intent.is-active {
+  background: var(--green, #1a7a4a);
+  color: #fff;
+  border-color: var(--green, #1a7a4a);
+}
+.txn-intent-btn.expense-intent {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1.5px solid #fca5a5;
+  font-weight: 600;
+}
+.txn-intent-btn.expense-intent:hover,
+.txn-intent-btn.expense-intent.is-active {
+  background: var(--red, #b91c1c);
+  color: #fff;
+  border-color: var(--red, #b91c1c);
+}
+
+/* ── C-05/M-06: Drawer close button ─────────────────────── */
+.drawer-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--ink3);
+  font-size: 22px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+  border-radius: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.drawer-close-btn:hover {
+  background: var(--surface2);
+  color: var(--ink);
+}
+
+/* ── M-06: Sticky Add transaction button ─────────────────── */
+.tx-sticky-add {
+  position: sticky;
+  top: 68px;
+  z-index: 8;
+}
+
+/* ── M-08: Period picker chips ───────────────────────────── */
+.tx-period-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tx-period-chip {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.tx-period-chip:hover {
+  background: var(--surface3, #eef2f7);
+  color: var(--ink);
+}
+.tx-period-chip.is-active {
+  background: var(--accent2);
+  color: #fff;
+  border-color: var(--accent2);
+}
+
+/* ── M-09: CPA sub-group labels ──────────────────────────── */
+.advanced-subgroup-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink3);
+  padding-top: 4px;
+}
+.advanced-subgroup-label--border {
+  padding-top: 14px;
+  margin-top: 4px;
+  border-top: 0.5px solid var(--border);
+}
+
+/* ── M-10: Receipt cell empty by default ─────────────────── */
+.receipt-attach-hover {
+  display: none;
+  color: var(--ink3);
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+td:hover .receipt-attach-hover,
+tr:hover .receipt-attach-hover {
+  display: inline;
+}
+
+/* ── N-04: Tax banner collapse/tooltip ───────────────────── */
+.tax-banner-collapse-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  align-self: flex-start;
+  flex-shrink: 0;
+}
+.tax-banner-collapse-btn:hover { color: #fff; }
+.tax-banner.is-collapsed .tax-banner-main,
+.tax-banner.is-collapsed .tax-banner-side {
+  display: none;
+}
+.tax-banner.is-collapsed .tax-banner-collapse-btn {
+  transform: rotate(180deg);
+}
+.tax-banner-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.5);
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.tax-banner-info-btn:hover { color: #fff; border-color: #fff; }
+.tax-banner-tooltip {
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-top: 6px;
+  max-width: 320px;
+}
+
+/* ── C-07: Bulk action bar ───────────────────────────────── */
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--accent2);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.bulk-action-bar[hidden] { display: none; }
+.bulk-selected-count {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  margin-right: 4px;
+}
+.bulk-action-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.bulk-action-btn:hover { background: rgba(255,255,255,0.25); }
+.bulk-action-btn--danger { border-color: rgba(255,150,150,0.4); background: rgba(220,50,50,0.25); }
+.bulk-action-btn--cancel { background: transparent; opacity: 0.7; }
+.col-check { width: 36px; }
+
+/* ── C-07: Pagination ────────────────────────────────────── */
+.tx-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 0 4px;
+}
+.tx-pagination[hidden] { display: none; }
+.tx-page-btn {
+  background: var(--surface2);
+  border: 0.5px solid var(--border2);
+  color: var(--ink2);
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.tx-page-btn:hover { background: var(--surface3, #eef2f7); }
+.tx-page-info { font-size: 13px; color: var(--ink3); }
+
+/* ── M-07: Recurring template add at bottom ──────────────── */
+.recurring-bottom-bar {
+  padding: 10px 0 4px;
+  display: flex;
+  justify-content: flex-start;
+}
+.recurring-add-inline {
+  font-size: 13px;
+  padding: 6px 14px;
+}

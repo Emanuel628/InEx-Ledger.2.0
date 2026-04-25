@@ -62,18 +62,23 @@
         </div>
         <div class="categories-header-actions">
           <button id="seedDefaultCategoriesBtn" type="button" class="categories-secondary-btn" data-i18n="categories_add_defaults">Add default categories</button>
-          <button id="showCategoryModal" type="button" class="categories-add-btn" data-i18n="categories_add">Add category</button>
         </div>
       </section>
 
       <section class="category-card">
         <div class="category-card-head"><h2 data-i18n="categories_income_title">Income categories</h2></div>
         <div id="incomeCategories" class="category-list"><div class="category-empty category-loading"><p data-i18n="categories_loading">Loading categories...</p></div></div>
+        <div class="category-card-footer">
+          <button id="addIncomeCategoryBtn" type="button" class="category-inline-add-btn" data-i18n="categories_add_income">+ Add income category</button>
+        </div>
       </section>
 
       <section class="category-card">
         <div class="category-card-head"><h2 data-i18n="categories_expense_title">Expense categories</h2></div>
         <div id="expenseCategories" class="category-list"><div class="category-empty category-loading"><p data-i18n="categories_loading">Loading categories...</p></div></div>
+        <div class="category-card-footer">
+          <button id="addExpenseCategoryBtn" type="button" class="category-inline-add-btn" data-i18n="categories_add_expense">+ Add expense category</button>
+        </div>
       </section>
 
       <p id="categoryMessage" class="category-message"></p>

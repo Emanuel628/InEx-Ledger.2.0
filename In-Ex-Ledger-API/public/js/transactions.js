@@ -1873,9 +1873,10 @@ function renderTransactionsTable(filteredTransactions) {
       : `<span class="status-badge status-pending">${txT("transactions_status_pending", "Pending")}</span>`;
     const receiptMarkup = txn.receiptId
       ? `<span class="receipt-status attached"><span class="receipt-dot"></span><span>${txT("transactions_receipt_attached_short", "Attached")}</span></span>`
-      : `<span class="receipt-status none"><span class="receipt-dot"></span><span>${txT("transactions_receipt_none", "None")}</span></span>`;
+      : `<a href="receipts" class="receipt-attach-hover" title="Attach a receipt">+ attach</a>`;
 
     row.innerHTML = `
+      <td class="col-check"><input type="checkbox" data-bulk-check="${escapeHtml(txn.id)}" aria-label="Select transaction" /></td>
       <td><span class="date-cell">${formatDisplayDate(txn.date)}</span></td>
       <td><div class="description-primary">${escapeHtml(txn.description || "-")}</div><div class="description-sub">${descriptionSub}</div></td>
       <td><span class="account-tag">${escapeHtml(accountName)}</span></td>
@@ -2786,7 +2787,128 @@ function initCsvImport() {
 document.addEventListener("DOMContentLoaded", () => {
   initCsvImport();
   initOcrPrefill();
+  initDrawerCloseBtn();
+  initTaxBannerControls();
+  initPeriodPicker();
+  initBulkActions();
 });
+
+function initDrawerCloseBtn() {
+  const closeBtn = document.getElementById("txDrawerClose");
+  closeBtn?.addEventListener("click", () => closeTransactionDrawer());
+}
+
+function initTaxBannerControls() {
+  const banner = document.getElementById("tax-cockpit");
+  const collapseBtn = document.getElementById("taxBannerCollapseBtn");
+  const infoBtn = document.getElementById("taxInfoBtn");
+  const tooltip = document.getElementById("taxInfoTooltip");
+
+  const COLLAPSE_KEY = "lb_tax_banner_collapsed";
+  if (banner && localStorage.getItem(COLLAPSE_KEY) === "true") {
+    banner.classList.add("is-collapsed");
+    if (collapseBtn) collapseBtn.setAttribute("aria-label", "Expand tax estimate");
+  }
+
+  collapseBtn?.addEventListener("click", () => {
+    const collapsed = banner?.classList.toggle("is-collapsed");
+    try { localStorage.setItem(COLLAPSE_KEY, String(!!collapsed)); } catch (_) {}
+    collapseBtn.setAttribute("aria-label", collapsed ? "Expand tax estimate" : "Collapse tax estimate");
+  });
+
+  infoBtn?.addEventListener("click", () => {
+    if (tooltip) tooltip.hidden = !tooltip.hidden;
+  });
+}
+
+function initPeriodPicker() {
+  const chips = document.querySelectorAll(".tx-period-chip");
+  chips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      chips.forEach((c) => c.classList.remove("is-active"));
+      chip.classList.add("is-active");
+      // Period filtering is visual only — transactions.js reload handles the rest
+      // via the existing scope/filter system. Dispatch a custom event so page can react.
+      window.dispatchEvent(new CustomEvent("txPeriodChanged", { detail: chip.dataset.period }));
+    });
+  });
+}
+
+let bulkSelectedIds = new Set();
+
+function initBulkActions() {
+  const bar = document.getElementById("bulkActionBar");
+  const selectAll = document.getElementById("bulkSelectAll");
+  const countEl = document.getElementById("bulkSelectedCount");
+  const cancelBtn = document.getElementById("bulkCancelSelect");
+
+  if (!bar) return;
+
+  function updateBar() {
+    const count = bulkSelectedIds.size;
+    bar.hidden = count === 0;
+    if (countEl) countEl.textContent = `${count} selected`;
+  }
+
+  // Delegate checkbox clicks on the table body
+  const tbody = document.querySelector(".transactions-table tbody");
+  tbody?.addEventListener("change", (e) => {
+    const cb = e.target.closest('[data-bulk-check]');
+    if (!cb) return;
+    const id = cb.dataset.bulkCheck;
+    if (cb.checked) bulkSelectedIds.add(id);
+    else bulkSelectedIds.delete(id);
+    updateBar();
+    if (selectAll) selectAll.indeterminate = bulkSelectedIds.size > 0 && bulkSelectedIds.size < tbody.querySelectorAll('[data-bulk-check]').length;
+  });
+
+  selectAll?.addEventListener("change", () => {
+    const checks = document.querySelectorAll('.transactions-table tbody [data-bulk-check]');
+    checks.forEach((cb) => {
+      cb.checked = selectAll.checked;
+      if (selectAll.checked) bulkSelectedIds.add(cb.dataset.bulkCheck);
+      else bulkSelectedIds.delete(cb.dataset.bulkCheck);
+    });
+    updateBar();
+  });
+
+  cancelBtn?.addEventListener("click", () => {
+    bulkSelectedIds.clear();
+    document.querySelectorAll('[data-bulk-check]').forEach((cb) => cb.checked = false);
+    if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
+    updateBar();
+  });
+
+  document.getElementById("bulkDeleteSelected")?.addEventListener("click", async () => {
+    if (!bulkSelectedIds.size) return;
+    if (!window.confirm(`Archive ${bulkSelectedIds.size} selected transaction(s)?`)) return;
+    const ids = Array.from(bulkSelectedIds);
+    for (const id of ids) {
+      try {
+        await apiFetch(`/api/transactions/${id}`, { method: "DELETE" });
+      } catch (_) {}
+    }
+    bulkSelectedIds.clear();
+    updateBar();
+    window.location.reload();
+  });
+
+  document.getElementById("bulkMarkCleared")?.addEventListener("click", async () => {
+    if (!bulkSelectedIds.size) return;
+    for (const id of Array.from(bulkSelectedIds)) {
+      try {
+        await apiFetch(`/api/transactions/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cleared: true })
+        });
+      } catch (_) {}
+    }
+    bulkSelectedIds.clear();
+    updateBar();
+    window.location.reload();
+  });
+}
 
 function initOcrPrefill() {
   const params = new URLSearchParams(window.location.search);
@@ -2800,11 +2922,11 @@ function initOcrPrefill() {
 
   // Wait for the drawer to initialise then pre-fill and open it
   const tryPrefill = () => {
-    const toggle = document.getElementById("addTxToggle");
+    const toggle = document.getElementById("addTxTogglePage");
     const amountEl = document.getElementById("amount");
     const dateEl = document.getElementById("date");
     const descEl = document.getElementById("description");
-    if (!toggle || !amountEl) return false;
+    if (!amountEl) return false;
 
     // Set expense intent
     const expenseBtn = document.querySelector('[data-intent="expense"]');
@@ -2817,7 +2939,7 @@ function initOcrPrefill() {
 
     // Open drawer
     if (transactionDrawerElement && transactionDrawerElement.hidden) {
-      toggle.click();
+      toggle?.click();
     }
 
     // Clean URL

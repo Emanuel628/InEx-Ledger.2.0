@@ -81,14 +81,27 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await loadBusinessRegion();
   wireCategoryModal();
+  wirePerListAddButtons();
   wireDefaultCategorySeed();
   await loadCategories();
   await refreshReceiptsDot();
 });
 
+function openCategoryModal(type) {
+  const modal = document.getElementById("categoryModal");
+  const typeSelect = document.getElementById("category-type");
+  if (typeSelect && type) typeSelect.value = type;
+  populateTaxLabelOptions(type || typeSelect?.value || "income");
+  modal?.classList.remove("hidden");
+}
+
+function wirePerListAddButtons() {
+  document.getElementById("addIncomeCategoryBtn")?.addEventListener("click", () => openCategoryModal("income"));
+  document.getElementById("addExpenseCategoryBtn")?.addEventListener("click", () => openCategoryModal("expense"));
+}
+
 function wireCategoryModal() {
   const modal = document.getElementById("categoryModal");
-  const openButton = document.getElementById("showCategoryModal");
   const cancelButton = document.getElementById("cancelCategoryModal");
   const backdrop = modal?.querySelector("[data-modal-close]");
   const form = document.getElementById("categoryForm");
@@ -96,10 +109,6 @@ function wireCategoryModal() {
   const typeSelect = document.getElementById("category-type");
   const taxLabelSelect = document.getElementById("category-tax-label");
 
-  openButton?.addEventListener("click", () => {
-    populateTaxLabelOptions(typeSelect?.value || "income");
-    modal?.classList.remove("hidden");
-  });
   cancelButton?.addEventListener("click", () => closeCategoryModal());
   backdrop?.addEventListener("click", () => closeCategoryModal());
   typeSelect?.addEventListener("change", () => populateTaxLabelOptions(typeSelect.value));
@@ -254,14 +263,12 @@ function showCategoriesOfflineBanner(show) {
   banner.hidden = !show;
   banner.textContent = show ? tx("categories_offline_warning") : "";
 
-  const addButton = document.getElementById("showCategoryModal");
   const defaultsButton = document.getElementById("seedDefaultCategoriesBtn");
-  if (addButton) {
-    addButton.disabled = show;
-  }
-  if (defaultsButton) {
-    defaultsButton.disabled = show;
-  }
+  if (defaultsButton) defaultsButton.disabled = show;
+  const incomeBtn = document.getElementById("addIncomeCategoryBtn");
+  const expenseBtn = document.getElementById("addExpenseCategoryBtn");
+  if (incomeBtn) incomeBtn.disabled = show;
+  if (expenseBtn) expenseBtn.disabled = show;
 }
 
 function normalizeCategory(category) {

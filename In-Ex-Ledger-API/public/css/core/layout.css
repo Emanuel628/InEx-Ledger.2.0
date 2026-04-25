@@ -954,6 +954,20 @@ body[data-theme="light"] select option {
   color: #b42318;
 }
 
+/* At 1100px collapse lower-priority nav items (Help, Messages, Settings) to icon-only */
+@media (max-width: 1100px) and (min-width: 1025px) {
+  .topbar-nav a[data-nav-help] span:not(.nav-icon),
+  .topbar-nav a[data-nav-messages] span:not(.nav-icon):not(.nav-msg-badge),
+  .topbar-nav a[href="settings"] span:not(.nav-icon) {
+    display: none !important;
+  }
+  .topbar-nav a[data-nav-help],
+  .topbar-nav a[data-nav-messages],
+  .topbar-nav a[href="settings"] {
+    padding: 6px 8px !important;
+  }
+}
+
 @media (max-width: 1024px) {
   .app-topbar,
   .settings-topbar,
@@ -1118,6 +1132,64 @@ body[data-theme="light"] select option {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ── Quick-add panel backdrop (C-02) ─────────────────────── */
+.dynamic-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  background: rgba(15, 25, 35, 0.36);
+  animation: backdrop-fade-in 160ms ease;
+}
+.dynamic-sidebar-backdrop[hidden] { display: none; }
+
+@keyframes backdrop-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Quick-add panel scroll fade (N-02) ──────────────────── */
+.dynamic-sidebar-quick-panel {
+  position: relative;
+  z-index: 70;
+}
+.dynamic-sidebar-quick-panel::after {
+  content: "";
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  display: block;
+  background: linear-gradient(to bottom, transparent, var(--surface));
+  pointer-events: none;
+  margin-top: -36px;
+}
+
+/* ── Business indicator in topbar (M-01) ─────────────────── */
+.topbar-business-name {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: rgba(255,255,255,0.7) !important;
+  background: rgba(255,255,255,0.12) !important;
+  border-radius: 5px !important;
+  padding: 2px 7px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 120px !important;
+  flex-shrink: 0 !important;
+  order: -1 !important;
+}
+
+/* ── Sidebar empty state (N-01) ──────────────────────────── */
+.dynamic-sidebar-empty-icon {
+  display: inline-block;
+  margin-right: 4px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--accent2);
 }
 
 /* ── Accessibility: respect reduced-motion preference ────── */

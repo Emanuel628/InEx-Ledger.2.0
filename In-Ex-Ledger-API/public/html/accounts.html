@@ -74,6 +74,12 @@
           </div>
           <div class="form-field">
             <label class="field-label" for="account-type" data-i18n="accounts_label_type">Account type</label>
+            <div class="account-type-chips" id="accountTypeChips">
+              <button type="button" class="account-type-chip" data-chip-type="checking">Checking</button>
+              <button type="button" class="account-type-chip" data-chip-type="savings">Savings</button>
+              <button type="button" class="account-type-chip" data-chip-type="credit_card">Credit Card</button>
+              <button type="button" class="account-type-chip" data-chip-type="cash">Cash</button>
+            </div>
             <select id="account-type" name="account-type" required class="form-control">
               <option value="" data-i18n="accounts_select_type">Select type</option>
             </select>
@@ -87,7 +93,23 @@
       </section>
 
       <section id="accountsList" class="accounts-list"><div class="accounts-empty accounts-loading" data-i18n="accounts_loading">Loading accounts...</div></section>
+      <div class="accounts-bottom-bar">
+        <button id="showAccountFormBottom" type="button" class="accounts-add-btn accounts-add-btn--bottom">+ Add account</button>
+      </div>
       <p id="accountMessage" class="account-message"></p>
+
+      <!-- C-08: Delete account confirmation modal -->
+      <div id="accountDeleteModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="accountDeleteModalTitle">
+        <div class="transaction-modal-content danger-modal">
+          <div class="danger-modal-icon" aria-hidden="true">!</div>
+          <h3 id="accountDeleteModalTitle">Delete account?</h3>
+          <p id="accountDeleteModalBody">This account has associated transactions. Deleting it cannot be undone.</p>
+          <div class="modal-actions danger-actions">
+            <button type="button" id="accountDeleteModalCancel" class="modal-cancel">Cancel</button>
+            <button type="button" id="accountDeleteModalConfirm" class="modal-delete">Yes, delete</button>
+          </div>
+        </div>
+      </div>
     </div>
   </main>
 

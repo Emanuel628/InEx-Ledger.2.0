@@ -529,14 +529,14 @@ function initDynamicSidebar() {
     sidebar.innerHTML = `
       <div class="dynamic-sidebar-header">
         <div>
-          <div class="sidebar-section-label">Favorites</div>
+          <div class="sidebar-section-label">Quick Add</div>
         </div>
         <button type="button" class="dynamic-sidebar-manage" data-sidebar-manage aria-expanded="false">Add</button>
       </div>
-      <nav class="sidebar-nav dynamic-sidebar-favorites" data-sidebar-favorites aria-label="Favorite actions">
+      <nav class="sidebar-nav dynamic-sidebar-favorites" data-sidebar-favorites aria-label="Quick add actions">
         ${favoriteMarkup}
       </nav>
-      <div class="dynamic-sidebar-empty" data-sidebar-empty${favorites.length ? " hidden" : ""}>No favorites</div>
+      <div class="dynamic-sidebar-empty" data-sidebar-empty${favorites.length ? " hidden" : ""}><span class="dynamic-sidebar-empty-icon">+</span> Click Add above to add quick-add shortcuts</div>
       <div class="dynamic-sidebar-library" data-sidebar-library hidden>
         ${Object.keys(groupedLibrary).map((group) => `
           <div class="dynamic-sidebar-library-group">
@@ -708,7 +708,7 @@ function renderDynamicSidebarFavorite(feature) {
     <div class="dynamic-sidebar-favorite" draggable="true" data-feature-id="${escapeDynamicSidebarAttr(feature.id)}" data-favorite-id="${escapeDynamicSidebarAttr(feature.id)}">
       <button type="button" class="sidebar-link dynamic-sidebar-link" data-sidebar-action="${escapeDynamicSidebarAttr(feature.id)}">
         <span class="sidebar-icon" aria-hidden="true">${feature.icon}</span>
-        <span>${escapeDynamicSidebarHtml(feature.label)}</span>
+        <span>+ ${escapeDynamicSidebarHtml(feature.label)}</span>
         ${receiptDot}
       </button>
       <button type="button" class="dynamic-sidebar-remove" data-sidebar-remove="${escapeDynamicSidebarAttr(feature.id)}" aria-label="Remove ${escapeDynamicSidebarAttr(feature.label)}">&times;</button>
@@ -729,6 +729,13 @@ function renderDynamicSidebarLibraryItem(feature, isAdded) {
 function ensureDynamicSidebarQuickPanel() {
   let panel = document.getElementById("dynamicSidebarQuickPanel");
   if (panel) return panel;
+
+  const backdrop = document.createElement("div");
+  backdrop.id = "dynamicSidebarBackdrop";
+  backdrop.className = "dynamic-sidebar-backdrop";
+  backdrop.hidden = true;
+  document.body.appendChild(backdrop);
+
   panel = document.createElement("aside");
   panel.id = "dynamicSidebarQuickPanel";
   panel.className = "dynamic-sidebar-quick-panel";
@@ -736,26 +743,43 @@ function ensureDynamicSidebarQuickPanel() {
   panel.hidden = true;
   document.body.appendChild(panel);
 
-  document.addEventListener("click", (event) => {
-    if (panel.hidden) return;
-    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-    if (target && (panel.contains(target) || target.closest("[data-sidebar-action]"))) return;
+  function tryClose() {
+    const form = panel.querySelector("form");
+    const hasInput = form && Array.from(form.elements).some((el) => {
+      if (el.type === "hidden" || el.type === "submit" || el.type === "button") return false;
+      if (el.type === "file") return el.files && el.files.length > 0;
+      return el.value && el.value.trim() !== "" && el.defaultValue !== el.value;
+    });
+    if (hasInput && !window.confirm("Close without saving? Your changes will be lost.")) return;
     closeDynamicSidebarQuickPanel(panel);
-  });
+  }
+
+  backdrop.addEventListener("click", tryClose);
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeDynamicSidebarQuickPanel(panel);
+    if (event.key === "Escape" && !panel.hidden) tryClose();
   });
   return panel;
+}
+
+function showDynamicSidebarBackdrop() {
+  const backdrop = document.getElementById("dynamicSidebarBackdrop");
+  if (backdrop) backdrop.hidden = false;
+}
+
+function hideDynamicSidebarBackdrop() {
+  const backdrop = document.getElementById("dynamicSidebarBackdrop");
+  if (backdrop) backdrop.hidden = true;
 }
 
 function openDynamicSidebarQuickPanel(feature, anchor, panel) {
   const anchorRect = anchor.getBoundingClientRect();
   panel.hidden = false;
   panel.style.top = `${Math.max(68, Math.min(anchorRect.top, window.innerHeight - 420))}px`;
+  showDynamicSidebarBackdrop();
   panel.innerHTML = `
     <div class="dynamic-sidebar-quick-header">
       <div>
-        <div class="dynamic-sidebar-quick-kicker">${escapeDynamicSidebarHtml(feature.group)}</div>
+        <div class="dynamic-sidebar-quick-kicker">Quick add</div>
         <h2>${escapeDynamicSidebarHtml(feature.label)}</h2>
       </div>
       <button type="button" data-quick-close aria-label="Close quick action">&times;</button>
@@ -770,6 +794,7 @@ function closeDynamicSidebarQuickPanel(panel) {
   if (!panel) return;
   panel.hidden = true;
   panel.innerHTML = "";
+  hideDynamicSidebarBackdrop();
 }
 
 function renderDynamicSidebarQuickAction(feature, body) {
@@ -1128,11 +1153,35 @@ function escapeDynamicSidebarAttr(value) {
   return escapeDynamicSidebarHtml(value);
 }
 
+function injectBusinessIndicator() {
+  const pill = document.querySelector(".app-topbar .user-pill");
+  if (!pill || pill.querySelector(".topbar-business-name")) return;
+
+  const biz = document.createElement("span");
+  biz.className = "topbar-business-name";
+  biz.id = "topbarBusinessName";
+  biz.setAttribute("aria-label", "Active business");
+  pill.insertBefore(biz, pill.firstChild);
+
+  function updateBizName() {
+    const name = window.__LUNA_ME__?.active_business_name
+      || window.__LUNA_ME__?.businesses?.find?.(b => b.id === window.__LUNA_ME__?.active_business_id)?.name
+      || "";
+    biz.textContent = name;
+    biz.hidden = !name;
+  }
+
+  updateBizName();
+  window.addEventListener("lunaProfileReady", updateBizName);
+  window.addEventListener("lunaBusinessChanged", updateBizName);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
   injectSkipLink();
   injectHelpNavLink();
   injectMessagesNavLink();
+  injectBusinessIndicator();
   initDynamicSidebar();
   injectMobileMenu();   // clones nav after Help/Messages are injected
   highlightNavigation(); // runs on all nav a elements including the drawer

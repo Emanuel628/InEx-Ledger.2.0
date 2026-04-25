@@ -17,9 +17,57 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof enforceTrial === "function") enforceTrial();
 
   wireAccountForm();
+  wireBottomAddButton();
+  wireAccountTypeChips();
+  wireAccountDeleteModal();
   await renderAccountList();
   updateReceiptsDot();
 });
+
+function wireBottomAddButton() {
+  const btn = document.getElementById("showAccountFormBottom");
+  const formContainer = document.getElementById("accountFormContainer");
+  const nameInput = document.getElementById("account-name");
+  btn?.addEventListener("click", () => {
+    if (formContainer) formContainer.hidden = false;
+    nameInput?.focus();
+    formContainer?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  });
+}
+
+function wireAccountTypeChips() {
+  const chips = document.querySelectorAll("[data-chip-type]");
+  const select = document.getElementById("account-type");
+  chips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      chips.forEach((c) => c.classList.remove("is-active"));
+      chip.classList.add("is-active");
+      if (select) select.value = chip.dataset.chipType;
+    });
+  });
+  select?.addEventListener("change", () => {
+    chips.forEach((c) => c.classList.toggle("is-active", c.dataset.chipType === select.value));
+  });
+}
+
+let pendingDeleteAccountId = null;
+
+function wireAccountDeleteModal() {
+  const modal = document.getElementById("accountDeleteModal");
+  const cancelBtn = document.getElementById("accountDeleteModalCancel");
+  const confirmBtn = document.getElementById("accountDeleteModalConfirm");
+  cancelBtn?.addEventListener("click", () => {
+    if (modal) modal.classList.add("hidden");
+    pendingDeleteAccountId = null;
+  });
+  confirmBtn?.addEventListener("click", async () => {
+    if (!pendingDeleteAccountId) return;
+    if (modal) modal.classList.add("hidden");
+    const id = pendingDeleteAccountId;
+    pendingDeleteAccountId = null;
+    await executeDeleteAccount(id);
+  });
+}
 
 function wireAccountForm() {
   const showButton = document.getElementById("showAccountForm");
@@ -138,6 +186,7 @@ async function renderAccountList() {
     }
 
     const accounts = await response.json();
+    window.__accountsCache = accounts;
     syncAccountsCache(accounts);
     if (!Array.isArray(accounts) || accounts.length === 0) {
       container.innerHTML = `<div class="accounts-empty">${escapeHtml(tx("accounts_no_accounts"))}</div>`;
@@ -172,10 +221,21 @@ async function renderAccountList() {
 }
 
 async function deleteAccount(accountId) {
-  if (!window.confirm(tx("accounts_confirm_delete"))) {
-    return;
+  const account = (window.__accountsCache || []).find((a) => a.id === accountId);
+  const name = account?.name || "this account";
+  const modal = document.getElementById("accountDeleteModal");
+  const body = document.getElementById("accountDeleteModalBody");
+  if (modal && body) {
+    body.textContent = `Delete "${name}"? This action cannot be undone.`;
+    modal.classList.remove("hidden");
+    pendingDeleteAccountId = accountId;
+  } else {
+    if (!window.confirm(tx("accounts_confirm_delete"))) return;
+    await executeDeleteAccount(accountId);
   }
+}
 
+async function executeDeleteAccount(accountId) {
   try {
     const response = await apiFetch(`/api/accounts/${accountId}`, {
       method: "DELETE"
