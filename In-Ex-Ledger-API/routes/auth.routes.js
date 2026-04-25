@@ -7,7 +7,7 @@ const express = require("express");
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const { Resend } = require("resend");
-const { signToken, verifyToken, requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { signToken, verifyToken, requireAuth, requireMfaIfEnabled } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const {
   createAuthLimiter,
@@ -1220,7 +1220,7 @@ router.get("/verify-email", async (req, res) => {
   }
 });
 
-router.post("/change-password", authLimiter, requireAuth, requireCsrfProtection, requireMfa, async (req, res) => {
+router.post("/change-password", authLimiter, requireAuth, requireCsrfProtection, requireMfaIfEnabled, async (req, res) => {
   const currentPassword = req.body?.currentPassword;
   const newPassword = req.body?.newPassword;
   const confirmPassword = req.body?.confirmPassword;
@@ -1805,7 +1805,7 @@ router.post("/reset-password", passwordLimiter, async (req, res) => {
   }
 });
 
-router.post("/recovery-email/request", requireAuth, requireCsrfProtection, authLimiter, requireMfa, async (req, res) => {
+router.post("/recovery-email/request", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
   const recoveryEmail = normalizeEmail(req.body?.recoveryEmail);
   const currentPassword = req.body?.currentPassword;
 
@@ -1878,7 +1878,7 @@ router.post("/recovery-email/request", requireAuth, requireCsrfProtection, authL
  * POST /request-email-change
  * Initiates email change: verifies current password, sends link to new address.
  */
-router.post("/request-email-change", requireAuth, requireCsrfProtection, authLimiter, requireMfa, async (req, res) => {
+router.post("/request-email-change", requireAuth, requireCsrfProtection, authLimiter, requireMfaIfEnabled, async (req, res) => {
   const { newEmail, currentPassword } = req.body ?? {};
   const email = normalizeEmail(newEmail);
 

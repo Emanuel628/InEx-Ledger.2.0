@@ -1944,14 +1944,7 @@ function initSecurityForm() {
 
     if (mfaMode === "enable_start") {
       if (!mfaStatus.recovery_email_verified) {
-        if (mfaEnabledToggle) {
-          mfaEnabledToggle.checked = false;
-        }
-        mfaMode = "idle";
-        updateMfaUi();
-        setMfaMessage("Add and verify a recovery email before enabling MFA.", "is-error");
-        recoveryEmailInput?.focus();
-        return;
+        setMfaMessage("Tip: add a recovery email so you can regain access if you lose your device.", "is-warning");
       }
       try {
         const response = await apiFetch("/api/auth/mfa/enable", {

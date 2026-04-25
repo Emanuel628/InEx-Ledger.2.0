@@ -1,7 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const { pool } = require("../db.js");
-const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfaIfEnabled } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createBusinessDeleteLimiter } = require("../middleware/rateLimitTiers.js");
 const {
@@ -135,7 +135,7 @@ router.post("/:id/activate", async (req, res) => {
  * Delete a business account and all its associated data.
  * Requires password confirmation. Cannot delete the user's only business.
  */
-router.delete("/:id", businessDeleteLimiter, requireMfa, async (req, res) => {
+router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, res) => {
   const { password } = req.body ?? {};
   const businessId = req.params.id;
 

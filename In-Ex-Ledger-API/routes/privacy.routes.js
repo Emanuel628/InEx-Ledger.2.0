@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const { pool } = require("../db.js");
-const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfaIfEnabled } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
@@ -201,7 +201,7 @@ router.post("/settings", async (req, res) => {
  * Key ledger fields included: TransactionIDs, Amounts, Dates, Categories.
  * Audit trail: every successful export is logged in user_action_audit_log.
  */
-router.post("/export", requireMfa, async (req, res) => {
+router.post("/export", requireMfaIfEnabled, async (req, res) => {
   const format = String(req.query.format || req.body?.format || "json").toLowerCase();
   if (format !== "json" && format !== "csv") {
     return res.status(400).json({ error: "Unsupported format. Use 'json' or 'csv'." });
@@ -408,7 +408,7 @@ router.post("/export", requireMfa, async (req, res) => {
  * Audit trail: the erasure request is logged in user_action_audit_log before
  * any data is modified so that compliance teams have a permanent record.
  */
-router.post("/erase", requireMfa, async (req, res) => {
+router.post("/erase", requireMfaIfEnabled, async (req, res) => {
   const userId = req.user.id;
   const ipAddress = req.ip || req.connection?.remoteAddress || null;
   const userAgent = req.get("user-agent") || null;
@@ -508,7 +508,7 @@ router.post("/erase", requireMfa, async (req, res) => {
  * mileage, recurring transactions, accounts, categories, exports) but keeps
  * the user account. Receipt/export files stored on disk are also removed.
  */
-router.post("/delete", requireMfa, async (req, res) => {
+router.post("/delete", requireMfaIfEnabled, async (req, res) => {
   const userId = req.user.id;
   const password = req.body?.password;
   const ipAddress = req.ip || req.connection?.remoteAddress || null;

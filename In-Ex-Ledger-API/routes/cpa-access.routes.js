@@ -1,7 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfaIfEnabled } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter, createRouteLimiter } = require("../middleware/rate-limit.middleware.js");
 
@@ -27,7 +27,7 @@ const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
 router.use(requireAuth);
-router.use(requireMfa);
+router.use(requireMfaIfEnabled);
 router.use(requireCsrfProtection);
 router.use(createDataApiLimiter({ max: 60 }));
 

@@ -10,7 +10,7 @@
  */
 
 const express = require('express');
-const { requireAuth, requireMfa } = require('../middleware/auth.middleware.js');
+const { requireAuth, requireMfaIfEnabled } = require('../middleware/auth.middleware.js');
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js');
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
@@ -25,7 +25,7 @@ const router = express.Router();
 // attacks against the auth check itself.
 router.use(createDataApiLimiter({ max: 60 }));
 router.use(requireAuth);
-router.use(requireMfa);
+router.use(requireMfaIfEnabled);
 router.use(requireCsrfProtection);
 
 // Verification calls hit an external API – apply a conservative rate limit.

@@ -96,10 +96,9 @@ function optionalAuth(req, res, next) {
 }
 
 /**
- * Middleware that requires MFA to be enabled and completed on the authenticated session.
- * Must be placed after requireAuth.
- * Returns 403 with mfa_required: true when MFA is not yet configured,
- * so the client can redirect the user to the MFA setup page.
+ * Middleware that requires BOTH MFA to be enabled AND the current session to be
+ * MFA-authenticated. Use only for actions that should be completely inaccessible
+ * to users who have not configured MFA (rare; prefer requireMfaIfEnabled below).
  */
 function requireMfa(req, res, next) {
   if (!req.user) {
@@ -127,4 +126,26 @@ function requireMfa(req, res, next) {
   next();
 }
 
-module.exports = { signToken, verifyToken, requireAuth, optionalAuth, requireMfa };
+/**
+ * Middleware that enforces MFA-authentication only when the user HAS MFA enabled.
+ * Users without MFA enabled pass through freely (they re-authenticate via password).
+ * Must be placed after requireAuth.
+ */
+function requireMfaIfEnabled(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  if (req.user.mfa_enabled && !req.user.mfa_authenticated) {
+    return res.status(403).json({
+      error: "MFA verification required for this action.",
+      mfa_required: true,
+      requirement: "verification",
+      reauthenticate: true
+    });
+  }
+
+  next();
+}
+
+module.exports = { signToken, verifyToken, requireAuth, optionalAuth, requireMfa, requireMfaIfEnabled };

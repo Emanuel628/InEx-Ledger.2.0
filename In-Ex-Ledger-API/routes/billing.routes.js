@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
-const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfaIfEnabled } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createBillingMutationLimiter } = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
@@ -458,7 +458,7 @@ router.post("/mock-v1", requireAuth, requireCsrfProtection, async (req, res) => 
   }
 });
 
-router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfa, async (req, res) => {
+router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfaIfEnabled, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
@@ -546,7 +546,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
   }
 });
 
-router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfa, async (req, res) => {
+router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfaIfEnabled, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const customerId = await ensureStripeCustomer(businessId, req.user);
@@ -565,7 +565,7 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
   }
 });
 
-router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfa, async (req, res) => {
+router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfaIfEnabled, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
