@@ -615,7 +615,7 @@
       <h3 id="dangerModalTitle" data-i18n="settings_delete_business_data_modal_title">Delete business data?</h3>
       <p id="dangerModalBody" data-i18n="settings_delete_business_data_modal_body">This action cannot be undone.</p>
       <div id="dangerModalConfirmWrap" class="danger-confirm-wrap hidden">
-        <label for="dangerModalConfirmInput" data-i18n="settings_type_delete_confirm">Type DELETE to confirm</label>
+        <label for="dangerModalConfirmInput" data-i18n="settings_type_delete_confirm">Type DELETE or your email to confirm</label>
         <input type="text" id="dangerModalConfirmInput" autocomplete="off" />
       </div>
       <div id="dangerModalPasswordWrap" class="danger-confirm-wrap hidden">
@@ -629,6 +629,21 @@
       <div class="modal-actions danger-actions">
         <button type="button" id="dangerModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
         <button type="button" id="dangerModalConfirm" class="modal-delete" data-i18n="common_delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- C-11: Accounting period lock confirmation modal -->
+  <div id="accountingLockConfirmModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="accountingLockConfirmTitle">
+    <div class="transaction-modal-content danger-modal">
+      <div class="danger-modal-icon" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none"><path d="M8 3L14 13H2L8 3Z"></path><line x1="8" y1="7" x2="8" y2="10"></line><circle cx="8" cy="12" r=".5" fill="currentColor"></circle></svg>
+      </div>
+      <h3 id="accountingLockConfirmTitle" data-i18n="settings_accounting_lock_confirm_title">Lock accounting period?</h3>
+      <p id="accountingLockConfirmBody" data-i18n="settings_accounting_lock_confirm_body">Transactions on or before the locked date cannot be edited or deleted. This can be changed later.</p>
+      <div class="modal-actions danger-actions">
+        <button type="button" id="accountingLockConfirmCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
+        <button type="button" id="accountingLockConfirmOk" class="modal-delete modal-delete-accent" data-i18n="settings_accounting_lock_save">Save lock</button>
       </div>
     </div>
   </div>

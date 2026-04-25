@@ -479,6 +479,83 @@
   }
 }
 
+/* M-16: filename as plain text link with icon */
+.receipt-file-button {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--accent2);
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.receipt-file-button::before {
+  content: "";
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect x='3' y='1' width='10' height='14' rx='1.5' stroke='%232563a8' stroke-width='1.5'/%3E%3Cpath d='M6 5h4M6 8h4M6 11h2' stroke='%232563a8' stroke-width='1.2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  flex-shrink: 0;
+}
+.receipt-file-button:hover { text-decoration: underline; }
+
+/* N-03: Drag-and-drop upload zone */
+.receipt-drop-zone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 20px;
+  border: 2px dashed var(--border2);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--ink3);
+  transition: border-color 0.15s, background 0.15s;
+  cursor: default;
+}
+.receipt-drop-zone.is-dragover {
+  border-color: var(--accent2);
+  background: var(--accent-light, #eff6ff);
+  color: var(--accent2);
+}
+.receipt-drop-icon { width: 22px; height: 22px; stroke: currentColor; flex-shrink: 0; }
+.receipt-drop-browse {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.receipt-drop-browse:hover { opacity: 0.8; }
+
+/* M-15: Bottom upload button */
+.receipts-card-footer {
+  padding: 12px 20px 14px;
+  border-top: 0.5px solid var(--border);
+}
+.receipt-bottom-upload-btn {
+  padding: 6px 14px;
+  border: 1.5px dashed var(--border2);
+  border-radius: 8px;
+  background: none;
+  color: var(--ink3);
+  font-size: 13px;
+  cursor: pointer;
+}
+.receipt-bottom-upload-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
 /* ── OCR Scan button & modal ─────────────────────────────── */
 .receipt-scan-btn {
   padding: 3px 10px;

@@ -62,17 +62,6 @@
         <div>
           <h1 class="page-title" data-i18n="exports_page_title">Export records</h1>
           <p class="page-subtitle" data-i18n="exports_page_subtitle">Generate clean reports for tax filing or CPA handoff</p>
-          <p class="page-context-note" id="exportTaxContext">Tax form context</p>
-        </div>
-        <div class="exports-hero-actions">
-          <button type="submit" form="exportForm" class="export-btn export-btn-secondary" id="exportCsvBtn" data-i18n="exports_button_csv">Export CSV</button>
-          <button type="button" class="export-btn export-btn-primary" id="exportPdfBtn">
-            <span class="button-icon" aria-hidden="true">
-              <svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg>
-            </span>
-            <span data-i18n="exports_button_pdf">Export PDF</span>
-            <span class="button-badge" data-i18n="exports_button_badge">Recommended for CPA</span>
-          </button>
         </div>
       </section>
 
@@ -191,6 +180,24 @@
             <div class="summary-row"><span data-i18n="transactions_kpi_total_income">Total income</span><strong class="summary-income" id="exportSummaryIncome">$0.00</strong></div>
             <div class="summary-row"><span data-i18n="transactions_kpi_total_expenses">Total expenses</span><strong class="summary-expense" id="exportSummaryExpenses">$0.00</strong></div>
             <div class="summary-row summary-net"><span data-i18n="transactions_kpi_net_profit">Net profit</span><strong id="exportSummaryNet">$0.00</strong></div>
+            <!-- N-05: Tax form context info callout -->
+            <div class="export-tax-callout" id="exportTaxContext" hidden>
+              <span class="export-tax-callout-icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke-width="1.2"/><line x1="8" y1="7" x2="8" y2="11" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="5" r="0.75" fill="currentColor" stroke="none"/></svg>
+              </span>
+              <span id="exportTaxContextText"></span>
+            </div>
+            <!-- C-09: Export buttons moved here, below Net Profit -->
+            <div class="export-summary-actions">
+              <button type="submit" form="exportForm" class="export-btn export-btn-secondary" id="exportCsvBtn" data-i18n="exports_button_csv">Export CSV</button>
+              <button type="button" class="export-btn export-btn-primary" id="exportPdfBtn">
+                <span class="button-icon" aria-hidden="true">
+                  <svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg>
+                </span>
+                <span data-i18n="exports_button_pdf">Export PDF</span>
+                <span class="button-badge" data-i18n="exports_button_badge">Recommended for CPA</span>
+              </button>
+            </div>
           </div>
 
           <p id="exportPdfNote" class="small-note" data-i18n="exports_pdf_note_default">PDF export is included in InEx Ledger Pro. All-business export downloads one file per business.</p>

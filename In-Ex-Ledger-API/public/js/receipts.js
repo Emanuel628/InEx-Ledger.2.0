@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof enforceTrial === "function") enforceTrial();
 
   wireReceiptUpload();
+  wireReceiptDropZone();
   wireReceiptRefresh();
   wireReceiptLinkModal();
   await loadTransactionMap();
@@ -23,30 +24,70 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateReceiptsDot();
 });
 
-function wireReceiptUpload() {
-  const uploadButton = document.getElementById("receiptUploadButton");
-  const uploadInput = document.getElementById("receiptUploadInput");
-
-  uploadButton?.addEventListener("click", () => {
-    if (!ensureV1Tier()) {
-      return;
-    }
-    uploadInput?.click();
-  });
-
-  uploadInput?.addEventListener("change", async () => {
-    const file = uploadInput.files?.[0];
-    if (!file) {
-      return;
-    }
-
+function wireUploadInput(inputEl) {
+  inputEl?.addEventListener("change", async () => {
+    const file = inputEl.files?.[0];
+    if (!file) return;
     try {
       await uploadReceipt(file);
       showReceiptsToast(tx("receipts_uploaded_success"));
-      uploadInput.value = "";
+      inputEl.value = "";
       await loadReceipts();
     } catch (error) {
       console.error("Receipt upload failed:", error);
+      showReceiptsToast(error.message || tx("receipts_error_upload"));
+    }
+  });
+}
+
+function wireReceiptUpload() {
+  const uploadButton = document.getElementById("receiptUploadButton");
+  const uploadInput = document.getElementById("receiptUploadInput");
+  const uploadButtonBottom = document.getElementById("receiptUploadButtonBottom");
+  const uploadInputBottom = document.getElementById("receiptUploadInputBottom");
+
+  uploadButton?.addEventListener("click", () => {
+    if (!ensureV1Tier()) return;
+    uploadInput?.click();
+  });
+  uploadButtonBottom?.addEventListener("click", () => {
+    if (!ensureV1Tier()) return;
+    uploadInputBottom?.click();
+  });
+
+  wireUploadInput(uploadInput);
+  wireUploadInput(uploadInputBottom);
+}
+
+function wireReceiptDropZone() {
+  const zone = document.getElementById("receiptDropZone");
+  const browseBtn = document.getElementById("receiptDropBrowse");
+  const uploadInput = document.getElementById("receiptUploadInput");
+  if (!zone) return;
+
+  browseBtn?.addEventListener("click", () => {
+    if (!ensureV1Tier()) return;
+    uploadInput?.click();
+  });
+
+  zone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    zone.classList.add("is-dragover");
+  });
+  zone.addEventListener("dragleave", (e) => {
+    if (!zone.contains(e.relatedTarget)) zone.classList.remove("is-dragover");
+  });
+  zone.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    zone.classList.remove("is-dragover");
+    if (!ensureV1Tier()) return;
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    try {
+      await uploadReceipt(file);
+      showReceiptsToast(tx("receipts_uploaded_success"));
+      await loadReceipts();
+    } catch (error) {
       showReceiptsToast(error.message || tx("receipts_error_upload"));
     }
   });

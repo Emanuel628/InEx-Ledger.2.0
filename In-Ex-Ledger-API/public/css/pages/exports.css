@@ -826,3 +826,13 @@
   overflow-wrap: break-word;
   word-break: normal;
 }
+
+/* N-05: Tax form info callout */
+.export-tax-callout { display:flex; align-items:flex-start; gap:7px; margin-top:10px; padding:8px 10px; background:var(--accent-light,#eff6ff); border:0.5px solid var(--accent2); border-radius:7px; font-size:12px; color:var(--accent2); line-height:1.5; }
+.export-tax-callout[hidden] { display:none; }
+.export-tax-callout-icon { flex-shrink:0; width:14px; height:14px; margin-top:1px; }
+.export-tax-callout-icon svg { width:100%; height:100%; stroke:currentColor; }
+
+/* C-09: Export action buttons inside summary panel */
+.export-summary-actions { display:flex; flex-direction:column; gap:8px; margin-top:14px; padding-top:14px; border-top:0.5px solid var(--border); }
+.export-summary-actions .export-btn { width:100%; justify-content:center; }

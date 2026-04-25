@@ -472,3 +472,12 @@ textarea.form-control {
     padding: 4px 0;
   }
 }
+
+/* N-06: Sticky history filter bar */
+.mileage-card .mileage-card-head--stack:has(#mileageSearch) {
+  position: sticky;
+  top: 56px;
+  z-index: 5;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--border);
+}

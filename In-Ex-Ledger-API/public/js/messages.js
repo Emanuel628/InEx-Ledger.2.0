@@ -8,7 +8,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 let _toastTimer = null;
 let _pollTimer = null;
-let _currentTab = "inbox"; // inbox | sent | archived
+let _currentTab = "messages"; // messages | support | notifications
 let _currentMsgId = null;
 let _currentMsgReceiverId = null;
 let _contacts = [];
@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireComposeModal();
   wireDetailPanel();
 
-  await Promise.all([loadMessages("inbox"), loadContacts()]);
+  await Promise.all([loadMessages("messages"), loadContacts()]);
 
   // Kick off polling
   schedulePoll();
@@ -73,7 +73,7 @@ function switchTab(tab) {
     a.classList.toggle("is-active", a.getAttribute("data-tab") === tab);
   });
 
-  const titleMap = { inbox: "Inbox", sent: "Sent", archived: "Archived" };
+  const titleMap = { messages: "Messages (CPA)", support: "Support", notifications: "Notifications" };
   const titleEl = document.getElementById("messagesTitle");
   if (titleEl) titleEl.textContent = titleMap[tab] || "Messages";
 
@@ -114,26 +114,30 @@ function wireSidebar() {
 // ─────────────────────────────────────────────
 // Load messages
 // ─────────────────────────────────────────────
+const MESSAGE_TYPE_FILTERS = {
+  messages: (m) => !m.message_type || ["general", "cpa", "general_cpa"].includes(m.message_type),
+  support: (m) => ["it_support", "support_request"].includes(m.message_type),
+  notifications: (m) => m.message_type === "notification"
+};
+
 async function loadMessages(tab) {
   const list = document.getElementById("messagesList");
   if (!list) return;
   list.innerHTML = '<div class="messages-loading">Loading messages…</div>';
 
-  try {
-    let url;
-    if (tab === "sent") {
-      url = `/api/messages/sent?limit=${PAGE_SIZE}`;
-    } else if (tab === "archived") {
-      url = `/api/messages/archived?limit=${PAGE_SIZE}`;
-    } else {
-      url = `/api/messages/inbox?limit=${PAGE_SIZE}`;
-    }
+  if (tab === "notifications") {
+    list.innerHTML = '<div class="messages-empty">No system notifications yet.</div>';
+    return;
+  }
 
-    const res = await apiFetch(url);
+  try {
+    const res = await apiFetch(`/api/messages/inbox?limit=${PAGE_SIZE}`);
     if (!res || !res.ok) throw new Error("Failed to load messages");
 
     const { messages } = await res.json();
-    renderMessageList(messages, tab);
+    const filter = MESSAGE_TYPE_FILTERS[tab];
+    const filtered = filter ? messages.filter(filter) : messages;
+    renderMessageList(filtered, tab);
     updateUnreadBadge();
   } catch {
     list.innerHTML = '<div class="messages-empty">Unable to load messages. Please refresh.</div>';
@@ -144,7 +148,7 @@ function renderMessageList(messages, tab) {
   const list = document.getElementById("messagesList");
 
   if (!messages || !messages.length) {
-    const emptyText = tab === "sent" ? "No sent messages." : tab === "archived" ? "No archived messages." : "Your inbox is empty.";
+    const emptyText = tab === "support" ? "No support tickets yet." : tab === "notifications" ? "No system notifications yet." : "No messages yet.";
     list.innerHTML = `<div class="messages-empty">${emptyText}</div>`;
     return;
   }

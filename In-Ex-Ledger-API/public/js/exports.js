@@ -730,7 +730,10 @@ function updateExportSummary() {
     summaryTaxForm.textContent = taxContext.label;
   }
   if (taxContextNote) {
-    taxContextNote.textContent = `${tx("exports_tax_context_prefix")}: ${taxContext.exportLabel}`;
+    const textNode = document.getElementById("exportTaxContextText");
+    const label = `${tx("exports_tax_context_prefix")}: ${taxContext.exportLabel}`;
+    if (textNode) textNode.textContent = label;
+    taxContextNote.hidden = !taxContext.exportLabel;
   }
 
   if (!startDate || !endDate || startDate > endDate) {

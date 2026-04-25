@@ -578,8 +578,7 @@ async function initAccountingLockPanel() {
     }
   };
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
+  const doSaveLock = async () => {
     const isClearing = !dateInput.value;
     try {
       const response = await apiFetch("/api/business/accounting-lock", {
@@ -609,7 +608,22 @@ async function initAccountingLockPanel() {
       console.error("Failed to save accounting lock", error);
       showSettingsToast(t("settings_accounting_lock_save_error"));
     }
+  };
+
+  const lockConfirmModal = document.getElementById("accountingLockConfirmModal");
+  const lockConfirmOk = document.getElementById("accountingLockConfirmOk");
+  const lockConfirmCancel = document.getElementById("accountingLockConfirmCancel");
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!dateInput.value) { void doSaveLock(); return; }
+    lockConfirmModal?.classList.remove("hidden");
   });
+  lockConfirmOk?.addEventListener("click", () => {
+    lockConfirmModal?.classList.add("hidden");
+    void doSaveLock();
+  });
+  lockConfirmCancel?.addEventListener("click", () => lockConfirmModal?.classList.add("hidden"));
 
   clearButton.addEventListener("click", async () => {
     try {
@@ -2405,9 +2419,14 @@ function initDangerZone() {
   deleteAccountButton?.addEventListener("click", () => openModal("delete_account"));
   cancelButton?.addEventListener("click", closeModal);
 
+  const getAccountEmail = () => String(window.__LUNA_ME__?.email || "").trim().toLowerCase();
+
   const updateDeleteAccountButtonState = () => {
     if (dangerAction === "delete_account") {
-      confirmButton.disabled = confirmInput?.value !== "DELETE" || !passwordInput?.value;
+      const val = (confirmInput?.value || "").trim();
+      const email = getAccountEmail();
+      const confirmed = val === "DELETE" || (email && val.toLowerCase() === email);
+      confirmButton.disabled = !confirmed || !passwordInput?.value;
       return;
     }
     if (dangerAction === "delete_data") {
