@@ -93,6 +93,12 @@ function loadAuthRouter(options = {}) {
                 : { rows: [], rowCount: 0 };
             }
 
+            if (/SELECT email,\s*email_verified FROM users WHERE email = \$1/i.test(sql)) {
+              return String(params[0] || "").toLowerCase() === state.user.email
+                ? { rows: [{ email: state.user.email, email_verified: state.user.email_verified }], rowCount: 1 }
+                : { rows: [], rowCount: 0 };
+            }
+
             if (/DELETE FROM password_reset_tokens WHERE email = \$1/i.test(sql)) {
               return { rows: [], rowCount: 0 };
             }
@@ -389,6 +395,31 @@ test("forgot-password does not trust Host header when APP_BASE_URL is unset", as
     assert.ok(payload.text.includes("http://localhost:8080/reset-password?token="));
     assert.equal(payload.html.includes("attacker.example"), false);
     assert.equal(payload.text.includes("attacker.example"), false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("send-verification does not leak whether an email exists", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/auth/send-verification")
+      .send({ email: "unknown@example.com" });
+
+    assert.equal(response.status, 200);
+    assert.match(String(response.body?.message || ""), /if the email is registered/i);
+    assert.equal(fixture.state.sentEmails.length, 0);
+    assert.ok(response.body?.verification_state, "verification state token should be returned");
+
+    const decoded = verifyToken(response.body.verification_state);
+    assert.equal(decoded.purpose, "verify_email_status");
+    assert.equal(decoded.email, "unknown@example.com");
   } finally {
     fixture.cleanup();
   }

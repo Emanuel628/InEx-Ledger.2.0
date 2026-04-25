@@ -31,6 +31,7 @@ const { getReceiptStorageStatus, initializeReceiptStorage } = require('./service
 const { logInfo, logWarn, logError } = require('./utils/logger.js');
 
 const app = express();
+app.disable('x-powered-by');
 const publicDir = path.join(process.cwd(), 'public');
 const htmlDir = path.join(publicDir, 'html');
 let globalLimiter = null;
@@ -151,6 +152,9 @@ app.use(helmet({
       imgSrc: ["'self'", 'data:', 'blob:'],
       connectSrc: ["'self'"],
       fontSrc: ["'self'", 'data:'],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameSrc: ["'none'"],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"]
     }

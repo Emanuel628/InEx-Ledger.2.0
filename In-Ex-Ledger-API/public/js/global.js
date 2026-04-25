@@ -344,7 +344,7 @@ function pollGlobalUnreadCount() {
   try {
     token = typeof getToken === "function"
       ? (getToken() || "")
-      : (sessionStorage.getItem("token") || localStorage.getItem("token") || "");
+      : (sessionStorage.getItem("token") || "");
   } catch (_) {}
   if (!token) return Promise.resolve(false);
 

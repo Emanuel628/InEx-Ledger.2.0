@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const express = require("express");
 const { pool } = require("../db.js");
 const { createRouteLimiter } = require("../middleware/rate-limit.middleware.js");
+const { verifyToken } = require("../middleware/auth.middleware.js");
 const { logError } = require("../utils/logger.js");
 
 const router = express.Router();
@@ -9,7 +10,6 @@ const router = express.Router();
 const MAX_USER_AGENT_LENGTH = 512;
 const VALID_DECISIONS = new Set(["accepted", "declined"]);
 
-// Lenient public rate limit: 20 requests / IP per 10 minutes
 const consentLimiter = createRouteLimiter({
   windowMs: 10 * 60 * 1000,
   max: 20,
@@ -17,12 +17,6 @@ const consentLimiter = createRouteLimiter({
   keyStrategy: "ip"
 });
 
-/**
- * POST /api/consent/cookie
- * Persists a cookie-banner decision to the DB for compliance evidence.
- * Public endpoint — no auth required.
- * Body: { decision: "accepted"|"declined", version: string }
- */
 router.post("/cookie", consentLimiter, async (req, res) => {
   const { decision, version } = req.body || {};
 
@@ -34,17 +28,16 @@ router.post("/cookie", consentLimiter, async (req, res) => {
   const ipAddress = (req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "").slice(0, 64);
   const userAgent = String(req.headers["user-agent"] || "").slice(0, MAX_USER_AGENT_LENGTH);
 
-  // Optional: attach to authenticated user if token is present
   let userId = null;
   try {
     const authHeader = req.headers.authorization || "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-    if (token && typeof require("../services/tokenService.js")?.verifyAccessToken === "function") {
-      const payload = require("../services/tokenService.js").verifyAccessToken(token);
-      userId = payload?.userId || payload?.sub || null;
+    if (token) {
+      const payload = verifyToken(token);
+      userId = payload?.id || payload?.userId || payload?.sub || null;
     }
   } catch (_) {
-    // Token optional — ignore errors
+    // Consent is public; invalid auth is ignored.
   }
 
   try {

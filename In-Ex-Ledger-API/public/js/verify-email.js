@@ -7,7 +7,8 @@ let linkNode;
 let resendButton;
 let resendLinkTrigger;
 let continueButton;
-let pendingEmail = "";
+let verificationState = "";
+const VERIFICATION_STATE_KEY = "pendingVerificationState";
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
@@ -18,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
   resendButton = document.getElementById("resendVerificationButton");
   resendLinkTrigger = document.getElementById("resendVerificationLink");
   continueButton = document.getElementById("continueToLoginButton");
-  pendingEmail = localStorage.getItem("pendingVerificationEmail") || "";
+  verificationState = localStorage.getItem(VERIFICATION_STATE_KEY) || "";
 
   wireActions();
 
@@ -26,7 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-  if (pendingEmail) {
+  if (verificationState) {
     updateStatus(tx("verify_email_status_sent"));
     startVerificationPolling();
   } else {
@@ -35,16 +36,17 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 // Polls the backend every 3 seconds to check if the email is verified
 function startVerificationPolling() {
-  if (!pendingEmail) return;
+  if (!verificationState) return;
   let polling = true;
   async function poll() {
     if (!polling) return;
     try {
-      const response = await fetch(`/api/check-email-verified?email=${encodeURIComponent(pendingEmail)}`);
+      const response = await fetch(`/api/check-email-verified?state=${encodeURIComponent(verificationState)}`);
       if (response.ok) {
         const data = await response.json();
         if (data.verified) {
           polling = false;
+          localStorage.removeItem(VERIFICATION_STATE_KEY);
           localStorage.removeItem("pendingVerificationEmail");
           updateStatus(tx("verify_email_status_success"));
           setTimeout(() => {
@@ -107,6 +109,7 @@ function consumeVerifiedSessionFromHash() {
     } else {
       sessionStorage.setItem("token", token);
     }
+    localStorage.removeItem(VERIFICATION_STATE_KEY);
     localStorage.removeItem("pendingVerificationEmail");
   } catch (_) {
     updateStatus(tx("verify_email_status_success"), true);
@@ -120,11 +123,10 @@ function consumeVerifiedSessionFromHash() {
 }
 
 async function resendVerification() {
-  const email =
-    pendingEmail || localStorage.getItem("pendingVerificationEmail") || "";
+  const state = verificationState || localStorage.getItem(VERIFICATION_STATE_KEY) || "";
 
-  if (!email) {
-    updateStatus(tx("verify_email_status_missing_email"), true);
+  if (!state) {
+    updateStatus(tx("verify_email_status_register"), true);
     return;
   }
 
@@ -134,12 +136,12 @@ async function resendVerification() {
       ? await fetchFn("/api/auth/send-verification", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email })
+          body: JSON.stringify({ verificationState: state })
         })
       : await fetch("/api/auth/send-verification", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email })
+          body: JSON.stringify({ verificationState: state })
         });
 
     const payload = response ? await response.json().catch(() => null) : null;
@@ -153,8 +155,10 @@ async function resendVerification() {
       return;
     }
 
-    pendingEmail = email;
-    localStorage.setItem("pendingVerificationEmail", email);
+    if (payload?.verification_state) {
+      verificationState = String(payload.verification_state);
+      localStorage.setItem(VERIFICATION_STATE_KEY, verificationState);
+    }
     renderVerificationLink("");
     updateStatus(payload?.message || tx("verify_email_status_resent"));
   } catch (error) {

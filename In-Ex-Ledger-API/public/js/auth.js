@@ -390,31 +390,9 @@ function ensureLegacyUserPills() {
 function getToken() {
   try {
     const sessionToken = sessionStorage.getItem(TOKEN_KEY) || "";
-    if (sessionToken) {
-      return sessionToken;
-    }
+    return sessionToken;
   } catch (_) {}
-
-  try {
-    const legacyToken = localStorage.getItem(TOKEN_KEY) || "";
-    if (!legacyToken) {
-      return "";
-    }
-    try {
-      sessionStorage.setItem(TOKEN_KEY, legacyToken);
-    } catch (_) {
-      if (localStorage.getItem("debug") === "true") {
-        console.warn("[AUTH] Unable to migrate token to sessionStorage.");
-      }
-      return "";
-    }
-    try {
-      localStorage.removeItem(TOKEN_KEY);
-    } catch (_) {}
-    return legacyToken;
-  } catch (_) {
-    return "";
-  }
+  return "";
 }
 
 function setToken(token) {

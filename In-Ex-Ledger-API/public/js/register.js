@@ -16,6 +16,7 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 const OFFLINE_ERROR_MESSAGE = "login_error_offline";
+const VERIFICATION_STATE_KEY = "pendingVerificationState";
 
 document.addEventListener("DOMContentLoaded", () => {
   form = document.getElementById("registerForm");
@@ -121,7 +122,13 @@ async function handleRegisterSubmit(event) {
 
     persistLanguage();
     await persistConsent();
-    localStorage.setItem("pendingVerificationEmail", email);
+    const verificationState = String(regBody?.verification_state || "").trim();
+    if (verificationState) {
+      localStorage.setItem(VERIFICATION_STATE_KEY, verificationState);
+    } else {
+      localStorage.removeItem(VERIFICATION_STATE_KEY);
+    }
+    localStorage.removeItem("pendingVerificationEmail");
     window.location.href = "/verify-email?email=sent";
   } catch (err) {
     console.error("Register request failed:", err);

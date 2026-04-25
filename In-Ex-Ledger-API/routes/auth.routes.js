@@ -101,6 +101,7 @@ const RECOVERY_EMAIL_TOKEN_TTL_MS = 30 * 60 * 1000;
 const MFA_PENDING_TOKEN_EXPIRY_SECONDS = 5 * 60;
 const MAX_LOGIN_ATTEMPTS = Number(process.env.MAX_LOGIN_ATTEMPTS) || 5;
 const LOGIN_LOCKOUT_MINUTES = Number(process.env.LOGIN_LOCKOUT_MINUTES) || 15;
+const VERIFICATION_STATUS_TOKEN_EXPIRY_SECONDS = Number(process.env.VERIFICATION_STATUS_TOKEN_EXPIRY_SECONDS) || 24 * 60 * 60;
 
 function normalizeEmail(email) {
   const normalized = String(email ?? "").trim().toLowerCase();
@@ -213,6 +214,24 @@ function buildVerificationLink(req, token) {
 
 function buildPasswordResetLink(req, token) {
   return `${getAppBaseUrl(req)}/reset-password?token=${token}`;
+}
+
+function createVerificationStatusToken(email) {
+  return signToken(
+    {
+      purpose: "verify_email_status",
+      email: normalizeEmail(email)
+    },
+    VERIFICATION_STATUS_TOKEN_EXPIRY_SECONDS
+  );
+}
+
+function decodeVerificationStatusToken(token) {
+  const payload = verifyToken(String(token || "").trim());
+  if (payload?.purpose !== "verify_email_status") {
+    throw new Error("Invalid verification status token");
+  }
+  return normalizeEmail(payload.email);
 }
 
 function getAppBaseUrl(req) {
@@ -808,7 +827,11 @@ router.post("/register", authLimiter, async (req, res) => {
     }
     // --- END OF EMAIL LOGIC ---
 
-    return res.status(201).json({ success: true, message: "Account created. Check your email!" });
+    return res.status(201).json({
+      success: true,
+      message: "Account created. Check your email!",
+      verification_state: createVerificationStatusToken(email)
+    });
   } catch (err) {
     if (!committed) {
       try {
@@ -830,23 +853,37 @@ router.post("/register", authLimiter, async (req, res) => {
  * Sends a verification email via the Resend API.
  */
 router.post("/send-verification", authLimiter, async (req, res) => {
-  const email = normalizeEmail(req.body?.email);
-  if (!email) return res.status(400).json({ error: "Email is required" });
+  let email = normalizeEmail(req.body?.email);
+  const verificationState = String(req.body?.verificationState || "").trim();
+
+  if (!email && verificationState) {
+    try {
+      email = decodeVerificationStatusToken(verificationState);
+    } catch (_) {
+      email = "";
+    }
+  }
+
+  if (!email) {
+    return res.status(200).json({ message: "If the email is registered and still pending verification, a verification link was sent." });
+  }
 
   try {
     const result = await pool.query("SELECT email, email_verified FROM users WHERE email = $1", [email]);
     const user = result.rows[0];
 
-    if (!user) return res.status(404).json({ error: "User not found" });
-    if (user.email_verified) return res.status(200).json({ message: "Email already verified" });
+    if (user && !user.email_verified) {
+      const { token } = await createVerificationToken(email);
+      const verificationLink = buildVerificationLink(req, token);
+      const lang = await getPreferredLanguageForEmail(email);
+      const emailContent = buildVerificationEmail(lang, verificationLink);
+      await sendAppEmail({ to: email, ...emailContent });
+    }
 
-    const { token, expiresAt } = await createVerificationToken(email);
-    const verificationLink = buildVerificationLink(req, token);
-    const lang = await getPreferredLanguageForEmail(email);
-    const emailContent = buildVerificationEmail(lang, verificationLink);
-    await sendAppEmail({ to: email, ...emailContent });
-
-    res.status(200).json({ message: "Verification link sent to your email." });
+    res.status(200).json({
+      message: "If the email is registered and still pending verification, a verification link was sent.",
+      verification_state: createVerificationStatusToken(email)
+    });
   } catch (err) {
     logError("Send verification error:", err);
     res.status(500).json({ error: "Failed to send verification email." });

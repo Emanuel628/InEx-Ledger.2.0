@@ -1,18 +1,42 @@
 // Mounted at /check-email-verified
-// Returns { verified: true/false } for a given email
-const express = require('express');
+// Returns { verified: true/false } for a signed verification-state token.
+const express = require("express");
 const router = express.Router();
-const { pool } = require('../db.js');
+const { pool } = require("../db.js");
+const { verifyToken } = require("../middleware/auth.middleware.js");
 
-router.get('/', async (req, res) => {
-  const email = String(req.query.email || '').trim().toLowerCase();
-  if (!email) return res.status(400).json({ error: 'Email is required' });
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+router.get("/", async (req, res) => {
+  const state = String(req.query.state || "").trim();
+  if (!state) {
+    return res.status(400).json({ error: "Verification state is required" });
+  }
+
+  let email = "";
   try {
-    const result = await pool.query('SELECT email_verified FROM users WHERE email = $1', [email]);
-    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
-    res.json({ verified: !!result.rows[0].email_verified });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to check verification status' });
+    const payload = verifyToken(state);
+    if (payload?.purpose !== "verify_email_status") {
+      return res.status(401).json({ error: "Invalid verification state" });
+    }
+    email = normalizeEmail(payload.email);
+    if (!email) {
+      return res.status(401).json({ error: "Invalid verification state" });
+    }
+  } catch (_) {
+    return res.status(401).json({ error: "Invalid verification state" });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT email_verified FROM users WHERE email = $1 LIMIT 1",
+      [email]
+    );
+    return res.json({ verified: !!result.rows[0]?.email_verified });
+  } catch (_) {
+    return res.status(500).json({ error: "Failed to check verification status" });
   }
 });
 
