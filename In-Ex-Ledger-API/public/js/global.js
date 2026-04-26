@@ -708,7 +708,7 @@ function renderDynamicSidebarFavorite(feature) {
     <div class="dynamic-sidebar-favorite" draggable="true" data-feature-id="${escapeDynamicSidebarAttr(feature.id)}" data-favorite-id="${escapeDynamicSidebarAttr(feature.id)}">
       <button type="button" class="sidebar-link dynamic-sidebar-link" data-sidebar-action="${escapeDynamicSidebarAttr(feature.id)}">
         <span class="sidebar-icon" aria-hidden="true">${feature.icon}</span>
-        <span>+ ${escapeDynamicSidebarHtml(feature.label)}</span>
+        <span class="dynamic-sidebar-label">+ ${escapeDynamicSidebarHtml(feature.label)}</span>
         ${receiptDot}
       </button>
       <button type="button" class="dynamic-sidebar-remove" data-sidebar-remove="${escapeDynamicSidebarAttr(feature.id)}" aria-label="Remove ${escapeDynamicSidebarAttr(feature.label)}">&times;</button>
