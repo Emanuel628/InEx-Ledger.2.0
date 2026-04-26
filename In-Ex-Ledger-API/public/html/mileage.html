@@ -5,7 +5,7 @@
   <title>InEx Ledger - Mileage</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css" />
-  <link rel="stylesheet" href="/css/pages/mileage.css?v=20260423a" />
+  <link rel="stylesheet" href="/css/pages/mileage.css?v=20260425a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -42,6 +42,7 @@
         <a href="receipts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span data-i18n="nav_receipts">Receipts</span><span id="receiptsDot" class="sidebar-dot" hidden></span></a>
         <a href="mileage" class="sidebar-link is-active"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span data-i18n="nav_mileage">Mileage</span></a>
         <a href="exports" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span data-i18n="nav_exports">Exports</span></a>
+        <a href="analytics" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 12l3.5-4 2.5 2 3-4 3 3"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Analytics</span></a>
       </nav>
 
       <!-- Business (V2) sidebar intentionally omitted on V1 pages -->
@@ -80,45 +81,52 @@
       </section>
 
       <section class="mileage-card">
-        <div class="mileage-card-head mileage-card-head--stack">
+        <div class="mileage-card-head mileage-activity-head">
           <div>
             <h2>Add activity</h2>
             <p class="mileage-card-copy">Record a trip or keep a vehicle-cost trail without leaving the page.</p>
           </div>
-          <div class="mileage-mode-toggle" role="tablist" aria-label="Entry mode">
+          <button type="button" class="mileage-collapse-btn" id="mileageActivityToggle" aria-expanded="false" aria-controls="mileageActivityBody">
+            <span class="mileage-collapse-label">Add</span>
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" width="14" height="14"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+
+        <div id="mileageActivityBody" hidden>
+          <div class="mileage-mode-toggle mileage-mode-toggle--body" role="tablist" aria-label="Entry mode">
             <button type="button" class="mileage-mode-button is-active" data-entry-mode="trip">Trip</button>
             <button type="button" class="mileage-mode-button" data-entry-mode="expense">Expense</button>
             <button type="button" class="mileage-mode-button" data-entry-mode="maintenance">Maintenance</button>
           </div>
+
+          <form id="mileageForm" class="mileage-form" data-entry-panel="trip">
+            <div class="mileage-grid">
+              <div class="form-field"><label class="field-label" for="mileageDate">Date</label><input type="date" id="mileageDate" required class="form-control" /></div>
+              <div class="form-field"><label class="field-label" for="mileagePurpose">Purpose</label><input type="text" id="mileagePurpose" required class="form-control" placeholder="Client meeting, supply run, pickup" /></div>
+              <div class="form-field"><label class="field-label" for="mileageDestination">Destination</label><input type="text" id="mileageDestination" class="form-control" placeholder="Austin, Office Depot, Job site" /></div>
+              <div class="form-field"><label class="field-label" for="mileageDistance" id="distanceLabel">Miles</label><input type="number" id="mileageDistance" min="0.1" step="0.1" required class="form-control" /></div>
+            </div>
+            <div class="mileage-form-actions">
+              <button type="submit" class="mileage-save-btn">Add trip</button>
+              <p id="mileageFormMessage" class="mileage-message"></p>
+            </div>
+          </form>
+
+          <form id="vehicleCostForm" class="mileage-form" data-entry-panel="cost" hidden>
+            <input type="hidden" id="vehicleCostType" value="expense" />
+            <div class="mileage-grid">
+              <div class="form-field"><label class="field-label" for="vehicleCostDate">Date</label><input type="date" id="vehicleCostDate" required class="form-control" /></div>
+              <div class="form-field"><label class="field-label" for="vehicleCostTitle" id="vehicleCostTitleLabel">Expense title</label><input type="text" id="vehicleCostTitle" required class="form-control" placeholder="Fuel, parking, oil change" /></div>
+              <div class="form-field"><label class="field-label" for="vehicleCostVendor">Vendor</label><input type="text" id="vehicleCostVendor" class="form-control" placeholder="Shell, Pep Boys, City Garage" /></div>
+              <div class="form-field"><label class="field-label" for="vehicleCostAmount">Amount</label><input type="number" id="vehicleCostAmount" min="0.01" step="0.01" required class="form-control" /></div>
+              <div class="form-field form-field--wide"><label class="field-label" for="vehicleCostNotes">Notes</label><textarea id="vehicleCostNotes" class="form-control" rows="3" placeholder="Optional service or purchase note"></textarea></div>
+            </div>
+            <div class="mileage-form-actions">
+              <button type="submit" class="mileage-save-btn" id="vehicleCostSubmit">Add expense</button>
+              <p id="vehicleCostFormMessage" class="mileage-message"></p>
+            </div>
+          </form>
         </div>
-
-        <form id="mileageForm" class="mileage-form" data-entry-panel="trip">
-          <div class="mileage-grid">
-            <div class="form-field"><label class="field-label" for="mileageDate">Date</label><input type="date" id="mileageDate" required class="form-control" /></div>
-            <div class="form-field"><label class="field-label" for="mileagePurpose">Purpose</label><input type="text" id="mileagePurpose" required class="form-control" placeholder="Client meeting, supply run, pickup" /></div>
-            <div class="form-field"><label class="field-label" for="mileageDestination">Destination</label><input type="text" id="mileageDestination" class="form-control" placeholder="Austin, Office Depot, Job site" /></div>
-            <div class="form-field"><label class="field-label" for="mileageDistance" id="distanceLabel">Miles</label><input type="number" id="mileageDistance" min="0.1" step="0.1" required class="form-control" /></div>
-          </div>
-          <div class="mileage-form-actions">
-            <button type="submit" class="mileage-save-btn">Add trip</button>
-            <p id="mileageFormMessage" class="mileage-message"></p>
-          </div>
-        </form>
-
-        <form id="vehicleCostForm" class="mileage-form" data-entry-panel="cost" hidden>
-          <input type="hidden" id="vehicleCostType" value="expense" />
-          <div class="mileage-grid">
-            <div class="form-field"><label class="field-label" for="vehicleCostDate">Date</label><input type="date" id="vehicleCostDate" required class="form-control" /></div>
-            <div class="form-field"><label class="field-label" for="vehicleCostTitle" id="vehicleCostTitleLabel">Expense title</label><input type="text" id="vehicleCostTitle" required class="form-control" placeholder="Fuel, parking, oil change" /></div>
-            <div class="form-field"><label class="field-label" for="vehicleCostVendor">Vendor</label><input type="text" id="vehicleCostVendor" class="form-control" placeholder="Shell, Pep Boys, City Garage" /></div>
-            <div class="form-field"><label class="field-label" for="vehicleCostAmount">Amount</label><input type="number" id="vehicleCostAmount" min="0.01" step="0.01" required class="form-control" /></div>
-            <div class="form-field form-field--wide"><label class="field-label" for="vehicleCostNotes">Notes</label><textarea id="vehicleCostNotes" class="form-control" rows="3" placeholder="Optional service or purchase note"></textarea></div>
-          </div>
-          <div class="mileage-form-actions">
-            <button type="submit" class="mileage-save-btn" id="vehicleCostSubmit">Add expense</button>
-            <p id="vehicleCostFormMessage" class="mileage-message"></p>
-          </div>
-        </form>
       </section>
 
       <section class="mileage-card">
@@ -130,6 +138,11 @@
           <div class="mileage-history-toolbar">
             <div class="mileage-search">
               <input type="search" id="mileageSearch" placeholder="Search purpose, vendor, destination, or notes" aria-label="Search mileage history" />
+            </div>
+            <div class="mileage-date-range">
+              <input type="date" id="mileageDateFrom" class="mileage-date-filter" aria-label="From date" />
+              <span class="mileage-date-sep" aria-hidden="true">–</span>
+              <input type="date" id="mileageDateTo" class="mileage-date-filter" aria-label="To date" />
             </div>
             <select id="mileageHistoryFilter" class="mileage-filter-select" aria-label="Filter history type">
               <option value="all">All activity</option>
@@ -154,18 +167,56 @@
           </table>
         </div>
         <p id="mileageEmpty" class="mileage-empty">No activity matches the current filters.</p>
+        <div class="mileage-pagination" id="mileagePagination" hidden>
+          <button type="button" class="mileage-page-btn" id="mileagePagePrev" aria-label="Previous page">&#8249;</button>
+          <span class="mileage-page-info" id="mileagePageInfo">Page 1 of 1</span>
+          <button type="button" class="mileage-page-btn" id="mileagePageNext" aria-label="Next page">&#8250;</button>
+        </div>
       </section>
     </div>
   </main>
 
+  <div id="mileageEditModal" class="mileage-modal-wrap hidden" role="dialog" aria-modal="true" aria-labelledby="mileageEditTitle">
+    <div class="mileage-modal-backdrop" id="mileageEditBackdrop"></div>
+    <div class="mileage-modal-panel">
+      <h3 id="mileageEditTitle">Edit entry</h3>
+      <form id="mileageEditForm" class="mileage-edit-form">
+        <input type="hidden" id="mileageEditId" />
+        <input type="hidden" id="mileageEditKind" />
+        <div id="mileageEditTripFields">
+          <div class="mileage-grid">
+            <div class="form-field"><label class="field-label" for="mileageEditDate">Date</label><input type="date" id="mileageEditDate" class="form-control" /></div>
+            <div class="form-field"><label class="field-label" for="mileageEditPurpose">Purpose</label><input type="text" id="mileageEditPurpose" class="form-control" /></div>
+            <div class="form-field"><label class="field-label" for="mileageEditDestination">Destination</label><input type="text" id="mileageEditDestination" class="form-control" /></div>
+            <div class="form-field"><label class="field-label" for="mileageEditDistance" id="mileageEditDistanceLabel">Miles</label><input type="number" id="mileageEditDistance" min="0.1" step="0.1" class="form-control" /></div>
+          </div>
+        </div>
+        <div id="mileageEditCostFields" hidden>
+          <div class="mileage-grid">
+            <div class="form-field"><label class="field-label" for="mileageEditCostDate">Date</label><input type="date" id="mileageEditCostDate" class="form-control" /></div>
+            <div class="form-field"><label class="field-label" for="mileageEditCostTitle" id="mileageEditTitleLabel">Title</label><input type="text" id="mileageEditCostTitle" class="form-control" /></div>
+            <div class="form-field"><label class="field-label" for="mileageEditCostVendor">Vendor</label><input type="text" id="mileageEditCostVendor" class="form-control" /></div>
+            <div class="form-field"><label class="field-label" for="mileageEditCostAmount">Amount</label><input type="number" id="mileageEditCostAmount" min="0.01" step="0.01" class="form-control" /></div>
+            <div class="form-field form-field--wide"><label class="field-label" for="mileageEditCostNotes">Notes</label><textarea id="mileageEditCostNotes" class="form-control" rows="2"></textarea></div>
+          </div>
+        </div>
+        <div class="mileage-modal-actions">
+          <button type="button" class="mileage-modal-cancel-btn" id="mileageEditCancel">Cancel</button>
+          <button type="submit" class="mileage-modal-save-btn">Save changes</button>
+        </div>
+        <p class="mileage-message" id="mileageEditMessage"></p>
+      </form>
+    </div>
+  </div>
+
   <div id="mileageToast" class="mileage-toast hidden" role="status" aria-live="polite"><span class="toast-check" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><polyline points="2 8 6 12 14 4"></polyline></svg></span><span id="mileageToastMessage" data-i18n="mileage_added">Mileage added</span></div>
 
   <script src="../js/escape-html.js?v=20260410a"></script>
-<script src="../js/global.js?v=20260423d"></script>
+<script src="../js/global.js?v=20260425a"></script>
   <script src="../js/i18n.js?v=20260405c"></script>
   <script src="../js/auth.js?v=20260405c"></script>
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
-  <script src="../js/mileage.js?v=20260423a"></script>
+  <script src="../js/mileage.js?v=20260425a"></script>
 </body>
 </html>

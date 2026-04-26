@@ -481,3 +481,221 @@ textarea.form-control {
   background: var(--surface);
   border-bottom: 0.5px solid var(--border);
 }
+
+/* Collapsible Add Activity */
+.mileage-activity-head {
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+}
+
+.mileage-collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  color: var(--ink2, #374151);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mileage-collapse-btn:hover {
+  background: var(--surface2, #f3f4f6);
+}
+
+.mileage-collapse-btn svg {
+  transition: transform 0.18s ease;
+}
+
+.mileage-collapse-btn[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+#mileageActivityBody:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.mileage-mode-toggle--body {
+  flex-wrap: wrap;
+}
+
+/* Date range filter */
+.mileage-date-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mileage-date-filter {
+  height: 44px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  color: var(--ink, #111827);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.mileage-date-filter:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.18);
+  border-color: var(--accent2, #2563eb);
+}
+
+.mileage-date-sep {
+  color: var(--ink3, #6b7280);
+  font-size: 14px;
+}
+
+/* Pagination */
+.mileage-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border, #e5e7eb);
+  margin-top: 14px;
+}
+
+.mileage-page-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  color: var(--ink2, #374151);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mileage-page-btn:hover:not(:disabled) {
+  background: var(--surface2, #f3f4f6);
+}
+
+.mileage-page-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.mileage-page-info {
+  font-size: 13px;
+  color: var(--ink2, #374151);
+  min-width: 90px;
+  text-align: center;
+}
+
+/* Edit button */
+.mileage-actions-cell {
+  white-space: nowrap;
+}
+
+.mileage-edit-btn {
+  border: 1px solid var(--border, #d1d5db);
+  background: var(--surface, #fff);
+  color: var(--ink2, #374151);
+  padding: 7px 11px;
+  cursor: pointer;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  margin-right: 6px;
+}
+
+.mileage-edit-btn:hover {
+  background: var(--surface2, #f3f4f6);
+  border-color: var(--accent2, #2563eb);
+  color: var(--accent2, #2563eb);
+}
+
+/* Edit modal */
+.mileage-modal-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mileage-modal-wrap.hidden {
+  display: none;
+}
+
+.mileage-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.mileage-modal-panel {
+  position: relative;
+  z-index: 1;
+  background: var(--surface, #fff);
+  border-radius: 18px;
+  padding: 28px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+}
+
+.mileage-modal-panel h3 {
+  margin: 0 0 20px;
+  font-size: 18px;
+}
+
+.mileage-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mileage-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.mileage-modal-cancel-btn {
+  padding: 10px 16px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  color: var(--ink2, #374151);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.mileage-modal-save-btn {
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent2, #2563eb);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mileage-modal-save-btn:hover {
+  opacity: 0.9;
+}

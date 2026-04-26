@@ -297,25 +297,23 @@ function renderCategoryGroup(containerId, type, emptyText) {
 
   const categories = categoryRecords.filter((item) => item.type === type);
   if (!categories.length) {
-    const addLabel = type === "income" ? tx("categories_add_income") : tx("categories_add_expense");
-    container.innerHTML = `<div class="category-empty"><p>${escapeHtml(emptyText)}</p><button type="button" class="empty-add-btn" data-empty-add="${type}">${escapeHtml(addLabel)}</button></div>`;
-    container.querySelector("[data-empty-add]")?.addEventListener("click", () => {
-      document.getElementById("category-type").value = type;
-      populateTaxLabelOptions(type);
-      document.getElementById("showCategoryModal")?.click();
-    });
+    container.innerHTML = `<div class="category-empty"><p>${escapeHtml(emptyText)}</p></div>`;
     return;
   }
 
-  container.innerHTML = categories.map((category) => `
+  container.innerHTML = categories.map((category) => {
+    const taxLine = category.taxLabel ? formatTaxLabel(category.taxLabel) : "";
+    const taxBadge = taxLine ? `<span class="category-tax-pill">${escapeHtml(taxLine)}</span>` : "";
+    return `
     <div class="category-item">
-      <div>
+      <div class="category-item-pills">
         <span class="category-pill pill-${escapeHtml(category.color || defaultColorForType(type))}">${escapeHtml(category.name)}</span>
-        ${category.taxLabel ? `<div class="field-hint">${escapeHtml(formatTaxLabel(category.taxLabel))}</div>` : ""}
+        ${taxBadge}
       </div>
       <button type="button" class="category-delete" data-category-delete="${escapeHtml(category.id)}" aria-label="${escapeHtml(tx("common_delete") + " " + (category.name || tx("categories_fallback_name")))}">${escapeHtml(tx("common_delete"))}</button>
     </div>
-  `).join("");
+  `;
+  }).join("");
 
   container.querySelectorAll("[data-category-delete]").forEach((button) => {
     button.addEventListener("click", async () => {

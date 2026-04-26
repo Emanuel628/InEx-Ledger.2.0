@@ -52,6 +52,7 @@
         <a href="receipts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span data-i18n="nav_receipts">Receipts</span><span id="receiptsDot" class="sidebar-dot" hidden></span></a>
         <a href="mileage" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span data-i18n="nav_mileage">Mileage</span></a>
         <a href="exports" class="sidebar-link is-active"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span data-i18n="nav_exports">Exports</span></a>
+        <a href="analytics" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 12l3.5-4 2.5 2 3-4 3 3"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Analytics</span></a>
       </nav>
 
       <!-- Business (V2) sidebar removed for V1/Pro isolation -->
@@ -62,6 +63,23 @@
         <div>
           <h1 class="page-title" data-i18n="exports_page_title">Export records</h1>
           <p class="page-subtitle" data-i18n="exports_page_subtitle">Generate clean reports for tax filing or CPA handoff</p>
+        </div>
+        <div class="exports-info-wrap">
+          <button type="button" class="exports-info-btn" id="exportsInfoBtn" aria-label="What's included in an export?" aria-expanded="false">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg>
+            <span>What's included?</span>
+          </button>
+          <div class="exports-info-tooltip" id="exportsInfoTooltip" hidden role="tooltip">
+            <strong>Each export includes:</strong>
+            <ul>
+              <li>All transactions in the selected date range and scope</li>
+              <li>Category, account, and tax-treatment columns</li>
+              <li>Edge-case fields: currency, personal-use %, indirect tax</li>
+              <li>Mileage summary (PDF only)</li>
+              <li>Business profile and tax form context (PDF only)</li>
+            </ul>
+            <p>CSV gives raw rows for spreadsheet review. PDF gives a formatted summary for a CPA handoff. Use both when you want the cleanest result.</p>
+          </div>
         </div>
       </section>
 
@@ -241,5 +259,20 @@
   <script src="../js/pdf_labels.js?v=20260405c"></script>
   <script src="../js/pdf_export.js?v=20260415a"></script>
   <script src="../js/exports.js?v=20260405c"></script>
+  <script>
+    document.getElementById('exportsInfoBtn')?.addEventListener('click', function() {
+      const tooltip = document.getElementById('exportsInfoTooltip');
+      const expanded = this.getAttribute('aria-expanded') === 'true';
+      this.setAttribute('aria-expanded', String(!expanded));
+      tooltip.hidden = expanded;
+    });
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#exportsInfoBtn') && !e.target.closest('#exportsInfoTooltip')) {
+        const tooltip = document.getElementById('exportsInfoTooltip');
+        const btn = document.getElementById('exportsInfoBtn');
+        if (tooltip && !tooltip.hidden) { tooltip.hidden = true; btn?.setAttribute('aria-expanded', 'false'); }
+      }
+    });
+  </script>
 </body>
 </html>

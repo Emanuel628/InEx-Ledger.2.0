@@ -1,6 +1,7 @@
 const METRIC_STORAGE_KEY = "lb_unit_metric";
 const MILES_TO_KM = 1.609344;
 const MILEAGE_TOAST_MS = 3000;
+const MILEAGE_PAGE_SIZE = 25;
 
 let mileageToastTimer = null;
 let mileageRecords = [];
@@ -8,6 +9,7 @@ let vehicleCosts = [];
 let unattachedReceiptsCount = 0;
 let mileageServerAvailable = true;
 let activeEntryMode = "trip";
+let mileageCurrentPage = 1;
 
 function tx(key, fallback = "") {
   return typeof window.t === "function" ? window.t(key) : fallback || key;
@@ -18,10 +20,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof enforceTrial === "function") enforceTrial();
 
   initializeMileageDates();
+  wireActivityToggle();
   wireEntryModeToggle();
   wireMileageForm();
   wireVehicleCostForm();
   wireHistoryFilters();
+  wireMileageEditModal();
 
   await loadMileageDashboard();
   refreshMileageLabels();
@@ -167,13 +171,26 @@ function wireVehicleCostForm() {
   });
 }
 
+function wireActivityToggle() {
+  const toggle = document.getElementById("mileageActivityToggle");
+  const body = document.getElementById("mileageActivityBody");
+  if (!toggle || !body) return;
+
+  toggle.addEventListener("click", () => {
+    const expanded = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!expanded));
+    body.hidden = expanded;
+    const label = toggle.querySelector(".mileage-collapse-label");
+    if (label) label.textContent = expanded ? "Add" : "Hide";
+  });
+}
+
 function wireHistoryFilters() {
-  document.getElementById("mileageSearch")?.addEventListener("input", () => {
-    renderMileageHistory();
-  });
-  document.getElementById("mileageHistoryFilter")?.addEventListener("change", () => {
-    renderMileageHistory();
-  });
+  const resetPage = () => { mileageCurrentPage = 1; renderMileageHistory(); };
+  document.getElementById("mileageSearch")?.addEventListener("input", resetPage);
+  document.getElementById("mileageHistoryFilter")?.addEventListener("change", resetPage);
+  document.getElementById("mileageDateFrom")?.addEventListener("change", resetPage);
+  document.getElementById("mileageDateTo")?.addEventListener("change", resetPage);
 }
 
 function refreshMileageLabels() {
@@ -303,14 +320,14 @@ function buildHistoryEntries() {
 function getFilteredHistoryEntries() {
   const historyFilter = document.getElementById("mileageHistoryFilter")?.value || "all";
   const searchTerm = (document.getElementById("mileageSearch")?.value || "").trim().toLowerCase();
+  const dateFrom = document.getElementById("mileageDateFrom")?.value || "";
+  const dateTo = document.getElementById("mileageDateTo")?.value || "";
 
   return buildHistoryEntries().filter((entry) => {
-    if (historyFilter !== "all" && entry.kind !== historyFilter) {
-      return false;
-    }
-    if (searchTerm && !entry.search.includes(searchTerm)) {
-      return false;
-    }
+    if (historyFilter !== "all" && entry.kind !== historyFilter) return false;
+    if (searchTerm && !entry.search.includes(searchTerm)) return false;
+    if (dateFrom && entry.date < dateFrom) return false;
+    if (dateTo && entry.date > dateTo) return false;
     return true;
   });
 }
@@ -318,20 +335,24 @@ function getFilteredHistoryEntries() {
 function renderMileageHistory() {
   const body = document.getElementById("mileageTableBody");
   const empty = document.getElementById("mileageEmpty");
-  if (!body || !empty) {
-    return;
-  }
+  if (!body || !empty) return;
 
-  const entries = getFilteredHistoryEntries();
-  renderMileageSummary(entries);
+  const allEntries = getFilteredHistoryEntries();
+  renderMileageSummary(allEntries);
 
-  if (!entries.length) {
+  if (!allEntries.length) {
     body.innerHTML = "";
     empty.hidden = false;
+    renderMileagePagination(0);
     return;
   }
 
   empty.hidden = true;
+  const totalPages = Math.ceil(allEntries.length / MILEAGE_PAGE_SIZE);
+  if (mileageCurrentPage > totalPages) mileageCurrentPage = totalPages;
+  const start = (mileageCurrentPage - 1) * MILEAGE_PAGE_SIZE;
+  const entries = allEntries.slice(start, start + MILEAGE_PAGE_SIZE);
+
   body.innerHTML = entries.map((entry) => `
     <tr>
       <td>${escapeHtml(entry.date)}</td>
@@ -341,14 +362,13 @@ function renderMileageHistory() {
         <div class="mileage-history-subtitle">${escapeHtml(entry.subtitle)}</div>
       </td>
       <td>${escapeHtml(entry.metricValue)}</td>
-      <td>
+      <td class="mileage-actions-cell">
+        <button type="button" class="mileage-edit-btn" data-edit-id="${escapeHtml(String(entry.id))}" data-edit-kind="${escapeHtml(entry.kind)}">Edit</button>
         <button
           type="button"
           class="mileage-delete"
-          ${entry.kind === "trip" ? `data-mileage-delete="${escapeHtml(entry.id)}"` : `data-vehicle-cost-delete="${escapeHtml(entry.id)}"`}
-        >
-          Delete
-        </button>
+          ${entry.kind === "trip" ? `data-mileage-delete="${escapeHtml(String(entry.id))}"` : `data-vehicle-cost-delete="${escapeHtml(String(entry.id))}"`}
+        >Delete</button>
       </td>
     </tr>
   `).join("");
@@ -356,10 +376,152 @@ function renderMileageHistory() {
   body.querySelectorAll("[data-mileage-delete]").forEach((button) => {
     button.addEventListener("click", async () => deleteMileage(button.getAttribute("data-mileage-delete") || ""));
   });
-
   body.querySelectorAll("[data-vehicle-cost-delete]").forEach((button) => {
     button.addEventListener("click", async () => deleteVehicleCost(button.getAttribute("data-vehicle-cost-delete") || ""));
   });
+  body.querySelectorAll(".mileage-edit-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.getAttribute("data-edit-id") || "";
+      const kind = button.getAttribute("data-edit-kind") || "";
+      const entry = kind === "trip"
+        ? mileageRecords.find((r) => String(r.id) === id)
+        : vehicleCosts.find((c) => String(c.id) === id);
+      if (entry) openMileageEditModal(entry, kind);
+    });
+  });
+
+  renderMileagePagination(allEntries.length);
+}
+
+function renderMileagePagination(total) {
+  const pagination = document.getElementById("mileagePagination");
+  const info = document.getElementById("mileagePageInfo");
+  const prev = document.getElementById("mileagePagePrev");
+  const next = document.getElementById("mileagePageNext");
+  if (!pagination || !info || !prev || !next) return;
+
+  const totalPages = Math.ceil(total / MILEAGE_PAGE_SIZE);
+  if (totalPages <= 1) {
+    pagination.hidden = true;
+    return;
+  }
+
+  pagination.hidden = false;
+  info.textContent = `Page ${mileageCurrentPage} of ${totalPages}`;
+  prev.disabled = mileageCurrentPage <= 1;
+  next.disabled = mileageCurrentPage >= totalPages;
+}
+
+function wireMileageEditModal() {
+  document.getElementById("mileageEditBackdrop")?.addEventListener("click", closeMileageEditModal);
+  document.getElementById("mileageEditCancel")?.addEventListener("click", closeMileageEditModal);
+  document.addEventListener("keydown", (e) => {
+    const modal = document.getElementById("mileageEditModal");
+    if (e.key === "Escape" && modal && !modal.classList.contains("hidden")) closeMileageEditModal();
+  });
+  document.getElementById("mileageEditForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await saveMileageEdit();
+  });
+  document.getElementById("mileagePagePrev")?.addEventListener("click", () => {
+    if (mileageCurrentPage > 1) { mileageCurrentPage--; renderMileageHistory(); }
+  });
+  document.getElementById("mileagePageNext")?.addEventListener("click", () => {
+    const totalPages = Math.ceil(getFilteredHistoryEntries().length / MILEAGE_PAGE_SIZE);
+    if (mileageCurrentPage < totalPages) { mileageCurrentPage++; renderMileageHistory(); }
+  });
+}
+
+function openMileageEditModal(entry, kind) {
+  const modal = document.getElementById("mileageEditModal");
+  const tripFields = document.getElementById("mileageEditTripFields");
+  const costFields = document.getElementById("mileageEditCostFields");
+  if (!modal || !tripFields || !costFields) return;
+
+  document.getElementById("mileageEditId").value = String(entry.id || "");
+  document.getElementById("mileageEditKind").value = kind;
+  document.getElementById("mileageEditMessage").textContent = "";
+
+  if (kind === "trip") {
+    tripFields.hidden = false;
+    costFields.hidden = true;
+    const useKilometers = shouldUseKilometers();
+    document.getElementById("mileageEditDate").value = entry.date || "";
+    document.getElementById("mileageEditPurpose").value = entry.purpose || "";
+    document.getElementById("mileageEditDestination").value = entry.destination || "";
+    document.getElementById("mileageEditDistance").value = convertMileageDistance(entry, useKilometers).toFixed(1);
+    const distLabel = document.getElementById("mileageEditDistanceLabel");
+    if (distLabel) distLabel.textContent = useKilometers ? "Kilometres" : "Miles";
+  } else {
+    tripFields.hidden = true;
+    costFields.hidden = false;
+    const titleLabel = document.getElementById("mileageEditTitleLabel");
+    if (titleLabel) titleLabel.textContent = kind === "maintenance" ? "Maintenance title" : "Expense title";
+    document.getElementById("mileageEditCostDate").value = entry.date || "";
+    document.getElementById("mileageEditCostTitle").value = entry.title || "";
+    document.getElementById("mileageEditCostVendor").value = entry.vendor || "";
+    document.getElementById("mileageEditCostAmount").value = entry.amount != null ? String(entry.amount) : "";
+    document.getElementById("mileageEditCostNotes").value = entry.notes || "";
+  }
+
+  modal.classList.remove("hidden");
+  (modal.querySelector("input[type='date'], input[type='text']"))?.focus();
+}
+
+function closeMileageEditModal() {
+  document.getElementById("mileageEditModal")?.classList.add("hidden");
+}
+
+async function saveMileageEdit() {
+  const id = document.getElementById("mileageEditId")?.value || "";
+  const kind = document.getElementById("mileageEditKind")?.value || "";
+  const message = document.getElementById("mileageEditMessage");
+  if (message) message.textContent = "";
+
+  let response;
+  if (kind === "trip") {
+    const date = document.getElementById("mileageEditDate")?.value || "";
+    const purpose = (document.getElementById("mileageEditPurpose")?.value || "").trim();
+    const destination = (document.getElementById("mileageEditDestination")?.value || "").trim();
+    const distInput = parseFloat(document.getElementById("mileageEditDistance")?.value || "");
+    if (!date || !purpose || !Number.isFinite(distInput) || distInput <= 0) {
+      if (message) message.textContent = "Complete the date, purpose, and distance.";
+      return;
+    }
+    const useKilometers = shouldUseKilometers();
+    const milesValue = useKilometers ? Number((distInput / MILES_TO_KM).toFixed(2)) : Number(distInput.toFixed(1));
+    const kmValue = useKilometers ? Number(distInput.toFixed(1)) : Number((distInput * MILES_TO_KM).toFixed(2));
+    response = await apiFetch(`/api/mileage/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ trip_date: date, purpose, destination, miles: milesValue, km: kmValue })
+    });
+  } else {
+    const entryDate = document.getElementById("mileageEditCostDate")?.value || "";
+    const title = (document.getElementById("mileageEditCostTitle")?.value || "").trim();
+    const vendor = (document.getElementById("mileageEditCostVendor")?.value || "").trim();
+    const amount = parseFloat(document.getElementById("mileageEditCostAmount")?.value || "");
+    const notes = (document.getElementById("mileageEditCostNotes")?.value || "").trim();
+    if (!entryDate || !title || !Number.isFinite(amount) || amount <= 0) {
+      if (message) message.textContent = "Complete the date, title, and amount.";
+      return;
+    }
+    response = await apiFetch(`/api/mileage/costs/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entry_type: kind, entry_date: entryDate, title, vendor, amount, notes })
+    });
+  }
+
+  if (!response || !response.ok) {
+    const errorPayload = response ? await response.json().catch(() => null) : null;
+    if (message) message.textContent = errorPayload?.error || "Unable to save changes.";
+    return;
+  }
+
+  closeMileageEditModal();
+  await loadMileageDashboard();
+  showMileageToast("Entry updated.");
 }
 
 function renderMileageSummary(entries) {

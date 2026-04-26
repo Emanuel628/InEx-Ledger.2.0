@@ -53,6 +53,7 @@
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-preferences" data-i18n="settings_nav_preferences">Preferences</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-privacy-data" data-i18n="settings_nav_privacy_data">Privacy &amp; Data</button>
           <button class="settings-nav-item settings-nav-danger" type="button" data-settings-nav-item data-settings-target="settings-danger-zone" data-i18n="settings_nav_danger_zone">Danger Zone</button>
+          <button class="settings-nav-item settings-nav-help" type="button" data-settings-nav-item data-settings-target="settings-help">Help</button>
         </nav>
       </div>
     </aside>
@@ -586,6 +587,107 @@
             <div class="danger-desc" data-i18n="settings_delete_account_desc">Permanently removes your account and all associated data. This cannot be undone.</div>
           </div>
           <button id="deleteAccountTrigger" type="button" class="danger-outline-btn" data-i18n="settings_delete_account_button">Permanently Delete Account…</button>
+        </div>
+      </section>
+
+      <section class="settings-card settings-panel" id="settings-help">
+        <div class="settings-panel-head card-head">
+          <h2 class="card-title">Help &amp; How to use</h2>
+          <p class="card-desc">Guidance for every feature — transactions, receipts, mileage, exports, and edge cases.</p>
+        </div>
+
+        <div class="settings-help-toc">
+          <a href="#sh-quick-start" class="settings-help-link">Quick start</a>
+          <a href="#sh-transactions" class="settings-help-link">Transactions</a>
+          <a href="#sh-receipts" class="settings-help-link">Receipts</a>
+          <a href="#sh-mileage" class="settings-help-link">Mileage</a>
+          <a href="#sh-exports" class="settings-help-link">Exports</a>
+          <a href="#sh-edge-cases" class="settings-help-link">Edge cases</a>
+          <a href="#sh-limits" class="settings-help-link">What the app doesn't do</a>
+          <a class="settings-help-link settings-help-link--external" href="help" target="_blank">Open full help page ↗</a>
+        </div>
+
+        <div id="sh-quick-start" class="settings-help-section">
+          <h3>Quick start</h3>
+          <ol class="settings-help-list">
+            <li><strong>Choose the correct region first.</strong> Set the business to the country where the books should live. This controls labels, tax hints, and export wording.</li>
+            <li><strong>Set the business profile.</strong> Confirm name, type, tax ID, fiscal year start, and address in Settings → Business.</li>
+            <li><strong>Add bank and card accounts.</strong> Keep personal and business accounts separate.</li>
+            <li><strong>Build a small category list.</strong> Start with the categories you use most. Too many categories create noise.</li>
+            <li><strong>Enter each transaction with a receipt when possible.</strong> The receipt is what lets a CPA verify the record.</li>
+            <li><strong>Export before tax time.</strong> Use CSV for data review and PDF for a CPA handoff.</li>
+          </ol>
+        </div>
+
+        <div id="sh-transactions" class="settings-help-section">
+          <h3>Transactions</h3>
+          <ul class="settings-help-list">
+            <li>Use <strong>Income</strong> when money came in for the business.</li>
+            <li>Use <strong>Expense</strong> when money went out for the business.</li>
+            <li>Pick the account that actually received or paid the money.</li>
+            <li>Pick the category that explains the business purpose.</li>
+            <li>Use the date the transaction happened, not the date you're entering it.</li>
+            <li>Use the <strong>advanced drawer</strong> for currency, split-use %, indirect tax, and review notes.</li>
+          </ul>
+        </div>
+
+        <div id="sh-receipts" class="settings-help-section">
+          <h3>Receipts</h3>
+          <ul class="settings-help-list">
+            <li>Upload receipts as close to the transaction as possible.</li>
+            <li>Use the receipt note field for anything a CPA would need to know later.</li>
+            <li>If one receipt covers more than one purpose, explain the split in the notes.</li>
+            <li>If the receipt is missing, write a note immediately while the context is still fresh.</li>
+          </ul>
+        </div>
+
+        <div id="sh-mileage" class="settings-help-section">
+          <h3>Mileage</h3>
+          <ul class="settings-help-list">
+            <li>Record business trips only. Note the date, distance, purpose, and destination.</li>
+            <li>Log vehicle expenses (fuel, parking, tolls) and maintenance separately from trips.</li>
+            <li>Use the same unit consistently (miles or km) so the export stays clean.</li>
+            <li>Change units in Settings → Preferences if your region default is wrong.</li>
+          </ul>
+        </div>
+
+        <div id="sh-exports" class="settings-help-section">
+          <h3>Exports</h3>
+          <ul class="settings-help-list">
+            <li>Use <strong>CSV</strong> for raw data review or import into another system.</li>
+            <li>Use <strong>PDF</strong> for a cleaner summary to hand to a CPA.</li>
+            <li>Filter the date range and scope before exporting.</li>
+            <li>If the export looks wrong, fix the source records first, not the export settings.</li>
+          </ul>
+        </div>
+
+        <div id="sh-edge-cases" class="settings-help-section">
+          <h3>Edge cases</h3>
+          <dl class="settings-help-dl">
+            <dt>Foreign currency (FX)</dt>
+            <dd>Record the source currency, original amount, exchange rate, conversion date, and converted amount in the advanced drawer. Keep the bank statement that shows the same rate.</dd>
+            <dt>Split-use (personal + business)</dt>
+            <dd>Record the full amount and use the personal-use % field to show the non-business portion. Leave a note explaining the split.</dd>
+            <dt>Capital items</dt>
+            <dd>Flag long-term assets (equipment, computers) with the capital item tax treatment. Don't calculate depreciation in the app — that's a CPA task.</dd>
+            <dt>Indirect taxes (GST/HST/QST/Sales tax)</dt>
+            <dd>Enter only the tax amount in the indirect tax field. Keep the supplier's GST/HST number if you plan to claim input tax credits.</dd>
+            <dt>Non-deductible items</dt>
+            <dd>Record the expense and mark it non-deductible. Keeping it in the books is better than leaving a gap a CPA has to explain.</dd>
+            <dt>Missing receipts</dt>
+            <dd>Don't delete the transaction. Mark it for review, write a note immediately, and attach a bank statement line as a substitute if needed.</dd>
+          </dl>
+        </div>
+
+        <div id="sh-limits" class="settings-help-section">
+          <h3>What InEx Ledger does not do</h3>
+          <ul class="settings-help-list">
+            <li>It does not replace a CPA for final tax treatment.</li>
+            <li>It does not promise that every transaction is deductible.</li>
+            <li>It does not calculate depreciation or handle complex tax return scenarios.</li>
+            <li>It does not remove the need to review capital items, personal-use splits, or indirect tax details.</li>
+          </ul>
+          <p class="settings-help-note">The app succeeds when it makes the books cleaner, the receipts easier to verify, and the CPA export shorter to review.</p>
         </div>
       </section>
 

@@ -51,6 +51,7 @@
             <a href="#receipts">Receipts</a>
             <a href="#mileage">Mileage</a>
             <a href="#exports">Exports</a>
+            <a href="#edge-cases">Edge cases</a>
             <a href="#cpa-access">CPA access</a>
             <a href="#security">Security & account control</a>
             <a href="#region-notes">Region-specific notes</a>
@@ -74,8 +75,8 @@
             <h1>How to use InEx Ledger</h1>
             <p class="help-intro">
               This page is the long-form guide for the app. Use it to set up a business, enter transactions,
-              attach receipts, keep mileage organized, hand off clean exports to a CPA, and understand where
-              the bookkeeping stops and tax judgment starts.
+              attach receipts, keep mileage organized, handle edge cases like foreign currency and split-use items,
+              hand off clean exports to a CPA, and understand where the bookkeeping stops and tax judgment starts.
             </p>
             <div class="help-hero-actions">
               <a class="help-primary-action" href="transactions">Go to transactions</a>
@@ -334,10 +335,84 @@
           </div>
         </section>
 
+        <section id="edge-cases" class="help-card help-section">
+          <div class="section-heading">
+            <p class="help-kicker">Advanced entries</p>
+            <h2>7. Edge cases and how to handle them</h2>
+          </div>
+          <p>
+            Most transactions are straightforward. These are the ones that need extra detail to survive a CPA review.
+            Use the advanced drawer in the transaction form for all of these.
+          </p>
+          <div class="help-grid-two">
+            <div>
+              <h3>Foreign currency (FX)</h3>
+              <ul class="help-list">
+                <li>Set the source currency to the currency the client paid in.</li>
+                <li>Record the original amount before any conversion.</li>
+                <li>Enter the exchange rate and conversion date used.</li>
+                <li>Enter the final converted amount in your business currency.</li>
+                <li>Keep the bank or payment processor statement that shows the same exchange rate — a CPA will ask for it.</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Split-use (personal + business)</h3>
+              <ul class="help-list">
+                <li>Use the personal-use % field to show the non-business portion.</li>
+                <li>Record the full amount, not just the deductible portion — the export math handles the rest.</li>
+                <li>Leave a note explaining the split if it is not obvious (e.g., "50% home office, 50% personal").</li>
+                <li>Common split-use items: home office, vehicle, phone, internet, and mixed-purpose meals.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="help-grid-two">
+            <div>
+              <h3>Capital items</h3>
+              <ul class="help-list">
+                <li>Flag any purchase that is a long-term asset rather than a regular expense (computer, equipment, furniture).</li>
+                <li>Use the tax treatment field to mark it as a capital item.</li>
+                <li>Do not try to calculate depreciation inside the app — that is a CPA task at tax time.</li>
+                <li>Keep the original invoice so the purchase date, cost, and description are all documented.</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Indirect taxes (GST/HST/QST/Sales tax)</h3>
+              <ul class="help-list">
+                <li>Use the indirect tax amount field when the vendor charged GST, HST, QST, or sales tax.</li>
+                <li>Record only the tax amount, not the total — the base amount goes in the main amount field.</li>
+                <li>Canadian users: keep the supplier's GST/HST number from the invoice if you plan to claim input tax credits.</li>
+                <li>US users: sales tax on business purchases is generally an expense — record it as part of the expense total or separately depending on how detailed your CPA wants the books.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="help-grid-two">
+            <div>
+              <h3>Non-deductible items</h3>
+              <ul class="help-list">
+                <li>Record the expense anyway and mark it as non-deductible using the tax treatment field.</li>
+                <li>Keeping non-deductible items in the books is better than leaving a gap that a CPA has to explain later.</li>
+                <li>Common non-deductible items: fines and penalties, personal expenses paid from a business account, political contributions, and 50%-limit meals above the deductible portion.</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Missing receipts</h3>
+              <ul class="help-list">
+                <li>Do not delete the transaction. Record it and mark it for review.</li>
+                <li>Use the notes field immediately while the context is still fresh — write what it was, who the vendor was, and why it was a business expense.</li>
+                <li>A bank or card statement line is not a receipt but it is still better than nothing.</li>
+                <li>If the receipt is recoverable (vendor portal, email), get it and attach it before tax time.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="help-callout">
+            The goal is not to resolve every edge case yourself. The goal is to document them clearly enough that a CPA can resolve them without scheduling a call.
+          </div>
+        </section>
+
         <section id="cpa-access" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Collaboration</p>
-            <h2>7. CPA access</h2>
+            <h2>8. CPA access</h2>
           </div>
           <p>
             CPA access is explicit. You invite a person, choose the scope, and then track the status in Settings.
@@ -359,7 +434,7 @@
         <section id="security" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Control</p>
-            <h2>8. Security and account control</h2>
+            <h2>9. Security and account control</h2>
           </div>
           <div class="help-grid-two">
             <div>
@@ -384,7 +459,7 @@
         <section id="region-notes" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Region-specific guidance</p>
-            <h2>9. Keep the advice region-locked</h2>
+            <h2>10. Keep the advice region-locked</h2>
           </div>
           <p>
             The app should only show guidance for the region you are actually using. That keeps U.S. users from
@@ -406,7 +481,7 @@
         <section id="troubleshooting" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Fixes</p>
-            <h2>10. Troubleshooting and common mistakes</h2>
+            <h2>11. Troubleshooting and common mistakes</h2>
           </div>
           <ul class="help-list">
             <li>If totals look wrong, check the date filter and business scope first.</li>
@@ -423,7 +498,7 @@
         <section id="limits" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Boundary</p>
-            <h2>11. What InEx Ledger does not do</h2>
+            <h2>12. What InEx Ledger does not do</h2>
           </div>
           <p>
             InEx Ledger is a bookkeeping and export app. It keeps records organized, preserves evidence, and
