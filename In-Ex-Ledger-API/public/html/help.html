@@ -52,7 +52,6 @@
             <a href="#mileage">Mileage</a>
             <a href="#exports">Exports</a>
             <a href="#edge-cases">Edge cases</a>
-            <a href="#cpa-access">CPA access</a>
             <a href="#security">Security & account control</a>
             <a href="#region-notes">Region-specific notes</a>
             <a href="#troubleshooting">Troubleshooting</a>
@@ -76,7 +75,7 @@
             <p class="help-intro">
               This page is the long-form guide for the app. Use it to set up a business, enter transactions,
               attach receipts, keep mileage organized, handle edge cases like foreign currency and split-use items,
-              hand off clean exports to a CPA, and understand where the bookkeeping stops and tax judgment starts.
+              prepare clean exports for filing or review, and understand where the bookkeeping stops and tax judgment starts.
             </p>
             <div class="help-hero-actions">
               <a class="help-primary-action" href="transactions">Go to transactions</a>
@@ -92,7 +91,7 @@
               <li>Enter income and expense transactions.</li>
               <li>Attach receipts and note anything unusual.</li>
               <li>Mark edge cases: FX, split use, capital items, and tax recoverability.</li>
-              <li>Export CSV/PDF for your CPA at tax time.</li>
+              <li>Export CSV/PDF for filing or review at tax time.</li>
             </ol>
           </div>
         </section>
@@ -120,8 +119,8 @@
               Too many categories create noise. Too few create bad exports.
             </li>
             <li>
-              <strong>Enter each transaction with a receipt when possible.</strong> The receipt is what lets a
-              CPA verify the record instead of guessing later.
+              <strong>Enter each transaction with a receipt when possible.</strong> The receipt is what lets you
+              verify the record instead of guessing later.
             </li>
             <li>
               <strong>Review edge-case fields when needed.</strong> Use the advanced details for currency,
@@ -132,7 +131,7 @@
             </li>
           </ol>
           <div class="help-callout">
-            Keep one rule in mind: if you would want a CPA to see it later, attach it now.
+            Keep one rule in mind: if you would want to defend it later, attach it now.
           </div>
         </section>
 
@@ -146,7 +145,7 @@
               <h3>Business profile</h3>
               <p>
                 Open Settings and complete the business profile first. That information flows into exports,
-                receipts, CPA handoff pages, and PDF reports. If the business name or tax ID is wrong,
+                receipts, and PDF reports. If the business name or tax ID is wrong,
                 everything downstream looks wrong too.
               </p>
               <ul class="help-list">
@@ -223,7 +222,7 @@
             </div>
           </div>
           <div class="help-subsection">
-            <h3>Advanced / CPA details</h3>
+            <h3>Advanced details</h3>
             <p>
               The advanced drawer is where edge cases live. Use it when the transaction is not plain domestic
               operating income or expense.
@@ -242,7 +241,7 @@
                   <li><strong>Tax treatment:</strong> flag capital items, split-use items, or non-deductible items.</li>
                   <li><strong>Personal-use %:</strong> show the non-business portion when a cost is shared.</li>
                   <li><strong>Indirect tax amount:</strong> capture GST/HST/QST or sales tax when relevant.</li>
-                  <li><strong>Review status and notes:</strong> leave a trail for a CPA or future cleanup.</li>
+                  <li><strong>Review status and notes:</strong> leave a trail for future cleanup.</li>
                 </ul>
               </div>
             </div>
@@ -260,13 +259,13 @@
           </p>
           <ul class="help-list">
             <li>Upload the receipt as close to the transaction as possible.</li>
-            <li>Use the receipt note field for anything a CPA would need to know later.</li>
+            <li>Use the receipt note field for anything you will need to know later.</li>
             <li>If one receipt covers more than one business purpose, explain the split in the review notes.</li>
             <li>If the receipt is missing, write a note immediately while the context is still fresh.</li>
             <li>Keep receipts from vendors, payment confirmations, and statements when they are the only proof available.</li>
           </ul>
           <div class="help-callout">
-            Best practice: if you would not hand the document to a CPA with no explanation, do not leave the notes blank.
+            Best practice: if the document would need explanation later, do not leave the notes blank.
           </div>
         </section>
 
@@ -300,11 +299,11 @@
         <section id="exports" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Tax handoff</p>
-            <h2>6. Exports and CPA handoff</h2>
+            <h2>6. Exports and filing prep</h2>
           </div>
           <p>
             Exports are the handoff layer. The goal is not to calculate every tax result inside the app.
-            The goal is to make the records clean enough that a CPA can work faster and with fewer questions.
+            The goal is to make the records clean enough that review and filing take less cleanup.
           </p>
           <div class="help-grid-two">
             <div>
@@ -313,14 +312,14 @@
                 <li>Use CSV when you want the raw data for review or import into another system.</li>
                 <li>Choose the correct business scope before exporting.</li>
                 <li>Filter the date range so you are not handing over more data than needed.</li>
-                <li>Include the edge-case columns when you want a CPA to review weird items quickly.</li>
+                <li>Include the edge-case columns when you want unusual items documented clearly.</li>
               </ul>
             </div>
             <div>
               <h3>PDF export</h3>
               <ul class="help-list">
                 <li>Use PDF when you want a cleaner summary for a human to read first.</li>
-                <li>Give your CPA the summary pages plus the CSV if they want to inspect the underlying rows.</li>
+                <li>Use the summary pages first, then the CSV when you need the underlying rows.</li>
                 <li>Check the summary before sending it. If the summary looks wrong, fix the source records first.</li>
               </ul>
             </div>
@@ -341,7 +340,7 @@
             <h2>7. Edge cases and how to handle them</h2>
           </div>
           <p>
-            Most transactions are straightforward. These are the ones that need extra detail to survive a CPA review.
+            Most transactions are straightforward. These are the ones that need extra detail to survive later review.
             Use the advanced drawer in the transaction form for all of these.
           </p>
           <div class="help-grid-two">
@@ -352,7 +351,7 @@
                 <li>Record the original amount before any conversion.</li>
                 <li>Enter the exchange rate and conversion date used.</li>
                 <li>Enter the final converted amount in your business currency.</li>
-                <li>Keep the bank or payment processor statement that shows the same exchange rate — a CPA will ask for it.</li>
+                <li>Keep the bank or payment processor statement that shows the same exchange rate.</li>
               </ul>
             </div>
             <div>
@@ -371,7 +370,7 @@
               <ul class="help-list">
                 <li>Flag any purchase that is a long-term asset rather than a regular expense (computer, equipment, furniture).</li>
                 <li>Use the tax treatment field to mark it as a capital item.</li>
-                <li>Do not try to calculate depreciation inside the app — that is a CPA task at tax time.</li>
+                <li>Do not try to calculate depreciation inside the app.</li>
                 <li>Keep the original invoice so the purchase date, cost, and description are all documented.</li>
               </ul>
             </div>
@@ -381,7 +380,7 @@
                 <li>Use the indirect tax amount field when the vendor charged GST, HST, QST, or sales tax.</li>
                 <li>Record only the tax amount, not the total — the base amount goes in the main amount field.</li>
                 <li>Canadian users: keep the supplier's GST/HST number from the invoice if you plan to claim input tax credits.</li>
-                <li>US users: sales tax on business purchases is generally an expense — record it as part of the expense total or separately depending on how detailed your CPA wants the books.</li>
+                <li>US users: sales tax on business purchases is generally an expense — record it as part of the expense total or separately depending on how much detail you need.</li>
               </ul>
             </div>
           </div>
@@ -390,7 +389,7 @@
               <h3>Non-deductible items</h3>
               <ul class="help-list">
                 <li>Record the expense anyway and mark it as non-deductible using the tax treatment field.</li>
-                <li>Keeping non-deductible items in the books is better than leaving a gap that a CPA has to explain later.</li>
+                <li>Keeping non-deductible items in the books is better than leaving a gap you have to explain later.</li>
                 <li>Common non-deductible items: fines and penalties, personal expenses paid from a business account, political contributions, and 50%-limit meals above the deductible portion.</li>
               </ul>
             </div>
@@ -405,11 +404,11 @@
             </div>
           </div>
           <div class="help-callout">
-            The goal is not to resolve every edge case yourself. The goal is to document them clearly enough that a CPA can resolve them without scheduling a call.
+            The goal is not to resolve every edge case yourself. The goal is to document them clearly enough for later review.
           </div>
         </section>
 
-        <section id="cpa-access" class="help-card help-section">
+        <section id="cpa-access" class="help-card help-section" hidden>
           <div class="section-heading">
             <p class="help-kicker">Collaboration</p>
             <h2>8. CPA access</h2>

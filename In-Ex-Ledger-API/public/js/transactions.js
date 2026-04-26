@@ -1830,6 +1830,7 @@ function renderTransactionsTable(filteredTransactions) {
   const accountsById = mapById(getAccounts());
   const categoriesById = mapById(getCategories());
   const isAllScope = getTransactionScope() === "all";
+  const canUseEdgeCaseTools = effectiveTier() === "v1";
   tbody.innerHTML = "";
 
   transactions.forEach((txn) => {
@@ -1857,19 +1858,19 @@ function renderTransactionsTable(filteredTransactions) {
     const businessCurrency = String(getBusinessById(txn.businessId)?.region || businessTaxProfile.region || getResolvedRegion()).toUpperCase() === "CA"
       ? "CAD"
       : "USD";
-    if (txn.currency && txn.currency !== businessCurrency) {
+    if (canUseEdgeCaseTools && txn.currency && txn.currency !== businessCurrency) {
       metadataBadges.push(formatTransactionMetaBadge(`FX ${txn.currency}`, "fx"));
     }
-    if (txn.taxTreatment && txn.taxTreatment !== "operating") {
+    if (canUseEdgeCaseTools && txn.taxTreatment && txn.taxTreatment !== "operating") {
       metadataBadges.push(formatTransactionMetaBadge(getTaxTreatmentLabel(txn.taxTreatment), txn.taxTreatment === "capital" ? "capital" : ""));
     }
-    if (txn.personalUsePct !== null && txn.personalUsePct !== undefined && txn.personalUsePct !== "") {
+    if (canUseEdgeCaseTools && txn.personalUsePct !== null && txn.personalUsePct !== undefined && txn.personalUsePct !== "") {
       metadataBadges.push(formatTransactionMetaBadge(`${Number(txn.personalUsePct).toFixed(1)}% personal use`, "split"));
     }
-    if (txn.indirectTaxAmount !== null && txn.indirectTaxAmount !== undefined && Number(txn.indirectTaxAmount) > 0) {
+    if (canUseEdgeCaseTools && txn.indirectTaxAmount !== null && txn.indirectTaxAmount !== undefined && Number(txn.indirectTaxAmount) > 0) {
       metadataBadges.push(formatTransactionMetaBadge(`${getIndirectTaxLabel(rowRegion)} ${formatCurrency(Number(txn.indirectTaxAmount) || 0, rowRegion)}`, "tax"));
     }
-    if (txn.reviewStatus && txn.reviewStatus !== "ready") {
+    if (canUseEdgeCaseTools && txn.reviewStatus && txn.reviewStatus !== "ready") {
       metadataBadges.push(formatTransactionMetaBadge(getReviewStatusLabel(txn.reviewStatus), txn.reviewStatus));
     }
     const descriptionSub = [businessBadge, descriptionTail, metadataBadges.join(" ")].filter(Boolean).join(" ");

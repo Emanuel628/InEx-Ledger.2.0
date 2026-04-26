@@ -294,6 +294,7 @@ function hasFeatureAccess(subscription, feature) {
     "receipts",
     "pdf_exports",
     "advanced_exports",
+    "edge_case_tools",
     "tax_estimates",
     "recurring_transactions"
   ]);

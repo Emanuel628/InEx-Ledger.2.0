@@ -394,6 +394,28 @@ function handleTransactionMutationError(res, err, fallbackMessage) {
   return res.status(500).json({ error: fallbackMessage });
 }
 
+function hasAdvancedTransactionPayload(normalized, fallbackCurrency) {
+  if (!normalized) {
+    return false;
+  }
+
+  return (
+    normalized.currency !== fallbackCurrency ||
+    normalized.source_amount !== null ||
+    normalized.exchange_rate !== null ||
+    normalized.exchange_date !== null ||
+    normalized.converted_amount !== null ||
+    normalized.tax_treatment === "capital" ||
+    normalized.tax_treatment === "split_use" ||
+    normalized.tax_treatment === "nondeductible" ||
+    normalized.indirect_tax_amount !== null ||
+    normalized.indirect_tax_recoverable === true ||
+    normalized.personal_use_pct !== null ||
+    (normalized.review_status && normalized.review_status !== "ready") ||
+    String(normalized.review_notes || "").trim().length > 0
+  );
+}
+
 router.get("/", async (req, res) => {
   try {
     const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
@@ -466,9 +488,16 @@ router.post("/", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     await assertCanCreateTransactions(pool, businessId, 1);
     const businessTaxContext = await getBusinessRegionAndCurrency(businessId);
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     const validation = validateTransactionPayload(req.body, businessTaxContext.currency);
     if (!validation.valid) {
       return res.status(400).json({ error: validation.message });
+    }
+    if (
+      hasAdvancedTransactionPayload(validation.normalized, businessTaxContext.currency) &&
+      !hasFeatureAccess(subscription, "edge_case_tools")
+    ) {
+      return res.status(402).json({ error: "Advanced transaction fields require an active InEx Ledger Pro plan." });
     }
 
     const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
@@ -551,9 +580,16 @@ router.put("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const businessTaxContext = await getBusinessRegionAndCurrency(businessId);
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     const validation = validateTransactionPayload(req.body, businessTaxContext.currency);
     if (!validation.valid) {
       return res.status(400).json({ error: validation.message });
+    }
+    if (
+      hasAdvancedTransactionPayload(validation.normalized, businessTaxContext.currency) &&
+      !hasFeatureAccess(subscription, "edge_case_tools")
+    ) {
+      return res.status(402).json({ error: "Advanced transaction fields require an active InEx Ledger Pro plan." });
     }
     const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
     const { description, note } = req.body;

@@ -545,6 +545,10 @@ async function requireValidSessionOrRedirect() {
   window.__AUTH_GUARD_STATE__.count += 1;
 
   const token = getToken();
+  if (!CPA_UI_ENABLED && getNormalizedPathname() === "/cpa-dashboard") {
+    window.location.href = "/transactions";
+    return;
+  }
 
   if (!token) {
     window.__AUTH_GUARD_STATE__.running = false;
