@@ -481,7 +481,29 @@ async function sendBillingEmail({ businessId, kind, details, actionUrl, invoiceU
 router.get("/subscription", requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    let subscription = await getSubscriptionSnapshotForBusiness(businessId);
+
+    if (!subscription.isPaid && subscription.stripeCustomerId) {
+      try {
+        const latest = await stripeGet(
+          `/subscriptions?customer=${encodeURIComponent(subscription.stripeCustomerId)}&status=all&limit=5`
+        );
+        const subscriptions = Array.isArray(latest?.data) ? latest.data : [];
+        const stripeSubscription =
+          subscriptions.find((item) => ["active", "trialing", "past_due", "canceled"].includes(String(item?.status || ""))) || null;
+
+        if (stripeSubscription) {
+          await syncStripeSubscriptionForBusiness(businessId, stripeSubscription);
+          subscription = await getSubscriptionSnapshotForBusiness(businessId);
+        }
+      } catch (syncErr) {
+        logWarn("GET /api/billing/subscription self-heal sync skipped:", {
+          businessId,
+          err: syncErr.message
+        });
+      }
+    }
+
     res.json({ subscription });
   } catch (err) {
     logError("GET /api/billing/subscription error:", err.message);

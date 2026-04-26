@@ -167,6 +167,10 @@ function applySubscriptionState(subscription) {
     return;
   }
 
+  if (window.__LUNA_ME__ && typeof window.__LUNA_ME__ === "object") {
+    window.__LUNA_ME__.subscription = subscription;
+  }
+
   localStorage.setItem(SUBSCRIPTION_KEY, JSON.stringify(subscription));
 
   if (subscription.trialEndsAt) {
@@ -208,6 +212,39 @@ function getStoredSubscriptionState() {
   } catch {
     return null;
   }
+}
+
+function getMaxBusinessesAllowedFromSubscription(subscription = getStoredSubscriptionState()) {
+  const max = Number(subscription?.maxBusinessesAllowed);
+  if (Number.isFinite(max) && max >= 1) {
+    return Math.floor(max);
+  }
+
+  const additional = Number(subscription?.additionalBusinesses);
+  if (Number.isFinite(additional) && additional > 0) {
+    return 1 + Math.floor(additional);
+  }
+
+  return 1;
+}
+
+function canCreateAnotherBusiness(profile = window.__LUNA_ME__) {
+  const businesses = getBusinessCollection(profile);
+  const subscription = profile?.subscription || getStoredSubscriptionState();
+  return businesses.length < getMaxBusinessesAllowedFromSubscription(subscription);
+}
+
+function showAdditionalBusinessPaywall(profile = window.__LUNA_ME__) {
+  const subscription = profile?.subscription || getStoredSubscriptionState();
+  const allowed = getMaxBusinessesAllowedFromSubscription(subscription);
+  const message = allowed <= 1
+    ? "Your current plan includes 1 business. Upgrade and add an additional business to continue."
+    : `Your current plan allows up to ${allowed} businesses. Add another additional business to continue.`;
+
+  showAccountMenuNotice(message);
+  window.setTimeout(() => {
+    window.location.href = "/subscription";
+  }, 250);
 }
 
 function getUserDisplayName(profile = {}) {
@@ -946,6 +983,10 @@ function ensureBusinessCreationModal() {
 }
 
 function openBusinessCreationModal() {
+  if (!canCreateAnotherBusiness()) {
+    showAdditionalBusinessPaywall();
+    return;
+  }
   ensureBusinessCreationModal();
   const modal = document.getElementById("businessCreationModal");
   const error = document.getElementById("businessModalError");
@@ -1053,6 +1094,11 @@ async function submitBusinessCreation() {
       const payload = response ? await response.json().catch(() => null) : null;
       if (error) {
         error.textContent = payload?.error || (typeof t === "function" ? t("auth_error_create_business") : "Unable to create business.");
+      }
+      if (payload?.code === "additional_business_payment_required") {
+        window.setTimeout(() => {
+          window.location.href = "/subscription";
+        }, 250);
       }
       return;
     }

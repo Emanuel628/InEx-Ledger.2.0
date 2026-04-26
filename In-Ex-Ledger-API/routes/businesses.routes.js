@@ -10,6 +10,7 @@ const {
   setActiveBusinessForUser,
   createBusinessForUser
 } = require("../api/utils/resolveBusinessIdForUser.js");
+const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 const { decryptTaxId } = require("../services/taxIdService.js");
 const { verifyPassword } = require("../utils/authUtils.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
@@ -92,15 +93,32 @@ router.post("/", async (req, res) => {
   }
 
   try {
+    const activeBusinessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
+    const businesses = await listBusinessesForUser(req.user.id);
+    const subscription = await getSubscriptionSnapshotForBusiness(activeBusinessId);
+    const maxBusinessesAllowed = Number(subscription?.maxBusinessesAllowed || 1);
+
+    if (businesses.length >= maxBusinessesAllowed) {
+      return res.status(402).json({
+        error: maxBusinessesAllowed <= 1
+          ? "Your current plan includes 1 business. Upgrade and add an additional business to continue."
+          : `Your current plan allows up to ${maxBusinessesAllowed} businesses. Add another additional business to continue.`,
+        code: "additional_business_payment_required",
+        max_businesses_allowed: maxBusinessesAllowed,
+        current_business_count: businesses.length,
+        subscription
+      });
+    }
+
     const businessId = await createBusinessForUser(req.user, validation.normalized);
     req.user.business_id = businessId;
-    const businesses = await listBusinessesForUser(req.user.id);
-    const activeBusiness = businesses.find((business) => business.id === businessId) || null;
+    const nextBusinesses = await listBusinessesForUser(req.user.id);
+    const activeBusiness = nextBusinesses.find((business) => business.id === businessId) || null;
 
     res.status(201).json({
       active_business_id: businessId,
       active_business: activeBusiness,
-      businesses
+      businesses: nextBusinesses
     });
   } catch (err) {
     logError("POST /businesses error:", err.message);

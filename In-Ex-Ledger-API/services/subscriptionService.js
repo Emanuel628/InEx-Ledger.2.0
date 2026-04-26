@@ -94,6 +94,7 @@ function deriveEffectiveState(row) {
   const now = Date.now();
   const trialEndsAt = normalizeDate(row?.trial_ends_at);
   const trialStartedAt = normalizeDate(row?.trial_started_at);
+  const metadata = row?.metadata_json && typeof row.metadata_json === "object" ? row.metadata_json : {};
   const resolvedTrialEndsAt = trialEndsAt || (trialStartedAt ? addDays(trialStartedAt, DEFAULT_TRIAL_DAYS) : null);
   const currentPeriodEnd = normalizeDate(row?.current_period_end);
   const pastDueStartedAt = resolvePastDueStartedAt(row);
@@ -143,6 +144,16 @@ function deriveEffectiveState(row) {
     effectiveStatus = row?.status || "free";
   }
 
+  const rawAdditionalBusinesses = Number(metadata.additional_businesses);
+  const additionalBusinesses =
+    Number.isSafeInteger(rawAdditionalBusinesses) && rawAdditionalBusinesses > 0
+      ? rawAdditionalBusinesses
+      : 0;
+  const maxBusinessesAllowed =
+    effectiveTier === PLAN_V1 || effectiveTier === PLAN_BUSINESS
+      ? 1 + additionalBusinesses
+      : 1;
+
   return {
     id: row?.id || null,
     businessId: row?.business_id || null,
@@ -153,6 +164,8 @@ function deriveEffectiveState(row) {
     effectiveTier,
     effectiveTierName: getPlanDisplayName(effectiveTier),
     effectiveStatus,
+    additionalBusinesses,
+    maxBusinessesAllowed,
     isTrialing,
     isPaid: Boolean(isActivePaid || isGracePeriod || isPastDueGracePeriod || isCanceledWithRemainingAccess),
     isCanceledWithRemainingAccess,
