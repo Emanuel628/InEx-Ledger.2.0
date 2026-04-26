@@ -610,7 +610,7 @@ body[data-theme="light"] select option {
   align-items: center !important;
   justify-content: space-between !important;
   gap: 12px !important;
-  flex-wrap: wrap !important;
+  flex-wrap: nowrap !important;
 }
 
 .topbar-left {
@@ -711,19 +711,19 @@ body[data-theme="light"] select option {
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
-  padding: 5px 10px 5px 6px !important;
+  padding: 5px 12px 5px 5px !important;
   border-radius: 20px !important;
-  background: rgba(255, 255, 255, 0.1) !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
   min-width: 0 !important;
-  max-width: min(260px, 34vw) !important;
+  max-width: min(240px, 34vw) !important;
   flex-shrink: 0 !important;
   cursor: pointer !important;
-  transition: background 140ms ease !important;
+  transition: background 140ms ease, box-shadow 140ms ease !important;
 }
 
 .user-pill:hover {
-  background: rgba(255, 255, 255, 0.16) !important;
+  background: #fff !important;
+  box-shadow: 0 2px 8px rgba(15, 25, 35, 0.18) !important;
 }
 
 .user-avatar {
@@ -742,7 +742,7 @@ body[data-theme="light"] select option {
 
 .user-name {
   font-size: 12px !important;
-  color: rgba(255, 255, 255, 0.9) !important;
+  color: var(--ink) !important;
   min-width: 0 !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -754,7 +754,7 @@ body[data-theme="light"] select option {
   width: 10px !important;
   height: 10px !important;
   flex-shrink: 0 !important;
-  color: rgba(255, 255, 255, 0.6) !important;
+  color: var(--ink3) !important;
   margin-left: -2px !important;
 }
 
