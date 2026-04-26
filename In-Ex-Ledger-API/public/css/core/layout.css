@@ -345,6 +345,20 @@ body[data-theme="light"] select option {
   color: var(--ink);
 }
 
+.app-sidebar--dynamic .sidebar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.app-sidebar--dynamic .sidebar-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
 .dynamic-sidebar-empty {
   margin: 8px 2px 4px;
   padding: 14px 10px;
@@ -352,7 +366,7 @@ body[data-theme="light"] select option {
   border-radius: 8px;
   color: var(--ink3);
   font-size: 12px;
-  text-align: center;
+  text-align: left;
 }
 
 .dynamic-sidebar-library {

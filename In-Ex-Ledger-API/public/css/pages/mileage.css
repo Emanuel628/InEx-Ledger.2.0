@@ -482,52 +482,6 @@ textarea.form-control {
   border-bottom: 0.5px solid var(--border);
 }
 
-/* Collapsible Add Activity */
-.mileage-activity-head {
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0;
-}
-
-.mileage-collapse-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 14px;
-  border: 1px solid var(--border, #d1d5db);
-  border-radius: 10px;
-  background: var(--surface, #fff);
-  color: var(--ink2, #374151);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.mileage-collapse-btn:hover {
-  background: var(--surface2, #f3f4f6);
-}
-
-.mileage-collapse-btn svg {
-  transition: transform 0.18s ease;
-}
-
-.mileage-collapse-btn[aria-expanded="true"] svg {
-  transform: rotate(180deg);
-}
-
-#mileageActivityBody:not([hidden]) {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 18px;
-}
-
-.mileage-mode-toggle--body {
-  flex-wrap: wrap;
-}
-
 /* Date range filter */
 .mileage-date-range {
   display: inline-flex;

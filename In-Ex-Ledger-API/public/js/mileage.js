@@ -20,7 +20,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof enforceTrial === "function") enforceTrial();
 
   initializeMileageDates();
-  wireActivityToggle();
   wireEntryModeToggle();
   wireMileageForm();
   wireVehicleCostForm();
@@ -168,20 +167,6 @@ function wireVehicleCostForm() {
     initializeMileageDates();
     setEntryMode(entryType);
     showMileageToast(entryType === "maintenance" ? "Maintenance logged." : "Vehicle expense logged.");
-  });
-}
-
-function wireActivityToggle() {
-  const toggle = document.getElementById("mileageActivityToggle");
-  const body = document.getElementById("mileageActivityBody");
-  if (!toggle || !body) return;
-
-  toggle.addEventListener("click", () => {
-    const expanded = toggle.getAttribute("aria-expanded") === "true";
-    toggle.setAttribute("aria-expanded", String(!expanded));
-    body.hidden = expanded;
-    const label = toggle.querySelector(".mileage-collapse-label");
-    if (label) label.textContent = expanded ? "Add" : "Hide";
   });
 }
 

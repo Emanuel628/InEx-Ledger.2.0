@@ -64,23 +64,6 @@
           <h1 class="page-title" data-i18n="exports_page_title">Export records</h1>
           <p class="page-subtitle" data-i18n="exports_page_subtitle">Generate clean reports for tax filing or CPA handoff</p>
         </div>
-        <div class="exports-info-wrap">
-          <button type="button" class="exports-info-btn" id="exportsInfoBtn" aria-label="What's included in an export?" aria-expanded="false">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg>
-            <span>What's included?</span>
-          </button>
-          <div class="exports-info-tooltip" id="exportsInfoTooltip" hidden role="tooltip">
-            <strong>Each export includes:</strong>
-            <ul>
-              <li>All transactions in the selected date range and scope</li>
-              <li>Category, account, and tax-treatment columns</li>
-              <li>Edge-case fields: currency, personal-use %, indirect tax</li>
-              <li>Mileage summary (PDF only)</li>
-              <li>Business profile and tax form context (PDF only)</li>
-            </ul>
-            <p>CSV gives raw rows for spreadsheet review. PDF gives a formatted summary for a CPA handoff. Use both when you want the cleanest result.</p>
-          </div>
-        </div>
       </section>
 
       <form id="exportForm" class="exports-grid" novalidate aria-label="Export configuration">
@@ -259,20 +242,5 @@
   <script src="../js/pdf_labels.js?v=20260405c"></script>
   <script src="../js/pdf_export.js?v=20260415a"></script>
   <script src="../js/exports.js?v=20260405c"></script>
-  <script>
-    document.getElementById('exportsInfoBtn')?.addEventListener('click', function() {
-      const tooltip = document.getElementById('exportsInfoTooltip');
-      const expanded = this.getAttribute('aria-expanded') === 'true';
-      this.setAttribute('aria-expanded', String(!expanded));
-      tooltip.hidden = expanded;
-    });
-    document.addEventListener('click', function(e) {
-      if (!e.target.closest('#exportsInfoBtn') && !e.target.closest('#exportsInfoTooltip')) {
-        const tooltip = document.getElementById('exportsInfoTooltip');
-        const btn = document.getElementById('exportsInfoBtn');
-        if (tooltip && !tooltip.hidden) { tooltip.hidden = true; btn?.setAttribute('aria-expanded', 'false'); }
-      }
-    });
-  </script>
 </body>
 </html>

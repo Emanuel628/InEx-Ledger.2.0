@@ -302,14 +302,9 @@ function renderCategoryGroup(containerId, type, emptyText) {
   }
 
   container.innerHTML = categories.map((category) => {
-    const taxLine = category.taxLabel ? formatTaxLabel(category.taxLabel) : "";
-    const taxBadge = taxLine ? `<span class="category-tax-pill">${escapeHtml(taxLine)}</span>` : "";
     return `
     <div class="category-item">
-      <div class="category-item-pills">
-        <span class="category-pill pill-${escapeHtml(category.color || defaultColorForType(type))}">${escapeHtml(category.name)}</span>
-        ${taxBadge}
-      </div>
+      <span class="category-pill pill-${escapeHtml(category.color || defaultColorForType(type))}">${escapeHtml(category.name)}</span>
       <button type="button" class="category-delete" data-category-delete="${escapeHtml(category.id)}" aria-label="${escapeHtml(tx("common_delete") + " " + (category.name || tx("categories_fallback_name")))}">${escapeHtml(tx("common_delete"))}</button>
     </div>
   `;
