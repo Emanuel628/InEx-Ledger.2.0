@@ -30,7 +30,6 @@
         <a data-i18n="nav_receipts" href="receipts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span>Receipts</span></a>
         <a href="mileage"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span data-i18n="nav_mileage">Mileage</span></a>
         <a data-i18n="nav_exports" href="exports"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Exports</span></a>
-        <a href="analytics"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 12l3.5-4 2.5 2 3-4 3 3"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Analytics</span></a>
         <a data-i18n="nav_settings" href="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg></span><span>Settings</span></a>
       </nav>
     </div>
@@ -615,8 +614,8 @@
             <li><strong>Set the business profile.</strong> Confirm name, type, tax ID, fiscal year start, and address in Settings → Business.</li>
             <li><strong>Add bank and card accounts.</strong> Keep personal and business accounts separate.</li>
             <li><strong>Build a small category list.</strong> Start with the categories you use most. Too many categories create noise.</li>
-            <li><strong>Enter each transaction with a receipt when possible.</strong> The receipt is what lets a CPA verify the record.</li>
-            <li><strong>Export before tax time.</strong> Use CSV for data review and PDF for a CPA handoff.</li>
+            <li><strong>Enter each transaction with a receipt when possible.</strong> The receipt is what lets you verify the record later.</li>
+            <li><strong>Export before tax time.</strong> Use CSV for data review and PDF for a clean summary.</li>
           </ol>
         </div>
 
@@ -636,7 +635,7 @@
           <h3>Receipts</h3>
           <ul class="settings-help-list">
             <li>Upload receipts as close to the transaction as possible.</li>
-            <li>Use the receipt note field for anything a CPA would need to know later.</li>
+            <li>Use the receipt note field for anything you will need to know later.</li>
             <li>If one receipt covers more than one purpose, explain the split in the notes.</li>
             <li>If the receipt is missing, write a note immediately while the context is still fresh.</li>
           </ul>
@@ -656,7 +655,7 @@
           <h3>Exports</h3>
           <ul class="settings-help-list">
             <li>Use <strong>CSV</strong> for raw data review or import into another system.</li>
-            <li>Use <strong>PDF</strong> for a cleaner summary to hand to a CPA.</li>
+            <li>Use <strong>PDF</strong> for a cleaner summary to review or share.</li>
             <li>Filter the date range and scope before exporting.</li>
             <li>If the export looks wrong, fix the source records first, not the export settings.</li>
           </ul>
@@ -670,7 +669,7 @@
             <dt>Split-use (personal + business)</dt>
             <dd>Record the full amount and use the personal-use % field to show the non-business portion. Leave a note explaining the split.</dd>
             <dt>Capital items</dt>
-            <dd>Flag long-term assets (equipment, computers) with the capital item tax treatment. Don't calculate depreciation in the app — that's a CPA task.</dd>
+            <dd>Flag long-term assets (equipment, computers) with the capital item tax treatment. Don't calculate depreciation in the app — handle that during later review.</dd>
             <dt>Indirect taxes (GST/HST/QST/Sales tax)</dt>
             <dd>Enter only the tax amount in the indirect tax field. Keep the supplier's GST/HST number if you plan to claim input tax credits.</dd>
             <dt>Non-deductible items</dt>
@@ -688,7 +687,7 @@
             <li>It does not calculate depreciation or handle complex tax return scenarios.</li>
             <li>It does not remove the need to review capital items, personal-use splits, or indirect tax details.</li>
           </ul>
-          <p class="settings-help-note">The app succeeds when it makes the books cleaner, the receipts easier to verify, and the CPA export shorter to review.</p>
+          <p class="settings-help-note">The app succeeds when it makes the books cleaner, the receipts easier to verify, and the export easier to review.</p>
         </div>
       </section>
 
