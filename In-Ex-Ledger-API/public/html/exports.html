@@ -61,8 +61,18 @@
     <div class="app-content exports-content">
       <section class="page-header exports-page-header">
         <div>
-          <h1 class="page-title" data-i18n="exports_page_title">Export records</h1>
+          <div class="exports-title-row">
+            <h1 class="page-title" data-i18n="exports_page_title">Export records</h1>
+            <button type="button" class="exports-info-btn" id="exportsInfoBtn" aria-label="Export help" aria-expanded="false">i</button>
+          </div>
           <p class="page-subtitle" data-i18n="exports_page_subtitle">Generate clean reports for tax filing and record review</p>
+          <div class="exports-info-popover" id="exportsInfoPopover" hidden>
+            <p><strong>CSV</strong> gives you the raw rows for review, spreadsheet work, and imports.</p>
+            <p><strong>PDF</strong> is the cleaner summary export and is available on Pro.</p>
+            <p><strong>Tax ID handling</strong> is ephemeral for PDF exports. It is processed only for that export flow and is not stored with your records.</p>
+            <p><strong>Export history</strong> keeps a record of generated exports when available for your account and scope.</p>
+            <p><strong>Date ranges</strong> control which records appear in the export. Fix the date range first if totals look wrong.</p>
+          </div>
         </div>
       </section>
 

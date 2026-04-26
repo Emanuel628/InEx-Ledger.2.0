@@ -60,7 +60,7 @@
       <div class="page-header">
         <div>
           <h1 class="page-title">Transactions</h1>
-          <p class="page-subtitle">Active business ledger · current reporting period</p>
+          <p class="page-subtitle">Active business ledger - current reporting period</p>
           <p class="page-context-note" id="transactionsTaxContext">Tax form context</p>
         </div>
         <div class="page-header-actions">
@@ -113,19 +113,13 @@
 
       <section id="tax-cockpit" class="tax-banner">
         <div class="tax-banner-main">
-          <div class="tax-banner-icon" aria-hidden="true">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="1" width="10" height="13" rx="1.5"></rect>
-              <path d="M6 5h4M6 8h4M6 11h3"></path>
-            </svg>
-          </div>
           <div class="tax-banner-copy">
             <div class="tax-banner-label" id="taxBannerLabel">Estimated tax owed (YTD)
               <button type="button" class="tax-banner-info-btn" id="taxInfoBtn" aria-label="How is this calculated?" title="How is this calculated?">?</button>
             </div>
             <div class="tax-banner-amount" id="taxOwed">$0.00</div>
             <p class="tax-banner-note" id="taxBannerNote">Based on net profit at 24% self-employment rate</p>
-            <p class="tax-banner-tooltip" id="taxInfoTooltip" hidden>Estimated based on net profit × combined tax rate for your province/state. Set your region in Settings for accurate estimates.</p>
+            <p class="tax-banner-tooltip" id="taxInfoTooltip" hidden>Estimated based on net profit x combined tax rate for your province/state. Set your region in Settings for accurate estimates.</p>
           </div>
         </div>
         <div class="tax-banner-side">
@@ -145,7 +139,7 @@
         </div>
         <div class="upsell-actions">
           <button data-upgrade data-i18n="transactions_upsell_cta">Upgrade to Pro</button>
-          <button type="button" class="upsell-dismiss" aria-label="Dismiss">×</button>
+          <button type="button" class="upsell-dismiss" aria-label="Dismiss">&times;</button>
         </div>
       </section>
 
@@ -190,7 +184,7 @@
                   <button type="button" class="txn-intent-btn income-intent" data-intent="income" data-i18n="transactions_intent_income">+ Income</button>
                   <button type="button" class="txn-intent-btn expense-intent" data-intent="expense" data-i18n="transactions_intent_expense">+ Expense</button>
                 </div>
-                <button type="button" class="drawer-close-btn" id="txDrawerClose" aria-label="Close form">×</button>
+                <button type="button" class="drawer-close-btn" id="txDrawerClose" aria-label="Close form">&times;</button>
               </div>
               <label for="txType" class="txn-type-label" data-i18n="label_tx_type">Transaction type</label>
               <select id="txType" required class="txn-type-select">
@@ -224,7 +218,7 @@
                   <label for="amount" class="form-label" data-i18n="transaction_label_amount">Amount</label>
                   <input class="form-control" type="number" id="amount" name="amount" step="0.01" required />
                 </div>
-                <!-- Payer / 1099 fields — shown only for income transactions -->
+                <!-- Payer / 1099 fields - shown only for income transactions -->
                 <div class="form-field income-only-field" id="payerNameField">
                   <label for="payerName" class="form-label" data-i18n="transaction_payer_label">Payer / Platform</label>
                   <input class="form-control" type="text" id="payerName" name="payer_name" list="payerNameSuggestions" data-i18n-placeholder="transaction_payer_placeholder" placeholder="e.g. Uber, Fiverr, Stripe" />
@@ -305,7 +299,7 @@
                   </div>
                   <div class="form-field" id="transactionPersonalUsePctField">
                     <label for="transactionPersonalUsePct" class="form-label">Personal-use %</label>
-                    <input id="transactionPersonalUsePct" class="form-control" type="number" step="0.01" min="0" max="100" placeholder="0 – 100" />
+                    <input id="transactionPersonalUsePct" class="form-control" type="number" step="0.01" min="0" max="100" placeholder="0 - 100" />
                     <p class="small-note" id="transactionDeductiblePreview" hidden></p>
                   </div>
                   <div class="form-field">
@@ -520,7 +514,7 @@
       <div class="form-field">
         <label for="csvImportAccount" class="form-label">Destination account</label>
         <select id="csvImportAccount" class="form-control">
-          <option value="">Select account…</option>
+          <option value="">Select account...</option>
         </select>
       </div>
       <div class="form-field">

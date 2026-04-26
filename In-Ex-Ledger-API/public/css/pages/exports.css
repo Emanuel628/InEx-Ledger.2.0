@@ -129,6 +129,55 @@
   gap: 10px;
 }
 
+.exports-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.exports-info-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.5px solid var(--border2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.exports-info-btn:hover,
+.exports-info-btn[aria-expanded="true"] {
+  border-color: var(--accent2);
+  color: var(--accent2);
+  background: var(--accent-light);
+}
+
+.exports-info-popover {
+  margin-top: 10px;
+  max-width: 640px;
+  padding: 12px 14px;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink2);
+  box-shadow: 0 12px 30px rgba(15, 25, 35, 0.08);
+}
+
+.exports-info-popover p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.exports-info-popover p + p {
+  margin-top: 8px;
+}
+
 .export-btn {
   padding: 9px 18px;
   border-radius: 8px;
@@ -241,6 +290,21 @@
   grid-template-columns: 1fr 1fr;
   gap: 14px;
   align-items: start;
+}
+
+.exports-card input[type="date"] {
+  position: relative;
+  cursor: pointer;
+}
+
+.exports-card input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 -------------------
 .exports-card input,

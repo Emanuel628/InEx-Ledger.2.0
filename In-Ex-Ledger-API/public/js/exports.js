@@ -66,6 +66,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   populateExportFilters();
   initExportLanguageSelect();
   initPresetChips();
+  initExportInfoPopover();
   setupExportForm();
   setupPdfButton();
   wireInlineTaxId();
@@ -73,6 +74,42 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateExportSummary();
   renderExportHistory();
 });
+
+function initExportInfoPopover() {
+  const button = document.getElementById("exportsInfoBtn");
+  const popover = document.getElementById("exportsInfoPopover");
+  if (!button || !popover) {
+    return;
+  }
+
+  const close = () => {
+    popover.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+  };
+
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const nextHidden = !popover.hidden;
+    popover.hidden = nextHidden;
+    button.setAttribute("aria-expanded", String(!nextHidden));
+  });
+
+  document.addEventListener("click", (event) => {
+    if (popover.hidden) {
+      return;
+    }
+    if (event.target === button || button.contains(event.target) || popover.contains(event.target)) {
+      return;
+    }
+    close();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !popover.hidden) {
+      close();
+    }
+  });
+}
 
 async function hydrateExportData() {
   await Promise.all([
