@@ -429,6 +429,7 @@ function ensureLegacyUserPills() {
   pill.innerHTML = `
     <span class="user-avatar">U</span>
     <span class="user-name">User</span>
+    <svg class="user-pill-chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
   `;
 
   header.appendChild(pill);
