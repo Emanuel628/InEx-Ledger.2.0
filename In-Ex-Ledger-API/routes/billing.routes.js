@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
+const { Resend } = require("resend");
 const { requireAuth, requireMfaIfEnabled } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createBillingMutationLimiter } = require("../middleware/rateLimitTiers.js");
@@ -12,6 +13,10 @@ const {
   setFreePlanForBusiness
 } = require("../services/subscriptionService.js");
 const { buildStripePriceEnvMap } = require("../services/stripePriceConfig.js");
+const {
+  getPreferredLanguageForUser,
+  buildBillingLifecycleEmail
+} = require("../services/emailI18nService.js");
 const {
   normalizeIpAddress,
   fetchIpLocation
@@ -31,16 +36,28 @@ const BILLING_CURRENCIES = new Set(["usd", "cad"]);
 const MAX_ADDITIONAL_BUSINESSES = 100;
 const BILLING_CONTEXT_CACHE_TTL_MS = 15 * 60 * 1000;
 const STRIPE_PRICE_CACHE_TTL_MS = 15 * 60 * 1000;
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "InEx Ledger <noreply@inexledger.com>";
 
 const { base: BASE_PRICE_ENV, addon: ADDON_PRICE_ENV } = buildStripePriceEnvMap();
 const billingContextCache = new Map();
 const stripePriceCache = new Map();
+let resendClient = null;
 
 class BillingValidationError extends Error {
   constructor(message) {
     super(message);
     this.name = "BillingValidationError";
   }
+}
+
+function getResend() {
+  if (!resendClient) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is not configured");
+    }
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendClient;
 }
 
 const billingReadLimiter = rateLimit({
@@ -382,6 +399,85 @@ function buildAppUrl(path) {
   return `${base.replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+function formatBillingCurrencyAmount(amountMinor, currency) {
+  const normalizedCurrency = String(currency || "usd").toUpperCase();
+  const value = Number(amountMinor || 0) / 100;
+  if (!Number.isFinite(value)) {
+    return `${normalizedCurrency} 0.00`;
+  }
+  const locale = normalizedCurrency === "CAD" ? "en-CA" : "en-US";
+  try {
+    return new Intl.NumberFormat(locale, { style: "currency", currency: normalizedCurrency }).format(value);
+  } catch (_) {
+    return `${normalizedCurrency} ${value.toFixed(2)}`;
+  }
+}
+
+function formatBillingIntervalLabel(interval) {
+  return String(interval || "").toLowerCase() === "yearly" ? "Yearly" : "Monthly";
+}
+
+function formatDateLabel(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) {
+    return "-";
+  }
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+async function findBillingContactByBusinessId(businessId) {
+  if (!businessId) {
+    return null;
+  }
+  const result = await pool.query(
+    `SELECT u.id AS user_id,
+            u.email,
+            COALESCE(u.display_name, u.full_name, u.email) AS display_name,
+            b.name AS business_name
+       FROM businesses b
+       JOIN users u ON u.id = b.user_id
+      WHERE b.id = $1
+      LIMIT 1`,
+    [businessId]
+  );
+  return result.rows[0] || null;
+}
+
+async function sendBillingEmail({ businessId, kind, details, actionUrl, invoiceUrl }) {
+  try {
+    const contact = await findBillingContactByBusinessId(businessId);
+    if (!contact?.email) {
+      return;
+    }
+    const lang = await getPreferredLanguageForUser(contact.user_id);
+    const billingUrl = buildAppUrl("/subscription");
+    const emailContent = buildBillingLifecycleEmail(lang, kind, {
+      details,
+      actionUrl,
+      invoiceUrl,
+      billingUrl
+    });
+    await getResend().emails.send({
+      from: RESEND_FROM_EMAIL,
+      to: contact.email,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      text: emailContent.text
+    });
+    logInfo("Billing lifecycle email sent", { businessId, kind, to: contact.email });
+  } catch (err) {
+    logWarn("Billing lifecycle email failed", {
+      businessId,
+      kind,
+      err: err.message
+    });
+  }
+}
+
 router.get("/subscription", requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
@@ -574,6 +670,15 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
       // No Stripe subscription — just downgrade to free immediately
       await setFreePlanForBusiness(businessId);
       const updated = await getSubscriptionSnapshotForBusiness(businessId);
+      await sendBillingEmail({
+        businessId,
+        kind: "canceling",
+        details: [
+          { label: "Plan", value: "Basic" },
+          { label: "Effective", value: "Immediate" }
+        ],
+        actionUrl: buildAppUrl("/subscription")
+      });
       return res.status(200).json({ subscription: updated });
     }
 
@@ -598,6 +703,15 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
     }
 
     const updated = await getSubscriptionSnapshotForBusiness(businessId);
+    await sendBillingEmail({
+      businessId,
+      kind: "canceling",
+      details: [
+        { label: "Plan", value: updated.effectiveTierName || "Pro" },
+        { label: "Access until", value: formatDateLabel(updated.currentPeriodEnd) }
+      ],
+      actionUrl: buildAppUrl("/subscription")
+    });
     logInfo("Billing cancellation scheduled", {
       userId: req.user?.id,
       businessId,
@@ -796,6 +910,17 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
         const sub = await subResponse.json().catch(() => null);
         if (sub && !sub.error) {
           await syncStripeSubscriptionForBusiness(businessId, sub);
+          await sendBillingEmail({
+            businessId,
+            kind: "activated",
+            details: [
+              { label: "Plan", value: "Pro" },
+              { label: "Billing", value: formatBillingIntervalLabel(sub?.metadata?.billing_interval) },
+              { label: "Additional businesses", value: String(Number(sub?.metadata?.additional_businesses) || 0) },
+              { label: "Access through", value: formatDateLabel(sub?.current_period_end ? new Date(sub.current_period_end * 1000) : null) }
+            ],
+            actionUrl: buildAppUrl("/subscription")
+          });
           logInfo("Stripe checkout.session.completed synced for business:", businessId);
         }
       }
@@ -817,6 +942,18 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
         const sub = await subResponse.json().catch(() => null);
         if (sub && !sub.error) {
           await syncStripeSubscriptionForBusiness(businessId, sub);
+          await sendBillingEmail({
+            businessId,
+            kind: "charged",
+            details: [
+              { label: "Amount", value: formatBillingCurrencyAmount(object?.amount_paid, object?.currency) },
+              { label: "Plan", value: "Pro" },
+              { label: "Billing", value: formatBillingIntervalLabel(sub?.metadata?.billing_interval) },
+              { label: "Paid on", value: formatDateLabel(object?.status_transitions?.paid_at ? new Date(object.status_transitions.paid_at * 1000) : object?.created ? new Date(object.created * 1000) : null) }
+            ],
+            actionUrl: object?.hosted_invoice_url || buildAppUrl("/subscription"),
+            invoiceUrl: object?.hosted_invoice_url || object?.invoice_pdf || ""
+          });
           logInfo("Stripe invoice.payment_succeeded synced for business:", businessId);
         }
       }

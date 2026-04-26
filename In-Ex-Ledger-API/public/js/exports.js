@@ -934,7 +934,7 @@ function buildBasicCsv(transactions, includeBusiness = false) {
     .forEach((transaction) => {
       rows.push([
         ...(includeBusiness ? [transaction.businessName || getBusinessById(transaction.businessId)?.name || tx("common_business")] : []),
-        transaction.date || "",
+        formatCsvDateCell(transaction.date),
         transaction.description || "",
         resolveTransactionType(transaction),
         transaction.cleared ? tx("transactions_status_cleared") : tx("transactions_status_pending"),
@@ -993,7 +993,7 @@ function buildFullCsv(transactions, currency, includeBusiness = false) {
 
       rows.push([
         ...(includeBusiness ? [transaction.businessName || getBusinessById(transaction.businessId)?.name || tx("common_business")] : []),
-        transaction.date || "",
+        formatCsvDateCell(transaction.date),
         transaction.description || "",
         type,
         transaction.cleared ? tx("transactions_status_cleared") : tx("transactions_status_pending"),
@@ -1005,7 +1005,7 @@ function buildFullCsv(transactions, currency, includeBusiness = false) {
         transaction.currency || currency,
         formatOptionalCsvNumber(transaction.sourceAmount ?? transaction.source_amount),
         formatOptionalCsvNumber(transaction.exchangeRate ?? transaction.exchange_rate, true),
-        transaction.exchangeDate || transaction.exchange_date || "",
+        formatCsvDateCell(transaction.exchangeDate || transaction.exchange_date || ""),
         formatOptionalCsvNumber(transaction.convertedAmount ?? transaction.converted_amount),
         (() => {
           const treatment = String(transaction.taxTreatment || transaction.tax_treatment || "").toLowerCase();
@@ -1036,6 +1036,16 @@ function escapeCsv(value) {
   return `"${stringValue.replace(/"/g, '""')}"`;
 }
 
+function formatCsvDateCell(value) {
+  const normalized = String(value || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return normalized;
+  }
+  // Prefix with an invisible LTR mark so spreadsheet apps preserve the
+  // short ISO date as text instead of auto-formatting it into truncated cells.
+  return `\u200E${normalized}`;
+}
+
 function formatOptionalCsvNumber(value, preservePrecision = false) {
   if (value === null || value === undefined || value === "") {
     return "";
@@ -1048,7 +1058,11 @@ function formatOptionalCsvNumber(value, preservePrecision = false) {
 }
 
 function downloadFile(content, filename, type) {
-  const blobData = content instanceof Uint8Array ? content.buffer : content;
+  const isCsv = typeof type === "string" && type.toLowerCase().startsWith("text/csv");
+  let blobData = content instanceof Uint8Array ? content.buffer : content;
+  if (isCsv && typeof blobData === "string") {
+    blobData = `\uFEFF${blobData}`;
+  }
   const blob = new Blob([blobData], { type });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");

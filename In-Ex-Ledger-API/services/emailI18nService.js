@@ -409,6 +409,129 @@ function buildMfaEmailContent(lang, purpose = "signin") {
   return bucket[l] || bucket.en;
 }
 
+/* =========================================================
+   Billing lifecycle emails
+   ========================================================= */
+const BILLING_LIFECYCLE = {
+  activated: {
+    en: {
+      subject: "Your InEx Ledger Pro subscription is active",
+      eyebrow: "InEx Ledger billing",
+      heading: "Your Pro subscription is active",
+      body: "Your business now has access to Pro features.",
+      detailsLabel: "Subscription details",
+      actionLabel: "Open billing",
+      footer: "You can review your billing details from the subscription page at any time.",
+      text: ({ summary, billingUrl }) =>
+        `Your InEx Ledger Pro subscription is active.\n\n${summary}\n\nReview billing: ${billingUrl}`
+    },
+    fr: {
+      subject: "Votre abonnement InEx Ledger Pro est actif",
+      eyebrow: "Facturation InEx Ledger",
+      heading: "Votre abonnement Pro est actif",
+      body: "Votre entreprise a maintenant accès aux fonctionnalités Pro.",
+      detailsLabel: "Détails de l’abonnement",
+      actionLabel: "Ouvrir la facturation",
+      footer: "Vous pouvez consulter vos détails de facturation depuis la page d’abonnement à tout moment.",
+      text: ({ summary, billingUrl }) =>
+        `Votre abonnement InEx Ledger Pro est actif.\n\n${summary}\n\nConsulter la facturation : ${billingUrl}`
+    }
+  },
+  canceling: {
+    en: {
+      subject: "Your InEx Ledger subscription will end at period close",
+      eyebrow: "InEx Ledger billing",
+      heading: "Cancellation scheduled",
+      body: "Your paid subscription will stay active until the end of the current billing period.",
+      detailsLabel: "Access details",
+      actionLabel: "Open billing",
+      footer: "You can resubscribe at any time before access ends.",
+      text: ({ summary, billingUrl }) =>
+        `Your InEx Ledger subscription is scheduled to cancel.\n\n${summary}\n\nReview billing: ${billingUrl}`
+    },
+    fr: {
+      subject: "Votre abonnement InEx Ledger prendra fin à la fin de la période",
+      eyebrow: "Facturation InEx Ledger",
+      heading: "Annulation planifiée",
+      body: "Votre abonnement payant restera actif jusqu’à la fin de la période de facturation en cours.",
+      detailsLabel: "Détails d’accès",
+      actionLabel: "Ouvrir la facturation",
+      footer: "Vous pouvez vous réabonner à tout moment avant la fin de l’accès.",
+      text: ({ summary, billingUrl }) =>
+        `Votre abonnement InEx Ledger est planifié pour annulation.\n\n${summary}\n\nConsulter la facturation : ${billingUrl}`
+    }
+  },
+  charged: {
+    en: {
+      subject: "Your InEx Ledger payment was received",
+      eyebrow: "InEx Ledger billing",
+      heading: "Payment received",
+      body: "We received your subscription payment successfully.",
+      detailsLabel: "Payment details",
+      actionLabel: "View invoice",
+      footer: "Keep this email for your records, or view the full invoice from the billing page.",
+      text: ({ summary, invoiceUrl }) =>
+        `Your InEx Ledger payment was received.\n\n${summary}${invoiceUrl ? `\n\nInvoice: ${invoiceUrl}` : ""}`
+    },
+    fr: {
+      subject: "Votre paiement InEx Ledger a été reçu",
+      eyebrow: "Facturation InEx Ledger",
+      heading: "Paiement reçu",
+      body: "Nous avons bien reçu le paiement de votre abonnement.",
+      detailsLabel: "Détails du paiement",
+      actionLabel: "Voir la facture",
+      footer: "Conservez ce courriel pour vos dossiers ou consultez la facture complète depuis la page de facturation.",
+      text: ({ summary, invoiceUrl }) =>
+        `Votre paiement InEx Ledger a été reçu.\n\n${summary}${invoiceUrl ? `\n\nFacture : ${invoiceUrl}` : ""}`
+    }
+  }
+};
+
+function buildBillingLifecycleEmail(lang, kind, options = {}) {
+  const l = normalizeEmailLang(lang);
+  const bucket = BILLING_LIFECYCLE[kind] || BILLING_LIFECYCLE.activated;
+  const s = bucket[l] || bucket.en;
+  const details = Array.isArray(options.details)
+    ? options.details.filter((detail) => detail && detail.label && detail.value)
+    : [];
+  const safeActionUrl = sanitizeHttpUrl(options.actionUrl);
+  const safeBillingUrl = sanitizeHttpUrl(options.billingUrl || options.actionUrl);
+  const safeInvoiceUrl = sanitizeHttpUrl(options.invoiceUrl);
+  const summary = details.map((detail) => `${detail.label}: ${detail.value}`).join("\n");
+  const detailHtml = details.length
+    ? `
+      <div style="margin: 20px 0; padding: 16px 18px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
+        <div style="margin: 0 0 10px; color: #0f172a; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">${escapeHtml(s.detailsLabel)}</div>
+        ${details
+          .map(
+            (detail) =>
+              `<div style="display: flex; gap: 8px; margin: 0 0 8px; color: #334155; font-size: 14px; line-height: 1.5;"><strong style="min-width: 132px; color: #0f172a;">${escapeHtml(detail.label)}</strong><span>${escapeHtml(detail.value)}</span></div>`
+          )
+          .join("")}
+      </div>`
+    : "";
+  const actionLink = safeActionUrl || safeInvoiceUrl || safeBillingUrl;
+  const html = wrapEmailHtml(
+    `<div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">${s.eyebrow}</div>
+     <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${s.heading}</h1>`,
+    `<p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">${s.body}</p>
+     ${detailHtml}
+     ${actionLink ? ctaButton(actionLink, s.actionLabel) : ""}
+     ${safeInvoiceUrl && safeInvoiceUrl !== actionLink ? `<p style="margin: 0 0 10px; word-break: break-all; color: #1d4ed8; font-size: 13px;">${escapeHtml(safeInvoiceUrl)}</p>` : ""}
+     <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">${s.footer}</p>`
+  );
+
+  return {
+    subject: s.subject,
+    html,
+    text: s.text({
+      summary,
+      billingUrl: safeBillingUrl,
+      invoiceUrl: safeInvoiceUrl
+    })
+  };
+}
+
 module.exports = {
   getPreferredLanguageForUser,
   getPreferredLanguageForEmail,
@@ -417,6 +540,7 @@ module.exports = {
   buildPasswordResetEmail,
   buildNewSignInAlertEmail,
   buildEmailChangeEmail,
+  buildBillingLifecycleEmail,
   buildMfaEmailContent,
   normalizeEmailLang
 };

@@ -137,6 +137,20 @@ function loadBillingRouter(options = {}) {
     }
 
     if (
+      requestName === "../services/emailI18nService.js" ||
+      /emailI18nService\.js$/.test(requestName)
+    ) {
+      return {
+        getPreferredLanguageForUser: async () => "en",
+        buildBillingLifecycleEmail: () => ({
+          subject: "Billing update",
+          html: "<p>ok</p>",
+          text: "ok"
+        })
+      };
+    }
+
+    if (
       requestName === "../middleware/auth.middleware.js" ||
       /auth\.middleware\.js$/.test(requestName)
     ) {
@@ -177,12 +191,23 @@ function loadBillingRouter(options = {}) {
       };
     }
 
+    if (requestName === "resend") {
+      return {
+        Resend: class Resend {
+          constructor() {
+            this.emails = { send: async () => ({ id: "email_test_123" }) };
+          }
+        }
+      };
+    }
+
     return originalLoad(requestName, parent, isMain);
   };
 
   delete require.cache[BILLING_ROUTE_PATH];
   process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
   process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_billing_webhook";
+  process.env.APP_BASE_URL = process.env.APP_BASE_URL || "https://app.inexledger.test";
 
   try {
     const router = require("../routes/billing.routes.js");
@@ -207,6 +232,7 @@ function loadBillingRouter(options = {}) {
         global.fetch = originalFetch;
         delete process.env.STRIPE_WEBHOOK_SECRET;
         delete process.env.STRIPE_SECRET_KEY;
+        delete process.env.APP_BASE_URL;
       }
     };
   } catch (err) {
@@ -214,6 +240,7 @@ function loadBillingRouter(options = {}) {
     global.fetch = originalFetch;
     delete process.env.STRIPE_WEBHOOK_SECRET;
     delete process.env.STRIPE_SECRET_KEY;
+    delete process.env.APP_BASE_URL;
     throw err;
   }
 }

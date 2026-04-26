@@ -76,6 +76,20 @@ function loadBillingRouter({ country = "Canada" } = {}) {
     }
 
     if (
+      requestName === "../services/emailI18nService.js" ||
+      /emailI18nService\.js$/.test(requestName)
+    ) {
+      return {
+        getPreferredLanguageForUser: async () => "en",
+        buildBillingLifecycleEmail: () => ({
+          subject: "Billing update",
+          html: "<p>ok</p>",
+          text: "ok"
+        })
+      };
+    }
+
+    if (
       requestName === "../services/signInSecurityService.js" ||
       /signInSecurityService\.js$/.test(requestName)
     ) {
@@ -98,7 +112,7 @@ function loadBillingRouter({ country = "Canada" } = {}) {
           };
           next();
         },
-        requireMfa: (_req, _res, next) => next()
+        requireMfaIfEnabled: (_req, _res, next) => next()
       };
     }
 
@@ -132,6 +146,16 @@ function loadBillingRouter({ country = "Canada" } = {}) {
     if (requestName === "express-rate-limit") {
       return function rateLimit() {
         return (_req, _res, next) => next();
+      };
+    }
+
+    if (requestName === "resend") {
+      return {
+        Resend: class Resend {
+          constructor() {
+            this.emails = { send: async () => ({ id: "email_test_123" }) };
+          }
+        }
       };
     }
 

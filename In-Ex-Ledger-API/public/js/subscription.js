@@ -504,8 +504,8 @@ async function loadBillingHistory() {
               <td>${escapeHtml(fmtAmount(inv.amount_paid, inv.currency))}</td>
               <td><span class="billing-status-badge billing-status-${escapeHtml(inv.status)}">${escapeHtml(inv.status || "-")}</span></td>
               <td>
-                ${inv.hosted_invoice_url
-                  ? `<a href="${escapeHtml(inv.hosted_invoice_url)}" target="_blank" rel="noopener noreferrer" class="billing-invoice-link">${tx("sub_mgmt_view_invoice")}</a>`
+                ${inv.hosted_invoice_url || inv.invoice_pdf
+                  ? `<a href="${escapeHtml(inv.hosted_invoice_url || inv.invoice_pdf)}" target="_blank" rel="noopener noreferrer" class="billing-invoice-link">${tx("sub_mgmt_view_invoice")}</a>`
                   : "-"}
               </td>
             </tr>
