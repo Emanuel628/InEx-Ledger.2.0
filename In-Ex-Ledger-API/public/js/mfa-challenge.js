@@ -49,26 +49,19 @@ async function handleMfaChallengeSubmit(event) {
   submitButton?.setAttribute("disabled", "true");
 
   try {
-    const response = await (typeof apiFetch === "function"
-      ? apiFetch("/api/auth/mfa/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mfaToken: pendingMfaToken,
-            code,
-            trustDevice
-          })
-        })
-      : fetch(buildApiUrl("/api/auth/mfa/verify"), {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mfaToken: pendingMfaToken,
-            code,
-            trustDevice
-          })
-        }));
+    const response = await fetch(buildApiUrl("/api/auth/mfa/verify"), {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(typeof csrfHeader === "function" ? csrfHeader("POST") : {})
+      },
+      body: JSON.stringify({
+        mfaToken: pendingMfaToken,
+        code,
+        trustDevice
+      })
+    });
 
     const data = response ? await response.json().catch(() => null) : null;
     if (!response || !response.ok || !data?.token) {
