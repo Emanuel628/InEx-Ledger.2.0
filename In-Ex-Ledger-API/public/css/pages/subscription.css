@@ -422,6 +422,9 @@
 .sub-checkout-modal {
   width: min(560px, calc(100vw - 32px));
   border-radius: 10px;
+  background: var(--surface);
+  padding: 28px;
+  box-shadow: 0 20px 60px rgba(15, 25, 35, 0.18);
 }
 
 .sub-checkout-head {
