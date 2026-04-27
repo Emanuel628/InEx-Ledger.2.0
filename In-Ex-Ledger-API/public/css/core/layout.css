@@ -730,8 +730,8 @@ body[data-theme="light"] select option {
   width: 28px !important;
   height: 28px !important;
   border-radius: 50% !important;
-  background: var(--accent2) !important;
-  color: #fff !important;
+  background: #dbeafe !important;
+  color: #1e40af !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
