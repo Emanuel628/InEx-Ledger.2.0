@@ -13,6 +13,7 @@ const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const SUBSCRIPTION_KEY = "lb_subscription";
 const ACTIVE_BUSINESS_ID_KEY = "lb_active_business_id";
 const ACTIVE_BUSINESS_NAME_KEY = "lb_business_name";
+const USER_PILL_CHEVRON_MARKUP = '<svg class="user-pill-chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CPA_UI_ENABLED = false;
 const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
@@ -344,6 +345,8 @@ function updateAuthenticatedChrome(profile = {}) {
     ensureLegacyUserPills();
   }
 
+  document.querySelectorAll(".user-pill").forEach(ensureUserPillChrome);
+
   document.querySelectorAll(".user-name").forEach((node) => {
     node.textContent = displayName;
   });
@@ -429,10 +432,22 @@ function ensureLegacyUserPills() {
   pill.innerHTML = `
     <span class="user-avatar">U</span>
     <span class="user-name">User</span>
-    <svg class="user-pill-chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    ${USER_PILL_CHEVRON_MARKUP}
   `;
 
   header.appendChild(pill);
+}
+
+function ensureUserPillChrome(pill) {
+  if (!pill || pill.dataset.userPillChrome === "ready") {
+    return;
+  }
+
+  if (!pill.querySelector(".user-pill-chevron")) {
+    pill.insertAdjacentHTML("beforeend", USER_PILL_CHEVRON_MARKUP);
+  }
+
+  pill.dataset.userPillChrome = "ready";
 }
 
 
