@@ -276,6 +276,8 @@ async function syncStripeSubscriptionForBusiness(businessId, subscription) {
         currency,
         additional_businesses: additionalBusinesses,
         addon_price_id: addonPriceId,
+        addon_subscription_item_id: addonItem?.id || null,
+        base_subscription_item_id: baseItem?.id || null,
         past_due_started_at: pastDueStartedAt
       })
     ]

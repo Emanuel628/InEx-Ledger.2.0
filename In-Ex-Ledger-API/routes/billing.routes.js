@@ -747,6 +747,118 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
   }
 });
 
+function getAddonPriceIds() {
+  const ids = new Set();
+  for (const intervalKey of Object.keys(ADDON_PRICE_ENV)) {
+    const intervalMap = ADDON_PRICE_ENV[intervalKey];
+    for (const currencyKey of Object.keys(intervalMap || {})) {
+      const envVar = intervalMap[currencyKey];
+      const priceId = process.env[envVar];
+      if (priceId) ids.add(priceId);
+    }
+  }
+  return ids;
+}
+
+async function resolveAddonPriceIdForSubscription(businessId) {
+  const result = await pool.query(
+    "SELECT metadata_json FROM business_subscriptions WHERE business_id = $1 LIMIT 1",
+    [businessId]
+  );
+  const meta =
+    result.rows[0]?.metadata_json && typeof result.rows[0].metadata_json === "object"
+      ? result.rows[0].metadata_json
+      : {};
+  const billingInterval = meta.billing_interval || "monthly";
+  const currency = meta.currency || "usd";
+  const addonEnv = ADDON_PRICE_ENV[billingInterval]?.[currency];
+  if (!addonEnv) {
+    throw new BillingValidationError(
+      "Additional business pricing is not configured for your billing interval and currency."
+    );
+  }
+  return requireEnvValue(addonEnv);
+}
+
+router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfaIfEnabled, async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+
+    if (subscription.effectiveTier !== "v1" || !subscription.isPaid) {
+      return res.status(403).json({
+        error: "Additional business slots require an active Pro subscription."
+      });
+    }
+    if (subscription.cancelAtPeriodEnd) {
+      return res.status(409).json({
+        error: "Cannot change business slots while cancellation is pending. Resume Pro to make changes."
+      });
+    }
+    if (!subscription.stripeSubscriptionId) {
+      return res.status(409).json({ error: "No active Stripe subscription found." });
+    }
+
+    const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
+
+    const stripeSub = await stripeGet(
+      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`
+    );
+    const items = Array.isArray(stripeSub.items?.data) ? stripeSub.items.data : [];
+    const addonPriceIds = getAddonPriceIds();
+    const existingAddonItem = items.find((item) => addonPriceIds.has(item?.price?.id)) || null;
+
+    let updatedSub;
+    if (additionalBusinesses === 0 && !existingAddonItem) {
+      updatedSub = stripeSub;
+    } else if (additionalBusinesses === 0 && existingAddonItem) {
+      updatedSub = await stripeRequest(
+        `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
+        {
+          "items[0][id]": existingAddonItem.id,
+          "items[0][deleted]": "true",
+          proration_behavior: "create_prorations"
+        }
+      );
+    } else if (existingAddonItem) {
+      updatedSub = await stripeRequest(
+        `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
+        {
+          "items[0][id]": existingAddonItem.id,
+          "items[0][quantity]": additionalBusinesses,
+          proration_behavior: "create_prorations"
+        }
+      );
+    } else {
+      const addonPriceId = await resolveAddonPriceIdForSubscription(businessId);
+      updatedSub = await stripeRequest(
+        `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
+        {
+          "items[0][price]": addonPriceId,
+          "items[0][quantity]": additionalBusinesses,
+          proration_behavior: "create_prorations"
+        }
+      );
+    }
+
+    await syncStripeSubscriptionForBusiness(businessId, updatedSub);
+    const updated = await getSubscriptionSnapshotForBusiness(businessId);
+    logInfo("Business slots updated", {
+      userId: req.user?.id,
+      businessId,
+      previousAdditionalBusinesses: subscription.additionalBusinesses,
+      newAdditionalBusinesses: additionalBusinesses
+    });
+    res.status(200).json({ subscription: updated });
+  } catch (err) {
+    logError("PATCH /api/billing/additional-businesses error:", err.message);
+    const status = err instanceof BillingValidationError ? 400 : 500;
+    res.status(status).json({
+      error: status === 400 ? err.message : "Failed to update business slots."
+    });
+  }
+});
+
 router.get("/history", billingReadLimiter, requireAuth, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
