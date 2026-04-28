@@ -521,6 +521,17 @@
   cursor: not-allowed;
 }
 
+.modal-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.drawer-submit {
+  padding: 8px 16px;
+}
+
 @media (max-width: 640px) {
   .sub-checkout-row {
     align-items: flex-start;
