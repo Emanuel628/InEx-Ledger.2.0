@@ -619,7 +619,7 @@ body[data-theme="light"] select option {
   gap: 28px !important;
   flex: 1 1 auto !important;
   min-width: 0 !important;
-  flex-wrap: wrap !important;
+  flex-wrap: nowrap !important;
 }
 
 .topbar-brand {
@@ -658,7 +658,7 @@ body[data-theme="light"] select option {
   gap: 8px !important;
   flex: 1 1 auto !important;
   min-width: 0 !important;
-  flex-wrap: wrap !important;
+  flex-wrap: nowrap !important;
 }
 
 .topbar-nav a {
@@ -742,7 +742,7 @@ body[data-theme="light"] select option {
 
 .user-name {
   font-size: 12px !important;
-  color: var(--ink) !important;
+  color: #0f172a !important;
   min-width: 0 !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
@@ -1023,7 +1023,7 @@ body[data-theme="light"] select option {
   .help-topbar {
     height: auto !important;
     padding: 12px 16px !important;
-    align-items: flex-start !important;
+    align-items: center !important;
     gap: 12px !important;
   }
 
