@@ -549,7 +549,7 @@ async function loadSubscription() {
     renderBusinessAccessSection(sub);
 
     if (planProBtn) {
-      if (sub.effectiveTier === "v1" && !sub.cancelAtPeriodEnd) {
+      if (sub.effectiveTier === "v1" && sub.isPaid && !sub.cancelAtPeriodEnd) {
         planProBtn.disabled = true;
         planProBtn.textContent = tx("subscription_current_plan");
         planProBtn.dataset.planDisabled = "true";
@@ -740,6 +740,7 @@ async function startCheckout() {
       })
     });
     if (!res) {
+      showSubToast(tx("subscription_checkout_error"));
       setCheckoutLoading(false);
       return;
     }
