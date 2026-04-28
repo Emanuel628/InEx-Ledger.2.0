@@ -12,6 +12,11 @@ const pricingState = {
   verifiedPricing: null
 };
 let currentSubscription = null;
+const businessSlotsState = {
+  currentAdditionalBusinesses: 0,
+  selectedAdditionalBusinesses: 0,
+  isSaving: false
+};
 
 function showSubToast(message) {
   const toast = document.getElementById("subToast");
@@ -332,6 +337,128 @@ function buildFreeTierConfirmationMessage(sub) {
   return tx("subscription_free_confirm_body_generic");
 }
 
+function wireSlotsControls() {
+  const input = document.getElementById("businessSlotsInput");
+  const decreaseBtn = document.getElementById("slotsDecreaseBtn");
+  const increaseBtn = document.getElementById("slotsIncreaseBtn");
+  const updateBtn = document.getElementById("updateSlotsBtn");
+  if (!input || !decreaseBtn || !increaseBtn || !updateBtn) return;
+
+  const syncButtons = () => {
+    const val = businessSlotsState.selectedAdditionalBusinesses;
+    input.value = String(val);
+    decreaseBtn.disabled = val <= 0;
+    increaseBtn.disabled = val >= MAX_ADDITIONAL_BUSINESSES;
+  };
+
+  input.addEventListener("change", () => {
+    businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(Number(input.value));
+    syncButtons();
+  });
+  decreaseBtn.addEventListener("click", () => {
+    businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(businessSlotsState.selectedAdditionalBusinesses - 1);
+    syncButtons();
+  });
+  increaseBtn.addEventListener("click", () => {
+    businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(businessSlotsState.selectedAdditionalBusinesses + 1);
+    syncButtons();
+  });
+  updateBtn.addEventListener("click", updateBusinessSlots);
+  syncButtons();
+}
+
+async function updateBusinessSlots() {
+  if (businessSlotsState.isSaving) return;
+  businessSlotsState.isSaving = true;
+  const updateBtn = document.getElementById("updateSlotsBtn");
+  if (updateBtn) {
+    updateBtn.disabled = true;
+    updateBtn.textContent = tx("subscription_checkout_loading");
+  }
+  try {
+    const res = await apiFetch("/api/billing/additional-businesses", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ additionalBusinesses: businessSlotsState.selectedAdditionalBusinesses })
+    });
+    const payload = await res?.json()?.catch(() => null);
+    if (!res || !res.ok) {
+      throw new Error(payload?.error || tx("subscription_business_slots_error"));
+    }
+    showSubToast(tx("subscription_business_slots_success"));
+    currentSubscription = await loadSubscription();
+    await loadBillingHistory();
+  } catch (err) {
+    showSubToast(err.message || tx("subscription_business_slots_error"));
+  } finally {
+    businessSlotsState.isSaving = false;
+    const btn = document.getElementById("updateSlotsBtn");
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = tx("subscription_update_business_slots");
+    }
+  }
+}
+
+function renderBusinessAccessSection(sub) {
+  const manager = document.getElementById("businessSlotsManager");
+  if (!manager) return;
+
+  const isActivePro = sub && sub.effectiveTier === "v1" && sub.isPaid && !sub.cancelAtPeriodEnd;
+  const isCancelingPro = sub && sub.effectiveTier === "v1" && sub.cancelAtPeriodEnd;
+
+  const proCardAddonGroup = document.getElementById("proCardAddonGroup");
+  if (proCardAddonGroup) {
+    proCardAddonGroup.classList.toggle("hidden", isActivePro || isCancelingPro);
+  }
+
+  if (!sub || sub.effectiveTier !== "v1") {
+    manager.innerHTML = `<p class="sub-access-upgrade-note">${escapeHtml(tx("subscription_business_access_upgrade_note"))}</p>`;
+    return;
+  }
+
+  businessSlotsState.currentAdditionalBusinesses = sub.additionalBusinesses || 0;
+  businessSlotsState.selectedAdditionalBusinesses = sub.additionalBusinesses || 0;
+
+  const extra = sub.additionalBusinesses || 0;
+  const total = 1 + extra;
+
+  const statsHtml = `
+    <div class="sub-access-grid">
+      <div class="sub-access-row">
+        <span class="sub-access-label">${escapeHtml(tx("subscription_included_businesses"))}</span>
+        <span class="sub-access-value">1</span>
+      </div>
+      <div class="sub-access-row">
+        <span class="sub-access-label">${escapeHtml(tx("subscription_extra_business_slots"))}</span>
+        <span class="sub-access-value">${extra}</span>
+      </div>
+      <div class="sub-access-row">
+        <span class="sub-access-label">${escapeHtml(tx("subscription_total_businesses_allowed"))}</span>
+        <span class="sub-access-value">${total}</span>
+      </div>
+    </div>`;
+
+  if (isCancelingPro) {
+    manager.innerHTML = `${statsHtml}<p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceling_help"))}</p>`;
+    return;
+  }
+
+  manager.innerHTML = `
+    ${statsHtml}
+    <div class="sub-slots-controls">
+      <div class="sub-quantity-control">
+        <button type="button" class="sub-quantity-btn" id="slotsDecreaseBtn" aria-label="Decrease">-</button>
+        <input id="businessSlotsInput" class="sub-quantity-input" type="number" min="0" max="100" step="1" value="${extra}" inputmode="numeric" />
+        <button type="button" class="sub-quantity-btn" id="slotsIncreaseBtn" aria-label="Increase">+</button>
+      </div>
+      <p class="sub-control-help">${escapeHtml(tx("subscription_extra_business_slots_help"))}</p>
+      <button type="button" id="updateSlotsBtn" class="settings-primary-btn">${escapeHtml(tx("subscription_update_business_slots"))}</button>
+    </div>`;
+
+  wireSlotsControls();
+}
+
 async function loadSubscription() {
   const statusBlock = document.getElementById("subStatusBlock");
   const manageBillingBtn = document.getElementById("subManageBillingBtn");
@@ -343,12 +470,14 @@ async function loadSubscription() {
   try {
     if (!isAuthenticated()) {
       if (statusBlock) statusBlock.innerHTML = `<p>${tx("sub_mgmt_not_signed_in")}</p>`;
+      renderBusinessAccessSection(null);
       return null;
     }
 
     const res = await apiFetch("/api/billing/subscription");
     if (!res || !res.ok) {
       if (statusBlock) statusBlock.innerHTML = `<p class="sub-status-error">${tx("sub_mgmt_load_error")}</p>`;
+      renderBusinessAccessSection(null);
       return null;
     }
 
@@ -356,6 +485,7 @@ async function loadSubscription() {
     const sub = payload?.subscription;
     if (!sub) {
       if (statusBlock) statusBlock.innerHTML = `<p class="sub-status-error">${tx("sub_mgmt_load_error")}</p>`;
+      renderBusinessAccessSection(null);
       return null;
     }
 
@@ -416,6 +546,7 @@ async function loadSubscription() {
     }
 
     updatePlanCardState(sub);
+    renderBusinessAccessSection(sub);
 
     if (planProBtn) {
       if (sub.effectiveTier === "v1" && !sub.cancelAtPeriodEnd) {

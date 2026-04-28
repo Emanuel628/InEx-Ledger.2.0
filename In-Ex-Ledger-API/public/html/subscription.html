@@ -49,6 +49,7 @@
       <nav class="settings-nav">
         <button class="settings-nav-item is-active" type="button" data-settings-target="sub-status-section" data-i18n="sub_mgmt_nav_status">Status &amp; plan</button>
         <button class="settings-nav-item" type="button" data-settings-target="sub-plans-section" data-i18n="sub_mgmt_nav_plans">Plans</button>
+        <button class="settings-nav-item" type="button" data-settings-target="sub-access-section" data-i18n="subscription_business_access_nav">Business access</button>
         <button class="settings-nav-item" type="button" data-settings-target="sub-history-section" data-i18n="sub_mgmt_nav_history">Billing history</button>
       </nav>
       <div class="settings-sidebar-actions">
@@ -118,7 +119,7 @@
                 <button type="button" class="sub-toggle-btn" data-billing-interval="yearly" data-i18n="subscription_billing_yearly">Yearly</button>
               </div>
             </div>
-            <div class="sub-control-group">
+            <div class="sub-control-group" id="proCardAddonGroup">
               <label class="sub-control-label" for="additionalBusinessesInput" data-i18n="subscription_additional_businesses_label">Additional businesses</label>
               <div class="sub-quantity-control">
                 <button type="button" class="sub-quantity-btn" data-qty-action="decrease" aria-label="Decrease">-</button>
@@ -185,6 +186,16 @@
             <p class="sub-plan-checkout-note">Pricing will appear here when the Business tier opens.</p>
           </div>
 
+      </div>
+    </section>
+
+    <section class="settings-card" id="sub-access-section">
+      <div class="card-head">
+        <h2 class="card-title" data-i18n="subscription_business_access_title">Business access</h2>
+        <p class="card-desc" data-i18n="subscription_business_access_desc">Manage additional businesses on your Pro subscription.</p>
+      </div>
+      <div id="businessSlotsManager">
+        <div class="sub-status-loading" data-i18n="settings_loading">Loading...</div>
       </div>
     </section>
 
@@ -300,6 +311,6 @@
 <script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/taxReminders.js?v=20260405c"></script>
 <script src="../js/billing-pricing.js?v=20260419a"></script>
-<script src="../js/subscription.js?v=20260425c"></script>
+<script src="../js/subscription.js?v=20260428a"></script>
 </body>
 </html>
