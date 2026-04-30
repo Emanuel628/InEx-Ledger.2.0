@@ -51,7 +51,7 @@ test("billable expenses checksum compatibility only allows the known historical 
   assert.equal(
     isCompatibleHistoricalMigrationChecksum(
       "20260419_create_billable_expenses_table.sql",
-      "511cb26e8a82e807a87fbaa40d11ff521c37ae4363761fd42170120a175009ba"
+      "d25041a060a490bb68b9d783adeeb87f6a72ec0aae4858e8f80369c264e639dc"
     ),
     true
   );
@@ -59,7 +59,15 @@ test("billable expenses checksum compatibility only allows the known historical 
   assert.equal(
     isCompatibleHistoricalMigrationChecksum(
       "20260419_create_billable_expenses_table.sql",
-      "88e445ae8a948cecef2fc05116342bc295df4eec7061c242f17043dcf6405a52"
+      "fb3d6f923d83707347a58d95dd7b9e6557b98c903fd1d1d060af81088986eebf"
+    ),
+    true
+  );
+
+  assert.equal(
+    isCompatibleHistoricalMigrationChecksum(
+      "20260419_create_billable_expenses_table.sql",
+      "511cb26e8a82e807a87fbaa40d11ff521c37ae4363761fd42170120a175009ba"
     ),
     false
   );
