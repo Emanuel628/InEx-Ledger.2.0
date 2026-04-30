@@ -949,6 +949,10 @@ body {
   gap: 0;
 }
 
+.settings-shell > * {
+  min-width: 0;
+}
+
 .settings-sidebar {
   background: var(--surface);
   border-right: 0.5px solid var(--border);
