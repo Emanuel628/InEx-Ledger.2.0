@@ -6,7 +6,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 
-const { computeChecksum } = require("../db.js");
+const { computeChecksum, isCompatibleHistoricalMigrationChecksum } = require("../db.js");
 
 const migrationsDir = path.join(__dirname, "..", "db", "migrations");
 
@@ -38,6 +38,36 @@ test("migration 050 drops cpa_audit_logs grant_id FK to prevent XX000 on account
   const sql = fs.readFileSync(path.join(migrationsDir, "050_drop_cpa_audit_grant_id_fk.sql"), "utf8");
 
   assert.match(sql, /ALTER TABLE IF EXISTS cpa_audit_logs\s+DROP CONSTRAINT IF EXISTS cpa_audit_logs_grant_id_fkey;/i);
+});
+
+test("billable expenses base migration does not inline the projects FK", () => {
+  const sql = fs.readFileSync(path.join(migrationsDir, "20260419_create_billable_expenses_table.sql"), "utf8");
+
+  assert.match(sql, /project_id\s+UUID/i);
+  assert.doesNotMatch(sql, /project_id\s+UUID\s+REFERENCES\s+projects\(id\)/i);
+});
+
+test("billable expenses checksum compatibility only allows the known historical inline-FK variant", () => {
+  assert.equal(
+    isCompatibleHistoricalMigrationChecksum(
+      "20260419_create_billable_expenses_table.sql",
+      "511cb26e8a82e807a87fbaa40d11ff521c37ae4363761fd42170120a175009ba"
+    ),
+    true
+  );
+
+  assert.equal(
+    isCompatibleHistoricalMigrationChecksum(
+      "20260419_create_billable_expenses_table.sql",
+      "88e445ae8a948cecef2fc05116342bc295df4eec7061c242f17043dcf6405a52"
+    ),
+    false
+  );
+
+  assert.equal(
+    isCompatibleHistoricalMigrationChecksum("some_other_migration.sql", "511cb26e8a82e807a87fbaa40d11ff521c37ae4363761fd42170120a175009ba"),
+    false
+  );
 });
 
 test("migration checksum hashing is stable across LF and CRLF line endings", () => {

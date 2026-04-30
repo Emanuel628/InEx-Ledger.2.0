@@ -103,6 +103,13 @@ const pool = new Pool({
   ssl: sslConfig
 });
 
+const MIGRATION_CHECKSUM_COMPATIBILITY = {
+  "20260419_create_billable_expenses_table.sql": new Set([
+    // Historical applied form with inline projects FK.
+    "511cb26e8a82e807a87fbaa40d11ff521c37ae4363761fd42170120a175009ba"
+  ])
+};
+
 pool.on('error', (err) => {
   console.error('Unexpected database pool error:', err.message);
 });
@@ -180,6 +187,20 @@ async function getAppliedMigrations() {
   return applied;
 }
 
+function isCompatibleHistoricalMigrationChecksum(filename, storedChecksum) {
+  const allowedChecksums = MIGRATION_CHECKSUM_COMPATIBILITY[filename];
+  return !!allowedChecksums && allowedChecksums.has(storedChecksum);
+}
+
+async function repairAppliedMigrationChecksum(filename, checksum) {
+  await withRetry(() =>
+    pool.query(
+      'UPDATE schema_migrations SET checksum = $2 WHERE filename = $1',
+      [filename, checksum]
+    )
+  );
+}
+
 // Run a single migration file inside a transaction and record it on success
 async function runMigration(filename, sql, checksum) {
   const client = await withRetry(() => pool.connect());
@@ -251,6 +272,15 @@ async function initDatabase() {
     if (appliedMap.has(filename)) {
       const storedChecksum = appliedMap.get(filename);
       if (storedChecksum !== checksum) {
+        if (isCompatibleHistoricalMigrationChecksum(filename, storedChecksum)) {
+          console.warn(
+            `Repairing historical migration checksum drift for ${filename}. ` +
+            'Stored checksum matched a known previously-applied file variant.'
+          );
+          await repairAppliedMigrationChecksum(filename, checksum);
+          skippedCount++;
+          continue;
+        }
         const msg = `Migration content changed since last run (${filename}). ` +
           'Re-running a previously applied migration is unsafe. ' +
           'Create a new migration file to make incremental schema changes.';
@@ -290,6 +320,7 @@ module.exports = {
   withRetry,
   computeChecksum,
   normalizeChecksumContent,
+  isCompatibleHistoricalMigrationChecksum,
   migrationStats,
   MigrationContentDriftError
 };
