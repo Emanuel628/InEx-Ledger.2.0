@@ -166,7 +166,8 @@ async function main() {
   const appliedRows = await loadAppliedMigrations();
 
   if (args.file && !appliedRows.some((row) => row.filename === args.file)) {
-    throw new Error(`Applied migration not found in schema_migrations: ${args.file}`);
+    console.log(`Applied migration not present in schema_migrations yet: ${args.file}. Nothing to repair.`);
+    return;
   }
 
   const report = buildDriftReport(appliedRows, currentChecksums, args.file);
