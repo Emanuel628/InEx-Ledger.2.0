@@ -194,6 +194,49 @@ function isCompatibleHistoricalMigrationChecksum(filename, storedChecksum) {
   return !!allowedChecksums && allowedChecksums.has(storedChecksum);
 }
 
+function hasRequiredColumns(actualColumns, requiredColumns) {
+  const actual = new Set(actualColumns);
+  return requiredColumns.every((columnName) => actual.has(columnName));
+}
+
+async function hasRepairableBillableExpensesSchema() {
+  const result = await withRetry(() =>
+    pool.query(
+      `SELECT column_name
+         FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'billable_expenses'`
+    )
+  );
+
+  const columnNames = result.rows.map((row) => row.column_name);
+  return hasRequiredColumns(columnNames, [
+    'id',
+    'business_id',
+    'project_id',
+    'description',
+    'amount',
+    'currency',
+    'status',
+    'expense_date',
+    'metadata',
+    'created_at',
+    'updated_at'
+  ]);
+}
+
+async function canAutoRepairMigrationDrift(filename, storedChecksum) {
+  if (isCompatibleHistoricalMigrationChecksum(filename, storedChecksum)) {
+    return true;
+  }
+
+  if (filename === '20260419_create_billable_expenses_table.sql') {
+    return hasRepairableBillableExpensesSchema();
+  }
+
+  return false;
+}
+
 async function repairAppliedMigrationChecksum(filename, checksum) {
   await withRetry(() =>
     pool.query(
@@ -274,10 +317,10 @@ async function initDatabase() {
     if (appliedMap.has(filename)) {
       const storedChecksum = appliedMap.get(filename);
       if (storedChecksum !== checksum) {
-        if (isCompatibleHistoricalMigrationChecksum(filename, storedChecksum)) {
+        if (await canAutoRepairMigrationDrift(filename, storedChecksum)) {
           console.warn(
             `Repairing historical migration checksum drift for ${filename}. ` +
-            'Stored checksum matched a known previously-applied file variant.'
+            `stored=${storedChecksum} current=${checksum}`
           );
           await repairAppliedMigrationChecksum(filename, checksum);
           skippedCount++;
@@ -322,6 +365,7 @@ module.exports = {
   withRetry,
   computeChecksum,
   normalizeChecksumContent,
+  hasRequiredColumns,
   isCompatibleHistoricalMigrationChecksum,
   migrationStats,
   MigrationContentDriftError

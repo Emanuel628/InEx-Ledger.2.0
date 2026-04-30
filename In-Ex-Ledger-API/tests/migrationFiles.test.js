@@ -6,7 +6,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 
-const { computeChecksum, isCompatibleHistoricalMigrationChecksum } = require("../db.js");
+const { computeChecksum, hasRequiredColumns, isCompatibleHistoricalMigrationChecksum } = require("../db.js");
 
 const migrationsDir = path.join(__dirname, "..", "db", "migrations");
 
@@ -74,6 +74,24 @@ test("billable expenses checksum compatibility only allows the known historical 
 
   assert.equal(
     isCompatibleHistoricalMigrationChecksum("some_other_migration.sql", "511cb26e8a82e807a87fbaa40d11ff521c37ae4363761fd42170120a175009ba"),
+    false
+  );
+});
+
+test("required-column helper only passes when every expected column exists", () => {
+  assert.equal(
+    hasRequiredColumns(
+      ["id", "business_id", "project_id", "description"],
+      ["id", "business_id", "project_id"]
+    ),
+    true
+  );
+
+  assert.equal(
+    hasRequiredColumns(
+      ["id", "business_id", "description"],
+      ["id", "business_id", "project_id"]
+    ),
     false
   );
 });
