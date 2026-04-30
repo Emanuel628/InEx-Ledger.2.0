@@ -2413,3 +2413,572 @@ tr:hover .receipt-attach-hover {
   font-size: 13px;
   padding: 6px 14px;
 }
+
+/* 2026-04-30 transactions redesign: trust-first operational polish */
+body {
+  background: #f4f7fb;
+}
+
+.app-content {
+  padding: 28px 28px 36px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0) 16%),
+    #f4f7fb;
+}
+
+.page-header {
+  align-items: flex-end;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: #102236;
+}
+
+.page-subtitle {
+  max-width: 62ch;
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 1.62;
+  color: #5c6977;
+}
+
+.page-context-note {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  margin-top: 14px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(36, 109, 187, 0.08);
+  color: var(--accent2);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.page-header-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 10px;
+}
+
+.scope-select-wrap {
+  min-height: 64px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 10px 22px rgba(15, 25, 35, 0.05);
+}
+
+.scope-select-label {
+  color: #6e7987;
+}
+
+.scope-select {
+  min-width: 160px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.tx-period-picker {
+  gap: 8px;
+  padding: 6px;
+  border-radius: 16px;
+  background: rgba(15, 25, 35, 0.04);
+}
+
+.tx-period-chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border-color: transparent;
+  background: transparent;
+  color: #5e6978;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tx-period-chip:hover {
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.tx-period-chip.is-active {
+  box-shadow: 0 10px 20px rgba(36, 109, 187, 0.18);
+}
+
+.page-add-button {
+  min-height: 48px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #2c79c4 0%, #246dbb 100%);
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 14px 24px rgba(36, 109, 187, 0.18);
+}
+
+.page-add-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(36, 109, 187, 0.22);
+}
+
+.stats-row {
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  padding: 18px 18px 20px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 28px rgba(15, 25, 35, 0.05);
+}
+
+.stat-label {
+  margin-bottom: 10px;
+  color: #6f7987;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.stat-value {
+  font-size: 30px;
+  font-weight: 700;
+  color: #0f1d2d;
+}
+
+.stat-delta {
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.tax-banner {
+  padding: 22px 24px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #143150 0%, #1e4972 100%);
+  box-shadow: 0 18px 34px rgba(17, 38, 61, 0.16);
+}
+
+.tax-banner-main,
+.tax-banner-side {
+  min-width: 0;
+}
+
+.tax-banner-label {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.tax-banner-amount {
+  margin-top: 10px;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.tax-banner-note,
+.tax-side-meta {
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.tax-side-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.tax-side-value {
+  margin-top: 10px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.tax-banner-info-btn {
+  width: 18px;
+  height: 18px;
+  margin-left: 0;
+}
+
+.tax-upsell-card,
+.transactions-panel {
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 14px 32px rgba(15, 25, 35, 0.05);
+}
+
+.transactions-panel {
+  margin-bottom: 22px;
+  overflow: hidden;
+}
+
+.transactions-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px) minmax(180px, 240px) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 22px 22px 18px;
+  border-bottom: 1px solid rgba(15, 25, 35, 0.06);
+}
+
+.transactions-panel-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #102236;
+}
+
+.toolbar-search,
+.toolbar-select,
+.toolbar-import-button {
+  min-height: 48px;
+}
+
+.toolbar-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 14px;
+  background: #fbfcfe;
+}
+
+.toolbar-search input {
+  border: none;
+  background: transparent;
+  height: 100%;
+  padding: 0;
+}
+
+.toolbar-search input:focus {
+  outline: none;
+}
+
+.toolbar-search-icon {
+  color: #7f8a98;
+}
+
+.toolbar-search-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  fill: none;
+}
+
+.toolbar-select {
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  background: #fbfcfe;
+  color: #223246;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.toolbar-import-button {
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 25, 35, 0.12);
+  background: #fff;
+  color: #223246;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.toolbar-import-button:hover {
+  background: #f7fafc;
+  color: #102236;
+  border-color: rgba(15, 25, 35, 0.18);
+}
+
+#txDrawer,
+#recurringDrawer {
+  padding: 0 22px 22px;
+  background: linear-gradient(180deg, rgba(245, 248, 252, 0.7), rgba(255, 255, 255, 0));
+}
+
+.transaction-drawer-card,
+.recurring-drawer-card {
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 14px 28px rgba(15, 25, 35, 0.04);
+}
+
+.transaction-drawer-head {
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(15, 25, 35, 0.06);
+  margin-bottom: 18px;
+}
+
+.drawer-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #102236;
+}
+
+.form-label {
+  color: #6a7684;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.form-control {
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 25, 35, 0.1);
+  background: #fbfcfe;
+  box-shadow: none;
+}
+
+textarea.form-control {
+  min-height: 110px;
+}
+
+.form-control:focus,
+.scope-select:focus,
+.toolbar-select:focus {
+  outline: none;
+  border-color: rgba(36, 109, 187, 0.45);
+  box-shadow: 0 0 0 4px rgba(36, 109, 187, 0.08);
+}
+
+.txn-intent-btn {
+  min-height: 46px;
+  padding: 0 18px;
+  box-shadow: none;
+}
+
+.tx-actions {
+  margin-top: 22px;
+}
+
+.drawer-submit,
+.modal-cancel,
+.modal-delete,
+.bulk-action-btn,
+.action-button,
+.status-badge,
+.tx-page-btn,
+.recurring-add-inline {
+  min-height: 40px;
+}
+
+.drawer-submit {
+  min-width: 168px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #2c79c4 0%, #246dbb 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 12px 22px rgba(36, 109, 187, 0.18);
+}
+
+.table-wrapper {
+  margin-top: 0;
+  padding: 0 22px 22px;
+}
+
+.transactions-table {
+  margin-top: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid rgba(15, 25, 35, 0.06);
+  border-radius: 18px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.transactions-table thead th {
+  padding: 14px 12px;
+  background: #f7fafc;
+  color: #6d7986;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom: 1px solid rgba(15, 25, 35, 0.06);
+}
+
+.transactions-table tbody tr {
+  border-bottom: none;
+}
+
+.transactions-table tbody tr:hover {
+  background: #fbfdff;
+}
+
+.transactions-table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid rgba(15, 25, 35, 0.05);
+}
+
+.description-primary {
+  font-weight: 700;
+}
+
+.description-sub {
+  margin-top: 6px;
+}
+
+.category-pill,
+.status-badge,
+.tx-meta-badge,
+.business-scope-badge {
+  font-weight: 700;
+}
+
+.action-button {
+  min-width: 58px;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(15, 25, 35, 0.1);
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.action-button:hover {
+  background: #f8fafc;
+}
+
+.bulk-action-bar {
+  margin: 0 22px 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: #19395a;
+}
+
+.tx-pagination {
+  padding: 0 22px 22px;
+}
+
+.tx-page-btn {
+  min-width: 42px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 25, 35, 0.1);
+  background: #fff;
+  color: #334155;
+}
+
+.recurring-bottom-bar {
+  padding: 0 22px 22px;
+}
+
+.recurring-add-inline {
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 14px;
+  background: #eef4fb;
+  color: var(--accent2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.danger-modal {
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 24px;
+  background: #fff;
+}
+
+@media (max-width: 1180px) {
+  .transactions-toolbar {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 1fr);
+  }
+
+  .toolbar-import-button {
+    width: fit-content;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-content {
+    padding: 18px 16px 28px;
+  }
+
+  .transactions-toolbar,
+  .table-wrapper,
+  #txDrawer,
+  #recurringDrawer,
+  .bulk-action-bar,
+  .tx-pagination,
+  .recurring-bottom-bar {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .transactions-toolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-title {
+    font-size: 28px;
+  }
+
+  .page-header-actions {
+    justify-content: stretch;
+  }
+
+  .scope-select-wrap,
+  .tx-period-picker,
+  .page-add-button {
+    width: 100%;
+  }
+
+  .tx-period-picker {
+    justify-content: stretch;
+  }
+
+  .tx-period-chip {
+    flex: 1 1 calc(50% - 8px);
+    justify-content: center;
+  }
+
+  .transactions-toolbar {
+    padding: 16px 16px 14px;
+  }
+
+  .transactions-panel-title {
+    font-size: 20px;
+  }
+
+  .stat-value,
+  .tax-banner-amount {
+    font-size: 28px;
+  }
+}

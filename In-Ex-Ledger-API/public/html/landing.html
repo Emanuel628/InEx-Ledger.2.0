@@ -2,22 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>InEx Ledger | Bookkeeping for Freelancers and 1099 Workers</title>
+  <title>InEx Ledger | Simple Bookkeeping for Solo Business Owners</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta
     name="description"
-    content="InEx Ledger helps freelancers and 1099 workers track income, capture write-offs, estimate quarterly taxes, and export clean records for their CPA."
+    content="InEx Ledger helps freelancers, contractors, and one-person businesses stay on top of income, write-offs, mileage, and taxes without using bloated accounting software."
   />
-  <meta property="og:title" content="InEx Ledger | Bookkeeping for Freelancers and 1099 Workers" />
+  <meta property="og:title" content="InEx Ledger | Simple Bookkeeping for Solo Business Owners" />
   <meta
     property="og:description"
-    content="Track income, log expenses, capture receipts, and know what to save for taxes without learning accounting software."
+    content="Track the money coming in, keep proof for what goes out, and know what to save for taxes before filing season gets messy."
   />
   <meta property="og:url" content="https://inexledger.com" />
   <meta property="og:type" content="website" />
 
-  <link rel="stylesheet" href="/css/app.css" />
-  <link rel="stylesheet" href="/css/pages/landing.css" />
+  <link rel="stylesheet" href="/css/app.css?v=20260430a" />
+  <link rel="stylesheet" href="/css/pages/landing.css?v=20260430a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -34,172 +34,287 @@
       </span>
       <span class="brand-text-dark">InEx Ledger</span>
     </a>
-    <nav class="marketing-nav">
-      <a href="/login" data-i18n="nav_sign_in">Sign in</a>
+    <nav class="marketing-nav" aria-label="Primary">
+      <a class="marketing-nav-link" href="#pricing">Pricing</a>
+      <a class="marketing-nav-link" href="#faq">FAQ</a>
+      <a class="marketing-nav-link" href="/login" data-i18n="nav_sign_in">Sign in</a>
+      <a class="marketing-nav-cta" href="/register">Start free</a>
     </nav>
   </header>
 
-  <main id="main-content">
+  <main id="main-content" class="marketing-main">
     <section class="hero">
       <div class="hero-copy">
-        <div class="hero-kicker">Bookkeeping built for self-employed work</div>
-        <h1>Track your income, capture your write-offs, and know what to save for taxes.</h1>
+        <div class="hero-kicker">Bookkeeping for one-person businesses</div>
+        <h1>The simple ledger for people who work for themselves.</h1>
         <p class="hero-lede">
-          InEx Ledger gives freelancers, gig workers, and independent contractors one simple place to
-          record money in, money out, mileage, receipts, and quarterly tax estimates.
+          InEx Ledger is for freelancers, contractors, gig workers, and solo operators who need clean books,
+          clear tax context, and less accounting software in their way.
         </p>
         <div class="hero-actions">
-          <a class="button primary" href="/register" data-i18n="landing_start_trial">Start free for 30 days</a>
-          <a class="button secondary" href="#pricing">See pricing</a>
+          <a class="button button-primary" href="/register" data-i18n="landing_start_trial">Start free for 30 days</a>
+          <a class="button button-secondary" href="#proof">See how it helps</a>
         </div>
-        <ul class="hero-points" aria-label="Core benefits">
-          <li>No spreadsheets.</li>
-          <li>No shoebox full of receipts.</li>
-          <li>No tax-season guesswork.</li>
+        <ul class="hero-proof-list" aria-label="What InEx Ledger helps prevent">
+          <li>No spreadsheet cleanup before taxes</li>
+          <li>No guessing what counts as a write-off</li>
+          <li>No bloated accounting suite to learn first</li>
         </ul>
-        <p class="hero-fit">
-          Built for rideshare drivers, delivery workers, freelancers, consultants, tradespeople, and other 1099 workers.
-        </p>
+        <div class="hero-support-note">
+          Best fit for independent operators who want enough bookkeeping to stay tax-ready without carrying enterprise software.
+        </div>
       </div>
 
-      <aside class="hero-panel" aria-label="What the app helps you manage">
-        <div class="hero-panel-card hero-panel-card-primary">
-          <span class="hero-panel-label">What you see</span>
-          <strong>Profit, expenses, and tax estimate at a glance</strong>
-          <p>Know where your business stands before quarterly deadlines and before your CPA asks.</p>
-        </div>
-        <div class="hero-panel-grid">
-          <div class="hero-panel-card">
-            <span class="hero-panel-label">Track</span>
-            <strong>Income, expenses, mileage, receipts</strong>
+      <div class="hero-visual" aria-label="InEx Ledger product preview">
+        <div class="hero-device">
+          <div class="hero-device-topbar">
+            <div class="hero-device-brand">
+              <span class="hero-device-mark"></span>
+              <span>InEx Ledger</span>
+            </div>
+            <div class="hero-device-pill">This month</div>
           </div>
-          <div class="hero-panel-card">
-            <span class="hero-panel-label">Export</span>
-            <strong>Clean records for filing and CPA handoff</strong>
+          <div class="hero-device-grid">
+            <article class="hero-metric">
+              <span class="hero-metric-label">Income</span>
+              <strong>$8,420</strong>
+              <em>3 clients paid</em>
+            </article>
+            <article class="hero-metric">
+              <span class="hero-metric-label">Expenses</span>
+              <strong>$1,960</strong>
+              <em>Receipts attached</em>
+            </article>
+            <article class="hero-metric hero-metric-wide">
+              <span class="hero-metric-label">Estimated tax set-aside</span>
+              <strong>$1,550</strong>
+              <em>Updated from current profit</em>
+            </article>
+          </div>
+          <div class="hero-ledger-card">
+            <div class="hero-ledger-head">
+              <span>Recent activity</span>
+              <span>Ready for export</span>
+            </div>
+            <div class="hero-ledger-row">
+              <div>
+                <strong>Client retainer</strong>
+                <span>Income · Cleared</span>
+              </div>
+              <strong class="amount-positive">+$2,500</strong>
+            </div>
+            <div class="hero-ledger-row">
+              <div>
+                <strong>Phone bill</strong>
+                <span>Expense · Receipt attached</span>
+              </div>
+              <strong class="amount-negative">-$86</strong>
+            </div>
+            <div class="hero-ledger-row">
+              <div>
+                <strong>Mileage log</strong>
+                <span>42 business miles</span>
+              </div>
+              <strong>Saved</strong>
+            </div>
           </div>
         </div>
-      </aside>
+      </div>
     </section>
 
-    <section class="focus-strip" aria-label="Core promise">
-      <div class="focus-item">
-        <strong>See what you earned.</strong>
-        <span>Track every payment and payer in one ledger.</span>
-      </div>
-      <div class="focus-item">
-        <strong>See what you can deduct.</strong>
-        <span>Log expenses, mileage, and receipts as you go.</span>
-      </div>
-      <div class="focus-item">
-        <strong>See what to set aside.</strong>
-        <span>Stay ahead of quarterly tax deadlines instead of reacting late.</span>
-      </div>
-    </section>
-
-    <section class="feature-section">
+    <section id="proof" class="problem-section">
       <div class="section-heading">
-        <h2>What InEx Ledger actually does</h2>
+        <span class="section-eyebrow">Why people look for an alternative</span>
+        <h2>Most solo operators do not need more accounting software. They need less friction.</h2>
         <p class="section-subtitle">
-          The product story is simple: keep your books current during the year so tax season is no longer a scramble.
+          The pain is usually not lack of features. It is having too much system around a job that should feel simple:
+          record the work, keep the proof, and stay ready for taxes.
         </p>
       </div>
-      <div class="feature-grid">
-        <article class="feature-card">
-          <div class="feature-step">01</div>
-          <h3>Capture every business dollar</h3>
-          <p>
-            Log income and expenses fast, tag income by client or platform, and keep your books organized without learning full accounting software.
-          </p>
+      <div class="problem-grid">
+        <article class="problem-card">
+          <span class="problem-number">01</span>
+          <h3>Oversized tools slow down basic bookkeeping</h3>
+          <p>Too many menus, too much setup, and too much accounting language for a one-person business trying to stay current.</p>
         </article>
-        <article class="feature-card">
-          <div class="feature-step">02</div>
-          <h3>Stay ready for taxes all year</h3>
-          <p>
-            Track mileage, store receipts, and monitor your estimated self-employment tax or CPP contribution before deadlines sneak up on you.
-          </p>
+        <article class="problem-card">
+          <span class="problem-number">02</span>
+          <h3>Spreadsheets break at the worst time</h3>
+          <p>Manual categories, missing receipts, and inconsistent records turn tax season into a cleanup project.</p>
         </article>
-        <article class="feature-card">
-          <div class="feature-step">03</div>
-          <h3>Hand off clean records when it matters</h3>
-          <p>
-            Export organized summaries for your CPA so filing is faster, clearer, and less dependent on last-minute cleanup.
-          </p>
+        <article class="problem-card">
+          <span class="problem-number">03</span>
+          <h3>Tax confidence disappears when the books lag</h3>
+          <p>If you do not know your profit, deductions, or set-aside, quarterly and annual filing decisions become guesswork.</p>
         </article>
       </div>
     </section>
 
-    <section class="benefits-section">
+    <section class="workflow-section">
       <div class="section-heading">
-        <h2>Why it helps</h2>
+        <span class="section-eyebrow">What the product actually does</span>
+        <h2>Built around the working rhythm of freelance and contract income.</h2>
       </div>
-      <div class="benefit-layout">
-        <div class="benefit-copy">
-          <p>
-            Most self-employed people do not need more accounting features. They need a system that makes the basics obvious and repeatable.
-          </p>
-          <p>
-            InEx Ledger is focused on the jobs that matter most: keep records current, protect deductions, and reduce tax-season stress.
-          </p>
-        </div>
-        <ul class="benefit-list">
-          <li>Know your numbers before quarterly taxes are due.</li>
-          <li>Keep proof attached to every important expense.</li>
-          <li>Separate personal chaos from business records.</li>
-          <li>Spend less time cleaning up books for filing.</li>
-        </ul>
+      <div class="workflow-grid">
+        <article class="workflow-card workflow-card-emphasis">
+          <div class="workflow-copy">
+            <h3>Keep one clean operating ledger</h3>
+            <p>Track income, expenses, categories, receipts, and recurring activity without setting up a full accounting stack first.</p>
+          </div>
+          <div class="workflow-mini-panel">
+            <span class="mini-label">Daily use</span>
+            <strong>Fast add flows</strong>
+            <span>Transactions, receipts, mileage, recurring entries</span>
+          </div>
+        </article>
+        <article class="workflow-card">
+          <div class="workflow-copy">
+            <h3>Stay tax-ready during the year</h3>
+            <p>Watch estimated tax exposure, keep documentation attached, and avoid rebuilding your books when filing gets close.</p>
+          </div>
+          <div class="workflow-mini-panel">
+            <span class="mini-label">Tax context</span>
+            <strong>Set-aside visibility</strong>
+            <span>Region-aware estimates and export-ready records</span>
+          </div>
+        </article>
+        <article class="workflow-card">
+          <div class="workflow-copy">
+            <h3>Hand off cleaner records when it matters</h3>
+            <p>Export organized summaries and supporting detail for your accountant, your own filing process, or your business archive.</p>
+          </div>
+          <div class="workflow-mini-panel">
+            <span class="mini-label">Output</span>
+            <strong>CPA-friendly exports</strong>
+            <span>CSV, PDF, and history where allowed</span>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="fit-section">
+      <div class="section-heading">
+        <span class="section-eyebrow">Best fit</span>
+        <h2>Clear about who this is for.</h2>
+      </div>
+      <div class="fit-grid">
+        <article class="fit-card fit-card-good">
+          <h3>Great fit if you are</h3>
+          <ul>
+            <li>A freelancer or consultant with a few steady clients</li>
+            <li>A 1099 worker who needs better records than a spreadsheet</li>
+            <li>A solo operator who wants simpler bookkeeping than QuickBooks</li>
+            <li>Someone who cares more about tax readiness than accounting depth</li>
+          </ul>
+        </article>
+        <article class="fit-card">
+          <h3>Not trying to be</h3>
+          <ul>
+            <li>A full ERP</li>
+            <li>A multi-department accounting suite</li>
+            <li>A heavy enterprise finance platform</li>
+            <li>Software built for teams who need every workflow under one roof</li>
+          </ul>
+        </article>
       </div>
     </section>
 
     <section id="pricing" class="pricing-section">
       <div class="section-heading">
-        <h2>Simple pricing for the core job</h2>
-        <p class="section-subtitle">Start with a 30-day free trial. No credit card required to begin.</p>
+        <span class="section-eyebrow">Pricing</span>
+        <h2>Start simple. Upgrade when the full workflow matters.</h2>
+        <p class="section-subtitle">A 30-day free trial gets you into the full product without asking for a card first.</p>
       </div>
-      <article class="pricing-card pricing-card-featured">
+
+      <div class="pricing-toggle" role="group" aria-label="Billing interval">
+        <button type="button" class="pricing-toggle-btn is-active" data-billing-toggle="monthly" aria-pressed="true">Monthly</button>
+        <button type="button" class="pricing-toggle-btn" data-billing-toggle="yearly" aria-pressed="false">Yearly</button>
+      </div>
+
+      <article
+        class="pricing-card"
+        data-pricing-card
+        data-price-monthly="12"
+        data-price-yearly-monthly="10.20"
+        data-price-yearly-total="122.40"
+        data-price-monthly-cad="16"
+        data-price-yearly-monthly-cad="13.60"
+        data-price-yearly-total-cad="163.20"
+      >
         <div class="pricing-card-header">
-          <div class="pricing-tier-kicker">Available now</div>
-          <h3 class="pricing-tier-name">Core Ledger</h3>
-          <div class="pricing-price-row">
-            <div class="pricing-price-block">
-              <span class="pricing-label">Monthly</span>
-              <strong>$12<span>/month</span></strong>
-            </div>
-            <div class="pricing-price-block pricing-price-block-muted">
-              <span class="pricing-label">Yearly</span>
-              <strong>$10.20<span>/month</span></strong>
-              <em>Billed annually at $122.40</em>
-            </div>
+          <div>
+            <span class="pricing-tier-kicker">Full workflow</span>
+            <h3 class="pricing-tier-name">Pro</h3>
           </div>
-          <p class="pricing-tier-desc">
-            Everything you need to track freelance income, log write-offs, watch tax estimates, and export clean records for filing.
-          </p>
+          <div class="pricing-price-block">
+            <strong><span data-price-amount>$12</span><span data-price-period>/ month</span></strong>
+            <em data-price-note>Billed monthly at $12.</em>
+          </div>
         </div>
+        <p class="pricing-tier-desc">
+          Income and expense tracking, receipts, mileage, analytics, exports, and tax-oriented visibility for one-person businesses that need clean books.
+        </p>
         <ul class="pricing-feature-list">
-          <li>Unlimited income and expense tracking</li>
-          <li>1099 and payer tagging</li>
-          <li>Mileage and receipt tracking</li>
-          <li>Quarterly tax estimate visibility</li>
-          <li>CSV and PDF exports for your CPA</li>
-          <li>30-day free trial and cancel-anytime billing</li>
+          <li>Unlimited transaction tracking</li>
+          <li>Receipt capture and mileage logging</li>
+          <li>Tax estimate visibility and export tools</li>
+          <li>Recurring templates and organized reporting</li>
+          <li>30-day free trial before paid billing begins</li>
+          <li>Basic remains available for lighter use</li>
         </ul>
-        <a href="/register" class="pricing-cta-btn pricing-cta-primary">Start free trial</a>
+        <a href="/register" class="pricing-cta-btn">Start free trial</a>
       </article>
-      <p class="pricing-footer-note">
-        A Basic plan is still available for lighter use. Pro unlocks the full workflow.
-      </p>
+    </section>
+
+    <section id="faq" class="faq-section">
+      <div class="section-heading">
+        <span class="section-eyebrow">FAQ</span>
+        <h2>Questions people ask before switching.</h2>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item" open>
+          <summary>Why would I use this instead of QuickBooks?</summary>
+          <p>If QuickBooks already fits your business, you may not need to switch. InEx Ledger is for independent operators who want a smaller, cleaner bookkeeping system focused on staying current and tax-ready.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Who is this built for?</summary>
+          <p>Freelancers, contractors, 1099 workers, consultants, tradespeople, and solo service businesses that want straightforward bookkeeping without a full accounting-suite learning curve.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Can I export my records?</summary>
+          <p>Yes. The product is built around keeping records clean enough to review, hand off, and export when filing or working with an accountant.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Do I need to know accounting?</summary>
+          <p>No. The product is designed to make the routine bookkeeping decisions obvious enough for day-to-day use, while still keeping your records organized for tax time.</p>
+        </details>
+      </div>
+    </section>
+
+    <section class="final-cta">
+      <div>
+        <span class="section-eyebrow">Ready to simplify it?</span>
+        <h2>Keep the books current. Make tax season lighter.</h2>
+        <p>Start with the workflow you actually need instead of a bigger system than your business asked for.</p>
+      </div>
+      <div class="final-cta-actions">
+        <a class="button button-primary" href="/register">Start free for 30 days</a>
+        <a class="button button-secondary" href="/login">Sign in</a>
+      </div>
     </section>
   </main>
 
-  <footer>
+  <footer class="marketing-footer">
     <p>
       <a href="privacy">Privacy</a>
       <a href="terms">Terms</a>
     </p>
-    <p>&copy; 2026 InEx Ledger - Built for freelancers and independent contractors</p>
+    <p>&copy; 2026 InEx Ledger. Built for independent operators who want cleaner books without extra software overhead.</p>
   </footer>
 
   <script src="../js/escape-html.js?v=20260410a"></script>
   <script src="../js/global.js?v=20260423d"></script>
   <script src="../js/i18n.js?v=20260405c"></script>
+  <script src="../js/landing.js?v=20260430a"></script>
 </body>
 </html>
