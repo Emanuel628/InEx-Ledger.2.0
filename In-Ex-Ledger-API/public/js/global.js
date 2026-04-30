@@ -1153,35 +1153,11 @@ function escapeDynamicSidebarAttr(value) {
   return escapeDynamicSidebarHtml(value);
 }
 
-function injectBusinessIndicator() {
-  const pill = document.querySelector(".app-topbar .user-pill");
-  if (!pill || pill.querySelector(".topbar-business-name")) return;
-
-  const biz = document.createElement("span");
-  biz.className = "topbar-business-name";
-  biz.id = "topbarBusinessName";
-  biz.setAttribute("aria-label", "Active business");
-  pill.insertBefore(biz, pill.firstChild);
-
-  function updateBizName() {
-    const name = window.__LUNA_ME__?.active_business_name
-      || window.__LUNA_ME__?.businesses?.find?.(b => b.id === window.__LUNA_ME__?.active_business_id)?.name
-      || "";
-    biz.textContent = name;
-    biz.hidden = !name;
-  }
-
-  updateBizName();
-  window.addEventListener("lunaProfileReady", updateBizName);
-  window.addEventListener("lunaBusinessChanged", updateBizName);
-}
-
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
   injectSkipLink();
   injectHelpNavLink();
   injectMessagesNavLink();
-  injectBusinessIndicator();
   initDynamicSidebar();
   injectMobileMenu();   // clones nav after Help/Messages are injected
   highlightNavigation(); // runs on all nav a elements including the drawer

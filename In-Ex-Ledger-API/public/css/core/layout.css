@@ -1210,22 +1210,6 @@ body[data-theme="light"] select option {
   margin-top: -36px;
 }
 
-/* ── Business indicator in topbar (M-01) ─────────────────── */
-.topbar-business-name {
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  color: rgba(255,255,255,0.7) !important;
-  background: rgba(255,255,255,0.12) !important;
-  border-radius: 5px !important;
-  padding: 2px 7px !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  max-width: 120px !important;
-  flex-shrink: 0 !important;
-  order: -1 !important;
-}
-
 /* ── Sidebar empty state (N-01) ──────────────────────────── */
 .dynamic-sidebar-empty-icon {
   display: inline-block;
