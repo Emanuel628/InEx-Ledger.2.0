@@ -258,7 +258,8 @@
 }
 
 .card-title-row + .field-label,
-.form-field:first-of-type .field-label {
+.form-field:first-of-type .field-label,
+.date-grid .form-field .field-label {
   margin-top: 0;
 }
 
