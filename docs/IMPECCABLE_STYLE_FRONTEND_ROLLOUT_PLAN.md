@@ -2,6 +2,10 @@
 
 This document defines the rollout plan for applying the `impeccable.style` design direction across the frontend in a controlled way.
 
+Companion documents:
+- [STYLE_SPEC.md](C:/Projects/InEx-Ledger.2.0/docs/STYLE_SPEC.md)
+- [CRITICAL_SWEEP.md](C:/Projects/InEx-Ledger.2.0/docs/CRITICAL_SWEEP.md)
+
 The goal is not to restyle pages randomly. The goal is to standardize trust, clarity, spacing, action hierarchy, and visual consistency across the product without breaking workflows.
 
 ## Rollout Strategy
