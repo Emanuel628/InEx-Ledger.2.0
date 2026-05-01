@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           if (btn) {
             btn.addEventListener("click", async () => {
               btn.disabled = true;
-              btn.textContent = "Activating…";
+              btn.textContent = "Activating...";
               if (errEl) errEl.hidden = true;
               try {
                 const r = await apiFetch("/api/billing/mock-v1", { method: "POST" });
@@ -59,7 +59,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       }
     } catch {
-      // Mock billing check failed silently — not a blocking error
+      // Mock billing check failed silently - not a blocking error
     }
   } else {
     if (freeSection) freeSection.hidden = true;

@@ -123,7 +123,7 @@ const MESSAGE_TYPE_FILTERS = {
 async function loadMessages(tab) {
   const list = document.getElementById("messagesList");
   if (!list) return;
-  list.innerHTML = '<div class="messages-loading">Loading messages…</div>';
+  list.innerHTML = '<div class="messages-loading">Loading messages...</div>';
 
   if (tab === "notifications") {
     list.innerHTML = '<div class="messages-empty">No system notifications yet.</div>';
@@ -180,7 +180,7 @@ function renderMessageRow(m, tab) {
   const unreadClass = (!isSent && !m.is_read) ? " is-unread" : "";
   const typeLabel = { cpa: "Review", general_cpa: "Review", it_support: "IT Support", support_request: "Support", general: "General" }[m.message_type] || m.message_type;
   const subject = m.subject || "(No subject)";
-  const preview = (m.body || "").replace(/\n/g, " ").slice(0, PREVIEW_MAX_LENGTH) + ((m.body || "").length > PREVIEW_MAX_LENGTH ? "…" : "");
+  const preview = (m.body || "").replace(/\n/g, " ").slice(0, PREVIEW_MAX_LENGTH) + ((m.body || "").length > PREVIEW_MAX_LENGTH ? "..." : "");
   const dateStr = formatRelativeDate(m.created_at);
   const archiveLabel = m.is_archived ? "Unarchive" : "Archive";
 
@@ -262,8 +262,8 @@ async function openMessageDetail(id) {
     if (subjectEl) subjectEl.textContent = `${subject} [${typeLabel}]`;
     if (fromEl) {
       fromEl.innerHTML = isSent
-        ? `To: <strong>${escapeHtml(counterpart)}</strong> &mdash; ${escapeHtml(dateStr)}`
-        : `From: <strong>${escapeHtml(counterpart)}</strong> &mdash; ${escapeHtml(dateStr)}`;
+        ? `To: <strong>${escapeHtml(counterpart)}</strong> - ${escapeHtml(dateStr)}`
+        : `From: <strong>${escapeHtml(counterpart)}</strong> - ${escapeHtml(dateStr)}`;
     }
     if (bodyEl) bodyEl.textContent = m.body;
     if (replyArea) { replyArea.classList.add("hidden"); }
@@ -304,7 +304,7 @@ async function sendReply() {
   }
 
   const btn = document.getElementById("replySendBtn");
-  if (btn) { btn.disabled = true; btn.textContent = "Sending…"; }
+  if (btn) { btn.disabled = true; btn.textContent = "Sending..."; }
 
   try {
     const res = await apiFetch("/api/messages", {
@@ -390,7 +390,7 @@ function populateContactSelect(select) {
   else {
     const opt = document.createElement("option");
     opt.value = "";
-    opt.textContent = "Select contact…";
+    opt.textContent = "Select contact...";
     select.appendChild(opt);
   }
   _contacts.forEach((c) => {
@@ -471,7 +471,7 @@ async function sendComposedMessage() {
   }
   if (errorEl) errorEl.textContent = "";
 
-  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = "Sending…"; }
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = "Sending..."; }
 
   try {
     const res = await apiFetch("/api/messages", {

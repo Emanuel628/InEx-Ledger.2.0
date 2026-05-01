@@ -9,7 +9,7 @@ function tx(key) {
 }
 
 function formatSessionDate(isoString) {
-  if (!isoString) return "—";
+  if (!isoString) return "-";
   try {
     return new Date(isoString).toLocaleString(undefined, {
       year: "numeric",
@@ -54,7 +54,7 @@ async function loadSessions() {
   const list = document.getElementById("sessionsList");
   if (!list) return;
 
-  list.innerHTML = `<div class="sessions-loading" aria-live="polite">${escapeHtml(tx("common_loading") || "Loading…")}</div>`;
+  list.innerHTML = `<div class="sessions-loading" aria-live="polite">${escapeHtml(tx("common_loading") || "Loading...")}</div>`;
   setSessionsMessage("");
 
   try {
@@ -165,7 +165,7 @@ async function revokeAllSessions() {
       throw new Error(payload.error || tx("sessions_error_revoke_all") || "Failed to revoke all sessions.");
     }
 
-    showSessionsToast(tx("sessions_all_revoked") || "All sessions revoked. Signing out…");
+    showSessionsToast(tx("sessions_all_revoked") || "All sessions revoked. Signing out...");
     window.setTimeout(() => {
       if (typeof markLoginReset === "function") {
         markLoginReset();

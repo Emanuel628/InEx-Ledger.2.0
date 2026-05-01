@@ -337,7 +337,8 @@
 
 .line-remove,
 .invoice-add-line,
-.modal-cancel {
+.modal-cancel,
+.tx-action-btn {
   min-height: 40px;
   border-radius: 12px;
   border: 1px solid rgba(15, 25, 35, 0.1);
@@ -351,6 +352,36 @@
 .line-remove {
   min-width: 34px;
   padding: 0;
+}
+
+.tx-action-btn {
+  padding: 0 12px;
+}
+
+.tx-action-btn:hover,
+.line-remove:hover,
+.invoice-add-line:hover,
+.modal-cancel:hover {
+  background: #f8fafc;
+}
+
+.action-send {
+  color: var(--accent2);
+  border-color: rgba(36, 109, 187, 0.18);
+}
+
+.action-pay {
+  color: var(--green);
+  border-color: rgba(26, 122, 74, 0.18);
+}
+
+.action-delete {
+  color: var(--red);
+  border-color: rgba(185, 28, 28, 0.18);
+}
+
+.action-delete:hover {
+  background: var(--red-bg);
 }
 
 .invoice-add-line {
