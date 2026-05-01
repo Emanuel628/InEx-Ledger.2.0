@@ -61,10 +61,145 @@ main {
 }
 
 main.app-shell {
+  display: flex;
+  align-items: stretch;
   width: 100%;
   max-width: none;
   margin: 0;
   padding: 0;
+  min-height: calc(100vh - 56px);
+  background: var(--page-bleed);
+}
+
+.app-page {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 32px;
+}
+
+.app-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.app-page-header-copy {
+  min-width: 0;
+  max-width: 62ch;
+}
+
+.app-page-kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(36, 109, 187, 0.14);
+  background: var(--accent-light);
+  color: var(--accent2);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.app-page-title {
+  margin: 0;
+  color: #102236;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.app-page-subtitle {
+  margin: 10px 0 0;
+  color: #5c6977;
+  font-size: 14px;
+  line-height: 1.62;
+}
+
+.app-sidebar {
+  width: 224px;
+  min-width: 224px;
+  padding: 18px 14px;
+  background: var(--surface);
+  border-right: 0.5px solid var(--border);
+  position: sticky;
+  top: 56px;
+  align-self: flex-start;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+}
+
+.sidebar-section-label {
+  padding: 10px 8px 8px;
+  color: var(--ink3);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-link {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--ink2);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.sidebar-link:hover,
+.sidebar-link:focus-visible {
+  background: var(--surface2);
+  color: var(--ink);
+}
+
+.sidebar-link.is-active {
+  background: transparent;
+  color: var(--accent2);
+  font-weight: 600;
+}
+
+.sidebar-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-shrink: 0;
+}
+
+.sidebar-icon svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sidebar-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent2);
+  margin-left: auto;
+  box-shadow: 0 0 0 3px rgba(37, 99, 168, 0.14);
 }
 
 section {
@@ -139,6 +274,20 @@ footer a:hover {
     box-sizing: border-box;
   }
 
+  .app-page {
+    padding: 18px 14px 28px;
+  }
+
+  .app-page-header {
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+
+  .app-page-title {
+    font-size: 28px;
+  }
+
   input,
   select,
   textarea,
@@ -176,7 +325,7 @@ body[data-theme="light"] .history-card {
 body[data-theme="light"],
 body[data-theme="light"] .app,
 body[data-theme="light"] main {
-  background: var(--surface2);
+  background: var(--page-bg);
   background-image: none;
 }
 
@@ -187,12 +336,12 @@ body.body--nav-open {
 body[data-theme="light"] .primary-btn,
 body[data-theme="light"] .btn-primary,
 body[data-theme="light"] button.primary {
-  background: var(--accent2);
+  background: var(--cta-gradient);
   color: #ffffff;
   border: none;
-  border-radius: 7px;
-  box-shadow: none;
-  font-weight: 500;
+  border-radius: 14px;
+  box-shadow: var(--shadow-cta);
+  font-weight: 700;
 }
 
 body[data-theme="light"] .primary-btn:hover,
@@ -552,6 +701,14 @@ body[data-theme="light"] select option {
 }
 
 @media (max-width: 1024px) {
+  .app-sidebar {
+    display: none;
+  }
+
+  .app-page {
+    padding: 24px 20px 28px;
+  }
+
   .app-sidebar.app-sidebar--dynamic {
     display: none;
   }
@@ -683,6 +840,89 @@ body[data-theme="light"] select option {
   background: rgba(255, 255, 255, 0.15) !important;
   font-weight: 500 !important;
   box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Shared static sidebar sync.
+   Many page CSS files still re-declare the same sidebar primitives.
+   Keep the shell consistent while page-level rollouts catch up. */
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic) {
+  width: 224px !important;
+  min-width: 224px !important;
+  padding: 18px 14px !important;
+  background: var(--surface) !important;
+  border-right: 0.5px solid var(--border) !important;
+  position: sticky !important;
+  top: 56px !important;
+  align-self: flex-start !important;
+  height: calc(100vh - 56px) !important;
+  overflow-y: auto !important;
+}
+
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-section-label {
+  padding: 10px 8px 8px !important;
+  color: var(--ink3) !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-nav {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-link {
+  display: grid !important;
+  grid-template-columns: 16px minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-height: 36px !important;
+  padding: 8px 10px !important;
+  border-radius: 8px !important;
+  color: var(--ink2) !important;
+  font-size: 13px !important;
+  text-decoration: none !important;
+}
+
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-link:hover,
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-link:focus-visible {
+  background: var(--surface2) !important;
+  color: var(--ink) !important;
+}
+
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-link.is-active {
+  background: transparent !important;
+  color: var(--accent2) !important;
+  font-weight: 600 !important;
+}
+
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-icon {
+  width: 16px !important;
+  height: 16px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  flex-shrink: 0 !important;
+}
+
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-icon svg {
+  width: 100% !important;
+  height: 100% !important;
+  stroke: currentColor !important;
+  stroke-width: 1.5 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-dot {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 999px !important;
+  background: var(--accent2) !important;
+  margin-left: auto !important;
+  box-shadow: 0 0 0 3px rgba(37, 99, 168, 0.14) !important;
 }
 
 .topbar-nav a:focus-visible {

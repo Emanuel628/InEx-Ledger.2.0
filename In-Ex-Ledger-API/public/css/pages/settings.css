@@ -2377,3 +2377,58 @@ body {
 .settings-help-open:hover {
   opacity: 0.92;
 }
+
+/* Impeccable style overrides */
+.settings-page {
+  background: var(--page-bleed);
+}
+
+.settings-shell {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 32px 24px 40px;
+}
+
+.settings-page .settings-sidebar-card,
+.settings-page .settings-card,
+.settings-page .settings-summary-card,
+.settings-page .settings-subpanel {
+  background: var(--panel-bg);
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  box-shadow: var(--shadow-card-lg);
+}
+
+.settings-page .settings-sidebar-card,
+.settings-page .settings-card,
+.settings-page .settings-summary-card {
+  border-radius: var(--radius-panel);
+}
+
+.settings-page .settings-page-heading h1 {
+  color: #102236;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.settings-page .settings-page-heading p,
+.settings-page .card-desc,
+.settings-page .settings-sidebar-intro,
+.settings-page .settings-summary-meta {
+  color: #5c6977;
+}
+
+.settings-page .settings-primary-btn {
+  background: var(--cta-gradient);
+  box-shadow: var(--shadow-cta);
+  border-radius: 14px;
+  font-weight: 700;
+}
+
+.settings-page .settings-secondary-btn,
+.settings-page .safe-action,
+.settings-page .danger-outline-btn,
+.settings-page .settings-help-open {
+  border-radius: 14px;
+  font-weight: 700;
+}

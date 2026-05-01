@@ -207,3 +207,60 @@ main {
 footer {
   margin-top: 40px;
 }
+
+body {
+  background: var(--page-bleed);
+}
+
+.auth-header {
+  max-width: 1160px;
+  margin-top: 24px;
+}
+
+main {
+  max-width: 520px;
+  margin-top: 72px;
+}
+
+.auth-card {
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: var(--radius-panel);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-card-lg);
+  padding: 34px 34px 30px;
+}
+
+.auth-card h2 {
+  color: #102236;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.auth-form label,
+.show-password-toggle {
+  color: #6a7684;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.auth-form :is(input, select) {
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 25, 35, 0.1);
+  background: #fbfcfe;
+  font-size: 14px;
+}
+
+.auth-submit,
+.auth-secondary-btn {
+  min-height: 48px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.auth-submit {
+  background: var(--cta-gradient);
+  box-shadow: var(--shadow-cta);
+}

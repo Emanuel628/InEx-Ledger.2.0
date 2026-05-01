@@ -21,8 +21,20 @@
   --radius: 10px;
   --radius-lg: 14px;
   --radius-xl: 20px;
+  --radius-panel: 24px;
+  --radius-section: 28px;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
   --shadow-card: 0 1px 3px rgba(15, 25, 35, 0.06), 0 1px 2px rgba(15, 25, 35, 0.04);
+  --shadow-card-lg: 0 14px 32px rgba(15, 25, 35, 0.05);
+  --shadow-stat: 0 12px 28px rgba(15, 25, 35, 0.05);
+  --shadow-accent: 0 18px 34px rgba(17, 38, 61, 0.16);
+  --shadow-cta: 0 14px 24px rgba(36, 109, 187, 0.18);
+  --page-bg: #f4f7fb;
+  --page-bleed: linear-gradient(180deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0) 16%), #f4f7fb;
+  --panel-bg: rgba(255, 255, 255, 0.97);
+  --card-bg-strong: rgba(255, 255, 255, 0.96);
+  --cta-gradient: linear-gradient(180deg, #2c79c4 0%, #246dbb 100%);
+  --accent-panel: linear-gradient(135deg, #143150 0%, #1e4972 100%);
 
   /* Aliases used by page-level CSS — map to canonical tokens above */
   --card-bg: var(--surface);
@@ -78,6 +90,16 @@
   --border: rgba(255, 255, 255, 0.08);
   --border2: rgba(255, 255, 255, 0.14);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-card-lg: 0 14px 32px rgba(0, 0, 0, 0.28);
+  --shadow-stat: 0 12px 28px rgba(0, 0, 0, 0.24);
+  --shadow-accent: 0 18px 34px rgba(0, 0, 0, 0.3);
+  --shadow-cta: 0 14px 24px rgba(96, 165, 250, 0.18);
+  --page-bg: #0b1220;
+  --page-bleed: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 16%), #0b1220;
+  --panel-bg: rgba(15, 25, 35, 0.96);
+  --card-bg-strong: rgba(15, 25, 35, 0.94);
+  --cta-gradient: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+  --accent-panel: linear-gradient(135deg, #143150 0%, #1d4365 100%);
 
   --card-bg: var(--surface);
   --bg-surface: var(--surface);

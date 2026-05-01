@@ -2,6 +2,46 @@
    Subscription Management Page
    ========================= */
 
+.sub-plan-card,
+.sub-status-inner {
+  border-radius: 20px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  background: var(--panel-bg);
+  box-shadow: var(--shadow-card-lg);
+}
+
+.sub-plan-card.sub-plan-featured {
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 1px rgba(37, 99, 168, 0.18), var(--shadow-card-lg);
+}
+
+.sub-plan-card.sub-plan-coming-soon {
+  background: linear-gradient(180deg, rgba(36, 109, 187, 0.06), rgba(255, 255, 255, 0.96));
+}
+
+.sub-plan-name,
+.sub-plan-price,
+.card-title {
+  color: #102236;
+}
+
+.sub-toggle-btn.is-active,
+.sub-plan-card > .settings-primary-btn {
+  background: var(--cta-gradient);
+}
+
+.sub-plan-card > .settings-primary-btn {
+  box-shadow: var(--shadow-cta);
+  border-radius: 14px;
+  font-weight: 700;
+}
+
+.sub-plan-card > .settings-secondary-btn,
+.sub-quantity-btn {
+  border-radius: 14px;
+  font-weight: 700;
+}
+
 /* Sub-status block */
 .sub-status-block {
   padding: 16px 0 8px;

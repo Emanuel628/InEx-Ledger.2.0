@@ -37,27 +37,29 @@
         <a href="transactions?type=income" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg></span><span>Income</span></a>
         <a href="transactions?type=expense" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 5v6M5 8l3 3 3-3"></path></svg></span><span>Expenses</span></a>
       </nav>
-      <div class="sidebar-section-label">Forecasting</div>
+
+      <div class="sidebar-section-label">Reporting</div>
       <nav class="sidebar-nav">
         <a href="analytics" class="sidebar-link is-active"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Analytics</span></a>
       </nav>
+
       <div class="sidebar-section-label">Tools</div>
       <nav class="sidebar-nav">
         <a href="receipts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span>Receipts</span><span id="receiptsDot" class="sidebar-dot" hidden></span></a>
         <a href="mileage" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span>Mileage</span></a>
         <a href="exports" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Exports</span></a>
       </nav>
-
-      <!-- Business (V2) sidebar removed for V1/Pro isolation -->
     </aside>
 
-    <div class="analytics-content">
-      <div class="analytics-page-header">
-        <h1>Analytics &amp; Forecasting</h1>
-        <p>Financial insights, cash flow projections, and what-if planning</p>
+    <div class="analytics-content app-page">
+      <div class="analytics-page-header app-page-header">
+        <div class="app-page-header-copy">
+          <div class="app-page-kicker">Reporting</div>
+          <h1 class="app-page-title">Analytics</h1>
+          <p class="app-page-subtitle">Review monthly performance, monitor cash flow trends, and model changes before they hit your ledger.</p>
+        </div>
       </div>
 
-      <!-- Tab bar -->
       <div class="analytics-tabs" role="tablist">
         <button class="analytics-tab is-active" data-tab="dashboard" role="tab" aria-selected="true">Dashboard</button>
         <button class="analytics-tab" data-tab="cashflow" role="tab" aria-selected="false">Cash Flow</button>
@@ -65,13 +67,11 @@
         <button class="analytics-tab" data-tab="whatif" role="tab" aria-selected="false">What-If</button>
       </div>
 
-      <!-- Dashboard panel -->
       <div class="analytics-panel is-visible" id="panel-dashboard">
         <div id="kpiRow" class="kpi-row">
-          <div class="analytics-loading">Loading dashboard…</div>
+          <div class="analytics-loading">Loading dashboard...</div>
         </div>
 
-        <!-- This Month card -->
         <div class="analytics-card analytics-this-month" id="thisMonthCard" hidden>
           <div class="this-month-header">
             <h2 id="thisMonthLabel">This Month</h2>
@@ -80,9 +80,8 @@
           <div class="this-month-grid" id="thisMonthGrid"></div>
         </div>
 
-        <!-- Trend sparkline -->
         <div class="analytics-card" id="trendCard" hidden>
-          <h2>12-Month Income &amp; Expense Trend</h2>
+          <h2>12-Month Income and Expense Trend</h2>
           <div class="sparkline-wrap">
             <svg id="trendChart" class="trend-chart" role="img" aria-label="Income and expense trend"></svg>
           </div>
@@ -93,7 +92,8 @@
         </div>
 
         <div class="analytics-card" id="monthlyCard" hidden>
-          <h2>Monthly Breakdown (last 12 months)</h2>
+          <h2>Monthly Breakdown</h2>
+          <p>Trailing 12 months of income, expenses, and net results.</p>
           <table class="monthly-table" id="monthlyTable">
             <thead>
               <tr>
@@ -110,38 +110,37 @@
         <div class="analytics-dual-grid">
           <div class="analytics-card" id="topIncomeCard" hidden>
             <h2>Top Income Sources</h2>
+            <p>Where the strongest revenue concentration is coming from.</p>
             <div id="topIncomeChart" class="bar-chart"></div>
           </div>
           <div class="analytics-card" id="topExpenseCard" hidden>
             <h2>Top Expense Categories</h2>
+            <p>Which costs are taking the largest share of spend.</p>
             <div id="topExpenseChart" class="bar-chart"></div>
           </div>
         </div>
       </div>
 
-      <!-- Cash Flow panel -->
       <div class="analytics-panel" id="panel-cashflow">
         <div class="analytics-card">
-          <h2>Cash Flow Projection — Next 3 Months</h2>
-          <p>Based on your trailing 6-month average and active recurring transactions</p>
-          <div id="cashFlowContent"><div class="analytics-loading">Loading…</div></div>
+          <h2>Cash Flow Projection - Next 3 Months</h2>
+          <p>Based on your trailing six-month average and active recurring transactions.</p>
+          <div id="cashFlowContent"><div class="analytics-loading">Loading...</div></div>
         </div>
       </div>
 
-      <!-- Seasonal panel -->
       <div class="analytics-panel" id="panel-seasonal">
         <div class="analytics-card">
           <h2>Seasonal Income Analysis</h2>
-          <p>Average income by calendar month across all your history</p>
-          <div id="seasonalContent"><div class="analytics-loading">Loading…</div></div>
+          <p>Average income by calendar month across your recorded history.</p>
+          <div id="seasonalContent"><div class="analytics-loading">Loading...</div></div>
         </div>
       </div>
 
-      <!-- What-If panel -->
       <div class="analytics-panel" id="panel-whatif">
         <div class="analytics-card">
           <h2>What-If Scenario Planner</h2>
-          <p>Simulate different income or expense conditions to plan ahead</p>
+          <p>Simulate income and expense changes before committing to a decision.</p>
 
           <div class="whatif-form" id="whatifForm">
             <div class="whatif-field">
@@ -166,7 +165,14 @@
           <div class="whatif-results" id="whatifResults">
             <div id="whatifMessages"></div>
             <table class="monthly-table analytics-whatif-table">
-              <thead><tr><th></th><th>Baseline</th><th>Scenario</th><th>Change</th></tr></thead>
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>Baseline</th>
+                  <th>Scenario</th>
+                  <th>Change</th>
+                </tr>
+              </thead>
               <tbody id="whatifTable"></tbody>
             </table>
           </div>
