@@ -1,61 +1,106 @@
 main {
-  max-width: 720px;
-  margin: 20px auto;
-  padding: 22px;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 30px 16px 80px;
 }
 
 section {
-  margin-bottom: 24px;
+  margin-bottom: 22px;
+}
+
+#freeUpgrade,
+#v1Banner {
+  padding: 28px;
+  border-radius: 24px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: var(--shadow-card-lg);
+}
+
+#freeUpgrade h2,
+#v1Banner p {
+  margin-top: 0;
+}
+
+#freeUpgrade h2 {
+  margin-bottom: 12px;
+  color: #102236;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+#freeUpgrade p,
+#v1Banner p,
+#mockUpgradeWrap,
+#freeUpgrade li {
+  color: #5d6877;
+  font-size: 14px;
+  line-height: 1.65;
 }
 
 #freeUpgrade ul {
-  list-style: disc;
+  margin: 18px 0 22px;
   padding-left: 20px;
+  color: #223246;
 }
 
-#freeUpgrade button {
-  margin-top: 12px;
+#freeUpgrade button,
+.mock-upgrade-btn {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#upgradePrimary {
+  border: none;
+  background: var(--cta-gradient);
+  color: #fff;
+  box-shadow: var(--shadow-cta);
 }
 
 #v1Banner {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 16px;
-  background: rgba(59, 130, 246, 0.08);
+  background: linear-gradient(180deg, rgba(36, 109, 187, 0.08), rgba(255, 255, 255, 0.97));
+}
+
+#v1Banner p {
+  margin: 0;
+  color: #102236;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 #mockUpgradeWrap {
   margin-top: 24px;
-  padding: 14px 16px;
-  border: 1.5px dashed var(--border2);
-  border-radius: var(--radius-lg);
-  background: var(--surface2);
+  padding: 18px;
+  border: 1px dashed rgba(15, 25, 35, 0.14);
+  border-radius: 20px;
+  background: rgba(245, 248, 252, 0.76);
   display: inline-flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .mock-upgrade-label {
   margin: 0;
-  font-size: 10px;
-  font-weight: 600;
+  color: #6a7684;
+  font-size: 11px;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink3);
 }
 
 .mock-upgrade-btn {
-  padding: 7px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  border: 1px solid var(--border2);
-  border-radius: 7px;
-  background: var(--surface);
-  color: var(--ink2);
-  cursor: pointer;
+  border: 1px solid rgba(15, 25, 35, 0.1);
+  background: #fff;
+  color: #223246;
 }
 
 .mock-upgrade-btn:hover:not(:disabled) {
-  border-color: var(--accent2);
+  border-color: rgba(36, 109, 187, 0.22);
   color: var(--accent2);
 }
 
@@ -66,6 +111,10 @@ section {
 
 .mock-upgrade-error {
   margin: 0;
-  font-size: 12px;
   color: var(--red);
+  font-size: 13px;
+}
+
+.topbar-nav .nav-icon {
+  display: none;
 }
