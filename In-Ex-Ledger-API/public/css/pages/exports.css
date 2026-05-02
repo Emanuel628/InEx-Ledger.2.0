@@ -404,6 +404,140 @@
   gap: 10px;
 }
 
+.history-empty {
+  padding: 28px 14px;
+  border-radius: 18px;
+  border: 1px dashed rgba(15, 25, 35, 0.12);
+  background: rgba(245, 248, 252, 0.72);
+  color: #667385;
+  font-size: 14px;
+  text-align: center;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(140px, 1fr) minmax(120px, .9fr) 64px auto;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 0;
+  border-top: 1px solid rgba(15, 25, 35, 0.05);
+}
+
+.history-item:first-child {
+  border-top: none;
+}
+
+.history-file {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.history-file-name,
+.history-period,
+.history-meta,
+.history-size {
+  color: #223246;
+  font-size: 13px;
+}
+
+.history-file-name {
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.history-period,
+.history-meta {
+  color: #5d6877;
+}
+
+.history-badge {
+  width: fit-content;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.history-badge.pdf {
+  background: rgba(36, 109, 187, 0.1);
+  color: var(--accent2);
+}
+
+.history-badge.csv {
+  background: rgba(15, 25, 35, 0.06);
+  color: #657284;
+}
+
+.history-download-cell {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.history-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.history-download,
+.history-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 40px;
+  max-width: 100%;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.history-download {
+  padding: 0 14px;
+  border: 1px solid rgba(15, 25, 35, 0.1);
+  background: #fff;
+  color: var(--accent2);
+  white-space: nowrap;
+}
+
+.history-download:hover {
+  background: #f8fbff;
+  border-color: rgba(36, 109, 187, 0.18);
+}
+
+.history-delete {
+  min-width: 40px;
+  padding: 0;
+  border: 1px solid rgba(15, 25, 35, 0.1);
+  background: #fff;
+  color: #667385;
+}
+
+.history-delete:hover {
+  background: var(--red-bg);
+  border-color: rgba(185, 28, 28, 0.18);
+  color: var(--red);
+}
+
+.history-download svg,
+.history-delete svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .settings-toast {
   position: fixed;
   right: 24px;
@@ -473,6 +607,16 @@
 
   .history-columns {
     display: none;
+  }
+
+  .history-item {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 16px 0;
+  }
+
+  .history-download-cell {
+    justify-content: flex-start;
   }
 }
 
