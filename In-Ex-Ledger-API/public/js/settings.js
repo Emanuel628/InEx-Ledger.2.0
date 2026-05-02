@@ -971,12 +971,18 @@ async function initPreferences() {
       const response = await apiFetch("/api/me/onboarding/replay", {
         method: "POST"
       });
+      const result = response ? await response.json().catch(() => null) : null;
 
       if (!response || !response.ok) {
         throw new Error("Unable to reset onboarding tips");
       }
 
       showSettingsToast(t("settings_tips_reset"));
+      if (result?.redirect_to) {
+        window.setTimeout(() => {
+          window.location.href = result.redirect_to;
+        }, 350);
+      }
     } catch (error) {
       console.error("Failed to reset onboarding tips", error);
       showSettingsToast(t("settings_tips_reset_error"));

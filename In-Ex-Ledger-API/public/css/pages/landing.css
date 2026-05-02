@@ -21,16 +21,16 @@ body {
 }
 
 .marketing-main {
-  width: min(1240px, calc(100vw - 48px));
+  width: min(1268px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 24px 0 72px;
+  padding: 18px 0 72px;
 }
 
 .marketing-header {
   position: sticky;
   top: 14px;
   z-index: 20;
-  width: min(1240px, calc(100vw - 48px));
+  width: min(1268px, calc(100vw - 32px));
   margin: 14px auto 0;
   padding: 14px 18px;
   display: flex;
@@ -140,7 +140,7 @@ body {
   grid-template-columns: minmax(0, 1.02fr) minmax(380px, 0.98fr);
   gap: 34px;
   align-items: center;
-  padding: 42px;
+  padding: 34px 36px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 253, 0.98)),
     var(--landing-surface);
@@ -164,20 +164,20 @@ body {
 }
 
 .hero h1 {
-  max-width: 11ch;
-  margin: 18px 0 0;
+  max-width: 10ch;
+  margin: 14px 0 0;
   color: #0f1d2f;
-  font-size: clamp(3.1rem, 6vw, 5.3rem);
-  line-height: 0.95;
-  letter-spacing: -0.05em;
+  font-size: clamp(2.7rem, 5vw, 4.55rem);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
 }
 
 .hero-lede {
   max-width: 58ch;
-  margin: 22px 0 0;
+  margin: 18px 0 0;
   color: var(--landing-muted);
-  font-size: 18px;
-  line-height: 1.72;
+  font-size: 17px;
+  line-height: 1.68;
 }
 
 .hero-actions,
@@ -185,7 +185,21 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 28px;
+  margin-top: 24px;
+}
+
+.hero-cta-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--landing-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.hero-cta-note strong {
+  color: var(--ink);
 }
 
 .button {
@@ -234,7 +248,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin: 22px 0 0;
+  margin: 18px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -254,7 +268,7 @@ body {
 }
 
 .hero-support-note {
-  margin-top: 18px;
+  margin-top: 14px;
   max-width: 62ch;
   color: var(--ink2);
   font-size: 14px;
@@ -266,7 +280,7 @@ body {
 }
 
 .hero-device {
-  padding: 18px;
+  padding: 16px;
   border-radius: 28px;
   background: linear-gradient(180deg, #183452 0%, #10253d 100%);
   box-shadow: var(--landing-shadow-lg);

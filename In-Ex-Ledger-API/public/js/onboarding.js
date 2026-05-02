@@ -164,6 +164,7 @@ function renderGuidedSetupCard(page) {
   card.id = "onboardingTourCard";
   card.className = "onboarding-tour-card onboarding-tour-card-guided";
   const stepLabel = `${tx("onboarding_guide_step_prefix")} ${config.stepNumber} ${tx("onboarding_guide_step_of")} ${GUIDED_SETUP_ORDER.length}`;
+  const canGoBack = config.stepNumber > 1;
   const launchButton = document.querySelector(config.launchSelector)
     ? `<button type="button" class="onboarding-tour-secondary onboarding-guide-launch">${escapeHtml(tx(config.launchLabelKey))}</button>`
     : "";
@@ -179,6 +180,7 @@ function renderGuidedSetupCard(page) {
     <p class="onboarding-tour-helper">${escapeHtml(tx(config.helperKey))}</p>
     <div class="onboarding-tour-actions">
       ${launchButton}
+      ${canGoBack ? `<button type="button" class="onboarding-tour-ghost onboarding-guide-back">${escapeHtml(tx("onboarding_guide_back"))}</button>` : ""}
       <button type="button" class="onboarding-tour-dismiss onboarding-guide-next">${escapeHtml(tx(config.nextLabelKey))}</button>
       <button type="button" class="onboarding-tour-ghost onboarding-guide-skip">${escapeHtml(tx("onboarding_guide_skip"))}</button>
     </div>
@@ -188,6 +190,9 @@ function renderGuidedSetupCard(page) {
 
   card.querySelector(".onboarding-guide-launch")?.addEventListener("click", () => {
     document.querySelector(config.launchSelector)?.click();
+  });
+  card.querySelector(".onboarding-guide-back")?.addEventListener("click", () => {
+    advanceGuidedSetup("back", page, card);
   });
   card.querySelector(".onboarding-guide-next")?.addEventListener("click", () => {
     advanceGuidedSetup(config.nextAction, page, card);

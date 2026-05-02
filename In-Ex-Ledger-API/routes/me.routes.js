@@ -28,9 +28,8 @@ const accountDeleteLimiter = rateLimit({
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const VALID_BUSINESS_TYPES = new Set(["sole_proprietor", "llc", "s_corp", "partnership", "corporation"]);
-const MAX_CUSTOM_ACCOUNT_TYPE_LEN = 50;
 const GUIDED_SETUP_STEPS = ["categories", "accounts", "transactions"];
-const VALID_GUIDED_SETUP_ACTIONS = new Set(["next", "skip", "finish"]);
+const VALID_GUIDED_SETUP_ACTIONS = new Set(["next", "back", "skip", "finish"]);
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const REFRESH_TOKEN_COOKIE = "refresh_token";
 const LEGACY_CPA_AUDIT_USER_CONSTRAINTS = [
@@ -87,6 +86,14 @@ function resolveNextGuidedSetupStep(currentStep) {
     return GUIDED_SETUP_STEPS[0];
   }
   return GUIDED_SETUP_STEPS[currentIndex + 1] || null;
+}
+
+function resolvePreviousGuidedSetupStep(currentStep) {
+  const currentIndex = GUIDED_SETUP_STEPS.indexOf(currentStep);
+  if (currentIndex <= 0) {
+    return null;
+  }
+  return GUIDED_SETUP_STEPS[currentIndex - 1] || null;
 }
 
 router.use(requireAuth);
@@ -170,8 +177,6 @@ router.put("/onboarding", async (req, res) => {
   const region = String(req.body?.region || "").trim().toUpperCase();
   const province = String(req.body?.province || "").trim().toUpperCase();
   const language = String(req.body?.language || "").trim();
-  const starterAccountType = String(req.body?.starter_account_type || "").trim();
-  const starterAccountName = String(req.body?.starter_account_name || "").trim();
 
   if (!businessName) {
     return res.status(400).json({ error: "Business name is required." });
@@ -188,24 +193,12 @@ router.put("/onboarding", async (req, res) => {
   if (region === "CA" && !CA_PROVINCES.has(province)) {
     return res.status(400).json({ error: "Choose a valid province." });
   }
-  if (!starterAccountType || starterAccountType.length > MAX_CUSTOM_ACCOUNT_TYPE_LEN) {
-    return res.status(400).json({ error: "Choose a starter account type." });
-  }
-  if (!starterAccountName) {
-    return res.status(400).json({ error: "Starter account name is required." });
-  }
   try {
     const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
     const client = await pool.connect();
 
     try {
       await client.query("BEGIN");
-
-      const currentUserState = await client.query(
-        "SELECT onboarding_completed FROM users WHERE id = $1 LIMIT 1",
-        [req.user.id]
-      );
-      const onboardingCompleted = !!currentUserState.rows[0]?.onboarding_completed;
 
       await client.query(
         `UPDATE businesses
@@ -221,26 +214,12 @@ router.put("/onboarding", async (req, res) => {
         [businessName, businessType, region, language, province || null, businessId]
       );
 
-      if (!onboardingCompleted) {
-        await client.query("DELETE FROM accounts WHERE business_id = $1", [businessId]);
-      }
-      const accountCheck = await client.query("SELECT 1 FROM accounts WHERE business_id = $1 LIMIT 1", [businessId]);
-      if (!onboardingCompleted && !accountCheck.rowCount) {
-        await client.query(
-          `INSERT INTO accounts (id, business_id, name, type)
-           VALUES ($1, $2, $3, $4)`,
-          [crypto.randomUUID(), businessId, starterAccountName, starterAccountType]
-        );
-      }
-
       const onboardingData = {
         business_name: businessName,
         business_type: businessType,
         region,
         province: region === "CA" ? province : "",
         language,
-        starter_account_type: starterAccountType,
-        starter_account_name: starterAccountName,
         guided_setup_active: true,
         guided_setup_step: GUIDED_SETUP_STEPS[0]
       };
@@ -326,6 +305,11 @@ router.post("/onboarding/guide", async (req, res) => {
       currentData.guided_setup_active = false;
       currentData.guided_setup_step = "complete";
       currentData.guided_setup_completed_at = timestamp;
+    } else if (action === "back") {
+      const previousStep = resolvePreviousGuidedSetupStep(effectivePage);
+      currentData.guided_setup_active = true;
+      currentData.guided_setup_step = previousStep || GUIDED_SETUP_STEPS[0];
+      redirectTo = `/${currentData.guided_setup_step}`;
     } else {
       currentTourSeen[effectivePage] = true;
       const nextStep = resolveNextGuidedSetupStep(effectivePage);
@@ -401,11 +385,28 @@ router.post("/onboarding/tour", async (req, res) => {
 
 router.post("/onboarding/replay", async (req, res) => {
   try {
-    await pool.query(
-      "UPDATE users SET onboarding_tour_seen = '{}'::jsonb WHERE id = $1",
+    const current = await pool.query(
+      "SELECT onboarding_data FROM users WHERE id = $1 LIMIT 1",
       [req.user.id]
     );
-    return res.status(200).json({ success: true });
+    if (!current.rowCount) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    const nextData =
+      current.rows[0]?.onboarding_data && typeof current.rows[0].onboarding_data === "object"
+        ? { ...current.rows[0].onboarding_data }
+        : {};
+    delete nextData.guided_setup_completed_at;
+    delete nextData.guided_setup_skipped_at;
+    nextData.guided_setup_active = true;
+    nextData.guided_setup_step = GUIDED_SETUP_STEPS[0];
+
+    await pool.query(
+      "UPDATE users SET onboarding_tour_seen = '{}'::jsonb, onboarding_data = $1::jsonb WHERE id = $2",
+      [JSON.stringify(nextData), req.user.id]
+    );
+    return res.status(200).json({ success: true, redirect_to: `/${GUIDED_SETUP_STEPS[0]}` });
   } catch (err) {
     logError("POST /me/onboarding/replay error:", err.message);
     return res.status(500).json({ error: "Failed to reset onboarding tips." });

@@ -28,11 +28,10 @@
       <div class="onboarding-intro">
         <span class="onboarding-kicker" data-i18n="onboarding_kicker">Get set up</span>
         <h1>Let's make your workspace usable in one pass.</h1>
-        <p>Tell us the basics, we'll set your defaults, create your first account, and walk you through categories, accounts, and transactions.</p>
+        <p>Tell us the basics, we'll set your defaults, then walk you through categories, accounts, and transactions without repeating setup you already did.</p>
         <ol class="onboarding-steps">
           <li data-i18n="onboarding_step_1">Business basics</li>
           <li data-i18n="onboarding_step_2">Regional defaults</li>
-          <li data-i18n="onboarding_step_3">First account</li>
           <li data-i18n="onboarding_step_4">Guided setup</li>
         </ol>
       </div>
@@ -81,31 +80,6 @@
               <option value="YT">Yukon</option>
             </select>
           </div>
-          <div class="form-field">
-            <label for="onboardingStarterAccountType" data-i18n="onboarding_first_account_type">Primary account type</label>
-            <select id="onboardingStarterAccountType" required>
-              <option value="checking" data-i18n="accounts_type_checking">Checking</option>
-              <option value="savings" data-i18n="accounts_type_savings">Savings</option>
-              <option value="credit_card" data-i18n="accounts_type_credit_card">Credit card</option>
-              <option value="cash" data-i18n="accounts_type_cash">Cash</option>
-              <option value="loan" data-i18n="accounts_type_loan">Loan</option>
-              <option value="custom" data-i18n="accounts_type_custom">Custom...</option>
-            </select>
-            <input
-              type="text"
-              id="onboardingCustomAccountType"
-              class="custom-account-type-input"
-              placeholder="e.g. Line of Credit"
-              maxlength="50"
-              hidden
-            />
-            <p class="onboarding-field-hint">Pick the account where most of your business money lives — usually a checking or credit card. You can add more accounts after setup.</p>
-          </div>
-          <div class="form-field">
-            <label for="onboardingStarterAccountName" data-i18n="onboarding_first_account_name">Account nickname</label>
-            <input type="text" id="onboardingStarterAccountName" required placeholder="e.g. Chase Business Checking" />
-            <p class="onboarding-field-hint">A short name you'll recognize — like "Chase Checking" or "Amex Card". You can rename it later in Accounts.</p>
-          </div>
         </div>
 
         <p id="onboardingMessage" class="auth-error" role="alert" aria-live="polite" hidden></p>
@@ -124,4 +98,3 @@
   <script src="../js/onboarding-page.js?v=20260419a"></script>
 </body>
 </html>
-

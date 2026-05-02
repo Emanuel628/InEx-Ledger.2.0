@@ -3,6 +3,7 @@ let onboardingMessage = null;
 let onboardingSubmitting = false;
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const GUIDED_SETUP_STEPS = new Set(["categories", "accounts", "transactions"]);
+
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
@@ -31,7 +32,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("onboardingRegion")?.addEventListener("change", syncProvinceField);
   window.addEventListener("lunaLanguageChanged", applyOnboardingStaticCopy);
   wireWorkTypeTiles();
-  wireCustomAccountType();
   onboardingForm.addEventListener("submit", handleOnboardingSubmit);
 });
 
@@ -41,38 +41,18 @@ function hydrateOnboardingDefaults(profile = {}) {
 
   const elBusinessName = document.getElementById("onboardingBusinessName");
   if (elBusinessName) elBusinessName.value = onboardingData.business_name || business.name || "";
-  // business_type is always sole_proprietor for the freelancer fast-path
+
   const savedWorkType = onboardingData.work_type || "other";
   const elWorkType = document.getElementById("onboardingWorkType");
   if (elWorkType) elWorkType.value = savedWorkType;
   document.querySelectorAll(".work-tile").forEach((btn) => {
     btn.classList.toggle("is-selected", btn.dataset.work === savedWorkType);
   });
+
   const elRegion = document.getElementById("onboardingRegion");
   if (elRegion) elRegion.value = onboardingData.region || business.region || "US";
   const elProvince = document.getElementById("onboardingProvince");
   if (elProvince) elProvince.value = onboardingData.province || business.province || "";
-
-  const elStarterAccountType = document.getElementById("onboardingStarterAccountType");
-  const elCustomAccountType = document.getElementById("onboardingCustomAccountType");
-  if (elStarterAccountType) {
-    const savedType = onboardingData.starter_account_type || "checking";
-    const knownTypes = new Set(["checking", "savings", "credit_card", "cash", "loan"]);
-    if (savedType && !knownTypes.has(savedType)) {
-      // Previously saved custom type — restore the custom input
-      elStarterAccountType.value = "custom";
-      if (elCustomAccountType) {
-        elCustomAccountType.hidden = false;
-        elCustomAccountType.required = true;
-        elCustomAccountType.value = savedType;
-      }
-    } else {
-      elStarterAccountType.value = savedType;
-    }
-  }
-
-  const elStarterAccountName = document.getElementById("onboardingStarterAccountName");
-  if (elStarterAccountName) elStarterAccountName.value = onboardingData.starter_account_name || "";
 
   syncProvinceField();
 }
@@ -83,13 +63,7 @@ async function handleOnboardingSubmit(event) {
     return;
   }
 
-  const submitButton = onboardingForm.querySelector("button[type=\"submit\"]");
-  const accountTypeSelect = document.getElementById("onboardingStarterAccountType")?.value || "";
-  const customAccountTypeValue = document.getElementById("onboardingCustomAccountType")?.value.trim() || "";
-  const effectiveAccountType = accountTypeSelect === "custom" ? customAccountTypeValue : accountTypeSelect;
-
-  // Language was chosen during registration and persisted to localStorage.
-  // The language select was removed from onboarding; read the saved value instead.
+  const submitButton = onboardingForm.querySelector('button[type="submit"]');
   const savedLanguage =
     (typeof getCurrentLanguage === "function" ? getCurrentLanguage() : null) ||
     localStorage.getItem("lb_language") ||
@@ -101,9 +75,7 @@ async function handleOnboardingSubmit(event) {
     business_type: "sole_proprietor",
     region: document.getElementById("onboardingRegion")?.value || "US",
     province: document.getElementById("onboardingProvince")?.value || "",
-    language: savedLanguage,
-    starter_account_type: effectiveAccountType,
-    starter_account_name: document.getElementById("onboardingStarterAccountName")?.value.trim() || ""
+    language: savedLanguage
   };
 
   if (payload.region !== "CA") {
@@ -111,10 +83,6 @@ async function handleOnboardingSubmit(event) {
   }
   if (payload.region === "CA" && !CA_PROVINCES.has(payload.province)) {
     setOnboardingMessage(tx("onboarding_error_province"));
-    return;
-  }
-  if (accountTypeSelect === "custom" && !customAccountTypeValue) {
-    setOnboardingMessage(tx("onboarding_error_custom_account_type") || "Please enter a name for your custom account type.");
     return;
   }
 
@@ -197,19 +165,6 @@ function applyOnboardingStaticCopy() {
   intro?.querySelector("h1")?.replaceChildren(tx("onboarding_title"));
   intro?.querySelector("p")?.replaceChildren(tx("onboarding_intro_guided"));
   document.title = `InEx Ledger - ${tx("onboarding_page_title")}`;
-}
-
-function wireCustomAccountType() {
-  const typeSelect = document.getElementById("onboardingStarterAccountType");
-  const customInput = document.getElementById("onboardingCustomAccountType");
-  if (!typeSelect || !customInput) return;
-
-  typeSelect.addEventListener("change", () => {
-    const isCustom = typeSelect.value === "custom";
-    customInput.hidden = !isCustom;
-    customInput.required = isCustom;
-    if (!isCustom) customInput.value = "";
-  });
 }
 
 function resolveOnboardingDestination(profile = {}) {
