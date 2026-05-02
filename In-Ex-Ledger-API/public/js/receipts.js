@@ -188,11 +188,13 @@ async function loadReceipts() {
 
     receiptRecords = remoteReceipts;
     receiptsLoadFailed = false;
+    receiptsLoading = false;
     renderReceipts(receiptRecords);
   } catch (error) {
     console.error("Failed to load receipts:", error);
     receiptRecords = [];
     receiptsLoadFailed = true;
+    receiptsLoading = false;
     renderReceipts(receiptRecords);
   } finally {
     receiptsLoading = false;
