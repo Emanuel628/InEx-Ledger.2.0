@@ -125,9 +125,12 @@ function renderThisMonth(cm) {
   const progress = document.getElementById("thisMonthProgress");
   if (!card || !grid) return;
 
-  label.textContent = `This Month (${escapeHtml(cm.label)})`;
-  const pct = Math.round((cm.days_elapsed / cm.days_in_month) * 100);
-  progress.textContent = `${cm.days_elapsed} of ${cm.days_in_month} days`;
+  label.textContent = `${escapeHtml(cm.title || "This Month")} (${escapeHtml(cm.label)})`;
+  if (cm.title === "Latest Active Month") {
+    progress.textContent = "Most recent month with recorded income";
+  } else {
+    progress.textContent = `${cm.days_elapsed} of ${cm.days_in_month} days`;
+  }
 
   function pctBadge(pct, inverse) {
     if (pct === 0) return "";

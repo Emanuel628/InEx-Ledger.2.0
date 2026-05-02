@@ -77,6 +77,10 @@ function buildTrailingMonthMap(monthCount) {
   }, new Map());
 }
 
+function firstDayOfMonthFromKey(key) {
+  return `${key}-01`;
+}
+
 /**
  * Returns a YYYY-MM-DD string for the first day of the month n months ago.
  */
@@ -260,8 +264,56 @@ router.get("/dashboard", async (req, res) => {
     const currentMonth = rowsToMonthSummary(currentMonthResult.rows);
     const priorMonth = rowsToMonthSummary(priorMonthResult.rows);
 
+    let currentMonthPayload = {
+      title: "This Month",
+      label: monthKey(now.getFullYear(), now.getMonth() + 1),
+      income: Number(currentMonth.income.toFixed(2)),
+      expense: Number(currentMonth.expense.toFixed(2)),
+      net: Number(currentMonth.net.toFixed(2)),
+      income_vs_prior_pct: pctChange(currentMonth.income, priorMonth.income),
+      expense_vs_prior_pct: pctChange(currentMonth.expense, priorMonth.expense),
+      net_vs_prior_pct: pctChange(currentMonth.net, priorMonth.net)
+    };
+
+    const hasCurrentMonthIncome = currentMonth.income > 0;
+    if (!hasCurrentMonthIncome) {
+      const latestIncomeMonthIndex = [...months]
+        .map((entry, index) => ({ entry, index }))
+        .reverse()
+        .find(({ entry }) => entry.income > 0)?.index;
+
+      if (latestIncomeMonthIndex !== undefined) {
+        const fallbackMonth = months[latestIncomeMonthIndex];
+        const fallbackPriorMonth = latestIncomeMonthIndex > 0
+          ? months[latestIncomeMonthIndex - 1]
+          : { income: 0, expense: 0, net: 0 };
+
+        currentMonthPayload = {
+          title: "Latest Active Month",
+          label: fallbackMonth.month,
+          income: Number(fallbackMonth.income.toFixed(2)),
+          expense: Number(fallbackMonth.expense.toFixed(2)),
+          net: Number(fallbackMonth.net.toFixed(2)),
+          days_elapsed: new Date(firstDayOfMonthFromKey(fallbackMonth.month)).getUTCDate(),
+          days_in_month: new Date(
+            Number(fallbackMonth.month.slice(0, 4)),
+            Number(fallbackMonth.month.slice(5, 7)),
+            0
+          ).getDate(),
+          income_vs_prior_pct: pctChange(fallbackMonth.income, fallbackPriorMonth.income),
+          expense_vs_prior_pct: pctChange(fallbackMonth.expense, fallbackPriorMonth.expense),
+          net_vs_prior_pct: pctChange(fallbackMonth.net, fallbackPriorMonth.net)
+        };
+      }
+    }
+
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const dayOfMonth = now.getDate();
+
+    if (currentMonthPayload.title === "This Month") {
+      currentMonthPayload.days_elapsed = dayOfMonth;
+      currentMonthPayload.days_in_month = daysInMonth;
+    }
 
     res.json({
       period_months: 12,
@@ -277,17 +329,7 @@ router.get("/dashboard", async (req, res) => {
         has_tax_estimates: hasTaxEstimates,
         region
       },
-      current_month: {
-        label: monthKey(now.getFullYear(), now.getMonth() + 1),
-        income: Number(currentMonth.income.toFixed(2)),
-        expense: Number(currentMonth.expense.toFixed(2)),
-        net: Number(currentMonth.net.toFixed(2)),
-        days_elapsed: dayOfMonth,
-        days_in_month: daysInMonth,
-        income_vs_prior_pct: pctChange(currentMonth.income, priorMonth.income),
-        expense_vs_prior_pct: pctChange(currentMonth.expense, priorMonth.expense),
-        net_vs_prior_pct: pctChange(currentMonth.net, priorMonth.net)
-      },
+      current_month: currentMonthPayload,
       monthly_breakdown: months,
       top_income_sources: topIncomeResult.rows.map((r) => ({
         category: r.category_name || "Uncategorized",

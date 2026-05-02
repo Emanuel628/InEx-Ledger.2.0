@@ -206,6 +206,17 @@
   font-size: 13px;
 }
 
+.checkbox-row input[type="checkbox"],
+.secure-export-checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  flex: 0 0 16px;
+  margin: 2px 0 0;
+  accent-color: var(--accent2);
+}
+
 .summary-panel {
   margin-top: 18px;
   padding: 18px;
