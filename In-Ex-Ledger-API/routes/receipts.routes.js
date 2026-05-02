@@ -21,7 +21,7 @@ const {
   getReceiptStorageDir,
   isManagedReceiptPath,
   resolveReceiptFilePath,
-  requirePersistentReceiptStorage
+  getReceiptStorageStatus
 } = require("../services/receiptStorage.js");
 const {
   loadAccountingLockState,
@@ -66,13 +66,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
    ========================================================= */
 
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: storageDir,
-    filename(_req, file, cb) {
-      const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `${crypto.randomUUID()}${ext}`);
-    }
-  }),
+  storage: multer.memoryStorage(),
 
   fileFilter(_req, file, cb) {
     const ext = path.extname(file.originalname).toLowerCase();
@@ -99,19 +93,20 @@ const upload = multer({
    Helpers
    ========================================================= */
 
-async function sha256File(storagePath) {
-  return await new Promise((resolve, reject) => {
-    const hash = crypto.createHash("sha256");
-    const stream = fs.createReadStream(storagePath);
-
-    stream.on("data", (chunk) => hash.update(chunk));
-    stream.on("end", () => resolve(hash.digest("hex")));
-    stream.on("error", reject);
-  });
-}
-
 function readReceiptFileBytes(storagePath) {
   return fs.readFileSync(storagePath);
+}
+
+function writeReceiptMirror(buffer, originalName) {
+  if (!buffer?.length) {
+    return null;
+  }
+
+  const ext = path.extname(String(originalName || "")).toLowerCase();
+  const storagePath = path.join(storageDir, `${crypto.randomUUID()}${ext}`);
+  fs.mkdirSync(storageDir, { recursive: true });
+  fs.writeFileSync(storagePath, buffer);
+  return storagePath;
 }
 
 function isUuid(value) {
@@ -185,7 +180,7 @@ router.get("/", async (req, res) => {
    POST /receipts — Upload Receipt
    ========================================================= */
 
-router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), async (req, res) => {
+router.post("/", upload.single("receipt"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "Receipt file is required." });
   }
@@ -194,7 +189,6 @@ router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), asyn
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "receipts")) {
-      safeUnlink(req.file?.path);
       return res.status(402).json({ error: "Receipt uploads require an active InEx Ledger Pro plan." });
     }
 
@@ -208,7 +202,6 @@ router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), asyn
 
     if (transactionId !== null) {
       if (!isUuid(transactionId)) {
-        safeUnlink(req.file?.path);
         return res.status(400).json({
           error: "transaction_id must be a valid UUID when provided."
         });
@@ -223,7 +216,6 @@ router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), asyn
       );
 
       if (!txCheck.rowCount) {
-        safeUnlink(req.file?.path);
         return res.status(404).json({
           error: "Transaction not found or does not belong to this business."
         });
@@ -234,10 +226,21 @@ router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), asyn
     }
 
     const receiptId = crypto.randomUUID();
-    const storagePath = req.file.path;
-
-    const fileBytes = readReceiptFileBytes(storagePath);
+    const fileBytes = req.file.buffer;
     const fileHash = crypto.createHash("sha256").update(fileBytes).digest("hex");
+    let storagePath = null;
+
+    try {
+      storagePath = writeReceiptMirror(fileBytes, req.file.originalname);
+    } catch (mirrorErr) {
+      const storageStatus = getReceiptStorageStatus();
+      logWarn("Receipt disk mirror unavailable; storing receipt in database only", {
+        receiptId,
+        directory: storageStatus.directory,
+        mode: storageStatus.mode,
+        error: mirrorErr.message
+      });
+    }
 
     await pool.query(
       `INSERT INTO receipts
@@ -260,6 +263,7 @@ router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), asyn
       filename: req.file.originalname,
       mime_type: req.file.mimetype,
       transaction_id: transactionId,
+      created_at: new Date().toISOString(),
       url: `/api/receipts/${receiptId}`
     });
   } catch (err) {
@@ -274,8 +278,6 @@ router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), asyn
     logError("POST /receipts error:", err);
 
     // Orphan cleanup
-    safeUnlink(req.file?.path);
-
     return res.status(500).json({ error: "Failed to save receipt." });
   }
 });
@@ -440,31 +442,15 @@ router.get("/:id", async (req, res) => {
     res.setHeader("Content-Type", mime_type || "application/octet-stream");
     res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(filename)}`);
 
-    if (resolvedStoragePath) {
-      if (!file_bytes) {
-        try {
-          const bytes = readReceiptFileBytes(resolvedStoragePath);
-          void pool.query(
-            `UPDATE receipts
-             SET file_bytes = $2
-             WHERE id = $1
-               AND file_bytes IS NULL`,
-            [id, bytes]
-          ).catch((error) => {
-            logWarn("Failed to backfill receipt bytes", { receiptId: id, error: error.message });
-          });
-        } catch (backfillErr) {
-          logWarn("Failed to read receipt bytes for backfill", {
-            receiptId: id,
-            error: backfillErr.message
-          });
-        }
-      }
+    if (file_bytes) {
+      return res.send(Buffer.isBuffer(file_bytes) ? file_bytes : Buffer.from(file_bytes));
+    }
 
+    if (resolvedStoragePath) {
       return res.sendFile(resolvedStoragePath);
     }
 
-    return res.send(Buffer.from(file_bytes));
+    return res.status(404).json({ error: "Receipt file missing." });
   } catch (err) {
     logError("GET /receipts/:id error:", err);
     return res.status(500).json({ error: "Failed to load receipt." });
@@ -721,10 +707,10 @@ router.post("/:id/extract", async (req, res) => {
     let ocrSourcePath = resolvedPath;
     let tempPath = null;
 
-    if (!ocrSourcePath && file_bytes) {
+    if (file_bytes) {
       const ext = path.extname(String(storage_path || "")).toLowerCase() || ".bin";
       tempPath = path.join(storageDir, `${crypto.randomUUID()}-ocr${ext}`);
-      fs.writeFileSync(tempPath, Buffer.from(file_bytes));
+      fs.writeFileSync(tempPath, Buffer.isBuffer(file_bytes) ? file_bytes : Buffer.from(file_bytes));
       ocrSourcePath = tempPath;
     }
 
