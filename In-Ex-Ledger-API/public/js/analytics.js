@@ -86,9 +86,11 @@ function renderDashboard(data) {
   // Monthly breakdown table
   if (monthly_breakdown && monthly_breakdown.length) {
     const tbody = document.getElementById("monthlyTableBody");
+    const activeMonthLabel = current_month?.label || "";
     tbody.innerHTML = monthly_breakdown.map((m) => {
       const netClass = m.net >= 0 ? "net-positive" : "net-negative";
-      return `<tr class="projection-row">
+      const activeClass = m.month === activeMonthLabel ? " projection-row--active" : "";
+      return `<tr class="projection-row${activeClass}">
         <td>${escapeHtml(m.month)}</td>
         <td>${fmt(m.income)}</td>
         <td>${fmt(m.expense)}</td>
