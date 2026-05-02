@@ -2987,3 +2987,13 @@ textarea.form-control {
     font-size: 28px;
   }
 }
+
+
+@keyframes tx-highlight-fade {
+  0%   { background-color: #fef9c3; }
+  100% { background-color: transparent; }
+}
+
+tr.tx-highlight {
+  animation: tx-highlight-fade 2s ease-out forwards;
+}

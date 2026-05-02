@@ -361,7 +361,7 @@ function renderTransactionCell(transactionId) {
 
   const transaction = transactionMap[transactionId];
   const label = transaction?.description || transactionId;
-  return `<a class="receipt-transaction-link" href="transactions">${escapeHtml(label)}</a>`;
+  return `<a class="receipt-transaction-link" href="transactions?highlight=${encodeURIComponent(transactionId)}#txn-${encodeURIComponent(transactionId)}">${escapeHtml(label)}</a>`;
 }
 
 function wireReceiptLinkModal() {

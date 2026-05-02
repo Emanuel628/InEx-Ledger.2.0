@@ -1837,6 +1837,7 @@ function renderTransactionsTable(filteredTransactions) {
 
   transactions.forEach((txn) => {
     const row = document.createElement("tr");
+    row.id = `txn-${txn.id}`;
     const categoryName = txn.categoryName || categoriesById[txn.categoryId]?.name || "-";
     const accountName = txn.accountName || accountsById[txn.accountId]?.name || "-";
     const rowRegion = String(
@@ -1918,8 +1919,26 @@ function renderTransactionsTable(filteredTransactions) {
       await toggleTransactionCleared(txn.id, !txn.cleared);
     });
   });
+
+  maybeScrollToHighlightedTransaction();
 }
 
+function maybeScrollToHighlightedTransaction() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("highlight");
+  if (!id) return;
+
+  const row = document.getElementById(`txn-${id}`);
+  if (!row) return;
+
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+  row.classList.add("tx-highlight");
+  setTimeout(() => row.classList.remove("tx-highlight"), 2000);
+
+  const clean = new URL(window.location.href);
+  clean.searchParams.delete("highlight");
+  window.history.replaceState({}, "", clean.toString());
+}
 
 function renderTotals() {
   const incomeLabel = document.getElementById("incomeYTD");
