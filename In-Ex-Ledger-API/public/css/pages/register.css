@@ -243,3 +243,15 @@
   line-height: 1.5;
   text-align: center;
 }
+
+main {
+  margin-top: 56px;
+}
+
+.auth-card {
+  padding-top: 30px;
+}
+
+.auth-form {
+  gap: 14px;
+}

@@ -143,9 +143,9 @@ body {
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1.02fr) minmax(380px, 0.98fr);
-  gap: 34px;
+  gap: 28px;
   align-items: center;
-  padding: 34px 36px;
+  padding: 30px 32px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 253, 0.98)),
     var(--landing-surface);
@@ -261,13 +261,13 @@ body {
 .hero-proof-list li {
   display: inline-flex;
   align-items: center;
-  min-height: 40px;
-  padding: 0 14px;
+  min-height: 36px;
+  padding: 0 12px;
   border-radius: 999px;
   background: var(--landing-surface-strong);
   border: 1px solid rgba(15, 25, 35, 0.08);
   color: var(--ink);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   box-shadow: 0 6px 16px rgba(15, 25, 35, 0.03);
 }
@@ -285,7 +285,7 @@ body {
 }
 
 .hero-device {
-  padding: 16px;
+  padding: 14px;
   border-radius: 28px;
   background: linear-gradient(180deg, #183452 0%, #10253d 100%);
   box-shadow: var(--landing-shadow-lg);
@@ -297,7 +297,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 6px 4px 18px;
+  padding: 4px 4px 14px;
 }
 
 .hero-device-brand {
@@ -332,7 +332,7 @@ body {
 .hero-device-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .hero-metric,
@@ -344,9 +344,9 @@ body {
 }
 
 .hero-metric {
-  padding: 18px;
+  padding: 16px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .hero-metric-wide {
@@ -363,7 +363,7 @@ body {
 }
 
 .hero-metric strong {
-  font-size: 30px;
+  font-size: 27px;
   line-height: 1;
   letter-spacing: -0.03em;
 }
@@ -376,7 +376,7 @@ body {
 
 .hero-ledger-card {
   margin-top: 14px;
-  padding: 18px;
+  padding: 16px;
 }
 
 .hero-ledger-head,
@@ -397,7 +397,7 @@ body {
 }
 
 .hero-ledger-row {
-  padding: 14px 0;
+  padding: 12px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -450,7 +450,7 @@ body {
 .fit-section,
 .pricing-section,
 .faq-section {
-  margin-top: 22px;
+  margin-top: 18px;
   padding: 34px;
 }
 
@@ -812,6 +812,35 @@ body {
 
   .hero h1 {
     max-width: none;
+  }
+}
+
+@media (max-height: 840px) and (min-width: 1024px) {
+  .marketing-main {
+    padding-top: 14px;
+  }
+
+  .hero {
+    gap: 24px;
+    padding: 26px 28px;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.45rem, 4.5vw, 4rem);
+  }
+
+  .hero-lede {
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  .hero-actions,
+  .final-cta-actions {
+    margin-top: 20px;
+  }
+
+  .hero-proof-list {
+    margin-top: 14px;
   }
 }
 
