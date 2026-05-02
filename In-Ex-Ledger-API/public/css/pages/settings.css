@@ -2084,7 +2084,8 @@ body {
 }
 
 .settings-page .settings-primary-btn:hover {
-  background: #111827;
+  background: #3b82f6;
+  color: white;
 }
 
 .settings-page .settings-secondary-btn,

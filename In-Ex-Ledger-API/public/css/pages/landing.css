@@ -234,7 +234,7 @@ body {
 
 .button-primary:hover {
   color: #fff;
-  background: #205f9d;
+  background: #3b82f6;
 }
 
 .button-secondary {
@@ -704,7 +704,7 @@ body {
 
 .pricing-cta-btn:hover {
   color: #fff;
-  background: #205f9d;
+  background: #3b82f6;
   text-decoration: none;
 }
 

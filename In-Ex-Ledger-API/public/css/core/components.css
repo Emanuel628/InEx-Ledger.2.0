@@ -208,7 +208,8 @@ button:hover,
 .primary-btn:hover,
 .btn-primary:hover,
 .primary-cta:hover {
-  background: #1f5b97;
+  background: #3b82f6;
+  color: white;
 }
 
 button:active,
@@ -231,7 +232,7 @@ button:active,
 
 .btn-secondary:hover,
 .ghost-btn:hover {
-  background: var(--surface3);
+  background: var(--accent-light);
   color: var(--ink);
 }
 
