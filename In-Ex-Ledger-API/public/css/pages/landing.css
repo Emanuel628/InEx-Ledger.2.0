@@ -98,14 +98,19 @@ body {
 }
 
 .marketing-nav-link {
-  color: #314255;
+  color: #111827;
   background: rgba(255, 255, 255, 0.62);
   border: 1px solid rgba(15, 25, 35, 0.06);
 }
 
+.marketing-nav-link[href="#pricing"],
+.marketing-nav-link[href="#faq"] {
+  color: #0f1720;
+}
+
 .marketing-nav-link:hover,
 .marketing-nav-link:focus-visible {
-  color: var(--ink);
+  color: #0f1720;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 10px 20px rgba(15, 25, 35, 0.06);
 }

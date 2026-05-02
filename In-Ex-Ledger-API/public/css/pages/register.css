@@ -4,6 +4,78 @@
 
 @import url("/css/pages/login.css");
 
+.register-trial-panel {
+  margin: 0 0 22px;
+  padding: 18px 18px 16px;
+  border: 1px solid rgba(36, 109, 187, 0.12);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(247, 250, 253, 0.98), rgba(239, 245, 251, 0.94));
+}
+
+.register-trial-kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(36, 109, 187, 0.08);
+  color: var(--accent2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.register-trial-panel h1 {
+  margin: 12px 0 8px;
+  color: var(--ink);
+  font-size: 28px;
+  line-height: 1.08;
+}
+
+.register-trial-panel p,
+.register-form-intro {
+  color: var(--ink2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.register-trial-panel p {
+  margin: 0;
+}
+
+.register-form-intro {
+  margin: -10px 0 18px;
+}
+
+.register-trial-points {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.register-trial-points li {
+  position: relative;
+  padding-left: 18px;
+  color: var(--ink2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.register-trial-points li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(36, 109, 187, 0.18);
+  border: 1px solid rgba(36, 109, 187, 0.38);
+}
+
 .password-meter-row {
   display: flex;
   align-items: center;
@@ -162,4 +234,12 @@
   margin-top: -6px;
   font-size: 12px;
   color: var(--red);
+}
+
+.register-submit-note {
+  margin: 12px 0 0;
+  color: var(--ink3);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
 }
