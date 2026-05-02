@@ -38,7 +38,7 @@ main {
 /* ── Form column ── */
 
 .register-form-col {
-  padding: 48px 56px 56px 0;
+  padding: 48px 0 56px 56px;
   max-width: 520px;
 }
 
@@ -279,7 +279,7 @@ main {
 .register-value-col {
   position: sticky;
   top: 80px;
-  padding: 48px 0 56px 56px;
+  padding: 48px 56px 56px 0;
 }
 
 .register-value-inner {
@@ -381,9 +381,8 @@ main {
     grid-template-columns: 1fr;
   }
 
-  /* On mobile: value column comes first */
+  /* On mobile: value column is already first in DOM */
   .register-value-col {
-    order: -1;
     position: static;
     padding: 0 0 0 0;
   }
