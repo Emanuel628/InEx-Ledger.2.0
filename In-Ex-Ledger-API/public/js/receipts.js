@@ -283,7 +283,7 @@ function renderReceipts(receipts) {
   }
 
   tableBody.innerHTML = receipts.map((receipt) => {
-    const transactionCell = renderTransactionCell(receipt.transaction_id);
+    const transactionCell = renderTransactionCell(receipt.transaction_id, receipt.id);
     return `
       <tr>
         <td data-label="${escapeHtml(tx("receipts_table_filename"))}">
@@ -316,6 +316,19 @@ function renderReceipts(receipts) {
         await openReceiptPreview(receipt.id, receipt.filename || "receipt");
       } catch (error) {
         console.error("Receipt preview failed:", error);
+        showReceiptsToast(error.message || tx("receipts_error_preview"));
+      }
+    });
+  });
+
+  tableBody.querySelectorAll("[data-receipt-view]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const receiptId = button.getAttribute("data-receipt-view") || "";
+      const receipt = receiptRecords.find((record) => record.id === receiptId);
+      if (!receipt) return;
+      try {
+        await openReceiptPreview(receipt.id, receipt.filename || "receipt");
+      } catch (error) {
         showReceiptsToast(error.message || tx("receipts_error_preview"));
       }
     });
@@ -354,14 +367,14 @@ function updateReceiptsEmptyState(node, title, body) {
   }
 }
 
-function renderTransactionCell(transactionId) {
+function renderTransactionCell(transactionId, receiptId) {
   if (!transactionId) {
     return "&mdash;";
   }
 
   const transaction = transactionMap[transactionId];
   const label = transaction?.description || transactionId;
-  return `<a class="receipt-transaction-link" href="transactions?highlight=${encodeURIComponent(transactionId)}#txn-${encodeURIComponent(transactionId)}">${escapeHtml(label)}</a>`;
+  return `<button type="button" class="receipt-transaction-link" data-receipt-view="${escapeHtml(receiptId || "")}">${escapeHtml(label)}</button>`;
 }
 
 function wireReceiptLinkModal() {
