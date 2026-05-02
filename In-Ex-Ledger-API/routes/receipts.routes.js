@@ -279,7 +279,7 @@ router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), asyn
 
 router.patch("/:id/attach", async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    const scope = await getBusinessScopeForUser(req.user, "all");
     const receiptId = req.params.id;
 
     if (!UUID_RE.test(receiptId)) {
@@ -302,7 +302,21 @@ router.patch("/:id/attach", async (req, res) => {
       }
     }
 
-    const lockState = await loadAccountingLockState(pool, businessId);
+    const receiptLookup = await pool.query(
+      `SELECT id, business_id
+       FROM receipts
+       WHERE id = $1
+         AND business_id = ANY($2::uuid[])
+       LIMIT 1`,
+      [receiptId, scope.businessIds]
+    );
+
+    if (!receiptLookup.rowCount) {
+      return res.status(404).json({ error: "Receipt not found." });
+    }
+
+    const receiptBusinessId = receiptLookup.rows[0].business_id;
+    const lockState = await loadAccountingLockState(pool, receiptBusinessId);
 
     if (transactionId !== null) {
       // Attaching to a transaction → verify ownership and lock state
@@ -311,7 +325,7 @@ router.patch("/:id/attach", async (req, res) => {
          FROM transactions
          WHERE id = $1 AND business_id = $2
          LIMIT 1`,
-        [transactionId, businessId]
+        [transactionId, receiptBusinessId]
       );
 
       if (!txCheck.rowCount) {
@@ -331,7 +345,7 @@ router.patch("/:id/attach", async (req, res) => {
           AND r.business_id = $2
           AND r.transaction_id IS NOT NULL
         LIMIT 1`,
-        [receiptId, businessId]
+        [receiptId, receiptBusinessId]
       );
 
       if (currentLink.rowCount) {
@@ -344,7 +358,7 @@ router.patch("/:id/attach", async (req, res) => {
        SET transaction_id = $1
        WHERE id = $2 AND business_id = $3
        RETURNING id, transaction_id`,
-      [transactionId, receiptId, businessId]
+      [transactionId, receiptId, receiptBusinessId]
     );
 
     if (!result.rowCount) {
@@ -373,7 +387,7 @@ router.patch("/:id/attach", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    const scope = await getBusinessScopeForUser(req.user, "all");
     const receiptId = String(req.params.id || "").trim();
     if (!isUuid(receiptId)) {
       return res.status(400).json({ error: "Invalid receipt ID." });
@@ -382,9 +396,9 @@ router.get("/:id", async (req, res) => {
     const result = await pool.query(
       `SELECT filename, mime_type, storage_path
        FROM receipts
-       WHERE id = $1 AND business_id = $2
+       WHERE id = $1 AND business_id = ANY($2::uuid[])
        LIMIT 1`,
-      [receiptId, businessId]
+      [receiptId, scope.businessIds]
     );
 
     if (!result.rowCount) {
@@ -433,7 +447,7 @@ router.delete("/:id", async (req, res) => {
   let movedToPending = false;
 
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    const scope = await getBusinessScopeForUser(req.user, "all");
     const receiptId = req.params.id;
     if (!isUuid(receiptId)) {
       return res.status(400).json({ error: "Invalid receipt ID." });
@@ -443,6 +457,7 @@ router.delete("/:id", async (req, res) => {
 
     const found = await client.query(
       `SELECT r.storage_path,
+              r.business_id,
               (
                 SELECT t.date
                   FROM transactions t
@@ -451,10 +466,10 @@ router.delete("/:id", async (req, res) => {
                  LIMIT 1
               ) AS tx_date
        FROM receipts r
-       WHERE r.id = $1 AND r.business_id = $2
+       WHERE r.id = $1 AND r.business_id = ANY($2::uuid[])
        FOR UPDATE
        LIMIT 1`,
-      [receiptId, businessId]
+      [receiptId, scope.businessIds]
     );
 
     if (!found.rowCount) {
@@ -464,8 +479,9 @@ router.delete("/:id", async (req, res) => {
 
     // Block deleting a receipt that is evidence for a locked-period transaction
     const txDate = found.rows[0]?.tx_date || null;
+    const receiptBusinessId = found.rows[0]?.business_id || null;
     if (txDate) {
-      const lockState = await loadAccountingLockState(pool, businessId);
+      const lockState = await loadAccountingLockState(pool, receiptBusinessId);
       try {
         assertDateUnlocked(lockState, txDate);
       } catch (lockErr) {
@@ -490,7 +506,7 @@ router.delete("/:id", async (req, res) => {
     await client.query(
       `DELETE FROM receipts
        WHERE id = $1 AND business_id = $2`,
-      [receiptId, businessId]
+      [receiptId, receiptBusinessId]
     );
 
     await client.query("COMMIT");
@@ -631,14 +647,14 @@ router.post("/:id/extract", async (req, res) => {
   }
 
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    const scope = await getBusinessScopeForUser(req.user, "all");
 
     const result = await pool.query(
       `SELECT filename, mime_type, storage_path
        FROM receipts
-       WHERE id = $1 AND business_id = $2
+       WHERE id = $1 AND business_id = ANY($2::uuid[])
        LIMIT 1`,
-      [receiptId, businessId]
+      [receiptId, scope.businessIds]
     );
 
     if (!result.rowCount) {

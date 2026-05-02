@@ -492,6 +492,13 @@ async function openReceiptPreview(receiptId, filename) {
     }
   });
 
+  if (response.status === 404) {
+    receiptRecords = receiptRecords.filter((record) => record?.id !== receiptId);
+    renderReceipts(receiptRecords);
+    void loadReceipts();
+    throw new Error(tx("receipts_error_open"));
+  }
+
   if (!response.ok) {
     throw new Error(tx("receipts_error_open"));
   }
