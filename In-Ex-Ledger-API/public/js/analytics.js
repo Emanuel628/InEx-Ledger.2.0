@@ -41,6 +41,37 @@ function wireTabBar() {
   });
 }
 
+function wireInfoPopover(buttonId, popoverId) {
+  const button = document.getElementById(buttonId);
+  const popover = document.getElementById(popoverId);
+  if (!button || !popover) return;
+
+  const close = () => {
+    button.setAttribute("aria-expanded", "false");
+    popover.hidden = true;
+  };
+
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const nextExpanded = button.getAttribute("aria-expanded") !== "true";
+    button.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
+    popover.hidden = !nextExpanded;
+  });
+
+  document.addEventListener("click", (event) => {
+    if (popover.hidden) return;
+    if (!popover.contains(event.target) && event.target !== button) {
+      close();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !popover.hidden) {
+      close();
+    }
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Dashboard
 // ---------------------------------------------------------------------------
@@ -372,6 +403,7 @@ function heatLevel(avg, overall, pct) {
 // What-If Scenario
 // ---------------------------------------------------------------------------
 function wireWhatIf() {
+  wireInfoPopover("whatifInfoBtn", "whatifInfoPopover");
   document.getElementById("whatifRunBtn")?.addEventListener("click", runWhatIf);
 }
 
