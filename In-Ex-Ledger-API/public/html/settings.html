@@ -53,7 +53,7 @@
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-preferences" data-i18n="settings_nav_preferences">Preferences</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-privacy-data" data-i18n="settings_nav_privacy_data">Privacy &amp; Data</button>
           <button class="settings-nav-item settings-nav-danger" type="button" data-settings-nav-item data-settings-target="settings-danger-zone" data-i18n="settings_nav_danger_zone">Danger Zone</button>
-          <button class="settings-nav-item settings-nav-help" type="button" data-settings-nav-item data-settings-target="settings-help">Help</button>
+          <button class="settings-nav-item settings-nav-help" type="button" data-settings-nav-item data-settings-target="settings-help" data-i18n="settings_nav_help">Help</button>
         </nav>
       </div>
     </aside>
@@ -600,19 +600,16 @@
 
       <section class="settings-card settings-panel" id="settings-help">
         <div class="settings-panel-head card-head">
-          <h2 class="card-title">Help &amp; Guidance</h2>
-          <p class="card-desc">Use the full guide for walkthroughs, edge-case documentation, exports, mileage, onboarding, and billing help.</p>
+          <h2 class="card-title" data-i18n="settings_help_title">Help &amp; Guidance</h2>
+          <p class="card-desc" data-i18n="settings_help_desc">Use the full guide for walkthroughs, edge-case documentation, exports, mileage, onboarding, and billing help.</p>
         </div>
 
         <div class="settings-help-entry">
           <div class="settings-help-entry-copy">
-            <h3>Open the full Help page</h3>
-            <p>
-              The Help page is the maintained source for transactions, categories, receipts, mileage,
-              exports, edge cases, onboarding flow, plan limits, and troubleshooting.
-            </p>
+            <h3 data-i18n="settings_help_open_title">Open the full Help page</h3>
+            <p data-i18n="settings_help_open_body">The Help page is the maintained source for transactions, categories, receipts, mileage, exports, edge cases, onboarding flow, plan limits, and troubleshooting.</p>
           </div>
-          <a class="settings-help-open" href="help">Open Help</a>
+          <a class="settings-help-open" href="help" data-i18n="settings_help_open_btn">Open Help</a>
         </div>
       </section>
 

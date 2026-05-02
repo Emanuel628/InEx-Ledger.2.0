@@ -83,7 +83,7 @@ async function loadDashboard() {
     renderDashboard(data);
   } catch (err) {
     const kpiRowEl = document.getElementById("kpiRow");
-    if (kpiRowEl) kpiRowEl.innerHTML = '<div class="analytics-empty">Unable to load dashboard data. Add some transactions to get started.</div>';
+    if (kpiRowEl) kpiRowEl.innerHTML = `<div class="analytics-empty">${escapeHtml(t("analytics_empty_dashboard"))}</div>`;
   }
 }
 
@@ -94,12 +94,12 @@ function renderDashboard(data) {
   const kpiRow = document.getElementById("kpiRow");
   if (!kpiRow) return;
   const isCA = summary.region === "CA";
-  const seTaxLabel = isCA ? "Est. CPP Contribution" : "Est. SE Tax Owed";
-  const seTaxNote = isCA ? "Canada Pension Plan (self-employed)" : "Self-employment tax (approx.)";
+  const seTaxLabel = isCA ? t("analytics_kpi_se_tax_ca") : t("analytics_kpi_se_tax_us");
+  const seTaxNote = isCA ? t("analytics_kpi_se_tax_note_ca") : t("analytics_kpi_se_tax_note_us");
   const cards = [
-    kpiCard("Total Income", fmt(summary.total_income), "trailing 12 months"),
-    kpiCard("Total Expenses", fmt(summary.total_expense), "trailing 12 months"),
-    kpiCard("Net Profit", fmt(summary.net), summary.net >= 0 ? "trailing 12 months" : "trailing 12 months", summary.net >= 0 ? "" : "kpi-value--negative")
+    kpiCard(t("analytics_kpi_total_income"), fmt(summary.total_income), t("analytics_kpi_trailing_12")),
+    kpiCard(t("analytics_kpi_total_expenses"), fmt(summary.total_expense), t("analytics_kpi_trailing_12")),
+    kpiCard(t("analytics_kpi_net_profit"), fmt(summary.net), t("analytics_kpi_trailing_12"), summary.net >= 0 ? "" : "kpi-value--negative")
   ];
   if (summary.has_tax_estimates) {
     cards.push(kpiCard(seTaxLabel, fmt(summary.se_tax_estimate ?? 0), seTaxNote));
@@ -158,9 +158,9 @@ function renderThisMonth(cm) {
   const progress = document.getElementById("thisMonthProgress");
   if (!card || !grid) return;
 
-  label.textContent = `${escapeHtml(cm.title || "This Month")} (${escapeHtml(cm.label)})`;
+  label.textContent = `${escapeHtml(cm.title === "Latest Active Month" ? t("analytics_latest_active_month") : (cm.title || t("analytics_this_month")))} (${escapeHtml(cm.label)})`;
   if (cm.title === "Latest Active Month") {
-    progress.textContent = "Most recent month with recorded income";
+    progress.textContent = t("analytics_latest_month_note");
   } else {
     progress.textContent = `${cm.days_elapsed} of ${cm.days_in_month} days`;
   }
@@ -176,15 +176,15 @@ function renderThisMonth(cm) {
   grid.innerHTML = [
     `<div class="this-month-item">
       <div class="this-month-val income">${fmt(cm.income)}</div>
-      <div class="this-month-key">Income ${pctBadge(cm.income_vs_prior_pct, false)}</div>
+      <div class="this-month-key">${escapeHtml(t("analytics_legend_income"))} ${pctBadge(cm.income_vs_prior_pct, false)}</div>
     </div>`,
     `<div class="this-month-item">
       <div class="this-month-val expense">${fmt(cm.expense)}</div>
-      <div class="this-month-key">Expenses ${pctBadge(cm.expense_vs_prior_pct, true)}</div>
+      <div class="this-month-key">${escapeHtml(t("analytics_legend_expenses"))} ${pctBadge(cm.expense_vs_prior_pct, true)}</div>
     </div>`,
     `<div class="this-month-item">
       <div class="this-month-val ${cm.net >= 0 ? "net-pos" : "net-neg"}">${fmt(cm.net)}</div>
-      <div class="this-month-key">Net ${pctBadge(cm.net_vs_prior_pct, false)}</div>
+      <div class="this-month-key">${escapeHtml(t("analytics_this_month_net"))} ${pctBadge(cm.net_vs_prior_pct, false)}</div>
     </div>`
   ].join("");
 
@@ -288,14 +288,14 @@ function resolveBarPctClass(pct) {
 // ---------------------------------------------------------------------------
 async function loadCashFlow() {
   const container = document.getElementById("cashFlowContent");
-  container.innerHTML = '<div class="analytics-loading">Loading…</div>';
+  container.innerHTML = `<div class="analytics-loading">${escapeHtml(t("analytics_loading"))}</div>`;
   try {
     const res = await apiFetch("/api/analytics/cash-flow");
     if (!res || !res.ok) throw new Error("Failed");
     const data = await res.json();
     renderCashFlow(data, container);
   } catch {
-    container.innerHTML = '<div class="analytics-empty">Unable to load cash flow data. Add some transactions to get started.</div>';
+    container.innerHTML = `<div class="analytics-empty">${escapeHtml(t("analytics_empty_cashflow"))}</div>`;
   }
 }
 
@@ -303,9 +303,9 @@ function renderCashFlow(data, container) {
   const { avg_monthly_income, avg_monthly_expense, recurring_monthly_expense, projections } = data;
 
   let html = `<div class="kpi-row kpi-row--spaced">
-    ${kpiCard("Avg Monthly Income", fmt(avg_monthly_income), "trailing 6 months")}
-    ${kpiCard("Avg Monthly Expenses", fmt(avg_monthly_expense), "trailing 6 months")}
-    ${kpiCard("Recurring Expenses", fmt(recurring_monthly_expense), "estimated per month")}
+    ${kpiCard(t("analytics_cashflow_avg_income"), fmt(avg_monthly_income), t("analytics_cashflow_trailing_6"))}
+    ${kpiCard(t("analytics_cashflow_avg_expenses"), fmt(avg_monthly_expense), t("analytics_cashflow_trailing_6"))}
+    ${kpiCard(t("analytics_cashflow_recurring"), fmt(recurring_monthly_expense), t("analytics_cashflow_per_month"))}
   </div>`;
 
   // Risk notifications
@@ -316,7 +316,7 @@ function renderCashFlow(data, container) {
 
   // Projection table
   html += `<table class="monthly-table monthly-table--spaced">
-    <thead><tr><th>Month</th><th>Projected Income</th><th>Projected Expenses</th><th>Projected Net</th></tr></thead>
+    <thead><tr><th>${escapeHtml(t("analytics_col_month"))}</th><th>${escapeHtml(t("analytics_col_proj_income"))}</th><th>${escapeHtml(t("analytics_col_proj_expenses"))}</th><th>${escapeHtml(t("analytics_col_proj_net"))}</th></tr></thead>
     <tbody>
       ${projections.map((p) => {
         const cls = p.projected_net >= 0 ? "net-positive" : "net-negative";
@@ -338,14 +338,14 @@ function renderCashFlow(data, container) {
 // ---------------------------------------------------------------------------
 async function loadSeasonal() {
   const container = document.getElementById("seasonalContent");
-  container.innerHTML = '<div class="analytics-loading">Loading…</div>';
+  container.innerHTML = `<div class="analytics-loading">${escapeHtml(t("analytics_loading"))}</div>`;
   try {
     const res = await apiFetch("/api/analytics/seasonal");
     if (!res || !res.ok) throw new Error("Failed");
     const data = await res.json();
     renderSeasonal(data, container);
   } catch {
-    container.innerHTML = '<div class="analytics-empty">Unable to load seasonal data. Add some income transactions to get started.</div>';
+    container.innerHTML = `<div class="analytics-empty">${escapeHtml(t("analytics_empty_seasonal"))}</div>`;
   }
 }
 
@@ -353,7 +353,7 @@ function renderSeasonal(data, container) {
   const { months, overall_avg, insights } = data;
 
   if (!months || months.length === 0) {
-    container.innerHTML = '<div class="analytics-empty">No income data yet. Add income transactions to see seasonal trends.</div>';
+    container.innerHTML = `<div class="analytics-empty">${escapeHtml(t("analytics_empty_seasonal_no_data"))}</div>`;
     return;
   }
 
@@ -435,7 +435,7 @@ async function runWhatIf() {
     renderWhatIf(data, messagesEl, tableEl);
     resultsEl.classList.add("visible");
   } catch {
-    messagesEl.innerHTML = '<span class="whatif-error">Unable to run scenario. Please try again.</span>';
+    messagesEl.innerHTML = `<span class="whatif-error">${escapeHtml(t("analytics_whatif_error"))}</span>`;
     resultsEl.classList.add("visible");
   }
 }
@@ -444,13 +444,13 @@ function renderWhatIf(data, messagesEl, tableEl) {
   const { baseline, scenario, messages } = data;
 
   messagesEl.innerHTML = messages.map((m) => `<div class="whatif-msg">• ${escapeHtml(m)}</div>`).join("") ||
-    '<div class="whatif-msg">No changes applied. Adjust the inputs and run again.</div>';
+    `<div class="whatif-msg">${escapeHtml(t("analytics_whatif_no_changes"))}</div>`;
 
   const netClass = scenario.net_delta >= 0 ? "whatif-net-positive" : "whatif-net-negative";
   tableEl.innerHTML = [
-    scenarioRow("Monthly Income", baseline.monthly_income, scenario.projected_income, "income"),
-    scenarioRow("Monthly Expenses", baseline.monthly_expense, scenario.projected_expense, "expense"),
-    scenarioRow("Monthly Net", baseline.monthly_net, scenario.projected_net, scenario.projected_net >= 0 ? "income" : "expense")
+    scenarioRow(t("analytics_whatif_monthly_income"), baseline.monthly_income, scenario.projected_income, "income"),
+    scenarioRow(t("analytics_whatif_monthly_expenses"), baseline.monthly_expense, scenario.projected_expense, "expense"),
+    scenarioRow(t("analytics_whatif_monthly_net"), baseline.monthly_net, scenario.projected_net, scenario.projected_net >= 0 ? "income" : "expense")
   ].join("");
 }
 

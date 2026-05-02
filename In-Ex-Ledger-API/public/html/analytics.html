@@ -31,76 +31,76 @@
 
   <main id="main-content" class="app-shell">
     <aside class="app-sidebar" aria-label="Sidebar">
-      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-section-label" data-i18n="analytics_sidebar_overview">Overview</div>
       <nav class="sidebar-nav">
-        <a href="transactions" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>All transactions</span></a>
-        <a href="transactions?type=income" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg></span><span>Income</span></a>
-        <a href="transactions?type=expense" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 5v6M5 8l3 3 3-3"></path></svg></span><span>Expenses</span></a>
+        <a href="transactions" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span data-i18n="analytics_sidebar_all_transactions">All transactions</span></a>
+        <a href="transactions?type=income" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg></span><span data-i18n="analytics_sidebar_income">Income</span></a>
+        <a href="transactions?type=expense" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 5v6M5 8l3 3 3-3"></path></svg></span><span data-i18n="analytics_sidebar_expenses">Expenses</span></a>
       </nav>
 
-      <div class="sidebar-section-label">Reporting</div>
+      <div class="sidebar-section-label" data-i18n="analytics_sidebar_reporting">Reporting</div>
       <nav class="sidebar-nav">
-        <a href="analytics" class="sidebar-link is-active"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Analytics</span></a>
+        <a href="analytics" class="sidebar-link is-active"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span data-i18n="nav_analytics">Analytics</span></a>
       </nav>
 
-      <div class="sidebar-section-label">Tools</div>
+      <div class="sidebar-section-label" data-i18n="analytics_sidebar_tools">Tools</div>
       <nav class="sidebar-nav">
-        <a href="receipts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span>Receipts</span><span id="receiptsDot" class="sidebar-dot" hidden></span></a>
-        <a href="mileage" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span>Mileage</span></a>
-        <a href="exports" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span>Exports</span></a>
+        <a href="receipts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span data-i18n="nav_receipts">Receipts</span><span id="receiptsDot" class="sidebar-dot" hidden></span></a>
+        <a href="mileage" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span data-i18n="nav_mileage">Mileage</span></a>
+        <a href="exports" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span data-i18n="nav_exports">Exports</span></a>
       </nav>
     </aside>
 
     <div class="analytics-content app-page">
       <div class="analytics-page-header app-page-header">
         <div class="app-page-header-copy">
-          <div class="app-page-kicker">Reporting</div>
-          <h1 class="app-page-title">Analytics</h1>
-          <p class="app-page-subtitle">Review monthly performance, monitor cash flow trends, and model changes before they hit your ledger.</p>
+          <div class="app-page-kicker" data-i18n="analytics_kicker">Reporting</div>
+          <h1 class="app-page-title" data-i18n="nav_analytics">Analytics</h1>
+          <p class="app-page-subtitle" data-i18n="analytics_subtitle">Review monthly performance, monitor cash flow trends, and model changes before they hit your ledger.</p>
         </div>
       </div>
 
       <div class="analytics-tabs" role="tablist">
-        <button class="analytics-tab is-active" data-tab="dashboard" role="tab" aria-selected="true">Dashboard</button>
-        <button class="analytics-tab" data-tab="cashflow" role="tab" aria-selected="false">Cash Flow</button>
-        <button class="analytics-tab" data-tab="seasonal" role="tab" aria-selected="false">Seasonal</button>
-        <button class="analytics-tab" data-tab="whatif" role="tab" aria-selected="false">What-If</button>
+        <button class="analytics-tab is-active" data-tab="dashboard" role="tab" aria-selected="true" data-i18n="analytics_tab_dashboard">Dashboard</button>
+        <button class="analytics-tab" data-tab="cashflow" role="tab" aria-selected="false" data-i18n="analytics_tab_cashflow">Cash Flow</button>
+        <button class="analytics-tab" data-tab="seasonal" role="tab" aria-selected="false" data-i18n="analytics_tab_seasonal">Seasonal</button>
+        <button class="analytics-tab" data-tab="whatif" role="tab" aria-selected="false" data-i18n="analytics_tab_whatif">What-If</button>
       </div>
 
       <div class="analytics-panel is-visible" id="panel-dashboard">
         <div id="kpiRow" class="kpi-row">
-          <div class="analytics-loading">Loading dashboard...</div>
+          <div class="analytics-loading" data-i18n="analytics_loading_dashboard">Loading dashboard…</div>
         </div>
 
         <div class="analytics-card analytics-this-month" id="thisMonthCard" hidden>
           <div class="this-month-header">
-            <h2 id="thisMonthLabel">This Month</h2>
+            <h2 id="thisMonthLabel" data-i18n="analytics_this_month">This Month</h2>
             <span class="this-month-progress" id="thisMonthProgress"></span>
           </div>
           <div class="this-month-grid" id="thisMonthGrid"></div>
         </div>
 
         <div class="analytics-card" id="trendCard" hidden>
-          <h2>12-Month Income and Expense Trend</h2>
+          <h2 data-i18n="analytics_trend_title">12-Month Income and Expense Trend</h2>
           <div class="sparkline-wrap">
             <svg id="trendChart" class="trend-chart" role="img" aria-label="Income and expense trend"></svg>
           </div>
           <div class="sparkline-legend">
-            <span class="legend-dot legend-income"></span><span>Income</span>
-            <span class="legend-dot legend-expense"></span><span>Expenses</span>
+            <span class="legend-dot legend-income"></span><span data-i18n="analytics_legend_income">Income</span>
+            <span class="legend-dot legend-expense"></span><span data-i18n="analytics_legend_expenses">Expenses</span>
           </div>
         </div>
 
         <div class="analytics-card" id="monthlyCard" hidden>
-          <h2>Monthly Breakdown</h2>
-          <p>Trailing 12 months of income, expenses, and net results.</p>
+          <h2 data-i18n="analytics_monthly_title">Monthly Breakdown</h2>
+          <p data-i18n="analytics_monthly_desc">Trailing 12 months of income, expenses, and net results.</p>
           <table class="monthly-table" id="monthlyTable">
             <thead>
               <tr>
-                <th>Month</th>
-                <th>Income</th>
-                <th>Expenses</th>
-                <th>Net</th>
+                <th data-i18n="analytics_col_month">Month</th>
+                <th data-i18n="analytics_col_income">Income</th>
+                <th data-i18n="analytics_col_expenses">Expenses</th>
+                <th data-i18n="analytics_col_net">Net</th>
               </tr>
             </thead>
             <tbody id="monthlyTableBody"></tbody>
@@ -109,13 +109,13 @@
 
         <div class="analytics-dual-grid">
           <div class="analytics-card" id="topIncomeCard" hidden>
-            <h2>Top Income Sources</h2>
-            <p>Where the strongest revenue concentration is coming from.</p>
+            <h2 data-i18n="analytics_top_income_title">Top Income Sources</h2>
+            <p data-i18n="analytics_top_income_desc">Where the strongest revenue concentration is coming from.</p>
             <div id="topIncomeChart" class="bar-chart"></div>
           </div>
           <div class="analytics-card" id="topExpenseCard" hidden>
-            <h2>Top Expense Categories</h2>
-            <p>Which costs are taking the largest share of spend.</p>
+            <h2 data-i18n="analytics_top_expense_title">Top Expense Categories</h2>
+            <p data-i18n="analytics_top_expense_desc">Which costs are taking the largest share of spend.</p>
             <div id="topExpenseChart" class="bar-chart"></div>
           </div>
         </div>
@@ -123,24 +123,24 @@
 
       <div class="analytics-panel" id="panel-cashflow">
         <div class="analytics-card">
-          <h2>Cash Flow Projection - Next 3 Months</h2>
-          <p>Based on your trailing six-month average and active recurring transactions.</p>
-          <div id="cashFlowContent"><div class="analytics-loading">Loading...</div></div>
+          <h2 data-i18n="analytics_cashflow_title">Cash Flow Projection – Next 3 Months</h2>
+          <p data-i18n="analytics_cashflow_desc">Based on your trailing six-month average and active recurring transactions.</p>
+          <div id="cashFlowContent"><div class="analytics-loading" data-i18n="analytics_loading">Loading…</div></div>
         </div>
       </div>
 
       <div class="analytics-panel" id="panel-seasonal">
         <div class="analytics-card">
-          <h2>Seasonal Income Analysis</h2>
-          <p>Average income by calendar month across your recorded history.</p>
-          <div id="seasonalContent"><div class="analytics-loading">Loading...</div></div>
+          <h2 data-i18n="analytics_seasonal_title">Seasonal Income Analysis</h2>
+          <p data-i18n="analytics_seasonal_desc">Average income by calendar month across your recorded history.</p>
+          <div id="seasonalContent"><div class="analytics-loading" data-i18n="analytics_loading">Loading…</div></div>
         </div>
       </div>
 
       <div class="analytics-panel" id="panel-whatif">
         <div class="analytics-card">
           <div class="analytics-title-row">
-            <h2>What-If Scenario Planner</h2>
+            <h2 data-i18n="analytics_whatif_title">What-If Scenario Planner</h2>
             <button
               type="button"
               class="analytics-info-btn"
@@ -149,32 +149,32 @@
               aria-expanded="false"
             >i</button>
           </div>
-          <p>Simulate income and expense changes before committing to a decision.</p>
+          <p data-i18n="analytics_whatif_desc">Simulate income and expense changes before committing to a decision.</p>
           <div class="analytics-info-popover" id="whatifInfoPopover" hidden>
-            <p><strong>Income change (%)</strong>: Enter a positive value to model higher monthly income, or a negative value to test a slowdown.</p>
-            <p><strong>Expense change (%)</strong>: Enter a positive value to increase monthly costs, or a negative value to model cost cuts.</p>
-            <p><strong>Weeks off</strong>: Use whole weeks you expect not to work or bill during the month. Leave blank if none.</p>
-            <p><strong>Override monthly income ($)</strong>: Use this only when you want to replace the automatic baseline with a specific monthly revenue amount.</p>
+            <p><strong data-i18n="analytics_whatif_info_income_label">Income change (%)</strong>: <span data-i18n="analytics_whatif_info_income_body">Enter a positive value to model higher monthly income, or a negative value to test a slowdown.</span></p>
+            <p><strong data-i18n="analytics_whatif_info_expense_label">Expense change (%)</strong>: <span data-i18n="analytics_whatif_info_expense_body">Enter a positive value to increase monthly costs, or a negative value to model cost cuts.</span></p>
+            <p><strong data-i18n="analytics_whatif_info_weeks_label">Weeks off</strong>: <span data-i18n="analytics_whatif_info_weeks_body">Use whole weeks you expect not to work or bill during the month. Leave blank if none.</span></p>
+            <p><strong data-i18n="analytics_whatif_info_override_label">Override monthly income ($)</strong>: <span data-i18n="analytics_whatif_info_override_body">Use this only when you want to replace the automatic baseline with a specific monthly revenue amount.</span></p>
           </div>
 
           <div class="whatif-form" id="whatifForm">
             <div class="whatif-field">
-              <label for="wiIncomePct">Income change (%)</label>
+              <label for="wiIncomePct" data-i18n="analytics_whatif_income_label">Income change (%)</label>
               <input type="number" id="wiIncomePct" placeholder="e.g. 10 or -15" step="1" class="form-control" />
             </div>
             <div class="whatif-field">
-              <label for="wiExpensePct">Expense change (%)</label>
+              <label for="wiExpensePct" data-i18n="analytics_whatif_expense_label">Expense change (%)</label>
               <input type="number" id="wiExpensePct" placeholder="e.g. 5 or -10" step="1" class="form-control" />
             </div>
             <div class="whatif-field">
-              <label for="wiWeeksOff">Weeks off</label>
+              <label for="wiWeeksOff" data-i18n="analytics_whatif_weeks_label">Weeks off</label>
               <input type="number" id="wiWeeksOff" placeholder="e.g. 2" min="0" max="52" step="1" class="form-control" />
             </div>
             <div class="whatif-field">
-              <label for="wiCustomIncome">Override monthly income ($)</label>
+              <label for="wiCustomIncome" data-i18n="analytics_whatif_custom_income_label">Override monthly income ($)</label>
               <input type="number" id="wiCustomIncome" placeholder="Leave blank for auto" min="0" step="0.01" class="form-control" />
             </div>
-            <button type="button" class="whatif-run-btn" id="whatifRunBtn">Run Scenario</button>
+            <button type="button" class="whatif-run-btn" id="whatifRunBtn" data-i18n="analytics_whatif_run_btn">Run Scenario</button>
           </div>
 
           <div class="whatif-results" id="whatifResults">
@@ -183,9 +183,9 @@
               <thead>
                 <tr>
                   <th></th>
-                  <th>Baseline</th>
-                  <th>Scenario</th>
-                  <th>Change</th>
+                  <th data-i18n="analytics_col_baseline">Baseline</th>
+                  <th data-i18n="analytics_col_scenario">Scenario</th>
+                  <th data-i18n="analytics_col_change">Change</th>
                 </tr>
               </thead>
               <tbody id="whatifTable"></tbody>
