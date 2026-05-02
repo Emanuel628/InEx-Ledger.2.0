@@ -172,6 +172,7 @@
 
 .account-delete-btn:hover {
   background: var(--red-bg);
+  color: var(--red);
 }
 
 .accounts-empty {

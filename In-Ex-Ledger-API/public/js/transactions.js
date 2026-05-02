@@ -1857,6 +1857,9 @@ function renderTransactionsTable(filteredTransactions) {
     const businessBadge = isAllScope
       ? `<span class="business-scope-badge">${escapeHtml(txn.businessName || getBusinessById(txn.businessId)?.name || "Business")}</span>`
       : "";
+    const typeBadge = txn.type === "income"
+      ? formatTransactionMetaBadge(txT("transactions_type_income", "Income"), "income-type")
+      : formatTransactionMetaBadge(txT("transactions_type_expense", "Expense"), "expense-type");
     const metadataBadges = [];
     const businessCurrency = String(getBusinessById(txn.businessId)?.region || businessTaxProfile.region || getResolvedRegion()).toUpperCase() === "CA"
       ? "CAD"
@@ -1864,7 +1867,7 @@ function renderTransactionsTable(filteredTransactions) {
     if (canUseEdgeCaseTools && txn.currency && txn.currency !== businessCurrency) {
       metadataBadges.push(formatTransactionMetaBadge(`FX ${txn.currency}`, "fx"));
     }
-    if (canUseEdgeCaseTools && txn.taxTreatment && txn.taxTreatment !== "operating") {
+    if (canUseEdgeCaseTools && txn.taxTreatment && txn.taxTreatment !== "operating" && txn.taxTreatment !== "income") {
       metadataBadges.push(formatTransactionMetaBadge(getTaxTreatmentLabel(txn.taxTreatment), txn.taxTreatment === "capital" ? "capital" : ""));
     }
     if (canUseEdgeCaseTools && txn.personalUsePct !== null && txn.personalUsePct !== undefined && txn.personalUsePct !== "") {
@@ -1876,7 +1879,7 @@ function renderTransactionsTable(filteredTransactions) {
     if (canUseEdgeCaseTools && txn.reviewStatus && txn.reviewStatus !== "ready") {
       metadataBadges.push(formatTransactionMetaBadge(getReviewStatusLabel(txn.reviewStatus), txn.reviewStatus));
     }
-    const descriptionSub = [businessBadge, descriptionTail, metadataBadges.join(" ")].filter(Boolean).join(" ");
+    const descriptionSub = [typeBadge, businessBadge, descriptionTail, metadataBadges.join(" ")].filter(Boolean).join(" ");
     const amountClass = txn.type === "income" ? "amount-positive" : "amount-negative";
     const amountPrefix = txn.type === "income" ? "+" : "-";
     const clearedMarkup = txn.cleared

@@ -1506,6 +1506,7 @@ body {
 
 .danger-outline-btn:hover {
   background: var(--red-bg);
+  color: var(--red);
 }
 
 .transaction-modal {

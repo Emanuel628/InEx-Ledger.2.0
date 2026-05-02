@@ -99,6 +99,7 @@
 
 .receipt-delete-btn:hover {
   background: var(--red-bg);
+  color: var(--red);
 }
 
 .receipts-card {

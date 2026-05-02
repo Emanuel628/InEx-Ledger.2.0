@@ -1585,6 +1585,16 @@ body {
   color: var(--green);
 }
 
+.tx-meta-badge.income-type {
+  background: rgba(16, 185, 129, 0.14);
+  color: #065f46;
+}
+
+.tx-meta-badge.expense-type {
+  background: rgba(239, 68, 68, 0.12);
+  color: #991b1b;
+}
+
 .business-scope-badge {
   display: inline-flex;
   align-items: center;
@@ -1713,6 +1723,11 @@ body {
   border-color: rgba(16, 185, 129, 0.25);
 }
 
+.status-toggle-button:hover {
+  background: transparent;
+  color: inherit;
+}
+
 .status-toggle-button:hover .status-pending,
 .status-toggle-button:hover .status-cleared {
   transform: translateY(-1px);
@@ -1763,7 +1778,7 @@ body {
 
 .action-button.delete:hover {
   background: var(--red-bg);
-  color: var(--red);
+  color: var(--red) !important;
   border-color: var(--red);
 }
 

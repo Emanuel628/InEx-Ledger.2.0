@@ -146,6 +146,7 @@
 
 .category-delete:hover {
   background: var(--red-bg);
+  color: var(--red);
 }
 
 .category-inline-add-btn,

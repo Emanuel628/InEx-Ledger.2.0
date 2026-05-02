@@ -382,6 +382,7 @@
 
 .action-delete:hover {
   background: var(--red-bg);
+  color: var(--red);
 }
 
 .invoice-add-line {

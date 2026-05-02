@@ -259,6 +259,7 @@
 
 .msg-btn.danger:hover {
   background: var(--red-bg);
+  color: var(--red);
 }
 
 .message-detail-overlay,

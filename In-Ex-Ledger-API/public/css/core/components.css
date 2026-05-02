@@ -246,6 +246,12 @@ button:active,
   cursor: pointer;
 }
 
+.btn-delete:hover,
+.btn-danger:hover {
+  background: var(--red-bg);
+  color: var(--red);
+}
+
 /* ── Focus-visible ring for interactive elements ─────────── */
 button:focus-visible,
 a:focus-visible,
