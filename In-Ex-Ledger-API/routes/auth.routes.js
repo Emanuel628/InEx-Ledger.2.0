@@ -234,6 +234,19 @@ function decodeVerificationStatusToken(token) {
   return normalizeEmail(payload.email);
 }
 
+function createVerifiedSignupBootstrapToken(user, req) {
+  const deviceContext = buildSignInDeviceContext(user, req) || {};
+  return signToken(
+    {
+      purpose: "verified_signup_bootstrap",
+      id: user.id,
+      email: normalizeEmail(user.email),
+      device_fingerprint_hash: deviceContext.fingerprintHash || null
+    },
+    VERIFICATION_STATUS_TOKEN_EXPIRY_SECONDS
+  );
+}
+
 function getAppBaseUrl(req) {
   const configured = String(process.env.APP_BASE_URL || process.env.FRONTEND_URL || "")
     .trim()
@@ -830,7 +843,8 @@ router.post("/register", authLimiter, async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "Account created. Check your email!",
-      verification_state: createVerificationStatusToken(email)
+      verification_state: createVerificationStatusToken(email),
+      signup_bootstrap_token: createVerifiedSignupBootstrapToken({ id: newUserId, email }, req)
     });
   } catch (err) {
     if (!committed) {
@@ -889,6 +903,63 @@ router.post("/send-verification", authLimiter, async (req, res) => {
   } catch (err) {
     logError("Send verification error:", err);
     res.status(500).json({ error: "Failed to send verification email." });
+  }
+});
+
+router.post("/complete-verified-signup", authLimiter, async (req, res) => {
+  const rawToken = String(req.body?.signupBootstrapToken || "").trim();
+  if (!rawToken) {
+    return res.status(400).json({ error: "Signup bootstrap token is required." });
+  }
+
+  let payload;
+  try {
+    payload = verifyToken(rawToken);
+  } catch (_) {
+    return res.status(401).json({ error: "Invalid signup bootstrap token." });
+  }
+
+  if (payload?.purpose !== "verified_signup_bootstrap" || !payload?.id || !payload?.email) {
+    return res.status(401).json({ error: "Invalid signup bootstrap token." });
+  }
+
+  try {
+    const user = await findUserById(payload.id);
+    if (!user || normalizeEmail(user.email) !== normalizeEmail(payload.email)) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    if (!user.email_verified) {
+      return res.status(409).json({ error: "Email is not verified yet." });
+    }
+
+    const deviceContext = buildSignInDeviceContext(user, req);
+    const tokenFingerprintHash = String(payload.device_fingerprint_hash || "").trim();
+    const currentFingerprintHash = String(deviceContext?.fingerprintHash || "").trim();
+    if (!tokenFingerprintHash || !currentFingerprintHash || tokenFingerprintHash !== currentFingerprintHash) {
+      return res.status(403).json({ error: "Signup session does not match this device." });
+    }
+
+    const session = await issueAuthenticatedSession(res, user);
+    try {
+      const recognizedDevice = await getRecognizedSignInDevice(user.id, currentFingerprintHash);
+      if (recognizedDevice) {
+        await touchRecognizedSignInDevice(user.id, deviceContext);
+      } else {
+        await insertRecognizedSignInDevice(user, deviceContext);
+      }
+    } catch (securitySignalErr) {
+      logWarn("Verified-signup device registration warning:", securitySignalErr?.message || securitySignalErr);
+    }
+
+    return res.status(200).json({
+      token: session.token,
+      email_verified: true,
+      onboarding_completed: false,
+      next: "/onboarding"
+    });
+  } catch (err) {
+    logError("Complete verified signup error:", err);
+    return res.status(500).json({ error: "Failed to complete verified signup." });
   }
 });
 

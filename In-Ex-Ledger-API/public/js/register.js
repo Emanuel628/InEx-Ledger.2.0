@@ -17,6 +17,7 @@ function tx(key) {
 }
 const OFFLINE_ERROR_MESSAGE = "login_error_offline";
 const VERIFICATION_STATE_KEY = "pendingVerificationState";
+const SIGNUP_BOOTSTRAP_KEY = "pendingSignupBootstrapToken";
 
 document.addEventListener("DOMContentLoaded", () => {
   form = document.getElementById("registerForm");
@@ -127,6 +128,12 @@ async function handleRegisterSubmit(event) {
       localStorage.setItem(VERIFICATION_STATE_KEY, verificationState);
     } else {
       localStorage.removeItem(VERIFICATION_STATE_KEY);
+    }
+    const signupBootstrapToken = String(regBody?.signup_bootstrap_token || "").trim();
+    if (signupBootstrapToken) {
+      localStorage.setItem(SIGNUP_BOOTSTRAP_KEY, signupBootstrapToken);
+    } else {
+      localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
     }
     localStorage.removeItem("pendingVerificationEmail");
     window.location.href = "/verify-email?email=sent";

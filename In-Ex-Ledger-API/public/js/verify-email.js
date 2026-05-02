@@ -9,6 +9,7 @@ let resendLinkTrigger;
 let continueButton;
 let verificationState = "";
 const VERIFICATION_STATE_KEY = "pendingVerificationState";
+const SIGNUP_BOOTSTRAP_KEY = "pendingSignupBootstrapToken";
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
@@ -34,7 +35,6 @@ document.addEventListener("DOMContentLoaded", () => {
     updateStatus(tx("verify_email_status_register"), true);
   }
 });
-// Polls the backend every 3 seconds to check if the email is verified
 function startVerificationPolling() {
   if (!verificationState) return;
   let polling = true;
@@ -46,12 +46,7 @@ function startVerificationPolling() {
         const data = await response.json();
         if (data.verified) {
           polling = false;
-          localStorage.removeItem(VERIFICATION_STATE_KEY);
-          localStorage.removeItem("pendingVerificationEmail");
-          updateStatus(tx("verify_email_status_success"));
-          setTimeout(() => {
-            window.location.replace("/login");
-          }, 1200);
+          await finalizeVerifiedSignup();
           return;
         }
       }
@@ -111,6 +106,7 @@ function consumeVerifiedSessionFromHash() {
       sessionStorage.setItem("token", token);
     }
     localStorage.removeItem(VERIFICATION_STATE_KEY);
+    localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
     localStorage.removeItem("pendingVerificationEmail");
   } catch (_) {
     updateStatus(tx("verify_email_status_success"), true);
@@ -174,4 +170,60 @@ async function resendVerification() {
 
 function goToLogin() {
   window.location.href = "/login";
+}
+
+async function finalizeVerifiedSignup() {
+  const signupBootstrapToken = String(localStorage.getItem(SIGNUP_BOOTSTRAP_KEY) || "").trim();
+  if (signupBootstrapToken) {
+    try {
+      const response = await fetch("/api/auth/complete-verified-signup", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ signupBootstrapToken })
+      });
+      const payload = response ? await response.json().catch(() => null) : null;
+      if (response && response.ok && payload?.token) {
+        if (typeof setToken === "function") {
+          setToken(payload.token);
+        } else {
+          sessionStorage.setItem("token", payload.token);
+        }
+        localStorage.removeItem(VERIFICATION_STATE_KEY);
+        localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
+        localStorage.removeItem("pendingVerificationEmail");
+        updateStatus(tx("verify_email_status_success"));
+        window.location.replace(payload?.next || "/onboarding");
+        return;
+      }
+    } catch (_) {
+      // Fall through to refresh-based recovery.
+    }
+  }
+
+  try {
+    if (typeof refreshAccessToken === "function") {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        localStorage.removeItem(VERIFICATION_STATE_KEY);
+        localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
+        localStorage.removeItem("pendingVerificationEmail");
+        updateStatus(tx("verify_email_status_success"));
+        window.location.replace("/onboarding");
+        return;
+      }
+    }
+  } catch (_) {
+    // Fall through to manual login if cookie-based recovery is unavailable.
+  }
+
+  localStorage.removeItem(VERIFICATION_STATE_KEY);
+  localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
+  localStorage.removeItem("pendingVerificationEmail");
+  updateStatus(tx("verify_email_status_success"));
+  setTimeout(() => {
+    window.location.replace("/login");
+  }, 1200);
 }
