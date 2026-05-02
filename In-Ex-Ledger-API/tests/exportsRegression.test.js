@@ -125,6 +125,7 @@ function loadExportsRouter(options = {}) {
     ],
     business: { name: "Acme", region: "us", province: "" }
   };
+  const decryptErrorMessage = options.decryptErrorMessage || "";
 
   Module._load = function(requestName, parent, isMain) {
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
@@ -184,7 +185,12 @@ function loadExportsRouter(options = {}) {
     }
     if (requestName === "../services/jweDecryptService.js" || /jweDecryptService\.js$/.test(requestName)) {
       return {
-        decryptJwe: () => "12-3456789"
+        decryptJwe: () => {
+          if (decryptErrorMessage) {
+            throw new Error(decryptErrorMessage);
+          }
+          return "12-3456789";
+        }
       };
     }
     if (requestName === "../services/pdfGeneratorService.js" || /pdfGeneratorService\.js$/.test(requestName)) {
@@ -352,6 +358,34 @@ test("exports generate route returns the inline PDF buffer and stores only the r
       "history metadata should record that only the redacted copy is stored"
     );
     assert.equal(fixture.state.released, true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("exports secure-export falls back to plaintext tax ID when JWE decrypt fails", async () => {
+  const fixture = loadExportsRouter({ decryptErrorMessage: "decrypt failed" });
+
+  try {
+    const app = buildApp(fixture.router);
+
+    const response = await request(app)
+      .post("/api/exports/secure-export")
+      .buffer(true)
+      .parse(parseBinaryResponse)
+      .send({
+        dateRange: { startDate: "2026-04-01", endDate: "2026-04-30" },
+        includeTaxId: true,
+        taxId_jwe: "broken_jwe",
+        taxId: "12-3456789",
+        language: "en",
+        currency: "USD",
+        templateVersion: "v1"
+      });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers["content-type"], "application/pdf");
+    assert.match(response.body.toString("latin1"), /\(Tax ID: 12-3456789\) Tj/);
   } finally {
     fixture.cleanup();
   }

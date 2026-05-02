@@ -36,6 +36,10 @@ function requireEmailVerified(req, res, next) {
 router.use(requireEmailVerified);
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const SSN_RE = /^(\d{3}-\d{2}-\d{4}|\d{9})$/;
+const EIN_RE = /^(\d{2}-\d{7}|\d{9})$/;
+const SIN_RE = /^(\d{3}-\d{3}-\d{3}|\d{9})$/;
+const BN_RE = /^(\d{9}|(?:\d{9}[A-Za-z]{2}\d{4})|(?:\d{9}\s?[A-Za-z]{2}\s?\d{4})|(?:\d{9}-[A-Za-z]{2}-\d{4}))$/;
 
 function validateDateRange(range) {
   if (!range || typeof range !== "object") return null;
@@ -45,6 +49,37 @@ function validateDateRange(range) {
   if (isNaN(new Date(startDate).getTime()) || isNaN(new Date(endDate).getTime())) return null;
   if (startDate > endDate) return null;
   return { startDate, endDate };
+}
+
+function isValidTaxId(value) {
+  if (!value) return false;
+  const trimmed = String(value).trim();
+  return SSN_RE.test(trimmed) || EIN_RE.test(trimmed) || SIN_RE.test(trimmed) || BN_RE.test(trimmed);
+}
+
+function resolveSecureExportTaxId(body, includeTaxId) {
+  if (!includeTaxId) {
+    return "";
+  }
+
+  const encryptedTaxId = String(body?.taxId_jwe || "").trim();
+  if (encryptedTaxId) {
+    try {
+      return decryptJwe(encryptedTaxId);
+    } catch (error) {
+      logError("Secure export JWE decrypt failed; attempting plaintext fallback", { err: error.message });
+    }
+  }
+
+  const fallbackTaxId = String(body?.taxId || "").trim();
+  if (isValidTaxId(fallbackTaxId)) {
+    return fallbackTaxId;
+  }
+
+  const invalidFallback = fallbackTaxId.length > 0;
+  const exportError = new Error(invalidFallback ? "Invalid Tax ID format." : "Unable to validate Tax ID for secure export.");
+  exportError.status = 400;
+  throw exportError;
 }
 
 function buildExportMetadataRows(exportId, metadata) {
@@ -358,7 +393,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       taxLabel: region === "ca" ? (c.tax_map_ca || "") : (c.tax_map_us || "")
     }));
 
-    const taxId = includeTaxId ? decryptJwe(req.body.taxId_jwe) : "";
+    const taxId = resolveSecureExportTaxId(req.body, includeTaxId);
 
     const generatedAt = new Date().toISOString();
     const reportId = createPdfReportId(generatedAt);
@@ -616,7 +651,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       taxLabel: region === "ca" ? (c.tax_map_ca || "") : (c.tax_map_us || "")
     }));
 
-    const taxId = includeTaxId ? decryptJwe(req.body.taxId_jwe) : "";
+    const taxId = resolveSecureExportTaxId(req.body, includeTaxId);
 
     const generatedAt = new Date().toISOString();
     const reportId = createPdfReportId(generatedAt);
@@ -678,6 +713,9 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
     return res.send(fullPdfBuffer);
   } catch (err) {
+    if (err?.status) {
+      return res.status(err.status).json({ error: err.message });
+    }
     logError("Secure export error", { body: sanitizedBody, err: err.message });
     return res.status(500).json({ error: "Failed to generate secure export." });
   }
