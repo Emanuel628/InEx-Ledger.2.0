@@ -2291,6 +2291,9 @@ body {
 .receipt-attach-hover {
   display: inline-flex;
   align-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
   color: var(--accent2);
   font-size: 12px;
   font-weight: 600;

@@ -11,6 +11,11 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
+function buildReceiptsNoCachePath(path) {
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}_ts=${Date.now()}`;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
@@ -29,10 +34,15 @@ function wireUploadInput(inputEl) {
     const file = inputEl.files?.[0];
     if (!file) return;
     try {
-      await uploadReceipt(file);
+      const uploaded = await uploadReceipt(file);
       showReceiptsToast(tx("receipts_uploaded_success"));
       inputEl.value = "";
+      if (uploaded?.id) {
+        prependUploadedReceipt(uploaded);
+      }
+      await loadTransactionMap();
       await loadReceipts();
+      updateReceiptsDot();
     } catch (error) {
       console.error("Receipt upload failed:", error);
       showReceiptsToast(error.message || tx("receipts_error_upload"));
@@ -84,9 +94,14 @@ function wireReceiptDropZone() {
     const file = e.dataTransfer?.files?.[0];
     if (!file) return;
     try {
-      await uploadReceipt(file);
+      const uploaded = await uploadReceipt(file);
       showReceiptsToast(tx("receipts_uploaded_success"));
+      if (uploaded?.id) {
+        prependUploadedReceipt(uploaded);
+      }
+      await loadTransactionMap();
       await loadReceipts();
+      updateReceiptsDot();
     } catch (error) {
       showReceiptsToast(error.message || tx("receipts_error_upload"));
     }
@@ -123,7 +138,7 @@ async function loadTransactionMap() {
   transactionMap = {};
 
   try {
-    const response = await apiFetch("/api/transactions");
+    const response = await apiFetch(buildReceiptsNoCachePath("/api/transactions"));
     if (!response || !response.ok) {
       return;
     }
@@ -156,7 +171,7 @@ async function loadReceipts() {
     renderReceipts(receiptRecords);
   }
   try {
-    const response = await apiFetch("/api/receipts");
+    const response = await apiFetch(buildReceiptsNoCachePath("/api/receipts"));
     if (!response) {
       receiptRecords = [];
       receiptsLoadFailed = true;
@@ -188,6 +203,25 @@ async function loadReceipts() {
     receiptsLoading = false;
     setReceiptRefreshBusy(false);
   }
+}
+
+function prependUploadedReceipt(uploadedReceipt) {
+  if (!uploadedReceipt?.id) {
+    return;
+  }
+
+  const normalized = {
+    id: uploadedReceipt.id,
+    filename: uploadedReceipt.filename || tx("receipts_fallback_name"),
+    mime_type: uploadedReceipt.mime_type || "",
+    transaction_id: uploadedReceipt.transaction_id || null,
+    created_at: uploadedReceipt.created_at || new Date().toISOString()
+  };
+
+  receiptRecords = [normalized, ...receiptRecords.filter((receipt) => receipt?.id !== normalized.id)];
+  receiptsLoadFailed = false;
+  receiptsLoading = false;
+  renderReceipts(receiptRecords);
 }
 
 function wireReceiptRefresh() {

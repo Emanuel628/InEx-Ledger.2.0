@@ -1727,7 +1727,9 @@ async function fetchTransactionsForPage() {
 
 async function fetchReceiptLinksSnapshot() {
   try {
-    const response = await apiFetch(`/api/receipts${buildTransactionScopeQuery()}`);
+    const query = buildTransactionScopeQuery();
+    const noCacheQuery = query ? `${query}&_ts=${Date.now()}` : `?_ts=${Date.now()}`;
+    const response = await apiFetch(`/api/receipts${noCacheQuery}`);
     if (!response || !response.ok) {
       return { byTransactionId: {}, unattachedCount: 0 };
     }
@@ -1881,7 +1883,7 @@ function renderTransactionsTable(filteredTransactions) {
       : `<span class="status-badge status-pending">${txT("transactions_status_pending", "Pending")}</span>`;
     const receiptMarkup = txn.receiptId
       ? `<span class="receipt-status attached"><span class="receipt-dot"></span><span>${txT("transactions_receipt_attached_short", "Attached")}</span></span>`
-      : `<a href="receipts" class="receipt-attach-hover" title="Attach a receipt">+ attach</a>`;
+      : `<button type="button" class="receipt-attach-hover" data-action="upload-receipt" data-id="${txn.id}" title="Attach a receipt">+ attach</button>`;
 
     row.innerHTML = `
       <td class="col-check"><input type="checkbox" data-bulk-check="${escapeHtml(txn.id)}" aria-label="Select transaction" /></td>
@@ -1905,6 +1907,9 @@ function renderTransactionsTable(filteredTransactions) {
 
     row.querySelector('[data-action="edit-transaction"]')?.addEventListener("click", () => {
       handleEditEntry(txn.id);
+    });
+    row.querySelector('[data-action="upload-receipt"]')?.addEventListener("click", () => {
+      triggerReceiptUpload(txn.id);
     });
     row.querySelector('[data-action="delete-transaction"]')?.addEventListener("click", () => {
       openTransactionModal(txn.id);

@@ -163,6 +163,10 @@ router.get("/", async (req, res) => {
     `;
     const result = await pool.query(sql, [scope.businessIds]);
 
+    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+
     return res.status(200).json(result.rows || []);
   } catch (err) {
     logError("Receipts load error:", err);
