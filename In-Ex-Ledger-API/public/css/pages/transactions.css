@@ -1761,6 +1761,11 @@ body {
   display: flex;
   gap: 6px;
   justify-content: flex-end;
+  visibility: hidden;
+}
+
+.transactions-table tr.row-selected .actions-cell {
+  visibility: visible;
 }
 
 .action-button {

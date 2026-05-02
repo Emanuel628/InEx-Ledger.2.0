@@ -1879,7 +1879,7 @@ function renderTransactionsTable(filteredTransactions) {
     if (canUseEdgeCaseTools && txn.reviewStatus && txn.reviewStatus !== "ready") {
       metadataBadges.push(formatTransactionMetaBadge(getReviewStatusLabel(txn.reviewStatus), txn.reviewStatus));
     }
-    const descriptionSub = [typeBadge, businessBadge, descriptionTail, metadataBadges.join(" ")].filter(Boolean).join(" ");
+    const descriptionSub = [businessBadge, descriptionTail, typeBadge, metadataBadges.join(" ")].filter(Boolean).join(" ");
     const amountClass = txn.type === "income" ? "amount-positive" : "amount-negative";
     const amountPrefix = txn.type === "income" ? "+" : "-";
     const clearedMarkup = txn.cleared
@@ -2870,79 +2870,13 @@ function initPeriodPicker() {
   });
 }
 
-let bulkSelectedIds = new Set();
-
 function initBulkActions() {
-  const bar = document.getElementById("bulkActionBar");
-  const selectAll = document.getElementById("bulkSelectAll");
-  const countEl = document.getElementById("bulkSelectedCount");
-  const cancelBtn = document.getElementById("bulkCancelSelect");
-
-  if (!bar) return;
-
-  function updateBar() {
-    const count = bulkSelectedIds.size;
-    bar.hidden = count === 0;
-    if (countEl) countEl.textContent = `${count} selected`;
-  }
-
-  // Delegate checkbox clicks on the table body
   const tbody = document.querySelector(".transactions-table tbody");
   tbody?.addEventListener("change", (e) => {
     const cb = e.target.closest('[data-bulk-check]');
     if (!cb) return;
-    const id = cb.dataset.bulkCheck;
-    if (cb.checked) bulkSelectedIds.add(id);
-    else bulkSelectedIds.delete(id);
-    updateBar();
-    if (selectAll) selectAll.indeterminate = bulkSelectedIds.size > 0 && bulkSelectedIds.size < tbody.querySelectorAll('[data-bulk-check]').length;
-  });
-
-  selectAll?.addEventListener("change", () => {
-    const checks = document.querySelectorAll('.transactions-table tbody [data-bulk-check]');
-    checks.forEach((cb) => {
-      cb.checked = selectAll.checked;
-      if (selectAll.checked) bulkSelectedIds.add(cb.dataset.bulkCheck);
-      else bulkSelectedIds.delete(cb.dataset.bulkCheck);
-    });
-    updateBar();
-  });
-
-  cancelBtn?.addEventListener("click", () => {
-    bulkSelectedIds.clear();
-    document.querySelectorAll('[data-bulk-check]').forEach((cb) => cb.checked = false);
-    if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
-    updateBar();
-  });
-
-  document.getElementById("bulkDeleteSelected")?.addEventListener("click", async () => {
-    if (!bulkSelectedIds.size) return;
-    if (!window.confirm(`Archive ${bulkSelectedIds.size} selected transaction(s)?`)) return;
-    const ids = Array.from(bulkSelectedIds);
-    for (const id of ids) {
-      try {
-        await apiFetch(`/api/transactions/${id}`, { method: "DELETE" });
-      } catch (_) {}
-    }
-    bulkSelectedIds.clear();
-    updateBar();
-    window.location.reload();
-  });
-
-  document.getElementById("bulkMarkCleared")?.addEventListener("click", async () => {
-    if (!bulkSelectedIds.size) return;
-    for (const id of Array.from(bulkSelectedIds)) {
-      try {
-        await apiFetch(`/api/transactions/${id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cleared: true })
-        });
-      } catch (_) {}
-    }
-    bulkSelectedIds.clear();
-    updateBar();
-    window.location.reload();
+    const row = cb.closest("tr");
+    if (row) row.classList.toggle("row-selected", cb.checked);
   });
 }
 
