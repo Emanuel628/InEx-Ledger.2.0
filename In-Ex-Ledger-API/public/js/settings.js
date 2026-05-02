@@ -256,6 +256,8 @@ async function initBusinessProfileForm() {
   document.getElementById("business-name").value = profile.name || "";
   document.getElementById("business-type-select").value = profile.type || "sole_proprietor";
   document.getElementById("fiscal-year").value = profile.fiscalYearStart || "";
+  document.getElementById("operating-name").value = profile.operatingName || "";
+  document.getElementById("business-activity-code").value = profile.businessActivityCode || "";
 
   // Parse stored newline-delimited address string back into structured fields
   const addrParts = (profile.address || "").split("\n");
@@ -285,7 +287,9 @@ async function initBusinessProfileForm() {
       name: document.getElementById("business-name").value.trim(),
       type: document.getElementById("business-type-select").value,
       fiscalYearStart: document.getElementById("fiscal-year").value,
-      address: addressParts.join("\n")
+      address: addressParts.join("\n"),
+      operatingName: document.getElementById("operating-name").value.trim(),
+      businessActivityCode: document.getElementById("business-activity-code").value.trim()
     };
 
     const saved = await saveBusinessProfileToApi(nextProfile);
@@ -684,7 +688,9 @@ async function loadBusinessProfile() {
     name: "",
     type: "sole_proprietor",
     fiscalYearStart: "",
-    address: ""
+    address: "",
+    operatingName: "",
+    businessActivityCode: ""
   };
 
   try {
@@ -698,7 +704,9 @@ async function loadBusinessProfile() {
       name: business?.name || "",
       type: business?.business_type || "sole_proprietor",
       fiscalYearStart: business?.fiscal_year_start || "",
-      address: business?.address || ""
+      address: business?.address || "",
+      operatingName: business?.operating_name || "",
+      businessActivityCode: business?.business_activity_code || ""
     };
     saveBusinessProfile(profile);
     return profile;
@@ -719,7 +727,9 @@ async function saveBusinessProfileToApi(profile) {
         name: profile.name,
         fiscal_year_start: profile.fiscalYearStart || null,
         business_type: profile.type || null,
-        address: profile.address || null
+        address: profile.address || null,
+        operating_name: profile.operatingName || null,
+        business_activity_code: profile.businessActivityCode || null
       })
     });
 

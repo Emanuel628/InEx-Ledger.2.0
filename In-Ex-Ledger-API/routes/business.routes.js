@@ -19,7 +19,8 @@ const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
 const BUSINESS_SELECT = `SELECT id, name, region, language, fiscal_year_start, province,
-                                business_type, tax_id, address, created_at
+                                business_type, tax_id, address, operating_name,
+                                business_activity_code, created_at
                          FROM businesses
                          WHERE id = $1`;
 
@@ -42,6 +43,8 @@ function normalizeBusinessRow(row) {
     business_type: null,
     tax_id: null,
     address: null,
+    operating_name: null,
+    business_activity_code: null,
     ...row,
     tax_id: decryptTaxId(row.tax_id)
   };
@@ -53,7 +56,18 @@ async function fetchBusinessRow(businessId) {
 }
 
 async function updateBusinessRow(businessId, payload) {
-  const { name, region, language, fiscal_year_start, province, business_type, tax_id, address } = payload;
+  const {
+    name,
+    region,
+    language,
+    fiscal_year_start,
+    province,
+    business_type,
+    tax_id,
+    address,
+    operating_name,
+    business_activity_code
+  } = payload;
   const normalizedTaxId = normalizeOptionalTrimmedString(tax_id);
   const encryptedTaxId = normalizedTaxId ? encryptTaxId(normalizedTaxId) : null;
   const result = await pool.query(
@@ -65,10 +79,13 @@ async function updateBusinessRow(businessId, payload) {
          province = $5,
          business_type = $6,
          tax_id = $7,
-         address = $8
-     WHERE id = $9
+         address = $8,
+         operating_name = $9,
+         business_activity_code = $10
+     WHERE id = $11
      RETURNING id, name, region, language, fiscal_year_start, province,
-               business_type, tax_id, address, created_at`,
+               business_type, tax_id, address, operating_name,
+               business_activity_code, created_at`,
     [
       normalizeOptionalTrimmedString(name),
       region || null,
@@ -78,6 +95,8 @@ async function updateBusinessRow(businessId, payload) {
       business_type,
       encryptedTaxId,
       address,
+      normalizeOptionalTrimmedString(operating_name),
+      normalizeOptionalTrimmedString(business_activity_code),
       businessId
     ]
   );
@@ -110,7 +129,9 @@ router.put("/", async (req, res) => {
     province,
     business_type,
     tax_id,
-    address
+    address,
+    operating_name,
+    business_activity_code
   } = req.body ?? {};
 
   if (region && !VALID_REGIONS.has(region)) {
@@ -145,6 +166,12 @@ router.put("/", async (req, res) => {
       : current.business_type;
     const resolvedTaxId = 'tax_id' in body ? (tax_id || null) : current.tax_id;
     const resolvedAddress = 'address' in body ? normalizeOptionalTrimmedString(address) : current.address;
+    const resolvedOperatingName = 'operating_name' in body
+      ? normalizeOptionalTrimmedString(operating_name)
+      : current.operating_name;
+    const resolvedBusinessActivityCode = 'business_activity_code' in body
+      ? normalizeOptionalTrimmedString(business_activity_code)
+      : current.business_activity_code;
 
     const updated = await updateBusinessRow(businessId, {
       name,
@@ -154,7 +181,9 @@ router.put("/", async (req, res) => {
       province: resolvedProvince,
       business_type: resolvedBusinessType,
       tax_id: resolvedTaxId,
-      address: resolvedAddress
+      address: resolvedAddress,
+      operating_name: resolvedOperatingName,
+      business_activity_code: resolvedBusinessActivityCode
     });
     res.json(updated);
   } catch (err) {

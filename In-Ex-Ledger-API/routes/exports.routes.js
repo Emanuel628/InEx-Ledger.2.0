@@ -348,7 +348,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
            ORDER BY entry_date ASC, created_at ASC`,
           [businessId, grantStartDate, grantEndDate]
         ),
-        pool.query(`SELECT name, region, province FROM businesses WHERE id = $1`, [businessId])
+        pool.query(`SELECT name, region, province, operating_name, business_activity_code FROM businesses WHERE id = $1`, [businessId])
       ]);
 
     const business = bizResult.rows[0] || {};
@@ -376,7 +376,8 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       currency,
       businessName: business.name || "",
       legalName: business.name || "",
-      operatingName: "",
+      operatingName: business.operating_name || "",
+      naics: business.business_activity_code || "",
       generatedAt,
       reportId,
       region,
@@ -597,7 +598,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
           [businessId, dateRange.startDate, dateRange.endDate]
         ),
         pool.query(
-          `SELECT name, region, province FROM businesses WHERE id = $1`,
+          `SELECT name, region, province, operating_name, business_activity_code FROM businesses WHERE id = $1`,
           [businessId]
         )
       ]);
@@ -627,7 +628,8 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       currency,
       businessName: business.name || "",
       legalName: business.name || "",
-      operatingName: "",
+      operatingName: business.operating_name || "",
+      naics: business.business_activity_code || "",
       generatedAt,
       reportId,
       region,
