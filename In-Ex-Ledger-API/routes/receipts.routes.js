@@ -20,6 +20,7 @@ const {
 const {
   getReceiptStorageDir,
   isManagedReceiptPath,
+  resolveReceiptFilePath,
   requirePersistentReceiptStorage
 } = require("../services/receiptStorage.js");
 const {
@@ -406,17 +407,17 @@ router.get("/:id", async (req, res) => {
     }
 
     const { filename, mime_type, storage_path } = result.rows[0];
-    const resolvedStoragePath = path.resolve(storage_path || "");
+    const resolvedStoragePath = resolveReceiptFilePath(storage_path);
 
-    if (!isManagedReceiptPath(resolvedStoragePath)) {
-      logWarn("Blocked receipt download for unmanaged storage path", {
-        receiptId,
-        businessId
-      });
+    if (!resolvedStoragePath) {
       return res.status(404).json({ error: "Receipt file missing." });
     }
 
-    if (!fs.existsSync(resolvedStoragePath)) {
+    if (!isManagedReceiptPath(resolvedStoragePath) && path.isAbsolute(String(storage_path || "").trim())) {
+      logWarn("Blocked receipt download for unmanaged storage path", {
+        receiptId,
+        businessIds: scope.businessIds
+      });
       return res.status(404).json({ error: "Receipt file missing." });
     }
 
@@ -662,13 +663,13 @@ router.post("/:id/extract", async (req, res) => {
     }
 
     const { mime_type, storage_path } = result.rows[0];
-    const resolvedPath = path.resolve(storage_path || "");
+    const resolvedPath = resolveReceiptFilePath(storage_path);
 
-    if (!isManagedReceiptPath(resolvedPath)) {
+    if (!resolvedPath) {
       return res.status(404).json({ error: "Receipt file missing." });
     }
 
-    if (!fs.existsSync(resolvedPath)) {
+    if (!isManagedReceiptPath(resolvedPath) && path.isAbsolute(String(storage_path || "").trim())) {
       return res.status(404).json({ error: "Receipt file missing." });
     }
 

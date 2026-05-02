@@ -113,6 +113,39 @@ function isManagedReceiptPath(filePath) {
   return path.resolve(filePath).startsWith(storageDir);
 }
 
+function resolveReceiptFilePath(filePath) {
+  if (!filePath) {
+    return null;
+  }
+
+  const rawPath = String(filePath).trim();
+  if (!rawPath) {
+    return null;
+  }
+
+  const candidates = [];
+  const resolvedRaw = path.resolve(rawPath);
+  candidates.push(resolvedRaw);
+
+  if (!path.isAbsolute(rawPath)) {
+    candidates.push(path.resolve(process.cwd(), rawPath));
+  }
+
+  const basename = path.basename(rawPath);
+  if (basename) {
+    candidates.push(path.join(getReceiptStorageDir(), basename));
+  }
+
+  const uniqueCandidates = [...new Set(candidates)];
+  for (const candidate of uniqueCandidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 function requirePersistentReceiptStorage(req, res, next) {
   const status = refreshReceiptStorageStatus();
   if (status.available) {
@@ -143,6 +176,7 @@ module.exports = {
   getReceiptStorageStatus,
   initializeReceiptStorage,
   isManagedReceiptPath,
+  resolveReceiptFilePath,
   requirePersistentReceiptStorage,
   resetReceiptStorageStatusForTests
 };
