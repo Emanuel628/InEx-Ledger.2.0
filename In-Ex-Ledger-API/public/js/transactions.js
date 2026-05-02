@@ -1903,8 +1903,10 @@ function renderTransactionsTable(filteredTransactions) {
       </td>
       <td class="amount-cell"><span class="${amountClass}">${amountPrefix}${formatCurrency(Math.abs(Number(txn.amount) || 0), rowRegion)}</span></td>
       <td class="actions-cell">
-        <button type="button" class="action-button" data-action="edit-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("common_edit", "Edit")}</button>
-        <button type="button" class="action-button delete" data-action="delete-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("common_delete", "Delete")}</button>
+        <div class="actions-inner">
+          <button type="button" class="action-button" data-action="edit-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("common_edit", "Edit")}</button>
+          <button type="button" class="action-button delete" data-action="delete-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("common_delete", "Delete")}</button>
+        </div>
       </td>
     `;
     tbody.appendChild(row);

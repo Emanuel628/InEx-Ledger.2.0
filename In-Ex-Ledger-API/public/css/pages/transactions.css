@@ -1504,7 +1504,8 @@ body {
 }
 
 .transactions-table .col-actions {
-  display: none;
+  width: 110px;
+  text-align: right;
 }
 
 .transactions-table tbody tr:hover {
@@ -1756,22 +1757,23 @@ body {
   color: var(--red);
 }
 
-.transactions-table tbody tr {
-  position: relative;
-}
-
 .actions-cell {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: none;
-  gap: 6px;
-  z-index: 1;
+  text-align: right;
 }
 
-.transactions-table tr.row-selected .actions-cell {
-  display: flex;
+.actions-inner {
+  display: inline-flex;
+  gap: 6px;
+  justify-content: flex-end;
+  visibility: hidden;
+}
+
+.transactions-table tr.row-selected .actions-inner {
+  visibility: visible;
+}
+
+.transactions-table tr.row-selected td {
+  background: rgba(37, 99, 168, 0.04);
 }
 
 .action-button {
