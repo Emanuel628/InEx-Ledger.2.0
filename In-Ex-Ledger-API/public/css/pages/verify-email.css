@@ -23,6 +23,10 @@
   color: var(--ink3);
 }
 
+.verify-trust-panel {
+  margin-bottom: 16px;
+}
+
 .verify-actions {
   display: grid;
   gap: 10px;
@@ -60,4 +64,8 @@
   text-align: center;
   color: var(--ink3);
   font-size: 13px;
+}
+
+.verify-support-note {
+  text-align: center;
 }

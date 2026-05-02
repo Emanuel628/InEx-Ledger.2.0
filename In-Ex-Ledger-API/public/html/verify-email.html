@@ -31,6 +31,10 @@
     <section class="auth-card verify-card">
       <p class="verify-eyebrow" data-i18n="verify_email_eyebrow">Account setup</p>
       <h2 data-i18n="verify_email_title">Verify your email</h2>
+      <div class="auth-trust-panel verify-trust-panel" aria-label="Verification note">
+        <div class="auth-trust-kicker">Before setup continues</div>
+        <p class="auth-trust-copy">This step confirms that you control the inbox tied to your books, exports, and billing notifications.</p>
+      </div>
       <p class="verify-copy" data-i18n="verify_email_copy">
         We sent a verification link to your inbox. Open the email, click the button,
         and come back here once your account is confirmed.
@@ -55,6 +59,7 @@
         Still nothing?
         <a href="#" id="resendVerificationLink" data-i18n="verify_email_resend_link">Send verification again</a>
       </p>
+      <p class="auth-support-note verify-support-note">If the email arrives late, the latest link is the one that matters. Older links may expire once you request a new one.</p>
     </section>
   </main>
 

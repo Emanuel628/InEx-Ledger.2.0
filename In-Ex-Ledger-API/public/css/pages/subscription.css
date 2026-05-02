@@ -47,6 +47,33 @@
   padding: 16px 0 8px;
 }
 
+.sub-trust-banner,
+.sub-plans-intro {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(36, 109, 187, 0.12);
+  background: linear-gradient(180deg, rgba(247, 250, 253, 0.98), rgba(239, 245, 251, 0.94));
+}
+
+.sub-trust-banner strong,
+.sub-plans-intro p {
+  color: #102236;
+}
+
+.sub-trust-banner span,
+.sub-plans-intro p,
+.sub-history-note {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.sub-trust-banner strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
 .sub-status-loading {
   color: var(--text-secondary);
   font-size: 14px;
@@ -140,11 +167,11 @@
 .sub-plan-card {
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
-  padding: 20px;
+  padding: 22px;
   background: var(--card-bg);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .sub-plan-card.sub-plan-featured {
@@ -176,20 +203,20 @@
 
 .sub-plan-name {
   margin: 0;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 .sub-plan-price {
   margin: 0;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .sub-plan-note {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-secondary);
 }
 
@@ -226,8 +253,9 @@
 .sub-plan-features li {
   font-size: 14px;
   color: var(--text-secondary);
-  padding-left: 16px;
+  padding-left: 18px;
   position: relative;
+  line-height: 1.5;
 }
 
 .sub-plan-features li::before {
@@ -393,7 +421,11 @@
 
 /* Billing History */
 .billing-history-list {
-  margin-top: 8px;
+  margin-top: 12px;
+}
+
+.sub-history-note {
+  margin: 14px 0 0;
 }
 
 .billing-history-table {
