@@ -12,6 +12,13 @@ body {
     linear-gradient(180deg, #fbfcfe 0%, #f2f5f9 100%);
 }
 
+/* Override login.css page-shell sizing */
+main {
+  max-width: none;
+  margin-top: 0;
+  padding: 0;
+}
+
 .register-main {
   width: min(1160px, calc(100vw - 32px));
   margin: 0 auto;
