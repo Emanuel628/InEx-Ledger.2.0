@@ -548,7 +548,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     const currency = req.body?.currency || "USD";
     const templateVersion = req.body?.templateVersion || "v1";
 
-    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult] =
+    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult] =
       await Promise.all([
         pool.query(
           `SELECT id, account_id, category_id, amount, type, description, date, note,
@@ -590,18 +590,24 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
           [businessId, dateRange.startDate, dateRange.endDate]
         ),
         pool.query(
-          `SELECT id, entry_type, entry_date, title, vendor, amount, notes, created_at
-           FROM vehicle_costs
-           WHERE business_id = $1
-             AND entry_date >= $2 AND entry_date <= $3
-           ORDER BY entry_date ASC, created_at ASC`,
-          [businessId, dateRange.startDate, dateRange.endDate]
-        ),
-        pool.query(
           `SELECT name, region, province, operating_name, business_activity_code FROM businesses WHERE id = $1`,
           [businessId]
         )
       ]);
+
+    let vehicleCostResult = { rows: [] };
+    try {
+      vehicleCostResult = await pool.query(
+        `SELECT id, entry_type, entry_date, title, vendor, amount, notes, created_at
+         FROM vehicle_costs
+         WHERE business_id = $1
+           AND entry_date >= $2 AND entry_date <= $3
+         ORDER BY entry_date ASC, created_at ASC`,
+        [businessId, dateRange.startDate, dateRange.endDate]
+      );
+    } catch (vcErr) {
+      logError("vehicle_costs query failed (migration pending?)", { err: vcErr.message });
+    }
 
     const business = bizResult.rows[0] || {};
     const region = String(business.region || "us").toLowerCase();
