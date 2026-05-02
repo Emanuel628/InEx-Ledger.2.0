@@ -780,7 +780,7 @@ async function resolveAddonPriceIdForSubscription(businessId) {
   return requireEnvValue(addonEnv);
 }
 
-router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfaIfEnabled, async (req, res) => {
+router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
