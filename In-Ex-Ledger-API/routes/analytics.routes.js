@@ -42,6 +42,29 @@ function monthKey(year, month) {
   return `${year}-${String(month).padStart(2, "0")}`;
 }
 
+function monthKeyFromDbValue(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return monthKey(value.getUTCFullYear(), value.getUTCMonth() + 1);
+  }
+
+  const stringValue = String(value).trim();
+  const match = stringValue.match(/^(\d{4})-(\d{2})/);
+  if (match) {
+    return `${match[1]}-${match[2]}`;
+  }
+
+  const parsed = new Date(stringValue);
+  if (!Number.isNaN(parsed.getTime())) {
+    return monthKey(parsed.getUTCFullYear(), parsed.getUTCMonth() + 1);
+  }
+
+  return null;
+}
+
 function buildTrailingMonthMap(monthCount) {
   return pastMonths(monthCount).reduce((acc, entry) => {
     acc.set(monthKey(entry.year, entry.month), {
@@ -155,7 +178,7 @@ router.get("/dashboard", async (req, res) => {
     // Build monthly map
     const monthlyMap = buildTrailingMonthMap(12);
     for (const row of monthlyResult.rows) {
-      const key = String(row.month).slice(0, 7); // YYYY-MM
+      const key = monthKeyFromDbValue(row.month);
       const bucket = monthlyMap.get(key);
       if (!bucket) {
         continue;
@@ -318,7 +341,7 @@ router.get("/cash-flow", async (req, res) => {
     // Summarise historical averages
     const monthTotals = buildTrailingMonthMap(6);
     for (const row of histResult.rows) {
-      const key = String(row.month).slice(0, 7);
+      const key = monthKeyFromDbValue(row.month);
       const bucket = monthTotals.get(key);
       if (!bucket) {
         continue;

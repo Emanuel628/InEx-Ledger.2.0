@@ -284,10 +284,13 @@ function renderReceipts(receipts) {
 
   tableBody.innerHTML = receipts.map((receipt) => {
     const transactionCell = renderTransactionCell(receipt.transaction_id, receipt.id);
+    const canViewReceipt = receipt?.is_viewable !== false;
     return `
       <tr>
         <td data-label="${escapeHtml(tx("receipts_table_filename"))}">
-          <button type="button" class="receipt-file-button" data-receipt-download="${escapeHtml(receipt.id || "")}">${escapeHtml(receipt.filename || tx("receipts_fallback_name"))}</button>
+          ${canViewReceipt
+            ? `<button type="button" class="receipt-file-button" data-receipt-download="${escapeHtml(receipt.id || "")}">${escapeHtml(receipt.filename || tx("receipts_fallback_name"))}</button>`
+            : `<span class="receipt-file-missing">${escapeHtml(receipt.filename || tx("receipts_fallback_name"))}</span>`}
         </td>
         <td data-label="${escapeHtml(tx("receipts_table_uploaded"))}">${escapeHtml(formatReceiptDate(receipt.created_at))}</td>
         <td data-label="${escapeHtml(tx("receipts_table_attached"))}">${transactionCell}</td>
@@ -374,6 +377,10 @@ function renderTransactionCell(transactionId, receiptId) {
 
   const transaction = transactionMap[transactionId];
   const label = transaction?.description || transactionId;
+  const receipt = receiptRecords.find((record) => record.id === receiptId);
+  if (receipt?.is_viewable === false) {
+    return `<span class="receipt-transaction-label">${escapeHtml(label)}</span>`;
+  }
   return `<button type="button" class="receipt-transaction-link" data-receipt-view="${escapeHtml(receiptId || "")}">${escapeHtml(label)}</button>`;
 }
 

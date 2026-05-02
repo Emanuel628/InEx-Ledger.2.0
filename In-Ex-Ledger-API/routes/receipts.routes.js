@@ -163,11 +163,19 @@ router.get("/", async (req, res) => {
     `;
     const result = await pool.query(sql, [scope.businessIds]);
 
+    const rows = (result.rows || []).map((row) => {
+      const resolvedStoragePath = resolveReceiptFilePath(row.storage_path);
+      return {
+        ...row,
+        is_viewable: !!resolvedStoragePath || !!row.file_bytes
+      };
+    });
+
     res.setHeader("Cache-Control", "private, no-store, must-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
 
-    return res.status(200).json(result.rows || []);
+    return res.status(200).json(rows);
   } catch (err) {
     logError("Receipts load error:", err);
     return res.status(500).json({
@@ -264,6 +272,7 @@ router.post("/", upload.single("receipt"), async (req, res) => {
       mime_type: req.file.mimetype,
       transaction_id: transactionId,
       created_at: new Date().toISOString(),
+      is_viewable: true,
       url: `/api/receipts/${receiptId}`
     });
   } catch (err) {

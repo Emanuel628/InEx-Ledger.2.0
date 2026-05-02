@@ -180,6 +180,11 @@
   text-decoration: none;
 }
 
+.receipt-file-missing,
+.receipt-transaction-label {
+  color: var(--ink2);
+}
+
 .receipt-transaction-link:hover {
   background: none;
   color: var(--accent2);
