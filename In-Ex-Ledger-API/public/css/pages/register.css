@@ -46,21 +46,6 @@ main {
   margin-bottom: 32px;
 }
 
-.register-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  min-height: 26px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: rgba(36, 109, 187, 0.08);
-  color: var(--accent2);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin-bottom: 12px;
-}
-
 .register-headline {
   margin: 0 0 10px;
   color: #102236;
@@ -384,7 +369,7 @@ main {
   /* On mobile: value column is already first in DOM */
   .register-value-col {
     position: static;
-    padding: 0 0 0 0;
+    padding: 0;
   }
 
   .register-value-inner {
