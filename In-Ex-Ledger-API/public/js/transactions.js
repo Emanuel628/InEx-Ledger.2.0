@@ -2543,6 +2543,7 @@ function triggerReceiptUpload(transactionId) {
   }
 
   receiptInputElement.dataset.transactionId = transactionId;
+  receiptInputElement.value = "";
   receiptInputElement.click();
 }
 

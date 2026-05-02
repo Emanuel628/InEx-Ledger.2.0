@@ -22,7 +22,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   wireReceiptUpload();
   wireReceiptDropZone();
-  wireReceiptRefresh();
   wireReceiptLinkModal();
   await loadTransactionMap();
   await loadReceipts();
@@ -40,8 +39,6 @@ function wireUploadInput(inputEl) {
       if (uploaded?.id) {
         prependUploadedReceipt(uploaded);
       }
-      await loadTransactionMap();
-      await loadReceipts();
       updateReceiptsDot();
     } catch (error) {
       console.error("Receipt upload failed:", error);
@@ -99,8 +96,6 @@ function wireReceiptDropZone() {
       if (uploaded?.id) {
         prependUploadedReceipt(uploaded);
       }
-      await loadTransactionMap();
-      await loadReceipts();
       updateReceiptsDot();
     } catch (error) {
       showReceiptsToast(error.message || tx("receipts_error_upload"));
@@ -222,20 +217,7 @@ function prependUploadedReceipt(uploadedReceipt) {
   receiptsLoadFailed = false;
   receiptsLoading = false;
   renderReceipts(receiptRecords);
-}
-
-function wireReceiptRefresh() {
-  const refreshButton = document.getElementById("receiptRefreshButton");
-  refreshButton?.addEventListener("click", async () => {
-    try {
-      await loadTransactionMap();
-      await loadReceipts();
-      showReceiptsToast("Receipts refreshed.");
-    } catch (error) {
-      console.error("Receipt refresh failed:", error);
-      showReceiptsToast(tx("receipts_error_load"));
-    }
-  });
+  void loadTransactionMap();
 }
 
 function setReceiptRefreshBusy(isBusy) {

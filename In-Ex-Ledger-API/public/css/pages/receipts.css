@@ -63,6 +63,7 @@
 .receipt-drop-browse,
 .receipt-refresh-btn,
 .receipt-link-btn,
+.receipt-scan-btn,
 .receipt-secondary-btn,
 .receipt-file-button,
 .receipt-bottom-upload-btn {
@@ -79,6 +80,7 @@
 
 .receipt-drop-browse,
 .receipt-link-btn,
+.receipt-scan-btn,
 .receipt-file-button {
   color: var(--accent2);
 }
@@ -300,6 +302,97 @@
   margin-top: 22px;
 }
 
+.transaction-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 25, 35, 0.45);
+}
+
+.transaction-modal.hidden {
+  display: none;
+}
+
+.transaction-modal-content {
+  width: min(520px, calc(100vw - 32px));
+  padding: 28px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 20px 60px rgba(15, 25, 35, 0.18);
+}
+
+.ocr-modal-title {
+  margin: 0 0 16px;
+  color: #102236;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.ocr-modal-body {
+  display: grid;
+  gap: 12px;
+}
+
+.ocr-field {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.ocr-label {
+  color: #6d7986;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ocr-val,
+.ocr-unavailable,
+.error-text,
+.analytics-loading {
+  color: var(--ink2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.drawer-submit,
+.modal-cancel {
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.drawer-submit {
+  border: 0;
+  background: var(--cta-gradient);
+  box-shadow: var(--shadow-cta);
+  color: #fff;
+}
+
+.modal-cancel {
+  border: 1px solid rgba(15, 25, 35, 0.12);
+  background: #fff;
+  color: var(--ink2);
+}
+
 @media (max-width: 900px) {
   .receipts-content {
     padding: 24px 20px 28px;
@@ -317,6 +410,7 @@
   .receipt-secondary-btn,
   .receipt-primary-btn,
   .receipt-link-btn,
+  .receipt-scan-btn,
   .receipt-delete-btn,
   .receipt-file-button,
   .receipt-bottom-upload-btn,
