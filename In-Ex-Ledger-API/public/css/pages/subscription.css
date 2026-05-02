@@ -4,19 +4,19 @@
 
 .sub-plan-card,
 .sub-status-inner {
-  border-radius: 20px;
+  border-radius: 16px;
   border: 1px solid rgba(15, 25, 35, 0.08);
-  background: var(--panel-bg);
-  box-shadow: var(--shadow-card-lg);
+  background: #fff;
+  box-shadow: 0 14px 28px rgba(15, 25, 35, 0.05);
 }
 
 .sub-plan-card.sub-plan-featured {
   border-color: var(--accent2);
-  box-shadow: 0 0 0 1px rgba(37, 99, 168, 0.18), var(--shadow-card-lg);
+  box-shadow: 0 0 0 1px rgba(37, 99, 168, 0.18), 0 16px 30px rgba(15, 25, 35, 0.06);
 }
 
 .sub-plan-card.sub-plan-coming-soon {
-  background: linear-gradient(180deg, rgba(36, 109, 187, 0.06), rgba(255, 255, 255, 0.96));
+  background: #f7fafc;
 }
 
 .sub-plan-name,
@@ -50,10 +50,10 @@
 .sub-trust-banner,
 .sub-plans-intro {
   margin-top: 16px;
-  padding: 16px 18px;
-  border-radius: 16px;
-  border: 1px solid rgba(36, 109, 187, 0.12);
-  background: linear-gradient(180deg, rgba(247, 250, 253, 0.98), rgba(239, 245, 251, 0.94));
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  background: #f8fbfe;
 }
 
 .sub-trust-banner strong,
@@ -85,10 +85,10 @@
 }
 
 .sub-status-inner {
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid var(--border-subtle);
   padding: 16px 20px;
-  background: var(--surface-alt, var(--card-bg));
+  background: #fbfcfe;
 }
 
 .sub-status-row {
@@ -166,9 +166,9 @@
 
 .sub-plan-card {
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: 16px;
   padding: 22px;
-  background: var(--card-bg);
+  background: #fff;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -185,7 +185,7 @@
 }
 
 .sub-plan-card.sub-plan-coming-soon {
-  background: linear-gradient(180deg, rgba(245, 247, 250, 0.92), rgba(236, 242, 248, 0.98));
+  background: #f7fafc;
 }
 
 .sub-plan-header {
@@ -203,13 +203,13 @@
 
 .sub-plan-name {
   margin: 0;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 700;
 }
 
 .sub-plan-price {
   margin: 0;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -217,6 +217,7 @@
 .sub-plan-note {
   margin: 0;
   font-size: 13px;
+  line-height: 1.55;
   color: var(--text-secondary);
 }
 
@@ -230,7 +231,7 @@
   border: 1px solid #bae6fd;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -252,10 +253,10 @@
 
 .sub-plan-features li {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: #425466;
   padding-left: 18px;
   position: relative;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .sub-plan-features li::before {
@@ -391,10 +392,10 @@
 }
 
 .sub-price-summary {
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid var(--border-subtle);
   padding: 12px;
-  background: var(--surface-alt, var(--card-bg));
+  background: #fbfcfe;
   display: flex;
   flex-direction: column;
   gap: 6px;
