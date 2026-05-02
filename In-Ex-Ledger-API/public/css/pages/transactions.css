@@ -2289,15 +2289,17 @@ body {
 
 /* ── M-10: Receipt cell empty by default ─────────────────── */
 .receipt-attach-hover {
-  display: none;
-  color: var(--ink3);
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent2);
   font-size: 12px;
+  font-weight: 600;
   text-decoration: none;
   cursor: pointer;
 }
-td:hover .receipt-attach-hover,
-tr:hover .receipt-attach-hover {
-  display: inline;
+
+.receipt-attach-hover:hover {
+  text-decoration: underline;
 }
 
 /* ── N-04: Tax banner collapse/tooltip ───────────────────── */
