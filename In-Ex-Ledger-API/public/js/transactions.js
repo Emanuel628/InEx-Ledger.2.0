@@ -1708,7 +1708,9 @@ async function fetchCategoriesForTransactions() {
 }
 
 async function fetchTransactionsForPage() {
-  const response = await apiFetch(`/api/transactions${buildTransactionScopeQuery()}`);
+  const query = buildTransactionScopeQuery();
+  const noCacheQuery = query ? `${query}&_ts=${Date.now()}` : `?_ts=${Date.now()}`;
+  const response = await apiFetch(`/api/transactions${noCacheQuery}`);
   if (!response || !response.ok) {
     throw new Error(txT("transactions_error_load", "Failed to load transactions."));
   }
@@ -1809,12 +1811,12 @@ function renderTransactionsTable(filteredTransactions) {
   if (!tbody) return;
 
   if (transactionsLoading && filteredTransactions === undefined) {
-    tbody.innerHTML = `<tr><td colspan="8" class="placeholder">${txT("transactions_loading", "Loading transactions...")}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">${txT("transactions_loading", "Loading transactions...")}</td></tr>`;
     return;
   }
 
   if (hasTransactionsLoadFailed && filteredTransactions === undefined) {
-    tbody.innerHTML = `<tr><td colspan="8" class="placeholder">${txT("transactions_error_load", "Unable to load transactions. Please refresh.")}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">${txT("transactions_error_load", "Unable to load transactions. Please refresh.")}</td></tr>`;
     return;
   }
 
@@ -1825,7 +1827,7 @@ function renderTransactionsTable(filteredTransactions) {
         : typeof t === "function"
         ? t("transactions_empty")
         : "No transactions yet.";
-    tbody.innerHTML = `<tr><td colspan="8" class="placeholder">${emptyText}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">${emptyText}</td></tr>`;
     return;
   }
 
@@ -1890,7 +1892,6 @@ function renderTransactionsTable(filteredTransactions) {
       : `<button type="button" class="receipt-attach-hover" data-action="upload-receipt" data-id="${txn.id}" title="Attach a receipt">+ attach</button>`;
 
     row.innerHTML = `
-      <td class="col-check"><input type="checkbox" data-bulk-check="${escapeHtml(txn.id)}" aria-label="Select transaction" /></td>
       <td><span class="date-cell">${formatDisplayDate(txn.date)}</span></td>
       <td><div class="description-primary">${escapeHtml(txn.description || "-")}</div><div class="description-sub">${descriptionSub}</div></td>
       <td><span class="account-tag">${escapeHtml(accountName)}</span></td>
@@ -1902,26 +1903,19 @@ function renderTransactionsTable(filteredTransactions) {
         </button>
       </td>
       <td class="amount-cell"><span class="${amountClass}">${amountPrefix}${formatCurrency(Math.abs(Number(txn.amount) || 0), rowRegion)}</span></td>
-      <td class="actions-cell">
-        <div class="actions-inner">
-          <button type="button" class="action-button" data-action="edit-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("common_edit", "Edit")}</button>
-          <button type="button" class="action-button delete" data-action="delete-transaction" data-id="${txn.id}" ${isAllScope ? "disabled" : ""}>${txT("common_delete", "Delete")}</button>
-        </div>
-      </td>
     `;
     tbody.appendChild(row);
 
-    row.querySelector('[data-action="edit-transaction"]')?.addEventListener("click", () => {
-      handleEditEntry(txn.id);
-    });
     row.querySelector('[data-action="upload-receipt"]')?.addEventListener("click", () => {
       triggerReceiptUpload(txn.id);
     });
-    row.querySelector('[data-action="delete-transaction"]')?.addEventListener("click", () => {
-      openTransactionModal(txn.id);
-    });
-    row.querySelector('[data-action="toggle-cleared"]')?.addEventListener("click", async () => {
+    row.querySelector('[data-action="toggle-cleared"]')?.addEventListener("click", async (e) => {
+      e.stopPropagation();
       await toggleTransactionCleared(txn.id, !txn.cleared);
+    });
+    row.addEventListener("click", (e) => {
+      if (e.target.closest("button, a, input, select")) return;
+      openRowActionPopup(txn.id, row, isAllScope);
     });
   });
 
@@ -2828,7 +2822,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initDrawerCloseBtn();
   initTaxBannerControls();
   initPeriodPicker();
-  initBulkActions();
+  initRowActionPopup();
 });
 
 function initDrawerCloseBtn() {
@@ -2872,31 +2866,59 @@ function initPeriodPicker() {
   });
 }
 
-function initBulkActions() {
-  const tbody = document.querySelector(".transactions-table tbody");
-  const selectAll = document.getElementById("bulkSelectAll");
+let _popupTxnId = null;
 
-  tbody?.addEventListener("change", (e) => {
-    const cb = e.target.closest('[data-bulk-check]');
-    if (!cb) return;
-    const row = cb.closest("tr");
-    if (row) row.classList.toggle("row-selected", cb.checked);
-    if (selectAll) {
-      const all = tbody.querySelectorAll('[data-bulk-check]');
-      const checked = tbody.querySelectorAll('[data-bulk-check]:checked');
-      selectAll.checked = all.length > 0 && checked.length === all.length;
-      selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
-    }
+function initRowActionPopup() {
+  const popup = document.getElementById("txRowPopup");
+  if (!popup) return;
+
+  document.getElementById("txPopupEdit")?.addEventListener("click", () => {
+    if (_popupTxnId) handleEditEntry(_popupTxnId);
+    closeRowActionPopup();
   });
 
-  selectAll?.addEventListener("change", () => {
-    const checks = document.querySelectorAll('.transactions-table tbody [data-bulk-check]');
-    checks.forEach((cb) => {
-      cb.checked = selectAll.checked;
-      const row = cb.closest("tr");
-      if (row) row.classList.toggle("row-selected", cb.checked);
-    });
+  document.getElementById("txPopupDelete")?.addEventListener("click", () => {
+    if (_popupTxnId) openTransactionModal(_popupTxnId);
+    closeRowActionPopup();
   });
+
+  document.addEventListener("click", (e) => {
+    if (!popup.hidden && !popup.contains(e.target)) closeRowActionPopup();
+  }, true);
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeRowActionPopup();
+  });
+}
+
+function openRowActionPopup(txnId, rowEl, isAllScope) {
+  const popup = document.getElementById("txRowPopup");
+  if (!popup) return;
+
+  _popupTxnId = txnId;
+
+  const editBtn = document.getElementById("txPopupEdit");
+  const deleteBtn = document.getElementById("txPopupDelete");
+  if (editBtn) editBtn.disabled = !!isAllScope;
+  if (deleteBtn) deleteBtn.disabled = !!isAllScope;
+
+  const rect = rowEl.getBoundingClientRect();
+  const popupW = 150;
+  let left = rect.right - popupW - 8;
+  let top = rect.bottom + 4;
+
+  if (left < 8) left = 8;
+  if (top + 88 > window.innerHeight) top = rect.top - 92;
+
+  popup.style.left = `${left}px`;
+  popup.style.top = `${top}px`;
+  popup.removeAttribute("hidden");
+}
+
+function closeRowActionPopup() {
+  const popup = document.getElementById("txRowPopup");
+  if (popup) popup.setAttribute("hidden", "");
+  _popupTxnId = null;
 }
 
 function initOcrPrefill() {

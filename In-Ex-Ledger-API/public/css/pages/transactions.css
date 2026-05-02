@@ -1503,10 +1503,6 @@ body {
   text-align: right;
 }
 
-.transactions-table .col-actions {
-  width: 110px;
-  text-align: right;
-}
 
 .transactions-table tbody tr:hover {
   background: var(--surface2);
@@ -1757,42 +1753,57 @@ body {
   color: var(--red);
 }
 
-.actions-cell {
-  text-align: right;
+.transactions-table tbody tr {
+  cursor: pointer;
 }
 
-.actions-inner {
-  display: inline-flex;
-  gap: 6px;
-  justify-content: flex-end;
-  visibility: hidden;
+/* ── Row action popup ────────────────────────────────────── */
+.tx-row-popup {
+  position: fixed;
+  z-index: 500;
+  background: #fff;
+  border: 1px solid rgba(15, 25, 35, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(15, 25, 35, 0.14);
+  overflow: hidden;
+  min-width: 148px;
 }
 
-.transactions-table tr.row-selected .actions-inner {
-  visibility: visible;
+.tx-row-popup[hidden] {
+  display: none;
 }
 
-.transactions-table tr.row-selected td {
-  background: rgba(37, 99, 168, 0.04);
+.tx-popup-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
 }
 
-.action-button {
-  padding: 4px 8px;
-  border: 0.5px solid var(--border2);
-  border-radius: 5px;
-  font-size: 11px;
-  color: var(--ink2);
-  background: none;
+.tx-popup-btn + .tx-popup-btn {
+  border-top: 0.5px solid var(--border);
 }
 
-.action-button:hover {
+.tx-popup-btn:hover {
   background: var(--surface2);
+  color: var(--ink);
 }
 
-.action-button.delete:hover {
+.tx-popup-delete {
+  color: var(--red);
+}
+
+.tx-popup-delete:hover {
   background: var(--red-bg);
-  color: var(--red) !important;
-  border-color: var(--red);
+  color: var(--red);
 }
 
 .transaction-modal {
@@ -2413,7 +2424,6 @@ body {
 .bulk-action-btn:hover { background: rgba(255,255,255,0.25); }
 .bulk-action-btn--danger { border-color: rgba(255,150,150,0.4); background: rgba(220,50,50,0.25); }
 .bulk-action-btn--cancel { background: transparent; opacity: 0.7; }
-.col-check { width: 36px; }
 
 /* ── C-07: Pagination ────────────────────────────────────── */
 .tx-pagination {
@@ -2818,7 +2828,6 @@ textarea.form-control {
 .modal-delete,
 .bulk-action-btn,
 .action-button,
-.status-badge,
 .tx-page-btn,
 .recurring-add-inline {
   min-height: 40px;

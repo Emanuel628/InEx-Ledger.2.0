@@ -352,7 +352,6 @@
           <table class="transactions-table">
             <thead>
               <tr>
-                <th class="col-check"><input type="checkbox" id="bulkSelectAll" title="Select all" /></th>
                 <th class="col-date" data-i18n="transactions_table_date">Date</th>
                 <th class="col-description" data-i18n="transactions_table_description">Description</th>
                 <th class="col-account" data-i18n="transactions_table_account">Account</th>
@@ -360,7 +359,6 @@
                 <th class="col-receipt">Receipt</th>
                 <th class="col-status">Status</th>
                 <th class="col-amount" data-i18n="transactions_table_amount">Amount</th>
-                <th class="col-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -483,6 +481,12 @@
       </section>
     </div>
   </main>
+
+  <!-- Row action popup -->
+  <div id="txRowPopup" class="tx-row-popup" hidden>
+    <button type="button" id="txPopupEdit" class="tx-popup-btn">Edit</button>
+    <button type="button" id="txPopupDelete" class="tx-popup-btn tx-popup-delete">Delete</button>
+  </div>
 
   <div id="transactionModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="transactionModalTitle" aria-describedby="transactionModalBody">
     <div class="transaction-modal-content danger-modal">
