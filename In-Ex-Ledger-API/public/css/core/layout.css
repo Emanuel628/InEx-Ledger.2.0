@@ -818,6 +818,16 @@ body[data-theme="light"] select option {
   flex-wrap: nowrap !important;
 }
 
+.app-topbar .topbar-nav:not(.is-ready) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.app-topbar .topbar-nav.is-ready {
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
 .topbar-nav a {
   gap: 6px !important;
   padding: 6px 12px !important;

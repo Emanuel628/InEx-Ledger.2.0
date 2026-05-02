@@ -126,14 +126,6 @@ function renderCanonicalTopbarNavigation() {
       icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg>'
     },
     {
-      href: "/help",
-      route: "help",
-      i18n: "nav_help",
-      label: "Help",
-      dataAttr: ' data-nav-help="true"',
-      icon: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 3.5h6a1 1 0 0 1 1 1V13h-6a1 1 0 0 1-1-1z"></path><path d="M9.5 4.5H12a1 1 0 0 1 1 1V13h-3.5"></path><path d="M6 7.5h2.5M6 10h2.5"></path></svg>'
-    },
-    {
       href: "/messages",
       route: "messages",
       label: "Messages",
@@ -155,6 +147,7 @@ function renderCanonicalTopbarNavigation() {
         ${link.trailing || ""}
       </a>`;
     }).join("");
+    nav.classList.add("is-ready");
   });
 }
 
