@@ -1,0 +1,2 @@
+ALTER TABLE receipts
+ADD COLUMN IF NOT EXISTS file_bytes BYTEA;

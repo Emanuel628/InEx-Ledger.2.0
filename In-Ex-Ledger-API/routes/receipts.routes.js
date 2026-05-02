@@ -110,6 +110,10 @@ async function sha256File(storagePath) {
   });
 }
 
+function readReceiptFileBytes(storagePath) {
+  return fs.readFileSync(storagePath);
+}
+
 function isUuid(value) {
   return typeof value === "string" && UUID_RE.test(value);
 }
@@ -232,12 +236,13 @@ router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), asyn
     const receiptId = crypto.randomUUID();
     const storagePath = req.file.path;
 
-    const fileHash = await sha256File(storagePath);
+    const fileBytes = readReceiptFileBytes(storagePath);
+    const fileHash = crypto.createHash("sha256").update(fileBytes).digest("hex");
 
     await pool.query(
       `INSERT INTO receipts
-        (id, business_id, transaction_id, filename, mime_type, storage_path, file_hash)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        (id, business_id, transaction_id, filename, mime_type, storage_path, file_hash, file_bytes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
       [
         receiptId,
         businessId,
@@ -245,7 +250,8 @@ router.post("/", requirePersistentReceiptStorage, upload.single("receipt"), asyn
         req.file.originalname,
         req.file.mimetype,
         storagePath,
-        fileHash
+        fileHash,
+        fileBytes
       ]
     );
 
@@ -395,7 +401,7 @@ router.get("/:id", async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT filename, mime_type, storage_path
+      `SELECT id, filename, mime_type, storage_path, file_bytes
        FROM receipts
        WHERE id = $1 AND business_id = ANY($2::uuid[])
        LIMIT 1`,
@@ -406,17 +412,22 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "Receipt not found." });
     }
 
-    const { filename, mime_type, storage_path } = result.rows[0];
+    const { id, filename, mime_type, storage_path, file_bytes } = result.rows[0];
     const resolvedStoragePath = resolveReceiptFilePath(storage_path);
 
-    if (!resolvedStoragePath) {
-      return res.status(404).json({ error: "Receipt file missing." });
-    }
-
-    if (!isManagedReceiptPath(resolvedStoragePath) && path.isAbsolute(String(storage_path || "").trim())) {
+    if (resolvedStoragePath && !isManagedReceiptPath(resolvedStoragePath) && path.isAbsolute(String(storage_path || "").trim())) {
       logWarn("Blocked receipt download for unmanaged storage path", {
         receiptId,
         businessIds: scope.businessIds
+      });
+      return res.status(404).json({ error: "Receipt file missing." });
+    }
+
+    if (!resolvedStoragePath && !file_bytes) {
+      logWarn("Receipt file missing for preview", {
+        receiptId,
+        businessIds: scope.businessIds,
+        storagePath
       });
       return res.status(404).json({ error: "Receipt file missing." });
     }
@@ -427,10 +438,33 @@ router.get("/:id", async (req, res) => {
     res.setHeader("Expires", "0");
 
     res.setHeader("Content-Type", mime_type || "application/octet-stream");
-    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(filename)}`);
 
+    if (resolvedStoragePath) {
+      if (!file_bytes) {
+        try {
+          const bytes = readReceiptFileBytes(resolvedStoragePath);
+          void pool.query(
+            `UPDATE receipts
+             SET file_bytes = $2
+             WHERE id = $1
+               AND file_bytes IS NULL`,
+            [id, bytes]
+          ).catch((error) => {
+            logWarn("Failed to backfill receipt bytes", { receiptId: id, error: error.message });
+          });
+        } catch (backfillErr) {
+          logWarn("Failed to read receipt bytes for backfill", {
+            receiptId: id,
+            error: backfillErr.message
+          });
+        }
+      }
 
-    return res.sendFile(resolvedStoragePath);
+      return res.sendFile(resolvedStoragePath);
+    }
+
+    return res.send(Buffer.from(file_bytes));
   } catch (err) {
     logError("GET /receipts/:id error:", err);
     return res.status(500).json({ error: "Failed to load receipt." });
@@ -651,7 +685,7 @@ router.post("/:id/extract", async (req, res) => {
     const scope = await getBusinessScopeForUser(req.user, "all");
 
     const result = await pool.query(
-      `SELECT filename, mime_type, storage_path
+      `SELECT filename, mime_type, storage_path, file_bytes
        FROM receipts
        WHERE id = $1 AND business_id = ANY($2::uuid[])
        LIMIT 1`,
@@ -662,14 +696,14 @@ router.post("/:id/extract", async (req, res) => {
       return res.status(404).json({ error: "Receipt not found." });
     }
 
-    const { mime_type, storage_path } = result.rows[0];
+    const { mime_type, storage_path, file_bytes } = result.rows[0];
     const resolvedPath = resolveReceiptFilePath(storage_path);
 
-    if (!resolvedPath) {
+    if (!resolvedPath && !file_bytes) {
       return res.status(404).json({ error: "Receipt file missing." });
     }
 
-    if (!isManagedReceiptPath(resolvedPath) && path.isAbsolute(String(storage_path || "").trim())) {
+    if (resolvedPath && !isManagedReceiptPath(resolvedPath) && path.isAbsolute(String(storage_path || "").trim())) {
       return res.status(404).json({ error: "Receipt file missing." });
     }
 
@@ -684,7 +718,20 @@ router.post("/:id/extract", async (req, res) => {
       });
     }
 
-    const ocrResult = await extractReceiptDataWithClaude(resolvedPath, mime_type);
+    let ocrSourcePath = resolvedPath;
+    let tempPath = null;
+
+    if (!ocrSourcePath && file_bytes) {
+      const ext = path.extname(String(storage_path || "")).toLowerCase() || ".bin";
+      tempPath = path.join(storageDir, `${crypto.randomUUID()}-ocr${ext}`);
+      fs.writeFileSync(tempPath, Buffer.from(file_bytes));
+      ocrSourcePath = tempPath;
+    }
+
+    const ocrResult = await extractReceiptDataWithClaude(ocrSourcePath, mime_type);
+    if (tempPath) {
+      safeUnlink(tempPath);
+    }
     return res.json(ocrResult);
   } catch (err) {
     logError("POST /receipts/:id/extract error:", err);
