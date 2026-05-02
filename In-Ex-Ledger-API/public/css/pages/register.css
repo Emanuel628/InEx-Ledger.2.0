@@ -121,8 +121,8 @@ body {
   background: var(--border2);
 }
 
-.meter-segment.is-weak  { background: var(--red); }
-.meter-segment.is-fair  { background: var(--amber); }
+.meter-segment.is-weak   { background: var(--red); }
+.meter-segment.is-fair   { background: var(--amber); }
 .meter-segment.is-strong { background: var(--green); }
 
 .password-strength-text {
@@ -131,9 +131,9 @@ body {
   margin: 0;
 }
 
-.password-strength-text.is-weak   { color: #b91c1c; }
-.password-strength-text.is-fair   { color: #92600a; }
-.password-strength-text.is-strong { color: #1a7a4a; }
+.password-strength-text.is-weak    { color: #b91c1c; }
+.password-strength-text.is-fair    { color: #92600a; }
+.password-strength-text.is-strong  { color: #1a7a4a; }
 
 .password-match-message {
   margin: 0;
