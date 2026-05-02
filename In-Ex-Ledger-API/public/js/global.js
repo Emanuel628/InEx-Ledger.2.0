@@ -61,12 +61,104 @@ function setGlobalTheme(theme) {
   return normalized;
 }
 
+function normalizeRoute(value) {
+  const raw = String(value || "").split(/[?#]/)[0];
+  const segment = raw.split("/").filter(Boolean).pop() || "landing";
+  return segment.replace(/\.html$/i, "") || "landing";
+}
+
+function renderCanonicalTopbarNavigation() {
+  const links = [
+    {
+      href: "/transactions",
+      route: "transactions",
+      i18n: "nav_transactions",
+      label: "Transactions",
+      icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg>'
+    },
+    {
+      href: "/accounts",
+      route: "accounts",
+      i18n: "nav_accounts",
+      label: "Accounts",
+      icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg>'
+    },
+    {
+      href: "/categories",
+      route: "categories",
+      i18n: "nav_categories",
+      label: "Categories",
+      icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg>'
+    },
+    {
+      href: "/receipts",
+      route: "receipts",
+      i18n: "nav_receipts",
+      label: "Receipts",
+      icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg>'
+    },
+    {
+      href: "/mileage",
+      route: "mileage",
+      i18n: "nav_mileage",
+      label: "Mileage",
+      icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg>'
+    },
+    {
+      href: "/exports",
+      route: "exports",
+      i18n: "nav_exports",
+      label: "Exports",
+      icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg>'
+    },
+    {
+      href: "/analytics",
+      route: "analytics",
+      i18n: "nav_analytics",
+      label: "Analytics",
+      icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg>'
+    },
+    {
+      href: "/settings",
+      route: "settings",
+      i18n: "nav_settings",
+      label: "Settings",
+      icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg>'
+    },
+    {
+      href: "/help",
+      route: "help",
+      i18n: "nav_help",
+      label: "Help",
+      dataAttr: ' data-nav-help="true"',
+      icon: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 3.5h6a1 1 0 0 1 1 1V13h-6a1 1 0 0 1-1-1z"></path><path d="M9.5 4.5H12a1 1 0 0 1 1 1V13h-3.5"></path><path d="M6 7.5h2.5M6 10h2.5"></path></svg>'
+    },
+    {
+      href: "/messages",
+      route: "messages",
+      label: "Messages",
+      dataAttr: ' data-nav-messages="true"',
+      icon: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4z"></path><path d="M2 4l6 5 6-5"></path></svg>',
+      trailing: '<span class="nav-msg-badge" data-count="0" hidden></span>'
+    }
+  ];
+
+  const currentRoute = normalizeRoute(window.location.pathname);
+  document.querySelectorAll(".app-topbar .topbar-nav").forEach((nav) => {
+    nav.innerHTML = links.map((link) => {
+      const activeClass = currentRoute === link.route ? " is-active" : "";
+      const i18nAttr = link.i18n ? ` data-i18n="${link.i18n}"` : "";
+      const dataAttr = link.dataAttr || "";
+      return `<a href="${link.href}" class="${activeClass.trim()}"${dataAttr}>
+        <span class="nav-icon" aria-hidden="true">${link.icon}</span>
+        <span${i18nAttr}>${link.label}</span>
+        ${link.trailing || ""}
+      </a>`;
+    }).join("");
+  });
+}
+
 function highlightNavigation() {
-  const normalizeRoute = (value) => {
-    const raw = String(value || "").split(/[?#]/)[0];
-    const segment = raw.split("/").filter(Boolean).pop() || "landing";
-    return segment.replace(/\.html$/i, "") || "landing";
-  };
 
   const path = normalizeRoute(window.location.pathname);
   document.querySelectorAll("nav a").forEach((link) => {
@@ -1156,10 +1248,9 @@ function escapeDynamicSidebarAttr(value) {
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
   injectSkipLink();
-  injectHelpNavLink();
-  injectMessagesNavLink();
+  renderCanonicalTopbarNavigation();
   initDynamicSidebar();
-  injectMobileMenu();   // clones nav after Help/Messages are injected
+  injectMobileMenu();   // clones the normalized nav
   highlightNavigation(); // runs on all nav a elements including the drawer
   applyDateInputConstraints();
   markRequiredFields();

@@ -950,25 +950,26 @@ body[data-theme="light"] select option {
 .user-pill {
   display: flex !important;
   align-items: center !important;
-  gap: 8px !important;
-  width: 38px !important;
+  gap: 0 !important;
+  width: auto !important;
   padding: 5px !important;
   border-radius: 20px !important;
   background: rgba(255, 255, 255, 0.95) !important;
   min-width: 0 !important;
-  max-width: min(240px, 34vw) !important;
+  max-width: 38px !important;
   flex-shrink: 0 !important;
   margin-left: auto !important;
   cursor: pointer !important;
   white-space: nowrap !important;
-  transition: width 180ms ease, padding 180ms ease, background 140ms ease, box-shadow 140ms ease !important;
+  transition: max-width 180ms ease, gap 180ms ease, padding 180ms ease, background 140ms ease, box-shadow 140ms ease !important;
 }
 
 .user-pill:hover,
 .user-pill:focus-visible,
 .user-pill:focus-within,
 .user-pill[aria-expanded="true"] {
-  width: min(240px, 34vw) !important;
+  gap: 8px !important;
+  max-width: min(200px, 28vw) !important;
   padding: 5px 12px 5px 5px !important;
   background: #fff !important;
   box-shadow: 0 2px 8px rgba(15, 25, 35, 0.18) !important;
