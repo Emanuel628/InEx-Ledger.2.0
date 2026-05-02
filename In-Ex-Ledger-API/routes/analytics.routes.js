@@ -12,6 +12,8 @@ const {
 const WEEKS_PER_MONTH = 52 / 12;
 const BIWEEKS_PER_MONTH = 26 / 12;
 const MAX_ANALYTICS_AMOUNT = 999999999.99;
+const ANALYTICS_AMOUNT_EXPR = "COALESCE(NULLIF(converted_amount, 0), amount)";
+const ANALYTICS_AMOUNT_EXPR_T = "COALESCE(NULLIF(t.converted_amount, 0), t.amount)";
 
 const router = express.Router();
 router.use(requireAuth);
@@ -97,56 +99,56 @@ router.get("/dashboard", async (req, res) => {
 
     // Monthly income / expense totals
     const monthlyResult = await pool.query(
-      `SELECT
-         DATE_TRUNC('month', date) AS month,
-         type,
-         SUM(amount) AS total
-       FROM transactions
-       WHERE business_id = $1
-         AND date >= $2
-         AND (is_adjustment = false OR is_adjustment IS NULL)
-         AND deleted_at IS NULL
-         AND (is_void = false OR is_void IS NULL)
-       GROUP BY month, type
-       ORDER BY month ASC`,
+       `SELECT
+          DATE_TRUNC('month', date) AS month,
+          type,
+          SUM(${ANALYTICS_AMOUNT_EXPR}) AS total
+        FROM transactions
+        WHERE business_id = $1
+          AND date >= $2
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND deleted_at IS NULL
+          AND (is_void = false OR is_void IS NULL)
+        GROUP BY month, type
+        ORDER BY month ASC`,
       [businessId, since]
     );
 
     // Top categories by income
     const topIncomeResult = await pool.query(
-      `SELECT
-         c.name AS category_name,
-         SUM(t.amount) AS total
-       FROM transactions t
-       LEFT JOIN categories c ON c.id = t.category_id
-       WHERE t.business_id = $1
-         AND t.type = 'income'
-         AND t.date >= $2
-         AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
-         AND t.deleted_at IS NULL
-         AND (t.is_void = false OR t.is_void IS NULL)
-       GROUP BY c.name
-       ORDER BY total DESC
-       LIMIT 5`,
+       `SELECT
+          c.name AS category_name,
+          SUM(${ANALYTICS_AMOUNT_EXPR_T}) AS total
+        FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.business_id = $1
+          AND t.type = 'income'
+          AND t.date >= $2
+          AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
+          AND t.deleted_at IS NULL
+          AND (t.is_void = false OR t.is_void IS NULL)
+        GROUP BY c.name
+        ORDER BY total DESC
+        LIMIT 5`,
       [businessId, since]
     );
 
     // Top categories by expense
     const topExpenseResult = await pool.query(
-      `SELECT
-         c.name AS category_name,
-         SUM(t.amount) AS total
-       FROM transactions t
-       LEFT JOIN categories c ON c.id = t.category_id
-       WHERE t.business_id = $1
-         AND t.type = 'expense'
-         AND t.date >= $2
-         AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
-         AND t.deleted_at IS NULL
-         AND (t.is_void = false OR t.is_void IS NULL)
-       GROUP BY c.name
-       ORDER BY total DESC
-       LIMIT 5`,
+       `SELECT
+          c.name AS category_name,
+          SUM(${ANALYTICS_AMOUNT_EXPR_T}) AS total
+        FROM transactions t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.business_id = $1
+          AND t.type = 'expense'
+          AND t.date >= $2
+          AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
+          AND t.deleted_at IS NULL
+          AND (t.is_void = false OR t.is_void IS NULL)
+        GROUP BY c.name
+        ORDER BY total DESC
+        LIMIT 5`,
       [businessId, since]
     );
 
@@ -198,23 +200,23 @@ router.get("/dashboard", async (req, res) => {
     const priorMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10);
     const priorMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0, 10);
 
-    const currentMonthResult = await pool.query(
-      `SELECT type, SUM(amount) AS total
-       FROM transactions
-       WHERE business_id = $1 AND date >= $2
-         AND (is_adjustment = false OR is_adjustment IS NULL)
-         AND deleted_at IS NULL AND (is_void = false OR is_void IS NULL)
-       GROUP BY type`,
+     const currentMonthResult = await pool.query(
+       `SELECT type, SUM(${ANALYTICS_AMOUNT_EXPR}) AS total
+        FROM transactions
+        WHERE business_id = $1 AND date >= $2
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND deleted_at IS NULL AND (is_void = false OR is_void IS NULL)
+        GROUP BY type`,
       [businessId, currentMonthStart]
     );
 
-    const priorMonthResult = await pool.query(
-      `SELECT type, SUM(amount) AS total
-       FROM transactions
-       WHERE business_id = $1 AND date >= $2 AND date <= $3
-         AND (is_adjustment = false OR is_adjustment IS NULL)
-         AND deleted_at IS NULL AND (is_void = false OR is_void IS NULL)
-       GROUP BY type`,
+     const priorMonthResult = await pool.query(
+       `SELECT type, SUM(${ANALYTICS_AMOUNT_EXPR}) AS total
+        FROM transactions
+        WHERE business_id = $1 AND date >= $2 AND date <= $3
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND deleted_at IS NULL AND (is_void = false OR is_void IS NULL)
+        GROUP BY type`,
       [businessId, priorMonthStart, priorMonthEnd]
     );
 
@@ -290,18 +292,18 @@ router.get("/cash-flow", async (req, res) => {
     const since = monthStartOffset(5);
 
     // Historical monthly income / expense for trailing 6 months
-    const histResult = await pool.query(
-      `SELECT
-         DATE_TRUNC('month', date) AS month,
-         type,
-         SUM(amount) AS total
-       FROM transactions
-       WHERE business_id = $1
-         AND date >= $2
-         AND (is_adjustment = false OR is_adjustment IS NULL)
-         AND deleted_at IS NULL
-         AND (is_void = false OR is_void IS NULL)
-       GROUP BY month, type`,
+     const histResult = await pool.query(
+       `SELECT
+          DATE_TRUNC('month', date) AS month,
+          type,
+          SUM(${ANALYTICS_AMOUNT_EXPR}) AS total
+        FROM transactions
+        WHERE business_id = $1
+          AND date >= $2
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND deleted_at IS NULL
+          AND (is_void = false OR is_void IS NULL)
+        GROUP BY month, type`,
       [businessId, since]
     );
 
@@ -428,21 +430,21 @@ router.get("/seasonal", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     // Average income per calendar month across all history
-    const result = await pool.query(
-      `SELECT
-         EXTRACT(MONTH FROM date)::int AS month_num,
-         TO_CHAR(date, 'Month')        AS month_name,
-         AVG(amount)                   AS avg_income,
-         SUM(amount)                   AS total_income,
-         COUNT(*)                      AS transaction_count
-       FROM transactions
-       WHERE business_id = $1
-         AND type = 'income'
-         AND (is_adjustment = false OR is_adjustment IS NULL)
-         AND deleted_at IS NULL
-         AND (is_void = false OR is_void IS NULL)
-       GROUP BY month_num, month_name
-       ORDER BY month_num ASC`,
+     const result = await pool.query(
+       `SELECT
+          EXTRACT(MONTH FROM date)::int AS month_num,
+          TO_CHAR(date, 'Month')        AS month_name,
+          AVG(${ANALYTICS_AMOUNT_EXPR}) AS avg_income,
+          SUM(${ANALYTICS_AMOUNT_EXPR}) AS total_income,
+          COUNT(*)                      AS transaction_count
+        FROM transactions
+        WHERE business_id = $1
+          AND type = 'income'
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND deleted_at IS NULL
+          AND (is_void = false OR is_void IS NULL)
+        GROUP BY month_num, month_name
+        ORDER BY month_num ASC`,
       [businessId]
     );
 
@@ -549,16 +551,16 @@ router.post("/whatif", async (req, res) => {
     }
 
     // Fetch trailing 6-month average as baseline
-    const histResult = await pool.query(
-      `SELECT
-         COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) AS income_total,
-         COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS expense_total
-       FROM transactions
-       WHERE business_id = $1
-         AND date >= $2
-         AND (is_adjustment = false OR is_adjustment IS NULL)
-         AND deleted_at IS NULL
-         AND (is_void = false OR is_void IS NULL)`,
+     const histResult = await pool.query(
+       `SELECT
+          COALESCE(SUM(CASE WHEN type = 'income' THEN ${ANALYTICS_AMOUNT_EXPR} ELSE 0 END), 0) AS income_total,
+          COALESCE(SUM(CASE WHEN type = 'expense' THEN ${ANALYTICS_AMOUNT_EXPR} ELSE 0 END), 0) AS expense_total
+        FROM transactions
+        WHERE business_id = $1
+          AND date >= $2
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND deleted_at IS NULL
+          AND (is_void = false OR is_void IS NULL)`,
       [businessId, since]
     );
 
