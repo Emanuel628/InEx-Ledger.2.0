@@ -784,8 +784,11 @@ router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billi
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    const hasActiveProAccess =
+      subscription.effectiveTier === "v1" &&
+      (subscription.isPaid || subscription.isTrialing);
 
-    if (subscription.effectiveTier !== "v1" || !subscription.isPaid) {
+    if (!hasActiveProAccess) {
       return res.status(403).json({
         error: "Additional business slots require an active Pro subscription."
       });

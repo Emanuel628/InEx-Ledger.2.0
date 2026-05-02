@@ -404,7 +404,9 @@ function renderBusinessAccessSection(sub) {
   const manager = document.getElementById("businessSlotsManager");
   if (!manager) return;
 
-  const isActivePro = sub && sub.effectiveTier === "v1" && sub.isPaid && !sub.cancelAtPeriodEnd;
+  const hasActiveProAccess =
+    sub && sub.effectiveTier === "v1" && (sub.isPaid || sub.isTrialing) && !sub.cancelAtPeriodEnd;
+  const isActivePro = hasActiveProAccess;
   const isCancelingPro = sub && sub.effectiveTier === "v1" && sub.cancelAtPeriodEnd;
 
   const proCardAddonGroup = document.getElementById("proCardAddonGroup");
@@ -549,7 +551,7 @@ async function loadSubscription() {
     renderBusinessAccessSection(sub);
 
     if (planProBtn) {
-      if (sub.effectiveTier === "v1" && sub.isPaid && !sub.cancelAtPeriodEnd) {
+      if (sub.effectiveTier === "v1" && (sub.isPaid || sub.isTrialing) && !sub.cancelAtPeriodEnd) {
         planProBtn.disabled = true;
         planProBtn.textContent = tx("subscription_current_plan");
         planProBtn.dataset.planDisabled = "true";

@@ -405,3 +405,33 @@ test("PATCH /additional-businesses — existing addon item is updated, not dupli
     cleanup();
   }
 });
+
+
+test("PATCH /additional-businesses ? trialing Pro user can increase slots", async () => {
+  const { app, state, cleanup } = loadBillingRouter({
+    snapshot: {
+      effectiveTier: "v1",
+      isPaid: false,
+      isTrialing: true,
+      cancelAtPeriodEnd: false,
+      stripeSubscriptionId: "sub_test_addon",
+      additionalBusinesses: 0
+    },
+    stripeSub: makeSub({ status: "trialing" })
+  });
+  try {
+    const res = await request(app)
+      .patch("/api/billing/additional-businesses")
+      .send({ additionalBusinesses: 2 });
+    assert.equal(res.status, 200);
+    assert.ok(res.body.subscription);
+    assert.equal(state.syncCalls.length, 1);
+    assert.equal(state.stripeUpdates.length, 1);
+    const update = state.stripeUpdates[0];
+    assert.equal(update["items[0][price]"], ADDON_PRICE_ID);
+    assert.equal(update["items[0][quantity]"], "2");
+    assert.equal(update["proration_behavior"], "create_prorations");
+  } finally {
+    cleanup();
+  }
+});
