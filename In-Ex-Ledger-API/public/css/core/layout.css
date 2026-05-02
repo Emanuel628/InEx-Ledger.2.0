@@ -951,7 +951,8 @@ body[data-theme="light"] select option {
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
-  padding: 5px 12px 5px 5px !important;
+  width: 38px !important;
+  padding: 5px !important;
   border-radius: 20px !important;
   background: rgba(255, 255, 255, 0.95) !important;
   min-width: 0 !important;
@@ -959,10 +960,16 @@ body[data-theme="light"] select option {
   flex-shrink: 0 !important;
   margin-left: auto !important;
   cursor: pointer !important;
-  transition: background 140ms ease, box-shadow 140ms ease !important;
+  white-space: nowrap !important;
+  transition: width 180ms ease, padding 180ms ease, background 140ms ease, box-shadow 140ms ease !important;
 }
 
-.user-pill:hover {
+.user-pill:hover,
+.user-pill:focus-visible,
+.user-pill:focus-within,
+.user-pill[aria-expanded="true"] {
+  width: min(240px, 34vw) !important;
+  padding: 5px 12px 5px 5px !important;
   background: #fff !important;
   box-shadow: 0 2px 8px rgba(15, 25, 35, 0.18) !important;
 }
@@ -985,18 +992,81 @@ body[data-theme="light"] select option {
   font-size: 12px !important;
   color: #0f172a !important;
   min-width: 0 !important;
+  max-width: 0 !important;
+  opacity: 0 !important;
   overflow: hidden !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
   font-weight: 500 !important;
+  transition: max-width 180ms ease, opacity 140ms ease !important;
 }
 
 .user-pill-chevron {
-  width: 10px !important;
+  width: 0 !important;
   height: 10px !important;
   flex-shrink: 0 !important;
   color: var(--ink3) !important;
+  margin-left: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  transition: width 180ms ease, opacity 140ms ease, margin-left 180ms ease, transform 140ms ease !important;
+}
+
+.user-pill:hover .user-name,
+.user-pill:focus-visible .user-name,
+.user-pill:focus-within .user-name,
+.user-pill[aria-expanded="true"] .user-name {
+  max-width: 156px !important;
+  opacity: 1 !important;
+}
+
+.user-pill:hover .user-pill-chevron,
+.user-pill:focus-visible .user-pill-chevron,
+.user-pill:focus-within .user-pill-chevron,
+.user-pill[aria-expanded="true"] .user-pill-chevron {
+  width: 10px !important;
   margin-left: -2px !important;
+  opacity: 1 !important;
+}
+
+.user-pill[aria-expanded="true"] .user-pill-chevron {
+  transform: rotate(180deg) !important;
+}
+
+.app-topbar:has(.user-pill:hover) .topbar-nav,
+.app-topbar:has(.user-pill:focus-within) .topbar-nav,
+.app-topbar:has(.user-pill[aria-expanded="true"]) .topbar-nav {
+  gap: 6px !important;
+}
+
+.app-topbar:has(.user-pill:hover) .topbar-nav a,
+.app-topbar:has(.user-pill:focus-within) .topbar-nav a,
+.app-topbar:has(.user-pill[aria-expanded="true"]) .topbar-nav a {
+  padding: 6px 10px !important;
+}
+
+.app-topbar:has(.user-pill:hover) .topbar-nav a[data-nav-help] span:not(.nav-icon),
+.app-topbar:has(.user-pill:hover) .topbar-nav a[data-nav-messages] span:not(.nav-icon):not(.nav-msg-badge),
+.app-topbar:has(.user-pill:hover) .topbar-nav a[href="settings"] span:not(.nav-icon),
+.app-topbar:has(.user-pill:focus-within) .topbar-nav a[data-nav-help] span:not(.nav-icon),
+.app-topbar:has(.user-pill:focus-within) .topbar-nav a[data-nav-messages] span:not(.nav-icon):not(.nav-msg-badge),
+.app-topbar:has(.user-pill:focus-within) .topbar-nav a[href="settings"] span:not(.nav-icon),
+.app-topbar:has(.user-pill[aria-expanded="true"]) .topbar-nav a[data-nav-help] span:not(.nav-icon),
+.app-topbar:has(.user-pill[aria-expanded="true"]) .topbar-nav a[data-nav-messages] span:not(.nav-icon):not(.nav-msg-badge),
+.app-topbar:has(.user-pill[aria-expanded="true"]) .topbar-nav a[href="settings"] span:not(.nav-icon) {
+  display: none !important;
+}
+
+.app-topbar:has(.user-pill:hover) .topbar-nav a[data-nav-help],
+.app-topbar:has(.user-pill:hover) .topbar-nav a[data-nav-messages],
+.app-topbar:has(.user-pill:hover) .topbar-nav a[href="settings"],
+.app-topbar:has(.user-pill:focus-within) .topbar-nav a[data-nav-help],
+.app-topbar:has(.user-pill:focus-within) .topbar-nav a[data-nav-messages],
+.app-topbar:has(.user-pill:focus-within) .topbar-nav a[href="settings"],
+.app-topbar:has(.user-pill[aria-expanded="true"]) .topbar-nav a[data-nav-help],
+.app-topbar:has(.user-pill[aria-expanded="true"]) .topbar-nav a[data-nav-messages],
+.app-topbar:has(.user-pill[aria-expanded="true"]) .topbar-nav a[href="settings"] {
+  padding: 6px 8px !important;
 }
 
 /* ── Legacy auth header (pages that haven't migrated to app-topbar) ── */
