@@ -1504,8 +1504,7 @@ body {
 }
 
 .transactions-table .col-actions {
-  width: 110px;
-  text-align: right;
+  display: none;
 }
 
 .transactions-table tbody tr:hover {
@@ -1757,15 +1756,22 @@ body {
   color: var(--red);
 }
 
+.transactions-table tbody tr {
+  position: relative;
+}
+
 .actions-cell {
-  display: flex;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
   gap: 6px;
-  justify-content: flex-end;
-  visibility: hidden;
+  z-index: 1;
 }
 
 .transactions-table tr.row-selected .actions-cell {
-  visibility: visible;
+  display: flex;
 }
 
 .action-button {

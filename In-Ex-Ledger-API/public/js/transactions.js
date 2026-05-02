@@ -2872,11 +2872,28 @@ function initPeriodPicker() {
 
 function initBulkActions() {
   const tbody = document.querySelector(".transactions-table tbody");
+  const selectAll = document.getElementById("bulkSelectAll");
+
   tbody?.addEventListener("change", (e) => {
     const cb = e.target.closest('[data-bulk-check]');
     if (!cb) return;
     const row = cb.closest("tr");
     if (row) row.classList.toggle("row-selected", cb.checked);
+    if (selectAll) {
+      const all = tbody.querySelectorAll('[data-bulk-check]');
+      const checked = tbody.querySelectorAll('[data-bulk-check]:checked');
+      selectAll.checked = all.length > 0 && checked.length === all.length;
+      selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
+    }
+  });
+
+  selectAll?.addEventListener("change", () => {
+    const checks = document.querySelectorAll('.transactions-table tbody [data-bulk-check]');
+    checks.forEach((cb) => {
+      cb.checked = selectAll.checked;
+      const row = cb.closest("tr");
+      if (row) row.classList.toggle("row-selected", cb.checked);
+    });
   });
 }
 
