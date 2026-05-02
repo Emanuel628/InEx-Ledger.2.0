@@ -427,7 +427,7 @@ router.get("/:id", async (req, res) => {
       logWarn("Receipt file missing for preview", {
         receiptId,
         businessIds: scope.businessIds,
-        storagePath
+        storagePath: storage_path
       });
       return res.status(404).json({ error: "Receipt file missing." });
     }
