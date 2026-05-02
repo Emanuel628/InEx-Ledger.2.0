@@ -102,6 +102,48 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
+function getGuidedCardUiStateKey(page) {
+  return `inex:onboarding-guide-ui:${page}`;
+}
+
+function readGuidedCardUiState(page) {
+  try {
+    const raw = window.sessionStorage?.getItem(getGuidedCardUiStateKey(page));
+    if (!raw) {
+      return { minimized: false, closed: false };
+    }
+    const parsed = JSON.parse(raw);
+    return {
+      minimized: !!parsed?.minimized,
+      closed: !!parsed?.closed
+    };
+  } catch (_) {
+    return { minimized: false, closed: false };
+  }
+}
+
+function writeGuidedCardUiState(page, state = {}) {
+  try {
+    window.sessionStorage?.setItem(
+      getGuidedCardUiStateKey(page),
+      JSON.stringify({
+        minimized: !!state.minimized,
+        closed: !!state.closed
+      })
+    );
+  } catch (_) {
+    // Ignore session storage failures for optional UI state.
+  }
+}
+
+function clearGuidedCardUiState(page) {
+  try {
+    window.sessionStorage?.removeItem(getGuidedCardUiStateKey(page));
+  } catch (_) {
+    // Ignore session storage failures for optional UI state.
+  }
+}
+
 function initOnboardingTours() {
   const page = resolveOnboardingTourPage();
   if (!page) {
@@ -159,10 +201,17 @@ function renderGuidedSetupCard(page) {
   if (!config) {
     return;
   }
+  const uiState = readGuidedCardUiState(page);
+  if (uiState.closed) {
+    return;
+  }
 
   const card = document.createElement("div");
   card.id = "onboardingTourCard";
   card.className = "onboarding-tour-card onboarding-tour-card-guided";
+  if (uiState.minimized) {
+    card.classList.add("is-minimized");
+  }
   const stepLabel = `${tx("onboarding_guide_step_prefix")} ${config.stepNumber} ${tx("onboarding_guide_step_of")} ${GUIDED_SETUP_ORDER.length}`;
   const canGoBack = config.stepNumber > 1;
   const launchButton = document.querySelector(config.launchSelector)
@@ -170,26 +219,56 @@ function renderGuidedSetupCard(page) {
     : "";
 
   card.innerHTML = `
-    <div class="onboarding-tour-kicker">${escapeHtml(tx("onboarding_guide_kicker"))}</div>
-    <div class="onboarding-tour-step">${escapeHtml(stepLabel)}</div>
+    <div class="onboarding-tour-header">
+      <div>
+        <div class="onboarding-tour-kicker">${escapeHtml(tx("onboarding_guide_kicker"))}</div>
+        <div class="onboarding-tour-step">${escapeHtml(stepLabel)}</div>
+      </div>
+      <div class="onboarding-tour-controls">
+        <button type="button" class="onboarding-tour-control onboarding-tour-minimize" aria-label="Minimize setup card" title="Minimize">−</button>
+        <button type="button" class="onboarding-tour-control onboarding-tour-close" aria-label="Close setup card" title="Close">&times;</button>
+      </div>
+    </div>
     <h3>${escapeHtml(tx(config.titleKey))}</h3>
-    <p>${escapeHtml(tx(config.bodyKey))}</p>
-    <ul>
-      ${config.points.map((point) => `<li>${escapeHtml(tx(point))}</li>`).join("")}
-    </ul>
-    <p class="onboarding-tour-helper">${escapeHtml(tx(config.helperKey))}</p>
-    <div class="onboarding-tour-actions">
-      ${launchButton}
-      ${canGoBack ? `<button type="button" class="onboarding-tour-ghost onboarding-guide-back">${escapeHtml(tx("onboarding_guide_back"))}</button>` : ""}
-      <button type="button" class="onboarding-tour-dismiss onboarding-guide-next">${escapeHtml(tx(config.nextLabelKey))}</button>
-      <button type="button" class="onboarding-tour-ghost onboarding-guide-skip">${escapeHtml(tx("onboarding_guide_skip"))}</button>
+    <div class="onboarding-tour-body">
+      <p>${escapeHtml(tx(config.bodyKey))}</p>
+      <ul>
+        ${config.points.map((point) => `<li>${escapeHtml(tx(point))}</li>`).join("")}
+      </ul>
+      <p class="onboarding-tour-helper">${escapeHtml(tx(config.helperKey))}</p>
+      <div class="onboarding-tour-actions">
+        ${launchButton}
+        ${canGoBack ? `<button type="button" class="onboarding-tour-ghost onboarding-guide-back">${escapeHtml(tx("onboarding_guide_back"))}</button>` : ""}
+        <button type="button" class="onboarding-tour-dismiss onboarding-guide-next">${escapeHtml(tx(config.nextLabelKey))}</button>
+        <button type="button" class="onboarding-tour-ghost onboarding-guide-skip">${escapeHtml(tx("onboarding_guide_skip"))}</button>
+      </div>
     </div>
   `;
 
   document.body.appendChild(card);
 
+  const minimizeButton = card.querySelector(".onboarding-tour-minimize");
+  const closeButton = card.querySelector(".onboarding-tour-close");
+
+  const syncMinimizedState = (minimized) => {
+    card.classList.toggle("is-minimized", minimized);
+    if (minimizeButton) {
+      minimizeButton.textContent = minimized ? "+" : "−";
+      minimizeButton.setAttribute("aria-label", minimized ? "Expand setup card" : "Minimize setup card");
+      minimizeButton.setAttribute("title", minimized ? "Expand" : "Minimize");
+    }
+    writeGuidedCardUiState(page, { minimized, closed: false });
+  };
+
   card.querySelector(".onboarding-guide-launch")?.addEventListener("click", () => {
     document.querySelector(config.launchSelector)?.click();
+  });
+  minimizeButton?.addEventListener("click", () => {
+    syncMinimizedState(!card.classList.contains("is-minimized"));
+  });
+  closeButton?.addEventListener("click", () => {
+    writeGuidedCardUiState(page, { minimized: false, closed: true });
+    card.remove();
   });
   card.querySelector(".onboarding-guide-back")?.addEventListener("click", () => {
     advanceGuidedSetup("back", page, card);
@@ -200,6 +279,8 @@ function renderGuidedSetupCard(page) {
   card.querySelector(".onboarding-guide-skip")?.addEventListener("click", () => {
     advanceGuidedSetup("skip", page, card);
   });
+
+  syncMinimizedState(uiState.minimized);
 }
 
 async function advanceGuidedSetup(action, page, card) {
@@ -224,6 +305,7 @@ async function advanceGuidedSetup(action, page, card) {
       window.__LUNA_ME__.onboarding = result?.onboarding || window.__LUNA_ME__.onboarding || null;
     }
     window.__LUNA_ONBOARDING__ = result?.onboarding || window.__LUNA_ONBOARDING__ || null;
+    clearGuidedCardUiState(page);
     window.location.href = result?.redirect_to || "/transactions";
   } catch (error) {
     console.error("Failed to update guided onboarding state", error);

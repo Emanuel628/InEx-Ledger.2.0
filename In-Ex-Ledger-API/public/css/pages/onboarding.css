@@ -151,10 +151,22 @@
   backdrop-filter: blur(8px);
 }
 
+.onboarding-tour-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.onboarding-tour-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.onboarding-tour-control,
 .onboarding-tour-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
   width: 32px;
   height: 32px;
   border: none;
@@ -170,9 +182,15 @@
   cursor: pointer;
 }
 
+.onboarding-tour-control:hover,
 .onboarding-tour-close:hover {
   background: rgba(15, 23, 42, 0.06);
   color: var(--ink);
+}
+
+.onboarding-tour-minimize {
+  font-size: 20px;
+  font-weight: 700;
 }
 
 .onboarding-tour-kicker {
@@ -187,6 +205,10 @@
 .onboarding-tour-card h3 {
   margin: 0 0 8px;
   font-size: 1.1rem;
+}
+
+.onboarding-tour-body {
+  margin-top: 6px;
 }
 
 .onboarding-tour-card p,
@@ -268,9 +290,27 @@
 
 .onboarding-tour-dismiss[disabled],
 .onboarding-tour-secondary[disabled],
-.onboarding-tour-ghost[disabled] {
+.onboarding-tour-ghost[disabled],
+.onboarding-tour-control[disabled],
+.onboarding-tour-close[disabled] {
   cursor: wait;
   opacity: 0.7;
+}
+
+.onboarding-tour-card.is-minimized {
+  padding-bottom: 14px;
+}
+
+.onboarding-tour-card.is-minimized .onboarding-tour-body {
+  display: none;
+}
+
+.onboarding-tour-card.is-minimized .onboarding-tour-kicker {
+  margin-bottom: 4px;
+}
+
+.onboarding-tour-card.is-minimized h3 {
+  margin: 6px 0 0;
 }
 
 @media (max-width: 1024px) {
