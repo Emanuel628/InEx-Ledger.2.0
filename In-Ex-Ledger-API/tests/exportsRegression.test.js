@@ -89,7 +89,7 @@ function loadExportsRouter(options = {}) {
         amount: "1200.00",
         type: "income",
         description: "Client A",
-        date: "2026-04-01",
+        date: new Date("2026-04-01T00:00:00.000Z"),
         note: "Invoice (April)",
         currency: "USD"
       },
@@ -100,7 +100,7 @@ function loadExportsRouter(options = {}) {
         amount: "200.00",
         type: "expense",
         description: "Office Depot",
-        date: "2026-04-02",
+        date: new Date("2026-04-02T00:00:00.000Z"),
         note: "Supplies",
         currency: "USD"
       }

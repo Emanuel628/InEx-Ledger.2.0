@@ -245,6 +245,21 @@ function formatJurisdiction(region, province) {
   return normalizedProvince ? `${normalizedRegion}-${normalizedProvince}` : normalizedRegion;
 }
 
+function normalizePdfDate(value) {
+  if (!value) return '';
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return '';
+    return value.toISOString().slice(0, 10);
+  }
+  const text = String(value).trim();
+  if (!text) return '';
+  const parsed = new Date(text);
+  if (!Number.isNaN(parsed.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(parsed.toISOString())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+  return text;
+}
+
 function buildCategoryBuckets(transactions, categories, labels, currency) {
   const categoryMap = mapByKey(categories, 'id');
   const buckets = new Map();
@@ -287,7 +302,7 @@ function buildCategoryBuckets(transactions, categories, labels, currency) {
 function normalizeDuplicateKey(txn) {
   const description = String(txn.description || txn.note || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const amount = Math.abs(Number(txn.amount) || 0).toFixed(2);
-  return `${txn.date || ''}|${amount}|${description}`;
+  return `${normalizePdfDate(txn.date)}|${amount}|${description}`;
 }
 
 function isSpecialReviewCategory(categoryName, taxMapping) {
@@ -466,7 +481,9 @@ function buildCategoryPages(transactions, categories, currency, labels) {
 function buildTransactionPages(transactions, accounts, categories, currency, labels) {
   const accountMap = mapByKey(accounts, 'id');
   const categoryMap = mapByKey(categories, 'id');
-  const sorted = (transactions || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const sorted = (transactions || [])
+    .slice()
+    .sort((a, b) => normalizePdfDate(a.date).localeCompare(normalizePdfDate(b.date)));
   if (!sorted.length) {
     const canvas = new PdfCanvas();
     canvas.text(40, 760, labels.transaction_log_title, 16);
@@ -479,7 +496,7 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
     const account = accountMap[txn.account_id || txn.accountId] || null;
     const flags = getTransactionFlags(txn, category);
     return {
-      date: txn.date || '',
+      date: normalizePdfDate(txn.date),
       id: truncateText(txn.id || '', 10),
       payeeMemo: truncateText(txn.description || txn.note || '(No description)', 25),
       accountCategory: truncateText(`${safeValue(account?.name, '-') } / ${safeValue(category?.name, 'Uncategorized')}`, 24),
@@ -525,7 +542,7 @@ function buildReceiptsPages(receipts, transactions, labels) {
     if (!txn) return null;
     return {
       receiptId: receipt.id || '',
-      txDate: txn.date || '',
+      txDate: normalizePdfDate(txn.date),
       txDescription: truncateText(txn.description || '(No description)', 28),
       fileName: truncateText(receipt.filename || 'Not specified', 22)
     };
