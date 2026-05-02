@@ -11,6 +11,10 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
+function missingReceiptMessage() {
+  return "This older receipt file is no longer available for preview. Re-upload it to restore viewing.";
+}
+
 function buildReceiptsNoCachePath(path) {
   const separator = path.includes("?") ? "&" : "?";
   return `${path}${separator}_ts=${Date.now()}`;
@@ -290,7 +294,7 @@ function renderReceipts(receipts) {
         <td data-label="${escapeHtml(tx("receipts_table_filename"))}">
           ${canViewReceipt
             ? `<button type="button" class="receipt-file-button" data-receipt-download="${escapeHtml(receipt.id || "")}">${escapeHtml(receipt.filename || tx("receipts_fallback_name"))}</button>`
-            : `<span class="receipt-file-missing">${escapeHtml(receipt.filename || tx("receipts_fallback_name"))}</span>`}
+            : `<button type="button" class="receipt-file-button receipt-file-button--missing" data-receipt-missing="${escapeHtml(receipt.id || "")}">${escapeHtml(receipt.filename || tx("receipts_fallback_name"))}</button>`}
         </td>
         <td data-label="${escapeHtml(tx("receipts_table_uploaded"))}">${escapeHtml(formatReceiptDate(receipt.created_at))}</td>
         <td data-label="${escapeHtml(tx("receipts_table_attached"))}">${transactionCell}</td>
@@ -337,6 +341,12 @@ function renderReceipts(receipts) {
     });
   });
 
+  tableBody.querySelectorAll("[data-receipt-missing]").forEach((button) => {
+    button.addEventListener("click", () => {
+      showReceiptsToast(missingReceiptMessage());
+    });
+  });
+
   tableBody.querySelectorAll("[data-receipt-link]").forEach((button) => {
     button.addEventListener("click", () => {
       const receiptId = button.getAttribute("data-receipt-link") || "";
@@ -379,7 +389,7 @@ function renderTransactionCell(transactionId, receiptId) {
   const label = transaction?.description || transactionId;
   const receipt = receiptRecords.find((record) => record.id === receiptId);
   if (receipt?.is_viewable === false) {
-    return `<span class="receipt-transaction-label">${escapeHtml(label)}</span>`;
+    return `<button type="button" class="receipt-transaction-link receipt-transaction-link--missing" data-receipt-missing="${escapeHtml(receiptId || "")}">${escapeHtml(label)}</button>`;
   }
   return `<button type="button" class="receipt-transaction-link" data-receipt-view="${escapeHtml(receiptId || "")}">${escapeHtml(label)}</button>`;
 }

@@ -191,6 +191,12 @@
   text-decoration: underline;
 }
 
+.receipt-file-button--missing,
+.receipt-transaction-link--missing {
+  color: var(--ink2);
+  opacity: 0.9;
+}
+
 .receipt-row-actions {
   display: flex;
   align-items: center;

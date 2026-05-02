@@ -66,9 +66,9 @@ function renderDashboard(data) {
   const seTaxLabel = isCA ? "Est. CPP Contribution" : "Est. SE Tax Owed";
   const seTaxNote = isCA ? "Canada Pension Plan (self-employed)" : "Self-employment tax (approx.)";
   const cards = [
-    kpiCard("Avg Monthly Income", fmt(summary.avg_monthly_income), "trailing 12 months"),
-    kpiCard("Avg Monthly Expenses", fmt(summary.avg_monthly_expense), "trailing 12 months"),
-    kpiCard("Your Profit", fmt(summary.net), summary.net >= 0 ? "profit" : "deficit", summary.net >= 0 ? "" : "kpi-value--negative")
+    kpiCard("Total Income", fmt(summary.total_income), "trailing 12 months"),
+    kpiCard("Total Expenses", fmt(summary.total_expense), "trailing 12 months"),
+    kpiCard("Net Profit", fmt(summary.net), summary.net >= 0 ? "trailing 12 months" : "trailing 12 months", summary.net >= 0 ? "" : "kpi-value--negative")
   ];
   if (summary.has_tax_estimates) {
     cards.push(kpiCard(seTaxLabel, fmt(summary.se_tax_estimate ?? 0), seTaxNote));
