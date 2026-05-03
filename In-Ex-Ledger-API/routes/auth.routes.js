@@ -1706,6 +1706,42 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
   }
 });
 
+router.post("/mfa/resend", authLimiter, async (req, res) => {
+  const mfaToken = String(req.body?.mfaToken || "").trim();
+  if (!mfaToken) {
+    return res.status(400).json({ error: "MFA token is required." });
+  }
+
+  try {
+    const pending = verifyToken(mfaToken);
+    if (!pending.id || pending.purpose !== "mfa_pending") {
+      return res.status(401).json({ error: "Verification session expired. Sign in again." });
+    }
+
+    const user = await findUserById(pending.id);
+    if (!user || user.email !== pending.email || !user.mfa_enabled) {
+      return res.status(401).json({ error: "Verification session expired. Sign in again." });
+    }
+
+    const userLang = await getPreferredLanguageForUser(user.id);
+    const nextToken = await createMfaEmailChallenge(user, req, {
+      businessId: pending.business_id || null,
+      lang: userLang,
+      mfaContentKey: "signin",
+      locationPath: "/login"
+    });
+
+    return res.status(200).json({
+      success: true,
+      mfa_token: nextToken,
+      message: "We emailed you a new verification code."
+    });
+  } catch (err) {
+    logError("MFA resend error:", err);
+    return res.status(401).json({ error: "Verification session expired. Sign in again." });
+  }
+});
+
 router.all([
   "/forgot-password",
   "/account-recovery",

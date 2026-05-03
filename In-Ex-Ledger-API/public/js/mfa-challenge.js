@@ -5,7 +5,7 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
-const pendingMfaToken = sessionStorage.getItem("lb_pending_mfa_token") || "";
+let pendingMfaToken = sessionStorage.getItem("lb_pending_mfa_token") || "";
 const pendingMfaEmail = sessionStorage.getItem("lb_pending_mfa_email") || "";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -27,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   mfaChallengeForm?.addEventListener("submit", handleMfaChallengeSubmit);
+  document.getElementById("mfaChallengeResend")?.addEventListener("click", handleMfaChallengeResend);
   document.getElementById("mfaChallengeBack")?.addEventListener("click", () => {
     clearPendingMfaState();
     window.location.href = "/login";
@@ -89,12 +90,58 @@ async function handleMfaChallengeSubmit(event) {
   }
 }
 
+async function handleMfaChallengeResend(event) {
+  const resendButton = event?.currentTarget;
+  if (!pendingMfaToken || !resendButton) {
+    return;
+  }
+
+  clearMfaChallengeError();
+  resendButton.setAttribute("disabled", "true");
+
+  try {
+    const response = await fetch(buildApiUrl("/api/auth/mfa/resend"), {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        mfaToken: pendingMfaToken
+      })
+    });
+
+    const data = response ? await response.json().catch(() => null) : null;
+    if (!response || !response.ok || !data?.mfa_token) {
+      showMfaChallengeError(data?.error || tx("mfa_challenge_error_resend"));
+      return;
+    }
+
+    pendingMfaToken = data.mfa_token;
+    sessionStorage.setItem("lb_pending_mfa_token", pendingMfaToken);
+    showMfaChallengeMessage(data?.message || tx("mfa_challenge_resend_success"), "is-success");
+  } catch (error) {
+    console.error("MFA resend request failed:", error);
+    showMfaChallengeError(tx("mfa_challenge_error_resend"));
+  } finally {
+    resendButton.removeAttribute("disabled");
+  }
+}
+
 function showMfaChallengeError(message) {
+  showMfaChallengeMessage(message, "");
+}
+
+function showMfaChallengeMessage(message, tone = "") {
   if (!mfaChallengeError) {
     return;
   }
   mfaChallengeError.textContent = message || "";
   mfaChallengeError.hidden = !message;
+  mfaChallengeError.classList.remove("is-success");
+  if (tone) {
+    mfaChallengeError.classList.add(tone);
+  }
 }
 
 function clearMfaChallengeError() {

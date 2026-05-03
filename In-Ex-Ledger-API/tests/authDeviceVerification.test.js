@@ -640,6 +640,41 @@ test("mfa challenge token lasts at least as long as the emailed code window", as
   }
 });
 
+test("mfa resend rotates the pending token and sends a fresh code", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+  fixture.state.user.mfa_enabled = true;
+  fixture.state.user.mfa_enabled_at = new Date().toISOString();
+
+  try {
+    const app = buildApp(fixture.router);
+    const loginResponse = await request(app)
+      .post("/api/auth/login")
+      .set("User-Agent", "TestBrowser/1.0")
+      .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
+
+    assert.equal(loginResponse.status, 200);
+    assert.equal(loginResponse.body?.mfa_required, true);
+    const firstToken = loginResponse.body.mfa_token;
+    const sentBefore = fixture.state.sentEmails.length;
+
+    const resendResponse = await request(app)
+      .post("/api/auth/mfa/resend")
+      .set("User-Agent", "TestBrowser/1.0")
+      .send({ mfaToken: firstToken });
+
+    assert.equal(resendResponse.status, 200);
+    assert.equal(resendResponse.body?.success, true);
+    assert.ok(resendResponse.body?.mfa_token, "resend should return a new pending token");
+    assert.notEqual(resendResponse.body.mfa_token, firstToken);
+    assert.equal(fixture.state.sentEmails.length, sentBefore + 1);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("multiple MFA code requests do not immediately invalidate the earlier challenge", async () => {
   const fixture = loadAuthRouter({
     nodeEnv: "test",
