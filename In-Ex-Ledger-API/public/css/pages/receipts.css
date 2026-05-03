@@ -148,6 +148,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .receipt-column-filename { width: 260px; }
