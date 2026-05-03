@@ -429,17 +429,22 @@ function renderBusinessAccessSection(sub) {
   const manager = document.getElementById("businessSlotsManager");
   if (!manager) return;
 
-  const hasActiveProAccess =
-    sub && sub.effectiveTier === "v1" && (sub.isPaid || sub.isTrialing) && !sub.cancelAtPeriodEnd;
-  const isActivePro = hasActiveProAccess;
-  const isCancelingPro = sub && sub.effectiveTier === "v1" && sub.cancelAtPeriodEnd;
+  const isProTier = !!sub && sub.effectiveTier === "v1";
+  const canManageSlots =
+    isProTier &&
+    Boolean(sub.stripeSubscriptionId) &&
+    (sub.isPaid || sub.isTrialing) &&
+    !sub.cancelAtPeriodEnd &&
+    !sub.isCanceledWithRemainingAccess;
+  const isCancelingPro = isProTier && sub.cancelAtPeriodEnd;
+  const isEndedProWithRemainingAccess = isProTier && sub.isCanceledWithRemainingAccess;
 
   const proCardAddonGroup = document.getElementById("proCardAddonGroup");
   if (proCardAddonGroup) {
-    proCardAddonGroup.classList.toggle("hidden", isActivePro || isCancelingPro);
+    proCardAddonGroup.classList.toggle("hidden", canManageSlots || isCancelingPro || isEndedProWithRemainingAccess);
   }
 
-  if (!sub || sub.effectiveTier !== "v1") {
+  if (!isProTier) {
     manager.innerHTML = `
       <div class="sub-access-message-card">
         <p class="sub-access-upgrade-note">${escapeHtml(tx("subscription_business_access_upgrade_note"))}</p>
@@ -478,6 +483,15 @@ function renderBusinessAccessSection(sub) {
       ${statsHtml}
       <div class="sub-access-message-card">
         <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceling_help"))}</p>
+      </div>`;
+    return;
+  }
+
+  if (isEndedProWithRemainingAccess) {
+    manager.innerHTML = `
+      ${statsHtml}
+      <div class="sub-access-message-card">
+        <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceled_help"))}</p>
       </div>`;
     return;
   }

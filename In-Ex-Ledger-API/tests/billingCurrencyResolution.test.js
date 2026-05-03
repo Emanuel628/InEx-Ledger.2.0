@@ -112,6 +112,7 @@ function loadBillingRouter({ country = "Canada" } = {}) {
           };
           next();
         },
+        requireMfa: (_req, _res, next) => next(),
         requireMfaIfEnabled: (_req, _res, next) => next()
       };
     }

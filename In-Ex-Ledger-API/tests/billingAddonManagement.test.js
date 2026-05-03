@@ -126,9 +126,16 @@ function loadBillingRouter(options = {}) {
     }
 
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
+      const requireMfa = (_req, res, next) => {
+        if (options.requireMfa) {
+          return res.status(403).json({ error: "MFA required", mfa_required: true });
+        }
+        next();
+      };
       return {
         requireAuth: (req, _res, next) => { req.user = { id: "user_test_001", email: "test@example.com" }; next(); },
-        requireMfaIfEnabled: (_req, _res, next) => next()
+        requireMfa,
+        requireMfaIfEnabled: requireMfa
       };
     }
 
@@ -238,6 +245,41 @@ test("PATCH /additional-businesses — Canceling Pro user cannot change slots (4
       .send({ additionalBusinesses: 2 });
     assert.equal(res.status, 409);
     assert.ok(res.body.error);
+  } finally {
+    cleanup();
+  }
+});
+
+test("PATCH /additional-businesses — canceled Pro subscription with remaining access cannot change slots (409)", async () => {
+  const { app, cleanup } = loadBillingRouter({
+    snapshot: {
+      effectiveTier: "v1",
+      isPaid: true,
+      isCanceledWithRemainingAccess: true,
+      cancelAtPeriodEnd: false,
+      stripeSubscriptionId: "sub_test_addon",
+      additionalBusinesses: 1
+    }
+  });
+  try {
+    const res = await request(app)
+      .patch("/api/billing/additional-businesses")
+      .send({ additionalBusinesses: 2 });
+    assert.equal(res.status, 409);
+    assert.match(res.body.error, /already been canceled/i);
+  } finally {
+    cleanup();
+  }
+});
+
+test("PATCH /additional-businesses — route requires MFA when enabled", async () => {
+  const { app, cleanup } = loadBillingRouter({ requireMfa: true });
+  try {
+    const res = await request(app)
+      .patch("/api/billing/additional-businesses")
+      .send({ additionalBusinesses: 2 });
+    assert.equal(res.status, 403);
+    assert.equal(res.body.mfa_required, true);
   } finally {
     cleanup();
   }

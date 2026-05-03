@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const { Resend } = require("resend");
-const { requireAuth, requireMfaIfEnabled } = require("../middleware/auth.middleware.js");
+const { requireAuth, requireMfa } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createBillingMutationLimiter } = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
@@ -27,7 +27,7 @@ const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const router = express.Router();
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
-const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2024-06-20";
+const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2026-02-25.clover";
 
 const billingMutationLimiter = createBillingMutationLimiter();
 
@@ -576,7 +576,7 @@ router.post("/mock-v1", requireAuth, requireCsrfProtection, async (req, res) => 
   }
 });
 
-router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfaIfEnabled, async (req, res) => {
+router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfa, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
@@ -664,7 +664,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
   }
 });
 
-router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfaIfEnabled, async (req, res) => {
+router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfa, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const customerId = await ensureStripeCustomer(businessId, req.user);
@@ -683,7 +683,7 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
   }
 });
 
-router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfaIfEnabled, async (req, res) => {
+router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfa, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
@@ -780,7 +780,7 @@ async function resolveAddonPriceIdForSubscription(businessId) {
   return requireEnvValue(addonEnv);
 }
 
-router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
+router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfa, async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
@@ -796,6 +796,11 @@ router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billi
     if (subscription.cancelAtPeriodEnd) {
       return res.status(409).json({
         error: "Cannot change business slots while cancellation is pending. Resume Pro to make changes."
+      });
+    }
+    if (subscription.isCanceledWithRemainingAccess) {
+      return res.status(409).json({
+        error: "Your Pro subscription has already been canceled. Start a new Pro subscription before changing business slots."
       });
     }
     if (!subscription.stripeSubscriptionId) {

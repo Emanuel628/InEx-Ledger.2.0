@@ -474,8 +474,13 @@
   align-self: center;
 }
 
+#slotsIncreaseBtn {
+  position: relative;
+  top: -3px;
+}
+
 #slotsIncreaseBtn span {
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .sub-quantity-btn:hover {

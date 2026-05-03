@@ -1446,6 +1446,7 @@ const TRANSLATIONS = {
     subscription_business_slots_success: 'Business slots updated.',
     subscription_business_slots_error: 'Unable to update business slots.',
     subscription_business_slots_canceling_help: 'Your plan is scheduled to cancel. Resume Pro before changing business slots.',
+    subscription_business_slots_canceled_help: 'This Pro subscription has already been canceled. Start a new Pro subscription before changing business slots.',
 
     // Settings nav
     settings_nav_account_settings: 'Account & Subscription',
