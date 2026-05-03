@@ -2715,7 +2715,12 @@ body {
 }
 
 .toolbar-search-icon {
+  position: static;
+  transform: none;
   color: #7f8a98;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .toolbar-search-icon svg {
