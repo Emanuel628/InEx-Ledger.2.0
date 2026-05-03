@@ -69,6 +69,7 @@ function loadBillingRouterFixture() {
             maxBusinessesAllowed: 3
           };
         },
+        findBillingAnchorBusinessIdForUser: async () => "biz_live_123",
         updateStripeCustomerForBusiness: async () => {},
         syncStripeSubscriptionForBusiness: async (businessId, subscription) => {
           state.syncCalls.push({ businessId, subscription });
@@ -88,6 +89,7 @@ function loadBillingRouterFixture() {
           req.user = { id: "user_live_123", email: "user@example.com" };
           next();
         },
+        requireMfa: (_req, _res, next) => next(),
         requireMfaIfEnabled: (_req, _res, next) => next()
       };
     }

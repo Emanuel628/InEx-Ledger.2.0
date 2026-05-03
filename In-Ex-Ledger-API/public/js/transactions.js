@@ -79,6 +79,7 @@ const TRANSACTION_REVIEW_LABELS = {
   locked: "Locked"
 };
 let unattachedReceiptsCount = 0;
+const selectedTransactionIds = new Set();
 let pendingTransactionReceiptFile = null;
 let recurringDrawerElement = null;
 let recurringToggleElement = null;
@@ -401,6 +402,12 @@ function syncTransactionScopeUi() {
     subtitle.textContent = isAllScope
       ? `${getBusinessesInScope().length || 0} ${txT("transactions_scope_businesses", "businesses")} · ${txT("transactions_scope_portfolio_view", "portfolio reporting view")}`
       : txT("transactions_scope_active_subtitle", "Active business ledger · current reporting period");
+  }
+
+  if (subtitle) {
+    subtitle.textContent = isAllScope
+      ? `${getBusinessesInScope().length || 0} ${txT("transactions_scope_businesses", "businesses")} - ${txT("transactions_scope_portfolio_view", "portfolio reporting view")}`
+      : txT("transactions_scope_active_subtitle", "Active business ledger - current reporting period");
   }
 
   addButtons.filter(Boolean).forEach((button) => {
@@ -1142,7 +1149,7 @@ function resetRecurringForm() {
 async function loadRecurringTemplates() {
   const tbody = document.getElementById("recurringTableBody");
   if (tbody) {
-    tbody.innerHTML = `<tr><td colspan="6" class="placeholder">${txT("transactions_recurring_loading", "Loading recurring templates...")}</td></tr>`;
+    tbody.innerHTML = `<tr class="placeholder-row"><td colspan="6" class="placeholder placeholder-cell">${txT("transactions_recurring_loading", "Loading recurring templates...")}</td></tr>`;
   }
 
   try {
@@ -1196,6 +1203,71 @@ function renderRecurringCategoryOptions() {
   syncCustomCategoryField("recurringCategory", "recurringCustomCategoryName");
 }
 
+function buildTransactionsEmptyStateMarkup(title, body, actionLabel) {
+  return `
+    <div class="table-empty-state">
+      <div class="table-empty-illustration" aria-hidden="true">
+        <svg viewBox="0 0 96 72" fill="none">
+          <rect x="18" y="12" width="40" height="48" rx="10" fill="#eaf0f7"></rect>
+          <rect x="26" y="22" width="24" height="4" rx="2" fill="#b8c5d8"></rect>
+          <rect x="26" y="32" width="20" height="4" rx="2" fill="#c6d2e2"></rect>
+          <rect x="26" y="42" width="16" height="4" rx="2" fill="#c6d2e2"></rect>
+          <circle cx="64" cy="46" r="12" fill="#ffffff" stroke="#1d4f91" stroke-width="4"></circle>
+          <path d="M72 54l8 8" stroke="#1d4f91" stroke-width="4" stroke-linecap="round"></path>
+          <circle cx="64" cy="46" r="2.5" fill="#1d4f91"></circle>
+          <circle cx="70" cy="16" r="4" fill="#d8e5f5"></circle>
+        </svg>
+      </div>
+      <h3 class="table-empty-title">${title}</h3>
+      <p class="table-empty-copy">${body}</p>
+      ${actionLabel ? `<button type="button" class="table-empty-button" id="transactionsEmptyAddButton">${actionLabel}</button>` : ""}
+    </div>
+  `;
+}
+
+function buildRecurringEmptyStateMarkup() {
+  return `
+    <div class="table-empty-state table-empty-state-recurring">
+      <div class="table-empty-illustration table-empty-illustration-calendar" aria-hidden="true">
+        <svg viewBox="0 0 96 72" fill="none">
+          <rect x="22" y="16" width="40" height="38" rx="8" fill="#e9eef6"></rect>
+          <rect x="22" y="24" width="40" height="8" fill="#c8d3e2"></rect>
+          <rect x="28" y="38" width="6" height="6" rx="1.5" fill="#c0cbdb"></rect>
+          <rect x="39" y="38" width="6" height="6" rx="1.5" fill="#c0cbdb"></rect>
+          <rect x="50" y="38" width="6" height="6" rx="1.5" fill="#c0cbdb"></rect>
+          <rect x="28" y="47" width="6" height="6" rx="1.5" fill="#c0cbdb"></rect>
+          <rect x="39" y="47" width="6" height="6" rx="1.5" fill="#c0cbdb"></rect>
+          <rect x="50" y="47" width="6" height="6" rx="1.5" fill="#c0cbdb"></rect>
+          <rect x="30" y="12" width="4" height="10" rx="2" fill="#7f91aa"></rect>
+          <rect x="50" y="12" width="4" height="10" rx="2" fill="#7f91aa"></rect>
+        </svg>
+      </div>
+      <h3 class="table-empty-title">${txT("transactions_recurring_empty", "No recurring templates yet.")}</h3>
+      <p class="table-empty-copy">Create a template to automate your regular expenses.</p>
+    </div>
+  `;
+}
+
+function updateTransactionSelectionHeader(visibleTransactions = []) {
+  const selectAllCheckbox = document.getElementById("txSelectAll");
+  if (!selectAllCheckbox) {
+    return;
+  }
+
+  if (!visibleTransactions.length) {
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
+    selectAllCheckbox.disabled = true;
+    return;
+  }
+
+  const visibleIds = visibleTransactions.map((txn) => String(txn.id));
+  const selectedCount = visibleIds.filter((id) => selectedTransactionIds.has(id)).length;
+  selectAllCheckbox.disabled = false;
+  selectAllCheckbox.checked = selectedCount === visibleIds.length;
+  selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < visibleIds.length;
+}
+
 function renderRecurringTemplates() {
   const tbody = document.getElementById("recurringTableBody");
   if (!tbody) {
@@ -1203,7 +1275,7 @@ function renderRecurringTemplates() {
   }
 
   if (!recurringState.templates.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="placeholder">${txT("transactions_recurring_empty", "No recurring templates yet.")}</td></tr>`;
+    tbody.innerHTML = `<tr class="placeholder-row"><td colspan="6" class="placeholder placeholder-cell">${buildRecurringEmptyStateMarkup()}</td></tr>`;
     return;
   }
 
@@ -1811,23 +1883,37 @@ function renderTransactionsTable(filteredTransactions) {
   if (!tbody) return;
 
   if (transactionsLoading && filteredTransactions === undefined) {
-    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">${txT("transactions_loading", "Loading transactions...")}</td></tr>`;
+    tbody.innerHTML = `<tr class="placeholder-row"><td colspan="9" class="placeholder placeholder-cell">${txT("transactions_loading", "Loading transactions...")}</td></tr>`;
+    updateTransactionSelectionHeader();
     return;
   }
 
   if (hasTransactionsLoadFailed && filteredTransactions === undefined) {
-    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">${txT("transactions_error_load", "Unable to load transactions. Please refresh.")}</td></tr>`;
+    tbody.innerHTML = `<tr class="placeholder-row"><td colspan="9" class="placeholder placeholder-cell">${txT("transactions_error_load", "Unable to load transactions. Please refresh.")}</td></tr>`;
+    updateTransactionSelectionHeader();
     return;
   }
 
   if (transactions.length === 0) {
-    const emptyText =
-      isFilteredView && ledgerState.transactions.length > 0
-        ? txT("transactions_empty_filtered", "No matching transactions.")
-        : typeof t === "function"
-        ? t("transactions_empty")
-        : "No transactions yet.";
-    tbody.innerHTML = `<tr><td colspan="7" class="placeholder">${emptyText}</td></tr>`;
+    if (isFilteredView && ledgerState.transactions.length > 0) {
+      tbody.innerHTML = `<tr class="placeholder-row"><td colspan="9" class="placeholder placeholder-cell">${txT("transactions_empty_filtered", "No matching transactions.")}</td></tr>`;
+    } else {
+      tbody.innerHTML = `
+        <tr class="placeholder-row">
+          <td colspan="9" class="placeholder placeholder-cell">
+            ${buildTransactionsEmptyStateMarkup(
+              typeof t === "function" ? t("transactions_empty") : "No transactions yet.",
+              "Add your first transaction to start tracking income and expenses.",
+              "+ Add transaction"
+            )}
+          </td>
+        </tr>
+      `;
+      tbody.querySelector("#transactionsEmptyAddButton")?.addEventListener("click", () => {
+        openTransactionDrawer();
+      });
+    }
+    updateTransactionSelectionHeader();
     return;
   }
 
@@ -1840,6 +1926,7 @@ function renderTransactionsTable(filteredTransactions) {
   transactions.forEach((txn) => {
     const row = document.createElement("tr");
     row.id = `txn-${txn.id}`;
+    const txnId = String(txn.id);
     const categoryName = txn.categoryName || categoriesById[txn.categoryId]?.name || "-";
     const accountName = txn.accountName || accountsById[txn.accountId]?.name || "-";
     const rowRegion = String(
@@ -1892,6 +1979,7 @@ function renderTransactionsTable(filteredTransactions) {
       : `<button type="button" class="receipt-attach-hover" data-action="upload-receipt" data-id="${txn.id}" title="Attach a receipt">+ attach</button>`;
 
     row.innerHTML = `
+      <td class="table-select-cell"><input type="checkbox" class="tx-row-select" data-id="${txn.id}" aria-label="Select transaction ${escapeHtml(txn.description || txn.id)}" ${selectedTransactionIds.has(txnId) ? "checked" : ""}></td>
       <td><span class="date-cell">${formatDisplayDate(txn.date)}</span></td>
       <td><div class="description-primary">${escapeHtml(txn.description || "-")}</div><div class="description-sub">${descriptionSub}</div></td>
       <td><span class="account-tag">${escapeHtml(accountName)}</span></td>
@@ -1903,7 +1991,9 @@ function renderTransactionsTable(filteredTransactions) {
         </button>
       </td>
       <td class="amount-cell"><span class="${amountClass}">${amountPrefix}${formatCurrency(Math.abs(Number(txn.amount) || 0), rowRegion)}</span></td>
+      <td class="table-actions-cell"><button type="button" class="row-action-button" data-action="row-menu" data-id="${txn.id}">Actions</button></td>
     `;
+    row.classList.toggle("is-selected", selectedTransactionIds.has(txnId));
     tbody.appendChild(row);
 
     row.querySelector('[data-action="upload-receipt"]')?.addEventListener("click", () => {
@@ -1913,11 +2003,51 @@ function renderTransactionsTable(filteredTransactions) {
       e.stopPropagation();
       await toggleTransactionCleared(txn.id, !txn.cleared);
     });
+    row.querySelector(".tx-row-select")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+    row.querySelector(".tx-row-select")?.addEventListener("change", (e) => {
+      const isChecked = e.target.checked;
+      if (isChecked) {
+        selectedTransactionIds.add(txnId);
+      } else {
+        selectedTransactionIds.delete(txnId);
+      }
+      row.classList.toggle("is-selected", isChecked);
+      updateTransactionSelectionHeader(transactions);
+    });
+    row.querySelector('[data-action="row-menu"]')?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openRowActionPopup(txn.id, e.currentTarget, isAllScope);
+    });
     row.addEventListener("click", (e) => {
-      if (e.target.closest("button, a, input, select")) return;
+      if (e.target.closest("button, a, input, select, label")) return;
       openRowActionPopup(txn.id, row, isAllScope);
     });
   });
+
+  const selectAllCheckbox = document.getElementById("txSelectAll");
+  if (selectAllCheckbox) {
+    selectAllCheckbox.onchange = () => {
+      const shouldSelectAll = selectAllCheckbox.checked;
+      transactions.forEach((txn) => {
+        const txnId = String(txn.id);
+        if (shouldSelectAll) {
+          selectedTransactionIds.add(txnId);
+        } else {
+          selectedTransactionIds.delete(txnId);
+        }
+      });
+
+      tbody.querySelectorAll(".tx-row-select").forEach((checkbox) => {
+        checkbox.checked = shouldSelectAll;
+        checkbox.closest("tr")?.classList.toggle("is-selected", shouldSelectAll);
+      });
+      updateTransactionSelectionHeader(transactions);
+    };
+  }
+
+  updateTransactionSelectionHeader(transactions);
 
   maybeScrollToHighlightedTransaction();
 }

@@ -156,6 +156,7 @@ function loadBillingRouter(options = {}) {
     ) {
       return {
         requireAuth: (_req, _res, next) => next(),
+        requireMfa: (_req, _res, next) => next(),
         requireMfaIfEnabled: (_req, _res, next) => next()
       };
     }

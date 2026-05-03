@@ -426,6 +426,15 @@
   background: var(--surface);
 }
 
+.sub-quantity-control-slots {
+  gap: 8px;
+  width: fit-content;
+  padding: 6px;
+  border-radius: 16px;
+  border-color: rgba(15, 25, 35, 0.08);
+  background: rgba(245, 248, 252, 0.82);
+}
+
 .sub-quantity-btn {
   width: 28px;
   height: 28px;
@@ -443,6 +452,35 @@
   flex-shrink: 0;
   font-weight: 500;
   transition: background 120ms ease, border-color 120ms ease;
+}
+
+.sub-quantity-btn span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  line-height: 1;
+}
+
+.sub-quantity-control-slots .sub-quantity-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  color: #223246;
+  font-size: 24px;
+  box-shadow: 0 8px 18px rgba(15, 25, 35, 0.05);
+  align-self: center;
+}
+
+#slotsIncreaseBtn {
+  position: relative;
+  top: -3px;
+}
+
+#slotsIncreaseBtn span {
+  transform: none;
 }
 
 .sub-quantity-btn:hover {
@@ -465,8 +503,25 @@
   color: var(--ink);
 }
 
+.sub-quantity-control-slots .sub-quantity-input {
+  width: 86px;
+  min-height: 44px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 25, 35, 0.1);
+  background: #fff;
+  color: #102236;
+  font-size: 18px;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
 .sub-quantity-input:focus {
   outline: none;
+}
+
+.sub-quantity-control-slots .sub-quantity-input:focus {
+  border-color: rgba(36, 109, 187, 0.45);
+  box-shadow: 0 0 0 4px rgba(36, 109, 187, 0.08);
 }
 
 /* ── Price summary ────────────────────────────────────────────── */
@@ -716,58 +771,198 @@
 
 /* ── Business access section ──────────────────────────────���───── */
 
-.sub-access-grid {
+.sub-access-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.sub-access-stat {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 14px 16px;
-  border-radius: var(--radius-lg);
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  margin-bottom: 16px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  box-shadow: 0 12px 28px rgba(15, 25, 35, 0.05);
 }
 
-.sub-access-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 14px;
-}
-
-.sub-access-label {
-  color: var(--ink2);
-}
-
-.sub-access-value {
+.sub-access-stat-label {
+  color: #6f7987;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--ink);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sub-access-stat-value {
+  color: #102236;
+  font-size: 31px;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+
+.sub-access-stat-meta {
+  color: #677487;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.sub-access-message-card {
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  background: linear-gradient(180deg, rgba(245, 248, 252, 0.82), rgba(255, 255, 255, 0.98));
 }
 
 .sub-access-upgrade-note,
 .sub-access-cancel-note {
+  margin: 0;
   font-size: 14px;
   color: var(--ink2);
   line-height: 1.6;
-  padding: 12px 0 4px;
 }
 
-.sub-slots-controls {
+.sub-slots-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 14px 32px rgba(15, 25, 35, 0.05);
+}
+
+.sub-slots-panel-head,
+.sub-slots-workbench,
+.sub-slots-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sub-slots-panel-copy {
+  max-width: 540px;
+}
+
+.sub-slots-panel-copy h3 {
+  margin: 0 0 6px;
+  color: #102236;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.sub-slots-panel-copy p {
+  margin: 0;
+  color: #5d6a79;
+  font-size: 14px;
+  line-height: 1.62;
+}
+
+.sub-slots-price-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(237, 244, 251, 0.94);
+  border: 1px solid rgba(36, 109, 187, 0.14);
+  color: var(--accent2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sub-slots-workbench {
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+.sub-slots-stepper-card,
+.sub-slots-summary-card {
+  border-radius: 20px;
+  border: 1px solid rgba(15, 25, 35, 0.07);
+  background: #fff;
+}
+
+.sub-slots-stepper-card {
+  flex: 0 1 430px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding: 14px 16px;
+  justify-content: center;
 }
 
-.sub-slots-controls .settings-primary-btn {
-  width: 100%;
-  display: inline-flex;
+.sub-slots-summary-card {
+  flex: 0 1 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(245, 248, 252, 0.82), rgba(255, 255, 255, 0.96));
+}
+
+.sub-slots-stepper-label {
+  color: #6f7987;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sub-slots-stepper-meta {
+  margin: 0;
+  color: #677487;
+  font-size: 13px;
+  line-height: 1.52;
+}
+
+.sub-slots-summary-row {
+  display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #223246;
+  font-size: 14px;
+}
+
+.sub-slots-summary-row strong {
+  color: #102236;
+  font-weight: 700;
+  text-align: right;
+}
+
+.sub-slots-summary-row-total {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid rgba(15, 25, 35, 0.08);
+}
+
+.sub-slots-footer {
+  align-items: center;
+}
+
+.sub-slots-save-btn {
+  width: auto;
+  min-width: 220px;
+  flex-shrink: 0;
+}
+
+.sub-slots-save-btn.is-dormant {
+  box-shadow: none;
 }
 
 .sub-control-help {
   margin: 0;
-  font-size: 12px;
-  color: var(--ink3);
+  font-size: 13px;
+  color: #667385;
+  line-height: 1.55;
+  max-width: 38ch;
 }
 
 /* ── Billing history ──────────────────────────────────────────── */
@@ -976,6 +1171,30 @@
 /* ── Mobile layout ────────────────────────────────���───────────── */
 
 @media (max-width: 640px) {
+  .sub-access-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .sub-slots-panel {
+    padding: 18px;
+  }
+
+  .sub-slots-panel-head,
+  .sub-slots-workbench,
+  .sub-slots-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sub-slots-save-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sub-quantity-control-slots {
+    justify-content: center;
+  }
+
   .sub-plans-title {
     font-size: 22px;
   }

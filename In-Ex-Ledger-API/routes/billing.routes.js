@@ -2,11 +2,12 @@ const crypto = require("crypto");
 const express = require("express");
 const rateLimit = require("express-rate-limit");
 const { Resend } = require("resend");
-const { requireAuth, requireMfaIfEnabled } = require("../middleware/auth.middleware.js");
+const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createBillingMutationLimiter } = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const {
+  findBillingAnchorBusinessIdForUser,
   getSubscriptionSnapshotForBusiness,
   updateStripeCustomerForBusiness,
   syncStripeSubscriptionForBusiness,
@@ -27,7 +28,7 @@ const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const router = express.Router();
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
-const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2024-06-20";
+const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2026-02-25.clover";
 
 const billingMutationLimiter = createBillingMutationLimiter();
 
@@ -258,13 +259,14 @@ function encodeFormBody(payload) {
   return params.toString();
 }
 
-async function stripeRequest(path, payload) {
+async function stripeRequest(path, payload, options = {}) {
   const response = await fetch(`${STRIPE_API_BASE}${path}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${getStripeSecretKey()}`,
       "Content-Type": "application/x-www-form-urlencoded",
-      "Stripe-Version": STRIPE_API_VERSION
+      "Stripe-Version": STRIPE_API_VERSION,
+      ...(options.idempotencyKey ? { "Idempotency-Key": String(options.idempotencyKey) } : {})
     },
     body: encodeFormBody(payload)
   });
@@ -357,28 +359,87 @@ async function findBusinessByStripeCustomerId(stripeCustomerId) {
 }
 
 async function ensureStripeCustomer(businessId, user) {
-  const existing = await pool.query(
-    `SELECT stripe_customer_id
-       FROM business_subscriptions
-      WHERE business_id = $1
-      LIMIT 1`,
-    [businessId]
-  );
+  await getSubscriptionSnapshotForBusiness(businessId);
 
-  const stripeCustomerId = existing.rows[0]?.stripe_customer_id;
-  if (stripeCustomerId) {
-    return stripeCustomerId;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const lockKey = BigInt("0x" + crypto.createHash("sha256").update(`stripe-customer:${businessId}`).digest("hex").slice(0, 15));
+    await client.query("SELECT pg_advisory_xact_lock($1)", [String(lockKey)]);
+
+    const existing = await client.query(
+      `SELECT stripe_customer_id
+         FROM business_subscriptions
+        WHERE business_id = $1
+        LIMIT 1`,
+      [businessId]
+    );
+
+    const stripeCustomerId = existing.rows[0]?.stripe_customer_id;
+    if (stripeCustomerId) {
+      await client.query("COMMIT");
+      return stripeCustomerId;
+    }
+
+    const customer = await stripeRequest("/customers", {
+      email: user.email,
+      name: user.display_name || user.full_name || user.email,
+      "metadata[business_id]": businessId,
+      "metadata[user_id]": user.id
+    });
+
+    await client.query(
+      `UPDATE business_subscriptions
+          SET stripe_customer_id = $2,
+              updated_at = NOW()
+        WHERE business_id = $1`,
+      [businessId, customer.id]
+    );
+    await client.query("COMMIT");
+    return customer.id;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function resolveBillingBusinessScope(user) {
+  const activeBusinessId = await resolveBusinessIdForUser(user);
+  const billingBusinessId =
+    await findBillingAnchorBusinessIdForUser(user?.id, activeBusinessId) || activeBusinessId;
+  return {
+    activeBusinessId,
+    billingBusinessId
+  };
+}
+
+function hasBlockingStripeSubscription(subscription) {
+  if (!subscription || typeof subscription !== "object") {
+    return false;
+  }
+  const status = String(subscription.status || "").toLowerCase();
+  if (["active", "trialing", "past_due", "unpaid"].includes(status)) {
+    return true;
+  }
+  if (status === "canceled") {
+    const periodEndMs = Number(subscription.current_period_end || 0) * 1000;
+    return periodEndMs > Date.now();
+  }
+  return false;
+}
+
+async function findBlockingStripeSubscriptionForCustomer(stripeCustomerId) {
+  if (!stripeCustomerId) {
+    return null;
   }
 
-  const customer = await stripeRequest("/customers", {
-    email: user.email,
-    name: user.display_name || user.full_name || user.email,
-    "metadata[business_id]": businessId,
-    "metadata[user_id]": user.id
-  });
-
-  await updateStripeCustomerForBusiness(businessId, customer.id);
-  return customer.id;
+  const latest = await stripeGet(
+    `/subscriptions?customer=${encodeURIComponent(stripeCustomerId)}&status=all&limit=10`
+  );
+  const subscriptions = Array.isArray(latest?.data) ? latest.data : [];
+  return subscriptions.find((item) => hasBlockingStripeSubscription(item)) || null;
 }
 
 function buildAppUrl(path) {
@@ -480,25 +541,20 @@ async function sendBillingEmail({ businessId, kind, details, actionUrl, invoiceU
 
 router.get("/subscription", requireAuth, async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    let subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
 
     if (!subscription.isPaid && subscription.stripeCustomerId) {
       try {
-        const latest = await stripeGet(
-          `/subscriptions?customer=${encodeURIComponent(subscription.stripeCustomerId)}&status=all&limit=5`
-        );
-        const subscriptions = Array.isArray(latest?.data) ? latest.data : [];
-        const stripeSubscription =
-          subscriptions.find((item) => ["active", "trialing", "past_due", "canceled"].includes(String(item?.status || ""))) || null;
+        const stripeSubscription = await findBlockingStripeSubscriptionForCustomer(subscription.stripeCustomerId);
 
         if (stripeSubscription) {
-          await syncStripeSubscriptionForBusiness(businessId, stripeSubscription);
-          subscription = await getSubscriptionSnapshotForBusiness(businessId);
+          await syncStripeSubscriptionForBusiness(billingBusinessId, stripeSubscription);
+          subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
         }
       } catch (syncErr) {
         logWarn("GET /api/billing/subscription self-heal sync skipped:", {
-          businessId,
+          businessId: billingBusinessId,
           err: syncErr.message
         });
       }
@@ -576,19 +632,19 @@ router.post("/mock-v1", requireAuth, requireCsrfProtection, async (req, res) => 
   }
 });
 
-router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfaIfEnabled, async (req, res) => {
+router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
     // Block when any live Stripe subscription exists — including subscriptions
     // scheduled to cancel at period end (cancel_at_period_end=true).  Allowing
     // checkout in that state creates a second parallel subscription and double
     // billing.  isCanceledWithRemainingAccess means Stripe already deleted the
     // subscription; the user may create a new one while keeping access through
     // the paid period.
-    if (subscription.isPaid && !subscription.isCanceledWithRemainingAccess) {
+    if (subscription.isPaid || subscription.isCanceledWithRemainingAccess) {
       return res.status(409).json({
-        error: "Business is already on an active paid plan. Use the billing portal to manage your subscription."
+        error: "This account already has paid Pro access or an overlapping paid period. Use Subscription to manage it instead of starting another checkout."
       });
     }
 
@@ -596,13 +652,13 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
     const billingContext = await resolveBillingContext(req);
     const requestedCurrency = String(req.body?.currency || "").trim().toLowerCase();
     if (
-      requestedCurrency &&
-      BILLING_CURRENCIES.has(requestedCurrency) &&
-      requestedCurrency !== billingContext.currency
+        requestedCurrency &&
+        BILLING_CURRENCIES.has(requestedCurrency) &&
+        requestedCurrency !== billingContext.currency
     ) {
       logWarn("Ignored client-supplied billing currency in favor of verified billing context", {
         userId: req.user?.id,
-        businessId,
+        businessId: billingBusinessId,
         requestedCurrency,
         resolvedCurrency: billingContext.currency,
         billingSource: billingContext.source
@@ -614,7 +670,16 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       additionalBusinesses
     });
 
-    const customerId = await ensureStripeCustomer(businessId, req.user);
+    const customerId = await ensureStripeCustomer(billingBusinessId, req.user);
+    const blockingSubscription = await findBlockingStripeSubscriptionForCustomer(customerId);
+    if (blockingSubscription) {
+      if (!subscription.isPaid) {
+        await syncStripeSubscriptionForBusiness(billingBusinessId, blockingSubscription);
+      }
+      return res.status(409).json({
+        error: "This account already has an active or overlapping Stripe subscription. Manage it from Subscription instead of starting another checkout."
+      });
+    }
     const sessionPayload = {
       mode: "subscription",
       customer: customerId,
@@ -622,7 +687,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       "line_items[0][quantity]": 1,
       success_url: buildAppUrl("/subscription?checkout=success"),
       cancel_url: buildAppUrl("/subscription?checkout=cancel"),
-      "metadata[business_id]": businessId,
+      "metadata[business_id]": billingBusinessId,
       "metadata[user_id]": req.user.id,
       "metadata[plan_code]": "v1",
       "metadata[billing_interval]": priceSelection.billingInterval,
@@ -645,10 +710,12 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       sessionPayload["subscription_data[metadata][addon_price_id]"] = priceSelection.addonPriceId;
     }
 
-    const session = await stripeRequest("/checkout/sessions", sessionPayload);
+    const session = await stripeRequest("/checkout/sessions", sessionPayload, {
+      idempotencyKey: `checkout:${billingBusinessId}:${priceSelection.billingInterval}:${priceSelection.currency}:${additionalBusinesses}`
+    });
     logInfo("Billing checkout session created", {
       userId: req.user?.id,
-      businessId,
+      businessId: billingBusinessId,
       currency: priceSelection.currency,
       billingInterval: priceSelection.billingInterval,
       additionalBusinesses
@@ -664,17 +731,17 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
   }
 });
 
-router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfaIfEnabled, async (req, res) => {
+router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const customerId = await ensureStripeCustomer(businessId, req.user);
+    const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    const customerId = await ensureStripeCustomer(billingBusinessId, req.user);
     const session = await stripeRequest("/billing_portal/sessions", {
       customer: customerId,
       return_url: buildAppUrl("/subscription")
     });
     logInfo("Billing portal session created", {
       userId: req.user?.id,
-      businessId
+      businessId: billingBusinessId
     });
     res.status(200).json({ url: session.url });
   } catch (err) {
@@ -683,17 +750,17 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
   }
 });
 
-router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, requireMfaIfEnabled, async (req, res) => {
+router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
 
     if (!subscription.stripeSubscriptionId) {
       // No Stripe subscription — just downgrade to free immediately
-      await setFreePlanForBusiness(businessId);
-      const updated = await getSubscriptionSnapshotForBusiness(businessId);
+      await setFreePlanForBusiness(billingBusinessId);
+      const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
       await sendBillingEmail({
-        businessId,
+        businessId: billingBusinessId,
         kind: "canceling",
         details: [
           { label: "Plan", value: "Basic" },
@@ -721,12 +788,12 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
     );
     const stripeSub = await stripeSubResponse.json().catch(() => null);
     if (stripeSub && !stripeSub.error) {
-      await syncStripeSubscriptionForBusiness(businessId, stripeSub);
+      await syncStripeSubscriptionForBusiness(billingBusinessId, stripeSub);
     }
 
-    const updated = await getSubscriptionSnapshotForBusiness(businessId);
+    const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
     await sendBillingEmail({
-      businessId,
+      businessId: billingBusinessId,
       kind: "canceling",
       details: [
         { label: "Plan", value: updated.effectiveTierName || "Pro" },
@@ -736,7 +803,7 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
     });
     logInfo("Billing cancellation scheduled", {
       userId: req.user?.id,
-      businessId,
+      businessId: billingBusinessId,
       stripeSubscriptionId: subscription.stripeSubscriptionId || null,
       cancelAtPeriodEnd: true
     });
@@ -782,8 +849,8 @@ async function resolveAddonPriceIdForSubscription(businessId) {
 
 router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
     const hasActiveProAccess =
       subscription.effectiveTier === "v1" &&
       (subscription.isPaid || subscription.isTrialing);
@@ -797,6 +864,28 @@ router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billi
       return res.status(409).json({
         error: "Cannot change business slots while cancellation is pending. Resume Pro to make changes."
       });
+    }
+    if (subscription.isCanceledWithRemainingAccess) {
+      return res.status(409).json({
+        error: "Your Pro subscription has already been canceled. Start a new Pro subscription before changing business slots."
+      });
+    }
+    if (subscription.isTrialing && !subscription.stripeSubscriptionId) {
+      const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
+      await pool.query(
+        `UPDATE business_subscriptions
+            SET metadata_json = COALESCE(metadata_json, '{}'::jsonb) || jsonb_build_object('additional_businesses', $2),
+                updated_at = NOW()
+          WHERE business_id = $1`,
+        [billingBusinessId, additionalBusinesses]
+      );
+      const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+      logInfo("Trial business slots updated locally", {
+        userId: req.user?.id,
+        businessId: billingBusinessId,
+        newAdditionalBusinesses: additionalBusinesses
+      });
+      return res.status(200).json({ subscription: updated });
     }
     if (!subscription.stripeSubscriptionId) {
       return res.status(409).json({ error: "No active Stripe subscription found." });
@@ -833,7 +922,7 @@ router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billi
         }
       );
     } else {
-      const addonPriceId = await resolveAddonPriceIdForSubscription(businessId);
+      const addonPriceId = await resolveAddonPriceIdForSubscription(billingBusinessId);
       updatedSub = await stripeRequest(
         `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
         {
@@ -844,11 +933,11 @@ router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billi
       );
     }
 
-    await syncStripeSubscriptionForBusiness(businessId, updatedSub);
-    const updated = await getSubscriptionSnapshotForBusiness(businessId);
+    await syncStripeSubscriptionForBusiness(billingBusinessId, updatedSub);
+    const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
     logInfo("Business slots updated", {
       userId: req.user?.id,
-      businessId,
+      businessId: billingBusinessId,
       previousAdditionalBusinesses: subscription.additionalBusinesses,
       newAdditionalBusinesses: additionalBusinesses
     });
@@ -864,10 +953,10 @@ router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billi
 
 router.get("/history", billingReadLimiter, requireAuth, async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
     const subRow = await pool.query(
       "SELECT stripe_customer_id FROM business_subscriptions WHERE business_id = $1 LIMIT 1",
-      [businessId]
+      [billingBusinessId]
     );
 
     const stripeCustomerId = subRow.rows[0]?.stripe_customer_id;

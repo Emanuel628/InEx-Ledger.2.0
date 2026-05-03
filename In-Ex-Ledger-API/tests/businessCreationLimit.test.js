@@ -8,8 +8,11 @@ const request = require("supertest");
 
 const BUSINESSES_ROUTE_PATH = require.resolve("../routes/businesses.routes.js");
 
-function loadBusinessesRouterFixture() {
+function loadBusinessesRouterFixture(options = {}) {
   const originalLoad = Module._load.bind(Module);
+  const state = {
+    businessCount: options.businessCount ?? 1
+  };
 
   Module._load = function (requestName, parent, isMain) {
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
@@ -35,19 +38,20 @@ function loadBusinessesRouterFixture() {
     if (requestName === "../api/utils/resolveBusinessIdForUser.js" || /resolveBusinessIdForUser\.js$/.test(requestName)) {
       return {
         resolveBusinessIdForUser: async () => "biz_limit_001",
-        listBusinessesForUser: async () => [
+        listBusinessesForUser: async () => options.listBusinesses || [
           { id: "biz_limit_001", name: "Main", is_active: true }
         ],
         setActiveBusinessForUser: async () => true,
-        createBusinessForUser: async () => {
-          throw new Error("createBusinessForUser should not be called when capped");
-        }
+        createBusinessForUserInTransaction: options.createBusinessForUserInTransaction || (async () => {
+          throw new Error("createBusinessForUserInTransaction should not be called when capped");
+        })
       };
     }
 
     if (requestName === "../services/subscriptionService.js" || /subscriptionService\.js$/.test(requestName)) {
       return {
-        getSubscriptionSnapshotForBusiness: async () => ({
+        findBillingAnchorBusinessIdForUser: async () => "biz_limit_001",
+        getSubscriptionSnapshotForBusiness: async () => (options.subscription || {
           effectiveTier: "free",
           maxBusinessesAllowed: 1
         })
@@ -71,7 +75,23 @@ function loadBusinessesRouterFixture() {
     }
 
     if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
-      return { pool: { async query() { return { rows: [], rowCount: 0 }; } } };
+      return {
+        pool: {
+          async query() { return { rows: [], rowCount: 0 }; },
+          async connect() {
+            return {
+              async query(sql) {
+                if (/SELECT pg_advisory_xact_lock/i.test(sql)) return { rows: [], rowCount: 1 };
+                if (/SELECT COUNT\(\*\)::int AS count FROM businesses/i.test(sql)) {
+                  return { rows: [{ count: state.businessCount }], rowCount: 1 };
+                }
+                return { rows: [], rowCount: 0 };
+              },
+              release() {}
+            };
+          }
+        }
+      };
     }
 
     return originalLoad(requestName, parent, isMain);
@@ -85,6 +105,7 @@ function loadBusinessesRouterFixture() {
 
   return {
     app,
+    state,
     cleanup() {
       delete require.cache[BUSINESSES_ROUTE_PATH];
       Module._load = originalLoad;
@@ -104,6 +125,35 @@ test("business creation requires payment when user is already at the business ca
     assert.equal(response.body?.code, "additional_business_payment_required");
     assert.equal(response.body?.max_businesses_allowed, 1);
     assert.equal(response.body?.current_business_count, 1);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("business creation is allowed during Pro trial when slot capacity already exists", async () => {
+  const fixture = loadBusinessesRouterFixture({
+    businessCount: 1,
+    subscription: {
+      effectiveTier: "v1",
+      effectiveStatus: "trialing",
+      isTrialing: true,
+      additionalBusinesses: 2,
+      maxBusinessesAllowed: 3
+    },
+    createBusinessForUserInTransaction: async () => "biz_limit_002",
+    listBusinesses: [
+      { id: "biz_limit_001", name: "Main", is_active: true },
+      { id: "biz_limit_002", name: "Second business", is_active: false }
+    ]
+  });
+
+  try {
+    const response = await request(fixture.app)
+      .post("/api/businesses")
+      .send({ name: "Second business", region: "US", language: "en" });
+
+    assert.equal(response.status, 201);
+    assert.equal(response.body?.active_business_id, "biz_limit_002");
   } finally {
     fixture.cleanup();
   }

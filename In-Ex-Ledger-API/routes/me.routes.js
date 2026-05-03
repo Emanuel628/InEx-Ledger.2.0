@@ -8,7 +8,7 @@ const { pool } = require("../db.js");
 const { requireAuth, verifyToken } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
-const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
+const { getSubscriptionSnapshotForUser } = require("../services/subscriptionService.js");
 const { listAssignedCpaGrants, listAccessibleBusinessScopeForUser } = require("../services/cpaAccessService.js");
 const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
@@ -104,7 +104,7 @@ router.get("/", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
     const result = await pool.query(
-      `SELECT id, email, role, email_verified, mfa_enabled, recovery_email, recovery_email_verified, full_name, display_name,
+      `SELECT id, email, role, email_verified, mfa_enabled, full_name, display_name,
               ui_preferences,
               country, province, data_residency, created_at,
               onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen,
@@ -124,7 +124,10 @@ router.get("/", async (req, res) => {
     const activeBusiness = businesses.find((business) => business.id === businessId) || null;
     const assignedCpaGrants = await listAssignedCpaGrants(user);
     const assignedCpaPortfolios = await listAccessibleBusinessScopeForUser(user);
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    const subscription = await getSubscriptionSnapshotForUser({
+      id: req.user.id,
+      business_id: businessId
+    });
     res.status(200).json({
       ...user,
       business_id: businessId,

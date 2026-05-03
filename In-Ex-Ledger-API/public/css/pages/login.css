@@ -204,6 +204,20 @@ main {
   color: var(--accent2);
 }
 
+.auth-text-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent2);
+  font: inherit;
+  cursor: pointer;
+}
+
+.auth-text-link:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 footer {
   margin-top: 40px;
 }

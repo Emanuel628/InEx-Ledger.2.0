@@ -8,9 +8,10 @@ const request = require("supertest");
 
 const BILLING_ROUTE_PATH = require.resolve("../routes/billing.routes.js");
 
-function loadBillingRouter({ country = "Canada" } = {}) {
+function loadBillingRouter({ country = "Canada", existingStripeSubscription = null } = {}) {
   const state = {
-    stripeRequests: []
+    stripeRequests: [],
+    stripeCustomerId: null
   };
 
   const originalLoad = Module._load.bind(Module);
@@ -22,9 +23,29 @@ function loadBillingRouter({ country = "Canada" } = {}) {
         pool: {
           async query(sql) {
             if (/SELECT stripe_customer_id/i.test(sql)) {
-              return { rows: [], rowCount: 0 };
+              return state.stripeCustomerId
+                ? { rows: [{ stripe_customer_id: state.stripeCustomerId }], rowCount: 1 }
+                : { rows: [], rowCount: 0 };
             }
             return { rows: [], rowCount: 0 };
+          },
+          async connect() {
+            return {
+              async query(sql, params = []) {
+                if (/SELECT pg_advisory_xact_lock/i.test(sql)) return { rows: [], rowCount: 1 };
+                if (/SELECT stripe_customer_id/i.test(sql)) {
+                  return state.stripeCustomerId
+                    ? { rows: [{ stripe_customer_id: state.stripeCustomerId }], rowCount: 1 }
+                    : { rows: [], rowCount: 0 };
+                }
+                if (/UPDATE business_subscriptions\s+SET stripe_customer_id/i.test(sql)) {
+                  state.stripeCustomerId = params[1] || null;
+                  return { rows: [], rowCount: 1 };
+                }
+                return { rows: [], rowCount: 0 };
+              },
+              release() {}
+            };
           }
         }
       };
@@ -39,6 +60,7 @@ function loadBillingRouter({ country = "Canada" } = {}) {
           isPaid: false,
           isCanceledWithRemainingAccess: false
         }),
+        findBillingAnchorBusinessIdForUser: async () => "22222222-2222-4222-8222-222222222222",
         updateStripeCustomerForBusiness: async () => {},
         syncStripeSubscriptionForBusiness: async () => {},
         setFreePlanForBusiness: async () => {}
@@ -112,6 +134,7 @@ function loadBillingRouter({ country = "Canada" } = {}) {
           };
           next();
         },
+        requireMfa: (_req, _res, next) => next(),
         requireMfaIfEnabled: (_req, _res, next) => next()
       };
     }
@@ -205,6 +228,13 @@ function loadBillingRouter({ country = "Canada" } = {}) {
       return {
         ok: true,
         json: async () => ({ id: "cus_test_123" })
+      };
+    }
+
+    if (String(url).includes("/subscriptions?customer=")) {
+      return {
+        ok: true,
+        json: async () => ({ data: existingStripeSubscription ? [existingStripeSubscription] : [] })
       };
     }
 
@@ -335,6 +365,31 @@ test("billing checkout rejects insecure APP_BASE_URL values", async () => {
     assert.equal(res.body.error, "Failed to start checkout.");
   } finally {
     process.env.APP_BASE_URL = originalBaseUrl;
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout blocks duplicate subscription creation when Stripe already has a live subscription for the customer", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    existingStripeSubscription: {
+      id: "sub_existing_live",
+      status: "active",
+      current_period_end: Math.floor(Date.now() / 1000) + 86400 * 30
+    }
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 1
+      });
+
+    assert.equal(res.status, 409);
+    assert.match(String(res.body?.error || ""), /already has an active|overlapping/i);
+  } finally {
     fixture.cleanup();
   }
 });

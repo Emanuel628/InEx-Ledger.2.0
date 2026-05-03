@@ -73,12 +73,19 @@ function loadBillingRouter(options = {}) {
     if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
       return {
         pool: {
-          async query(sql) {
+          async query(sql, params = []) {
             if (/SELECT metadata_json FROM business_subscriptions/i.test(sql)) {
               return {
                 rows: [{ metadata_json: { billing_interval: "monthly", currency: "usd" } }],
                 rowCount: 1
               };
+            }
+            if (/UPDATE business_subscriptions\s+SET metadata_json/i.test(sql)) {
+              state.snapshot = {
+                ...state.snapshot,
+                additionalBusinesses: Number(params[1] || 0)
+              };
+              return { rows: [], rowCount: 1 };
             }
             if (/INSERT INTO stripe_webhook_events/i.test(sql)) return { rowCount: 1 };
             return { rows: [], rowCount: 0 };
@@ -93,8 +100,12 @@ function loadBillingRouter(options = {}) {
         getSubscriptionSnapshotForBusiness: async () => {
           callCount += 1;
           if (callCount === 1) return state.snapshot;
-          return { ...state.snapshot, additionalBusinesses: state.stripeUpdates.length > 0 ? 2 : 0 };
+          return {
+            ...state.snapshot,
+            additionalBusinesses: state.snapshot.additionalBusinesses ?? (state.stripeUpdates.length > 0 ? 2 : 0)
+          };
         },
+        findBillingAnchorBusinessIdForUser: async () => "biz_addon_001",
         updateStripeCustomerForBusiness: async () => {},
         syncStripeSubscriptionForBusiness: async (bizId, sub) => {
           state.syncCalls.push({ bizId, sub });
@@ -128,6 +139,7 @@ function loadBillingRouter(options = {}) {
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
       return {
         requireAuth: (req, _res, next) => { req.user = { id: "user_test_001", email: "test@example.com" }; next(); },
+        requireMfa: (_req, _res, next) => next(),
         requireMfaIfEnabled: (_req, _res, next) => next()
       };
     }
@@ -238,6 +250,28 @@ test("PATCH /additional-businesses — Canceling Pro user cannot change slots (4
       .send({ additionalBusinesses: 2 });
     assert.equal(res.status, 409);
     assert.ok(res.body.error);
+  } finally {
+    cleanup();
+  }
+});
+
+test("PATCH /additional-businesses — canceled Pro subscription with remaining access cannot change slots (409)", async () => {
+  const { app, cleanup } = loadBillingRouter({
+    snapshot: {
+      effectiveTier: "v1",
+      isPaid: true,
+      isCanceledWithRemainingAccess: true,
+      cancelAtPeriodEnd: false,
+      stripeSubscriptionId: "sub_test_addon",
+      additionalBusinesses: 1
+    }
+  });
+  try {
+    const res = await request(app)
+      .patch("/api/billing/additional-businesses")
+      .send({ additionalBusinesses: 2 });
+    assert.equal(res.status, 409);
+    assert.match(res.body.error, /already been canceled/i);
   } finally {
     cleanup();
   }
@@ -431,6 +465,29 @@ test("PATCH /additional-businesses ? trialing Pro user can increase slots", asyn
     assert.equal(update["items[0][price]"], ADDON_PRICE_ID);
     assert.equal(update["items[0][quantity]"], "2");
     assert.equal(update["proration_behavior"], "create_prorations");
+  } finally {
+    cleanup();
+  }
+});
+
+test("PATCH /additional-businesses — trialing user without Stripe subscription stores slot count locally", async () => {
+  const { app, state, cleanup } = loadBillingRouter({
+    snapshot: {
+      effectiveTier: "v1",
+      isPaid: false,
+      isTrialing: true,
+      cancelAtPeriodEnd: false,
+      stripeSubscriptionId: null,
+      additionalBusinesses: 0
+    }
+  });
+  try {
+    const res = await request(app)
+      .patch("/api/billing/additional-businesses")
+      .send({ additionalBusinesses: 3 });
+    assert.equal(res.status, 200);
+    assert.equal(state.stripeUpdates.length, 0, "trial slot changes should not hit Stripe before paid conversion");
+    assert.equal(res.body.subscription?.additionalBusinesses, 3);
   } finally {
     cleanup();
   }

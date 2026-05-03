@@ -8,9 +8,12 @@ const {
   resolveBusinessIdForUser,
   listBusinessesForUser,
   setActiveBusinessForUser,
-  createBusinessForUser
+  createBusinessForUserInTransaction
 } = require("../api/utils/resolveBusinessIdForUser.js");
-const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
+const {
+  findBillingAnchorBusinessIdForUser,
+  getSubscriptionSnapshotForBusiness
+} = require("../services/subscriptionService.js");
 const { decryptTaxId } = require("../services/taxIdService.js");
 const { verifyPassword } = require("../utils/authUtils.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
@@ -38,6 +41,20 @@ function normalizeBusinessPayload(payload = {}) {
   }
 
   return { valid: true, normalized: { name, region, language } };
+}
+
+function buildBusinessLimitError(subscription, maxBusinessesAllowed) {
+  const hasProAccess = subscription?.effectiveTier === "v1";
+
+  if (hasProAccess) {
+    return maxBusinessesAllowed <= 1
+      ? "Your Pro plan currently includes 1 business. Add an additional business slot in Subscription to continue."
+      : `Your Pro plan currently allows up to ${maxBusinessesAllowed} businesses. Increase your additional business slots in Subscription to continue.`;
+  }
+
+  return maxBusinessesAllowed <= 1
+    ? "Your current plan includes 1 business. Upgrade to Pro and add an additional business slot to continue."
+    : `Your current plan allows up to ${maxBusinessesAllowed} businesses. Upgrade your business access in Subscription to continue.`;
 }
 
 router.get("/", async (req, res) => {
@@ -92,25 +109,37 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: validation.error });
   }
 
+  const client = await pool.connect();
   try {
     const activeBusinessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
-    const businesses = await listBusinessesForUser(req.user.id);
-    const subscription = await getSubscriptionSnapshotForBusiness(activeBusinessId);
+    const billingBusinessId =
+      await findBillingAnchorBusinessIdForUser(req.user.id, activeBusinessId) || activeBusinessId;
+    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
     const maxBusinessesAllowed = Number(subscription?.maxBusinessesAllowed || 1);
 
-    if (businesses.length >= maxBusinessesAllowed) {
+    await client.query("BEGIN");
+    const lockKey = BigInt("0x" + require("crypto").createHash("sha256").update(String(req.user.id)).digest("hex").slice(0, 15));
+    await client.query("SELECT pg_advisory_xact_lock($1)", [String(lockKey)]);
+
+    const businessCountResult = await client.query(
+      "SELECT COUNT(*)::int AS count FROM businesses WHERE user_id = $1",
+      [req.user.id]
+    );
+    const businessCount = Number(businessCountResult.rows[0]?.count || 0);
+
+    if (businessCount >= maxBusinessesAllowed) {
+      await client.query("ROLLBACK");
       return res.status(402).json({
-        error: maxBusinessesAllowed <= 1
-          ? "Your current plan includes 1 business. Upgrade and add an additional business to continue."
-          : `Your current plan allows up to ${maxBusinessesAllowed} businesses. Add another additional business to continue.`,
+        error: buildBusinessLimitError(subscription, maxBusinessesAllowed),
         code: "additional_business_payment_required",
         max_businesses_allowed: maxBusinessesAllowed,
-        current_business_count: businesses.length,
+        current_business_count: businessCount,
         subscription
       });
     }
 
-    const businessId = await createBusinessForUser(req.user, validation.normalized);
+    const businessId = await createBusinessForUserInTransaction(client, req.user, validation.normalized);
+    await client.query("COMMIT");
     req.user.business_id = businessId;
     const nextBusinesses = await listBusinessesForUser(req.user.id);
     const activeBusiness = nextBusinesses.find((business) => business.id === businessId) || null;
@@ -121,8 +150,15 @@ router.post("/", async (req, res) => {
       businesses: nextBusinesses
     });
   } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {
+      // noop
+    }
     logError("POST /businesses error:", err.message);
     res.status(500).json({ error: "Failed to create business." });
+  } finally {
+    client.release();
   }
 });
 
