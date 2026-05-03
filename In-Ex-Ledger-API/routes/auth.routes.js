@@ -76,7 +76,7 @@ const REFRESH_TOKEN_EXPIRY_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRY_DAYS) 
 const REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 const MFA_TRUST_EXPIRY_DAYS = Number(process.env.MFA_TRUST_EXPIRY_DAYS) || 14;
 const MFA_TRUST_EXPIRY_MS = MFA_TRUST_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-const MFA_EMAIL_CODE_EXPIRY_MINUTES = Number(process.env.MFA_EMAIL_CODE_EXPIRY_MINUTES) || 10;
+const MFA_EMAIL_CODE_EXPIRY_MINUTES = Number(process.env.MFA_EMAIL_CODE_EXPIRY_MINUTES) || 15;
 const MFA_EMAIL_CODE_EXPIRY_MS = MFA_EMAIL_CODE_EXPIRY_MINUTES * 60 * 1000;
 const REFRESH_TOKEN_BYTE_LENGTH = 48;
 const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 15 * 60;
@@ -98,7 +98,7 @@ class EmailNotVerifiedError extends Error {
 const VERIFICATION_TOKEN_TTL_MS = 15 * 60 * 1000;
 const PASSWORD_RESET_TTL_MS = 20 * 60 * 1000;
 const RECOVERY_EMAIL_TOKEN_TTL_MS = 30 * 60 * 1000;
-const MFA_PENDING_TOKEN_EXPIRY_SECONDS = 5 * 60;
+const MFA_PENDING_TOKEN_EXPIRY_SECONDS = MFA_EMAIL_CODE_EXPIRY_MINUTES * 60;
 const MAX_LOGIN_ATTEMPTS = Number(process.env.MAX_LOGIN_ATTEMPTS) || 5;
 const LOGIN_LOCKOUT_MINUTES = Number(process.env.LOGIN_LOCKOUT_MINUTES) || 15;
 const VERIFICATION_STATUS_TOKEN_EXPIRY_SECONDS = Number(process.env.VERIFICATION_STATUS_TOKEN_EXPIRY_SECONDS) || 24 * 60 * 60;
@@ -1648,7 +1648,6 @@ router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter
 router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
   const mfaToken = req.body?.mfaToken;
   const code = req.body?.code;
-  const trustDevice = !!req.body?.trustDevice;
 
   if (!mfaToken || !code) {
     return res.status(400).json({ error: "MFA token and code are required." });
@@ -1688,7 +1687,7 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
 
     await consumeMfaEmailChallenge(challenge.id);
     const refreshedUser = await findUserById(user.id);
-    if (trustDevice && refreshedUser.mfa_enabled) {
+    if (refreshedUser.mfa_enabled) {
       const trustedDevice = await createTrustedMfaDevice(refreshedUser, req);
       setMfaTrustCookie(res, trustedDevice.token, trustedDevice.expiresAt);
     }

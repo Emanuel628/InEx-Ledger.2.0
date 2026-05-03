@@ -21,6 +21,10 @@ document.addEventListener("DOMContentLoaded", () => {
   if (intro && pendingMfaEmail) {
     intro.textContent = `${tx("mfa_challenge_intro_prefix")} ${pendingMfaEmail}. ${tx("mfa_challenge_intro_suffix")}`;
   }
+  const trustToggle = document.getElementById("mfaTrustDevice");
+  if (trustToggle) {
+    trustToggle.checked = true;
+  }
 
   mfaChallengeForm?.addEventListener("submit", handleMfaChallengeSubmit);
   document.getElementById("mfaChallengeBack")?.addEventListener("click", () => {
@@ -36,7 +40,8 @@ async function handleMfaChallengeSubmit(event) {
   }
 
   const code = document.getElementById("mfaChallengeCode")?.value.trim() || "";
-  const trustDevice = !!document.getElementById("mfaTrustDevice")?.checked;
+  const trustToggle = document.getElementById("mfaTrustDevice");
+  const trustDevice = trustToggle ? trustToggle.checked : true;
   const submitButton = mfaChallengeForm.querySelector("button[type=\"submit\"]");
 
   clearMfaChallengeError();

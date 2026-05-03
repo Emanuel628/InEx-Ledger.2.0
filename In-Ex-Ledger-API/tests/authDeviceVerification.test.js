@@ -61,6 +61,7 @@ function loadAuthRouter(options = {}) {
     businessId: "00000000-0000-4000-8000-0000000000b1",
     hasRecognizedDeviceHistory: options.hasRecognizedDeviceHistory ?? true,
     recognizedDevice: !!options.recognizedDevice,
+    trustedMfaTokenHash: null,
     pendingChallengeId: null,
     pendingChallengeCodeHash: null,
     sentEmails: [],
@@ -184,7 +185,30 @@ function loadAuthRouter(options = {}) {
               return { rows: [], rowCount: 1 };
             }
 
+            if (/INSERT INTO mfa_trusted_devices/i.test(sql)) {
+              state.trustedMfaTokenHash = params[2];
+              return { rows: [], rowCount: 1 };
+            }
+
+            if (/SELECT id,\s*user_id,\s*expires_at\s+FROM mfa_trusted_devices/i.test(sql)) {
+              return params[0] === state.trustedMfaTokenHash && params[1] === state.user.id
+                ? {
+                    rows: [{
+                      id: "trusted-device-1",
+                      user_id: state.user.id,
+                      expires_at: new Date(Date.now() + 60_000).toISOString()
+                    }],
+                    rowCount: 1
+                  }
+                : { rows: [], rowCount: 0 };
+            }
+
+            if (/UPDATE mfa_trusted_devices SET last_used_at = NOW\(\) WHERE id = \$1/i.test(sql)) {
+              return { rows: [], rowCount: 1 };
+            }
+
             if (/DELETE FROM mfa_trusted_devices WHERE user_id = \$1/i.test(sql)) {
+              state.trustedMfaTokenHash = null;
               return { rows: [], rowCount: 0 };
             }
 
@@ -528,6 +552,79 @@ test("mfa verification refuses to issue session when user becomes unverified", a
     assert.equal(verifyResponse.status, 403);
     assert.equal(verifyResponse.body?.token, undefined);
     assert.match(String(verifyResponse.body?.error || ""), /verify your email/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("mfa sign-in trusts the device and skips another code on the next login", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+  fixture.state.user.mfa_enabled = true;
+  fixture.state.user.mfa_enabled_at = new Date().toISOString();
+
+  try {
+    const app = buildApp(fixture.router);
+    const firstLogin = await request(app)
+      .post("/api/auth/login")
+      .set("User-Agent", "TestBrowser/1.0")
+      .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
+
+    assert.equal(firstLogin.status, 200);
+    assert.equal(firstLogin.body?.mfa_required, true);
+    const verificationEmail = fixture.state.sentEmails.at(-1);
+    const codeMatch = String(verificationEmail?.text || "").match(/Code:\s*(\d{6})/);
+    assert.ok(codeMatch, "verification email should contain a 6-digit code");
+
+    const verifyResponse = await request(app)
+      .post("/api/auth/mfa/verify")
+      .set("User-Agent", "TestBrowser/1.0")
+      .send({
+        mfaToken: firstLogin.body.mfa_token,
+        code: codeMatch[1],
+        trustDevice: false
+      });
+
+    assert.equal(verifyResponse.status, 200);
+    assert.ok(verifyResponse.body?.token, "successful verification should return auth token");
+    const trustCookie = verifyResponse.headers["set-cookie"]?.find((cookie) => cookie.startsWith("mfa_trust="));
+    assert.ok(trustCookie, "successful MFA verification should set an mfa_trust cookie");
+
+    const secondLogin = await request(app)
+      .post("/api/auth/login")
+      .set("User-Agent", "TestBrowser/1.0")
+      .set("Cookie", trustCookie.split(";")[0])
+      .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
+
+    assert.equal(secondLogin.status, 200);
+    assert.ok(secondLogin.body?.token, "trusted device should log in directly");
+    assert.equal(secondLogin.body?.mfa_required, undefined);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("mfa challenge token lasts at least as long as the emailed code window", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+  fixture.state.user.mfa_enabled = true;
+  fixture.state.user.mfa_enabled_at = new Date().toISOString();
+
+  try {
+    const app = buildApp(fixture.router);
+    const loginResponse = await request(app)
+      .post("/api/auth/login")
+      .set("User-Agent", "TestBrowser/1.0")
+      .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
+
+    assert.equal(loginResponse.status, 200);
+    assert.equal(loginResponse.body?.mfa_required, true);
+    const pending = verifyToken(loginResponse.body.mfa_token);
+    assert.ok((pending.exp - pending.iat) >= 15 * 60, "pending MFA token should remain valid for at least 15 minutes");
   } finally {
     fixture.cleanup();
   }
