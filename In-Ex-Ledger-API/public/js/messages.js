@@ -73,7 +73,7 @@ function switchTab(tab) {
     a.classList.toggle("is-active", a.getAttribute("data-tab") === tab);
   });
 
-  const titleMap = { messages: "Messages", support: "Support", notifications: "Notifications" };
+  const titleMap = { messages: t("messages_title_messages"), support: t("messages_title_support"), notifications: t("messages_title_notifications") };
   const titleEl = document.getElementById("messagesTitle");
   if (titleEl) titleEl.textContent = titleMap[tab] || "Messages";
 
@@ -123,10 +123,10 @@ const MESSAGE_TYPE_FILTERS = {
 async function loadMessages(tab) {
   const list = document.getElementById("messagesList");
   if (!list) return;
-  list.innerHTML = '<div class="messages-loading">Loading messages...</div>';
+  list.innerHTML = `<div class="messages-loading">${t("messages_loading")}</div>`;
 
   if (tab === "notifications") {
-    list.innerHTML = '<div class="messages-empty">No system notifications yet.</div>';
+    list.innerHTML = `<div class="messages-empty">${t("messages_empty_notifications")}</div>`;
     return;
   }
 
@@ -140,7 +140,7 @@ async function loadMessages(tab) {
     renderMessageList(filtered, tab);
     updateUnreadBadge();
   } catch {
-    list.innerHTML = '<div class="messages-empty">Unable to load messages. Please refresh.</div>';
+    list.innerHTML = `<div class="messages-empty">${t("messages_empty_load_error")}</div>`;
   }
 }
 
@@ -148,7 +148,7 @@ function renderMessageList(messages, tab) {
   const list = document.getElementById("messagesList");
 
   if (!messages || !messages.length) {
-    const emptyText = tab === "support" ? "No support tickets yet." : tab === "notifications" ? "No system notifications yet." : "No messages yet.";
+    const emptyText = tab === "support" ? t("messages_empty_support") : tab === "notifications" ? t("messages_empty_notifications") : t("messages_empty");
     list.innerHTML = `<div class="messages-empty">${emptyText}</div>`;
     return;
   }
@@ -178,7 +178,7 @@ function renderMessageRow(m, tab) {
     : (m.sender_name || m.sender_email || "Unknown");
   const initial = (counterpart[0] || "?").toUpperCase();
   const unreadClass = (!isSent && !m.is_read) ? " is-unread" : "";
-  const typeLabel = { cpa: "Review", general_cpa: "Review", it_support: "IT Support", support_request: "Support", general: "General" }[m.message_type] || m.message_type;
+  const typeLabel = { cpa: t("messages_type_review"), general_cpa: t("messages_type_review"), it_support: t("messages_type_it_support"), support_request: t("messages_type_support_request"), general: t("messages_type_general") }[m.message_type] || m.message_type;
   const subject = m.subject || "(No subject)";
   const preview = (m.body || "").replace(/\n/g, " ").slice(0, PREVIEW_MAX_LENGTH) + ((m.body || "").length > PREVIEW_MAX_LENGTH ? "..." : "");
   const dateStr = formatRelativeDate(m.created_at);
@@ -250,7 +250,7 @@ async function openMessageDetail(id) {
       ? (m.receiver_name || m.receiver_email || "Unknown")
       : (m.sender_name || m.sender_email || "Unknown");
     const dateStr = formatRelativeDate(m.created_at);
-    const typeLabel = { cpa: "Review", general_cpa: "Review", it_support: "IT Support", support_request: "Support Request", general: "General" }[m.message_type] || m.message_type;
+    const typeLabel = { cpa: t("messages_type_review"), general_cpa: t("messages_type_review"), it_support: t("messages_type_it_support"), support_request: t("messages_type_support_request"), general: t("messages_type_general") }[m.message_type] || m.message_type;
 
     const subjectEl = document.getElementById("messageDetailSubject");
     const fromEl = document.getElementById("messageDetailFrom");
@@ -262,8 +262,8 @@ async function openMessageDetail(id) {
     if (subjectEl) subjectEl.textContent = `${subject} [${typeLabel}]`;
     if (fromEl) {
       fromEl.innerHTML = isSent
-        ? `To: <strong>${escapeHtml(counterpart)}</strong> - ${escapeHtml(dateStr)}`
-        : `From: <strong>${escapeHtml(counterpart)}</strong> - ${escapeHtml(dateStr)}`;
+        ? `${t("messages_detail_to")} <strong>${escapeHtml(counterpart)}</strong> - ${escapeHtml(dateStr)}`
+        : `${t("messages_detail_from")} <strong>${escapeHtml(counterpart)}</strong> - ${escapeHtml(dateStr)}`;
     }
     if (bodyEl) bodyEl.textContent = m.body;
     if (replyArea) { replyArea.classList.add("hidden"); }
@@ -281,7 +281,7 @@ async function openMessageDetail(id) {
 
     updateUnreadBadge();
   } catch {
-    showToast("Unable to open message. Please try again.");
+    showToast(t("messages_error_open"));
   }
 }
 
@@ -295,16 +295,16 @@ async function sendReply() {
   const input = document.getElementById("replyInput");
   const body = (input?.value || "").trim();
   if (!body) {
-    showFieldTooltip(input, "Please write a reply before sending.");
+    showFieldTooltip(input, t("messages_error_reply_empty"));
     return;
   }
   if (!isUuid(_currentMsgReceiverId)) {
-    showToast("Reply recipient is invalid. Reopen the message and try again.");
+    showToast(t("messages_error_reply_recipient"));
     return;
   }
 
   const btn = document.getElementById("replySendBtn");
-  if (btn) { btn.disabled = true; btn.textContent = "Sending..."; }
+  if (btn) { btn.disabled = true; btn.textContent = t("messages_sending"); }
 
   try {
     const res = await apiFetch("/api/messages", {
@@ -326,12 +326,12 @@ async function sendReply() {
     if (input) input.value = "";
     document.getElementById("replyArea")?.classList.add("hidden");
     closeMessageDetail();
-    showToast("Reply sent.");
+    showToast(t("messages_reply_sent"));
     await loadMessages(_currentTab);
   } catch (err) {
     showToast(err.message || "Failed to send reply. Please try again.");
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = "Send Reply"; }
+    if (btn) { btn.disabled = false; btn.textContent = t("messages_reply_send_btn"); }
   }
 }
 
@@ -455,23 +455,23 @@ async function sendComposedMessage() {
   const body = (bodyEl?.value || "").trim();
 
   if (!receiverId) {
-    if (errorEl) errorEl.textContent = "Please select a recipient.";
+    if (errorEl) errorEl.textContent = t("messages_error_no_recipient");
     toEl?.focus();
     return;
   }
   if (!isUuid(receiverId)) {
-    if (errorEl) errorEl.textContent = "Please select a valid recipient.";
+    if (errorEl) errorEl.textContent = t("messages_error_invalid_recipient");
     toEl?.focus();
     return;
   }
   if (!body) {
-    if (errorEl) errorEl.textContent = "Message body is required.";
+    if (errorEl) errorEl.textContent = t("messages_error_body_required");
     bodyEl?.focus();
     return;
   }
   if (errorEl) errorEl.textContent = "";
 
-  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = "Sending..."; }
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = t("messages_sending"); }
 
   try {
     const res = await apiFetch("/api/messages", {
@@ -487,12 +487,12 @@ async function sendComposedMessage() {
     }
 
     closeComposeModal();
-    showToast("Message sent.");
+    showToast(t("messages_toast_sent"));
     if (_currentTab === "sent") await loadMessages("sent");
   } catch {
-    if (errorEl) errorEl.textContent = "Network error. Please try again.";
+    if (errorEl) errorEl.textContent = t("messages_error_network");
   } finally {
-    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = "Send"; }
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = t("messages_compose_send_btn"); }
   }
 }
 

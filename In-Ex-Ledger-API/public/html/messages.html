@@ -31,31 +31,31 @@
 
   <main id="main-content" class="app-shell">
     <aside class="app-sidebar" aria-label="Sidebar">
-      <div class="sidebar-section-label">Messages</div>
+      <div class="sidebar-section-label" data-i18n="messages_sidebar_messages">Messages</div>
       <nav class="sidebar-nav">
         <a href="#" class="sidebar-link is-active" id="sidebarInbox" data-tab="inbox">
           <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 4h12v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4z"></path><path d="M2 4l6 5 6-5"></path></svg></span>
-          <span>Inbox</span>
+          <span data-i18n="messages_sidebar_inbox">Inbox</span>
           <span id="sidebarUnreadBadge" class="messages-tab-badge" hidden></span>
         </a>
         <a href="#" class="sidebar-link" id="sidebarSent" data-tab="sent">
           <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M14 2L2 7l5 2 2 5 5-12z"></path></svg></span>
-          <span>Sent</span>
+          <span data-i18n="messages_sidebar_sent">Sent</span>
         </a>
         <a href="#" class="sidebar-link" id="sidebarArchived" data-tab="archived">
           <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="6" width="12" height="8" rx="1"></rect><path d="M2 6l2-4h8l2 4"></path><line x1="6" y1="10" x2="10" y2="10"></line></svg></span>
-          <span>Archived</span>
+          <span data-i18n="messages_sidebar_archived">Archived</span>
         </a>
       </nav>
-      <div class="sidebar-section-label sidebar-section-label-spaced">Support</div>
+      <div class="sidebar-section-label sidebar-section-label-spaced" data-i18n="messages_sidebar_support_label">Support</div>
       <nav class="sidebar-nav">
         <a href="#" class="sidebar-link" id="sidebarNewMsg" data-action="compose">
           <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 14l1.5-4.5L11 2l3 3-7.5 7.5L2 14z"></path><path d="M10 3l3 3"></path></svg></span>
-          <span>New Message</span>
+          <span data-i18n="messages_sidebar_new_msg">New Message</span>
         </a>
         <a href="#" class="sidebar-link" id="sidebarSupport" data-action="support">
           <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6"></circle><path d="M6 6a2 2 0 1 1 2 2v1"></path><circle cx="8" cy="12" r=".5" fill="currentColor"></circle></svg></span>
-          <span>Request Support</span>
+          <span data-i18n="messages_sidebar_request_support">Request Support</span>
         </a>
       </nav>
     </aside>
@@ -63,15 +63,15 @@
     <div class="messages-content">
       <div class="messages-header">
         <h1 id="messagesTitle">Inbox</h1>
-        <button type="button" class="messages-compose-btn" id="composeBtn">+ Compose</button>
+        <button type="button" class="messages-compose-btn" id="composeBtn" data-i18n="messages_compose_btn">+ Compose</button>
       </div>
 
       <div class="messages-tabs" role="tablist" aria-label="Message types">
         <button type="button" class="messages-tab is-active" id="tabMessages" role="tab" aria-selected="true" aria-controls="messagesList" data-tab="messages">
-          Messages<span class="messages-tab-badge" id="inboxBadge" hidden></span>
+          <span data-i18n="messages_tab_messages">Messages</span><span class="messages-tab-badge" id="inboxBadge" hidden></span>
         </button>
-        <button type="button" class="messages-tab" id="tabSupport" role="tab" aria-selected="false" aria-controls="messagesList" data-tab="support">Support</button>
-        <button type="button" class="messages-tab" id="tabNotifications" role="tab" aria-selected="false" aria-controls="messagesList" data-tab="notifications">Notifications</button>
+        <button type="button" class="messages-tab" id="tabSupport" role="tab" aria-selected="false" aria-controls="messagesList" data-tab="support" data-i18n="messages_tab_support">Support</button>
+        <button type="button" class="messages-tab" id="tabNotifications" role="tab" aria-selected="false" aria-controls="messagesList" data-tab="notifications" data-i18n="messages_tab_notifications">Notifications</button>
       </div>
 
       <div class="messages-panel" id="messagesPanel" role="tabpanel" aria-labelledby="tabMessages">
@@ -95,14 +95,14 @@
       <div class="message-detail-body" id="messageDetailBody"></div>
       <div class="message-detail-footer">
         <div class="message-detail-actions">
-          <button type="button" class="msg-btn" id="detailReplyBtn">Reply</button>
-          <button type="button" class="msg-btn" id="detailArchiveBtn">Archive</button>
-          <button type="button" class="msg-btn danger" id="detailDeleteBtn">Delete</button>
+          <button type="button" class="msg-btn" id="detailReplyBtn" data-i18n="messages_detail_reply_btn">Reply</button>
+          <button type="button" class="msg-btn" id="detailArchiveBtn" data-i18n="messages_detail_archive_btn">Archive</button>
+          <button type="button" class="msg-btn danger" id="detailDeleteBtn" data-i18n="messages_detail_delete_btn">Delete</button>
         </div>
       </div>
       <div class="message-reply-area hidden" id="replyArea">
         <textarea class="message-reply-input form-control" id="replyInput" placeholder="Write your reply…" maxlength="10000"></textarea>
-        <button type="button" class="message-reply-send" id="replySendBtn">Send Reply</button>
+        <button type="button" class="message-reply-send" id="replySendBtn" data-i18n="messages_reply_send_btn">Send Reply</button>
       </div>
     </div>
   </div>
@@ -110,33 +110,33 @@
   <!-- Compose modal -->
   <div class="compose-overlay hidden" id="composeOverlay" role="dialog" aria-modal="true" aria-labelledby="composeTitle">
     <div class="compose-modal">
-      <h2 id="composeTitle">New Message</h2>
+      <h2 id="composeTitle" data-i18n="messages_compose_title">New Message</h2>
       <div class="compose-field">
-        <label for="composeTo">To</label>
+        <label for="composeTo" data-i18n="messages_compose_to_label">To</label>
         <select id="composeTo">
-          <option value="">Select contact…</option>
+          <option value="" data-i18n="messages_compose_to_placeholder">Select contact…</option>
         </select>
       </div>
       <div class="compose-field">
-        <label for="composeType">Message Type</label>
+        <label for="composeType" data-i18n="messages_compose_type_label">Message Type</label>
         <select id="composeType">
-          <option value="general">General</option>
-          <option value="it_support">IT Support</option>
-          <option value="support_request">Support Request</option>
+          <option value="general" data-i18n="messages_compose_type_general">General</option>
+          <option value="it_support" data-i18n="messages_compose_type_it_support">IT Support</option>
+          <option value="support_request" data-i18n="messages_compose_type_support_request">Support Request</option>
         </select>
       </div>
       <div class="compose-field">
-        <label for="composeSubject">Subject (optional)</label>
+        <label for="composeSubject" data-i18n="messages_compose_subject_label">Subject (optional)</label>
         <input type="text" id="composeSubject" maxlength="200" placeholder="Brief subject…" class="form-control" />
       </div>
       <div class="compose-field">
-        <label for="composeBody">Message</label>
+        <label for="composeBody" data-i18n="messages_compose_body_label">Message</label>
         <textarea id="composeBody" maxlength="10000" placeholder="Write your message…" class="form-control"></textarea>
       </div>
       <p class="compose-error" id="composeError"></p>
       <div class="compose-actions">
-        <button type="button" class="compose-cancel" id="composeCancelBtn">Cancel</button>
-        <button type="button" class="compose-send" id="composeSendBtn">Send</button>
+        <button type="button" class="compose-cancel" id="composeCancelBtn" data-i18n="messages_compose_cancel_btn">Cancel</button>
+        <button type="button" class="compose-send" id="composeSendBtn" data-i18n="messages_compose_send_btn">Send</button>
       </div>
     </div>
   </div>
