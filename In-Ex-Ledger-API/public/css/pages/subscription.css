@@ -413,10 +413,11 @@
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  border: none;
+  border: 1px solid transparent;
+  padding: 0;
   background: var(--surface2);
-  font-size: 15px;
-  line-height: 1;
+  font-size: 16px;
+  line-height: 0;
   color: var(--ink);
   cursor: pointer;
   display: flex;
@@ -424,11 +425,12 @@
   justify-content: center;
   flex-shrink: 0;
   font-weight: 500;
-  transition: background 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease;
 }
 
 .sub-quantity-btn:hover {
-  background: var(--surface3);
+  background: rgba(37, 99, 168, 0.1);
+  border-color: rgba(37, 99, 168, 0.28);
 }
 
 .sub-quantity-btn:disabled {
