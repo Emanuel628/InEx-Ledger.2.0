@@ -2752,6 +2752,9 @@ body {
 }
 
 .toolbar-import-button {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
   padding: 0 16px;
   border-radius: 12px;
   border: 1px solid rgba(15, 25, 35, 0.12);
