@@ -385,31 +385,6 @@ function makeCsrfHeaders() {
   };
 }
 
-test("forgot-password does not trust Host header when APP_BASE_URL is unset", async () => {
-  const fixture = loadAuthRouter({
-    nodeEnv: "development"
-  });
-
-  try {
-    const app = buildApp(fixture.router);
-    const response = await request(app)
-      .post("/api/auth/forgot-password")
-      .set("Host", "attacker.example")
-      .set("X-Forwarded-Host", "attacker.example")
-      .send({ email: fixture.state.user.email });
-
-    assert.equal(response.status, 200);
-    assert.equal(fixture.state.sentEmails.length, 1);
-    const payload = fixture.state.sentEmails[0];
-    assert.ok(payload.html.includes("http://localhost:8080/reset-password?token="));
-    assert.ok(payload.text.includes("http://localhost:8080/reset-password?token="));
-    assert.equal(payload.html.includes("attacker.example"), false);
-    assert.equal(payload.text.includes("attacker.example"), false);
-  } finally {
-    fixture.cleanup();
-  }
-});
-
 test("send-verification does not leak whether an email exists", async () => {
   const fixture = loadAuthRouter({
     nodeEnv: "test",
@@ -462,7 +437,7 @@ test("send-verification accepts a signed verification state for legitimate resen
   }
 });
 
-test("new-device sign-in requires 6-digit email verification before issuing session", async () => {
+test("new-device sign-in succeeds directly when MFA is disabled", async () => {
   const fixture = loadAuthRouter({
     nodeEnv: "test",
     appBaseUrl: "https://app.inexledger.test"
@@ -476,26 +451,10 @@ test("new-device sign-in requires 6-digit email verification before issuing sess
       .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
 
     assert.equal(loginResponse.status, 200);
-    assert.equal(loginResponse.body?.mfa_required, true);
-    assert.equal(loginResponse.body?.device_verification_required, true);
-    assert.ok(loginResponse.body?.mfa_token, "mfa_token should be returned");
-    assert.equal(fixture.state.sentEmails.length, 1);
-
-    const verificationEmail = fixture.state.sentEmails[0];
-    const codeMatch = String(verificationEmail.text || "").match(/Code:\s*(\d{6})/);
-    assert.ok(codeMatch, "verification email should contain a 6-digit code");
-
-    const verifyResponse = await request(app)
-      .post("/api/auth/mfa/verify")
-      .set("User-Agent", "TestBrowser/1.0")
-      .send({
-        mfaToken: loginResponse.body.mfa_token,
-        code: codeMatch[1],
-        trustDevice: false
-      });
-
-    assert.equal(verifyResponse.status, 200);
-    assert.ok(verifyResponse.body?.token, "successful verification should return auth token");
+    assert.ok(loginResponse.body?.token, "login should return an auth token");
+    assert.equal(loginResponse.body?.mfa_required, undefined);
+    assert.equal(loginResponse.body?.device_verification_required, undefined);
+    assert.equal(fixture.state.sentEmails.length, 0);
     assert.equal(fixture.state.recognizedDevice, true);
 
     const secondLogin = await request(app)
@@ -539,6 +498,8 @@ test("mfa verification refuses to issue session when user becomes unverified", a
     nodeEnv: "test",
     appBaseUrl: "https://app.inexledger.test"
   });
+  fixture.state.user.mfa_enabled = true;
+  fixture.state.user.mfa_enabled_at = new Date().toISOString();
 
   try {
     const app = buildApp(fixture.router);

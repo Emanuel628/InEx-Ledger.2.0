@@ -231,8 +231,6 @@ test("frontend compliance: public auth pages use plain fetch without CSRF (expec
   const publicAuthFiles = [
     "login.js",
     "register.js",
-    "forgot-password.js",
-    "reset-password.js",
     "verify-email.js",
     "mfa-challenge.js"
   ];

@@ -104,6 +104,10 @@ function loadAuthRouter() {
 
     if (requestName === "../services/subscriptionService.js" || /subscriptionService\.js$/.test(requestName)) {
       return {
+        getSubscriptionSnapshotForUser: async () => ({
+          effectiveTier: "trial",
+          effectiveStatus: "trialing"
+        }),
         getSubscriptionSnapshotForBusiness: async () => ({
           effectiveTier: "trial",
           effectiveStatus: "trialing"

@@ -1701,19 +1701,11 @@ function initSecurityForm() {
   const mfaPrimaryButton = document.getElementById("mfaPrimaryButton");
   const mfaCancelButton = document.getElementById("mfaCancelButton");
   const mfaMessage = document.getElementById("mfaMessage");
-  const recoveryEmailInput = document.getElementById("recovery-email");
-  const recoveryEmailPassword = document.getElementById("recovery-email-password");
-  const recoveryEmailSaveButton = document.getElementById("recoveryEmailSaveButton");
-  const recoveryEmailStatus = document.getElementById("recoveryEmailStatus");
-  const recoveryEmailMessage = document.getElementById("recoveryEmailMessage");
   const revokeAllSessionsButton = document.getElementById("settingsRevokeAllSessionsBtn");
-  const recoveryEmailVerified = new URLSearchParams(window.location.search).get("recovery_email_verified") === "true";
 
   let mfaStatus = {
     enabled: false,
-    delivery: "email",
-    recovery_email_masked: "",
-    recovery_email_verified: false
+    delivery: "email"
   };
   let mfaMode = "idle";
   let mfaPendingToken = "";
@@ -1780,47 +1772,6 @@ function initSecurityForm() {
     }
   };
 
-  const setRecoveryMessage = (message = "", tone = "") => {
-    if (!recoveryEmailMessage) {
-      return;
-    }
-    recoveryEmailMessage.textContent = message;
-    recoveryEmailMessage.classList.remove("is-error", "is-success");
-    if (tone) {
-      recoveryEmailMessage.classList.add(tone);
-    }
-  };
-
-  const maskRecoveryEmailForDisplay = (email) => {
-    const value = String(email || "").trim().toLowerCase();
-    const atIndex = value.indexOf("@");
-    if (atIndex <= 0) {
-      return "";
-    }
-    const local = value.slice(0, atIndex);
-    const domain = value.slice(atIndex + 1);
-    const maskedLocal = local.length <= 2 ? `${local[0] || "*"}*` : `${local.slice(0, 2)}${"*".repeat(Math.max(local.length - 2, 2))}`;
-    const domainParts = domain.split(".");
-    const domainName = domainParts.shift() || "";
-    const maskedDomain = domainName.length <= 2 ? `${domainName[0] || "*"}*` : `${domainName.slice(0, 2)}${"*".repeat(Math.max(domainName.length - 2, 2))}`;
-    return `${maskedLocal}@${[maskedDomain, ...domainParts].join(".")}`;
-  };
-
-  const updateRecoveryUi = () => {
-    if (!recoveryEmailStatus) {
-      return;
-    }
-    if (mfaStatus.recovery_email_verified && mfaStatus.recovery_email_masked) {
-      recoveryEmailStatus.textContent = `Verified recovery email: ${mfaStatus.recovery_email_masked}`;
-      return;
-    }
-    if (mfaStatus.recovery_email_masked) {
-      recoveryEmailStatus.textContent = `Pending confirmation: ${mfaStatus.recovery_email_masked}. Check that inbox to finish setup.`;
-      return;
-    }
-    recoveryEmailStatus.textContent = "No recovery email verified yet.";
-  };
-
   const resetSetupPanel = () => {
     mfaSetupPanel?.classList.add("hidden");
     if (mfaSetupCode) mfaSetupCode.value = "";
@@ -1867,7 +1818,6 @@ function initSecurityForm() {
     }
 
     if (mfaMode === "idle") resetSetupPanel();
-    updateRecoveryUi();
   };
 
   const loadMfaStatus = async () => {
@@ -1910,7 +1860,7 @@ function initSecurityForm() {
 
   showToggle?.addEventListener("change", () => {
     const type = showToggle.checked ? "text" : "password";
-    [currentInput, newInput, confirmInput, recoveryEmailPassword].forEach((input) => {
+    [currentInput, newInput, confirmInput].forEach((input) => {
       if (!input) {
         return;
       }
@@ -1984,9 +1934,6 @@ function initSecurityForm() {
     setMfaMessage("");
 
     if (mfaMode === "enable_start") {
-      if (!mfaStatus.recovery_email_verified) {
-        setMfaMessage("Tip: add a recovery email so you can regain access if you lose your device.", "is-warning");
-      }
       try {
         const response = await apiFetch("/api/auth/mfa/enable", {
           method: "POST",
@@ -2144,50 +2091,6 @@ function initSecurityForm() {
     await revokeAllSessionsFromSettings(revokeAllSessionsButton);
   });
 
-  recoveryEmailSaveButton?.addEventListener("click", async () => {
-    setRecoveryMessage("");
-    const recoveryEmail = recoveryEmailInput?.value.trim() || "";
-    const currentPassword = recoveryEmailPassword?.value || "";
-    if (!recoveryEmail || !currentPassword) {
-      setRecoveryMessage("Enter the recovery email and your current password.", "is-error");
-      return;
-    }
-
-    recoveryEmailSaveButton.disabled = true;
-    try {
-      const response = await apiFetch("/api/auth/recovery-email/request", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          recoveryEmail,
-          currentPassword
-        })
-      });
-      const payload = response ? await response.json().catch(() => null) : null;
-      if (!response || !response.ok) {
-        setRecoveryMessage(payload?.error || "Unable to save recovery email.", "is-error");
-        return;
-      }
-
-      if (!mfaStatus.recovery_email_verified) {
-        mfaStatus.recovery_email_masked = maskRecoveryEmailForDisplay(recoveryEmail);
-        mfaStatus.recovery_email_verified = false;
-        updateRecoveryUi();
-      }
-      setRecoveryMessage(payload?.message || "Check your recovery email for a confirmation link.", "is-success");
-      if (recoveryEmailPassword) {
-        recoveryEmailPassword.value = "";
-      }
-    } catch (error) {
-      console.error("Recovery email request failed", error);
-      setRecoveryMessage("Unable to save recovery email.", "is-error");
-    } finally {
-      recoveryEmailSaveButton.disabled = false;
-    }
-  });
-
   updateStrength();
   updateRequirements();
   updateMatch();
@@ -2196,13 +2099,6 @@ function initSecurityForm() {
     console.error("Failed to initialize MFA settings", error);
     setMfaMessage(t("settings_mfa_status_error"), "is-error");
     setMfaUnknown();
-  }).finally(() => {
-    if (recoveryEmailVerified) {
-      showSettingsToast("Recovery email confirmed.");
-      const url = new URL(window.location.href);
-      url.searchParams.delete("recovery_email_verified");
-      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
-    }
   });
 }
 

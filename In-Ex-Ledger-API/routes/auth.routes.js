@@ -1007,7 +1007,7 @@ router.post("/login", authLimiter, async (req, res) => {
         lockedUntil: getLoginLockExpiry(user)?.toISOString() || null
       });
       return res.status(423).json({
-        error: "Too many failed sign-in attempts. Try again later or use account recovery.",
+        error: "Too many failed sign-in attempts. Try again later.",
         code: "account_locked",
         locked_until: getLoginLockExpiry(user)?.toISOString() || null
       });
@@ -1033,7 +1033,7 @@ router.post("/login", authLimiter, async (req, res) => {
       }
       if (failureState.lockedUntil) {
         return res.status(423).json({
-          error: "Too many failed sign-in attempts. Try again later or use account recovery.",
+          error: "Too many failed sign-in attempts. Try again later.",
           code: "account_locked",
           locked_until: failureState.lockedUntil.toISOString()
         });
@@ -1082,7 +1082,6 @@ router.post("/login", authLimiter, async (req, res) => {
     );
     const isFirstSignIn = existingDeviceCount.rowCount === 0;
 
-    const needsDeviceVerification = !recognizedDevice && !!deviceContext && !isFirstSignIn;
     let mfaAuthenticated = false;
 
     if (user.mfa_enabled) {
@@ -1109,27 +1108,6 @@ router.post("/login", authLimiter, async (req, res) => {
           mfa_enabled: true
         });
       }
-    } else if (needsDeviceVerification) {
-      const userLang = await getPreferredLanguageForUser(user.id);
-      const pendingToken = await createMfaEmailChallenge(user, req, {
-        businessId,
-        tokenPurpose: "device_signin_pending",
-        tokenPayload: {
-          device_fingerprint_hash: deviceContext.fingerprintHash,
-          device_ip_hash: deviceContext.ipHash,
-          device_user_agent: deviceContext.userAgent
-        },
-        lang: userLang,
-        mfaContentKey: "signin",
-        locationPath: "/login"
-      });
-      return res.status(200).json({
-        mfa_required: true,
-        mfa_token: pendingToken,
-        email_verified: verified,
-        mfa_enabled: false,
-        device_verification_required: true
-      });
     }
 
     const session = await issueAuthenticatedSession(res, user, businessId, {
@@ -1147,6 +1125,12 @@ router.post("/login", authLimiter, async (req, res) => {
         await insertRecognizedSignInDevice(user, deviceContext);
       } catch (securitySignalErr) {
         logWarn("First sign-in device registration warning:", securitySignalErr?.message || securitySignalErr);
+      }
+    } else if (!recognizedDevice && deviceContext) {
+      try {
+        await insertRecognizedSignInDevice(user, deviceContext);
+      } catch (securitySignalErr) {
+        logWarn("New device registration warning:", securitySignalErr?.message || securitySignalErr);
       }
     } else if (recognizedDevice && deviceContext) {
       try {
@@ -1672,7 +1656,7 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
 
   try {
     const pending = verifyToken(mfaToken);
-    if (!pending.id || (pending.purpose !== "mfa_pending" && pending.purpose !== "device_signin_pending")) {
+    if (!pending.id || pending.purpose !== "mfa_pending") {
       return res.status(401).json({ error: "Invalid MFA session." });
     }
 
@@ -1680,7 +1664,7 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
     if (!user || user.email !== pending.email) {
       return res.status(401).json({ error: "MFA session is no longer valid." });
     }
-    if (pending.purpose === "mfa_pending" && !user.mfa_enabled) {
+    if (!user.mfa_enabled) {
       return res.status(401).json({ error: "MFA session is no longer valid." });
     }
 
@@ -1704,30 +1688,12 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
 
     await consumeMfaEmailChallenge(challenge.id);
     const refreshedUser = await findUserById(user.id);
-    if (pending.purpose === "device_signin_pending") {
-      if (refreshedUser.mfa_enabled) {
-        return res.status(401).json({ error: "Invalid MFA session." });
-      }
-      const deviceContext = buildSignInDeviceContext(refreshedUser, req) || {};
-      const tokenFingerprintHash = String(pending.device_fingerprint_hash || "").trim();
-      const currentFingerprintHash = String(deviceContext.fingerprintHash || "").trim();
-      if (!tokenFingerprintHash || !currentFingerprintHash || tokenFingerprintHash !== currentFingerprintHash) {
-        return res.status(401).json({ error: "Invalid MFA session." });
-      }
-      const fingerprintHash = tokenFingerprintHash;
-      await insertRecognizedSignInDevice(refreshedUser, {
-        userAgent: String(pending.device_user_agent || deviceContext.userAgent || ""),
-        ipAddress: deviceContext.ipAddress || null,
-        fingerprintHash,
-        ipHash: pending.device_ip_hash ? String(pending.device_ip_hash) : (deviceContext.ipHash || null)
-      });
-    }
     if (trustDevice && refreshedUser.mfa_enabled) {
       const trustedDevice = await createTrustedMfaDevice(refreshedUser, req);
       setMfaTrustCookie(res, trustedDevice.token, trustedDevice.expiresAt);
     }
     const session = await issueAuthenticatedSession(res, refreshedUser, pending.business_id || null, {
-      mfaAuthenticated: pending.purpose === "mfa_pending"
+      mfaAuthenticated: true
     });
     return res.status(200).json(session);
   } catch (err) {
@@ -1739,6 +1705,16 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
     logError("MFA verify error:", err);
     return res.status(401).json({ error: "Invalid or expired MFA session." });
   }
+});
+
+router.all([
+  "/forgot-password",
+  "/account-recovery",
+  "/reset-password",
+  "/recovery-email/request",
+  "/confirm-recovery-email"
+], (_req, res) => {
+  return res.status(404).json({ error: "Not found." });
 });
 
 /**
