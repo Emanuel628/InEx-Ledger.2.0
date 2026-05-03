@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <title>InEx Ledger - Messages</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="/css/app.css" />
-  <link rel="stylesheet" href="/css/pages/messages.css" />
+  <link rel="stylesheet" href="/css/app.css?v=20260430a" />
+  <link rel="stylesheet" href="/css/pages/messages.css?v=20260503a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -61,24 +61,107 @@
     </aside>
 
     <div class="messages-content">
-      <div class="messages-header">
-        <h1 id="messagesTitle">Inbox</h1>
-        <button type="button" class="messages-compose-btn" id="composeBtn" data-i18n="messages_compose_btn">+ Compose</button>
-      </div>
-
-      <div class="messages-tabs" role="tablist" aria-label="Message types">
-        <button type="button" class="messages-tab is-active" id="tabMessages" role="tab" aria-selected="true" aria-controls="messagesList" data-tab="messages">
-          <span data-i18n="messages_tab_messages">Messages</span><span class="messages-tab-badge" id="inboxBadge" hidden></span>
-        </button>
-        <button type="button" class="messages-tab" id="tabSupport" role="tab" aria-selected="false" aria-controls="messagesList" data-tab="support" data-i18n="messages_tab_support">Support</button>
-        <button type="button" class="messages-tab" id="tabNotifications" role="tab" aria-selected="false" aria-controls="messagesList" data-tab="notifications" data-i18n="messages_tab_notifications">Notifications</button>
-      </div>
-
-      <div class="messages-panel" id="messagesPanel" role="tabpanel" aria-labelledby="tabMessages">
-        <div class="messages-list" id="messagesList">
-        <div class="messages-loading">Loading messages...</div>
+      <section class="messages-page-header">
+        <div class="messages-page-copy">
+          <span class="messages-page-eyebrow">Message Center</span>
+          <h1 id="messagesTitle">Inbox</h1>
+          <p class="messages-page-subtitle" id="messagesHeaderSubtitle">Secure threads for accountant review, support questions, and account communication.</p>
+          <p class="messages-page-context">Verified contacts only. Every thread stays attached to your account history.</p>
         </div>
-      </div>
+        <div class="messages-page-actions">
+          <div class="messages-sync-pill">
+            <span class="messages-sync-dot" aria-hidden="true"></span>
+            <span id="messagesSyncStatus">Checking for new activity</span>
+          </div>
+          <button type="button" class="messages-compose-btn" id="composeBtn" data-i18n="messages_compose_btn">+ Compose</button>
+        </div>
+      </section>
+
+      <section class="messages-overview-grid" aria-label="Messages overview">
+        <article class="messages-overview-card">
+          <span class="messages-overview-icon messages-overview-icon--unread" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M3 5.5h14v9a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5v-9Z"></path><path d="M3 6l7 5 7-5"></path></svg>
+          </span>
+          <div class="messages-overview-copy">
+            <div class="messages-overview-label">Unread now</div>
+            <div class="messages-overview-value" id="messagesUnreadMetric">0</div>
+            <div class="messages-overview-meta">Threads waiting on you</div>
+          </div>
+        </article>
+        <article class="messages-overview-card">
+          <span class="messages-overview-icon messages-overview-icon--queue" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="3"></rect><path d="M6.5 7.5h7M6.5 10h7M6.5 12.5h4"></path></svg>
+          </span>
+          <div class="messages-overview-copy">
+            <div class="messages-overview-label">Current queue</div>
+            <div class="messages-overview-value" id="messagesQueueMetric">0</div>
+            <div class="messages-overview-meta" id="messagesQueueMeta">Visible in this mailbox</div>
+          </div>
+        </article>
+        <article class="messages-overview-card">
+          <span class="messages-overview-icon messages-overview-icon--support" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M10 16.5c3.59 0 6.5-2.69 6.5-6s-2.91-6-6.5-6-6.5 2.69-6.5 6c0 1.29.44 2.48 1.19 3.45L4 17l3.43-.78c.79.18 1.64.28 2.57.28Z"></path><path d="M7.75 8.5h4.5M7.75 11h3"></path></svg>
+          </span>
+          <div class="messages-overview-copy">
+            <div class="messages-overview-label">Support threads</div>
+            <div class="messages-overview-value" id="messagesSupportMetric">0</div>
+            <div class="messages-overview-meta">Operational requests and help</div>
+          </div>
+        </article>
+        <article class="messages-overview-card">
+          <span class="messages-overview-icon messages-overview-icon--refresh" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M15.5 7.5V4.5h-3"></path><path d="M15.18 9a5.75 5.75 0 1 1-1.2-2.18L15.5 7.5"></path></svg>
+          </span>
+          <div class="messages-overview-copy">
+            <div class="messages-overview-label">Last refresh</div>
+            <div class="messages-overview-value messages-overview-value--small" id="messagesRefreshMetric">-</div>
+            <div class="messages-overview-meta">Pulled from your active mailbox</div>
+          </div>
+        </article>
+      </section>
+
+      <section class="messages-focus-banner" aria-label="Message workflow">
+        <div class="messages-focus-main">
+          <span class="messages-focus-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="3"></rect><path d="M3 7l9 6 9-6"></path><path d="M8 3h8"></path></svg>
+          </span>
+          <div class="messages-focus-copy">
+            <div class="messages-focus-label">Operational communication</div>
+            <h2>Built for real accounting and support work, not social chatter.</h2>
+            <p>Keep accountant reviews, support requests, and account updates in one controlled queue with clean archive history.</p>
+          </div>
+        </div>
+        <div class="messages-focus-actions">
+          <button type="button" class="messages-focus-btn" id="supportShortcutBtn">Request Support</button>
+        </div>
+      </section>
+
+      <section class="messages-panel" id="messagesPanel" role="tabpanel" aria-labelledby="tabMessages">
+        <div class="messages-panel-header">
+          <div class="messages-panel-copy">
+            <div class="messages-panel-kickers">
+              <span class="messages-mailbox-pill" id="messagesMailboxBadge">Inbox</span>
+              <span class="messages-count-pill" id="messagesVisibleCount">0 threads visible</span>
+            </div>
+            <h2 id="messagesSurfaceTitle">Conversation queue</h2>
+            <p id="messagesSurfaceSubtitle">Review incoming threads, keep support work organized, and archive finished conversations without losing history.</p>
+          </div>
+          <div class="messages-panel-tools">
+            <div class="messages-tabs" role="tablist" aria-label="Message types">
+              <button type="button" class="messages-tab is-active" id="tabMessages" role="tab" aria-selected="true" aria-controls="messagesList" data-tab="messages">
+                <span data-i18n="messages_tab_messages">Messages</span><span class="messages-tab-badge" id="inboxBadge" hidden></span>
+              </button>
+              <button type="button" class="messages-tab" id="tabSupport" role="tab" aria-selected="false" aria-controls="messagesList" data-tab="support" data-i18n="messages_tab_support">Support</button>
+              <button type="button" class="messages-tab" id="tabNotifications" role="tab" aria-selected="false" aria-controls="messagesList" data-tab="notifications" data-i18n="messages_tab_notifications">Notifications</button>
+            </div>
+          </div>
+        </div>
+        <div class="messages-list-shell">
+          <div class="messages-list" id="messagesList">
+            <div class="messages-loading">Loading messages...</div>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 
@@ -90,7 +173,7 @@
           <div class="message-detail-subject" id="messageDetailSubject"></div>
           <div class="message-detail-from" id="messageDetailFrom"></div>
         </div>
-        <button type="button" class="message-detail-close" id="messageDetailClose" aria-label="Close">×</button>
+        <button type="button" class="message-detail-close" id="messageDetailClose" aria-label="Close">&times;</button>
       </div>
       <div class="message-detail-body" id="messageDetailBody"></div>
       <div class="message-detail-footer">
@@ -101,7 +184,7 @@
         </div>
       </div>
       <div class="message-reply-area hidden" id="replyArea">
-        <textarea class="message-reply-input form-control" id="replyInput" placeholder="Write your reply…" maxlength="10000"></textarea>
+        <textarea class="message-reply-input form-control" id="replyInput" placeholder="Write your reply..." maxlength="10000"></textarea>
         <button type="button" class="message-reply-send" id="replySendBtn" data-i18n="messages_reply_send_btn">Send Reply</button>
       </div>
     </div>
@@ -114,7 +197,7 @@
       <div class="compose-field">
         <label for="composeTo" data-i18n="messages_compose_to_label">To</label>
         <select id="composeTo">
-          <option value="" data-i18n="messages_compose_to_placeholder">Select contact…</option>
+          <option value="" data-i18n="messages_compose_to_placeholder">Select contact...</option>
         </select>
       </div>
       <div class="compose-field">
@@ -127,11 +210,11 @@
       </div>
       <div class="compose-field">
         <label for="composeSubject" data-i18n="messages_compose_subject_label">Subject (optional)</label>
-        <input type="text" id="composeSubject" maxlength="200" placeholder="Brief subject…" class="form-control" />
+        <input type="text" id="composeSubject" maxlength="200" placeholder="Brief subject..." class="form-control" />
       </div>
       <div class="compose-field">
         <label for="composeBody" data-i18n="messages_compose_body_label">Message</label>
-        <textarea id="composeBody" maxlength="10000" placeholder="Write your message…" class="form-control"></textarea>
+        <textarea id="composeBody" maxlength="10000" placeholder="Write your message..." class="form-control"></textarea>
       </div>
       <p class="compose-error" id="composeError"></p>
       <div class="compose-actions">
@@ -152,6 +235,6 @@
   <script src="/js/auth.js?v=20260408a"></script>
   <script src="/js/trial.js?v=20260408a"></script>
   <script src="/js/taxReminders.js?v=20260408a"></script>
-  <script src="/js/messages.js?v=20260408a"></script>
+  <script src="/js/messages.js?v=20260503a"></script>
 </body>
 </html>
