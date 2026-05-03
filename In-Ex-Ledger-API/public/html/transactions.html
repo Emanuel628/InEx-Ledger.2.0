@@ -96,35 +96,43 @@
       <section class="stats-row">
         <article class="stat-card">
           <div class="stat-card-icon stat-icon--income" aria-hidden="true">
-            <svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg>
+            <svg viewBox="0 0 16 16" fill="none"><path d="M3 10.5 6.5 7l2.2 2.2L13 5"></path><path d="M10 5h3v3"></path></svg>
           </div>
-          <div class="stat-label stat-label-income">Total income</div>
-          <div class="stat-value stat-value-income" id="incomeYTD">$0.00</div>
-          <div class="stat-delta" id="incomeDelta">+0.0% vs last year</div>
+          <div class="stat-card-copy">
+            <div class="stat-label stat-label-income">Total income</div>
+            <div class="stat-value stat-value-income" id="incomeYTD">$0.00</div>
+            <div class="stat-delta" id="incomeDelta">+0.0% vs last year</div>
+          </div>
         </article>
         <article class="stat-card">
           <div class="stat-card-icon stat-icon--expense" aria-hidden="true">
-            <svg viewBox="0 0 16 16" fill="none"><path d="M8 5v6M5 8l3 3 3-3"></path></svg>
+            <svg viewBox="0 0 16 16" fill="none"><path d="M3 5.5 6.5 9l2.2-2.2L13 11"></path><path d="M10 11h3V8"></path></svg>
           </div>
-          <div class="stat-label stat-label-expense">Total expenses</div>
-          <div class="stat-value stat-value-expense" id="expensesYTD">$0.00</div>
-          <div class="stat-delta" id="expensesDelta">+0.0% vs last year</div>
+          <div class="stat-card-copy">
+            <div class="stat-label stat-label-expense">Total expenses</div>
+            <div class="stat-value stat-value-expense" id="expensesYTD">$0.00</div>
+            <div class="stat-delta" id="expensesDelta">+0.0% vs last year</div>
+          </div>
         </article>
         <article class="stat-card">
           <div class="stat-card-icon stat-icon--profit" aria-hidden="true">
             <svg viewBox="0 0 16 16" fill="none"><line x1="8" y1="2" x2="8" y2="14"></line><path d="M5 5h4a2 2 0 0 0 0 4H7a2.5 2.5 0 0 1 0 5h4"></path></svg>
           </div>
-          <div class="stat-label">Net profit</div>
-          <div class="stat-value" id="netProfitYTD">$0.00</div>
-          <div class="stat-delta">After all deductions</div>
+          <div class="stat-card-copy">
+            <div class="stat-label">Net profit</div>
+            <div class="stat-value" id="netProfitYTD">$0.00</div>
+            <div class="stat-delta">After all deductions</div>
+          </div>
         </article>
         <article class="stat-card">
           <div class="stat-card-icon stat-icon--count" aria-hidden="true">
-            <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg>
+            <svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2.5" width="10" height="11" rx="2"></rect><path d="M6 5.5h4M6 8.5h4M6 11.5h2.5"></path></svg>
           </div>
-          <div class="stat-label">Transactions</div>
-          <div class="stat-value" id="transactionCountValue">0</div>
-          <div class="stat-delta" id="transactionCountDelta">0 this month</div>
+          <div class="stat-card-copy">
+            <div class="stat-label">Transactions</div>
+            <div class="stat-value" id="transactionCountValue">0</div>
+            <div class="stat-delta" id="transactionCountDelta">0 this month</div>
+          </div>
         </article>
       </section>
 

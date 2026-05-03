@@ -3180,20 +3180,24 @@ tr.tx-highlight {
 .app-sidebar nav.sidebar-nav > a.sidebar-link,
 .app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-link {
   min-height: 34px !important;
-  grid-template-columns: 16px 12px minmax(0, 1fr) auto !important;
+  grid-template-columns: 14px 10px minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  justify-items: start !important;
   gap: 8px !important;
-  padding: 7px 10px !important;
+  padding: 7px 10px 7px 8px !important;
   border-radius: 10px !important;
   font-size: 13px !important;
   font-weight: 600 !important;
 }
 
 .sidebar-icon {
-  justify-content: center !important;
+  width: 14px !important;
+  height: 14px !important;
+  justify-content: flex-start !important;
 }
 
 .sidebar-link-prefix {
-  width: 12px;
+  width: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3205,6 +3209,8 @@ tr.tx-highlight {
 
 .sidebar-link-text {
   min-width: 0;
+  justify-self: start;
+  text-align: left;
   line-height: 1.15;
 }
 
@@ -3225,22 +3231,18 @@ tr.tx-highlight {
 }
 
 .stat-card {
-  display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
-  grid-template-rows: auto auto auto;
-  column-gap: 14px;
-  row-gap: 4px;
-  align-items: start;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
   padding: 18px 18px 18px 16px;
 }
 
 .stat-card-icon {
-  grid-column: 1;
-  grid-row: 1 / span 3;
   width: 38px;
   height: 38px;
   margin-bottom: 0;
-  align-self: start;
+  margin-top: 2px;
+  align-self: flex-start;
 }
 
 .stat-card-icon svg {
@@ -3248,15 +3250,15 @@ tr.tx-highlight {
   height: 18px;
 }
 
-.stat-label,
-.stat-value,
-.stat-delta {
-  grid-column: 2;
+.stat-card-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .stat-label {
   margin-bottom: 0;
-  align-self: end;
 }
 
 .stat-value {
@@ -3464,7 +3466,7 @@ tr.tx-highlight {
   }
 
   .stat-card {
-    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 12px;
   }
 
   .transactions-toolbar-tools {
@@ -3488,8 +3490,7 @@ tr.tx-highlight {
 
 @media (max-width: 640px) {
   .stat-card {
-    grid-template-columns: 38px minmax(0, 1fr);
-    column-gap: 12px;
+    gap: 12px;
   }
 
   .stat-card-icon {
