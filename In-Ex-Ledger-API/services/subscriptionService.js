@@ -185,8 +185,40 @@ async function getSubscriptionSnapshotForBusiness(businessId) {
   return deriveEffectiveState(row);
 }
 
+async function findBillingAnchorBusinessIdForUser(userId, preferredBusinessId = null) {
+  if (!userId) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `SELECT b.id
+       FROM businesses b
+       LEFT JOIN business_subscriptions bs
+         ON bs.business_id = b.id
+      WHERE b.user_id = $1
+      ORDER BY
+        CASE
+          WHEN b.id = $2 AND bs.stripe_subscription_id IS NOT NULL THEN 0
+          WHEN bs.stripe_subscription_id IS NOT NULL THEN 1
+          WHEN b.id = $2 AND bs.stripe_customer_id IS NOT NULL THEN 2
+          WHEN bs.stripe_customer_id IS NOT NULL THEN 3
+          WHEN b.id = $2 THEN 4
+          ELSE 5
+        END,
+        b.created_at ASC,
+        b.id ASC
+      LIMIT 1`,
+    [userId, preferredBusinessId]
+  );
+
+  return result.rows[0]?.id || null;
+}
+
 async function getSubscriptionSnapshotForUser(user) {
-  const businessId = user?.business_id;
+  const businessId = await findBillingAnchorBusinessIdForUser(
+    user?.id,
+    user?.business_id || user?.active_business_id || null
+  );
   if (!businessId) {
     return null;
   }
@@ -329,6 +361,7 @@ module.exports = {
   PLAN_BUSINESS,
   ensureBusinessSubscription,
   deriveEffectiveState,
+  findBillingAnchorBusinessIdForUser,
   getSubscriptionSnapshotForBusiness,
   updateStripeCustomerForBusiness,
   syncStripeSubscriptionForBusiness,

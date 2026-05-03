@@ -223,7 +223,9 @@ function loadAuthRouter(options = {}) {
 
     if (requestName === "../services/subscriptionService.js" || /subscriptionService\.js$/.test(requestName)) {
       return {
-        getSubscriptionSnapshotForBusiness: async () => ({ status: "active" })
+        getSubscriptionSnapshotForBusiness: async () => ({ status: "active" }),
+        getSubscriptionSnapshotForUser: async () => ({ status: "active" }),
+        findBillingAnchorBusinessIdForUser: async () => state.businessId
       };
     }
 

@@ -432,7 +432,6 @@ function renderBusinessAccessSection(sub) {
   const isProTier = !!sub && sub.effectiveTier === "v1";
   const canManageSlots =
     isProTier &&
-    Boolean(sub.stripeSubscriptionId) &&
     (sub.isPaid || sub.isTrialing) &&
     !sub.cancelAtPeriodEnd &&
     !sub.isCanceledWithRemainingAccess;
@@ -575,6 +574,8 @@ async function loadSubscription() {
     }
 
     currentSubscription = sub;
+    pricingState.additionalBusinesses = clampAdditionalBusinesses(Number(sub.additionalBusinesses || 0));
+    updatePricingUI();
 
     if (statusBlock) {
       let statusHtml = "";

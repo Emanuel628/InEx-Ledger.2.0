@@ -17,7 +17,7 @@ const {
 } = require("../middleware/rateLimitTiers.js");
 const { pool } = require("../db.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
-const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
+const { getSubscriptionSnapshotForUser } = require("../services/subscriptionService.js");
 const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
@@ -354,7 +354,10 @@ async function buildAuthenticatedAccessPayload(user, businessIdOverride = null, 
   }
 
   const businessId = businessIdOverride || (await resolveBusinessIdForUser(user));
-  const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+  const subscription = await getSubscriptionSnapshotForUser({
+    id: user.id,
+    business_id: businessId
+  });
   const token = signToken(
     {
       id: user.id,
@@ -1208,7 +1211,10 @@ router.post("/refresh", tokenRefreshLimiter, requireCsrfProtection, async (req, 
       email: result.rows[0].email,
       business_id: req.user?.business_id
     });
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    const subscription = await getSubscriptionSnapshotForUser({
+      id: result.rows[0].user_id,
+      business_id: businessId
+    });
 
     const token = signToken(
       {

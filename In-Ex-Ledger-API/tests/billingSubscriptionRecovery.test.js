@@ -69,6 +69,7 @@ function loadBillingRouterFixture() {
             maxBusinessesAllowed: 3
           };
         },
+        findBillingAnchorBusinessIdForUser: async () => "biz_live_123",
         updateStripeCustomerForBusiness: async () => {},
         syncStripeSubscriptionForBusiness: async (businessId, subscription) => {
           state.syncCalls.push({ businessId, subscription });

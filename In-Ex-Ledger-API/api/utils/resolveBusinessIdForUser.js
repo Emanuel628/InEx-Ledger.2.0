@@ -187,34 +187,46 @@ async function createBusinessForUser(user, payload = {}) {
     throw new Error("User is required to create a business");
   }
 
-  const businessId = crypto.randomUUID();
-  const businessName = String(payload.name || "").trim() || buildBusinessName(user);
-  const region = String(payload.region || "US").trim().toUpperCase() === "CA" ? "CA" : "US";
-  const language = ["en", "es", "fr"].includes(String(payload.language || "").trim())
-    ? String(payload.language).trim()
-    : "en";
   const client = await pool.connect();
-
   try {
     await client.query("BEGIN");
-    await client.query(
-      `INSERT INTO businesses (id, user_id, name, region, language)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [businessId, user.id, businessName, region, language]
-    );
-
-    await seedDefaultsForBusiness(client, businessId);
-    await client.query(
-      "UPDATE users SET active_business_id = $1 WHERE id = $2",
-      [businessId, user.id]
-    );
+    const businessId = await createBusinessForUserInTransaction(client, user, payload);
     await client.query("COMMIT");
+    return businessId;
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();
   }
+}
+
+async function createBusinessForUserInTransaction(client, user, payload = {}) {
+  if (!client) {
+    throw new Error("Database client is required to create a business in transaction");
+  }
+  if (!user?.id) {
+    throw new Error("User is required to create a business");
+  }
+
+  const businessId = crypto.randomUUID();
+  const businessName = String(payload.name || "").trim() || buildBusinessName(user);
+  const region = String(payload.region || "US").trim().toUpperCase() === "CA" ? "CA" : "US";
+  const language = ["en", "es", "fr"].includes(String(payload.language || "").trim())
+    ? String(payload.language).trim()
+    : "en";
+
+  await client.query(
+    `INSERT INTO businesses (id, user_id, name, region, language)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [businessId, user.id, businessName, region, language]
+  );
+
+  await seedDefaultsForBusiness(client, businessId);
+  await client.query(
+    "UPDATE users SET active_business_id = $1 WHERE id = $2",
+    [businessId, user.id]
+  );
 
   return businessId;
 }
@@ -224,5 +236,6 @@ module.exports = {
   getBusinessScopeForUser,
   listBusinessesForUser,
   setActiveBusinessForUser,
-  createBusinessForUser
+  createBusinessForUser,
+  createBusinessForUserInTransaction
 };
