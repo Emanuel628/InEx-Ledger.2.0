@@ -2,6 +2,23 @@
    Subscription Page
    ───────────────────────────────────────────────────────────── */
 
+/* No sidebar — full-width centred layout */
+.sub-no-sidebar {
+  display: block;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 28px 24px 48px;
+}
+
+.sub-no-sidebar .settings-main {
+  padding: 0;
+  max-width: none;
+}
+
+.sub-no-sidebar .settings-card {
+  margin-bottom: 20px;
+}
+
 /* ── Status section ─────────────────────────────────────────── */
 
 .sub-status-block {
