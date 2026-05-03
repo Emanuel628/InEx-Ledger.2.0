@@ -398,7 +398,16 @@ function ensureAddSlotModal() {
     closeAddSlotModal();
     businessSlotsState.selectedAdditionalBusinesses = businessSlotsState.currentAdditionalBusinesses + 1;
     const ok = await updateBusinessSlots();
-    if (ok && typeof openBusinessCreationModal === "function") openBusinessCreationModal();
+    if (!ok) return;
+    // Bypass canCreateAnotherBusiness — we just paid for the slot
+    if (typeof ensureBusinessCreationModal === "function") ensureBusinessCreationModal();
+    const bModal = document.getElementById("businessCreationModal");
+    if (bModal) {
+      const bErr = document.getElementById("businessModalError");
+      if (bErr) bErr.textContent = "";
+      bModal.hidden = false;
+      setTimeout(() => document.getElementById("businessNameInput")?.focus(), 0);
+    }
   });
 }
 

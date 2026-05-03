@@ -11,6 +11,7 @@ const {
   createBusinessForUserInTransaction
 } = require("../api/utils/resolveBusinessIdForUser.js");
 const {
+  PLAN_V1,
   findBillingAnchorBusinessIdForUser,
   getSubscriptionSnapshotForBusiness
 } = require("../services/subscriptionService.js");
@@ -139,6 +140,33 @@ router.post("/", async (req, res) => {
     }
 
     const businessId = await createBusinessForUserInTransaction(client, req.user, validation.normalized);
+
+    // Pre-seed the subscription so the new business inherits the anchor's state
+    // instead of getting its own fresh 30-day trial.
+    if (subscription.isPaid) {
+      await client.query(
+        `INSERT INTO business_subscriptions
+           (id, business_id, provider, plan_code, status, current_period_start, current_period_end)
+         VALUES ($1, $2, 'stripe', $3, 'active', $4, $5)
+         ON CONFLICT (business_id) DO NOTHING`,
+        [require("crypto").randomUUID(), businessId, PLAN_V1,
+         subscription.currentPeriodStart || new Date(),
+         subscription.currentPeriodEnd || null]
+      );
+    } else if (subscription.isTrialing && subscription.trialEndsAt) {
+      // Match the anchor's trial window — don't give the new business its own fresh trial
+      await client.query(
+        `INSERT INTO business_subscriptions
+           (id, business_id, provider, plan_code, status,
+            trial_started_at, trial_ends_at, current_period_start, current_period_end)
+         VALUES ($1, $2, 'stripe', $3, 'trialing', $4, $5, $4, $5)
+         ON CONFLICT (business_id) DO NOTHING`,
+        [require("crypto").randomUUID(), businessId, PLAN_V1,
+         subscription.trialStartedAt || new Date(),
+         new Date(subscription.trialEndsAt)]
+      );
+    }
+
     await client.query("COMMIT");
     req.user.business_id = businessId;
     const nextBusinesses = await listBusinessesForUser(req.user.id);
