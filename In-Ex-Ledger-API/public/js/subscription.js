@@ -337,6 +337,92 @@ function buildFreeTierConfirmationMessage(sub) {
   return tx("subscription_free_confirm_body_generic");
 }
 
+function buildAddSlotPricingHtml(sub) {
+  const currency = sub?.currency || "usd";
+  const interval = sub?.billingInterval || "monthly";
+  const currentAdditional = businessSlotsState.currentAdditionalBusinesses;
+  const newAdditional = currentAdditional + 1;
+  const intervalLabel = interval === "yearly" ? "yr" : "mo";
+
+  if (sub?.isPaid) {
+    const currentPrice = billingPricingUtils.getGrandTotal(currency, interval, currentAdditional);
+    const newPrice = billingPricingUtils.getGrandTotal(currency, interval, newAdditional);
+    return `
+      <div class="add-slot-pricing">
+        <div class="add-slot-pricing-row">
+          <span>Current</span>
+          <strong>${escapeHtml(billingPricingUtils.formatMoney(currency, currentPrice))}/${intervalLabel}</strong>
+        </div>
+        <div class="add-slot-pricing-row add-slot-pricing-new">
+          <span>After adding</span>
+          <strong>${escapeHtml(billingPricingUtils.formatMoney(currency, newPrice))}/${intervalLabel}</strong>
+        </div>
+      </div>
+      <p class="add-slot-modal-note">The difference is charged immediately, prorated for the rest of your billing period.</p>`;
+  }
+
+  if (sub?.isTrialing) {
+    const pricing = billingPricingUtils.getPricing(currency, interval);
+    return `
+      <div class="add-slot-pricing">
+        <div class="add-slot-pricing-row">
+          <span>Add-on cost</span>
+          <strong>+${escapeHtml(billingPricingUtils.formatMoney(currency, pricing.addon))}/${intervalLabel}</strong>
+        </div>
+      </div>
+      <p class="add-slot-modal-note">You won't be charged until your trial ends.</p>`;
+  }
+
+  return `<p class="add-slot-modal-note">${escapeHtml(tx("subscription_extra_business_slots_help"))}</p>`;
+}
+
+function ensureAddSlotModal() {
+  if (document.getElementById("addSlotConfirmModal")) return;
+  const el = document.createElement("div");
+  el.id = "addSlotConfirmModal";
+  el.className = "business-modal-backdrop";
+  el.hidden = true;
+  el.innerHTML = `
+    <div class="business-modal" role="dialog" aria-modal="true" aria-labelledby="addSlotModalTitle">
+      <h3 id="addSlotModalTitle">Add a business?</h3>
+      <div id="addSlotModalBody"></div>
+      <div class="business-modal-actions">
+        <button type="button" id="addSlotModalCancel">Cancel</button>
+        <button type="button" id="addSlotModalConfirm" class="settings-primary-btn">Confirm &amp; set up business</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+  el.addEventListener("click", (e) => { if (e.target === el) closeAddSlotModal(); });
+  el.querySelector("#addSlotModalCancel")?.addEventListener("click", closeAddSlotModal);
+  el.querySelector("#addSlotModalConfirm")?.addEventListener("click", async () => {
+    closeAddSlotModal();
+    businessSlotsState.selectedAdditionalBusinesses = businessSlotsState.currentAdditionalBusinesses + 1;
+    const ok = await updateBusinessSlots();
+    if (ok && typeof openBusinessCreationModal === "function") openBusinessCreationModal();
+  });
+}
+
+function openAddSlotModal(sub) {
+  ensureAddSlotModal();
+  const modal = document.getElementById("addSlotConfirmModal");
+  const body = document.getElementById("addSlotModalBody");
+  const newAdditional = businessSlotsState.currentAdditionalBusinesses + 1;
+  const newTotal = 1 + newAdditional;
+  const noun = newAdditional === 1 ? "add-on" : "add-ons";
+  if (body) {
+    body.innerHTML = `
+      <p>You'll have <strong>${newTotal} businesses</strong> — 1 included with Pro, ${newAdditional} ${noun}.</p>
+      ${buildAddSlotPricingHtml(sub)}`;
+  }
+  modal.hidden = false;
+  modal.querySelector("#addSlotModalConfirm")?.focus();
+}
+
+function closeAddSlotModal() {
+  const modal = document.getElementById("addSlotConfirmModal");
+  if (modal) modal.hidden = true;
+}
+
 function wireSlotActions() {
   const addBtn = document.getElementById("addSlotBtn");
   const removeBtn = document.getElementById("removeSlotBtn");
@@ -345,10 +431,9 @@ function wireSlotActions() {
   const removeCancelBtn = document.getElementById("removeSlotCancelBtn");
   if (!addBtn || !removeBtn) return;
 
-  addBtn.addEventListener("click", async () => {
+  addBtn.addEventListener("click", () => {
     if (businessSlotsState.isSaving) return;
-    businessSlotsState.selectedAdditionalBusinesses = businessSlotsState.currentAdditionalBusinesses + 1;
-    await updateBusinessSlots();
+    openAddSlotModal(currentSubscription);
   });
 
   removeBtn.addEventListener("click", () => {
@@ -395,7 +480,7 @@ function syncSlotActions() {
 }
 
 async function updateBusinessSlots() {
-  if (businessSlotsState.isSaving) return;
+  if (businessSlotsState.isSaving) return false;
   businessSlotsState.isSaving = true;
   syncSlotActions();
   try {
@@ -410,9 +495,12 @@ async function updateBusinessSlots() {
     }
     showSubToast(tx("subscription_business_slots_success"));
     currentSubscription = await loadSubscription();
+    if (typeof applySubscriptionState === "function") applySubscriptionState(currentSubscription);
     await loadBillingHistory();
+    return true;
   } catch (err) {
     showSubToast(err.message || tx("subscription_business_slots_error"));
+    return false;
   } finally {
     businessSlotsState.isSaving = false;
     syncSlotActions();

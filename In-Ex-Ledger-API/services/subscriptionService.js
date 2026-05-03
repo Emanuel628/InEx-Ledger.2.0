@@ -176,7 +176,9 @@ function deriveEffectiveState(row) {
     trialStartedAt: row?.trial_started_at || null,
     trialEndsAt: resolvedTrialEndsAt || null,
     currentPeriodStart: row?.current_period_start || null,
-    currentPeriodEnd: row?.current_period_end || null
+    currentPeriodEnd: row?.current_period_end || null,
+    billingInterval: metadata.billing_interval || null,
+    currency: metadata.currency || null
   };
 }
 
