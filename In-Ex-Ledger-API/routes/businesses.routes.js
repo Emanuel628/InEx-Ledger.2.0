@@ -40,6 +40,20 @@ function normalizeBusinessPayload(payload = {}) {
   return { valid: true, normalized: { name, region, language } };
 }
 
+function buildBusinessLimitError(subscription, maxBusinessesAllowed) {
+  const hasProAccess = subscription?.effectiveTier === "v1";
+
+  if (hasProAccess) {
+    return maxBusinessesAllowed <= 1
+      ? "Your Pro plan currently includes 1 business. Add an additional business slot in Subscription to continue."
+      : `Your Pro plan currently allows up to ${maxBusinessesAllowed} businesses. Increase your additional business slots in Subscription to continue.`;
+  }
+
+  return maxBusinessesAllowed <= 1
+    ? "Your current plan includes 1 business. Upgrade to Pro and add an additional business slot to continue."
+    : `Your current plan allows up to ${maxBusinessesAllowed} businesses. Upgrade your business access in Subscription to continue.`;
+}
+
 router.get("/", async (req, res) => {
   try {
     const activeBusinessId = await resolveBusinessIdForUser(req.user);
@@ -100,9 +114,7 @@ router.post("/", async (req, res) => {
 
     if (businesses.length >= maxBusinessesAllowed) {
       return res.status(402).json({
-        error: maxBusinessesAllowed <= 1
-          ? "Your current plan includes 1 business. Upgrade and add an additional business to continue."
-          : `Your current plan allows up to ${maxBusinessesAllowed} businesses. Add another additional business to continue.`,
+        error: buildBusinessLimitError(subscription, maxBusinessesAllowed),
         code: "additional_business_payment_required",
         max_businesses_allowed: maxBusinessesAllowed,
         current_business_count: businesses.length,

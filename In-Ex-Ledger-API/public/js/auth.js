@@ -238,9 +238,14 @@ function canCreateAnotherBusiness(profile = window.__LUNA_ME__) {
 function showAdditionalBusinessPaywall(profile = window.__LUNA_ME__) {
   const subscription = profile?.subscription || getStoredSubscriptionState();
   const allowed = getMaxBusinessesAllowedFromSubscription(subscription);
-  const message = allowed <= 1
-    ? "Your current plan includes 1 business. Upgrade and add an additional business to continue."
-    : `Your current plan allows up to ${allowed} businesses. Add another additional business to continue.`;
+  const hasProAccess = subscription?.effectiveTier === "v1";
+  const message = hasProAccess
+    ? (allowed <= 1
+        ? "Your Pro plan currently includes 1 business. Add an additional business slot in Subscription to continue."
+        : `Your Pro plan currently allows up to ${allowed} businesses. Increase your additional business slots in Subscription to continue.`)
+    : (allowed <= 1
+        ? "Your current plan includes 1 business. Upgrade to Pro and add an additional business slot to continue."
+        : `Your current plan allows up to ${allowed} businesses. Upgrade your business access in Subscription to continue.`);
 
   showAccountMenuNotice(message);
   window.setTimeout(() => {

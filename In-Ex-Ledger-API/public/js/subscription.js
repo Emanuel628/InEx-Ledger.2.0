@@ -344,14 +344,13 @@ function wireSlotsControls() {
   const updateBtn = document.getElementById("updateSlotsBtn");
   if (!input || !decreaseBtn || !increaseBtn || !updateBtn) return;
 
-  const syncButtons = () => {
-    const val = businessSlotsState.selectedAdditionalBusinesses;
-    input.value = String(val);
-    decreaseBtn.disabled = val <= 0;
-    increaseBtn.disabled = val >= MAX_ADDITIONAL_BUSINESSES;
-  };
+  const syncButtons = () => syncBusinessSlotsControls();
 
   input.addEventListener("change", () => {
+    businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(Number(input.value));
+    syncButtons();
+  });
+  input.addEventListener("input", () => {
     businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(Number(input.value));
     syncButtons();
   });
@@ -367,14 +366,44 @@ function wireSlotsControls() {
   syncButtons();
 }
 
+function syncBusinessSlotsControls() {
+  const input = document.getElementById("businessSlotsInput");
+  const decreaseBtn = document.getElementById("slotsDecreaseBtn");
+  const increaseBtn = document.getElementById("slotsIncreaseBtn");
+  const updateBtn = document.getElementById("updateSlotsBtn");
+  const selectedValueEl = document.getElementById("businessSlotsSelectedValue");
+  const projectedTotalEl = document.getElementById("businessSlotsProjectedTotal");
+  const selectionSummaryEl = document.getElementById("businessSlotsSelectionSummary");
+
+  if (!input || !decreaseBtn || !increaseBtn || !updateBtn) return;
+
+  const selected = businessSlotsState.selectedAdditionalBusinesses;
+  const total = 1 + selected;
+  const hasChanges = selected !== businessSlotsState.currentAdditionalBusinesses;
+
+  input.value = String(selected);
+  decreaseBtn.disabled = businessSlotsState.isSaving || selected <= 0;
+  increaseBtn.disabled = businessSlotsState.isSaving || selected >= MAX_ADDITIONAL_BUSINESSES;
+  input.disabled = businessSlotsState.isSaving;
+  updateBtn.disabled = businessSlotsState.isSaving || !hasChanges;
+  updateBtn.textContent = businessSlotsState.isSaving
+    ? tx("subscription_checkout_loading")
+    : tx("subscription_update_business_slots");
+  updateBtn.classList.toggle("is-dormant", !hasChanges);
+
+  if (selectedValueEl) selectedValueEl.textContent = String(selected);
+  if (projectedTotalEl) projectedTotalEl.textContent = String(total);
+  if (selectionSummaryEl) {
+    selectionSummaryEl.textContent = selected > 0
+      ? `1 included + ${selected} additional`
+      : "1 included only";
+  }
+}
+
 async function updateBusinessSlots() {
   if (businessSlotsState.isSaving) return;
   businessSlotsState.isSaving = true;
-  const updateBtn = document.getElementById("updateSlotsBtn");
-  if (updateBtn) {
-    updateBtn.disabled = true;
-    updateBtn.textContent = tx("subscription_checkout_loading");
-  }
+  syncBusinessSlotsControls();
   try {
     const res = await apiFetch("/api/billing/additional-businesses", {
       method: "PATCH",
@@ -392,11 +421,7 @@ async function updateBusinessSlots() {
     showSubToast(err.message || tx("subscription_business_slots_error"));
   } finally {
     businessSlotsState.isSaving = false;
-    const btn = document.getElementById("updateSlotsBtn");
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = tx("subscription_update_business_slots");
-    }
+    syncBusinessSlotsControls();
   }
 }
 
@@ -415,7 +440,10 @@ function renderBusinessAccessSection(sub) {
   }
 
   if (!sub || sub.effectiveTier !== "v1") {
-    manager.innerHTML = `<p class="sub-access-upgrade-note">${escapeHtml(tx("subscription_business_access_upgrade_note"))}</p>`;
+    manager.innerHTML = `
+      <div class="sub-access-message-card">
+        <p class="sub-access-upgrade-note">${escapeHtml(tx("subscription_business_access_upgrade_note"))}</p>
+      </div>`;
     return;
   }
 
@@ -424,38 +452,79 @@ function renderBusinessAccessSection(sub) {
 
   const extra = sub.additionalBusinesses || 0;
   const total = 1 + extra;
+  const selectionSummary = extra > 0 ? `1 included + ${extra} additional` : "1 included only";
 
   const statsHtml = `
-    <div class="sub-access-grid">
-      <div class="sub-access-row">
-        <span class="sub-access-label">${escapeHtml(tx("subscription_included_businesses"))}</span>
-        <span class="sub-access-value">1</span>
-      </div>
-      <div class="sub-access-row">
-        <span class="sub-access-label">${escapeHtml(tx("subscription_extra_business_slots"))}</span>
-        <span class="sub-access-value">${extra}</span>
-      </div>
-      <div class="sub-access-row">
-        <span class="sub-access-label">${escapeHtml(tx("subscription_total_businesses_allowed"))}</span>
-        <span class="sub-access-value">${total}</span>
-      </div>
+    <div class="sub-access-overview">
+      <article class="sub-access-stat">
+        <span class="sub-access-stat-label">${escapeHtml(tx("subscription_included_businesses"))}</span>
+        <strong class="sub-access-stat-value">1</strong>
+        <span class="sub-access-stat-meta">Included with Pro</span>
+      </article>
+      <article class="sub-access-stat">
+        <span class="sub-access-stat-label">${escapeHtml(tx("subscription_extra_business_slots"))}</span>
+        <strong class="sub-access-stat-value">${extra}</strong>
+        <span class="sub-access-stat-meta">Paid add-on capacity</span>
+      </article>
+      <article class="sub-access-stat">
+        <span class="sub-access-stat-label">${escapeHtml(tx("subscription_total_businesses_allowed"))}</span>
+        <strong class="sub-access-stat-value">${total}</strong>
+        <span class="sub-access-stat-meta">Available workspaces</span>
+      </article>
     </div>`;
 
   if (isCancelingPro) {
-    manager.innerHTML = `${statsHtml}<p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceling_help"))}</p>`;
+    manager.innerHTML = `
+      ${statsHtml}
+      <div class="sub-access-message-card">
+        <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceling_help"))}</p>
+      </div>`;
     return;
   }
 
   manager.innerHTML = `
     ${statsHtml}
-    <div class="sub-slots-controls">
-      <div class="sub-quantity-control">
-        <button type="button" class="sub-quantity-btn" id="slotsDecreaseBtn" aria-label="Decrease">-</button>
-        <input id="businessSlotsInput" class="sub-quantity-input" type="number" min="0" max="100" step="1" value="${extra}" inputmode="numeric" />
-        <button type="button" class="sub-quantity-btn" id="slotsIncreaseBtn" aria-label="Increase">+</button>
+    <div class="sub-slots-panel">
+      <div class="sub-slots-panel-head">
+        <div class="sub-slots-panel-copy">
+          <h3>Adjust business slot capacity</h3>
+          <p>Add workspace capacity only when you actually need another separate business ledger.</p>
+        </div>
+        <div class="sub-slots-price-pill">${escapeHtml(tx("subscription_extra_business_slots_help"))}</div>
       </div>
-      <p class="sub-control-help">${escapeHtml(tx("subscription_extra_business_slots_help"))}</p>
-      <button type="button" id="updateSlotsBtn" class="settings-primary-btn">${escapeHtml(tx("subscription_update_business_slots"))}</button>
+      <div class="sub-slots-workbench">
+        <div class="sub-slots-stepper-card">
+          <span class="sub-slots-stepper-label">${escapeHtml(tx("subscription_extra_business_slots"))}</span>
+          <div class="sub-quantity-control sub-quantity-control-slots">
+            <button type="button" class="sub-quantity-btn" id="slotsDecreaseBtn" aria-label="Decrease">
+              <span aria-hidden="true">&minus;</span>
+            </button>
+            <input id="businessSlotsInput" class="sub-quantity-input" type="number" min="0" max="100" step="1" value="${extra}" inputmode="numeric" />
+            <button type="button" class="sub-quantity-btn" id="slotsIncreaseBtn" aria-label="Increase">
+              <span aria-hidden="true">+</span>
+            </button>
+          </div>
+          <p class="sub-slots-stepper-meta">Changes apply to your active Pro subscription and keep each business in its own workspace.</p>
+        </div>
+        <div class="sub-slots-summary-card">
+          <div class="sub-slots-summary-row">
+            <span>Selected add-on slots</span>
+            <strong id="businessSlotsSelectedValue">${extra}</strong>
+          </div>
+          <div class="sub-slots-summary-row">
+            <span>Workspace capacity</span>
+            <strong id="businessSlotsProjectedTotal">${total}</strong>
+          </div>
+          <div class="sub-slots-summary-row sub-slots-summary-row-total">
+            <span>Configuration</span>
+            <strong id="businessSlotsSelectionSummary">${selectionSummary}</strong>
+          </div>
+        </div>
+      </div>
+      <div class="sub-slots-footer">
+        <p class="sub-control-help">${escapeHtml(tx("subscription_extra_business_slots_help"))}</p>
+        <button type="button" id="updateSlotsBtn" class="settings-primary-btn sub-slots-save-btn">${escapeHtml(tx("subscription_update_business_slots"))}</button>
+      </div>
     </div>`;
 
   wireSlotsControls();
