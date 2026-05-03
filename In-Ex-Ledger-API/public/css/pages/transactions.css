@@ -3206,6 +3206,25 @@ tr.tx-highlight {
   display: block !important;
 }
 
+.sidebar-icon--transactions svg,
+.sidebar-icon--receipts svg,
+.sidebar-icon--mileage svg,
+.sidebar-icon--accounts svg,
+.sidebar-icon--categories svg {
+  transform-origin: center;
+}
+
+.sidebar-icon--transactions svg,
+.sidebar-icon--receipts svg,
+.sidebar-icon--accounts svg {
+  transform: translateX(-0.4px);
+}
+
+.sidebar-icon--mileage svg,
+.sidebar-icon--categories svg {
+  transform: translateX(-0.9px);
+}
+
 .sidebar-link-prefix {
   flex: 0 0 10px;
   width: 10px;

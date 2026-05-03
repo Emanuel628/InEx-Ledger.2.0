@@ -5,7 +5,7 @@
   <title>InEx Ledger - Transactions</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="stylesheet" href="/css/app.css?v=20260430a">
-<link rel="stylesheet" href="/css/pages/transactions.css?v=20260503d">
+<link rel="stylesheet" href="/css/pages/transactions.css?v=20260503e">
 </head>
 
 <body>
@@ -47,11 +47,11 @@
         <button type="button" class="sidebar-add-pill" onclick="document.getElementById('addTxTogglePage').click()">+ Add</button>
       </div>
       <nav class="sidebar-nav">
-        <a href="transactions" class="sidebar-link is-active" onclick="event.preventDefault();document.getElementById('addTxTogglePage').click()"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="2.5" width="14" height="15" rx="3"></rect><path d="M7 7h6M7 10h6M7 13h4"></path></svg></span><span class="sidebar-link-prefix" aria-hidden="true">+</span><span class="sidebar-link-text">Transactions</span></a>
-        <a href="receipts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="2.5" width="14" height="15" rx="3"></rect><path d="M7 7h1M10 7h3M7 10h1M10 10h3M7 13h1M10 13h3"></path></svg></span><span class="sidebar-link-prefix" aria-hidden="true">+</span><span class="sidebar-link-text">Receipts</span><span id="receiptsDot" class="sidebar-dot" hidden></span></a>
-        <a href="mileage" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="1.75"></circle><path d="M10 3.5v3M10 13.5v3M3.5 10h3M13.5 10h3M6 6l1.6 1.6M12.4 12.4 14 14M6 14l1.6-1.6M12.4 7.6 14 6"></path></svg></span><span class="sidebar-link-prefix" aria-hidden="true">+</span><span class="sidebar-link-text">Mileage</span></a>
-        <a href="accounts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><rect x="2.5" y="5.5" width="15" height="10" rx="2.5"></rect><path d="M7 5.5V4a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 13 4v1.5"></path></svg></span><span class="sidebar-link-prefix" aria-hidden="true">+</span><span class="sidebar-link-text">Accounts</span></a>
-        <a href="categories" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.5"></circle><path d="M10 6.2v4.1l2.7 2.1"></path></svg></span><span class="sidebar-link-prefix" aria-hidden="true">+</span><span class="sidebar-link-text">Categories</span></a>
+        <a href="transactions" class="sidebar-link is-active" onclick="event.preventDefault();document.getElementById('addTxTogglePage').click()"><span class="sidebar-icon sidebar-icon--transactions" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><rect x="2.5" y="2.5" width="13" height="15" rx="2.5"></rect><path d="M6.5 7h5M6.5 10h5M6.5 13h3.4"></path></svg></span><span class="sidebar-link-prefix" aria-hidden="true">+</span><span class="sidebar-link-text">Transactions</span></a>
+        <a href="receipts" class="sidebar-link"><span class="sidebar-icon sidebar-icon--receipts" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><rect x="2.5" y="2.5" width="13" height="15" rx="2.5"></rect><path d="M6.4 7h.2M8.8 7h2.7M6.4 10h.2M8.8 10h2.7M6.4 13h.2M8.8 13h2.7"></path></svg></span><span class="sidebar-link-prefix" aria-hidden="true">+</span><span class="sidebar-link-text">Receipts</span><span id="receiptsDot" class="sidebar-dot" hidden></span></a>
+        <a href="mileage" class="sidebar-link"><span class="sidebar-icon sidebar-icon--mileage" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><circle cx="9.5" cy="10" r="1.65"></circle><path d="M9.5 2.5v3M9.5 14.5v3M2.5 10h3M13.5 10h3M5.1 5.6l1.7 1.7M12.2 12.7l1.7 1.7M5.1 14.4l1.7-1.7M12.2 7.3 13.9 5.6"></path></svg></span><span class="sidebar-link-prefix" aria-hidden="true">+</span><span class="sidebar-link-text">Mileage</span></a>
+        <a href="accounts" class="sidebar-link"><span class="sidebar-icon sidebar-icon--accounts" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><rect x="2.5" y="5.5" width="13.5" height="9.5" rx="2.2"></rect><path d="M6.4 5.5V4.1a1.6 1.6 0 0 1 1.6-1.6h2.5a1.6 1.6 0 0 1 1.6 1.6v1.4"></path></svg></span><span class="sidebar-link-prefix" aria-hidden="true">+</span><span class="sidebar-link-text">Accounts</span></a>
+        <a href="categories" class="sidebar-link"><span class="sidebar-icon sidebar-icon--categories" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><circle cx="9.5" cy="10" r="7"></circle><path d="M9.5 6.2v4l2.5 2.1"></path></svg></span><span class="sidebar-link-prefix" aria-hidden="true">+</span><span class="sidebar-link-text">Categories</span></a>
       </nav>
       <!-- Filter links kept for JS routing but not shown in sidebar UI -->
       <nav class="sidebar-nav sidebar-filter-nav" aria-hidden="true">
@@ -570,7 +570,7 @@
 <script src="../js/auth.js?v=20260405c"></script>
 <script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/taxReminders.js?v=20260405c"></script>
-<script src="../js/transactions.js?v=20260503d"></script>
+<script src="../js/transactions.js?v=20260503e"></script>
 </body>
 </html>
 
