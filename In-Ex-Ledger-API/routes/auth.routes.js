@@ -514,7 +514,7 @@ async function recordFailedLoginAttempt(user) {
 }
 
 async function clearPendingMfaEmailChallenges(userId) {
-  await pool.query("DELETE FROM mfa_email_challenges WHERE user_id = $1 AND consumed_at IS NULL", [userId]);
+  await pool.query("DELETE FROM mfa_email_challenges WHERE user_id = $1 AND expires_at <= NOW()", [userId]);
 }
 
 async function createMfaEmailChallenge(user, req, options = {}) {

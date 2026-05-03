@@ -62,8 +62,7 @@ function loadAuthRouter(options = {}) {
     hasRecognizedDeviceHistory: options.hasRecognizedDeviceHistory ?? true,
     recognizedDevice: !!options.recognizedDevice,
     trustedMfaTokenHash: null,
-    pendingChallengeId: null,
-    pendingChallengeCodeHash: null,
+    pendingChallenges: new Map(),
     sentEmails: [],
     capturedQueries: []
   };
@@ -140,26 +139,28 @@ function loadAuthRouter(options = {}) {
               return { rows: [], rowCount: 1 };
             }
 
-            if (/DELETE FROM mfa_email_challenges WHERE user_id = \$1 AND consumed_at IS NULL/i.test(sql)) {
-              state.pendingChallengeId = null;
-              state.pendingChallengeCodeHash = null;
+            if (/DELETE FROM mfa_email_challenges WHERE user_id = \$1 AND expires_at <= NOW\(\)/i.test(sql)) {
               return { rows: [], rowCount: 0 };
             }
 
             if (/INSERT INTO mfa_email_challenges/i.test(sql)) {
-              state.pendingChallengeId = params[0];
-              state.pendingChallengeCodeHash = params[2];
+              state.pendingChallenges.set(params[0], {
+                code_hash: params[2],
+                attempt_count: 0,
+                expires_at: new Date(Date.now() + 60_000).toISOString()
+              });
               return { rows: [], rowCount: 1 };
             }
 
             if (/SELECT id, code_hash, attempt_count, expires_at\s+FROM mfa_email_challenges/i.test(sql)) {
-              if (params[0] === state.pendingChallengeId && params[1] === state.user.id && state.pendingChallengeCodeHash) {
+              const challenge = state.pendingChallenges.get(params[0]);
+              if (params[1] === state.user.id && challenge) {
                 return {
                   rows: [{
-                    id: state.pendingChallengeId,
-                    code_hash: state.pendingChallengeCodeHash,
-                    attempt_count: 0,
-                    expires_at: new Date(Date.now() + 60_000).toISOString()
+                    id: params[0],
+                    code_hash: challenge.code_hash,
+                    attempt_count: challenge.attempt_count,
+                    expires_at: challenge.expires_at
                   }],
                   rowCount: 1
                 };
@@ -167,8 +168,17 @@ function loadAuthRouter(options = {}) {
               return { rows: [], rowCount: 0 };
             }
 
+            if (/UPDATE mfa_email_challenges SET attempt_count = attempt_count \+ 1 WHERE id = \$1/i.test(sql)) {
+              const challenge = state.pendingChallenges.get(params[0]);
+              if (challenge) {
+                challenge.attempt_count += 1;
+                state.pendingChallenges.set(params[0], challenge);
+              }
+              return { rows: [], rowCount: 1 };
+            }
+
             if (/UPDATE mfa_email_challenges SET consumed_at = NOW\(\) WHERE id = \$1/i.test(sql)) {
-              state.pendingChallengeCodeHash = null;
+              state.pendingChallenges.delete(params[0]);
               return { rows: [], rowCount: 1 };
             }
 
@@ -625,6 +635,49 @@ test("mfa challenge token lasts at least as long as the emailed code window", as
     assert.equal(loginResponse.body?.mfa_required, true);
     const pending = verifyToken(loginResponse.body.mfa_token);
     assert.ok((pending.exp - pending.iat) >= 15 * 60, "pending MFA token should remain valid for at least 15 minutes");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("multiple MFA code requests do not immediately invalidate the earlier challenge", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+  fixture.state.user.mfa_enabled = true;
+  fixture.state.user.mfa_enabled_at = new Date().toISOString();
+
+  try {
+    const app = buildApp(fixture.router);
+    const firstLogin = await request(app)
+      .post("/api/auth/login")
+      .set("User-Agent", "TestBrowser/1.0")
+      .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
+
+    assert.equal(firstLogin.status, 200);
+    assert.equal(firstLogin.body?.mfa_required, true);
+    const firstCode = String(fixture.state.sentEmails.at(-1)?.text || "").match(/Code:\s*(\d{6})/);
+    assert.ok(firstCode, "first MFA email should contain a 6-digit code");
+
+    const secondLogin = await request(app)
+      .post("/api/auth/login")
+      .set("User-Agent", "TestBrowser/1.0")
+      .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
+
+    assert.equal(secondLogin.status, 200);
+    assert.equal(secondLogin.body?.mfa_required, true);
+
+    const verifyFirst = await request(app)
+      .post("/api/auth/mfa/verify")
+      .set("User-Agent", "TestBrowser/1.0")
+      .send({
+        mfaToken: firstLogin.body.mfa_token,
+        code: firstCode[1]
+      });
+
+    assert.equal(verifyFirst.status, 200);
+    assert.ok(verifyFirst.body?.token, "first challenge should still verify after a second code is issued");
   } finally {
     fixture.cleanup();
   }
