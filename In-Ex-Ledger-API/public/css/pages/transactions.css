@@ -3036,6 +3036,79 @@ textarea.form-control {
   }
 }
 
+/* ── Quick Add sidebar enhancements ─────────────────────── */
+.sidebar-section-label--sub {
+  margin-top: 18px;
+}
+
+.app-sidebar .sidebar-nav > button.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--ink2);
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-sidebar .sidebar-nav > button.sidebar-link:hover {
+  background: var(--surface2);
+  color: var(--ink);
+}
+
+.app-sidebar .sidebar-nav > button.sidebar-link span {
+  color: inherit;
+}
+
+/* ── Stat card icon circles ──────────────────────────────── */
+.stat-card-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+.stat-card-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.stat-icon--income {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+}
+
+.stat-icon--expense {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.stat-icon--profit {
+  background: rgba(37, 99, 168, 0.1);
+  color: var(--accent2, #2563a8);
+}
+
+.stat-icon--count {
+  background: rgba(124, 58, 237, 0.1);
+  color: #7c3aed;
+}
+
 
 @keyframes tx-highlight-fade {
   0%   { background-color: #fef9c3; }
