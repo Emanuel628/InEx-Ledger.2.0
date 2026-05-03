@@ -3180,20 +3180,30 @@ tr.tx-highlight {
 .app-sidebar nav.sidebar-nav > a.sidebar-link,
 .app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-link {
   min-height: 34px !important;
-  grid-template-columns: 14px 10px minmax(0, 1fr) auto !important;
+  grid-template-columns: 18px 10px minmax(0, 1fr) auto !important;
   align-items: center !important;
   justify-items: start !important;
   gap: 8px !important;
-  padding: 7px 10px 7px 8px !important;
+  padding: 7px 10px 7px 10px !important;
   border-radius: 10px !important;
   font-size: 13px !important;
   font-weight: 600 !important;
 }
 
 .sidebar-icon {
-  width: 14px !important;
-  height: 14px !important;
+  width: 18px !important;
+  height: 18px !important;
+  display: inline-flex !important;
+  align-items: center !important;
   justify-content: flex-start !important;
+  flex-shrink: 0 !important;
+  overflow: visible !important;
+}
+
+.sidebar-icon svg {
+  width: 18px !important;
+  height: 18px !important;
+  display: block !important;
 }
 
 .sidebar-link-prefix {
