@@ -2547,8 +2547,18 @@ body {
   background: rgba(255, 255, 255, 0.86);
 }
 
-.tx-period-chip.is-active {
+.tx-period-chip.is-active,
+.tx-period-chip.is-active:hover,
+.tx-period-chip.is-active:active {
+  background: var(--accent2);
+  color: #fff;
   box-shadow: 0 10px 20px rgba(36, 109, 187, 0.18);
+}
+
+.tx-period-chip:not(.is-active):active {
+  background: var(--accent2);
+  color: #fff;
+  border-color: transparent;
 }
 
 .page-add-button {
