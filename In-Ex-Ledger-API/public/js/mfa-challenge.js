@@ -5,11 +5,19 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
-let pendingMfaToken = sessionStorage.getItem("lb_pending_mfa_token") || "";
-const pendingMfaEmail = sessionStorage.getItem("lb_pending_mfa_email") || "";
+let pendingMfaToken = "";
+
+function syncPendingMfaToken() {
+  pendingMfaToken = sessionStorage.getItem("lb_pending_mfa_token") || "";
+  return pendingMfaToken;
+}
+
+function getPendingMfaEmail() {
+  return sessionStorage.getItem("lb_pending_mfa_email") || "";
+}
 
 document.addEventListener("DOMContentLoaded", () => {
-  if (!pendingMfaToken) {
+  if (!syncPendingMfaToken()) {
     window.location.href = "/login";
     return;
   }
@@ -18,6 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
   mfaChallengeError = document.getElementById("mfaChallengeError");
 
   const intro = document.getElementById("mfaChallengeIntro");
+  const pendingMfaEmail = getPendingMfaEmail();
   if (intro && pendingMfaEmail) {
     intro.textContent = `${tx("mfa_challenge_intro_prefix")} ${pendingMfaEmail}. ${tx("mfa_challenge_intro_suffix")}`;
   }
@@ -34,9 +43,18 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
+window.addEventListener("pageshow", () => {
+  syncPendingMfaToken();
+});
+
 async function handleMfaChallengeSubmit(event) {
   event.preventDefault();
   if (!mfaChallengeForm || isSubmittingMfa) {
+    return;
+  }
+  const currentMfaToken = syncPendingMfaToken();
+  if (!currentMfaToken) {
+    window.location.href = "/login";
     return;
   }
 
@@ -63,7 +81,7 @@ async function handleMfaChallengeSubmit(event) {
         ...(typeof csrfHeader === "function" ? csrfHeader("POST") : {})
       },
       body: JSON.stringify({
-        mfaToken: pendingMfaToken,
+        mfaToken: currentMfaToken,
         code,
         trustDevice
       })
@@ -92,7 +110,8 @@ async function handleMfaChallengeSubmit(event) {
 
 async function handleMfaChallengeResend(event) {
   const resendButton = event?.currentTarget;
-  if (!pendingMfaToken || !resendButton) {
+  const currentMfaToken = syncPendingMfaToken();
+  if (!currentMfaToken || !resendButton) {
     return;
   }
 
@@ -107,7 +126,7 @@ async function handleMfaChallengeResend(event) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        mfaToken: pendingMfaToken
+        mfaToken: currentMfaToken
       })
     });
 

@@ -1701,7 +1701,7 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
       clearMfaTrustCookie(res);
       return res.status(403).json({ error: "Please verify your email before signing in." });
     }
-    logError("MFA verify error:", err);
+    logError("MFA verify error:", err?.message || err);
     return res.status(401).json({ error: "Invalid or expired MFA session." });
   }
 });
