@@ -3130,3 +3130,325 @@ textarea.form-control {
 tr.tx-highlight {
   animation: tx-highlight-fade 2s ease-out forwards;
 }
+
+/* 2026-05-03 transactions reference sync */
+.app-shell {
+  background:
+    radial-gradient(circle at top right, rgba(56, 118, 191, 0.08), transparent 26%),
+    #f6f8fc;
+}
+
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic),
+.app-sidebar {
+  width: 176px !important;
+  min-width: 176px !important;
+  padding: 16px 12px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: inset -1px 0 0 rgba(15, 25, 35, 0.05);
+}
+
+.sidebar-quick-header {
+  padding: 8px 8px 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(15, 25, 35, 0.06);
+}
+
+.sidebar-quick-header .sidebar-section-label,
+.app-sidebar .sidebar-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.sidebar-add-pill {
+  min-width: 40px;
+  height: 26px;
+  justify-content: center;
+  border-color: rgba(20, 54, 97, 0.14);
+  background: #f3f6fb;
+  color: #224974;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.app-sidebar .sidebar-nav,
+.sidebar-nav {
+  gap: 6px;
+}
+
+.app-sidebar .sidebar-nav > .sidebar-link,
+.app-sidebar .sidebar-nav > a.sidebar-link,
+.app-sidebar nav.sidebar-nav > a.sidebar-link,
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-link {
+  min-height: 34px !important;
+  grid-template-columns: 16px minmax(0, 1fr) auto !important;
+  gap: 8px !important;
+  padding: 7px 10px !important;
+  border-radius: 10px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.sidebar-icon {
+  justify-content: center !important;
+}
+
+.sidebar-link-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sidebar-link-prefix {
+  width: 8px;
+  flex: 0 0 8px;
+  text-align: center;
+}
+
+.sidebar-link-text {
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.app-sidebar .sidebar-nav > .sidebar-link.is-active,
+.app-sidebar .sidebar-nav > a.sidebar-link.is-active,
+.app-sidebar nav.sidebar-nav > a.sidebar-link.is-active,
+.app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-link.is-active {
+  background: rgba(36, 109, 187, 0.08) !important;
+  color: #224974 !important;
+}
+
+.sidebar-dot {
+  justify-self: end;
+}
+
+.transactions-toolbar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.transactions-toolbar-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.transactions-toolbar-subtitle {
+  margin: 0;
+  color: #7a8694;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.transactions-toolbar-tools {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(170px, 184px);
+  align-items: start;
+  gap: 12px;
+}
+
+.transactions-toolbar-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toolbar-search,
+.toolbar-select,
+.toolbar-import-button {
+  min-height: 42px;
+}
+
+.toolbar-search {
+  background: #fff;
+}
+
+.toolbar-select,
+.toolbar-import-button {
+  width: 100%;
+}
+
+.toolbar-import-button {
+  justify-content: flex-start;
+  padding-left: 14px;
+  background: #fff;
+}
+
+.recurring-toolbar {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.recurring-toolbar-copy {
+  align-self: center;
+}
+
+.recurring-subtitle {
+  max-width: 54ch;
+  margin-bottom: 0;
+}
+
+.recurring-add-inline {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(15, 25, 35, 0.1);
+  background: #fff;
+  color: #224974;
+  box-shadow: none;
+}
+
+.transactions-table thead th.col-select,
+.transactions-table tbody td.table-select-cell {
+  width: 42px;
+  text-align: center;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.transactions-table thead th.col-actions,
+.transactions-table tbody td.table-actions-cell {
+  width: 92px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+#txSelectAll,
+.tx-row-select {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #224974;
+  cursor: pointer;
+}
+
+.transactions-table tbody tr.is-selected {
+  background: #f4f8fe;
+}
+
+.transactions-table tbody tr.is-selected td {
+  background: transparent;
+}
+
+.row-action-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 25, 35, 0.1);
+  background: #fff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.row-action-button:hover {
+  background: #f8fafc;
+}
+
+.placeholder-row td {
+  border-bottom: none !important;
+}
+
+.placeholder-cell {
+  padding: 30px 18px !important;
+}
+
+.table-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 216px;
+  text-align: center;
+}
+
+.table-empty-state-recurring {
+  min-height: 172px;
+}
+
+.table-empty-illustration {
+  width: 112px;
+  height: 84px;
+  color: #224974;
+}
+
+.table-empty-illustration svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.table-empty-title {
+  margin: 0;
+  color: #15283d;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.table-empty-copy {
+  margin: 0;
+  max-width: 36ch;
+  color: #6f7c8a;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.table-empty-button {
+  min-height: 38px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #214d87 0%, #173d6b 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 10px 18px rgba(23, 61, 107, 0.2);
+}
+
+@media (max-width: 1180px) {
+  .transactions-toolbar-tools {
+    grid-template-columns: minmax(220px, 1fr) minmax(170px, 184px);
+  }
+}
+
+@media (max-width: 900px) {
+  .transactions-toolbar,
+  .recurring-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .transactions-toolbar-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .transactions-toolbar-controls {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .transactions-toolbar-controls > * {
+    flex: 1 1 180px;
+  }
+
+  .recurring-add-inline {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .placeholder-cell {
+    padding: 24px 14px !important;
+  }
+
+  .table-empty-state {
+    min-height: 188px;
+  }
+
+  .table-empty-title {
+    font-size: 17px;
+  }
+
+  .table-empty-copy {
+    max-width: 28ch;
+  }
+}

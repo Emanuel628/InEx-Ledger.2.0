@@ -47,11 +47,11 @@
         <button type="button" class="sidebar-add-pill" onclick="document.getElementById('addTxTogglePage').click()">+ Add</button>
       </div>
       <nav class="sidebar-nav">
-        <a href="transactions" class="sidebar-link" onclick="event.preventDefault();document.getElementById('addTxTogglePage').click()"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>+ Transactions</span></a>
-        <a href="receipts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span>+ Receipts</span><span id="receiptsDot" class="sidebar-dot" hidden></span></a>
-        <a href="mileage" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span>+ Mileage</span></a>
-        <a href="accounts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg></span><span>+ Accounts</span></a>
-        <a href="categories" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg></span><span>+ Categories</span></a>
+        <a href="transactions" class="sidebar-link is-active" onclick="event.preventDefault();document.getElementById('addTxTogglePage').click()"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span class="sidebar-link-label"><span class="sidebar-link-prefix">+</span><span class="sidebar-link-text">Transactions</span></span></a>
+        <a href="receipts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg></span><span class="sidebar-link-label"><span class="sidebar-link-prefix">+</span><span class="sidebar-link-text">Receipts</span></span><span id="receiptsDot" class="sidebar-dot" hidden></span></a>
+        <a href="mileage" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span class="sidebar-link-label"><span class="sidebar-link-prefix">+</span><span class="sidebar-link-text">Mileage</span></span></a>
+        <a href="accounts" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg></span><span class="sidebar-link-label"><span class="sidebar-link-prefix">+</span><span class="sidebar-link-text">Accounts</span></span></a>
+        <a href="categories" class="sidebar-link"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg></span><span class="sidebar-link-label"><span class="sidebar-link-prefix">+</span><span class="sidebar-link-text">Categories</span></span></a>
       </nav>
       <!-- Filter links kept for JS routing but not shown in sidebar UI -->
       <nav class="sidebar-nav sidebar-filter-nav" aria-hidden="true">
@@ -112,7 +112,7 @@
         </article>
         <article class="stat-card">
           <div class="stat-card-icon stat-icon--profit" aria-hidden="true">
-            <svg viewBox="0 0 16 16" fill="none"><line x1="8" y1="2" x2="8" y2="14"></line><path d="M5 5h4a2 2 0 0 1 0 4H7a2.5 2.5 0 0 0 0 5h4"></path></svg>
+            <svg viewBox="0 0 16 16" fill="none"><line x1="8" y1="2" x2="8" y2="14"></line><path d="M5 5h4a2 2 0 0 0 0 4H7a2.5 2.5 0 0 1 0 5h4"></path></svg>
           </div>
           <div class="stat-label">Net profit</div>
           <div class="stat-value" id="netProfitYTD">$0.00</div>
@@ -162,34 +162,41 @@
 
       <section class="transactions-panel">
         <div class="transactions-toolbar">
-          <h2 class="transactions-panel-title">Recorded transactions</h2>
-          <div class="toolbar-search">
-            <span class="toolbar-search-icon" aria-hidden="true">
-              <svg viewBox="0 0 16 16">
-                <circle cx="7" cy="7" r="5"></circle>
-                <line x1="10.5" y1="10.5" x2="14" y2="14"></line>
-              </svg>
-            </span>
-            <input
-              type="search"
-              id="transactionSearch"
-              placeholder="Search transactions..."
-              data-i18n-placeholder="transactions_search_placeholder"
-              data-i18n-aria-label="transactions_search_label"
-              aria-label="Search transactions"
-            />
+          <div class="transactions-toolbar-copy">
+            <h2 class="transactions-panel-title">Recorded transactions</h2>
+            <p class="transactions-toolbar-subtitle">Track imported and manual entries for this reporting period.</p>
           </div>
-          <select id="transactionCategoryFilter" class="toolbar-select">
-            <option value="" data-i18n="transactions_filter_all_categories">All categories</option>
-          </select>
-          <button
-            id="importCsvBtn"
-            class="toolbar-import-button"
-            type="button"
-            title="Import transactions from a bank CSV file"
-          >
-            Import CSV
-          </button>
+          <div class="transactions-toolbar-tools">
+            <div class="toolbar-search">
+              <span class="toolbar-search-icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16">
+                  <circle cx="7" cy="7" r="5"></circle>
+                  <line x1="10.5" y1="10.5" x2="14" y2="14"></line>
+                </svg>
+              </span>
+              <input
+                type="search"
+                id="transactionSearch"
+                placeholder="Search transactions..."
+                data-i18n-placeholder="transactions_search_placeholder"
+                data-i18n-aria-label="transactions_search_label"
+                aria-label="Search transactions"
+              />
+            </div>
+            <div class="transactions-toolbar-controls">
+              <select id="transactionCategoryFilter" class="toolbar-select">
+                <option value="" data-i18n="transactions_filter_all_categories">All categories</option>
+              </select>
+              <button
+                id="importCsvBtn"
+                class="toolbar-import-button"
+                type="button"
+                title="Import transactions from a bank CSV file"
+              >
+                Import CSV
+              </button>
+            </div>
+          </div>
         </div>
 
         <div id="txDrawer" hidden>
@@ -369,6 +376,7 @@
           <table class="transactions-table">
             <thead>
               <tr>
+                <th class="col-select"><input type="checkbox" id="txSelectAll" aria-label="Select all visible transactions" /></th>
                 <th class="col-date" data-i18n="transactions_table_date">Date</th>
                 <th class="col-description" data-i18n="transactions_table_description">Description</th>
                 <th class="col-account" data-i18n="transactions_table_account">Account</th>
@@ -376,6 +384,7 @@
                 <th class="col-receipt">Receipt</th>
                 <th class="col-status">Status</th>
                 <th class="col-amount" data-i18n="transactions_table_amount">Amount</th>
+                <th class="col-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -391,10 +400,13 @@
 
       <section class="transactions-panel recurring-panel">
         <div class="transactions-toolbar recurring-toolbar">
-          <div>
+          <div class="transactions-toolbar-copy recurring-toolbar-copy">
             <h2 class="transactions-panel-title">Recurring templates</h2>
-            <p class="page-subtitle recurring-subtitle">Use templates for work that repeats on a schedule.</p>
+            <p class="page-subtitle recurring-subtitle">Automate retainers, subscriptions, and fixed monthly expenses.</p>
           </div>
+          <button id="recurringToggle" class="toolbar-add-button recurring-add-inline" type="button" aria-expanded="false">
+            + Add recurring template
+          </button>
         </div>
 
         <div id="recurringDrawer" hidden>
@@ -489,11 +501,6 @@
               <tr><td colspan="6" class="placeholder">Loading recurring templates...</td></tr>
             </tbody>
           </table>
-        </div>
-        <div class="recurring-bottom-bar">
-          <button id="recurringToggle" class="toolbar-add-button recurring-add-inline" type="button" aria-expanded="false">
-            + Add recurring template
-          </button>
         </div>
       </section>
     </div>
