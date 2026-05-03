@@ -427,8 +427,9 @@
 }
 
 .sub-quantity-control-slots {
-  gap: 10px;
-  padding: 8px;
+  gap: 8px;
+  width: fit-content;
+  padding: 6px;
   border-radius: 16px;
   border-color: rgba(15, 25, 35, 0.08);
   background: rgba(245, 248, 252, 0.82);
@@ -470,6 +471,11 @@
   color: #223246;
   font-size: 24px;
   box-shadow: 0 8px 18px rgba(15, 25, 35, 0.05);
+  align-self: center;
+}
+
+#slotsIncreaseBtn span {
+  transform: translateY(-1px);
 }
 
 .sub-quantity-btn:hover {
@@ -494,7 +500,7 @@
 
 .sub-quantity-control-slots .sub-quantity-input {
   width: 86px;
-  min-height: 48px;
+  min-height: 44px;
   border-radius: 14px;
   border: 1px solid rgba(15, 25, 35, 0.1);
   background: #fff;
@@ -817,8 +823,8 @@
 .sub-slots-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 22px;
+  gap: 14px;
+  padding: 18px;
   border-radius: 24px;
   border: 1px solid rgba(15, 25, 35, 0.08);
   background: rgba(255, 255, 255, 0.98);
@@ -831,7 +837,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
 }
 
 .sub-slots-panel-copy {
@@ -839,7 +845,7 @@
 }
 
 .sub-slots-panel-copy h3 {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   color: #102236;
   font-size: 22px;
   font-weight: 700;
@@ -856,7 +862,7 @@
 .sub-slots-price-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 34px;
+  min-height: 30px;
   padding: 0 12px;
   border-radius: 999px;
   background: rgba(237, 244, 251, 0.94);
@@ -868,6 +874,7 @@
 
 .sub-slots-workbench {
   align-items: stretch;
+  justify-content: flex-start;
 }
 
 .sub-slots-stepper-card,
@@ -878,19 +885,20 @@
 }
 
 .sub-slots-stepper-card {
-  flex: 1.15;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 18px;
-}
-
-.sub-slots-summary-card {
-  flex: 0.85;
+  flex: 0 1 430px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 18px;
+  padding: 14px 16px;
+  justify-content: center;
+}
+
+.sub-slots-summary-card {
+  flex: 0 1 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
   background: linear-gradient(180deg, rgba(245, 248, 252, 0.82), rgba(255, 255, 255, 0.96));
 }
 
@@ -906,7 +914,7 @@
   margin: 0;
   color: #677487;
   font-size: 13px;
-  line-height: 1.58;
+  line-height: 1.52;
 }
 
 .sub-slots-summary-row {
@@ -926,7 +934,7 @@
 
 .sub-slots-summary-row-total {
   margin-top: auto;
-  padding-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid rgba(15, 25, 35, 0.08);
 }
 
@@ -949,7 +957,7 @@
   font-size: 13px;
   color: #667385;
   line-height: 1.55;
-  max-width: 44ch;
+  max-width: 38ch;
 }
 
 /* ── Billing history ──────────────────────────────────────────── */
