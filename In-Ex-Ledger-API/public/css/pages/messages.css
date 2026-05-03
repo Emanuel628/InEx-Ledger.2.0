@@ -476,6 +476,10 @@
   font-weight: 700;
 }
 
+.messages-tab-badge[hidden] {
+  display: none !important;
+}
+
 #inboxBadge.messages-tab-badge {
   width: 7px;
   min-width: 7px;
