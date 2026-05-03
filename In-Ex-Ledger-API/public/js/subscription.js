@@ -347,11 +347,11 @@ function wireSlotsControls() {
   const syncButtons = () => syncBusinessSlotsControls();
 
   input.addEventListener("change", () => {
-    businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(Number(input.value));
+    businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(Number(input.value) - 1);
     syncButtons();
   });
   input.addEventListener("input", () => {
-    businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(Number(input.value));
+    businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(Number(input.value) - 1);
     syncButtons();
   });
   decreaseBtn.addEventListener("click", () => {
@@ -381,7 +381,7 @@ function syncBusinessSlotsControls() {
   const total = 1 + selected;
   const hasChanges = selected !== businessSlotsState.currentAdditionalBusinesses;
 
-  input.value = String(selected);
+  input.value = String(1 + selected);
   decreaseBtn.disabled = businessSlotsState.isSaving || selected <= 0;
   increaseBtn.disabled = businessSlotsState.isSaving || selected >= MAX_ADDITIONAL_BUSINESSES;
   input.disabled = businessSlotsState.isSaving;
@@ -500,32 +500,32 @@ function renderBusinessAccessSection(sub) {
     <div class="sub-slots-panel">
       <div class="sub-slots-panel-head">
         <div class="sub-slots-panel-copy">
-          <h3>Adjust business slot capacity</h3>
-          <p>Add workspace capacity only when you actually need another separate business ledger.</p>
+          <h3>Add additional business</h3>
+          <p>1 business is included with Pro. Set the total number you need — each one beyond the first is billed as an add-on.</p>
         </div>
         <div class="sub-slots-price-pill">${escapeHtml(tx("subscription_extra_business_slots_help"))}</div>
       </div>
       <div class="sub-slots-workbench">
         <div class="sub-slots-stepper-card">
-          <span class="sub-slots-stepper-label">${escapeHtml(tx("subscription_extra_business_slots"))}</span>
+          <span class="sub-slots-stepper-label">${escapeHtml(tx("subscription_total_businesses_allowed"))}</span>
           <div class="sub-quantity-control sub-quantity-control-slots">
             <button type="button" class="sub-quantity-btn" id="slotsDecreaseBtn" aria-label="Decrease">
               <span aria-hidden="true">&minus;</span>
             </button>
-            <input id="businessSlotsInput" class="sub-quantity-input" type="number" min="0" max="100" step="1" value="${extra}" inputmode="numeric" />
+            <input id="businessSlotsInput" class="sub-quantity-input" type="number" min="1" max="101" step="1" value="${total}" inputmode="numeric" />
             <button type="button" class="sub-quantity-btn" id="slotsIncreaseBtn" aria-label="Increase">
               <span aria-hidden="true">+</span>
             </button>
           </div>
-          <p class="sub-slots-stepper-meta">Changes apply to your active Pro subscription and keep each business in its own workspace.</p>
+          <p class="sub-slots-stepper-meta">1 is included with Pro — anything above 1 is billed as an add-on.</p>
         </div>
         <div class="sub-slots-summary-card">
           <div class="sub-slots-summary-row">
-            <span>Selected add-on slots</span>
+            <span>Add-on slots</span>
             <strong id="businessSlotsSelectedValue">${extra}</strong>
           </div>
           <div class="sub-slots-summary-row">
-            <span>Workspace capacity</span>
+            <span>Total businesses</span>
             <strong id="businessSlotsProjectedTotal">${total}</strong>
           </div>
           <div class="sub-slots-summary-row sub-slots-summary-row-total">
