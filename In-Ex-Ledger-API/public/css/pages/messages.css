@@ -440,6 +440,9 @@
 }
 
 .messages-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 40px;
   padding: 0 14px;
   border: 1px solid transparent;
@@ -471,6 +474,19 @@
   color: inherit;
   font-size: 10px;
   font-weight: 700;
+}
+
+#inboxBadge.messages-tab-badge {
+  width: 7px;
+  min-width: 7px;
+  height: 7px;
+  margin-left: 8px;
+  padding: 0;
+  border-radius: 999px;
+  background: #e24b4a;
+  color: transparent;
+  font-size: 0;
+  box-shadow: none;
 }
 
 .messages-list-shell,
@@ -784,6 +800,11 @@
   background: rgba(15, 25, 35, 0.45);
 }
 
+.compose-overlay {
+  align-items: flex-start;
+  overflow-y: auto;
+}
+
 .message-detail-overlay.hidden,
 .compose-overlay.hidden,
 .messages-toast.hidden {
@@ -804,9 +825,12 @@
 }
 
 .compose-modal {
-  width: min(100%, 560px);
-  padding: 28px;
-  gap: 14px;
+  width: min(100%, 880px);
+  max-height: none;
+  overflow: visible;
+  margin: 8px auto;
+  padding: 30px 30px 28px;
+  gap: 16px;
 }
 
 .compose-modal h2,
@@ -1052,6 +1076,12 @@
   .message-detail-panel,
   .compose-modal {
     border-radius: 20px;
+  }
+
+  .compose-modal {
+    width: min(100%, 680px);
+    padding: 24px 20px 22px;
+    margin: 0 auto;
   }
 }
 
