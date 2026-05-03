@@ -1694,7 +1694,6 @@ function initSecurityForm() {
   const requirementItems = document.querySelectorAll(".password-requirements li");
   const submitButton = document.getElementById("securitySaveButton");
   const mfaEnabledToggle = document.getElementById("mfaEnabledToggle");
-  const mfaCurrentPassword = document.getElementById("mfa-current-password");
   const mfaSetupPanel = document.getElementById("mfaSetupPanel");
   const mfaCodeField = document.getElementById("mfaCodeField");
   const mfaSetupCode = document.getElementById("mfaSetupCode");
@@ -1824,7 +1823,6 @@ function initSecurityForm() {
 
   const resetSetupPanel = () => {
     mfaSetupPanel?.classList.add("hidden");
-    if (mfaCurrentPassword) mfaCurrentPassword.value = "";
     if (mfaSetupCode) mfaSetupCode.value = "";
     mfaCodeField?.classList.add("hidden");
     mfaCancelButton?.classList.add("hidden");
@@ -1912,7 +1910,7 @@ function initSecurityForm() {
 
   showToggle?.addEventListener("change", () => {
     const type = showToggle.checked ? "text" : "password";
-    [currentInput, newInput, confirmInput, mfaCurrentPassword, recoveryEmailPassword].forEach((input) => {
+    [currentInput, newInput, confirmInput, recoveryEmailPassword].forEach((input) => {
       if (!input) {
         return;
       }
@@ -1994,10 +1992,7 @@ function initSecurityForm() {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            currentPassword: mfaCurrentPassword?.value || ""
-          })
+          }
         });
         const payload = response ? await response.json().catch(() => null) : null;
 
@@ -2034,7 +2029,6 @@ function initSecurityForm() {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            currentPassword: mfaCurrentPassword?.value || "",
             code: mfaSetupCode?.value || "",
             mfaToken: mfaPendingToken
           })
@@ -2070,10 +2064,7 @@ function initSecurityForm() {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            currentPassword: mfaCurrentPassword?.value || ""
-          })
+          }
         });
         const payload = response ? await response.json().catch(() => null) : null;
 
@@ -2110,7 +2101,6 @@ function initSecurityForm() {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            currentPassword: mfaCurrentPassword?.value || "",
             code: mfaSetupCode?.value || "",
             mfaToken: mfaPendingToken
           })

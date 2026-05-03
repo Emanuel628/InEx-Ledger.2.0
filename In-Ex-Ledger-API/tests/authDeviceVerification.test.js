@@ -592,7 +592,7 @@ test("mfa enable returns a fresh MFA-authenticated access token for subsequent p
       .post("/api/auth/mfa/enable")
       .set("Authorization", `Bearer ${authToken}`)
       .set(csrfHeaders)
-      .send({ currentPassword: "CorrectPassword1!" });
+      .send({});
 
     assert.equal(startResponse.status, 200);
     assert.equal(startResponse.body?.pending_verification, true);
@@ -607,7 +607,6 @@ test("mfa enable returns a fresh MFA-authenticated access token for subsequent p
       .set("Authorization", `Bearer ${authToken}`)
       .set(csrfHeaders)
       .send({
-        currentPassword: "CorrectPassword1!",
         code: codeMatch[1],
         mfaToken: startResponse.body.mfa_token
       });

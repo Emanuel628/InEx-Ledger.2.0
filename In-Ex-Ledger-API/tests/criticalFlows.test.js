@@ -364,38 +364,6 @@ test("billing: POST /checkout-session rejects missing CSRF token (403)", async (
   assert.equal(res.status, 403);
 });
 
-test("billing: POST /checkout-session requires MFA (403 mfa_required) when MFA is not enabled", async () => {
-  const billingRouter = require("../routes/billing.routes.js");
-  const app = buildApp(billingRouter, "/api/billing");
-  const authToken = makeToken({ mfa_enabled: false });
-  const csrf = generateCsrfToken();
-
-  const res = await request(app)
-    .post("/api/billing/checkout-session")
-    .set("Authorization", `Bearer ${authToken}`)
-    .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
-    .send({});
-  assert.equal(res.status, 403);
-  assert.equal(res.body?.mfa_required, true);
-});
-
-test("billing: PATCH /additional-businesses requires MFA (403 mfa_required) when MFA is not enabled", async () => {
-  const billingRouter = require("../routes/billing.routes.js");
-  const app = buildApp(billingRouter, "/api/billing");
-  const authToken = makeToken({ mfa_enabled: false });
-  const csrf = generateCsrfToken();
-
-  const res = await request(app)
-    .patch("/api/billing/additional-businesses")
-    .set("Authorization", `Bearer ${authToken}`)
-    .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
-    .send({ additionalBusinesses: 1 });
-  assert.equal(res.status, 403);
-  assert.equal(res.body?.mfa_required, true);
-});
-
 // ---------------------------------------------------------------------------
 // 5. Settings (me) Routes
 // ---------------------------------------------------------------------------

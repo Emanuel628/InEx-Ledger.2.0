@@ -1472,22 +1472,13 @@ router.post("/mfa/reauth", requireAuth, requireCsrfProtection, mfaVerifyLimiter,
 });
 
 router.post("/mfa/enable", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
-  const currentPassword = req.body?.currentPassword;
   const code = String(req.body?.code || "").trim();
   const mfaToken = String(req.body?.mfaToken || "").trim();
-  if (!currentPassword) {
-    return res.status(400).json({ error: "Current password is required." });
-  }
 
   try {
     const user = await findUserById(req.user.id);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
-    }
-
-    const { match } = await verifyPassword(currentPassword, user.password_hash);
-    if (!match) {
-      return res.status(401).json({ error: "Current password is incorrect." });
     }
 
     if (!code || !mfaToken) {
@@ -1574,22 +1565,13 @@ router.post("/mfa/enable", requireAuth, requireCsrfProtection, authLimiter, asyn
 });
 
 router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
-  const currentPassword = req.body?.currentPassword;
   const code = String(req.body?.code || "").trim();
   const mfaToken = String(req.body?.mfaToken || "").trim();
-  if (!currentPassword) {
-    return res.status(400).json({ error: "Current password is required." });
-  }
 
   try {
     const user = await findUserById(req.user.id);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
-    }
-
-    const { match } = await verifyPassword(currentPassword, user.password_hash);
-    if (!match) {
-      return res.status(401).json({ error: "Current password is incorrect." });
     }
 
     if (!code || !mfaToken) {
