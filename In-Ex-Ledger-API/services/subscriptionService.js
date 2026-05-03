@@ -363,6 +363,7 @@ module.exports = {
   deriveEffectiveState,
   findBillingAnchorBusinessIdForUser,
   getSubscriptionSnapshotForBusiness,
+  getSubscriptionSnapshotForUser,
   updateStripeCustomerForBusiness,
   syncStripeSubscriptionForBusiness,
   setFreePlanForBusiness,
