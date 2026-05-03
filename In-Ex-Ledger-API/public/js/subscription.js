@@ -337,73 +337,67 @@ function buildFreeTierConfirmationMessage(sub) {
   return tx("subscription_free_confirm_body_generic");
 }
 
-function wireSlotsControls() {
-  const input = document.getElementById("businessSlotsInput");
-  const decreaseBtn = document.getElementById("slotsDecreaseBtn");
-  const increaseBtn = document.getElementById("slotsIncreaseBtn");
-  const updateBtn = document.getElementById("updateSlotsBtn");
-  if (!input || !decreaseBtn || !increaseBtn || !updateBtn) return;
+function wireSlotActions() {
+  const addBtn = document.getElementById("addSlotBtn");
+  const removeBtn = document.getElementById("removeSlotBtn");
+  const removeConfirm = document.getElementById("removeSlotConfirm");
+  const removeConfirmBtn = document.getElementById("removeSlotConfirmBtn");
+  const removeCancelBtn = document.getElementById("removeSlotCancelBtn");
+  if (!addBtn || !removeBtn) return;
 
-  const syncButtons = () => syncBusinessSlotsControls();
+  addBtn.addEventListener("click", async () => {
+    if (businessSlotsState.isSaving) return;
+    businessSlotsState.selectedAdditionalBusinesses = businessSlotsState.currentAdditionalBusinesses + 1;
+    await updateBusinessSlots();
+  });
 
-  input.addEventListener("change", () => {
-    businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(Number(input.value) - 1);
-    syncButtons();
+  removeBtn.addEventListener("click", () => {
+    if (businessSlotsState.isSaving || businessSlotsState.currentAdditionalBusinesses <= 0) return;
+    removeConfirm.classList.remove("hidden");
+    removeBtn.disabled = true;
   });
-  input.addEventListener("input", () => {
-    businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(Number(input.value) - 1);
-    syncButtons();
+
+  removeCancelBtn?.addEventListener("click", () => {
+    removeConfirm.classList.add("hidden");
+    removeBtn.disabled = businessSlotsState.currentAdditionalBusinesses <= 0;
   });
-  decreaseBtn.addEventListener("click", () => {
-    businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(businessSlotsState.selectedAdditionalBusinesses - 1);
-    syncButtons();
+
+  removeConfirmBtn?.addEventListener("click", async () => {
+    removeConfirm.classList.add("hidden");
+    if (businessSlotsState.isSaving || businessSlotsState.currentAdditionalBusinesses <= 0) return;
+    businessSlotsState.selectedAdditionalBusinesses = businessSlotsState.currentAdditionalBusinesses - 1;
+    await updateBusinessSlots();
   });
-  increaseBtn.addEventListener("click", () => {
-    businessSlotsState.selectedAdditionalBusinesses = clampAdditionalBusinesses(businessSlotsState.selectedAdditionalBusinesses + 1);
-    syncButtons();
-  });
-  updateBtn.addEventListener("click", updateBusinessSlots);
-  syncButtons();
 }
 
-function syncBusinessSlotsControls() {
-  const input = document.getElementById("businessSlotsInput");
-  const decreaseBtn = document.getElementById("slotsDecreaseBtn");
-  const increaseBtn = document.getElementById("slotsIncreaseBtn");
-  const updateBtn = document.getElementById("updateSlotsBtn");
-  const selectedValueEl = document.getElementById("businessSlotsSelectedValue");
-  const projectedTotalEl = document.getElementById("businessSlotsProjectedTotal");
-  const selectionSummaryEl = document.getElementById("businessSlotsSelectionSummary");
+function syncSlotActions() {
+  const addBtn = document.getElementById("addSlotBtn");
+  const removeBtn = document.getElementById("removeSlotBtn");
+  const stateLabel = document.getElementById("slotsStateLabel");
+  const removeConfirm = document.getElementById("removeSlotConfirm");
+  if (!addBtn || !removeBtn) return;
 
-  if (!input || !decreaseBtn || !increaseBtn || !updateBtn) return;
+  const isSaving = businessSlotsState.isSaving;
+  const extra = businessSlotsState.currentAdditionalBusinesses;
+  const total = 1 + extra;
 
-  const selected = businessSlotsState.selectedAdditionalBusinesses;
-  const total = 1 + selected;
-  const hasChanges = selected !== businessSlotsState.currentAdditionalBusinesses;
-
-  input.value = String(1 + selected);
-  decreaseBtn.disabled = businessSlotsState.isSaving || selected <= 0;
-  increaseBtn.disabled = businessSlotsState.isSaving || selected >= MAX_ADDITIONAL_BUSINESSES;
-  input.disabled = businessSlotsState.isSaving;
-  updateBtn.disabled = businessSlotsState.isSaving || !hasChanges;
-  updateBtn.textContent = businessSlotsState.isSaving
-    ? tx("subscription_checkout_loading")
-    : tx("subscription_update_business_slots");
-  updateBtn.classList.toggle("is-dormant", !hasChanges);
-
-  if (selectedValueEl) selectedValueEl.textContent = String(selected);
-  if (projectedTotalEl) projectedTotalEl.textContent = String(total);
-  if (selectionSummaryEl) {
-    selectionSummaryEl.textContent = selected > 0
-      ? `1 included + ${selected} additional`
-      : "1 included only";
+  addBtn.disabled = isSaving || extra >= MAX_ADDITIONAL_BUSINESSES;
+  addBtn.textContent = isSaving ? tx("subscription_checkout_loading") : "Add a business";
+  removeBtn.disabled = isSaving || extra <= 0;
+  if (isSaving && removeConfirm) removeConfirm.classList.add("hidden");
+  if (stateLabel) {
+    stateLabel.textContent = extra === 0
+      ? "You have 1 business — included with Pro."
+      : extra === 1
+        ? `You have ${total} businesses — 1 included with Pro, 1 add-on.`
+        : `You have ${total} businesses — 1 included with Pro, ${extra} add-ons.`;
   }
 }
 
 async function updateBusinessSlots() {
   if (businessSlotsState.isSaving) return;
   businessSlotsState.isSaving = true;
-  syncBusinessSlotsControls();
+  syncSlotActions();
   try {
     const res = await apiFetch("/api/billing/additional-businesses", {
       method: "PATCH",
@@ -421,7 +415,7 @@ async function updateBusinessSlots() {
     showSubToast(err.message || tx("subscription_business_slots_error"));
   } finally {
     businessSlotsState.isSaving = false;
-    syncBusinessSlotsControls();
+    syncSlotActions();
   }
 }
 
@@ -495,52 +489,39 @@ function renderBusinessAccessSection(sub) {
     return;
   }
 
+  const stateMsg = extra === 0
+    ? "You have 1 business — included with Pro."
+    : extra === 1
+      ? `You have ${total} businesses — 1 included with Pro, 1 add-on.`
+      : `You have ${total} businesses — 1 included with Pro, ${extra} add-ons.`;
+
   manager.innerHTML = `
     ${statsHtml}
     <div class="sub-slots-panel">
       <div class="sub-slots-panel-head">
         <div class="sub-slots-panel-copy">
-          <h3>Add additional business</h3>
-          <p>1 business is included with Pro. Set the total number you need — each one beyond the first is billed as an add-on.</p>
+          <h3>Additional businesses</h3>
+          <p>1 business is included with Pro. Each one beyond that is a paid add-on.</p>
         </div>
         <div class="sub-slots-price-pill">${escapeHtml(tx("subscription_extra_business_slots_help"))}</div>
       </div>
-      <div class="sub-slots-workbench">
-        <div class="sub-slots-stepper-card">
-          <span class="sub-slots-stepper-label">${escapeHtml(tx("subscription_total_businesses_allowed"))}</span>
-          <div class="sub-quantity-control sub-quantity-control-slots">
-            <button type="button" class="sub-quantity-btn" id="slotsDecreaseBtn" aria-label="Decrease">
-              <span aria-hidden="true">&minus;</span>
-            </button>
-            <input id="businessSlotsInput" class="sub-quantity-input" type="number" min="1" max="101" step="1" value="${total}" inputmode="numeric" />
-            <button type="button" class="sub-quantity-btn" id="slotsIncreaseBtn" aria-label="Increase">
-              <span aria-hidden="true">+</span>
-            </button>
-          </div>
-          <p class="sub-slots-stepper-meta">1 is included with Pro — anything above 1 is billed as an add-on.</p>
+      <div class="sub-slots-actions">
+        <p class="sub-slots-state-label" id="slotsStateLabel">${escapeHtml(stateMsg)}</p>
+        <div class="sub-slots-btn-row">
+          <button type="button" id="removeSlotBtn" class="sub-slots-remove-btn"${extra <= 0 ? " disabled" : ""}>Remove a business</button>
+          <button type="button" id="addSlotBtn" class="sub-slots-add-btn">Add a business</button>
         </div>
-        <div class="sub-slots-summary-card">
-          <div class="sub-slots-summary-row">
-            <span>Add-on slots</span>
-            <strong id="businessSlotsSelectedValue">${extra}</strong>
-          </div>
-          <div class="sub-slots-summary-row">
-            <span>Total businesses</span>
-            <strong id="businessSlotsProjectedTotal">${total}</strong>
-          </div>
-          <div class="sub-slots-summary-row sub-slots-summary-row-total">
-            <span>Configuration</span>
-            <strong id="businessSlotsSelectionSummary">${selectionSummary}</strong>
+        <div id="removeSlotConfirm" class="sub-slots-remove-confirm hidden">
+          <p>This removes 1 business slot from your bill. Make sure no active data is assigned to it first.</p>
+          <div class="sub-slots-confirm-btns">
+            <button type="button" id="removeSlotCancelBtn" class="sub-slots-confirm-cancel">Keep it</button>
+            <button type="button" id="removeSlotConfirmBtn" class="sub-slots-confirm-ok">Yes, remove it</button>
           </div>
         </div>
-      </div>
-      <div class="sub-slots-footer">
-        <p class="sub-control-help">${escapeHtml(tx("subscription_extra_business_slots_help"))}</p>
-        <button type="button" id="updateSlotsBtn" class="settings-primary-btn sub-slots-save-btn">${escapeHtml(tx("subscription_update_business_slots"))}</button>
       </div>
     </div>`;
 
-  wireSlotsControls();
+  wireSlotActions();
 }
 
 async function loadSubscription() {

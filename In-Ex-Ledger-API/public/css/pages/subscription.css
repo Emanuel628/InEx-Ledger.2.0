@@ -957,6 +957,114 @@
   box-shadow: none;
 }
 
+/* ── Slot action buttons ───────────────────────────────────────── */
+
+.sub-slots-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sub-slots-state-label {
+  margin: 0;
+  font-size: 14px;
+  color: #5d6a79;
+}
+
+.sub-slots-btn-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sub-slots-add-btn,
+.sub-slots-remove-btn {
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.sub-slots-add-btn {
+  background: #1a5fb4;
+  color: #fff;
+  border-color: #1a5fb4;
+}
+
+.sub-slots-add-btn:hover:not(:disabled) {
+  background: #1750a0;
+}
+
+.sub-slots-remove-btn {
+  background: transparent;
+  color: #b83c2b;
+  border-color: rgba(184, 60, 43, 0.35);
+}
+
+.sub-slots-remove-btn:hover:not(:disabled) {
+  background: rgba(184, 60, 43, 0.06);
+}
+
+.sub-slots-add-btn:disabled,
+.sub-slots-remove-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sub-slots-remove-confirm {
+  padding: 16px 20px;
+  background: rgba(184, 60, 43, 0.05);
+  border: 1px solid rgba(184, 60, 43, 0.2);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sub-slots-remove-confirm p {
+  margin: 0;
+  font-size: 13px;
+  color: #5d2218;
+}
+
+.sub-slots-confirm-btns {
+  display: flex;
+  gap: 10px;
+}
+
+.sub-slots-confirm-cancel,
+.sub-slots-confirm-ok {
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid;
+}
+
+.sub-slots-confirm-cancel {
+  background: transparent;
+  color: #5d6a79;
+  border-color: rgba(15, 25, 35, 0.15);
+}
+
+.sub-slots-confirm-cancel:hover {
+  background: rgba(15, 25, 35, 0.04);
+}
+
+.sub-slots-confirm-ok {
+  background: #b83c2b;
+  color: #fff;
+  border-color: #b83c2b;
+}
+
+.sub-slots-confirm-ok:hover {
+  background: #a13325;
+}
+
 .sub-control-help {
   margin: 0;
   font-size: 13px;
