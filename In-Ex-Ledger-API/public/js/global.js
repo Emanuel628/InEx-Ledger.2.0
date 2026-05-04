@@ -1367,11 +1367,85 @@ window.LUNA_TAX = {
    ========================================================= */
 (function () {
   var CONSENT_KEY = 'lb_cookie_consent';
+  var CONSENT_COOKIE_NAME = 'lb_cookie_consent';
   var CONSENT_VERSION = '1';
 
-  function getConsentRecord() {
+  function parseConsentRecord(value) {
+    if (!value) return null;
     try {
-      return JSON.parse(localStorage.getItem(CONSENT_KEY) || 'null');
+      var parsed = typeof value === 'string' ? JSON.parse(value) : value;
+      if (!parsed || !parsed.decision) return null;
+      return {
+        decision: parsed.decision,
+        version: String(parsed.version || CONSENT_VERSION),
+        at: parsed.at || new Date().toISOString()
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function getCookieRecord() {
+    var cookieString = String(document.cookie || '');
+    if (!cookieString) return null;
+    var prefix = CONSENT_COOKIE_NAME + '=';
+    var match = cookieString
+      .split(';')
+      .map(function (part) { return part.trim(); })
+      .find(function (part) { return part.indexOf(prefix) === 0; });
+    if (!match) return null;
+    return parseConsentRecord(decodeURIComponent(match.slice(prefix.length)));
+  }
+
+  function persistConsentRecord(record) {
+    try {
+      localStorage.setItem(CONSENT_KEY, JSON.stringify(record));
+    } catch (_) { /* ignore */ }
+    try {
+      document.cookie = CONSENT_COOKIE_NAME + '=' + encodeURIComponent(JSON.stringify(record)) +
+        '; Max-Age=' + String(365 * 24 * 60 * 60) +
+        '; Path=/; SameSite=Lax';
+    } catch (_) { /* ignore */ }
+  }
+
+  function getConsentRecord() {
+    var localRecord = null;
+    try {
+      localRecord = parseConsentRecord(localStorage.getItem(CONSENT_KEY) || 'null');
+    } catch (_) {
+      localRecord = null;
+    }
+    if (localRecord) return localRecord;
+    var cookieRecord = getCookieRecord();
+    if (cookieRecord) {
+      persistConsentRecord(cookieRecord);
+      return cookieRecord;
+    }
+    return null;
+  }
+
+  async function fetchServerConsentRecord() {
+    if (typeof window.fetch !== 'function') {
+      return null;
+    }
+    try {
+      var headers = {};
+      if (typeof getToken === 'function') {
+        var token = getToken();
+        if (token) {
+          headers.Authorization = 'Bearer ' + token;
+        }
+      }
+      var response = await window.fetch('/api/consent/cookie', {
+        method: 'GET',
+        credentials: 'include',
+        headers: headers
+      });
+      if (!response || !response.ok) {
+        return null;
+      }
+      var payload = await response.json().catch(function () { return null; });
+      return parseConsentRecord(payload && payload.record);
     } catch (_) {
       return null;
     }
@@ -1379,20 +1453,34 @@ window.LUNA_TAX = {
 
   function setConsentRecord(decision) {
     var record = { decision: decision, version: CONSENT_VERSION, at: new Date().toISOString() };
-    localStorage.setItem(CONSENT_KEY, JSON.stringify(record));
+    persistConsentRecord(record);
     // Persist to DB for compliance audit trail (best-effort, fire-and-forget)
     try {
-      var fetchFn = typeof apiFetch === 'function' ? apiFetch : window.fetch.bind(window);
-      fetchFn('/api/consent/cookie', {
+      var headers = { 'Content-Type': 'application/json' };
+      if (typeof getToken === 'function') {
+        var token = getToken();
+        if (token) {
+          headers.Authorization = 'Bearer ' + token;
+        }
+      }
+      window.fetch('/api/consent/cookie', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: headers,
         body: JSON.stringify({ decision: decision, version: CONSENT_VERSION })
       }).catch(function () { /* ignore — localStorage record is the source of truth */ });
     } catch (_) { /* ignore */ }
   }
 
-  function needsBanner() {
+  async function needsBanner() {
     var record = getConsentRecord();
+    if (!record || record.version !== CONSENT_VERSION) {
+      var serverRecord = await fetchServerConsentRecord();
+      if (serverRecord) {
+        persistConsentRecord(serverRecord);
+        record = serverRecord;
+      }
+    }
     if (!record) return true;
     if (record.version !== CONSENT_VERSION) return true;
     return false;
@@ -1450,8 +1538,8 @@ window.LUNA_TAX = {
     return banner;
   }
 
-  function initCookieBanner() {
-    if (!needsBanner()) return;
+  async function initCookieBanner() {
+    if (!(await needsBanner())) return;
     var banner = buildBanner();
     document.body.appendChild(banner);
 
@@ -1470,9 +1558,9 @@ window.LUNA_TAX = {
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initCookieBanner);
+    document.addEventListener('DOMContentLoaded', function () { void initCookieBanner(); });
   } else {
-    initCookieBanner();
+    void initCookieBanner();
   }
 
   window.cookieConsent = {
