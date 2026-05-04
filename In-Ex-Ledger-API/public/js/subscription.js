@@ -287,8 +287,9 @@ function setCheckoutLoading(isLoading) {
 function updatePlanCardState(sub) {
   const planFree = document.getElementById("planFree");
   const planPro = document.getElementById("planPro");
-  const isCurrentFree = !sub || sub.effectiveTier !== "v1" || !!sub.cancelAtPeriodEnd;
-  const isCurrentPro = !!sub && sub.effectiveTier === "v1" && !sub.cancelAtPeriodEnd;
+  const selectedPlanCode = sub?.selectedPlanCode || sub?.planCode || (sub?.effectiveTier === "v1" ? "v1" : "free");
+  const isCurrentFree = !sub || !!sub.cancelAtPeriodEnd || selectedPlanCode !== "v1";
+  const isCurrentPro = !!sub && !sub.cancelAtPeriodEnd && selectedPlanCode === "v1";
 
   planFree?.classList.toggle("is-current", isCurrentFree);
   planPro?.classList.toggle("is-current", isCurrentPro);
@@ -658,6 +659,8 @@ async function loadSubscription() {
     if (statusBlock) {
       let statusHtml = "";
       let statusClass = "sub-status-free";
+      const selectedPlanCode = sub.selectedPlanCode || sub.planCode || (sub.effectiveTier === "v1" ? "v1" : "free");
+      const isTrialDowngradedToFree = sub.isTrialing && selectedPlanCode !== "v1";
 
       if (sub.isTrialing && sub.trialEndsAt) {
         statusClass = "sub-status-trial";
@@ -665,7 +668,8 @@ async function loadSubscription() {
           <div class="sub-status-row">
             <span class="sub-status-badge sub-badge-trial">${tx("sub_mgmt_badge_trial")}</span>
             <span class="sub-status-detail">${tx("sub_mgmt_trial_ends")}: <strong>${fmtDate(sub.trialEndsAt)}</strong></span>
-          </div>`;
+          </div>
+          ${isTrialDowngradedToFree ? `<div class="sub-status-row"><span class="sub-status-detail">Basic is selected for after the trial. You still keep Pro trial access until <strong>${fmtDate(sub.trialEndsAt)}</strong>.</span></div>` : ""}`;
       } else if (sub.cancelAtPeriodEnd && sub.currentPeriodEnd) {
         statusClass = "sub-status-canceling";
         statusHtml = `
@@ -713,7 +717,8 @@ async function loadSubscription() {
     renderBusinessAccessSection(sub);
 
     if (planProBtn) {
-      if (sub.effectiveTier === "v1" && (sub.isPaid || sub.isTrialing) && !sub.cancelAtPeriodEnd) {
+      const selectedPlanCode = sub.selectedPlanCode || sub.planCode || (sub.effectiveTier === "v1" ? "v1" : "free");
+      if (selectedPlanCode === "v1" && (sub.isPaid || sub.isTrialing) && !sub.cancelAtPeriodEnd) {
         planProBtn.disabled = true;
         planProBtn.textContent = tx("subscription_current_plan");
         planProBtn.dataset.planDisabled = "true";
@@ -726,10 +731,11 @@ async function loadSubscription() {
     }
 
     if (planFreeBtn) {
+      const selectedPlanCode = sub.selectedPlanCode || sub.planCode || (sub.effectiveTier === "v1" ? "v1" : "free");
       if (sub.cancelAtPeriodEnd) {
         planFreeBtn.disabled = true;
         planFreeBtn.textContent = tx("subscription_free_pending");
-      } else if (sub.effectiveTier !== "v1") {
+      } else if (selectedPlanCode !== "v1") {
         planFreeBtn.disabled = true;
         planFreeBtn.textContent = tx("subscription_current_plan");
       } else {
@@ -911,6 +917,17 @@ async function startCheckout() {
 
     const payload = await res.json().catch(() => null);
     if (!res.ok) throw new Error(payload?.error || tx("subscription_checkout_error"));
+    if (payload?.subscription) {
+      closeCheckoutModal();
+      currentSubscription = payload.subscription;
+      if (typeof applySubscriptionState === "function") {
+        applySubscriptionState(payload.subscription);
+      }
+      await loadSubscription();
+      await loadBillingHistory();
+      showSubToast("Pro trial resumed.");
+      return;
+    }
     if (payload?.url) {
       if (!isAllowedBillingRedirect(payload.url)) {
         throw new Error(tx("subscription_checkout_error"));

@@ -95,6 +95,7 @@ function deriveEffectiveState(row) {
   const trialEndsAt = normalizeDate(row?.trial_ends_at);
   const trialStartedAt = normalizeDate(row?.trial_started_at);
   const metadata = row?.metadata_json && typeof row.metadata_json === "object" ? row.metadata_json : {};
+  const trialPlanSelection = metadata.trial_plan_selection === PLAN_FREE ? PLAN_FREE : PLAN_V1;
   const resolvedTrialEndsAt = trialEndsAt || (trialStartedAt ? addDays(trialStartedAt, DEFAULT_TRIAL_DAYS) : null);
   const currentPeriodEnd = normalizeDate(row?.current_period_end);
   const pastDueStartedAt = resolvePastDueStartedAt(row);
@@ -159,6 +160,7 @@ function deriveEffectiveState(row) {
     businessId: row?.business_id || null,
     provider: row?.provider || "stripe",
     planCode: row?.plan_code || PLAN_FREE,
+    selectedPlanCode: isTrialing ? trialPlanSelection : (row?.plan_code || PLAN_FREE),
     planName: getPlanDisplayName(row?.plan_code || PLAN_FREE),
     status: row?.status || "inactive",
     effectiveTier,
@@ -167,6 +169,8 @@ function deriveEffectiveState(row) {
     additionalBusinesses,
     maxBusinessesAllowed,
     isTrialing,
+    trialPlanSelection,
+    isTrialDowngradedToFree: Boolean(isTrialing && trialPlanSelection === PLAN_FREE),
     isPaid: Boolean(isActivePaid || isGracePeriod || isPastDueGracePeriod || isCanceledWithRemainingAccess),
     isCanceledWithRemainingAccess,
     cancelAtPeriodEnd: Boolean(row?.cancel_at_period_end),
@@ -318,6 +322,37 @@ async function syncStripeSubscriptionForBusiness(businessId, subscription) {
   );
 }
 
+async function setTrialPlanSelectionForBusiness(businessId, planCode, additionalBusinesses) {
+  const currentSnapshot = await ensureBusinessSubscription(businessId);
+  const currentMetadata =
+    currentSnapshot?.metadata_json && typeof currentSnapshot.metadata_json === "object"
+      ? currentSnapshot.metadata_json
+      : {};
+  const nextMetadata = { ...currentMetadata };
+
+  if (planCode === PLAN_FREE) {
+    nextMetadata.trial_plan_selection = PLAN_FREE;
+  } else {
+    delete nextMetadata.trial_plan_selection;
+  }
+
+  if (Number.isSafeInteger(additionalBusinesses) && additionalBusinesses >= 0) {
+    nextMetadata.additional_businesses = additionalBusinesses;
+  }
+
+  await pool.query(
+    `UPDATE business_subscriptions
+        SET plan_code = $2,
+            status = 'trialing',
+            cancel_at_period_end = false,
+            canceled_at = NULL,
+            metadata_json = $3::jsonb,
+            updated_at = NOW()
+      WHERE business_id = $1`,
+    [businessId, PLAN_V1, JSON.stringify(nextMetadata)]
+  );
+}
+
 async function setFreePlanForBusiness(businessId) {
   await ensureBusinessSubscription(businessId);
   await pool.query(
@@ -368,6 +403,7 @@ module.exports = {
   getSubscriptionSnapshotForUser,
   updateStripeCustomerForBusiness,
   syncStripeSubscriptionForBusiness,
+  setTrialPlanSelectionForBusiness,
   setFreePlanForBusiness,
   hasFeatureAccess,
   getPlanDisplayName

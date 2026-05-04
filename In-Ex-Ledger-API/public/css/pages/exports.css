@@ -279,6 +279,7 @@
 
 .export-summary-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 18px;
 }
@@ -290,6 +291,7 @@
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+  flex: 1 1 220px;
 }
 
 .export-btn-secondary {
@@ -601,7 +603,6 @@
   .exports-title-row,
   .export-summary-actions,
   .secure-export-input-row {
-    grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;
   }
@@ -611,8 +612,7 @@
   }
 
   .export-btn,
-  .secure-export-toggle-btn,
-  .exports-info-btn {
+  .secure-export-toggle-btn {
     width: 100%;
   }
 
@@ -639,5 +639,27 @@
   .exports-card,
   .history-card {
     border-radius: 20px;
+  }
+
+  .exports-title-row,
+  .summary-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .summary-row strong,
+  .button-badge {
+    width: 100%;
+  }
+
+  .history-actions {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .history-download,
+  .history-delete,
+  .exports-info-btn {
+    width: 100%;
   }
 }

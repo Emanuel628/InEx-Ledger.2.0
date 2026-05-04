@@ -88,15 +88,17 @@ function getPdfLabels(lang) {
 
 class PdfCanvas {
   constructor() {
-    this.commands = ['BT'];
+    this.commands = [];
   }
 
-  text(x, y, text, size = 11) {
+  text(x, y, text, size = 11, font = 'F1') {
     const fx = Number.isFinite(x) ? x.toFixed(2) : '0.00';
     const fy = Number.isFinite(y) ? y.toFixed(2) : '0.00';
-    this.commands.push(`/F1 ${size} Tf`);
+    this.commands.push('BT');
+    this.commands.push(`/${font} ${size} Tf`);
     this.commands.push(`1 0 0 1 ${fx} ${fy} Tm`);
     this.commands.push(`${pdfLiteral(text)} Tj`);
+    this.commands.push('ET');
   }
 
   addFooter(pageNumber, totalPages, footerText) {
@@ -104,7 +106,7 @@ class PdfCanvas {
   }
 
   build() {
-    return [...this.commands, 'ET'].join('\n');
+    return this.commands.join('\n');
   }
 }
 
@@ -395,16 +397,16 @@ function buildIdentityPage(data) {
   const {
     labels, totals, currency, legalName, operatingName, taxId, naics, businessName,
     startDate, endDate, reportId, generatedAt, accountingBasis, region, province,
-    reviewInsights, isSecure
+    reviewInsights, isSecure, categoryPreviewEntries = []
   } = data;
 
   const canvas = new PdfCanvas();
   let y = 760;
-  canvas.text(40, y, labels.report_title, 18); y -= 20;
+  canvas.text(40, y, labels.report_title, 18, 'F2'); y -= 20;
   canvas.text(40, y, isSecure ? labels.report_subtitle_secure : labels.report_subtitle_redacted, 10); y -= 18;
-  canvas.text(40, y, isSecure ? labels.badge_secure : labels.badge_redacted, 11);
+  canvas.text(40, y, isSecure ? labels.badge_secure : labels.badge_redacted, 11, 'F2');
 
-  canvas.text(40, 690, labels.entity_section_title, 12);
+  canvas.text(40, 690, labels.entity_section_title, 12, 'F2');
   buildKeyValueRows(canvas, 40, 670, [
     [labels.legal_name, safeValue(legalName || businessName)],
     [labels.business_name, safeValue(operatingName)],
@@ -413,7 +415,7 @@ function buildIdentityPage(data) {
     [labels.jurisdiction, formatJurisdiction(region, province)]
   ]);
 
-  canvas.text(330, 690, labels.reporting_section_title, 12);
+  canvas.text(330, 690, labels.reporting_section_title, 12, 'F2');
   buildKeyValueRows(canvas, 330, 670, [
     [labels.reporting_period, `${startDate} to ${endDate}`],
     [labels.accounting_basis, safeValue(accountingBasis, labels.accounting_basis_unspecified)],
@@ -423,7 +425,7 @@ function buildIdentityPage(data) {
     [labels.prepared_from, labels.prepared_from_value]
   ]);
 
-  canvas.text(40, 555, labels.financial_summary_title, 12);
+  canvas.text(40, 555, labels.financial_summary_title, 12, 'F2');
   buildKeyValueRows(canvas, 40, 535, [
     [labels.gross_income, formatCurrencyForPdf(totals.income, currency)],
     [labels.total_expenses, formatCurrencyForPdf(totals.expenses, currency)],
@@ -431,7 +433,7 @@ function buildIdentityPage(data) {
     [labels.transaction_count, String(reviewInsights.transactionCount)]
   ]);
 
-  canvas.text(330, 555, labels.tax_estimate_title, 12);
+  canvas.text(330, 555, labels.tax_estimate_title, 12, 'F2');
   buildKeyValueRows(canvas, 330, 535, [
     [labels.estimated_tax, formatCurrencyForPdf(totals.estimatedTax, currency)]
   ]);
@@ -439,7 +441,7 @@ function buildIdentityPage(data) {
     canvas.text(330, 519 - (index * 14), line, 9);
   });
 
-  canvas.text(40, 430, labels.review_flags_title, 12);
+  canvas.text(40, 430, labels.review_flags_title, 12, 'F2');
   buildKeyValueRows(canvas, 40, 410, [
     [labels.uncategorized_transactions, String(reviewInsights.uncategorizedCount)],
     [labels.review_flagged_transactions, String(reviewInsights.reviewFlagCount)],
@@ -447,25 +449,43 @@ function buildIdentityPage(data) {
     [labels.receipt_coverage, reviewInsights.receiptCoverageText]
   ]);
 
+  if (categoryPreviewEntries.length) {
+    canvas.text(40, 318, labels.category_breakdown_title, 12, 'F2');
+    canvas.text(40, 296, labels.col_category, 9, 'F2');
+    canvas.text(220, 296, labels.col_tax_mapping, 9, 'F2');
+    canvas.text(470, 296, labels.col_amount, 9, 'F2');
+    canvas.text(540, 296, labels.col_review_status, 9, 'F2');
+    let categoryY = 276;
+    categoryPreviewEntries.forEach((row) => {
+      canvas.text(40, categoryY, truncateText(row.categoryName, 28), 8);
+      canvas.text(220, categoryY, truncateText(row.taxMapping, 40), 8);
+      canvas.text(470, categoryY, row.amount, 8);
+      canvas.text(540, categoryY, row.reviewStatus, 8);
+      categoryY -= 14;
+    });
+  }
+
   return canvas;
 }
 
-function buildCategoryPages(transactions, categories, currency, labels) {
+function buildCategoryPages(transactions, categories, currency, labels, embeddedCount = 0) {
   const entries = buildCategoryBuckets(transactions, categories, labels, currency);
-  if (!entries.length) {
+  const remainingEntries = entries.slice(embeddedCount);
+  if (!remainingEntries.length) {
+    if (entries.length) return [];
     const canvas = new PdfCanvas();
-    canvas.text(40, 760, labels.category_breakdown_title, 16);
+    canvas.text(40, 760, labels.category_breakdown_title, 16, 'F2');
     canvas.text(40, 720, labels.no_category_data, 11);
     return [canvas];
   }
 
-  return chunkArray(entries, 22).map((chunk) => {
+  return chunkArray(remainingEntries, 22).map((chunk) => {
     const canvas = new PdfCanvas();
-    canvas.text(40, 760, labels.category_breakdown_title, 16);
-    canvas.text(40, 730, labels.col_category, 10);
-    canvas.text(220, 730, labels.col_tax_mapping, 10);
-    canvas.text(470, 730, labels.col_amount, 10);
-    canvas.text(540, 730, labels.col_review_status, 10);
+    canvas.text(40, 760, labels.category_breakdown_title, 16, 'F2');
+    canvas.text(40, 730, labels.col_category, 10, 'F2');
+    canvas.text(220, 730, labels.col_tax_mapping, 10, 'F2');
+    canvas.text(470, 730, labels.col_amount, 10, 'F2');
+    canvas.text(540, 730, labels.col_review_status, 10, 'F2');
     let y = 708;
     chunk.forEach((row) => {
       canvas.text(40, y, truncateText(row.categoryName, 28), 9);
@@ -486,7 +506,7 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
     .sort((a, b) => normalizePdfDate(a.date).localeCompare(normalizePdfDate(b.date)));
   if (!sorted.length) {
     const canvas = new PdfCanvas();
-    canvas.text(40, 760, labels.transaction_log_title, 16);
+    canvas.text(40, 760, labels.transaction_log_title, 16, 'F2');
     canvas.text(40, 720, labels.no_transaction_data, 11);
     return [canvas];
   }
@@ -509,14 +529,14 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
 
   return chunkArray(rows, 12).map((chunk) => {
     const canvas = new PdfCanvas();
-    canvas.text(40, 760, labels.transaction_log_title, 16);
-    canvas.text(40, 732, labels.col_date, 10);
-    canvas.text(95, 732, labels.col_tx_id, 10);
-    canvas.text(150, 732, labels.col_payee_memo, 10);
-    canvas.text(305, 732, labels.col_account_category, 10);
-    canvas.text(430, 732, labels.col_tax_map_short, 10);
-    canvas.text(515, 732, labels.col_amount, 10);
-    canvas.text(560, 732, labels.col_flag, 10);
+    canvas.text(40, 760, labels.transaction_log_title, 16, 'F2');
+    canvas.text(40, 732, labels.col_date, 10, 'F2');
+    canvas.text(95, 732, labels.col_tx_id, 10, 'F2');
+    canvas.text(150, 732, labels.col_payee_memo, 10, 'F2');
+    canvas.text(305, 732, labels.col_account_category, 10, 'F2');
+    canvas.text(430, 732, labels.col_tax_map_short, 10, 'F2');
+    canvas.text(515, 732, labels.col_amount, 10, 'F2');
+    canvas.text(560, 732, labels.col_flag, 10, 'F2');
     let y = 708;
     chunk.forEach((row) => {
       canvas.text(40, y, row.date, 9);
@@ -640,6 +660,129 @@ function buildReviewAndDisclosurePage(transactions, categories, receipts, labels
   return [canvas];
 }
 
+function buildSupportPages(receipts, transactions, mileage, labels, currency, reviewInsights) {
+  const txMap = mapByKey(transactions, 'id');
+  const receiptRows = (receipts || []).map((receipt) => {
+    const txnId = receipt.transaction_id || receipt.transactionId;
+    const txn = txMap[txnId];
+    if (!txn) return null;
+    return {
+      receiptId: truncateText(receipt.id || '', 28),
+      txDate: normalizePdfDate(txn.date),
+      txDescription: truncateText(txn.description || '(No description)', 26),
+      fileName: truncateText(receipt.filename || 'Not specified', 20)
+    };
+  }).filter(Boolean);
+
+  const pages = [];
+  let canvas = new PdfCanvas();
+  let y = 760;
+
+  const startPage = () => {
+    canvas = new PdfCanvas();
+    y = 760;
+    canvas.text(40, y, 'Supporting Schedules and Review', 16, 'F2');
+    y -= 28;
+  };
+
+  const pushPage = () => {
+    pages.push(canvas);
+    startPage();
+  };
+
+  const ensureSpace = (needed) => {
+    if (y - needed < 60) {
+      pushPage();
+    }
+  };
+
+  startPage();
+
+  if (receiptRows.length) {
+    canvas.text(40, y, labels.receipts_index_title, 12, 'F2');
+    y -= 20;
+    canvas.text(40, y, 'Receipt ID', 9, 'F2');
+    canvas.text(170, y, 'Tx Date', 9, 'F2');
+    canvas.text(250, y, 'Tx Description', 9, 'F2');
+    canvas.text(430, y, 'File Name', 9, 'F2');
+    y -= 18;
+    receiptRows.forEach((row) => {
+      ensureSpace(18);
+      canvas.text(40, y, row.receiptId, 8);
+      canvas.text(170, y, row.txDate, 8);
+      canvas.text(250, y, row.txDescription, 8);
+      canvas.text(430, y, row.fileName, 8);
+      y -= 14;
+    });
+    y -= 10;
+  }
+
+  if (Array.isArray(mileage) && mileage.length) {
+    const totalMiles = mileage.reduce((sum, row) => sum + Math.abs(Number(row.miles) || 0), 0);
+    const totalKm = mileage.reduce((sum, row) => sum + Math.abs(Number(row.km) || 0), 0);
+    const totalDistance = mileage.reduce((sum, row) => {
+      const start = Number(row.odometer_start);
+      const end = Number(row.odometer_end);
+      return Number.isFinite(start) && Number.isFinite(end) ? sum + Math.abs(end - start) : sum;
+    }, 0);
+    const businessPct = totalDistance > 0 ? (totalKm / totalDistance) * 100 : null;
+
+    ensureSpace(84);
+    canvas.text(40, y, labels.mileage_summary_title, 12, 'F2');
+    y -= 20;
+    if (totalMiles > 0) { canvas.text(40, y, `Total business miles: ${formatDistance(totalMiles)} mi`, 9); y -= 14; }
+    if (totalKm > 0) { canvas.text(40, y, `Total business kilometers: ${formatDistance(totalKm)} km`, 9); y -= 14; }
+    if (businessPct !== null) { canvas.text(40, y, `Business-use percentage: ${businessPct.toFixed(1)}%`, 9); y -= 14; }
+    canvas.text(40, y, labels.mileage_note_csv, 9);
+    y -= 18;
+  }
+
+  ensureSpace(170);
+  canvas.text(40, y, labels.review_items_title, 12, 'F2');
+  y -= 20;
+  [
+    [labels.review_uncategorized, reviewInsights.uncategorizedCount],
+    [labels.review_missing_description, reviewInsights.missingDescriptionCount],
+    [labels.review_possible_duplicates, reviewInsights.duplicateCount],
+    [labels.review_negative_expenses, reviewInsights.negativeExpenseCount],
+    [labels.review_mixed_use, reviewInsights.mixedUseCount],
+    [labels.review_special_categories, reviewInsights.specialCategoryCount],
+    [labels.review_missing_receipts, reviewInsights.missingReceiptCount]
+  ].forEach(([label, count]) => {
+    canvas.text(40, y, `${label}: ${count}`, 9);
+    y -= 14;
+  });
+
+  if ((reviewInsights.samples || []).length) {
+    y -= 6;
+    canvas.text(40, y, labels.review_samples_title, 10, 'F2');
+    y -= 16;
+    reviewInsights.samples.slice(0, 5).forEach((sample) => {
+      ensureSpace(16);
+      canvas.text(40, y, truncateText(sample.reason, 26), 8);
+      canvas.text(210, y, truncateText(sample.description, 32), 8);
+      canvas.text(480, y, formatCurrencyForPdf(sample.amount, currency), 8);
+      y -= 13;
+    });
+  } else {
+    y -= 6;
+    canvas.text(40, y, labels.review_items_none, 9);
+    y -= 16;
+  }
+
+  ensureSpace(80);
+  canvas.text(40, y, labels.disclosure_title, 10, 'F2');
+  y -= 16;
+  wrapText(labels.disclosure_body, 88).forEach((line) => {
+    ensureSpace(12);
+    canvas.text(40, y, line, 8);
+    y -= 12;
+  });
+
+  pages.push(canvas);
+  return pages;
+}
+
 function buildFooterText(labels, reportId, generatedAt, isSecure, pageNumber, totalPages) {
   const confidentiality = isSecure ? labels.footer_confidential : labels.badge_redacted;
   return truncateText(`${labels.footer_brand} | ${confidentiality} | ${reportId} | ${formatReportTimestamp(generatedAt)} | Page ${pageNumber}/${totalPages}`, 110);
@@ -653,7 +796,7 @@ function createPdfBytes(pageContents) {
   const encoder = new TextEncoder();
   const objects = [];
   const pageEntries = [];
-  let nextId = 4;
+  let nextId = 5;
 
   pageContents.forEach((content) => {
     const contentId = nextId++;
@@ -664,11 +807,12 @@ function createPdfBytes(pageContents) {
   objects.push(buildObject(1, '<< /Type /Catalog /Pages 2 0 R >>'));
   objects.push(buildObject(2, `<< /Type /Pages /Count ${pageEntries.length} /Kids [${pageEntries.map((entry) => `${entry.pageId} 0 R`).join(' ')}] >>`));
   objects.push(buildObject(3, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'));
+  objects.push(buildObject(4, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'));
 
   pageEntries.forEach((entry) => {
     const length = encoder.encode(entry.content).length;
     objects.push(buildObject(entry.contentId, `<< /Length ${length} >>\nstream\n${entry.content}\nendstream`));
-    objects.push(buildObject(entry.pageId, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents ${entry.contentId} 0 R >>`));
+    objects.push(buildObject(entry.pageId, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${entry.contentId} 0 R >>`));
   });
 
   const parts = ['%PDF-1.3\n'];
@@ -719,6 +863,8 @@ function buildPdfExport(options) {
   const totals = calculateTotals(transactions, region, province);
   const reviewInsights = buildReviewInsights(transactions, categories, receipts);
   const isSecure = Boolean(String(taxId || '').trim());
+  const categoryEntries = buildCategoryBuckets(transactions, categories, labels, currency);
+  const categoryPreviewEntries = categoryEntries.slice(0, 6);
 
   const canvases = [
     buildIdentityPage({
@@ -738,13 +884,12 @@ function buildPdfExport(options) {
       region,
       province,
       reviewInsights,
-      isSecure
+      isSecure,
+      categoryPreviewEntries
     }),
-    ...buildCategoryPages(transactions, categories, currency, labels),
+    ...buildCategoryPages(transactions, categories, currency, labels, categoryPreviewEntries.length),
     ...buildTransactionPages(transactions, accounts, categories, currency, labels),
-    ...buildReceiptsPages(receipts, transactions, labels),
-    ...buildMileagePage(mileage, labels),
-    ...buildReviewAndDisclosurePage(transactions, categories, receipts, labels, currency, region, reviewInsights)
+    ...buildSupportPages(receipts, transactions, mileage, labels, currency, reviewInsights)
   ];
 
   const totalPages = canvases.length;

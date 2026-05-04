@@ -2259,8 +2259,9 @@ body {
 
 @media (max-width: 720px) {
   .settings-page .settings-shell {
-    width: min(100% - 16px, 1180px);
+    width: 100%;
     gap: 16px;
+    padding: 18px 12px 28px;
   }
 
   .settings-page .settings-sidebar {
@@ -2271,7 +2272,7 @@ body {
   .settings-page .settings-overview,
   .settings-page .settings-card,
   .settings-page .danger-card {
-    padding: 20px;
+    padding: 18px;
     border-radius: 22px;
   }
 
@@ -2334,6 +2335,32 @@ body {
   }
 }
 
+@media (max-width: 640px) {
+  .settings-shell {
+    padding: 16px 10px 24px;
+  }
+
+  .settings-page .settings-main {
+    min-width: 0;
+    padding-bottom: 112px;
+  }
+
+  .settings-page .settings-row-copy,
+  .settings-page .settings-sidebar-intro,
+  .settings-page .settings-page-heading p {
+    max-width: none;
+  }
+
+  .settings-help-entry {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-help-open {
+    width: 100%;
+  }
+}
+
 /* ── Settings Help panel ─────────────────────────────────── */
 .settings-nav-help {
   border-top: 0.5px solid var(--border);
@@ -2388,6 +2415,7 @@ body {
 /* Impeccable style overrides */
 .settings-page {
   background: var(--page-bleed);
+  overflow-x: hidden;
 }
 
 .settings-shell {
@@ -2403,6 +2431,7 @@ body {
   background: var(--panel-bg);
   border: 1px solid rgba(15, 25, 35, 0.08);
   box-shadow: var(--shadow-card-lg);
+  min-width: 0;
 }
 
 .settings-page .settings-sidebar-card,

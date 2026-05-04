@@ -11,6 +11,7 @@ const {
   getSubscriptionSnapshotForBusiness,
   updateStripeCustomerForBusiness,
   syncStripeSubscriptionForBusiness,
+  setTrialPlanSelectionForBusiness,
   setFreePlanForBusiness
 } = require("../services/subscriptionService.js");
 const { buildStripePriceEnvMap } = require("../services/stripePriceConfig.js");
@@ -636,6 +637,13 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
+
+    if (subscription.isTrialing && !subscription.stripeSubscriptionId) {
+      await setTrialPlanSelectionForBusiness(billingBusinessId, "v1", additionalBusinesses);
+      const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+      return res.status(200).json({ subscription: updated, trialResumed: true });
+    }
     // Block when any live Stripe subscription exists — including subscriptions
     // scheduled to cancel at period end (cancel_at_period_end=true).  Allowing
     // checkout in that state creates a second parallel subscription and double
@@ -648,7 +656,6 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       });
     }
 
-    const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
     const billingContext = await resolveBillingContext(req);
     const requestedCurrency = String(req.body?.currency || "").trim().toLowerCase();
     if (
@@ -754,6 +761,12 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+
+    if (subscription.isTrialing && !subscription.stripeSubscriptionId) {
+      await setTrialPlanSelectionForBusiness(billingBusinessId, "free");
+      const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+      return res.status(200).json({ subscription: updated });
+    }
 
     if (!subscription.stripeSubscriptionId) {
       // No Stripe subscription — just downgrade to free immediately

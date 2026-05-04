@@ -30,6 +30,26 @@ test("deriveEffectiveState keeps active trials on v1", () => {
   assert.equal(snapshot.isPaid, false);
 });
 
+test("deriveEffectiveState preserves trial access while allowing Basic to be selected for after the trial", () => {
+  const snapshot = deriveEffectiveState({
+    id: "sub_trial_basic_selected",
+    business_id: "biz_trial_basic_selected",
+    provider: "stripe",
+    plan_code: PLAN_V1,
+    status: "trialing",
+    trial_ends_at: isoDateFromNow(12),
+    current_period_end: isoDateFromNow(12),
+    metadata_json: {
+      trial_plan_selection: PLAN_FREE
+    }
+  });
+
+  assert.equal(snapshot.effectiveTier, PLAN_V1);
+  assert.equal(snapshot.isTrialing, true);
+  assert.equal(snapshot.selectedPlanCode, PLAN_FREE);
+  assert.equal(snapshot.isTrialDowngradedToFree, true);
+});
+
 test("deriveEffectiveState downgrades expired trials to free", () => {
   const snapshot = deriveEffectiveState({
     id: "sub_expired_trial",
