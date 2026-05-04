@@ -5,6 +5,7 @@ const CATEGORY_TAX_OPTIONS = {
     income: [
       { value: "gross_receipts_sales", label: "Gross receipts or sales", line: "1" },
       { value: "returns_allowances", label: "Returns and allowances", line: "2" },
+      { value: "interest_income", label: "Interest income", line: "Sch B" },
       { value: "other_income", label: "Other income", line: "6" },
       { value: "nonemployee_compensation", label: "Nonemployee compensation (1099-NEC)", line: "1099-NEC" },
       { value: "payment_card_income", label: "Payment card / third-party network income (1099-K)", line: "1099-K" },
@@ -32,36 +33,68 @@ const CATEGORY_TAX_OPTIONS = {
       { value: "taxes_licenses", label: "Taxes and licenses", line: "23" },
       { value: "travel", label: "Travel, meals, and entertainment: travel", line: "24a" },
       { value: "meals", label: "Travel, meals, and entertainment: meals", line: "24b" },
-      { value: "utilities", label: "Utilities", line: "25" }
+      { value: "utilities", label: "Utilities", line: "25" },
+      { value: "wages", label: "Wages (less employment credits)", line: "26" },
+      { value: "home_office", label: "Home office (Form 8829)", line: "30" },
+      { value: "bank_fees", label: "Bank service charges", line: "27a" },
+      { value: "software_subscriptions", label: "Software and subscriptions", line: "27a" },
+      { value: "other_expense", label: "Other business expenses", line: "27a" }
     ]
   },
   CA: {
     income: [
-      { value: "t2125_8000", label: "Gross professional fees", line: "T2125 Line 8000" },
-      { value: "t2125_8290", label: "Other income", line: "T2125 Line 8290" },
+      { value: "sales", label: "Gross sales / professional fees", line: "T2125 Line 8000" },
+      { value: "gst_hst_collected", label: "GST/HST collected (balance sheet — not income)", line: "GST/HST" },
+      { value: "subsidies_grants", label: "Subsidies, grants and rebates", line: "T2125 Line 8290" },
+      { value: "other_income", label: "Other income", line: "T2125 Line 8290" },
       { value: "t4a_20", label: "Self-employment commissions (T4A Box 20)", line: "T4A Box 20" },
       { value: "t4a_28", label: "Other income (T4A Box 28)", line: "T4A Box 28" },
       { value: "cash_income", label: "Cash income", line: "Cash" }
     ],
     expense: [
-      { value: "ca_8810", label: "Advertising", line: "8810" },
-      { value: "ca_8820", label: "Meals and entertainment (50%)", line: "8820" },
-      { value: "ca_8860", label: "Bad debts", line: "8860" },
-      { value: "ca_8871", label: "Insurance", line: "8871" },
-      { value: "ca_8910", label: "Interest", line: "8910" },
-      { value: "ca_8960", label: "Legal and accounting fees", line: "8960" },
-      { value: "ca_9060", label: "Salaries, wages, benefits", line: "9060" },
-      { value: "ca_9130", label: "Rent", line: "9130" },
-      { value: "ca_9140", label: "Repairs and maintenance", line: "9140" },
-      { value: "ca_9180", label: "Telephone and utilities", line: "9180" },
-      { value: "ca_9200", label: "Travel", line: "9200" },
-      { value: "ca_9220", label: "Fuel costs", line: "9220" },
-      { value: "ca_9270", label: "Other expenses", line: "9270" },
-      { value: "ca_9281", label: "Motor vehicle expenses", line: "9281" },
-      { value: "ca_9936", label: "Capital cost allowance (CCA)", line: "9936" },
-      { value: "ca_9943", label: "Business-use-of-home expenses", line: "9943" }
+      { value: "advertising", label: "Advertising", line: "T2125 Line 8810" },
+      { value: "meals_entertainment", label: "Meals and entertainment (50%)", line: "T2125 Line 8820" },
+      { value: "delivery_freight", label: "Delivery, freight and express", line: "T2125 Line 8870" },
+      { value: "insurance", label: "Insurance", line: "T2125 Line 8871" },
+      { value: "interest_bank_charges", label: "Interest and bank charges", line: "T2125 Line 8910" },
+      { value: "legal_accounting", label: "Legal, accounting and professional fees", line: "T2125 Line 8960" },
+      { value: "office_expense", label: "Office expenses", line: "T2125 Line 9270" },
+      { value: "business_tax_fees_licenses_memberships", label: "Business taxes, licences and memberships", line: "T2125 Line 9270" },
+      { value: "property_taxes", label: "Property taxes", line: "T2125 Line 9270" },
+      { value: "salaries_wages_benefits", label: "Salaries, wages and benefits", line: "T2125 Line 9060" },
+      { value: "rent", label: "Rent", line: "T2125 Line 9130" },
+      { value: "maintenance_repairs", label: "Repairs and maintenance", line: "T2125 Line 9140" },
+      { value: "utilities", label: "Telephone and utilities", line: "T2125 Line 9180" },
+      { value: "travel", label: "Travel expenses", line: "T2125 Line 9200" },
+      { value: "motor_vehicle", label: "Motor vehicle expenses", line: "T2125 Line 9281" },
+      { value: "home_office", label: "Business-use-of-home expenses", line: "T2125 Line 9943" },
+      { value: "gst_hst_paid", label: "GST/HST paid (input tax credits)", line: "GST/HST ITC" },
+      { value: "other_expense", label: "Other expenses", line: "T2125 Line 9270" }
     ]
   }
+};
+
+// Lookup map for old ca_XXXX / t2125_XXXX values that may be stored in the DB
+// from before the tax option keys were updated to plain-English names.
+const LEGACY_TAX_VALUE_LABELS = {
+  t2125_8000: { label: "Gross professional fees", line: "T2125 Line 8000" },
+  t2125_8290: { label: "Other income", line: "T2125 Line 8290" },
+  ca_8810: { label: "Advertising", line: "T2125 Line 8810" },
+  ca_8820: { label: "Meals and entertainment (50%)", line: "T2125 Line 8820" },
+  ca_8860: { label: "Bad debts", line: "T2125 Line 8860" },
+  ca_8871: { label: "Insurance", line: "T2125 Line 8871" },
+  ca_8910: { label: "Interest", line: "T2125 Line 8910" },
+  ca_8960: { label: "Legal and accounting fees", line: "T2125 Line 8960" },
+  ca_9060: { label: "Salaries, wages and benefits", line: "T2125 Line 9060" },
+  ca_9130: { label: "Rent", line: "T2125 Line 9130" },
+  ca_9140: { label: "Repairs and maintenance", line: "T2125 Line 9140" },
+  ca_9180: { label: "Telephone and utilities", line: "T2125 Line 9180" },
+  ca_9200: { label: "Travel", line: "T2125 Line 9200" },
+  ca_9220: { label: "Fuel costs", line: "T2125 Line 9220" },
+  ca_9270: { label: "Other expenses", line: "T2125 Line 9270" },
+  ca_9281: { label: "Motor vehicle expenses", line: "T2125 Line 9281" },
+  ca_9936: { label: "Capital cost allowance (CCA)", line: "T2125 Line 9936" },
+  ca_9943: { label: "Business-use-of-home expenses", line: "T2125 Line 9943" }
 };
 
 let categoriesToastTimer = null;
@@ -302,9 +335,16 @@ function renderCategoryGroup(containerId, type, emptyText) {
   }
 
   container.innerHTML = categories.map((category) => {
+    const taxInfo = category.taxLabel ? getTaxInfo(category.taxLabel) : null;
+    const taxChipHtml = taxInfo
+      ? `<span class="category-tax-pill" title="${escapeHtml(taxInfo.label)}">${escapeHtml(taxInfo.line || taxInfo.label)}</span>`
+      : "";
     return `
     <div class="category-item">
-      <span class="category-pill pill-${escapeHtml(category.color || defaultColorForType(type))}">${escapeHtml(category.name)}</span>
+      <div class="category-item-meta">
+        <span class="category-pill pill-${escapeHtml(category.color || defaultColorForType(type))}">${escapeHtml(category.name)}</span>
+        ${taxChipHtml}
+      </div>
       <button type="button" class="category-delete" data-category-delete="${escapeHtml(category.id)}" aria-label="${escapeHtml(tx("common_delete") + " " + (category.name || tx("categories_fallback_name")))}">${escapeHtml(tx("common_delete"))}</button>
     </div>
   `;
@@ -355,47 +395,30 @@ function populateTaxLabelOptions(type) {
   select.value = options.some((option) => option.value === previous) ? previous : "";
   select.disabled = !currentRegion || options.length === 0;
 
-  // Show/hide description hint below select
-  if (hint) {
-    if (select.value) {
-      // Find selected option's description
-      const selected = options.find(opt => opt.value === select.value);
-      if (selected && selected.line) {
-        hint.textContent = `Schedule C Line ${selected.line}: ${selected.label}`;
-        hint.style.display = "block";
-      } else {
-        hint.textContent = "";
-        hint.style.display = "none";
-      }
-    } else {
-      hint.textContent = "";
-      hint.style.display = "none";
+  function buildHintText(selected) {
+    if (!selected || !selected.line) return "";
+    const { line, label } = selected;
+    if (currentRegion === "US" && type === "expense" && /^\d/.test(line)) {
+      return `Schedule C Line ${line}: ${label}`;
     }
+    return `${line}: ${label}`;
   }
 
-  // Listen for select change to update hint
+  if (hint) {
+    const selected = options.find(opt => opt.value === select.value);
+    const text = buildHintText(selected);
+    hint.textContent = text;
+    hint.style.display = text ? "block" : "none";
+  }
+
   select.onchange = function() {
     if (hint) {
       const selected = options.find(opt => opt.value === select.value);
-      if (selected && selected.line) {
-        hint.textContent = `Schedule C Line ${selected.line}: ${selected.label}`;
-        hint.style.display = "block";
-      } else {
-        hint.textContent = "";
-        hint.style.display = "none";
-      }
+      const text = buildHintText(selected);
+      hint.textContent = text;
+      hint.style.display = text ? "block" : "none";
     }
   };
-
-  // Hide field if type is income
-  const formField = select.closest('.form-field');
-  if (formField) {
-    if (type === "income") {
-      formField.style.display = "none";
-    } else {
-      formField.style.display = "";
-    }
-  }
 }
 
 async function loadBusinessRegion() {
@@ -486,11 +509,21 @@ async function refreshReceiptsDot() {
   updateReceiptsDot();
 }
 
-function formatTaxLabel(value) {
+function getTaxInfo(value) {
+  if (!value) return null;
   const groups = currentRegion ? CATEGORY_TAX_OPTIONS[currentRegion] : null;
-  if (!groups) return value;
-  const options = [...groups.income, ...groups.expense];
-  return options.find((option) => option.value === value)?.label || value;
+  if (groups) {
+    const found = [...groups.income, ...groups.expense].find((o) => o.value === value);
+    if (found) return { label: found.label, line: found.line };
+  }
+  const legacy = LEGACY_TAX_VALUE_LABELS[value];
+  if (legacy) return legacy;
+  return null;
+}
+
+function formatTaxLabel(value) {
+  const info = getTaxInfo(value);
+  return info ? info.label : (value || "");
 }
 
 function getCategories() {

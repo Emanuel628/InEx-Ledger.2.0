@@ -95,6 +95,14 @@
   background: rgba(255, 255, 255, 0.88);
 }
 
+.category-item-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
 .category-item-pills {
   display: flex;
   align-items: center;
