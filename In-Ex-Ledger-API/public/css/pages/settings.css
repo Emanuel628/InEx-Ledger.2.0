@@ -2259,7 +2259,8 @@ body {
 
 @media (max-width: 720px) {
   .settings-page .settings-shell {
-    width: min(100% - 16px, 1180px);
+    width: 100%;
+    padding: 16px 12px 32px;
     gap: 16px;
   }
 
@@ -2267,12 +2268,46 @@ body {
     position: static;
   }
 
+  .settings-page .settings-main {
+    padding: 0;
+  }
+
   .settings-page .settings-sidebar-card,
   .settings-page .settings-overview,
   .settings-page .settings-card,
   .settings-page .danger-card {
-    padding: 20px;
-    border-radius: 22px;
+    padding: 18px 16px;
+    border-radius: 18px;
+  }
+
+  .settings-page .settings-page-heading h1 {
+    font-size: 26px;
+  }
+
+  .settings-page .inline-select {
+    min-width: 0;
+  }
+
+  .settings-page .settings-row,
+  .settings-page .danger-row {
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .settings-page .settings-summary-card-head h2 {
+    font-size: 17px;
+  }
+
+  .settings-page .settings-help-entry {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .settings-page .settings-help-open {
+    width: 100%;
   }
 
   .settings-page .settings-nav {
@@ -2388,6 +2423,16 @@ body {
 /* Impeccable style overrides */
 .settings-page {
   background: var(--page-bleed);
+  overflow-x: hidden;
+}
+
+.settings-page .settings-page-heading h1,
+.settings-page .settings-summary-card h2,
+.settings-page .settings-card h2,
+.settings-page .settings-card h3,
+.settings-page .danger-card-title {
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .settings-shell {
