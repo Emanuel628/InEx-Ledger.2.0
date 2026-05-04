@@ -2297,6 +2297,10 @@ body {
     grid-template-columns: 1fr;
   }
 
+  .settings-page .address-row-inline {
+    grid-template-columns: 1fr;
+  }
+
   .settings-page .settings-summary-card {
     min-height: 0;
   }

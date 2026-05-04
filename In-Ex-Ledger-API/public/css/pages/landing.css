@@ -957,7 +957,8 @@ body {
   }
 
   .marketing-nav-signin {
-    display: none;
+    width: 100%;
+    text-align: center;
   }
 
   .hero {

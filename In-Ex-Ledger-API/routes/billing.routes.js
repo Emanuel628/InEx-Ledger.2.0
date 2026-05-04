@@ -639,11 +639,6 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
     const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
     const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
 
-    if (subscription.isTrialing && !subscription.stripeSubscriptionId) {
-      await setTrialPlanSelectionForBusiness(billingBusinessId, "v1", additionalBusinesses);
-      const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
-      return res.status(200).json({ subscription: updated, trialResumed: true });
-    }
     // Block when any live Stripe subscription exists — including subscriptions
     // scheduled to cancel at period end (cancel_at_period_end=true).  Allowing
     // checkout in that state creates a second parallel subscription and double
@@ -715,6 +710,13 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       sessionPayload["line_items[1][quantity]"] = additionalBusinesses;
       sessionPayload["metadata[addon_price_id]"] = priceSelection.addonPriceId;
       sessionPayload["subscription_data[metadata][addon_price_id]"] = priceSelection.addonPriceId;
+    }
+
+    if (subscription.isTrialing && subscription.trialEndsAt) {
+      const trialEndUnix = Math.floor(new Date(subscription.trialEndsAt).getTime() / 1000);
+      if (trialEndUnix > Math.floor(Date.now() / 1000)) {
+        sessionPayload["subscription_data[trial_end]"] = trialEndUnix;
+      }
     }
 
     const session = await stripeRequest("/checkout/sessions", sessionPayload, {
