@@ -128,7 +128,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
 }
 
 .pricing-hero h1,
@@ -426,11 +426,13 @@
 
 .pricing-addon-box,
 .pricing-total-box {
-  padding: 18px;
-  border-radius: 20px;
-  background: rgba(245, 248, 252, 0.88);
-  border: 1px solid rgba(15, 25, 35, 0.06);
-  margin-bottom: 14px;
+  padding: 18px 0 0;
+  border-top: 1px solid rgba(15, 25, 35, 0.08);
+  margin: 18px 0 0;
+}
+
+.pricing-total-box {
+  margin-bottom: 18px;
 }
 
 .pricing-addon-box label {
