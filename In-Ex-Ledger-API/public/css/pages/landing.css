@@ -81,6 +81,35 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.marketing-nav-sections {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(15, 25, 35, 0.04);
+  border: 1px solid rgba(15, 25, 35, 0.06);
+}
+
+.marketing-nav-sections .marketing-nav-link {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+  color: var(--ink2);
+  font-size: 13px;
+}
+
+.marketing-nav-sections .marketing-nav-link:hover,
+.marketing-nav-sections .marketing-nav-link:focus-visible {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 4px 10px rgba(15, 25, 35, 0.05);
 }
 
 .marketing-nav-link,
@@ -157,6 +186,7 @@ body {
   align-items: center;
   width: fit-content;
   min-height: 32px;
+  margin-bottom: 18px;
   padding: 0 12px;
   border-radius: 999px;
   background: var(--landing-soft-blue);
@@ -669,21 +699,30 @@ body {
   list-style: none;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px 24px;
   margin: 22px 0 0;
   padding: 0;
 }
 
 .pricing-feature-list li {
-  min-height: 58px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: #f8fafc;
-  border: 1px solid rgba(15, 25, 35, 0.06);
+  position: relative;
+  padding-left: 26px;
   color: var(--ink);
   font-size: 14px;
-  font-weight: 600;
-  line-height: 1.5;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
+.pricing-feature-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.4em;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--landing-soft-blue) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23246dbb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='2.5,6 5,8.5 9.5,4'/></svg>") center / 12px 12px no-repeat;
+  border: 1px solid rgba(36, 109, 187, 0.24);
 }
 
 .pricing-cta-btn {
@@ -854,11 +893,30 @@ body {
     top: 10px;
     margin-top: 10px;
     padding: 12px 14px;
+    flex-wrap: wrap;
   }
 
   .marketing-nav {
     flex-wrap: wrap;
     justify-content: flex-end;
+    width: 100%;
+  }
+
+  .marketing-nav-sections {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .marketing-nav-sections::-webkit-scrollbar {
+    display: none;
+  }
+
+  .marketing-nav-sections .marketing-nav-link {
+    flex: 0 0 auto;
   }
 
   .hero,
@@ -898,7 +956,7 @@ body {
     gap: 8px;
   }
 
-  .marketing-nav-link {
+  .marketing-nav-signin {
     display: none;
   }
 
