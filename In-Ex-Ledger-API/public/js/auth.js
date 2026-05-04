@@ -853,7 +853,11 @@ function initAccountMenus(displayName = "User", profile = {}) {
       menu.id = menuId;
       menu.setAttribute("role", "menu");
       pill.appendChild(menu);
+    }
+
+    if (pill.dataset.menuTriggerWired !== "true") {
       wireMenuTrigger(pill, menu);
+      pill.dataset.menuTriggerWired = "true";
     }
 
     menu.innerHTML = `

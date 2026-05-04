@@ -1384,12 +1384,37 @@ body[data-theme="light"] select option {
 }
 
 @media (max-width: 480px) {
-  .user-name {
+  .user-pill {
+    min-height: 38px !important;
+  }
+
+  .user-pill .user-name,
+  .user-pill .user-pill-chevron {
     display: none !important;
   }
 
-  .user-pill-chevron {
-    display: none !important;
+  .user-pill[aria-expanded="true"] .user-name,
+  .user-pill[aria-expanded="true"] .user-pill-chevron {
+    display: inline-flex !important;
+  }
+
+  .user-pill[aria-expanded="true"] {
+    max-width: min(220px, 60vw) !important;
+  }
+
+  .account-menu {
+    position: fixed !important;
+    top: auto !important;
+    right: 12px !important;
+    left: 12px !important;
+    bottom: 12px !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-height: 70vh !important;
+    overflow-y: auto !important;
+    border-radius: 16px !important;
+    box-shadow: 0 -8px 28px rgba(15, 25, 35, 0.18), 0 18px 40px rgba(15, 25, 35, 0.14) !important;
+    z-index: 200 !important;
   }
 }
 
