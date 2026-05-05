@@ -1,0 +1,37 @@
+/* Mobile-only account menu positioning.
+   Keeps the signed-in user dropdown anchored directly under the header pill. */
+@media (max-width: 767px) {
+  .app-topbar .user-pill,
+  .settings-topbar .user-pill,
+  .accounts-topbar .user-pill,
+  .exports-topbar .user-pill,
+  .receipts-topbar .user-pill,
+  .categories-topbar .user-pill,
+  .mileage-topbar .user-pill,
+  .messages-topbar .user-pill,
+  .analytics-topbar .user-pill,
+  .help-topbar .user-pill {
+    position: relative !important;
+  }
+
+  .app-topbar .account-menu,
+  .settings-topbar .account-menu,
+  .accounts-topbar .account-menu,
+  .exports-topbar .account-menu,
+  .receipts-topbar .account-menu,
+  .categories-topbar .account-menu,
+  .mileage-topbar .account-menu,
+  .messages-topbar .account-menu,
+  .analytics-topbar .account-menu,
+  .help-topbar .account-menu {
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top, 0px) + 74px) !important;
+    right: 12px !important;
+    left: 12px !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    transform: none !important;
+    z-index: 120 !important;
+  }
+}
