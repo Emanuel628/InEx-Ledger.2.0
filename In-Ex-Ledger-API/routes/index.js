@@ -4,10 +4,12 @@ const arApService = require('../services/arApService');
 const { allowTrustedBrowserAccountSwitch, rememberTrustedBrowserOnLogout } = require('../middleware/accountSwitchMfaTrust.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled.js');
 
+const businessTierOnly = [requireV2BusinessEnabled, requireV2Entitlement];
+
 router.use('/auth/login', allowTrustedBrowserAccountSwitch);
 router.use('/auth/logout', rememberTrustedBrowserOnLogout);
 
-router.get('/arap-summary', requireV2BusinessEnabled, requireV2Entitlement, async (req, res) => {
+router.get('/arap-summary', ...businessTierOnly, async (req, res) => {
   try {
     res.json(await arApService.getArApSummary(req.business.id));
   } catch (_) {
@@ -17,12 +19,12 @@ router.get('/arap-summary', requireV2BusinessEnabled, requireV2Entitlement, asyn
 
 const ENABLE_V2_BUSINESS = process.env.ENABLE_V2_BUSINESS === 'true';
 if (ENABLE_V2_BUSINESS) {
-  router.use('/vendors', require('./vendors.routes'));
-  router.use('/customers', require('./customers.routes'));
-  router.use('/invoices', require('./invoices.routes'));
-  router.use('/bills', require('./bills.routes'));
-  router.use('/projects', require('./projects.routes'));
-  router.use('/billable-expenses', require('./billable-expenses.routes'));
+  router.use('/vendors', ...businessTierOnly, require('./vendors.routes'));
+  router.use('/customers', ...businessTierOnly, require('./customers.routes'));
+  router.use('/invoices', ...businessTierOnly, require('./invoices.routes'));
+  router.use('/bills', ...businessTierOnly, require('./bills.routes'));
+  router.use('/projects', ...businessTierOnly, require('./projects.routes'));
+  router.use('/billable-expenses', ...businessTierOnly, require('./billable-expenses.routes'));
 }
 
 router.use('/auth', require('./auth.routes.js'));
