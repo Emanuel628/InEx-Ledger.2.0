@@ -1,13 +1,17 @@
 /* Early theme bootstrap
-   Runs before page CSS finishes loading so dark mode can style landing/auth/app
-   pages on first paint instead of waiting for global.js at the bottom of body. */
+   Dark mode is temporarily disabled while the design is revisited.
+
+   Do not delete dark-mode CSS or theme code. This boot file simply forces the
+   active runtime theme to light so previous localStorage settings or system/PC
+   dark preferences cannot switch the app into dark mode for now.
+*/
 (function () {
   var theme = "light";
+
   try {
-    theme = localStorage.getItem("lb_theme") === "dark" ? "dark" : "light";
-  } catch (_) {
-    theme = "light";
-  }
+    localStorage.setItem("lb_theme", "light");
+    localStorage.setItem("lb_theme_version", "2");
+  } catch (_) {}
 
   document.documentElement.setAttribute("data-theme", theme);
   document.documentElement.classList.remove("dark", "light");
