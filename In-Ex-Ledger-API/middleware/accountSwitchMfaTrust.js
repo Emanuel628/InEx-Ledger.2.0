@@ -40,14 +40,11 @@ function setGlobalMfaTrustCookie(res, req) {
 
 function hasValidGlobalMfaTrustCookie(req) {
   const token = String(req.cookies?.[GLOBAL_MFA_TRUST_COOKIE] || '').trim();
-  if (!token) {
-    return false;
-  }
+  if (!token) return false;
 
   try {
     const payload = verifyToken(token);
-    return payload?.purpose === 'global_mfa_trust'
-      && payload?.user_agent_hash === getUserAgentHash(req);
+    return payload?.purpose === 'global_mfa_trust' && payload?.user_agent_hash === getUserAgentHash(req);
   } catch (_) {
     return false;
   }
@@ -57,11 +54,13 @@ async function createRefreshToken(userId, { mfaAuthenticated = false } = {}) {
   const token = crypto.randomBytes(REFRESH_TOKEN_BYTE_LENGTH).toString('hex');
   const hashed = hashRefreshToken(token);
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
+
   await pool.query(
     `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, mfa_authenticated)
      VALUES ($1, $2, $3, $4, $5)`,
     [crypto.randomUUID(), userId, hashed, expiresAt, !!mfaAuthenticated]
   );
+
   return { token, expiresAt };
 }
 
@@ -85,20 +84,14 @@ async function findUserById(userId) {
 
 async function issueSessionFromTrustedBrowser(req, res, mfaToken) {
   const pending = verifyToken(String(mfaToken || '').trim());
-  if (pending?.purpose !== 'mfa_pending' || !pending?.id) {
-    return null;
-  }
+  if (pending?.purpose !== 'mfa_pending' || !pending?.id) return null;
 
   const user = await findUserById(pending.id);
-  if (!user || user.is_erased || !user.email_verified) {
-    return null;
-  }
+  if (!user || user.is_erased || !user.email_verified) return null;
 
   const businessId = pending.business_id || await resolveBusinessIdForUser(user);
-  const subscription = await getSubscriptionSnapshotForUser({
-    id: user.id,
-    business_id: businessId
-  });
+  const subscription = await getSubscriptionSnapshotForUser({ id: user.id, business_id: businessId });
+
   const token = signToken({
     id: user.id,
     email: user.email,
@@ -122,21 +115,21 @@ async function issueSessionFromTrustedBrowser(req, res, mfaToken) {
   };
 }
 
-function allowTrustedBrowserAccountSwitch(req, res, next) {
-  if (String(req.method || '').toUpperCase() !== 'POST') {
-    return next();
+function sendLoginResponseWithAccountSwitchTrust(req, res, loginPayload, sendJson) {
+  if (!loginPayload?.mfa_required || !loginPayload?.mfa_token || !hasValidGlobalMfaTrustCookie(req)) {
+    return sendJson(loginPayload);
   }
 
-  const originalJson = res.json.bind(res);
-  res.json = function patchedLoginJson(payload) {
-    if (!payload?.mfa_required || !payload?.mfa_token || !hasValidGlobalMfaTrustCookie(req)) {
-      return originalJson(payload);
-    }
+  return issueSessionFromTrustedBrowser(req, res, loginPayload.mfa_token)
+    .then((trustedPayload) => sendJson(trustedPayload || loginPayload))
+    .catch(() => sendJson(loginPayload));
+}
 
-    return issueSessionFromTrustedBrowser(req, res, payload.mfa_token)
-      .then((trustedPayload) => originalJson(trustedPayload || payload))
-      .catch(() => originalJson(payload));
-  };
+function allowTrustedBrowserAccountSwitch(req, res, next) {
+  if (String(req.method || '').toUpperCase() !== 'POST') return next();
+
+  const sendJson = res.json.bind(res);
+  res.json = (loginPayload) => sendLoginResponseWithAccountSwitchTrust(req, res, loginPayload, sendJson);
 
   return next();
 }
