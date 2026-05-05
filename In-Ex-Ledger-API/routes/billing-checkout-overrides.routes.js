@@ -1,3 +1,7 @@
-const original = require("./billing-checkout-overrides.routes.js");
+const express = require("express");
 
-module.exports = original;
+// Reserved for narrow checkout overrides. Keep as a valid router so the route
+// stack stays safe even when no override is active.
+const router = express.Router();
+
+module.exports = router;
