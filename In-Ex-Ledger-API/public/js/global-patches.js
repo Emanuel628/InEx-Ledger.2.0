@@ -1,10 +1,15 @@
 /* Global app behavior patches loaded after global.js.
-   Temporarily no-op.
-
-   The sidebar multi-select behavior needs to live inside global.js where the
-   dynamic sidebar is rendered. Loading it as a second observer script can fight
-   the sidebar re-render cycle and break the menu.
-*/
+   Keep this file small and targeted; move fixes into the main modules when
+   the shared shell is refactored. */
 (function () {
-  // Intentionally empty.
+  function loadScriptOnce(src, id) {
+    if (document.getElementById(id)) return;
+    const script = document.createElement("script");
+    script.id = id;
+    script.src = src;
+    script.defer = true;
+    document.head.appendChild(script);
+  }
+
+  loadScriptOnce("/js/sidebar-multiselect.js?v=20260505b", "sidebar-multiselect-js");
 })();
