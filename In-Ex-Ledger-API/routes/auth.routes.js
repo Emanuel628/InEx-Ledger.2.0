@@ -789,12 +789,22 @@ router.post("/register", authLimiter, async (req, res) => {
   const country = String(req.body?.country || "").trim().toUpperCase() || null;
   const province = String(req.body?.province || "").trim().toUpperCase() || null;
 
+  // Server-side enforcement of the Terms / Privacy Policy consent that the
+  // registration UI presents. Required for PIPEDA (Canada) and Quebec Law 25
+  // compliance and to prevent account creation via direct API calls that
+  // bypass the front-end checkbox.
+  const tosConsent = req.body?.tos_consent === true || req.body?.tosConsent === true;
+
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
 
   if (!isStrongPassword(password)) {
     return res.status(400).json({ error: "Password must be at least 8 characters and include an uppercase letter, number, and symbol." });
+  }
+
+  if (!tosConsent) {
+    return res.status(400).json({ error: "You must accept the Terms and Privacy Policy to create an account." });
   }
 
   const hashedPassword = await hashPassword(password);

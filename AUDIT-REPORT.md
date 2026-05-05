@@ -1,3 +1,8 @@
+> **STATUS: DONE — DO NOT USE THIS FILE.**
+> All findings in this report have been addressed in the codebase. This file
+> is retained for historical reference only. Do not consult it for current
+> production-readiness assessments — the audit is stale relative to the live code.
+
 # InEx Ledger 2.0 — Full Audit Report
 
 **Date:** 2026-04-11  

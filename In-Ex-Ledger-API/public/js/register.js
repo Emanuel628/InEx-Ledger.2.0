@@ -111,7 +111,7 @@ async function handleRegisterSubmit(event) {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, tos_consent: true })
     });
 
     const regBody = await regResponse.json().catch(() => null);
