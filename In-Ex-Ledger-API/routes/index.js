@@ -43,7 +43,6 @@ router.use('/recurring', require('./recurring.routes.js'));
 router.use('/businesses', require('./businesses.routes.js'));
 router.use('/cpa-access', require('./cpa-access.routes.js'));
 router.use('/cpa-verification', require('./cpa-verification.routes.js'));
-router.use('/analytics', require('./analytics-mileage.routes.js'));
 router.use('/analytics', require('./analytics.routes.js'));
 router.use('/invoices-v1', require('./invoices-v1.routes.js'));
 router.use('/messages', require('./messages.routes.js'));
