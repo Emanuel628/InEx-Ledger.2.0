@@ -1,12 +1,11 @@
-/* App shell stability fixes
-   Prevent the browser from showing temporary static chrome before
-   global.js replaces it with the canonical app shell.
+/* App shell + page paint stability fixes
+   Prevent the browser from showing temporary static/default page chrome before
+   global.js, auth.js, and the page-specific JS hydrate the real app state.
 
-   The app currently has static HTML shell markup in each page and a dynamic
-   shell renderer in global.js. During normal page navigation, the browser can
-   paint the static sidebar/topbar first, then global.js swaps in the canonical
-   Quick Add sidebar and canonical nav. These guards reserve layout space but
-   hide the stale version until the canonical shell is ready.
+   Root cause: the app pages are static HTML first, then JavaScript performs
+   auth/profile validation, business hydration, and page data rendering after
+   DOMContentLoaded. Without a paint gate, users can briefly see the default
+   server HTML version of the entire page before the hydrated version appears.
 */
 
 /* Topbar nav is rendered canonically by global.js. Do not show the per-page
@@ -38,5 +37,36 @@
 
   main.app-shell > .app-sidebar.app-sidebar--dynamic * {
     visibility: visible !important;
+  }
+}
+
+/* Full-page hydration gate.
+   This intentionally targets app pages only, not landing/login/register.
+   It prevents the entire static/default app page from flashing before the
+   page scripts replace it with authenticated, business-scoped data. */
+body:has(main.app-shell) main.app-shell {
+  opacity: 0;
+  animation: inex-app-page-hydrated 760ms steps(1, end) forwards;
+}
+
+body:has(main.app-shell) .app-topbar {
+  opacity: 0;
+  animation: inex-app-page-hydrated 760ms steps(1, end) forwards;
+}
+
+@keyframes inex-app-page-hydrated {
+  0%, 99% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body:has(main.app-shell) main.app-shell,
+  body:has(main.app-shell) .app-topbar {
+    animation-duration: 520ms;
   }
 }
