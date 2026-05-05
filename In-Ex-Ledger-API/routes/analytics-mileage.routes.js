@@ -8,12 +8,59 @@ const { getSubscriptionSnapshotForBusiness, PLAN_PRO, PLAN_BUSINESS } = require(
 const { logError } = require("../utils/logger.js");
 
 const router = express.Router();
+const MILEAGE_SCHEMA_CACHE_MS = 5 * 60 * 1000;
+let cachedMileageColumnMode = null;
+let cachedMileageColumnFetchedAt = 0;
+let cachedMileageColumnModePromise = null;
+
 router.use(requireAuth);
 router.use(requireCsrfProtection);
 router.use(createDataApiLimiter());
 
 function canViewMileageAnalytics(subscription) {
   return subscription?.effectiveTier === PLAN_PRO || subscription?.effectiveTier === PLAN_BUSINESS;
+}
+
+async function getMileageColumnMode() {
+  if (cachedMileageColumnMode && Date.now() - cachedMileageColumnFetchedAt < MILEAGE_SCHEMA_CACHE_MS) {
+    return cachedMileageColumnMode;
+  }
+  if (cachedMileageColumnModePromise) {
+    return cachedMileageColumnModePromise;
+  }
+
+  cachedMileageColumnModePromise = pool.query(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'mileage'
+        AND column_name IN ('date', 'trip_date')`
+  ).then(({ rows }) => {
+    const columns = new Set(rows.map((row) => row.column_name));
+    cachedMileageColumnMode = {
+      hasDate: columns.has("date"),
+      hasTripDate: columns.has("trip_date")
+    };
+    cachedMileageColumnFetchedAt = Date.now();
+    return cachedMileageColumnMode;
+  }).finally(() => {
+    cachedMileageColumnModePromise = null;
+  });
+
+  return cachedMileageColumnModePromise;
+}
+
+function mileageDateSelect(mode) {
+  if (mode.hasTripDate && mode.hasDate) {
+    return "COALESCE(trip_date, date)";
+  }
+  if (mode.hasTripDate) {
+    return "trip_date";
+  }
+  if (mode.hasDate) {
+    return "date";
+  }
+  throw new Error("Mileage table is missing both date and trip_date columns.");
 }
 
 router.get("/mileage", async (req, res) => {
@@ -24,11 +71,14 @@ router.get("/mileage", async (req, res) => {
       return res.status(404).json({ error: "Not found" });
     }
 
+    const mileageColumns = await getMileageColumnMode();
+    const dateSelect = mileageDateSelect(mileageColumns);
+
     const mileageResult = await pool.query(
       `SELECT COUNT(*) AS trip_count,
               COALESCE(SUM(COALESCE(miles, 0)), 0) AS total_miles,
               COALESCE(SUM(COALESCE(km, 0)), 0) AS total_km,
-              MAX(COALESCE(trip_date, date)) AS last_trip_date
+              MAX(${dateSelect}) AS last_trip_date
          FROM mileage
         WHERE business_id = $1`,
       [businessId]
