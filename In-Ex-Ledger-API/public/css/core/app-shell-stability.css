@@ -1,0 +1,42 @@
+/* App shell stability fixes
+   Prevent the browser from showing temporary static chrome before
+   global.js replaces it with the canonical app shell.
+
+   The app currently has static HTML shell markup in each page and a dynamic
+   shell renderer in global.js. During a normal page navigation, the browser can
+   paint the static sidebar/topbar first, then global.js swaps in the canonical
+   Quick Add sidebar and canonical nav. These guards reserve the shell layout
+   space but hide the stale version until global.js marks it ready.
+*/
+
+/* Topbar nav is rendered canonically by global.js. Do not show the per-page
+   hardcoded nav while the script is preparing the canonical nav. */
+.app-topbar .topbar-nav:not(.is-ready) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.app-topbar .topbar-nav.is-ready {
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+@media (min-width: 1025px) {
+  /* Hide the old static page sidebar, but keep its column reserved so the page
+     does not jump horizontally while global.js converts it to .app-sidebar--dynamic. */
+  main.app-shell > .app-sidebar:not(.app-sidebar--dynamic) {
+    visibility: hidden !important;
+  }
+
+  main.app-shell > .app-sidebar:not(.app-sidebar--dynamic) * {
+    visibility: hidden !important;
+  }
+
+  main.app-shell > .app-sidebar.app-sidebar--dynamic {
+    visibility: visible !important;
+  }
+
+  main.app-shell > .app-sidebar.app-sidebar--dynamic * {
+    visibility: visible !important;
+  }
+}
