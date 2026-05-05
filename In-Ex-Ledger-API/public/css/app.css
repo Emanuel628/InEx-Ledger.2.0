@@ -5,6 +5,15 @@
 @import url("/css/core/app-shell-stability.css?v=20260505g");
 @import url("/css/core/dark-mode.css?v=20260505b");
 
+/* Header user pill contrast */
+.app-topbar .user-pill:hover,
+.app-topbar .user-pill:hover .user-name,
+.app-topbar .user-pill:hover #topbarName,
+.app-topbar .user-pill:hover .user-avatar,
+.app-topbar .user-pill:hover #topbarAvatar {
+  color: #0f172a !important;
+}
+
 /* Mobile account menu polish.
    Kept in the app stylesheet so the mobile menu rules travel with the main app chrome. */
 @media (max-width: 767px) {
