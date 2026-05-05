@@ -1,12 +1,15 @@
-/* Proper dark mode palette layer
-   Loads last on canonical pages. Covers marketing, auth, and app pages.
-   Direction: premium graphite/navy, softened indigo accent, readable muted text,
-   calm semantic colors, and zero white cards/CTAs in dark mode.
+/* Dark mode entrypoint
+   This file is injected after page-specific CSS by server.js. Keep it as the
+   final dark-mode entrypoint so page CSS cannot reintroduce white cards, white
+   CTA blocks, white tables, or light preview panels.
 */
+
+@import url("/css/core/dark-mode-final.css?v=20260505a");
 
 html[data-theme="dark"],
 body.dark {
   color-scheme: dark;
+
   --ink: #eef2f8;
   --ink2: #c4cedd;
   --ink3: #9aa7ba;
@@ -14,6 +17,7 @@ body.dark {
   --text-primary: var(--ink);
   --text-secondary: var(--ink2);
   --text-muted: var(--ink3);
+
   --surface: #121a29;
   --surface2: #182234;
   --surface3: #22304a;
@@ -22,11 +26,13 @@ body.dark {
   --input-bg: #0e1523;
   --panel-bg: rgba(18, 26, 41, 0.96);
   --card-bg-strong: rgba(18, 26, 41, 0.98);
+
   --accent: #111827;
   --accent2: #8fa2ff;
   --accent-light: #232c47;
   --accent-primary: var(--accent2);
   --primary: var(--accent2);
+
   --green: #86d39f;
   --green-bg: #123421;
   --red: #f3a6a6;
@@ -34,13 +40,16 @@ body.dark {
   --red-border: #74414a;
   --amber: #f2cf8a;
   --amber-bg: #3b2a12;
+
   --border: rgba(196, 206, 221, 0.13);
   --border2: rgba(196, 206, 221, 0.22);
+
   --page-bg: #0a0f19;
   --page-bleed:
     radial-gradient(circle at 8% 0%, rgba(143, 162, 255, 0.10), transparent 30%),
     radial-gradient(circle at 88% 8%, rgba(72, 90, 140, 0.12), transparent 28%),
     #0a0f19;
+
   --cta-gradient: linear-gradient(180deg, #8fa2ff 0%, #6f82f2 100%);
   --accent-panel: linear-gradient(135deg, #101827 0%, #1a2440 100%);
 
@@ -59,213 +68,5 @@ body.dark {
 html[data-theme="dark"] body,
 body.dark {
   background: var(--page-bleed, #0a0f19) !important;
-  color: var(--ink) !important;
-}
-
-html[data-theme="dark"] main,
-body.dark main,
-html[data-theme="dark"] .app-shell,
-body.dark .app-shell,
-html[data-theme="dark"] .app-page,
-body.dark .app-page,
-html[data-theme="dark"] .app-content,
-body.dark .app-content,
-html[data-theme="dark"] .marketing-main,
-body.dark .marketing-main {
-  background: transparent !important;
-  color: var(--ink) !important;
-}
-
-html[data-theme="dark"] :is(section, article, .card, .panel, .hero, .problem-section, .workflow-section, .fit-section, .pricing-section, .faq-section, .problem-card, .workflow-card, .fit-card, .pricing-card, .pricing-price-block, .faq-item, .auth-card, .auth-trust-panel, .stat-card, .tx-card, .tax-banner, .tax-upsell-card, .upsell-card, .upgrade-card, .subscription-card, .transactions-panel, .transactions-toolbar, .table-wrapper, .transaction-drawer-card, .recurring-drawer-card, .settings-section, .settings-card, .history-card, .account-form-card, .empty-state, .empty-card, .receipt-card, .export-card, .analytics-card, .message-card, .app-sidebar, .dynamic-sidebar-library, .dynamic-sidebar-quick-panel),
-body.dark :is(section, article, .card, .panel, .hero, .problem-section, .workflow-section, .fit-section, .pricing-section, .faq-section, .problem-card, .workflow-card, .fit-card, .pricing-card, .pricing-price-block, .faq-item, .auth-card, .auth-trust-panel, .stat-card, .tx-card, .tax-banner, .tax-upsell-card, .upsell-card, .upgrade-card, .subscription-card, .transactions-panel, .transactions-toolbar, .table-wrapper, .transaction-drawer-card, .recurring-drawer-card, .settings-section, .settings-card, .history-card, .account-form-card, .empty-state, .empty-card, .receipt-card, .export-card, .analytics-card, .message-card, .app-sidebar, .dynamic-sidebar-library, .dynamic-sidebar-quick-panel) {
-  background: var(--surface) !important;
-  border-color: var(--border) !important;
-  color: var(--ink) !important;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22) !important;
-}
-
-html[data-theme="dark"] :is(.marketing-header, .auth-header, .app-topbar),
-body.dark :is(.marketing-header, .auth-header, .app-topbar) {
-  background: rgba(15, 23, 39, 0.88) !important;
-  border-color: rgba(196, 206, 221, 0.13) !important;
-  color: var(--ink) !important;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22) !important;
-}
-
-html[data-theme="dark"] :is(.marketing-nav-sections, .marketing-nav-link, .marketing-nav-sections .marketing-nav-link:hover, .marketing-nav-sections .marketing-nav-link:focus-visible, .button-secondary, .hero-proof-list li, .pricing-toggle, .pricing-toggle-btn, .pricing-toggle-btn.is-active, .pricing-price-block, .toolbar-search, .transactions-table thead, .transactions-table th, .tx-period-picker, .tx-period-chip, .scope-select-wrap, .user-pill, .receipt-upload-inline, .sidebar-add-pill, .dynamic-sidebar-manage),
-body.dark :is(.marketing-nav-sections, .marketing-nav-link, .marketing-nav-sections .marketing-nav-link:hover, .marketing-nav-sections .marketing-nav-link:focus-visible, .button-secondary, .hero-proof-list li, .pricing-toggle, .pricing-toggle-btn, .pricing-toggle-btn.is-active, .pricing-price-block, .toolbar-search, .transactions-table thead, .transactions-table th, .tx-period-picker, .tx-period-chip, .scope-select-wrap, .user-pill, .receipt-upload-inline, .sidebar-add-pill, .dynamic-sidebar-manage) {
-  background: var(--surface2) !important;
-  border-color: var(--border) !important;
-  color: var(--ink2) !important;
-  box-shadow: none !important;
-}
-
-html[data-theme="dark"] :is(input, select, textarea),
-body.dark :is(input, select, textarea) {
-  background: var(--input-bg) !important;
-  border-color: var(--border2) !important;
-  color: var(--ink) !important;
-}
-
-html[data-theme="dark"] :is(input, textarea)::placeholder,
-body.dark :is(input, textarea)::placeholder {
-  color: var(--ink3) !important;
-}
-
-html[data-theme="dark"] :is(h1, h2, h3, h4, .app-page-title, .page-title, .section-heading h2, .hero h1, .pricing-tier-name, .brand-text, .brand-text-dark),
-body.dark :is(h1, h2, h3, h4, .app-page-title, .page-title, .section-heading h2, .hero h1, .pricing-tier-name, .brand-text, .brand-text-dark) {
-  color: var(--ink) !important;
-}
-
-html[data-theme="dark"] :is(p, label, small, .app-page-subtitle, .page-subtitle, .section-subtitle, .hero-lede, .hero-cta-note, .hero-support-note, .pricing-tier-desc, .faq-item p, .auth-page-intro, .auth-trust-copy, .auth-support-note, .transactions-toolbar-subtitle, .stat-label, .stat-delta, .tax-banner-note, .tax-side-meta, .small-note, .muted, .text-muted, .marketing-footer, .marketing-footer a),
-body.dark :is(p, label, small, .app-page-subtitle, .page-subtitle, .section-subtitle, .hero-lede, .hero-cta-note, .hero-support-note, .pricing-tier-desc, .faq-item p, .auth-page-intro, .auth-trust-copy, .auth-support-note, .transactions-toolbar-subtitle, .stat-label, .stat-delta, .tax-banner-note, .tax-side-meta, .small-note, .muted, .text-muted, .marketing-footer, .marketing-footer a) {
-  color: var(--ink2) !important;
-}
-
-html[data-theme="dark"] a,
-body.dark a {
-  color: var(--accent2) !important;
-}
-
-html[data-theme="dark"] :is(button, .button, .btn, .auth-submit, .auth-secondary-btn, .toolbar-import-button, .toolbar-add-button, .page-add-button, .receipt-upload-button, .pricing-cta-btn, .marketing-nav-cta),
-body.dark :is(button, .button, .btn, .auth-submit, .auth-secondary-btn, .toolbar-import-button, .toolbar-add-button, .page-add-button, .receipt-upload-button, .pricing-cta-btn, .marketing-nav-cta) {
-  background: var(--surface2) !important;
-  border-color: var(--border2) !important;
-  color: var(--ink) !important;
-  box-shadow: none !important;
-}
-
-html[data-theme="dark"] :is(.button-primary, .primary-btn, .btn-primary, button.primary, .auth-submit, .drawer-submit, .page-add-button, .pricing-cta-btn, .marketing-nav-cta, [data-upgrade]),
-body.dark :is(.button-primary, .primary-btn, .btn-primary, button.primary, .auth-submit, .drawer-submit, .page-add-button, .pricing-cta-btn, .marketing-nav-cta, [data-upgrade]) {
-  background: var(--cta-gradient) !important;
-  border-color: transparent !important;
-  color: #0a0f19 !important;
-  box-shadow: 0 14px 26px rgba(143, 162, 255, 0.18) !important;
-}
-
-html[data-theme="dark"] :is(.hero-kicker, .section-eyebrow, .pricing-tier-kicker, .problem-number, .auth-trust-kicker),
-body.dark :is(.hero-kicker, .section-eyebrow, .pricing-tier-kicker, .problem-number, .auth-trust-kicker) {
-  background: var(--accent-light) !important;
-  border-color: rgba(143, 162, 255, 0.22) !important;
-  color: var(--accent2) !important;
-}
-
-/* Final no-white guard for the exact internals visible in QA screenshots. */
-html[data-theme="dark"] :is(
-  .category-item,
-  .category-card-head,
-  .category-card-footer,
-  .category-tax-pill,
-  .pill-blue,
-  .pill-green,
-  .pill-amber,
-  .pill-pink,
-  .pill-red,
-  .pill-slate,
-  .transactions-table,
-  .transactions-table tbody,
-  .transactions-table tr,
-  .transactions-table td,
-  .transactions-table th,
-  .mileage-table,
-  .mileage-table tbody,
-  .mileage-table tr,
-  .mileage-table td,
-  .mileage-table th,
-  .receipts-table,
-  .receipts-table tbody,
-  .receipts-table tr,
-  .receipts-table td,
-  .receipts-table th,
-  .analytics-table,
-  .analytics-table tbody,
-  .analytics-table tr,
-  .analytics-table td,
-  .analytics-table th,
-  .monthly-breakdown-table,
-  .monthly-breakdown-table tbody,
-  .monthly-breakdown-table tr,
-  .monthly-breakdown-table td,
-  .monthly-breakdown-table th,
-  .message-empty-state,
-  .message-empty,
-  .empty-inbox,
-  .empty-threads,
-  .export-preview,
-  .export-preview-card,
-  .export-document-preview,
-  .report-preview,
-  .pdf-preview,
-  .document-preview,
-  .preview-card,
-  .receipt-dropzone,
-  .upload-dropzone
-),
-body.dark :is(
-  .category-item,
-  .category-card-head,
-  .category-card-footer,
-  .category-tax-pill,
-  .pill-blue,
-  .pill-green,
-  .pill-amber,
-  .pill-pink,
-  .pill-red,
-  .pill-slate,
-  .transactions-table,
-  .transactions-table tbody,
-  .transactions-table tr,
-  .transactions-table td,
-  .transactions-table th,
-  .mileage-table,
-  .mileage-table tbody,
-  .mileage-table tr,
-  .mileage-table td,
-  .mileage-table th,
-  .receipts-table,
-  .receipts-table tbody,
-  .receipts-table tr,
-  .receipts-table td,
-  .receipts-table th,
-  .analytics-table,
-  .analytics-table tbody,
-  .analytics-table tr,
-  .analytics-table td,
-  .analytics-table th,
-  .monthly-breakdown-table,
-  .monthly-breakdown-table tbody,
-  .monthly-breakdown-table tr,
-  .monthly-breakdown-table td,
-  .monthly-breakdown-table th,
-  .message-empty-state,
-  .message-empty,
-  .empty-inbox,
-  .empty-threads,
-  .export-preview,
-  .export-preview-card,
-  .export-document-preview,
-  .report-preview,
-  .pdf-preview,
-  .document-preview,
-  .preview-card,
-  .receipt-dropzone,
-  .upload-dropzone
-) {
-  background: var(--surface2) !important;
-  background-color: var(--surface2) !important;
-  background-image: none !important;
-  border-color: var(--border2) !important;
-  color: var(--ink2) !important;
-}
-
-html[data-theme="dark"] :is(.category-delete, .delete-btn, .modal-cancel, .categories-secondary-btn),
-body.dark :is(.category-delete, .delete-btn, .modal-cancel, .categories-secondary-btn) {
-  background: #1d2638 !important;
-  border-color: var(--border2) !important;
-  color: var(--ink) !important;
-}
-
-html[data-theme="dark"] body:has(main.app-shell)::before,
-body.dark:has(main.app-shell)::before {
-  background: var(--page-bleed, #0a0f19) !important;
+  color: var(--ink, #eef2f8) !important;
 }
