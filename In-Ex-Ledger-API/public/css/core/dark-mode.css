@@ -1,24 +1,12 @@
 /* Proper dark mode palette layer
-   This file intentionally loads after app-shell-stability.css so the actual
-   designed dark palette wins over older hard-coded contrast patches.
-
-   Direction: premium graphite/navy, softened indigo accent, readable muted
-   text, and calm semantic colors. No neon cyan, no washed-out gray-on-white.
+   Loads last on canonical pages. Covers marketing, auth, and app pages.
+   Direction: premium graphite/navy, softened indigo accent, readable muted text,
+   calm semantic colors, and zero white cards/CTAs in dark mode.
 */
 
 html[data-theme="dark"],
 body.dark {
   color-scheme: dark;
-}
-
-html[data-theme="dark"] body,
-body.dark {
-  background: var(--page-bleed, #0a0f19) !important;
-  color: var(--ink) !important;
-}
-
-html[data-theme="dark"] body:has(main.app-shell),
-body.dark:has(main.app-shell) {
   --ink: #eef2f8;
   --ink2: #c4cedd;
   --ink3: #9aa7ba;
@@ -55,239 +43,303 @@ body.dark:has(main.app-shell) {
     #0a0f19;
   --cta-gradient: linear-gradient(180deg, #8fa2ff 0%, #6f82f2 100%);
   --accent-panel: linear-gradient(135deg, #101827 0%, #1a2440 100%);
-  background: var(--page-bleed) !important;
+
+  /* Landing page variables are declared in landing.css on :root. Override them
+     here too so the marketing page cannot keep white surfaces in dark mode. */
+  --landing-bg: #0a0f19;
+  --landing-surface: rgba(18, 26, 41, 0.96);
+  --landing-surface-strong: #121a29;
+  --landing-border: rgba(196, 206, 221, 0.13);
+  --landing-border-strong: rgba(196, 206, 221, 0.22);
+  --landing-muted: #c4cedd;
+  --landing-deep: #eef2f8;
+  --landing-soft-blue: #232c47;
+  --landing-shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.35);
+  --landing-shadow-md: 0 16px 36px rgba(0, 0, 0, 0.26);
+}
+
+html[data-theme="dark"] body,
+body.dark {
+  background: var(--page-bleed, #0a0f19) !important;
   color: var(--ink) !important;
 }
 
-html[data-theme="dark"] body:has(main.app-shell) main,
-html[data-theme="dark"] body:has(main.app-shell) main.app-shell,
-html[data-theme="dark"] body:has(main.app-shell) .app-page,
-html[data-theme="dark"] body:has(main.app-shell) .app-content,
-body.dark:has(main.app-shell) main,
-body.dark:has(main.app-shell) main.app-shell,
-body.dark:has(main.app-shell) .app-page,
-body.dark:has(main.app-shell) .app-content {
+html[data-theme="dark"] main,
+body.dark main,
+html[data-theme="dark"] .app-shell,
+body.dark .app-shell,
+html[data-theme="dark"] .app-page,
+body.dark .app-page,
+html[data-theme="dark"] .app-content,
+body.dark .app-content,
+html[data-theme="dark"] .marketing-main,
+body.dark .marketing-main {
   background: transparent !important;
   color: var(--ink) !important;
 }
 
-/* Dark surfaces: catch the actual app UI components, not just generic cards. */
-html[data-theme="dark"] body:has(main.app-shell) section,
-html[data-theme="dark"] body:has(main.app-shell) article,
-html[data-theme="dark"] body:has(main.app-shell) .card,
-html[data-theme="dark"] body:has(main.app-shell) .panel,
-html[data-theme="dark"] body:has(main.app-shell) .stat-card,
-html[data-theme="dark"] body:has(main.app-shell) .tx-card,
-html[data-theme="dark"] body:has(main.app-shell) .tax-banner,
-html[data-theme="dark"] body:has(main.app-shell) .tax-upsell-card,
-html[data-theme="dark"] body:has(main.app-shell) .upsell-card,
-html[data-theme="dark"] body:has(main.app-shell) .upgrade-card,
-html[data-theme="dark"] body:has(main.app-shell) .pricing-card,
-html[data-theme="dark"] body:has(main.app-shell) .subscription-card,
-html[data-theme="dark"] body:has(main.app-shell) .transactions-panel,
-html[data-theme="dark"] body:has(main.app-shell) .transactions-toolbar,
-html[data-theme="dark"] body:has(main.app-shell) .table-wrapper,
-html[data-theme="dark"] body:has(main.app-shell) .transaction-drawer-card,
-html[data-theme="dark"] body:has(main.app-shell) .recurring-drawer-card,
-html[data-theme="dark"] body:has(main.app-shell) .settings-section,
-html[data-theme="dark"] body:has(main.app-shell) .settings-card,
-html[data-theme="dark"] body:has(main.app-shell) .history-card,
-html[data-theme="dark"] body:has(main.app-shell) .account-form-card,
-html[data-theme="dark"] body:has(main.app-shell) .empty-state,
-html[data-theme="dark"] body:has(main.app-shell) .empty-card,
-html[data-theme="dark"] body:has(main.app-shell) .receipt-card,
-html[data-theme="dark"] body:has(main.app-shell) .export-card,
-html[data-theme="dark"] body:has(main.app-shell) .analytics-card,
-html[data-theme="dark"] body:has(main.app-shell) .message-card,
-html[data-theme="dark"] body:has(main.app-shell) .app-sidebar,
-html[data-theme="dark"] body:has(main.app-shell) .dynamic-sidebar-library,
-html[data-theme="dark"] body:has(main.app-shell) .dynamic-sidebar-quick-panel,
-body.dark:has(main.app-shell) section,
-body.dark:has(main.app-shell) article,
-body.dark:has(main.app-shell) .card,
-body.dark:has(main.app-shell) .panel,
-body.dark:has(main.app-shell) .stat-card,
-body.dark:has(main.app-shell) .tx-card,
-body.dark:has(main.app-shell) .tax-banner,
-body.dark:has(main.app-shell) .tax-upsell-card,
-body.dark:has(main.app-shell) .upsell-card,
-body.dark:has(main.app-shell) .upgrade-card,
-body.dark:has(main.app-shell) .pricing-card,
-body.dark:has(main.app-shell) .subscription-card,
-body.dark:has(main.app-shell) .transactions-panel,
-body.dark:has(main.app-shell) .transactions-toolbar,
-body.dark:has(main.app-shell) .table-wrapper,
-body.dark:has(main.app-shell) .transaction-drawer-card,
-body.dark:has(main.app-shell) .recurring-drawer-card,
-body.dark:has(main.app-shell) .settings-section,
-body.dark:has(main.app-shell) .settings-card,
-body.dark:has(main.app-shell) .history-card,
-body.dark:has(main.app-shell) .account-form-card,
-body.dark:has(main.app-shell) .empty-state,
-body.dark:has(main.app-shell) .empty-card,
-body.dark:has(main.app-shell) .receipt-card,
-body.dark:has(main.app-shell) .export-card,
-body.dark:has(main.app-shell) .analytics-card,
-body.dark:has(main.app-shell) .message-card,
-body.dark:has(main.app-shell) .app-sidebar,
-body.dark:has(main.app-shell) .dynamic-sidebar-library,
-body.dark:has(main.app-shell) .dynamic-sidebar-quick-panel {
+/* Global dark surfaces: marketing, auth, and app cards/panels. */
+html[data-theme="dark"] :is(
+  section,
+  article,
+  .card,
+  .panel,
+  .hero,
+  .problem-section,
+  .workflow-section,
+  .fit-section,
+  .pricing-section,
+  .faq-section,
+  .problem-card,
+  .workflow-card,
+  .fit-card,
+  .pricing-card,
+  .pricing-price-block,
+  .faq-item,
+  .auth-card,
+  .auth-trust-panel,
+  .stat-card,
+  .tx-card,
+  .tax-banner,
+  .tax-upsell-card,
+  .upsell-card,
+  .upgrade-card,
+  .subscription-card,
+  .transactions-panel,
+  .transactions-toolbar,
+  .table-wrapper,
+  .transaction-drawer-card,
+  .recurring-drawer-card,
+  .settings-section,
+  .settings-card,
+  .history-card,
+  .account-form-card,
+  .empty-state,
+  .empty-card,
+  .receipt-card,
+  .export-card,
+  .analytics-card,
+  .message-card,
+  .app-sidebar,
+  .dynamic-sidebar-library,
+  .dynamic-sidebar-quick-panel
+),
+body.dark :is(
+  section,
+  article,
+  .card,
+  .panel,
+  .hero,
+  .problem-section,
+  .workflow-section,
+  .fit-section,
+  .pricing-section,
+  .faq-section,
+  .problem-card,
+  .workflow-card,
+  .fit-card,
+  .pricing-card,
+  .pricing-price-block,
+  .faq-item,
+  .auth-card,
+  .auth-trust-panel,
+  .stat-card,
+  .tx-card,
+  .tax-banner,
+  .tax-upsell-card,
+  .upsell-card,
+  .upgrade-card,
+  .subscription-card,
+  .transactions-panel,
+  .transactions-toolbar,
+  .table-wrapper,
+  .transaction-drawer-card,
+  .recurring-drawer-card,
+  .settings-section,
+  .settings-card,
+  .history-card,
+  .account-form-card,
+  .empty-state,
+  .empty-card,
+  .receipt-card,
+  .export-card,
+  .analytics-card,
+  .message-card,
+  .app-sidebar,
+  .dynamic-sidebar-library,
+  .dynamic-sidebar-quick-panel
+) {
   background: var(--surface) !important;
   border-color: var(--border) !important;
   color: var(--ink) !important;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22) !important;
 }
 
-/* Raised nested surfaces: toolbars, rows, chips, table headers, and search boxes. */
-html[data-theme="dark"] body:has(main.app-shell) .toolbar-search,
-html[data-theme="dark"] body:has(main.app-shell) .transactions-table thead,
-html[data-theme="dark"] body:has(main.app-shell) .transactions-table th,
-html[data-theme="dark"] body:has(main.app-shell) .tx-period-picker,
-html[data-theme="dark"] body:has(main.app-shell) .tx-period-chip,
-html[data-theme="dark"] body:has(main.app-shell) .scope-select-wrap,
-html[data-theme="dark"] body:has(main.app-shell) .user-pill,
-html[data-theme="dark"] body:has(main.app-shell) .receipt-upload-inline,
-html[data-theme="dark"] body:has(main.app-shell) .sidebar-add-pill,
-html[data-theme="dark"] body:has(main.app-shell) .dynamic-sidebar-manage,
-body.dark:has(main.app-shell) .toolbar-search,
-body.dark:has(main.app-shell) .transactions-table thead,
-body.dark:has(main.app-shell) .transactions-table th,
-body.dark:has(main.app-shell) .tx-period-picker,
-body.dark:has(main.app-shell) .tx-period-chip,
-body.dark:has(main.app-shell) .scope-select-wrap,
-body.dark:has(main.app-shell) .user-pill,
-body.dark:has(main.app-shell) .receipt-upload-inline,
-body.dark:has(main.app-shell) .sidebar-add-pill,
-body.dark:has(main.app-shell) .dynamic-sidebar-manage {
+/* Header/nav surfaces. */
+html[data-theme="dark"] :is(.marketing-header, .auth-header, .app-topbar),
+body.dark :is(.marketing-header, .auth-header, .app-topbar) {
+  background: rgba(15, 23, 39, 0.88) !important;
+  border-color: rgba(196, 206, 221, 0.13) !important;
+  color: var(--ink) !important;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22) !important;
+}
+
+/* Raised nested surfaces: no white pills, chips, table heads, search bars, or price blocks. */
+html[data-theme="dark"] :is(
+  .marketing-nav-sections,
+  .marketing-nav-link,
+  .marketing-nav-sections .marketing-nav-link:hover,
+  .marketing-nav-sections .marketing-nav-link:focus-visible,
+  .button-secondary,
+  .hero-proof-list li,
+  .pricing-toggle,
+  .pricing-toggle-btn,
+  .pricing-toggle-btn.is-active,
+  .pricing-price-block,
+  .toolbar-search,
+  .transactions-table thead,
+  .transactions-table th,
+  .tx-period-picker,
+  .tx-period-chip,
+  .scope-select-wrap,
+  .user-pill,
+  .receipt-upload-inline,
+  .sidebar-add-pill,
+  .dynamic-sidebar-manage
+),
+body.dark :is(
+  .marketing-nav-sections,
+  .marketing-nav-link,
+  .marketing-nav-sections .marketing-nav-link:hover,
+  .marketing-nav-sections .marketing-nav-link:focus-visible,
+  .button-secondary,
+  .hero-proof-list li,
+  .pricing-toggle,
+  .pricing-toggle-btn,
+  .pricing-toggle-btn.is-active,
+  .pricing-price-block,
+  .toolbar-search,
+  .transactions-table thead,
+  .transactions-table th,
+  .tx-period-picker,
+  .tx-period-chip,
+  .scope-select-wrap,
+  .user-pill,
+  .receipt-upload-inline,
+  .sidebar-add-pill,
+  .dynamic-sidebar-manage
+) {
   background: var(--surface2) !important;
   border-color: var(--border) !important;
   color: var(--ink2) !important;
+  box-shadow: none !important;
 }
 
-html[data-theme="dark"] body:has(main.app-shell) .app-topbar,
-body.dark:has(main.app-shell) .app-topbar {
-  background: #0f1727 !important;
-  border-bottom-color: rgba(196, 206, 221, 0.13) !important;
-}
-
-html[data-theme="dark"] body:has(main.app-shell) .app-page-title,
-html[data-theme="dark"] body:has(main.app-shell) h1,
-html[data-theme="dark"] body:has(main.app-shell) h2,
-html[data-theme="dark"] body:has(main.app-shell) h3,
-html[data-theme="dark"] body:has(main.app-shell) h4,
-body.dark:has(main.app-shell) .app-page-title,
-body.dark:has(main.app-shell) h1,
-body.dark:has(main.app-shell) h2,
-body.dark:has(main.app-shell) h3,
-body.dark:has(main.app-shell) h4 {
-  color: var(--ink) !important;
-}
-
-html[data-theme="dark"] body:has(main.app-shell) .app-page-subtitle,
-html[data-theme="dark"] body:has(main.app-shell) .page-subtitle,
-html[data-theme="dark"] body:has(main.app-shell) .transactions-toolbar-subtitle,
-html[data-theme="dark"] body:has(main.app-shell) .stat-label,
-html[data-theme="dark"] body:has(main.app-shell) .stat-delta,
-html[data-theme="dark"] body:has(main.app-shell) .tax-banner-note,
-html[data-theme="dark"] body:has(main.app-shell) .tax-side-meta,
-html[data-theme="dark"] body:has(main.app-shell) .small-note,
-html[data-theme="dark"] body:has(main.app-shell) .muted,
-html[data-theme="dark"] body:has(main.app-shell) .text-muted,
-html[data-theme="dark"] body:has(main.app-shell) small,
-body.dark:has(main.app-shell) .app-page-subtitle,
-body.dark:has(main.app-shell) .page-subtitle,
-body.dark:has(main.app-shell) .transactions-toolbar-subtitle,
-body.dark:has(main.app-shell) .stat-label,
-body.dark:has(main.app-shell) .stat-delta,
-body.dark:has(main.app-shell) .tax-banner-note,
-body.dark:has(main.app-shell) .tax-side-meta,
-body.dark:has(main.app-shell) .small-note,
-body.dark:has(main.app-shell) .muted,
-body.dark:has(main.app-shell) .text-muted,
-body.dark:has(main.app-shell) small {
-  color: var(--ink2) !important;
-}
-
-html[data-theme="dark"] body:has(main.app-shell) input,
-html[data-theme="dark"] body:has(main.app-shell) select,
-html[data-theme="dark"] body:has(main.app-shell) textarea,
-body.dark:has(main.app-shell) input,
-body.dark:has(main.app-shell) select,
-body.dark:has(main.app-shell) textarea {
+/* Dark form fields everywhere, including auth pages. */
+html[data-theme="dark"] :is(input, select, textarea),
+body.dark :is(input, select, textarea) {
   background: var(--input-bg) !important;
   border-color: var(--border2) !important;
   color: var(--ink) !important;
 }
 
-html[data-theme="dark"] body:has(main.app-shell) input::placeholder,
-html[data-theme="dark"] body:has(main.app-shell) textarea::placeholder,
-body.dark:has(main.app-shell) input::placeholder,
-body.dark:has(main.app-shell) textarea::placeholder {
+html[data-theme="dark"] :is(input, textarea)::placeholder,
+body.dark :is(input, textarea)::placeholder {
   color: var(--ink3) !important;
 }
 
-html[data-theme="dark"] body:has(main.app-shell) .sidebar-link,
-html[data-theme="dark"] body:has(main.app-shell) .dynamic-sidebar-link,
-body.dark:has(main.app-shell) .sidebar-link,
-body.dark:has(main.app-shell) .dynamic-sidebar-link {
+/* Text hierarchy. */
+html[data-theme="dark"] :is(h1, h2, h3, h4, .app-page-title, .page-title, .section-heading h2, .hero h1, .pricing-tier-name, .brand-text, .brand-text-dark),
+body.dark :is(h1, h2, h3, h4, .app-page-title, .page-title, .section-heading h2, .hero h1, .pricing-tier-name, .brand-text, .brand-text-dark) {
+  color: var(--ink) !important;
+}
+
+html[data-theme="dark"] :is(
+  p,
+  label,
+  small,
+  .app-page-subtitle,
+  .page-subtitle,
+  .section-subtitle,
+  .hero-lede,
+  .hero-cta-note,
+  .hero-support-note,
+  .pricing-tier-desc,
+  .faq-item p,
+  .auth-page-intro,
+  .auth-trust-copy,
+  .auth-support-note,
+  .transactions-toolbar-subtitle,
+  .stat-label,
+  .stat-delta,
+  .tax-banner-note,
+  .tax-side-meta,
+  .small-note,
+  .muted,
+  .text-muted,
+  .marketing-footer,
+  .marketing-footer a
+),
+body.dark :is(
+  p,
+  label,
+  small,
+  .app-page-subtitle,
+  .page-subtitle,
+  .section-subtitle,
+  .hero-lede,
+  .hero-cta-note,
+  .hero-support-note,
+  .pricing-tier-desc,
+  .faq-item p,
+  .auth-page-intro,
+  .auth-trust-copy,
+  .auth-support-note,
+  .transactions-toolbar-subtitle,
+  .stat-label,
+  .stat-delta,
+  .tax-banner-note,
+  .tax-side-meta,
+  .small-note,
+  .muted,
+  .text-muted,
+  .marketing-footer,
+  .marketing-footer a
+) {
   color: var(--ink2) !important;
 }
 
-html[data-theme="dark"] body:has(main.app-shell) .sidebar-link:hover,
-html[data-theme="dark"] body:has(main.app-shell) .dynamic-sidebar-link:hover,
-body.dark:has(main.app-shell) .sidebar-link:hover,
-body.dark:has(main.app-shell) .dynamic-sidebar-link:hover {
-  background: var(--surface2) !important;
-  color: var(--ink) !important;
+html[data-theme="dark"] a,
+body.dark a {
+  color: var(--accent2) !important;
 }
 
 /* Buttons and CTAs: no white buttons in dark mode. */
-html[data-theme="dark"] body:has(main.app-shell) button,
-html[data-theme="dark"] body:has(main.app-shell) .button,
-html[data-theme="dark"] body:has(main.app-shell) .btn,
-html[data-theme="dark"] body:has(main.app-shell) .toolbar-import-button,
-html[data-theme="dark"] body:has(main.app-shell) .toolbar-add-button,
-html[data-theme="dark"] body:has(main.app-shell) .page-add-button,
-html[data-theme="dark"] body:has(main.app-shell) .receipt-upload-button,
-body.dark:has(main.app-shell) button,
-body.dark:has(main.app-shell) .button,
-body.dark:has(main.app-shell) .btn,
-body.dark:has(main.app-shell) .toolbar-import-button,
-body.dark:has(main.app-shell) .toolbar-add-button,
-body.dark:has(main.app-shell) .page-add-button,
-body.dark:has(main.app-shell) .receipt-upload-button {
+html[data-theme="dark"] :is(button, .button, .btn, .auth-submit, .auth-secondary-btn, .toolbar-import-button, .toolbar-add-button, .page-add-button, .receipt-upload-button, .pricing-cta-btn, .marketing-nav-cta),
+body.dark :is(button, .button, .btn, .auth-submit, .auth-secondary-btn, .toolbar-import-button, .toolbar-add-button, .page-add-button, .receipt-upload-button, .pricing-cta-btn, .marketing-nav-cta) {
   background: var(--surface2) !important;
   border-color: var(--border2) !important;
   color: var(--ink) !important;
+  box-shadow: none !important;
 }
 
-html[data-theme="dark"] body:has(main.app-shell) .primary-btn,
-html[data-theme="dark"] body:has(main.app-shell) .btn-primary,
-html[data-theme="dark"] body:has(main.app-shell) button.primary,
-html[data-theme="dark"] body:has(main.app-shell) .drawer-submit,
-html[data-theme="dark"] body:has(main.app-shell) .page-add-button,
-html[data-theme="dark"] body:has(main.app-shell) [data-upgrade],
-body.dark:has(main.app-shell) .primary-btn,
-body.dark:has(main.app-shell) .btn-primary,
-body.dark:has(main.app-shell) button.primary,
-body.dark:has(main.app-shell) .drawer-submit,
-body.dark:has(main.app-shell) .page-add-button,
-body.dark:has(main.app-shell) [data-upgrade] {
+html[data-theme="dark"] :is(.button-primary, .primary-btn, .btn-primary, button.primary, .auth-submit, .drawer-submit, .page-add-button, .pricing-cta-btn, .marketing-nav-cta, [data-upgrade]),
+body.dark :is(.button-primary, .primary-btn, .btn-primary, button.primary, .auth-submit, .drawer-submit, .page-add-button, .pricing-cta-btn, .marketing-nav-cta, [data-upgrade]) {
   background: var(--cta-gradient) !important;
   border-color: transparent !important;
   color: #0a0f19 !important;
   box-shadow: 0 14px 26px rgba(143, 162, 255, 0.18) !important;
 }
 
-html[data-theme="dark"] body:has(main.app-shell) a,
-body.dark:has(main.app-shell) a {
+html[data-theme="dark"] :is(.hero-kicker, .section-eyebrow, .pricing-tier-kicker, .problem-number, .auth-trust-kicker),
+body.dark :is(.hero-kicker, .section-eyebrow, .pricing-tier-kicker, .problem-number, .auth-trust-kicker) {
+  background: var(--accent-light) !important;
+  border-color: rgba(143, 162, 255, 0.22) !important;
   color: var(--accent2) !important;
 }
 
-html[data-theme="dark"] body:has(main.app-shell) .transactions-table td,
-html[data-theme="dark"] body:has(main.app-shell) .transactions-table th,
-body.dark:has(main.app-shell) .transactions-table td,
-body.dark:has(main.app-shell) .transactions-table th {
+html[data-theme="dark"] :is(.transactions-table td, .transactions-table th),
+body.dark :is(.transactions-table td, .transactions-table th) {
   border-color: var(--border) !important;
   color: var(--ink2) !important;
 }
