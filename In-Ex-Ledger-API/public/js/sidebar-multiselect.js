@@ -1,12 +1,16 @@
 /* Quick Add multi-select UX
    Keeps the sidebar Add library open while users add multiple shortcuts.
    The library only closes when the user clicks the Done button.
+
+   Important: do not observe/rewrite the dynamic sidebar render cycle. global.js
+   owns the sidebar markup and re-renders it after each add/remove. This file
+   only preserves the user's open/closed intent after those renders complete.
 */
 (function () {
-  const OPEN_STATE = "true";
+  let shouldKeepLibraryOpen = false;
 
-  function getSidebarFromNode(node) {
-    return node?.closest?.(".app-sidebar--dynamic") || document.querySelector(".app-sidebar--dynamic");
+  function getSidebar() {
+    return document.querySelector(".app-sidebar--dynamic");
   }
 
   function getLibrary(sidebar) {
@@ -17,49 +21,36 @@
     return sidebar?.querySelector?.("[data-sidebar-manage]") || null;
   }
 
-  function openLibrary(sidebar) {
+  function openLibrary() {
+    const sidebar = getSidebar();
     const library = getLibrary(sidebar);
     const manageButton = getManageButton(sidebar);
     if (!sidebar || !library || !manageButton) return;
 
-    sidebar.dataset.sidebarLibraryOpen = OPEN_STATE;
     library.hidden = false;
     manageButton.setAttribute("aria-expanded", "true");
     manageButton.textContent = "Done";
   }
 
-  function closeLibrary(sidebar) {
+  function closeLibrary() {
+    const sidebar = getSidebar();
     const library = getLibrary(sidebar);
     const manageButton = getManageButton(sidebar);
     if (!sidebar || !library || !manageButton) return;
 
-    delete sidebar.dataset.sidebarLibraryOpen;
     library.hidden = true;
     manageButton.setAttribute("aria-expanded", "false");
     manageButton.textContent = "Add";
   }
 
-  function restoreOpenLibrary(sidebar) {
-    if (!sidebar || sidebar.dataset.sidebarLibraryOpen !== OPEN_STATE) return;
-    openLibrary(sidebar);
-  }
+  function restoreOpenStateAfterRender() {
+    if (!shouldKeepLibraryOpen) return;
 
-  function observeSidebar(sidebar) {
-    if (!sidebar || sidebar.dataset.sidebarMultiSelectObserved === "true") return;
-    sidebar.dataset.sidebarMultiSelectObserved = "true";
-
-    const observer = new MutationObserver(() => {
-      restoreOpenLibrary(sidebar);
-    });
-
-    observer.observe(sidebar, {
-      childList: true,
-      subtree: true
-    });
-  }
-
-  function observeExistingSidebars() {
-    document.querySelectorAll(".app-sidebar--dynamic").forEach(observeSidebar);
+    // global.js may re-render the sidebar immediately after the click handler.
+    // Run after the current event and again on the next frame so the new markup
+    // is present before we reopen the library.
+    window.setTimeout(openLibrary, 0);
+    window.requestAnimationFrame(openLibrary);
   }
 
   document.addEventListener("click", (event) => {
@@ -68,36 +59,23 @@
 
     if (!manageButton && !addButton) return;
 
-    const sidebar = getSidebarFromNode(event.target);
-    if (!sidebar) return;
-
-    if (manageButton) {
-      window.requestAnimationFrame(() => {
-        const isOpen = manageButton.getAttribute("aria-expanded") === "true";
-        if (isOpen) {
-          openLibrary(sidebar);
-        } else {
-          closeLibrary(sidebar);
-        }
-      });
+    if (addButton) {
+      shouldKeepLibraryOpen = true;
+      restoreOpenStateAfterRender();
       return;
     }
 
-    if (addButton) {
-      sidebar.dataset.sidebarLibraryOpen = OPEN_STATE;
-      window.requestAnimationFrame(() => openLibrary(sidebar));
-    }
-  });
+    // Add/Done button: let global.js toggle first, then mirror that final state.
+    window.requestAnimationFrame(() => {
+      const currentManageButton = getManageButton(getSidebar());
+      const isOpen = currentManageButton?.getAttribute("aria-expanded") === "true";
 
-  const rootObserver = new MutationObserver(observeExistingSidebars);
-  rootObserver.observe(document.documentElement, {
-    childList: true,
-    subtree: true
+      shouldKeepLibraryOpen = Boolean(isOpen);
+      if (shouldKeepLibraryOpen) {
+        openLibrary();
+      } else {
+        closeLibrary();
+      }
+    });
   });
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", observeExistingSidebars, { once: true });
-  } else {
-    observeExistingSidebars();
-  }
 })();
