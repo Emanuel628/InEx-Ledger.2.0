@@ -38,6 +38,7 @@ router.use('/me', require('./me.routes.js'));
 router.use('/crypto', require('./crypto.routes.js'));
 router.use('/privacy', require('./privacy.routes.js'));
 router.use('/region', require('./region.routes.js'));
+router.use('/entitlements', require('./entitlements.routes.js'));
 router.use('/mileage', require('./mileage.routes.js'));
 router.use('/sessions', require('./sessions.routes.js'));
 router.use('/billing', require('./billing-checkout-overrides.routes.js'));
