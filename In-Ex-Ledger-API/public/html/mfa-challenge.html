@@ -46,8 +46,11 @@
 
         <label class="auth-checkbox">
           <input type="checkbox" id="mfaTrustDevice" checked />
-          <span data-i18n="mfa_challenge_trust_device">Trust this device</span>
+          <span data-i18n="mfa_challenge_trust_device">Trust this device for this account</span>
         </label>
+        <p class="auth-helper" data-i18n="mfa_challenge_trust_helper">
+          You may need to verify again when signing into a different InEx Ledger account on this device.
+        </p>
 
         <button type="submit" class="auth-submit" data-i18n="mfa_challenge_submit">Verify and continue</button>
         <button type="button" id="mfaChallengeBack" class="auth-secondary-btn" data-i18n="mfa_challenge_back">Back to sign in</button>
