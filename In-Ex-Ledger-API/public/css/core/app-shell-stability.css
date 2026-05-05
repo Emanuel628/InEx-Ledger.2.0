@@ -16,6 +16,129 @@ body:has(main.app-shell) {
     var(--page-bleed, var(--page-bg, #f8fafc)) !important;
 }
 
+/* Dark mode contrast stabilization.
+   Some page CSS still paints white/light cards while global tokens switch text
+   to dark-mode muted grays. Force authenticated app pages onto a consistent
+   dark canvas/surface system so muted text is never placed on white panels. */
+html[data-theme="dark"] body:has(main.app-shell),
+body.dark:has(main.app-shell) {
+  --ink: #f8fafc;
+  --ink2: #cbd5e1;
+  --ink3: #94a3b8;
+  --text-main: var(--ink);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink2);
+  --text-muted: var(--ink3);
+  --surface: #111827;
+  --surface2: #172033;
+  --surface3: #22304a;
+  --card-bg: var(--surface);
+  --bg-surface: var(--surface);
+  --input-bg: #0f172a;
+  --panel-bg: rgba(17, 24, 39, 0.96);
+  --card-bg-strong: rgba(17, 24, 39, 0.96);
+  --border: rgba(148, 163, 184, 0.18);
+  --border2: rgba(203, 213, 225, 0.26);
+  --page-bg: #08111f;
+  --page-bleed:
+    radial-gradient(circle at 10% 0%, rgba(96, 165, 250, 0.13), transparent 28%),
+    radial-gradient(circle at 88% 10%, rgba(129, 140, 248, 0.10), transparent 26%),
+    #08111f;
+  background: var(--page-bleed) !important;
+  color: var(--ink) !important;
+}
+
+html[data-theme="dark"] body:has(main.app-shell) main,
+html[data-theme="dark"] body:has(main.app-shell) main.app-shell,
+html[data-theme="dark"] body:has(main.app-shell) .app-page,
+body.dark:has(main.app-shell) main,
+body.dark:has(main.app-shell) main.app-shell,
+body.dark:has(main.app-shell) .app-page {
+  background: transparent !important;
+  color: var(--ink) !important;
+}
+
+html[data-theme="dark"] body:has(main.app-shell) section,
+html[data-theme="dark"] body:has(main.app-shell) .card,
+html[data-theme="dark"] body:has(main.app-shell) .tx-card,
+html[data-theme="dark"] body:has(main.app-shell) .settings-section,
+html[data-theme="dark"] body:has(main.app-shell) .panel,
+html[data-theme="dark"] body:has(main.app-shell) .history-card,
+html[data-theme="dark"] body:has(main.app-shell) .account-form-card,
+html[data-theme="dark"] body:has(main.app-shell) .app-sidebar,
+html[data-theme="dark"] body:has(main.app-shell) .dynamic-sidebar-quick-panel,
+body.dark:has(main.app-shell) section,
+body.dark:has(main.app-shell) .card,
+body.dark:has(main.app-shell) .tx-card,
+body.dark:has(main.app-shell) .settings-section,
+body.dark:has(main.app-shell) .panel,
+body.dark:has(main.app-shell) .history-card,
+body.dark:has(main.app-shell) .account-form-card,
+body.dark:has(main.app-shell) .app-sidebar,
+body.dark:has(main.app-shell) .dynamic-sidebar-quick-panel {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--ink) !important;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22) !important;
+}
+
+html[data-theme="dark"] body:has(main.app-shell) input,
+html[data-theme="dark"] body:has(main.app-shell) select,
+html[data-theme="dark"] body:has(main.app-shell) textarea,
+body.dark:has(main.app-shell) input,
+body.dark:has(main.app-shell) select,
+body.dark:has(main.app-shell) textarea {
+  background: var(--input-bg) !important;
+  border-color: var(--border2) !important;
+  color: var(--ink) !important;
+}
+
+html[data-theme="dark"] body:has(main.app-shell) input::placeholder,
+html[data-theme="dark"] body:has(main.app-shell) textarea::placeholder,
+body.dark:has(main.app-shell) input::placeholder,
+body.dark:has(main.app-shell) textarea::placeholder {
+  color: #7f8fa6 !important;
+}
+
+html[data-theme="dark"] body:has(main.app-shell) .app-page-title,
+html[data-theme="dark"] body:has(main.app-shell) h1,
+html[data-theme="dark"] body:has(main.app-shell) h2,
+html[data-theme="dark"] body:has(main.app-shell) h3,
+body.dark:has(main.app-shell) .app-page-title,
+body.dark:has(main.app-shell) h1,
+body.dark:has(main.app-shell) h2,
+body.dark:has(main.app-shell) h3 {
+  color: var(--ink) !important;
+}
+
+html[data-theme="dark"] body:has(main.app-shell) .app-page-subtitle,
+html[data-theme="dark"] body:has(main.app-shell) .page-subtitle,
+html[data-theme="dark"] body:has(main.app-shell) .muted,
+html[data-theme="dark"] body:has(main.app-shell) .text-muted,
+html[data-theme="dark"] body:has(main.app-shell) small,
+body.dark:has(main.app-shell) .app-page-subtitle,
+body.dark:has(main.app-shell) .page-subtitle,
+body.dark:has(main.app-shell) .muted,
+body.dark:has(main.app-shell) .text-muted,
+body.dark:has(main.app-shell) small {
+  color: var(--ink2) !important;
+}
+
+html[data-theme="dark"] body:has(main.app-shell) .sidebar-link,
+html[data-theme="dark"] body:has(main.app-shell) .dynamic-sidebar-link,
+body.dark:has(main.app-shell) .sidebar-link,
+body.dark:has(main.app-shell) .dynamic-sidebar-link {
+  color: var(--ink2) !important;
+}
+
+html[data-theme="dark"] body:has(main.app-shell) .sidebar-link:hover,
+html[data-theme="dark"] body:has(main.app-shell) .dynamic-sidebar-link:hover,
+body.dark:has(main.app-shell) .sidebar-link:hover,
+body.dark:has(main.app-shell) .dynamic-sidebar-link:hover {
+  background: var(--surface2) !important;
+  color: var(--ink) !important;
+}
+
 /* Topbar nav is rendered canonically by global.js. Do not show the per-page
    hardcoded nav while the script is preparing the canonical nav. */
 .app-topbar .topbar-nav:not(.is-ready) {
@@ -143,6 +266,14 @@ body:has(main.app-shell)::before {
     var(--page-bleed, var(--page-bg, #f8fafc));
   opacity: 1;
   pointer-events: none;
+}
+
+html[data-theme="dark"] body:has(main.app-shell)::before,
+body.dark:has(main.app-shell)::before {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(96, 165, 250, 0.17), transparent 30%),
+    linear-gradient(180deg, rgba(8, 17, 31, 0.88), rgba(8, 17, 31, 0.96)),
+    #08111f;
 }
 
 /* Tiny Chrome-dino-style loader: simple, quiet, and CSS-only. */
