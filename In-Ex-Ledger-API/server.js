@@ -125,6 +125,21 @@ function injectGlobalBehaviorPatches(pageName, html) {
   return `${html}\n${scriptTag}`;
 }
 
+function injectFinalDarkModeStylesheet(html) {
+  if (typeof html !== 'string' || html.includes('/css/core/dark-mode.css?v=20260505c')) {
+    return html;
+  }
+  const linkTag = '  <link rel="stylesheet" href="/css/core/dark-mode.css?v=20260505c">\n';
+  if (/<\/head>/i.test(html)) {
+    return html.replace(/<\/head>/i, `${linkTag}</head>`);
+  }
+  return `${linkTag}${html}`;
+}
+
+function prepareCanonicalHtml(pageName, html) {
+  return injectGlobalBehaviorPatches(pageName, injectFinalDarkModeStylesheet(html));
+}
+
 function sendCanonicalPage(pageName, req, res) {
   const fileName = `${pageName}.html`;
   const filePath = path.join(htmlDir, fileName);
@@ -137,7 +152,7 @@ function sendCanonicalPage(pageName, req, res) {
       });
       return res.status(404).send('Not Found');
     }
-    res.type('html').send(injectGlobalBehaviorPatches(pageName, html));
+    res.type('html').send(prepareCanonicalHtml(pageName, html));
   });
 }
 
