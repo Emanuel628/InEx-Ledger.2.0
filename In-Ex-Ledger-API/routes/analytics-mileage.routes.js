@@ -28,38 +28,23 @@ async function getMileageColumnMode() {
   if (cachedMileageColumnModePromise) {
     return cachedMileageColumnModePromise;
   }
-
   cachedMileageColumnModePromise = pool.query(
-    `SELECT column_name
-       FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = 'mileage'
-        AND column_name IN ('date', 'trip_date')`
+    `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'mileage' AND column_name IN ('date', 'trip_date')`
   ).then(({ rows }) => {
     const columns = new Set(rows.map((row) => row.column_name));
-    cachedMileageColumnMode = {
-      hasDate: columns.has("date"),
-      hasTripDate: columns.has("trip_date")
-    };
+    cachedMileageColumnMode = { hasDate: columns.has("date"), hasTripDate: columns.has("trip_date") };
     cachedMileageColumnFetchedAt = Date.now();
     return cachedMileageColumnMode;
   }).finally(() => {
     cachedMileageColumnModePromise = null;
   });
-
   return cachedMileageColumnModePromise;
 }
 
 function mileageDateSelect(mode) {
-  if (mode.hasTripDate && mode.hasDate) {
-    return "COALESCE(trip_date, date)";
-  }
-  if (mode.hasTripDate) {
-    return "trip_date";
-  }
-  if (mode.hasDate) {
-    return "date";
-  }
+  if (mode.hasTripDate && mode.hasDate) return "COALESCE(trip_date, date)";
+  if (mode.hasTripDate) return "trip_date";
+  if (mode.hasDate) return "date";
   throw new Error("Mileage table is missing both date and trip_date columns.");
 }
 
@@ -71,26 +56,13 @@ router.get("/mileage", async (req, res) => {
       return res.status(404).json({ error: "Not found" });
     }
 
-    const mileageColumns = await getMileageColumnMode();
-    const dateSelect = mileageDateSelect(mileageColumns);
-
+    const dateSelect = mileageDateSelect(await getMileageColumnMode());
     const mileageResult = await pool.query(
-      `SELECT COUNT(*) AS trip_count,
-              COALESCE(SUM(COALESCE(miles, 0)), 0) AS total_miles,
-              COALESCE(SUM(COALESCE(km, 0)), 0) AS total_km,
-              MAX(${dateSelect}) AS last_trip_date
-         FROM mileage
-        WHERE business_id = $1`,
+      `SELECT COUNT(*) AS trip_count, COALESCE(SUM(COALESCE(miles, 0)), 0) AS total_miles, COALESCE(SUM(COALESCE(km, 0)), 0) AS total_km, MAX(${dateSelect}) AS last_trip_date FROM mileage WHERE business_id = $1`,
       [businessId]
     );
-
     const costsResult = await pool.query(
-      `SELECT COALESCE(SUM(CASE WHEN entry_type = 'expense' THEN amount ELSE 0 END), 0) AS vehicle_expense_total,
-              COALESCE(SUM(CASE WHEN entry_type = 'maintenance' THEN amount ELSE 0 END), 0) AS maintenance_total,
-              COUNT(*) AS cost_count,
-              MAX(entry_date) AS last_cost_date
-         FROM vehicle_costs
-        WHERE business_id = $1`,
+      `SELECT COALESCE(SUM(CASE WHEN entry_type = 'expense' THEN amount ELSE 0 END), 0) AS vehicle_expense_total, COALESCE(SUM(CASE WHEN entry_type = 'maintenance' THEN amount ELSE 0 END), 0) AS maintenance_total, COUNT(*) AS cost_count, MAX(entry_date) AS last_cost_date FROM vehicle_costs WHERE business_id = $1`,
       [businessId]
     );
 
