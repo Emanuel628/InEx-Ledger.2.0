@@ -1,0 +1,16 @@
+/* Currency value fit rules.
+   CAD labels such as CA$ can be wider than USD, especially on mobile cards. */
+:is(.card, .settings-card, .billing-card, .subscription-card, .summary-card, .kpi-card, .stat-card, .analytics-card, .account-card, .balance-card) :is(.amount, .balance, .price, .money, .currency, .kpi-value, .stat-value, [data-price-amount], [data-currency-amount]) {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.05;
+}
+
+@media (max-width: 767px) {
+  :is(.card, .settings-card, .billing-card, .subscription-card, .summary-card, .kpi-card, .stat-card, .analytics-card, .account-card, .balance-card) :is(.amount, .balance, .price, .money, .currency, .kpi-value, .stat-value, [data-price-amount], [data-currency-amount]) {
+    font-size: clamp(1.5rem, 9vw, 2.5rem);
+    letter-spacing: -0.045em;
+  }
+}
