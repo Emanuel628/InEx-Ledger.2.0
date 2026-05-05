@@ -6,8 +6,8 @@
 
    In that state, the user is not starting a brand-new paid subscription yet;
    they are changing the selected post-trial plan back to Pro. Intercept the Pro
-   CTA and use the dedicated reactivation endpoint so they do not have to wait
-   for trial expiry.
+   CTA only when the loaded subscription state proves this is the downgraded
+   trial case. Otherwise leave the normal checkout flow alone.
 */
 (function () {
   let cachedSubscription = null;
@@ -88,35 +88,18 @@
     }
   }
 
-  async function handleProClick(event) {
-    const button = event.target?.closest?.("#planProBtn");
-    if (!button || !isSubscriptionPage()) return;
-
-    const subscription = await loadSubscription();
-    if (!isTrialDowngradedToBasic(subscription)) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    await reactivateTrial(button);
-  }
-
   document.addEventListener("click", (event) => {
     const button = event.target?.closest?.("#planProBtn");
     if (!button || !isSubscriptionPage()) return;
 
-    // Capture the click before subscription.js opens checkout. We wait for the
-    // subscription fetch and only cancel the normal flow when this is the
-    // downgraded-trial state.
+    if (!isTrialDowngradedToBasic(cachedSubscription)) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
-    handleProClick(event).then(async () => {
-      const subscription = await loadSubscription();
-      if (!isTrialDowngradedToBasic(subscription)) {
-        button.click();
-      }
-    });
+    reactivateTrial(button);
   }, true);
 
   if (document.readyState === "loading") {
