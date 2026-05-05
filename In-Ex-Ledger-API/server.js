@@ -1,4 +1,4 @@
-﻿// Startup check for required environment variables
+// Startup check for required environment variables
 const REQUIRED_ENV_VARS = [
   'DATABASE_URL',
   'JWT_SECRET',
@@ -111,11 +111,34 @@ function isBlockedV2PageRequest(requestPath) {
   return V2_HTML_PAGES.has(pageName);
 }
 
+function injectGlobalBehaviorPatches(pageName, html) {
+  if (pageName === 'landing' || typeof html !== 'string') {
+    return html;
+  }
+  if (html.includes('/js/global-patches.js')) {
+    return html;
+  }
+  const scriptTag = '  <script src="/js/global-patches.js?v=20260505a" defer></script>\n';
+  if (/<\/body>/i.test(html)) {
+    return html.replace(/<\/body>/i, `${scriptTag}</body>`);
+  }
+  return `${html}\n${scriptTag}`;
+}
+
 function sendCanonicalPage(pageName, req, res) {
   const fileName = `${pageName}.html`;
   const filePath = path.join(htmlDir, fileName);
   setStaticAssetCacheHeaders(res, filePath);
-  res.sendFile(filePath);
+  fs.readFile(filePath, 'utf8', (err, html) => {
+    if (err) {
+      logError('Failed to serve canonical page', {
+        pageName,
+        message: err?.message || String(err)
+      });
+      return res.status(404).send('Not Found');
+    }
+    res.type('html').send(injectGlobalBehaviorPatches(pageName, html));
+  });
 }
 
 /* =========================================================
