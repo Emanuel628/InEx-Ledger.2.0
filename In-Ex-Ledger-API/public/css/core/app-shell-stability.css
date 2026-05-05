@@ -75,25 +75,22 @@ body:has(main.app-shell)::before {
   pointer-events: none;
 }
 
+/* Tiny Chrome-dino-style loader: simple, quiet, and CSS-only. */
 body:has(main.app-shell)::after {
-  content: "InEx Ledger";
+  content: "🦆";
   position: fixed;
   left: 50%;
   top: 50%;
   z-index: 9999;
   transform: translate(-50%, -50%);
-  width: min(340px, calc(100vw - 48px));
-  min-height: 132px;
   display: grid;
   place-items: center;
-  border: 0.5px solid rgba(148, 163, 184, 0.28);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+  width: 54px;
+  height: 54px;
   color: var(--ink, #0f172a);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 34px;
+  line-height: 1;
+  filter: grayscale(0.15) saturate(0.9);
   pointer-events: none;
 }
 
@@ -103,17 +100,33 @@ body:has(main.app-shell):has(.app-topbar .topbar-nav.is-ready)::after {
   visibility: hidden;
 }
 
-@supports (backdrop-filter: blur(18px)) {
-  body:has(main.app-shell)::after {
-    backdrop-filter: blur(18px);
-  }
-}
-
 @media (prefers-reduced-motion: no-preference) {
+  body:has(main.app-shell)::after {
+    animation: inex-duck-takeoff 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
   body:has(main.app-shell) main.app-shell,
   body:has(main.app-shell) .app-topbar,
   body:has(main.app-shell)::before,
   body:has(main.app-shell)::after {
     transition: opacity 160ms ease, visibility 160ms ease;
+  }
+}
+
+@keyframes inex-duck-takeoff {
+  0% {
+    transform: translate(-50%, -50%) translateY(6px) rotate(-4deg) scale(0.92);
+  }
+
+  38% {
+    transform: translate(-50%, -50%) translateY(0) rotate(3deg) scale(1);
+  }
+
+  72% {
+    transform: translate(-50%, -50%) translate(18px, -18px) rotate(-8deg) scale(1.04);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) translate(28px, -30px) rotate(-10deg) scale(1);
   }
 }
