@@ -1,12 +1,20 @@
-/* App shell + page paint stability fixes
-   Prevent the browser from showing temporary static/default page chrome before
-   global.js, auth.js, and the page-specific JS hydrate the real app state.
+/* App shell + page paint stability
+   Goal: app pages should never flash stale/default HTML and should never show
+   a plain white loading frame. They should hold a calm branded loading surface
+   until global.js has normalized the shared app shell.
 
-   Root cause: the app pages are static HTML first, then JavaScript performs
-   auth/profile validation, business hydration, and page data rendering after
-   DOMContentLoaded. Without a paint gate, users can briefly see the default
-   server HTML version of the entire page before the hydrated version appears.
+   This is scoped to authenticated app pages using main.app-shell. Marketing,
+   login, register, and onboarding pages are not affected unless they opt into
+   the app shell layout.
 */
+
+/* Keep the body on the app canvas immediately, even before page hydration. */
+body:has(main.app-shell) {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(99, 102, 241, 0.08), transparent 30%),
+    radial-gradient(circle at 88% 8%, rgba(37, 99, 235, 0.06), transparent 26%),
+    var(--page-bleed, var(--page-bg, #f8fafc)) !important;
+}
 
 /* Topbar nav is rendered canonically by global.js. Do not show the per-page
    hardcoded nav while the script is preparing the canonical nav. */
@@ -40,33 +48,72 @@
   }
 }
 
-/* Full-page hydration gate.
-   This intentionally targets app pages only, not landing/login/register.
-   It prevents the entire static/default app page from flashing before the
-   page scripts replace it with authenticated, business-scoped data. */
-body:has(main.app-shell) main.app-shell {
-  opacity: 0;
-  animation: inex-app-page-hydrated 760ms steps(1, end) forwards;
-}
-
+/* Real loading surface, not a white flash.
+   The app content is held until the canonical nav is ready. This ties reveal to
+   the actual shell normalization signal instead of a blind white delay. */
+body:has(main.app-shell) main.app-shell,
 body:has(main.app-shell) .app-topbar {
   opacity: 0;
-  animation: inex-app-page-hydrated 760ms steps(1, end) forwards;
 }
 
-@keyframes inex-app-page-hydrated {
-  0%, 99% {
-    opacity: 0;
-  }
+body:has(main.app-shell):has(.app-topbar .topbar-nav.is-ready) main.app-shell,
+body:has(main.app-shell):has(.app-topbar .topbar-nav.is-ready) .app-topbar {
+  opacity: 1;
+}
 
-  100% {
-    opacity: 1;
+/* Full-screen boot surface shown only while the app shell is normalizing. */
+body:has(main.app-shell)::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.11), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(248, 250, 252, 0.94)),
+    var(--page-bleed, var(--page-bg, #f8fafc));
+  opacity: 1;
+  pointer-events: none;
+}
+
+body:has(main.app-shell)::after {
+  content: "InEx Ledger";
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  width: min(340px, calc(100vw - 48px));
+  min-height: 132px;
+  display: grid;
+  place-items: center;
+  border: 0.5px solid rgba(148, 163, 184, 0.28);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+  color: var(--ink, #0f172a);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  pointer-events: none;
+}
+
+body:has(main.app-shell):has(.app-topbar .topbar-nav.is-ready)::before,
+body:has(main.app-shell):has(.app-topbar .topbar-nav.is-ready)::after {
+  opacity: 0;
+  visibility: hidden;
+}
+
+@supports (backdrop-filter: blur(18px)) {
+  body:has(main.app-shell)::after {
+    backdrop-filter: blur(18px);
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: no-preference) {
   body:has(main.app-shell) main.app-shell,
-  body:has(main.app-shell) .app-topbar {
-    animation-duration: 520ms;
+  body:has(main.app-shell) .app-topbar,
+  body:has(main.app-shell)::before,
+  body:has(main.app-shell)::after {
+    transition: opacity 160ms ease, visibility 160ms ease;
   }
 }
