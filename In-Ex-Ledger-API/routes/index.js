@@ -1,91 +1,53 @@
-
 const express = require('express');
 const router = express.Router();
 const arApService = require('../services/arApService');
-const {
-  allowTrustedBrowserAccountSwitch,
-  rememberTrustedBrowserOnLogout
-} = require('../middleware/accountSwitchMfaTrust.js');
+const { allowTrustedBrowserAccountSwitch, rememberTrustedBrowserOnLogout } = require('../middleware/accountSwitchMfaTrust.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled.js');
 
 router.use('/auth/login', allowTrustedBrowserAccountSwitch);
 router.use('/auth/logout', rememberTrustedBrowserOnLogout);
 
-// AR/AP summary endpoint (feature-flagged)
 router.get('/arap-summary', requireV2BusinessEnabled, requireV2Entitlement, async (req, res) => {
-	const businessId = req.business.id;
-	try {
-		const summary = await arApService.getArApSummary(businessId);
-		res.json(summary);
-	} catch (err) {
-		res.status(500).json({ error: 'Failed to load AR/AP summary.' });
-	}
+  try {
+    res.json(await arApService.getArApSummary(req.business.id));
+  } catch (_) {
+    res.status(500).json({ error: 'Failed to load AR/AP summary.' });
+  }
 });
-// V2/Business modules (feature-flagged)
-const vendorsRoutes = require('./vendors.routes');
-const customersRoutes = require('./customers.routes');
-const invoicesRoutes = require('./invoices.routes');
-const billsRoutes = require('./bills.routes');
-const projectsRoutes = require('./projects.routes');
-const billableExpensesRoutes = require('./billable-expenses.routes');
-// Feature flag for V2/Business modules
-const ENABLE_V2_BUSINESS = process.env.ENABLE_V2_BUSINESS === 'true';
 
+const ENABLE_V2_BUSINESS = process.env.ENABLE_V2_BUSINESS === 'true';
 if (ENABLE_V2_BUSINESS) {
-	router.use('/vendors', vendorsRoutes);
-	router.use('/customers', customersRoutes);
-	router.use('/invoices', invoicesRoutes);
-	router.use('/bills', billsRoutes);
-	router.use('/projects', projectsRoutes);
-	router.use('/billable-expenses', billableExpensesRoutes);
+  router.use('/vendors', require('./vendors.routes'));
+  router.use('/customers', require('./customers.routes'));
+  router.use('/invoices', require('./invoices.routes'));
+  router.use('/bills', require('./bills.routes'));
+  router.use('/projects', require('./projects.routes'));
+  router.use('/billable-expenses', require('./billable-expenses.routes'));
 }
 
-const authRoutes = require('./auth.routes.js');
-const accountsRoutes = require('./accounts.routes.js');
-const receiptsRoutes = require('./receipts.routes.js');
-const categoriesRoutes = require('./categories.routes.js');
-const exportsRoutes = require('./exports.routes.js');
-const businessRoutes = require('./business.routes.js');
-const systemRoutes = require('./system.routes.js');
-const meRoutes = require('./me.routes.js');
-const cryptoRoutes = require('./crypto.routes.js');
-const privacyRoutes = require('./privacy.routes.js');
-const mileageRoutes = require('./mileage.routes.js');
-const sessionsRoutes = require('./sessions.routes.js');
-const billingCheckoutOverridesRoutes = require('./billing-checkout-overrides.routes.js');
-const billingRoutes = require('./billing.routes.js');
-const recurringRoutes = require('./recurring.routes.js');
-const businessesRoutes = require('./businesses.routes.js');
-const cpaAccessRoutes = require('./cpa-access.routes.js');
-const cpaVerificationRoutes = require('./cpa-verification.routes.js');
-const analyticsRoutes = require('./analytics.routes.js');
-const invoicesV1Routes = require('./invoices-v1.routes.js');
-const messagesRoutes = require('./messages.routes.js');
-const consentRoutes = require('./consent.routes.js');
-const checkEmailVerifiedRoutes = require('./check-email-verified.routes.js');
-
-router.use('/auth', authRoutes);
-router.use('/accounts', accountsRoutes);
-router.use('/receipts', receiptsRoutes);
-router.use('/categories', categoriesRoutes);
-router.use('/exports', exportsRoutes);
-router.use('/business', businessRoutes);
-router.use('/system', systemRoutes);
-router.use('/me', meRoutes);
-router.use('/crypto', cryptoRoutes);
-router.use('/privacy', privacyRoutes);
-router.use('/mileage', mileageRoutes);
-router.use('/sessions', sessionsRoutes);
-router.use('/billing', billingCheckoutOverridesRoutes);
-router.use('/billing', billingRoutes);
-router.use('/recurring', recurringRoutes);
-router.use('/businesses', businessesRoutes);
-router.use('/cpa-access', cpaAccessRoutes);
-router.use('/cpa-verification', cpaVerificationRoutes);
-router.use('/analytics', analyticsRoutes);
-router.use('/invoices-v1', invoicesV1Routes);
-router.use('/messages', messagesRoutes);
-router.use('/consent', consentRoutes);
-router.use('/check-email-verified', checkEmailVerifiedRoutes);
+router.use('/auth', require('./auth.routes.js'));
+router.use('/accounts', require('./accounts.routes.js'));
+router.use('/receipts', require('./receipts.routes.js'));
+router.use('/categories', require('./categories.routes.js'));
+router.use('/exports', require('./exports.routes.js'));
+router.use('/business', require('./business.routes.js'));
+router.use('/system', require('./system.routes.js'));
+router.use('/me', require('./me.routes.js'));
+router.use('/crypto', require('./crypto.routes.js'));
+router.use('/privacy', require('./privacy.routes.js'));
+router.use('/mileage', require('./mileage.routes.js'));
+router.use('/sessions', require('./sessions.routes.js'));
+router.use('/billing', require('./billing-checkout-overrides.routes.js'));
+router.use('/billing', require('./billing.routes.js'));
+router.use('/recurring', require('./recurring.routes.js'));
+router.use('/businesses', require('./businesses.routes.js'));
+router.use('/cpa-access', require('./cpa-access.routes.js'));
+router.use('/cpa-verification', require('./cpa-verification.routes.js'));
+router.use('/analytics', require('./analytics-mileage.routes.js'));
+router.use('/analytics', require('./analytics.routes.js'));
+router.use('/invoices-v1', require('./invoices-v1.routes.js'));
+router.use('/messages', require('./messages.routes.js'));
+router.use('/consent', require('./consent.routes.js'));
+router.use('/check-email-verified', require('./check-email-verified.routes.js'));
 
 module.exports = router;
