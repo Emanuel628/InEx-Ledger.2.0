@@ -1,10 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const arApService = require('../services/arApService');
+const { requireAuth } = require('../middleware/auth.middleware.js');
+const { resolveBusinessIdForUser } = require('../api/utils/resolveBusinessIdForUser.js');
+const { getSubscriptionSnapshotForBusiness, PLAN_PRO, PLAN_BUSINESS } = require('../services/subscriptionService.js');
 const { allowTrustedBrowserAccountSwitch, rememberTrustedBrowserOnLogout } = require('../middleware/accountSwitchMfaTrust.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled.js');
 
 const businessTierOnly = [requireV2BusinessEnabled, requireV2Entitlement];
+
+async function getEffectiveTierForRequest(req) {
+  const businessId = await resolveBusinessIdForUser(req.user);
+  const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+  return subscription?.effectiveTier || null;
+}
 
 router.use('/auth/login', allowTrustedBrowserAccountSwitch);
 router.use('/auth/logout', rememberTrustedBrowserOnLogout);
@@ -14,6 +23,32 @@ router.get('/arap-summary', ...businessTierOnly, async (req, res) => {
     res.json(await arApService.getArApSummary(req.business.id));
   } catch (_) {
     res.status(500).json({ error: 'Failed to load AR/AP summary.' });
+  }
+});
+
+// Optional paid-feature preload endpoints should not create noisy 402 console errors
+// when a page checks for data the current plan does not include.
+router.get('/recurring', requireAuth, async (req, res, next) => {
+  try {
+    const tier = await getEffectiveTierForRequest(req);
+    if (tier !== PLAN_BUSINESS) {
+      return res.json([]);
+    }
+    return next();
+  } catch (_) {
+    return next();
+  }
+});
+
+router.get('/exports/history', requireAuth, async (req, res, next) => {
+  try {
+    const tier = await getEffectiveTierForRequest(req);
+    if (tier !== PLAN_PRO && tier !== PLAN_BUSINESS) {
+      return res.json([]);
+    }
+    return next();
+  } catch (_) {
+    return next();
   }
 });
 
