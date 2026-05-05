@@ -1029,6 +1029,7 @@ body[data-theme="light"] select option {
 .user-pill[aria-expanded="true"] .user-name {
   max-width: 156px !important;
   opacity: 1 !important;
+  color: #0f172a !important;
 }
 
 .user-pill:hover .user-pill-chevron,

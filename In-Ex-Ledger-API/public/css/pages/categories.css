@@ -48,8 +48,9 @@
 }
 
 .categories-secondary-btn:hover {
+  background: var(--accent2);
   border-color: var(--accent2);
-  color: var(--accent2);
+  color: #fff;
 }
 
 .category-card {

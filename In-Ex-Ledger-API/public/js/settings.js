@@ -1046,6 +1046,17 @@ async function initPreferences() {
         language: nextPreferences.language,
         province: nextPreferences.region === "ca" ? nextPreferences.province : ""
       });
+
+      if (preferenceBaseline && preferenceBaseline.region !== nextPreferences.region) {
+        try {
+          await apiFetch("/api/categories/defaults", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" }
+          });
+        } catch {
+          // Category seeding is best-effort; don't block the save flow
+        }
+      }
     }
 
     if (typeof setCurrentRegion === "function") {
