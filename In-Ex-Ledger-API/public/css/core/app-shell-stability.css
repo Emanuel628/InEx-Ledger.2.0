@@ -1,0 +1,17 @@
+/* App shell stability fixes
+   Prevent the browser from showing the temporary static sidebar before
+   global.js replaces it with the dynamic Quick Add sidebar.
+
+   Keep this scoped to desktop app-shell layouts only. Mobile already hides
+   the sidebar at the layout breakpoint, so this does not affect mobile view.
+*/
+
+@media (min-width: 1025px) {
+  main.app-shell > .app-sidebar:not(.app-sidebar--dynamic) {
+    visibility: hidden;
+  }
+
+  main.app-shell > .app-sidebar.app-sidebar--dynamic {
+    visibility: visible;
+  }
+}
