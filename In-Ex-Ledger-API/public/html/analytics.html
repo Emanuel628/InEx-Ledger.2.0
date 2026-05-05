@@ -141,13 +141,7 @@
         <div class="analytics-card">
           <div class="analytics-title-row">
             <h2 data-i18n="analytics_whatif_title">What-If Scenario Planner</h2>
-            <button
-              type="button"
-              class="analytics-info-btn"
-              id="whatifInfoBtn"
-              aria-label="What-if planner help"
-              aria-expanded="false"
-            >i</button>
+            <button type="button" class="analytics-info-btn" id="whatifInfoBtn" aria-label="What-if planner help" aria-expanded="false">i</button>
           </div>
           <p data-i18n="analytics_whatif_desc">Simulate income and expense changes before committing to a decision.</p>
           <div class="analytics-info-popover" id="whatifInfoPopover" hidden>
@@ -158,36 +152,17 @@
           </div>
 
           <div class="whatif-form" id="whatifForm">
-            <div class="whatif-field">
-              <label for="wiIncomePct" data-i18n="analytics_whatif_income_label">Income change (%)</label>
-              <input type="number" id="wiIncomePct" placeholder="e.g. 10 or -15" step="1" class="form-control" />
-            </div>
-            <div class="whatif-field">
-              <label for="wiExpensePct" data-i18n="analytics_whatif_expense_label">Expense change (%)</label>
-              <input type="number" id="wiExpensePct" placeholder="e.g. 5 or -10" step="1" class="form-control" />
-            </div>
-            <div class="whatif-field">
-              <label for="wiWeeksOff" data-i18n="analytics_whatif_weeks_label">Weeks off</label>
-              <input type="number" id="wiWeeksOff" placeholder="e.g. 2" min="0" max="52" step="1" class="form-control" />
-            </div>
-            <div class="whatif-field">
-              <label for="wiCustomIncome" data-i18n="analytics_whatif_custom_income_label">Override monthly income ($)</label>
-              <input type="number" id="wiCustomIncome" placeholder="Leave blank for auto" min="0" step="0.01" class="form-control" />
-            </div>
+            <div class="whatif-field"><label for="wiIncomePct" data-i18n="analytics_whatif_income_label">Income change (%)</label><input type="number" id="wiIncomePct" placeholder="e.g. 10 or -15" step="1" class="form-control" /></div>
+            <div class="whatif-field"><label for="wiExpensePct" data-i18n="analytics_whatif_expense_label">Expense change (%)</label><input type="number" id="wiExpensePct" placeholder="e.g. 5 or -10" step="1" class="form-control" /></div>
+            <div class="whatif-field"><label for="wiWeeksOff" data-i18n="analytics_whatif_weeks_label">Weeks off</label><input type="number" id="wiWeeksOff" placeholder="e.g. 2" min="0" max="52" step="1" class="form-control" /></div>
+            <div class="whatif-field"><label for="wiCustomIncome" data-i18n="analytics_whatif_custom_income_label">Override monthly income ($)</label><input type="number" id="wiCustomIncome" placeholder="Leave blank for auto" min="0" step="0.01" class="form-control" /></div>
             <button type="button" class="whatif-run-btn" id="whatifRunBtn" data-i18n="analytics_whatif_run_btn">Run Scenario</button>
           </div>
 
           <div class="whatif-results" id="whatifResults">
             <div id="whatifMessages"></div>
             <table class="monthly-table analytics-whatif-table">
-              <thead>
-                <tr>
-                  <th></th>
-                  <th data-i18n="analytics_col_baseline">Baseline</th>
-                  <th data-i18n="analytics_col_scenario">Scenario</th>
-                  <th data-i18n="analytics_col_change">Change</th>
-                </tr>
-              </thead>
+              <thead><tr><th></th><th data-i18n="analytics_col_baseline">Baseline</th><th data-i18n="analytics_col_scenario">Scenario</th><th data-i18n="analytics_col_change">Change</th></tr></thead>
               <tbody id="whatifTable"></tbody>
             </table>
           </div>
@@ -203,5 +178,6 @@
   <script src="/js/trial.js?v=20260502f"></script>
   <script src="/js/taxReminders.js?v=20260502f"></script>
   <script src="/js/analytics.js?v=20260502f"></script>
+  <script src="/js/analytics-mileage.js?v=20260505a"></script>
 </body>
 </html>
