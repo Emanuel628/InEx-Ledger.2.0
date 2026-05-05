@@ -48,6 +48,76 @@ body:has(main.app-shell) {
   }
 }
 
+/* Quick Add sidebar alignment
+   global.js renders the plus sign and label as one text string, e.g.
+   "+ Transactions". If that text wraps, the plus can land on its own line,
+   which makes the sidebar look misaligned. Keep rows on a strict grid and
+   reserve one consistent visual lane for icon + label. */
+.app-sidebar--dynamic .dynamic-sidebar-favorites {
+  display: grid !important;
+  gap: 8px !important;
+  padding: 10px 0 0 !important;
+}
+
+.app-sidebar--dynamic .dynamic-sidebar-favorite {
+  display: block !important;
+  position: relative !important;
+  border-radius: 10px !important;
+}
+
+.app-sidebar--dynamic .sidebar-link.dynamic-sidebar-link {
+  display: grid !important;
+  grid-template-columns: 22px minmax(0, 1fr) !important;
+  align-items: center !important;
+  column-gap: 14px !important;
+  width: 100% !important;
+  min-height: 44px !important;
+  padding: 10px 12px !important;
+  border-radius: 10px !important;
+  line-height: 1 !important;
+}
+
+.app-sidebar--dynamic .sidebar-link.dynamic-sidebar-link .sidebar-icon {
+  width: 22px !important;
+  height: 22px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  justify-self: center !important;
+  align-self: center !important;
+}
+
+.app-sidebar--dynamic .sidebar-link.dynamic-sidebar-link .sidebar-icon svg {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+}
+
+.app-sidebar--dynamic .dynamic-sidebar-label {
+  display: block !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  align-self: center !important;
+  color: inherit !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+}
+
+.app-sidebar--dynamic .dynamic-sidebar-remove {
+  position: absolute !important;
+  top: 50% !important;
+  right: 6px !important;
+  transform: translateY(-50%) !important;
+}
+
+.app-sidebar--dynamic .dynamic-sidebar-link .sidebar-dot {
+  position: absolute !important;
+  right: 12px !important;
+}
+
 /* Real loading surface, not a white flash.
    The app content is held until the canonical nav is ready. This ties reveal to
    the actual shell normalization signal instead of a blind white delay. */
