@@ -125,6 +125,17 @@ function injectGlobalBehaviorPatches(pageName, html) {
   return `${html}\n${scriptTag}`;
 }
 
+function injectThemeBootstrap(html) {
+  if (typeof html !== 'string' || html.includes('/js/theme-boot.js')) {
+    return html;
+  }
+  const scriptTag = '  <script src="/js/theme-boot.js?v=20260505a"></script>\n';
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/<head[^>]*>/i, (match) => `${match}\n${scriptTag}`);
+  }
+  return `${scriptTag}${html}`;
+}
+
 function injectFinalDarkModeStylesheet(html) {
   if (typeof html !== 'string' || html.includes('/css/core/dark-mode.css?v=20260505c')) {
     return html;
@@ -137,7 +148,9 @@ function injectFinalDarkModeStylesheet(html) {
 }
 
 function prepareCanonicalHtml(pageName, html) {
-  return injectGlobalBehaviorPatches(pageName, injectFinalDarkModeStylesheet(html));
+  const withThemeBoot = injectThemeBootstrap(html);
+  const withFinalDarkMode = injectFinalDarkModeStylesheet(withThemeBoot);
+  return injectGlobalBehaviorPatches(pageName, withFinalDarkMode);
 }
 
 function sendCanonicalPage(pageName, req, res) {
