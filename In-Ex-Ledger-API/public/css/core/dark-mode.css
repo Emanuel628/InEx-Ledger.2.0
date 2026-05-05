@@ -44,8 +44,6 @@ body.dark {
   --cta-gradient: linear-gradient(180deg, #8fa2ff 0%, #6f82f2 100%);
   --accent-panel: linear-gradient(135deg, #101827 0%, #1a2440 100%);
 
-  /* Landing page variables are declared in landing.css on :root. Override them
-     here too so the marketing page cannot keep white surfaces in dark mode. */
   --landing-bg: #0a0f19;
   --landing-surface: rgba(18, 26, 41, 0.96);
   --landing-surface-strong: #121a29;
@@ -78,104 +76,14 @@ body.dark .marketing-main {
   color: var(--ink) !important;
 }
 
-/* Global dark surfaces: marketing, auth, and app cards/panels. */
-html[data-theme="dark"] :is(
-  section,
-  article,
-  .card,
-  .panel,
-  .hero,
-  .problem-section,
-  .workflow-section,
-  .fit-section,
-  .pricing-section,
-  .faq-section,
-  .problem-card,
-  .workflow-card,
-  .fit-card,
-  .pricing-card,
-  .pricing-price-block,
-  .faq-item,
-  .auth-card,
-  .auth-trust-panel,
-  .stat-card,
-  .tx-card,
-  .tax-banner,
-  .tax-upsell-card,
-  .upsell-card,
-  .upgrade-card,
-  .subscription-card,
-  .transactions-panel,
-  .transactions-toolbar,
-  .table-wrapper,
-  .transaction-drawer-card,
-  .recurring-drawer-card,
-  .settings-section,
-  .settings-card,
-  .history-card,
-  .account-form-card,
-  .empty-state,
-  .empty-card,
-  .receipt-card,
-  .export-card,
-  .analytics-card,
-  .message-card,
-  .app-sidebar,
-  .dynamic-sidebar-library,
-  .dynamic-sidebar-quick-panel
-),
-body.dark :is(
-  section,
-  article,
-  .card,
-  .panel,
-  .hero,
-  .problem-section,
-  .workflow-section,
-  .fit-section,
-  .pricing-section,
-  .faq-section,
-  .problem-card,
-  .workflow-card,
-  .fit-card,
-  .pricing-card,
-  .pricing-price-block,
-  .faq-item,
-  .auth-card,
-  .auth-trust-panel,
-  .stat-card,
-  .tx-card,
-  .tax-banner,
-  .tax-upsell-card,
-  .upsell-card,
-  .upgrade-card,
-  .subscription-card,
-  .transactions-panel,
-  .transactions-toolbar,
-  .table-wrapper,
-  .transaction-drawer-card,
-  .recurring-drawer-card,
-  .settings-section,
-  .settings-card,
-  .history-card,
-  .account-form-card,
-  .empty-state,
-  .empty-card,
-  .receipt-card,
-  .export-card,
-  .analytics-card,
-  .message-card,
-  .app-sidebar,
-  .dynamic-sidebar-library,
-  .dynamic-sidebar-quick-panel
-) {
+html[data-theme="dark"] :is(section, article, .card, .panel, .hero, .problem-section, .workflow-section, .fit-section, .pricing-section, .faq-section, .problem-card, .workflow-card, .fit-card, .pricing-card, .pricing-price-block, .faq-item, .auth-card, .auth-trust-panel, .stat-card, .tx-card, .tax-banner, .tax-upsell-card, .upsell-card, .upgrade-card, .subscription-card, .transactions-panel, .transactions-toolbar, .table-wrapper, .transaction-drawer-card, .recurring-drawer-card, .settings-section, .settings-card, .history-card, .account-form-card, .empty-state, .empty-card, .receipt-card, .export-card, .analytics-card, .message-card, .app-sidebar, .dynamic-sidebar-library, .dynamic-sidebar-quick-panel),
+body.dark :is(section, article, .card, .panel, .hero, .problem-section, .workflow-section, .fit-section, .pricing-section, .faq-section, .problem-card, .workflow-card, .fit-card, .pricing-card, .pricing-price-block, .faq-item, .auth-card, .auth-trust-panel, .stat-card, .tx-card, .tax-banner, .tax-upsell-card, .upsell-card, .upgrade-card, .subscription-card, .transactions-panel, .transactions-toolbar, .table-wrapper, .transaction-drawer-card, .recurring-drawer-card, .settings-section, .settings-card, .history-card, .account-form-card, .empty-state, .empty-card, .receipt-card, .export-card, .analytics-card, .message-card, .app-sidebar, .dynamic-sidebar-library, .dynamic-sidebar-quick-panel) {
   background: var(--surface) !important;
   border-color: var(--border) !important;
   color: var(--ink) !important;
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22) !important;
 }
 
-/* Header/nav surfaces. */
 html[data-theme="dark"] :is(.marketing-header, .auth-header, .app-topbar),
 body.dark :is(.marketing-header, .auth-header, .app-topbar) {
   background: rgba(15, 23, 39, 0.88) !important;
@@ -184,58 +92,14 @@ body.dark :is(.marketing-header, .auth-header, .app-topbar) {
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22) !important;
 }
 
-/* Raised nested surfaces: no white pills, chips, table heads, search bars, or price blocks. */
-html[data-theme="dark"] :is(
-  .marketing-nav-sections,
-  .marketing-nav-link,
-  .marketing-nav-sections .marketing-nav-link:hover,
-  .marketing-nav-sections .marketing-nav-link:focus-visible,
-  .button-secondary,
-  .hero-proof-list li,
-  .pricing-toggle,
-  .pricing-toggle-btn,
-  .pricing-toggle-btn.is-active,
-  .pricing-price-block,
-  .toolbar-search,
-  .transactions-table thead,
-  .transactions-table th,
-  .tx-period-picker,
-  .tx-period-chip,
-  .scope-select-wrap,
-  .user-pill,
-  .receipt-upload-inline,
-  .sidebar-add-pill,
-  .dynamic-sidebar-manage
-),
-body.dark :is(
-  .marketing-nav-sections,
-  .marketing-nav-link,
-  .marketing-nav-sections .marketing-nav-link:hover,
-  .marketing-nav-sections .marketing-nav-link:focus-visible,
-  .button-secondary,
-  .hero-proof-list li,
-  .pricing-toggle,
-  .pricing-toggle-btn,
-  .pricing-toggle-btn.is-active,
-  .pricing-price-block,
-  .toolbar-search,
-  .transactions-table thead,
-  .transactions-table th,
-  .tx-period-picker,
-  .tx-period-chip,
-  .scope-select-wrap,
-  .user-pill,
-  .receipt-upload-inline,
-  .sidebar-add-pill,
-  .dynamic-sidebar-manage
-) {
+html[data-theme="dark"] :is(.marketing-nav-sections, .marketing-nav-link, .marketing-nav-sections .marketing-nav-link:hover, .marketing-nav-sections .marketing-nav-link:focus-visible, .button-secondary, .hero-proof-list li, .pricing-toggle, .pricing-toggle-btn, .pricing-toggle-btn.is-active, .pricing-price-block, .toolbar-search, .transactions-table thead, .transactions-table th, .tx-period-picker, .tx-period-chip, .scope-select-wrap, .user-pill, .receipt-upload-inline, .sidebar-add-pill, .dynamic-sidebar-manage),
+body.dark :is(.marketing-nav-sections, .marketing-nav-link, .marketing-nav-sections .marketing-nav-link:hover, .marketing-nav-sections .marketing-nav-link:focus-visible, .button-secondary, .hero-proof-list li, .pricing-toggle, .pricing-toggle-btn, .pricing-toggle-btn.is-active, .pricing-price-block, .toolbar-search, .transactions-table thead, .transactions-table th, .tx-period-picker, .tx-period-chip, .scope-select-wrap, .user-pill, .receipt-upload-inline, .sidebar-add-pill, .dynamic-sidebar-manage) {
   background: var(--surface2) !important;
   border-color: var(--border) !important;
   color: var(--ink2) !important;
   box-shadow: none !important;
 }
 
-/* Dark form fields everywhere, including auth pages. */
 html[data-theme="dark"] :is(input, select, textarea),
 body.dark :is(input, select, textarea) {
   background: var(--input-bg) !important;
@@ -248,64 +112,13 @@ body.dark :is(input, textarea)::placeholder {
   color: var(--ink3) !important;
 }
 
-/* Text hierarchy. */
 html[data-theme="dark"] :is(h1, h2, h3, h4, .app-page-title, .page-title, .section-heading h2, .hero h1, .pricing-tier-name, .brand-text, .brand-text-dark),
 body.dark :is(h1, h2, h3, h4, .app-page-title, .page-title, .section-heading h2, .hero h1, .pricing-tier-name, .brand-text, .brand-text-dark) {
   color: var(--ink) !important;
 }
 
-html[data-theme="dark"] :is(
-  p,
-  label,
-  small,
-  .app-page-subtitle,
-  .page-subtitle,
-  .section-subtitle,
-  .hero-lede,
-  .hero-cta-note,
-  .hero-support-note,
-  .pricing-tier-desc,
-  .faq-item p,
-  .auth-page-intro,
-  .auth-trust-copy,
-  .auth-support-note,
-  .transactions-toolbar-subtitle,
-  .stat-label,
-  .stat-delta,
-  .tax-banner-note,
-  .tax-side-meta,
-  .small-note,
-  .muted,
-  .text-muted,
-  .marketing-footer,
-  .marketing-footer a
-),
-body.dark :is(
-  p,
-  label,
-  small,
-  .app-page-subtitle,
-  .page-subtitle,
-  .section-subtitle,
-  .hero-lede,
-  .hero-cta-note,
-  .hero-support-note,
-  .pricing-tier-desc,
-  .faq-item p,
-  .auth-page-intro,
-  .auth-trust-copy,
-  .auth-support-note,
-  .transactions-toolbar-subtitle,
-  .stat-label,
-  .stat-delta,
-  .tax-banner-note,
-  .tax-side-meta,
-  .small-note,
-  .muted,
-  .text-muted,
-  .marketing-footer,
-  .marketing-footer a
-) {
+html[data-theme="dark"] :is(p, label, small, .app-page-subtitle, .page-subtitle, .section-subtitle, .hero-lede, .hero-cta-note, .hero-support-note, .pricing-tier-desc, .faq-item p, .auth-page-intro, .auth-trust-copy, .auth-support-note, .transactions-toolbar-subtitle, .stat-label, .stat-delta, .tax-banner-note, .tax-side-meta, .small-note, .muted, .text-muted, .marketing-footer, .marketing-footer a),
+body.dark :is(p, label, small, .app-page-subtitle, .page-subtitle, .section-subtitle, .hero-lede, .hero-cta-note, .hero-support-note, .pricing-tier-desc, .faq-item p, .auth-page-intro, .auth-trust-copy, .auth-support-note, .transactions-toolbar-subtitle, .stat-label, .stat-delta, .tax-banner-note, .tax-side-meta, .small-note, .muted, .text-muted, .marketing-footer, .marketing-footer a) {
   color: var(--ink2) !important;
 }
 
@@ -314,7 +127,6 @@ body.dark a {
   color: var(--accent2) !important;
 }
 
-/* Buttons and CTAs: no white buttons in dark mode. */
 html[data-theme="dark"] :is(button, .button, .btn, .auth-submit, .auth-secondary-btn, .toolbar-import-button, .toolbar-add-button, .page-add-button, .receipt-upload-button, .pricing-cta-btn, .marketing-nav-cta),
 body.dark :is(button, .button, .btn, .auth-submit, .auth-secondary-btn, .toolbar-import-button, .toolbar-add-button, .page-add-button, .receipt-upload-button, .pricing-cta-btn, .marketing-nav-cta) {
   background: var(--surface2) !important;
@@ -338,10 +150,119 @@ body.dark :is(.hero-kicker, .section-eyebrow, .pricing-tier-kicker, .problem-num
   color: var(--accent2) !important;
 }
 
-html[data-theme="dark"] :is(.transactions-table td, .transactions-table th),
-body.dark :is(.transactions-table td, .transactions-table th) {
-  border-color: var(--border) !important;
+/* Final no-white guard for the exact internals visible in QA screenshots. */
+html[data-theme="dark"] :is(
+  .category-item,
+  .category-card-head,
+  .category-card-footer,
+  .category-tax-pill,
+  .pill-blue,
+  .pill-green,
+  .pill-amber,
+  .pill-pink,
+  .pill-red,
+  .pill-slate,
+  .transactions-table,
+  .transactions-table tbody,
+  .transactions-table tr,
+  .transactions-table td,
+  .transactions-table th,
+  .mileage-table,
+  .mileage-table tbody,
+  .mileage-table tr,
+  .mileage-table td,
+  .mileage-table th,
+  .receipts-table,
+  .receipts-table tbody,
+  .receipts-table tr,
+  .receipts-table td,
+  .receipts-table th,
+  .analytics-table,
+  .analytics-table tbody,
+  .analytics-table tr,
+  .analytics-table td,
+  .analytics-table th,
+  .monthly-breakdown-table,
+  .monthly-breakdown-table tbody,
+  .monthly-breakdown-table tr,
+  .monthly-breakdown-table td,
+  .monthly-breakdown-table th,
+  .message-empty-state,
+  .message-empty,
+  .empty-inbox,
+  .empty-threads,
+  .export-preview,
+  .export-preview-card,
+  .export-document-preview,
+  .report-preview,
+  .pdf-preview,
+  .document-preview,
+  .preview-card,
+  .receipt-dropzone,
+  .upload-dropzone
+),
+body.dark :is(
+  .category-item,
+  .category-card-head,
+  .category-card-footer,
+  .category-tax-pill,
+  .pill-blue,
+  .pill-green,
+  .pill-amber,
+  .pill-pink,
+  .pill-red,
+  .pill-slate,
+  .transactions-table,
+  .transactions-table tbody,
+  .transactions-table tr,
+  .transactions-table td,
+  .transactions-table th,
+  .mileage-table,
+  .mileage-table tbody,
+  .mileage-table tr,
+  .mileage-table td,
+  .mileage-table th,
+  .receipts-table,
+  .receipts-table tbody,
+  .receipts-table tr,
+  .receipts-table td,
+  .receipts-table th,
+  .analytics-table,
+  .analytics-table tbody,
+  .analytics-table tr,
+  .analytics-table td,
+  .analytics-table th,
+  .monthly-breakdown-table,
+  .monthly-breakdown-table tbody,
+  .monthly-breakdown-table tr,
+  .monthly-breakdown-table td,
+  .monthly-breakdown-table th,
+  .message-empty-state,
+  .message-empty,
+  .empty-inbox,
+  .empty-threads,
+  .export-preview,
+  .export-preview-card,
+  .export-document-preview,
+  .report-preview,
+  .pdf-preview,
+  .document-preview,
+  .preview-card,
+  .receipt-dropzone,
+  .upload-dropzone
+) {
+  background: var(--surface2) !important;
+  background-color: var(--surface2) !important;
+  background-image: none !important;
+  border-color: var(--border2) !important;
   color: var(--ink2) !important;
+}
+
+html[data-theme="dark"] :is(.category-delete, .delete-btn, .modal-cancel, .categories-secondary-btn),
+body.dark :is(.category-delete, .delete-btn, .modal-cancel, .categories-secondary-btn) {
+  background: #1d2638 !important;
+  border-color: var(--border2) !important;
+  color: var(--ink) !important;
 }
 
 html[data-theme="dark"] body:has(main.app-shell)::before,
