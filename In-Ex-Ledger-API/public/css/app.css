@@ -1,4 +1,5 @@
 @import url("/css/core/tokens.css");
 @import url("/css/core/base.css");
 @import url("/css/core/components.css");
-@import url("/css/core/layout.css");
+@import url("/css/core/layout.css?v=20260504a");
+@import url("/css/core/app-shell-stability.css?v=20260505b");
