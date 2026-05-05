@@ -1,9 +1,12 @@
 /* Dark mode entrypoint
-   This file is injected after page-specific CSS by server.js. Keep it as the
-   final dark-mode entrypoint so page CSS cannot reintroduce white cards, white
-   CTA blocks, white tables, or light preview panels.
+   Dark mode is temporarily disabled while the design is revisited.
+
+   The dark-mode CSS is intentionally kept in the repo for later. This entrypoint
+   now loads the temporary disable layer first so the Settings toggle is hidden
+   and runtime appearance stays light.
 */
 
+@import url("/css/core/dark-mode-disabled.css?v=20260505a");
 @import url("/css/core/dark-mode-final.css?v=20260505a");
 
 html[data-theme="dark"],
