@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const arApService = require('../services/arApService');
+const { COOKIE_OPTIONS } = require('../utils/authUtils.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled.js');
 // AR/AP summary endpoint (feature-flagged)
 router.get('/arap-summary', requireV2BusinessEnabled, requireV2Entitlement, async (req, res) => {
@@ -55,6 +56,11 @@ const invoicesV1Routes = require('./invoices-v1.routes.js');
 const messagesRoutes = require('./messages.routes.js');
 const consentRoutes = require('./consent.routes.js');
 const checkEmailVerifiedRoutes = require('./check-email-verified.routes.js');
+
+router.use('/auth/logout', (req, res, next) => {
+  res.clearCookie('mfa_trust', COOKIE_OPTIONS);
+  next();
+});
 
 router.use('/auth', authRoutes);
 router.use('/accounts', accountsRoutes);
