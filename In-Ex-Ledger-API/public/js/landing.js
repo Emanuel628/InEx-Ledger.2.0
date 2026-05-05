@@ -27,6 +27,19 @@ const CANADA_LANDING_COPY = {
   landing_cta_button: "Start free trial"
 };
 
+const CANADA_TEXT_REPLACEMENTS = [
+  [/1099 workers/gi, "Canadian freelancers"],
+  [/1099 contractors/gi, "Canadian contractors"],
+  [/1099 contractor/gi, "Canadian contractor"],
+  [/1099s/gi, "T4A slips"],
+  [/1099/gi, "T4A"],
+  [/Schedule C/gi, "T2125"],
+  [/IRS/gi, "CRA"],
+  [/tax season exports/gi, "T2125-ready exports"],
+  [/US tax categories/gi, "Canadian business categories"],
+  [/U\.S\. tax categories/gi, "Canadian business categories"]
+];
+
 function normalizeLandingRegion(value) {
   const raw = String(value || "").trim().toUpperCase();
   if (raw === "CA" || raw === "CAN" || raw === "CANADA") return "CA";
@@ -60,6 +73,34 @@ function applyCanadianLandingCopy() {
     document.querySelectorAll(`[data-i18n="${key}"]`).forEach((node) => {
       node.textContent = value;
     });
+  });
+  scrubCanadianTaxWording();
+}
+
+function scrubCanadianTaxWording() {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement;
+      if (!parent || ["SCRIPT", "STYLE", "NOSCRIPT"].includes(parent.tagName)) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      return /1099|Schedule C|IRS|US tax|U\.S\. tax/i.test(node.nodeValue || "")
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT;
+    }
+  });
+
+  const nodes = [];
+  while (walker.nextNode()) {
+    nodes.push(walker.currentNode);
+  }
+
+  nodes.forEach((node) => {
+    let text = node.nodeValue || "";
+    CANADA_TEXT_REPLACEMENTS.forEach(([pattern, replacement]) => {
+      text = text.replace(pattern, replacement);
+    });
+    node.nodeValue = text;
   });
 }
 
