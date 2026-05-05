@@ -18,6 +18,7 @@ router.use(requireCsrfProtection);
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
+const FISCAL_YEAR_START_RE = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const BUSINESS_SELECT = `SELECT id, name, region, language, fiscal_year_start, province,
                                 business_type, tax_id, address, operating_name,
                                 business_activity_code, created_at
@@ -139,6 +140,9 @@ router.put("/", async (req, res) => {
   }
   if (language && !VALID_LANGUAGES.has(language)) {
     return res.status(400).json({ error: "language must be 'en', 'es', or 'fr'" });
+  }
+  if (fiscal_year_start != null && fiscal_year_start !== "" && !FISCAL_YEAR_START_RE.test(String(fiscal_year_start))) {
+    return res.status(400).json({ error: "fiscal_year_start must be in MM-DD format with valid month (01-12) and day (01-31)." });
   }
 
   try {

@@ -5,3 +5,8 @@ node_modules/
 *.log
 npm-debug.log*
 .DS_Store
+
+# Browser test/scratch artifacts (do not commit)
+tmp-chrome/
+tmp-edge/
+tmp-*.txt

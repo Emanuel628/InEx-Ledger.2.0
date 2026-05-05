@@ -1,4 +1,10 @@
-﻿# InEx Ledger 2.0 - Current Status
+﻿> **STATUS: DONE — DO NOT USE THIS FILE.**
+> All items tracked in this document have been completed. Stripe is configured
+> and verified, secrets/env vars are set in Railway, and remaining audit items
+> have been addressed in code. This file is retained for historical reference
+> only — do not consult it for current production-readiness assessments.
+
+# InEx Ledger 2.0 - Current Status
 
 ## Live App Structure
 

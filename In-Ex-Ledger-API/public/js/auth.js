@@ -60,6 +60,13 @@ if (!window.__AUTH_GUARD_STATE__) {
 }
 
 let pendingRefreshPromise = null;
+let _accessToken = null;
+
+// Wipe any legacy token from prior versions that persisted to web storage.
+// The access token now lives only in memory; the HttpOnly refresh cookie
+// re-issues it on page load via refreshAccessToken().
+try { sessionStorage.removeItem("token"); } catch (_) {}
+try { localStorage.removeItem("token"); } catch (_) {}
 
 function resolveStorageUserId(profile = window.__LUNA_ME__) {
   return profile?.id || profile?.user_id || profile?.userId || profile?.uid || "";
@@ -457,29 +464,19 @@ function ensureUserPillChrome(pill) {
 
 
 function getToken() {
-  try {
-    const sessionToken = sessionStorage.getItem(TOKEN_KEY) || "";
-    return sessionToken;
-  } catch (_) {}
-  return "";
+  return _accessToken || "";
 }
 
 function setToken(token) {
-  try {
-    sessionStorage.setItem(TOKEN_KEY, token);
-  } catch (_) {}
-  try {
-    localStorage.removeItem(TOKEN_KEY);
-  } catch (_) {}
+  _accessToken = token || null;
+  try { sessionStorage.removeItem(TOKEN_KEY); } catch (_) {}
+  try { localStorage.removeItem(TOKEN_KEY); } catch (_) {}
 }
 
 function clearToken() {
-  try {
-    sessionStorage.removeItem(TOKEN_KEY);
-  } catch (_) {}
-  try {
-    localStorage.removeItem(TOKEN_KEY);
-  } catch (_) {}
+  _accessToken = null;
+  try { sessionStorage.removeItem(TOKEN_KEY); } catch (_) {}
+  try { localStorage.removeItem(TOKEN_KEY); } catch (_) {}
   clearSubscriptionState();
   clearAppState();
   if (window.__AUTH_GUARD_STATE__) {
@@ -602,13 +599,18 @@ async function requireValidSessionOrRedirect() {
   window.__AUTH_GUARD_STATE__.running = true;
   window.__AUTH_GUARD_STATE__.count += 1;
 
-  const token = getToken();
   if (!CPA_UI_ENABLED && getNormalizedPathname() === "/cpa-dashboard") {
     window.location.href = "/transactions";
     return;
   }
 
-  if (!token) {
+  // In-memory access token is empty after every page reload; recover it from
+  // the HttpOnly refresh cookie before treating the session as expired.
+  if (!getToken()) {
+    await refreshAccessToken();
+  }
+
+  if (!getToken()) {
     window.__AUTH_GUARD_STATE__.running = false;
     window.location.href = LOGIN_PAGE;
     return;
@@ -682,8 +684,12 @@ async function requireValidSessionOrRedirect() {
 
 async function redirectIfAuthenticated() {
   try {
-    const existingToken = getToken();
-    if (!existingToken) {
+    if (!getToken()) {
+      // Try to bootstrap from the HttpOnly refresh cookie. If that fails,
+      // the visitor is genuinely signed out.
+      await refreshAccessToken();
+    }
+    if (!getToken()) {
       return;
     }
 
