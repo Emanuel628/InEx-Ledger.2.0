@@ -4,7 +4,7 @@
 
 Phase 1 is partially complete.
 
-The sidecar patch files have been removed, but the real owner file, `In-Ex-Ledger-API/public/js/global.js`, still needs to absorb the intended sidebar logic directly.
+The sidecar patch files have been removed, and the stale quick-add entitlement endpoint has been removed. The real owner file, `In-Ex-Ledger-API/public/js/global.js`, still needs to absorb the intended sidebar logic directly.
 
 ## Completed
 
@@ -16,7 +16,27 @@ The following patch/sidecar files were deleted:
 - `In-Ex-Ledger-API/public/js/quick-add-entitlements.js`
 - `In-Ex-Ledger-API/public/js/sidebar-multiselect.js`
 
-These files should not be recreated. Their useful behavior must live in the proper owner file.
+The stale endpoint below was also removed because it only supported the deleted sidecar file:
+
+- `GET /api/entitlements/quick-add`
+
+The general entitlement endpoint remains and now exposes the proper sidebar flags:
+
+- `GET /api/entitlements/features`
+- `quick_add_sidebar_enabled`
+- `business_quick_add_enabled`
+
+The deleted sidecar files should not be recreated. Their useful behavior must live in the proper owner file.
+
+## Product Decision
+
+Quick Add sidebar gating should be:
+
+- Basic/free: no Quick Add sidebar
+- Pro: Core Quick Add only
+- Business: Core plus Business Quick Add
+
+This keeps the free product useful without making it feel like the complete paid product.
 
 ## Why This Exists
 
@@ -43,7 +63,9 @@ Do not hide them with JavaScript after render.
 
 Quick Add should render different feature groups based on subscription tier.
 
-Pro/basic/free users should only see Core quick-add actions.
+Basic/free users should not see the dynamic Quick Add sidebar.
+
+Pro users should only see Core quick-add actions.
 
 Business-tier users should see Core plus Business actions.
 
@@ -77,22 +99,15 @@ Possible tier sources:
 - `window.__LUNA_ME__?.subscription?.effectiveTier`
 - stored subscription state in `localStorage.lb_subscription`
 - fallback `localStorage.tier`
+- `/api/entitlements/features` if a fresh server-side check is needed
 
-### 3. Consider hiding the entire dynamic sidebar for Basic/free users
+### 3. Hide the dynamic sidebar for Basic/free users
 
-New product decision under consideration:
+Implement this directly in `global.js`:
 
-> Basic/free users may not need the Quick Add sidebar at all.
-
-Reason: the free/basic product is already broad, and Quick Add may make the free tier feel too complete.
-
-If accepted, implement this in `global.js` directly:
-
-- Free/basic: no dynamic Quick Add sidebar
-- Pro: Core Quick Add only
-- Business: Core plus Business Quick Add
-
-Do not use a hide-after-render file.
+- If tier is Basic/free, do not initialize the dynamic Quick Add sidebar.
+- Prefer removing/hiding the sidebar container before rendering it.
+- Do not use a hide-after-render file.
 
 ### 4. Move multi-select behavior into `global.js`
 
@@ -130,7 +145,10 @@ Phase 1 is complete only when all of these are true:
 
 - No sidecar files listed above exist.
 - No HTML or JS references those deleted files.
+- `GET /api/entitlements/quick-add` is gone.
+- `GET /api/entitlements/features` remains.
 - `global.js` is the only owner of dynamic sidebar logic.
+- Basic/free users do not see the Quick Add sidebar.
 - Analytics does not appear in Quick Add.
 - Business quick-add options do not appear for non-Business users.
 - Pro users see only Core Quick Add options.
