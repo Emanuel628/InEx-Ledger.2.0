@@ -20,6 +20,44 @@ async function archiveTransaction({ pool, businessId, transactionId, userId, rea
   return result.rows[0] || null;
 }
 
+async function restoreMostRecentArchivedTransaction({ pool, businessId, userId }) {
+  const candidate = await pool.query(
+    `SELECT id
+       FROM transactions
+      WHERE business_id = $1
+        AND deleted_at IS NOT NULL
+        AND (is_void = true OR is_void IS NULL)
+        AND (is_adjustment = false OR is_adjustment IS NULL)
+      ORDER BY deleted_at DESC, voided_at DESC, created_at DESC
+      LIMIT 1`,
+    [businessId]
+  );
+
+  const transactionId = candidate.rows[0]?.id;
+  if (!transactionId) {
+    return null;
+  }
+
+  const restored = await pool.query(
+    `UPDATE transactions
+        SET deleted_at = NULL,
+            is_void = false,
+            voided_at = NULL,
+            voided_by_id = NULL,
+            deleted_by_id = NULL,
+            deleted_reason = NULL,
+            adjusted_by_id = COALESCE(adjusted_by_id, $3)
+      WHERE id = $1
+        AND business_id = $2
+        AND deleted_at IS NOT NULL
+      RETURNING *`,
+    [transactionId, businessId, userId]
+  );
+
+  return restored.rows[0] || null;
+}
+
 module.exports = {
-  archiveTransaction
+  archiveTransaction,
+  restoreMostRecentArchivedTransaction
 };
