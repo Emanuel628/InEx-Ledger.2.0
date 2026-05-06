@@ -15,6 +15,8 @@ function tx(key) {
 const OFFLINE_ERROR_MESSAGE = "login_error_offline";
 const EXPIRED_SESSION_MESSAGE = "login_error_expired";
 const AUTOFILL_CLEAR_RETRY_DELAYS_MS = [200, 600, 1200];
+const POST_LOGIN_HANDOFF_KEY = "lb_post_login_access_token_handoff";
+const POST_LOGIN_HANDOFF_AT_KEY = "lb_post_login_access_token_handoff_at";
 
 redirectIfAuthenticated();
 
@@ -43,6 +45,14 @@ window.addEventListener("pageshow", () => {
 function markPostLoginRefreshBridge() {
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `post_login_refresh_bridge=1; Max-Age=30; Path=/; SameSite=Strict${secure}`;
+}
+
+function markPostLoginAccessHandoff(token) {
+  try {
+    if (!token) return;
+    sessionStorage.setItem(POST_LOGIN_HANDOFF_KEY, token);
+    sessionStorage.setItem(POST_LOGIN_HANDOFF_AT_KEY, String(Date.now()));
+  } catch (_) {}
 }
 
 function resetLoginFieldsIfNeeded() {
@@ -133,7 +143,7 @@ async function handleLoginSubmit(event) {
     if (data?.mfa_required && data?.mfa_token) {
       sessionStorage.setItem("lb_pending_mfa_token", data.mfa_token);
       sessionStorage.setItem("lb_pending_mfa_email", email);
-      window.location.href = "/mfa-challenge?v=20260503f";
+      window.location.href = "/mfa-challenge?v=20260506a";
       return;
     }
 
@@ -144,6 +154,7 @@ async function handleLoginSubmit(event) {
 
     setToken(data.token);
     markPostLoginRefreshBridge();
+    markPostLoginAccessHandoff(data.token);
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }
