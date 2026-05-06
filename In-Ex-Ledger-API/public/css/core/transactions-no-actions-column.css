@@ -12,6 +12,13 @@
   overflow: hidden !important;
 }
 
+/* There is no bulk action flow anymore, so remove Select All from the header.
+   Keep the select column itself for per-row checkboxes. */
+.transactions-table thead #txSelectAll,
+.transactions-table thead th.col-select input[type="checkbox"] {
+  display: none !important;
+}
+
 .transactions-table tr.is-selected {
   background: rgba(79, 70, 229, 0.06);
 }
