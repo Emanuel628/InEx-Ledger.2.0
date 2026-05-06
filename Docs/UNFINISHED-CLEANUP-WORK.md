@@ -292,7 +292,7 @@ If checkbox row actions are kept:
 
 ---
 
-# Phase 3 — Auth Bridge Cleanup
+# Phase 3 — Auth Bridge / MFA Trust Cleanup
 
 ## Completed
 
@@ -314,9 +314,34 @@ Final search found no active leftovers for:
 - `auth-login-handoff`
 - `refresh_bridge`
 
-## Phase 3 Status
+## Phase 6 Audit Correction
 
-Complete.
+The final audit found another auth/MFA bandaid candidate that was not part of the original Phase 3 list:
+
+- `In-Ex-Ledger-API/middleware/accountSwitchMfaTrust.js`
+
+This file may contain useful behavior, but the implementation is suspicious because it overrides `res.json` on `/auth/login` to intercept the login response and convert an MFA-required response into a trusted-browser session.
+
+Do not delete it blindly.
+
+Correct destination if kept:
+
+- `In-Ex-Ledger-API/routes/auth.routes.js`
+- a dedicated MFA trust/auth service owned by the auth flow
+
+Consolidation direction:
+
+- Move trusted-browser account-switch behavior into the explicit login/MFA route flow.
+- Avoid monkey-patching `res.json` from middleware.
+- Keep the global MFA trust cookie behavior only if it is an intentional product/security decision.
+- Delete `accountSwitchMfaTrust.js` only after the behavior is represented in the real auth/MFA owner flow, or after the feature is intentionally removed.
+
+## Phase 3 Definition of Done
+
+- Login/MFA frontend bridge cookies are gone.
+- No auth handoff frontend file exists.
+- Trusted-browser account-switch behavior is either intentionally removed or owned by the real auth/MFA route/service flow.
+- No auth middleware monkey-patches `res.json`.
 
 ---
 
@@ -523,6 +548,7 @@ Remaining sidecar/patch files confirmed on `main`:
 - `In-Ex-Ledger-API/routes/billing-checkout-overrides.routes.js`
 - `In-Ex-Ledger-API/services/subscriptionTrialCheckoutPatch.js`
 - `In-Ex-Ledger-API/public/js/theme-boot.js`
+- `In-Ex-Ledger-API/middleware/accountSwitchMfaTrust.js`
 
 Files confirmed gone/not found from current direct checks:
 
