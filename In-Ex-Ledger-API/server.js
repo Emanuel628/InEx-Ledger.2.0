@@ -18,6 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const routes = require('./routes/index.js');
 const cookieParser = require('cookie-parser');
+const transactionsUndoRouter = require('./routes/transactions-undo.routes.js');
 const transactionsRouter = require('./routes/transactions.routes.js');
 const { createGlobalLimiter } = require('./middleware/rateLimitTiers.js');
 const {
@@ -369,6 +370,7 @@ app.get('/index.html', (req, res) => {
    ========================================================= */
 
 // Transaction management
+app.use('/api/transactions', transactionsUndoRouter);
 app.use('/api/transactions', transactionsRouter);
 logInfo('MOUNTED: /api/transactions');
 
