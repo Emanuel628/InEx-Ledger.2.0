@@ -15,6 +15,16 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+(function wireAuthLoginHandoff() {
+  if (document.getElementById("auth-login-handoff-js")) return;
+
+  const script = document.createElement("script");
+  script.id = "auth-login-handoff-js";
+  script.src = "/js/auth-login-handoff.js?v=20260506a";
+  script.defer = true;
+  document.head.appendChild(script);
+})();
+
 (function wireBusinessQuickAddHardening() {
   if (document.getElementById("hide-business-quick-add-js")) return;
 
