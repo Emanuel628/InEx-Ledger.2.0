@@ -2731,6 +2731,7 @@ const TRANSLATIONS = {
     subscription_business_slots_success: 'Espacios actualizados.',
     subscription_business_slots_error: 'No se pudo actualizar los espacios.',
     subscription_business_slots_canceling_help: 'Tu plan está programado para cancelarse. Reanuda Pro antes de cambiar los espacios.',
+    subscription_business_slots_canceled_help: 'Esta suscripción Pro ya fue cancelada. Inicia una nueva suscripción Pro antes de cambiar los espacios de empresa.',
 
     // Settings nav
     settings_nav_account_settings: 'Cuenta y suscripción',
@@ -4019,6 +4020,7 @@ const TRANSLATIONS = {
     subscription_business_slots_success: 'Espaces mis à jour.',
     subscription_business_slots_error: 'Impossible de mettre à jour les espaces.',
     subscription_business_slots_canceling_help: 'Votre plan est programmé pour être annulé. Reprenez Pro avant de modifier les espaces.',
+    subscription_business_slots_canceled_help: 'Cet abonnement Pro a déjà été annulé. Démarrez un nouvel abonnement Pro avant de modifier les espaces d\'entreprise.',
 
     // Settings nav
     settings_nav_account_settings: 'Compte et abonnement',
