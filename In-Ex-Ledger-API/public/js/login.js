@@ -40,11 +40,6 @@ window.addEventListener("pageshow", () => {
   resetLoginFieldsIfNeeded();
 });
 
-function markPostLoginRefreshBridge() {
-  const secure = window.location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `post_login_refresh_bridge=1; Max-Age=30; Path=/; SameSite=Strict${secure}`;
-}
-
 function resetLoginFieldsIfNeeded() {
   const shouldReset = typeof consumeLoginResetFlag === "function"
     ? consumeLoginResetFlag()
@@ -143,7 +138,6 @@ async function handleLoginSubmit(event) {
     }
 
     setToken(data.token);
-    markPostLoginRefreshBridge();
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }
