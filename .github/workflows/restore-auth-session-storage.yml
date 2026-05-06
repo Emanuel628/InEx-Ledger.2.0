@@ -1,0 +1,126 @@
+name: Restore auth session storage once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/restore-auth-session-storage.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  restore-auth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore auth sessionStorage contract
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+
+          function read(file) {
+            return fs.readFileSync(file, 'utf8');
+          }
+
+          function write(file, content) {
+            fs.writeFileSync(file, content);
+          }
+
+          function replaceExact(content, from, to, label) {
+            if (!content.includes(from)) {
+              throw new Error(`Missing expected block: ${label}`);
+            }
+            return content.replace(from, to);
+          }
+
+          const authPath = 'In-Ex-Ledger-API/public/js/auth.js';
+          let auth = read(authPath);
+
+          auth = replaceExact(
+            auth,
+            `let pendingRefreshPromise = null;\nlet _accessToken = null;\n\n// Wipe any legacy token from prior versions that persisted to web storage.\n// The access token now lives only in memory; the HttpOnly refresh cookie\n// re-issues it on page load via refreshAccessToken().\ntry { sessionStorage.removeItem("token"); } catch (_) {}\ntry { localStorage.removeItem("token"); } catch (_) {}\n`,
+            `let pendingRefreshPromise = null;\n`,
+            'memory-only token declaration and purge'
+          );
+
+          auth = replaceExact(
+            auth,
+            `function getToken() {\n  return _accessToken || "";\n}\n\nfunction setToken(token) {\n  _accessToken = token || null;\n  try { sessionStorage.removeItem(TOKEN_KEY); } catch (_) {}\n  try { localStorage.removeItem(TOKEN_KEY); } catch (_) {}\n}\n\nfunction clearToken() {\n  _accessToken = null;\n  try { sessionStorage.removeItem(TOKEN_KEY); } catch (_) {}\n  try { localStorage.removeItem(TOKEN_KEY); } catch (_) {}\n  clearSubscriptionState();\n  clearAppState();\n  if (window.__AUTH_GUARD_STATE__) {\n    window.__AUTH_GUARD_STATE__.lastError = null;\n  }\n}\n`,
+            `function getToken() {\n  try {\n    return sessionStorage.getItem(TOKEN_KEY) || "";\n  } catch (_) {}\n  return "";\n}\n\nfunction setToken(token) {\n  try {\n    sessionStorage.setItem(TOKEN_KEY, token);\n  } catch (_) {}\n  try {\n    localStorage.removeItem(TOKEN_KEY);\n  } catch (_) {}\n}\n\nfunction clearToken() {\n  try {\n    sessionStorage.removeItem(TOKEN_KEY);\n  } catch (_) {}\n  try {\n    localStorage.removeItem(TOKEN_KEY);\n  } catch (_) {}\n  clearSubscriptionState();\n  clearAppState();\n  if (window.__AUTH_GUARD_STATE__) {\n    window.__AUTH_GUARD_STATE__.lastError = null;\n  }\n}\n`,
+            'memory-only token functions'
+          );
+
+          auth = auth.replace(
+            `  // In-memory access token is empty after every page reload; recover it from\n  // the HttpOnly refresh cookie before treating the session as expired.\n`,
+            `  // If no stored access token is available, try the refresh cookie before treating the session as expired.\n`
+          );
+          auth = auth.replace(
+            `      // Try to bootstrap from the HttpOnly refresh cookie. If that fails,\n      // the visitor is genuinely signed out.\n`,
+            `      // Try to bootstrap from the HttpOnly refresh cookie. If that fails, the visitor is genuinely signed out.\n`
+          );
+          write(authPath, auth);
+
+          const loginPath = 'In-Ex-Ledger-API/public/js/login.js';
+          if (fs.existsSync(loginPath)) {
+            let login = read(loginPath);
+            login = login.replace(/\nconst POST_LOGIN_HANDOFF_KEY = "lb_post_login_access_token_handoff";\nconst POST_LOGIN_HANDOFF_AT_KEY = "lb_post_login_access_token_handoff_at";\n/g, '\n');
+            login = login.replace(/\nfunction markPostLoginAccessHandoff\(token\) \{\n  try \{\n    if \(!token\) return;\n    sessionStorage\.setItem\(POST_LOGIN_HANDOFF_KEY, token\);\n    sessionStorage\.setItem\(POST_LOGIN_HANDOFF_AT_KEY, String\(Date\.now\(\)\)\);\n  \} catch \(_\) \{\}\n\}\n/g, '\n');
+            login = login.replace(/\n    markPostLoginAccessHandoff\(data\.token\);/g, '');
+            write(loginPath, login);
+          }
+
+          const mfaPath = 'In-Ex-Ledger-API/public/js/mfa-challenge.js';
+          if (fs.existsSync(mfaPath)) {
+            let mfa = read(mfaPath);
+            mfa = mfa.replace(/\nconst POST_LOGIN_HANDOFF_KEY = "lb_post_login_access_token_handoff";\nconst POST_LOGIN_HANDOFF_AT_KEY = "lb_post_login_access_token_handoff_at";\n/g, '\n');
+            mfa = mfa.replace(/\nfunction markPostLoginAccessHandoff\(token\) \{\n  try \{\n    if \(!token\) return;\n    sessionStorage\.setItem\(POST_LOGIN_HANDOFF_KEY, token\);\n    sessionStorage\.setItem\(POST_LOGIN_HANDOFF_AT_KEY, String\(Date\.now\(\)\)\);\n  \} catch \(_\) \{\}\n\}\n/g, '\n');
+            mfa = mfa.replace(/\n    markPostLoginAccessHandoff\(data\.token\);/g, '');
+            write(mfaPath, mfa);
+          }
+
+          const obsoleteFiles = [
+            'In-Ex-Ledger-API/public/js/auth-login-handoff.js',
+            'In-Ex-Ledger-API/tests/authLoginHandoffFrontend.test.js'
+          ];
+          for (const file of obsoleteFiles) {
+            if (fs.existsSync(file)) fs.unlinkSync(file);
+          }
+
+          const htmlDir = 'In-Ex-Ledger-API/public/html';
+          for (const name of fs.readdirSync(htmlDir)) {
+            if (!name.endsWith('.html')) continue;
+            const file = path.join(htmlDir, name);
+            let html = read(file);
+            const before = html;
+            html = html.replace(/auth\.js\?v=20260506a/g, 'auth.js?v=20260506b');
+            html = html.replace(/auth\.js\?v=20260504a/g, 'auth.js?v=20260506b');
+            html = html.replace(/login\.js\?v=20260506a/g, 'login.js?v=20260506b');
+            html = html.replace(/mfa-challenge\.js\?v=20260506a/g, 'mfa-challenge.js?v=20260506b');
+            if (html !== before) write(file, html);
+          }
+          NODE
+
+      - name: Verify restore
+        shell: bash
+        run: |
+          ! grep -R "_accessToken" In-Ex-Ledger-API/public/js/auth.js
+          ! grep -R "lb_post_login_access_token_handoff" In-Ex-Ledger-API/public/js In-Ex-Ledger-API/tests || true
+          grep -q "sessionStorage.getItem(TOKEN_KEY)" In-Ex-Ledger-API/public/js/auth.js
+          grep -q "sessionStorage.setItem(TOKEN_KEY, token)" In-Ex-Ledger-API/public/js/auth.js
+
+      - name: Commit restore and remove one-time workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/restore-auth-session-storage.yml
+          git add -A
+          git diff --cached --stat
+          git commit -m "Fully restore sessionStorage auth tokens" || exit 0
+          git push
