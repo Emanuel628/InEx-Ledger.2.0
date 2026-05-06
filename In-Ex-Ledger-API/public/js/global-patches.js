@@ -11,4 +11,5 @@
 
   loadScriptOnce("/js/sidebar-multiselect.js?v=20260505b", "sidebar-multiselect-js");
   loadScriptOnce("/js/quick-add-entitlements.js?v=20260505a", "quick-add-entitlements-js");
+  loadScriptOnce("/js/transaction-checkbox-actions.js?v=20260505a", "transaction-checkbox-actions-js");
 })();
