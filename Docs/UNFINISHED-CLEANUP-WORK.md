@@ -9,7 +9,7 @@ Do not create separate phase cleanup docs for the same effort. Add unfinished it
 - Phase 1: Partially complete. Patch files are removed, but `global.js` still needs direct Quick Add gating.
 - Phase 2: Partially complete. Patch routes/files are removed, but the Undo button still needs a proper rebuild in the real transaction owner files.
 - Phase 3: Complete. Login/MFA refresh bridge cookie code was removed.
-- Phase 4: Not started. Billing/subscription patch and override files still need review and consolidation.
+- Phase 4: In review. Billing/subscription sidecar files contain wanted behavior and must be consolidated, not blindly deleted.
 - Phase 5: Not started. Dark mode/theme drift still needs review because dark mode is unplugged and visually unfinished.
 
 ---
@@ -305,35 +305,127 @@ Complete.
 
 ---
 
-# Phase 4 — Billing / Subscription Patch Consolidation
+# Phase 4 — Billing / Subscription Consolidation
 
-## Not Started
+## Status
 
-Suspicious files still need review and consolidation:
+Phase 4 has started as review only. Do not delete billing or subscription sidecar files until their useful behavior has been moved into the owner files.
 
-- `billing-checkout-overrides.routes.js`
-- `billing-reactivation.routes.js`
-- `subscription-reactivation.js`
-- `subscriptionTrialCheckoutPatch.js`
+## Findings
 
-Some of this behavior may be wanted, but it should not live in patch/override sidecar files if it is permanent product behavior.
+### `billing-checkout-overrides.routes.js`
 
-## Remaining Work
+Status: active.
 
-Review each file and move useful logic into the correct owner files:
+Current owner problem: this file is mounted before `billing.routes.js` and intercepts `POST /api/billing/checkout-session`.
+
+Purpose: normalize a downgraded/free-selected trial before checkout so the main checkout route can create the normal Stripe checkout instead of blocking the user as if they already had paid Pro access.
+
+This behavior appears useful and should be kept.
+
+Correct destination:
+
+- `In-Ex-Ledger-API/routes/billing.routes.js`
+
+Consolidation direction:
+
+- Move `isTrialReupgradeAttempt(subscription)` into `billing.routes.js`.
+- Move the `cancel_at_period_end = false` trial normalization into the top of the real `router.post("/checkout-session", ...)` route.
+- After that, remove the mount from `routes/index.js` and delete `billing-checkout-overrides.routes.js`.
+
+Do not delete this file before consolidation.
+
+### `billing-reactivation.routes.js`
+
+Status: contains wanted product behavior, but current review did not find it mounted in `routes/index.js`.
+
+Purpose: lets a trialing user reactivate Pro during the trial after they selected Basic/free for the post-trial plan.
+
+Endpoint:
+
+```text
+POST /api/billing/reactivate-trial-pro
+```
+
+Correct destination:
+
+- `In-Ex-Ledger-API/routes/billing.routes.js`
+
+Consolidation direction:
+
+- Move the `reactivate-trial-pro` route into `billing.routes.js`.
+- Reuse existing billing helpers already in `billing.routes.js` where possible, including `stripeRequest`, `normalizeAdditionalBusinesses`, and `resolveBillingBusinessScope`.
+- Keep rate limiting, auth, and CSRF protection.
+- Delete `billing-reactivation.routes.js` only after the route exists in `billing.routes.js` and is mounted through the normal billing router.
+
+Do not delete this file before consolidation.
+
+### `subscription-reactivation.js`
+
+Status: contains wanted frontend behavior, but current `subscription.html` review shows it is not loaded directly. The subscription page loads `subscription.js`.
+
+Purpose: intercept the Pro CTA only when the user is in the downgraded-trial state and call `/api/billing/reactivate-trial-pro` instead of starting brand-new checkout.
+
+Correct destination:
+
+- `In-Ex-Ledger-API/public/js/subscription.js`
+
+Consolidation direction:
+
+- Move `isTrialDowngradedToBasic(subscription)` into `subscription.js`.
+- Move the Pro reactivation click behavior into the existing Pro CTA handler in `subscription.js`.
+- Ensure it uses the existing subscription page state instead of refetching duplicate state where possible.
+- Delete `subscription-reactivation.js` only after the behavior is integrated and the page uses it from `subscription.js`.
+
+Do not delete this file before consolidation.
+
+### `subscriptionTrialCheckoutPatch.js`
+
+Status: patch-style monkey patch.
+
+Purpose: prevents trialing snapshots from masquerading as paid/remaining paid access by forcing trialing snapshots to:
+
+```js
+isPaid: false,
+isCanceledWithRemainingAccess: false
+```
+
+Correct destination:
+
+- `In-Ex-Ledger-API/services/subscriptionService.js`
+
+Consolidation direction:
+
+- Move the normalization into the actual subscription snapshot builder inside `subscriptionService.js`.
+- Trialing access should remain effective Pro trial access, but it should not be treated as paid access for checkout blocking.
+- Delete `subscriptionTrialCheckoutPatch.js` only after the snapshot logic is native to `subscriptionService.js` and no require/import points to the patch module.
+
+Do not delete this file before consolidation.
+
+## What Cannot Be Safely Implemented From This Connector
+
+The correct destination files are large owner files that are truncated in the current GitHub connector view:
 
 - `In-Ex-Ledger-API/routes/billing.routes.js`
 - `In-Ex-Ledger-API/services/subscriptionService.js`
 - `In-Ex-Ledger-API/public/js/subscription.js`
 
-Delete or rename patch/override files after consolidation.
+Do not work around this by creating new sidecar files.
+
+The remaining Phase 4 work should be done with full-file access through Codex or a local checkout.
 
 ## Phase 4 Definition of Done
 
-- No billing/subscription file is named like a patch, override, or temporary workaround.
-- Checkout logic lives in billing route/service owner files.
-- Reactivation logic lives in billing/subscription owner files.
-- Frontend subscription behavior lives in `subscription.js`.
+- No billing/subscription file is named like a patch, override, bridge, or temporary workaround.
+- Checkout trial normalization lives in `billing.routes.js`.
+- Trial Pro reactivation backend route lives in `billing.routes.js`.
+- Trial Pro reactivation frontend behavior lives in `subscription.js`.
+- Trial snapshot paid-access normalization lives in `subscriptionService.js`.
+- `routes/index.js` does not mount `billing-checkout-overrides.routes.js`.
+- `billing-checkout-overrides.routes.js` is deleted after consolidation.
+- `billing-reactivation.routes.js` is deleted after consolidation.
+- `subscription-reactivation.js` is deleted after consolidation.
+- `subscriptionTrialCheckoutPatch.js` is deleted after consolidation.
 
 ---
 
