@@ -2,15 +2,12 @@ const express = require('express');
 const router = express.Router();
 const arApService = require('../services/arApService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
-const { COOKIE_OPTIONS } = require('../utils/authUtils.js');
 const { resolveBusinessIdForUser } = require('../api/utils/resolveBusinessIdForUser.js');
 const { getSubscriptionSnapshotForBusiness, PLAN_PRO, PLAN_BUSINESS } = require('../services/subscriptionService.js');
 const { allowTrustedBrowserAccountSwitch, rememberTrustedBrowserOnLogout } = require('../middleware/accountSwitchMfaTrust.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled.js');
 
 const businessTierOnly = [requireV2BusinessEnabled, requireV2Entitlement];
-const REFRESH_TOKEN_COOKIE = 'refresh_token';
-const POST_LOGIN_REFRESH_BRIDGE_COOKIE = 'post_login_refresh_bridge';
 
 async function getEffectiveTierForRequest(req) {
   const businessId = await resolveBusinessIdForUser(req.user);
@@ -20,35 +17,6 @@ async function getEffectiveTierForRequest(req) {
 
 router.use('/auth/login', allowTrustedBrowserAccountSwitch);
 router.use('/auth/logout', rememberTrustedBrowserOnLogout);
-
-// Security hardening: do not let the HttpOnly refresh cookie silently recreate
-// a frontend session later. The only allowed refresh is a short post-login
-// bridge window, because the access token is memory-only and is lost during
-// the redirect from /login to the app page.
-//
-// Important: this bridge must survive multiple parallel page-boot API calls.
-// The app can fire /api/me, /api/transactions, /api/accounts, etc. at nearly
-// the same time. Consuming the bridge on the first refresh leaves the rest of
-// the page half-loaded. The browser-set cookie has Max-Age=30, so we let the
-// short window expire naturally instead of clearing it on the first request.
-//
-// Also important: blocking refresh must NOT clear MFA trusted-device cookies.
-// Those cookies are the browser-side half of the DB-backed trusted-device
-// record. If they are deleted here, the user will be asked for a 6-digit code
-// again even though the database still has the trusted device saved.
-router.post('/auth/refresh', (req, res, next) => {
-  const hasPostLoginBridge = req.cookies?.[POST_LOGIN_REFRESH_BRIDGE_COOKIE] === '1';
-
-  if (hasPostLoginBridge) {
-    return next();
-  }
-
-  res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
-  return res.status(401).json({
-    error: 'Session refresh is disabled. Please sign in again.',
-    code: 'REAUTH_REQUIRED'
-  });
-});
 
 router.get('/arap-summary', ...businessTierOnly, async (req, res) => {
   try {
