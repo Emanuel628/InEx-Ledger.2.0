@@ -25,6 +25,16 @@ function escapeHtml(value) {
   document.head.appendChild(script);
 })();
 
+(function wireAnalyticsQuickAddHardening() {
+  if (document.getElementById("hide-analytics-quick-add-js")) return;
+
+  const script = document.createElement("script");
+  script.id = "hide-analytics-quick-add-js";
+  script.src = "/js/hide-analytics-quick-add.js?v=20260505a";
+  script.defer = true;
+  document.head.appendChild(script);
+})();
+
 (function wireTransactionCheckboxActions() {
   if (!/\/transactions(?:$|[?#/])?/i.test(window.location.pathname)) return;
   if (document.getElementById("transaction-checkbox-actions-js")) return;
