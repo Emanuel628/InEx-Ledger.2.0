@@ -12,6 +12,7 @@ Do not create separate phase cleanup docs for the same effort. Add unfinished it
 - Phase 4: In review. Billing/subscription sidecar files contain wanted behavior and must be consolidated, not blindly deleted.
 - Phase 5: In review. Dark mode must remain hard-disabled, including OS/browser automatic dark mode, until it is redesigned.
 - Phase 6: In review. Final audit found remaining sidecar files that should be moved into owner files before deletion.
+- Additional audit: New cleanup candidates were found after the first Phase 6 list, including dark-mode duplicate CSS, recovery artifacts, checksum repair scripts, test naming drift, and documentation folder drift.
 
 ---
 
@@ -497,7 +498,7 @@ Old localStorage dark setting -> app resets to light
 - `theme-boot.js` exists and currently forces light mode early by setting `lb_theme` and `data-theme` to `light`.
 - `tokens.css` still contains a full `[data-theme="dark"]` block.
 - `global.js` still contains `setGlobalTheme(theme)` and can accept `"dark"`.
-- The old duplicate dark-mode CSS files were not found at the checked root CSS paths, but this should be rechecked with full local search.
+- Duplicate dark-mode drift CSS was later found under `In-Ex-Ledger-API/public/css/core/` and is tracked in the Additional Cleanup Candidates section.
 
 ## Remaining Work
 
@@ -571,6 +572,138 @@ Files confirmed gone/not found from current direct checks:
 - No hidden script injection remains.
 - All useful behavior lives in owner files.
 - `Docs/UNFINISHED-CLEANUP-WORK.md` remains the single cleanup source of truth.
+
+---
+
+# Additional Cleanup Candidates Found After Phase 6
+
+## Status
+
+Additional broad filename searches found more files that look like cleanup drift, one-off recovery work, duplicate theme code, or documentation sprawl.
+
+Do not delete these blindly. For each file, first confirm whether it is imported, mounted, referenced by HTML, used by `package.json`, or used by GitHub Actions. If behavior is useful, move it into the proper owner file/folder. If it is a one-off artifact, delete it after confirming it is unused.
+
+## Theme / Dark Mode Drift
+
+Additional files found:
+
+- `In-Ex-Ledger-API/public/css/core/dark-mode-final.css`
+- `In-Ex-Ledger-API/public/css/core/dark-mode-disabled.css`
+
+Owner files/folders:
+
+- `In-Ex-Ledger-API/public/css/core/tokens.css`
+- `In-Ex-Ledger-API/public/js/global.js`
+- `In-Ex-Ledger-API/public/js/theme-boot.js`
+
+Action:
+
+- Review HTML/CSS imports for both CSS files.
+- Keep only one intentional dark-mode-disabled path while dark mode is off.
+- If `theme-boot.js` remains, document it as the early light-mode lock, not a temporary patch.
+- Delete duplicate `dark-mode-final.css` / `dark-mode-disabled.css` drift files after behavior is owned.
+
+## Recovery / Checksum Artifacts
+
+Additional files found:
+
+- `In-Ex-Ledger-API/recovery-artifacts/2026-04-11/README.txt`
+- `In-Ex-Ledger-API/recovery-artifacts/2026-04-11/fix_001.js`
+- `In-Ex-Ledger-API/recovery-artifacts/2026-04-11/fix_checksum.js`
+- `In-Ex-Ledger-API/recovery-artifacts/2026-04-11/fix_all_checksums.js`
+- `In-Ex-Ledger-API/recovery-artifacts/2026-04-11/fix_checksums_from_git.js`
+- `In-Ex-Ledger-API/recovery-artifacts/2026-04-11/show_checksums.js`
+- `In-Ex-Ledger-API/scripts/repair-migration-checksums.js`
+
+Owner files/folders:
+
+- `In-Ex-Ledger-API/scripts/`
+- migration runner / checksum validation owner code
+- `Docs/UNFINISHED-CLEANUP-WORK.md`
+
+Action:
+
+- Decide whether checksum repair is still needed.
+- If it is needed, keep one intentional maintenance script under `In-Ex-Ledger-API/scripts/` with clear instructions.
+- Delete the dated `recovery-artifacts/2026-04-11/` folder after confirming it is not used by runtime, tests, package scripts, or CI.
+- Do not keep multiple checksum fix scripts with overlapping behavior.
+
+## Test Naming / Audit Drift
+
+Additional files found:
+
+- `In-Ex-Ledger-API/tests/i18nFix.js`
+- `In-Ex-Ledger-API/tests/i18nAudit.js`
+- `In-Ex-Ledger-API/tests/billingSubscriptionRecovery.test.js`
+
+Owner files/folders:
+
+- `In-Ex-Ledger-API/tests/i18nCoverage.test.js`
+- `In-Ex-Ledger-API/tests/emailI18n.test.js`
+- billing/subscription regression test files under `In-Ex-Ledger-API/tests/`
+
+Action:
+
+- If `i18nFix.js` contains useful regression coverage, rename it to a stable `.test.js` name or merge it into `i18nCoverage.test.js` / `emailI18n.test.js`.
+- If `i18nAudit.js` is a one-off audit script, move it to an intentional scripts/audit location or delete it after confirming it is unused.
+- Keep `billingSubscriptionRecovery.test.js` only if it is a real regression test. If the name reflects a temporary recovery effort, rename it to match the billing/subscription behavior it protects.
+
+## Documentation Drift
+
+Additional files/folders found:
+
+- `AUDIT-REPORT.md`
+- `AUDIT-REPORT-2026-04-13.md`
+- `TASK-STATUS.md`
+- lowercase `docs/` folder, including examples such as:
+  - `docs/table-audit.md`
+  - `docs/SECURITY_PLAN.md`
+  - `docs/V2_BUILD_PLAN.md`
+  - `docs/IMPECCABLE_STYLE_FRONTEND_ROLLOUT_PLAN.md`
+  - `docs/MUTATION_AUDIT.md`
+
+Owner folder:
+
+- `Docs/`
+
+Action:
+
+- Move or merge useful root docs and lowercase `docs/` files into `Docs/`.
+- Delete stale duplicate audit reports after useful content is preserved.
+- Avoid maintaining both `Docs/` and lowercase `docs/`.
+- Decide whether `README.md` should stay at root for GitHub visibility while the working documentation lives under `Docs/`.
+- Keep `TASK-STATUS.md` only if it remains the current project status source; otherwise merge its useful content into the Docs folder and delete the duplicate status file.
+
+## Guardrail / Utility Script Review
+
+Additional files found:
+
+- `scripts/check-bundle-drift.js`
+- `scripts/log_scan.js`
+- `In-Ex-Ledger-API/scripts/log_scan.js`
+
+Owner files/folders:
+
+- `scripts/`
+- `In-Ex-Ledger-API/scripts/`
+- GitHub Actions workflows / package scripts that intentionally run these checks
+
+Action:
+
+- Keep these only if they are wired into CI, package scripts, or documented maintenance workflows.
+- If they are useful, document when/how they run.
+- If they are unused one-off scan scripts, delete them.
+- Avoid duplicate root-level and API-level scripts that perform the same scan unless there is a clear reason.
+
+## Additional Audit Definition of Done
+
+- No duplicate dark-mode CSS drift files remain.
+- No dated recovery artifact folder remains in the app tree unless explicitly archived and documented.
+- No one-off checksum fix scripts remain unless consolidated into one documented maintenance script.
+- No tests are named like temporary fixes or audits unless intentionally documented.
+- Documentation lives under `Docs/`, except root `README.md` if kept for GitHub landing visibility.
+- No duplicate `docs/` and `Docs/` documentation systems remain.
+- No unused scan/drift scripts remain outside documented CI or maintenance workflows.
 
 ---
 
