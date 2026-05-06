@@ -3,6 +3,7 @@
   if (!/\/transactions(?:$|[?#/])?/i.test(window.location.pathname)) return;
 
   let selectedId = null;
+  let selectedCheckbox = null;
 
   function getTable() {
     return document.querySelector(".transactions-table");
@@ -62,7 +63,9 @@
       .tx-row-popup {
         position: fixed;
         z-index: 1000;
+        width: max-content;
         min-width: 142px;
+        max-width: min(220px, calc(100vw - 16px));
         padding: 8px;
         border-radius: 14px;
         border: 1px solid rgba(148, 163, 184, 0.28);
@@ -74,6 +77,19 @@
 
       .tx-row-popup[hidden] {
         display: none !important;
+      }
+
+      .tx-row-popup::before {
+        content: "";
+        position: absolute;
+        top: -6px;
+        left: 14px;
+        width: 10px;
+        height: 10px;
+        background: #ffffff;
+        border-left: 1px solid rgba(148, 163, 184, 0.28);
+        border-top: 1px solid rgba(148, 163, 184, 0.28);
+        transform: rotate(45deg);
       }
 
       .tx-popup-action {
@@ -110,21 +126,51 @@
     table.querySelectorAll("th.col-actions, td.table-actions-cell").forEach((node) => node.remove());
   }
 
-  function positionPopupNearCheckbox(checkbox) {
-    const popup = getPopup();
-    const rect = checkbox.getBoundingClientRect();
-    const popupWidth = 142;
-    const left = Math.max(8, Math.min(rect.left, window.innerWidth - popupWidth - 8));
-    const below = rect.bottom + 8;
-    const top = below + 96 > window.innerHeight ? Math.max(8, rect.top - 96) : below;
+  function getAnchorRect(checkbox) {
+    const input = checkbox instanceof HTMLElement ? checkbox : null;
+    if (!input || !input.isConnected) return null;
 
-    popup.style.left = `${left}px`;
-    popup.style.top = `${top}px`;
+    const rect = input.getBoundingClientRect();
+    if (rect.width > 0 || rect.height > 0) return rect;
+
+    const cell = input.closest("td, th, label") || input;
+    return cell.getBoundingClientRect();
+  }
+
+  function positionPopupNearCheckbox(checkbox) {
+    selectedCheckbox = checkbox || selectedCheckbox;
+    const anchor = selectedCheckbox;
+    const rect = getAnchorRect(anchor);
+    const popup = getPopup();
+
+    if (!rect) {
+      popup.hidden = true;
+      return;
+    }
+
     popup.hidden = false;
+
+    // Measure after showing so the browser can calculate the real popup size.
+    const popupRect = popup.getBoundingClientRect();
+    const gap = 10;
+    const viewportPadding = 8;
+    const preferredLeft = rect.left + Math.max(0, (rect.width - 16) / 2);
+    const maxLeft = window.innerWidth - popupRect.width - viewportPadding;
+    const left = Math.max(viewportPadding, Math.min(preferredLeft, maxLeft));
+
+    const belowTop = rect.bottom + gap;
+    const aboveTop = rect.top - popupRect.height - gap;
+    const top = belowTop + popupRect.height <= window.innerHeight - viewportPadding
+      ? belowTop
+      : Math.max(viewportPadding, aboveTop);
+
+    popup.style.left = `${Math.round(left)}px`;
+    popup.style.top = `${Math.round(top)}px`;
   }
 
   function clearSelection(hidePopup = true) {
     selectedId = null;
+    selectedCheckbox = null;
     document.querySelectorAll(".transactions-table .tx-row-select").forEach((checkbox) => {
       checkbox.checked = false;
       checkbox.closest("tr")?.classList.remove("is-selected");
@@ -152,8 +198,9 @@
     }
 
     selectedId = id;
+    selectedCheckbox = checkbox;
     row?.classList.add("is-selected");
-    positionPopupNearCheckbox(checkbox);
+    window.requestAnimationFrame(() => positionPopupNearCheckbox(checkbox));
   }
 
   function wireCheckboxes() {
@@ -176,10 +223,17 @@
     }, true);
   }
 
+  function repositionOpenPopup() {
+    const popup = document.getElementById("txRowPopup");
+    if (!popup || popup.hidden || !selectedCheckbox) return;
+    positionPopupNearCheckbox(selectedCheckbox);
+  }
+
   function sync() {
     injectStyles();
     removeActionsHeaderAndCells();
     wireCheckboxes();
+    repositionOpenPopup();
   }
 
   document.addEventListener("DOMContentLoaded", () => {
@@ -196,5 +250,7 @@
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") clearSelection();
     });
+    window.addEventListener("scroll", repositionOpenPopup, true);
+    window.addEventListener("resize", repositionOpenPopup);
   });
 })();
