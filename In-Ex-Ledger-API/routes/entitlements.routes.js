@@ -14,22 +14,12 @@ function buildEntitlements(subscription) {
 
   return {
     effective_tier: effectiveTier,
+    quick_add_sidebar_enabled: isPro || isBusiness,
     business_quick_add_enabled: isBusiness,
     recurring_templates_enabled: isBusiness,
     export_history_enabled: isPro || isBusiness
   };
 }
-
-router.get('/quick-add', async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    res.json(buildEntitlements(subscription));
-  } catch (err) {
-    logError('GET /entitlements/quick-add error:', err.stack || err);
-    res.status(500).json({ error: 'Failed to load quick add entitlements.' });
-  }
-});
 
 router.get('/features', async (req, res) => {
   try {
