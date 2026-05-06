@@ -1,0 +1,17 @@
+/* Transactions table should not expose a permanent Actions column.
+   Row actions belong to the left checkbox / selected-row popup flow. */
+.transactions-table th.col-actions,
+.transactions-table td.table-actions-cell,
+.transactions-table .row-action-button {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+}
+
+.transactions-table tr.is-selected {
+  background: rgba(79, 70, 229, 0.06);
+}
