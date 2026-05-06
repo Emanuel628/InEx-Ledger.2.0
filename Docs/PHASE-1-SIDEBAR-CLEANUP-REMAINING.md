@@ -38,6 +38,143 @@ Quick Add sidebar gating should be:
 
 This keeps the free product useful without making it feel like the complete paid product.
 
+## Required Gating Logic for `global.js`
+
+`global.js` must become the single source of truth for Quick Add visibility.
+
+Do **not** recreate sidecar files. Do **not** hide items after render. Do **not** inject scripts.
+
+### Tier behavior
+
+```text
+Basic/free -> do not initialize or render the Quick Add sidebar
+Pro        -> render only Core Quick Add items
+Business   -> render Core plus Business Quick Add items
+```
+
+### Suggested helper functions
+
+Add helper functions near the dynamic sidebar constants in `global.js`:
+
+```js
+const DYNAMIC_SIDEBAR_CORE_FEATURE_IDS = new Set([
+  "transactions",
+  "receipts",
+  "mileage",
+  "accounts",
+  "categories",
+  "exports"
+]);
+
+const DYNAMIC_SIDEBAR_BUSINESS_FEATURE_IDS = new Set([
+  "customers",
+  "invoices",
+  "bills",
+  "vendors",
+  "projects",
+  "billable-expenses",
+  "billable_expenses"
+]);
+
+function normalizeDynamicSidebarTier(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getDynamicSidebarSubscription() {
+  const profileSubscription = window.__LUNA_ME__?.subscription;
+  if (profileSubscription && typeof profileSubscription === "object") {
+    return profileSubscription;
+  }
+
+  try {
+    return JSON.parse(localStorage.getItem("lb_subscription") || "null") || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function getDynamicSidebarTier() {
+  const subscription = getDynamicSidebarSubscription();
+  const candidates = [
+    subscription?.effectiveTier,
+    subscription?.tier,
+    subscription?.plan,
+    subscription?.planCode,
+    subscription?.plan_code,
+    localStorage.getItem("tier")
+  ];
+
+  return candidates.map(normalizeDynamicSidebarTier).find(Boolean) || "free";
+}
+
+function hasDynamicSidebarQuickAddAccess() {
+  const tier = getDynamicSidebarTier();
+  return tier === "v1" || tier === "pro" || tier === "business" || tier === "v2";
+}
+
+function hasDynamicSidebarBusinessTier() {
+  const tier = getDynamicSidebarTier();
+  return tier === "business" || tier === "v2" || tier === "business_tier";
+}
+
+function getDynamicSidebarAvailableFeatures() {
+  if (!hasDynamicSidebarQuickAddAccess()) {
+    return [];
+  }
+
+  const allowBusiness = hasDynamicSidebarBusinessTier();
+  return DYNAMIC_SIDEBAR_FEATURES.filter((feature) => {
+    if (DYNAMIC_SIDEBAR_BUSINESS_FEATURE_IDS.has(feature.id)) {
+      return allowBusiness;
+    }
+    return DYNAMIC_SIDEBAR_CORE_FEATURE_IDS.has(feature.id);
+  });
+}
+```
+
+### Required `initDynamicSidebar()` behavior
+
+At the start of `initDynamicSidebar()`:
+
+```js
+const availableFeatures = getDynamicSidebarAvailableFeatures();
+if (!availableFeatures.length) {
+  sidebar.hidden = true;
+  sidebar.setAttribute("aria-hidden", "true");
+  sidebar.innerHTML = "";
+  return;
+}
+```
+
+Then build `featureMap`, favorites, and the rendered library from `availableFeatures`, not directly from `DYNAMIC_SIDEBAR_FEATURES`.
+
+Do this:
+
+```js
+let availableFeatures = getDynamicSidebarAvailableFeatures();
+let featureMap = new Map(availableFeatures.map((feature) => [feature.id, feature]));
+```
+
+Inside `render()`, refresh the available list before rendering:
+
+```js
+availableFeatures = getDynamicSidebarAvailableFeatures();
+featureMap = new Map(availableFeatures.map((feature) => [feature.id, feature]));
+favorites = favorites.filter((id) => featureMap.has(id));
+```
+
+Then group from:
+
+```js
+availableFeatures.reduce(...)
+```
+
+not:
+
+```js
+DYNAMIC_SIDEBAR_FEATURES.reduce(...)
+```
+
 ## Why This Exists
 
 `global.js` is the actual owner of the dynamic sidebar / Quick Add feature list. The deleted files were workaround files that hid or modified sidebar behavior after render. That is not acceptable architecture.
@@ -68,29 +205,6 @@ Basic/free users should not see the dynamic Quick Add sidebar.
 Pro users should only see Core quick-add actions.
 
 Business-tier users should see Core plus Business actions.
-
-Suggested source-level rules:
-
-```js
-const DYNAMIC_SIDEBAR_CORE_FEATURE_IDS = new Set([
-  "transactions",
-  "receipts",
-  "mileage",
-  "accounts",
-  "categories",
-  "exports"
-]);
-
-const DYNAMIC_SIDEBAR_BUSINESS_FEATURE_IDS = new Set([
-  "customers",
-  "invoices",
-  "bills",
-  "vendors",
-  "projects",
-  "billable-expenses",
-  "billable_expenses"
-]);
-```
 
 Business quick-add options should only render when the active subscription tier is Business / V2.
 
@@ -150,6 +264,7 @@ Phase 1 is complete only when all of these are true:
 - `global.js` is the only owner of dynamic sidebar logic.
 - Basic/free users do not see the Quick Add sidebar.
 - Analytics does not appear in Quick Add.
+- Settings does not appear in Quick Add.
 - Business quick-add options do not appear for non-Business users.
 - Pro users see only Core Quick Add options.
 - Business-tier users see Core plus Business Quick Add options.
