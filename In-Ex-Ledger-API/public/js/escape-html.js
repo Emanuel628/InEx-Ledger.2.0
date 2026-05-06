@@ -41,7 +41,7 @@ function escapeHtml(value) {
 
   const script = document.createElement("script");
   script.id = "transaction-undo-button-js";
-  script.src = "/js/transaction-undo-button.js?v=20260505a";
+  script.src = "/js/transaction-undo-button.js?v=20260505b";
   script.defer = true;
   document.head.appendChild(script);
 })();
