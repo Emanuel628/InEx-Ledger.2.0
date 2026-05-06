@@ -87,5 +87,6 @@ router.use('/invoices-v1', require('./invoices-v1.routes.js'));
 router.use('/messages', require('./messages.routes.js'));
 router.use('/consent', require('./consent.routes.js'));
 router.use('/check-email-verified', require('./check-email-verified.routes.js'));
+router.use('/transactions', require('./transactions-undo.routes.js'));
 
 module.exports = router;
