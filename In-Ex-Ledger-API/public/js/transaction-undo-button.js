@@ -1,4 +1,4 @@
-/* Replace the old Select All checkbox slot with a quiet Undo control. */
+/* Replace the old Select All checkbox slot with a neutral Undo control. */
 (function () {
   if (!/\/transactions(?:$|[?#/])?/i.test(location.pathname)) return;
 
@@ -17,104 +17,124 @@
   }
 
   function installStyle() {
-    if (document.getElementById('txUndoButtonStyle')) return;
-    const style = document.createElement('style');
-    style.id = 'txUndoButtonStyle';
+    let style = document.getElementById('txUndoButtonStyle');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'txUndoButtonStyle';
+      document.head.appendChild(style);
+    }
+
+    // Always replace the style content. Older cached scripts injected the blue CTA style.
     style.textContent = `
       .transactions-table thead #txSelectAll { display: none !important; }
       .transactions-table thead th.col-select,
       .transactions-table tbody td:first-child {
-        width: 116px !important;
-        min-width: 116px !important;
-        max-width: 116px !important;
-        text-align: center;
-        vertical-align: middle;
-        padding-left: 14px !important;
-        padding-right: 14px !important;
+        width: 128px !important;
+        min-width: 128px !important;
+        max-width: 128px !important;
+        text-align: center !important;
+        vertical-align: middle !important;
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+        overflow: visible !important;
       }
       .transactions-table thead th.col-date,
       .transactions-table tbody td:nth-child(2) {
-        padding-left: 22px !important;
+        padding-left: 28px !important;
       }
-      .tx-undo-delete-button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 5px;
-        min-width: 78px;
-        height: 28px;
-        padding: 0 11px;
-        border: 1px solid rgba(148, 163, 184, 0.42);
-        border-radius: 999px;
+      .transactions-table thead th.col-select .tx-undo-delete-button,
+      #txUndoDeleteButton.tx-undo-delete-button {
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 5px !important;
+        width: auto !important;
+        min-width: 82px !important;
+        max-width: 96px !important;
+        height: 28px !important;
+        padding: 0 12px !important;
+        border: 1px solid rgba(148, 163, 184, 0.45) !important;
+        border-radius: 999px !important;
         background: #ffffff !important;
+        background-image: none !important;
         color: #475569 !important;
-        font: inherit;
-        font-size: 12px;
-        font-weight: 800;
-        line-height: 1;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        cursor: pointer;
-        box-shadow: none;
-        white-space: nowrap;
+        font-family: inherit !important;
+        font-size: 12px !important;
+        font-weight: 800 !important;
+        line-height: 1 !important;
+        letter-spacing: 0.04em !important;
+        text-transform: uppercase !important;
+        cursor: pointer !important;
+        box-shadow: none !important;
+        filter: none !important;
+        white-space: nowrap !important;
       }
-      .tx-undo-delete-button:hover {
+      .transactions-table thead th.col-select .tx-undo-delete-button:hover,
+      #txUndoDeleteButton.tx-undo-delete-button:hover {
         background: #f8fafc !important;
-        border-color: rgba(100, 116, 139, 0.55);
+        background-image: none !important;
+        border-color: rgba(100, 116, 139, 0.6) !important;
         color: #0f172a !important;
+        box-shadow: none !important;
+        filter: none !important;
       }
-      .tx-undo-delete-button:focus-visible {
-        outline: 3px solid rgba(100, 116, 139, 0.18);
-        outline-offset: 2px;
+      #txUndoDeleteButton.tx-undo-delete-button:focus-visible {
+        outline: 3px solid rgba(100, 116, 139, 0.18) !important;
+        outline-offset: 2px !important;
       }
-      .tx-undo-delete-button:disabled {
-        opacity: 0.5;
-        cursor: wait;
+      #txUndoDeleteButton.tx-undo-delete-button:disabled {
+        opacity: 0.5 !important;
+        cursor: wait !important;
       }
       .tx-undo-delete-icon {
-        font-size: 14px;
-        line-height: 1;
-        transform: translateY(-0.5px);
+        font-size: 14px !important;
+        line-height: 1 !important;
+        transform: translateY(-0.5px) !important;
       }
     `;
-    document.head.appendChild(style);
   }
 
   function ensureUndoButton() {
     installStyle();
     const headerCell = document.querySelector('.transactions-table thead th.col-select');
     if (!headerCell) return;
+
     const selectAll = headerCell.querySelector('#txSelectAll');
     if (selectAll) selectAll.remove();
-    if (headerCell.querySelector('#txUndoDeleteButton')) return;
 
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.id = 'txUndoDeleteButton';
+    let button = headerCell.querySelector('#txUndoDeleteButton');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.id = 'txUndoDeleteButton';
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        try {
+          const res = await api('/api/transactions/undo-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          if (!res || !res.ok) {
+            const err = res ? await res.json().catch(() => null) : null;
+            throw new Error(err?.error || 'No deleted transaction to restore.');
+          }
+          location.reload();
+        } catch (error) {
+          alert(error.message || 'Unable to restore transaction.');
+        } finally {
+          button.disabled = false;
+        }
+      });
+      headerCell.appendChild(button);
+    }
+
     button.className = 'tx-undo-delete-button';
     button.title = 'Undo last deleted transaction';
     button.setAttribute('aria-label', 'Undo last deleted transaction');
     button.innerHTML = '<span>Undo</span><span class="tx-undo-delete-icon" aria-hidden="true">↶</span>';
-    button.addEventListener('click', async () => {
-      button.disabled = true;
-      try {
-        const res = await api('/api/transactions/undo-delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({})
-        });
-        if (!res || !res.ok) {
-          const err = res ? await res.json().catch(() => null) : null;
-          throw new Error(err?.error || 'No deleted transaction to restore.');
-        }
-        location.reload();
-      } catch (error) {
-        alert(error.message || 'Unable to restore transaction.');
-      } finally {
-        button.disabled = false;
-      }
-    });
-    headerCell.appendChild(button);
   }
 
   function start() {
