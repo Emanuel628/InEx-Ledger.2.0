@@ -7,10 +7,11 @@ Do not create separate phase cleanup docs for the same effort. Add unfinished it
 ## Current Status Summary
 
 - Phase 1: Partially complete. Patch files are removed, but `global.js` still needs direct Quick Add gating.
-- Phase 2: Partially complete. Patch routes/files are removed, but the Undo button still needs a proper rebuild in the real transaction owner files.
+- Phase 2: Partially complete. Patch routes/files are removed, but the Undo button and checkbox row actions still need a proper rebuild in the real transaction owner files.
 - Phase 3: Complete. Login/MFA refresh bridge cookie code was removed.
 - Phase 4: In review. Billing/subscription sidecar files contain wanted behavior and must be consolidated, not blindly deleted.
 - Phase 5: In review. Dark mode must remain hard-disabled, including OS/browser automatic dark mode, until it is redesigned.
+- Phase 6: In review. Final audit found remaining sidecar files that should be moved into owner files before deletion.
 
 ---
 
@@ -188,7 +189,7 @@ After changing `global.js`, cache-bust all HTML references to the new global ver
 
 ---
 
-# Phase 2 — Transactions Undo Cleanup
+# Phase 2 — Transactions Undo / Checkbox Action Cleanup
 
 ## Completed
 
@@ -200,16 +201,21 @@ Deleted the separate backend sidecar route file:
 
 - `In-Ex-Ledger-API/routes/transactions-undo.routes.js`
 
-Current active search did not find these old frontend sidecar files on `main`:
+## Phase 6 Audit Correction
 
-- `transaction-undo-button.js`
-- `transaction-checkbox-actions.js`
-- `transaction-checkbox-actions-v2.js`
-- `transactions-no-actions-column.css`
+The final audit found these frontend sidecar files still exist on `main`:
+
+- `In-Ex-Ledger-API/public/js/transaction-undo-button.js`
+- `In-Ex-Ledger-API/public/js/transaction-checkbox-actions.js`
+- `In-Ex-Ledger-API/public/js/transaction-checkbox-actions-v2.js`
+
+Do not delete them blindly if their behavior is still wanted. They should be treated as implementation notes/source material, then moved into the real transaction owner files before deletion.
+
+Current reference search did not find active HTML/global references to these files, so they appear to be disconnected sidecars. Still, the useful behavior should be reviewed before deletion.
 
 ## Remaining Work
 
-The Undo button is not currently active. If still wanted, it must be rebuilt directly inside the real transaction owner files.
+Undo and checkbox row actions are not properly active from owner files. If still wanted, rebuild them directly inside the real transaction owner files.
 
 Do not recreate sidecar files.
 
@@ -255,7 +261,7 @@ const {
 
 ### Frontend rebuild direction
 
-If the button is kept:
+If the Undo button is kept:
 
 - Place it directly in `transactions.html` where the select-all checkbox/header action belongs.
 - Put the click handler directly in `transactions.js`.
@@ -264,6 +270,13 @@ If the button is kept:
 - Show a clear success/failure message.
 - Style it in `transactions.css`.
 
+If checkbox row actions are kept:
+
+- Move popup/edit/delete behavior from `transaction-checkbox-actions-v2.js` into `transactions.js`.
+- Move popup markup/styling into `transactions.html` and `transactions.css`.
+- Do not create or keep `transaction-checkbox-actions.js` or `transaction-checkbox-actions-v2.js`.
+- Prefer one implementation only; do not keep both v1 and v2 behaviors.
+
 ## Phase 2 Definition of Done
 
 - `transactions-undo.routes.js` does not exist.
@@ -271,9 +284,11 @@ If the button is kept:
 - No frontend transaction sidecar scripts exist.
 - No utility file injects transaction behavior.
 - Undo is either intentionally removed or properly rebuilt in the real owner files.
+- Checkbox row actions are either intentionally removed or properly rebuilt in the real owner files.
 - If kept, `POST /api/transactions/undo-delete` lives in `transactions.routes.js`.
 - If kept, the Undo button is in `transactions.html`.
 - If kept, Undo frontend logic is in `transactions.js`.
+- If kept, checkbox popup logic is in `transactions.js`, not a `-v2` sidecar.
 
 ---
 
@@ -484,6 +499,52 @@ Preferred final architecture:
 - No duplicate `dark-mode-final` / `dark-mode-disabled` drift files exist.
 - No hidden server/script injection controls theme behavior.
 - Dark mode is either intentionally disabled or fully redesigned.
+
+---
+
+# Phase 6 — Final Audit
+
+## Status
+
+Phase 6 has started.
+
+Do not delete remaining sidecar files unless both are true:
+
+1. the behavior is unwanted or already integrated into the correct owner file, and
+2. the owner-file destination is documented.
+
+## Findings
+
+Remaining sidecar/patch files confirmed on `main`:
+
+- `In-Ex-Ledger-API/public/js/transaction-undo-button.js`
+- `In-Ex-Ledger-API/public/js/transaction-checkbox-actions.js`
+- `In-Ex-Ledger-API/public/js/transaction-checkbox-actions-v2.js`
+- `In-Ex-Ledger-API/routes/billing-checkout-overrides.routes.js`
+- `In-Ex-Ledger-API/services/subscriptionTrialCheckoutPatch.js`
+- `In-Ex-Ledger-API/public/js/theme-boot.js`
+
+Files confirmed gone/not found from current direct checks:
+
+- `In-Ex-Ledger-API/public/js/global-patches.js`
+- `In-Ex-Ledger-API/public/js/quick-add-entitlements.js`
+
+## Phase 6 Remaining Work
+
+- Recheck all suspicious filenames using a full local search because the GitHub connector search can miss exact filenames.
+- For every remaining sidecar, choose one of these outcomes:
+  - move useful behavior into owner file, then delete sidecar
+  - mark as intentionally permanent with a clear owner reason
+  - delete only if behavior is truly unwanted and unused
+- Do not create new sidecars.
+
+## Phase 6 Definition of Done
+
+- No disconnected sidecar files remain.
+- No `-v2`, `patch`, `override`, `bridge`, or `temporary` file remains unless explicitly documented as permanent.
+- No hidden script injection remains.
+- All useful behavior lives in owner files.
+- `Docs/UNFINISHED-CLEANUP-WORK.md` remains the single cleanup source of truth.
 
 ---
 
