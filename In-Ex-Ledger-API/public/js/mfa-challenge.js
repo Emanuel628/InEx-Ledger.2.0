@@ -6,8 +6,6 @@ function tx(key) {
 }
 
 let pendingMfaToken = "";
-const POST_LOGIN_HANDOFF_KEY = "lb_post_login_access_token_handoff";
-const POST_LOGIN_HANDOFF_AT_KEY = "lb_post_login_access_token_handoff_at";
 
 function syncPendingMfaToken() {
   pendingMfaToken = sessionStorage.getItem("lb_pending_mfa_token") || "";
@@ -23,13 +21,6 @@ function markPostLoginRefreshBridge() {
   document.cookie = `post_login_refresh_bridge=1; Max-Age=30; Path=/; SameSite=Strict${secure}`;
 }
 
-function markPostLoginAccessHandoff(token) {
-  try {
-    if (!token) return;
-    sessionStorage.setItem(POST_LOGIN_HANDOFF_KEY, token);
-    sessionStorage.setItem(POST_LOGIN_HANDOFF_AT_KEY, String(Date.now()));
-  } catch (_) {}
-}
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!syncPendingMfaToken()) {
@@ -111,7 +102,6 @@ async function handleMfaChallengeSubmit(event) {
     clearPendingMfaState();
     setToken(data.token);
     markPostLoginRefreshBridge();
-    markPostLoginAccessHandoff(data.token);
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }

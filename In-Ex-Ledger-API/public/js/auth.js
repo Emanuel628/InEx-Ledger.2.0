@@ -60,13 +60,6 @@ if (!window.__AUTH_GUARD_STATE__) {
 }
 
 let pendingRefreshPromise = null;
-let _accessToken = null;
-
-// Wipe any legacy token from prior versions that persisted to web storage.
-// The access token now lives only in memory; the HttpOnly refresh cookie
-// re-issues it on page load via refreshAccessToken().
-try { sessionStorage.removeItem("token"); } catch (_) {}
-try { localStorage.removeItem("token"); } catch (_) {}
 
 function resolveStorageUserId(profile = window.__LUNA_ME__) {
   return profile?.id || profile?.user_id || profile?.userId || profile?.uid || "";
@@ -464,19 +457,28 @@ function ensureUserPillChrome(pill) {
 
 
 function getToken() {
-  return _accessToken || "";
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) || "";
+  } catch (_) {}
+  return "";
 }
 
 function setToken(token) {
-  _accessToken = token || null;
-  try { sessionStorage.removeItem(TOKEN_KEY); } catch (_) {}
-  try { localStorage.removeItem(TOKEN_KEY); } catch (_) {}
+  try {
+    sessionStorage.setItem(TOKEN_KEY, token);
+  } catch (_) {}
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch (_) {}
 }
 
 function clearToken() {
-  _accessToken = null;
-  try { sessionStorage.removeItem(TOKEN_KEY); } catch (_) {}
-  try { localStorage.removeItem(TOKEN_KEY); } catch (_) {}
+  try {
+    sessionStorage.removeItem(TOKEN_KEY);
+  } catch (_) {}
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch (_) {}
   clearSubscriptionState();
   clearAppState();
   if (window.__AUTH_GUARD_STATE__) {
@@ -604,8 +606,7 @@ async function requireValidSessionOrRedirect() {
     return;
   }
 
-  // In-memory access token is empty after every page reload; recover it from
-  // the HttpOnly refresh cookie before treating the session as expired.
+  // If no stored access token is available, try the refresh cookie before treating the session as expired.
   if (!getToken()) {
     await refreshAccessToken();
   }
@@ -685,8 +686,7 @@ async function requireValidSessionOrRedirect() {
 async function redirectIfAuthenticated() {
   try {
     if (!getToken()) {
-      // Try to bootstrap from the HttpOnly refresh cookie. If that fails,
-      // the visitor is genuinely signed out.
+      // Try to bootstrap from the HttpOnly refresh cookie. If that fails, the visitor is genuinely signed out.
       await refreshAccessToken();
     }
     if (!getToken()) {
