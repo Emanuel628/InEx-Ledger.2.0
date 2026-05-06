@@ -1,4 +1,4 @@
-/* Replace the old Select All checkbox slot with an Undo button. */
+/* Replace the old Select All checkbox slot with a quiet Undo control. */
 (function () {
   if (!/\/transactions(?:$|[?#/])?/i.test(location.pathname)) return;
 
@@ -22,23 +22,50 @@
     style.id = 'txUndoButtonStyle';
     style.textContent = `
       .transactions-table thead #txSelectAll { display: none !important; }
+      .transactions-table thead th.col-select {
+        text-align: center;
+        vertical-align: middle;
+      }
       .tx-undo-delete-button {
-        width: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        min-width: 72px;
         height: 30px;
-        display: inline-grid;
-        place-items: center;
-        border: 0;
+        padding: 0 10px;
+        border: 1px solid rgba(148, 163, 184, 0.36);
         border-radius: 999px;
-        background: #1f5f8b;
-        color: #fff;
-        font-size: 17px;
+        background: rgba(255, 255, 255, 0.72);
+        color: #475569;
+        font: inherit;
+        font-size: 12px;
         font-weight: 800;
         line-height: 1;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
         cursor: pointer;
-        box-shadow: 0 8px 18px rgba(31, 95, 139, 0.22);
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        white-space: nowrap;
       }
-      .tx-undo-delete-button:hover { filter: brightness(1.04); }
-      .tx-undo-delete-button:disabled { opacity: 0.5; cursor: wait; }
+      .tx-undo-delete-button:hover {
+        background: #ffffff;
+        border-color: rgba(100, 116, 139, 0.48);
+        color: #0f172a;
+      }
+      .tx-undo-delete-button:focus-visible {
+        outline: 3px solid rgba(59, 130, 246, 0.22);
+        outline-offset: 2px;
+      }
+      .tx-undo-delete-button:disabled {
+        opacity: 0.5;
+        cursor: wait;
+      }
+      .tx-undo-delete-icon {
+        font-size: 14px;
+        line-height: 1;
+        transform: translateY(-0.5px);
+      }
     `;
     document.head.appendChild(style);
   }
@@ -57,7 +84,7 @@
     button.className = 'tx-undo-delete-button';
     button.title = 'Undo last deleted transaction';
     button.setAttribute('aria-label', 'Undo last deleted transaction');
-    button.textContent = '↶';
+    button.innerHTML = '<span>Undo</span><span class="tx-undo-delete-icon" aria-hidden="true">↶</span>';
     button.addEventListener('click', async () => {
       button.disabled = true;
       try {
