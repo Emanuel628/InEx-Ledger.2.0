@@ -16,6 +16,11 @@ function getPendingMfaEmail() {
   return sessionStorage.getItem("lb_pending_mfa_email") || "";
 }
 
+function markPostLoginRefreshBridge() {
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `post_login_refresh_bridge=1; Max-Age=30; Path=/; SameSite=Strict${secure}`;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   if (!syncPendingMfaToken()) {
     window.location.href = "/login";
@@ -95,6 +100,7 @@ async function handleMfaChallengeSubmit(event) {
 
     clearPendingMfaState();
     setToken(data.token);
+    markPostLoginRefreshBridge();
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }
