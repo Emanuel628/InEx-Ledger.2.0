@@ -12,6 +12,7 @@ const businessTierOnly = [requireV2BusinessEnabled, requireV2Entitlement];
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
 const MFA_TRUST_COOKIE = 'mfa_trust';
 const GLOBAL_MFA_TRUST_COOKIE = 'mfa_global_trust';
+const POST_LOGIN_REFRESH_BRIDGE_COOKIE = 'post_login_refresh_bridge';
 
 async function getEffectiveTierForRequest(req) {
   const businessId = await resolveBusinessIdForUser(req.user);
@@ -23,9 +24,17 @@ router.use('/auth/login', allowTrustedBrowserAccountSwitch);
 router.use('/auth/logout', rememberTrustedBrowserOnLogout);
 
 // Security hardening: do not let the HttpOnly refresh cookie silently recreate
-// a frontend session. Users must explicitly sign in after the in-memory access
-// token is gone, such as after reload, browser restart, or returning later.
-router.post('/auth/refresh', (req, res) => {
+// a frontend session later. The only allowed refresh is a one-time short bridge
+// immediately after login, because the access token is memory-only and is lost
+// during the redirect from /login to the app page.
+router.post('/auth/refresh', (req, res, next) => {
+  const hasPostLoginBridge = req.cookies?.[POST_LOGIN_REFRESH_BRIDGE_COOKIE] === '1';
+  res.clearCookie(POST_LOGIN_REFRESH_BRIDGE_COOKIE, { ...COOKIE_OPTIONS, httpOnly: false });
+
+  if (hasPostLoginBridge) {
+    return next();
+  }
+
   res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
   res.clearCookie(MFA_TRUST_COOKIE, COOKIE_OPTIONS);
   res.clearCookie(GLOBAL_MFA_TRUST_COOKIE, COOKIE_OPTIONS);
