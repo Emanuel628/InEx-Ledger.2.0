@@ -22,22 +22,32 @@
     style.id = 'txUndoButtonStyle';
     style.textContent = `
       .transactions-table thead #txSelectAll { display: none !important; }
-      .transactions-table thead th.col-select {
+      .transactions-table thead th.col-select,
+      .transactions-table tbody td:first-child {
+        width: 116px !important;
+        min-width: 116px !important;
+        max-width: 116px !important;
         text-align: center;
         vertical-align: middle;
+        padding-left: 14px !important;
+        padding-right: 14px !important;
+      }
+      .transactions-table thead th.col-date,
+      .transactions-table tbody td:nth-child(2) {
+        padding-left: 22px !important;
       }
       .tx-undo-delete-button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 5px;
-        min-width: 72px;
-        height: 30px;
-        padding: 0 10px;
-        border: 1px solid rgba(148, 163, 184, 0.36);
+        min-width: 78px;
+        height: 28px;
+        padding: 0 11px;
+        border: 1px solid rgba(148, 163, 184, 0.42);
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.72);
-        color: #475569;
+        background: #ffffff !important;
+        color: #475569 !important;
         font: inherit;
         font-size: 12px;
         font-weight: 800;
@@ -45,16 +55,16 @@
         letter-spacing: 0.04em;
         text-transform: uppercase;
         cursor: pointer;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        box-shadow: none;
         white-space: nowrap;
       }
       .tx-undo-delete-button:hover {
-        background: #ffffff;
-        border-color: rgba(100, 116, 139, 0.48);
-        color: #0f172a;
+        background: #f8fafc !important;
+        border-color: rgba(100, 116, 139, 0.55);
+        color: #0f172a !important;
       }
       .tx-undo-delete-button:focus-visible {
-        outline: 3px solid rgba(59, 130, 246, 0.22);
+        outline: 3px solid rgba(100, 116, 139, 0.18);
         outline-offset: 2px;
       }
       .tx-undo-delete-button:disabled {
