@@ -26,6 +26,41 @@
     return popup;
   }
 
+  function getSelectedRow() {
+    return selectedCheckbox?.closest?.("tr") || null;
+  }
+
+  function getButtonText(button) {
+    return String(button?.textContent || button?.getAttribute?.("aria-label") || button?.title || "").trim();
+  }
+
+  function findExistingRowAction(action) {
+    const row = getSelectedRow();
+    if (!row) return null;
+
+    const buttons = Array.from(row.querySelectorAll("button, a, [role='button']"));
+    const matchers = action === "edit"
+      ? [/(^|\b)edit(\b|$)/i]
+      : [/(^|\b)delete(\b|$)/i, /(^|\b)archive(\b|$)/i, /(^|\b)remove(\b|$)/i];
+
+    return buttons.find((button) => {
+      const dataAction = String(button.dataset?.action || button.dataset?.rowAction || button.getAttribute?.("data-action") || "");
+      const text = getButtonText(button);
+      return matchers.some((pattern) => pattern.test(dataAction) || pattern.test(text));
+    }) || null;
+  }
+
+  function triggerExistingRowAction(action) {
+    const existingButton = findExistingRowAction(action);
+    if (!existingButton) {
+      console.warn(`[Transactions] No existing ${action} action found for selected row.`);
+      return false;
+    }
+
+    existingButton.click();
+    return true;
+  }
+
   function wirePopupButtons(popup) {
     const editButton = popup.querySelector("#txPopupEdit");
     const deleteButton = popup.querySelector("#txPopupDelete");
@@ -33,19 +68,15 @@
     editButton?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      if (selectedId && typeof window.handleEditEntry === "function") {
-        window.handleEditEntry(selectedId);
-      }
-      clearSelection();
+      const triggered = triggerExistingRowAction("edit");
+      if (triggered) clearSelection();
     });
 
     deleteButton?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      if (selectedId && typeof window.openTransactionModal === "function") {
-        window.openTransactionModal(selectedId);
-      }
-      clearSelection(false);
+      const triggered = triggerExistingRowAction("delete");
+      if (triggered) clearSelection(false);
     });
   }
 
@@ -120,10 +151,10 @@
     document.head.appendChild(style);
   }
 
-  function removeActionsHeaderAndCells() {
+  function removeActionsHeaderOnly() {
     const table = getTable();
     if (!table) return;
-    table.querySelectorAll("th.col-actions, td.table-actions-cell").forEach((node) => node.remove());
+    table.querySelectorAll("th.col-actions").forEach((node) => node.remove());
   }
 
   function getAnchorRect(checkbox) {
@@ -150,7 +181,6 @@
 
     popup.hidden = false;
 
-    // Measure after showing so the browser can calculate the real popup size.
     const popupRect = popup.getBoundingClientRect();
     const gap = 10;
     const viewportPadding = 8;
@@ -231,7 +261,7 @@
 
   function sync() {
     injectStyles();
-    removeActionsHeaderAndCells();
+    removeActionsHeaderOnly();
     wireCheckboxes();
     repositionOpenPopup();
   }
