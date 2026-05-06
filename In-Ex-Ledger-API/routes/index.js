@@ -2,12 +2,16 @@ const express = require('express');
 const router = express.Router();
 const arApService = require('../services/arApService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
+const { COOKIE_OPTIONS } = require('../utils/authUtils.js');
 const { resolveBusinessIdForUser } = require('../api/utils/resolveBusinessIdForUser.js');
 const { getSubscriptionSnapshotForBusiness, PLAN_PRO, PLAN_BUSINESS } = require('../services/subscriptionService.js');
 const { allowTrustedBrowserAccountSwitch, rememberTrustedBrowserOnLogout } = require('../middleware/accountSwitchMfaTrust.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled.js');
 
 const businessTierOnly = [requireV2BusinessEnabled, requireV2Entitlement];
+const REFRESH_TOKEN_COOKIE = 'refresh_token';
+const MFA_TRUST_COOKIE = 'mfa_trust';
+const GLOBAL_MFA_TRUST_COOKIE = 'mfa_global_trust';
 
 async function getEffectiveTierForRequest(req) {
   const businessId = await resolveBusinessIdForUser(req.user);
@@ -17,6 +21,19 @@ async function getEffectiveTierForRequest(req) {
 
 router.use('/auth/login', allowTrustedBrowserAccountSwitch);
 router.use('/auth/logout', rememberTrustedBrowserOnLogout);
+
+// Security hardening: do not let the HttpOnly refresh cookie silently recreate
+// a frontend session. Users must explicitly sign in after the in-memory access
+// token is gone, such as after reload, browser restart, or returning later.
+router.post('/auth/refresh', (req, res) => {
+  res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
+  res.clearCookie(MFA_TRUST_COOKIE, COOKIE_OPTIONS);
+  res.clearCookie(GLOBAL_MFA_TRUST_COOKIE, COOKIE_OPTIONS);
+  return res.status(401).json({
+    error: 'Session refresh is disabled. Please sign in again.',
+    code: 'REAUTH_REQUIRED'
+  });
+});
 
 router.get('/arap-summary', ...businessTierOnly, async (req, res) => {
   try {
