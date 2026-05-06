@@ -35,6 +35,17 @@ function escapeHtml(value) {
   document.head.appendChild(script);
 })();
 
+(function wireTransactionUndoButton() {
+  if (!/\/transactions(?:$|[?#/])?/i.test(window.location.pathname)) return;
+  if (document.getElementById("transaction-undo-button-js")) return;
+
+  const script = document.createElement("script");
+  script.id = "transaction-undo-button-js";
+  script.src = "/js/transaction-undo-button.js?v=20260505a";
+  script.defer = true;
+  document.head.appendChild(script);
+})();
+
 (function wireTransactionCheckboxActions() {
   if (!/\/transactions(?:$|[?#/])?/i.test(window.location.pathname)) return;
   if (document.getElementById("transaction-checkbox-actions-js")) return;
