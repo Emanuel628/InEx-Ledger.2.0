@@ -10,7 +10,7 @@ Do not create separate phase cleanup docs for the same effort. Add unfinished it
 - Phase 2: Partially complete. Patch routes/files are removed, but the Undo button still needs a proper rebuild in the real transaction owner files.
 - Phase 3: Complete. Login/MFA refresh bridge cookie code was removed.
 - Phase 4: In review. Billing/subscription sidecar files contain wanted behavior and must be consolidated, not blindly deleted.
-- Phase 5: Not started. Dark mode/theme drift still needs review because dark mode is unplugged and visually unfinished.
+- Phase 5: In review. Dark mode must remain hard-disabled, including OS/browser automatic dark mode, until it is redesigned.
 
 ---
 
@@ -431,36 +431,59 @@ The remaining Phase 4 work should be done with full-file access through Codex or
 
 # Phase 5 — Theme / Dark Mode Drift Cleanup
 
-## Not Started
+## Status
 
-Dark mode is currently unplugged and visually unfinished. There are still many white cards in dark mode, and the dark palette is not approved.
+Phase 5 has started as review only.
 
-Suspicious files to review:
+Dark mode must remain completely shut off for now. This includes users whose PC, browser, or OS is set to automatic dark mode.
 
-- `theme-boot.js`
-- `dark-mode.css`
-- `dark-mode-final.css`
-- `dark-mode-disabled.css`
+Do not redesign dark mode in this cleanup pass. Do not allow dark mode to activate until the palette and all page/card surfaces are reworked properly.
 
 ## Product Decision
 
-Dark mode should stay unplugged for now unless it can be made visually consistent.
+Dark mode is disabled until a full redesign is done.
+
+Required behavior now:
+
+```text
+User selected light mode      -> app stays light
+User selected dark mode       -> app forces light
+OS/browser automatic dark     -> app forces light
+Old localStorage dark setting -> app resets to light
+```
+
+## Findings
+
+- `theme-boot.js` exists and currently forces light mode early by setting `lb_theme` and `data-theme` to `light`.
+- `tokens.css` still contains a full `[data-theme="dark"]` block.
+- `global.js` still contains `setGlobalTheme(theme)` and can accept `"dark"`.
+- The old duplicate dark-mode CSS files were not found at the checked root CSS paths, but this should be rechecked with full local search.
 
 ## Remaining Work
 
-- Remove or consolidate duplicate dark-mode files.
-- Ensure there is no server-side or utility-file theme injection.
-- Keep the default theme light.
-- If dark mode remains disabled, remove visible toggles or unfinished dark behavior.
-- If any dark-mode token work is kept, it belongs in `tokens.css`, `app.css`, and `global.js`, not separate patch CSS files.
+Keep the current light-mode lock until dark mode is redesigned.
+
+Preferred final architecture:
+
+- Move the force-light behavior into `global.js` as the owner of theme behavior.
+- Keep `theme-boot.js` only if it is intentionally needed as an early anti-flash light-mode lock.
+- If `theme-boot.js` stays, document that it is not a patch; it is the early light-mode enforcement layer.
+- Prevent `setGlobalTheme("dark")` from applying dark mode while dark mode is disabled.
+- Remove or hide any visible dark-mode toggle while dark mode is disabled.
+- Reset stale `lb_theme=dark` values to `light`.
+- Do not rely on OS/browser `prefers-color-scheme`.
+- Do not delete dark-mode tokens unless the team decides the future redesign will start from scratch.
 
 ## Phase 5 Definition of Done
 
-- One theme system only.
-- No `theme-boot.js` sidecar behavior.
-- No duplicate `dark-mode-final` / `dark-mode-disabled` drift files.
-- No hidden server/script injection for theme behavior.
-- Dark mode is either intentionally disabled or fully styled.
+- Dark mode cannot activate from localStorage.
+- Dark mode cannot activate from OS/browser automatic dark mode.
+- Dark mode cannot activate from a visible UI toggle.
+- `global.js` clearly owns theme behavior.
+- Any early boot file is either removed after ownership moves to `global.js`, or explicitly documented as a permanent early light-mode lock.
+- No duplicate `dark-mode-final` / `dark-mode-disabled` drift files exist.
+- No hidden server/script injection controls theme behavior.
+- Dark mode is either intentionally disabled or fully redesigned.
 
 ---
 
