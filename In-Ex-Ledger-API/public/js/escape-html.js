@@ -15,82 +15,111 @@ function escapeHtml(value) {
 }
 
 /*
- * Critical auth startup handoff.
+ * Temporary auth compatibility bridge.
  *
- * auth.js keeps the access token memory-only. A full redirect from login/MFA
- * to /transactions clears that memory. This helper must run BEFORE auth.js and
- * transactions.js. Do not load it as a deferred child script; that can run too
- * late and leave the protected page half-loaded.
+ * auth.js was changed to memory-only access tokens. That broke the existing
+ * redirect flow because /login writes the token, then /transactions loads in a
+ * new page context. Until auth.js is fully reverted, this restores the previous
+ * sessionStorage token contract early enough that the app can load normally.
  */
-(function installImmediateAuthLoginHandoff() {
-  const HANDOFF_KEY = "lb_post_login_access_token_handoff";
-  const HANDOFF_AT_KEY = "lb_post_login_access_token_handoff_at";
-  const MAX_AGE_MS = 60 * 1000;
-  const path = String(window.location.pathname || "").replace(/\/+$/, "") || "/";
-  const isAuthPage = path === "/login" || path === "/mfa-challenge";
+(function restoreSessionTokenAuthContract() {
+  const TOKEN_KEY = "token";
+  const MAX_ATTEMPTS = 120;
 
-  function readFreshHandoffToken() {
-    try {
-      const token = sessionStorage.getItem(HANDOFF_KEY) || "";
-      const createdAt = Number(sessionStorage.getItem(HANDOFF_AT_KEY) || 0);
-      if (!token || !createdAt || Date.now() - createdAt > MAX_AGE_MS) {
-        return "";
+  let originalRemoveItem = null;
+  let storageGuardActive = true;
+
+  try {
+    originalRemoveItem = Storage.prototype.removeItem;
+    Storage.prototype.removeItem = function guardedRemoveItem(key) {
+      if (storageGuardActive && this === window.sessionStorage && key === TOKEN_KEY) {
+        return undefined;
       }
-      return token;
+      return originalRemoveItem.apply(this, arguments);
+    };
+  } catch (_) {
+    originalRemoveItem = null;
+  }
+
+  function readStoredToken() {
+    try {
+      return sessionStorage.getItem(TOKEN_KEY) || "";
     } catch (_) {
       return "";
     }
   }
 
-  function clearHandoffToken() {
+  function writeStoredToken(token) {
     try {
-      sessionStorage.removeItem(HANDOFF_KEY);
-      sessionStorage.removeItem(HANDOFF_AT_KEY);
-    } catch (_) {}
-  }
-
-  function writeHandoffToken(token) {
-    try {
-      if (!token) return;
-      sessionStorage.setItem(HANDOFF_KEY, token);
-      sessionStorage.setItem(HANDOFF_AT_KEY, String(Date.now()));
-    } catch (_) {}
-  }
-
-  function installSetTokenWrapper() {
-    if (window.__AUTH_LOGIN_HANDOFF_INSTALLED__) return true;
-    if (typeof window.setToken !== "function") return false;
-
-    const originalSetToken = window.setToken;
-    window.setToken = function setTokenWithImmediateHandoff(token) {
-      const result = originalSetToken.apply(this, arguments);
-      if (isAuthPage && token) {
-        writeHandoffToken(token);
+      if (token) {
+        sessionStorage.setItem(TOKEN_KEY, token);
+      } else {
+        sessionStorage.removeItem(TOKEN_KEY);
       }
-      return result;
+    } catch (_) {}
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch (_) {}
+  }
+
+  function restoreRemoveItem() {
+    storageGuardActive = false;
+    if (originalRemoveItem) {
+      try {
+        Storage.prototype.removeItem = originalRemoveItem;
+      } catch (_) {}
+    }
+  }
+
+  function installContract() {
+    if (window.__AUTH_SESSION_TOKEN_CONTRACT_RESTORED__) {
+      restoreRemoveItem();
+      return true;
+    }
+
+    if (typeof window.getToken !== "function" || typeof window.setToken !== "function") {
+      return false;
+    }
+
+    window.getToken = function getTokenFromSessionStorage() {
+      return readStoredToken();
     };
 
-    window.__AUTH_LOGIN_HANDOFF_INSTALLED__ = true;
+    window.setToken = function setTokenInSessionStorage(token) {
+      writeStoredToken(token);
+    };
+
+    window.clearToken = function clearSessionStorageToken() {
+      writeStoredToken("");
+      if (typeof window.clearSubscriptionState === "function") {
+        window.clearSubscriptionState();
+      }
+      if (typeof window.clearAppState === "function") {
+        window.clearAppState();
+      }
+      if (window.__AUTH_GUARD_STATE__) {
+        window.__AUTH_GUARD_STATE__.lastError = null;
+      }
+    };
+
+    window.__AUTH_SESSION_TOKEN_CONTRACT_RESTORED__ = true;
+    restoreRemoveItem();
     return true;
   }
 
-  // On protected pages, start trying immediately. auth.js is loaded before the
-  // page boot script, so this usually installs and consumes before DOMContentLoaded.
-  const pendingToken = !isAuthPage ? readFreshHandoffToken() : "";
   let attempts = 0;
   const timer = window.setInterval(() => {
     attempts += 1;
-    const installed = installSetTokenWrapper();
-    if (installed && pendingToken) {
-      clearHandoffToken();
-      window.setToken(pendingToken);
-    } else if (installed && !isAuthPage) {
-      clearHandoffToken();
-    }
-    if (installed || attempts >= 80) {
+    if (installContract() || attempts >= MAX_ATTEMPTS) {
       window.clearInterval(timer);
+      restoreRemoveItem();
     }
-  }, 10);
+  }, 1);
+
+  window.addEventListener("DOMContentLoaded", () => {
+    installContract();
+    restoreRemoveItem();
+  }, { once: true });
 })();
 
 (function wireBusinessQuickAddHardening() {
