@@ -21,7 +21,7 @@ function escapeHtml(value) {
 
   const script = document.createElement("script");
   script.id = "transaction-checkbox-actions-js";
-  script.src = "/js/transaction-checkbox-actions.js?v=20260505b";
+  script.src = "/js/transaction-checkbox-actions-v2.js?v=20260505a";
   script.defer = true;
   document.head.appendChild(script);
 })();
