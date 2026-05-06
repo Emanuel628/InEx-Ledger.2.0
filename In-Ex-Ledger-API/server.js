@@ -18,7 +18,6 @@ const fs = require('fs');
 const path = require('path');
 const routes = require('./routes/index.js');
 const cookieParser = require('cookie-parser');
-const transactionsUndoRouter = require('./routes/transactions-undo.routes.js');
 const transactionsRouter = require('./routes/transactions.routes.js');
 const { createGlobalLimiter } = require('./middleware/rateLimitTiers.js');
 const {
@@ -112,62 +111,11 @@ function isBlockedV2PageRequest(requestPath) {
   return V2_HTML_PAGES.has(pageName);
 }
 
-function injectGlobalBehaviorPatches(pageName, html) {
-  if (pageName === 'landing' || typeof html !== 'string') {
-    return html;
-  }
-  if (html.includes('/js/global-patches.js')) {
-    return html;
-  }
-  const scriptTag = '  <script src="/js/global-patches.js?v=20260505a" defer></script>\n';
-  if (/<\/body>/i.test(html)) {
-    return html.replace(/<\/body>/i, `${scriptTag}</body>`);
-  }
-  return `${html}\n${scriptTag}`;
-}
-
-function injectThemeBootstrap(html) {
-  if (typeof html !== 'string' || html.includes('/js/theme-boot.js')) {
-    return html;
-  }
-  const scriptTag = '  <script src="/js/theme-boot.js?v=20260505a"></script>\n';
-  if (/<head[^>]*>/i.test(html)) {
-    return html.replace(/<head[^>]*>/i, (match) => `${match}\n${scriptTag}`);
-  }
-  return `${scriptTag}${html}`;
-}
-
-function injectFinalDarkModeStylesheet(html) {
-  if (typeof html !== 'string' || html.includes('/css/core/dark-mode.css?v=20260505c')) {
-    return html;
-  }
-  const linkTag = '  <link rel="stylesheet" href="/css/core/dark-mode.css?v=20260505c">\n';
-  if (/<\/head>/i.test(html)) {
-    return html.replace(/<\/head>/i, `${linkTag}</head>`);
-  }
-  return `${linkTag}${html}`;
-}
-
-function prepareCanonicalHtml(pageName, html) {
-  const withThemeBoot = injectThemeBootstrap(html);
-  const withFinalDarkMode = injectFinalDarkModeStylesheet(withThemeBoot);
-  return injectGlobalBehaviorPatches(pageName, withFinalDarkMode);
-}
-
 function sendCanonicalPage(pageName, req, res) {
   const fileName = `${pageName}.html`;
   const filePath = path.join(htmlDir, fileName);
   setStaticAssetCacheHeaders(res, filePath);
-  fs.readFile(filePath, 'utf8', (err, html) => {
-    if (err) {
-      logError('Failed to serve canonical page', {
-        pageName,
-        message: err?.message || String(err)
-      });
-      return res.status(404).send('Not Found');
-    }
-    res.type('html').send(prepareCanonicalHtml(pageName, html));
-  });
+  res.sendFile(filePath);
 }
 
 /* =========================================================
@@ -370,7 +318,6 @@ app.get('/index.html', (req, res) => {
    ========================================================= */
 
 // Transaction management
-app.use('/api/transactions', transactionsUndoRouter);
 app.use('/api/transactions', transactionsRouter);
 logInfo('MOUNTED: /api/transactions');
 
