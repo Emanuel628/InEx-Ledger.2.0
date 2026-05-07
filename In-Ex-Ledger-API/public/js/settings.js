@@ -119,6 +119,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
 
+  initCollapsibleSettingsPanels();
   initSettingsNav();
   initSettingsTabs();
   await initBusinessProfileForm();
@@ -136,6 +137,34 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.addEventListener("lunaLanguageChanged", refreshSettingsLocalizedState);
   window.addEventListener("lunaRegionChanged", refreshSettingsLocalizedState);
 });
+
+function initCollapsibleSettingsPanels() {
+  const panels = Array.from(document.querySelectorAll("[data-collapsible-panel]"));
+  if (!panels.length) {
+    return;
+  }
+
+  const setCollapsed = (panel, collapsed) => {
+    panel.classList.toggle("is-collapsed", collapsed);
+    const toggle = panel.querySelector("[data-settings-panel-toggle]");
+    if (toggle) {
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      toggle.textContent = collapsed ? "Expand" : "Collapse";
+    }
+  };
+
+  panels.forEach((panel) => {
+    const toggle = panel.querySelector("[data-settings-panel-toggle]");
+    if (!toggle) {
+      return;
+    }
+
+    setCollapsed(panel, panel.dataset.collapsedDefault === "true");
+    toggle.addEventListener("click", () => {
+      setCollapsed(panel, !panel.classList.contains("is-collapsed"));
+    });
+  });
+}
 
 function resolveSavedTheme() {
   const storedVersion = localStorage.getItem("lb_theme_version");
@@ -1833,7 +1862,7 @@ function initSecurityForm() {
       mfaCancelButton?.classList.add("hidden");
     } else {
       mfaSetupPanel?.classList.remove("hidden");
-      mfaCancelButton?.classList.toggle("hidden", mfaStatus.enabled);
+      mfaCancelButton?.classList.remove("hidden");
     }
 
     if (mfaMode === "idle") resetSetupPanel();

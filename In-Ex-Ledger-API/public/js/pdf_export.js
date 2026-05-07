@@ -151,6 +151,21 @@ function formatReportTimestamp(rawValue) {
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
+function normalizePdfDate(rawValue) {
+  if (!rawValue) {
+    return '';
+  }
+  const date = new Date(rawValue);
+  if (Number.isNaN(date.getTime())) {
+    return String(rawValue);
+  }
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0')
+  ].join('-');
+}
+
 function buildReportId(rawValue) {
   if (rawValue) return String(rawValue);
   const stamp = formatReportTimestamp(new Date()).replace(/[-: ]/g, '').slice(0, 8);

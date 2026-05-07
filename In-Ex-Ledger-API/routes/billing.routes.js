@@ -645,6 +645,53 @@ router.post("/mock-v1", requireAuth, requireCsrfProtection, async (req, res) => 
   }
 });
 
+router.post("/reactivate-trial-pro", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
+  try {
+    const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+
+    if (!subscription?.isTrialing) {
+      return res.status(409).json({
+        error: "Pro can only be reactivated this way while the free trial is still active."
+      });
+    }
+
+    if (!isTrialReupgradeAttempt(subscription)) {
+      return res.status(409).json({
+        error: "Pro is already selected for this trial."
+      });
+    }
+
+    const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
+
+    if (subscription.stripeSubscriptionId) {
+      const stripeSubscription = await stripeRequest(`/subscriptions/${subscription.stripeSubscriptionId}`, {
+        cancel_at_period_end: false,
+        "metadata[plan_code]": "v1"
+      });
+      await syncStripeSubscriptionForBusiness(billingBusinessId, stripeSubscription);
+    }
+
+    await setTrialPlanSelectionForBusiness(billingBusinessId, "v1", additionalBusinesses);
+    const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+
+    logInfo("Trial Pro reactivated", {
+      userId: req.user?.id,
+      businessId: billingBusinessId,
+      stripeSubscriptionId: subscription.stripeSubscriptionId || null,
+      additionalBusinesses
+    });
+
+    res.status(200).json({
+      reactivated: true,
+      subscription: updated
+    });
+  } catch (err) {
+    logError("POST /api/billing/reactivate-trial-pro error:", err.message);
+    res.status(500).json({ error: "Failed to reactivate Pro trial." });
+  }
+});
+
 router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);

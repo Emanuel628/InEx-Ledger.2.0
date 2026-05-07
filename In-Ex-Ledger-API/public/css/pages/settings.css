@@ -697,7 +697,16 @@
 #settings-privacy-data { order: 6; }
 
 .settings-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 16px;
+}
+
+.settings-panel-copy {
+  flex: 1;
+  min-width: 0;
 }
 
 .settings-panel-head h2 {
@@ -737,6 +746,31 @@
   margin: 4px 0 0;
   font-size: 13px;
   color: #64748b;
+}
+
+.settings-panel-toggle {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  background: #ffffff;
+  color: #224974;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.settings-panel-toggle:hover {
+  background: #f8fafc;
+}
+
+.settings-panel.is-collapsed > :not(.settings-panel-head) {
+  display: none;
+}
+
+.settings-panel.is-collapsed .settings-panel-head {
+  margin-bottom: 0;
 }
 
 .settings-inline-actions {
@@ -1329,6 +1363,16 @@ body {
   gap: 8px;
   margin-top: 10px;
   font-size: 13px;
+}
+
+.security-show-password input {
+  margin: 0;
+  flex: 0 0 auto;
+  order: 0;
+}
+
+.security-show-password span {
+  order: 1;
 }
 
 .session-block {

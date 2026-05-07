@@ -118,10 +118,7 @@ router.get("/settings", async (req, res) => {
   }
 });
 
-/**
- * POST /api/privacy/settings
- */
-router.post("/settings", async (req, res) => {
+async function savePrivacySettings(req, res) {
   const dataSharingOptOut = typeof req.body?.dataSharingOptOut === "boolean" ? req.body.dataSharingOptOut : false;
   const consentGiven = typeof req.body?.consentGiven === "boolean" ? req.body.consentGiven : true;
   // analyticsOptIn is only meaningful for Quebec users (Law 25 explicit opt-in).
@@ -191,7 +188,17 @@ router.post("/settings", async (req, res) => {
     logError("POST /privacy/settings error", { err: err.message });
     res.status(500).json({ error: "Failed to save privacy settings." });
   }
-});
+}
+
+/**
+ * POST /api/privacy/settings
+ */
+router.post("/settings", savePrivacySettings);
+
+/**
+ * PUT /api/privacy/settings
+ */
+router.put("/settings", savePrivacySettings);
 
 /**
  * POST /api/privacy/export

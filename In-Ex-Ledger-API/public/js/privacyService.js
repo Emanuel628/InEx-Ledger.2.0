@@ -97,8 +97,8 @@
       if (await apiAvailable()) {
         try {
           const res = await fetch(buildApiUrl("/api/privacy/settings"), {
-            method: "PUT",
-            headers: authHeaders("PUT"),
+            method: "POST",
+            headers: authHeaders("POST"),
             credentials: "include",
             body: JSON.stringify({
               dataSharingOptOut: !!merged.dataSharingOptOut,

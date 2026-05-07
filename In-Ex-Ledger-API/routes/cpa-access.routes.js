@@ -528,7 +528,7 @@ router.get("/portfolio/:ownerUserId/exports", async (req, res) => {
               b.region AS business_region,
               b.province AS business_province,
               e.created_at,
-              e.type AS export_type,
+              e.export_type,
               m.start_date,
               m.end_date,
               m.include_tax_id,

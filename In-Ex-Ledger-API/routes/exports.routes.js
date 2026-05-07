@@ -151,7 +151,7 @@ async function storeCompletedExport({
   try {
     await client.query("BEGIN");
     await client.query(
-      `INSERT INTO exports (id, business_id, user_id, type)
+      `INSERT INTO exports (id, business_id, user_id, export_type)
        VALUES ($1, $2, $3, $4)`,
       [exportId, businessId, userId, exportType]
     );
@@ -472,7 +472,7 @@ router.get("/history", exportGrantLimiter, async (req, res) => {
     const result = await pool.query(
       `SELECT e.id,
               e.created_at,
-              e.type AS export_type,
+              e.export_type,
               m.start_date,
               m.end_date,
               m.include_tax_id,

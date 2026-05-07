@@ -295,6 +295,17 @@ function updatePlanCardState(sub) {
   planPro?.classList.toggle("is-current", isCurrentPro);
 }
 
+function isTrialDowngradedToBasic(subscription) {
+  if (!subscription || !subscription.isTrialing) {
+    return false;
+  }
+  return Boolean(
+    subscription.isTrialDowngradedToFree ||
+    subscription.cancelAtPeriodEnd ||
+    subscription.selectedPlanCode !== "v1"
+  );
+}
+
 function initSubNav() {
   const navButtons = Array.from(document.querySelectorAll("[data-settings-target]"));
   if (!navButtons.length) return;
@@ -901,7 +912,11 @@ async function startCheckout() {
     await loadVerifiedPricingContext();
     setCheckoutLoading(true);
 
-    const res = await apiFetch("/api/billing/checkout-session", {
+    const endpoint = isTrialDowngradedToBasic(currentSubscription)
+      ? "/api/billing/reactivate-trial-pro"
+      : "/api/billing/checkout-session";
+
+    const res = await apiFetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
