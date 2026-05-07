@@ -606,12 +606,8 @@ async function requireValidSessionOrRedirect() {
     return;
   }
 
-  // If no stored access token is available, try the refresh cookie before treating the session as expired.
-  if (!getToken()) {
-    await refreshAccessToken();
-  }
-
-  if (!getToken()) {
+  const token = getToken();
+  if (!token) {
     window.__AUTH_GUARD_STATE__.running = false;
     window.location.href = LOGIN_PAGE;
     return;
@@ -685,11 +681,8 @@ async function requireValidSessionOrRedirect() {
 
 async function redirectIfAuthenticated() {
   try {
-    if (!getToken()) {
-      // Try to bootstrap from the HttpOnly refresh cookie. If that fails, the visitor is genuinely signed out.
-      await refreshAccessToken();
-    }
-    if (!getToken()) {
+    const existingToken = getToken();
+    if (!existingToken) {
       return;
     }
 
