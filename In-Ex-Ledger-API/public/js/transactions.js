@@ -1253,23 +1253,7 @@ function buildRecurringEmptyStateMarkup() {
 }
 
 function updateTransactionSelectionHeader(visibleTransactions = []) {
-  const selectAllCheckbox = document.getElementById("txSelectAll");
-  if (!selectAllCheckbox) {
-    return;
-  }
-
-  if (!visibleTransactions.length) {
-    selectAllCheckbox.checked = false;
-    selectAllCheckbox.indeterminate = false;
-    selectAllCheckbox.disabled = true;
-    return;
-  }
-
-  const visibleIds = visibleTransactions.map((txn) => String(txn.id));
-  const selectedCount = visibleIds.filter((id) => selectedTransactionIds.has(id)).length;
-  selectAllCheckbox.disabled = false;
-  selectAllCheckbox.checked = selectedCount === visibleIds.length;
-  selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < visibleIds.length;
+  void visibleTransactions;
 }
 
 function setTransactionUndoState({ message = "", canUndo = false, isError = false } = {}) {
@@ -1284,17 +1268,18 @@ function syncTransactionUndoBar() {
   const undoMessage = document.getElementById("txUndoMessage");
   const undoButton = document.getElementById("txUndoDeleteButton");
   const isAllScope = getTransactionScope() === "all";
-  const shouldShow = !isAllScope && (transactionUndoAvailable || !!transactionUndoMessage);
+  const shouldShowMessage = !isAllScope && !!transactionUndoMessage;
+  const shouldShowUndo = !isAllScope && transactionUndoAvailable;
 
   if (!undoBar || !undoMessage || !undoButton) {
     return;
   }
 
-  undoBar.hidden = !shouldShow;
-  undoBar.classList.toggle("is-error", shouldShow && transactionUndoError);
+  undoBar.hidden = !shouldShowMessage;
+  undoBar.classList.toggle("is-error", shouldShowMessage && transactionUndoError);
   undoMessage.textContent = transactionUndoMessage;
-  undoButton.hidden = !transactionUndoAvailable;
-  undoButton.disabled = !transactionUndoAvailable;
+  undoButton.hidden = !shouldShowUndo;
+  undoButton.disabled = !shouldShowUndo;
 }
 
 function renderRecurringTemplates() {
@@ -2094,28 +2079,6 @@ function renderTransactionsTable(filteredTransactions) {
       updateTransactionSelectionHeader(transactions);
     });
   });
-
-  const selectAllCheckbox = document.getElementById("txSelectAll");
-  if (selectAllCheckbox) {
-    selectAllCheckbox.onchange = () => {
-      const shouldSelectAll = selectAllCheckbox.checked;
-      closeRowActionPopup();
-      transactions.forEach((txn) => {
-        const txnId = String(txn.id);
-        if (shouldSelectAll) {
-          selectedTransactionIds.add(txnId);
-        } else {
-          selectedTransactionIds.delete(txnId);
-        }
-      });
-
-      tbody.querySelectorAll(".tx-row-select").forEach((checkbox) => {
-        checkbox.checked = shouldSelectAll;
-        checkbox.closest("tr")?.classList.toggle("is-selected", shouldSelectAll);
-      });
-      updateTransactionSelectionHeader(transactions);
-    };
-  }
 
   updateTransactionSelectionHeader(transactions);
 

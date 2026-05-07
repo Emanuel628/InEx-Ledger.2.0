@@ -3395,7 +3395,13 @@ tr.tx-highlight {
   box-shadow: none;
 }
 
-.transactions-table thead th.col-select,
+.transactions-table thead th.col-select {
+  width: 108px;
+  text-align: left;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
 .transactions-table tbody td.table-select-cell {
   width: 42px;
   text-align: center;
@@ -3404,7 +3410,6 @@ tr.tx-highlight {
   position: relative;
 }
 
-#txSelectAll,
 .tx-row-select {
   width: 15px;
   height: 15px;
@@ -3419,6 +3424,27 @@ tr.tx-highlight {
 
 .transactions-table tbody tr.is-selected td {
   background: transparent;
+}
+
+.tx-header-undo-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 25, 35, 0.12);
+  background: #ffffff;
+  color: #224974;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tx-header-undo-btn:hover {
+  background: #f4f8fe;
+}
+
+.tx-header-undo-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .placeholder-row td {
