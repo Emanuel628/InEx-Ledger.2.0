@@ -80,6 +80,9 @@ const TRANSACTION_REVIEW_LABELS = {
 };
 let unattachedReceiptsCount = 0;
 const selectedTransactionIds = new Set();
+let transactionUndoMessage = "";
+let transactionUndoAvailable = false;
+let transactionUndoError = false;
 let pendingTransactionReceiptFile = null;
 let recurringDrawerElement = null;
 let recurringToggleElement = null;
@@ -862,6 +865,7 @@ async function loadTransactions() {
     setTransactionsLoading(false);
     applyFilters();
     renderTotals();
+    syncTransactionUndoBar();
   }
 }
 
@@ -1268,6 +1272,31 @@ function updateTransactionSelectionHeader(visibleTransactions = []) {
   selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < visibleIds.length;
 }
 
+function setTransactionUndoState({ message = "", canUndo = false, isError = false } = {}) {
+  transactionUndoMessage = String(message || "").trim();
+  transactionUndoAvailable = !!canUndo;
+  transactionUndoError = !!isError;
+  syncTransactionUndoBar();
+}
+
+function syncTransactionUndoBar() {
+  const undoBar = document.getElementById("txUndoBar");
+  const undoMessage = document.getElementById("txUndoMessage");
+  const undoButton = document.getElementById("txUndoDeleteButton");
+  const isAllScope = getTransactionScope() === "all";
+  const shouldShow = !isAllScope && (transactionUndoAvailable || !!transactionUndoMessage);
+
+  if (!undoBar || !undoMessage || !undoButton) {
+    return;
+  }
+
+  undoBar.hidden = !shouldShow;
+  undoBar.classList.toggle("is-error", shouldShow && transactionUndoError);
+  undoMessage.textContent = transactionUndoMessage;
+  undoButton.hidden = !transactionUndoAvailable;
+  undoButton.disabled = !transactionUndoAvailable;
+}
+
 function renderRecurringTemplates() {
   const tbody = document.getElementById("recurringTableBody");
   if (!tbody) {
@@ -1518,7 +1547,11 @@ async function handleTransactionDelete(transactionId) {
 
   if (!response || !response.ok) {
     const errorPayload = response ? await response.json().catch(() => null) : null;
-    setTransactionFormMessage(errorPayload?.error || txT("transactions_error_delete", "Unable to delete transaction."));
+    setTransactionUndoState({
+      message: errorPayload?.error || txT("transactions_error_delete", "Unable to archive transaction."),
+      canUndo: false,
+      isError: true
+    });
     closeTransactionModal();
     return;
   }
@@ -1527,8 +1560,39 @@ async function handleTransactionDelete(transactionId) {
     editingTransactionId = null;
     setEditingMode(false);
   }
+  selectedTransactionIds.delete(String(transactionId));
   closeTransactionModal();
   await loadTransactions();
+  setTransactionUndoState({
+    message: txT("transactions_archive_success", "Transaction archived."),
+    canUndo: true,
+    isError: false
+  });
+}
+
+async function handleUndoArchivedTransaction() {
+  const response = await apiFetch("/api/transactions/undo-delete", {
+    method: "POST"
+  });
+
+  if (!response || !response.ok) {
+    const errorPayload = response ? await response.json().catch(() => null) : null;
+    const status = response?.status || 0;
+    setTransactionUndoState({
+      message: errorPayload?.error || txT("transactions_undo_error", "Unable to restore the archived transaction."),
+      canUndo: status !== 404,
+      isError: true
+    });
+    return;
+  }
+
+  selectedTransactionIds.clear();
+  await loadTransactions();
+  setTransactionUndoState({
+    message: txT("transactions_undo_success", "Archived transaction restored."),
+    canUndo: false,
+    isError: false
+  });
 }
 
 async function toggleTransactionCleared(transactionId, nextCleared) {
@@ -2952,8 +3016,22 @@ document.addEventListener("DOMContentLoaded", () => {
   initDrawerCloseBtn();
   initTaxBannerControls();
   initPeriodPicker();
+  initTransactionUndoBar();
   initRowActionPopup();
 });
+
+function initTransactionUndoBar() {
+  const undoButton = document.getElementById("txUndoDeleteButton");
+  undoButton?.addEventListener("click", async () => {
+    undoButton.disabled = true;
+    try {
+      await handleUndoArchivedTransaction();
+    } finally {
+      syncTransactionUndoBar();
+    }
+  });
+  syncTransactionUndoBar();
+}
 
 function initDrawerCloseBtn() {
   const closeBtn = document.getElementById("txDrawerClose");

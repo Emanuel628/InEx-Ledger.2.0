@@ -5,7 +5,7 @@
   <title>InEx Ledger - Transactions</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="stylesheet" href="/css/app.css?v=20260504a">
-<link rel="stylesheet" href="/css/pages/transactions.css?v=20260503e">
+<link rel="stylesheet" href="/css/pages/transactions.css?v=20260507a">
 </head>
 
 <body>
@@ -205,6 +205,11 @@
               </button>
             </div>
           </div>
+        </div>
+
+        <div id="txUndoBar" class="bulk-action-bar" hidden>
+          <span id="txUndoMessage" class="bulk-action-message" aria-live="polite"></span>
+          <button type="button" id="txUndoDeleteButton" class="bulk-action-btn" hidden>Undo last archive</button>
         </div>
 
         <div id="txDrawer" hidden>
@@ -565,12 +570,12 @@
 </div>
 
 <script src="../js/escape-html.js?v=20260410a"></script>
-<script src="../js/global.js?v=20260423d"></script>
+<script src="../js/global.js?v=20260507a"></script>
 <script src="../js/i18n.js?v=20260405c"></script>
 <script src="../js/auth.js?v=20260506b"></script>
 <script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/taxReminders.js?v=20260405c"></script>
-<script src="../js/transactions.js?v=20260503e"></script>
+<script src="../js/transactions.js?v=20260507a"></script>
 </body>
 </html>
 

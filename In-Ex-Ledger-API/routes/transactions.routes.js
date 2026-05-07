@@ -12,7 +12,10 @@ const {
   assertDateUnlocked,
   loadAccountingLockState
 } = require("../services/accountingLockService.js");
-const { archiveTransaction } = require("../services/transactionAuditService.js");
+const {
+  archiveTransaction,
+  restoreMostRecentArchivedTransaction
+} = require("../services/transactionAuditService.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
   getSubscriptionSnapshotForBusiness,
@@ -700,6 +703,48 @@ router.delete("/:id", async (req, res) => {
   } catch (err) {
     logError("DELETE /transactions/:id error:", err);
     return handleTransactionMutationError(res, err, "Failed to delete transaction.");
+  }
+});
+
+router.post("/undo-delete", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const candidate = await pool.query(
+      `SELECT id, date
+         FROM transactions
+        WHERE business_id = $1
+          AND deleted_at IS NOT NULL
+          AND (is_void = true OR is_void IS NULL)
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+        ORDER BY deleted_at DESC, voided_at DESC, created_at DESC
+        LIMIT 1`,
+      [businessId]
+    );
+
+    if (candidate.rowCount === 0) {
+      return res.status(404).json({ error: "No archived transaction is available to restore." });
+    }
+
+    await assertUnlockedBusinessDates(businessId, candidate.rows[0].date);
+
+    const restored = await restoreMostRecentArchivedTransaction({
+      pool,
+      businessId,
+      transactionId: candidate.rows[0].id,
+      userId: req.user.id
+    });
+
+    if (!restored) {
+      return res.status(404).json({ error: "No archived transaction is available to restore." });
+    }
+
+    res.json({
+      message: "Transaction restored.",
+      transaction: decryptTransactionRow(restored)
+    });
+  } catch (err) {
+    logError("POST /transactions/undo-delete error:", err);
+    return handleTransactionMutationError(res, err, "Failed to restore transaction.");
   }
 });
 

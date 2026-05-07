@@ -2404,8 +2404,12 @@ body {
   margin-bottom: 8px;
   flex-wrap: wrap;
 }
+.bulk-action-bar.is-error {
+  background: #8f2f3d;
+}
 .bulk-action-bar[hidden] { display: none; }
-.bulk-selected-count {
+.bulk-selected-count,
+.bulk-action-message {
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -2420,6 +2424,10 @@ body {
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
+}
+.bulk-action-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 .bulk-action-btn:hover { background: rgba(255,255,255,0.25); }
 .bulk-action-btn--danger { border-color: rgba(255,150,150,0.4); background: rgba(220,50,50,0.25); }

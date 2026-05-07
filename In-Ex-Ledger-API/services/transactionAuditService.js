@@ -20,21 +20,25 @@ async function archiveTransaction({ pool, businessId, transactionId, userId, rea
   return result.rows[0] || null;
 }
 
-async function restoreMostRecentArchivedTransaction({ pool, businessId, userId }) {
-  const candidate = await pool.query(
-    `SELECT id
-       FROM transactions
-      WHERE business_id = $1
-        AND deleted_at IS NOT NULL
-        AND (is_void = true OR is_void IS NULL)
-        AND (is_adjustment = false OR is_adjustment IS NULL)
-      ORDER BY deleted_at DESC, voided_at DESC, created_at DESC
-      LIMIT 1`,
-    [businessId]
-  );
+async function restoreMostRecentArchivedTransaction({ pool, businessId, userId, transactionId = null }) {
+  let resolvedTransactionId = transactionId;
+  if (!resolvedTransactionId) {
+    const candidate = await pool.query(
+      `SELECT id
+         FROM transactions
+        WHERE business_id = $1
+          AND deleted_at IS NOT NULL
+          AND (is_void = true OR is_void IS NULL)
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+        ORDER BY deleted_at DESC, voided_at DESC, created_at DESC
+        LIMIT 1`,
+      [businessId]
+    );
 
-  const transactionId = candidate.rows[0]?.id;
-  if (!transactionId) {
+    resolvedTransactionId = candidate.rows[0]?.id || null;
+  }
+
+  if (!resolvedTransactionId) {
     return null;
   }
 
@@ -51,7 +55,7 @@ async function restoreMostRecentArchivedTransaction({ pool, businessId, userId }
         AND business_id = $2
         AND deleted_at IS NOT NULL
       RETURNING *`,
-    [transactionId, businessId, userId]
+    [resolvedTransactionId, businessId, userId]
   );
 
   return restored.rows[0] || null;
