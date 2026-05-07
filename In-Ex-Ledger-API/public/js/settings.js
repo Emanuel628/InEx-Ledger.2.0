@@ -4,7 +4,7 @@ const REGION_DISPLAY = {
 };
 
 const SETTINGS_DEFAULT_THEME = typeof DEFAULT_THEME !== "undefined" ? DEFAULT_THEME : "light";
-const SETTINGS_THEME_VERSION = typeof THEME_VERSION !== "undefined" ? THEME_VERSION : "2";
+const SETTINGS_THEME_VERSION = typeof THEME_VERSION !== "undefined" ? THEME_VERSION : "3";
 const SETTINGS_TOAST_MS = 3000;
 const SETTINGS_DELETE_DATA_KEYS = [
   "lb_accounts",
@@ -139,12 +139,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function resolveSavedTheme() {
   const storedVersion = localStorage.getItem("lb_theme_version");
-  if (storedVersion !== SETTINGS_THEME_VERSION) {
+  const storedTheme = localStorage.getItem("lb_theme");
+  if (storedVersion !== SETTINGS_THEME_VERSION || storedTheme !== SETTINGS_DEFAULT_THEME) {
     localStorage.setItem("lb_theme", SETTINGS_DEFAULT_THEME);
     localStorage.setItem("lb_theme_version", SETTINGS_THEME_VERSION);
-    return SETTINGS_DEFAULT_THEME;
   }
-  return localStorage.getItem("lb_theme") || SETTINGS_DEFAULT_THEME;
+  return SETTINGS_DEFAULT_THEME;
 }
 
 function getBusinessProfile() {
@@ -778,6 +778,7 @@ async function initPreferences() {
   const saveBar = document.getElementById("settingsSaveBar");
   const saveButton = document.getElementById("settingsSavePreferences");
   const cancelButton = document.getElementById("settingsCancelChanges");
+  const darkModeRow = darkModeToggle?.closest(".settings-row");
 
   businessSettingsState = await loadBusinessSettings();
 
@@ -825,7 +826,12 @@ async function initPreferences() {
       }
       languageSelect.value = state.language;
     }
-    if (darkModeToggle) darkModeToggle.checked = state.theme === "dark";
+    if (darkModeToggle) {
+      darkModeToggle.checked = false;
+      darkModeToggle.disabled = true;
+      darkModeToggle.setAttribute("aria-disabled", "true");
+    }
+    darkModeRow?.classList.add("hidden");
     if (distanceSelect) distanceSelect.value = state.distance;
     if (optOutToggle) optOutToggle.checked = !!state.optOutAnalytics;
     syncProvinceVisibility(state.region);
@@ -858,7 +864,7 @@ async function initPreferences() {
       region: nextRegion,
       province: nextProvince,
       language: languageSelect ? languageSelect.value : pendingPreferences.language,
-      theme: darkModeToggle?.checked ? "dark" : "light",
+      theme: SETTINGS_DEFAULT_THEME,
       distance: distanceSelect ? distanceSelect.value : pendingPreferences.distance,
       optOutAnalytics: !!optOutToggle?.checked
     };
@@ -883,12 +889,14 @@ async function initPreferences() {
 
   if (darkModeToggle) {
     darkModeToggle.addEventListener("change", () => {
-      const theme = darkModeToggle.checked ? "dark" : "light";
       if (typeof setGlobalTheme === "function") {
-        setGlobalTheme(theme);
+        setGlobalTheme(SETTINGS_DEFAULT_THEME);
       } else {
-        document.documentElement.setAttribute("data-theme", theme);
+        localStorage.setItem("lb_theme", SETTINGS_DEFAULT_THEME);
+        localStorage.setItem("lb_theme_version", SETTINGS_THEME_VERSION);
+        document.documentElement.setAttribute("data-theme", SETTINGS_DEFAULT_THEME);
       }
+      darkModeToggle.checked = false;
       updatePendingPreferences();
     });
   }

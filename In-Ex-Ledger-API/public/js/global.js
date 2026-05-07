@@ -11,7 +11,7 @@ window.isV2BusinessUnlocked = isV2BusinessUnlocked;
 /* Global helpers shared across pages */
 
 const DEFAULT_THEME = "light";
-const THEME_VERSION = "2";
+const THEME_VERSION = "3";
 const US_ESTIMATED_TAX_RATE = 0.24;
 const CANADA_ESTIMATED_TAX_RATES = {
   AB: 0.05,
@@ -30,31 +30,38 @@ const CANADA_ESTIMATED_TAX_RATES = {
 };
 const DEFAULT_CA_ESTIMATED_TAX_RATE = 0.05;
 
-function resolveSavedTheme() {
-  const storedVersion = localStorage.getItem("lb_theme_version");
-  if (storedVersion !== THEME_VERSION) {
+function persistDefaultTheme() {
+  try {
     localStorage.setItem("lb_theme", DEFAULT_THEME);
     localStorage.setItem("lb_theme_version", THEME_VERSION);
-    return DEFAULT_THEME;
-  }
+  } catch (_) {}
+}
 
-  return localStorage.getItem("lb_theme") || DEFAULT_THEME;
+function applyThemeToDocument(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  document.body.classList.remove("dark", "light");
+  document.body.classList.add(theme);
+}
+
+function resolveSavedTheme() {
+  try {
+    const storedVersion = localStorage.getItem("lb_theme_version");
+    const storedTheme = localStorage.getItem("lb_theme");
+    if (storedVersion !== THEME_VERSION || storedTheme !== DEFAULT_THEME) {
+      persistDefaultTheme();
+    }
+  } catch (_) {}
+  return DEFAULT_THEME;
 }
 
 function applyGlobalTheme() {
-  const savedTheme = resolveSavedTheme();
-  document.documentElement.setAttribute("data-theme", savedTheme);
-  document.body.classList.remove("dark", "light");
-  document.body.classList.add(savedTheme);
+  applyThemeToDocument(resolveSavedTheme());
 }
 
 function setGlobalTheme(theme) {
-  const normalized = theme === "dark" ? "dark" : "light";
-  localStorage.setItem("lb_theme", normalized);
-  localStorage.setItem("lb_theme_version", THEME_VERSION);
-  document.documentElement.setAttribute("data-theme", normalized);
-  document.body.classList.remove("dark", "light");
-  document.body.classList.add(normalized);
+  const normalized = DEFAULT_THEME;
+  persistDefaultTheme();
+  applyThemeToDocument(normalized);
   if (typeof window !== "undefined" && typeof CustomEvent === "function") {
     window.dispatchEvent(new CustomEvent("lunaThemeChanged", { detail: normalized }));
   }
@@ -479,6 +486,23 @@ function applyMileageNavLabel() {
 
 const DYNAMIC_SIDEBAR_FAVORITES_KEY = "lb_dynamic_sidebar_favorites";
 const DYNAMIC_SIDEBAR_DEFAULT_FAVORITES = ["transactions", "receipts", "mileage", "accounts", "categories"];
+const DYNAMIC_SIDEBAR_CORE_FEATURE_IDS = new Set([
+  "transactions",
+  "receipts",
+  "mileage",
+  "accounts",
+  "categories",
+  "exports"
+]);
+const DYNAMIC_SIDEBAR_BUSINESS_FEATURE_IDS = new Set([
+  "customers",
+  "invoices",
+  "bills",
+  "vendors",
+  "projects",
+  "billable-expenses",
+  "billable_expenses"
+]);
 let dynamicSidebarSaveTimer = null;
 
 const DYNAMIC_SIDEBAR_FEATURES = [
@@ -521,14 +545,6 @@ const DYNAMIC_SIDEBAR_FEATURES = [
     group: "Core",
     actionLabel: "Add category",
     icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg>'
-  },
-  {
-    id: "analytics",
-    label: "Analytics",
-    route: "analytics",
-    group: "Core",
-    actionLabel: "Open analytics",
-    icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg>'
   },
   {
     id: "exports",
@@ -579,23 +595,90 @@ const DYNAMIC_SIDEBAR_FEATURES = [
     icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M6 4l1-1h3l1 1"></path></svg>'
   },
   {
-    id: "settings",
-    label: "Settings",
-    route: "settings",
-    group: "System",
-    actionLabel: "Open settings",
-    icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg>'
+    id: "billable-expenses",
+    label: "Billable Expenses",
+    route: "billable-expenses",
+    group: "Business",
+    actionLabel: "Open billable expenses",
+    icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 3h10v10H3z"></path><path d="M5 6h6M5 9h4"></path></svg>'
   }
 ];
+
+function normalizeDynamicSidebarTier(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getDynamicSidebarSubscription() {
+  const profileSubscription = window.__LUNA_ME__?.subscription;
+  if (profileSubscription && typeof profileSubscription === "object") {
+    return profileSubscription;
+  }
+
+  try {
+    return JSON.parse(localStorage.getItem("lb_subscription") || "null") || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function getDynamicSidebarTier() {
+  const subscription = getDynamicSidebarSubscription();
+  const candidates = [
+    subscription?.effectiveTier,
+    subscription?.tier,
+    subscription?.plan,
+    subscription?.planCode,
+    subscription?.plan_code,
+    localStorage.getItem("tier")
+  ];
+
+  return candidates.map(normalizeDynamicSidebarTier).find(Boolean) || "free";
+}
+
+function hasDynamicSidebarQuickAddAccess() {
+  const tier = getDynamicSidebarTier();
+  return tier === "v1" || tier === "pro" || tier === "business" || tier === "v2";
+}
+
+function hasDynamicSidebarBusinessTier() {
+  const tier = getDynamicSidebarTier();
+  return tier === "business" || tier === "v2" || tier === "business_tier";
+}
+
+function getDynamicSidebarAvailableFeatures() {
+  if (!hasDynamicSidebarQuickAddAccess()) {
+    return [];
+  }
+
+  const allowBusiness = hasDynamicSidebarBusinessTier();
+  return DYNAMIC_SIDEBAR_FEATURES.filter((feature) => {
+    if (DYNAMIC_SIDEBAR_BUSINESS_FEATURE_IDS.has(feature.id)) {
+      return allowBusiness;
+    }
+    return DYNAMIC_SIDEBAR_CORE_FEATURE_IDS.has(feature.id);
+  });
+}
 
 function initDynamicSidebar() {
   const shell = document.querySelector("main.app-shell");
   const sidebar = shell?.querySelector(".app-sidebar");
   if (!shell || !sidebar) return;
 
-  const featureMap = new Map(DYNAMIC_SIDEBAR_FEATURES.map((feature) => [feature.id, feature]));
+  const availableFeatures = getDynamicSidebarAvailableFeatures();
+  if (!availableFeatures.length) {
+    sidebar.hidden = true;
+    sidebar.setAttribute("aria-hidden", "true");
+    sidebar.innerHTML = "";
+    return;
+  }
+
+  sidebar.hidden = false;
+  sidebar.removeAttribute("aria-hidden");
+
+  const featureMap = new Map(availableFeatures.map((feature) => [feature.id, feature]));
   let favorites = getDynamicSidebarFavorites(featureMap, window.__LUNA_ME__?.ui_preferences);
   let draggedFeatureId = "";
+  let shouldKeepLibraryOpen = false;
 
   sidebar.className = "app-sidebar app-sidebar--dynamic";
   sidebar.setAttribute("aria-label", "Favorites");
@@ -605,7 +688,7 @@ function initDynamicSidebar() {
   function render() {
     favorites = favorites.filter((id) => featureMap.has(id));
     const favoriteMarkup = favorites.map((id) => renderDynamicSidebarFavorite(featureMap.get(id))).join("");
-    const groupedLibrary = DYNAMIC_SIDEBAR_FEATURES.reduce((groups, feature) => {
+    const groupedLibrary = availableFeatures.reduce((groups, feature) => {
       if (!groups[feature.group]) groups[feature.group] = [];
       groups[feature.group].push(feature);
       return groups;
@@ -616,13 +699,13 @@ function initDynamicSidebar() {
         <div>
           <div class="sidebar-section-label">Quick Add</div>
         </div>
-        <button type="button" class="dynamic-sidebar-manage" data-sidebar-manage aria-expanded="false">Add</button>
+        <button type="button" class="dynamic-sidebar-manage" data-sidebar-manage aria-expanded="${String(shouldKeepLibraryOpen)}">${shouldKeepLibraryOpen ? "Done" : "Add"}</button>
       </div>
       <nav class="sidebar-nav dynamic-sidebar-favorites" data-sidebar-favorites aria-label="Quick add actions">
         ${favoriteMarkup}
       </nav>
       <div class="dynamic-sidebar-empty" data-sidebar-empty${favorites.length ? " hidden" : ""}><span class="dynamic-sidebar-empty-icon">+</span> Click Add above to add quick-add shortcuts</div>
-      <div class="dynamic-sidebar-library" data-sidebar-library hidden>
+      <div class="dynamic-sidebar-library" data-sidebar-library${shouldKeepLibraryOpen ? "" : " hidden"}>
         ${Object.keys(groupedLibrary).map((group) => `
           <div class="dynamic-sidebar-library-group">
             <div class="sidebar-section-label">${escapeDynamicSidebarHtml(group)}</div>
@@ -641,10 +724,8 @@ function initDynamicSidebar() {
     const favoritesNav = sidebar.querySelector("[data-sidebar-favorites]");
 
     manageButton?.addEventListener("click", () => {
-      const nextHidden = !library?.hidden;
-      if (library) library.hidden = nextHidden;
-      manageButton.setAttribute("aria-expanded", String(!nextHidden));
-      manageButton.textContent = nextHidden ? "Add" : "Done";
+      shouldKeepLibraryOpen = !shouldKeepLibraryOpen;
+      render();
     });
 
     favoritesNav?.addEventListener("dragover", (event) => {
@@ -711,6 +792,7 @@ function initDynamicSidebar() {
     } else {
       favorites.push(id);
     }
+    shouldKeepLibraryOpen = true;
     saveDynamicSidebarFavorites(favorites);
     render();
   }
