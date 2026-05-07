@@ -76,7 +76,6 @@ router.use('/region', require('./region.routes.js'));
 router.use('/entitlements', require('./entitlements.routes.js'));
 router.use('/mileage', require('./mileage.routes.js'));
 router.use('/sessions', require('./sessions.routes.js'));
-router.use('/billing', require('./billing-checkout-overrides.routes.js'));
 router.use('/billing', require('./billing.routes.js'));
 router.use('/recurring', require('./recurring.routes.js'));
 router.use('/businesses', require('./businesses.routes.js'));

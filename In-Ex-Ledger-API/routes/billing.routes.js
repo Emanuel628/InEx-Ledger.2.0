@@ -173,6 +173,18 @@ function normalizeAdditionalBusinesses(input) {
   return value;
 }
 
+function isTrialReupgradeAttempt(subscription) {
+  return Boolean(
+    subscription?.isTrialing &&
+    (
+      subscription.cancelAtPeriodEnd ||
+      subscription.isTrialDowngradedToFree ||
+      subscription.selectedPlanCode !== "v1" ||
+      subscription.trialPlanSelection === "free"
+    )
+  );
+}
+
 function getVerifiedClientIp(req) {
   return normalizeIpAddress(req?.ip || req?.socket?.remoteAddress || "");
 }
@@ -636,8 +648,27 @@ router.post("/mock-v1", requireAuth, requireCsrfProtection, async (req, res) => 
 router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
     const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
+
+    if (isTrialReupgradeAttempt(subscription)) {
+      await pool.query(
+        `UPDATE business_subscriptions
+            SET cancel_at_period_end = false,
+                canceled_at = NULL,
+                updated_at = NOW()
+          WHERE business_id = $1
+            AND status = 'trialing'`,
+        [billingBusinessId]
+      );
+      logInfo("Normalized downgraded trial before checkout", {
+        businessId: billingBusinessId,
+        userId: req.user?.id,
+        selectedPlanCode: subscription.selectedPlanCode,
+        trialPlanSelection: subscription.trialPlanSelection
+      });
+      subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    }
 
     // Block when any live Stripe subscription exists — including subscriptions
     // scheduled to cancel at period end (cancel_at_period_end=true).  Allowing

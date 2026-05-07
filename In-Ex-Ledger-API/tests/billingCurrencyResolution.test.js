@@ -8,10 +8,15 @@ const request = require("supertest");
 
 const BILLING_ROUTE_PATH = require.resolve("../routes/billing.routes.js");
 
-function loadBillingRouter({ country = "Canada", existingStripeSubscription = null } = {}) {
+function loadBillingRouter({
+  country = "Canada",
+  existingStripeSubscription = null,
+  subscriptionSnapshots = null
+} = {}) {
   const state = {
     stripeRequests: [],
-    stripeCustomerId: null
+    stripeCustomerId: null,
+    normalizationUpdates: 0
   };
 
   const originalLoad = Module._load.bind(Module);
@@ -26,6 +31,10 @@ function loadBillingRouter({ country = "Canada", existingStripeSubscription = nu
               return state.stripeCustomerId
                 ? { rows: [{ stripe_customer_id: state.stripeCustomerId }], rowCount: 1 }
                 : { rows: [], rowCount: 0 };
+            }
+            if (/UPDATE business_subscriptions\s+SET cancel_at_period_end = false/i.test(sql)) {
+              state.normalizationUpdates += 1;
+              return { rows: [], rowCount: 1 };
             }
             return { rows: [], rowCount: 0 };
           },
@@ -42,6 +51,10 @@ function loadBillingRouter({ country = "Canada", existingStripeSubscription = nu
                   state.stripeCustomerId = params[1] || null;
                   return { rows: [], rowCount: 1 };
                 }
+                if (/UPDATE business_subscriptions\s+SET cancel_at_period_end = false/i.test(sql)) {
+                  state.normalizationUpdates += 1;
+                  return { rows: [], rowCount: 1 };
+                }
                 return { rows: [], rowCount: 0 };
               },
               release() {}
@@ -55,11 +68,19 @@ function loadBillingRouter({ country = "Canada", existingStripeSubscription = nu
       requestName === "../services/subscriptionService.js" ||
       /subscriptionService\.js$/.test(requestName)
     ) {
+      const snapshots = Array.isArray(subscriptionSnapshots) && subscriptionSnapshots.length
+        ? subscriptionSnapshots.map((snapshot) => ({ ...snapshot }))
+        : null;
       return {
-        getSubscriptionSnapshotForBusiness: async () => ({
-          isPaid: false,
-          isCanceledWithRemainingAccess: false
-        }),
+        getSubscriptionSnapshotForBusiness: async () => {
+          if (snapshots) {
+            return snapshots.length > 1 ? snapshots.shift() : snapshots[0];
+          }
+          return {
+            isPaid: false,
+            isCanceledWithRemainingAccess: false
+          };
+        },
         findBillingAnchorBusinessIdForUser: async () => "22222222-2222-4222-8222-222222222222",
         updateStripeCustomerForBusiness: async () => {},
         syncStripeSubscriptionForBusiness: async () => {},
@@ -389,6 +410,55 @@ test("billing checkout blocks duplicate subscription creation when Stripe alread
 
     assert.equal(res.status, 409);
     assert.match(String(res.body?.error || ""), /already has an active|overlapping/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout normalizes downgraded trial state before creating Stripe checkout", async () => {
+  const fixture = loadBillingRouter({
+    country: "Canada",
+    subscriptionSnapshots: [
+      {
+        isPaid: false,
+        isCanceledWithRemainingAccess: false,
+        isTrialing: true,
+        cancelAtPeriodEnd: true,
+        selectedPlanCode: "free",
+        trialPlanSelection: "free",
+        isTrialDowngradedToFree: true,
+        trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      },
+      {
+        isPaid: false,
+        isCanceledWithRemainingAccess: false,
+        isTrialing: true,
+        cancelAtPeriodEnd: false,
+        selectedPlanCode: "v1",
+        trialPlanSelection: "v1",
+        isTrialDowngradedToFree: false,
+        trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 0
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(fixture.state.normalizationUpdates, 1);
+
+    const checkoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+
+    assert.ok(checkoutRequest, "Stripe checkout request should be created");
+    assert.ok(checkoutRequest.body.get("subscription_data[trial_end]"));
   } finally {
     fixture.cleanup();
   }
