@@ -4,7 +4,6 @@ const arApService = require('../services/arApService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
 const { resolveBusinessIdForUser } = require('../api/utils/resolveBusinessIdForUser.js');
 const { getSubscriptionSnapshotForBusiness, PLAN_PRO, PLAN_BUSINESS } = require('../services/subscriptionService.js');
-const { allowTrustedBrowserAccountSwitch, rememberTrustedBrowserOnLogout } = require('../middleware/accountSwitchMfaTrust.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled.js');
 
 const businessTierOnly = [requireV2BusinessEnabled, requireV2Entitlement];
@@ -14,9 +13,6 @@ async function getEffectiveTierForRequest(req) {
   const subscription = await getSubscriptionSnapshotForBusiness(businessId);
   return subscription?.effectiveTier || null;
 }
-
-router.use('/auth/login', allowTrustedBrowserAccountSwitch);
-router.use('/auth/logout', rememberTrustedBrowserOnLogout);
 
 router.get('/arap-summary', ...businessTierOnly, async (req, res) => {
   try {

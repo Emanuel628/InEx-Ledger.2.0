@@ -1754,7 +1754,7 @@ body {
 }
 
 .transactions-table tbody tr {
-  cursor: pointer;
+  cursor: default;
 }
 
 /* ── Row action popup ────────────────────────────────────── */
@@ -3401,13 +3401,7 @@ tr.tx-highlight {
   text-align: center;
   padding-left: 10px;
   padding-right: 10px;
-}
-
-.transactions-table thead th.col-actions,
-.transactions-table tbody td.table-actions-cell {
-  width: 92px;
-  text-align: right;
-  white-space: nowrap;
+  position: relative;
 }
 
 #txSelectAll,
@@ -3425,21 +3419,6 @@ tr.tx-highlight {
 
 .transactions-table tbody tr.is-selected td {
   background: transparent;
-}
-
-.row-action-button {
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 25, 35, 0.1);
-  background: #fff;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.row-action-button:hover {
-  background: #f8fafc;
 }
 
 .placeholder-row td {

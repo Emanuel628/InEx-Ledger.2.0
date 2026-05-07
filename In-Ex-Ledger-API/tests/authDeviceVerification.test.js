@@ -616,6 +616,37 @@ test("mfa sign-in trusts the device and skips another code on the next login", a
   }
 });
 
+test("global MFA trust cookie can satisfy login without the middleware sidecar", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+  fixture.state.user.mfa_enabled = true;
+  fixture.state.user.mfa_enabled_at = new Date().toISOString();
+
+  try {
+    const app = buildApp(fixture.router);
+    const globalTrustCookie = signToken({
+      purpose: "global_mfa_trust",
+      user_agent_hash: makeHash("TestBrowser/1.0")
+    });
+
+    const loginResponse = await request(app)
+      .post("/api/auth/login")
+      .set("User-Agent", "TestBrowser/1.0")
+      .set("Cookie", `mfa_global_trust=${globalTrustCookie}`)
+      .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
+
+    assert.equal(loginResponse.status, 200);
+    assert.ok(loginResponse.body?.token, "global trust should allow the login route to issue a session directly");
+    assert.equal(loginResponse.body?.mfa_required, undefined);
+    const refreshedGlobalTrust = loginResponse.headers["set-cookie"]?.find((cookie) => cookie.startsWith("mfa_global_trust="));
+    assert.ok(refreshedGlobalTrust, "trusted browser login should refresh the global MFA trust cookie");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("mfa challenge token lasts at least as long as the emailed code window", async () => {
   const fixture = loadAuthRouter({
     nodeEnv: "test",
@@ -767,6 +798,72 @@ test("mfa enable returns a fresh MFA-authenticated access token for subsequent p
     assert.equal(decoded.mfa_enabled, true);
     assert.equal(decoded.mfa_authenticated, true);
     assert.equal(fixture.state.user.mfa_enabled, true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("logout preserves only the browser-level MFA trust cookie for MFA-authenticated sessions", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const authToken = signToken({
+      id: fixture.state.user.id,
+      email: fixture.state.user.email,
+      email_verified: true,
+      business_id: fixture.state.businessId,
+      mfa_enabled: true,
+      mfa_authenticated: true
+    });
+
+    const response = await request(app)
+      .post("/api/auth/logout")
+      .set("User-Agent", "TestBrowser/1.0")
+      .set("Authorization", `Bearer ${authToken}`)
+      .set(makeCsrfHeaders())
+      .send({});
+
+    assert.equal(response.status, 204);
+    const setCookies = response.headers["set-cookie"] || [];
+    assert.ok(setCookies.some((cookie) => cookie.startsWith("mfa_global_trust=")), "logout should set the browser-level MFA trust cookie");
+    assert.ok(setCookies.some((cookie) => cookie.startsWith("mfa_trust=;")), "logout should clear the per-device MFA trust cookie");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("logout without MFA authentication does not rewrite the browser-level trust cookie", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const authToken = signToken({
+      id: fixture.state.user.id,
+      email: fixture.state.user.email,
+      email_verified: true,
+      business_id: fixture.state.businessId,
+      mfa_enabled: true,
+      mfa_authenticated: false
+    });
+
+    const response = await request(app)
+      .post("/api/auth/logout")
+      .set("User-Agent", "TestBrowser/1.0")
+      .set("Authorization", `Bearer ${authToken}`)
+      .set(makeCsrfHeaders())
+      .send({});
+
+    assert.equal(response.status, 204);
+    const setCookies = response.headers["set-cookie"] || [];
+    assert.equal(setCookies.some((cookie) => cookie.startsWith("mfa_global_trust=")), false);
+    assert.ok(setCookies.some((cookie) => cookie.startsWith("mfa_trust=;")), "logout should still clear the per-device MFA trust cookie");
   } finally {
     fixture.cleanup();
   }

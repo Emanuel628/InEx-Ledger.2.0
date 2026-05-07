@@ -72,10 +72,12 @@ const tokenRefreshLimiter = createTokenRefreshLimiter();
    ========================================================= */
 const REFRESH_TOKEN_COOKIE = "refresh_token";
 const MFA_TRUST_COOKIE = "mfa_trust";
+const GLOBAL_MFA_TRUST_COOKIE = "mfa_global_trust";
 const REFRESH_TOKEN_EXPIRY_DAYS = Number(process.env.REFRESH_TOKEN_EXPIRY_DAYS) || 7;
 const REFRESH_TOKEN_EXPIRY_MS = REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 const MFA_TRUST_EXPIRY_DAYS = Number(process.env.MFA_TRUST_EXPIRY_DAYS) || 14;
 const MFA_TRUST_EXPIRY_MS = MFA_TRUST_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+const GLOBAL_MFA_TRUST_EXPIRY_SECONDS = Number(process.env.GLOBAL_MFA_TRUST_EXPIRY_SECONDS) || 14 * 24 * 60 * 60;
 const MFA_EMAIL_CODE_EXPIRY_MINUTES = Number(process.env.MFA_EMAIL_CODE_EXPIRY_MINUTES) || 15;
 const MFA_EMAIL_CODE_EXPIRY_MS = MFA_EMAIL_CODE_EXPIRY_MINUTES * 60 * 1000;
 const REFRESH_TOKEN_BYTE_LENGTH = 48;
@@ -642,6 +644,43 @@ function clearMfaTrustCookie(res) {
   res.clearCookie(MFA_TRUST_COOKIE, COOKIE_OPTIONS);
 }
 
+function getUserAgentHash(req) {
+  return hashValue(String(req.get("user-agent") || "").trim().slice(0, 512));
+}
+
+function setGlobalMfaTrustCookie(res, req) {
+  const token = signToken(
+    {
+      purpose: "global_mfa_trust",
+      user_agent_hash: getUserAgentHash(req)
+    },
+    GLOBAL_MFA_TRUST_EXPIRY_SECONDS
+  );
+
+  res.cookie(GLOBAL_MFA_TRUST_COOKIE, token, {
+    ...COOKIE_OPTIONS,
+    maxAge: GLOBAL_MFA_TRUST_EXPIRY_SECONDS * 1000
+  });
+}
+
+function clearGlobalMfaTrustCookie(res) {
+  res.clearCookie(GLOBAL_MFA_TRUST_COOKIE, COOKIE_OPTIONS);
+}
+
+function hasValidGlobalMfaTrustCookie(req) {
+  const token = String(req.cookies?.[GLOBAL_MFA_TRUST_COOKIE] || "").trim();
+  if (!token) {
+    return false;
+  }
+
+  try {
+    const payload = verifyToken(token);
+    return payload?.purpose === "global_mfa_trust" && payload?.user_agent_hash === getUserAgentHash(req);
+  } catch (_) {
+    return false;
+  }
+}
+
 function hashRefreshToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
@@ -1104,6 +1143,17 @@ router.post("/login", authLimiter, async (req, res) => {
       }
 
       if (!trustedDevice) {
+        if (hasValidGlobalMfaTrustCookie(req)) {
+          mfaAuthenticated = true;
+          setGlobalMfaTrustCookie(res, req);
+        } else {
+          if (req.cookies?.[GLOBAL_MFA_TRUST_COOKIE]) {
+            clearGlobalMfaTrustCookie(res);
+          }
+        }
+      }
+
+      if (!mfaAuthenticated) {
         const userLang = await getPreferredLanguageForUser(user.id);
         const mfaToken = await createMfaEmailChallenge(user, req, {
           businessId,
@@ -1240,11 +1290,15 @@ router.post("/logout", requireAuth, requireCsrfProtection, async (req, res) => {
     const hashed = hashRefreshToken(rawToken);
     await revokeRefreshTokenByHash(hashed);
   }
+  if (req.user?.mfa_authenticated) {
+    setGlobalMfaTrustCookie(res, req);
+  }
   logInfo("User logout", {
     userId: req.user?.id || null,
     businessId: req.user?.business_id || null
   });
   clearRefreshCookie(res);
+  clearMfaTrustCookie(res);
   res.status(204).end();
 });
 

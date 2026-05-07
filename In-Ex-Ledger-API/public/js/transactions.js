@@ -1946,25 +1946,27 @@ function renderTransactionsTable(filteredTransactions) {
 
   if (!tbody) return;
 
+  closeRowActionPopup();
+
   if (transactionsLoading && filteredTransactions === undefined) {
-    tbody.innerHTML = `<tr class="placeholder-row"><td colspan="9" class="placeholder placeholder-cell">${txT("transactions_loading", "Loading transactions...")}</td></tr>`;
+    tbody.innerHTML = `<tr class="placeholder-row"><td colspan="8" class="placeholder placeholder-cell">${txT("transactions_loading", "Loading transactions...")}</td></tr>`;
     updateTransactionSelectionHeader();
     return;
   }
 
   if (hasTransactionsLoadFailed && filteredTransactions === undefined) {
-    tbody.innerHTML = `<tr class="placeholder-row"><td colspan="9" class="placeholder placeholder-cell">${txT("transactions_error_load", "Unable to load transactions. Please refresh.")}</td></tr>`;
+    tbody.innerHTML = `<tr class="placeholder-row"><td colspan="8" class="placeholder placeholder-cell">${txT("transactions_error_load", "Unable to load transactions. Please refresh.")}</td></tr>`;
     updateTransactionSelectionHeader();
     return;
   }
 
   if (transactions.length === 0) {
     if (isFilteredView && ledgerState.transactions.length > 0) {
-      tbody.innerHTML = `<tr class="placeholder-row"><td colspan="9" class="placeholder placeholder-cell">${txT("transactions_empty_filtered", "No matching transactions.")}</td></tr>`;
+      tbody.innerHTML = `<tr class="placeholder-row"><td colspan="8" class="placeholder placeholder-cell">${txT("transactions_empty_filtered", "No matching transactions.")}</td></tr>`;
     } else {
       tbody.innerHTML = `
         <tr class="placeholder-row">
-          <td colspan="9" class="placeholder placeholder-cell">
+          <td colspan="8" class="placeholder placeholder-cell">
             ${buildTransactionsEmptyStateMarkup(
               typeof t === "function" ? t("transactions_empty") : "No transactions yet.",
               "Add your first transaction to start tracking income and expenses.",
@@ -2055,7 +2057,6 @@ function renderTransactionsTable(filteredTransactions) {
         </button>
       </td>
       <td class="amount-cell"><span class="${amountClass}">${amountPrefix}${formatCurrency(Math.abs(Number(txn.amount) || 0), rowRegion)}</span></td>
-      <td class="table-actions-cell"><button type="button" class="row-action-button" data-action="row-menu" data-id="${txn.id}">Actions</button></td>
     `;
     row.classList.toggle("is-selected", selectedTransactionIds.has(txnId));
     tbody.appendChild(row);
@@ -2071,22 +2072,26 @@ function renderTransactionsTable(filteredTransactions) {
       e.stopPropagation();
     });
     row.querySelector(".tx-row-select")?.addEventListener("change", (e) => {
-      const isChecked = e.target.checked;
+      const checkbox = e.target;
+      const isChecked = checkbox.checked;
       if (isChecked) {
+        selectedTransactionIds.clear();
         selectedTransactionIds.add(txnId);
+        tbody.querySelectorAll(".tx-row-select").forEach((otherCheckbox) => {
+          if (otherCheckbox !== checkbox) {
+            otherCheckbox.checked = false;
+            otherCheckbox.closest("tr")?.classList.remove("is-selected");
+          }
+        });
+        openRowActionPopup(txn.id, checkbox, isAllScope);
       } else {
         selectedTransactionIds.delete(txnId);
+        if (_popupTxnId === txn.id) {
+          closeRowActionPopup();
+        }
       }
       row.classList.toggle("is-selected", isChecked);
       updateTransactionSelectionHeader(transactions);
-    });
-    row.querySelector('[data-action="row-menu"]')?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      openRowActionPopup(txn.id, e.currentTarget, isAllScope);
-    });
-    row.addEventListener("click", (e) => {
-      if (e.target.closest("button, a, input, select, label")) return;
-      openRowActionPopup(txn.id, row, isAllScope);
     });
   });
 
@@ -2094,6 +2099,7 @@ function renderTransactionsTable(filteredTransactions) {
   if (selectAllCheckbox) {
     selectAllCheckbox.onchange = () => {
       const shouldSelectAll = selectAllCheckbox.checked;
+      closeRowActionPopup();
       transactions.forEach((txn) => {
         const txnId = String(txn.id);
         if (shouldSelectAll) {
@@ -3075,6 +3081,7 @@ function initPeriodPicker() {
 }
 
 let _popupTxnId = null;
+let _popupAnchorElement = null;
 
 function initRowActionPopup() {
   const popup = document.getElementById("txRowPopup");
@@ -3091,42 +3098,73 @@ function initRowActionPopup() {
   });
 
   document.addEventListener("click", (e) => {
-    if (!popup.hidden && !popup.contains(e.target)) closeRowActionPopup();
+    if (!popup.hidden && !popup.contains(e.target) && !e.target.closest(".tx-row-select")) closeRowActionPopup();
   }, true);
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeRowActionPopup();
   });
+
+  window.addEventListener("resize", () => {
+    if (_popupTxnId && _popupAnchorElement) {
+      positionRowActionPopup(_popupAnchorElement);
+    }
+  });
+
+  window.addEventListener("scroll", () => {
+    if (_popupTxnId && _popupAnchorElement) {
+      positionRowActionPopup(_popupAnchorElement);
+    }
+  }, true);
 }
 
-function openRowActionPopup(txnId, rowEl, isAllScope) {
+function openRowActionPopup(txnId, anchorEl, isAllScope) {
   const popup = document.getElementById("txRowPopup");
   if (!popup) return;
 
   _popupTxnId = txnId;
+  _popupAnchorElement = anchorEl;
 
   const editBtn = document.getElementById("txPopupEdit");
   const deleteBtn = document.getElementById("txPopupDelete");
   if (editBtn) editBtn.disabled = !!isAllScope;
   if (deleteBtn) deleteBtn.disabled = !!isAllScope;
 
-  const rect = rowEl.getBoundingClientRect();
-  const popupW = 150;
-  let left = rect.right - popupW - 8;
-  let top = rect.bottom + 4;
-
-  if (left < 8) left = 8;
-  if (top + 88 > window.innerHeight) top = rect.top - 92;
-
-  popup.style.left = `${left}px`;
-  popup.style.top = `${top}px`;
   popup.removeAttribute("hidden");
+  positionRowActionPopup(anchorEl);
+}
+
+function positionRowActionPopup(anchorEl) {
+  const popup = document.getElementById("txRowPopup");
+  if (!popup || !anchorEl) return;
+
+  const anchorCell = anchorEl.closest(".table-select-cell") || anchorEl;
+  const rect = anchorCell.getBoundingClientRect();
+  const popupRect = popup.getBoundingClientRect();
+  const gap = 10;
+  const viewportPadding = 8;
+
+  let left = rect.right + gap;
+  if (left + popupRect.width > window.innerWidth - viewportPadding) {
+    left = rect.left - popupRect.width - gap;
+  }
+  left = Math.max(viewportPadding, left);
+
+  let top = rect.top + Math.max(0, (rect.height - popupRect.height) / 2);
+  if (top + popupRect.height > window.innerHeight - viewportPadding) {
+    top = window.innerHeight - popupRect.height - viewportPadding;
+  }
+  top = Math.max(viewportPadding, top);
+
+  popup.style.left = `${Math.round(left)}px`;
+  popup.style.top = `${Math.round(top)}px`;
 }
 
 function closeRowActionPopup() {
   const popup = document.getElementById("txRowPopup");
   if (popup) popup.setAttribute("hidden", "");
   _popupTxnId = null;
+  _popupAnchorElement = null;
 }
 
 function initOcrPrefill() {
