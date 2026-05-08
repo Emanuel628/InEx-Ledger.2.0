@@ -4,15 +4,67 @@ This document defines how InEx Ledger should stay organized as the codebase matu
 
 ## Documentation structure
 
-`Docs/` is the current working documentation folder.
+The repository uses four top-level documentation folders:
+
+- `Docs/` — important documentation related to the application itself.
+- `Work-To-Do/` — unfinished or planned work.
+- `Work-Completed/` — completed, stale, archived, or historical work files.
+- `Work-Review/` — audits, sweeps, investigations, and review notes.
+
+Only `.md` files belong in the three work folders.
 
 Root-level documents should be limited to files that GitHub or project visitors expect at the repository root, such as:
 
 - `README.md`
-- `SECURITY.md` if needed later
 - license or contribution files if added later
 
-Historical audit or status files may remain at the root only if they are clearly marked stale at the top. They should not be used as current source-of-truth documents.
+Do not maintain both lowercase `docs/` and uppercase `Docs/`.
+
+## Folder rules
+
+### `Docs/`
+
+Use this for application-facing documentation:
+
+- README/product overview copies
+- terms/privacy/security references
+- deployment instructions
+- authentication instructions
+- operational runbooks
+- privacy impact assessments
+- accounting trust rules
+- style/spec documents
+- maintenance-script instructions
+- repository governance rules
+
+### `Work-To-Do/`
+
+Use this for unfinished or planned work:
+
+- build plans
+- rollout plans
+- unfinished cleanup trackers
+- production-readiness work that still needs live validation
+- feature roadmap documents
+
+### `Work-Completed/`
+
+Use this for completed or stale work files:
+
+- old audit reports marked done
+- stale task-status documents
+- archived historical reports
+- documents marked `DONE — DO NOT USE`
+
+### `Work-Review/`
+
+Use this for review material:
+
+- mutation audits
+- table audits
+- critical sweeps
+- security reviews
+- investigation notes
 
 ## Stale document policy
 
@@ -20,17 +72,12 @@ If a document is no longer current:
 
 1. Mark it clearly at the top with `STATUS: DONE`, `STATUS: STALE`, or `STATUS: ARCHIVED`.
 2. Explain what document should be used instead.
-3. Do not let stale audit/status documents drive new work.
-
-Current stale root files:
-
-- `AUDIT-REPORT.md`
-- `AUDIT-REPORT-2026-04-13.md`
-- `TASK-STATUS.md`
+3. Move it to `Work-Completed/` if it is historical.
+4. Do not let stale audit/status documents drive new work.
 
 Current source of truth for cleanup work:
 
-- `Docs/UNFINISHED-CLEANUP-WORK.md`
+- `Work-To-Do/UNFINISHED-CLEANUP-WORK.md`
 
 ## Owner-file rule
 

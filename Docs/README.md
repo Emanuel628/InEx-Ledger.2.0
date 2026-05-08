@@ -1,29 +1,68 @@
 # InEx Ledger Docs
 
-This folder is the working documentation home for InEx Ledger.
+This folder is for important documentation related to the application itself.
 
-Use this folder for current planning, cleanup, governance, architecture notes, and maintenance references. Root-level reports may remain for GitHub visibility or historical reference, but current work should point back here.
+Use `Docs/` for product, operational, security, privacy, deployment, runbook, authentication, style, and instructional documentation.
 
-## Current docs
+Do not use this folder as a dumping ground for old task trackers, stale audits, or temporary cleanup notes.
 
-- `UNFINISHED-CLEANUP-WORK.md` — cleanup tracker for unfinished owner-file, sidecar, drift, and patch work.
-- `REPO-GOVERNANCE.md` — repository organization rules, owner-file rules, parked dark mode policy, and stale document policy.
-- `MAINTENANCE-SCRIPTS.md` — intentional maintenance scripts, why they exist, and when to run them.
+## Folder structure
 
-## Root-level document status
+### `Docs/`
 
-These root-level files are historical and should not be used as current status sources:
+Application and operational documentation.
 
-- `AUDIT-REPORT.md`
-- `AUDIT-REPORT-2026-04-13.md`
-- `TASK-STATUS.md`
+Examples:
 
-Those files are retained only as historical snapshots. Current status should live in this folder.
+- README / product overview
+- authentication contract
+- deployment checklist
+- security notes
+- privacy impact assessment
+- breach notification runbook
+- accounting trust rules
+- style/spec documents
+- maintenance-script instructions
+- repository governance rules
 
-## Documentation rules
+### `Work-To-Do/`
 
-- Do not create duplicate cleanup docs for the same effort.
-- Do not create new phase docs when the work belongs in `UNFINISHED-CLEANUP-WORK.md`.
-- Prefer one owner document per topic.
-- If a document becomes stale, mark it clearly at the top before leaving it in the repo.
-- Keep root `README.md` only as the repository landing page; detailed working docs belong here.
+Markdown files for planned or unfinished work.
+
+Examples:
+
+- build plans
+- rollout plans
+- unfinished cleanup trackers
+- production-readiness work that still requires action
+
+### `Work-Completed/`
+
+Markdown files for work that is done, stale, archived, or historical.
+
+Examples:
+
+- completed audit reports
+- completed task-status files
+- stale reports marked `DONE — DO NOT USE`
+
+### `Work-Review/`
+
+Markdown files that exist mainly for review, audit, sweep, investigation, or analysis.
+
+Examples:
+
+- mutation audits
+- table audits
+- critical sweeps
+- code review notes
+
+## Rules
+
+- Only `.md` files belong in `Work-To-Do/`, `Work-Completed/`, and `Work-Review/`.
+- Keep app-facing documentation in `Docs/`.
+- Move completed/stale work documents to `Work-Completed/`.
+- Move audit/review/sweep documents to `Work-Review/`.
+- Move unfinished plans and active work trackers to `Work-To-Do/`.
+- Do not maintain both lowercase `docs/` and uppercase `Docs/`.
+- Do not create duplicate trackers for the same work.
