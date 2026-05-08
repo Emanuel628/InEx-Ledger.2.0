@@ -2890,7 +2890,11 @@ function initCsvImport() {
       accounts.map((a) => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name)}</option>`).join("");
   }
 
-  importBtn.addEventListener("click", () => {
+  importBtn.addEventListener("click", async () => {
+    const canImport = await switchToActiveScopeIfNeeded();
+    if (!canImport) {
+      return;
+    }
     populateCsvAccounts();
     document.getElementById("csvImportStep1").hidden = false;
     document.getElementById("csvImportStep2").hidden = true;
@@ -2910,9 +2914,9 @@ function initCsvImport() {
     if (e.key === "Escape") modal.classList.add("hidden");
   });
 
-  doneBtn.addEventListener("click", () => {
+  doneBtn.addEventListener("click", async () => {
     modal.classList.add("hidden");
-    loadTransactions();
+    await loadTransactions();
   });
 
   startBtn.addEventListener("click", async () => {
@@ -2947,7 +2951,7 @@ function initCsvImport() {
         body: formData
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         errorEl.textContent = data.error || "Import failed.";
@@ -2969,6 +2973,9 @@ function initCsvImport() {
       `;
       document.getElementById("csvImportStep1").hidden = true;
       document.getElementById("csvImportStep2").hidden = false;
+      setTransactionFormMessage(`CSV import complete. Imported ${data.imported || 0} and skipped ${data.skipped || 0}.`);
+      await loadTransactions();
+      renderTotals();
     } catch (err) {
       errorEl.textContent = "An unexpected error occurred. Please try again.";
       errorEl.hidden = false;

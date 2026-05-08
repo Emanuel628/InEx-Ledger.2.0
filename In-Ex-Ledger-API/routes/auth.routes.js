@@ -268,6 +268,10 @@ function getAppBaseUrl(req) {
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new Error("APP_BASE_URL must use http or https");
   }
+  if (parsed.hostname === "inexledger.com") {
+    parsed.hostname = "www.inexledger.com";
+    return parsed.toString().replace(/\/+$/, "");
+  }
   return configured;
 }
 

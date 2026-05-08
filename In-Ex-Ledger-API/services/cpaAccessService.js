@@ -19,7 +19,22 @@ function getResend() {
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "InEx Ledger <noreply@inexledger.com>";
 
 function getAppBaseUrl() {
-  return String(process.env.APP_BASE_URL || "").trim().replace(/\/+$/, "");
+  const configured = String(process.env.APP_BASE_URL || "").trim().replace(/\/+$/, "");
+  if (!configured) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(configured);
+    if (parsed.hostname === "inexledger.com") {
+      parsed.hostname = "www.inexledger.com";
+      return parsed.toString().replace(/\/+$/, "");
+    }
+  } catch (_) {
+    return configured;
+  }
+
+  return configured;
 }
 
 function escapeHtml(value) {

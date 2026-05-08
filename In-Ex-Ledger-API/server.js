@@ -64,6 +64,7 @@ const LEGACY_HTML_REDIRECTS = new Map([
   ['/html/mfa.html', '/settings#settings-security'],
   ['/mfa.html', '/settings#settings-security']
 ]);
+const INDEXABLE_PUBLIC_PAGES = new Set(["landing", "pricing", "legal", "privacy", "terms"]);
 
 function setStaticAssetCacheHeaders(res, filePath) {
   const normalizedPath = String(filePath || '').toLowerCase();
@@ -84,6 +85,49 @@ function setStaticAssetCacheHeaders(res, filePath) {
 
 function getCanonicalPagePath(pageName) {
   return pageName === 'landing' ? '/' : `/${pageName}`;
+}
+
+function resolveCanonicalAppOrigin() {
+  const configured = String(process.env.APP_BASE_URL || '').trim();
+  if (!configured) {
+    return 'https://www.inexledger.com';
+  }
+
+  try {
+    const parsed = new URL(configured);
+    if (parsed.hostname === 'inexledger.com') {
+      parsed.hostname = 'www.inexledger.com';
+    }
+    return parsed.origin;
+  } catch (_) {
+    return 'https://www.inexledger.com';
+  }
+}
+
+function resolveRequestedPageName(requestPath) {
+  const normalizedPath = String(requestPath || '')
+    .toLowerCase()
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '');
+
+  if (!normalizedPath) {
+    return 'landing';
+  }
+
+  const candidate = normalizedPath.startsWith('html/')
+    ? normalizedPath.slice('html/'.length)
+    : normalizedPath;
+  const pageName = candidate.endsWith('.html')
+    ? candidate.slice(0, -'.html'.length)
+    : candidate;
+
+  return htmlPageNames.includes(pageName) ? pageName : null;
+}
+
+function getNormalizedRequestHost(req) {
+  const forwardedHost = String(req.headers['x-forwarded-host'] || req.headers.host || '').trim();
+  return forwardedHost.split(',')[0].trim().toLowerCase();
 }
 
 function isBlockedV2PageRequest(requestPath) {
@@ -200,6 +244,26 @@ app.use(cors({
    ========================================================= */
 app.use(cookieParser());
 app.use(ensureCsrfCookie);
+
+app.use((req, res, next) => {
+  if ((req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api/')) {
+    const requestHost = getNormalizedRequestHost(req);
+    if (requestHost === 'inexledger.com') {
+      return res.redirect(301, `${resolveCanonicalAppOrigin()}${req.originalUrl || req.url || '/'}`);
+    }
+  }
+  next();
+});
+
+app.use((req, res, next) => {
+  if ((req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api/')) {
+    const pageName = resolveRequestedPageName(req.path);
+    if (pageName && !INDEXABLE_PUBLIC_PAGES.has(pageName)) {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+  }
+  next();
+});
 
 for (const [legacyPath, nextPath] of LEGACY_HTML_REDIRECTS.entries()) {
   app.get(legacyPath, (req, res) => {

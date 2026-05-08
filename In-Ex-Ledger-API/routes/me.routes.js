@@ -28,6 +28,9 @@ const accountDeleteLimiter = rateLimit({
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const VALID_BUSINESS_TYPES = new Set(["sole_proprietor", "llc", "s_corp", "partnership", "corporation"]);
+const VALID_WORK_TYPES = new Set(["gig", "creative", "trade", "other"]);
+const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
+const VALID_STARTER_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash", "loan"]);
 const GUIDED_SETUP_STEPS = ["categories", "accounts", "transactions"];
 const VALID_GUIDED_SETUP_ACTIONS = new Set(["next", "back", "skip", "finish"]);
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
@@ -94,6 +97,95 @@ function resolvePreviousGuidedSetupStep(currentStep) {
     return null;
   }
   return GUIDED_SETUP_STEPS[currentIndex - 1] || null;
+}
+
+function resolveDefaultStartFocus(workType) {
+  if (workType === "gig" || workType === "trade") {
+    return "mileage";
+  }
+  return "transactions";
+}
+
+function buildWorkTypeRecommendations(workType) {
+  switch (workType) {
+    case "gig":
+      return {
+        recommended_categories: [
+          "Platform income",
+          "Mileage",
+          "Gas and fuel",
+          "Parking and tolls",
+          "Phone plan"
+        ],
+        setup_notes: [
+          "Start by logging one payout and one vehicle-related expense.",
+          "Mileage is usually worth setting up early for rideshare and delivery work."
+        ]
+      };
+    case "creative":
+      return {
+        recommended_categories: [
+          "Client income",
+          "Software subscriptions",
+          "Office supplies",
+          "Advertising and marketing",
+          "Professional services"
+        ],
+        setup_notes: [
+          "Create the categories you use on client work before adding a batch of transactions.",
+          "Keep software and contractor costs separate so exports stay cleaner later."
+        ]
+      };
+    case "trade":
+      return {
+        recommended_categories: [
+          "Job income",
+          "Materials",
+          "Tools",
+          "Subcontractors",
+          "Mileage"
+        ],
+        setup_notes: [
+          "Materials, tools, and mileage are usually the first categories worth setting up.",
+          "Receipts matter more when purchases happen on the job, so keep that workflow close."
+        ]
+      };
+    default:
+      return {
+        recommended_categories: [
+          "Business income",
+          "Supplies",
+          "Software",
+          "Travel",
+          "Meals"
+        ],
+        setup_notes: [
+          "Start with the categories and account names you will actually use this month.",
+          "You can expand the setup after a few real transactions make the gaps obvious."
+        ]
+      };
+  }
+}
+
+function buildStarterAccountName(workType, starterAccountType) {
+  const typeLabelMap = {
+    checking: "Checking",
+    savings: "Savings",
+    credit_card: "Business Card",
+    cash: "Cash",
+    loan: "Business Loan"
+  };
+  const baseLabel = typeLabelMap[starterAccountType] || "Primary Account";
+  if (workType === "gig") {
+    return starterAccountType === "credit_card" ? "Driver Card" : `Driver ${baseLabel}`;
+  }
+  if (workType === "creative") {
+    return starterAccountType === "credit_card" ? "Studio Card" : `Studio ${baseLabel}`;
+  }
+  if (workType === "trade") {
+    return starterAccountType === "credit_card" ? "Job Card" : `Job ${baseLabel}`;
+  }
+  return starterAccountType === "credit_card" ? "Business Card" : `Primary ${baseLabel}`;
 }
 
 router.use(requireAuth);
@@ -177,6 +269,10 @@ router.get("/onboarding", async (req, res) => {
 router.put("/onboarding", async (req, res) => {
   const businessName = String(req.body?.business_name || "").trim();
   const businessType = String(req.body?.business_type || "").trim();
+  const workType = String(req.body?.work_type || "").trim().toLowerCase();
+  const starterAccountType = String(req.body?.starter_account_type || "").trim().toLowerCase();
+  const starterAccountName = normalizeOptionalTrimmedString(req.body?.starter_account_name);
+  const startFocus = String(req.body?.start_focus || "").trim().toLowerCase();
   const region = String(req.body?.region || "").trim().toUpperCase();
   const province = String(req.body?.province || "").trim().toUpperCase();
   const language = String(req.body?.language || "").trim();
@@ -187,11 +283,20 @@ router.put("/onboarding", async (req, res) => {
   if (!VALID_BUSINESS_TYPES.has(businessType)) {
     return res.status(400).json({ error: "Choose a valid business type." });
   }
+  if (workType && !VALID_WORK_TYPES.has(workType)) {
+    return res.status(400).json({ error: "Choose a valid work type." });
+  }
   if (!VALID_REGIONS.has(region)) {
     return res.status(400).json({ error: "Choose a valid region." });
   }
   if (!VALID_LANGUAGES.has(language)) {
     return res.status(400).json({ error: "Choose a valid language." });
+  }
+  if (starterAccountType && !VALID_STARTER_ACCOUNT_TYPES.has(starterAccountType)) {
+    return res.status(400).json({ error: "Choose a valid starter account type." });
+  }
+  if (startFocus && !VALID_START_FOCUS.has(startFocus)) {
+    return res.status(400).json({ error: "Choose a valid starting workflow." });
   }
   if (region === "CA" && !CA_PROVINCES.has(province)) {
     return res.status(400).json({ error: "Choose a valid province." });
@@ -202,6 +307,23 @@ router.put("/onboarding", async (req, res) => {
 
     try {
       await client.query("BEGIN");
+
+      const currentUser = await client.query(
+        "SELECT onboarding_completed FROM users WHERE id = $1 LIMIT 1",
+        [req.user.id]
+      );
+      const alreadyCompleted = !!currentUser.rows[0]?.onboarding_completed;
+      const normalizedWorkType = VALID_WORK_TYPES.has(workType) ? workType : "other";
+      const normalizedStarterAccountType = VALID_STARTER_ACCOUNT_TYPES.has(starterAccountType)
+        ? starterAccountType
+        : "checking";
+      const normalizedStartFocus = VALID_START_FOCUS.has(startFocus)
+        ? startFocus
+        : resolveDefaultStartFocus(normalizedWorkType);
+      const workTypeRecommendations = buildWorkTypeRecommendations(normalizedWorkType);
+      const starterName =
+        starterAccountName || buildStarterAccountName(normalizedWorkType, normalizedStarterAccountType);
+      const guidedSetupActive = GUIDED_SETUP_STEPS.includes(normalizedStartFocus);
 
       await client.query(
         `UPDATE businesses
@@ -217,14 +339,32 @@ router.put("/onboarding", async (req, res) => {
         [businessName, businessType, region, language, province || null, businessId]
       );
 
+      if (!alreadyCompleted) {
+        await client.query(
+          "DELETE FROM accounts WHERE business_id = $1",
+          [businessId]
+        );
+        await client.query(
+          `INSERT INTO accounts (id, business_id, name, type)
+           VALUES ($1, $2, $3, $4)`,
+          [crypto.randomUUID(), businessId, starterName, normalizedStarterAccountType]
+        );
+      }
+
       const onboardingData = {
         business_name: businessName,
         business_type: businessType,
+        work_type: normalizedWorkType,
+        starter_account_type: normalizedStarterAccountType,
+        starter_account_name: starterName,
+        start_focus: normalizedStartFocus,
         region,
         province: region === "CA" ? province : "",
         language,
-        guided_setup_active: true,
-        guided_setup_step: GUIDED_SETUP_STEPS[0]
+        recommended_categories: workTypeRecommendations.recommended_categories,
+        setup_notes: workTypeRecommendations.setup_notes,
+        guided_setup_active: guidedSetupActive,
+        guided_setup_step: guidedSetupActive ? normalizedStartFocus : "complete"
       };
 
       const updated = await client.query(
@@ -241,7 +381,7 @@ router.put("/onboarding", async (req, res) => {
 
       return res.status(200).json({
         onboarding: normalizeOnboardingPayload(updated.rows[0]),
-        redirect_to: `/${GUIDED_SETUP_STEPS[0]}`
+        redirect_to: `/${normalizedStartFocus}`
       });
     } catch (err) {
       await client.query("ROLLBACK");

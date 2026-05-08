@@ -27,3 +27,22 @@ test("CSS assets disable browser caching", async () => {
   const response = await request(app).get("/css/app.css").expect(200);
   assertNoStore(response);
 });
+
+test("private app pages send noindex headers", async () => {
+  const response = await request(app).get("/transactions").expect(200);
+  assert.strictEqual(response.headers["x-robots-tag"], "noindex, nofollow");
+});
+
+test("public legal pages remain indexable", async () => {
+  const response = await request(app).get("/privacy").expect(200);
+  assert.ok(!response.headers["x-robots-tag"]);
+});
+
+test("apex host redirects HTML traffic to canonical www host", async () => {
+  const response = await request(app)
+    .get("/pricing")
+    .set("Host", "inexledger.com")
+    .expect(301);
+
+  assert.strictEqual(response.headers.location, "https://www.inexledger.com/pricing");
+});

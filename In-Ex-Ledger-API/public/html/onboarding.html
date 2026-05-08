@@ -34,12 +34,23 @@
           <li data-i18n="onboarding_step_2">Regional defaults</li>
           <li data-i18n="onboarding_step_4">Guided setup</li>
         </ol>
+        <div class="onboarding-preview-card" id="onboardingPlanPreview" aria-live="polite">
+          <div class="onboarding-preview-kicker">Your setup plan</div>
+          <h2 id="onboardingPlanTitle">Built for solo work that needs clean books fast.</h2>
+          <p id="onboardingPlanBody">We'll save your basics, create your first account, and take you to the workflow that makes sense to start with.</p>
+          <ul id="onboardingPlanBullets" class="onboarding-preview-list">
+            <li>Save the business name and filing region you actually use.</li>
+            <li>Create a starter account so the ledger is usable immediately.</li>
+            <li>Send you to the right first workflow instead of a dead-end setup screen.</li>
+          </ul>
+        </div>
       </div>
 
       <form id="onboardingForm" class="onboarding-card">
         <div class="onboarding-grid">
           <div class="form-field form-field-full">
             <label class="field-label" data-i18n="onboarding_work_type_label">What kind of work do you do?</label>
+            <p class="onboarding-field-hint">We use this to suggest categories, starter guidance, and the first workflow to open after setup.</p>
             <div class="onboarding-work-tiles" id="onboardingWorkTiles">
               <button type="button" class="work-tile" data-work="gig" data-i18n="onboarding_work_type_gig">Rideshare / Delivery</button>
               <button type="button" class="work-tile" data-work="creative" data-i18n="onboarding_work_type_creative">Creative / Consulting</button>
@@ -54,6 +65,20 @@
             <input type="text" id="onboardingBusinessName" autocomplete="name" required data-i18n-placeholder="onboarding_business_name_placeholder" placeholder="e.g. Jane Smith or Jane's Design" />
           </div>
           <input type="hidden" id="onboardingBusinessType" value="sole_proprietor" />
+          <div class="form-field">
+            <label for="onboardingStarterAccountType" data-i18n="onboarding_first_account_type">Primary account type</label>
+            <select id="onboardingStarterAccountType" required>
+              <option value="checking">Checking</option>
+              <option value="savings">Savings</option>
+              <option value="credit_card">Credit card</option>
+              <option value="cash">Cash</option>
+              <option value="loan">Loan</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="onboardingStarterAccountName" data-i18n="onboarding_first_account_name">Account nickname</label>
+            <input type="text" id="onboardingStarterAccountName" autocomplete="off" placeholder="e.g. Primary Checking" />
+          </div>
           <div class="form-field">
             <label for="onboardingRegion" data-i18n="onboarding_region">Where do you file taxes?</label>
             <select id="onboardingRegion" required>
@@ -79,6 +104,17 @@
               <option value="SK">Saskatchewan</option>
               <option value="YT">Yukon</option>
             </select>
+          </div>
+          <div class="form-field form-field-full">
+            <label class="field-label" data-i18n="onboarding_start_focus">What do you want to do first?</label>
+            <p class="onboarding-field-hint">We'll open this workflow immediately after setup so you can start doing real work right away.</p>
+            <div class="onboarding-focus-tiles" id="onboardingFocusTiles">
+              <button type="button" class="focus-tile is-selected" data-focus="transactions" data-i18n="onboarding_focus_transactions">Log income & expenses</button>
+              <button type="button" class="focus-tile" data-focus="receipts" data-i18n="onboarding_focus_receipts">Upload receipts</button>
+              <button type="button" class="focus-tile" data-focus="mileage" data-i18n="onboarding_focus_mileage">Track mileage</button>
+              <button type="button" class="focus-tile" data-focus="exports" data-i18n="onboarding_focus_exports">Review exports</button>
+            </div>
+            <input type="hidden" id="onboardingStartFocus" value="transactions" />
           </div>
         </div>
 

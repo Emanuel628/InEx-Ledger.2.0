@@ -137,7 +137,10 @@ function loadMeRouterFixture() {
     }
 
     if (requestName === "../services/subscriptionService.js" || /subscriptionService\.js$/.test(requestName)) {
-      return { getSubscriptionSnapshotForBusiness: async () => ({ status: "active" }) };
+      return {
+        getSubscriptionSnapshotForBusiness: async () => ({ status: "active" }),
+        getSubscriptionSnapshotForUser: async () => ({ status: "active" })
+      };
     }
 
     if (requestName === "../services/cpaAccessService.js" || /cpaAccessService\.js$/.test(requestName)) {

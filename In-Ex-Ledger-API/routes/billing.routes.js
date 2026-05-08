@@ -469,8 +469,11 @@ function buildAppUrl(path) {
   if (parsed.protocol !== "https:" && !isLocalhost) {
     throw new Error("APP_BASE_URL must use HTTPS");
   }
-
-  return `${base.replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+  if (parsed.hostname === "inexledger.com") {
+    parsed.hostname = "www.inexledger.com";
+  }
+  const normalizedBase = parsed.toString().replace(/\/+$/, "");
+  return `${normalizedBase}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 function formatBillingCurrencyAmount(amountMinor, currency) {
