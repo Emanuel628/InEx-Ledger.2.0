@@ -1,6 +1,14 @@
 /* Header account pill and mobile account menu behavior. */
 .app-topbar .user-pill .user-name,
-.app-topbar .user-pill #topbarName {
+.app-topbar .user-pill #topbarName,
+.app-topbar .user-pill:hover .user-name,
+.app-topbar .user-pill:hover #topbarName,
+.app-topbar .user-pill:focus-visible .user-name,
+.app-topbar .user-pill:focus-visible #topbarName,
+.app-topbar .user-pill:focus-within .user-name,
+.app-topbar .user-pill:focus-within #topbarName,
+.app-topbar .user-pill[aria-expanded="true"] .user-name,
+.app-topbar .user-pill[aria-expanded="true"] #topbarName {
   color: #0f172a !important;
 }
 
@@ -9,6 +17,19 @@
 .app-topbar .user-pill:hover #topbarName,
 .app-topbar .user-pill:hover .user-avatar,
 .app-topbar .user-pill:hover #topbarAvatar {
+  color: #0f172a !important;
+}
+
+.app-topbar .account-menu,
+.app-topbar .account-menu-item,
+.app-topbar .account-menu-item:hover,
+.app-topbar .account-menu-item:focus-visible,
+.app-topbar .account-menu-label,
+.app-topbar .account-menu-current,
+.app-topbar .account-menu-caption,
+.app-topbar .account-menu-hint,
+.app-topbar .business-menu-copy,
+.app-topbar .business-menu-state {
   color: #0f172a !important;
 }
 
