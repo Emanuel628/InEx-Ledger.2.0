@@ -160,15 +160,15 @@
 
 .category-inline-add-btn,
 .empty-add-btn {
-  border: 1px dashed rgba(15, 25, 35, 0.18);
-  background: transparent;
-  color: var(--ink2);
+  border: 0;
+  background: var(--cta-gradient);
+  box-shadow: var(--shadow-cta);
+  color: #fff;
 }
 
 .category-inline-add-btn:hover,
 .empty-add-btn:hover {
-  border-color: var(--accent2);
-  color: var(--accent2);
+  filter: brightness(1.03);
 }
 
 .category-card-footer {

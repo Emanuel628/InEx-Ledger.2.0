@@ -155,26 +155,30 @@ function hideCpaSettingsUi() {
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await requireValidSessionOrRedirect();
-  if (typeof enforceTrial === "function") enforceTrial();
+  try {
+    await requireValidSessionOrRedirect();
+    if (typeof enforceTrial === "function") enforceTrial();
 
-  initCollapsibleSettingsPanels();
-  initSettingsNav();
-  initSettingsTabs();
-  await initBusinessProfileForm();
-  await initAccountingLockPanel();
-  await initAccountSettings();
-  if (isCpaUiEnabled()) {
-    await initCpaAccess();
-  } else {
-    hideCpaSettingsUi();
+    initCollapsibleSettingsPanels();
+    initSettingsNav();
+    initSettingsTabs();
+    await initBusinessProfileForm();
+    await initAccountingLockPanel();
+    await initAccountSettings();
+    if (isCpaUiEnabled()) {
+      await initCpaAccess();
+    } else {
+      hideCpaSettingsUi();
+    }
+    await initPreferences();
+    initSecurityForm();
+    initDangerZone();
+    syncSettingsOverviewSummaries();
+    window.addEventListener("lunaLanguageChanged", refreshSettingsLocalizedState);
+    window.addEventListener("lunaRegionChanged", refreshSettingsLocalizedState);
+  } finally {
+    document.body.classList.remove("settings-loading");
   }
-  await initPreferences();
-  initSecurityForm();
-  initDangerZone();
-  syncSettingsOverviewSummaries();
-  window.addEventListener("lunaLanguageChanged", refreshSettingsLocalizedState);
-  window.addEventListener("lunaRegionChanged", refreshSettingsLocalizedState);
 });
 
 function initCollapsibleSettingsPanels() {

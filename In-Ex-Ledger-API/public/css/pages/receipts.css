@@ -78,6 +78,13 @@
   cursor: pointer;
 }
 
+.receipt-bottom-upload-btn {
+  border: 0;
+  background: var(--cta-gradient);
+  box-shadow: var(--shadow-cta);
+  color: #fff;
+}
+
 .receipt-drop-browse,
 .receipt-link-btn,
 .receipt-scan-btn,

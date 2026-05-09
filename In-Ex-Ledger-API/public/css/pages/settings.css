@@ -962,6 +962,15 @@ body {
   background: var(--surface2);
 }
 
+.settings-page.settings-loading .settings-shell {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.settings-page .settings-shell {
+  transition: opacity 120ms ease;
+}
+
 /* SVG icon sizing for settings-specific icons */
 .danger-card-icon svg,
 .danger-modal-icon svg {

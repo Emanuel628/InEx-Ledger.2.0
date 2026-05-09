@@ -16,7 +16,8 @@ const recurringState = {
 const transactionFilters = {
   type: "all",
   search: "",
-  category: ""
+  category: "",
+  period: "this-month"
 };
 
 const DRAWER_OPEN_LABEL = "+ Add new";
@@ -871,7 +872,6 @@ async function loadTransactions() {
     renderCategoryOptions();
     setTransactionsLoading(false);
     applyFilters();
-    renderTotals();
     syncTransactionUndoBar();
     void syncTransactionUndoAvailability({ preserveMessage: !!transactionUndoMessage });
   }
@@ -1692,9 +1692,58 @@ function setEditingMode(enabled) {
 }
 
 function applyFilters() {
+  const filtered = getFilteredTransactions();
+  renderTransactionsTable(filtered);
+  renderTotals(filtered);
+}
+
+function normalizeTransactionDateValue(value) {
+  const raw = String(value || "").slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
+}
+
+function getCurrentDateParts() {
+  const now = new Date();
+  return {
+    year: now.getFullYear(),
+    month: now.getMonth()
+  };
+}
+
+function matchesTransactionPeriod(txn, period = transactionFilters.period) {
+  if (period === "all") {
+    return true;
+  }
+  const normalizedDate = normalizeTransactionDateValue(txn?.date);
+  if (!normalizedDate) {
+    return false;
+  }
+
+  const [yearString, monthString] = normalizedDate.split("-");
+  const year = Number(yearString);
+  const monthIndex = Number(monthString) - 1;
+  if (!Number.isFinite(year) || !Number.isFinite(monthIndex)) {
+    return false;
+  }
+
+  const { year: currentYear, month: currentMonth } = getCurrentDateParts();
+  if (period === "this-month") {
+    return year === currentYear && monthIndex === currentMonth;
+  }
+  if (period === "ytd") {
+    return year === currentYear;
+  }
+  if (period === "last-month") {
+    const lastMonthDate = new Date(currentYear, currentMonth - 1, 1);
+    return year === lastMonthDate.getFullYear() && monthIndex === lastMonthDate.getMonth();
+  }
+  return true;
+}
+
+function getFilteredTransactions() {
   const transactions = ledgerState.transactions || [];
   const term = (transactionFilters.search || "").trim().toLowerCase();
-  let filtered = transactions;
+  let filtered = transactions.filter((tx) => matchesTransactionPeriod(tx));
   if (transactionFilters.type === "income" || transactionFilters.type === "expense") {
     filtered = filtered.filter((tx) => tx.type === transactionFilters.type);
   }
@@ -1723,7 +1772,7 @@ function applyFilters() {
   if (transactionFilters.category) {
     filtered = filtered.filter((tx) => tx.categoryId === transactionFilters.category);
   }
-  renderTransactionsTable(filtered);
+  return filtered;
 }
 
 async function handleTransactionDelete(transactionId) {
@@ -2307,7 +2356,7 @@ function maybeScrollToHighlightedTransaction() {
   window.history.replaceState({}, "", clean.toString());
 }
 
-function renderTotals() {
+function renderTotals(filteredTransactions = getFilteredTransactions()) {
   const incomeLabel = document.getElementById("incomeYTD");
   const expensesLabel = document.getElementById("expensesYTD");
   const netLabel = document.getElementById("netProfitYTD");
@@ -2326,9 +2375,9 @@ function renderTotals() {
   const mixedCurrencies = hasMixedCurrenciesInScope();
   const scopeRegion = getScopeCurrencyRegion();
 
-  const totals = calculateTotals();
-  const comparison = calculateYearComparisons();
-  const transactionsCount = (ledgerState.transactions || []).length;
+  const totals = calculateTotals(filteredTransactions);
+  const comparison = calculateYearComparisons(filteredTransactions);
+  const transactionsCount = filteredTransactions.length;
   if (incomeLabel) {
     incomeLabel.textContent = isAllScope && mixedCurrencies ? txT("exports_per_business", "Per-business") : formatCurrency(totals.income, scopeRegion);
   }
@@ -2350,7 +2399,7 @@ function renderTotals() {
     transactionCountValue.textContent = String(transactionsCount);
   }
   if (transactionCountDelta) {
-    transactionCountDelta.textContent = `${countTransactionsThisMonth()} ${txT("transactions_this_month", "this month")}`;
+    transactionCountDelta.textContent = `${countTransactionsThisMonth(filteredTransactions)} ${txT("transactions_this_month", "this month")}`;
   }
 
   const tier = effectiveTier();
@@ -2392,11 +2441,11 @@ function renderTotals() {
   maybePlaySlotAnimation();
 }
 
-function calculateTotals() {
+function calculateTotals(transactions = ledgerState.transactions || []) {
   let income = 0;
   let expenses = 0;
 
-  ledgerState.transactions.forEach((txn) => {
+  transactions.forEach((txn) => {
     const amount = Math.abs(Number(txn.amount) || 0);
     if (txn.type === "income") {
       income += amount;
@@ -2512,7 +2561,7 @@ function getCategoryToneClass(name) {
   return "tone-default";
 }
 
-function calculateYearComparisons() {
+function calculateYearComparisons(transactions = ledgerState.transactions || []) {
   const currentYear = new Date().getFullYear();
   const previousYear = currentYear - 1;
   let currentIncome = 0;
@@ -2520,7 +2569,7 @@ function calculateYearComparisons() {
   let currentExpenses = 0;
   let previousExpenses = 0;
 
-  (ledgerState.transactions || []).forEach((txn) => {
+  transactions.forEach((txn) => {
     const year = Number(String(txn.date || "").slice(0, 4));
     const amount = Math.abs(Number(txn.amount) || 0);
     if (txn.type === "income") {
@@ -2553,9 +2602,9 @@ function formatPercentChange(value) {
   return `${sign}${value.toFixed(1)}%`;
 }
 
-function countTransactionsThisMonth() {
+function countTransactionsThisMonth(transactions = ledgerState.transactions || []) {
   const now = new Date();
-  return (ledgerState.transactions || []).filter((txn) => {
+  return transactions.filter((txn) => {
     const parsed = new Date(`${txn.date}T00:00:00`);
     return parsed.getFullYear() === now.getFullYear() && parsed.getMonth() === now.getMonth();
   }).length;
@@ -3295,11 +3344,12 @@ function initTaxBannerControls() {
 function initPeriodPicker() {
   const chips = document.querySelectorAll(".tx-period-chip");
   chips.forEach((chip) => {
+    chip.classList.toggle("is-active", chip.dataset.period === transactionFilters.period);
     chip.addEventListener("click", () => {
       chips.forEach((c) => c.classList.remove("is-active"));
       chip.classList.add("is-active");
-      // Period filtering is visual only — transactions.js reload handles the rest
-      // via the existing scope/filter system. Dispatch a custom event so page can react.
+      transactionFilters.period = chip.dataset.period || "this-month";
+      applyFilters();
       window.dispatchEvent(new CustomEvent("txPeriodChanged", { detail: chip.dataset.period }));
     });
   });

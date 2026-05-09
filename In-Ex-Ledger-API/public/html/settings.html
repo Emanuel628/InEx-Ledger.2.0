@@ -5,10 +5,10 @@
   <title>InEx Ledger - Settings</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css?v=20260509b" />
-  <link rel="stylesheet" href="/css/pages/settings.css?v=20260509e" />
+  <link rel="stylesheet" href="/css/pages/settings.css?v=20260509f" />
 </head>
 
-<body class="settings-page">
+<body class="settings-page settings-loading">
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
   <header class="app-topbar settings-topbar">
     <div class="topbar-left">
@@ -48,7 +48,6 @@
           <button class="settings-nav-item is-active" type="button" data-settings-nav-item data-settings-target="settings-overview" data-i18n="settings_nav_overview">Overview</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-business" data-i18n="settings_nav_business">Business</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-billing" data-i18n="settings_nav_billing">Billing</button>
-          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-cpa-access" data-i18n="settings_nav_cpa_access">CPA Access</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-security" data-i18n="settings_nav_security">Security</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-preferences" data-i18n="settings_nav_preferences">Preferences</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-privacy-data" data-i18n="settings_nav_privacy_data">Privacy &amp; Data</button>
@@ -85,16 +84,6 @@
               <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
             </div>
             <p id="overviewBillingSummary" class="settings-summary-meta" data-i18n="settings_overview_billing_loading">Loading subscription details...</p>
-          </button>
-          <button class="settings-summary-card" type="button" data-settings-target="settings-cpa-access">
-            <div class="settings-summary-card-head">
-              <div>
-                <h2 data-i18n="settings_nav_cpa_access">CPA Access</h2>
-                <p data-i18n="settings_overview_cpa_desc">Invite your accountant and manage their access.</p>
-              </div>
-              <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
-            </div>
-            <p id="overviewCpaSummary" class="settings-summary-meta" data-i18n="settings_overview_cpa_loading">Loading access details...</p>
           </button>
           <button class="settings-summary-card" type="button" data-settings-target="settings-security">
             <div class="settings-summary-card-head">
@@ -262,7 +251,7 @@
 
       </section>
 
-      <section class="settings-card settings-panel" id="settings-cpa-access">
+      <section class="settings-card settings-panel hidden" id="settings-cpa-access" hidden aria-hidden="true">
         <div class="settings-panel-head card-head">
           <h2 class="card-title" data-i18n="settings_nav_cpa_access">CPA Access</h2>
           <p class="card-desc" data-i18n="settings_cpa_desc">Invite your accountant, review active access, and audit changes.</p>
@@ -698,6 +687,6 @@
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
   <script src="../js/privacyService.js?v=20260507a"></script>
-  <script src="../js/settings.js?v=20260509h"></script>
+  <script src="../js/settings.js?v=20260509i"></script>
 </body>
 </html>
