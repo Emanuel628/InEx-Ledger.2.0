@@ -3217,11 +3217,12 @@ tr.tx-highlight {
 /* Keep the owner-file dynamic Quick Add rail in control on Transactions. */
 .app-shell > .app-sidebar.app-sidebar--dynamic,
 .app-sidebar.app-sidebar--dynamic {
-  width: auto !important;
-  min-width: 0 !important;
+  width: 224px !important;
+  min-width: 224px !important;
   padding: 14px 12px !important;
   flex: 0 0 auto !important;
-  overflow: visible !important;
+  overflow-x: clip !important;
+  overflow-y: auto !important;
   box-shadow: inset -1px 0 0 rgba(15, 25, 35, 0.05) !important;
 }
 

@@ -656,11 +656,35 @@ function initDynamicSidebar() {
   const sidebar = shell?.querySelector(".app-sidebar");
   if (!shell || !sidebar) return;
 
+  function ensureDynamicSidebarCollapseHandle() {
+    let handle = shell.querySelector(".dynamic-sidebar-shell-handle");
+    if (!handle) {
+      handle = document.createElement("button");
+      handle.type = "button";
+      handle.className = "dynamic-sidebar-shell-handle";
+      handle.setAttribute("data-sidebar-collapse", "");
+      handle.innerHTML = '<span data-sidebar-collapse-glyph aria-hidden="true"></span>';
+      const appPage = shell.querySelector(".app-page");
+      if (appPage) {
+        shell.insertBefore(handle, appPage);
+      } else {
+        shell.appendChild(handle);
+      }
+    }
+    return handle;
+  }
+
+  function removeDynamicSidebarCollapseHandle() {
+    shell.querySelector(".dynamic-sidebar-shell-handle")?.remove();
+  }
+
   const availableFeatures = getDynamicSidebarAvailableFeatures();
   if (!availableFeatures.length) {
     sidebar.hidden = true;
     sidebar.setAttribute("aria-hidden", "true");
     sidebar.innerHTML = "";
+    shell.classList.remove("app-shell--sidebar-collapsed");
+    removeDynamicSidebarCollapseHandle();
     return;
   }
 
@@ -677,16 +701,15 @@ function initDynamicSidebar() {
   sidebar.setAttribute("aria-label", "Favorites");
 
   const quickPanel = ensureDynamicSidebarQuickPanel();
+  const collapseHandle = ensureDynamicSidebarCollapseHandle();
 
   function updateCollapseHandleState() {
-    const handle = sidebar.querySelector("[data-sidebar-collapse]");
-    if (!handle) return;
     const label = isCollapsed ? "Open Quick Add sidebar" : "Collapse Quick Add sidebar";
-    handle.classList.toggle("is-collapsed", isCollapsed);
-    handle.setAttribute("aria-label", label);
-    handle.setAttribute("aria-pressed", isCollapsed ? "true" : "false");
-    handle.setAttribute("title", label);
-    const glyph = handle.querySelector("[data-sidebar-collapse-glyph]");
+    collapseHandle.classList.toggle("is-collapsed", isCollapsed);
+    collapseHandle.setAttribute("aria-label", label);
+    collapseHandle.setAttribute("aria-pressed", isCollapsed ? "true" : "false");
+    collapseHandle.setAttribute("title", label);
+    const glyph = collapseHandle.querySelector("[data-sidebar-collapse-glyph]");
     if (glyph) {
       glyph.innerHTML = isCollapsed ? "&rsaquo;" : "&lsaquo;";
     }
@@ -730,16 +753,6 @@ function initDynamicSidebar() {
           </div>
         `).join("")}
       </div>
-      <button
-        type="button"
-        class="dynamic-sidebar-collapse-handle"
-        data-sidebar-collapse
-        aria-label="${isCollapsed ? "Open Quick Add sidebar" : "Collapse Quick Add sidebar"}"
-        aria-pressed="${isCollapsed ? "true" : "false"}"
-        title="${isCollapsed ? "Open Quick Add sidebar" : "Collapse Quick Add sidebar"}"
-      >
-        <span data-sidebar-collapse-glyph aria-hidden="true">${isCollapsed ? "&rsaquo;" : "&lsaquo;"}</span>
-      </button>
     `;
 
     applyCollapsedState();
@@ -754,14 +767,6 @@ function initDynamicSidebar() {
     manageButton?.addEventListener("click", () => {
       shouldKeepLibraryOpen = !shouldKeepLibraryOpen;
       render();
-    });
-
-    sidebar.querySelector("[data-sidebar-collapse]")?.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      isCollapsed = !isCollapsed;
-      localStorage.setItem(DYNAMIC_SIDEBAR_COLLAPSED_KEY, isCollapsed ? "true" : "false");
-      applyCollapsedState();
     });
 
     favoritesNav?.addEventListener("dragover", (event) => {
@@ -816,6 +821,17 @@ function initDynamicSidebar() {
         const feature = featureMap.get(button.getAttribute("data-sidebar-action") || "");
         if (feature) openDynamicSidebarQuickPanel(feature, button, quickPanel);
       });
+    });
+  }
+
+  if (!collapseHandle.dataset.bound) {
+    collapseHandle.dataset.bound = "true";
+    collapseHandle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      isCollapsed = !isCollapsed;
+      localStorage.setItem(DYNAMIC_SIDEBAR_COLLAPSED_KEY, isCollapsed ? "true" : "false");
+      applyCollapsedState();
     });
   }
 
