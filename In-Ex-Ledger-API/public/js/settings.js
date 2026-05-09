@@ -1,4 +1,4 @@
-﻿const REGION_DISPLAY = {
+const REGION_DISPLAY = {
   us: "United States",
   ca: "Canada"
 };
@@ -92,8 +92,26 @@ let businessSettingsState = {
 let settingsOverviewState = {
   businessProfile: null,
   billingStatus: "",
+  cpaActiveCount: 0,
+  cpaHistoryCount: 0,
   mfaEnabled: false
 };
+
+function isCpaUiEnabled() {
+  return window.__LUNA_FLAGS__?.cpaUiEnabled === true;
+}
+
+function hideCpaSettingsUi() {
+  document.querySelectorAll('[data-settings-target="settings-cpa-access"]').forEach((node) => {
+    node.hidden = true;
+    node.classList.add("hidden");
+  });
+  const cpaPanel = document.getElementById("settings-cpa-access");
+  if (cpaPanel) {
+    cpaPanel.hidden = true;
+    cpaPanel.classList.add("hidden");
+  }
+}
 
 console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
@@ -103,9 +121,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   initCollapsibleSettingsPanels();
   initSettingsNav();
+  initSettingsTabs();
   await initBusinessProfileForm();
   await initAccountingLockPanel();
   await initAccountSettings();
+  if (isCpaUiEnabled()) {
+    await initCpaAccess();
+  } else {
+    hideCpaSettingsUi();
+  }
   await initPreferences();
   initSecurityForm();
   initDangerZone();
@@ -208,6 +232,7 @@ function resolvePreferenceSummaryState() {
 function syncSettingsOverviewSummaries() {
   const businessNode = document.getElementById("overviewBusinessSummary");
   const billingNode = document.getElementById("overviewBillingSummary");
+  const cpaNode = document.getElementById("overviewCpaSummary");
   const securityNode = document.getElementById("overviewSecuritySummary");
   const preferencesNode = document.getElementById("overviewPreferencesSummary");
   const privacyNode = document.getElementById("overviewPrivacySummary");
@@ -222,6 +247,18 @@ function syncSettingsOverviewSummaries() {
     billingNode.textContent = settingsOverviewState.billingStatus || t("settings_overview_billing_unavailable");
   }
 
+  if (cpaNode) {
+    if (!isCpaUiEnabled()) {
+      cpaNode.closest(".settings-summary-card")?.classList.add("hidden");
+    }
+    const activeLabel = settingsOverviewState.cpaActiveCount === 1
+      ? t("settings_overview_active_grant_singular")
+      : t("settings_overview_active_grant_plural");
+    const historyLabel = settingsOverviewState.cpaHistoryCount === 1
+      ? t("settings_overview_history_item_singular")
+      : t("settings_overview_history_item_plural");
+    cpaNode.textContent = `${settingsOverviewState.cpaActiveCount} ${activeLabel} • ${settingsOverviewState.cpaHistoryCount} ${historyLabel}`;
+  }
 
   if (securityNode) {
     securityNode.textContent = settingsOverviewState.mfaEnabled
@@ -1110,6 +1147,328 @@ async function initPreferences() {
   });
 }
 
+async function initCpaAccess() {
+  if (!isCpaUiEnabled()) {
+    hideCpaSettingsUi();
+    return;
+  }
+  const form = document.getElementById("cpaAccessForm");
+  const emailInput = document.getElementById("cpaAccessEmail");
+  const scopeSelect = document.getElementById("cpaAccessScope");
+  const businessSelect = document.getElementById("cpaAccessBusiness");
+  const businessWrap = document.getElementById("cpaBusinessSelectWrap");
+  const messageNode = document.getElementById("cpaAccessMessage");
+  const currentListNode = document.getElementById("cpaCurrentAccessList");
+  const historyListNode = document.getElementById("cpaAccessHistoryList");
+  const auditNode = document.getElementById("cpaAuditActivityList");
+  const submitBtn = form?.querySelector("button[type='submit']") || form?.querySelector("button");
+
+  if (!form || !emailInput || !scopeSelect || !businessSelect || !businessWrap || !currentListNode || !historyListNode) {
+    return;
+  }
+
+  const syncBusinessVisibility = () => {
+    const scopedToAll = scopeSelect.value === "all";
+    businessWrap.hidden = scopedToAll;
+    businessSelect.disabled = scopedToAll;
+  };
+
+  const setMessage = (message = "", tone = "") => {
+    messageNode.textContent = message;
+    messageNode.classList.remove("is-error", "is-success");
+    if (tone) {
+      messageNode.classList.add(tone);
+    }
+  };
+
+  const loadBusinessOptions = async () => {
+    try {
+      const response = await apiFetch("/api/businesses");
+      if (!response || !response.ok) {
+        throw new Error(t("settings_cpa_load_businesses_error"));
+      }
+
+      const payload = await response.json().catch(() => null);
+      const businesses = Array.isArray(payload?.businesses) ? payload.businesses : [];
+      const activeBusinessId = payload?.active_business_id || "";
+
+      businessSelect.innerHTML = "";
+      businesses.forEach((business) => {
+        const option = document.createElement("option");
+        option.value = business.id;
+        option.textContent = business.name || t("common_business");
+        if (business.id === activeBusinessId) {
+          option.selected = true;
+        }
+        businessSelect.appendChild(option);
+      });
+    } catch (error) {
+      console.error("Failed to load CPA business options", error);
+      setMessage(t("settings_cpa_load_businesses_error"), "is-error");
+    }
+  };
+
+  const renderOwnedGrants = async () => {
+    try {
+      const response = await apiFetch("/api/cpa-access/grants/owned");
+      if (!response || !response.ok) {
+        throw new Error(t("settings_cpa_grants_load_error"));
+      }
+
+      const payload = await response.json().catch(() => null);
+      const grants = Array.isArray(payload?.grants) ? payload.grants : [];
+
+      const activeGrants = grants.filter((grant) => grant.status === "active");
+      const historyGrants = grants.filter((grant) => grant.status !== "active");
+      settingsOverviewState.cpaActiveCount = activeGrants.length;
+      settingsOverviewState.cpaHistoryCount = historyGrants.length;
+      syncSettingsOverviewSummaries();
+
+      const renderGrantCard = (grant, mode) => {
+        const detailParts = [interpolateTranslatedMessage("settings_cpa_detail_created", { date: formatSettingsDate(grant.created_at) })];
+        if (grant.accepted_at) detailParts.push(interpolateTranslatedMessage("settings_cpa_detail_accepted", { date: formatSettingsDate(grant.accepted_at) }));
+        if (grant.revoked_at) detailParts.push(interpolateTranslatedMessage("settings_cpa_detail_revoked", { date: formatSettingsDate(grant.revoked_at) }));
+        if (grant.revoked_visible_until) detailParts.push(interpolateTranslatedMessage("settings_cpa_detail_visible_until", { date: formatSettingsDate(grant.revoked_visible_until) }));
+
+        const statusLabel =
+          grant.status === "active"
+            ? t("settings_cpa_status_current", "current")
+            : grant.status === "pending"
+              ? t("settings_cpa_status_pending", "pending")
+              : t("settings_cpa_status_revoked", "revoked");
+        const buttonMarkup =
+          grant.status === "active"
+            ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeHtml(grant.id || "")}">${escapeHtml(t("settings_cpa_revoke"))}</button>`
+            : grant.status === "pending"
+              ? `<button type="button" class="cpa-access-revoke" data-cpa-revoke="${escapeHtml(grant.id || "")}">${escapeHtml(t("settings_cpa_revoke"))}</button>`
+              : `<button type="button" class="cpa-access-delete" data-cpa-delete="${escapeHtml(grant.id || "")}">${escapeHtml(t("common_delete"))}</button>`;
+
+        return `
+          <div class="cpa-access-item ${mode}">
+            <div class="cpa-access-meta">
+              <div class="cpa-access-email">${escapeHtml(grant.grantee_email || "")}</div>
+              <div class="cpa-access-tags">
+                <span class="cpa-access-tag scope">${grant.scope === "all" ? escapeHtml(t("settings_cpa_scope_all")) : escapeHtml(t("settings_cpa_scope_business"))}</span>
+                <span class="cpa-access-tag business">${escapeHtml(grant.business_name || t("settings_cpa_portfolio_wide"))}</span>
+                <span class="cpa-access-tag ${escapeHtml(grant.status || "pending")}">${escapeHtml(statusLabel)}</span>
+              </div>
+              <div class="cpa-access-detail">${escapeHtml(detailParts.join(" | "))}</div>
+            </div>
+            <div class="cpa-access-actions">
+              ${buttonMarkup}
+            </div>
+          </div>
+        `;
+      };
+
+      const currentNode = document.getElementById("cpaCurrentAccessList");
+      const historyNode = document.getElementById("cpaAccessHistoryList");
+
+      if (currentNode) {
+        currentNode.innerHTML = activeGrants.length
+          ? activeGrants.map((grant) => renderGrantCard(grant, "current")).join("")
+          : `<div class="cpa-access-empty">${escapeHtml(t("settings_cpa_current_empty", "No one currently has access."))}</div>`;
+      }
+
+      if (historyNode) {
+        historyNode.innerHTML = historyGrants.length
+          ? historyGrants.map((grant) => renderGrantCard(grant, "history")).join("")
+          : `<div class="cpa-access-empty">${escapeHtml(t("settings_cpa_history_empty", "No recent invitations or revoked access."))}</div>`;
+      }
+
+      const revokeTargets = [...document.querySelectorAll("[data-cpa-revoke]")];
+      revokeTargets.forEach((button) => {
+        button.addEventListener("click", async () => {
+          const grantId = button.getAttribute("data-cpa-revoke");
+          if (!grantId) {
+            return;
+          }
+
+          const revokeResponse = await apiFetch(`/api/cpa-access/grants/${grantId}`, {
+            method: "DELETE"
+          });
+
+          if (!revokeResponse || !revokeResponse.ok) {
+            const errorPayload = await revokeResponse?.json().catch(() => null);
+            setMessage(errorPayload?.error || t("settings_cpa_revoke_error"), "is-error");
+            return;
+          }
+
+          setMessage(t("settings_cpa_revoked"), "is-success");
+          showSettingsToast(t("settings_cpa_revoked"));
+          await renderOwnedGrants();
+          await renderAuditActivity();
+        });
+      });
+
+      const deleteTargets = [...document.querySelectorAll("[data-cpa-delete]")];
+      deleteTargets.forEach((button) => {
+        button.addEventListener("click", async () => {
+          const grantId = button.getAttribute("data-cpa-delete");
+          if (!grantId) {
+            return;
+          }
+
+          const deleteResponse = await apiFetch(`/api/cpa-access/grants/${grantId}/permanent`, {
+            method: "DELETE"
+          });
+
+          if (!deleteResponse || !deleteResponse.ok) {
+            const errorPayload = await deleteResponse?.json().catch(() => null);
+            setMessage(errorPayload?.error || t("settings_cpa_delete_error"), "is-error");
+            return;
+          }
+
+          setMessage(t("settings_cpa_deleted"), "is-success");
+          showSettingsToast(t("settings_cpa_deleted"));
+          await renderOwnedGrants();
+          await renderAuditActivity();
+        });
+      });
+    } catch (error) {
+      console.error("Failed to load CPA grants", error);
+      settingsOverviewState.cpaActiveCount = 0;
+      settingsOverviewState.cpaHistoryCount = 0;
+      syncSettingsOverviewSummaries();
+      currentListNode.innerHTML = `<div class="cpa-access-empty">${escapeHtml(t("settings_cpa_grants_load_error"))}</div>`;
+      historyListNode.innerHTML = `<div class="cpa-access-empty">${escapeHtml(t("settings_cpa_grants_load_error"))}</div>`;
+    }
+  };
+
+  const renderAuditActivity = async () => {
+    if (!auditNode) {
+      return;
+    }
+
+    try {
+      const response = await apiFetch("/api/cpa-access/audit?limit=12");
+      if (!response || !response.ok) {
+        throw new Error(t("settings_cpa_audit_load_error"));
+      }
+
+      const payload = await response.json().catch(() => null);
+      const logs = Array.isArray(payload?.logs) ? payload.logs : [];
+
+      if (!logs.length) {
+        auditNode.innerHTML = `<div class="cpa-access-empty">${escapeHtml(t("settings_cpa_audit_empty"))}</div>`;
+        return;
+      }
+
+      auditNode.innerHTML = logs.map((entry) => `
+        <div class="cpa-access-item">
+          <div class="cpa-access-meta">
+              <div class="cpa-access-email">${escapeHtml(formatSettingsAuditAction(entry.action))}</div>
+              <div class="cpa-access-tags">
+                <span class="cpa-access-tag business">${escapeHtml(entry.business_name || t("settings_cpa_portfolio_wide"))}</span>
+              </div>
+            <div class="cpa-access-detail">${escapeHtml(formatSettingsDateTime(entry.created_at))}${entry.actor_email ? ` | ${escapeHtml(entry.actor_email)}` : ""}</div>
+          </div>
+        </div>
+      `).join("");
+    } catch (error) {
+      console.error("Failed to load CPA audit activity", error);
+      auditNode.innerHTML = `<div class="cpa-access-empty">${escapeHtml(t("settings_cpa_audit_load_error"))}</div>`;
+    }
+  };
+
+  scopeSelect.addEventListener("change", () => {
+    syncBusinessVisibility();
+    setMessage("");
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    setMessage("");
+    if (submitBtn) submitBtn.disabled = true;
+
+    const payload = {
+      email: emailInput.value.trim(),
+      scope: scopeSelect.value === "all" ? "all" : "business",
+      business_id: scopeSelect.value === "all" ? null : businessSelect.value || null
+    };
+
+    try {
+      const response = await apiFetch("/api/cpa-access/grants", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response || !response.ok) {
+        const body = response ? await response.json().catch(() => null) : null;
+        setMessage(body?.error || t("settings_cpa_create_error"), "is-error");
+        return;
+      }
+
+      emailInput.value = "";
+      scopeSelect.value = "business";
+      syncBusinessVisibility();
+      setMessage(t("settings_cpa_created"), "is-success");
+      showSettingsToast(t("settings_cpa_created"));
+      await renderOwnedGrants();
+      await renderAuditActivity();
+    } catch (error) {
+      console.error("CPA invite failed", error);
+      setMessage(t("settings_cpa_create_error"), "is-error");
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+
+  await loadBusinessOptions();
+  syncBusinessVisibility();
+  await renderOwnedGrants();
+  await renderAuditActivity();
+}
+
+function formatSettingsDate(value) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleDateString(resolveDisplayLocale(), { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatSettingsDateTime(value) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return date.toLocaleString(resolveDisplayLocale(), {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function formatSettingsAuditAction(action) {
+  const labels = {
+    grant_auto_accepted: "Grant auto-accepted",
+    grant_created_active: "Grant created",
+    grant_created_pending: "Invite created",
+    grant_revoked: "Grant revoked",
+    grant_deleted: "Revoked grant deleted",
+    portfolio_summary_viewed: "CPA reviewed summary",
+    portfolio_transactions_viewed: "CPA reviewed transactions",
+    portfolio_receipts_viewed: "CPA reviewed receipts",
+    portfolio_receipt_downloaded: "CPA downloaded receipt",
+    portfolio_mileage_viewed: "CPA reviewed mileage",
+    portfolio_exports_viewed: "CPA reviewed exports",
+    portfolio_export_downloaded: "CPA downloaded redacted export",
+    portfolio_audit_viewed: "CPA reviewed audit feed"
+  };
+  return labels[action] || String(action || "activity").replace(/_/g, " ");
+}
 
 function refreshSettingsLocalizedState() {
   const consentStatus = document.getElementById("consentStatus");
@@ -1791,6 +2150,28 @@ function initSecurityForm() {
   });
 }
 
+function initSettingsTabs() {
+  const tabButtons = Array.from(document.querySelectorAll("[data-cpa-tab]"));
+  const tabPanels = Array.from(document.querySelectorAll("[data-cpa-panel]"));
+  if (!tabButtons.length || !tabPanels.length) {
+    return;
+  }
+
+  const setActiveTab = (tabId) => {
+    tabButtons.forEach((button) => {
+      const isActive = button.dataset.cpaTab === tabId;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+    tabPanels.forEach((panel) => {
+      panel.classList.toggle("is-active", panel.dataset.cpaPanel === tabId);
+    });
+  };
+
+  tabButtons.forEach((button) => {
+    button.addEventListener("click", () => setActiveTab(button.dataset.cpaTab || "active"));
+  });
+}
 function initSettingsNav() {
   const triggers = Array.from(document.querySelectorAll("[data-settings-target]"));
   const navButtons = Array.from(document.querySelectorAll("[data-settings-nav-item]"));
@@ -1845,6 +2226,12 @@ function getPasswordScore(password) {
   if (passed >= 3) return 2;
   if (passed >= 2) return 1;
   return 0;
+}
+
+function getStrengthLabel(score) {
+  if (score >= 3) return t("settings_password_strong");
+  if (score >= 2) return t("settings_password_fair");
+  return t("settings_password_weak");
 }
 
 function clearBusinessDataState() {
@@ -2217,4 +2604,3 @@ function showSettingsToast(message) {
     toast.classList.add("hidden");
   }, SETTINGS_TOAST_MS);
 }
-
