@@ -301,10 +301,6 @@ function getActiveBusiness(profile = {}) {
   return businesses.find((business) => business.id === activeBusinessId) || null;
 }
 
-function getAssignedCpaPortfolios(profile = {}) {
-  return Array.isArray(profile.assigned_cpa_portfolios) ? profile.assigned_cpa_portfolios : [];
-}
-
 /**
  * Sync region and province from the active business to localStorage and
  * window globals so region-hardening functions have the correct context.
@@ -831,8 +827,6 @@ function initAccountMenus(displayName = "User", profile = {}) {
   ensureBusinessCreationModal();
   const activeBusiness = getActiveBusiness(profile);
   const businesses = getBusinessCollection(profile);
-  const assignedCpaPortfolios = getAssignedCpaPortfolios(profile);
-  const hasCpaWorkspace = CPA_UI_ENABLED && assignedCpaPortfolios.length > 0;
   const businessCountLabel = `${businesses.length} business${businesses.length === 1 ? "" : "es"}`;
 
   document.querySelectorAll(".user-pill").forEach((pill, index) => {
@@ -885,12 +879,6 @@ function initAccountMenus(displayName = "User", profile = {}) {
           </button>
         `).join("")}
       </div>
-      ${hasCpaWorkspace ? `
-      <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="cpa-workspace" role="menuitem">
-        <span class="account-menu-label">${typeof t === "function" ? t("auth_cpa_workspace") : "CPA workspace"}</span>
-        <span class="account-menu-hint">${assignedCpaPortfolios.length} ${typeof t === "function" ? t(assignedCpaPortfolios.length === 1 ? "auth_portfolio_assigned_singular" : "auth_portfolio_assigned_plural") : assignedCpaPortfolios.length === 1 ? "portfolio assigned" : "portfolios assigned"}</span>
-      </button>
-      ` : ""}
       <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="add-business" role="menuitem">
         <span class="account-menu-label">${typeof t === "function" ? t("auth_add_another_business") : "Add another business"}</span>
         <span class="account-menu-hint">${typeof t === "function" ? t("auth_create_and_switch") : "Create and switch instantly"}</span>
@@ -921,11 +909,6 @@ function initAccountMenus(displayName = "User", profile = {}) {
 
       if (action === "logout") {
         await signOut();
-        return;
-      }
-
-      if (action === "cpa-workspace") {
-        window.location.href = "/cpa-dashboard";
         return;
       }
 
