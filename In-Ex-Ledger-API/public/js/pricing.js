@@ -127,34 +127,6 @@ function clampAdditionalBusinesses(value) {
   return next;
 }
 
-function isTrialDowngradedToBasic(subscription) {
-  if (!subscription || !subscription.isTrialing) {
-    return false;
-  }
-  return Boolean(
-    subscription.isTrialDowngradedToFree ||
-    subscription.cancelAtPeriodEnd ||
-    subscription.selectedPlanCode !== "v1"
-  );
-}
-
-async function loadSubscriptionSnapshot() {
-  if (typeof apiFetch !== "function") {
-    return null;
-  }
-
-  try {
-    const res = await apiFetch("/api/billing/subscription");
-    if (!res || !res.ok) {
-      return null;
-    }
-    const payload = await res.json().catch(() => null);
-    return payload?.subscription || null;
-  } catch (_) {
-    return null;
-  }
-}
-
 function persistPendingChoice() {
   sessionStorage.setItem(
     "lb_pending_pricing_choice",
@@ -183,12 +155,7 @@ async function launchCheckout() {
       button.textContent = "Launching secure checkout…";
     }
 
-    const subscription = await loadSubscriptionSnapshot();
-    const endpoint = isTrialDowngradedToBasic(subscription)
-      ? "/api/billing/reactivate-trial-pro"
-      : "/api/billing/checkout-session";
-
-    const res = await apiFetch(endpoint, {
+    const res = await apiFetch("/api/billing/checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -208,11 +175,6 @@ async function launchCheckout() {
     const payload = await res.json().catch(() => null);
     if (!res.ok) {
       throw new Error(payload?.error || "Unable to start checkout.");
-    }
-
-    if (payload?.subscription) {
-      window.location.href = "/subscription?trial=pro-reactivated";
-      return;
     }
 
     if (payload?.url) {

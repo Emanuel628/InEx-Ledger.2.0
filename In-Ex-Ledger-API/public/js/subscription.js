@@ -295,17 +295,6 @@ function updatePlanCardState(sub) {
   planPro?.classList.toggle("is-current", isCurrentPro);
 }
 
-function isTrialDowngradedToBasic(subscription) {
-  if (!subscription || !subscription.isTrialing) {
-    return false;
-  }
-  return Boolean(
-    subscription.isTrialDowngradedToFree ||
-    subscription.cancelAtPeriodEnd ||
-    subscription.selectedPlanCode !== "v1"
-  );
-}
-
 function initSubNav() {
   const navButtons = Array.from(document.querySelectorAll("[data-settings-target]"));
   if (!navButtons.length) return;
@@ -533,12 +522,13 @@ function renderBusinessAccessSection(sub) {
   if (!manager) return;
 
   const isProTier = !!sub && sub.effectiveTier === "v1";
+  const isActiveTrial = isProTier && sub.isTrialing;
   const canManageSlots =
     isProTier &&
     (sub.isPaid || sub.isTrialing) &&
-    !sub.cancelAtPeriodEnd &&
+    (!sub.cancelAtPeriodEnd || isActiveTrial) &&
     !sub.isCanceledWithRemainingAccess;
-  const isCancelingPro = isProTier && sub.cancelAtPeriodEnd;
+  const isCancelingPro = isProTier && sub.cancelAtPeriodEnd && !isActiveTrial;
   const isEndedProWithRemainingAccess = isProTier && sub.isCanceledWithRemainingAccess;
 
   const proCardAddonGroup = document.getElementById("proCardAddonGroup");
@@ -729,7 +719,7 @@ async function loadSubscription() {
 
     if (planProBtn) {
       const selectedPlanCode = sub.selectedPlanCode || sub.planCode || (sub.effectiveTier === "v1" ? "v1" : "free");
-      if (selectedPlanCode === "v1" && (sub.isPaid || sub.isTrialing) && !sub.cancelAtPeriodEnd) {
+      if (sub.isPaid && !sub.cancelAtPeriodEnd) {
         planProBtn.disabled = true;
         planProBtn.textContent = tx("subscription_current_plan");
         planProBtn.dataset.planDisabled = "true";
@@ -912,11 +902,7 @@ async function startCheckout() {
     await loadVerifiedPricingContext();
     setCheckoutLoading(true);
 
-    const endpoint = isTrialDowngradedToBasic(currentSubscription)
-      ? "/api/billing/reactivate-trial-pro"
-      : "/api/billing/checkout-session";
-
-    const res = await apiFetch(endpoint, {
+    const res = await apiFetch("/api/billing/checkout-session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -932,17 +918,6 @@ async function startCheckout() {
 
     const payload = await res.json().catch(() => null);
     if (!res.ok) throw new Error(payload?.error || tx("subscription_checkout_error"));
-    if (payload?.subscription) {
-      closeCheckoutModal();
-      currentSubscription = payload.subscription;
-      if (typeof applySubscriptionState === "function") {
-        applySubscriptionState(payload.subscription);
-      }
-      await loadSubscription();
-      await loadBillingHistory();
-      showSubToast("Pro trial resumed.");
-      return;
-    }
     if (payload?.url) {
       if (!isAllowedBillingRedirect(payload.url)) {
         throw new Error(tx("subscription_checkout_error"));

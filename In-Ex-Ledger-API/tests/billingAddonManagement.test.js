@@ -492,3 +492,28 @@ test("PATCH /additional-businesses — trialing user without Stripe subscription
     cleanup();
   }
 });
+
+test("PATCH /additional-businesses — downgraded active trial can still update slots", async () => {
+  const { app, state, cleanup } = loadBillingRouter({
+    snapshot: {
+      effectiveTier: "v1",
+      isPaid: false,
+      isTrialing: true,
+      cancelAtPeriodEnd: true,
+      selectedPlanCode: "free",
+      isTrialDowngradedToFree: true,
+      stripeSubscriptionId: null,
+      additionalBusinesses: 1
+    }
+  });
+  try {
+    const res = await request(app)
+      .patch("/api/billing/additional-businesses")
+      .send({ additionalBusinesses: 4 });
+    assert.equal(res.status, 200);
+    assert.equal(state.stripeUpdates.length, 0, "trial slot changes should stay local until paid checkout");
+    assert.equal(res.body.subscription?.additionalBusinesses, 4);
+  } finally {
+    cleanup();
+  }
+});

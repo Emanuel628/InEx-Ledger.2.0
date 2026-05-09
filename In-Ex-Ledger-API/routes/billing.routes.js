@@ -956,7 +956,7 @@ router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billi
         error: "Additional business slots require an active Pro subscription."
       });
     }
-    if (subscription.cancelAtPeriodEnd) {
+    if (subscription.cancelAtPeriodEnd && !subscription.isTrialing) {
       return res.status(409).json({
         error: "Cannot change business slots while cancellation is pending. Resume Pro to make changes."
       });
