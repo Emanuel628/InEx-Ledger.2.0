@@ -33,12 +33,7 @@ function loadMeRouterFixture() {
     onboarding_completed: false,
     onboarding_completed_at: null,
     onboarding_data: {},
-    onboarding_tour_seen: {},
-    cpa_license_number: null,
-    cpa_license_verified: false,
-    cpa_license_status: null,
-    cpa_license_verified_at: null,
-    cpa_license_jurisdiction: null
+    onboarding_tour_seen: {}
   };
 
   Module._load = function(requestName, parent, isMain) {
@@ -140,13 +135,6 @@ function loadMeRouterFixture() {
       return {
         getSubscriptionSnapshotForBusiness: async () => ({ status: "active" }),
         getSubscriptionSnapshotForUser: async () => ({ status: "active" })
-      };
-    }
-
-    if (requestName === "../services/cpaAccessService.js" || /cpaAccessService\.js$/.test(requestName)) {
-      return {
-        listAssignedCpaGrants: async () => [],
-        listAccessibleBusinessScopeForUser: async () => []
       };
     }
 

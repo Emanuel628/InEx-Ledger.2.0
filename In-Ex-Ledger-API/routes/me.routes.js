@@ -9,7 +9,6 @@ const { requireAuth, verifyToken } = require("../middleware/auth.middleware.js")
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForUser } = require("../services/subscriptionService.js");
-const { listAssignedCpaGrants, listAccessibleBusinessScopeForUser } = require("../services/cpaAccessService.js");
 const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { logError, logInfo } = require("../utils/logger.js");
@@ -199,9 +198,7 @@ router.get("/", async (req, res) => {
       `SELECT id, email, role, email_verified, mfa_enabled, full_name, display_name,
               ui_preferences,
               country, province, data_residency, created_at,
-              onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen,
-              cpa_license_number, cpa_license_verified, cpa_license_status,
-              cpa_license_verified_at, cpa_license_jurisdiction
+              onboarding_completed, onboarding_completed_at, onboarding_data, onboarding_tour_seen
          FROM users
         WHERE id = $1
         LIMIT 1`,
@@ -214,8 +211,6 @@ router.get("/", async (req, res) => {
     }
     const businesses = await listBusinessesForUser(req.user.id);
     const activeBusiness = businesses.find((business) => business.id === businessId) || null;
-    const assignedCpaGrants = await listAssignedCpaGrants(user);
-    const assignedCpaPortfolios = await listAccessibleBusinessScopeForUser(user);
     const subscription = await getSubscriptionSnapshotForUser({
       id: req.user.id,
       business_id: businessId
@@ -226,17 +221,7 @@ router.get("/", async (req, res) => {
       active_business_id: businessId,
       active_business: activeBusiness,
       businesses,
-      assigned_cpa_grants: assignedCpaGrants,
-      assigned_cpa_portfolios: assignedCpaPortfolios,
       onboarding: normalizeOnboardingPayload(user),
-      cpa_verification: {
-        hasLicense: !!user.cpa_license_number,
-        licenseNumber: user.cpa_license_number || null,
-        verified: !!user.cpa_license_verified,
-        status: user.cpa_license_status || null,
-        verifiedAt: user.cpa_license_verified_at || null,
-        jurisdiction: user.cpa_license_jurisdiction || null
-      },
       subscription
     });
   } catch (err) {
@@ -799,7 +784,7 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
 
     // Hard-delete the user row.  All remaining child rows (refresh_tokens,
     // mfa_trusted_devices, mfa_email_challenges, email_change_requests,
-    // user_privacy_settings, cpa_access_grants) are removed automatically
+    // user_privacy_settings) are removed automatically
     // via ON DELETE CASCADE foreign keys.
     const result = await client.query(
       "DELETE FROM users WHERE id = $1 RETURNING id",

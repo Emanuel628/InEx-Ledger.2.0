@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ï»¿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -48,7 +48,6 @@
           <button class="settings-nav-item is-active" type="button" data-settings-nav-item data-settings-target="settings-overview" data-i18n="settings_nav_overview">Overview</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-business" data-i18n="settings_nav_business">Business</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-billing" data-i18n="settings_nav_billing">Billing</button>
-          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-cpa-access" data-i18n="settings_nav_cpa_access">CPA Access</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-security" data-i18n="settings_nav_security">Security</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-preferences" data-i18n="settings_nav_preferences">Preferences</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-privacy-data" data-i18n="settings_nav_privacy_data">Privacy &amp; Data</button>
@@ -85,16 +84,6 @@
               <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
             </div>
             <p id="overviewBillingSummary" class="settings-summary-meta" data-i18n="settings_overview_billing_loading">Loading subscription details...</p>
-          </button>
-          <button class="settings-summary-card" type="button" data-settings-target="settings-cpa-access">
-            <div class="settings-summary-card-head">
-              <div>
-                <h2 data-i18n="settings_nav_cpa_access">CPA Access</h2>
-                <p data-i18n="settings_overview_cpa_desc">Invite your accountant and manage their access.</p>
-              </div>
-              <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
-            </div>
-            <p id="overviewCpaSummary" class="settings-summary-meta" data-i18n="settings_overview_cpa_loading">Loading access details...</p>
           </button>
           <button class="settings-summary-card" type="button" data-settings-target="settings-security">
             <div class="settings-summary-card-head">
@@ -245,7 +234,7 @@
             <div class="settings-row-copy">
               <div class="settings-row-title" data-i18n="settings_subscription_status_title">Subscription</div>
               <div class="settings-row-desc">
-                <span id="accountSubStatusLabel" data-i18n="settings_loading">Loading…</span>
+                <span id="accountSubStatusLabel" data-i18n="settings_loading">Loadingâ€¦</span>
               </div>
             </div>
             <a href="subscription" class="settings-secondary-btn" data-i18n="settings_manage_subscription">Manage subscription</a>
@@ -256,85 +245,10 @@
               <div class="settings-row-title" data-i18n="settings_cancel_subscription_title">Cancel subscription</div>
               <div class="settings-row-desc" data-i18n="settings_cancel_subscription_desc">Your access continues until the end of your current billing period.</div>
             </div>
-            <button type="button" id="cancelSubscriptionBtn" class="danger-outline-btn" data-i18n="settings_cancel_subscription_btn">Cancel subscription…</button>
+            <button type="button" id="cancelSubscriptionBtn" class="danger-outline-btn" data-i18n="settings_cancel_subscription_btn">Cancel subscriptionâ€¦</button>
           </div>
         </div>
 
-      </section>
-
-      <section class="settings-card settings-panel" id="settings-cpa-access">
-        <div class="settings-panel-head card-head">
-          <h2 class="card-title" data-i18n="settings_nav_cpa_access">CPA Access</h2>
-          <p class="card-desc" data-i18n="settings_cpa_desc">Invite your accountant, review active access, and audit changes.</p>
-        </div>
-
-        <div class="settings-tabs" role="tablist" aria-label="CPA access sections">
-          <button class="settings-tab is-active" type="button" role="tab" aria-selected="true" data-cpa-tab="active" data-i18n="settings_cpa_tab_active">Active</button>
-          <button class="settings-tab" type="button" role="tab" aria-selected="false" data-cpa-tab="invite" data-i18n="settings_cpa_tab_invite">Invite</button>
-          <button class="settings-tab" type="button" role="tab" aria-selected="false" data-cpa-tab="history" data-i18n="settings_cpa_tab_history">History</button>
-          <button class="settings-tab" type="button" role="tab" aria-selected="false" data-cpa-tab="audit" data-i18n="settings_cpa_tab_audit">Audit</button>
-        </div>
-
-        <div class="settings-tab-panel is-active" data-cpa-panel="active">
-          <div class="settings-subpanel">
-            <div class="settings-subpanel-head">
-              <h3 data-i18n="settings_cpa_current_title">Current access</h3>
-              <p data-i18n="settings_cpa_active_desc">People who can review your data right now.</p>
-            </div>
-            <div id="cpaCurrentAccessList" class="cpa-access-list"></div>
-          </div>
-        </div>
-
-        <div class="settings-tab-panel" data-cpa-panel="invite">
-          <div class="settings-subpanel">
-            <div class="settings-subpanel-head">
-              <h3 data-i18n="settings_cpa_invite_title">Invite</h3>
-              <p data-i18n="settings_cpa_invite_desc">Grant access to one business or your full portfolio.</p>
-            </div>
-            <form id="cpaAccessForm" class="business-form">
-              <div class="settings-form-grid cpa-access-grid">
-                <div class="form-field">
-                  <label for="cpaAccessEmail" data-i18n="settings_cpa_email">CPA email</label>
-                  <input type="email" id="cpaAccessEmail" name="cpa_access_email" placeholder="name@firm.com" required />
-                </div>
-                <div class="form-field">
-                  <label for="cpaAccessScope" data-i18n="settings_cpa_scope">Access scope</label>
-                  <select id="cpaAccessScope" name="cpa_access_scope">
-                    <option value="business" data-i18n="settings_cpa_scope_business">One business</option>
-                    <option value="all" data-i18n="settings_cpa_scope_all">All businesses</option>
-                  </select>
-                </div>
-                <div class="form-field" id="cpaBusinessSelectWrap">
-                  <label for="cpaAccessBusiness" data-i18n="common_business">Business</label>
-                  <select id="cpaAccessBusiness" name="cpa_access_business"></select>
-                </div>
-              </div>
-              <p class="settings-helper-note" data-i18n="settings_cpa_scope_note">Use one-business access when a CPA is filing a single entity. Use all-business access only when they need your full portfolio.</p>
-              <p id="cpaAccessMessage" class="settings-inline-message"></p>
-              <button type="submit" class="settings-primary-btn" data-i18n="settings_cpa_send_invite">Send access invite</button>
-            </form>
-          </div>
-        </div>
-
-        <div class="settings-tab-panel" data-cpa-panel="history">
-          <div class="settings-subpanel">
-            <div class="settings-subpanel-head">
-              <h3 data-i18n="settings_cpa_history_title">History</h3>
-              <p data-i18n="settings_cpa_history_panel_desc">Pending, expired, and revoked access records.</p>
-            </div>
-            <div id="cpaAccessHistoryList" class="cpa-access-list"></div>
-          </div>
-        </div>
-
-        <div class="settings-tab-panel" data-cpa-panel="audit">
-          <div class="settings-subpanel">
-            <div class="settings-subpanel-head">
-              <h3 data-i18n="settings_cpa_audit_title">Audit</h3>
-              <p data-i18n="settings_cpa_audit_desc">Review invite, revoke, and accountant activity events.</p>
-            </div>
-            <div id="cpaAuditActivityList" class="cpa-access-list"></div>
-          </div>
-        </div>
       </section>
 
       <section class="settings-card settings-panel" id="settings-preferences">
@@ -567,14 +481,14 @@
             <div class="danger-name" data-i18n="settings_delete_business_data_title">Delete business data</div>
             <div class="danger-desc" data-i18n="settings_delete_business_data_desc">Removes all transactions, receipts, and mileage records. Your account and settings are kept.</div>
           </div>
-          <button type="button" id="deleteMyDataBtn" class="danger-outline-btn" data-i18n="settings_delete_business_data_button">Delete data…</button>
+          <button type="button" id="deleteMyDataBtn" class="danger-outline-btn" data-i18n="settings_delete_business_data_button">Delete dataâ€¦</button>
         </div>
         <div class="danger-row">
           <div class="danger-copy">
             <div class="danger-name" data-i18n="settings_delete_account_title">Delete account permanently</div>
             <div class="danger-desc" data-i18n="settings_delete_account_desc">Permanently removes your account and all associated data. This cannot be undone.</div>
           </div>
-          <button id="deleteAccountTrigger" type="button" class="danger-outline-btn" data-i18n="settings_delete_account_button">Permanently Delete Account…</button>
+          <button id="deleteAccountTrigger" type="button" class="danger-outline-btn" data-i18n="settings_delete_account_button">Permanently Delete Accountâ€¦</button>
         </div>
       </section>
 
@@ -593,7 +507,7 @@
         </div>
       </section>
 
-      <!-- Preference save bar — fixed to viewport bottom, shown when preferences change -->
+      <!-- Preference save bar â€” fixed to viewport bottom, shown when preferences change -->
       <div id="settingsSaveBar" class="settings-save-bar hidden" aria-live="polite">
         <div class="settings-save-copy">
           <strong data-i18n="settings_unsaved_title">Unsaved preference changes</strong>
@@ -686,7 +600,7 @@
       <p data-i18n="qc_analytics_consent_body">By enabling analytics tracking, I agree that my usage data may be collected and analyzed for improving the app's services. I understand I can disable tracking at any time via Privacy Settings.</p>
       <div class="modal-actions danger-actions">
         <button type="button" id="qcConsentCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
-        <button type="button" id="qcConsentConfirm" class="modal-delete modal-delete-accent" data-i18n="qc_analytics_consent_confirm">I Agree – Enable Tracking</button>
+        <button type="button" id="qcConsentConfirm" class="modal-delete modal-delete-accent" data-i18n="qc_analytics_consent_confirm">I Agree â€“ Enable Tracking</button>
       </div>
     </div>
   </div>
@@ -701,3 +615,4 @@
   <script src="../js/settings.js?v=20260507a"></script>
 </body>
 </html>
+

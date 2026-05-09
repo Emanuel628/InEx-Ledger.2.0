@@ -1012,57 +1012,7 @@ test("receipts: PATCH /:id/attach rejects missing CSRF token (403)", async () =>
 });
 
 // ---------------------------------------------------------------------------
-// 15. CPA Access Routes — MFA-gated
-// ---------------------------------------------------------------------------
-
-test("cpa-access: GET /grants/owned rejects unauthenticated requests (401)", async () => {
-  const cpaRouter = require("../routes/cpa-access.routes.js");
-  const app = buildApp(cpaRouter, "/api/cpa-access");
-
-  const res = await request(app).get("/api/cpa-access/grants/owned");
-  assert.equal(res.status, 401);
-});
-
-test("cpa-access: GET /grants/owned requires MFA (403 mfa_required) when MFA is not enabled", async () => {
-  const cpaRouter = require("../routes/cpa-access.routes.js");
-  const app = buildApp(cpaRouter, "/api/cpa-access");
-  const authToken = makeToken({ mfa_enabled: false });
-  const csrf = generateCsrfToken();
-
-  const res = await request(app)
-    .get("/api/cpa-access/grants/owned")
-    .set("Authorization", `Bearer ${authToken}`)
-    .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`);
-  assert.equal(res.status, 403);
-  assert.equal(res.body?.mfa_required, true);
-});
-
-test("cpa-access: GET /portfolio/:ownerId rejects unauthenticated requests (401)", async () => {
-  const cpaRouter = require("../routes/cpa-access.routes.js");
-  const app = buildApp(cpaRouter, "/api/cpa-access");
-
-  const res = await request(app).get("/api/cpa-access/portfolio/some-owner-id");
-  assert.equal(res.status, 401);
-});
-
-test("cpa-access: GET /portfolio/:ownerId requires MFA (403 mfa_required) when MFA is not enabled", async () => {
-  const cpaRouter = require("../routes/cpa-access.routes.js");
-  const app = buildApp(cpaRouter, "/api/cpa-access");
-  const authToken = makeToken({ mfa_enabled: false });
-  const csrf = generateCsrfToken();
-
-  const res = await request(app)
-    .get("/api/cpa-access/portfolio/some-owner-id")
-    .set("Authorization", `Bearer ${authToken}`)
-    .set(CSRF_HEADER_NAME, csrf)
-    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`);
-  assert.equal(res.status, 403);
-  assert.equal(res.body?.mfa_required, true);
-});
-
-// ---------------------------------------------------------------------------
-// 16. Accounting Lock — service layer with fake pool
+// 15. Accounting Lock — service layer with fake pool
 // ---------------------------------------------------------------------------
 
 test("loadAccountingLockState returns unlocked state when no row exists", async () => {

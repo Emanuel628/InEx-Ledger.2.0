@@ -1,4 +1,4 @@
-User-agent: *
+﻿User-agent: *
 Allow: /
 Disallow: /accounts
 Disallow: /analytics
@@ -7,7 +7,6 @@ Disallow: /billable-expenses
 Disallow: /bills
 Disallow: /categories
 Disallow: /change-email
-Disallow: /cpa-dashboard
 Disallow: /customers
 Disallow: /exports
 Disallow: /invoices
@@ -28,3 +27,4 @@ Disallow: /vendors
 Disallow: /verify-email
 
 Sitemap: https://www.inexledger.com/sitemap.xml
+

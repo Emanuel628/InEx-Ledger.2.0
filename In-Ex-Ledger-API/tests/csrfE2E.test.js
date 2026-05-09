@@ -103,8 +103,6 @@ const MUTATION_ROUTE_FILES = [
   "business.routes.js",
   "businesses.routes.js",
   "categories.routes.js",
-  "cpa-access.routes.js",
-  "cpa-verification.routes.js",
   "exports.routes.js",
   "me.routes.js",
   "messages.routes.js",

@@ -11,7 +11,7 @@ router.use(requireAuth);
 router.use(requireCsrfProtection);
 router.use(createDataApiLimiter({ max: 120 }));
 
-const VALID_MESSAGE_TYPES = new Set(["cpa", "it_support", "general", "support_request"]);
+const VALID_MESSAGE_TYPES = new Set(["it_support", "general", "support_request"]);
 const MAX_SUBJECT_LEN = 200;
 const MAX_BODY_LEN = 10000;
 const MAX_PAGE_SIZE = 50;
@@ -65,8 +65,6 @@ router.get("/unread-count", async (req, res) => {
 // GET /api/messages/contacts
 // Returns users that the current user is permitted to message.
 // A user may message:
-//   - Any CPA who has been granted access to one of their businesses
-//   - Any client whose business they have been granted CPA access to
 //   - Anyone who has previously sent them a message (reply flow)
 //   - Users with role = 'it_support' or 'admin' (support channel)
 router.get("/contacts", async (req, res) => {
@@ -79,24 +77,8 @@ router.get("/contacts", async (req, res) => {
          FROM users u
         WHERE u.id != $1
           AND (
-            -- CPAs granted access to this user's businesses
-            EXISTS (
-              SELECT 1 FROM cpa_access_grants g
-               JOIN businesses b ON b.id = g.business_id
-              WHERE b.user_id = $1
-                AND g.grantee_user_id = u.id
-                AND g.status IN ('active', 'pending')
-            )
-            -- Businesses this user (acting as CPA) was granted access to
-            OR EXISTS (
-              SELECT 1 FROM cpa_access_grants g
-               JOIN businesses b ON b.id = g.business_id
-              WHERE g.grantee_user_id = $1
-                AND b.user_id = u.id
-                AND g.status IN ('active', 'pending')
-            )
             -- Previously exchanged messages (reply flow)
-            OR EXISTS (
+            EXISTS (
               SELECT 1 FROM messages m
               WHERE (m.sender_id = $1 AND m.receiver_id = u.id)
                  OR (m.receiver_id = $1 AND m.sender_id = u.id)
@@ -326,24 +308,8 @@ router.post("/", async (req, res) => {
            FROM users u
           WHERE u.id = $2
             AND (
-              -- Receiver is a CPA granted access to one of sender's businesses
-              EXISTS (
-                SELECT 1 FROM cpa_access_grants g
-                 JOIN businesses b ON b.id = g.business_id
-                WHERE b.user_id = $1
-                  AND g.grantee_user_id = u.id
-                  AND g.status IN ('active', 'pending')
-              )
-              -- Receiver is a client whose business sender (acting as CPA) was granted access to
-              OR EXISTS (
-                SELECT 1 FROM cpa_access_grants g
-                 JOIN businesses b ON b.id = g.business_id
-                WHERE g.grantee_user_id = $1
-                  AND b.user_id = u.id
-                  AND g.status IN ('active', 'pending')
-              )
               -- Prior message exchange exists (reply flow)
-              OR EXISTS (
+              EXISTS (
                 SELECT 1 FROM messages m
                 WHERE (m.sender_id = $1 AND m.receiver_id = u.id)
                    OR (m.receiver_id = $1 AND m.sender_id = u.id)

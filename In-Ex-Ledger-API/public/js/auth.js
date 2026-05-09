@@ -14,7 +14,6 @@ const SUBSCRIPTION_KEY = "lb_subscription";
 const ACTIVE_BUSINESS_ID_KEY = "lb_active_business_id";
 const ACTIVE_BUSINESS_NAME_KEY = "lb_business_name";
 const USER_PILL_CHEVRON_MARKUP = '<svg class="user-pill-chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const CPA_UI_ENABLED = false;
 const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
 const LOGIN_RESET_KEY = "lb_login_reset";
@@ -50,9 +49,7 @@ if (!window.API_BASE) {
   window.API_BASE = "";
 }
 
-window.__LUNA_FLAGS__ = Object.assign({}, window.__LUNA_FLAGS__, {
-  cpaUiEnabled: CPA_UI_ENABLED
-});
+window.__LUNA_FLAGS__ = Object.assign({}, window.__LUNA_FLAGS__, {});
 
 
 if (!window.__AUTH_GUARD_STATE__) {
@@ -596,11 +593,6 @@ async function requireValidSessionOrRedirect() {
 
   window.__AUTH_GUARD_STATE__.running = true;
   window.__AUTH_GUARD_STATE__.count += 1;
-
-  if (!CPA_UI_ENABLED && getNormalizedPathname() === "/cpa-dashboard") {
-    window.location.href = "/transactions";
-    return;
-  }
 
   const token = getToken();
   if (!token) {

@@ -141,13 +141,6 @@ function loadMeRouter(options = {}) {
       };
     }
 
-    if (requestName === "../services/cpaAccessService.js" || /cpaAccessService\.js$/.test(requestName)) {
-      return {
-        listAssignedCpaGrants: async () => [],
-        listAccessibleBusinessScopeForUser: async () => []
-      };
-    }
-
     if (requestName === "../utils/authUtils.js" || /authUtils\.js$/.test(requestName)) {
       return {
         COOKIE_OPTIONS: { path: "/", httpOnly: true },
