@@ -83,6 +83,9 @@ const selectedTransactionIds = new Set();
 let transactionUndoMessage = "";
 let transactionUndoAvailable = false;
 let transactionUndoError = false;
+let transactionFxReferenceState = null;
+let transactionFxReferenceDismissed = false;
+let transactionFxReferenceRequestId = 0;
 let pendingTransactionReceiptFile = null;
 let recurringDrawerElement = null;
 let recurringToggleElement = null;
@@ -175,6 +178,10 @@ function getBusinessCurrencyCode() {
 }
 
 function getTransactionDefaultCurrency() {
+  return getBusinessCurrencyCode();
+}
+
+function getTransactionReferenceCurrency() {
   return getBusinessCurrencyCode();
 }
 
@@ -866,6 +873,7 @@ async function loadTransactions() {
     applyFilters();
     renderTotals();
     syncTransactionUndoBar();
+    void syncTransactionUndoAvailability({ preserveMessage: !!transactionUndoMessage });
   }
 }
 
@@ -1263,6 +1271,194 @@ function setTransactionUndoState({ message = "", canUndo = false, isError = fals
   syncTransactionUndoBar();
 }
 
+async function syncTransactionUndoAvailability({ preserveMessage = true } = {}) {
+  try {
+    const response = await apiFetch("/api/transactions/undo-delete-status");
+    if (!response || !response.ok) {
+      return;
+    }
+    const payload = await response.json().catch(() => null);
+    const remainingUndoCount = Number(payload?.remaining_undo_count || 0);
+    if (!preserveMessage) {
+      transactionUndoMessage = remainingUndoCount > 0
+        ? `${remainingUndoCount} ${remainingUndoCount === 1 ? "archived transaction is" : "archived transactions are"} available to restore.`
+        : "";
+      transactionUndoError = false;
+    }
+    transactionUndoAvailable = remainingUndoCount > 0;
+    syncTransactionUndoBar();
+  } catch (_) {
+    // Keep the local undo state if the status probe fails.
+  }
+}
+
+function getTransactionFxReferenceDate() {
+  const exchangeDateInput = document.getElementById("transactionExchangeDate");
+  const transactionDateInput = document.getElementById("date");
+  return (
+    String(exchangeDateInput?.value || "").trim()
+    || String(transactionDateInput?.value || "").trim()
+    || new Date().toISOString().slice(0, 10)
+  );
+}
+
+function formatTransactionFxReferenceLine({ from, to, rate, date }) {
+  const sourceAmountInput = document.getElementById("transactionSourceAmount");
+  const sourceAmount = Number.parseFloat(sourceAmountInput?.value || "");
+  const normalizedRate = Number(rate || 0);
+  const rateLabel = `${normalizedRate.toFixed(6)} ${to}`;
+  if (Number.isFinite(sourceAmount) && sourceAmount > 0) {
+    const converted = sourceAmount * normalizedRate;
+    return `${sourceAmount.toFixed(2)} ${from} ≈ ${converted.toFixed(2)} ${to} using ${rateLabel} on ${formatDisplayDate(date)}`;
+  }
+  return `1 ${from} ≈ ${rateLabel} on ${formatDisplayDate(date)}`;
+}
+
+function syncTransactionFxReferenceBox({
+  visible = false,
+  loading = false,
+  rate = null,
+  detail = "",
+  note = "",
+  canApply = false,
+  isError = false
+} = {}) {
+  const box = document.getElementById("transactionFxReferenceBox");
+  const rateValue = document.getElementById("transactionFxReferenceValue");
+  const detailNode = document.getElementById("transactionFxReferenceDetail");
+  const noteNode = document.getElementById("transactionFxReferenceAdvisory");
+  const applyButton = document.getElementById("transactionFxApplyButton");
+  const toggleButton = document.getElementById("transactionFxInfoToggle");
+
+  if (!box || !rateValue || !detailNode || !noteNode || !applyButton || !toggleButton) {
+    return;
+  }
+
+  box.hidden = !visible;
+  box.classList.toggle("is-loading", visible && loading);
+  box.classList.toggle("is-error", visible && isError);
+  toggleButton.setAttribute("aria-expanded", visible ? "true" : "false");
+  rateValue.textContent = loading
+    ? txT("transactions_fx_loading", "Loading reference rate...")
+    : (rate || txT("transactions_fx_empty", "No reference rate loaded."));
+  detailNode.textContent = detail;
+  detailNode.hidden = !detail;
+  noteNode.textContent = note;
+  applyButton.hidden = !canApply;
+  applyButton.disabled = !canApply;
+}
+
+function clearTransactionFxReferenceBox() {
+  transactionFxReferenceState = null;
+  syncTransactionFxReferenceBox({ visible: false });
+}
+
+async function refreshTransactionFxReference({ forceOpen = false } = {}) {
+  const currencySelect = document.getElementById("transactionCurrency");
+  const exchangeRateInput = document.getElementById("transactionExchangeRate");
+  const from = String(currencySelect?.value || "").trim().toUpperCase();
+  const to = String(getTransactionReferenceCurrency() || "").trim().toUpperCase();
+  const date = getTransactionFxReferenceDate();
+
+  if (!currencySelect || !exchangeRateInput) {
+    return;
+  }
+
+  if (!from || from === to) {
+    transactionFxReferenceDismissed = false;
+    clearTransactionFxReferenceBox();
+    return;
+  }
+
+  if (transactionFxReferenceDismissed && !forceOpen) {
+    return;
+  }
+
+  const requestId = ++transactionFxReferenceRequestId;
+  syncTransactionFxReferenceBox({
+    visible: true,
+    loading: true,
+    note: txT("transactions_fx_advisory", "Reference only. Confirm the final exchange rate independently before filing or reconciliation.")
+  });
+
+  try {
+    const response = await apiFetch(
+      `/api/transactions/exchange-rate-reference?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${encodeURIComponent(date)}`
+    );
+    const payload = response ? await response.json().catch(() => null) : null;
+    if (requestId !== transactionFxReferenceRequestId) {
+      return;
+    }
+    if (!response || !response.ok || !payload?.rate) {
+      transactionFxReferenceState = null;
+      syncTransactionFxReferenceBox({
+        visible: true,
+        loading: false,
+        rate: txT("transactions_fx_unavailable", "Reference unavailable"),
+        note: payload?.error || txT("transactions_fx_error", "Unable to load a reference exchange rate right now."),
+        isError: true
+      });
+      return;
+    }
+
+    transactionFxReferenceState = {
+      from: payload.from || from,
+      to: payload.to || to,
+      rate: Number(payload.rate),
+      date: payload.date || date,
+      advisory: payload.advisory || txT("transactions_fx_advisory", "Reference only. Confirm the final exchange rate independently before filing or reconciliation.")
+    };
+
+    syncTransactionFxReferenceBox({
+      visible: true,
+      loading: false,
+      rate: `1 ${transactionFxReferenceState.from} = ${transactionFxReferenceState.rate.toFixed(6)} ${transactionFxReferenceState.to}`,
+      detail: formatTransactionFxReferenceLine(transactionFxReferenceState),
+      note: transactionFxReferenceState.advisory,
+      canApply: true
+    });
+  } catch (_) {
+    if (requestId !== transactionFxReferenceRequestId) {
+      return;
+    }
+    transactionFxReferenceState = null;
+    syncTransactionFxReferenceBox({
+      visible: true,
+      loading: false,
+      rate: txT("transactions_fx_unavailable", "Reference unavailable"),
+      note: txT("transactions_fx_error", "Unable to load a reference exchange rate right now."),
+      isError: true
+    });
+  }
+}
+
+function syncTransactionFxReferenceSummary() {
+  if (!transactionFxReferenceState) {
+    return;
+  }
+  syncTransactionFxReferenceBox({
+    visible: true,
+    loading: false,
+    rate: `1 ${transactionFxReferenceState.from} = ${transactionFxReferenceState.rate.toFixed(6)} ${transactionFxReferenceState.to}`,
+    detail: formatTransactionFxReferenceLine(transactionFxReferenceState),
+    note: transactionFxReferenceState.advisory,
+    canApply: true
+  });
+}
+
+function applyTransactionFxReferenceRate() {
+  if (!transactionFxReferenceState?.rate) {
+    return;
+  }
+  const exchangeRateInput = document.getElementById("transactionExchangeRate");
+  if (!exchangeRateInput) {
+    return;
+  }
+  exchangeRateInput.value = transactionFxReferenceState.rate.toFixed(6);
+  updateConvertedAmountPreview();
+  syncTransactionFxReferenceSummary();
+}
+
 function syncTransactionUndoBar() {
   const undoBar = document.getElementById("txUndoBar");
   const undoMessage = document.getElementById("txUndoMessage");
@@ -1433,6 +1629,7 @@ function prefillTransactionForm(transaction) {
     noteInput.value = transaction.note || "";
   }
   syncEdgeCaseUi();
+  void refreshTransactionFxReference();
 }
 
 function resetTransactionForm() {
@@ -1446,6 +1643,8 @@ function resetTransactionForm() {
   setEditingMode(false);
   clearCustomCategoryField("category", "customCategoryName");
   setTransactionAdvancedDefaults();
+  transactionFxReferenceDismissed = false;
+  clearTransactionFxReferenceBox();
   const message = document.getElementById("transactionFormMessage");
   if (message) {
     message.textContent = "";
@@ -1478,6 +1677,8 @@ function setTransactionAdvancedDefaults() {
         : "Use this for sales tax or other indirect taxes that need review.";
   }
   syncEdgeCaseUi();
+  transactionFxReferenceDismissed = false;
+  void refreshTransactionFxReference();
 }
 
 function setEditingMode(enabled) {
@@ -1572,10 +1773,14 @@ async function handleUndoArchivedTransaction() {
   }
 
   selectedTransactionIds.clear();
+  const payload = await response.json().catch(() => null);
   await loadTransactions();
+  const remainingUndoCount = Number(payload?.remaining_undo_count || 0);
   setTransactionUndoState({
-    message: txT("transactions_undo_success", "Archived transaction restored."),
-    canUndo: false,
+    message: remainingUndoCount > 0
+      ? `${txT("transactions_undo_success", "Archived transaction restored.")} ${remainingUndoCount} ${remainingUndoCount === 1 ? "undo" : "undos"} remaining.`
+      : txT("transactions_undo_success", "Archived transaction restored."),
+    canUndo: remainingUndoCount > 0,
     isError: false
   });
 }
@@ -2548,14 +2753,45 @@ function validateEdgeCaseFields({ sourceAmount, exchangeRate, convertedAmount, p
 function wireEdgeCaseFields() {
   const sourceAmountInput = document.getElementById("transactionSourceAmount");
   const exchangeRateInput = document.getElementById("transactionExchangeRate");
+  const exchangeDateInput = document.getElementById("transactionExchangeDate");
+  const transactionDateInput = document.getElementById("date");
+  const currencySelect = document.getElementById("transactionCurrency");
   const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
   const personalUseInput = document.getElementById("transactionPersonalUsePct");
   const reviewStatusSelect = document.getElementById("transactionReviewStatus");
   const amountInput = document.getElementById("amount");
+  const infoToggle = document.getElementById("transactionFxInfoToggle");
+  const applyButton = document.getElementById("transactionFxApplyButton");
 
   if (sourceAmountInput && exchangeRateInput) {
-    sourceAmountInput.addEventListener("input", updateConvertedAmountPreview);
+    sourceAmountInput.addEventListener("input", () => {
+      updateConvertedAmountPreview();
+      syncTransactionFxReferenceSummary();
+    });
     exchangeRateInput.addEventListener("input", updateConvertedAmountPreview);
+  }
+
+  if (exchangeDateInput) {
+    exchangeDateInput.addEventListener("change", () => {
+      transactionFxReferenceDismissed = false;
+      void refreshTransactionFxReference();
+    });
+  }
+
+  if (transactionDateInput) {
+    transactionDateInput.addEventListener("change", () => {
+      if (!String(exchangeDateInput?.value || "").trim()) {
+        transactionFxReferenceDismissed = false;
+        void refreshTransactionFxReference();
+      }
+    });
+  }
+
+  if (currencySelect) {
+    currencySelect.addEventListener("change", () => {
+      transactionFxReferenceDismissed = false;
+      void refreshTransactionFxReference();
+    });
   }
 
   if (taxTreatmentSelect) {
@@ -2574,7 +2810,25 @@ function wireEdgeCaseFields() {
     reviewStatusSelect.addEventListener("change", syncEdgeCaseUi);
   }
 
+  if (infoToggle) {
+    infoToggle.addEventListener("click", () => {
+      const box = document.getElementById("transactionFxReferenceBox");
+      const shouldOpen = !!box?.hidden;
+      transactionFxReferenceDismissed = !shouldOpen;
+      if (shouldOpen) {
+        void refreshTransactionFxReference({ forceOpen: true });
+      } else {
+        clearTransactionFxReferenceBox();
+      }
+    });
+  }
+
+  if (applyButton) {
+    applyButton.addEventListener("click", applyTransactionFxReferenceRate);
+  }
+
   syncEdgeCaseUi();
+  void refreshTransactionFxReference();
 }
 
 function syncEdgeCaseUi() {
@@ -2596,6 +2850,7 @@ function updateConvertedAmountPreview() {
   if (Number.isFinite(src) && src > 0 && Number.isFinite(rate) && rate > 0) {
     convertedInput.value = (src * rate).toFixed(2);
   }
+  syncTransactionFxReferenceSummary();
 }
 
 function syncPersonalUsePctVisibility() {

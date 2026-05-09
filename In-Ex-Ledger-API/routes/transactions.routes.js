@@ -14,7 +14,8 @@ const {
 } = require("../services/accountingLockService.js");
 const {
   archiveTransaction,
-  restoreMostRecentArchivedTransaction
+  restoreMostRecentArchivedTransaction,
+  countRestorableArchivedTransactions
 } = require("../services/transactionAuditService.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
@@ -32,6 +33,8 @@ const VALID_TAX_TREATMENTS = new Set(["income", "operating", "capital", "split_u
 const VALID_REVIEW_STATUSES = new Set(["needs_review", "ready", "matched", "locked"]);
 const MAX_TRANSACTION_AMOUNT = 999999999.99;
 const MAX_PERCENT = 100;
+const TRANSACTION_UNDO_STACK_LIMIT = 20;
+const REFERENCE_RATE_CURRENCIES = new Set(["USD", "CAD", "EUR", "GBP", "AUD", "JPY"]);
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -39,6 +42,10 @@ const UUID_REGEX =
 router.use(requireAuth);
 router.use(requireCsrfProtection);
 router.use(createTransactionLimiter());
+
+function isReferenceRateDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
+}
 
 function deriveCategoryKindFromSlug(slug) {
   const normalized = String(slug ?? "").trim().toLowerCase();
@@ -717,8 +724,8 @@ router.post("/undo-delete", async (req, res) => {
           AND (is_void = true OR is_void IS NULL)
           AND (is_adjustment = false OR is_adjustment IS NULL)
         ORDER BY deleted_at DESC, voided_at DESC, created_at DESC
-        LIMIT 1`,
-      [businessId]
+        LIMIT $2`,
+      [businessId, TRANSACTION_UNDO_STACK_LIMIT]
     );
 
     if (candidate.rowCount === 0) {
@@ -738,13 +745,104 @@ router.post("/undo-delete", async (req, res) => {
       return res.status(404).json({ error: "No archived transaction is available to restore." });
     }
 
+    const remainingUndoCount = await countRestorableArchivedTransactions({
+      pool,
+      businessId,
+      limit: TRANSACTION_UNDO_STACK_LIMIT
+    });
+
     res.json({
       message: "Transaction restored.",
-      transaction: decryptTransactionRow(restored)
+      transaction: decryptTransactionRow(restored),
+      remaining_undo_count: remainingUndoCount,
+      undo_stack_limit: TRANSACTION_UNDO_STACK_LIMIT
     });
   } catch (err) {
     logError("POST /transactions/undo-delete error:", err);
     return handleTransactionMutationError(res, err, "Failed to restore transaction.");
+  }
+});
+
+router.get("/undo-delete-status", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const remainingUndoCount = await countRestorableArchivedTransactions({
+      pool,
+      businessId,
+      limit: TRANSACTION_UNDO_STACK_LIMIT
+    });
+
+    res.json({
+      remaining_undo_count: remainingUndoCount,
+      undo_stack_limit: TRANSACTION_UNDO_STACK_LIMIT
+    });
+  } catch (err) {
+    logError("GET /transactions/undo-delete-status error:", err);
+    res.status(500).json({ error: "Failed to load undo status." });
+  }
+});
+
+router.get("/exchange-rate-reference", async (req, res) => {
+  try {
+    const from = String(req.query.from || "").trim().toUpperCase();
+    const to = String(req.query.to || "").trim().toUpperCase();
+    const requestedDate = String(req.query.date || "").trim();
+
+    if (!REFERENCE_RATE_CURRENCIES.has(from) || !REFERENCE_RATE_CURRENCIES.has(to)) {
+      return res.status(400).json({ error: "Unsupported currency pair." });
+    }
+
+    if (from === to) {
+      return res.json({
+        from,
+        to,
+        rate: 1,
+        date: requestedDate || new Date().toISOString().slice(0, 10),
+        source: "same-currency",
+        advisory: "Reference only. Confirm the final rate independently before filing or reconciliation."
+      });
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const effectiveDate = isReferenceRateDate(requestedDate) && requestedDate <= today ? requestedDate : "latest";
+    const endpoint =
+      effectiveDate === "latest"
+        ? `https://api.frankfurter.app/latest?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+        : `https://api.frankfurter.app/${effectiveDate}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+
+    const response = await fetch(endpoint, {
+      headers: {
+        accept: "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      logWarn("GET /transactions/exchange-rate-reference upstream error", {
+        status: response.status,
+        from,
+        to,
+        requestedDate
+      });
+      return res.status(502).json({ error: "Unable to load a reference exchange rate right now." });
+    }
+
+    const payload = await response.json();
+    const rate = Number(payload?.rates?.[to]);
+    if (!Number.isFinite(rate) || rate <= 0) {
+      return res.status(404).json({ error: "Reference exchange rate unavailable for that currency pair." });
+    }
+
+    res.json({
+      from,
+      to,
+      rate,
+      date: payload?.date || (effectiveDate === "latest" ? today : effectiveDate),
+      source: "Frankfurter",
+      advisory: "Reference only. Confirm the final rate independently before filing or reconciliation."
+    });
+  } catch (err) {
+    logError("GET /transactions/exchange-rate-reference error:", err);
+    res.status(500).json({ error: "Failed to load the reference exchange rate." });
   }
 });
 

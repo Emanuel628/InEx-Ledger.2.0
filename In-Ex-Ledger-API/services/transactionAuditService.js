@@ -61,7 +61,28 @@ async function restoreMostRecentArchivedTransaction({ pool, businessId, userId, 
   return restored.rows[0] || null;
 }
 
+async function countRestorableArchivedTransactions({ pool, businessId, limit = 20 }) {
+  const normalizedLimit = Number.isFinite(limit) ? Math.max(1, Math.min(50, Number(limit))) : 20;
+  const result = await pool.query(
+    `SELECT COUNT(*)::int AS total
+       FROM (
+         SELECT id
+           FROM transactions
+          WHERE business_id = $1
+            AND deleted_at IS NOT NULL
+            AND (is_void = true OR is_void IS NULL)
+            AND (is_adjustment = false OR is_adjustment IS NULL)
+          ORDER BY deleted_at DESC, voided_at DESC, created_at DESC
+          LIMIT $2
+       ) recent_archived`,
+    [businessId, normalizedLimit]
+  );
+
+  return Number(result.rows[0]?.total || 0);
+}
+
 module.exports = {
   archiveTransaction,
-  restoreMostRecentArchivedTransaction
+  restoreMostRecentArchivedTransaction,
+  countRestorableArchivedTransactions
 };
