@@ -1,75 +1,32 @@
-/* Dark mode entrypoint
-   Dark mode is temporarily disabled while the design is revisited.
+/* Theme owner file
+   Dark mode is intentionally disabled right now.
 
-   The dark-mode CSS is intentionally kept in the repo for later. This entrypoint
-   now loads the temporary disable layer first so the Settings toggle is hidden
-   and runtime appearance stays light.
+   This file exists so there is one clear CSS owner for that decision instead
+   of several drift files layered on top of each other. The actual theme boot
+   lock still happens in public/js/theme-boot.js and runtime theme behavior is
+   still owned by public/js/global.js.
+
+   When dark mode is redesigned properly, rebuild it from the main theme tokens
+   and page owner styles instead of reintroducing patch files.
 */
 
-@import url("/css/core/dark-mode-disabled.css?v=20260505a");
-@import url("/css/core/dark-mode-final.css?v=20260505a");
+#darkModeToggle {
+  display: none !important;
+}
 
+.settings-row:has(#darkModeToggle) {
+  display: none !important;
+}
+
+html,
 html[data-theme="dark"],
+body,
 body.dark {
-  color-scheme: dark;
-
-  --ink: #eef2f8;
-  --ink2: #c4cedd;
-  --ink3: #9aa7ba;
-  --text-main: var(--ink);
-  --text-primary: var(--ink);
-  --text-secondary: var(--ink2);
-  --text-muted: var(--ink3);
-
-  --surface: #121a29;
-  --surface2: #182234;
-  --surface3: #22304a;
-  --card-bg: var(--surface);
-  --bg-surface: var(--surface);
-  --input-bg: #0e1523;
-  --panel-bg: rgba(18, 26, 41, 0.96);
-  --card-bg-strong: rgba(18, 26, 41, 0.98);
-
-  --accent: #111827;
-  --accent2: #8fa2ff;
-  --accent-light: #232c47;
-  --accent-primary: var(--accent2);
-  --primary: var(--accent2);
-
-  --green: #86d39f;
-  --green-bg: #123421;
-  --red: #f3a6a6;
-  --red-bg: #3b171b;
-  --red-border: #74414a;
-  --amber: #f2cf8a;
-  --amber-bg: #3b2a12;
-
-  --border: rgba(196, 206, 221, 0.13);
-  --border2: rgba(196, 206, 221, 0.22);
-
-  --page-bg: #0a0f19;
-  --page-bleed:
-    radial-gradient(circle at 8% 0%, rgba(143, 162, 255, 0.10), transparent 30%),
-    radial-gradient(circle at 88% 8%, rgba(72, 90, 140, 0.12), transparent 28%),
-    #0a0f19;
-
-  --cta-gradient: linear-gradient(180deg, #8fa2ff 0%, #6f82f2 100%);
-  --accent-panel: linear-gradient(135deg, #101827 0%, #1a2440 100%);
-
-  --landing-bg: #0a0f19;
-  --landing-surface: rgba(18, 26, 41, 0.96);
-  --landing-surface-strong: #121a29;
-  --landing-border: rgba(196, 206, 221, 0.13);
-  --landing-border-strong: rgba(196, 206, 221, 0.22);
-  --landing-muted: #c4cedd;
-  --landing-deep: #eef2f8;
-  --landing-soft-blue: #232c47;
-  --landing-shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.35);
-  --landing-shadow-md: 0 16px 36px rgba(0, 0, 0, 0.26);
+  color-scheme: light !important;
 }
 
 html[data-theme="dark"] body,
 body.dark {
-  background: var(--page-bleed, #0a0f19) !important;
-  color: var(--ink, #eef2f8) !important;
+  background: var(--page-bleed-light, var(--page-bleed, #f7fafc)) !important;
+  color: var(--ink, #122033) !important;
 }

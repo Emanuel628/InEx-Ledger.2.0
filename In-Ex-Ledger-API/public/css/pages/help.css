@@ -255,6 +255,15 @@ main.help-main {
   margin-bottom: 0;
 }
 
+.help-subsection {
+  margin-top: 24px;
+}
+
+.help-subsection + .help-subsection {
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
 @media (max-width: 1100px) {
   .help-layout {
     grid-template-columns: 1fr;

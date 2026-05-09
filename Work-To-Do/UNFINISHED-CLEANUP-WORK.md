@@ -587,8 +587,8 @@ Do not delete these blindly. For each file, first confirm whether it is imported
 
 Additional files found:
 
-- `In-Ex-Ledger-API/public/css/core/dark-mode-final.css`
-- `In-Ex-Ledger-API/public/css/core/dark-mode-disabled.css`
+- `In-Ex-Ledger-API/public/css/core/dark-mode-final.css` (completed: deleted after consolidation)
+- `In-Ex-Ledger-API/public/css/core/dark-mode-disabled.css` (completed: deleted after consolidation)
 
 Owner files/folders:
 
@@ -598,10 +598,10 @@ Owner files/folders:
 
 Action:
 
-- Review HTML/CSS imports for both CSS files.
-- Keep only one intentional dark-mode-disabled path while dark mode is off.
-- If `theme-boot.js` remains, document it as the early light-mode lock, not a temporary patch.
-- Delete duplicate `dark-mode-final.css` / `dark-mode-disabled.css` drift files after behavior is owned.
+- Reviewed HTML/CSS imports for both CSS files.
+- Kept one intentional dark-mode-disabled owner path in `public/css/core/dark-mode.css`.
+- `theme-boot.js` remains as the early light-mode lock.
+- Deleted duplicate `dark-mode-final.css` / `dark-mode-disabled.css` after behavior was consolidated.
 
 ## Recovery / Checksum Artifacts
 

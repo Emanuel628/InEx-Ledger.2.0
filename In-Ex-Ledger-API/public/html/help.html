@@ -4,8 +4,12 @@
   <meta charset="UTF-8" />
   <title>InEx Ledger - Help & How To Use</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="/css/app.css?v=20260504a" />
-  <link rel="stylesheet" href="/css/pages/help.css" />
+  <meta
+    name="description"
+    content="Detailed help for InEx Ledger covering onboarding, transactions, CSV import, recurring entries, exports, receipts, mileage, security, and edge cases."
+  />
+  <link rel="stylesheet" href="/css/app.css?v=20260508a" />
+  <link rel="stylesheet" href="/css/pages/help.css?v=20260508a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -45,15 +49,18 @@
         <section class="help-panel">
           <div class="sidebar-section-label">Guide</div>
           <nav class="help-nav">
-            <a href="#quick-start">Quick start</a>
-            <a href="#setup">Set up your business</a>
+            <a href="#overview">Overview</a>
+            <a href="#onboarding">Onboarding</a>
+            <a href="#business-setup">Business setup</a>
             <a href="#transactions">Transactions</a>
+            <a href="#csv-import">CSV import</a>
             <a href="#receipts">Receipts</a>
             <a href="#mileage">Mileage</a>
             <a href="#exports">Exports</a>
             <a href="#edge-cases">Edge cases</a>
-            <a href="#security">Security & account control</a>
-            <a href="#region-notes">Region-specific notes</a>
+            <a href="#security">Security</a>
+            <a href="#billing">Billing</a>
+            <a href="#cpa-access">CPA access</a>
             <a href="#troubleshooting">Troubleshooting</a>
             <a href="#limits">What the app does not do</a>
           </nav>
@@ -61,7 +68,9 @@
 
         <section class="help-panel help-actions-panel">
           <div class="sidebar-section-label">Shortcuts</div>
+          <a class="help-action-link" href="onboarding">Open onboarding</a>
           <a class="help-action-link" href="transactions">Open transactions</a>
+          <a class="help-action-link" href="receipts">Open receipts</a>
           <a class="help-action-link" href="exports">Open exports</a>
           <a class="help-action-link" href="settings">Open settings</a>
         </section>
@@ -73,444 +82,459 @@
             <p class="help-kicker">Operating manual</p>
             <h1>How to use InEx Ledger</h1>
             <p class="help-intro">
-              This page is the long-form guide for the app. Use it to set up a business, enter transactions,
-              attach receipts, keep mileage organized, handle edge cases like foreign currency and split-use items,
-              prepare clean exports for filing or review, and understand where the bookkeeping stops and tax judgment starts.
+              This is the complete user guide for the live app. It explains what each area does, what to click,
+              what to enter, why it matters, and what to avoid. If you are unsure where to start, follow the
+              sections in order once. After that, you can come back to the part you need.
             </p>
             <div class="help-hero-actions">
               <a class="help-primary-action" href="transactions">Go to transactions</a>
-              <a class="help-secondary-action" href="exports">Export records</a>
+              <a class="help-secondary-action" href="settings">Open settings</a>
             </div>
           </div>
           <div class="help-hero-aside">
-            <h2>Fast path</h2>
+            <h2>Shortest useful path</h2>
             <ol class="help-step-list compact">
-              <li>Pick the correct region and province/state.</li>
-              <li>Fill in the business profile.</li>
-              <li>Add accounts and categories.</li>
-              <li>Enter income and expense transactions.</li>
-              <li>Attach receipts and note anything unusual.</li>
-              <li>Mark edge cases: FX, split use, capital items, and tax recoverability.</li>
-              <li>Export CSV/PDF for filing or review at tax time.</li>
+              <li>Finish onboarding with your real business name, region, and first workflow.</li>
+              <li>Add the account where the money actually lives.</li>
+              <li>Create or review your categories.</li>
+              <li>Log transactions with receipts or notes.</li>
+              <li>Use edge-case fields only when the transaction is not simple.</li>
+              <li>Run exports when you want a review package or filing handoff.</li>
             </ol>
           </div>
         </section>
 
-        <section id="quick-start" class="help-card help-section">
+        <section id="overview" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Start here</p>
-            <h2>1. Quick start</h2>
+            <h2>1. What the app is for</h2>
           </div>
-          <ol class="help-step-list">
-            <li>
-              <strong>Choose the correct region first.</strong> Set the business to the country where the
-              books should live. This controls labels, tax hints, and export wording.
-            </li>
-            <li>
-              <strong>Set the business profile.</strong> Confirm the name, business type, tax ID, fiscal year
-              start, and address so exports match the records a CPA expects.
-            </li>
-            <li>
-              <strong>Add the bank and card accounts you actually use.</strong> Keep personal and business
-              accounts separate. If money moves from a personal account, still record the transaction.
-            </li>
-            <li>
-              <strong>Build a small category list.</strong> Start with the categories you use most often.
-              Too many categories create noise. Too few create bad exports.
-            </li>
-            <li>
-              <strong>Enter each transaction with a receipt when possible.</strong> The receipt is what lets you
-              verify the record instead of guessing later.
-            </li>
-            <li>
-              <strong>Review edge-case fields when needed.</strong> Use the advanced details for currency,
-              tax treatment, split-use items, and indirect taxes.
-            </li>
-            <li>
-              <strong>Export before tax time.</strong> Use CSV for data review and PDF for a cleaner handoff.
-            </li>
-          </ol>
-          <div class="help-callout">
-            Keep one rule in mind: if you would want to defend it later, attach it now.
+          <p>
+            InEx Ledger is a bookkeeping app. Its job is to help you keep clean records. It is not trying to be
+            a giant accounting suite, and it is not trying to replace final tax judgment. The app works best
+            when you use it to keep the facts straight:
+          </p>
+          <ul class="help-list">
+            <li>What money came in.</li>
+            <li>What money went out.</li>
+            <li>Which account it came from or went to.</li>
+            <li>Why it happened.</li>
+            <li>What proof exists for it.</li>
+          </ul>
+          <div class="help-grid-two">
+            <div class="help-callout">
+              <strong>If you are new:</strong> do not try to perfect every record on day one. First make sure
+              every real transaction exists. Then clean up categories, notes, and edge cases.
+            </div>
+            <div class="help-callout">
+              <strong>If you are behind:</strong> use CSV import or batch entry to get caught up, then review
+              the odd transactions one by one.
+            </div>
           </div>
         </section>
 
-        <section id="setup" class="help-card help-section">
+        <section id="onboarding" class="help-card help-section">
+          <div class="section-heading">
+            <p class="help-kicker">First-run flow</p>
+            <h2>2. Onboarding: what it asks and why it matters</h2>
+          </div>
+          <p>
+            The onboarding page is not filler anymore. It saves setup information that affects your first account,
+            your opening workflow, and the guidance the app shows after setup.
+          </p>
+          <div class="help-grid-two">
+            <div>
+              <h3>What to enter</h3>
+              <dl class="help-dl">
+                <dt>Work type</dt>
+                <dd>Choose the option closest to what you actually do. This is used for guided setup and starter guidance.</dd>
+                <dt>Your name or trade name</dt>
+                <dd>Use the real business-facing name you want tied to the records.</dd>
+                <dt>Primary account type</dt>
+                <dd>Pick the first account the app should create for you.</dd>
+                <dt>Account nickname</dt>
+                <dd>Give the first account a useful name like “Primary Checking” or “Business Visa.”</dd>
+                <dt>Region and province/state</dt>
+                <dd>These control labels, tax hints, and region-specific guidance.</dd>
+                <dt>Start focus</dt>
+                <dd>This decides where the app sends you right after onboarding: transactions, receipts, mileage, or exports.</dd>
+              </dl>
+            </div>
+            <div>
+              <h3>What happens after you save</h3>
+              <ul class="help-list">
+                <li>Your onboarding details are stored in the account.</li>
+                <li>Your starter account is created if one does not already exist.</li>
+                <li>The app sends you to the workflow you chose as your start focus.</li>
+                <li>Guided setup reminders can use your work type instead of showing generic filler.</li>
+              </ul>
+              <div class="help-callout">
+                If you picked the wrong thing, do not panic. You can still fix the business profile, accounts,
+                and categories afterward.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="business-setup" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Foundation</p>
-            <h2>2. Set up your business correctly</h2>
+            <h2>3. Business setup and scope</h2>
           </div>
           <div class="help-grid-two">
             <div>
               <h3>Business profile</h3>
               <p>
-                Open Settings and complete the business profile first. That information flows into exports,
-                receipts, and PDF reports. If the business name or tax ID is wrong,
-                everything downstream looks wrong too.
+                Open Settings and complete the business profile carefully. This affects export labels, PDF output,
+                region guidance, and what a CPA sees later.
               </p>
               <ul class="help-list">
-                <li>Use the legal business name, not a nickname.</li>
-                <li>Choose the real entity type.</li>
-                <li>Set the fiscal year start if your year is not January 1.</li>
-                <li>Store the business address exactly as you want it to appear on exports.</li>
+                <li>Use the legal or true operating name, not a throwaway nickname.</li>
+                <li>Choose the correct entity type if the app asks for one.</li>
+                <li>Keep address, tax ID, and fiscal-year settings current.</li>
+                <li>Do not mix two real businesses into one profile just to “keep it simple.”</li>
               </ul>
             </div>
             <div>
-              <h3>Accounts and categories</h3>
+              <h3>Active business vs all businesses</h3>
               <p>
-                Accounts are where the money lives. Categories are what the money means. Keep them separate.
-                A card or bank account should not be used as a category, and a category should not be used as
-                a bank account.
+                Some pages let you switch between the active business and the all-business reporting view.
+                This matters a lot.
               </p>
               <ul class="help-list">
-                <li>Use one account per bank or credit card.</li>
-                <li>Use categories for the business purpose of the transaction.</li>
-                <li>Keep category names simple and stable.</li>
-                <li>Do not create duplicate categories just because wording changes.</li>
+                <li><strong>Active business</strong> is for normal daily bookkeeping and editing.</li>
+                <li><strong>All businesses</strong> is for portfolio-level reporting only.</li>
+                <li>You cannot add or edit normal transactions in all-business scope.</li>
+                <li>If totals look strange, check the scope before you assume the math is wrong.</li>
               </ul>
             </div>
           </div>
-          <div class="help-note-grid">
-            <div class="help-callout" data-region-show="us">
-              U.S. users should keep U.S. business labels in the profile and ignore Canadian tax labels when they are hidden.
-            </div>
-            <div class="help-callout" data-region-show="ca">
-              Canadian users should keep province and tax-profile fields accurate so exports stay aligned with T2125 and related records.
-            </div>
-            <div class="help-callout" data-region-show="ca-qc">
-              Quebec users should also keep any required French-language presentation and province-specific documents in sync with the business records.
-            </div>
+          <div class="help-callout">
+            Simple rule: if you are entering or editing data, stay in the active business. If you are comparing
+            businesses, use the all-business view.
           </div>
         </section>
 
         <section id="transactions" class="help-card help-section">
           <div class="section-heading">
-            <p class="help-kicker">Daily bookkeeping</p>
-            <h2>3. Enter transactions the right way</h2>
+            <p class="help-kicker">Daily work</p>
+            <h2>4. Transactions: the main workflow</h2>
           </div>
+          <p>
+            This is the page you will use the most. A good transaction record should answer five questions:
+            when, what, how much, which account, and why.
+          </p>
           <div class="help-grid-two">
             <div>
-              <h3>Income vs expense</h3>
-              <p>
-                Income increases the business total. Expenses reduce the business total if they are legitimate
-                business expenses. The app stores the amount as a positive number and applies the sign in the
-                math, so you should not enter negative values to "flip" a transaction.
-              </p>
-              <ul class="help-list">
-                <li>Use <strong>Income</strong> when money came in for the business.</li>
-                <li>Use <strong>Expense</strong> when money went out for the business.</li>
-                <li>Pick the account that actually received or paid the money.</li>
-                <li>Pick the category that explains the business purpose.</li>
-              </ul>
+              <h3>How to enter a basic transaction</h3>
+              <ol class="help-step-list">
+                <li>Choose the correct date.</li>
+                <li>Write a short description that a stranger could still understand later.</li>
+                <li>Enter the amount as a positive number.</li>
+                <li>Choose Income or Expense.</li>
+                <li>Select the account where the money actually moved.</li>
+                <li>Select the category that explains the business purpose.</li>
+                <li>Attach the receipt if you have it.</li>
+              </ol>
             </div>
             <div>
-              <h3>What to fill in</h3>
+              <h3>What the controls mean</h3>
               <dl class="help-dl">
-                <dt>Date</dt>
-                <dd>Use the real transaction date, not the date you feel like sorting it into later.</dd>
-                <dt>Description</dt>
-                <dd>Write enough detail that someone else can recognize the transaction later.</dd>
-                <dt>Account</dt>
-                <dd>Select the bank or card used for the transaction.</dd>
-                <dt>Category</dt>
-                <dd>Select the business purpose or income type.</dd>
-                <dt>Receipt attachment</dt>
-                <dd>Attach a receipt, invoice, statement, or other proof whenever one exists.</dd>
                 <dt>Cleared</dt>
-                <dd>Mark it once it matches the bank or card statement.</dd>
+                <dd>Use this after the transaction matches the bank or card statement.</dd>
+                <dt>Review status</dt>
+                <dd>Use this when something still needs a human decision or follow-up.</dd>
+                <dt>Note</dt>
+                <dd>Use this to explain anything the raw description does not cover.</dd>
+                <dt>Receipt</dt>
+                <dd>This is the proof. Attach it whenever one exists.</dd>
               </dl>
             </div>
           </div>
+
           <div class="help-subsection">
-            <h3>Advanced details</h3>
+            <h3>Undo, checkboxes, and row actions</h3>
+            <ul class="help-list">
+              <li>The checkbox on the left side of the row is what opens the Edit/Delete popup for that transaction.</li>
+              <li>The popup appears near the checkbox on purpose. It should not open randomly elsewhere on the page.</li>
+              <li>The Undo button in the table header restores archived transactions.</li>
+              <li>Undo is not limited to one restore anymore. The app keeps a recent stack and lets you restore several archived items in order.</li>
+            </ul>
+            <div class="help-callout">
+              If you accidentally delete a transaction, use Undo right away before doing unrelated cleanup. It is
+              much easier to restore recent records than to re-create them from memory.
+            </div>
+          </div>
+
+          <div class="help-subsection">
+            <h3>Recurring transactions</h3>
             <p>
-              The advanced drawer is where edge cases live. Use it when the transaction is not plain domestic
-              operating income or expense.
+              Use recurring templates for things that repeat on a schedule: retainers, subscriptions, rent,
+              software, or fixed monthly charges.
             </p>
-            <div class="help-grid-two">
-              <div>
-                <ul class="help-list">
-                  <li><strong>Currency:</strong> record the source currency if it is not the business currency.</li>
-                  <li><strong>Source amount:</strong> record the original amount before conversion.</li>
-                  <li><strong>Exchange rate / date:</strong> record how the app should normalize the value.</li>
-                  <li><strong>Converted amount:</strong> use the final business-currency amount.</li>
-                </ul>
-              </div>
-              <div>
-                <ul class="help-list">
-                  <li><strong>Tax treatment:</strong> flag capital items, split-use items, or non-deductible items.</li>
-                  <li><strong>Personal-use %:</strong> show the non-business portion when a cost is shared.</li>
-                  <li><strong>Indirect tax amount:</strong> capture GST/HST/QST or sales tax when relevant.</li>
-                  <li><strong>Review status and notes:</strong> leave a trail for future cleanup.</li>
-                </ul>
-              </div>
+            <ul class="help-list">
+              <li>Create the template once.</li>
+              <li>Choose the cadence: weekly, biweekly, monthly, quarterly, or yearly.</li>
+              <li>Use Post next when you want to create the next entry immediately.</li>
+              <li>Pause a template instead of deleting it if the charge may come back later.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section id="csv-import" class="help-card help-section">
+          <div class="section-heading">
+            <p class="help-kicker">Catch-up tool</p>
+            <h2>5. CSV import from your bank or card</h2>
+          </div>
+          <p>
+            CSV import is for getting real transaction rows into the ledger faster. It is not magic. You still
+            need to review what came in.
+          </p>
+          <ol class="help-step-list">
+            <li>Open the Transactions page in the correct active business.</li>
+            <li>Open the CSV import modal.</li>
+            <li>Choose the destination account. This is where the imported rows will land.</li>
+            <li>Select the CSV file exported from your bank or card provider.</li>
+            <li>Run the import and read the result summary before you close the modal.</li>
+            <li>Reloaded transactions will appear in the real transactions table. Review them before export time.</li>
+          </ol>
+          <div class="help-grid-two">
+            <div class="help-callout">
+              Best use case: when you are behind and need the raw rows in the system quickly.
+            </div>
+            <div class="help-callout">
+              Bad use case: importing messy data and assuming the categories, notes, and edge cases will fix themselves.
             </div>
           </div>
         </section>
 
         <section id="receipts" class="help-card help-section">
           <div class="section-heading">
-            <p class="help-kicker">Evidence</p>
-            <h2>4. Receipts: how to keep them useful</h2>
+            <p class="help-kicker">Proof</p>
+            <h2>6. Receipts and supporting evidence</h2>
           </div>
           <p>
-            A receipt is not just a picture. It is the support for the transaction. The best receipt record is
-            legible, dated, matched to one transaction, and easy to export later.
+            A receipt is the support for the record. The goal is not just to store a picture. The goal is to
+            make the transaction defendable later.
           </p>
           <ul class="help-list">
-            <li>Upload the receipt as close to the transaction as possible.</li>
-            <li>Use the receipt note field for anything you will need to know later.</li>
-            <li>If one receipt covers more than one business purpose, explain the split in the review notes.</li>
-            <li>If the receipt is missing, write a note immediately while the context is still fresh.</li>
-            <li>Keep receipts from vendors, payment confirmations, and statements when they are the only proof available.</li>
+            <li>Upload the receipt as soon as possible while you still know what it is.</li>
+            <li>If one document supports multiple business facts, explain that in the note.</li>
+            <li>If the vendor email or portal is the only proof you have, attach that instead of leaving nothing.</li>
+            <li>If the receipt is missing, keep the transaction and leave a note immediately.</li>
+            <li>Use the Receipts page to review what is attached and what still needs work.</li>
           </ul>
           <div class="help-callout">
-            Best practice: if the document would need explanation later, do not leave the notes blank.
+            If you must choose between a perfect category and missing proof, get the proof first. You can fix the
+            category later much more easily than you can rebuild a missing receipt trail.
           </div>
         </section>
 
         <section id="mileage" class="help-card help-section">
           <div class="section-heading">
-            <p class="help-kicker">Distance tracking</p>
-            <h2>5. Mileage</h2>
+            <p class="help-kicker">Travel records</p>
+            <h2>7. Mileage</h2>
           </div>
           <div class="help-grid-two">
             <div>
               <p>
-                Mileage is only useful if the trip is documented well. Record the date, distance, purpose, and
-                where the trip started and ended. The app supports both miles and kilometers, and it should match
-                the region and settings you use.
+                Mileage needs enough detail that you can explain the trip later. The minimum useful record is:
+                date, purpose, distance, and where the trip started and ended.
               </p>
               <ul class="help-list">
                 <li>Record business trips only.</li>
-                <li>Do not guess the distance after the fact if you can avoid it.</li>
-                <li>Keep a short purpose note that explains why the trip was business-related.</li>
-                <li>Use the same unit consistently so the export stays clean.</li>
+                <li>Keep the purpose short but specific.</li>
+                <li>Use one unit consistently.</li>
+                <li>Fix mistakes early so the export stays clean.</li>
               </ul>
             </div>
-            <div>
-              <div class="help-callout">
-                Mileage does not need to be perfect prose. It does need enough information that the trip can be defended later.
-              </div>
+            <div class="help-callout">
+              “Client visit,” “supply pickup,” or “job-site estimate” is useful. “Trip” is not useful.
             </div>
           </div>
         </section>
 
         <section id="exports" class="help-card help-section">
           <div class="section-heading">
-            <p class="help-kicker">Tax handoff</p>
-            <h2>6. Exports and filing prep</h2>
+            <p class="help-kicker">Handoff layer</p>
+            <h2>8. Exports, PDF, CSV, and export history</h2>
           </div>
           <p>
-            Exports are the handoff layer. The goal is not to calculate every tax result inside the app.
-            The goal is to make the records clean enough that review and filing take less cleanup.
+            Exports are how you turn your working ledger into something ready for review, filing prep, or a CPA handoff.
           </p>
           <div class="help-grid-two">
             <div>
               <h3>CSV export</h3>
               <ul class="help-list">
-                <li>Use CSV when you want the raw data for review or import into another system.</li>
-                <li>Choose the correct business scope before exporting.</li>
-                <li>Filter the date range so you are not handing over more data than needed.</li>
-                <li>Include the edge-case columns when you want unusual items documented clearly.</li>
+                <li>Use CSV when you want the underlying rows and columns.</li>
+                <li>Use it for spreadsheets, review, sorting, and external analysis.</li>
+                <li>Check business scope and date range first.</li>
+                <li>If the export looks wrong, the first suspect is usually the filter or scope.</li>
               </ul>
             </div>
             <div>
               <h3>PDF export</h3>
               <ul class="help-list">
-                <li>Use PDF when you want a cleaner summary for a human to read first.</li>
-                <li>Use the summary pages first, then the CSV when you need the underlying rows.</li>
-                <li>Check the summary before sending it. If the summary looks wrong, fix the source records first.</li>
+                <li>Use PDF when you want a cleaner human-readable package.</li>
+                <li>Use it for summaries, handoff, and quicker review before opening the raw data.</li>
+                <li>Support pages and summaries are built from the same source data, so fix the books first if the PDF looks wrong.</li>
               </ul>
             </div>
           </div>
-          <div class="help-note-grid">
-            <div class="help-callout">
-              Export scope matters. Active-business exports use only the current business. All-business exports combine every business you can access.
-            </div>
-            <div class="help-callout">
-              If the export does not look right, inspect the filters first. Most export mistakes are scope mistakes, not math mistakes.
-            </div>
+          <div class="help-subsection">
+            <h3>Export history</h3>
+            <p>
+              The export history area exists so you can see what was generated and download the output again when needed.
+            </p>
+            <ul class="help-list">
+              <li>Use history when you need to confirm what was exported before.</li>
+              <li>Use fresh exports after major cleanup instead of assuming an older file is still the right one.</li>
+              <li>If a PDF or CSV looks wrong, fix the source records and generate a new export.</li>
+            </ul>
           </div>
         </section>
 
         <section id="edge-cases" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Advanced entries</p>
-            <h2>7. Edge cases and how to handle them</h2>
+            <h2>9. Edge cases: use the extra fields only when you need them</h2>
           </div>
-          <p>
-            Most transactions are straightforward. These are the ones that need extra detail to survive later review.
-            Use the advanced drawer in the transaction form for all of these.
-          </p>
           <div class="help-grid-two">
             <div>
-              <h3>Foreign currency (FX)</h3>
+              <h3>Foreign currency</h3>
               <ul class="help-list">
-                <li>Set the source currency to the currency the client paid in.</li>
-                <li>Record the original amount before any conversion.</li>
-                <li>Enter the exchange rate and conversion date used.</li>
-                <li>Enter the final converted amount in your business currency.</li>
-                <li>Keep the bank or payment processor statement that shows the same exchange rate.</li>
+                <li>Set the source currency to the real currency of the original transaction.</li>
+                <li>Enter the source amount before conversion.</li>
+                <li>Use the exchange-rate field and date to record how the amount was normalized.</li>
+                <li>The small live reference box can suggest a rate, but it is advisory only. You still need to confirm the final rate independently.</li>
+                <li>Use the “Use rate” action only if it matches your actual support.</li>
               </ul>
             </div>
             <div>
-              <h3>Split-use (personal + business)</h3>
+              <h3>Split-use and non-deductible items</h3>
               <ul class="help-list">
-                <li>Use the personal-use % field to show the non-business portion.</li>
-                <li>Record the full amount, not just the deductible portion - the export math handles the rest.</li>
-                <li>Leave a note explaining the split if it is not obvious (e.g., "50% home office, 50% personal").</li>
-                <li>Common split-use items: home office, vehicle, phone, internet, and mixed-purpose meals.</li>
+                <li>Use split-use when something is partly business and partly personal.</li>
+                <li>Record the full amount and enter the personal-use percentage.</li>
+                <li>Use non-deductible when the transaction belongs in the books but should not be treated as deductible.</li>
+                <li>Leave a note when the reason is not obvious.</li>
               </ul>
             </div>
           </div>
           <div class="help-grid-two">
             <div>
-              <h3>Capital items</h3>
+              <h3>Capital items and indirect taxes</h3>
               <ul class="help-list">
-                <li>Flag any purchase that is a long-term asset rather than a regular expense (computer, equipment, furniture).</li>
-                <li>Use the tax treatment field to mark it as a capital item.</li>
-                <li>Do not try to calculate depreciation inside the app.</li>
-                <li>Keep the original invoice so the purchase date, cost, and description are all documented.</li>
+                <li>Mark long-life purchases like equipment or furniture as capital items.</li>
+                <li>Do not try to force depreciation math into a normal expense row.</li>
+                <li>Use the indirect-tax amount field for GST/HST/QST or sales-tax detail when relevant.</li>
+                <li>Keep the source invoice because it proves both the base amount and the tax amount.</li>
               </ul>
             </div>
             <div>
-              <h3>Indirect taxes (GST/HST/QST/Sales tax)</h3>
+              <h3>Review status</h3>
               <ul class="help-list">
-                <li>Use the indirect tax amount field when the vendor charged GST, HST, QST, or sales tax.</li>
-                <li>Record only the tax amount, not the total - the base amount goes in the main amount field.</li>
-                <li>Canadian users: keep the supplier's GST/HST number from the invoice if you plan to claim input tax credits.</li>
-                <li>US users: sales tax on business purchases is generally an expense - record it as part of the expense total or separately depending on how much detail you need.</li>
+                <li>Use review status to mark records that still need a decision.</li>
+                <li>Use review notes to explain the question clearly.</li>
+                <li>Do not leave confusing records unlabeled and hope you remember later.</li>
               </ul>
             </div>
-          </div>
-          <div class="help-grid-two">
-            <div>
-              <h3>Non-deductible items</h3>
-              <ul class="help-list">
-                <li>Record the expense anyway and mark it as non-deductible using the tax treatment field.</li>
-                <li>Keeping non-deductible items in the books is better than leaving a gap you have to explain later.</li>
-                <li>Common non-deductible items: fines and penalties, personal expenses paid from a business account, political contributions, and 50%-limit meals above the deductible portion.</li>
-              </ul>
-            </div>
-            <div>
-              <h3>Missing receipts</h3>
-              <ul class="help-list">
-                <li>Do not delete the transaction. Record it and mark it for review.</li>
-                <li>Use the notes field immediately while the context is still fresh - write what it was, who the vendor was, and why it was a business expense.</li>
-                <li>A bank or card statement line is not a receipt but it is still better than nothing.</li>
-                <li>If the receipt is recoverable (vendor portal, email), get it and attach it before tax time.</li>
-              </ul>
-            </div>
-          </div>
-          <div class="help-callout">
-            The goal is not to resolve every edge case yourself. The goal is to document them clearly enough for later review.
-          </div>
-        </section>
-
-        <section id="cpa-access" class="help-card help-section" hidden>
-          <div class="section-heading">
-            <p class="help-kicker">Collaboration</p>
-            <h2>8. CPA access</h2>
-          </div>
-          <p>
-            CPA access is explicit. You invite a person, choose the scope, and then track the status in Settings.
-            The app separates active access from recent invitations and revoked access so you can tell who still
-            has visibility right now.
-          </p>
-          <ul class="help-list">
-            <li>Use one-business access when the CPA is handling a single entity.</li>
-            <li>Use all-business access only when they truly need your full portfolio.</li>
-            <li>Review the current-access list before tax season so you know who can still see the books.</li>
-            <li>Revoke access when the work is done.</li>
-            <li>Keep audit activity when you need to prove who saw what and when.</li>
-          </ul>
-          <div class="help-callout">
-            Revoked CPA access stays visible for 30 days in the current workflow, which gives you a short audit window without keeping stale access forever.
           </div>
         </section>
 
         <section id="security" class="help-card help-section">
           <div class="section-heading">
-            <p class="help-kicker">Control</p>
-            <h2>9. Security and account control</h2>
+            <p class="help-kicker">Protection</p>
+            <h2>10. Security, MFA, sessions, and account control</h2>
           </div>
           <div class="help-grid-two">
             <div>
+              <h3>MFA</h3>
               <ul class="help-list">
-                <li>Turn MFA on and leave it on unless you have a very specific reason not to.</li>
-                <li>Sign out when you are done on a shared machine.</li>
-                <li>Use a unique password and change it if you suspect the account has been exposed.</li>
-                <li>Keep separate businesses separate. Do not force all activity into one company just to make it easier.</li>
+                <li>Turn MFA on unless you have a real operational reason not to.</li>
+                <li>Use the Verify flow to confirm it is working.</li>
+                <li>Use the cancel action during MFA setup if you opened the flow by mistake.</li>
+                <li>Only turn MFA off when you understand the security tradeoff.</li>
               </ul>
             </div>
             <div>
+              <h3>Sessions and sign-in behavior</h3>
               <ul class="help-list">
-                <li>Delete a business only when the records truly belong together and you no longer need it.</li>
-                <li>Delete your data only when you understand what will be removed.</li>
-                <li>Use the account deletion flow only when you want the account gone, not as a shortcut for cleanup.</li>
-                <li>Review session and security pages if you suspect another device is still signed in.</li>
+                <li>Sign out on shared or borrowed devices.</li>
+                <li>Review active sessions if you suspect another device is still logged in.</li>
+                <li>Change your password if you suspect exposure.</li>
+                <li>Keep business boundaries clean instead of using one account or business as a dumping ground.</li>
               </ul>
             </div>
           </div>
         </section>
 
-        <section id="region-notes" class="help-card help-section">
+        <section id="billing" class="help-card help-section">
           <div class="section-heading">
-            <p class="help-kicker">Region-specific guidance</p>
-            <h2>10. Keep the advice region-locked</h2>
+            <p class="help-kicker">Access control</p>
+            <h2>11. Billing, plans, and feature access</h2>
           </div>
           <p>
-            The app should only show guidance for the region you are actually using. That keeps U.S. users from
-            seeing Canadian reminders and keeps Canadian users from seeing U.S. labels that do not apply.
+            Your plan affects what parts of the product are available. The billing pages manage checkout,
+            subscription state, and reactivation flows.
           </p>
-          <div class="help-grid-two">
-            <div class="help-callout" data-region-show="us">
-              <strong>United States:</strong> use U.S. labels, U.S. entities, and U.S. export language. Ignore Canadian GST/HST/QST guidance unless you actually operate in Canada.
-            </div>
-            <div class="help-callout" data-region-show="ca">
-              <strong>Canada:</strong> use your province, GST/HST/QST fields, and Canadian export language. Keep your records clean enough for a T2125 handoff.
-            </div>
+          <ul class="help-list">
+            <li>Use the subscription page when you want to review or change plan status.</li>
+            <li>If you are trialing or reactivating, follow the in-app billing flow rather than starting a new unrelated checkout session.</li>
+            <li>If a feature does not appear, check whether it is gated by plan or by business scope.</li>
+            <li>If checkout fails, do not keep hammering the button. Read the message first.</li>
+          </ul>
+        </section>
+
+        <section id="cpa-access" class="help-card help-section">
+          <div class="section-heading">
+            <p class="help-kicker">Collaboration</p>
+            <h2>12. CPA access and adviser collaboration</h2>
           </div>
-          <div class="help-callout" data-region-show="ca-qc">
-            <strong>Quebec:</strong> keep province-specific settings, French presentation, and local recordkeeping expectations aligned before you hand the file to a CPA.
-          </div>
+          <p>
+            CPA access lives in Settings. It is explicit, scoped, and revocable.
+          </p>
+          <ul class="help-list">
+            <li>Invite the accountant using the correct email address.</li>
+            <li>Choose one-business access when they only need one entity.</li>
+            <li>Choose all-business access only when they truly need the full portfolio.</li>
+            <li>Review active, pending, revoked, and audit activity regularly.</li>
+            <li>Revoke access when the engagement is done.</li>
+          </ul>
         </section>
 
         <section id="troubleshooting" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Fixes</p>
-            <h2>11. Troubleshooting and common mistakes</h2>
+            <h2>13. Troubleshooting and common mistakes</h2>
           </div>
           <ul class="help-list">
-            <li>If totals look wrong, check the date filter and business scope first.</li>
-            <li>If a transaction is marked for review, it usually means the app saw an edge case and wants a human to confirm it.</li>
-            <li>If a receipt is missing, attach the best replacement proof and leave a note.</li>
-            <li>If an amount is in the wrong currency, correct the source currency and exchange rate before exporting.</li>
-            <li>If a category seems off, fix the category before you send the export to a CPA.</li>
-            <li>If the page is showing the wrong language or region, change it in Settings and refresh the browser.</li>
-            <li>If exports do not match the table, confirm whether you exported the active business or all businesses.</li>
-            <li>If mileage is wrong, fix the date and unit first, then update the note.</li>
+            <li>If totals look wrong, check the business scope and date filter first.</li>
+            <li>If the app will not let you add or edit a transaction, make sure you are not in all-business scope.</li>
+            <li>If a receipt is missing, keep the transaction and add a note instead of deleting the evidence trail.</li>
+            <li>If a CSV import looks incomplete, confirm the file and destination account before rerunning it.</li>
+            <li>If the exchange rate looks off, check the currency, date, and your own supporting statement before using the suggested rate.</li>
+            <li>If the export looks wrong, fix the source data and create a fresh export.</li>
+            <li>If a transaction needs to be restored, use Undo before you do unrelated edits.</li>
+            <li>If something still feels random, slow down and verify the scope, account, category, and date. Most bookkeeping errors come from one of those four fields.</li>
           </ul>
         </section>
 
         <section id="limits" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Boundary</p>
-            <h2>12. What InEx Ledger does not do</h2>
+            <h2>14. What InEx Ledger does not do</h2>
           </div>
           <p>
-            InEx Ledger is a bookkeeping and export app. It keeps records organized, preserves evidence, and
-            gives a CPA clean source data. It is not trying to replace tax judgment or file a return for you.
+            InEx Ledger helps you keep cleaner books. It does not magically make every judgment call for you.
           </p>
           <ul class="help-list">
-            <li>It does not replace a CPA for final tax treatment.</li>
-            <li>It does not promise that every transaction is deductible.</li>
-            <li>It does not turn a messy receipt into a perfect tax position by itself.</li>
-            <li>It does not remove the need to review capital items, personal-use splits, or indirect tax details.</li>
+            <li>It does not replace a CPA, attorney, or tax preparer.</li>
+            <li>It does not make a questionable expense deductible just because it is recorded.</li>
+            <li>It does not turn missing proof into good proof.</li>
+            <li>It does not remove the need to review currency conversions, split-use items, capital items, or tax treatment.</li>
           </ul>
           <div class="help-callout">
-            The app succeeds when it makes the books cleaner, the receipts easier to verify, and the CPA export shorter to review.
+            The app succeeds when the books are cleaner, the evidence is easier to find, and the handoff to a reviewer is shorter and less painful.
           </div>
         </section>
       </div>
@@ -518,7 +542,7 @@
   </main>
 
   <script src="../js/escape-html.js?v=20260410a"></script>
-<script src="../js/global.js?v=20260507a"></script>
+  <script src="../js/global.js?v=20260507a"></script>
   <script src="../js/i18n.js?v=20260405c"></script>
 </body>
 </html>

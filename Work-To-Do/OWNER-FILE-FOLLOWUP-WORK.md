@@ -430,7 +430,7 @@ Do not leave apex and `www` half-split.
 
 ### Status
 
-Open.
+Complete.
 
 The webhook route code and tests are in place, but the live Stripe endpoint configuration is still not aligned with the live host that actually reaches the route.
 
@@ -515,20 +515,19 @@ Current issue:
 - `In-Ex-Ledger-API/public/html/transactions.html`
 - `In-Ex-Ledger-API/public/js/transactions.js`
 - `In-Ex-Ledger-API/public/css/pages/transactions.css`
-- `In-Ex-Ledger-API/public/css/core/transactions-no-actions-column.css`
 
-### Required behavior
+### Result
 
-- Move any still-needed layout rules into `transactions.css`.
-- Delete `transactions-no-actions-column.css` if it no longer adds anything unique.
-- Remove dead references to `#txSelectAll`.
-- Do not keep transaction layout behavior in a cleanup drift stylesheet.
+- Transaction layout rules were folded into `transactions.css`.
+- `transactions-no-actions-column.css` was deleted.
+- Dead `#txSelectAll` cleanup styling was removed from the global CSS layer.
+- Transaction layout behavior is no longer kept in a cleanup drift stylesheet.
 
 ### Definition of done
 
 - Transaction table layout is owned by `transactions.css`.
 - No dead `#txSelectAll` styling remains.
-- `transactions-no-actions-column.css` is deleted or reduced to an intentionally documented permanent role.
+- `transactions-no-actions-column.css` is deleted.
 
 ---
 
