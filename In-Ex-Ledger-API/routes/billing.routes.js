@@ -798,7 +798,13 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
     }
 
     const session = await stripeRequest("/checkout/sessions", sessionPayload, {
-      idempotencyKey: `checkout:${billingBusinessId}:${priceSelection.billingInterval}:${priceSelection.currency}:${additionalBusinesses}`
+      idempotencyKey: buildCheckoutIdempotencyKey({
+        businessId: billingBusinessId,
+        billingInterval: priceSelection.billingInterval,
+        currency: priceSelection.currency,
+        additionalBusinesses,
+        userId: req.user?.id
+      })
     });
     logInfo("Billing checkout session created", {
       userId: req.user?.id,
@@ -958,6 +964,19 @@ function resolveCheckoutCurrency(subscription, billingContext) {
   return normalizeCurrency(billingContext?.currency || "usd");
 }
 
+function buildCheckoutIdempotencyKey({ businessId, billingInterval, currency, additionalBusinesses, userId }) {
+  return [
+    "checkout",
+    businessId,
+    billingInterval,
+    currency,
+    additionalBusinesses,
+    userId || "anonymous",
+    Date.now(),
+    crypto.randomUUID()
+  ].join(":");
+}
+
 router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
@@ -985,7 +1004,7 @@ router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billi
       const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
       await pool.query(
         `UPDATE business_subscriptions
-            SET metadata_json = COALESCE(metadata_json, '{}'::jsonb) || jsonb_build_object('additional_businesses', $2),
+            SET metadata_json = COALESCE(metadata_json, '{}'::jsonb) || jsonb_build_object('additional_businesses', $2::integer),
                 updated_at = NOW()
           WHERE business_id = $1`,
         [billingBusinessId, additionalBusinesses]
