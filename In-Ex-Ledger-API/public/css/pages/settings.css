@@ -1637,17 +1637,18 @@ body {
 }
 
 .settings-page .settings-shell {
-  width: min(100% - 32px, 1180px);
-  margin: 20px auto 0;
+  width: min(100% - 40px, 1360px);
+  margin: 28px auto 0;
   min-height: auto;
-  grid-template-columns: 1fr;
-  gap: 20px;
+  grid-template-columns: 270px minmax(0, 1fr);
+  gap: 24px;
 }
 
 .settings-page .settings-sidebar {
   position: sticky;
-  top: 16px;
+  top: 78px;
   z-index: 20;
+  align-self: start;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1671,7 +1672,7 @@ body {
 }
 
 .settings-page .settings-sidebar-intro {
-  max-width: 62ch;
+  max-width: none;
   margin: 10px 0 0;
   color: #475569;
   font-size: 14px;
@@ -1679,18 +1680,19 @@ body {
 }
 
 .settings-page .settings-nav {
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 8px;
   margin-top: 16px;
 }
 
 .settings-page .settings-nav-item {
-  width: auto;
-  padding: 6px 12px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 14px;
   border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.96);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
   color: #334155;
   font-size: 13px;
   font-weight: 600;
@@ -1703,9 +1705,9 @@ body {
 }
 
 .settings-page .settings-nav-item.is-active {
-  background: var(--accent2);
-  border-color: var(--accent2);
-  color: #ffffff;
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.24);
+  color: #1d4ed8;
 }
 
 .settings-page .settings-nav-danger {
@@ -1716,12 +1718,6 @@ body {
   background: #991b1b;
   border-color: #991b1b;
 }
-
-.settings-page .settings-nav-help {
-  border-top: none;
-  margin-top: 0;
-}
-
 
 .settings-page .settings-main {
   gap: 20px;
@@ -1766,11 +1762,14 @@ body {
 }
 
 .settings-page .settings-overview-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
+button.settings-summary-card,
 .settings-page .settings-summary-card {
+  appearance: none;
+  text-align: left;
   min-height: 176px;
   padding: 18px 20px;
   border: 1px solid rgba(148, 163, 184, 0.16);
@@ -1824,8 +1823,21 @@ body {
 }
 
 .settings-page .settings-detail-grid {
-  grid-template-columns: 1fr;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
   gap: 20px;
+  align-items: start;
+}
+
+.settings-page #settings-business,
+.settings-page #settings-security {
+  grid-column: 1;
+}
+
+.settings-page #settings-billing,
+.settings-page #settings-preferences,
+.settings-page #settings-privacy-data {
+  grid-column: 2;
 }
 
 .settings-page .settings-card {
@@ -1838,6 +1850,14 @@ body {
 
 .settings-page .settings-panel-head {
   margin-bottom: 20px;
+}
+
+.settings-page .settings-panel.is-collapsed > :not(.settings-panel-head) {
+  display: none !important;
+}
+
+.settings-page .settings-panel.is-collapsed .settings-panel-head {
+  margin-bottom: 0;
 }
 
 .settings-page .card-title {
@@ -2079,6 +2099,41 @@ body {
   background: #ffffff;
   color: #0f172a;
   box-shadow: none;
+}
+
+@media (max-width: 1180px) {
+  .settings-page .settings-shell {
+    width: min(100% - 32px, 1180px);
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page .settings-sidebar {
+    position: static;
+  }
+
+  .settings-page .settings-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .settings-page .settings-nav-item {
+    width: auto;
+    border-radius: 999px;
+    padding: 8px 14px;
+  }
+
+  .settings-page .settings-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page #settings-business,
+  .settings-page #settings-security,
+  .settings-page #settings-billing,
+  .settings-page #settings-preferences,
+  .settings-page #settings-privacy-data {
+    grid-column: auto;
+  }
 }
 
 @media (max-width: 1100px) {

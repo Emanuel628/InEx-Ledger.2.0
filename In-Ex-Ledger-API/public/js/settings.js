@@ -202,7 +202,7 @@ function resolvePreferenceSummaryState() {
   const language = localizeLanguageSummary(source.language);
   const region = localizeRegionSummary(source.region);
   const theme = localizeThemeSummary(source.theme);
-  return `${language} â€¢ ${region} â€¢ ${theme}`;
+  return `${language} - ${region} - ${theme}`;
 }
 
 function syncSettingsOverviewSummaries() {
@@ -216,7 +216,7 @@ function syncSettingsOverviewSummaries() {
   const businessName = businessProfile?.name || t("settings_overview_business_missing");
   const businessType = localizeBusinessType(businessProfile?.type);
   const fiscalYear = formatFiscalYearSummary(businessProfile?.fiscalYearStart);
-  if (businessNode) businessNode.textContent = `${businessName} â€¢ ${businessType} â€¢ ${fiscalYear}`;
+  if (businessNode) businessNode.textContent = `${businessName} - ${businessType} - ${fiscalYear}`;
 
   if (billingNode) {
     billingNode.textContent = settingsOverviewState.billingStatus || t("settings_overview_billing_unavailable");
@@ -225,8 +225,8 @@ function syncSettingsOverviewSummaries() {
 
   if (securityNode) {
     securityNode.textContent = settingsOverviewState.mfaEnabled
-      ? `${t("settings_overview_mfa_enabled")} â€¢ ${t("settings_overview_sessions_available")}`
-      : `${t("settings_overview_mfa_disabled")} â€¢ ${t("settings_overview_sessions_available")}`;
+      ? `${t("settings_overview_mfa_enabled")} - ${t("settings_overview_sessions_available")}`
+      : `${t("settings_overview_mfa_disabled")} - ${t("settings_overview_sessions_available")}`;
   }
 
   if (preferencesNode) {
@@ -235,8 +235,8 @@ function syncSettingsOverviewSummaries() {
 
   if (privacyNode) {
     privacyNode.textContent = privacySettings.dataSharingOptOut
-      ? `${t("settings_overview_analytics_off")} â€¢ ${t("settings_overview_data_export")}`
-      : `${t("settings_overview_analytics_on")} â€¢ ${t("settings_overview_data_export")}`;
+      ? `${t("settings_overview_analytics_off")} - ${t("settings_overview_data_export")}`
+      : `${t("settings_overview_analytics_on")} - ${t("settings_overview_data_export")}`;
   }
 }
 
