@@ -557,31 +557,40 @@ body[data-theme="light"] select option {
 .dynamic-sidebar-collapse-handle {
   position: absolute;
   top: 50%;
-  right: -18px;
+  right: -24px;
   transform: translateY(-50%);
-  width: 18px;
-  height: 64px;
-  border: 0.5px solid var(--border);
+  width: 24px;
+  height: 72px;
+  border: 1px solid #cbd5e1;
   border-left: 0;
   border-radius: 0 999px 999px 0;
-  background: var(--surface);
-  color: var(--ink2);
+  background: #e5e7eb;
+  color: #334155;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(15, 25, 35, 0.08);
+  box-shadow: 0 10px 24px rgba(15, 25, 35, 0.12);
   cursor: pointer;
-  z-index: 2;
+  z-index: 12;
+  pointer-events: auto;
+}
+
+.dynamic-sidebar-collapse-handle.is-collapsed {
+  right: auto;
+  left: -24px;
+  border-left: 1px solid #cbd5e1;
+  border-right: 0;
+  border-radius: 999px 0 0 999px;
 }
 
 .dynamic-sidebar-collapse-handle:hover,
 .dynamic-sidebar-collapse-handle:focus-visible {
-  background: var(--surface2);
-  color: var(--ink);
+  background: #dbe1e8;
+  color: #0f172a;
 }
 
 .dynamic-sidebar-collapse-handle span {
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
 }
 

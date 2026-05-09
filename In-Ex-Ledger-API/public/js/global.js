@@ -678,6 +678,20 @@ function initDynamicSidebar() {
 
   const quickPanel = ensureDynamicSidebarQuickPanel();
 
+  function updateCollapseHandleState() {
+    const handle = sidebar.querySelector("[data-sidebar-collapse]");
+    if (!handle) return;
+    const label = isCollapsed ? "Open Quick Add sidebar" : "Collapse Quick Add sidebar";
+    handle.classList.toggle("is-collapsed", isCollapsed);
+    handle.setAttribute("aria-label", label);
+    handle.setAttribute("aria-pressed", isCollapsed ? "true" : "false");
+    handle.setAttribute("title", label);
+    const glyph = handle.querySelector("[data-sidebar-collapse-glyph]");
+    if (glyph) {
+      glyph.innerHTML = isCollapsed ? "&rsaquo;" : "&lsaquo;";
+    }
+  }
+
   function applyCollapsedState() {
     shell.classList.toggle("app-shell--sidebar-collapsed", isCollapsed);
     sidebar.classList.toggle("is-collapsed", isCollapsed);
@@ -685,6 +699,7 @@ function initDynamicSidebar() {
     if (isCollapsed) {
       closeDynamicSidebarQuickPanel(quickPanel);
     }
+    updateCollapseHandleState();
   }
 
   function render() {
@@ -723,7 +738,7 @@ function initDynamicSidebar() {
         aria-pressed="${isCollapsed ? "true" : "false"}"
         title="${isCollapsed ? "Open Quick Add sidebar" : "Collapse Quick Add sidebar"}"
       >
-        <span aria-hidden="true">${isCollapsed ? "›" : "‹"}</span>
+        <span data-sidebar-collapse-glyph aria-hidden="true">${isCollapsed ? "&rsaquo;" : "&lsaquo;"}</span>
       </button>
     `;
 
@@ -741,10 +756,12 @@ function initDynamicSidebar() {
       render();
     });
 
-    sidebar.querySelector("[data-sidebar-collapse]")?.addEventListener("click", () => {
+    sidebar.querySelector("[data-sidebar-collapse]")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       isCollapsed = !isCollapsed;
       localStorage.setItem(DYNAMIC_SIDEBAR_COLLAPSED_KEY, isCollapsed ? "true" : "false");
-      render();
+      applyCollapsedState();
     });
 
     favoritesNav?.addEventListener("dragover", (event) => {
