@@ -98,7 +98,7 @@ It is designed to be a clean, CPA-safe bookkeeping tool for users who need:
 
 - Vanilla HTML, CSS, and JavaScript frontend
 - Express-served frontend bundle under `In-Ex-Ledger-API/public/`
-- Dark-mode capable UI
+- Light-mode locked UI while dark mode is redesigned
 - Mobile-responsive app shell
 - Shared topbar/account menu behavior
 - Multi-language frontend support

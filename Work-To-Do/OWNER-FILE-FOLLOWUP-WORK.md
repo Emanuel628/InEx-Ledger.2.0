@@ -10,15 +10,15 @@ Do not create new workaround files for these items. If behavior is useful, it be
 
 ### Status
 
-Open.
+Complete.
 
-The Transactions page currently shows an `Import CSV` button, and the backend transactions route contains a CSV import section, but the frontend owner file does not appear to wire the button to the backend endpoint yet.
+The Transactions page owner files now wire CSV import end-to-end.
 
 Current state:
 
-- `transactions.html` has the visible `Import CSV` button.
-- `transactions.routes.js` has a CSV import section for `POST /transactions/import/csv`.
-- `transactions.js` needs the frontend wiring.
+- `transactions.html` has the visible `Import CSV` button and modal flow.
+- `transactions.routes.js` handles `POST /transactions/import/csv`.
+- `transactions.js` wires the modal, sends the file through `FormData`, forces active-business scope, refreshes transactions after success, and shows a clear result message.
 
 ### Owner files
 
@@ -26,114 +26,9 @@ Current state:
 - `In-Ex-Ledger-API/public/js/transactions.js`
 - `In-Ex-Ledger-API/routes/transactions.routes.js`
 
-### Required behavior
+### Result
 
-CSV import should work from the user interface and create real transactions.
-
-User flow:
-
-1. User clicks `Import CSV` on the Transactions page.
-2. App opens a CSV file picker.
-3. User selects a `.csv` file.
-4. Frontend sends the file to the existing CSV import endpoint using `FormData`.
-5. Backend parses the CSV.
-6. Backend validates account/category/date/type/amount data.
-7. Backend inserts valid rows into the `transactions` table for the active business.
-8. Frontend refreshes the transaction list.
-9. Frontend shows a clear result message with imported/skipped/error counts.
-
-### Frontend implementation direction
-
-Add CSV import wiring directly inside:
-
-```text
-In-Ex-Ledger-API/public/js/transactions.js
-```
-
-Do not create a new CSV sidecar file.
-
-Add this near the existing DOMContentLoaded wiring:
-
-```js
-wireCsvImport();
-```
-
-Add a function like:
-
-```js
-function wireCsvImport() {
-  const importButton = document.getElementById("importCsvBtn");
-  if (!importButton) {
-    return;
-  }
-
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = ".csv,text/csv";
-  input.hidden = true;
-  input.id = "transactionCsvInput";
-  document.body.appendChild(input);
-
-  importButton.addEventListener("click", async () => {
-    const canImport = await switchToActiveScopeIfNeeded();
-    if (!canImport) {
-      return;
-    }
-
-    input.value = "";
-    input.click();
-  });
-
-  input.addEventListener("change", async () => {
-    const file = input.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    importButton.disabled = true;
-    const originalText = importButton.textContent;
-    importButton.textContent = txT("transactions_importing_csv", "Importing...");
-
-    try {
-      const response = await apiFetch("/api/transactions/import/csv", {
-        method: "POST",
-        body: formData
-      });
-
-      const result = response ? await response.json().catch(() => null) : null;
-
-      if (!response || !response.ok) {
-        setTransactionFormMessage(
-          result?.error || txT("transactions_import_csv_error", "Unable to import CSV.")
-        );
-        return;
-      }
-
-      const imported = Number(result?.imported || result?.imported_count || 0);
-      const skipped = Number(result?.skipped || result?.skipped_count || 0);
-
-      setTransactionFormMessage(
-        txT(
-          "transactions_import_csv_success",
-          `CSV import complete. Imported ${imported} transaction${imported === 1 ? "" : "s"}${skipped ? `, skipped ${skipped}` : ""}.`
-        )
-      );
-
-      await loadTransactions();
-      renderTotals();
-    } catch (error) {
-      console.error("CSV import failed:", error);
-      setTransactionFormMessage(txT("transactions_import_csv_error", "Unable to import CSV."));
-    } finally {
-      importButton.disabled = false;
-      importButton.textContent = originalText || "Import CSV";
-    }
-  });
-}
-```
+CSV import works from the user interface and creates real transactions through the owner files.
 
 ### Backend verification
 
@@ -171,13 +66,13 @@ Confirm the route:
 
 ### Status
 
-Open.
+Complete.
 
-The current onboarding work-type tiles are not meaningful yet. The frontend asks what kind of work the user does, but the backend currently ignores `work_type`, and the answer does not appear to change categories, exports, reminders, reports, or later app behavior.
+The onboarding flow now persists and uses the setup choices in the owner files instead of asking questions and discarding the answers.
 
 Do not remove the field blindly. If onboarding asks a question, the answer should affect setup in a useful way.
 
-### Current issue
+### Current state
 
 The current onboarding field:
 
@@ -194,30 +89,21 @@ Trades / Home Services
 Other independent work
 ```
 
-Current problem:
+Resolved behavior:
 
-- Frontend sends `work_type`.
-- Backend does not appear to persist/use `work_type` in onboarding data.
-- No later app behavior appears to use it.
-- This makes the field feel like pointless onboarding friction.
+- Frontend sends `work_type`, `starter_account_type`, `starter_account_name`, and `start_focus`.
+- Backend persists those values in onboarding data.
+- The flow creates the starter account during onboarding.
+- The chosen start focus controls the first workflow the user lands in after setup.
+- Guided onboarding behavior can now use the saved work type instead of treating it as throwaway friction.
 
-### Product decision needed
+### Product decision
 
-Either:
-
-1. Remove the work-type field completely, or
-2. Make it meaningful by using it to customize setup.
-
-Preferred direction: make it meaningful.
+The flow was kept and made meaningful instead of being removed.
 
 ### Entity/business type decision
 
-Do not ask users to pick LLC / sole proprietor / entity type during first-run onboarding unless the app meaningfully uses that choice.
-
-Recommended behavior:
-
-- Default `business_type` to `sole_proprietor` internally for onboarding.
-- Move legal/entity type editing to Settings / Business Profile if needed later.
+Onboarding keeps the lighter first-run setup path and leaves deeper legal/entity editing to the business profile flow later.
 - Do not add onboarding friction for a setting that does not change the first-run experience.
 
 ### Owner files
