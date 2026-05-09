@@ -9,7 +9,8 @@ const pricingState = {
   currency: "usd",
   additionalBusinesses: 0,
   isCheckoutLoading: false,
-  verifiedPricing: null
+  verifiedPricing: null,
+  verifiedPricingCurrency: null
 };
 let currentSubscription = null;
 const businessSlotsState = {
@@ -59,7 +60,10 @@ function formatMoney(currency, amount) {
 }
 
 function getPricingDetails() {
-  if (pricingState.verifiedPricing?.[pricingState.billingInterval]) {
+  if (
+    pricingState.verifiedPricing?.[pricingState.billingInterval] &&
+    pricingState.verifiedPricingCurrency === pricingState.currency
+  ) {
     return pricingState.verifiedPricing[pricingState.billingInterval];
   }
   if (typeof billingPricingUtils.getPricing === "function") {
@@ -69,7 +73,10 @@ function getPricingDetails() {
 }
 
 function getAddonTotalAmount() {
-  if (pricingState.verifiedPricing?.[pricingState.billingInterval]) {
+  if (
+    pricingState.verifiedPricing?.[pricingState.billingInterval] &&
+    pricingState.verifiedPricingCurrency === pricingState.currency
+  ) {
     const pricing = getPricingDetails();
     return pricing.addon * pricingState.additionalBusinesses;
   }
@@ -84,7 +91,10 @@ function getAddonTotalAmount() {
 }
 
 function getGrandTotalAmount() {
-  if (pricingState.verifiedPricing?.[pricingState.billingInterval]) {
+  if (
+    pricingState.verifiedPricing?.[pricingState.billingInterval] &&
+    pricingState.verifiedPricingCurrency === pricingState.currency
+  ) {
     const pricing = getPricingDetails();
     return pricing.base + getAddonTotalAmount();
   }
@@ -113,6 +123,7 @@ async function loadVerifiedPricingContext() {
     const currency = String(payload?.currency || "").toLowerCase();
     if (BILLING_CURRENCIES.includes(currency)) {
       pricingState.currency = currency;
+      pricingState.verifiedPricingCurrency = currency;
     }
   } catch (_) {
     // Fall back to the default pricing table currency.
@@ -130,6 +141,7 @@ async function loadVerifiedPricing() {
     const currency = String(payload?.currency || "").toLowerCase();
     if (BILLING_CURRENCIES.includes(currency)) {
       pricingState.currency = currency;
+      pricingState.verifiedPricingCurrency = currency;
     }
     if (payload?.pricing?.monthly && payload?.pricing?.yearly) {
       pricingState.verifiedPricing = payload.pricing;
@@ -221,6 +233,7 @@ async function initPricingControls() {
   pricingState.billingInterval = "monthly";
   pricingState.additionalBusinesses = 0;
   pricingState.verifiedPricing = null;
+  pricingState.verifiedPricingCurrency = null;
   await loadVerifiedPricing();
 
   document.querySelectorAll("[data-billing-interval]").forEach((btn) => {
@@ -339,23 +352,26 @@ function buildFreeTierConfirmationMessage(sub) {
 }
 
 function buildAddSlotPricingHtml(sub) {
-  const currency = sub?.currency || "usd";
-  const interval = sub?.billingInterval || "monthly";
+  const currency = sub?.currency || pricingState.currency || "usd";
+  const interval = sub?.billingInterval || pricingState.billingInterval || "monthly";
   const currentAdditional = businessSlotsState.currentAdditionalBusinesses;
   const newAdditional = currentAdditional + 1;
   const intervalLabel = interval === "yearly" ? "yr" : "mo";
+  const isYearly = interval === "yearly";
+  const currentPrice = billingPricingUtils.getGrandTotal(currency, interval, currentAdditional);
+  const newPrice = billingPricingUtils.getGrandTotal(currency, interval, newAdditional);
+  const currentLabel = `Current ${isYearly ? "yearly" : "monthly"} total`;
+  const newLabel = `New ${isYearly ? "yearly" : "monthly"} total`;
 
   if (sub?.isPaid) {
-    const currentPrice = billingPricingUtils.getGrandTotal(currency, interval, currentAdditional);
-    const newPrice = billingPricingUtils.getGrandTotal(currency, interval, newAdditional);
     return `
       <div class="add-slot-pricing">
         <div class="add-slot-pricing-row">
-          <span>Current</span>
+          <span>${currentLabel}</span>
           <strong>${escapeHtml(billingPricingUtils.formatMoney(currency, currentPrice))}/${intervalLabel}</strong>
         </div>
         <div class="add-slot-pricing-row add-slot-pricing-new">
-          <span>After adding</span>
+          <span>${newLabel}</span>
           <strong>${escapeHtml(billingPricingUtils.formatMoney(currency, newPrice))}/${intervalLabel}</strong>
         </div>
       </div>
@@ -363,15 +379,18 @@ function buildAddSlotPricingHtml(sub) {
   }
 
   if (sub?.isTrialing) {
-    const pricing = billingPricingUtils.getPricing(currency, interval);
     return `
       <div class="add-slot-pricing">
         <div class="add-slot-pricing-row">
-          <span>Add-on cost</span>
-          <strong>+${escapeHtml(billingPricingUtils.formatMoney(currency, pricing.addon))}/${intervalLabel}</strong>
+          <span>${currentLabel} after trial</span>
+          <strong>${escapeHtml(billingPricingUtils.formatMoney(currency, currentPrice))}/${intervalLabel}</strong>
+        </div>
+        <div class="add-slot-pricing-row add-slot-pricing-new">
+          <span>${newLabel} after adding</span>
+          <strong>${escapeHtml(billingPricingUtils.formatMoney(currency, newPrice))}/${intervalLabel}</strong>
         </div>
       </div>
-      <p class="add-slot-modal-note">You won't be charged until your trial ends.</p>`;
+      <p class="add-slot-modal-note">You will not be charged during the trial. Confirm now so the new total is ready when the trial ends.</p>`;
   }
 
   return `<p class="add-slot-modal-note">${escapeHtml(tx("subscription_extra_business_slots_help"))}</p>`;
@@ -654,6 +673,12 @@ async function loadSubscription() {
     }
 
     currentSubscription = sub;
+    if (sub.currency) {
+      pricingState.currency = String(sub.currency).toLowerCase();
+    }
+    if (sub.billingInterval === "monthly" || sub.billingInterval === "yearly") {
+      pricingState.billingInterval = sub.billingInterval;
+    }
     pricingState.additionalBusinesses = clampAdditionalBusinesses(Number(sub.additionalBusinesses || 0));
     updatePricingUI();
 

@@ -124,7 +124,10 @@ function loadBillingRouter(options = {}) {
         buildStripePriceLookup: () => ({
           basePriceIds: new Set([BASE_PRICE_ID]),
           addonPriceIds: new Set([ADDON_PRICE_ID]),
-          metadataByPriceId: new Map()
+          metadataByPriceId: new Map([
+            [BASE_PRICE_ID, { billingInterval: "monthly", currency: "usd", type: "base" }],
+            [ADDON_PRICE_ID, { billingInterval: "monthly", currency: "usd", type: "addon" }]
+          ])
         })
       };
     }
@@ -488,6 +491,33 @@ test("PATCH /additional-businesses — trialing user without Stripe subscription
     assert.equal(res.status, 200);
     assert.equal(state.stripeUpdates.length, 0, "trial slot changes should not hit Stripe before paid conversion");
     assert.equal(res.body.subscription?.additionalBusinesses, 3);
+  } finally {
+    cleanup();
+  }
+});
+
+test("PATCH /additional-businesses — infers pricing terms from Stripe subscription when snapshot metadata is missing", async () => {
+  const { app, state, cleanup } = loadBillingRouter({
+    snapshot: {
+      effectiveTier: "v1",
+      isPaid: true,
+      cancelAtPeriodEnd: false,
+      stripeSubscriptionId: "sub_test_addon",
+      additionalBusinesses: 0,
+      billingInterval: null,
+      currency: null
+    },
+    stripeSub: makeSub({ metadata: {} })
+  });
+  try {
+    const res = await request(app)
+      .patch("/api/billing/additional-businesses")
+      .send({ additionalBusinesses: 2 });
+    assert.equal(res.status, 200);
+    assert.equal(state.stripeUpdates.length, 1);
+    const update = state.stripeUpdates[0];
+    assert.equal(update["items[0][price]"], ADDON_PRICE_ID);
+    assert.equal(update["items[0][quantity]"], "2");
   } finally {
     cleanup();
   }

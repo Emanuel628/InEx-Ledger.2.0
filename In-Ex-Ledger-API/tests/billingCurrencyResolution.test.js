@@ -114,6 +114,30 @@ function loadBillingRouter({
               cad: "STRIPE_ADDL_Y_CA"
             }
           }
+        }),
+        buildStripePriceLookup: () => ({
+          basePriceIds: new Set([
+            "price_month_usd",
+            "price_month_cad",
+            "price_year_usd",
+            "price_year_cad"
+          ]),
+          addonPriceIds: new Set([
+            "price_addon_month_usd",
+            "price_addon_month_cad",
+            "price_addon_year_usd",
+            "price_addon_year_cad"
+          ]),
+          metadataByPriceId: new Map([
+            ["price_month_usd", { billingInterval: "monthly", currency: "usd", type: "base" }],
+            ["price_month_cad", { billingInterval: "monthly", currency: "cad", type: "base" }],
+            ["price_year_usd", { billingInterval: "yearly", currency: "usd", type: "base" }],
+            ["price_year_cad", { billingInterval: "yearly", currency: "cad", type: "base" }],
+            ["price_addon_month_usd", { billingInterval: "monthly", currency: "usd", type: "addon" }],
+            ["price_addon_month_cad", { billingInterval: "monthly", currency: "cad", type: "addon" }],
+            ["price_addon_year_usd", { billingInterval: "yearly", currency: "usd", type: "addon" }],
+            ["price_addon_year_cad", { billingInterval: "yearly", currency: "cad", type: "addon" }]
+          ])
         })
       };
     }
@@ -368,6 +392,42 @@ test("billing checkout ignores client currency and uses verified region currency
   }
 });
 
+test("billing checkout keeps the existing subscription currency when trial metadata is already set", async () => {
+  const fixture = loadBillingRouter({
+    country: "Canada",
+    subscriptionSnapshots: [
+      {
+        isPaid: false,
+        isCanceledWithRemainingAccess: false,
+        isTrialing: true,
+        currency: "usd"
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 1
+      });
+
+    assert.equal(res.status, 200);
+
+    const checkoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+
+    assert.ok(checkoutRequest, "Stripe checkout request should be created");
+    assert.equal(checkoutRequest.body.get("line_items[0][price]"), "price_month_usd");
+    assert.equal(checkoutRequest.body.get("line_items[1][price]"), "price_addon_month_usd");
+    assert.equal(checkoutRequest.body.get("metadata[currency]"), "usd");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("billing checkout rejects insecure APP_BASE_URL values", async () => {
   const fixture = loadBillingRouter({ country: "United States" });
   const originalBaseUrl = process.env.APP_BASE_URL;
@@ -411,6 +471,28 @@ test("billing checkout blocks duplicate subscription creation when Stripe alread
     assert.equal(res.status, 409);
     assert.match(String(res.body?.error || ""), /already has an active|overlapping/i);
   } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout returns a validation error when pricing is not configured for the resolved currency", async () => {
+  const fixture = loadBillingRouter({ country: "Canada" });
+  const originalCadPrice = process.env.STRIPE_PRO_M_CA;
+
+  try {
+    delete process.env.STRIPE_PRO_M_CA;
+
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 0
+      });
+
+    assert.equal(res.status, 400);
+    assert.match(String(res.body?.error || ""), /pricing is not configured yet/i);
+  } finally {
+    process.env.STRIPE_PRO_M_CA = originalCadPrice;
     fixture.cleanup();
   }
 });

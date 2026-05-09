@@ -14,7 +14,7 @@ const {
   setTrialPlanSelectionForBusiness,
   setFreePlanForBusiness
 } = require("../services/subscriptionService.js");
-const { buildStripePriceEnvMap } = require("../services/stripePriceConfig.js");
+const { buildStripePriceEnvMap, buildStripePriceLookup } = require("../services/stripePriceConfig.js");
 const {
   getPreferredLanguageForUser,
   buildBillingLifecycleEmail
@@ -41,6 +41,7 @@ const STRIPE_PRICE_CACHE_TTL_MS = 15 * 60 * 1000;
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "InEx Ledger <noreply@inexledger.com>";
 
 const { base: BASE_PRICE_ENV, addon: ADDON_PRICE_ENV } = buildStripePriceEnvMap();
+const { addonPriceIds: STRIPE_ADDON_PRICE_IDS, metadataByPriceId: STRIPE_PRICE_METADATA_BY_ID } = buildStripePriceLookup();
 const billingContextCache = new Map();
 const stripePriceCache = new Map();
 let resendClient = null;
@@ -135,6 +136,17 @@ function requireEnvValue(name) {
   return value;
 }
 
+function getConfiguredPriceId(envName, unavailableMessage) {
+  if (!envName) {
+    throw new BillingValidationError(unavailableMessage);
+  }
+  try {
+    return requireEnvValue(envName);
+  } catch (_) {
+    throw new BillingValidationError(unavailableMessage);
+  }
+}
+
 function normalizeBillingInterval(input) {
   if (!input) {
     return "monthly";
@@ -155,6 +167,28 @@ function normalizeCurrency(input) {
     throw new BillingValidationError("Invalid currency.");
   }
   return value;
+}
+
+function normalizeOptionalBillingInterval(input) {
+  if (!input) {
+    return null;
+  }
+  try {
+    return normalizeBillingInterval(input);
+  } catch (_) {
+    return null;
+  }
+}
+
+function normalizeOptionalCurrency(input) {
+  if (!input) {
+    return null;
+  }
+  try {
+    return normalizeCurrency(input);
+  } catch (_) {
+    return null;
+  }
 }
 
 function normalizeAdditionalBusinesses(input) {
@@ -242,17 +276,17 @@ function resolveStripePriceSelection({ billingInterval, currency, additionalBusi
   const interval = normalizeBillingInterval(billingInterval);
   const normalizedCurrency = normalizeCurrency(currency);
   const baseEnv = BASE_PRICE_ENV[interval]?.[normalizedCurrency];
-  if (!baseEnv) {
-    throw new BillingValidationError("Unsupported billing interval or currency.");
-  }
-  const basePriceId = requireEnvValue(baseEnv);
+  const basePriceId = getConfiguredPriceId(
+    baseEnv,
+    "Pricing is not configured yet for the selected billing interval and currency."
+  );
   let addonPriceId = null;
   if (additionalBusinesses > 0) {
     const addonEnv = ADDON_PRICE_ENV[interval]?.[normalizedCurrency];
-    if (!addonEnv) {
-      throw new BillingValidationError("Additional business pricing is not configured.");
-    }
-    addonPriceId = requireEnvValue(addonEnv);
+    addonPriceId = getConfiguredPriceId(
+      addonEnv,
+      "Additional business pricing is not configured yet for the selected billing interval and currency."
+    );
   }
   return {
     billingInterval: interval,
@@ -700,9 +734,19 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
         billingSource: billingContext.source
       });
     }
+    const checkoutCurrency = resolveCheckoutCurrency(subscription, billingContext);
+    if (checkoutCurrency !== billingContext.currency) {
+      logInfo("Using existing subscription currency for checkout", {
+        userId: req.user?.id,
+        businessId: billingBusinessId,
+        subscriptionCurrency: checkoutCurrency,
+        resolvedCurrency: billingContext.currency,
+        billingSource: billingContext.source
+      });
+    }
     const priceSelection = resolveStripePriceSelection({
       billingInterval: req.body?.billingInterval,
-      currency: billingContext.currency,
+      currency: checkoutCurrency,
       additionalBusinesses
     });
 
@@ -864,36 +908,54 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
 });
 
 function getAddonPriceIds() {
-  const ids = new Set();
-  for (const intervalKey of Object.keys(ADDON_PRICE_ENV)) {
-    const intervalMap = ADDON_PRICE_ENV[intervalKey];
-    for (const currencyKey of Object.keys(intervalMap || {})) {
-      const envVar = intervalMap[currencyKey];
-      const priceId = process.env[envVar];
-      if (priceId) ids.add(priceId);
-    }
-  }
-  return ids;
+  return new Set(STRIPE_ADDON_PRICE_IDS);
 }
 
-async function resolveAddonPriceIdForSubscription(businessId) {
-  const result = await pool.query(
-    "SELECT metadata_json FROM business_subscriptions WHERE business_id = $1 LIMIT 1",
-    [businessId]
+function resolveSubscriptionBillingTerms(subscription, stripeSub) {
+  const stripeItems = Array.isArray(stripeSub?.items?.data) ? stripeSub.items.data : [];
+  const addonItem = stripeItems.find((item) => STRIPE_ADDON_PRICE_IDS.has(item?.price?.id)) || null;
+  const baseItem = stripeItems.find((item) => !STRIPE_ADDON_PRICE_IDS.has(item?.price?.id)) || null;
+  const subscriptionMeta = stripeSub?.metadata && typeof stripeSub.metadata === "object"
+    ? stripeSub.metadata
+    : {};
+  const basePriceMeta = baseItem?.price?.id ? STRIPE_PRICE_METADATA_BY_ID.get(baseItem.price.id) : null;
+  const addonPriceMeta = addonItem?.price?.id ? STRIPE_PRICE_METADATA_BY_ID.get(addonItem.price.id) : null;
+  const stripePriceCurrency = normalizeOptionalCurrency(baseItem?.price?.currency || addonItem?.price?.currency);
+  const stripeRecurringInterval = normalizeOptionalBillingInterval(
+    baseItem?.price?.recurring?.interval || addonItem?.price?.recurring?.interval
   );
-  const meta =
-    result.rows[0]?.metadata_json && typeof result.rows[0].metadata_json === "object"
-      ? result.rows[0].metadata_json
-      : {};
-  const billingInterval = meta.billing_interval || "monthly";
-  const currency = meta.currency || "usd";
+
+  return {
+    billingInterval: normalizeOptionalBillingInterval(subscription?.billingInterval) ||
+      normalizeOptionalBillingInterval(subscriptionMeta.billing_interval) ||
+      normalizeOptionalBillingInterval(basePriceMeta?.billingInterval) ||
+      normalizeOptionalBillingInterval(addonPriceMeta?.billingInterval) ||
+      stripeRecurringInterval ||
+      "monthly",
+    currency: normalizeOptionalCurrency(subscription?.currency) ||
+      normalizeOptionalCurrency(subscriptionMeta.currency) ||
+      normalizeOptionalCurrency(basePriceMeta?.currency) ||
+      normalizeOptionalCurrency(addonPriceMeta?.currency) ||
+      stripePriceCurrency ||
+      "usd"
+  };
+}
+
+function resolveAddonPriceIdForSubscription(subscription, stripeSub) {
+  const { billingInterval, currency } = resolveSubscriptionBillingTerms(subscription, stripeSub);
   const addonEnv = ADDON_PRICE_ENV[billingInterval]?.[currency];
-  if (!addonEnv) {
-    throw new BillingValidationError(
-      "Additional business pricing is not configured for your billing interval and currency."
-    );
+  return getConfiguredPriceId(
+    addonEnv,
+    "Additional business pricing is not configured yet for your billing interval and currency."
+  );
+}
+
+function resolveCheckoutCurrency(subscription, billingContext) {
+  const subscriptionCurrency = normalizeOptionalCurrency(subscription?.currency);
+  if (subscriptionCurrency) {
+    return subscriptionCurrency;
   }
-  return requireEnvValue(addonEnv);
+  return normalizeCurrency(billingContext?.currency || "usd");
 }
 
 router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
@@ -971,7 +1033,7 @@ router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billi
         }
       );
     } else {
-      const addonPriceId = await resolveAddonPriceIdForSubscription(billingBusinessId);
+      const addonPriceId = resolveAddonPriceIdForSubscription(subscription, stripeSub);
       updatedSub = await stripeRequest(
         `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
         {
