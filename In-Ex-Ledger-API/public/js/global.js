@@ -1,13 +1,4 @@
 // === V2/BUSINESS DEMO UNLOCK FLAG ===
-const V2_BUSINESS_UNLOCK_KEY = "lb_v2_business_unlocked";
-function isV2BusinessUnlocked() {
-  try {
-    return localStorage.getItem(V2_BUSINESS_UNLOCK_KEY) === "true";
-  } catch (_) {
-    return false;
-  }
-}
-window.isV2BusinessUnlocked = isV2BusinessUnlocked;
 /* Global helpers shared across pages */
 
 const DEFAULT_THEME = "light";
