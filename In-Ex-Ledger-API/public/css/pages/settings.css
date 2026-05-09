@@ -2358,111 +2358,481 @@ button.settings-summary-card,
   font-weight: 700;
 }
 
-/* Final settings workspace restore:
-   keep the original sidebar + two-column layout for normal desktop widths,
-   and only collapse into the compact stacked layout on genuinely narrow screens. */
+/* Restore the polished top-card settings layout that existed before the cleanup regressions. */
 .settings-page .settings-shell {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 24px;
-  width: min(100% - 40px, 1360px);
-  margin: 28px auto 0;
-  padding: 0 0 48px;
+  width: min(100% - 32px, 1180px);
+  margin: 20px auto 0;
   min-height: auto;
-  align-items: start;
+  grid-template-columns: 1fr;
+  gap: 20px;
 }
 
 .settings-page .settings-sidebar {
-  display: block;
   position: sticky;
-  top: 78px;
-  align-self: start;
+  top: 16px;
+  z-index: 20;
   padding: 0;
   border: 0;
   background: transparent;
 }
 
+.settings-page .settings-sidebar-card {
+  padding: 20px 22px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(14px);
+}
+
+.settings-page .settings-sidebar-title {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-page .settings-sidebar-intro {
+  max-width: 62ch;
+  margin: 10px 0 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 .settings-page .settings-nav {
-  display: flex;
-  flex-direction: column;
-  flex-wrap: nowrap;
-  gap: 8px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
 }
 
 .settings-page .settings-nav-item {
-  width: 100%;
+  width: auto;
+  padding: 6px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.4);
   text-align: left;
 }
 
+.settings-page .settings-nav-item:hover {
+  background: var(--accent-light);
+  color: var(--accent2);
+}
+
+.settings-page .settings-nav-item.is-active {
+  background: var(--accent2);
+  border-color: var(--accent2);
+  color: #ffffff;
+}
+
+.settings-page .settings-nav-danger {
+  color: #b91c1c;
+}
+
+.settings-page .settings-nav-danger.is-active {
+  background: #991b1b;
+  border-color: #991b1b;
+}
+
+.settings-page .settings-nav-help {
+  border-top: none;
+  margin-top: 0;
+}
+
 .settings-page .settings-main {
-  display: flex;
-  flex-direction: column;
   gap: 20px;
-  min-width: 0;
   padding: 0 0 96px;
   background: transparent;
 }
 
+.settings-page .settings-overview,
+.settings-page .settings-card,
+.settings-page .danger-card {
+  scroll-margin-top: 110px;
+}
+
+.settings-page .settings-overview {
+  margin-bottom: 0;
+  padding: 34px;
+  border: 1px solid rgba(191, 219, 254, 0.4);
+  border-radius: 32px;
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.94));
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.06);
+}
+
+.settings-page .settings-page-heading {
+  margin-bottom: 22px;
+}
+
+.settings-page .settings-page-heading h1 {
+  font-size: clamp(2.3rem, 5vw, 4rem);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+  color: #0f172a;
+}
+
+.settings-page .settings-page-heading p {
+  max-width: 60ch;
+  margin-top: 12px;
+  color: #475569;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.settings-page .settings-overview-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.settings-page .settings-summary-card {
+  min-height: 176px;
+  padding: 18px 20px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.settings-page .settings-summary-card:hover {
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.08);
+}
+
+.settings-page .settings-summary-card-head {
+  align-items: flex-start;
+}
+
+.settings-page .settings-summary-card h2 {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.settings-page .settings-summary-card-head p {
+  margin-top: 8px;
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.settings-page .settings-summary-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.settings-page .settings-summary-meta {
+  margin-top: 18px;
+  color: #334155;
+  line-height: 1.55;
+}
+
+.settings-page .settings-trust-banner {
+  margin-top: 18px;
+  padding: 18px 20px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
 .settings-page .settings-detail-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  grid-template-columns: 1fr;
   gap: 20px;
-  align-items: start;
 }
 
-.settings-page #settings-business,
-.settings-page #settings-security {
-  grid-column: 1;
+.settings-page .settings-card {
+  padding: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.05);
 }
 
-.settings-page #settings-billing,
-.settings-page #settings-preferences,
-.settings-page #settings-privacy-data {
-  grid-column: 2;
+.settings-page .settings-panel-head {
+  margin-bottom: 20px;
 }
 
-@media (max-width: 760px) {
+.settings-page .card-title {
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  font-weight: 700;
+  line-height: 1.12;
+  color: #0f172a;
+}
+
+.settings-page .card-desc {
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.settings-page .settings-subpanel {
+  padding: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 22px;
+  background: rgba(248, 250, 252, 0.78);
+}
+
+.settings-page .settings-subpanel + .settings-subpanel {
+  margin-top: 16px;
+}
+
+.settings-page .settings-subpanel-head {
+  margin-bottom: 14px;
+}
+
+.settings-page .settings-subpanel-head h3,
+.settings-page .security-fieldset legend,
+.settings-page .session-block h3,
+.settings-page .mfa-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.settings-page .settings-subpanel-head p,
+.settings-page .session-note,
+.settings-page .settings-helper-note,
+.settings-page .settings-inline-message {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.settings-page .recovery-email-block {
+  margin-top: 0;
+}
+
+.settings-page .settings-form-grid,
+.settings-page .security-grid {
+  gap: 18px;
+}
+
+.settings-page .settings-row {
+  margin-left: 0;
+  margin-right: 0;
+  padding: 18px 0;
+  border-top: 1px solid rgba(226, 232, 240, 0.92);
+}
+
+.settings-page .settings-row-copy {
+  gap: 6px;
+  max-width: 58ch;
+}
+
+.settings-page .settings-row-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.settings-page .settings-row-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #64748b;
+}
+
+.settings-page .inline-select {
+  min-width: 220px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.settings-page .settings-primary-btn,
+.settings-page .settings-secondary-btn,
+.settings-page .safe-action,
+.settings-page .danger-outline-btn,
+.settings-page .modal-cancel,
+.settings-page .modal-delete {
+  min-height: 42px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-page .settings-primary-btn {
+  padding: 10px 18px;
+  background: #0f172a;
+  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.12);
+}
+
+.settings-page .settings-primary-btn:hover {
+  background: #3b82f6;
+  color: white;
+}
+
+.settings-page .settings-secondary-btn,
+.settings-page .safe-action,
+.settings-page .session-manage-link,
+.settings-page .modal-cancel {
+  padding: 10px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.settings-page .session-manage-link {
+  text-decoration: none;
+}
+
+.settings-page .safe-action:hover,
+.settings-page .settings-secondary-btn:hover,
+.settings-page .session-manage-link:hover,
+.settings-page .modal-cancel:hover {
+  background: #f8fafc;
+}
+
+.settings-page .danger-outline-btn {
+  padding: 10px 16px;
+  border-width: 1px;
+}
+
+.settings-page .business-list-item {
+  padding: 16px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.settings-page .security-fieldset {
+  padding: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 20px;
+  background: #ffffff;
+}
+
+.settings-page .settings-password-meter {
+  background: #e2e8f0;
+}
+
+.settings-page .session-block,
+.settings-page .mfa-block {
+  margin-top: 18px;
+}
+
+.settings-page .mfa-block {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settings-page .mfa-setup-panel,
+.settings-page .mfa-recovery-wrap {
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.settings-page .danger-card {
+  margin-top: 0;
+  border: 1px solid rgba(248, 113, 113, 0.24);
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255, 247, 247, 0.98), rgba(255, 255, 255, 0.95));
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.05);
+}
+
+.settings-page .danger-card-head {
+  padding: 18px 22px;
+  background: transparent;
+  border-bottom: 1px solid rgba(248, 113, 113, 0.18);
+}
+
+.settings-page .danger-card-head p {
+  margin-left: 0;
+  color: #9f1239;
+}
+
+.settings-page .danger-card-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.settings-page .danger-row {
+  padding: 18px 22px;
+  border-bottom-color: rgba(248, 113, 113, 0.14);
+}
+
+.settings-page .danger-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-page .danger-desc {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6b7280;
+}
+
+.settings-page .settings-save-bar {
+  left: 50%;
+  right: auto;
+  bottom: 20px;
+  width: min(calc(100% - 32px), 1180px);
+  transform: translateX(-50%);
+  padding: 16px 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.96);
+  box-shadow: 0 24px 40px rgba(15, 23, 42, 0.18);
+}
+
+.settings-page .settings-save-copy strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.settings-page .settings-save-copy span {
+  font-size: 13px;
+}
+
+.settings-page .settings-save-bar .settings-secondary-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.settings-page .settings-save-bar .settings-primary-btn {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+@media (max-width: 1100px) {
+  .settings-page .settings-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
   .settings-page .settings-shell {
-    width: min(100% - 28px, 1180px);
-    grid-template-columns: 1fr;
-    gap: 18px;
-    padding-bottom: 28px;
+    width: 100%;
+    gap: 16px;
+    padding: 18px 12px 28px;
   }
 
   .settings-page .settings-sidebar {
     position: static;
   }
 
-  .settings-page .settings-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .settings-page .settings-nav-item {
-    width: auto;
-    border-radius: 999px;
-  }
-
-  .settings-page .settings-detail-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-page #settings-business,
-  .settings-page #settings-security,
-  .settings-page #settings-billing,
-  .settings-page #settings-preferences,
-  .settings-page #settings-privacy-data {
-    grid-column: auto;
-  }
-}
-
-@media (max-width: 640px) {
-  .settings-page .settings-shell {
-    width: 100%;
-    margin-top: 0;
-    padding: 18px 12px 28px;
-    gap: 16px;
+  .settings-page .settings-sidebar-card,
+  .settings-page .settings-overview,
+  .settings-page .settings-card,
+  .settings-page .danger-card {
+    padding: 18px;
+    border-radius: 22px;
   }
 
   .settings-page .settings-nav {
@@ -2478,6 +2848,20 @@ button.settings-summary-card,
 
   .settings-page .settings-nav-item {
     white-space: nowrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-page .settings-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page .settings-row,
+  .settings-page .danger-row,
+  .settings-page .settings-trust-banner,
+  .settings-page .settings-summary-card-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

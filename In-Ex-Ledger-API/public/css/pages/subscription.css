@@ -1188,6 +1188,25 @@
   box-shadow: 0 24px 60px rgba(15, 25, 35, 0.18);
 }
 
+#subCheckoutModal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 25, 35, 0.45);
+  z-index: 1200;
+}
+
+#subCheckoutModal.hidden {
+  display: none;
+}
+
+#subCheckoutModal .transaction-modal-content {
+  margin: 0;
+}
+
 .sub-checkout-head {
   display: flex;
   flex-direction: column;
