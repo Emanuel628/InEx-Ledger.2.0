@@ -13,8 +13,10 @@ const {
 const {
   PLAN_V1,
   findBillingAnchorBusinessIdForUser,
-  getSubscriptionSnapshotForBusiness
+  getSubscriptionSnapshotForBusiness,
+  syncStripeSubscriptionForBusiness
 } = require("../services/subscriptionService.js");
+const { buildStripePriceLookup } = require("../services/stripePriceConfig.js");
 const { decryptTaxId } = require("../services/taxIdService.js");
 const { verifyPassword } = require("../utils/authUtils.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
@@ -25,6 +27,199 @@ router.use(requireAuth);
 router.use(requireCsrfProtection);
 
 const businessDeleteLimiter = createBusinessDeleteLimiter();
+const STRIPE_API_BASE = "https://api.stripe.com/v1";
+const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2026-02-25.clover";
+const { addonPriceIds: STRIPE_ADDON_PRICE_IDS } = buildStripePriceLookup();
+
+function getStripeSecretKey() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error("STRIPE_SECRET_KEY is not configured");
+  }
+  return process.env.STRIPE_SECRET_KEY;
+}
+
+function encodeFormBody(payload) {
+  const params = new URLSearchParams();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      params.append(key, String(value));
+    }
+  });
+  return params.toString();
+}
+
+async function stripeRequest(path, payload) {
+  const response = await fetch(`${STRIPE_API_BASE}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${getStripeSecretKey()}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Stripe-Version": STRIPE_API_VERSION
+    },
+    body: encodeFormBody(payload)
+  });
+
+  const json = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(json?.error?.message || `Stripe request failed (${response.status})`);
+  }
+
+  return json;
+}
+
+async function stripeGet(path) {
+  const response = await fetch(`${STRIPE_API_BASE}${path}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${getStripeSecretKey()}`,
+      "Stripe-Version": STRIPE_API_VERSION
+    }
+  });
+
+  const json = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(json?.error?.message || `Stripe request failed (${response.status})`);
+  }
+
+  return json;
+}
+
+async function updateAnchorAdditionalBusinesses(client, businessId, additionalBusinesses) {
+  await client.query(
+    `UPDATE business_subscriptions
+        SET metadata_json = COALESCE(metadata_json, '{}'::jsonb) || jsonb_build_object('additional_businesses', $2::integer),
+            updated_at = NOW()
+      WHERE business_id = $1`,
+    [businessId, additionalBusinesses]
+  );
+}
+
+async function migrateBillingAnchorSubscription(client, sourceBusinessId, targetBusinessId, additionalBusinesses) {
+  const sourceResult = await client.query(
+    `SELECT provider, plan_code, status, stripe_customer_id, stripe_subscription_id, stripe_price_id,
+            trial_started_at, trial_ends_at, current_period_start, current_period_end,
+            cancel_at_period_end, canceled_at, metadata_json
+       FROM business_subscriptions
+      WHERE business_id = $1
+      LIMIT 1`,
+    [sourceBusinessId]
+  );
+
+  if (!sourceResult.rowCount) {
+    return;
+  }
+
+  const source = sourceResult.rows[0];
+  const nextMetadata = {
+    ...(source?.metadata_json && typeof source.metadata_json === "object" ? source.metadata_json : {}),
+    additional_businesses: additionalBusinesses
+  };
+
+  await client.query(
+    `INSERT INTO business_subscriptions (
+        id, business_id, provider, plan_code, status, stripe_customer_id, stripe_subscription_id, stripe_price_id,
+        trial_started_at, trial_ends_at, current_period_start, current_period_end,
+        cancel_at_period_end, canceled_at, metadata_json
+     )
+     VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8,
+        $9, $10, $11, $12,
+        $13, $14, $15::jsonb
+     )
+     ON CONFLICT (business_id) DO UPDATE
+       SET provider = EXCLUDED.provider,
+           plan_code = EXCLUDED.plan_code,
+           status = EXCLUDED.status,
+           stripe_customer_id = EXCLUDED.stripe_customer_id,
+           stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+           stripe_price_id = EXCLUDED.stripe_price_id,
+           trial_started_at = EXCLUDED.trial_started_at,
+           trial_ends_at = EXCLUDED.trial_ends_at,
+           current_period_start = EXCLUDED.current_period_start,
+           current_period_end = EXCLUDED.current_period_end,
+           cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+           canceled_at = EXCLUDED.canceled_at,
+           metadata_json = EXCLUDED.metadata_json,
+           updated_at = NOW()`,
+    [
+      crypto.randomUUID(),
+      targetBusinessId,
+      source.provider,
+      source.plan_code,
+      source.status,
+      source.stripe_customer_id,
+      source.stripe_subscription_id,
+      source.stripe_price_id,
+      source.trial_started_at,
+      source.trial_ends_at,
+      source.current_period_start,
+      source.current_period_end,
+      Boolean(source.cancel_at_period_end),
+      source.canceled_at,
+      JSON.stringify(nextMetadata)
+    ]
+  );
+}
+
+async function syncStripeBusinessSlotsAfterDelete({
+  billingBusinessId,
+  successorBusinessId,
+  subscription,
+  additionalBusinesses
+}) {
+  if (!billingBusinessId || !subscription?.stripeSubscriptionId) {
+    return;
+  }
+
+  const stripeSub = await stripeGet(
+    `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`
+  );
+  const items = Array.isArray(stripeSub.items?.data) ? stripeSub.items.data : [];
+  const existingAddonItem = items.find((item) => STRIPE_ADDON_PRICE_IDS.has(item?.price?.id)) || null;
+  const nextBusinessId = billingBusinessId;
+  const movedAnchor = Boolean(subscription?.businessId && subscription.businessId !== billingBusinessId);
+
+  let updatedSub = stripeSub;
+  if (additionalBusinesses === 0 && existingAddonItem) {
+    updatedSub = await stripeRequest(
+      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
+      {
+        "items[0][id]": existingAddonItem.id,
+        "items[0][deleted]": "true",
+        "metadata[business_id]": nextBusinessId,
+        "metadata[additional_businesses]": additionalBusinesses,
+        proration_behavior: "create_prorations"
+      }
+    );
+  } else if (existingAddonItem) {
+    updatedSub = await stripeRequest(
+      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
+      {
+        "items[0][id]": existingAddonItem.id,
+        "items[0][quantity]": additionalBusinesses,
+        "metadata[business_id]": nextBusinessId,
+        "metadata[additional_businesses]": additionalBusinesses,
+        proration_behavior: "create_prorations"
+      }
+    );
+  } else if (movedAnchor) {
+    updatedSub = await stripeRequest(
+      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
+      {
+        "metadata[business_id]": nextBusinessId,
+        "metadata[additional_businesses]": additionalBusinesses
+      }
+    );
+  }
+
+  if (subscription?.stripeCustomerId && movedAnchor) {
+    await stripeRequest(`/customers/${encodeURIComponent(subscription.stripeCustomerId)}`, {
+      "metadata[business_id]": nextBusinessId
+    });
+  }
+
+  await syncStripeSubscriptionForBusiness(nextBusinessId, updatedSub);
+}
 
 function normalizeBusinessPayload(payload = {}) {
   const name = String(payload.name || "").trim();
@@ -235,16 +430,39 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
       return res.status(404).json({ error: "Business not found." });
     }
 
+    const activeBusinessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
+    const billingBusinessId =
+      await findBillingAnchorBusinessIdForUser(req.user.id, activeBusinessId) || activeBusinessId;
+    const subscription = billingBusinessId
+      ? await getSubscriptionSnapshotForBusiness(billingBusinessId)
+      : null;
+
     // Prevent deletion of the user's only business
     const countCheck = await pool.query(
       "SELECT COUNT(*)::int AS count FROM businesses WHERE user_id = $1",
       [req.user.id]
     );
-    if (Number(countCheck.rows[0]?.count || 0) <= 1) {
+    const currentBusinessCount = Number(countCheck.rows[0]?.count || 0);
+    if (currentBusinessCount <= 1) {
       return res.status(409).json({
         error: "You cannot delete your only business account. Delete your account instead."
       });
     }
+    const nextBusinessCount = Math.max(currentBusinessCount - 1, 1);
+    const nextAdditionalBusinesses = Math.max(nextBusinessCount - 1, 0);
+    const successorBusinessResult = await pool.query(
+      `SELECT id
+         FROM businesses
+        WHERE user_id = $1
+          AND id <> $2
+        ORDER BY
+          CASE WHEN id = $3 THEN 0 ELSE 1 END,
+          created_at ASC,
+          id ASC
+        LIMIT 1`,
+      [req.user.id, businessId, activeBusinessId]
+    );
+    const successorBusinessId = successorBusinessResult.rows[0]?.id || null;
 
     // Verify the user's password
     const userRow = await pool.query(
@@ -263,6 +481,7 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
     // because of ON DELETE RESTRICT on account_id and category_id.
     const client = await pool.connect();
     let storagePaths = [];
+    let transactionCommitted = false;
     try {
       await client.query("BEGIN");
 
@@ -287,6 +506,17 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
         [businessId]
       );
 
+      if (billingBusinessId && businessId === billingBusinessId && successorBusinessId) {
+        await migrateBillingAnchorSubscription(
+          client,
+          billingBusinessId,
+          successorBusinessId,
+          nextAdditionalBusinesses
+        );
+      } else if (billingBusinessId) {
+        await updateAnchorAdditionalBusinesses(client, billingBusinessId, nextAdditionalBusinesses);
+      }
+
       // Delete the business — all remaining child rows cascade (transactions, receipts,
       // mileage, accounts, categories, exports, subscriptions)
       await client.query(
@@ -294,17 +524,21 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
         [businessId, req.user.id]
       );
 
-      // If this was the active business, point to another one
+      // If this was the active business, point to another one. Otherwise keep the current active business.
       await client.query(
         `UPDATE users
-            SET active_business_id = (
-              SELECT id FROM businesses WHERE user_id = $1 ORDER BY created_at ASC, id ASC LIMIT 1
-            )
+            SET active_business_id = CASE
+              WHEN active_business_id = $2 THEN (
+                SELECT id FROM businesses WHERE user_id = $1 ORDER BY created_at ASC, id ASC LIMIT 1
+              )
+              ELSE active_business_id
+            END
           WHERE id = $1`,
-        [req.user.id]
+        [req.user.id, businessId]
       );
 
       await client.query("COMMIT");
+      transactionCommitted = true;
 
       await Promise.all(
         storagePaths.map(async (filePath) => {
@@ -320,15 +554,54 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
           }
         })
       );
+
+      const nextBillingBusinessId =
+        billingBusinessId && businessId === billingBusinessId
+          ? successorBusinessId
+          : billingBusinessId;
+
+      if (nextBillingBusinessId && subscription?.effectiveTier === PLAN_V1) {
+        try {
+          await syncStripeBusinessSlotsAfterDelete({
+            billingBusinessId: nextBillingBusinessId,
+            successorBusinessId,
+            subscription,
+            additionalBusinesses: nextAdditionalBusinesses
+          });
+        } catch (stripeErr) {
+          logError("DELETE /businesses/:id: failed to sync Stripe business slots", {
+            businessId,
+            nextBillingBusinessId,
+            err: stripeErr.message
+          });
+          throw stripeErr;
+        }
+      }
     } catch (err) {
-      await client.query("ROLLBACK");
+      if (!transactionCommitted) {
+        await client.query("ROLLBACK");
+      }
       throw err;
     } finally {
       client.release();
     }
 
     const businesses = await listBusinessesForUser(req.user.id);
-    res.status(200).json({ message: "Business deleted.", businesses });
+    const nextActiveBusinessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
+    const activeBusiness = businesses.find((business) => business.id === nextActiveBusinessId) || null;
+    const nextBillingBusinessId =
+      await findBillingAnchorBusinessIdForUser(req.user.id, nextActiveBusinessId) || nextActiveBusinessId;
+    const nextSubscription = nextBillingBusinessId
+      ? await getSubscriptionSnapshotForBusiness(nextBillingBusinessId)
+      : null;
+
+    res.status(200).json({
+      message: "Business deleted.",
+      active_business_id: nextActiveBusinessId,
+      active_business: activeBusiness,
+      businesses,
+      subscription: nextSubscription
+    });
   } catch (err) {
     logError("DELETE /businesses/:id error:", err.message);
     res.status(500).json({ error: "Failed to delete business." });

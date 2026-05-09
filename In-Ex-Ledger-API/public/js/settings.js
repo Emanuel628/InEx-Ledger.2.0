@@ -96,9 +96,48 @@ let settingsOverviewState = {
   cpaHistoryCount: 0,
   mfaEnabled: false
 };
+let settingsBusinessesState = [];
+let settingsSubscriptionState = null;
+let settingsPricingState = null;
 
 function isCpaUiEnabled() {
   return window.__LUNA_FLAGS__?.cpaUiEnabled === true;
+}
+
+function formatSettingsMoney(currency, amount) {
+  const normalizedCurrency = String(currency || "usd").toUpperCase();
+  const value = Number(amount || 0);
+  const locale = normalizedCurrency === "CAD" ? "en-CA" : "en-US";
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: normalizedCurrency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  } catch (_) {
+    return `${normalizedCurrency} ${value.toFixed(2)}`;
+  }
+}
+
+async function loadSettingsPricingState() {
+  if (settingsPricingState) {
+    return settingsPricingState;
+  }
+  try {
+    const res = await apiFetch("/api/billing/pricing");
+    if (!res || !res.ok) {
+      return null;
+    }
+    const payload = await res.json().catch(() => null);
+    if (!payload?.pricing) {
+      return null;
+    }
+    settingsPricingState = payload;
+    return settingsPricingState;
+  } catch (_) {
+    return null;
+  }
 }
 
 function hideCpaSettingsUi() {
@@ -351,6 +390,7 @@ async function renderBusinessList() {
 
     const payload = await response.json().catch(() => null);
     const businesses = Array.isArray(payload?.businesses) ? payload.businesses : [];
+    settingsBusinessesState = businesses;
     const activeId = payload?.active_business_id || "";
 
     if (!businesses.length) {
@@ -402,7 +442,7 @@ async function renderBusinessList() {
       btn.addEventListener("click", () => {
         const bizId = btn.getAttribute("data-business-delete");
         const bizName = btn.getAttribute("data-business-name") || t("common_business");
-        openDeleteBusinessModal(bizId, bizName);
+        void openDeleteBusinessModal(bizId, bizName);
       });
     });
   } catch (err) {
@@ -479,7 +519,7 @@ function openAddBusinessModal() {
 
 let pendingDeleteBusinessId = null;
 
-function openDeleteBusinessModal(bizId, bizName) {
+async function openDeleteBusinessModal(bizId, bizName) {
   const modal = document.getElementById("dangerModal");
   const title = document.getElementById("dangerModalTitle");
   const body = document.getElementById("dangerModalBody");
@@ -492,12 +532,41 @@ function openDeleteBusinessModal(bizId, bizName) {
   pendingDeleteBusinessId = bizId;
   dangerAction = "delete_business";
   title.textContent = t("settings_delete_business_modal_title");
-  body.textContent = interpolateTranslatedMessage("settings_delete_business_modal_body", { name: bizName });
+  body.innerHTML = `<span>${escapeHtml(interpolateTranslatedMessage("settings_delete_business_modal_body", { name: bizName }))}</span>`;
   confirmWrap.classList.add("hidden");
   passwordWrap.classList.remove("hidden");
   if (passwordInput) passwordInput.value = "";
   confirmButton.disabled = false;
   modal.classList.remove("hidden");
+
+  const currentSubscription = settingsSubscriptionState;
+  const currentBusinessCount = Array.isArray(settingsBusinessesState) ? settingsBusinessesState.length : 0;
+  const nextBusinessCount = Math.max(currentBusinessCount - 1, 0);
+  const nextAdditionalBusinesses = Math.max(nextBusinessCount - 1, 0);
+  if (!currentSubscription || currentBusinessCount <= 1) {
+    return;
+  }
+
+  const pricingPayload = await loadSettingsPricingState();
+  const interval = currentSubscription.billingInterval === "yearly" ? "yearly" : "monthly";
+  const currency = String(currentSubscription.currency || pricingPayload?.currency || "usd").toLowerCase();
+  const pricing = pricingPayload?.pricing?.[interval];
+
+  const detailParts = [
+    `<span>${escapeHtml(interpolateTranslatedMessage("settings_delete_business_modal_body", { name: bizName }))}</span>`,
+    `<span>You will have <strong>${nextBusinessCount}</strong> business${nextBusinessCount === 1 ? "" : "es"} remaining.</span>`
+  ];
+
+  if (pricing?.base != null && pricing?.addon != null && currentSubscription.effectiveTier === "v1") {
+    const currentTotal = Number(pricing.base) + (Number(pricing.addon) * Number(currentSubscription.additionalBusinesses || 0));
+    const nextTotal = Number(pricing.base) + (Number(pricing.addon) * nextAdditionalBusinesses);
+    const intervalLabel = interval === "yearly" ? "yearly" : "monthly";
+    detailParts.push(
+      `<span>Your ${intervalLabel} total will change from <strong>${escapeHtml(formatSettingsMoney(currency, currentTotal))}</strong> to <strong>${escapeHtml(formatSettingsMoney(currency, nextTotal))}</strong>.</span>`
+    );
+  }
+
+  body.innerHTML = detailParts.join("<br /><br />");
 }
 
 async function initAccountSettings() {
@@ -556,6 +625,7 @@ async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBod
       statusLabel.textContent = t("settings_sub_status_unknown");
       return;
     }
+    settingsSubscriptionState = sub;
 
     const tierLabel = sub.effectiveTier === "v1" ? "Pro" : "Basic";
     let statusText = "";
@@ -2456,9 +2526,32 @@ function initDangerZone() {
             confirmButton.disabled = false;
             return;
           }
+          if (Array.isArray(payload?.businesses)) {
+            settingsBusinessesState = payload.businesses;
+            if (window.__LUNA_ME__ && typeof window.__LUNA_ME__ === "object") {
+              window.__LUNA_ME__.businesses = payload.businesses;
+            }
+          }
+          if (payload?.active_business && typeof applyActivatedBusinessContext === "function") {
+            applyActivatedBusinessContext(payload.active_business);
+          }
+          if (payload?.subscription) {
+            settingsSubscriptionState = payload.subscription;
+            if (typeof applySubscriptionState === "function") {
+              applySubscriptionState(payload.subscription);
+            }
+          }
+          if (window.__LUNA_ME__ && typeof updateAuthenticatedChrome === "function") {
+            updateAuthenticatedChrome(window.__LUNA_ME__);
+          }
           showSettingsToast(t("settings_delete_business_success"));
           closeModal();
           await renderBusinessList();
+          await loadAndDisplaySubscription(
+            document.getElementById("accountSubStatusLabel"),
+            document.getElementById("cancelSubscriptionRow"),
+            document.getElementById("cancelSubModalBody")
+          );
         } catch (err) {
           console.error("Business deletion failed", err);
           showSettingsToast(t("settings_delete_business_error"));
