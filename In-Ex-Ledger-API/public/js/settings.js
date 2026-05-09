@@ -360,14 +360,62 @@ async function initBusinessProfileForm() {
       businessActivityCode: document.getElementById("business-activity-code").value.trim()
     };
 
-    const saved = await saveBusinessProfileToApi(nextProfile);
-    if (!saved) {
+    const savedBusiness = await saveBusinessProfileToApi(nextProfile);
+    if (!savedBusiness) {
       showSettingsToast(t("settings_business_profile_save_error"));
       return;
     }
-    saveBusinessProfile(nextProfile);
-    settingsOverviewState.businessProfile = nextProfile;
+    const savedProfile = {
+      name: savedBusiness?.name || nextProfile.name,
+      type: savedBusiness?.business_type || nextProfile.type,
+      fiscalYearStart: savedBusiness?.fiscal_year_start || nextProfile.fiscalYearStart,
+      address: savedBusiness?.address || nextProfile.address,
+      operatingName: savedBusiness?.operating_name || nextProfile.operatingName,
+      businessActivityCode: savedBusiness?.business_activity_code || nextProfile.businessActivityCode
+    };
+    saveBusinessProfile(savedProfile);
+    settingsOverviewState.businessProfile = savedProfile;
+    if (window.__LUNA_ME__ && typeof window.__LUNA_ME__ === "object") {
+      const activeBusinessId = window.__LUNA_ME__?.active_business_id || window.__LUNA_ME__?.active_business?.id || "";
+      if (activeBusinessId) {
+        if (Array.isArray(window.__LUNA_ME__.businesses)) {
+          window.__LUNA_ME__.businesses = window.__LUNA_ME__.businesses.map((business) => (
+            business?.id === activeBusinessId
+              ? {
+                  ...business,
+                  name: savedProfile.name || business?.name || "",
+                  business_type: savedProfile.type || business?.business_type || null,
+                  fiscal_year_start: savedProfile.fiscalYearStart || business?.fiscal_year_start || null,
+                  address: savedProfile.address || business?.address || null,
+                  operating_name: savedProfile.operatingName || business?.operating_name || null,
+                  business_activity_code: savedProfile.businessActivityCode || business?.business_activity_code || null
+                }
+              : business
+          ));
+        }
+        if (window.__LUNA_ME__.active_business && window.__LUNA_ME__.active_business.id === activeBusinessId) {
+          applyActivatedBusinessContext({
+            ...window.__LUNA_ME__.active_business,
+            name: savedProfile.name || window.__LUNA_ME__.active_business.name || "",
+            business_type: savedProfile.type || window.__LUNA_ME__.active_business.business_type || null,
+            fiscal_year_start: savedProfile.fiscalYearStart || window.__LUNA_ME__.active_business.fiscal_year_start || null,
+            address: savedProfile.address || window.__LUNA_ME__.active_business.address || null,
+            operating_name: savedProfile.operatingName || window.__LUNA_ME__.active_business.operating_name || null,
+            business_activity_code: savedProfile.businessActivityCode || window.__LUNA_ME__.active_business.business_activity_code || null
+          });
+        }
+      }
+      if (typeof updateAuthenticatedChrome === "function") {
+        updateAuthenticatedChrome(window.__LUNA_ME__);
+      }
+    }
+    settingsBusinessesState = settingsBusinessesState.map((business) => (
+      business?.id === (window.__LUNA_ME__?.active_business_id || "")
+        ? { ...business, name: savedProfile.name || business?.name || "" }
+        : business
+    ));
     syncSettingsOverviewSummaries();
+    await renderBusinessList();
     showSettingsToast(t("settings_business_profile_saved"));
   });
 
@@ -832,10 +880,13 @@ async function saveBusinessProfileToApi(profile) {
       })
     });
 
-    return !!(response && response.ok);
+    if (!response || !response.ok) {
+      return null;
+    }
+    return await response.json().catch(() => null);
   } catch (error) {
     console.error("Failed to save business profile", error);
-    return false;
+    return null;
   }
 }
 

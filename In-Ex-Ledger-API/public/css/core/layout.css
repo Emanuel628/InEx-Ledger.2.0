@@ -63,6 +63,7 @@ main {
 main.app-shell {
   display: flex;
   align-items: stretch;
+  position: relative;
   width: 100%;
   max-width: none;
   margin: 0;
@@ -396,6 +397,24 @@ body[data-theme="light"] select option {
   align-self: flex-start;
   height: calc(100vh - 56px);
   overflow-y: auto;
+  overflow-x: visible;
+  transition: width 180ms ease, min-width 180ms ease, padding 180ms ease;
+}
+
+.app-sidebar.app-sidebar--dynamic.is-collapsed {
+  width: 24px;
+  min-width: 24px;
+  padding: 14px 0;
+  overflow: visible;
+}
+
+.app-sidebar.app-sidebar--dynamic.is-collapsed > :not(.dynamic-sidebar-collapse-handle) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-shell.app-shell--sidebar-collapsed .app-page {
+  padding-left: 20px;
 }
 
 .dynamic-sidebar-header {
@@ -533,6 +552,37 @@ body[data-theme="light"] select option {
   margin-top: 14px;
   padding-top: 10px;
   border-top: 0.5px solid var(--border);
+}
+
+.dynamic-sidebar-collapse-handle {
+  position: absolute;
+  top: 50%;
+  right: -18px;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 64px;
+  border: 0.5px solid var(--border);
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
+  background: var(--surface);
+  color: var(--ink2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(15, 25, 35, 0.08);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.dynamic-sidebar-collapse-handle:hover,
+.dynamic-sidebar-collapse-handle:focus-visible {
+  background: var(--surface2);
+  color: var(--ink);
+}
+
+.dynamic-sidebar-collapse-handle span {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .dynamic-sidebar-library-group + .dynamic-sidebar-library-group {

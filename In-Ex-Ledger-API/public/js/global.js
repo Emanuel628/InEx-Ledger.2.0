@@ -476,6 +476,7 @@ function applyMileageNavLabel() {
 }
 
 const DYNAMIC_SIDEBAR_FAVORITES_KEY = "lb_dynamic_sidebar_favorites";
+const DYNAMIC_SIDEBAR_COLLAPSED_KEY = "lb_dynamic_sidebar_collapsed";
 const DYNAMIC_SIDEBAR_DEFAULT_FAVORITES = ["transactions", "receipts", "mileage", "accounts", "categories"];
 const DYNAMIC_SIDEBAR_CORE_FEATURE_IDS = new Set([
   "transactions",
@@ -670,11 +671,21 @@ function initDynamicSidebar() {
   let favorites = getDynamicSidebarFavorites(featureMap, window.__LUNA_ME__?.ui_preferences);
   let draggedFeatureId = "";
   let shouldKeepLibraryOpen = false;
+  let isCollapsed = localStorage.getItem(DYNAMIC_SIDEBAR_COLLAPSED_KEY) === "true";
 
   sidebar.className = "app-sidebar app-sidebar--dynamic";
   sidebar.setAttribute("aria-label", "Favorites");
 
   const quickPanel = ensureDynamicSidebarQuickPanel();
+
+  function applyCollapsedState() {
+    shell.classList.toggle("app-shell--sidebar-collapsed", isCollapsed);
+    sidebar.classList.toggle("is-collapsed", isCollapsed);
+    sidebar.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+    if (isCollapsed) {
+      closeDynamicSidebarQuickPanel(quickPanel);
+    }
+  }
 
   function render() {
     favorites = favorites.filter((id) => featureMap.has(id));
@@ -704,8 +715,19 @@ function initDynamicSidebar() {
           </div>
         `).join("")}
       </div>
+      <button
+        type="button"
+        class="dynamic-sidebar-collapse-handle"
+        data-sidebar-collapse
+        aria-label="${isCollapsed ? "Open Quick Add sidebar" : "Collapse Quick Add sidebar"}"
+        aria-pressed="${isCollapsed ? "true" : "false"}"
+        title="${isCollapsed ? "Open Quick Add sidebar" : "Collapse Quick Add sidebar"}"
+      >
+        <span aria-hidden="true">${isCollapsed ? "›" : "‹"}</span>
+      </button>
     `;
 
+    applyCollapsedState();
     wireDynamicSidebarEvents();
   }
 
@@ -716,6 +738,12 @@ function initDynamicSidebar() {
 
     manageButton?.addEventListener("click", () => {
       shouldKeepLibraryOpen = !shouldKeepLibraryOpen;
+      render();
+    });
+
+    sidebar.querySelector("[data-sidebar-collapse]")?.addEventListener("click", () => {
+      isCollapsed = !isCollapsed;
+      localStorage.setItem(DYNAMIC_SIDEBAR_COLLAPSED_KEY, isCollapsed ? "true" : "false");
       render();
     });
 

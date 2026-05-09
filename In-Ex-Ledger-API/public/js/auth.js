@@ -298,6 +298,16 @@ function getActiveBusiness(profile = {}) {
   return businesses.find((business) => business.id === activeBusinessId) || null;
 }
 
+function getPillBusinessName(profile = {}) {
+  const activeBusiness = getActiveBusiness(profile);
+  const candidate =
+    activeBusiness?.name ||
+    localStorage.getItem(ACTIVE_BUSINESS_NAME_KEY) ||
+    "";
+  const normalized = String(candidate || "").trim();
+  return normalized || "Business";
+}
+
 /**
  * Sync region and province from the active business to localStorage and
  * window globals so region-hardening functions have the correct context.
@@ -336,6 +346,7 @@ function persistBusinessContext(profile = {}) {
 function updateAuthenticatedChrome(profile = {}) {
   const displayName = getUserDisplayName(profile);
   const initials = getUserInitials(profile);
+  const pillBusinessName = getPillBusinessName(profile);
 
   persistBusinessContext(profile);
   // Onboarding is a clean setup wizard — skip the header user pill there.
@@ -346,7 +357,7 @@ function updateAuthenticatedChrome(profile = {}) {
   document.querySelectorAll(".user-pill").forEach(ensureUserPillChrome);
 
   document.querySelectorAll(".user-name").forEach((node) => {
-    node.textContent = displayName;
+    node.textContent = pillBusinessName;
   });
 
   document.querySelectorAll(".user-avatar").forEach((node) => {

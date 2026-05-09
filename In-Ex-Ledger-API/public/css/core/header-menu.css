@@ -1,4 +1,9 @@
 /* Header account pill and mobile account menu behavior. */
+.app-topbar .user-pill .user-name,
+.app-topbar .user-pill #topbarName {
+  color: #0f172a !important;
+}
+
 .app-topbar .user-pill:hover,
 .app-topbar .user-pill:hover .user-name,
 .app-topbar .user-pill:hover #topbarName,

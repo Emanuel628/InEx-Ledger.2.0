@@ -258,7 +258,7 @@
   text-transform: uppercase;
 }
 
-/* ── Plan top area ──────────────────────────────��─────────────── */
+/* ── Plan top area ──────────────────────────────??─────────────── */
 
 .sub-plan-top {
   display: flex;
@@ -382,7 +382,7 @@
   flex-shrink: 0;
 }
 
-/* ── Billing toggle ────────────────────────────────��──────────── */
+/* ── Billing toggle ────────────────────────────────??──────────── */
 
 .sub-toggle {
   display: inline-flex;
@@ -769,7 +769,7 @@
   padding-top: 14px;
 }
 
-/* ── Business access section ──────────────────────────────���───── */
+/* ── Business access section ──────────────────────────────???───── */
 
 .sub-access-overview {
   display: grid;
@@ -1339,7 +1339,7 @@
   }
 }
 
-/* ── Mobile layout ────────────────────────────────���───────────── */
+/* ── Mobile layout ────────────────────────────────???───────────── */
 
 @media (max-width: 640px) {
   .sub-access-overview {
