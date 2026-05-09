@@ -2421,7 +2421,7 @@ button.settings-summary-card,
   grid-column: 2;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 760px) {
   .settings-page .settings-shell {
     width: min(100% - 28px, 1180px);
     grid-template-columns: 1fr;
