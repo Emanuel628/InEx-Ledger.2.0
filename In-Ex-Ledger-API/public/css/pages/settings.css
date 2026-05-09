@@ -2358,3 +2358,126 @@ button.settings-summary-card,
   font-weight: 700;
 }
 
+/* Final settings workspace restore:
+   keep the original sidebar + two-column layout for normal desktop widths,
+   and only collapse into the compact stacked layout on genuinely narrow screens. */
+.settings-page .settings-shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px;
+  width: min(100% - 40px, 1360px);
+  margin: 28px auto 0;
+  padding: 0 0 48px;
+  min-height: auto;
+  align-items: start;
+}
+
+.settings-page .settings-sidebar {
+  display: block;
+  position: sticky;
+  top: 78px;
+  align-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.settings-page .settings-nav {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+.settings-page .settings-nav-item {
+  width: 100%;
+  text-align: left;
+}
+
+.settings-page .settings-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  padding: 0 0 96px;
+  background: transparent;
+}
+
+.settings-page .settings-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.settings-page #settings-business,
+.settings-page #settings-security {
+  grid-column: 1;
+}
+
+.settings-page #settings-billing,
+.settings-page #settings-preferences,
+.settings-page #settings-privacy-data {
+  grid-column: 2;
+}
+
+@media (max-width: 980px) {
+  .settings-page .settings-shell {
+    width: min(100% - 28px, 1180px);
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding-bottom: 28px;
+  }
+
+  .settings-page .settings-sidebar {
+    position: static;
+  }
+
+  .settings-page .settings-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .settings-page .settings-nav-item {
+    width: auto;
+    border-radius: 999px;
+  }
+
+  .settings-page .settings-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page #settings-business,
+  .settings-page #settings-security,
+  .settings-page #settings-billing,
+  .settings-page #settings-preferences,
+  .settings-page #settings-privacy-data {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-page .settings-shell {
+    width: 100%;
+    margin-top: 0;
+    padding: 18px 12px 28px;
+    gap: 16px;
+  }
+
+  .settings-page .settings-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .settings-page .settings-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-page .settings-nav-item {
+    white-space: nowrap;
+  }
+}
+
