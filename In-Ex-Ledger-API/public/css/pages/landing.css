@@ -151,6 +151,7 @@ body {
 }
 
 .marketing-nav-cta:hover {
+  background: rgba(36, 109, 187, 0.88);
   color: #fff;
   transform: translateY(-1px);
   box-shadow: 0 14px 28px rgba(36, 109, 187, 0.24);

@@ -1366,12 +1366,13 @@ body {
 }
 
 .security-show-password {
-  display: flex;
-  flex-wrap: wrap;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   margin-top: 10px;
   font-size: 13px;
+  width: fit-content;
+  justify-self: start;
 }
 
 .security-show-password input {

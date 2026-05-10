@@ -202,6 +202,10 @@ main {
 }
 
 .consent-field label {
+  display: inline-flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0;
   text-transform: none;
   letter-spacing: 0;
   font-weight: 400;
