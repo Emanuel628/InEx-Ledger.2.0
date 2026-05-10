@@ -81,6 +81,7 @@ const TRANSACTION_REVIEW_LABELS = {
 };
 let unattachedReceiptsCount = 0;
 const selectedTransactionIds = new Set();
+const selectedRecurringTemplateIds = new Set();
 let transactionUndoMessage = "";
 let transactionUndoAvailable = false;
 let transactionUndoError = false;
@@ -1485,19 +1486,36 @@ function renderRecurringTemplates() {
   }
 
   if (!recurringState.templates.length) {
+    selectedRecurringTemplateIds.clear();
+    closeRecurringRowActionPopup();
     tbody.innerHTML = `<tr class="placeholder-row"><td colspan="6" class="placeholder placeholder-cell">${buildRecurringEmptyStateMarkup()}</td></tr>`;
     return;
   }
 
+  if (_popupRecurringTemplateId && !recurringState.templates.some((item) => String(item.id) === String(_popupRecurringTemplateId))) {
+    selectedRecurringTemplateIds.delete(String(_popupRecurringTemplateId));
+    closeRecurringRowActionPopup();
+  }
+
   tbody.innerHTML = "";
   recurringState.templates.forEach((template) => {
+    const templateId = String(template.id);
     const row = document.createElement("tr");
     const activeBadge = template.active
       ? `<span class="status-badge status-cleared">${txT("transactions_recurring_active", "Active")}</span>`
       : `<span class="status-badge status-pending">${txT("transactions_recurring_paused", "Paused")}</span>`;
 
     row.innerHTML = `
-      <td>
+      <td class="table-select-cell">
+        <input
+          type="checkbox"
+          class="tx-row-select recurring-row-select"
+          data-id="${template.id}"
+          aria-label="Select recurring template ${escapeHtml(template.description || template.id)}"
+          ${selectedRecurringTemplateIds.has(templateId) ? "checked" : ""}
+        >
+      </td>
+      <td class="recurring-description-cell">
         <div class="recurring-meta">
           <span class="recurring-primary">${escapeHtml(template.description || "-")}</span>
           <span class="recurring-secondary">${template.note ? escapeHtml(template.note) : txT("transactions_recurring_no_note", "No internal note")}</span>
@@ -1507,26 +1525,33 @@ function renderRecurringTemplates() {
       <td>${formatDisplayDate(template.next_run_date)}</td>
       <td>${activeBadge}</td>
       <td class="amount-cell"><span class="${template.type === "income" ? "amount-positive" : "amount-negative"}">${template.type === "income" ? "+" : "-"}${formatCurrency(Math.abs(Number(template.amount) || 0))}</span></td>
-      <td class="recurring-actions-cell">
-        <button type="button" class="action-button" data-action="recurring-run" data-id="${template.id}">${txT("transactions_recurring_post_next", "Post next")}</button>
-        <button type="button" class="action-button" data-action="recurring-status" data-id="${template.id}">${template.active ? txT("transactions_recurring_pause", "Pause") : txT("transactions_recurring_resume", "Resume")}</button>
-        <button type="button" class="action-button" data-action="recurring-edit" data-id="${template.id}">${txT("common_edit", "Edit")}</button>
-        <button type="button" class="action-button delete" data-action="recurring-delete" data-id="${template.id}">${txT("common_delete", "Delete")}</button>
-      </td>
     `;
+    row.classList.toggle("is-selected", selectedRecurringTemplateIds.has(templateId));
     tbody.appendChild(row);
 
-    row.querySelector('[data-action="recurring-run"]')?.addEventListener("click", async () => {
-      await runRecurringTemplate(template.id);
+    row.querySelector(".recurring-row-select")?.addEventListener("click", (event) => {
+      event.stopPropagation();
     });
-    row.querySelector('[data-action="recurring-status"]')?.addEventListener("click", async () => {
-      await toggleRecurringTemplateStatus(template.id, !template.active);
-    });
-    row.querySelector('[data-action="recurring-edit"]')?.addEventListener("click", () => {
-      handleEditRecurringTemplate(template.id);
-    });
-    row.querySelector('[data-action="recurring-delete"]')?.addEventListener("click", async () => {
-      await deleteRecurringTemplate(template.id);
+    row.querySelector(".recurring-row-select")?.addEventListener("change", (event) => {
+      const checkbox = event.target;
+      const isChecked = checkbox.checked;
+      if (isChecked) {
+        selectedRecurringTemplateIds.clear();
+        selectedRecurringTemplateIds.add(templateId);
+        tbody.querySelectorAll(".recurring-row-select").forEach((otherCheckbox) => {
+          if (otherCheckbox !== checkbox) {
+            otherCheckbox.checked = false;
+            otherCheckbox.closest("tr")?.classList.remove("is-selected");
+          }
+        });
+        openRecurringRowActionPopup(template.id, checkbox);
+      } else {
+        selectedRecurringTemplateIds.delete(templateId);
+        if (String(_popupRecurringTemplateId) === templateId) {
+          closeRecurringRowActionPopup();
+        }
+      }
+      row.classList.toggle("is-selected", isChecked);
     });
   });
 }
@@ -3298,6 +3323,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initPeriodPicker();
   initTransactionUndoBar();
   initRowActionPopup();
+  initRecurringRowActionPopup();
 });
 
 function initTransactionUndoBar() {
@@ -3357,6 +3383,8 @@ function initPeriodPicker() {
 
 let _popupTxnId = null;
 let _popupAnchorElement = null;
+let _popupRecurringTemplateId = null;
+let _popupRecurringAnchorElement = null;
 
 function initRowActionPopup() {
   const popup = document.getElementById("txRowPopup");
@@ -3397,6 +3425,7 @@ function openRowActionPopup(txnId, anchorEl, isAllScope) {
   const popup = document.getElementById("txRowPopup");
   if (!popup) return;
 
+  closeRecurringRowActionPopup();
   _popupTxnId = txnId;
   _popupAnchorElement = anchorEl;
 
@@ -3411,6 +3440,12 @@ function openRowActionPopup(txnId, anchorEl, isAllScope) {
 
 function positionRowActionPopup(anchorEl) {
   const popup = document.getElementById("txRowPopup");
+  if (!popup || !anchorEl) return;
+
+  positionActionPopup(popup, anchorEl);
+}
+
+function positionActionPopup(popup, anchorEl) {
   if (!popup || !anchorEl) return;
 
   const anchorCell = anchorEl.closest(".table-select-cell") || anchorEl;
@@ -3440,6 +3475,92 @@ function closeRowActionPopup() {
   if (popup) popup.setAttribute("hidden", "");
   _popupTxnId = null;
   _popupAnchorElement = null;
+}
+
+function initRecurringRowActionPopup() {
+  const popup = document.getElementById("recurringRowPopup");
+  if (!popup) return;
+
+  document.getElementById("recurringPopupRun")?.addEventListener("click", async () => {
+    const templateId = _popupRecurringTemplateId;
+    closeRecurringRowActionPopup();
+    if (templateId) {
+      await runRecurringTemplate(templateId);
+    }
+  });
+
+  document.getElementById("recurringPopupStatus")?.addEventListener("click", async () => {
+    const template = (recurringState.templates || []).find((item) => String(item.id) === String(_popupRecurringTemplateId));
+    const templateId = template?.id;
+    closeRecurringRowActionPopup();
+    if (templateId) {
+      await toggleRecurringTemplateStatus(templateId, !template.active);
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!popup.hidden && !popup.contains(event.target) && !event.target.closest(".recurring-row-select")) {
+      closeRecurringRowActionPopup();
+    }
+  }, true);
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeRecurringRowActionPopup();
+    }
+  });
+
+  window.addEventListener("resize", () => {
+    if (_popupRecurringTemplateId && _popupRecurringAnchorElement) {
+      positionRecurringRowActionPopup(_popupRecurringAnchorElement);
+    }
+  });
+
+  window.addEventListener("scroll", () => {
+    if (_popupRecurringTemplateId && _popupRecurringAnchorElement) {
+      positionRecurringRowActionPopup(_popupRecurringAnchorElement);
+    }
+  }, true);
+}
+
+function openRecurringRowActionPopup(templateId, anchorEl) {
+  const popup = document.getElementById("recurringRowPopup");
+  if (!popup) return;
+
+  const template = (recurringState.templates || []).find((item) => String(item.id) === String(templateId));
+  if (!template) return;
+
+  closeRowActionPopup();
+  _popupRecurringTemplateId = template.id;
+  _popupRecurringAnchorElement = anchorEl;
+
+  const runButton = document.getElementById("recurringPopupRun");
+  const statusButton = document.getElementById("recurringPopupStatus");
+  if (runButton) {
+    runButton.textContent = txT("transactions_recurring_post_next", "Post next");
+  }
+  if (statusButton) {
+    statusButton.textContent = template.active
+      ? txT("transactions_recurring_pause", "Pause")
+      : txT("transactions_recurring_resume", "Resume");
+  }
+
+  popup.removeAttribute("hidden");
+  positionRecurringRowActionPopup(anchorEl);
+}
+
+function positionRecurringRowActionPopup(anchorEl) {
+  const popup = document.getElementById("recurringRowPopup");
+  if (!popup || !anchorEl) return;
+
+  positionActionPopup(popup, anchorEl);
+}
+
+function closeRecurringRowActionPopup() {
+  const popup = document.getElementById("recurringRowPopup");
+  if (popup) popup.setAttribute("hidden", "");
+  _popupRecurringTemplateId = null;
+  _popupRecurringAnchorElement = null;
 }
 
 function initOcrPrefill() {

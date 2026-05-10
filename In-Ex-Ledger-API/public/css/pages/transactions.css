@@ -1221,7 +1221,7 @@ body {
   margin-top: 0;
 }
 
-.recurring-table tbody td:first-child {
+.recurring-table tbody td.recurring-description-cell {
   min-width: 220px;
 }
 
@@ -1239,13 +1239,6 @@ body {
 .recurring-secondary {
   font-size: 11px;
   color: var(--ink3);
-}
-
-.recurring-actions-cell {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  flex-wrap: wrap;
 }
 
 .source-badge {
@@ -1795,6 +1788,16 @@ body {
 .tx-popup-btn:hover {
   background: var(--surface2);
   color: var(--ink);
+}
+
+.tx-popup-primary {
+  color: var(--accent2);
+  font-weight: 700;
+}
+
+.tx-popup-primary:hover {
+  background: rgba(44, 121, 196, 0.08);
+  color: var(--accent2);
 }
 
 .tx-popup-delete {
@@ -2463,9 +2466,10 @@ body {
 .recurring-add-inline {
   font-size: 13px;
   padding: 6px 14px;
-  background: var(--accent2);
+  background: linear-gradient(180deg, #2c79c4 0%, #246dbb 100%);
   color: #fff;
   border: none;
+  box-shadow: 0 10px 18px rgba(36, 109, 187, 0.18);
 }
 
 /* 2026-04-30 transactions redesign: trust-first operational polish */
@@ -2971,10 +2975,11 @@ textarea.form-control {
   padding: 0 16px;
   border: none;
   border-radius: 14px;
-  background: #eef4fb;
-  color: var(--accent2);
+  background: linear-gradient(180deg, #2c79c4 0%, #246dbb 100%);
+  color: #fff;
   font-size: 13px;
   font-weight: 700;
+  box-shadow: 0 12px 22px rgba(36, 109, 187, 0.18);
 }
 
 .danger-modal {
@@ -3404,10 +3409,10 @@ tr.tx-highlight {
 .recurring-add-inline {
   min-height: 40px;
   padding: 0 14px;
-  border: 1px solid rgba(15, 25, 35, 0.1);
-  background: #fff;
-  color: #224974;
-  box-shadow: none;
+  border: none;
+  background: linear-gradient(180deg, #2c79c4 0%, #246dbb 100%);
+  color: #fff;
+  box-shadow: 0 12px 22px rgba(36, 109, 187, 0.18);
 }
 
 .transactions-table thead th.col-select {
@@ -3444,6 +3449,22 @@ tr.tx-highlight {
 
 .transactions-table tbody tr.is-selected td {
   background: transparent;
+}
+
+.recurring-table thead th.col-select {
+  width: 56px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.recurring-table tbody td.table-select-cell {
+  width: 56px;
+}
+
+.recurring-table thead th.col-amount,
+.recurring-table tbody td.amount-cell {
+  width: 180px;
+  white-space: nowrap;
 }
 
 .tx-header-undo-btn {

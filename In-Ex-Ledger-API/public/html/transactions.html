@@ -521,12 +521,12 @@
           <table class="transactions-table recurring-table">
             <thead>
               <tr>
+                <th class="col-select"></th>
                 <th>Description</th>
                 <th>Cadence</th>
                 <th>Next run</th>
                 <th>Status</th>
-                <th>Amount</th>
-                <th class="col-actions">Actions</th>
+                <th class="col-amount">Amount</th>
               </tr>
             </thead>
             <tbody id="recurringTableBody">
@@ -542,6 +542,11 @@
   <div id="txRowPopup" class="tx-row-popup" hidden>
     <button type="button" id="txPopupEdit" class="tx-popup-btn">Edit</button>
     <button type="button" id="txPopupDelete" class="tx-popup-btn tx-popup-delete">Delete</button>
+  </div>
+
+  <div id="recurringRowPopup" class="tx-row-popup" hidden>
+    <button type="button" id="recurringPopupRun" class="tx-popup-btn tx-popup-primary">Post next</button>
+    <button type="button" id="recurringPopupStatus" class="tx-popup-btn tx-popup-primary">Pause</button>
   </div>
 
   <div id="transactionModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="transactionModalTitle" aria-describedby="transactionModalBody">
