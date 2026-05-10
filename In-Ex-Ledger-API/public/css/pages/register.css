@@ -189,9 +189,10 @@ main {
 }
 
 .consent-field {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 16px 1fr;
   gap: 8px;
+  align-items: start;
   font-size: 13px;
   line-height: 1.4;
   color: var(--ink2);
@@ -209,13 +210,13 @@ main {
   font-size: 13px;
   color: var(--ink2);
   margin-bottom: 0;
+  line-height: 1.5;
 }
 
 .consent-checkbox {
   width: 14px;
   height: 14px;
   margin-top: 2px;
-  flex: 0 0 auto;
 }
 
 .consent-required-hint {
