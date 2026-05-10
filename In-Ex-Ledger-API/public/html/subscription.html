@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css?v=20260508a" />
   <link rel="stylesheet" href="/css/pages/settings.css?v=20260509d" />
-  <link rel="stylesheet" href="/css/pages/subscription.css?v=20260509a" />
+  <link rel="stylesheet" href="/css/pages/subscription.css?v=20260510a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -45,14 +45,16 @@
     <main id="main-content" class="settings-main">
 
       <!-- -- Status & Plan --------------------------- -->
-      <section class="settings-card" id="sub-status-section">
-        <div class="card-head">
-          <h2 class="card-title" data-i18n="sub_mgmt_status_title">Subscription status</h2>
-          <p class="card-desc">Your current plan and billing details.</p>
-        </div>
-
-        <div class="sub-status-block" id="subStatusBlock">
-          <div class="sub-status-loading" data-i18n="settings_loading">Loading...</div>
+      <section class="settings-card sub-hero-card" id="sub-status-section">
+        <div class="sub-hero-shell">
+          <div class="sub-hero-copy">
+            <span class="sub-hero-kicker">Billing overview</span>
+            <h1 class="sub-hero-title">Subscription, billing, and business access in one place.</h1>
+            <p class="sub-hero-sub">Clear renewal timing, direct plan actions, and a visible roster of every business tied to your account.</p>
+          </div>
+          <div class="sub-status-block" id="subStatusBlock">
+            <div class="sub-status-loading" data-i18n="settings_loading">Loading...</div>
+          </div>
         </div>
 
         <div class="sub-stripe-note">
@@ -74,8 +76,8 @@
 
         <div class="sub-plans-head">
           <span class="sub-plans-kicker">Plans &amp; Pricing</span>
-          <h2 class="sub-plans-title">Built for how you actually work.</h2>
-          <p class="sub-plans-sub">Start free. Upgrade when you need the full picture&#x202F;&mdash; receipts, mileage, exports, analytics, and no transaction limits.</p>
+          <h2 class="sub-plans-title">A cleaner billing surface with one primary action per state.</h2>
+          <p class="sub-plans-sub">Compare plans, see the real total before Stripe, and act directly from the page without hunting through settings.</p>
         </div>
 
         <div class="sub-plans-grid">
@@ -162,7 +164,7 @@
 
             <div class="sub-plan-cta-area">
               <button type="button" id="planProBtn" class="sub-cta-primary" data-i18n="subscription_pro_cta">Upgrade to Pro</button>
-              <p class="sub-plan-checkout-note">Review total and pay securely in Stripe.</p>
+              <p class="sub-plan-checkout-note">Secure checkout opens in Stripe when a new subscription is needed.</p>
             </div>
           </div>
 
@@ -257,7 +259,7 @@
       <section class="settings-card" id="sub-access-section">
         <div class="card-head">
           <h2 class="card-title" data-i18n="subscription_business_access_title">Business access</h2>
-          <p class="card-desc" data-i18n="subscription_business_access_desc">Manage additional businesses on your Pro subscription.</p>
+          <p class="card-desc">See every business on this account, manage add-on capacity, and delete a specific business directly from here.</p>
         </div>
         <div id="businessSlotsManager">
           <div class="sub-status-loading" data-i18n="settings_loading">Loading&#x2026;</div>
@@ -276,56 +278,6 @@
       </section>
 
     </main>
-  </div>
-
-  <!-- Checkout modal -->
-  <div id="subCheckoutModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="subCheckoutModalTitle">
-    <div class="transaction-modal-content sub-checkout-modal">
-      <div class="sub-checkout-head">
-        <div class="sub-checkout-kicker">Secure checkout</div>
-        <h3 id="subCheckoutModalTitle">Review your subscription</h3>
-        <p class="sub-checkout-copy">You&#x2019;ll be redirected to Stripe to enter payment details and complete your subscription securely.</p>
-      </div>
-      <div class="sub-checkout-card">
-        <div class="sub-checkout-row">
-          <span class="sub-checkout-label">Plan</span>
-          <strong id="subCheckoutPlanLabel">Pro</strong>
-        </div>
-        <div class="sub-checkout-row">
-          <span class="sub-checkout-label">Billing</span>
-          <strong id="subCheckoutIntervalLabel">Monthly</strong>
-        </div>
-        <div class="sub-checkout-row">
-          <span class="sub-checkout-label">Currency</span>
-          <strong id="subCheckoutCurrencyLabel">USD</strong>
-        </div>
-        <div class="sub-checkout-row">
-          <span class="sub-checkout-label">Additional businesses</span>
-          <strong id="subCheckoutAddonCount">0</strong>
-        </div>
-        <div class="sub-checkout-row">
-          <span class="sub-checkout-label">Plan total</span>
-          <strong id="subCheckoutBaseTotal">&#x2014;</strong>
-        </div>
-        <div class="sub-checkout-row">
-          <span class="sub-checkout-label">Add-on total</span>
-          <strong id="subCheckoutAddonTotal">&#x2014;</strong>
-        </div>
-        <div class="sub-checkout-row sub-checkout-row-total">
-          <span class="sub-checkout-label">Estimated total</span>
-          <strong id="subCheckoutGrandTotal">&#x2014;</strong>
-        </div>
-      </div>
-      <div class="sub-checkout-points">
-        <div class="sub-checkout-point">Hosted securely by Stripe</div>
-        <div class="sub-checkout-point">Final taxes and payment details confirmed there</div>
-        <div class="sub-checkout-point">You can return here if you cancel before paying</div>
-      </div>
-      <div class="modal-actions">
-        <button type="button" id="subCheckoutCancel" class="modal-cancel">Cancel</button>
-        <button type="button" id="subCheckoutConfirm" class="drawer-submit">Continue to secure checkout</button>
-      </div>
-    </div>
   </div>
 
   <!-- Cancel subscription modal -->
@@ -366,6 +318,28 @@
     </div>
   </div>
 
+  <div id="subBusinessDeleteModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="subBusinessDeleteTitle">
+    <div class="transaction-modal-content danger-modal">
+      <div class="danger-modal-icon" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none">
+          <path d="M8 3L14 13H2L8 3Z"></path>
+          <line x1="8" y1="7" x2="8" y2="10"></line>
+          <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
+        </svg>
+      </div>
+      <h3 id="subBusinessDeleteTitle">Delete this business?</h3>
+      <p id="subBusinessDeleteBody">This permanently deletes the selected business and its associated records.</p>
+      <label class="sub-business-delete-field" for="subBusinessDeletePassword">
+        <span>Confirm with your password</span>
+        <input id="subBusinessDeletePassword" type="password" autocomplete="current-password" />
+      </label>
+      <div class="modal-actions danger-actions">
+        <button type="button" id="subBusinessDeleteCancel" class="modal-cancel">Cancel</button>
+        <button type="button" id="subBusinessDeleteConfirm" class="modal-delete">Delete business</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="subToast" class="settings-toast hidden" role="status" aria-live="polite">
     <span id="subToastMessage">Saved</span>
@@ -378,6 +352,6 @@
   <script src="../js/trial.js?v=20260502g"></script>
   <script src="../js/taxReminders.js?v=20260502g"></script>
   <script src="../js/billing-pricing.js?v=20260419a"></script>
-  <script src="../js/subscription.js?v=20260509b"></script>
+  <script src="../js/subscription.js?v=20260510a"></script>
 </body>
 </html>

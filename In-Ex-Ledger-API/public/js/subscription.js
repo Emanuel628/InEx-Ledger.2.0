@@ -13,6 +13,13 @@ const pricingState = {
   verifiedPricingCurrency: null
 };
 let currentSubscription = null;
+let pendingDeleteBusinessId = null;
+const subscriptionBusinessesState = {
+  items: [],
+  activeBusinessId: "",
+  error: "",
+  isLoaded: false
+};
 const businessSlotsState = {
   currentAdditionalBusinesses: 0,
   selectedAdditionalBusinesses: 0,
@@ -272,27 +279,16 @@ async function initPricingControls() {
 function setCheckoutLoading(isLoading) {
   pricingState.isCheckoutLoading = isLoading;
   const planProBtn = document.getElementById("planProBtn");
-  const checkoutConfirmBtn = document.getElementById("subCheckoutConfirm");
   const defaultLabel = planProBtn?.dataset.defaultLabel || planProBtn?.textContent || "";
-  const defaultCheckoutLabel =
-    checkoutConfirmBtn?.dataset.defaultLabel || checkoutConfirmBtn?.textContent || "";
   if (isLoading) {
     if (planProBtn) {
       planProBtn.disabled = true;
       planProBtn.textContent = tx("subscription_checkout_loading");
     }
-    if (checkoutConfirmBtn) {
-      checkoutConfirmBtn.disabled = true;
-      checkoutConfirmBtn.textContent = tx("subscription_checkout_loading");
-    }
   } else {
     if (planProBtn) {
       planProBtn.disabled = planProBtn.dataset.planDisabled === "true";
       planProBtn.textContent = defaultLabel;
-    }
-    if (checkoutConfirmBtn) {
-      checkoutConfirmBtn.disabled = false;
-      checkoutConfirmBtn.textContent = defaultCheckoutLabel;
     }
   }
 }
@@ -301,11 +297,112 @@ function updatePlanCardState(sub) {
   const planFree = document.getElementById("planFree");
   const planPro = document.getElementById("planPro");
   const selectedPlanCode = sub?.selectedPlanCode || sub?.planCode || (sub?.effectiveTier === "v1" ? "v1" : "free");
-  const isCurrentFree = !sub || !!sub.cancelAtPeriodEnd || selectedPlanCode !== "v1";
-  const isCurrentPro = !!sub && !sub.cancelAtPeriodEnd && selectedPlanCode === "v1";
+  const isCurrentFree = !sub || !!sub.cancelAtPeriodEnd || !!sub?.isCanceledWithRemainingAccess || selectedPlanCode !== "v1";
+  const isCurrentPro = !!sub && !sub.cancelAtPeriodEnd && !sub.isCanceledWithRemainingAccess && selectedPlanCode === "v1";
 
   planFree?.classList.toggle("is-current", isCurrentFree);
   planPro?.classList.toggle("is-current", isCurrentPro);
+}
+
+function getSelectedPlanCode(sub) {
+  return sub?.selectedPlanCode || sub?.planCode || (sub?.effectiveTier === "v1" ? "v1" : "free");
+}
+
+function getPrimaryPlanAction(sub) {
+  if (!sub) {
+    return { mode: "checkout", label: tx("subscription_pro_cta"), disabled: false };
+  }
+
+  const selectedPlanCode = getSelectedPlanCode(sub);
+
+  if (sub.isPaid && sub.cancelAtPeriodEnd && sub.stripeSubscriptionId && !sub.isTrialing) {
+    return { mode: "resume", label: "Keep Pro active", disabled: false };
+  }
+
+  if (sub.isPaid && !sub.cancelAtPeriodEnd && !sub.isCanceledWithRemainingAccess) {
+    return { mode: "current", label: tx("subscription_current_plan"), disabled: true };
+  }
+
+  if (sub.isTrialing && selectedPlanCode !== "v1") {
+    return { mode: "checkout", label: "Continue with Pro", disabled: false };
+  }
+
+  if (sub.isTrialing) {
+    return { mode: "checkout", label: "Set up Pro billing", disabled: false };
+  }
+
+  if (sub.isCanceledWithRemainingAccess) {
+    return { mode: "checkout", label: "Start a new Pro cycle", disabled: false };
+  }
+
+  return { mode: "checkout", label: tx("subscription_pro_cta"), disabled: false };
+}
+
+function buildStatusPanelMarkup(sub) {
+  if (!sub) {
+    return `<p class="sub-status-error">${tx("sub_mgmt_load_error")}</p>`;
+  }
+
+  let badgeClass = "sub-badge-free";
+  let badgeLabel = tx("sub_mgmt_badge_free");
+  let headline = "Basic plan";
+  let detail = tx("sub_mgmt_free_desc");
+
+  if (sub.isTrialing && sub.trialEndsAt) {
+    badgeClass = "sub-badge-trial";
+    badgeLabel = tx("sub_mgmt_badge_trial");
+    headline = `Pro trial ends ${fmtDate(sub.trialEndsAt)}`;
+    detail = getSelectedPlanCode(sub) !== "v1"
+      ? `Basic is selected after trial, but Pro access stays live until ${fmtDate(sub.trialEndsAt)}.`
+      : "Finish billing setup before the trial ends to avoid interruption.";
+  } else if (sub.cancelAtPeriodEnd && sub.currentPeriodEnd) {
+    badgeClass = "sub-badge-canceling";
+    badgeLabel = tx("sub_mgmt_badge_canceling");
+    headline = `Pro access stays on until ${fmtDate(sub.currentPeriodEnd)}`;
+    detail = "Renewal is off. You can keep the current Pro subscription active without starting a second checkout.";
+  } else if (sub.isPaid && sub.currentPeriodEnd) {
+    badgeClass = "sub-badge-active";
+    badgeLabel = tx("sub_mgmt_badge_pro");
+    headline = `Pro renews ${fmtDate(sub.currentPeriodEnd)}`;
+    detail = "Payment method, invoices, and renewal settings are managed securely in Stripe.";
+  } else if (sub.isCanceledWithRemainingAccess && sub.currentPeriodEnd) {
+    badgeClass = "sub-badge-canceling";
+    badgeLabel = "Ended in Stripe";
+    headline = `Access remains until ${fmtDate(sub.currentPeriodEnd)}`;
+    detail = "Your last Pro cycle is still available. Starting a new Pro cycle creates fresh billing in Stripe.";
+  }
+
+  const additionalBusinesses = Number(sub.additionalBusinesses || 0);
+  const totalBusinesses = 1 + additionalBusinesses;
+  const billingIntervalLabel = sub.billingInterval === "yearly" ? "Yearly" : "Monthly";
+  const currencyLabel = String(sub.currency || pricingState.currency || "usd").toUpperCase();
+
+  return `
+    <div class="sub-status-spotlight">
+      <div class="sub-status-spotlight-top">
+        <span class="sub-status-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>
+        <span class="sub-status-plan-pill">${escapeHtml(sub.effectiveTier === "v1" ? "Pro" : "Basic")}</span>
+      </div>
+      <h2 class="sub-status-headline">${escapeHtml(headline)}</h2>
+      <p class="sub-status-copy">${escapeHtml(detail)}</p>
+      <div class="sub-status-stats">
+        <article class="sub-status-stat-card">
+          <span class="sub-status-stat-label">Billing cycle</span>
+          <strong class="sub-status-stat-value">${escapeHtml(billingIntervalLabel)}</strong>
+          <span class="sub-status-stat-meta">${escapeHtml(currencyLabel)} pricing</span>
+        </article>
+        <article class="sub-status-stat-card">
+          <span class="sub-status-stat-label">Businesses allowed</span>
+          <strong class="sub-status-stat-value">${totalBusinesses}</strong>
+          <span class="sub-status-stat-meta">${additionalBusinesses > 0 ? `${additionalBusinesses} paid add-on${additionalBusinesses === 1 ? "" : "s"}` : "1 included with your plan"}</span>
+        </article>
+        <article class="sub-status-stat-card">
+          <span class="sub-status-stat-label">Billing system</span>
+          <strong class="sub-status-stat-value">Stripe</strong>
+          <span class="sub-status-stat-meta">Portal, invoices, and payment method</span>
+        </article>
+      </div>
+    </div>`;
 }
 
 function initSubNav() {
@@ -339,6 +436,135 @@ function initSubNav() {
     );
     targets.forEach(({ target }) => observer.observe(target));
   }
+}
+
+async function loadBusinessRoster() {
+  try {
+    const response = await apiFetch("/api/businesses");
+    if (!response || !response.ok) {
+      subscriptionBusinessesState.items = [];
+      subscriptionBusinessesState.activeBusinessId = "";
+      subscriptionBusinessesState.error = "Failed to load businesses.";
+      subscriptionBusinessesState.isLoaded = true;
+      return false;
+    }
+
+    const payload = await response.json().catch(() => null);
+    subscriptionBusinessesState.items = Array.isArray(payload?.businesses) ? payload.businesses : [];
+    subscriptionBusinessesState.activeBusinessId = payload?.active_business_id || "";
+    subscriptionBusinessesState.error = "";
+    subscriptionBusinessesState.isLoaded = true;
+    return true;
+  } catch (err) {
+    console.error("[Subscription] Failed to load businesses:", err);
+    subscriptionBusinessesState.items = [];
+    subscriptionBusinessesState.activeBusinessId = "";
+    subscriptionBusinessesState.error = "Failed to load businesses.";
+    subscriptionBusinessesState.isLoaded = true;
+    return false;
+  }
+}
+
+function buildBusinessRosterMarkup(sub) {
+  if (!subscriptionBusinessesState.isLoaded) {
+    return `
+      <div class="sub-business-roster-card">
+        <div class="sub-business-roster-head">
+          <div>
+            <h3>Businesses on this account</h3>
+            <p>Loading your businesses…</p>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  if (subscriptionBusinessesState.error) {
+    return `
+      <div class="sub-business-roster-card">
+        <div class="sub-business-roster-head">
+          <div>
+            <h3>Businesses on this account</h3>
+            <p class="sub-business-roster-error">${escapeHtml(subscriptionBusinessesState.error)}</p>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const businesses = Array.isArray(subscriptionBusinessesState.items) ? subscriptionBusinessesState.items : [];
+  const activeId = subscriptionBusinessesState.activeBusinessId || "";
+  const billingOwnerId = sub?.businessId || "";
+  const canDeleteMultiple = businesses.length > 1;
+
+  return `
+    <aside class="sub-business-roster-card">
+      <div class="sub-business-roster-head">
+        <div>
+          <h3>Businesses on this account</h3>
+          <p>Delete a specific business directly here instead of leaving billing.</p>
+        </div>
+        <span class="sub-business-roster-count">${businesses.length}</span>
+      </div>
+      <div class="sub-business-roster-list">
+        ${businesses.length
+          ? businesses.map((biz) => `
+            <article class="sub-business-item ${biz.id === activeId ? "is-active" : ""}">
+              <div class="sub-business-item-copy">
+                <div class="sub-business-item-title-row">
+                  <h4>${escapeHtml(biz.name || "Business")}</h4>
+                  <div class="sub-business-item-badges">
+                    ${biz.id === activeId ? `<span class="sub-business-badge">Active</span>` : ""}
+                    ${biz.id === billingOwnerId ? `<span class="sub-business-badge is-billing">Billing owner</span>` : ""}
+                  </div>
+                </div>
+                <p>${biz.id === billingOwnerId ? "This business owns the current billing relationship." : "Operational workspace on this account."}</p>
+              </div>
+              <div class="sub-business-item-actions">
+                ${biz.id !== activeId ? `<button type="button" class="settings-secondary-btn" data-business-switch="${escapeHtml(biz.id)}">Switch</button>` : ""}
+                <button
+                  type="button"
+                  class="danger-outline-btn"
+                  data-business-delete="${escapeHtml(biz.id)}"
+                  data-business-name="${escapeHtml(biz.name || "Business")}"
+                  ${!canDeleteMultiple ? "disabled" : ""}
+                >
+                  Delete business
+                </button>
+              </div>
+            </article>
+          `).join("")
+          : `<p class="sub-empty-msg">No businesses found.</p>`}
+      </div>
+    </aside>`;
+}
+
+function wireBusinessRosterActions() {
+  document.querySelectorAll("[data-business-switch]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const businessId = button.getAttribute("data-business-switch");
+      if (!businessId) return;
+      button.disabled = true;
+      try {
+        const res = await apiFetch(`/api/businesses/${businessId}/activate`, { method: "POST" });
+        if (!res || !res.ok) {
+          const payload = await res?.json()?.catch(() => null);
+          throw new Error(payload?.error || "Failed to switch business.");
+        }
+        window.location.reload();
+      } catch (err) {
+        showSubToast(err.message || "Failed to switch business.");
+        button.disabled = false;
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-business-delete]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const businessId = button.getAttribute("data-business-delete");
+      const businessName = button.getAttribute("data-business-name") || "Business";
+      if (!businessId) return;
+      openBusinessDeleteModal(businessId, businessName);
+    });
+  });
 }
 
 function buildFreeTierConfirmationMessage(sub) {
@@ -555,27 +781,17 @@ function renderBusinessAccessSection(sub) {
     proCardAddonGroup.classList.toggle("hidden", canManageSlots || isCancelingPro || isEndedProWithRemainingAccess);
   }
 
-  if (!isProTier) {
-    manager.innerHTML = `
-      <div class="sub-access-message-card">
-        <p class="sub-access-upgrade-note">${escapeHtml(tx("subscription_business_access_upgrade_note"))}</p>
-      </div>`;
-    return;
-  }
-
-  businessSlotsState.currentAdditionalBusinesses = sub.additionalBusinesses || 0;
-  businessSlotsState.selectedAdditionalBusinesses = sub.additionalBusinesses || 0;
-
-  const extra = sub.additionalBusinesses || 0;
+  const extra = Number(sub?.additionalBusinesses || 0);
   const total = 1 + extra;
-  const selectionSummary = extra > 0 ? `1 included + ${extra} additional` : "1 included only";
+  businessSlotsState.currentAdditionalBusinesses = extra;
+  businessSlotsState.selectedAdditionalBusinesses = extra;
 
   const statsHtml = `
     <div class="sub-access-overview">
       <article class="sub-access-stat">
         <span class="sub-access-stat-label">${escapeHtml(tx("subscription_included_businesses"))}</span>
         <strong class="sub-access-stat-value">1</strong>
-        <span class="sub-access-stat-meta">Included with Pro</span>
+        <span class="sub-access-stat-meta">Included with the base plan</span>
       </article>
       <article class="sub-access-stat">
         <span class="sub-access-stat-label">${escapeHtml(tx("subscription_extra_business_slots"))}</span>
@@ -584,62 +800,97 @@ function renderBusinessAccessSection(sub) {
       </article>
       <article class="sub-access-stat">
         <span class="sub-access-stat-label">${escapeHtml(tx("subscription_total_businesses_allowed"))}</span>
-        <strong class="sub-access-stat-value">${total}</strong>
-        <span class="sub-access-stat-meta">Available workspaces</span>
+        <strong class="sub-access-stat-value">${isProTier ? total : 1}</strong>
+        <span class="sub-access-stat-meta">${isProTier ? "Maximum workspaces on the current plan" : "Upgrade to unlock more businesses"}</span>
       </article>
     </div>`;
+
+  const rosterHtml = buildBusinessRosterMarkup(sub);
+
+  if (!isProTier) {
+    manager.innerHTML = `
+      ${statsHtml}
+      <div class="sub-access-layout">
+        <div class="sub-access-main">
+          <div class="sub-access-message-card">
+            <p class="sub-access-upgrade-note">${escapeHtml(tx("subscription_business_access_upgrade_note"))}</p>
+          </div>
+        </div>
+        ${rosterHtml}
+      </div>`;
+    wireBusinessRosterActions();
+    return;
+  }
 
   if (isCancelingPro) {
     manager.innerHTML = `
       ${statsHtml}
-      <div class="sub-access-message-card">
-        <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceling_help"))}</p>
+      <div class="sub-access-layout">
+        <div class="sub-access-main">
+          <div class="sub-access-message-card">
+            <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceling_help"))}</p>
+          </div>
+        </div>
+        ${rosterHtml}
       </div>`;
+    wireBusinessRosterActions();
     return;
   }
 
   if (isEndedProWithRemainingAccess) {
     manager.innerHTML = `
       ${statsHtml}
-      <div class="sub-access-message-card">
-        <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceled_help"))}</p>
+      <div class="sub-access-layout">
+        <div class="sub-access-main">
+          <div class="sub-access-message-card">
+            <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceled_help"))}</p>
+          </div>
+        </div>
+        ${rosterHtml}
       </div>`;
+    wireBusinessRosterActions();
     return;
   }
 
   const stateMsg = extra === 0
-    ? "You have 1 business — included with Pro."
+    ? "You have 1 business included with Pro."
     : extra === 1
-      ? `You have ${total} businesses — 1 included with Pro, 1 add-on.`
-      : `You have ${total} businesses — 1 included with Pro, ${extra} add-ons.`;
+      ? `You have ${total} businesses: 1 included and 1 add-on.`
+      : `You have ${total} businesses: 1 included and ${extra} add-ons.`;
 
   manager.innerHTML = `
     ${statsHtml}
-    <div class="sub-slots-panel">
-      <div class="sub-slots-panel-head">
-        <div class="sub-slots-panel-copy">
-          <h3>Additional businesses</h3>
-          <p>1 business is included with Pro. Each one beyond that is a paid add-on.</p>
-        </div>
-        <div class="sub-slots-price-pill">${escapeHtml(tx("subscription_extra_business_slots_help"))}</div>
-      </div>
-      <div class="sub-slots-actions">
-        <p class="sub-slots-state-label" id="slotsStateLabel">${escapeHtml(stateMsg)}</p>
-        <div class="sub-slots-btn-row">
-          <button type="button" id="removeSlotBtn" class="sub-slots-remove-btn"${extra <= 0 ? " disabled" : ""}>Remove a business</button>
-          <button type="button" id="addSlotBtn" class="sub-slots-add-btn">Add a business</button>
-        </div>
-        <div id="removeSlotConfirm" class="sub-slots-remove-confirm hidden">
-          <p>This removes 1 business slot from your bill. Make sure no active data is assigned to it first.</p>
-          <div class="sub-slots-confirm-btns">
-            <button type="button" id="removeSlotCancelBtn" class="sub-slots-confirm-cancel">Keep it</button>
-            <button type="button" id="removeSlotConfirmBtn" class="sub-slots-confirm-ok">Yes, remove it</button>
+    <div class="sub-access-layout">
+      <div class="sub-access-main">
+        <div class="sub-slots-panel">
+          <div class="sub-slots-panel-head">
+            <div class="sub-slots-panel-copy">
+              <h3>Business capacity</h3>
+              <p>Add or remove paid business slots. Changes stay aligned with the billing cycle and Stripe handles the billing math.</p>
+            </div>
+            <div class="sub-slots-price-pill">${escapeHtml(tx("subscription_extra_business_slots_help"))}</div>
+          </div>
+          <div class="sub-slots-actions">
+            <p class="sub-slots-state-label" id="slotsStateLabel">${escapeHtml(stateMsg)}</p>
+            <div class="sub-slots-btn-row">
+              <button type="button" id="removeSlotBtn" class="sub-slots-remove-btn"${extra <= 0 ? " disabled" : ""}>Remove a business</button>
+              <button type="button" id="addSlotBtn" class="sub-slots-add-btn">Add a business</button>
+            </div>
+            <div id="removeSlotConfirm" class="sub-slots-remove-confirm hidden">
+              <p>This removes 1 business slot from your bill. Make sure the business you want gone is deleted first.</p>
+              <div class="sub-slots-confirm-btns">
+                <button type="button" id="removeSlotCancelBtn" class="sub-slots-confirm-cancel">Keep it</button>
+                <button type="button" id="removeSlotConfirmBtn" class="sub-slots-confirm-ok">Yes, remove it</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+      ${rosterHtml}
     </div>`;
 
   wireSlotActions();
+  wireBusinessRosterActions();
 }
 
 async function loadSubscription() {
@@ -681,44 +932,10 @@ async function loadSubscription() {
     }
     pricingState.additionalBusinesses = clampAdditionalBusinesses(Number(sub.additionalBusinesses || 0));
     updatePricingUI();
+    await loadBusinessRoster();
 
     if (statusBlock) {
-      let statusHtml = "";
-      let statusClass = "sub-status-free";
-      const selectedPlanCode = sub.selectedPlanCode || sub.planCode || (sub.effectiveTier === "v1" ? "v1" : "free");
-      const isTrialDowngradedToFree = sub.isTrialing && selectedPlanCode !== "v1";
-
-      if (sub.isTrialing && sub.trialEndsAt) {
-        statusClass = "sub-status-trial";
-        statusHtml = `
-          <div class="sub-status-row">
-            <span class="sub-status-badge sub-badge-trial">${tx("sub_mgmt_badge_trial")}</span>
-            <span class="sub-status-detail">${tx("sub_mgmt_trial_ends")}: <strong>${fmtDate(sub.trialEndsAt)}</strong></span>
-          </div>
-          ${isTrialDowngradedToFree ? `<div class="sub-status-row"><span class="sub-status-detail">Basic is selected for after the trial. You still keep Pro trial access until <strong>${fmtDate(sub.trialEndsAt)}</strong>.</span></div>` : ""}`;
-      } else if (sub.cancelAtPeriodEnd && sub.currentPeriodEnd) {
-        statusClass = "sub-status-canceling";
-        statusHtml = `
-          <div class="sub-status-row">
-            <span class="sub-status-badge sub-badge-canceling">${tx("sub_mgmt_badge_canceling")}</span>
-            <span class="sub-status-detail">${tx("sub_mgmt_access_until")}: <strong>${fmtDate(sub.currentPeriodEnd)}</strong></span>
-          </div>`;
-      } else if (sub.isPaid && sub.currentPeriodEnd) {
-        statusClass = "sub-status-active";
-        statusHtml = `
-          <div class="sub-status-row">
-            <span class="sub-status-badge sub-badge-active">${tx("sub_mgmt_badge_pro")}</span>
-            <span class="sub-status-detail">${tx("sub_mgmt_renews")}: <strong>${fmtDate(sub.currentPeriodEnd)}</strong></span>
-          </div>`;
-      } else {
-        statusHtml = `
-          <div class="sub-status-row">
-            <span class="sub-status-badge sub-badge-free">${tx("sub_mgmt_badge_free")}</span>
-            <span class="sub-status-detail">${tx("sub_mgmt_free_desc")}</span>
-          </div>`;
-      }
-
-      statusBlock.innerHTML = `<div class="sub-status-inner ${statusClass}">${statusHtml}</div>`;
+      statusBlock.innerHTML = buildStatusPanelMarkup(sub);
     }
 
     if (cancelModalBody && sub.currentPeriodEnd) {
@@ -743,22 +960,17 @@ async function loadSubscription() {
     renderBusinessAccessSection(sub);
 
     if (planProBtn) {
-      const selectedPlanCode = sub.selectedPlanCode || sub.planCode || (sub.effectiveTier === "v1" ? "v1" : "free");
-      if (sub.isPaid && !sub.cancelAtPeriodEnd) {
-        planProBtn.disabled = true;
-        planProBtn.textContent = tx("subscription_current_plan");
-        planProBtn.dataset.planDisabled = "true";
-      } else {
-        planProBtn.disabled = false;
-        planProBtn.textContent = tx("subscription_pro_cta");
-        planProBtn.dataset.planDisabled = "false";
-      }
+      const action = getPrimaryPlanAction(sub);
+      planProBtn.disabled = action.disabled;
+      planProBtn.textContent = action.label;
+      planProBtn.dataset.planDisabled = action.disabled ? "true" : "false";
+      planProBtn.dataset.actionMode = action.mode;
       planProBtn.dataset.defaultLabel = planProBtn.textContent;
     }
 
     if (planFreeBtn) {
-      const selectedPlanCode = sub.selectedPlanCode || sub.planCode || (sub.effectiveTier === "v1" ? "v1" : "free");
-      if (sub.cancelAtPeriodEnd) {
+      const selectedPlanCode = getSelectedPlanCode(sub);
+      if (sub.cancelAtPeriodEnd || sub.isCanceledWithRemainingAccess) {
         planFreeBtn.disabled = true;
         planFreeBtn.textContent = tx("subscription_free_pending");
       } else if (selectedPlanCode !== "v1") {
@@ -846,79 +1058,37 @@ async function loadBillingHistory() {
   }
 }
 
-function populateCheckoutModal() {
-  const intervalLabel = tx(
-    pricingState.billingInterval === "yearly"
-      ? "subscription_billing_yearly"
-      : "subscription_billing_monthly"
-  );
-  const currencyLabel = String(pricingState.currency || "usd").toUpperCase();
-  const pricing = getPricingDetails();
-  const baseTotal = formatMoney(pricingState.currency, pricing.base);
-  const addonTotal = formatMoney(pricingState.currency, getAddonTotalAmount());
-  const grandTotal = formatMoney(pricingState.currency, getGrandTotalAmount());
-
-  const planEl = document.getElementById("subCheckoutPlanLabel");
-  const intervalEl = document.getElementById("subCheckoutIntervalLabel");
-  const currencyEl = document.getElementById("subCheckoutCurrencyLabel");
-  const addonCountEl = document.getElementById("subCheckoutAddonCount");
-  const baseTotalEl = document.getElementById("subCheckoutBaseTotal");
-  const addonTotalEl = document.getElementById("subCheckoutAddonTotal");
-  const grandTotalEl = document.getElementById("subCheckoutGrandTotal");
-
-  if (planEl) planEl.textContent = "Pro";
-  if (intervalEl) intervalEl.textContent = intervalLabel;
-  if (currencyEl) currencyEl.textContent = currencyLabel;
-  if (addonCountEl) {
-    addonCountEl.textContent = pricingState.additionalBusinesses > 0
-      ? String(pricingState.additionalBusinesses)
-      : "None";
-  }
-  if (baseTotalEl) baseTotalEl.textContent = baseTotal;
-  if (addonTotalEl) addonTotalEl.textContent = pricingState.additionalBusinesses > 0 ? addonTotal : formatMoney(pricingState.currency, 0);
-  if (grandTotalEl) grandTotalEl.textContent = grandTotal;
-}
-
-function openCheckoutModal() {
-  if (pricingState.isCheckoutLoading) {
-    return;
-  }
-  const modal = document.getElementById("subCheckoutModal");
-  if (!modal) {
-    void startCheckout();
-    return;
-  }
-  populateCheckoutModal();
-  modal.classList.remove("hidden");
-}
-
-function closeCheckoutModal() {
-  document.getElementById("subCheckoutModal")?.classList.add("hidden");
-}
-
-function wireCheckoutModal() {
-  const modal = document.getElementById("subCheckoutModal");
-  const cancelBtn = document.getElementById("subCheckoutCancel");
-  const confirmBtn = document.getElementById("subCheckoutConfirm");
-
-  if (!modal || !cancelBtn || !confirmBtn) {
-    return;
-  }
-
-  confirmBtn.dataset.defaultLabel = confirmBtn.textContent || "";
-
-  cancelBtn.addEventListener("click", closeCheckoutModal);
-  confirmBtn.addEventListener("click", startCheckout);
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal && !pricingState.isCheckoutLoading) {
-      closeCheckoutModal();
+async function resumeSubscription() {
+  try {
+    setCheckoutLoading(true);
+    const res = await apiFetch("/api/billing/resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    const payload = await res?.json()?.catch(() => null);
+    if (!res || !res.ok) {
+      throw new Error(payload?.error || "Failed to keep Pro active.");
     }
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modal.classList.contains("hidden") && !pricingState.isCheckoutLoading) {
-      closeCheckoutModal();
-    }
-  });
+    showSubToast("Pro renewal is active again.");
+    currentSubscription = await loadSubscription();
+    await loadBillingHistory();
+  } catch (err) {
+    showSubToast(err.message || "Failed to keep Pro active.");
+  } finally {
+    setCheckoutLoading(false);
+  }
+}
+
+async function handlePrimaryPlanAction() {
+  const actionMode = document.getElementById("planProBtn")?.dataset.actionMode || "checkout";
+  if (actionMode === "current") {
+    return;
+  }
+  if (actionMode === "resume") {
+    await resumeSubscription();
+    return;
+  }
+  await startCheckout();
 }
 
 async function startCheckout() {
@@ -947,7 +1117,6 @@ async function startCheckout() {
       if (!isAllowedBillingRedirect(payload.url)) {
         throw new Error(tx("subscription_checkout_error"));
       }
-      closeCheckoutModal();
       window.location.href = payload.url;
       return;
     }
@@ -977,6 +1146,91 @@ async function openCustomerPortal() {
   } catch (err) {
     showSubToast(err.message || tx("subscription_portal_error"));
   }
+}
+
+function openBusinessDeleteModal(businessId, businessName) {
+  pendingDeleteBusinessId = businessId;
+  const modal = document.getElementById("subBusinessDeleteModal");
+  const body = document.getElementById("subBusinessDeleteBody");
+  const passwordInput = document.getElementById("subBusinessDeletePassword");
+  const remainingBusinesses = Math.max((subscriptionBusinessesState.items || []).length - 1, 0);
+  const nextAdditionalBusinesses = Math.max(remainingBusinesses - 1, 0);
+  const currentAdditionalBusinesses = Number(currentSubscription?.additionalBusinesses || 0);
+
+  if (body) {
+    const lines = [
+      `<span>This permanently deletes <strong>${escapeHtml(businessName)}</strong> and its associated data.</span>`,
+      `<span>You will have <strong>${remainingBusinesses}</strong> business${remainingBusinesses === 1 ? "" : "es"} remaining.</span>`
+    ];
+
+    if (currentSubscription?.effectiveTier === "v1") {
+      lines.push(
+        `<span>Your paid add-on count will change from <strong>${currentAdditionalBusinesses}</strong> to <strong>${nextAdditionalBusinesses}</strong>.</span>`
+      );
+    }
+
+    body.innerHTML = lines.join("<br /><br />");
+  }
+
+  if (passwordInput) {
+    passwordInput.value = "";
+  }
+  modal?.classList.remove("hidden");
+  setTimeout(() => passwordInput?.focus(), 0);
+}
+
+function closeBusinessDeleteModal() {
+  pendingDeleteBusinessId = null;
+  document.getElementById("subBusinessDeleteModal")?.classList.add("hidden");
+}
+
+function wireBusinessDeleteModal() {
+  const modal = document.getElementById("subBusinessDeleteModal");
+  const cancelBtn = document.getElementById("subBusinessDeleteCancel");
+  const confirmBtn = document.getElementById("subBusinessDeleteConfirm");
+  const passwordInput = document.getElementById("subBusinessDeletePassword");
+
+  cancelBtn?.addEventListener("click", closeBusinessDeleteModal);
+  modal?.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      closeBusinessDeleteModal();
+    }
+  });
+
+  confirmBtn?.addEventListener("click", async () => {
+    const password = passwordInput?.value || "";
+    if (!pendingDeleteBusinessId) return;
+    if (!password) {
+      showSubToast("Enter your password to delete this business.");
+      passwordInput?.focus();
+      return;
+    }
+
+    confirmBtn.disabled = true;
+    try {
+      const res = await apiFetch(`/api/businesses/${pendingDeleteBusinessId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password })
+      });
+      const payload = await res?.json()?.catch(() => null);
+      if (!res || !res.ok) {
+        throw new Error(payload?.error || "Failed to delete business.");
+      }
+
+      if (payload?.active_business && typeof applyActivatedBusinessContext === "function") {
+        applyActivatedBusinessContext(payload.active_business);
+      }
+      showSubToast("Business deleted.");
+      closeBusinessDeleteModal();
+      currentSubscription = await loadSubscription();
+      await loadBillingHistory();
+    } catch (err) {
+      showSubToast(err.message || "Failed to delete business.");
+    } finally {
+      confirmBtn.disabled = false;
+    }
+  });
 }
 
 function wireFreeTierModal() {
@@ -1031,13 +1285,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   await initPricingControls();
 
   const planProBtn = document.getElementById("planProBtn");
-  planProBtn?.addEventListener("click", openCheckoutModal);
-  wireCheckoutModal();
+  planProBtn?.addEventListener("click", () => {
+    void handlePrimaryPlanAction();
+  });
 
   const manageBillingBtn = document.getElementById("subManageBillingBtn");
   manageBillingBtn?.addEventListener("click", openCustomerPortal);
 
   wireFreeTierModal();
+  wireBusinessDeleteModal();
 
   const cancelBtn = document.getElementById("subCancelBtn");
   const cancelModal = document.getElementById("subCancelModal");

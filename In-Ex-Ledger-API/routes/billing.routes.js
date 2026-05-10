@@ -470,10 +470,6 @@ function hasBlockingStripeSubscription(subscription) {
   if (["active", "trialing", "past_due", "unpaid"].includes(status)) {
     return true;
   }
-  if (status === "canceled") {
-    const periodEndMs = Number(subscription.current_period_end || 0) * 1000;
-    return periodEndMs > Date.now();
-  }
   return false;
 }
 
@@ -707,15 +703,15 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
     }
 
-    // Block when any live Stripe subscription exists — including subscriptions
-    // scheduled to cancel at period end (cancel_at_period_end=true).  Allowing
-    // checkout in that state creates a second parallel subscription and double
-    // billing.  isCanceledWithRemainingAccess means Stripe already deleted the
-    // subscription; the user may create a new one while keeping access through
-    // the paid period.
-    if (subscription.isPaid || subscription.isCanceledWithRemainingAccess) {
+    if (subscription.isPaid && !subscription.cancelAtPeriodEnd && !subscription.isCanceledWithRemainingAccess) {
       return res.status(409).json({
         error: "This account already has paid Pro access or an overlapping paid period. Use Subscription to manage it instead of starting another checkout."
+      });
+    }
+
+    if (subscription.cancelAtPeriodEnd && subscription.stripeSubscriptionId && !subscription.isTrialing) {
+      return res.status(409).json({
+        error: "This Pro subscription is already active and scheduled to end. Use Keep Pro active instead of starting a new checkout."
       });
     }
 
@@ -840,6 +836,54 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
   } catch (err) {
     logError("POST /api/billing/customer-portal error:", err.message);
     res.status(500).json({ error: "Failed to open billing portal." });
+  }
+});
+
+router.post("/resume", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
+  try {
+    const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+
+    if (subscription.isTrialing) {
+      await setTrialPlanSelectionForBusiness(
+        billingBusinessId,
+        "v1",
+        normalizeAdditionalBusinesses(subscription.additionalBusinesses)
+      );
+      subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+      return res.status(200).json({ subscription });
+    }
+
+    if (!subscription.cancelAtPeriodEnd) {
+      return res.status(200).json({ subscription });
+    }
+
+    if (!subscription.stripeSubscriptionId) {
+      await pool.query(
+        `UPDATE business_subscriptions
+            SET cancel_at_period_end = false,
+                canceled_at = NULL,
+                updated_at = NOW()
+          WHERE business_id = $1`,
+        [billingBusinessId]
+      );
+      subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+      return res.status(200).json({ subscription });
+    }
+
+    await stripeRequest(`/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`, {
+      cancel_at_period_end: false,
+      proration_behavior: "none"
+    });
+    const stripeSubscription = await stripeGet(
+      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`
+    );
+    await syncStripeSubscriptionForBusiness(billingBusinessId, stripeSubscription);
+    subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    res.status(200).json({ subscription });
+  } catch (err) {
+    logError("POST /api/billing/resume error:", err.message);
+    res.status(500).json({ error: "Failed to resume subscription." });
   }
 });
 

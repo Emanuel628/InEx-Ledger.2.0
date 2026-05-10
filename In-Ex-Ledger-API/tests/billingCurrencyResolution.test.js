@@ -283,6 +283,27 @@ function loadBillingRouter({
       };
     }
 
+    if (/\/subscriptions\/[^/?]+$/.test(String(url))) {
+      const subscriptionId = String(url).split("/subscriptions/")[1];
+      return {
+        ok: true,
+        json: async () => ({
+          id: subscriptionId,
+          status: "active",
+          cancel_at_period_end: false,
+          current_period_start: Math.floor(Date.now() / 1000) - 86400,
+          current_period_end: Math.floor(Date.now() / 1000) + 86400 * 30,
+          customer: "cus_test_123",
+          metadata: {
+            billing_interval: "monthly",
+            currency: "usd",
+            additional_businesses: "0"
+          },
+          items: { data: [] }
+        })
+      };
+    }
+
     if (String(url).endsWith("/checkout/sessions")) {
       return {
         ok: true,
@@ -475,6 +496,41 @@ test("billing checkout blocks duplicate subscription creation when Stripe alread
   }
 });
 
+test("billing checkout allows a fresh checkout after Stripe has already canceled the prior subscription", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    existingStripeSubscription: {
+      id: "sub_canceled_live_access",
+      status: "canceled",
+      current_period_end: Math.floor(Date.now() / 1000) + 86400 * 14
+    },
+    subscriptionSnapshots: [
+      {
+        isPaid: true,
+        isCanceledWithRemainingAccess: true,
+        cancelAtPeriodEnd: false
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 0
+      });
+
+    assert.equal(res.status, 200);
+    const checkoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+    assert.ok(checkoutRequest, "Stripe checkout request should be created");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("billing checkout returns a validation error when pricing is not configured for the resolved currency", async () => {
   const fixture = loadBillingRouter({ country: "Canada" });
   const originalCadPrice = process.env.STRIPE_PRO_M_CA;
@@ -541,6 +597,47 @@ test("billing checkout normalizes downgraded trial state before creating Stripe 
 
     assert.ok(checkoutRequest, "Stripe checkout request should be created");
     assert.ok(checkoutRequest.body.get("subscription_data[trial_end]"));
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing resume clears cancel_at_period_end on the existing Stripe subscription", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [
+      {
+        isPaid: true,
+        isCanceledWithRemainingAccess: false,
+        isTrialing: false,
+        cancelAtPeriodEnd: true,
+        stripeSubscriptionId: "sub_resume_123",
+        additionalBusinesses: 2
+      },
+      {
+        isPaid: true,
+        isCanceledWithRemainingAccess: false,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        stripeSubscriptionId: "sub_resume_123",
+        additionalBusinesses: 2
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/resume")
+      .send({});
+
+    assert.equal(res.status, 200);
+
+    const resumeRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/subscriptions/sub_resume_123") &&
+      entry.body?.get("cancel_at_period_end") === "false"
+    );
+
+    assert.ok(resumeRequest, "Stripe subscription should be resumed in place");
   } finally {
     fixture.cleanup();
   }
