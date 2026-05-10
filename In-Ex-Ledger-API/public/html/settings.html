@@ -5,7 +5,7 @@
   <title>InEx Ledger - Settings</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css?v=20260508a" />
-  <link rel="stylesheet" href="/css/pages/settings.css?v=20260510b" />
+  <link rel="stylesheet" href="/css/pages/settings.css?v=20260510c" />
 </head>
 
 <body class="settings-page settings-loading">
@@ -248,6 +248,10 @@
             <h3 data-i18n="settings_accounting_lock_title">Accounting period lock</h3>
             <p data-i18n="settings_accounting_lock_desc">Block edits, deletes, and new transactions on or before a closing date.</p>
           </div>
+          <div class="settings-lock-state-bar" id="lockStateBar" aria-live="polite">
+            <span id="lockStateBadge" class="settings-lock-badge settings-lock-badge--unlocked">Unlocked</span>
+            <span id="lockStateDetail"></span>
+          </div>
           <form id="accountingLockForm" class="business-form">
             <div class="settings-form-grid">
               <div class="form-field">
@@ -283,7 +287,7 @@
             <div class="settings-row-copy">
               <div class="settings-row-title" data-i18n="settings_subscription_status_title">Subscription</div>
               <div class="settings-row-desc">
-                <span id="accountSubStatusLabel" class="settings-live-status" data-i18n="settings_loading">Loading...</span>
+                <span id="accountSubStatusLabel" class="settings-billing-chip settings-billing-chip--free">Loading…</span>
               </div>
             </div>
             <a href="subscription" class="settings-secondary-btn" data-i18n="settings_manage_subscription">Manage subscription</a>
@@ -502,6 +506,11 @@
             <p class="card-desc" data-i18n="settings_security_desc">Password, multi-factor authentication, and active sessions.</p>
           </div>
           <button type="button" class="settings-panel-toggle" data-settings-panel-toggle aria-expanded="false">Expand</button>
+        </div>
+        <div class="security-trust-summary" id="securityTrustSummary" aria-live="polite">
+          <span id="securityTrustMfaBadge" class="security-trust-badge security-trust-badge--off">MFA off</span>
+          <span class="security-trust-sep" aria-hidden="true">·</span>
+          <a href="sessions" class="security-trust-link">Manage active sessions</a>
         </div>
         <div class="settings-subpanel">
         <form id="securityForm" class="security-form">
@@ -771,6 +780,6 @@
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
   <script src="../js/privacyService.js?v=20260507a"></script>
-  <script src="../js/settings.js?v=20260509e"></script>
+  <script src="../js/settings.js?v=20260510a"></script>
 </body>
 </html>

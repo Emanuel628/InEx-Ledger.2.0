@@ -307,9 +307,23 @@ function syncSettingsHeroState() {
   if (businessMetaNode) businessMetaNode.textContent = businessCountLabel;
 
   if (billingStatusNode) {
-    billingStatusNode.textContent = settingsSubscriptionState
-      ? (settingsSubscriptionState.effectiveTier === "v1" ? "Pro plan" : "Basic plan")
-      : "Loading...";
+    const sub = settingsSubscriptionState;
+    if (!sub) {
+      billingStatusNode.textContent = "Loading…";
+    } else if (String(sub.status || "").toLowerCase() === "past_due") {
+      billingStatusNode.textContent = "Past due";
+    } else if (sub.isTrialing && sub.trialEndsAt) {
+      const d = new Date(sub.trialEndsAt).toLocaleDateString(resolveDisplayLocale(), { month: "short", day: "numeric" });
+      billingStatusNode.textContent = `Trial ends ${d}`;
+    } else if (sub.cancelAtPeriodEnd && sub.currentPeriodEnd) {
+      const d = new Date(sub.currentPeriodEnd).toLocaleDateString(resolveDisplayLocale(), { month: "short", day: "numeric" });
+      billingStatusNode.textContent = `Cancels ${d}`;
+    } else if (sub.isPaid && sub.currentPeriodEnd) {
+      const d = new Date(sub.currentPeriodEnd).toLocaleDateString(resolveDisplayLocale(), { month: "short", day: "numeric" });
+      billingStatusNode.textContent = `Pro · renews ${d}`;
+    } else {
+      billingStatusNode.textContent = "Basic";
+    }
   }
   if (billingMetaNode) {
     billingMetaNode.textContent = settingsOverviewState.billingStatus || "Subscription details unavailable";
@@ -554,7 +568,7 @@ async function renderBusinessList() {
           </div>
         </div>
         <div class="business-list-actions">
-          ${biz.id !== activeId ? `<button type="button" class="settings-secondary-btn business-switch-btn" data-business-switch="${escapeHtml(biz.id)}">${escapeHtml(t("settings_business_switch"))}</button>` : ""}
+          ${biz.id !== activeId ? `<button type="button" class="settings-primary-btn business-switch-btn" data-business-switch="${escapeHtml(biz.id)}">${escapeHtml(t("settings_business_switch"))}</button>` : ""}
           <button type="button" class="settings-secondary-btn business-edit-btn" data-business-edit="${escapeHtml(biz.id)}">Edit</button>
           <button type="button" class="danger-outline-btn business-delete-btn" data-business-delete="${escapeHtml(biz.id)}" data-business-name="${escapeHtml(businessName)}">${escapeHtml(t("settings_delete_business_btn"))}</button>
         </div>
@@ -897,6 +911,12 @@ async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBod
       statusText = interpolateTranslatedMessage("settings_sub_status_free", { plan: tierLabel });
     }
 
+    let chipMod = "free";
+    if (String(sub.status || "").toLowerCase() === "past_due") chipMod = "pastdue";
+    else if (sub.isTrialing) chipMod = "trial";
+    else if (sub.cancelAtPeriodEnd) chipMod = "canceling";
+    else if (sub.isPaid) chipMod = "active";
+    statusLabel.className = `settings-billing-chip settings-billing-chip--${chipMod}`;
     statusLabel.textContent = statusText;
     settingsOverviewState.billingStatus = statusText;
     syncSettingsOverviewSummaries();
@@ -936,12 +956,27 @@ async function initAccountingLockPanel() {
   const renderStatus = (lock) => {
     settingsOverviewState.accountingLockDate = lock?.lockedThroughDate || null;
     syncSettingsOverviewSummaries();
+    const bar = document.getElementById("lockStateBar");
+    const badge = document.getElementById("lockStateBadge");
+    const detail = document.getElementById("lockStateDetail");
     if (lock?.lockedThroughDate) {
+      if (badge) {
+        badge.textContent = "Locked";
+        badge.className = "settings-lock-badge settings-lock-badge--locked";
+      }
+      if (detail) detail.textContent = `through ${formatSettingsDate(lock.lockedThroughDate)}`;
+      if (bar) bar.hidden = false;
       statusNode.textContent = interpolateTranslatedMessage("settings_accounting_lock_status_locked", {
         date: lock.lockedThroughDate
       });
       return;
     }
+    if (badge) {
+      badge.textContent = "Unlocked";
+      badge.className = "settings-lock-badge settings-lock-badge--unlocked";
+    }
+    if (detail) detail.textContent = "No accounting period lock is active.";
+    if (bar) bar.hidden = false;
     statusNode.textContent = t("settings_accounting_lock_status_unlocked");
   };
 
@@ -2164,6 +2199,11 @@ function initSecurityForm() {
   const updateMfaUi = () => {
     settingsOverviewState.mfaEnabled = !!mfaStatus.enabled;
     syncSettingsOverviewSummaries();
+    const trustBadge = document.getElementById("securityTrustMfaBadge");
+    if (trustBadge) {
+      trustBadge.textContent = mfaStatus.enabled ? "MFA on" : "MFA off";
+      trustBadge.className = `security-trust-badge security-trust-badge--${mfaStatus.enabled ? "on" : "off"}`;
+    }
     if (mfaEnabledToggle) {
       mfaEnabledToggle.checked = !!mfaStatus.enabled;
     }
