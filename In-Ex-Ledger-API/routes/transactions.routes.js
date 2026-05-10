@@ -1016,7 +1016,7 @@ function detectColumns(headers) {
   const h = headers.map((x) => x.toLowerCase());
   const find = (...candidates) => candidates.find((c) => h.includes(c)) || null;
 
-  const dateCol = find("date", "transaction_date", "trans__date", "posted_date", "date_");
+  const dateCol = find("date", "transaction_date", "trans__date", "posted_date", "posting_date", "post_date", "date_");
   const descCol = find(
     "description", "transaction_description", "transaction_description_1",
     "payee", "merchant", "memo", "details", "narrative", "trans__description"
@@ -1095,7 +1095,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     const { region, currency: fallbackCurrency } = await getBusinessRegionAndCurrency(businessId);
     const lockState = await loadAccountingLockState(pool, businessId);
 
-    const csvText = req.file.buffer.toString("utf-8");
+    const csvText = req.file.buffer.toString("utf-8").replace(/^\uFEFF/, "");
     const rows = parseCsv(csvText);
     if (rows.length === 0) {
       return res.status(400).json({ error: "CSV file is empty or could not be parsed." });
