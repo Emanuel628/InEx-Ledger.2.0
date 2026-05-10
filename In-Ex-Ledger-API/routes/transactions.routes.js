@@ -1201,7 +1201,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
           `INSERT INTO transactions
             (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted,
              date, currency, tax_treatment, review_status, converted_amount)
-           VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8, $9, $10, $11, 'needs_review', $5)`,
+           VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8, $9, $10, $11, 'needs_review', $5)`,
           [
             crypto.randomUUID(),
             businessId,
