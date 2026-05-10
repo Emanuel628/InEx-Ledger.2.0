@@ -251,6 +251,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await refreshCategoryOptions();
   await loadTransactions();
   await loadRecurringTemplates();
+  setInterval(() => renderGhostSuggestions(), 5 * 60 * 1000);
   wireTransactionSearch();
   wireTransactionCategoryFilter();
   wirePagination();
@@ -877,6 +878,7 @@ async function loadTransactions() {
     renderCategoryOptions();
     setTransactionsLoading(false);
     applyFilters(true);
+    renderGhostSuggestions();
     syncTransactionUndoBar();
     void syncTransactionUndoAvailability({ preserveMessage: !!transactionUndoMessage });
   }
@@ -2289,9 +2291,6 @@ function dismissRecurringSuggestion(key) {
   const dismissed = new Set(JSON.parse(localStorage.getItem(RECURRING_SUGGESTIONS_DISMISSED_KEY) || "[]"));
   dismissed.add(key);
   localStorage.setItem(RECURRING_SUGGESTIONS_DISMISSED_KEY, JSON.stringify([...dismissed]));
-  document.querySelectorAll(".tx-ghost-row").forEach(row => {
-    if (row.dataset.ghostKey === key) row.remove();
-  });
 }
 
 function prefillRecurringForm(suggestion) {
@@ -2315,39 +2314,51 @@ function prefillRecurringForm(suggestion) {
   }, 50);
 }
 
-function renderGhostSuggestions(tbody) {
+function renderGhostSuggestions() {
+  const panel = document.getElementById("recurringGhostPanel");
+  if (!panel) return;
+
   const suggestions = detectRecurringSuggestions();
-  if (!suggestions.length) return;
+  if (!suggestions.length) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    return;
+  }
+
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="tx-ghost-panel-header">
+      <span class="tx-ghost-badge">Recurring?</span>
+      <span class="tx-ghost-panel-title">We spotted patterns that might be recurring</span>
+    </div>
+  `;
 
   for (const s of suggestions) {
     const monthsLabel = `${s.months} month${s.months === 1 ? "" : "s"}`;
     const amountStr = formatCurrency(s.amount);
-    const tr = document.createElement("tr");
-    tr.className = "tx-ghost-row";
-    tr.dataset.ghostKey = s.key;
-    tr.innerHTML = `
-      <td colspan="8" class="tx-ghost-cell">
-        <div class="tx-ghost-inner">
-          <span class="tx-ghost-badge">Recurring?</span>
-          <span class="tx-ghost-desc">${escapeHtml(s.description)}</span>
-          <span class="tx-ghost-meta">seen ${monthsLabel} · ${amountStr}</span>
-          <div class="tx-ghost-actions">
-            <button type="button" class="tx-ghost-accept">Make recurring</button>
-            <button type="button" class="tx-ghost-dismiss">Not now</button>
-          </div>
+    const card = document.createElement("div");
+    card.className = "tx-ghost-card";
+    card.dataset.ghostKey = s.key;
+    card.innerHTML = `
+      <div class="tx-ghost-inner">
+        <span class="tx-ghost-desc">${escapeHtml(s.description)}</span>
+        <span class="tx-ghost-meta">seen ${monthsLabel} · ${amountStr}</span>
+        <div class="tx-ghost-actions">
+          <button type="button" class="tx-ghost-accept">Make recurring</button>
+          <button type="button" class="tx-ghost-dismiss">Not now</button>
         </div>
-      </td>`;
-
-    tr.querySelector(".tx-ghost-accept").addEventListener("click", () => {
+      </div>
+    `;
+    card.querySelector(".tx-ghost-accept").addEventListener("click", () => {
       prefillRecurringForm(s);
       document.querySelector(".recurring-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
       openRecurringDrawer();
     });
-    tr.querySelector(".tx-ghost-dismiss").addEventListener("click", () => {
+    card.querySelector(".tx-ghost-dismiss").addEventListener("click", () => {
       dismissRecurringSuggestion(s.key);
+      renderGhostSuggestions();
     });
-
-    tbody.appendChild(tr);
+    panel.appendChild(card);
   }
 }
 
@@ -2511,9 +2522,6 @@ function renderTransactionsTable(filteredTransactions) {
       updateTransactionSelectionHeader(transactions);
     });
   });
-
-  const isLastPage = pageStart + PAGE_SIZE >= transactions.length;
-  if (isLastPage) renderGhostSuggestions(tbody);
 
   updateTransactionSelectionHeader(transactions);
 

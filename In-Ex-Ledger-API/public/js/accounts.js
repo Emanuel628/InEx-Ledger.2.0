@@ -1,4 +1,6 @@
-﻿const ACCOUNT_TYPES = [
+﻿const ACCOUNT_SUGGESTIONS_DISMISSED_KEY = "lb_account_suggestions_dismissed";
+
+const ACCOUNT_TYPES = [
   { value: "checking", labelKey: "accounts_type_checking" },
   { value: "savings", labelKey: "accounts_type_savings" },
   { value: "credit_card", labelKey: "accounts_type_credit_card" },
@@ -22,6 +24,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireAccountTypeChips();
   wireAccountDeleteModal();
   await renderAccountList();
+  setInterval(() => refreshAccountGhosts(), 5 * 60 * 1000);
   updateReceiptsDot();
 });
 
@@ -183,6 +186,7 @@ async function renderAccountList() {
     syncAccountsCache(accounts);
     if (!Array.isArray(accounts) || accounts.length === 0) {
       container.innerHTML = `<div class="accounts-empty">${escapeHtml(tx("accounts_no_accounts"))}</div>`;
+      void refreshAccountGhosts();
       return;
     }
 
@@ -205,6 +209,8 @@ async function renderAccountList() {
         await deleteAccount(accountId);
       });
     });
+
+    void refreshAccountGhosts();
   } catch (error) {
     container.innerHTML = "";
     if (message) {
@@ -309,3 +315,127 @@ async function getApiErrorText(response, fallback) {
   }
   return fallback || tx("common_error");
 }
+
+// ─── Account Ghost Suggestions ────────────────────────────────────────────────
+// Detects masked card/account numbers (e.g. ****1234) in transaction
+// descriptions and suggests adding them as accounts if not already tracked.
+
+function extractAccountHints(description) {
+  const hints = new Set();
+  const re = /(?:\*{1,4}|[xX]{2,4})(\d{4})\b/g;
+  let m;
+  while ((m = re.exec(String(description || ""))) !== null) {
+    hints.add(m[1]);
+  }
+  return [...hints];
+}
+
+function detectAccountSuggestions(transactions, existingAccounts) {
+  const dismissed = new Set(
+    JSON.parse(localStorage.getItem(ACCOUNT_SUGGESTIONS_DISMISSED_KEY) || "[]")
+  );
+  const existingNames = new Set(
+    existingAccounts.map(a => String(a.name || "").toLowerCase())
+  );
+
+  const counts = {};
+  const samples = {};
+
+  for (const txn of transactions) {
+    for (const last4 of extractAccountHints(txn.description || "")) {
+      if (dismissed.has(last4)) continue;
+      const display = `****${last4}`;
+      if (existingNames.has(display.toLowerCase())) continue;
+      if ([...existingNames].some(n => n.endsWith(last4))) continue;
+      counts[last4] = (counts[last4] || 0) + 1;
+      if (!samples[last4]) samples[last4] = String(txn.description || "");
+    }
+  }
+
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([last4, count]) => ({
+      last4,
+      display: `****${last4}`,
+      count,
+      sample: samples[last4]
+    }));
+}
+
+function renderAccountGhosts(suggestions) {
+  const panel = document.getElementById("accountGhostPanel");
+  if (!panel) return;
+
+  if (!suggestions.length) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    return;
+  }
+
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="acc-ghost-header">
+      <span class="acc-ghost-badge">New account?</span>
+      <span class="acc-ghost-title">We spotted untracked accounts in your transactions</span>
+    </div>
+  `;
+
+  for (const s of suggestions) {
+    const card = document.createElement("article");
+    card.className = "account-card acc-ghost-card";
+    card.dataset.ghostLast4 = s.last4;
+    const txLabel = `${s.count} transaction${s.count === 1 ? "" : "s"}`;
+    const preview = escapeHtml(String(s.sample).slice(0, 45));
+    card.innerHTML = `
+      <div>
+        <div class="account-name acc-ghost-name">${escapeHtml(s.display)}</div>
+        <div class="account-type acc-ghost-meta">Seen in ${txLabel} &mdash; e.g. &ldquo;${preview}&rdquo;</div>
+      </div>
+      <div class="acc-ghost-actions">
+        <button type="button" class="acc-ghost-add-btn">Add account</button>
+        <button type="button" class="acc-ghost-dismiss-btn">Not now</button>
+      </div>
+    `;
+
+    card.querySelector(".acc-ghost-add-btn").addEventListener("click", () => {
+      const nameInput = document.getElementById("account-name");
+      const formContainer = document.getElementById("accountFormContainer");
+      if (nameInput) nameInput.value = s.display;
+      if (formContainer) formContainer.hidden = false;
+      formContainer?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      nameInput?.focus();
+    });
+
+    card.querySelector(".acc-ghost-dismiss-btn").addEventListener("click", () => {
+      const dismissed = new Set(
+        JSON.parse(localStorage.getItem(ACCOUNT_SUGGESTIONS_DISMISSED_KEY) || "[]")
+      );
+      dismissed.add(s.last4);
+      localStorage.setItem(ACCOUNT_SUGGESTIONS_DISMISSED_KEY, JSON.stringify([...dismissed]));
+      card.remove();
+      if (!panel.querySelectorAll(".acc-ghost-card").length) {
+        panel.hidden = true;
+        panel.innerHTML = "";
+      }
+    });
+
+    panel.appendChild(card);
+  }
+}
+
+async function refreshAccountGhosts() {
+  const accounts = window.__accountsCache || [];
+  try {
+    const res = await apiFetch("/api/transactions");
+    if (!res || !res.ok) return;
+    const payload = await res.json().catch(() => null);
+    const transactions = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.transactions)
+      ? payload.transactions
+      : [];
+    renderAccountGhosts(detectAccountSuggestions(transactions, accounts));
+  } catch {}
+}
+// ─────────────────────────────────────────────────────────────────────────────

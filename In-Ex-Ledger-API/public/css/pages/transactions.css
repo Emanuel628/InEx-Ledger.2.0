@@ -3764,16 +3764,36 @@ tr.tx-highlight {
 }
 
 /* ── Ghost recurring suggestions ────────────────────────── */
-.tx-ghost-row {
-  opacity: 0.45;
+.recurring-ghost-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px;
+  border: 1px dashed var(--border2);
+  border-radius: var(--radius-panel);
+  background: var(--surface2);
+  opacity: 0.75;
   transition: opacity 0.15s ease;
 }
-.tx-ghost-row:hover {
-  opacity: 0.85;
+.recurring-ghost-panel:hover {
+  opacity: 1;
 }
-.tx-ghost-cell {
-  padding: 8px 14px;
-  border-top: 1px dashed var(--border2);
+.tx-ghost-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.tx-ghost-panel-title {
+  font-size: 12px;
+  color: var(--ink3);
+  font-weight: 500;
+}
+.tx-ghost-card {
+  background: var(--panel-bg);
+  border: 1px dashed var(--border2);
+  border-radius: 10px;
+  padding: 8px 12px;
 }
 .tx-ghost-inner {
   display: flex;

@@ -237,6 +237,106 @@
   display: none;
 }
 
+/* ── Account Ghost Suggestions ──────────────────────────────────────────────── */
+.account-ghost-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 14px 18px;
+  border: 1px dashed var(--border2, rgba(15,25,35,0.12));
+  border-radius: var(--radius-panel, 16px);
+  background: var(--surface2, #f7f8fa);
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+.account-ghost-panel:hover {
+  opacity: 1;
+}
+.acc-ghost-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.acc-ghost-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--surface3, #eef0f4);
+  color: var(--ink3, #8a95a3);
+  border: 1px dashed var(--border2, rgba(15,25,35,0.12));
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.acc-ghost-title {
+  font-size: 12px;
+  color: var(--ink3, #8a95a3);
+  font-weight: 500;
+}
+.acc-ghost-card {
+  opacity: 1;
+  border-style: dashed;
+}
+.acc-ghost-name {
+  font-style: italic;
+  color: var(--ink2, #4a5568);
+}
+.acc-ghost-meta {
+  font-size: 12px;
+  color: var(--ink3, #8a95a3);
+  margin-top: 3px;
+  font-style: normal;
+}
+.acc-ghost-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.acc-ghost-add-btn {
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--accent2, #246dbb);
+  background: transparent;
+  color: var(--accent2, #246dbb);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.acc-ghost-add-btn:hover {
+  background: rgba(36,109,187,0.07);
+}
+.acc-ghost-dismiss-btn {
+  font-size: 12px;
+  font-family: inherit;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border2, rgba(15,25,35,0.12));
+  background: transparent;
+  color: var(--ink3, #8a95a3);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.acc-ghost-dismiss-btn:hover {
+  background: var(--surface3, #eef0f4);
+}
+@media (max-width: 640px) {
+  .acc-ghost-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .acc-ghost-add-btn,
+  .acc-ghost-dismiss-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
 .toast-check {
   width: 14px;
   height: 14px;
