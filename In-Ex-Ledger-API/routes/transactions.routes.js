@@ -629,21 +629,36 @@ router.put("/:id", async (req, res) => {
 
     const encryptedDescription = tryEncryptDescription(description);
 
-    // Audit Pivot: insert a new adjustment row referencing the original transaction
     const result = await pool.query(
-      `INSERT INTO transactions
-        (id, business_id, account_id, category_id, amount, type, cleared,
-         description, description_encrypted, date, note,
-         currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
-         indirect_tax_amount, indirect_tax_recoverable, personal_use_pct, review_status, review_notes,
-         is_adjustment, original_transaction_id, adjusted_by_id, adjusted_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-               $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
-               true, $23, $24, NOW())
+      `UPDATE transactions
+          SET account_id              = $1,
+              category_id             = $2,
+              amount                  = $3,
+              type                    = $4,
+              cleared                 = $5,
+              description             = $6,
+              description_encrypted   = $7,
+              date                    = $8,
+              note                    = $9,
+              currency                = $10,
+              source_amount           = $11,
+              exchange_rate           = $12,
+              exchange_date           = $13,
+              converted_amount        = $14,
+              tax_treatment           = $15,
+              indirect_tax_amount     = $16,
+              indirect_tax_recoverable= $17,
+              personal_use_pct        = $18,
+              review_status           = $19,
+              review_notes            = $20,
+              adjusted_by_id          = $21,
+              adjusted_at             = NOW()
+        WHERE id = $22
+          AND business_id = $23
+          AND deleted_at IS NULL
+          AND (is_adjustment = false OR is_adjustment IS NULL)
        RETURNING *`,
       [
-        crypto.randomUUID(),
-        businessId,
         account_id,
         mappedCategoryId,
         amount,
@@ -657,19 +672,22 @@ router.put("/:id", async (req, res) => {
         validation.normalized.source_amount,
         validation.normalized.exchange_rate,
         validation.normalized.exchange_date,
-        validation.normalized.converted_amount !== null
-          ? validation.normalized.converted_amount
-          : amount,
+        validation.normalized.converted_amount !== null ? validation.normalized.converted_amount : amount,
         validation.normalized.tax_treatment || (type === "income" ? "income" : "operating"),
         validation.normalized.indirect_tax_amount,
         validation.normalized.indirect_tax_recoverable,
         validation.normalized.personal_use_pct,
         validation.normalized.review_status || "ready",
         validation.normalized.review_notes,
+        req.user.id,
         req.params.id,
-        req.user.id
+        businessId
       ]
     );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Transaction not found." });
+    }
 
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
