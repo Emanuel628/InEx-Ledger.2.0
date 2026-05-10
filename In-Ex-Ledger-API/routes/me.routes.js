@@ -161,7 +161,6 @@ router.use(createDataApiLimiter());
 
 router.get("/", async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
     const result = await pool.query(
       `SELECT id, email, role, email_verified, mfa_enabled, full_name, display_name,
               ui_preferences,
@@ -175,8 +174,9 @@ router.get("/", async (req, res) => {
 
     const user = result.rows[0];
     if (!user) {
-      return res.status(404).json({ error: "User not found." });
+      return res.status(401).json({ error: "User not found." });
     }
+    const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
     const businesses = await listBusinessesForUser(req.user.id);
     const activeBusiness = businesses.find((business) => business.id === businessId) || null;
     const subscription = await getSubscriptionSnapshotForUser({
