@@ -5,7 +5,7 @@
   <title>InEx Ledger - Getting Started</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css?v=20260510c" />
-  <link rel="stylesheet" href="/css/pages/onboarding.css?v=20260510a" />
+  <link rel="stylesheet" href="/css/pages/onboarding.css?v=20260510b" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -28,7 +28,7 @@
       <div class="onboarding-intro">
         <span class="onboarding-kicker" data-i18n="onboarding_kicker">Get set up</span>
         <h1>Let's make your workspace usable in one pass.</h1>
-        <p>Tell us the business basics that actually matter, we'll save the right defaults, create your first real account, and send you straight into productive work.</p>
+        <p>Tell us the business basics that actually matter, we'll save the right defaults, create your first real account, and walk you through the setup step by step.</p>
         <ol class="onboarding-steps">
           <li data-i18n="onboarding_step_1">Business basics</li>
           <li data-i18n="onboarding_step_2">Regional defaults</li>
@@ -38,11 +38,11 @@
         <div class="onboarding-preview-card" id="onboardingPlanPreview" aria-live="polite">
           <div class="onboarding-preview-kicker">Your setup plan</div>
           <h2 id="onboardingPlanTitle">Built to start real bookkeeping right away.</h2>
-          <p id="onboardingPlanBody">We'll save your business basics, create your first account, and open the workflow you want first.</p>
+          <p id="onboardingPlanBody">We'll save your business basics, create your first account, and guide you through categories, accounts, and transactions in order.</p>
           <ul id="onboardingPlanBullets" class="onboarding-preview-list">
             <li>Save the business name and filing region you actually use.</li>
             <li>Create a starter account so the ledger is usable immediately.</li>
-            <li>Send you to the right first workflow instead of a dead-end setup screen.</li>
+            <li>Walk through the guided setup so the workspace is ready for real bookkeeping.</li>
           </ul>
         </div>
       </div>
@@ -94,17 +94,7 @@
               <option value="YT">Yukon</option>
             </select>
           </div>
-          <div class="form-field form-field-full">
-            <label class="field-label" data-i18n="onboarding_start_focus">What do you want to do first?</label>
-            <p class="onboarding-field-hint">We'll open this workflow immediately after setup so you can start doing real work right away.</p>
-            <div class="onboarding-focus-tiles" id="onboardingFocusTiles">
-              <button type="button" class="focus-tile is-selected" data-focus="transactions" data-i18n="onboarding_focus_transactions">Log income & expenses</button>
-              <button type="button" class="focus-tile" data-focus="receipts" data-i18n="onboarding_focus_receipts">Upload receipts</button>
-              <button type="button" class="focus-tile" data-focus="mileage" data-i18n="onboarding_focus_mileage">Track mileage</button>
-              <button type="button" class="focus-tile" data-focus="exports" data-i18n="onboarding_focus_exports">Review exports</button>
-            </div>
-            <input type="hidden" id="onboardingStartFocus" value="transactions" />
-          </div>
+
         </div>
 
         <p id="onboardingMessage" class="auth-error" role="alert" aria-live="polite" hidden></p>
@@ -120,7 +110,7 @@
   <script src="../js/global.js?v=20260510c"></script>
   <script src="../js/i18n.js?v=20260510c"></script>
   <script src="../js/auth.js?v=20260510a"></script>
-  <script src="../js/onboarding-page.js?v=20260510a"></script>
+  <script src="../js/onboarding-page.js?v=20260510b"></script>
 </body>
 </html>
 

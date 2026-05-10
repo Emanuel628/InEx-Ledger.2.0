@@ -98,7 +98,7 @@ function resolvePreviousGuidedSetupStep(currentStep) {
 }
 
 function resolveDefaultStartFocus() {
-  return "transactions";
+  return "categories";
 }
 
 function buildOnboardingRecommendations(region, startFocus) {

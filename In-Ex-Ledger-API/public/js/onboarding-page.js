@@ -2,47 +2,8 @@ let onboardingForm = null;
 let onboardingMessage = null;
 let onboardingSubmitting = false;
 let onboardingAccountNameTouched = false;
-let onboardingStartFocusTouched = false;
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const GUIDED_SETUP_STEPS = new Set(["categories", "accounts", "transactions"]);
-const ONBOARDING_PLAN_PRESETS = {
-  transactions: {
-    title: "Open the ledger first and start with real activity.",
-    body: "We'll save your defaults, create the first account, and send you straight into Transactions so the workspace becomes usable immediately.",
-    bullets: [
-      "Start with one income item and one expense instead of over-planning the setup.",
-      "Use the first account you actually post to most often.",
-      "Clean categories and region defaults will already be in place for the first entries."
-    ]
-  },
-  receipts: {
-    title: "Get receipt capture working before paper starts piling up.",
-    body: "We'll save your basics, create the first account, and open Receipts so you can test the upload flow right away.",
-    bullets: [
-      "Upload one real receipt so the workflow is proven immediately.",
-      "Then connect that receipt to the matching transaction instead of saving cleanup for later.",
-      "You can still move into Transactions as soon as the capture path is ready."
-    ]
-  },
-  mileage: {
-    title: "Set up mileage before the trips become reconstruction work.",
-    body: "We'll save your region, create the first account, and open Mileage so your first deductible trip can be logged correctly.",
-    bullets: [
-      "Add the date, purpose, destination, and distance for one real trip.",
-      "Mileage works best when it starts early rather than at tax time.",
-      "The ledger and mileage records can grow together from there."
-    ]
-  },
-  exports: {
-    title: "Build the structure now so exports are clean later.",
-    body: "We'll save your basics, create the first account, and open Exports so you can review the handoff layer after the workspace is configured.",
-    bullets: [
-      "Exports become useful once the account list and categories are practical.",
-      "You can review the output early, then go back and add real activity.",
-      "The guided setup still points you toward categories, accounts, and transactions next."
-    ]
-  }
-};
 const STARTER_ACCOUNT_NAME_PRESETS = {
   checking: { US: "Primary Checking", CA: "Primary Chequing" },
   savings: { US: "Business Savings", CA: "Business Savings" },
@@ -83,7 +44,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateOnboardingPlanPreview();
   });
   window.addEventListener("lunaLanguageChanged", applyOnboardingStaticCopy);
-  wireStartFocusTiles();
   onboardingForm.addEventListener("submit", handleOnboardingSubmit);
 });
 
@@ -106,8 +66,6 @@ function hydrateOnboardingDefaults(profile = {}) {
   if (elStarterAccountName) {
     elStarterAccountName.value = onboardingData.starter_account_name || "";
   }
-  const savedStartFocus = onboardingData.start_focus || "transactions";
-  applyStartFocusSelection(savedStartFocus);
   syncStarterAccountName();
   updateOnboardingPlanPreview();
 
@@ -131,7 +89,6 @@ async function handleOnboardingSubmit(event) {
     business_type: "sole_proprietor",
     starter_account_type: document.getElementById("onboardingStarterAccountType")?.value || "checking",
     starter_account_name: document.getElementById("onboardingStarterAccountName")?.value.trim() || "",
-    start_focus: document.getElementById("onboardingStartFocus")?.value || "transactions",
     region: document.getElementById("onboardingRegion")?.value || "US",
     province: document.getElementById("onboardingProvince")?.value || "",
     language: savedLanguage
@@ -186,28 +143,6 @@ async function handleOnboardingSubmit(event) {
   }
 }
 
-function wireStartFocusTiles() {
-  const tiles = document.querySelectorAll(".focus-tile");
-  tiles.forEach((tile) => {
-    tile.addEventListener("click", () => {
-      onboardingStartFocusTouched = true;
-      applyStartFocusSelection(tile.dataset.focus);
-    });
-  });
-}
-
-function applyStartFocusSelection(focus) {
-  const normalizedFocus = focus || "transactions";
-  const hidden = document.getElementById("onboardingStartFocus");
-  if (hidden) {
-    hidden.value = normalizedFocus;
-  }
-  document.querySelectorAll(".focus-tile").forEach((btn) => {
-    btn.classList.toggle("is-selected", btn.dataset.focus === normalizedFocus);
-  });
-  updateOnboardingPlanPreview();
-}
-
 function syncStarterAccountName() {
   if (onboardingAccountNameTouched) {
     updateOnboardingPlanPreview();
@@ -226,8 +161,6 @@ function syncStarterAccountName() {
 }
 
 function updateOnboardingPlanPreview() {
-  const focus = document.getElementById("onboardingStartFocus")?.value || "transactions";
-  const preset = ONBOARDING_PLAN_PRESETS[focus] || ONBOARDING_PLAN_PRESETS.transactions;
   const region = document.getElementById("onboardingRegion")?.value === "CA" ? "CA" : "US";
   const accountType = document.getElementById("onboardingStarterAccountType")?.value || "checking";
   const accountName =
@@ -235,19 +168,9 @@ function updateOnboardingPlanPreview() {
     STARTER_ACCOUNT_NAME_PRESETS[accountType]?.[region] ||
     STARTER_ACCOUNT_NAME_PRESETS.checking[region];
   const regionLabel = region === "CA" ? "Canada" : "the United States";
-  const title = document.getElementById("onboardingPlanTitle");
   const body = document.getElementById("onboardingPlanBody");
-  const bullets = document.getElementById("onboardingPlanBullets");
-  if (title) {
-    title.textContent = preset.title;
-  }
   if (body) {
-    body.textContent = `${preset.body} First stop: ${formatStartFocusLabel(focus)}. Filing defaults: ${regionLabel}. Starter account: ${accountName}.`;
-  }
-  if (bullets) {
-    bullets.innerHTML = preset.bullets
-      .map((item) => `<li>${escapeHtml(item)}</li>`)
-      .join("");
+    body.textContent = `We'll save your business basics, create your first account, and guide you through the setup step by step. Filing defaults: ${regionLabel}. Starter account: ${accountName}.`;
   }
 }
 
@@ -255,13 +178,6 @@ function syncOnboardingPreview() {
   syncProvinceField();
   syncStarterAccountName();
   updateOnboardingPlanPreview();
-}
-
-function formatStartFocusLabel(focus) {
-  if (focus === "receipts") return "Receipts";
-  if (focus === "mileage") return "Mileage";
-  if (focus === "exports") return "Exports";
-  return "Transactions";
 }
 
 function setOnboardingMessage(message = "") {
@@ -303,11 +219,5 @@ function resolveOnboardingDestination(profile = {}) {
   if (onboardingData.guided_setup_active && GUIDED_SETUP_STEPS.has(guidedSetupStep)) {
     return `/${guidedSetupStep}`;
   }
-
-  const startFocus = String(onboardingData.start_focus || "").trim().toLowerCase();
-  if (startFocus) {
-    return `/${startFocus}`;
-  }
-
-  return "/transactions";
+  return "/categories";
 }
