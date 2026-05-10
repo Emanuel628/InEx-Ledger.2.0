@@ -56,6 +56,8 @@ let activeModalTransactionId = null;
 let editingTransactionId = null;
 let transactionsLoading = false;
 let hasTransactionsLoadFailed = false;
+let currentPage = 0;
+const PAGE_SIZE = 50;
 const SLOT_ANIMATION_KEY = "lb_transactions_slot_played";
 let slotAnimationPlayed = false;
 const missingAccountWarnings = new Set();
@@ -250,6 +252,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadRecurringTemplates();
   wireTransactionSearch();
   wireTransactionCategoryFilter();
+  wirePagination();
   wireTransactionModal();
   window.addEventListener("accountsUpdated", async () => {
     await refreshAccountOptions();
@@ -872,7 +875,7 @@ async function loadTransactions() {
     renderAccountOptions();
     renderCategoryOptions();
     setTransactionsLoading(false);
-    applyFilters();
+    applyFilters(true);
     syncTransactionUndoBar();
     void syncTransactionUndoAvailability({ preserveMessage: !!transactionUndoMessage });
   }
@@ -908,7 +911,7 @@ function wireTransactionSearch() {
     }
     debounceTimer = setTimeout(() => {
       transactionFilters.search = searchInput.value;
-      applyFilters();
+      applyFilters(true);
     }, 150);
   });
 }
@@ -920,7 +923,7 @@ function wireTransactionCategoryFilter() {
   }
   filter.addEventListener("change", () => {
     transactionFilters.category = filter.value;
-    applyFilters();
+    applyFilters(true);
   });
 }
 
@@ -953,7 +956,7 @@ function initSidebarTypeFilter() {
           : `transactions?type=${transactionFilters.type}`;
       window.history.replaceState({}, "", nextUrl);
       syncSidebarState();
-      applyFilters();
+      applyFilters(true);
     });
   });
 }
@@ -1716,10 +1719,37 @@ function setEditingMode(enabled) {
     : txT("transactions_save_submit", "Save transaction");
 }
 
-function applyFilters() {
+function applyFilters(resetPage = false) {
+  if (resetPage) currentPage = 0;
   const filtered = getFilteredTransactions();
   renderTransactionsTable(filtered);
   renderTotals(filtered);
+}
+
+function renderPagination(totalCount) {
+  const bar = document.getElementById("txPagination");
+  const prevBtn = document.getElementById("txPrevPage");
+  const nextBtn = document.getElementById("txNextPage");
+  const info = document.getElementById("txPageInfo");
+  if (!bar) return;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  bar.hidden = totalPages <= 1;
+  if (totalPages <= 1) return;
+  const start = currentPage * PAGE_SIZE + 1;
+  const end = Math.min((currentPage + 1) * PAGE_SIZE, totalCount);
+  if (info) info.textContent = `${start}–${end} of ${totalCount}`;
+  if (prevBtn) prevBtn.disabled = currentPage === 0;
+  if (nextBtn) nextBtn.disabled = currentPage >= totalPages - 1;
+}
+
+function wirePagination() {
+  document.getElementById("txPrevPage")?.addEventListener("click", () => {
+    if (currentPage > 0) { currentPage--; applyFilters(); }
+  });
+  document.getElementById("txNextPage")?.addEventListener("click", () => {
+    const totalPages = Math.ceil(getFilteredTransactions().length / PAGE_SIZE);
+    if (currentPage < totalPages - 1) { currentPage++; applyFilters(); }
+  });
 }
 
 function normalizeTransactionDateValue(value) {
@@ -2253,7 +2283,11 @@ function renderTransactionsTable(filteredTransactions) {
   const canUseEdgeCaseTools = effectiveTier() === "v1";
   tbody.innerHTML = "";
 
-  transactions.forEach((txn) => {
+  const pageStart = currentPage * PAGE_SIZE;
+  const pageTransactions = transactions.slice(pageStart, pageStart + PAGE_SIZE);
+  renderPagination(transactions.length);
+
+  pageTransactions.forEach((txn) => {
     const row = document.createElement("tr");
     row.id = `txn-${txn.id}`;
     const txnId = String(txn.id);
@@ -3375,7 +3409,7 @@ function initPeriodPicker() {
       chips.forEach((c) => c.classList.remove("is-active"));
       chip.classList.add("is-active");
       transactionFilters.period = chip.dataset.period || "this-month";
-      applyFilters();
+      applyFilters(true);
       window.dispatchEvent(new CustomEvent("txPeriodChanged", { detail: chip.dataset.period }));
     });
   });
