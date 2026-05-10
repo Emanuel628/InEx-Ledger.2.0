@@ -3866,6 +3866,7 @@ tr.tx-highlight {
 }
 
 /* ── Bulk delete bar ─────────────────────────────────────────────────────────── */
+.tx-bulk-bar[hidden] { display: none; }
 .tx-bulk-bar {
   position: fixed;
   bottom: 28px;
