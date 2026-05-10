@@ -58,6 +58,7 @@ let transactionsLoading = false;
 let hasTransactionsLoadFailed = false;
 let currentPage = 0;
 const PAGE_SIZE = 50;
+const RECURRING_SUGGESTIONS_DISMISSED_KEY = 'lb_recurring_suggestions_dismissed';
 const SLOT_ANIMATION_KEY = "lb_transactions_slot_played";
 let slotAnimationPlayed = false;
 const missingAccountWarnings = new Set();
@@ -2232,6 +2233,124 @@ function normalizeTransaction(transaction) {
   };
 }
 
+function normalizeDescForSuggestion(desc) {
+  return String(desc || "").toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function detectRecurringSuggestions() {
+  const dismissed = new Set(JSON.parse(localStorage.getItem(RECURRING_SUGGESTIONS_DISMISSED_KEY) || "[]"));
+  const templateDescs = new Set(
+    (recurringState.templates || []).map(t => normalizeDescForSuggestion(t.description))
+  );
+  const transactions = ledgerState.transactions || [];
+
+  const groups = {};
+  for (const txn of transactions) {
+    const key = normalizeDescForSuggestion(txn.description);
+    if (key.length < 3) continue;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(txn);
+  }
+
+  const suggestions = [];
+  for (const [key, txns] of Object.entries(groups)) {
+    if (dismissed.has(key) || templateDescs.has(key)) continue;
+    const months = new Set(txns.map(t => t.date.slice(0, 7)));
+    if (months.size < 2) continue;
+
+    const amountCounts = {};
+    for (const txn of txns) {
+      const a = String(txn.amount);
+      amountCounts[a] = (amountCounts[a] || 0) + 1;
+    }
+    const mostCommonAmount = Number(
+      Object.entries(amountCounts).sort((a, b) => b[1] - a[1])[0][0]
+    );
+
+    const latest = txns.reduce((a, b) => (a.date > b.date ? a : b));
+    suggestions.push({
+      key,
+      description: latest.description,
+      amount: mostCommonAmount,
+      type: latest.type,
+      categoryId: latest.categoryId,
+      accountId: latest.accountId,
+      months: months.size,
+      occurrences: txns.length
+    });
+  }
+
+  return suggestions
+    .sort((a, b) => b.months - a.months || b.occurrences - a.occurrences)
+    .slice(0, 3);
+}
+
+function dismissRecurringSuggestion(key) {
+  const dismissed = new Set(JSON.parse(localStorage.getItem(RECURRING_SUGGESTIONS_DISMISSED_KEY) || "[]"));
+  dismissed.add(key);
+  localStorage.setItem(RECURRING_SUGGESTIONS_DISMISSED_KEY, JSON.stringify([...dismissed]));
+  document.querySelectorAll(".tx-ghost-row").forEach(row => {
+    if (row.dataset.ghostKey === key) row.remove();
+  });
+}
+
+function prefillRecurringForm(suggestion) {
+  const descInput = document.getElementById("recurringDescription");
+  const amountInput = document.getElementById("recurringAmount");
+  const typeSelect = document.getElementById("recurringType");
+  const cadenceSelect = document.getElementById("recurringCadence");
+  const accountSelect = document.getElementById("recurringAccount");
+  const categorySelect = document.getElementById("recurringCategory");
+
+  if (descInput) descInput.value = suggestion.description;
+  if (amountInput) amountInput.value = suggestion.amount.toFixed(2);
+  if (cadenceSelect) cadenceSelect.value = "monthly";
+  if (typeSelect) {
+    typeSelect.value = suggestion.type;
+    typeSelect.dispatchEvent(new Event("change"));
+  }
+  if (accountSelect && suggestion.accountId) accountSelect.value = suggestion.accountId;
+  setTimeout(() => {
+    if (categorySelect && suggestion.categoryId) categorySelect.value = suggestion.categoryId;
+  }, 50);
+}
+
+function renderGhostSuggestions(tbody) {
+  const suggestions = detectRecurringSuggestions();
+  if (!suggestions.length) return;
+
+  for (const s of suggestions) {
+    const monthsLabel = `${s.months} month${s.months === 1 ? "" : "s"}`;
+    const amountStr = formatCurrency(s.amount);
+    const tr = document.createElement("tr");
+    tr.className = "tx-ghost-row";
+    tr.dataset.ghostKey = s.key;
+    tr.innerHTML = `
+      <td colspan="8" class="tx-ghost-cell">
+        <div class="tx-ghost-inner">
+          <span class="tx-ghost-badge">Recurring?</span>
+          <span class="tx-ghost-desc">${escapeHtml(s.description)}</span>
+          <span class="tx-ghost-meta">seen ${monthsLabel} · ${amountStr}</span>
+          <div class="tx-ghost-actions">
+            <button type="button" class="tx-ghost-accept">Make recurring</button>
+            <button type="button" class="tx-ghost-dismiss">Not now</button>
+          </div>
+        </div>
+      </td>`;
+
+    tr.querySelector(".tx-ghost-accept").addEventListener("click", () => {
+      prefillRecurringForm(s);
+      document.querySelector(".recurring-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      openRecurringDrawer();
+    });
+    tr.querySelector(".tx-ghost-dismiss").addEventListener("click", () => {
+      dismissRecurringSuggestion(s.key);
+    });
+
+    tbody.appendChild(tr);
+  }
+}
+
 function renderTransactionsTable(filteredTransactions) {
   const tbody = document.querySelector("tbody");
   const transactions =
@@ -2392,6 +2511,9 @@ function renderTransactionsTable(filteredTransactions) {
       updateTransactionSelectionHeader(transactions);
     });
   });
+
+  const isLastPage = pageStart + PAGE_SIZE >= transactions.length;
+  if (isLastPage) renderGhostSuggestions(tbody);
 
   updateTransactionSelectionHeader(transactions);
 

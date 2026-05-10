@@ -3762,3 +3762,85 @@ tr.tx-highlight {
     max-width: 28ch;
   }
 }
+
+/* ── Ghost recurring suggestions ────────────────────────── */
+.tx-ghost-row {
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+}
+.tx-ghost-row:hover {
+  opacity: 0.85;
+}
+.tx-ghost-cell {
+  padding: 8px 14px;
+  border-top: 1px dashed var(--border2);
+}
+.tx-ghost-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tx-ghost-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--surface3);
+  color: var(--ink3);
+  border: 1px dashed var(--border2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tx-ghost-desc {
+  font-size: 13px;
+  color: var(--ink2);
+  font-style: italic;
+}
+.tx-ghost-meta {
+  font-size: 12px;
+  color: var(--ink3);
+}
+.tx-ghost-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.tx-ghost-accept {
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--green);
+  background: transparent;
+  color: var(--green);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.tx-ghost-accept:hover {
+  background: var(--green-bg);
+}
+.tx-ghost-dismiss {
+  font-size: 12px;
+  font-family: inherit;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--ink3);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.tx-ghost-dismiss:hover {
+  background: var(--surface2);
+}
+@media (max-width: 640px) {
+  .tx-ghost-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+}
