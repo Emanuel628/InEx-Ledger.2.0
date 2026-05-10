@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <title>InEx Ledger - Transactions</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<link rel="stylesheet" href="/css/app.css?v=20260509b">
-<link rel="stylesheet" href="/css/pages/transactions.css?v=20260509b">
+<link rel="stylesheet" href="/css/app.css?v=20260510a">
+<link rel="stylesheet" href="/css/pages/transactions.css?v=20260510a">
 </head>
 
 <body>
@@ -65,7 +65,7 @@
       <div class="page-header">
         <div>
           <h1 class="page-title">Transactions</h1>
-          <p class="page-subtitle">Active business ledger â€” current reporting period</p>
+          <p class="page-subtitle">Active business ledger Ã¢â‚¬â€ current reporting period</p>
           <p class="page-context-note" id="transactionsTaxContext">Tax form context</p>
         </div>
         <div class="page-header-actions">
@@ -324,6 +324,10 @@
                     </label>
                     <input id="transactionExchangeRate" class="form-control" type="number" step="0.000001" min="0" placeholder="e.g. 1.35" />
                     <div class="fx-reference-box" id="transactionFxReferenceBox" hidden>
+                      <div class="fx-reference-kicker-row">
+                        <span class="fx-reference-kicker">Reference only</span>
+                        <span class="fx-reference-status">Live market snapshot</span>
+                      </div>
                       <div class="fx-reference-title-row">
                         <strong class="fx-reference-title">Live reference rate</strong>
                         <span class="fx-reference-value" id="transactionFxReferenceValue">No reference rate loaded.</span>
@@ -593,11 +597,11 @@
 </div>
 
 <script src="../js/escape-html.js?v=20260410a"></script>
-<script src="../js/global.js?v=20260509b"></script>
+<script src="../js/global.js?v=20260510a"></script>
 <script src="../js/i18n.js?v=20260509c"></script>
 <script src="../js/auth.js?v=20260506b"></script>
 <script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/taxReminders.js?v=20260405c"></script>
-<script src="../js/transactions.js?v=20260509c"></script>
+<script src="../js/transactions.js?v=20260510a"></script>
 </body>
 </html>

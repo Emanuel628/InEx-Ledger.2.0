@@ -664,12 +664,7 @@ function initDynamicSidebar() {
       handle.className = "dynamic-sidebar-shell-handle";
       handle.setAttribute("data-sidebar-collapse", "");
       handle.innerHTML = '<span data-sidebar-collapse-glyph aria-hidden="true"></span>';
-      const appPage = shell.querySelector(".app-page");
-      if (appPage) {
-        shell.insertBefore(handle, appPage);
-      } else {
-        shell.appendChild(handle);
-      }
+      shell.appendChild(handle);
     }
     return handle;
   }
@@ -699,9 +694,11 @@ function initDynamicSidebar() {
 
   sidebar.className = "app-sidebar app-sidebar--dynamic";
   sidebar.setAttribute("aria-label", "Favorites");
+  sidebar.id = sidebar.id || "dynamicQuickAddSidebar";
 
   const quickPanel = ensureDynamicSidebarQuickPanel();
   const collapseHandle = ensureDynamicSidebarCollapseHandle();
+  collapseHandle.setAttribute("aria-controls", sidebar.id);
 
   function updateCollapseHandleState() {
     const label = isCollapsed ? "Open Quick Add sidebar" : "Collapse Quick Add sidebar";

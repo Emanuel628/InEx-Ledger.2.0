@@ -45,17 +45,22 @@
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
 }
 
 .categories-secondary-btn:hover {
-  background: var(--accent2);
-  border-color: var(--accent2);
-  color: #fff;
+  transform: translateY(-1px);
+  background: #f7fbff;
+  border-color: rgba(36, 109, 187, 0.18);
+  color: var(--accent2);
+  box-shadow: 0 12px 24px rgba(36, 109, 187, 0.1);
 }
 
 .category-card {
   overflow: hidden;
-  background: var(--panel-bg);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0) 24%),
+    var(--panel-bg);
   border: 1px solid rgba(15, 25, 35, 0.08);
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-card-lg);
@@ -164,11 +169,14 @@
   background: var(--cta-gradient);
   box-shadow: var(--shadow-cta);
   color: #fff;
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
 }
 
 .category-inline-add-btn:hover,
 .empty-add-btn:hover {
+  transform: translateY(-1px);
   filter: brightness(1.03);
+  box-shadow: 0 18px 30px rgba(36, 109, 187, 0.22);
 }
 
 .category-card-footer {

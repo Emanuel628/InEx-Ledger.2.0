@@ -3498,22 +3498,57 @@ tr.tx-highlight {
 }
 
 .fx-reference-box {
-  margin-top: 10px;
-  padding: 12px;
-  border: 1px solid rgba(34, 73, 116, 0.14);
-  border-radius: 12px;
-  background: linear-gradient(180deg, #fbfdff 0%, #f3f8ff 100%);
-  box-shadow: 0 10px 24px rgba(20, 47, 78, 0.08);
+  margin-top: 12px;
+  padding: 14px 14px 13px;
+  border: 1px solid rgba(36, 109, 187, 0.14);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(36, 109, 187, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(243,248,255,0.96) 100%);
+  box-shadow: 0 14px 28px rgba(15, 25, 35, 0.08);
 }
 
 .fx-reference-box.is-error {
-  border-color: rgba(175, 62, 62, 0.22);
-  background: linear-gradient(180deg, #fffafa 0%, #fff3f3 100%);
+  border-color: rgba(185, 28, 28, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(185, 28, 28, 0.09), transparent 34%),
+    linear-gradient(180deg, #fffafa 0%, #fff4f4 100%);
+}
+
+.fx-reference-kicker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.fx-reference-kicker,
+.fx-reference-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.fx-reference-kicker {
+  background: rgba(36, 109, 187, 0.1);
+  color: var(--accent2);
+}
+
+.fx-reference-status {
+  background: rgba(15, 25, 35, 0.05);
+  color: #486073;
 }
 
 .fx-reference-title-row {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
@@ -3521,40 +3556,55 @@ tr.tx-highlight {
 .fx-reference-title {
   color: #183b63;
   font-size: 12px;
+  font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .fx-reference-value {
-  color: #1e4d7b;
-  font-size: 13px;
+  color: #123557;
+  font-size: 15px;
   font-weight: 700;
   text-align: right;
+  line-height: 1.35;
 }
 
 .fx-reference-detail {
   margin-top: 8px;
+  color: #526579;
+  line-height: 1.55;
 }
 
 .fx-reference-actions {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .fx-reference-apply {
   flex: 0 0 auto;
-  min-height: 34px;
-  padding: 0 12px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--cta-gradient);
+  box-shadow: var(--shadow-cta);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .fx-reference-advisory {
   margin: 0;
+  max-width: 34ch;
+  color: #607284;
+  line-height: 1.5;
 }
 
 @media (max-width: 700px) {
+  .fx-reference-kicker-row,
   .fx-reference-title-row,
   .fx-reference-actions {
     flex-direction: column;

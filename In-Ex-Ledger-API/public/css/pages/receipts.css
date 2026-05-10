@@ -28,6 +28,14 @@
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+}
+
+.upload-btn:hover,
+.receipt-primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 30px rgba(36, 109, 187, 0.22);
+  filter: saturate(1.02);
 }
 
 .receipt-drop-zone,
@@ -47,6 +55,9 @@
   gap: 10px;
   flex-wrap: wrap;
   color: var(--ink2);
+  background:
+    radial-gradient(circle at top right, rgba(36, 109, 187, 0.08), transparent 28%),
+    var(--panel-bg);
 }
 
 .receipt-drop-icon {
@@ -83,6 +94,13 @@
   background: var(--cta-gradient);
   box-shadow: var(--shadow-cta);
   color: #fff;
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+}
+
+.receipt-bottom-upload-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 30px rgba(36, 109, 187, 0.22);
+  filter: saturate(1.02);
 }
 
 .receipt-drop-browse,
@@ -111,6 +129,9 @@
 
 .receipts-card {
   overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0) 24%),
+    var(--panel-bg);
 }
 
 .receipts-card-head {
