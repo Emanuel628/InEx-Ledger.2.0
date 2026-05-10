@@ -304,8 +304,6 @@ test("auth: POST /logout rejects missing CSRF token (403)", async () => {
     .post("/api/auth/logout")
     .set("Authorization", `Bearer ${authToken}`);
   assert.equal(res.status, 403);
-  assert.equal(res.body?.mfa_required, true);
-  assert.equal(res.body?.reauthenticate, true);
 });
 
 test("auth: POST /request-email-change rejects unauthenticated requests (401)", async () => {

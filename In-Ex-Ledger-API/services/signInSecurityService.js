@@ -32,8 +32,10 @@ function hashValue(value) {
   return crypto.createHash("sha256").update(String(value || "")).digest("hex");
 }
 
-function buildDeviceFingerprint({ userId, userAgent }) {
-  return hashValue(`user:${userId || ""}|ua:${normalizeUserAgent(userAgent)}`);
+function buildDeviceFingerprint({ userId, userAgent, ipAddress }) {
+  return hashValue(
+    `user:${userId || ""}|ua:${normalizeUserAgent(userAgent)}|ip:${normalizeIpAddress(ipAddress)}`
+  );
 }
 
 function isPrivateIp(ipAddress) {
