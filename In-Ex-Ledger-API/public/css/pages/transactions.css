@@ -2235,6 +2235,12 @@ body {
   color: var(--text-secondary);
   margin: 8px 0 0;
 }
+.csv-import-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
 
 /* ── C-04: Income/Expense intent buttons ─────────────────── */
 .txn-intent-btn.income-intent {

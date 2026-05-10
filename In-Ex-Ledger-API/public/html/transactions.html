@@ -564,7 +564,7 @@
 <div id="csvImportModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="csvImportModalTitle">
   <div class="transaction-modal-content csv-import-modal-content">
     <h3 id="csvImportModalTitle" class="csv-import-title">Import from Bank CSV</h3>
-    <p class="csv-import-subtitle">Upload a CSV export from your bank. Supports BMO, TD, RBC, Scotiabank, and most standard formats.</p>
+    <p class="csv-import-subtitle">Upload a CSV export from your bank. Supports BMO, TD, RBC, Scotiabank, Chase, Bank of America, Capital One, Wells Fargo, and most standard formats.</p>
 
     <div id="csvImportStep1">
       <div class="form-field">
@@ -576,6 +576,7 @@
       <div class="form-field">
         <label for="csvImportFile" class="form-label">CSV file</label>
         <input type="file" id="csvImportFile" accept=".csv,text/csv" class="form-control" />
+        <p class="csv-import-hint">Your CSV needs columns for <strong>date</strong>, <strong>description</strong>, and either a single <strong>amount</strong> column or separate <strong>withdrawal</strong> and <strong>deposit</strong> columns. Re-importing the same file will create duplicate transactions.</p>
       </div>
       <p id="csvImportError" class="error-text" hidden></p>
       <div class="modal-actions">
@@ -599,6 +600,6 @@
 <script src="../js/auth.js?v=20260506b"></script>
 <script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/taxReminders.js?v=20260405c"></script>
-<script src="../js/transactions.js?v=20260507a"></script>
+<script src="../js/transactions.js?v=20260510a"></script>
 </body>
 </html>
