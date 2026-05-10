@@ -2683,6 +2683,7 @@ function initDangerZone() {
   const cancelButton = document.getElementById("dangerModalCancel");
   const deleteDataButton = document.getElementById("deleteMyDataBtn");
   const deleteAccountButton = document.getElementById("deleteAccountTrigger");
+  const deleteAllTransactionsButton = document.getElementById("deleteAllTransactionsBtn");
   let deleteAccountMfaEnabled = null;
   let deleteAccountMfaStatusPromise = null;
   let deleteAccountMfaToken = "";
@@ -2728,7 +2729,14 @@ function initDangerZone() {
   const openModal = (action) => {
     dangerAction = action;
     if (confirmInput) confirmInput.value = "";
-    if (action === "delete_account") {
+    if (action === "delete_transactions") {
+      title.textContent = "Delete all transactions?";
+      body.textContent = "This will permanently remove every transaction in your ledger. This cannot be undone.";
+      confirmWrap.classList.remove("hidden");
+      if (passwordWrap) passwordWrap.classList.add("hidden");
+      resetDeleteAccountMfaState();
+      confirmButton.disabled = true;
+    } else if (action === "delete_account") {
       title.textContent = t("settings_delete_account_modal_title");
       body.textContent = t("settings_delete_account_modal_body");
       confirmWrap.classList.remove("hidden");
@@ -2752,6 +2760,7 @@ function initDangerZone() {
     modal.classList.remove("hidden");
   };
 
+  deleteAllTransactionsButton?.addEventListener("click", () => openModal("delete_transactions"));
   deleteDataButton?.addEventListener("click", () => openModal("delete_data"));
   deleteAccountButton?.addEventListener("click", () => openModal("delete_account"));
   cancelButton?.addEventListener("click", closeModal);
@@ -2759,6 +2768,10 @@ function initDangerZone() {
   const getAccountEmail = () => String(window.__LUNA_ME__?.email || "").trim().toLowerCase();
 
   const updateDeleteAccountButtonState = () => {
+    if (dangerAction === "delete_transactions") {
+      confirmButton.disabled = (confirmInput?.value || "").trim() !== "DELETE";
+      return;
+    }
     if (dangerAction === "delete_account") {
       const val = (confirmInput?.value || "").trim();
       const email = getAccountEmail();
@@ -2777,6 +2790,35 @@ function initDangerZone() {
 
   confirmButton?.addEventListener("click", () => {
     void (async () => {
+      if (dangerAction === "delete_transactions") {
+        if ((confirmInput?.value || "").trim() !== "DELETE") {
+          showSettingsToast("Type DELETE to confirm.");
+          confirmInput?.focus();
+          return;
+        }
+        confirmButton.disabled = true;
+        try {
+          const res = await apiFetch("/api/transactions/bulk-delete-all", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ confirm: "DELETE" })
+          });
+          const payload = res ? await res.json().catch(() => null) : null;
+          if (!res || !res.ok) {
+            showSettingsToast(payload?.error || "Failed to delete transactions.");
+            confirmButton.disabled = false;
+            return;
+          }
+          showSettingsToast(payload?.message || "All transactions deleted.");
+          closeModal();
+        } catch (err) {
+          console.error("Delete all transactions failed", err);
+          showSettingsToast("Failed to delete transactions.");
+          confirmButton.disabled = false;
+        }
+        return;
+      }
+
       if (dangerAction === "delete_data") {
         const password = passwordInput?.value || "";
         if (!password) {

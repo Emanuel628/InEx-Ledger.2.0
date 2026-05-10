@@ -713,6 +713,27 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+router.delete("/bulk-delete-all", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const confirm = String(req.body?.confirm || "").trim();
+    if (confirm !== "DELETE") {
+      return res.status(400).json({ error: "Confirmation required. Send { confirm: 'DELETE' }." });
+    }
+    const result = await pool.query(
+      `UPDATE transactions
+          SET deleted_at = now(), is_void = true, voided_at = now()
+        WHERE business_id = $1
+          AND deleted_at IS NULL`,
+      [businessId]
+    );
+    res.json({ message: `Deleted ${result.rowCount} transaction(s).`, count: result.rowCount });
+  } catch (err) {
+    logError("DELETE /transactions/bulk-delete-all error:", err);
+    res.status(500).json({ error: "Failed to delete transactions." });
+  }
+});
+
 router.post("/undo-delete", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
