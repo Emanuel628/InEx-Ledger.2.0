@@ -272,6 +272,41 @@ function resolvePreferenceSummaryState() {
   return `${language} • ${region} • ${theme}`;
 }
 
+function syncSettingsHeroState() {
+  const activeBusinessNode = document.getElementById("settingsHeroActiveBusiness");
+  const businessMetaNode = document.getElementById("settingsHeroBusinessMeta");
+  const billingStatusNode = document.getElementById("settingsHeroBillingStatus");
+  const billingMetaNode = document.getElementById("settingsHeroBillingMeta");
+  const securityStatusNode = document.getElementById("settingsHeroSecurityStatus");
+  const securityMetaNode = document.getElementById("settingsHeroSecurityMeta");
+
+  const businessProfile = settingsOverviewState.businessProfile || getBusinessProfile();
+  const activeBusinessName = businessProfile?.name || t("settings_overview_business_missing");
+  const businessCount = Array.isArray(settingsBusinessesState) ? settingsBusinessesState.length : 0;
+  const businessCountLabel = businessCount === 1 ? "1 business in workspace" : `${businessCount} businesses in workspace`;
+
+  if (activeBusinessNode) activeBusinessNode.textContent = activeBusinessName;
+  if (businessMetaNode) businessMetaNode.textContent = businessCountLabel;
+
+  if (billingStatusNode) {
+    billingStatusNode.textContent = settingsSubscriptionState
+      ? (settingsSubscriptionState.effectiveTier === "v1" ? "Pro plan" : "Basic plan")
+      : "Loading...";
+  }
+  if (billingMetaNode) {
+    billingMetaNode.textContent = settingsOverviewState.billingStatus || "Subscription details unavailable";
+  }
+
+  if (securityStatusNode) {
+    securityStatusNode.textContent = settingsOverviewState.mfaEnabled ? "MFA enabled" : "MFA off";
+  }
+  if (securityMetaNode) {
+    securityMetaNode.textContent = settingsOverviewState.mfaEnabled
+      ? "New-device sign-ins require a verification code."
+      : "Enable multi-factor authentication for stronger account protection.";
+  }
+}
+
 function syncSettingsOverviewSummaries() {
   const businessNode = document.getElementById("overviewBusinessSummary");
   const billingNode = document.getElementById("overviewBillingSummary");
@@ -318,6 +353,7 @@ function syncSettingsOverviewSummaries() {
       ? `${t("settings_overview_analytics_off")} • ${t("settings_overview_data_export")}`
       : `${t("settings_overview_analytics_on")} • ${t("settings_overview_data_export")}`;
   }
+  syncSettingsHeroState();
 }
 
 async function initBusinessProfileForm() {
@@ -444,24 +480,32 @@ async function renderBusinessList() {
     const businesses = Array.isArray(payload?.businesses) ? payload.businesses : [];
     settingsBusinessesState = businesses;
     const activeId = payload?.active_business_id || "";
+    syncSettingsOverviewSummaries();
 
     if (!businesses.length) {
       wrap.innerHTML = `<p class="settings-helper-note">${escapeHtml(t("settings_no_businesses"))}</p>`;
       return;
     }
 
-    wrap.innerHTML = businesses.map((biz) => `
+    wrap.innerHTML = businesses.map((biz) => {
+      const businessName = biz.name || t("common_business");
+      const businessInitial = String(businessName).trim().charAt(0).toUpperCase() || "B";
+      return `
       <div class="business-list-item ${biz.id === activeId ? "is-active" : ""}">
         <div class="business-list-meta">
-          <span class="business-list-name">${escapeHtml(biz.name || t("common_business"))}</span>
-          ${biz.id === activeId ? `<span class="business-list-badge" data-i18n="settings_business_active_badge">${escapeHtml(t("settings_business_active_badge"))}</span>` : ""}
+          <span class="business-list-avatar" aria-hidden="true">${escapeHtml(businessInitial)}</span>
+          <div class="business-list-copy">
+            <span class="business-list-name">${escapeHtml(businessName)}</span>
+            ${biz.id === activeId ? `<span class="business-list-badge" data-i18n="settings_business_active_badge">${escapeHtml(t("settings_business_active_badge"))}</span>` : ""}
+          </div>
         </div>
         <div class="business-list-actions">
           ${biz.id !== activeId ? `<button type="button" class="settings-secondary-btn business-switch-btn" data-business-switch="${escapeHtml(biz.id)}">${escapeHtml(t("settings_business_switch"))}</button>` : ""}
-          <button type="button" class="danger-outline-btn business-delete-btn" data-business-delete="${escapeHtml(biz.id)}" data-business-name="${escapeHtml(biz.name || "")}">${escapeHtml(t("settings_delete_business_btn"))}</button>
+          <button type="button" class="danger-outline-btn business-delete-btn" data-business-delete="${escapeHtml(biz.id)}" data-business-name="${escapeHtml(businessName)}">${escapeHtml(t("settings_delete_business_btn"))}</button>
         </div>
       </div>
-    `).join("");
+    `;
+    }).join("");
 
     wrap.querySelectorAll("[data-business-switch]").forEach((btn) => {
       btn.addEventListener("click", async () => {

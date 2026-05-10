@@ -5,7 +5,7 @@
   <title>InEx Ledger - Settings</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css?v=20260508a" />
-  <link rel="stylesheet" href="/css/pages/settings.css?v=20260510a" />
+  <link rel="stylesheet" href="/css/pages/settings.css?v=20260510b" />
 </head>
 
 <body class="settings-page settings-loading">
@@ -61,8 +61,33 @@
     <main id="main-content" class="settings-main">
       <section class="settings-overview" id="settings-overview">
         <div class="settings-page-heading">
-          <h1 data-i18n="settings_overview_title">Settings</h1>
-          <p data-i18n="settings_overview_intro">Keep your business profile, billing, security, and privacy controls organized in one calm workspace.</p>
+          <div class="settings-page-heading-copy">
+            <span class="settings-page-kicker">Workspace administration</span>
+            <h1 data-i18n="settings_overview_title">Settings</h1>
+            <p data-i18n="settings_overview_intro">Keep your business profile, billing, security, and privacy controls organized in one calm workspace.</p>
+          </div>
+          <div class="settings-page-heading-actions">
+            <a href="subscription" class="settings-secondary-btn" data-i18n="settings_manage_subscription">Manage subscription</a>
+            <a href="help" class="settings-primary-btn" data-i18n="settings_help_open_btn">Open Help</a>
+          </div>
+        </div>
+
+        <div class="settings-state-strip" aria-label="Workspace status">
+          <div class="settings-state-card">
+            <span class="settings-state-label">Active business</span>
+            <strong id="settingsHeroActiveBusiness" class="settings-state-value">Loading...</strong>
+            <p id="settingsHeroBusinessMeta" class="settings-state-meta">Checking workspace businesses...</p>
+          </div>
+          <div class="settings-state-card">
+            <span class="settings-state-label">Billing</span>
+            <strong id="settingsHeroBillingStatus" class="settings-state-value">Loading...</strong>
+            <p id="settingsHeroBillingMeta" class="settings-state-meta">Checking subscription state...</p>
+          </div>
+          <div class="settings-state-card">
+            <span class="settings-state-label">Security</span>
+            <strong id="settingsHeroSecurityStatus" class="settings-state-value">Loading...</strong>
+            <p id="settingsHeroSecurityMeta" class="settings-state-meta">Checking account protection...</p>
+          </div>
         </div>
 
         <div class="settings-overview-grid">
@@ -198,12 +223,14 @@
         </div>
 
         <div class="settings-business-management settings-subpanel">
-          <div class="settings-subpanel-head">
-            <h3 class="card-title" data-i18n="settings_business_management_title">Business management</h3>
-            <p class="card-desc" data-i18n="settings_business_management_desc">Manage your business accounts. You can switch between businesses or delete one you no longer need.</p>
+          <div class="settings-subpanel-head settings-subpanel-head-inline">
+            <div>
+              <h3 class="card-title" data-i18n="settings_business_management_title">Business management</h3>
+              <p class="card-desc" data-i18n="settings_business_management_desc">Manage your business accounts. You can switch between businesses or delete one you no longer need.</p>
+            </div>
+            <button type="button" id="addBusinessBtn" class="settings-secondary-btn" data-i18n="settings_add_business">Add another business</button>
           </div>
           <div id="businessListWrap" class="business-list-wrap"></div>
-          <button type="button" id="addBusinessBtn" class="settings-secondary-btn" data-i18n="settings_add_business">Add another business</button>
         </div>
 
         <div class="settings-subpanel">
@@ -245,7 +272,7 @@
             <div class="settings-row-copy">
               <div class="settings-row-title" data-i18n="settings_subscription_status_title">Subscription</div>
               <div class="settings-row-desc">
-                <span id="accountSubStatusLabel" data-i18n="settings_loading">Loading...</span>
+                <span id="accountSubStatusLabel" class="settings-live-status" data-i18n="settings_loading">Loading...</span>
               </div>
             </div>
             <a href="subscription" class="settings-secondary-btn" data-i18n="settings_manage_subscription">Manage subscription</a>

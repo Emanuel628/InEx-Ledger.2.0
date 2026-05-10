@@ -2519,3 +2519,185 @@ body {
   border-radius: 14px;
   font-weight: 700;
 }
+
+/* 2026-05-10 control-center refresh */
+.settings-page .settings-page-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.settings-page .settings-page-heading-copy {
+  max-width: 62ch;
+}
+
+.settings-page .settings-page-kicker {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-page .settings-page-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.settings-page .settings-state-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.settings-page .settings-state-card {
+  padding: 18px 18px 16px;
+  border: 1px solid rgba(191, 219, 254, 0.9);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.9));
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.08);
+}
+
+.settings-page .settings-state-label {
+  display: inline-block;
+  margin-bottom: 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-page .settings-state-value {
+  display: block;
+  color: #0f172a;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.settings-page .settings-state-meta {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.settings-page .settings-live-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.09);
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.settings-page .settings-subpanel-head-inline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-page .business-list-wrap {
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.settings-page .business-list-item {
+  align-items: center;
+  padding: 18px;
+  border-radius: 22px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.settings-page .business-list-item:hover {
+  border-color: rgba(59, 130, 246, 0.32);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+  transform: translateY(-1px);
+}
+
+.settings-page .business-list-item.is-active {
+  border-color: rgba(37, 99, 235, 0.42);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.96), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 18px 34px rgba(37, 99, 235, 0.08);
+}
+
+.settings-page .business-list-meta {
+  gap: 14px;
+}
+
+.settings-page .business-list-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  color: #1d4ed8;
+  font-size: 15px;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
+.settings-page .business-list-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.settings-page .business-list-name {
+  font-size: 15px;
+}
+
+.settings-page .business-list-badge {
+  width: fit-content;
+  padding: 4px 10px;
+  background: #1d4ed8;
+}
+
+.settings-page .business-list-actions {
+  justify-content: flex-end;
+}
+
+@media (max-width: 1100px) {
+  .settings-page .settings-state-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .settings-page .settings-page-heading,
+  .settings-page .settings-subpanel-head-inline {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .settings-page .settings-page-heading-actions,
+  .settings-page .business-list-actions {
+    width: 100%;
+  }
+
+  .settings-page .settings-state-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-page .business-list-item {
+    align-items: flex-start;
+  }
+}
