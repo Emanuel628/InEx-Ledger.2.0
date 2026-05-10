@@ -1016,14 +1016,28 @@ function detectColumns(headers) {
   const h = headers.map((x) => x.toLowerCase());
   const find = (...candidates) => candidates.find((c) => h.includes(c)) || null;
 
-  const dateCol = find("date", "transaction_date", "trans__date", "posted_date", "posting_date", "post_date", "date_");
+  const dateCol = find(
+    "date", "transaction_date", "trans__date", "posted_date", "posting_date",
+    "post_date", "date_", "date_posted", "trans_date", "value_date",
+    "effective_date", "settlement_date", "completed_date", "started_date"
+  );
   const descCol = find(
     "description", "transaction_description", "transaction_description_1",
-    "payee", "merchant", "memo", "details", "narrative", "trans__description"
+    "description_1", "description_2",
+    "payee", "merchant", "memo", "details", "narrative",
+    "trans__description", "particulars", "beneficiary", "name"
   );
-  const amountCol = find("amount", "transaction_amount", "net_amount");
-  const withdrawalCol = find("withdrawal", "debit", "withdrawals", "cheques_and_other_deductions");
-  const depositCol = find("deposit", "credit", "deposits", "deposits_and_other_credits");
+  const amountCol = find(
+    "amount", "transaction_amount", "net_amount", "debit_credit", "cad_", "usd_"
+  );
+  const withdrawalCol = find(
+    "withdrawal", "debit", "withdrawals", "cheques_and_other_deductions",
+    "withdrawals_debits", "withdrawals__dr_", "amount_debit", "debit_amount", "money_out"
+  );
+  const depositCol = find(
+    "deposit", "credit", "deposits", "deposits_and_other_credits",
+    "deposits_credits", "deposits__cr_", "amount_credit", "credit_amount", "money_in"
+  );
 
   return { dateCol, descCol, amountCol, withdrawalCol, depositCol };
 }
