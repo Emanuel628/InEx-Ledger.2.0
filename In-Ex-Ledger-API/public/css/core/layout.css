@@ -176,6 +176,15 @@ main.app-shell {
   font-weight: 600;
 }
 
+button.sidebar-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+
 .sidebar-icon {
   width: 16px;
   height: 16px;

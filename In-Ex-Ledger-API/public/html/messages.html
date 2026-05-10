@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>InEx Ledger - Messages</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="/css/app.css?v=20260510c" />
+  <link rel="stylesheet" href="/css/app.css?v=20260510f" />
   <link rel="stylesheet" href="/css/pages/messages.css?v=20260503c" />
 </head>
 <body>
@@ -33,30 +33,30 @@
     <aside class="app-sidebar" aria-label="Sidebar">
       <div class="sidebar-section-label" data-i18n="messages_sidebar_messages">Messages</div>
       <nav class="sidebar-nav">
-        <a href="#" class="sidebar-link is-active" id="sidebarInbox" data-tab="inbox">
+        <button type="button" class="sidebar-link is-active" id="sidebarInbox" data-tab="inbox">
           <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 4h12v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4z"></path><path d="M2 4l6 5 6-5"></path></svg></span>
           <span data-i18n="messages_sidebar_inbox">Inbox</span>
           <span id="sidebarUnreadBadge" class="messages-tab-badge" hidden></span>
-        </a>
-        <a href="#" class="sidebar-link" id="sidebarSent" data-tab="sent">
+        </button>
+        <button type="button" class="sidebar-link" id="sidebarSent" data-tab="sent">
           <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M14 2L2 7l5 2 2 5 5-12z"></path></svg></span>
           <span data-i18n="messages_sidebar_sent">Sent</span>
-        </a>
-        <a href="#" class="sidebar-link" id="sidebarArchived" data-tab="archived">
+        </button>
+        <button type="button" class="sidebar-link" id="sidebarArchived" data-tab="archived">
           <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="6" width="12" height="8" rx="1"></rect><path d="M2 6l2-4h8l2 4"></path><line x1="6" y1="10" x2="10" y2="10"></line></svg></span>
           <span data-i18n="messages_sidebar_archived">Archived</span>
-        </a>
+        </button>
       </nav>
       <div class="sidebar-section-label sidebar-section-label-spaced" data-i18n="messages_sidebar_support_label">Support</div>
       <nav class="sidebar-nav">
-        <a href="#" class="sidebar-link" id="sidebarNewMsg" data-action="compose">
+        <button type="button" class="sidebar-link" id="sidebarNewMsg" data-action="compose">
           <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2 14l1.5-4.5L11 2l3 3-7.5 7.5L2 14z"></path><path d="M10 3l3 3"></path></svg></span>
           <span data-i18n="messages_sidebar_new_msg">New Message</span>
-        </a>
-        <a href="#" class="sidebar-link" id="sidebarSupport" data-action="support">
+        </button>
+        <button type="button" class="sidebar-link" id="sidebarSupport" data-action="support">
           <span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6"></circle><path d="M6 6a2 2 0 1 1 2 2v1"></path><circle cx="8" cy="12" r=".5" fill="currentColor"></circle></svg></span>
           <span data-i18n="messages_sidebar_request_support">Request Support</span>
-        </a>
+        </button>
       </nav>
     </aside>
 
@@ -231,7 +231,7 @@
 
   <script src="/js/escape-html.js?v=20260410a"></script>
   <script src="/js/global.js?v=20260510c"></script>
-  <script src="/js/i18n.js?v=20260510c"></script>
+  <script src="/js/i18n.js?v=20260510f"></script>
   <script src="/js/auth.js?v=20260510a"></script>
   <script src="/js/trial.js?v=20260408a"></script>
   <script src="/js/taxReminders.js?v=20260408a"></script>
