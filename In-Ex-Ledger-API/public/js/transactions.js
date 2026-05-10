@@ -17,7 +17,7 @@ const transactionFilters = {
   type: "all",
   search: "",
   category: "",
-  period: "this-month"
+  period: localStorage.getItem("lb_tx_period") || "this-month"
 };
 
 const DRAWER_OPEN_LABEL = "+ Add new";
@@ -3554,6 +3554,7 @@ function initPeriodPicker() {
       chips.forEach((c) => c.classList.remove("is-active"));
       chip.classList.add("is-active");
       transactionFilters.period = chip.dataset.period || "this-month";
+      localStorage.setItem("lb_tx_period", transactionFilters.period);
       applyFilters(true);
       window.dispatchEvent(new CustomEvent("txPeriodChanged", { detail: chip.dataset.period }));
     });
