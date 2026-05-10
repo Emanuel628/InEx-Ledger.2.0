@@ -1366,23 +1366,28 @@ body {
 }
 
 .security-show-password {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
   margin-top: 10px;
   font-size: 13px;
   width: fit-content;
-  justify-self: start;
+  color: var(--ink2);
+  cursor: pointer;
 }
 
 .security-show-password input {
   margin: 0;
   flex: 0 0 auto;
-  order: 0;
 }
 
 .security-show-password span {
-  order: 1;
+  flex: 1;
+}
+
+#securitySaveButton {
+  display: block;
+  margin-top: 16px;
 }
 
 .session-block {
