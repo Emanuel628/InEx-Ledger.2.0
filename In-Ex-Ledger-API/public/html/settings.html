@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <title>InEx Ledger - Settings</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="/css/app.css?v=20260510c" />
-  <link rel="stylesheet" href="/css/pages/settings.css?v=20260509f" />
+  <link rel="stylesheet" href="/css/app.css?v=20260508a" />
+  <link rel="stylesheet" href="/css/pages/settings.css?v=20260509e" />
 </head>
 
-<body class="settings-page settings-loading">
+<body class="settings-page">
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
   <header class="app-topbar settings-topbar">
     <div class="topbar-left">
@@ -48,6 +48,7 @@
           <button class="settings-nav-item is-active" type="button" data-settings-nav-item data-settings-target="settings-overview" data-i18n="settings_nav_overview">Overview</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-business" data-i18n="settings_nav_business">Business</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-billing" data-i18n="settings_nav_billing">Billing</button>
+          <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-cpa-access" data-i18n="settings_nav_cpa_access">CPA Access</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-security" data-i18n="settings_nav_security">Security</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-preferences" data-i18n="settings_nav_preferences">Preferences</button>
           <button class="settings-nav-item" type="button" data-settings-nav-item data-settings-target="settings-privacy-data" data-i18n="settings_nav_privacy_data">Privacy &amp; Data</button>
@@ -85,11 +86,21 @@
             </div>
             <p id="overviewBillingSummary" class="settings-summary-meta" data-i18n="settings_overview_billing_loading">Loading subscription details...</p>
           </button>
+          <button class="settings-summary-card" type="button" data-settings-target="settings-cpa-access">
+            <div class="settings-summary-card-head">
+              <div>
+                <h2 data-i18n="settings_nav_cpa_access">CPA Access</h2>
+                <p data-i18n="settings_overview_cpa_desc">Invite your accountant and manage their access.</p>
+              </div>
+              <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
+            </div>
+            <p id="overviewCpaSummary" class="settings-summary-meta" data-i18n="settings_overview_cpa_loading">Loading access details...</p>
+          </button>
           <button class="settings-summary-card" type="button" data-settings-target="settings-security">
             <div class="settings-summary-card-head">
               <div>
                 <h2 data-i18n="settings_nav_security">Security</h2>
-                <p data-i18n="settings_overview_security_desc">Password and multi-factor authentication.</p>
+                <p data-i18n="settings_overview_security_desc">Password, multi-factor authentication, and active sessions.</p>
               </div>
               <span class="settings-summary-action" data-i18n="settings_overview_manage">Manage</span>
             </div>
@@ -234,7 +245,7 @@
             <div class="settings-row-copy">
               <div class="settings-row-title" data-i18n="settings_subscription_status_title">Subscription</div>
               <div class="settings-row-desc">
-                <span id="accountSubStatusLabel" data-i18n="settings_loading">LoadingÃ¢â‚¬Â¦</span>
+                <span id="accountSubStatusLabel" data-i18n="settings_loading">Loading...</span>
               </div>
             </div>
             <a href="subscription" class="settings-secondary-btn" data-i18n="settings_manage_subscription">Manage subscription</a>
@@ -245,13 +256,13 @@
               <div class="settings-row-title" data-i18n="settings_cancel_subscription_title">Cancel subscription</div>
               <div class="settings-row-desc" data-i18n="settings_cancel_subscription_desc">Your access continues until the end of your current billing period.</div>
             </div>
-            <button type="button" id="cancelSubscriptionBtn" class="danger-outline-btn" data-i18n="settings_cancel_subscription_btn">Cancel subscriptionÃ¢â‚¬Â¦</button>
+            <button type="button" id="cancelSubscriptionBtn" class="danger-outline-btn" data-i18n="settings_cancel_subscription_btn">Cancel subscription...</button>
           </div>
         </div>
 
       </section>
 
-      <section class="settings-card settings-panel hidden" id="settings-cpa-access" hidden aria-hidden="true">
+      <section class="settings-card settings-panel" id="settings-cpa-access">
         <div class="settings-panel-head card-head">
           <h2 class="card-title" data-i18n="settings_nav_cpa_access">CPA Access</h2>
           <p class="card-desc" data-i18n="settings_cpa_desc">Invite your accountant, review active access, and audit changes.</p>
@@ -457,7 +468,7 @@
         <div class="settings-panel-head card-head">
           <div class="settings-panel-copy">
             <h2 class="card-title" data-i18n="settings_nav_security">Security</h2>
-            <p class="card-desc" data-i18n="settings_security_desc">Password and multi-factor authentication.</p>
+            <p class="card-desc" data-i18n="settings_security_desc">Password, multi-factor authentication, and active sessions.</p>
           </div>
           <button type="button" class="settings-panel-toggle" data-settings-panel-toggle aria-expanded="false">Expand</button>
         </div>
@@ -501,6 +512,7 @@
         <div class="settings-subpanel session-block">
           <h3 data-i18n="settings_session_title">Session</h3>
           <div class="session-actions">
+            <a href="sessions" class="settings-secondary-btn session-manage-link" data-i18n="settings_manage_sessions">Manage active sessions</a>
             <button type="button" id="settingsRevokeAllSessionsBtn" class="settings-primary-btn secondary-session-btn" data-i18n="settings_sign_out_all">Sign out of all sessions</button>
           </div>
           <p class="session-note" data-i18n="settings_session_note">Use this if your account has been accessed from a device you don't recognize.</p>
@@ -555,14 +567,14 @@
             <div class="danger-name" data-i18n="settings_delete_business_data_title">Delete business data</div>
             <div class="danger-desc" data-i18n="settings_delete_business_data_desc">Removes all transactions, receipts, and mileage records. Your account and settings are kept.</div>
           </div>
-          <button type="button" id="deleteMyDataBtn" class="danger-outline-btn" data-i18n="settings_delete_business_data_button">Delete dataÃ¢â‚¬Â¦</button>
+          <button type="button" id="deleteMyDataBtn" class="danger-outline-btn" data-i18n="settings_delete_business_data_button">Delete data...</button>
         </div>
         <div class="danger-row">
           <div class="danger-copy">
             <div class="danger-name" data-i18n="settings_delete_account_title">Delete account permanently</div>
             <div class="danger-desc" data-i18n="settings_delete_account_desc">Permanently removes your account and all associated data. This cannot be undone.</div>
           </div>
-          <button id="deleteAccountTrigger" type="button" class="danger-outline-btn" data-i18n="settings_delete_account_button">Permanently Delete AccountÃ¢â‚¬Â¦</button>
+          <button id="deleteAccountTrigger" type="button" class="danger-outline-btn" data-i18n="settings_delete_account_button">Permanently Delete Account...</button>
         </div>
       </section>
 
@@ -581,7 +593,7 @@
         </div>
       </section>
 
-      <!-- Preference save bar Ã¢â‚¬â€ fixed to viewport bottom, shown when preferences change -->
+      <!-- Preference save bar - fixed to viewport bottom, shown when preferences change -->
       <div id="settingsSaveBar" class="settings-save-bar hidden" aria-live="polite">
         <div class="settings-save-copy">
           <strong data-i18n="settings_unsaved_title">Unsaved preference changes</strong>
@@ -674,22 +686,18 @@
       <p data-i18n="qc_analytics_consent_body">By enabling analytics tracking, I agree that my usage data may be collected and analyzed for improving the app's services. I understand I can disable tracking at any time via Privacy Settings.</p>
       <div class="modal-actions danger-actions">
         <button type="button" id="qcConsentCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
-        <button type="button" id="qcConsentConfirm" class="modal-delete modal-delete-accent" data-i18n="qc_analytics_consent_confirm">I Agree Ã¢â‚¬â€œ Enable Tracking</button>
+        <button type="button" id="qcConsentConfirm" class="modal-delete modal-delete-accent" data-i18n="qc_analytics_consent_confirm">I Agree &ndash; Enable Tracking</button>
       </div>
     </div>
   </div>
 
   <script src="../js/escape-html.js?v=20260410a"></script>
-<script src="../js/global.js?v=20260510c"></script>
-  <script src="../js/i18n.js?v=20260510c"></script>
-  <script src="../js/auth.js?v=20260510a"></script>
+<script src="../js/global.js?v=20260507a"></script>
+  <script src="../js/i18n.js?v=20260509a"></script>
+  <script src="../js/auth.js?v=20260506b"></script>
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
   <script src="../js/privacyService.js?v=20260507a"></script>
-  <script src="../js/settings.js?v=20260509i"></script>
+  <script src="../js/settings.js?v=20260509e"></script>
 </body>
 </html>
-
-
-
-
