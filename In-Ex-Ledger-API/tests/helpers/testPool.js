@@ -129,7 +129,7 @@ function buildTestApp(router, mountPath = "/api/test") {
  */
 function makeAuthToken(extra = {}) {
   return signToken({
-    id: "user-test-001",
+    id: "00000000-0000-4000-8000-000000000141",
     email: "test@inexledger.local",
     mfa_enabled: false,
     ...extra,
@@ -142,7 +142,7 @@ function makeAuthToken(extra = {}) {
  */
 function makeMfaToken(extra = {}) {
   return signToken({
-    id: "user-mfa-001",
+    id: "00000000-0000-4000-8000-000000000142",
     email: "mfa@inexledger.local",
     mfa_enabled: true,
     mfa_authenticated: true,
@@ -190,7 +190,7 @@ function bearerHeader(jwt) {
  */
 function makeUserRow(overrides = {}) {
   return {
-    id: "user-fixture-001",
+    id: "00000000-0000-4000-8000-000000000151",
     email: "fixture@inexledger.local",
     password_hash: "$2b$12$placeholder",
     mfa_enabled: false,
@@ -204,8 +204,8 @@ function makeUserRow(overrides = {}) {
  */
 function makeBusinessRow(overrides = {}) {
   return {
-    id: "biz-fixture-001",
-    user_id: "user-fixture-001",
+    id: "00000000-0000-4000-8000-000000000251",
+    user_id: "00000000-0000-4000-8000-000000000151",
     name: "Fixture Business LLC",
     region: "US",
     language: "en",
@@ -219,10 +219,10 @@ function makeBusinessRow(overrides = {}) {
  */
 function makeTransactionRow(overrides = {}) {
   return {
-    id: "txn-fixture-001",
-    business_id: "biz-fixture-001",
-    account_id: "acct-fixture-001",
-    category_id: "cat-fixture-001",
+    id: "00000000-0000-4000-8000-000000000351",
+    business_id: "00000000-0000-4000-8000-000000000251",
+    account_id: "00000000-0000-4000-8000-000000000451",
+    category_id: "00000000-0000-4000-8000-000000000551",
     type: "expense",
     amount: "49.99",
     date: "2026-03-15",
@@ -241,8 +241,8 @@ function makeTransactionRow(overrides = {}) {
  */
 function makeAccountRow(overrides = {}) {
   return {
-    id: "acct-fixture-001",
-    business_id: "biz-fixture-001",
+    id: "00000000-0000-4000-8000-000000000451",
+    business_id: "00000000-0000-4000-8000-000000000251",
     name: "Checking",
     type: "asset",
     created_at: new Date("2026-01-01T00:00:00Z").toISOString(),
@@ -255,8 +255,8 @@ function makeAccountRow(overrides = {}) {
  */
 function makeCategoryRow(overrides = {}) {
   return {
-    id: "cat-fixture-001",
-    business_id: "biz-fixture-001",
+    id: "00000000-0000-4000-8000-000000000551",
+    business_id: "00000000-0000-4000-8000-000000000251",
     name: "Office Supplies",
     kind: "expense",
     color: "blue",

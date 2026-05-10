@@ -19,7 +19,7 @@ function loadInvoicesRouter() {
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
       return {
         requireAuth(req, _res, next) {
-          req.user = { id: "user-test" };
+          req.user = { id: "00000000-0000-4000-8000-000000000131" };
           next();
         }
       };
@@ -33,7 +33,7 @@ function loadInvoicesRouter() {
     }
     if (requestName === "../api/utils/resolveBusinessIdForUser.js" || /resolveBusinessIdForUser\.js$/.test(requestName)) {
       return {
-        resolveBusinessIdForUser: async () => "biz-test"
+        resolveBusinessIdForUser: async () => "00000000-0000-4000-8000-000000000231"
       };
     }
     if (requestName === "../services/subscriptionService.js" || /subscriptionService\.js$/.test(requestName)) {

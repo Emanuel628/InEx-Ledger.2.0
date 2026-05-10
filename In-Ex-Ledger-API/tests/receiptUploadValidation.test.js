@@ -26,7 +26,7 @@ function loadReceiptsRouter(options = {}) {
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
       return {
         requireAuth(req, _res, next) {
-          req.user = { id: "user-test" };
+          req.user = { id: "00000000-0000-4000-8000-000000000171" };
           next();
         }
       };

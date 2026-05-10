@@ -21,7 +21,7 @@ function loadReceiptsRouter() {
     if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
       return {
         requireAuth(req, _res, next) {
-          req.user = { id: "user-test" };
+          req.user = { id: "00000000-0000-4000-8000-000000000161" };
           next();
         }
       };
@@ -42,8 +42,10 @@ function loadReceiptsRouter() {
     }
     if (requestName === "../api/utils/resolveBusinessIdForUser.js" || /resolveBusinessIdForUser\.js$/.test(requestName)) {
       return {
-        resolveBusinessIdForUser: async () => "biz-test",
-        getBusinessScopeForUser: async () => ({ businessIds: ["biz-test"] })
+        resolveBusinessIdForUser: async () => "00000000-0000-4000-8000-000000000261",
+        getBusinessScopeForUser: async () => ({
+          businessIds: ["00000000-0000-4000-8000-000000000261"]
+        })
       };
     }
     if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
@@ -81,6 +83,8 @@ function loadReceiptsRouter() {
     if (requestName === "../services/receiptStorage.js" || /receiptStorage\.js$/.test(requestName)) {
       return {
         getReceiptStorageDir: () => storageDir,
+        resolveReceiptFilePath: (filePath) => filePath,
+        getReceiptStorageStatus: () => ({ directory: storageDir, mode: "filesystem" }),
         isManagedReceiptPath: () => true,
         requirePersistentReceiptStorage(_req, _res, next) {
           next();

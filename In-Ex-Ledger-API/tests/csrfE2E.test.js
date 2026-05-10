@@ -81,7 +81,11 @@ function buildTestApp() {
  *   { id, email, mfa_enabled }
  */
 function makeAuthToken() {
-  return signToken({ id: "user-test-id", email: "test@example.com", mfa_enabled: false });
+  return signToken({
+    id: "00000000-0000-4000-8000-000000000121",
+    email: "test@example.com",
+    mfa_enabled: false
+  });
 }
 
 // ---------------------------------------------------------------------------

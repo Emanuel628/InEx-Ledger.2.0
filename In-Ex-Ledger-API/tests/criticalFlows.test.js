@@ -61,17 +61,21 @@ const {
 } = require("../services/accountingLockService.js");
 const { archiveTransaction } = require("../services/transactionAuditService.js");
 
+const TEST_USER_ID = "00000000-0000-4000-8000-000000000111";
+const TEST_MFA_USER_ID = "00000000-0000-4000-8000-000000000112";
+const TEST_BUSINESS_ID = "00000000-0000-4000-8000-000000000211";
+
 // ---------------------------------------------------------------------------
 // Token helpers
 // ---------------------------------------------------------------------------
 
 function makeToken(extra = {}) {
-  return signToken({ id: "user-test", email: "test@example.com", mfa_enabled: false, ...extra });
+  return signToken({ id: TEST_USER_ID, email: "test@example.com", mfa_enabled: false, ...extra });
 }
 
 function makeMfaToken() {
   return signToken({
-    id: "user-mfa",
+    id: TEST_MFA_USER_ID,
     email: "mfa@example.com",
     mfa_enabled: true,
     mfa_authenticated: true
@@ -173,10 +177,10 @@ test("privacy: POST /erase rejects missing CSRF token (403)", async () => {
   assert.equal(res.status, 403);
 });
 
-test("privacy: POST /erase requires MFA (403 mfa_required) when MFA is not enabled", async () => {
+test("privacy: POST /erase rejects when MFA is enabled but the session is not MFA-authenticated", async () => {
   const privacyRouter = require("../routes/privacy.routes.js");
   const app = buildApp(privacyRouter, "/api/privacy");
-  const authToken = makeToken({ mfa_enabled: false });
+  const authToken = makeToken({ mfa_enabled: true });
   const csrf = generateCsrfToken();
 
   const res = await request(app)
@@ -187,6 +191,7 @@ test("privacy: POST /erase requires MFA (403 mfa_required) when MFA is not enabl
     .send({});
   assert.equal(res.status, 403);
   assert.equal(res.body?.mfa_required, true);
+  assert.equal(res.body?.reauthenticate, true);
 });
 
 test("privacy: POST /delete rejects unauthenticated requests (401)", async () => {
@@ -208,10 +213,10 @@ test("privacy: POST /delete rejects missing CSRF token (403)", async () => {
   assert.equal(res.status, 403);
 });
 
-test("privacy: POST /delete requires MFA (403 mfa_required) when MFA is not enabled", async () => {
+test("privacy: POST /delete rejects when MFA is enabled but the session is not MFA-authenticated", async () => {
   const privacyRouter = require("../routes/privacy.routes.js");
   const app = buildApp(privacyRouter, "/api/privacy");
-  const authToken = makeToken({ mfa_enabled: false });
+  const authToken = makeToken({ mfa_enabled: true });
   const csrf = generateCsrfToken();
 
   const res = await request(app)
@@ -222,6 +227,7 @@ test("privacy: POST /delete requires MFA (403 mfa_required) when MFA is not enab
     .send({ password: "example-password" });
   assert.equal(res.status, 403);
   assert.equal(res.body?.mfa_required, true);
+  assert.equal(res.body?.reauthenticate, true);
 });
 
 test("privacy: POST /delete requires password even when MFA-authenticated", async () => {
@@ -265,10 +271,10 @@ test("auth: POST /change-password rejects missing CSRF token (403)", async () =>
   assert.equal(res.status, 403);
 });
 
-test("auth: POST /change-password requires MFA (403 mfa_required) when MFA is not enabled", async () => {
+test("auth: POST /change-password rejects when MFA is enabled but the session is not MFA-authenticated", async () => {
   const authRouter = require("../routes/auth.routes.js");
   const app = buildApp(authRouter, "/api/auth");
-  const authToken = makeToken({ mfa_enabled: false });
+  const authToken = makeToken({ mfa_enabled: true });
   const csrf = generateCsrfToken();
 
   const res = await request(app)
@@ -298,6 +304,8 @@ test("auth: POST /logout rejects missing CSRF token (403)", async () => {
     .post("/api/auth/logout")
     .set("Authorization", `Bearer ${authToken}`);
   assert.equal(res.status, 403);
+  assert.equal(res.body?.mfa_required, true);
+  assert.equal(res.body?.reauthenticate, true);
 });
 
 test("auth: POST /request-email-change rejects unauthenticated requests (401)", async () => {
@@ -544,7 +552,7 @@ test("businesses: POST /:id/activate rejects unauthenticated requests (401)", as
   const bizRouter = require("../routes/businesses.routes.js");
   const app = buildApp(bizRouter, "/api/businesses");
 
-  const res = await request(app).post("/api/businesses/some-biz-id/activate");
+  const res = await request(app).post(`/api/businesses/${TEST_BUSINESS_ID}/activate`);
   assert.equal(res.status, 401);
 });
 
@@ -554,7 +562,7 @@ test("businesses: POST /:id/activate rejects missing CSRF token (403)", async ()
   const authToken = makeToken();
 
   const res = await request(app)
-    .post("/api/businesses/some-biz-id/activate")
+    .post(`/api/businesses/${TEST_BUSINESS_ID}/activate`)
     .set("Authorization", `Bearer ${authToken}`);
   assert.equal(res.status, 403);
 });
@@ -564,7 +572,7 @@ test("businesses: DELETE /:id rejects unauthenticated requests (401)", async () 
   const app = buildApp(bizRouter, "/api/businesses");
 
   const res = await request(app)
-    .delete("/api/businesses/some-biz-id")
+    .delete(`/api/businesses/${TEST_BUSINESS_ID}`)
     .send({ password: "secret" });
   assert.equal(res.status, 401);
 });
@@ -575,26 +583,27 @@ test("businesses: DELETE /:id rejects missing CSRF token (403)", async () => {
   const authToken = makeToken();
 
   const res = await request(app)
-    .delete("/api/businesses/some-biz-id")
+    .delete(`/api/businesses/${TEST_BUSINESS_ID}`)
     .set("Authorization", `Bearer ${authToken}`)
     .send({ password: "secret" });
   assert.equal(res.status, 403);
 });
 
-test("businesses: DELETE /:id requires MFA (403 mfa_required) when MFA is not enabled", async () => {
+test("businesses: DELETE /:id rejects when MFA is enabled but the session is not MFA-authenticated", async () => {
   const bizRouter = require("../routes/businesses.routes.js");
   const app = buildApp(bizRouter, "/api/businesses");
-  const authToken = makeToken({ mfa_enabled: false });
+  const authToken = makeToken({ mfa_enabled: true });
   const csrf = generateCsrfToken();
 
   const res = await request(app)
-    .delete("/api/businesses/some-biz-id")
+    .delete(`/api/businesses/${TEST_BUSINESS_ID}`)
     .set("Authorization", `Bearer ${authToken}`)
     .set(CSRF_HEADER_NAME, csrf)
     .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
     .send({ password: "secret" });
   assert.equal(res.status, 403);
   assert.equal(res.body?.mfa_required, true);
+  assert.equal(res.body?.reauthenticate, true);
 });
 
 // ---------------------------------------------------------------------------
