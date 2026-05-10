@@ -16,7 +16,7 @@ const {
 } = require("../services/accountingLockService.js");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card", "cash", "loan"];
+const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card", "cash", "loan", "custom"];
 
 const router = express.Router();
 router.use(requireAuth);

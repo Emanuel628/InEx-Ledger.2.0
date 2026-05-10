@@ -2463,6 +2463,9 @@ body {
 .recurring-add-inline {
   font-size: 13px;
   padding: 6px 14px;
+  background: var(--accent2);
+  color: #fff;
+  border: none;
 }
 
 /* 2026-04-30 transactions redesign: trust-first operational polish */

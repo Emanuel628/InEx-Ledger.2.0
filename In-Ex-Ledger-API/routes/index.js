@@ -27,7 +27,7 @@ router.get('/arap-summary', ...businessTierOnly, async (req, res) => {
 router.get('/recurring', requireAuth, async (req, res, next) => {
   try {
     const tier = await getEffectiveTierForRequest(req);
-    if (tier !== PLAN_BUSINESS) {
+    if (tier !== PLAN_BUSINESS && tier !== PLAN_PRO) {
       return res.json([]);
     }
     return next();

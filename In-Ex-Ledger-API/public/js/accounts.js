@@ -3,7 +3,8 @@
   { value: "savings", labelKey: "accounts_type_savings" },
   { value: "credit_card", labelKey: "accounts_type_credit_card" },
   { value: "loan", labelKey: "accounts_type_loan" },
-  { value: "cash", labelKey: "accounts_type_cash" }
+  { value: "cash", labelKey: "accounts_type_cash" },
+  { value: "custom", labelKey: "accounts_type_custom" }
 ];
 const ACCOUNTS_TOAST_MS = 3000;
 let accountsToastTimer = null;
@@ -37,16 +38,11 @@ function wireBottomAddButton() {
 
 function wireAccountTypeChips() {
   const chips = document.querySelectorAll("[data-chip-type]");
-  const select = document.getElementById("account-type");
   chips.forEach((chip) => {
     chip.addEventListener("click", () => {
       chips.forEach((c) => c.classList.remove("is-active"));
       chip.classList.add("is-active");
-      if (select) select.value = chip.dataset.chipType;
     });
-  });
-  select?.addEventListener("change", () => {
-    chips.forEach((c) => c.classList.toggle("is-active", c.dataset.chipType === select.value));
   });
 }
 
@@ -73,13 +69,10 @@ function wireAccountForm() {
   const showButton = document.getElementById("showAccountForm");
   const formContainer = document.getElementById("accountFormContainer");
   const form = document.getElementById("accountForm");
-  const typeSelect = document.getElementById("account-type");
   const nameInput = document.getElementById("account-name");
   const cancelButton = document.getElementById("cancelAccountEdit");
   const message = document.getElementById("accountFormMessage");
   const submitButton = form?.querySelector('button[type="submit"]');
-
-  populateAccountTypes(typeSelect);
 
   showButton?.addEventListener("click", () => {
     formContainer.hidden = !formContainer.hidden;
@@ -100,7 +93,7 @@ function wireAccountForm() {
     event.preventDefault();
 
     const name = nameInput?.value.trim() || "";
-    const type = typeSelect?.value || "";
+    const type = document.querySelector("#accountTypeChips .account-type-chip.is-active")?.dataset.chipType || "";
 
     if (!name || !type) {
       if (message) {
@@ -242,7 +235,9 @@ async function executeDeleteAccount(accountId) {
     });
 
     if (!response || !response.ok) {
-      showAccountsToast(tx("accounts_error_delete"));
+      const payload = response ? await response.json().catch(() => null) : null;
+      const msg = payload?.error || tx("accounts_error_delete");
+      showAccountsToast(msg);
       return;
     }
 
