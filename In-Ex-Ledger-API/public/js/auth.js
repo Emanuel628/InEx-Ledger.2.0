@@ -756,12 +756,10 @@ async function redirectIfAuthenticated() {
 async function apiFetch(url, options = {}) {
   const apiUrl = buildApiUrl(url);
   const method = String(options.method || "GET").toUpperCase();
-  const buildHeaders = () => ({
-    "Content-Type": "application/json",
-    ...(options.headers || {}),
-    ...authHeader(),
-    ...csrfHeader(method)
-  });
+  const buildHeaders = () => {
+    const base = options.body instanceof FormData ? {} : { "Content-Type": "application/json" };
+    return { ...base, ...(options.headers || {}), ...authHeader(), ...csrfHeader(method) };
+  };
   let response = await fetch(apiUrl, {
     ...options,
     credentials: "include",
