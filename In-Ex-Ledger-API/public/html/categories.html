@@ -5,7 +5,7 @@
   <title>InEx Ledger - Categories</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css?v=20260510c" />
-  <link rel="stylesheet" href="/css/pages/categories.css?v=20260510a" />
+  <link rel="stylesheet" href="/css/pages/categories.css?v=20260510b" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -64,26 +64,26 @@
         </div>
         <div class="categories-header-actions">
           <div class="categories-defaults-wrap">
-            <button id="seedDefaultCategoriesBtn" type="button" class="categories-secondary-btn" data-i18n="categories_add_defaults">Add default categories</button>
+            <button id="seedDefaultCategoriesBtn" type="button" class="categories-primary-btn" data-i18n="categories_add_defaults">Add default categories</button>
             <p class="categories-defaults-hint" data-i18n="categories_defaults_hint">Start with your region defaults, then edit or remove anything you do not need.</p>
           </div>
         </div>
       </section>
 
       <section class="category-card">
-        <div class="category-card-head"><h2 data-i18n="categories_income_title">Income categories</h2></div>
-        <div id="incomeCategories" class="category-list"><div class="category-empty category-loading"><p data-i18n="categories_loading">Loading categories...</p></div></div>
-        <div class="category-card-footer">
+        <div class="category-card-head">
+          <h2 data-i18n="categories_income_title">Income categories</h2>
           <button id="addIncomeCategoryBtn" type="button" class="category-inline-add-btn" data-i18n="categories_add_income">+ Add income category</button>
         </div>
+        <div id="incomeCategories" class="category-list"><div class="category-empty category-loading"><p data-i18n="categories_loading">Loading categories...</p></div></div>
       </section>
 
       <section class="category-card">
-        <div class="category-card-head"><h2 data-i18n="categories_expense_title">Expense categories</h2></div>
-        <div id="expenseCategories" class="category-list"><div class="category-empty category-loading"><p data-i18n="categories_loading">Loading categories...</p></div></div>
-        <div class="category-card-footer">
+        <div class="category-card-head">
+          <h2 data-i18n="categories_expense_title">Expense categories</h2>
           <button id="addExpenseCategoryBtn" type="button" class="category-inline-add-btn" data-i18n="categories_add_expense">+ Add expense category</button>
         </div>
+        <div id="expenseCategories" class="category-list"><div class="category-empty category-loading"><p data-i18n="categories_loading">Loading categories...</p></div></div>
       </section>
 
       <p id="categoryMessage" class="category-message"></p>
@@ -141,11 +141,13 @@
 
   <script src="../js/escape-html.js?v=20260410a"></script>
 <script src="../js/global.js?v=20260510c"></script>
-  <script src="../js/i18n.js?v=20260510a"></script>
-  <script src="../js/auth.js?v=20260506b"></script>
+  <script src="../js/i18n.js?v=20260510b"></script>
+  <script src="../js/auth.js?v=20260510a"></script>
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
   <script src="../js/categories-backend.js?v=20260405c"></script>
 </body>
 </html>
+
+
 

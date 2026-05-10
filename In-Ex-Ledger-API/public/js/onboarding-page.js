@@ -5,75 +5,50 @@ let onboardingAccountNameTouched = false;
 let onboardingStartFocusTouched = false;
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const GUIDED_SETUP_STEPS = new Set(["categories", "accounts", "transactions"]);
-const ONBOARDING_WORKFLOW_PRESETS = {
-  gig: {
-    title: "Set up for platform payouts, mileage, and vehicle costs.",
-    body: "We'll keep the setup focused on the records gig and delivery work usually needs first.",
+const ONBOARDING_PLAN_PRESETS = {
+  transactions: {
+    title: "Open the ledger first and start with real activity.",
+    body: "We'll save your defaults, create the first account, and send you straight into Transactions so the workspace becomes usable immediately.",
     bullets: [
-      "Suggest categories like platform income, mileage, fuel, parking, and phone plan.",
-      "Create a starter account so payouts and expenses have somewhere real to land.",
-      "Open mileage first unless you choose a different workflow."
-    ],
-    defaultFocus: "mileage",
-    accountNames: {
-      checking: "Driver Checking",
-      savings: "Driver Savings",
-      credit_card: "Driver Card",
-      cash: "Driver Cash",
-      loan: "Vehicle Loan"
-    }
+      "Start with one income item and one expense instead of over-planning the setup.",
+      "Use the first account you actually post to most often.",
+      "Clean categories and region defaults will already be in place for the first entries."
+    ]
   },
-  creative: {
-    title: "Set up for client income, software, and project expenses.",
-    body: "This path keeps the ledger practical for consulting, design, freelance, and service work.",
+  receipts: {
+    title: "Get receipt capture working before paper starts piling up.",
+    body: "We'll save your basics, create the first account, and open Receipts so you can test the upload flow right away.",
     bullets: [
-      "Suggest categories like client income, software, office supplies, and marketing.",
-      "Create a starter account name that fits ongoing business use.",
-      "Open transactions first so the ledger starts with real activity."
-    ],
-    defaultFocus: "transactions",
-    accountNames: {
-      checking: "Studio Checking",
-      savings: "Studio Savings",
-      credit_card: "Studio Card",
-      cash: "Petty Cash",
-      loan: "Equipment Loan"
-    }
+      "Upload one real receipt so the workflow is proven immediately.",
+      "Then connect that receipt to the matching transaction instead of saving cleanup for later.",
+      "You can still move into Transactions as soon as the capture path is ready."
+    ]
   },
-  trade: {
-    title: "Set up for job costs, materials, tools, and mileage.",
-    body: "We'll bias the first setup pass toward the expense patterns common in field work and home services.",
+  mileage: {
+    title: "Set up mileage before the trips become reconstruction work.",
+    body: "We'll save your region, create the first account, and open Mileage so your first deductible trip can be logged correctly.",
     bullets: [
-      "Suggest categories like job income, materials, tools, subcontractors, and mileage.",
-      "Create the first account so purchases and deposits are easy to place correctly.",
-      "Open mileage first unless you want to begin somewhere else."
-    ],
-    defaultFocus: "mileage",
-    accountNames: {
-      checking: "Job Checking",
-      savings: "Tax Savings",
-      credit_card: "Job Card",
-      cash: "Job Cash",
-      loan: "Truck Loan"
-    }
+      "Add the date, purpose, destination, and distance for one real trip.",
+      "Mileage works best when it starts early rather than at tax time.",
+      "The ledger and mileage records can grow together from there."
+    ]
   },
-  other: {
-    title: "Set up a clean starting point without overcomplicating it.",
-    body: "We'll save the essentials, create the first usable account, and send you into the workflow you want first.",
+  exports: {
+    title: "Build the structure now so exports are clean later.",
+    body: "We'll save your basics, create the first account, and open Exports so you can review the handoff layer after the workspace is configured.",
     bullets: [
-      "Start with a practical account and a small set of categories you will actually use.",
-      "Keep the filing region correct so tax-related defaults start in the right place.",
-      "Open the workflow you want first instead of forcing a generic setup detour."
-    ],
-    defaultFocus: "transactions",
-    accountNames: {
-      checking: "Primary Checking",
-      savings: "Business Savings",
-      credit_card: "Business Card",
-      cash: "Cash",
-      loan: "Business Loan"
-    }
+      "Exports become useful once the account list and categories are practical.",
+      "You can review the output early, then go back and add real activity.",
+      "The guided setup still points you toward categories, accounts, and transactions next."
+    ]
   }
+};
+const STARTER_ACCOUNT_NAME_PRESETS = {
+  checking: { US: "Primary Checking", CA: "Primary Chequing" },
+  savings: { US: "Business Savings", CA: "Business Savings" },
+  credit_card: { US: "Business Card", CA: "Business Card" },
+  cash: { US: "Cash", CA: "Cash" },
+  loan: { US: "Business Loan", CA: "Business Loan" }
 };
 
 function tx(key) {
@@ -101,13 +76,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   hydrateOnboardingDefaults(profile);
-  document.getElementById("onboardingRegion")?.addEventListener("change", syncProvinceField);
+  document.getElementById("onboardingRegion")?.addEventListener("change", syncOnboardingPreview);
   document.getElementById("onboardingStarterAccountType")?.addEventListener("change", syncStarterAccountName);
   document.getElementById("onboardingStarterAccountName")?.addEventListener("input", () => {
     onboardingAccountNameTouched = true;
+    updateOnboardingPlanPreview();
   });
   window.addEventListener("lunaLanguageChanged", applyOnboardingStaticCopy);
-  wireWorkTypeTiles();
   wireStartFocusTiles();
   onboardingForm.addEventListener("submit", handleOnboardingSubmit);
 });
@@ -118,11 +93,6 @@ function hydrateOnboardingDefaults(profile = {}) {
 
   const elBusinessName = document.getElementById("onboardingBusinessName");
   if (elBusinessName) elBusinessName.value = onboardingData.business_name || business.name || "";
-
-  const savedWorkType = onboardingData.work_type || "other";
-  const elWorkType = document.getElementById("onboardingWorkType");
-  if (elWorkType) elWorkType.value = savedWorkType;
-  applyWorkTypeSelection(savedWorkType, { preserveFocus: true, preserveAccountName: true });
 
   const elRegion = document.getElementById("onboardingRegion");
   if (elRegion) elRegion.value = onboardingData.region || business.region || "US";
@@ -136,7 +106,7 @@ function hydrateOnboardingDefaults(profile = {}) {
   if (elStarterAccountName) {
     elStarterAccountName.value = onboardingData.starter_account_name || "";
   }
-  const savedStartFocus = onboardingData.start_focus || resolveWorkPreset(savedWorkType).defaultFocus || "transactions";
+  const savedStartFocus = onboardingData.start_focus || "transactions";
   applyStartFocusSelection(savedStartFocus);
   syncStarterAccountName();
   updateOnboardingPlanPreview();
@@ -158,7 +128,6 @@ async function handleOnboardingSubmit(event) {
 
   const payload = {
     business_name: document.getElementById("onboardingBusinessName")?.value.trim() || "",
-    work_type: document.getElementById("onboardingWorkType")?.value || "other",
     business_type: "sole_proprietor",
     starter_account_type: document.getElementById("onboardingStarterAccountType")?.value || "checking",
     starter_account_name: document.getElementById("onboardingStarterAccountName")?.value.trim() || "",
@@ -217,15 +186,6 @@ async function handleOnboardingSubmit(event) {
   }
 }
 
-function wireWorkTypeTiles() {
-  const tiles = document.querySelectorAll(".work-tile");
-  tiles.forEach((tile) => {
-    tile.addEventListener("click", () => {
-      applyWorkTypeSelection(tile.dataset.work);
-    });
-  });
-}
-
 function wireStartFocusTiles() {
   const tiles = document.querySelectorAll(".focus-tile");
   tiles.forEach((tile) => {
@@ -234,29 +194,6 @@ function wireStartFocusTiles() {
       applyStartFocusSelection(tile.dataset.focus);
     });
   });
-}
-
-function resolveWorkPreset(workType) {
-  return ONBOARDING_WORKFLOW_PRESETS[workType] || ONBOARDING_WORKFLOW_PRESETS.other;
-}
-
-function applyWorkTypeSelection(workType, options = {}) {
-  const normalizedWorkType = ONBOARDING_WORKFLOW_PRESETS[workType] ? workType : "other";
-  const hidden = document.getElementById("onboardingWorkType");
-  if (hidden) {
-    hidden.value = normalizedWorkType;
-  }
-  document.querySelectorAll(".work-tile").forEach((btn) => {
-    btn.classList.toggle("is-selected", btn.dataset.work === normalizedWorkType);
-  });
-
-  if (!options.preserveFocus && !onboardingStartFocusTouched) {
-    applyStartFocusSelection(resolveWorkPreset(normalizedWorkType).defaultFocus);
-  }
-  if (!options.preserveAccountName && !onboardingAccountNameTouched) {
-    syncStarterAccountName();
-  }
-  updateOnboardingPlanPreview();
 }
 
 function applyStartFocusSelection(focus) {
@@ -273,22 +210,31 @@ function applyStartFocusSelection(focus) {
 
 function syncStarterAccountName() {
   if (onboardingAccountNameTouched) {
+    updateOnboardingPlanPreview();
     return;
   }
-  const workType = document.getElementById("onboardingWorkType")?.value || "other";
   const accountType = document.getElementById("onboardingStarterAccountType")?.value || "checking";
-  const preset = resolveWorkPreset(workType);
+  const region = document.getElementById("onboardingRegion")?.value === "CA" ? "CA" : "US";
   const accountInput = document.getElementById("onboardingStarterAccountName");
   if (!accountInput) {
     return;
   }
-  accountInput.value = preset.accountNames?.[accountType] || "Primary Checking";
+  accountInput.value =
+    STARTER_ACCOUNT_NAME_PRESETS[accountType]?.[region] ||
+    STARTER_ACCOUNT_NAME_PRESETS.checking[region];
+  updateOnboardingPlanPreview();
 }
 
 function updateOnboardingPlanPreview() {
-  const workType = document.getElementById("onboardingWorkType")?.value || "other";
   const focus = document.getElementById("onboardingStartFocus")?.value || "transactions";
-  const preset = resolveWorkPreset(workType);
+  const preset = ONBOARDING_PLAN_PRESETS[focus] || ONBOARDING_PLAN_PRESETS.transactions;
+  const region = document.getElementById("onboardingRegion")?.value === "CA" ? "CA" : "US";
+  const accountType = document.getElementById("onboardingStarterAccountType")?.value || "checking";
+  const accountName =
+    document.getElementById("onboardingStarterAccountName")?.value.trim() ||
+    STARTER_ACCOUNT_NAME_PRESETS[accountType]?.[region] ||
+    STARTER_ACCOUNT_NAME_PRESETS.checking[region];
+  const regionLabel = region === "CA" ? "Canada" : "the United States";
   const title = document.getElementById("onboardingPlanTitle");
   const body = document.getElementById("onboardingPlanBody");
   const bullets = document.getElementById("onboardingPlanBullets");
@@ -296,13 +242,19 @@ function updateOnboardingPlanPreview() {
     title.textContent = preset.title;
   }
   if (body) {
-    body.textContent = `${preset.body} First stop: ${formatStartFocusLabel(focus)}.`;
+    body.textContent = `${preset.body} First stop: ${formatStartFocusLabel(focus)}. Filing defaults: ${regionLabel}. Starter account: ${accountName}.`;
   }
   if (bullets) {
     bullets.innerHTML = preset.bullets
       .map((item) => `<li>${escapeHtml(item)}</li>`)
       .join("");
   }
+}
+
+function syncOnboardingPreview() {
+  syncProvinceField();
+  syncStarterAccountName();
+  updateOnboardingPlanPreview();
 }
 
 function formatStartFocusLabel(focus) {

@@ -27,7 +27,6 @@ const accountDeleteLimiter = rateLimit({
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const VALID_BUSINESS_TYPES = new Set(["sole_proprietor", "llc", "s_corp", "partnership", "corporation"]);
-const VALID_WORK_TYPES = new Set(["gig", "creative", "trade", "other"]);
 const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
 const VALID_STARTER_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash", "loan"]);
 const GUIDED_SETUP_STEPS = ["categories", "accounts", "transactions"];
@@ -98,92 +97,61 @@ function resolvePreviousGuidedSetupStep(currentStep) {
   return GUIDED_SETUP_STEPS[currentIndex - 1] || null;
 }
 
-function resolveDefaultStartFocus(workType) {
-  if (workType === "gig" || workType === "trade") {
-    return "mileage";
-  }
+function resolveDefaultStartFocus() {
   return "transactions";
 }
 
-function buildWorkTypeRecommendations(workType) {
-  switch (workType) {
-    case "gig":
+function buildOnboardingRecommendations(region, startFocus) {
+  const recommendedCategories =
+    region === "CA"
+      ? ["Business income", "Office supplies", "Software", "Travel", "Meals and entertainment"]
+      : ["Business income", "Supplies", "Software", "Travel", "Meals"];
+
+  switch (startFocus) {
+    case "receipts":
       return {
-        recommended_categories: [
-          "Platform income",
-          "Mileage",
-          "Gas and fuel",
-          "Parking and tolls",
-          "Phone plan"
-        ],
+        recommended_categories: recommendedCategories,
         setup_notes: [
-          "Start by logging one payout and one vehicle-related expense.",
-          "Mileage is usually worth setting up early for rideshare and delivery work."
+          "Upload one real receipt first so your capture workflow is tested immediately.",
+          "After that, connect the receipt to the matching transaction instead of leaving cleanup for later."
         ]
       };
-    case "creative":
+    case "mileage":
       return {
-        recommended_categories: [
-          "Client income",
-          "Software subscriptions",
-          "Office supplies",
-          "Advertising and marketing",
-          "Professional services"
-        ],
+        recommended_categories: recommendedCategories,
         setup_notes: [
-          "Create the categories you use on client work before adding a batch of transactions.",
-          "Keep software and contractor costs separate so exports stay cleaner later."
+          "Log one real business trip first so the mileage workflow is ready before trips pile up.",
+          "Keep the ledger and mileage records moving together instead of rebuilding them at tax time."
         ]
       };
-    case "trade":
+    case "exports":
       return {
-        recommended_categories: [
-          "Job income",
-          "Materials",
-          "Tools",
-          "Subcontractors",
-          "Mileage"
-        ],
+        recommended_categories: recommendedCategories,
         setup_notes: [
-          "Materials, tools, and mileage are usually the first categories worth setting up.",
-          "Receipts matter more when purchases happen on the job, so keep that workflow close."
+          "Exports become useful once categories and accounts are practical and current.",
+          "Use the guided setup to add a few real records first, then review exports with live data."
         ]
       };
     default:
       return {
-        recommended_categories: [
-          "Business income",
-          "Supplies",
-          "Software",
-          "Travel",
-          "Meals"
-        ],
+        recommended_categories: recommendedCategories,
         setup_notes: [
           "Start with the categories and account names you will actually use this month.",
-          "You can expand the setup after a few real transactions make the gaps obvious."
+          "Add one or two real transactions early so the rest of the setup stays grounded in real activity."
         ]
       };
   }
 }
 
-function buildStarterAccountName(workType, starterAccountType) {
+function buildStarterAccountName(starterAccountType, region = "US") {
   const typeLabelMap = {
-    checking: "Checking",
+    checking: region === "CA" ? "Chequing" : "Checking",
     savings: "Savings",
     credit_card: "Business Card",
     cash: "Cash",
     loan: "Business Loan"
   };
   const baseLabel = typeLabelMap[starterAccountType] || "Primary Account";
-  if (workType === "gig") {
-    return starterAccountType === "credit_card" ? "Driver Card" : `Driver ${baseLabel}`;
-  }
-  if (workType === "creative") {
-    return starterAccountType === "credit_card" ? "Studio Card" : `Studio ${baseLabel}`;
-  }
-  if (workType === "trade") {
-    return starterAccountType === "credit_card" ? "Job Card" : `Job ${baseLabel}`;
-  }
   return starterAccountType === "credit_card" ? "Business Card" : `Primary ${baseLabel}`;
 }
 
@@ -254,7 +222,6 @@ router.get("/onboarding", async (req, res) => {
 router.put("/onboarding", async (req, res) => {
   const businessName = String(req.body?.business_name || "").trim();
   const businessType = String(req.body?.business_type || "").trim();
-  const workType = String(req.body?.work_type || "").trim().toLowerCase();
   const starterAccountType = String(req.body?.starter_account_type || "").trim().toLowerCase();
   const starterAccountName = normalizeOptionalTrimmedString(req.body?.starter_account_name);
   const startFocus = String(req.body?.start_focus || "").trim().toLowerCase();
@@ -267,9 +234,6 @@ router.put("/onboarding", async (req, res) => {
   }
   if (!VALID_BUSINESS_TYPES.has(businessType)) {
     return res.status(400).json({ error: "Choose a valid business type." });
-  }
-  if (workType && !VALID_WORK_TYPES.has(workType)) {
-    return res.status(400).json({ error: "Choose a valid work type." });
   }
   if (!VALID_REGIONS.has(region)) {
     return res.status(400).json({ error: "Choose a valid region." });
@@ -298,16 +262,15 @@ router.put("/onboarding", async (req, res) => {
         [req.user.id]
       );
       const alreadyCompleted = !!currentUser.rows[0]?.onboarding_completed;
-      const normalizedWorkType = VALID_WORK_TYPES.has(workType) ? workType : "other";
       const normalizedStarterAccountType = VALID_STARTER_ACCOUNT_TYPES.has(starterAccountType)
         ? starterAccountType
         : "checking";
       const normalizedStartFocus = VALID_START_FOCUS.has(startFocus)
         ? startFocus
-        : resolveDefaultStartFocus(normalizedWorkType);
-      const workTypeRecommendations = buildWorkTypeRecommendations(normalizedWorkType);
+        : resolveDefaultStartFocus();
+      const onboardingRecommendations = buildOnboardingRecommendations(region, normalizedStartFocus);
       const starterName =
-        starterAccountName || buildStarterAccountName(normalizedWorkType, normalizedStarterAccountType);
+        starterAccountName || buildStarterAccountName(normalizedStarterAccountType, region);
       const guidedSetupActive = GUIDED_SETUP_STEPS.includes(normalizedStartFocus);
 
       await client.query(
@@ -339,15 +302,14 @@ router.put("/onboarding", async (req, res) => {
       const onboardingData = {
         business_name: businessName,
         business_type: businessType,
-        work_type: normalizedWorkType,
         starter_account_type: normalizedStarterAccountType,
         starter_account_name: starterName,
         start_focus: normalizedStartFocus,
         region,
         province: region === "CA" ? province : "",
         language,
-        recommended_categories: workTypeRecommendations.recommended_categories,
-        setup_notes: workTypeRecommendations.setup_notes,
+        recommended_categories: onboardingRecommendations.recommended_categories,
+        setup_notes: onboardingRecommendations.setup_notes,
         guided_setup_active: guidedSetupActive,
         guided_setup_step: guidedSetupActive ? normalizedStartFocus : "complete"
       };

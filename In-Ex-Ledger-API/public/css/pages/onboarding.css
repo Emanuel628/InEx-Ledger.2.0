@@ -118,41 +118,6 @@
   width: 100%;
 }
 
-/* Work-type selection tiles */
-.onboarding-work-tiles {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-top: 8px;
-}
-
-.work-tile {
-  min-height: 48px;
-  padding: 12px 14px;
-  border: 1px solid rgba(15, 25, 35, 0.1);
-  border-radius: 14px;
-  background: #fbfcfe;
-  color: var(--ink2);
-  font-size: 13px;
-  font-weight: 700;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
-}
-
-.work-tile:hover {
-  border-color: var(--accent2);
-  background: var(--accent-light);
-  color: var(--accent2);
-}
-
-.work-tile.is-selected {
-  border-color: var(--accent2);
-  background: var(--accent-light);
-  color: var(--accent2);
-  font-weight: 700;
-}
-
 .onboarding-focus-tiles {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

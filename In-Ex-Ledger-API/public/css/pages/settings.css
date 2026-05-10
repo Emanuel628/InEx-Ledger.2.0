@@ -1410,12 +1410,6 @@ body {
   margin-top: 0;
 }
 
-.session-manage-link {
-  display: inline-flex;
-  align-items: center;
-  text-decoration: none;
-}
-
 .session-note {
   margin-top: 8px;
   font-size: 12px;
@@ -2149,7 +2143,6 @@ body {
 
 .settings-page .settings-secondary-btn,
 .settings-page .safe-action,
-.settings-page .session-manage-link,
 .settings-page .modal-cancel {
   padding: 10px 16px;
   border: 1px solid rgba(148, 163, 184, 0.24);
@@ -2157,13 +2150,8 @@ body {
   color: #0f172a;
 }
 
-.settings-page .session-manage-link {
-  text-decoration: none;
-}
-
 .settings-page .safe-action:hover,
 .settings-page .settings-secondary-btn:hover,
-.settings-page .session-manage-link:hover,
 .settings-page .modal-cancel:hover {
   background: #f8fafc;
 }

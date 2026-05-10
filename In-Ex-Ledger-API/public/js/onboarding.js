@@ -53,40 +53,6 @@ const ONBOARDING_TOURS = {
 };
 
 const GUIDED_SETUP_ORDER = ["categories", "accounts", "transactions"];
-const WORK_TYPE_TOUR_NOTES = {
-  gig: {
-    categories: "For rideshare and delivery work, start with categories like platform income, mileage, fuel, parking, and phone plan.",
-    accounts: "Your main payout account and your most-used card are usually enough to start cleanly.",
-    transactions: "A good first pass is one payout and one vehicle-related expense.",
-    receipts: "Keep fuel, parking, toll, and maintenance receipts attached as you go.",
-    mileage: "Mileage is usually one of the highest-value habits to set up early for this work.",
-    exports: "Exports matter most after payouts, mileage, and vehicle expenses are categorized consistently."
-  },
-  creative: {
-    categories: "Client income, software, office supplies, and marketing are often the first categories worth setting up.",
-    accounts: "Start with the bank account and card you use for client work and subscriptions.",
-    transactions: "Try entering one client payment and one software or operating expense first.",
-    receipts: "Keep software and contractor receipts organized early so project costs stay clean later.",
-    mileage: "Mileage may be secondary here unless you drive regularly for client work.",
-    exports: "Exports are easier to trust when client income and software costs are separated clearly."
-  },
-  trade: {
-    categories: "Materials, tools, subcontractors, and mileage are usually the first categories that matter.",
-    accounts: "Set up the account or card that job costs actually hit in the field.",
-    transactions: "A practical first pass is one job payment and one materials or tools expense.",
-    receipts: "Material and tools receipts are easier to lose later, so attach them early.",
-    mileage: "Mileage often matters immediately for jobs, supplier runs, and site visits.",
-    exports: "Exports work better when materials, tools, and subcontractors are kept separate."
-  },
-  other: {
-    categories: "Keep the first categories practical and expand only after real activity shows what is missing.",
-    accounts: "Use the account you expect to post to most often first.",
-    transactions: "Start with one income item and one expense so the ledger becomes usable immediately.",
-    receipts: "Attach receipts early so later cleanup does not turn into reconstruction work.",
-    mileage: "If driving matters to the business, log mileage early; otherwise focus on the ledger first.",
-    exports: "Exports become useful once you have a handful of real entries and clean categories."
-  }
-};
 const GUIDED_SETUP_CONFIG = {
   categories: {
     stepNumber: 1,
@@ -209,12 +175,6 @@ function getOnboardingData() {
   return window.__LUNA_ME__?.onboarding?.data || window.__LUNA_ONBOARDING__?.data || {};
 }
 
-function getWorkTypeTourNote(page) {
-  const workType = String(getOnboardingData().work_type || "").trim().toLowerCase();
-  const notes = WORK_TYPE_TOUR_NOTES[workType] || WORK_TYPE_TOUR_NOTES.other;
-  return notes?.[page] || "";
-}
-
 function maybeShowOnboardingTour(page, profile) {
   const onboarding = profile?.onboarding || {};
   if (!onboarding.completed || document.getElementById("onboardingTourCard")) {
@@ -258,7 +218,6 @@ function renderGuidedSetupCard(page) {
   }
   const stepLabel = `${tx("onboarding_guide_step_prefix")} ${config.stepNumber} ${tx("onboarding_guide_step_of")} ${GUIDED_SETUP_ORDER.length}`;
   const canGoBack = config.stepNumber > 1;
-  const personalizedNote = getWorkTypeTourNote(page);
   const launchButton = document.querySelector(config.launchSelector)
     ? `<button type="button" class="onboarding-tour-secondary onboarding-guide-launch">${escapeHtml(tx(config.launchLabelKey))}</button>`
     : "";
@@ -280,7 +239,6 @@ function renderGuidedSetupCard(page) {
       <ul>
         ${config.points.map((point) => `<li>${escapeHtml(tx(point))}</li>`).join("")}
       </ul>
-      ${personalizedNote ? `<p class="onboarding-tour-helper">${escapeHtml(personalizedNote)}</p>` : ""}
       <p class="onboarding-tour-helper">${escapeHtml(tx(config.helperKey))}</p>
       <div class="onboarding-tour-actions">
         ${launchButton}

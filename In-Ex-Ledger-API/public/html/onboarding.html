@@ -5,7 +5,7 @@
   <title>InEx Ledger - Getting Started</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css?v=20260510c" />
-  <link rel="stylesheet" href="/css/pages/onboarding.css?v=20260419a" />
+  <link rel="stylesheet" href="/css/pages/onboarding.css?v=20260510a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -28,16 +28,17 @@
       <div class="onboarding-intro">
         <span class="onboarding-kicker" data-i18n="onboarding_kicker">Get set up</span>
         <h1>Let's make your workspace usable in one pass.</h1>
-        <p>Tell us the basics, we'll set your defaults, then walk you through categories, accounts, and transactions without repeating setup you already did.</p>
+        <p>Tell us the business basics that actually matter, we'll save the right defaults, create your first real account, and send you straight into productive work.</p>
         <ol class="onboarding-steps">
           <li data-i18n="onboarding_step_1">Business basics</li>
           <li data-i18n="onboarding_step_2">Regional defaults</li>
+          <li data-i18n="onboarding_step_3">First account</li>
           <li data-i18n="onboarding_step_4">Guided setup</li>
         </ol>
         <div class="onboarding-preview-card" id="onboardingPlanPreview" aria-live="polite">
           <div class="onboarding-preview-kicker">Your setup plan</div>
-          <h2 id="onboardingPlanTitle">Built for solo work that needs clean books fast.</h2>
-          <p id="onboardingPlanBody">We'll save your basics, create your first account, and take you to the workflow that makes sense to start with.</p>
+          <h2 id="onboardingPlanTitle">Built to start real bookkeeping right away.</h2>
+          <p id="onboardingPlanBody">We'll save your business basics, create your first account, and open the workflow you want first.</p>
           <ul id="onboardingPlanBullets" class="onboarding-preview-list">
             <li>Save the business name and filing region you actually use.</li>
             <li>Create a starter account so the ledger is usable immediately.</li>
@@ -48,18 +49,6 @@
 
       <form id="onboardingForm" class="onboarding-card">
         <div class="onboarding-grid">
-          <div class="form-field form-field-full">
-            <label class="field-label" data-i18n="onboarding_work_type_label">What kind of work do you do?</label>
-            <p class="onboarding-field-hint">We use this to suggest categories, starter guidance, and the first workflow to open after setup.</p>
-            <div class="onboarding-work-tiles" id="onboardingWorkTiles">
-              <button type="button" class="work-tile" data-work="gig" data-i18n="onboarding_work_type_gig">Rideshare / Delivery</button>
-              <button type="button" class="work-tile" data-work="creative" data-i18n="onboarding_work_type_creative">Creative / Consulting</button>
-              <button type="button" class="work-tile" data-work="trade" data-i18n="onboarding_work_type_trade">Trades / Home Services</button>
-              <button type="button" class="work-tile is-selected" data-work="other" data-i18n="onboarding_work_type_other">Other independent work</button>
-            </div>
-            <input type="hidden" id="onboardingWorkType" value="other" />
-          </div>
-
           <div class="form-field">
             <label for="onboardingBusinessName" data-i18n="onboarding_business_name">Your name or trade name</label>
             <input type="text" id="onboardingBusinessName" autocomplete="name" required data-i18n-placeholder="onboarding_business_name_placeholder" placeholder="e.g. Jane Smith or Jane's Design" />
@@ -129,9 +118,11 @@
 
   <script src="../js/escape-html.js?v=20260410a"></script>
   <script src="../js/global.js?v=20260510c"></script>
-  <script src="../js/i18n.js?v=20260510a"></script>
-  <script src="../js/auth.js?v=20260506b"></script>
-  <script src="../js/onboarding-page.js?v=20260419a"></script>
+  <script src="../js/i18n.js?v=20260510b"></script>
+  <script src="../js/auth.js?v=20260510a"></script>
+  <script src="../js/onboarding-page.js?v=20260510a"></script>
 </body>
 </html>
+
+
 

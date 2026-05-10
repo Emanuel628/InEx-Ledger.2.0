@@ -13,6 +13,8 @@ const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
 const SUBSCRIPTION_KEY = "lb_subscription";
 const ACTIVE_BUSINESS_ID_KEY = "lb_active_business_id";
 const ACTIVE_BUSINESS_NAME_KEY = "lb_business_name";
+const USER_DISPLAY_NAME_KEY = "lb_user_display_name";
+const USER_INITIALS_KEY = "lb_user_initials";
 const USER_PILL_CHEVRON_MARKUP = '<svg class="user-pill-chevron" viewBox="0 0 10 6" fill="none" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
@@ -135,6 +137,8 @@ function clearAppState() {
     localStorage.removeItem("auth_token");
     localStorage.removeItem(ACTIVE_BUSINESS_ID_KEY);
     localStorage.removeItem(ACTIVE_BUSINESS_NAME_KEY);
+    localStorage.removeItem(USER_DISPLAY_NAME_KEY);
+    localStorage.removeItem(USER_INITIALS_KEY);
     localStorage.removeItem("lb_transactions_upsell_hidden");
   } catch (_) {}
   try {
@@ -349,6 +353,10 @@ function updateAuthenticatedChrome(profile = {}) {
   const pillBusinessName = getPillBusinessName(profile);
 
   persistBusinessContext(profile);
+  try {
+    localStorage.setItem(USER_DISPLAY_NAME_KEY, displayName);
+    localStorage.setItem(USER_INITIALS_KEY, initials);
+  } catch (_) {}
   // Onboarding is a clean setup wizard — skip the header user pill there.
   if (!isOnboardingRoute()) {
     ensureLegacyUserPills();
@@ -366,6 +374,31 @@ function updateAuthenticatedChrome(profile = {}) {
   });
 
   initAccountMenus(displayName, profile);
+}
+
+function preloadAuthenticatedChrome() {
+  try {
+    const pillBusinessName = String(localStorage.getItem(ACTIVE_BUSINESS_NAME_KEY) || "").trim();
+    const initials = String(localStorage.getItem(USER_INITIALS_KEY) || "").trim();
+    const displayName = String(localStorage.getItem(USER_DISPLAY_NAME_KEY) || "").trim() || "User";
+
+    if (!pillBusinessName && !initials) {
+      return;
+    }
+
+    document.querySelectorAll(".user-name").forEach((node) => {
+      if (pillBusinessName) {
+        node.textContent = pillBusinessName;
+      }
+    });
+
+    document.querySelectorAll(".user-avatar").forEach((node) => {
+      if (initials) {
+        node.textContent = initials;
+        node.setAttribute("aria-label", `${displayName} initials`);
+      }
+    });
+  } catch (_) {}
 }
 
 function getNormalizedPathname() {
@@ -418,7 +451,7 @@ function maybeLoadOnboardingRuntime(profile = {}) {
 
   if (!document.querySelector('script[data-onboarding-runtime="true"]')) {
     const script = document.createElement("script");
-    script.src = "/js/onboarding.js?v=20260419a";
+    script.src = "/js/onboarding.js?v=20260510a";
     script.dataset.onboardingRuntime = "true";
     document.body.appendChild(script);
   }
@@ -458,6 +491,8 @@ function ensureUserPillChrome(pill) {
 
   pill.dataset.userPillChrome = "ready";
 }
+
+preloadAuthenticatedChrome();
 
 
 function getToken() {
@@ -1234,3 +1269,4 @@ document.addEventListener("keydown", (event) => {
     closeBusinessCreationModal();
   }
 });
+
