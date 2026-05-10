@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const { pool } = require("../db.js");
 const { logWarn } = require("../utils/logger.js");
 
-const EXPORT_GRANT_TTL_MS = Number(process.env.EXPORT_GRANT_TTL_MS || 60_000);
+const DEFAULT_EXPORT_GRANT_TTL_MS = 60_000;
 const ACTION_SCOPE = "generate_pdf";
 
 let warnedAboutMissingSecret = false;
@@ -33,13 +33,21 @@ function signWithGrantSecret(message) {
   return crypto.createHmac("sha256", EXPORT_GRANT_SECRET).update(message).digest("base64url");
 }
 
-function signGrantToken(payload, expiresInSeconds) {
+function resolveGrantTtlMs() {
+  const parsed = Number(process.env.EXPORT_GRANT_TTL_MS || DEFAULT_EXPORT_GRANT_TTL_MS);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_EXPORT_GRANT_TTL_MS;
+}
+
+function signGrantToken(payload, expiresAtMs) {
   const header = encodeSegment({ alg: "HS256", typ: "JWT" });
-  const now = Math.floor(Date.now() / 1000);
+  const nowMs = Date.now();
+  const now = Math.floor(nowMs / 1000);
   const bodyPayload = {
     ...payload,
     iat: now,
-    exp: now + expiresInSeconds
+    iat_ms: nowMs,
+    exp: Math.ceil(expiresAtMs / 1000),
+    exp_ms: expiresAtMs
   };
   const body = encodeSegment(bodyPayload);
   const signature = signWithGrantSecret(`${header}.${body}`);
@@ -62,7 +70,15 @@ function verifyGrantToken(token) {
     throw new Error("Invalid grant token signature");
   }
   const decoded = JSON.parse(decodeSegment(body));
-  const now = Math.floor(Date.now() / 1000);
+  const nowMs = Date.now();
+  if (typeof decoded.exp_ms === "number") {
+    if (decoded.exp_ms <= nowMs) {
+      throw new Error("Grant token expired");
+    }
+    return decoded;
+  }
+
+  const now = Math.floor(nowMs / 1000);
   if (typeof decoded.exp === "number" && decoded.exp <= now) {
     throw new Error("Grant token expired");
   }
@@ -71,10 +87,10 @@ function verifyGrantToken(token) {
 
 async function issueExportGrant({ businessId, userId, exportType = "pdf", includeTaxId = false, dateRange, metadata = {} }) {
   ensureSecret();
+  const ttlMs = resolveGrantTtlMs();
   const now = Date.now();
-  const expiresAt = now + EXPORT_GRANT_TTL_MS;
+  const expiresAt = now + ttlMs;
   const jti = crypto.randomUUID();
-  const expiresInSeconds = Math.floor(EXPORT_GRANT_TTL_MS / 1000);
   const payload = {
     jti,
     action: ACTION_SCOPE,
@@ -86,7 +102,7 @@ async function issueExportGrant({ businessId, userId, exportType = "pdf", includ
     metadata
   };
 
-  const token = signGrantToken(payload, expiresInSeconds);
+  const token = signGrantToken(payload, expiresAt);
 
   await pool.query(
     "INSERT INTO export_grant_jtis (jti, expires_at) VALUES ($1, $2)",
