@@ -515,10 +515,20 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
     const category = categoryMap[txn.category_id || txn.categoryId] || null;
     const account = accountMap[txn.account_id || txn.accountId] || null;
     const flags = getTransactionFlags(txn, category);
+    const payerDetails = [];
+    const payerName = txn.payer_name || txn.payerName || "";
+    const taxFormType = txn.tax_form_type || txn.taxFormType || "";
+    if (String(txn.type || "").toLowerCase() === "income" && payerName) {
+      payerDetails.push(`Payer: ${payerName}`);
+    }
+    if (String(txn.type || "").toLowerCase() === "income" && taxFormType) {
+      payerDetails.push(`Form: ${taxFormType}`);
+    }
+    const payeeMemoParts = [txn.description || txn.note || "(No description)", ...payerDetails];
     return {
       date: normalizePdfDate(txn.date),
       id: truncateText(txn.id || '', 10),
-      payeeMemo: truncateText(txn.description || txn.note || '(No description)', 25),
+      payeeMemo: truncateText(payeeMemoParts.join(" | "), 25),
       accountCategory: truncateText(`${safeValue(account?.name, '-') } / ${safeValue(category?.name, 'Uncategorized')}`, 24),
       taxMapping: truncateText(safeValue(category?.tax_label || category?.taxLabel, 'Unmapped'), 18),
       amount: formatCurrencyForPdf(Math.abs(Number(txn.amount) || 0), currency),

@@ -31,6 +31,7 @@ const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
 const VALID_TAX_TREATMENTS = new Set(["income", "operating", "capital", "split_use", "nondeductible"]);
 const VALID_REVIEW_STATUSES = new Set(["needs_review", "ready", "matched", "locked"]);
+const VALID_TAX_FORMS = new Set(["1099-NEC", "1099-K", "T4A", "none"]);
 const MAX_TRANSACTION_AMOUNT = 999999999.99;
 const MAX_PERCENT = 100;
 const TRANSACTION_UNDO_STACK_LIMIT = 20;
@@ -359,15 +360,18 @@ function tryDecrypt(value) {
 
 /**
  * Attempts to encrypt a transaction description using AES-256-GCM.
- * Falls back to null (plain-text storage only) when FIELD_ENCRYPTION_KEY is
- * not configured so that transactions can still be saved without encryption.
- * A warning is logged so that server operators are alerted to the missing key.
+ * In production this fails closed when FIELD_ENCRYPTION_KEY is missing.
+ * Outside production it falls back to plain-text storage with a warning so
+ * local development and older test fixtures can still run.
  */
 function tryEncryptDescription(description) {
   if (!description) return null;
   try {
     return encrypt(description);
   } catch (encryptErr) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("FIELD_ENCRYPTION_KEY is required in production to store transaction descriptions.");
+    }
     logError(
       "[transactions] Field encryption unavailable — description stored as plain text. " +
       "Set FIELD_ENCRYPTION_KEY to enable at-rest encryption:",
@@ -458,6 +462,8 @@ router.get("/", async (req, res) => {
               t.personal_use_pct,
               t.review_status,
               t.review_notes,
+              t.payer_name,
+              t.tax_form_type,
               t.recurring_transaction_id,
               t.recurring_occurrence_date,
               t.is_adjustment,
@@ -513,8 +519,7 @@ router.post("/", async (req, res) => {
     const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
     const { description, note } = req.body;
     const payerName = type === "income" ? (String(req.body.payer_name || "").trim().slice(0, 200) || null) : null;
-    const validTaxForms = new Set(["1099-NEC", "1099-K", "T4A", "none"]);
-    const taxFormType = type === "income" && validTaxForms.has(req.body.tax_form_type) ? req.body.tax_form_type : null;
+    const taxFormType = type === "income" && VALID_TAX_FORMS.has(req.body.tax_form_type) ? req.body.tax_form_type : null;
     await assertUnlockedBusinessDates(businessId, date);
     const encryptedDescription = tryEncryptDescription(description);
 
@@ -628,6 +633,8 @@ router.put("/:id", async (req, res) => {
     }
 
     const encryptedDescription = tryEncryptDescription(description);
+    const payerName = type === "income" ? (String(req.body.payer_name || "").trim().slice(0, 200) || null) : null;
+    const taxFormType = type === "income" && VALID_TAX_FORMS.has(req.body.tax_form_type) ? req.body.tax_form_type : null;
 
     const result = await pool.query(
       `UPDATE transactions
@@ -651,10 +658,12 @@ router.put("/:id", async (req, res) => {
               personal_use_pct        = $18,
               review_status           = $19,
               review_notes            = $20,
-              adjusted_by_id          = $21,
+              payer_name              = $21,
+              tax_form_type           = $22,
+              adjusted_by_id          = $23,
               adjusted_at             = NOW()
-        WHERE id = $22
-          AND business_id = $23
+        WHERE id = $24
+          AND business_id = $25
           AND deleted_at IS NULL
           AND (is_adjustment = false OR is_adjustment IS NULL)
        RETURNING *`,
@@ -679,6 +688,8 @@ router.put("/:id", async (req, res) => {
         validation.normalized.personal_use_pct,
         validation.normalized.review_status || "ready",
         validation.normalized.review_notes,
+        payerName,
+        taxFormType,
         req.user.id,
         req.params.id,
         businessId
@@ -702,6 +713,25 @@ router.delete("/bulk-delete-all", async (req, res) => {
     const confirm = String(req.body?.confirm || "").trim();
     if (confirm !== "DELETE") {
       return res.status(400).json({ error: "Confirmation required. Send { confirm: 'DELETE' }." });
+    }
+    const lockState = await loadAccountingLockState(pool, businessId);
+    if (lockState?.lockedThroughDate) {
+      const lockedTransaction = await pool.query(
+        `SELECT id
+           FROM transactions
+          WHERE business_id = $1
+            AND deleted_at IS NULL
+            AND date <= $2
+          LIMIT 1`,
+        [businessId, lockState.lockedThroughDate]
+      );
+      if (lockedTransaction.rowCount > 0) {
+        return res.status(409).json({
+          error: "Some transactions are in a locked accounting period and cannot be deleted.",
+          code: "ACCOUNTING_PERIOD_LOCKED",
+          locked_through_date: lockState.lockedThroughDate
+        });
+      }
     }
     const result = await pool.query(
       `UPDATE transactions

@@ -1005,6 +1005,8 @@ function buildFullCsv(transactions, currency, includeBusiness = false) {
     "Indirect Tax Amount",
     "Indirect Tax Recoverable",
     "Personal Use %",
+    "Payer Name",
+    "Tax Form Type",
     "Review Status",
     "Review Notes"
   ]];
@@ -1054,6 +1056,8 @@ function buildFullCsv(transactions, currency, includeBusiness = false) {
           const pct = Number(transaction.personalUsePct ?? transaction.personal_use_pct);
           return Number.isFinite(pct) && pct > 0 ? pct.toFixed(1) : "";
         })(),
+        transaction.payerName || transaction.payer_name || "",
+        transaction.taxFormType || transaction.tax_form_type || "",
         (() => {
           const status = String(transaction.reviewStatus || transaction.review_status || "").toLowerCase();
           return status && status !== "ready" ? status : "";

@@ -20,7 +20,9 @@ function buildTestPdf() {
         accountId: "acc_main",
         date: "2026-04-01",
         merchant: "Client A",
-        note: "Invoice (April)"
+        note: "Invoice (April)",
+        payer_name: "Acme Platform",
+        tax_form_type: "1099-K"
       },
       {
         id: "tx_expense",
@@ -91,7 +93,9 @@ function loadExportsRouter(options = {}) {
         description: "Client A",
         date: new Date("2026-04-01T00:00:00.000Z"),
         note: "Invoice (April)",
-        currency: "USD"
+        currency: "USD",
+        payer_name: "Acme Platform",
+        tax_form_type: "1099-K"
       },
       {
         id: "tx_expense",
@@ -317,6 +321,7 @@ test("buildPdfExport writes literal Helvetica text commands instead of UTF-16 he
   assert.match(pdf, /\(Category Totals and Suggested Tax Mapping\) Tj/);
   assert.match(pdf, /\(Detailed Transaction Ledger\) Tj/);
   assert.match(pdf, /\(Review Items and Exceptions\) Tj/);
+  assert.match(pdf, /\(Invoice \\\(April\\\) \| Paye\.\.\.\) Tj/);
   assert.doesNotMatch(pdf, /<FEFF/i);
   assert.doesNotMatch(pdf, /[^\x00-\x7F]/);
 });
@@ -341,6 +346,7 @@ test("exports generate route returns the inline PDF buffer and stores only the r
     assert.match(response.body.toString("latin1"), /^%PDF-/);
     assert.match(response.body.toString("latin1"), /\(Tax ID: 12-3456789\) Tj/);
     assert.match(response.body.toString("latin1"), /\(Secure Export\) Tj/);
+    assert.match(response.body.toString("latin1"), /\(Client A \| Payer: Acme\.\.\.\) Tj/);
     assert.equal(fixture.state.vehicleCostQueryCount > 0, true, "vehicle costs should be included in export queries");
     assert.ok(fixture.state.savedRedacted?.jobId, "redacted export should be saved");
     assert.ok(Buffer.isBuffer(fixture.state.savedRedacted?.buffer));

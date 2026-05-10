@@ -1613,6 +1613,8 @@ function prefillTransactionForm(transaction) {
   const reviewStatusSelect = document.getElementById("transactionReviewStatus");
   const reviewNotesInput = document.getElementById("transactionReviewNotes");
   const noteInput = document.getElementById("transactionNote");
+  const payerNameInput = document.getElementById("payerName");
+  const taxFormTypeInput = document.getElementById("taxFormType");
 
   if (dateInput) {
     dateInput.value = transaction.date || "";
@@ -1633,6 +1635,7 @@ function prefillTransactionForm(transaction) {
   if (typeSelect) {
     typeSelect.value = transaction.type || "expense";
   }
+  setTransactionType(transaction.type || "expense");
   if (clearedInput) {
     clearedInput.checked = !!transaction.cleared;
   }
@@ -1671,6 +1674,12 @@ function prefillTransactionForm(transaction) {
   }
   if (noteInput) {
     noteInput.value = transaction.note || "";
+  }
+  if (payerNameInput) {
+    payerNameInput.value = transaction.payerName || transaction.payer_name || "";
+  }
+  if (taxFormTypeInput) {
+    taxFormTypeInput.value = transaction.taxFormType || transaction.tax_form_type || "";
   }
   syncEdgeCaseUi();
   void refreshTransactionFxReference();
@@ -2244,7 +2253,9 @@ function normalizeTransaction(transaction) {
     recurringOccurrenceDate:
       String(
         transaction.recurringOccurrenceDate || transaction.recurring_occurrence_date || ""
-      ).slice(0, 10)
+      ).slice(0, 10),
+    payerName: transaction.payerName || transaction.payer_name || "",
+    taxFormType: transaction.taxFormType || transaction.tax_form_type || ""
   };
 }
 
@@ -2474,6 +2485,12 @@ function renderTransactionsTable(filteredTransactions) {
     }
     if (canUseEdgeCaseTools && txn.reviewStatus && txn.reviewStatus !== "ready") {
       metadataBadges.push(formatTransactionMetaBadge(getReviewStatusLabel(txn.reviewStatus), txn.reviewStatus));
+    }
+    if (txn.type === "income" && txn.payerName) {
+      metadataBadges.push(formatTransactionMetaBadge(`Payer: ${txn.payerName}`, "income-payer"));
+    }
+    if (txn.type === "income" && txn.taxFormType) {
+      metadataBadges.push(formatTransactionMetaBadge(txn.taxFormType, "income-tax-form"));
     }
     const descriptionSub = [businessBadge, descriptionTail, typeBadge, metadataBadges.join(" ")].filter(Boolean).join(" ");
     const amountClass = txn.type === "income" ? "amount-positive" : "amount-negative";

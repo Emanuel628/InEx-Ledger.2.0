@@ -1,16 +1,3 @@
-// Startup check for required environment variables
-const REQUIRED_ENV_VARS = [
-  'DATABASE_URL',
-  'JWT_SECRET',
-  'APP_BASE_URL',
-  'RESEND_API_KEY',
-  // Add more as needed
-];
-const missingVars = REQUIRED_ENV_VARS.filter((v) => !process.env[v]);
-if (missingVars.length > 0 && process.env.NODE_ENV !== 'test') {
-  console.error('Startup failed: Missing required environment variables:', missingVars);
-  process.exit(1);
-}
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -28,7 +15,17 @@ const { ensureCsrfCookie } = require('./middleware/csrf.middleware.js');
 const { initDatabase, migrationStats, MigrationContentDriftError } = require('./db.js');
 const { buildHealthCheckResponse } = require('./services/healthCheckService.js');
 const { getReceiptStorageStatus, initializeReceiptStorage } = require('./services/receiptStorage.js');
+const { validateEnvironmentOrThrow } = require('./services/envValidationService.js');
 const { logInfo, logWarn, logError } = require('./utils/logger.js');
+
+if (process.env.NODE_ENV !== 'test') {
+  try {
+    validateEnvironmentOrThrow();
+  } catch (error) {
+    console.error('Startup failed:', error.message);
+    process.exit(1);
+  }
+}
 
 const app = express();
 app.disable('x-powered-by');

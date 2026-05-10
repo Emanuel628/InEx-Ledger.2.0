@@ -348,7 +348,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
           `SELECT id, account_id, category_id, amount, type, description, date, note,
                   currency, source_amount, exchange_rate, tax_treatment,
                   indirect_tax_amount, indirect_tax_recoverable, personal_use_pct,
-                  review_status
+                  review_status, payer_name, tax_form_type
            FROM transactions
            WHERE business_id = $1
              AND date >= $2 AND date <= $3
@@ -589,7 +589,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
           `SELECT id, account_id, category_id, amount, type, description, date, note,
                   currency, source_amount, exchange_rate, tax_treatment,
                   indirect_tax_amount, indirect_tax_recoverable, personal_use_pct,
-                  review_status
+                  review_status, payer_name, tax_form_type
            FROM transactions
            WHERE business_id = $1
              AND date >= $2 AND date <= $3
