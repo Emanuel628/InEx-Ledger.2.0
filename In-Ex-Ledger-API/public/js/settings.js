@@ -2353,12 +2353,6 @@ function getPasswordScore(password) {
   return 0;
 }
 
-function getStrengthLabel(score) {
-  if (score >= 3) return t("settings_password_strong");
-  if (score >= 2) return t("settings_password_fair");
-  return t("settings_password_weak");
-}
-
 function clearBusinessDataState() {
   SETTINGS_DELETE_DATA_KEYS.forEach((key) => localStorage.removeItem(key));
   if (window.lunaStorage?.purgeSensitiveStorage) {
