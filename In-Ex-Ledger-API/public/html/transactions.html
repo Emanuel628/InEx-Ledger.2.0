@@ -5,7 +5,7 @@
   <title>InEx Ledger - Transactions</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="stylesheet" href="/css/app.css?v=20260510f">
-<link rel="stylesheet" href="/css/pages/transactions.css?v=20260510h">
+<link rel="stylesheet" href="/css/pages/transactions.css?v=20260510i">
 </head>
 
 <body>
@@ -540,9 +540,17 @@
     </div>
   </main>
 
+  <!-- Bulk delete bar (appears when 2+ rows selected) -->
+  <div id="txBulkBar" class="tx-bulk-bar" hidden>
+    <span id="txBulkCount" class="tx-bulk-count">0 selected</span>
+    <button type="button" id="txBulkDeleteBtn" class="tx-bulk-delete-btn">Delete selected</button>
+    <button type="button" id="txBulkCancelBtn" class="tx-bulk-cancel-btn">Cancel</button>
+  </div>
+
   <!-- Row action popup -->
   <div id="txRowPopup" class="tx-row-popup" hidden>
     <button type="button" id="txPopupEdit" class="tx-popup-btn">Edit</button>
+    <button type="button" id="txPopupReview" class="tx-popup-btn">Mark for review</button>
     <button type="button" id="txPopupDelete" class="tx-popup-btn tx-popup-delete">Delete</button>
   </div>
 
@@ -602,6 +610,6 @@
 <script src="../js/auth.js?v=20260510b"></script>
 <script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/taxReminders.js?v=20260405c"></script>
-<script src="../js/transactions.js?v=20260510e"></script>
+<script src="../js/transactions.js?v=20260510f"></script>
 </body>
 </html>

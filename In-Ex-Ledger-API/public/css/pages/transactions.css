@@ -3864,3 +3864,59 @@ tr.tx-highlight {
     width: 100%;
   }
 }
+
+/* ── Bulk delete bar ─────────────────────────────────────────────────────────── */
+.tx-bulk-bar {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  border-radius: 14px;
+  background: var(--ink, #1a2433);
+  color: #fff;
+  box-shadow: 0 12px 36px rgba(15,25,35,0.28);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.tx-bulk-count {
+  font-weight: 600;
+  margin-right: 4px;
+}
+.tx-bulk-delete-btn {
+  padding: 5px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,80,80,0.6);
+  background: transparent;
+  color: #ff8080;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.tx-bulk-delete-btn:hover {
+  background: rgba(255,80,80,0.15);
+}
+.tx-bulk-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.tx-bulk-cancel-btn {
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.tx-bulk-cancel-btn:hover {
+  background: rgba(255,255,255,0.08);
+}

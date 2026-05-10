@@ -1271,6 +1271,19 @@ function updateTransactionSelectionHeader(visibleTransactions = []) {
   void visibleTransactions;
 }
 
+function syncBulkBar() {
+  const bar = document.getElementById("txBulkBar");
+  const countEl = document.getElementById("txBulkCount");
+  if (!bar) return;
+  const n = selectedTransactionIds.size;
+  if (n >= 2) {
+    if (countEl) countEl.textContent = `${n} selected`;
+    bar.hidden = false;
+  } else {
+    bar.hidden = true;
+  }
+}
+
 function setTransactionUndoState({ message = "", canUndo = false, isError = false } = {}) {
   transactionUndoMessage = String(message || "").trim();
   transactionUndoAvailable = !!canUndo;
@@ -2503,22 +2516,24 @@ function renderTransactionsTable(filteredTransactions) {
       const checkbox = e.target;
       const isChecked = checkbox.checked;
       if (isChecked) {
-        selectedTransactionIds.clear();
         selectedTransactionIds.add(txnId);
-        tbody.querySelectorAll(".tx-row-select").forEach((otherCheckbox) => {
-          if (otherCheckbox !== checkbox) {
-            otherCheckbox.checked = false;
-            otherCheckbox.closest("tr")?.classList.remove("is-selected");
-          }
-        });
-        openRowActionPopup(txn.id, checkbox, isAllScope);
+        if (selectedTransactionIds.size === 1) {
+          openRowActionPopup(txn.id, checkbox, isAllScope);
+        } else {
+          closeRowActionPopup();
+        }
       } else {
         selectedTransactionIds.delete(txnId);
-        if (_popupTxnId === txn.id) {
+        if (selectedTransactionIds.size === 1) {
+          const remainingId = [...selectedTransactionIds][0];
+          const remainingCheckbox = tbody.querySelector(`.tx-row-select[data-id="${remainingId}"]`);
+          if (remainingCheckbox) openRowActionPopup(remainingId, remainingCheckbox, isAllScope);
+        } else if (selectedTransactionIds.size === 0) {
           closeRowActionPopup();
         }
       }
       row.classList.toggle("is-selected", isChecked);
+      syncBulkBar();
       updateTransactionSelectionHeader(transactions);
     });
   });
@@ -3559,8 +3574,54 @@ function initRowActionPopup() {
     closeRowActionPopup();
   });
 
+  document.getElementById("txPopupReview")?.addEventListener("click", async () => {
+    const id = _popupTxnId;
+    closeRowActionPopup();
+    if (!id) return;
+    try {
+      const res = await apiFetch(`/api/transactions/${id}/review-status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ review_status: "needs_review" })
+      });
+      if (res && res.ok) await loadTransactions();
+    } catch (err) {
+      console.error("Mark for review failed", err);
+    }
+  });
+
   document.getElementById("txPopupDelete")?.addEventListener("click", () => {
     if (_popupTxnId) openTransactionModal(_popupTxnId);
+    closeRowActionPopup();
+  });
+
+  document.getElementById("txBulkDeleteBtn")?.addEventListener("click", async () => {
+    const ids = [...selectedTransactionIds];
+    if (!ids.length) return;
+    const bar = document.getElementById("txBulkBar");
+    const btn = document.getElementById("txBulkDeleteBtn");
+    if (btn) btn.disabled = true;
+    try {
+      await Promise.all(ids.map(id =>
+        apiFetch(`/api/transactions/${id}`, { method: "DELETE" })
+      ));
+      selectedTransactionIds.clear();
+      if (bar) bar.hidden = true;
+      await loadTransactions();
+    } catch (err) {
+      console.error("Bulk delete failed", err);
+      if (btn) btn.disabled = false;
+    }
+  });
+
+  document.getElementById("txBulkCancelBtn")?.addEventListener("click", () => {
+    selectedTransactionIds.clear();
+    document.querySelectorAll(".tx-row-select").forEach(cb => {
+      cb.checked = false;
+      cb.closest("tr")?.classList.remove("is-selected");
+    });
+    const bar = document.getElementById("txBulkBar");
+    if (bar) bar.hidden = true;
     closeRowActionPopup();
   });
 

@@ -678,6 +678,27 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+router.delete("/bulk-delete-all", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const confirm = String(req.body?.confirm || "").trim();
+    if (confirm !== "DELETE") {
+      return res.status(400).json({ error: "Confirmation required. Send { confirm: 'DELETE' }." });
+    }
+    const result = await pool.query(
+      `UPDATE transactions
+          SET deleted_at = now(), is_void = true, voided_at = now()
+        WHERE business_id = $1
+          AND deleted_at IS NULL`,
+      [businessId]
+    );
+    res.json({ message: `Deleted ${result.rowCount} transaction(s).`, count: result.rowCount });
+  } catch (err) {
+    logError("DELETE /transactions/bulk-delete-all error:", err);
+    res.status(500).json({ error: "Failed to delete transactions." });
+  }
+});
+
 router.delete("/:id", async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: "Invalid transaction ID." });
@@ -710,27 +731,6 @@ router.delete("/:id", async (req, res) => {
   } catch (err) {
     logError("DELETE /transactions/:id error:", err);
     return handleTransactionMutationError(res, err, "Failed to delete transaction.");
-  }
-});
-
-router.delete("/bulk-delete-all", async (req, res) => {
-  try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    const confirm = String(req.body?.confirm || "").trim();
-    if (confirm !== "DELETE") {
-      return res.status(400).json({ error: "Confirmation required. Send { confirm: 'DELETE' }." });
-    }
-    const result = await pool.query(
-      `UPDATE transactions
-          SET deleted_at = now(), is_void = true, voided_at = now()
-        WHERE business_id = $1
-          AND deleted_at IS NULL`,
-      [businessId]
-    );
-    res.json({ message: `Deleted ${result.rowCount} transaction(s).`, count: result.rowCount });
-  } catch (err) {
-    logError("DELETE /transactions/bulk-delete-all error:", err);
-    res.status(500).json({ error: "Failed to delete transactions." });
   }
 });
 
@@ -864,6 +864,38 @@ router.get("/exchange-rate-reference", async (req, res) => {
   } catch (err) {
     logError("GET /transactions/exchange-rate-reference error:", err);
     res.status(500).json({ error: "Failed to load the reference exchange rate." });
+  }
+});
+
+router.patch("/:id/review-status", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid transaction ID." });
+  }
+  const status = String(req.body?.review_status || "").trim().toLowerCase();
+  if (!VALID_REVIEW_STATUSES.has(status)) {
+    return res.status(400).json({ error: "review_status must be one of needs_review, ready, matched, or locked" });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const result = await pool.query(
+      `UPDATE transactions
+         SET review_status = $1
+       WHERE id = $2
+         AND business_id = $3
+         AND deleted_at IS NULL
+         AND (is_adjustment = false OR is_adjustment IS NULL)
+         AND (is_void = false OR is_void IS NULL)
+       RETURNING *`,
+      [status, req.params.id, businessId]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Transaction not found." });
+    }
+    res.json(decryptTransactionRow(result.rows[0]));
+  } catch (err) {
+    logError("PATCH /transactions/:id/review-status error:", err);
+    return handleTransactionMutationError(res, err, "Failed to update review status.");
   }
 });
 
