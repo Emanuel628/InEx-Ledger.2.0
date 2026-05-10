@@ -486,7 +486,6 @@ function applyMileageNavLabel() {
 }
 
 const DYNAMIC_SIDEBAR_FAVORITES_KEY = "lb_dynamic_sidebar_favorites";
-const DYNAMIC_SIDEBAR_COLLAPSED_KEY = "lb_dynamic_sidebar_collapsed";
 const DYNAMIC_SIDEBAR_DEFAULT_FAVORITES = ["transactions", "receipts", "mileage", "accounts", "categories"];
 const DYNAMIC_SIDEBAR_CORE_FEATURE_IDS = new Set([
   "transactions",
@@ -690,30 +689,11 @@ function initDynamicSidebar() {
   const sidebar = shell?.querySelector(".app-sidebar");
   if (!shell || !sidebar) return;
 
-  function ensureDynamicSidebarCollapseHandle() {
-    let handle = shell.querySelector(".dynamic-sidebar-shell-handle");
-    if (!handle) {
-      handle = document.createElement("button");
-      handle.type = "button";
-      handle.className = "dynamic-sidebar-shell-handle";
-      handle.setAttribute("data-sidebar-collapse", "");
-      handle.innerHTML = '<span data-sidebar-collapse-glyph aria-hidden="true"></span>';
-      shell.appendChild(handle);
-    }
-    return handle;
-  }
-
-  function removeDynamicSidebarCollapseHandle() {
-    shell.querySelector(".dynamic-sidebar-shell-handle")?.remove();
-  }
-
   const availableFeatures = getDynamicSidebarAvailableFeatures();
   if (!availableFeatures.length) {
     sidebar.hidden = true;
     sidebar.setAttribute("aria-hidden", "true");
     sidebar.innerHTML = "";
-    shell.classList.remove("app-shell--sidebar-collapsed");
-    removeDynamicSidebarCollapseHandle();
     return;
   }
 
@@ -724,39 +704,11 @@ function initDynamicSidebar() {
   let favorites = getDynamicSidebarFavorites(featureMap, window.__LUNA_ME__?.ui_preferences);
   let draggedFeatureId = "";
   let shouldKeepLibraryOpen = false;
-  let isCollapsed = localStorage.getItem(DYNAMIC_SIDEBAR_COLLAPSED_KEY) === "true";
 
   sidebar.className = "app-sidebar app-sidebar--dynamic";
   sidebar.setAttribute("aria-label", "Favorites");
-  sidebar.id = sidebar.id || "dynamicQuickAddSidebar";
 
   const quickPanel = ensureDynamicSidebarQuickPanel();
-  const collapseHandle = ensureDynamicSidebarCollapseHandle();
-  collapseHandle.setAttribute("aria-controls", sidebar.id);
-
-  function updateCollapseHandleState() {
-    const label = isCollapsed
-      ? gT("quick_add_sidebar_open", "Open Quick Add sidebar")
-      : gT("quick_add_sidebar_collapse", "Collapse Quick Add sidebar");
-    collapseHandle.classList.toggle("is-collapsed", isCollapsed);
-    collapseHandle.setAttribute("aria-label", label);
-    collapseHandle.setAttribute("aria-pressed", isCollapsed ? "true" : "false");
-    collapseHandle.setAttribute("title", label);
-    const glyph = collapseHandle.querySelector("[data-sidebar-collapse-glyph]");
-    if (glyph) {
-      glyph.innerHTML = isCollapsed ? "&rsaquo;" : "&lsaquo;";
-    }
-  }
-
-  function applyCollapsedState() {
-    shell.classList.toggle("app-shell--sidebar-collapsed", isCollapsed);
-    sidebar.classList.toggle("is-collapsed", isCollapsed);
-    sidebar.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
-    if (isCollapsed) {
-      closeDynamicSidebarQuickPanel(quickPanel);
-    }
-    updateCollapseHandleState();
-  }
 
   function render() {
     favorites = favorites.filter((id) => featureMap.has(id));
@@ -788,7 +740,6 @@ function initDynamicSidebar() {
       </div>
     `;
 
-    applyCollapsedState();
     wireDynamicSidebarEvents();
   }
 
@@ -854,17 +805,6 @@ function initDynamicSidebar() {
         const feature = featureMap.get(button.getAttribute("data-sidebar-action") || "");
         if (feature) openDynamicSidebarQuickPanel(feature, button, quickPanel);
       });
-    });
-  }
-
-  if (!collapseHandle.dataset.bound) {
-    collapseHandle.dataset.bound = "true";
-    collapseHandle.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      isCollapsed = !isCollapsed;
-      localStorage.setItem(DYNAMIC_SIDEBAR_COLLAPSED_KEY, isCollapsed ? "true" : "false");
-      applyCollapsedState();
     });
   }
 

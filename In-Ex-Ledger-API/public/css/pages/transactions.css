@@ -3226,13 +3226,6 @@ tr.tx-highlight {
   box-shadow: inset -1px 0 0 rgba(15, 25, 35, 0.05) !important;
 }
 
-.app-shell > .app-sidebar.app-sidebar--dynamic.is-collapsed,
-.app-sidebar.app-sidebar--dynamic.is-collapsed {
-  width: 24px !important;
-  min-width: 24px !important;
-  padding: 14px 0 !important;
-}
-
 .sidebar-icon--transactions svg,
 .sidebar-icon--receipts svg,
 .sidebar-icon--mileage svg,
