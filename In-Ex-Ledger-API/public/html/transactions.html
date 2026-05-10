@@ -65,7 +65,7 @@
       <div class="page-header">
         <div>
           <h1 class="page-title">Transactions</h1>
-          <p class="page-subtitle">Active business ledger Ã¢â‚¬â€ current reporting period</p>
+          <p class="page-subtitle">Active business ledger ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â current reporting period</p>
           <p class="page-context-note" id="transactionsTaxContext">Tax form context</p>
         </div>
         <div class="page-header-actions">
@@ -307,12 +307,12 @@
                     </select>
                   </div>
                   <div class="form-field">
-                    <label for="transactionSourceAmount" class="form-label">Source amount</label>
+                    <label for="transactionSourceAmount" class="form-label" data-i18n="transactions_source_amount">Source amount</label>
                     <input id="transactionSourceAmount" class="form-control" type="number" step="0.01" min="0" placeholder="Amount in foreign currency" />
                   </div>
                   <div class="form-field">
                     <label for="transactionExchangeRate" class="form-label form-label-inline">
-                      <span>Exchange rate</span>
+                      <span data-i18n="transactions_exchange_rate">Exchange rate</span>
                       <button
                         type="button"
                         class="edge-case-info-toggle"
@@ -325,31 +325,31 @@
                     <input id="transactionExchangeRate" class="form-control" type="number" step="0.000001" min="0" placeholder="e.g. 1.35" />
                     <div class="fx-reference-box" id="transactionFxReferenceBox" hidden>
                       <div class="fx-reference-kicker-row">
-                        <span class="fx-reference-kicker">Reference only</span>
-                        <span class="fx-reference-status">Live market snapshot</span>
+                        <span class="fx-reference-kicker" data-i18n="transactions_fx_reference_only">Reference only</span>
+                        <span class="fx-reference-status" data-i18n="transactions_fx_live_snapshot">Live market snapshot</span>
                       </div>
                       <div class="fx-reference-title-row">
-                        <strong class="fx-reference-title">Live reference rate</strong>
+                        <strong class="fx-reference-title" data-i18n="transactions_fx_live_reference_rate">Live reference rate</strong>
                         <span class="fx-reference-value" id="transactionFxReferenceValue">No reference rate loaded.</span>
                       </div>
                       <p class="small-note fx-reference-detail" id="transactionFxReferenceDetail" hidden></p>
                       <div class="fx-reference-actions">
-                        <button type="button" class="button-secondary fx-reference-apply" id="transactionFxApplyButton" hidden>Use rate</button>
-                        <p class="small-note fx-reference-advisory" id="transactionFxReferenceAdvisory">
+                        <button type="button" class="button-secondary fx-reference-apply" id="transactionFxApplyButton" hidden data-i18n="transactions_fx_use_rate">Use rate</button>
+                        <p class="small-note fx-reference-advisory" id="transactionFxReferenceAdvisory" data-i18n="transactions_fx_reference_advisory">
                           Reference only. Confirm the final exchange rate independently before filing or reconciliation.
                         </p>
                       </div>
                     </div>
                   </div>
                   <div class="form-field">
-                    <label for="transactionExchangeDate" class="form-label">Exchange date</label>
+                    <label for="transactionExchangeDate" class="form-label" data-i18n="transactions_exchange_date">Exchange date</label>
                     <input id="transactionExchangeDate" class="form-control" type="date" />
                   </div>
                   <div class="form-field">
-                    <label for="transactionConvertedAmount" class="form-label">Converted amount</label>
+                    <label for="transactionConvertedAmount" class="form-label" data-i18n="transactions_converted_amount">Converted amount</label>
                     <input id="transactionConvertedAmount" class="form-control" type="number" step="0.01" min="0" placeholder="Auto-calculated or override" />
                   </div>
-                  <div class="form-field form-field-full advanced-subgroup-label advanced-subgroup-label--border">Tax</div>
+                  <div class="form-field form-field-full advanced-subgroup-label advanced-subgroup-label--border" data-i18n="common_tax">Tax</div>
                   <div class="form-field">
                     <label for="transactionTaxTreatment" class="form-label">Tax treatment</label>
                     <select id="transactionTaxTreatment" class="form-control">
@@ -372,9 +372,9 @@
                   <div class="form-field">
                     <label class="status-toggle-row" for="transactionIndirectTaxRecoverable">
                       <input type="checkbox" id="transactionIndirectTaxRecoverable" />
-                      <span>Tax recoverable</span>
+                      <span data-i18n="transactions_tax_recoverable">Tax recoverable</span>
                     </label>
-                    <p class="small-note" id="transactionIndirectTaxNote">Mark this when the indirect tax can be recovered or credited later.</p>
+                    <p class="small-note" id="transactionIndirectTaxNote" data-i18n="transactions_tax_recoverable_note">Mark this when the indirect tax can be recovered or credited later.</p>
                   </div>
                   <div class="form-field form-field-full advanced-subgroup-label advanced-subgroup-label--border">Review</div>
                   <div class="form-field">
@@ -389,7 +389,7 @@
                   </div>
                   <div class="form-field form-field-full">
                     <label for="transactionReviewNotes" class="form-label">Review notes</label>
-                    <textarea id="transactionReviewNotes" class="form-control" rows="3" placeholder="Add review notes, split-use reasoning, or FX details"></textarea>
+                    <textarea id="transactionReviewNotes" class="form-control" rows="3" data-i18n-placeholder="transactions_review_notes_placeholder" placeholder="Add review notes, split-use reasoning, or FX details"></textarea>
                   </div>
                   <div class="form-field form-field-full" data-region-show="ca">
                     <p class="small-note">Canadian users: keep GST/HST/QST details here so your T2125 export stays clean.</p>
@@ -597,8 +597,8 @@
 </div>
 
 <script src="../js/escape-html.js?v=20260410a"></script>
-<script src="../js/global.js?v=20260510a"></script>
-<script src="../js/i18n.js?v=20260509c"></script>
+<script src="../js/global.js?v=20260510b"></script>
+<script src="../js/i18n.js?v=20260510a"></script>
 <script src="../js/auth.js?v=20260506b"></script>
 <script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/taxReminders.js?v=20260405c"></script>

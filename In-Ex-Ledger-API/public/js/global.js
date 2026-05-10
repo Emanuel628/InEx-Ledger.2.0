@@ -219,6 +219,16 @@ function formatEstimatedTaxPercent(rate, province = "") {
   return `${(Number(rate || 0) * 100).toFixed(decimals)}%`;
 }
 
+function gT(key, fallback) {
+  if (typeof window.t === "function") {
+    const result = window.t(key);
+    if (result && result !== key) {
+      return result;
+    }
+  }
+  return fallback;
+}
+
 function resolveEstimatedTaxProfile(region, province) {
   const normalizedRegion = normalizeEstimatedTaxRegion(region);
   const normalizedProvince = normalizeEstimatedTaxProvince(province);
@@ -501,97 +511,121 @@ const DYNAMIC_SIDEBAR_FEATURES = [
   {
     id: "transactions",
     label: "Transactions",
+    labelKey: "nav_transactions",
     route: "transactions",
     group: "Core",
     actionLabel: "Add transaction",
+    actionKey: "quick_add_action_add_transaction",
     icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg>'
   },
   {
     id: "receipts",
     label: "Receipts",
+    labelKey: "nav_receipts",
     route: "receipts",
     group: "Core",
     actionLabel: "Upload receipt",
+    actionKey: "quick_add_action_upload_receipt",
     icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg>'
   },
   {
     id: "mileage",
     label: "Mileage",
+    labelKey: "nav_mileage",
     route: "mileage",
     group: "Core",
     actionLabel: "Add trip",
+    actionKey: "quick_add_action_add_trip",
     icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg>'
   },
   {
     id: "accounts",
     label: "Accounts",
+    labelKey: "nav_accounts",
     route: "accounts",
     group: "Core",
     actionLabel: "Add account",
+    actionKey: "quick_add_action_add_account",
     icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg>'
   },
   {
     id: "categories",
     label: "Categories",
+    labelKey: "nav_categories",
     route: "categories",
     group: "Core",
     actionLabel: "Add category",
+    actionKey: "quick_add_action_add_category",
     icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg>'
   },
   {
     id: "exports",
     label: "Exports",
+    labelKey: "nav_exports",
     route: "exports",
     group: "Core",
     actionLabel: "Create export",
+    actionKey: "quick_add_action_create_export",
     icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg>'
   },
   {
     id: "customers",
     label: "Customers",
+    labelKey: "nav_customers",
     route: "customers",
     group: "Business",
     actionLabel: "Open customers",
+    actionKey: "quick_add_action_open_customers",
     icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.5"></circle><path d="M2.5 13a3.5 3.5 0 0 1 7 0"></path><path d="M10.5 4.5a2 2 0 0 1 0 4M11.5 10.5A3 3 0 0 1 14 13"></path></svg>'
   },
   {
     id: "invoices",
     label: "Invoices",
+    labelKey: "nav_invoices",
     route: "invoices",
     group: "Business",
     actionLabel: "Open invoices",
+    actionKey: "quick_add_action_open_invoices",
     icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg>'
   },
   {
     id: "bills",
     label: "Bills",
+    labelKey: "nav_bills",
     route: "bills",
     group: "Business",
     actionLabel: "Open bills",
+    actionKey: "quick_add_action_open_bills",
     icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M4 2.5h8v11l-2-1-2 1-2-1-2 1v-11z"></path><path d="M6 6h4M6 9h3"></path></svg>'
   },
   {
     id: "vendors",
     label: "Vendors",
+    labelKey: "nav_vendors",
     route: "vendors",
     group: "Business",
     actionLabel: "Open vendors",
+    actionKey: "quick_add_action_open_vendors",
     icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 7h10v6H3z"></path><path d="M4 7V4h8v3M6 10h4"></path></svg>'
   },
   {
     id: "projects",
     label: "Projects",
+    labelKey: "nav_projects",
     route: "projects",
     group: "Business",
     actionLabel: "Open projects",
+    actionKey: "quick_add_action_open_projects",
     icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M6 4l1-1h3l1 1"></path></svg>'
   },
   {
     id: "billable-expenses",
     label: "Billable Expenses",
+    labelKey: "nav_billable_expenses",
     route: "billable-expenses",
     group: "Business",
     actionLabel: "Open billable expenses",
+    actionKey: "quick_add_action_open_billable_expenses",
     icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 3h10v10H3z"></path><path d="M5 6h6M5 9h4"></path></svg>'
   }
 ];
@@ -701,7 +735,9 @@ function initDynamicSidebar() {
   collapseHandle.setAttribute("aria-controls", sidebar.id);
 
   function updateCollapseHandleState() {
-    const label = isCollapsed ? "Open Quick Add sidebar" : "Collapse Quick Add sidebar";
+    const label = isCollapsed
+      ? gT("quick_add_sidebar_open", "Open Quick Add sidebar")
+      : gT("quick_add_sidebar_collapse", "Collapse Quick Add sidebar");
     collapseHandle.classList.toggle("is-collapsed", isCollapsed);
     collapseHandle.setAttribute("aria-label", label);
     collapseHandle.setAttribute("aria-pressed", isCollapsed ? "true" : "false");
@@ -734,18 +770,18 @@ function initDynamicSidebar() {
     sidebar.innerHTML = `
       <div class="dynamic-sidebar-header">
         <div>
-          <div class="sidebar-section-label">Quick Add</div>
+          <div class="sidebar-section-label">${escapeDynamicSidebarHtml(gT("quick_add_title", "Quick Add"))}</div>
         </div>
-        <button type="button" class="dynamic-sidebar-manage" data-sidebar-manage aria-expanded="${String(shouldKeepLibraryOpen)}">${shouldKeepLibraryOpen ? "Done" : "Add"}</button>
+        <button type="button" class="dynamic-sidebar-manage" data-sidebar-manage aria-expanded="${String(shouldKeepLibraryOpen)}">${escapeDynamicSidebarHtml(shouldKeepLibraryOpen ? gT("common_done", "Done") : gT("common_add", "Add"))}</button>
       </div>
       <nav class="sidebar-nav dynamic-sidebar-favorites" data-sidebar-favorites aria-label="Quick add actions">
         ${favoriteMarkup}
       </nav>
-      <div class="dynamic-sidebar-empty" data-sidebar-empty${favorites.length ? " hidden" : ""}><span class="dynamic-sidebar-empty-icon">+</span> Click Add above to add quick-add shortcuts</div>
+      <div class="dynamic-sidebar-empty" data-sidebar-empty${favorites.length ? " hidden" : ""}><span class="dynamic-sidebar-empty-icon">+</span> ${escapeDynamicSidebarHtml(gT("quick_add_empty", "Click Add above to add quick-add shortcuts"))}</div>
       <div class="dynamic-sidebar-library" data-sidebar-library${shouldKeepLibraryOpen ? "" : " hidden"}>
         ${Object.keys(groupedLibrary).map((group) => `
           <div class="dynamic-sidebar-library-group">
-            <div class="sidebar-section-label">${escapeDynamicSidebarHtml(group)}</div>
+            <div class="sidebar-section-label">${escapeDynamicSidebarHtml(group === "Business" ? gT("quick_add_group_business", "Business") : gT("quick_add_group_core", "Core"))}</div>
             ${groupedLibrary[group].map((feature) => renderDynamicSidebarLibraryItem(feature, favorites.includes(feature.id))).join("")}
           </div>
         `).join("")}
@@ -882,6 +918,14 @@ function saveDynamicSidebarFavorites(favorites) {
   queueDynamicSidebarFavoritesSave(dedupedFavorites);
 }
 
+function getDynamicSidebarFeatureLabel(feature) {
+  return gT(feature?.labelKey, feature?.label || "");
+}
+
+function getDynamicSidebarActionLabel(feature) {
+  return gT(feature?.actionKey, feature?.actionLabel || gT("common_open", "Open"));
+}
+
 function queueDynamicSidebarFavoritesSave(favorites) {
   if (dynamicSidebarSaveTimer) {
     window.clearTimeout(dynamicSidebarSaveTimer);
@@ -920,24 +964,26 @@ function queueDynamicSidebarFavoritesSave(favorites) {
 function renderDynamicSidebarFavorite(feature) {
   if (!feature) return "";
   const receiptDot = feature.id === "receipts" ? '<span id="receiptsDot" class="sidebar-dot" hidden></span>' : "";
+  const featureLabel = getDynamicSidebarFeatureLabel(feature);
   return `
     <div class="dynamic-sidebar-favorite" draggable="true" data-feature-id="${escapeDynamicSidebarAttr(feature.id)}" data-favorite-id="${escapeDynamicSidebarAttr(feature.id)}">
       <button type="button" class="sidebar-link dynamic-sidebar-link" data-sidebar-action="${escapeDynamicSidebarAttr(feature.id)}">
         <span class="sidebar-icon" aria-hidden="true">${feature.icon}</span>
-        <span class="dynamic-sidebar-label">+ ${escapeDynamicSidebarHtml(feature.label)}</span>
+        <span class="dynamic-sidebar-label">+ ${escapeDynamicSidebarHtml(featureLabel)}</span>
         ${receiptDot}
       </button>
-      <button type="button" class="dynamic-sidebar-remove" data-sidebar-remove="${escapeDynamicSidebarAttr(feature.id)}" aria-label="Remove ${escapeDynamicSidebarAttr(feature.label)}">&times;</button>
+      <button type="button" class="dynamic-sidebar-remove" data-sidebar-remove="${escapeDynamicSidebarAttr(feature.id)}" aria-label="${escapeDynamicSidebarAttr(`${gT("common_remove", "Remove")} ${featureLabel}`)}">&times;</button>
     </div>
   `;
 }
 
 function renderDynamicSidebarLibraryItem(feature, isAdded) {
+  const featureLabel = getDynamicSidebarFeatureLabel(feature);
   return `
     <div class="dynamic-sidebar-library-item" draggable="true" data-feature-id="${escapeDynamicSidebarAttr(feature.id)}">
       <span class="sidebar-icon" aria-hidden="true">${feature.icon}</span>
-      <span>${escapeDynamicSidebarHtml(feature.label)}</span>
-      <button type="button" data-sidebar-add="${escapeDynamicSidebarAttr(feature.id)}"${isAdded ? " disabled" : ""}>${isAdded ? "Added" : "Add"}</button>
+      <span>${escapeDynamicSidebarHtml(featureLabel)}</span>
+      <button type="button" data-sidebar-add="${escapeDynamicSidebarAttr(feature.id)}"${isAdded ? " disabled" : ""}>${escapeDynamicSidebarHtml(isAdded ? gT("quick_add_added", "Added") : gT("common_add", "Add"))}</button>
     </div>
   `;
 }
@@ -989,16 +1035,17 @@ function hideDynamicSidebarBackdrop() {
 
 function openDynamicSidebarQuickPanel(feature, anchor, panel) {
   const anchorRect = anchor.getBoundingClientRect();
+  const featureLabel = getDynamicSidebarFeatureLabel(feature);
   panel.hidden = false;
   panel.style.top = `${Math.max(68, Math.min(anchorRect.top, window.innerHeight - 420))}px`;
   showDynamicSidebarBackdrop();
   panel.innerHTML = `
     <div class="dynamic-sidebar-quick-header">
       <div>
-        <div class="dynamic-sidebar-quick-kicker">Quick add</div>
-        <h2>${escapeDynamicSidebarHtml(feature.label)}</h2>
+        <div class="dynamic-sidebar-quick-kicker">${escapeDynamicSidebarHtml(gT("quick_add_title", "Quick Add"))}</div>
+        <h2>${escapeDynamicSidebarHtml(featureLabel)}</h2>
       </div>
-      <button type="button" data-quick-close aria-label="Close quick action">&times;</button>
+      <button type="button" data-quick-close aria-label="${escapeDynamicSidebarAttr(gT("quick_add_close_action", "Close quick action"))}">&times;</button>
     </div>
     <div class="dynamic-sidebar-quick-body" data-quick-body></div>
   `;
@@ -1041,7 +1088,7 @@ function renderDynamicSidebarQuickAction(feature, body) {
 function renderDynamicSidebarOpenPage(body, feature) {
   body.innerHTML = `
     <div class="dynamic-sidebar-action-stack">
-      <a class="dynamic-sidebar-primary-action" href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(feature.actionLabel || "Open")}</a>
+      <a class="dynamic-sidebar-primary-action" href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</a>
     </div>
   `;
 }
@@ -1058,8 +1105,8 @@ function renderQuickTransactionForm(body, feature) {
       <label>Category<select name="category_id" required><option value="">Loading...</option></select></label>
       <label>Note<textarea name="note" rows="2"></textarea></label>
       <div class="dynamic-sidebar-form-actions">
-        <a href="${escapeDynamicSidebarAttr(feature.route)}">Open page</a>
-        <button type="submit">${escapeDynamicSidebarHtml(feature.actionLabel)}</button>
+        <a href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(gT("common_open_page", "Open page"))}</a>
+        <button type="submit">${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</button>
       </div>
       <div class="dynamic-sidebar-form-message" data-quick-message></div>
     </form>
@@ -1134,8 +1181,8 @@ function renderQuickReceiptForm(body, feature) {
     <form class="dynamic-sidebar-form" data-quick-receipt-form>
       <label>Receipt file<input name="receipt" type="file" accept="image/*,application/pdf" required></label>
       <div class="dynamic-sidebar-form-actions">
-        <a href="${escapeDynamicSidebarAttr(feature.route)}">Open page</a>
-        <button type="submit">${escapeDynamicSidebarHtml(feature.actionLabel)}</button>
+        <a href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(gT("common_open_page", "Open page"))}</a>
+        <button type="submit">${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</button>
       </div>
       <div class="dynamic-sidebar-form-message" data-quick-message></div>
     </form>
@@ -1183,8 +1230,8 @@ function renderQuickMileageForm(body, feature) {
       <label>Destination<input name="destination" type="text" autocomplete="off"></label>
       <label>${distanceLabel}<input name="distance" type="number" min="0.1" step="0.1" inputmode="decimal" required></label>
       <div class="dynamic-sidebar-form-actions">
-        <a href="${escapeDynamicSidebarAttr(feature.route)}">Open page</a>
-        <button type="submit">${escapeDynamicSidebarHtml(feature.actionLabel)}</button>
+        <a href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(gT("common_open_page", "Open page"))}</a>
+        <button type="submit">${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</button>
       </div>
       <div class="dynamic-sidebar-form-message" data-quick-message></div>
     </form>
@@ -1231,8 +1278,8 @@ function renderQuickAccountForm(body, feature) {
         <option value="cash">Cash</option>
       </select></label>
       <div class="dynamic-sidebar-form-actions">
-        <a href="${escapeDynamicSidebarAttr(feature.route)}">Open page</a>
-        <button type="submit">${escapeDynamicSidebarHtml(feature.actionLabel)}</button>
+        <a href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(gT("common_open_page", "Open page"))}</a>
+        <button type="submit">${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</button>
       </div>
       <div class="dynamic-sidebar-form-message" data-quick-message></div>
     </form>
@@ -1273,8 +1320,8 @@ function renderQuickCategoryForm(body, feature) {
         <option value="income">Income</option>
       </select></label>
       <div class="dynamic-sidebar-form-actions">
-        <a href="${escapeDynamicSidebarAttr(feature.route)}">Open page</a>
-        <button type="submit">${escapeDynamicSidebarHtml(feature.actionLabel)}</button>
+        <a href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(gT("common_open_page", "Open page"))}</a>
+        <button type="submit">${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</button>
       </div>
       <div class="dynamic-sidebar-form-message" data-quick-message></div>
     </form>
