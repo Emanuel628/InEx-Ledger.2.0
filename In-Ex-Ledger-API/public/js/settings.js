@@ -94,7 +94,8 @@ let settingsOverviewState = {
   billingStatus: "",
   cpaActiveCount: 0,
   cpaHistoryCount: 0,
-  mfaEnabled: false
+  mfaEnabled: false,
+  accountingLockDate: null
 };
 let settingsBusinessesState = [];
 let settingsSubscriptionState = null;
@@ -173,6 +174,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await initPreferences();
     initSecurityForm();
     initDangerZone();
+    wireBusinessEditModal();
     syncSettingsOverviewSummaries();
     window.addEventListener("lunaLanguageChanged", refreshSettingsLocalizedState);
     window.addEventListener("lunaRegionChanged", refreshSettingsLocalizedState);
@@ -241,6 +243,18 @@ function formatFiscalYearSummary(value) {
   return interpolateTranslatedMessage("settings_overview_fiscal_year", { date: formatted });
 }
 
+function formatSettingsDate(value, options = {}) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString(resolveDisplayLocale(), {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    ...options
+  });
+}
+
 function localizeBusinessType(type) {
   const key = SETTINGS_BUSINESS_TYPE_KEYS[String(type || "").trim()];
   return key ? t(key) : t("settings_overview_business_type_missing");
@@ -279,6 +293,10 @@ function syncSettingsHeroState() {
   const billingMetaNode = document.getElementById("settingsHeroBillingMeta");
   const securityStatusNode = document.getElementById("settingsHeroSecurityStatus");
   const securityMetaNode = document.getElementById("settingsHeroSecurityMeta");
+  const lockStatusNode = document.getElementById("settingsHeroLockStatus");
+  const lockMetaNode = document.getElementById("settingsHeroLockMeta");
+  const cpaStatusNode = document.getElementById("settingsHeroCpaStatus");
+  const cpaMetaNode = document.getElementById("settingsHeroCpaMeta");
 
   const businessProfile = settingsOverviewState.businessProfile || getBusinessProfile();
   const activeBusinessName = businessProfile?.name || t("settings_overview_business_missing");
@@ -304,6 +322,28 @@ function syncSettingsHeroState() {
     securityMetaNode.textContent = settingsOverviewState.mfaEnabled
       ? "New-device sign-ins require a verification code."
       : "Enable multi-factor authentication for stronger account protection.";
+  }
+
+  if (lockStatusNode) {
+    lockStatusNode.textContent = settingsOverviewState.accountingLockDate
+      ? `Locked through ${formatSettingsDate(settingsOverviewState.accountingLockDate)}`
+      : "Unlocked";
+  }
+  if (lockMetaNode) {
+    lockMetaNode.textContent = settingsOverviewState.accountingLockDate
+      ? "Changes before the closed date are blocked."
+      : "No accounting period lock is active.";
+  }
+
+  if (cpaStatusNode) {
+    cpaStatusNode.textContent = settingsOverviewState.cpaActiveCount > 0
+      ? `${settingsOverviewState.cpaActiveCount} active`
+      : "No active access";
+  }
+  if (cpaMetaNode) {
+    cpaMetaNode.textContent = settingsOverviewState.cpaHistoryCount > 0
+      ? `${settingsOverviewState.cpaHistoryCount} historical access record${settingsOverviewState.cpaHistoryCount === 1 ? "" : "s"}`
+      : "No prior invite or revoke history yet.";
   }
 }
 
@@ -361,20 +401,7 @@ async function initBusinessProfileForm() {
   if (!form) return;
 
   const profile = await loadBusinessProfile();
-  document.getElementById("business-name").value = profile.name || "";
-  document.getElementById("business-type-select").value = profile.type || "sole_proprietor";
-  document.getElementById("fiscal-year").value = profile.fiscalYearStart || "";
-  document.getElementById("operating-name").value = profile.operatingName || "";
-  document.getElementById("business-activity-code").value = profile.businessActivityCode || "";
-
-  // Parse stored newline-delimited address string back into structured fields
-  const addrParts = (profile.address || "").split("\n");
-  document.getElementById("address-line1").value = addrParts[0] || "";
-  document.getElementById("address-line2").value = addrParts[1] || "";
-  document.getElementById("address-city").value = addrParts[2] || "";
-  document.getElementById("address-state").value = addrParts[3] || "";
-  document.getElementById("address-postal").value = addrParts[4] || "";
-  document.getElementById("address-country").value = addrParts[5] || "";
+  applyBusinessProfileForm(profile);
 
   settingsOverviewState.businessProfile = profile;
   syncSettingsOverviewSummaries();
@@ -465,6 +492,22 @@ async function initBusinessProfileForm() {
   });
 }
 
+function applyBusinessProfileForm(profile) {
+  document.getElementById("business-name").value = profile.name || "";
+  document.getElementById("business-type-select").value = profile.type || "sole_proprietor";
+  document.getElementById("fiscal-year").value = profile.fiscalYearStart || "";
+  document.getElementById("operating-name").value = profile.operatingName || "";
+  document.getElementById("business-activity-code").value = profile.businessActivityCode || "";
+
+  const addrParts = (profile.address || "").split("\n");
+  document.getElementById("address-line1").value = addrParts[0] || "";
+  document.getElementById("address-line2").value = addrParts[1] || "";
+  document.getElementById("address-city").value = addrParts[2] || "";
+  document.getElementById("address-state").value = addrParts[3] || "";
+  document.getElementById("address-postal").value = addrParts[4] || "";
+  document.getElementById("address-country").value = addrParts[5] || "";
+}
+
 async function renderBusinessList() {
   const wrap = document.getElementById("businessListWrap");
   if (!wrap) return;
@@ -487,20 +530,32 @@ async function renderBusinessList() {
       return;
     }
 
+    const billingOwnerId = settingsSubscriptionState?.businessId || "";
     wrap.innerHTML = businesses.map((biz) => {
       const businessName = biz.name || t("common_business");
       const businessInitial = String(businessName).trim().charAt(0).toUpperCase() || "B";
+      const businessType = localizeBusinessType(biz.business_type);
+      const createdLabel = biz.created_at ? `Created ${formatSettingsDate(biz.created_at)}` : "Workspace";
+      const lockMeta = biz.locked_through_date ? `Locked through ${formatSettingsDate(biz.locked_through_date)}` : createdLabel;
       return `
       <div class="business-list-item ${biz.id === activeId ? "is-active" : ""}">
         <div class="business-list-meta">
           <span class="business-list-avatar" aria-hidden="true">${escapeHtml(businessInitial)}</span>
           <div class="business-list-copy">
-            <span class="business-list-name">${escapeHtml(businessName)}</span>
-            ${biz.id === activeId ? `<span class="business-list-badge" data-i18n="settings_business_active_badge">${escapeHtml(t("settings_business_active_badge"))}</span>` : ""}
+            <div class="business-list-title-row">
+              <span class="business-list-name">${escapeHtml(businessName)}</span>
+              <div class="business-list-badges">
+                ${biz.id === activeId ? `<span class="business-list-badge" data-i18n="settings_business_active_badge">${escapeHtml(t("settings_business_active_badge"))}</span>` : ""}
+                ${biz.id === billingOwnerId ? `<span class="business-list-badge is-billing-owner">Billing owner</span>` : ""}
+                ${biz.locked_through_date ? `<span class="business-list-badge is-locked">Locked</span>` : ""}
+              </div>
+            </div>
+            <span class="business-list-meta-line">${escapeHtml(`${businessType} • ${lockMeta}`)}</span>
           </div>
         </div>
         <div class="business-list-actions">
           ${biz.id !== activeId ? `<button type="button" class="settings-secondary-btn business-switch-btn" data-business-switch="${escapeHtml(biz.id)}">${escapeHtml(t("settings_business_switch"))}</button>` : ""}
+          <button type="button" class="settings-secondary-btn business-edit-btn" data-business-edit="${escapeHtml(biz.id)}">Edit</button>
           <button type="button" class="danger-outline-btn business-delete-btn" data-business-delete="${escapeHtml(biz.id)}" data-business-name="${escapeHtml(businessName)}">${escapeHtml(t("settings_delete_business_btn"))}</button>
         </div>
       </div>
@@ -539,6 +594,14 @@ async function renderBusinessList() {
         const bizId = btn.getAttribute("data-business-delete");
         const bizName = btn.getAttribute("data-business-name") || t("common_business");
         void openDeleteBusinessModal(bizId, bizName);
+      });
+    });
+
+    wrap.querySelectorAll("[data-business-edit]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const bizId = btn.getAttribute("data-business-edit");
+        if (!bizId) return;
+        void openBusinessEditModal(bizId);
       });
     });
   } catch (err) {
@@ -665,6 +728,102 @@ async function openDeleteBusinessModal(bizId, bizName) {
   body.innerHTML = detailParts.join("<br /><br />");
 }
 
+async function openBusinessEditModal(businessId) {
+  const modal = document.getElementById("businessEditModal");
+  const response = await apiFetch(`/api/businesses/${businessId}/profile`);
+  if (!response || !response.ok) {
+    showSettingsToast("Failed to load business details.");
+    return;
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (!payload) {
+    showSettingsToast("Failed to load business details.");
+    return;
+  }
+
+  document.getElementById("businessEditId").value = businessId;
+  document.getElementById("businessEditName").value = payload.name || "";
+  document.getElementById("businessEditType").value = payload.business_type || "sole_proprietor";
+  document.getElementById("businessEditFiscalYear").value = payload.fiscal_year_start || "";
+  document.getElementById("businessEditOperatingName").value = payload.operating_name || "";
+  document.getElementById("businessEditActivityCode").value = payload.business_activity_code || "";
+  modal?.classList.remove("hidden");
+}
+
+function closeBusinessEditModal() {
+  document.getElementById("businessEditModal")?.classList.add("hidden");
+}
+
+function wireBusinessEditModal() {
+  const modal = document.getElementById("businessEditModal");
+  const form = document.getElementById("businessEditForm");
+  const cancelButton = document.getElementById("businessEditCancel");
+  const saveButton = document.getElementById("businessEditSave");
+  if (!modal || !form || !cancelButton || !saveButton) {
+    return;
+  }
+
+  cancelButton.addEventListener("click", closeBusinessEditModal);
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) {
+      closeBusinessEditModal();
+    }
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const businessId = document.getElementById("businessEditId").value;
+    if (!businessId) {
+      return;
+    }
+
+    saveButton.disabled = true;
+    try {
+      const response = await apiFetch(`/api/businesses/${businessId}/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: document.getElementById("businessEditName").value.trim(),
+          business_type: document.getElementById("businessEditType").value,
+          fiscal_year_start: document.getElementById("businessEditFiscalYear").value || null,
+          operating_name: document.getElementById("businessEditOperatingName").value.trim(),
+          business_activity_code: document.getElementById("businessEditActivityCode").value.trim()
+        })
+      });
+      const payload = response ? await response.json().catch(() => null) : null;
+      if (!response || !response.ok) {
+        throw new Error(payload?.error || "Failed to update business.");
+      }
+
+      const activeBusinessId = window.__LUNA_ME__?.active_business_id || window.__LUNA_ME__?.active_business?.id || "";
+      if (businessId === activeBusinessId) {
+        const currentProfile = getBusinessProfile();
+        const updatedProfile = {
+          ...currentProfile,
+          name: payload?.name || currentProfile.name || "",
+          type: payload?.business_type || currentProfile.type || "sole_proprietor",
+          fiscalYearStart: payload?.fiscal_year_start || currentProfile.fiscalYearStart || "",
+          address: payload?.address || currentProfile.address || "",
+          operatingName: payload?.operating_name || currentProfile.operatingName || "",
+          businessActivityCode: payload?.business_activity_code || currentProfile.businessActivityCode || ""
+        };
+        saveBusinessProfile(updatedProfile);
+        applyBusinessProfileForm(updatedProfile);
+      }
+
+      closeBusinessEditModal();
+      await renderBusinessList();
+      syncSettingsOverviewSummaries();
+      showSettingsToast("Business updated.");
+    } catch (error) {
+      showSettingsToast(error.message || "Failed to update business.");
+    } finally {
+      saveButton.disabled = false;
+    }
+  });
+}
+
 async function initAccountSettings() {
   const statusLabel = document.getElementById("accountSubStatusLabel");
   const cancelRow = document.getElementById("cancelSubscriptionRow");
@@ -741,6 +900,9 @@ async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBod
     statusLabel.textContent = statusText;
     settingsOverviewState.billingStatus = statusText;
     syncSettingsOverviewSummaries();
+    if (settingsBusinessesState.length) {
+      await renderBusinessList();
+    }
 
     // Show cancel button only for active paid plans that aren't already canceling
     const canCancel = sub.isPaid && !sub.cancelAtPeriodEnd;
@@ -772,6 +934,8 @@ async function initAccountingLockPanel() {
   }
 
   const renderStatus = (lock) => {
+    settingsOverviewState.accountingLockDate = lock?.lockedThroughDate || null;
+    syncSettingsOverviewSummaries();
     if (lock?.lockedThroughDate) {
       statusNode.textContent = interpolateTranslatedMessage("settings_accounting_lock_status_locked", {
         date: lock.lockedThroughDate

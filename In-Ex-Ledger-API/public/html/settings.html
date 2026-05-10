@@ -88,6 +88,16 @@
             <strong id="settingsHeroSecurityStatus" class="settings-state-value">Loading...</strong>
             <p id="settingsHeroSecurityMeta" class="settings-state-meta">Checking account protection...</p>
           </div>
+          <div class="settings-state-card">
+            <span class="settings-state-label">Accounting lock</span>
+            <strong id="settingsHeroLockStatus" class="settings-state-value">Loading...</strong>
+            <p id="settingsHeroLockMeta" class="settings-state-meta">Checking locked period...</p>
+          </div>
+          <div class="settings-state-card">
+            <span class="settings-state-label">CPA access</span>
+            <strong id="settingsHeroCpaStatus" class="settings-state-value">Loading...</strong>
+            <p id="settingsHeroCpaMeta" class="settings-state-meta">Checking accountant access...</p>
+          </div>
         </div>
 
         <div class="settings-overview-grid">
@@ -166,15 +176,26 @@
       <section class="settings-card settings-panel" id="settings-business" data-collapsible-panel data-collapsed-default="true">
         <div class="settings-panel-head card-head">
           <div class="settings-panel-copy">
-            <h2 class="card-title" data-i18n="settings_nav_business">Business</h2>
-            <p class="card-desc" data-i18n="settings_business_desc">Edit details, manage businesses, or remove a business you no longer use.</p>
+            <h2 class="card-title">Businesses</h2>
+            <p class="card-desc">See every business tied to this account, identify the billing owner, and manage a specific business directly from the roster before editing deeper details.</p>
           </div>
           <button type="button" class="settings-panel-toggle" data-settings-panel-toggle aria-expanded="false">Expand</button>
         </div>
+        <div class="settings-business-management settings-subpanel">
+          <div class="settings-subpanel-head settings-subpanel-head-inline">
+            <div>
+              <h3 class="card-title">Business roster</h3>
+              <p class="card-desc">Every business appears here with ownership and lock context. Switch, edit, or delete directly from the row.</p>
+            </div>
+            <button type="button" id="addBusinessBtn" class="settings-secondary-btn" data-i18n="settings_add_business">Add another business</button>
+          </div>
+          <div id="businessListWrap" class="business-list-wrap"></div>
+        </div>
+
         <div class="settings-subpanel">
           <div class="settings-subpanel-head">
-            <h3 data-i18n="settings_business_details_title">Business details</h3>
-            <p data-i18n="settings_business_details_desc">Business identity, tax profile, and address.</p>
+            <h3 data-i18n="settings_business_details_title">Active business details</h3>
+            <p data-i18n="settings_business_details_desc">Business identity, tax profile, and address for the currently active workspace.</p>
           </div>
           <form id="businessProfileForm" class="business-form">
           <div class="settings-form-grid">
@@ -222,17 +243,6 @@
           </form>
         </div>
 
-        <div class="settings-business-management settings-subpanel">
-          <div class="settings-subpanel-head settings-subpanel-head-inline">
-            <div>
-              <h3 class="card-title" data-i18n="settings_business_management_title">Business management</h3>
-              <p class="card-desc" data-i18n="settings_business_management_desc">Manage your business accounts. You can switch between businesses or delete one you no longer need.</p>
-            </div>
-            <button type="button" id="addBusinessBtn" class="settings-secondary-btn" data-i18n="settings_add_business">Add another business</button>
-          </div>
-          <div id="businessListWrap" class="business-list-wrap"></div>
-        </div>
-
         <div class="settings-subpanel">
           <div class="settings-subpanel-head">
             <h3 data-i18n="settings_accounting_lock_title">Accounting period lock</h3>
@@ -266,7 +276,8 @@
 
         <div class="settings-subpanel">
           <div class="settings-subpanel-head">
-            <h3 data-i18n="settings_your_plan_title">Your plan</h3>
+            <h3 data-i18n="settings_your_plan_title">Billing center</h3>
+            <p>Subscription status, payment method, invoices, and add-on capacity are managed together in the billing center.</p>
           </div>
           <div class="settings-row">
             <div class="settings-row-copy">
@@ -277,14 +288,7 @@
             </div>
             <a href="subscription" class="settings-secondary-btn" data-i18n="settings_manage_subscription">Manage subscription</a>
           </div>
-
-          <div class="settings-row" id="cancelSubscriptionRow">
-            <div class="settings-row-copy">
-              <div class="settings-row-title" data-i18n="settings_cancel_subscription_title">Cancel subscription</div>
-              <div class="settings-row-desc" data-i18n="settings_cancel_subscription_desc">Your access continues until the end of your current billing period.</div>
-            </div>
-            <button type="button" id="cancelSubscriptionBtn" class="danger-outline-btn" data-i18n="settings_cancel_subscription_btn">Cancel subscription...</button>
-          </div>
+          <p class="settings-helper-note">Routine settings stay here. Plan changes, invoices, and payment details live in the dedicated billing flow.</p>
         </div>
 
       </section>
@@ -694,6 +698,48 @@
         <button type="button" id="cancelSubModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
         <button type="button" id="cancelSubModalConfirm" class="modal-delete" data-i18n="settings_cancel_sub_confirm_btn">Yes, cancel subscription</button>
       </div>
+    </div>
+  </div>
+
+  <div id="businessEditModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="businessEditModalTitle">
+    <div class="transaction-modal-content business-edit-modal">
+      <h3 id="businessEditModalTitle">Edit business</h3>
+      <p class="business-edit-modal-copy">Update the selected business without switching away from the current workspace.</p>
+      <form id="businessEditForm" class="business-form">
+        <input type="hidden" id="businessEditId" />
+        <div class="settings-form-grid">
+          <div class="form-field">
+            <label for="businessEditName">Business name</label>
+            <input type="text" id="businessEditName" required />
+          </div>
+          <div class="form-field">
+            <label for="businessEditType">Business type</label>
+            <select id="businessEditType">
+              <option value="sole_proprietor">Sole proprietor</option>
+              <option value="llc">LLC</option>
+              <option value="s_corp">S-Corp</option>
+              <option value="partnership">Partnership</option>
+              <option value="corporation">Corporation</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="businessEditFiscalYear">Fiscal year start</label>
+            <input type="date" id="businessEditFiscalYear" />
+          </div>
+          <div class="form-field">
+            <label for="businessEditOperatingName">Operating name (DBA)</label>
+            <input type="text" id="businessEditOperatingName" />
+          </div>
+          <div class="form-field">
+            <label for="businessEditActivityCode">Business activity code</label>
+            <input type="text" id="businessEditActivityCode" />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="businessEditCancel" class="modal-cancel">Cancel</button>
+          <button type="submit" id="businessEditSave" class="settings-primary-btn">Save business</button>
+        </div>
+      </form>
     </div>
   </div>
 

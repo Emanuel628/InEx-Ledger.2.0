@@ -554,6 +554,80 @@ async function findBillingContactByBusinessId(businessId) {
   return result.rows[0] || null;
 }
 
+function summarizeDefaultPaymentMethod(paymentMethod) {
+  if (!paymentMethod || typeof paymentMethod !== "object") {
+    return null;
+  }
+
+  if (paymentMethod.type === "card" && paymentMethod.card) {
+    return {
+      type: "card",
+      brand: paymentMethod.card.brand || "card",
+      last4: paymentMethod.card.last4 || "",
+      expMonth: paymentMethod.card.exp_month || null,
+      expYear: paymentMethod.card.exp_year || null
+    };
+  }
+
+  if (paymentMethod.type === "us_bank_account" && paymentMethod.us_bank_account) {
+    return {
+      type: "us_bank_account",
+      bankName: paymentMethod.us_bank_account.bank_name || "Bank account",
+      last4: paymentMethod.us_bank_account.last4 || ""
+    };
+  }
+
+  return {
+    type: paymentMethod.type || "unknown"
+  };
+}
+
+async function fetchBillingInvoicesForCustomer(stripeCustomerId, limit = 24) {
+  if (!stripeCustomerId) {
+    return [];
+  }
+
+  const payload = await stripeGet(
+    `/invoices?customer=${encodeURIComponent(stripeCustomerId)}&limit=${Math.max(1, Math.min(limit, 24))}`
+  );
+
+  return (payload?.data || []).map((inv) => ({
+    id: inv.id,
+    number: inv.number,
+    amount_paid: inv.amount_paid,
+    amount_due: inv.amount_due,
+    currency: inv.currency,
+    status: inv.status,
+    period_start: inv.period_start,
+    period_end: inv.period_end,
+    created: inv.created,
+    hosted_invoice_url: inv.hosted_invoice_url,
+    invoice_pdf: inv.invoice_pdf
+  }));
+}
+
+async function fetchBillingOverviewForBusiness(billingBusinessId) {
+  const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+  const stripeCustomerId = subscription?.stripeCustomerId || null;
+  let paymentMethod = null;
+  let invoices = [];
+
+  if (stripeCustomerId) {
+    const customer = await stripeGet(
+      `/customers/${encodeURIComponent(stripeCustomerId)}?expand[]=invoice_settings.default_payment_method`
+    );
+    paymentMethod = summarizeDefaultPaymentMethod(customer?.invoice_settings?.default_payment_method || null);
+    invoices = await fetchBillingInvoicesForCustomer(stripeCustomerId, 24);
+  }
+
+  return {
+    subscription,
+    paymentMethod,
+    invoices,
+    portalAvailable: Boolean(stripeCustomerId)
+  };
+}
+
 async function sendBillingEmail({ businessId, kind, details, actionUrl, invoiceUrl }) {
   try {
     const contact = await findBillingContactByBusinessId(businessId);
@@ -1125,6 +1199,17 @@ router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billi
   }
 });
 
+router.get("/overview", billingReadLimiter, requireAuth, async (req, res) => {
+  try {
+    const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    const overview = await fetchBillingOverviewForBusiness(billingBusinessId);
+    res.status(200).json(overview);
+  } catch (err) {
+    logError("GET /api/billing/overview error:", err.message);
+    res.status(500).json({ error: "Failed to load billing overview." });
+  }
+});
+
 router.get("/history", billingReadLimiter, requireAuth, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
@@ -1138,34 +1223,7 @@ router.get("/history", billingReadLimiter, requireAuth, async (req, res) => {
       return res.status(200).json({ invoices: [] });
     }
 
-    const response = await fetch(
-      `${STRIPE_API_BASE}/invoices?customer=${stripeCustomerId}&limit=24&status=paid`,
-      {
-        headers: {
-          Authorization: `Bearer ${getStripeSecretKey()}`,
-          "Stripe-Version": STRIPE_API_VERSION
-        }
-      }
-    );
-
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) {
-      throw new Error(payload?.error?.message || "Failed to fetch billing history");
-    }
-
-    const invoices = (payload?.data || []).map((inv) => ({
-      id: inv.id,
-      number: inv.number,
-      amount_paid: inv.amount_paid,
-      currency: inv.currency,
-      status: inv.status,
-      period_start: inv.period_start,
-      period_end: inv.period_end,
-      created: inv.created,
-      hosted_invoice_url: inv.hosted_invoice_url,
-      invoice_pdf: inv.invoice_pdf
-    }));
-
+    const invoices = await fetchBillingInvoicesForCustomer(stripeCustomerId, 24);
     res.status(200).json({ invoices });
   } catch (err) {
     logError("GET /api/billing/history error:", err.message);

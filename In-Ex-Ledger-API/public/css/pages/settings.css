@@ -2701,3 +2701,61 @@ body {
     align-items: flex-start;
   }
 }
+
+.settings-page .settings-state-strip {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.settings-page .settings-primary-btn {
+  background: #2563eb;
+}
+
+.settings-page .settings-primary-btn:hover {
+  background: #1d4ed8;
+}
+
+.settings-page .business-list-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.settings-page .business-list-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.settings-page .business-list-meta-line {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.settings-page .business-list-badge.is-billing-owner {
+  background: #0f172a;
+}
+
+.settings-page .business-list-badge.is-locked {
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+}
+
+.settings-page .business-edit-modal {
+  max-width: 720px;
+}
+
+.settings-page .business-edit-modal-copy {
+  margin: 6px 0 18px;
+  color: #64748b;
+}
+
+@media (max-width: 1280px) {
+  .settings-page .settings-state-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

@@ -5,8 +5,8 @@
   <title>Subscription | InEx Ledger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css?v=20260508a" />
-  <link rel="stylesheet" href="/css/pages/settings.css?v=20260509d" />
-  <link rel="stylesheet" href="/css/pages/subscription.css?v=20260510a" />
+  <link rel="stylesheet" href="/css/pages/settings.css?v=20260510b" />
+  <link rel="stylesheet" href="/css/pages/subscription.css?v=20260510b" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -48,9 +48,9 @@
       <section class="settings-card sub-hero-card" id="sub-status-section">
         <div class="sub-hero-shell">
           <div class="sub-hero-copy">
-            <span class="sub-hero-kicker">Billing overview</span>
-            <h1 class="sub-hero-title">Subscription, billing, and business access in one place.</h1>
-            <p class="sub-hero-sub">Clear renewal timing, direct plan actions, and a visible roster of every business tied to your account.</p>
+            <span class="sub-hero-kicker">Billing center</span>
+            <h1 class="sub-hero-title">Plan state, payment details, invoices, and renewal actions in one flow.</h1>
+            <p class="sub-hero-sub">Use this page for billing only. Business switching, editing, and deletion belong in Settings.</p>
           </div>
           <div class="sub-status-block" id="subStatusBlock">
             <div class="sub-status-loading" data-i18n="settings_loading">Loading...</div>
@@ -66,6 +66,7 @@
         </div>
 
         <div class="settings-row sub-actions-row">
+          <a href="settings" class="settings-secondary-btn">Back to settings</a>
           <button type="button" id="subManageBillingBtn" class="settings-secondary-btn hidden" data-i18n="subscription_manage_billing">Manage billing</button>
           <button type="button" id="subCancelBtn" class="danger-outline-btn hidden" data-i18n="settings_cancel_subscription_btn">Cancel subscription&#x2026;</button>
         </div>
@@ -77,7 +78,7 @@
         <div class="sub-plans-head">
           <span class="sub-plans-kicker">Plans &amp; Pricing</span>
           <h2 class="sub-plans-title">A cleaner billing surface with one primary action per state.</h2>
-          <p class="sub-plans-sub">Compare plans, see the real total before Stripe, and act directly from the page without hunting through settings.</p>
+          <p class="sub-plans-sub">Compare only the plans and billed add-ons that matter right now. Primary actions should match the live state of the account.</p>
         </div>
 
         <div class="sub-plans-grid">
@@ -168,101 +169,23 @@
             </div>
           </div>
 
-          <!-- Business (Coming Soon) -->
-          <div class="sub-plan-card sub-plan-coming-soon" id="planBusiness">
-            <div class="sub-plan-badge-row">
-              <span class="sub-coming-badge" data-i18n="subscription_v2_badge">Coming soon</span>
-            </div>
-            <div class="sub-plan-top">
-              <h3 class="sub-plan-name" data-i18n="subscription_v2_title_short">Business</h3>
-              <p class="sub-plan-pitch">Invoicing, payables, multi-user access, and deeper operating controls &mdash; built for growing teams.</p>
-            </div>
-            <ul class="sub-plan-features">
-              <li>Everything in Pro</li>
-              <li data-i18n="subscription_v2_feature_1">Customer &amp; vendor management</li>
-              <li data-i18n="subscription_v2_feature_3">Invoicing &amp; bill management</li>
-              <li data-i18n="subscription_v2_feature_5">Accounts receivable &amp; payable</li>
-              <li data-i18n="subscription_v2_feature_7">Bank reconciliation</li>
-              <li data-i18n="subscription_v2_feature_8">Expanded financial reports</li>
-              <li data-i18n="subscription_v2_feature_15">Multi-user access &amp; permissions</li>
-              <li data-i18n="subscription_v2_feature_10">Billable expense tracking</li>
-              <li data-i18n="subscription_v2_feature_11">Recurring invoices &amp; bills</li>
-              <li data-i18n="subscription_v2_feature_12">Accountant-ready exports</li>
-            </ul>
-            <p class="sub-plan-coming-note">Pricing will appear here when Business opens.</p>
-          </div>
-
         </div><!-- /.sub-plans-grid -->
-
-        <!-- Trust strip -->
-        <div class="sub-trust-strip">
-          <div class="sub-trust-item">
-            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <rect x="2" y="7" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.4"/>
-              <path d="M5 7V5a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-            </svg>
-            <span>Billing secured by Stripe</span>
-          </div>
-          <div class="sub-trust-item">
-            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/>
-              <path d="M8 5v4l2 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span>Cancel anytime</span>
-          </div>
-          <div class="sub-trust-item">
-            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M8 2L3 5v3.5C3 11.5 5.5 13.5 8 14c2.5-.5 5-2.5 5-5.5V5L8 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-              <path d="M6 8l1.5 1.5 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span>Your data, always yours</span>
-          </div>
-          <div class="sub-trust-item">
-            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-              <path d="M5 8h6M5 10.5h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-            </svg>
-            <span>No hidden fees</span>
-          </div>
-        </div>
-
-        <!-- FAQ -->
-        <div class="sub-faq">
-          <h3 class="sub-faq-heading">Common questions</h3>
-          <div class="sub-faq-grid">
-            <details class="sub-faq-item">
-              <summary>Can I cancel at any time?</summary>
-              <p>Yes&#x202F;&mdash; cancel from this page whenever you like. Your subscription stays active until the end of the current billing period. No partial refunds, no cancellation fees.</p>
-            </details>
-            <details class="sub-faq-item">
-              <summary>What happens to my data if I downgrade?</summary>
-              <p>Nothing is deleted. Your records stay accessible on Basic. You can still read your full history and export data. You simply lose access to Pro-only features like receipt scanning, mileage tracking, and analytics.</p>
-            </details>
-            <details class="sub-faq-item">
-              <summary>Is my payment information secure?</summary>
-              <p>InEx Ledger never sees your card details. Checkout is hosted entirely by Stripe&#x202F;&mdash; a PCI-DSS Level&nbsp;1 certified payment processor. Your credentials stay on Stripe&rsquo;s servers at all times.</p>
-            </details>
-            <details class="sub-faq-item">
-              <summary>Is there a discount for paying yearly?</summary>
-              <p>Yes. The yearly plan is equivalent to two months free compared to paying monthly. Select &#x201C;Yearly&#x201D; on the Pro card to see the adjusted price before checkout.</p>
-            </details>
-            <details class="sub-faq-item">
-              <summary>Can I manage more than one business?</summary>
-              <p>Yes. Pro includes one business by default. Additional businesses are billed as an add-on. Use the stepper on the Pro card to set your count&#x202F;&mdash; it&rsquo;s reflected in the price summary before you go to Stripe.</p>
-            </details>
-          </div>
-        </div>
 
       </section>
 
-      <!-- -- Business Access -------------------------- -->
+      <!-- -- Billing Details -------------------------- -->
       <section class="settings-card" id="sub-access-section">
         <div class="card-head">
-          <h2 class="card-title" data-i18n="subscription_business_access_title">Business access</h2>
-          <p class="card-desc">See every business on this account, manage add-on capacity, and delete a specific business directly from here.</p>
+          <h2 class="card-title">Billing details</h2>
+          <p class="card-desc">Payment method, invoice access, and billed business capacity belong here. Business ownership and deletion live in Settings.</p>
         </div>
-        <div id="businessSlotsManager">
-          <div class="sub-status-loading" data-i18n="settings_loading">Loading&#x2026;</div>
+        <div class="sub-billing-detail-grid">
+          <div id="subPaymentMethodCard" class="sub-detail-card">
+            <div class="sub-status-loading" data-i18n="settings_loading">Loading&#x2026;</div>
+          </div>
+          <div id="businessSlotsManager" class="sub-detail-card">
+            <div class="sub-status-loading" data-i18n="settings_loading">Loading&#x2026;</div>
+          </div>
         </div>
       </section>
 
@@ -314,28 +237,6 @@
       <div class="modal-actions danger-actions">
         <button type="button" id="subFreeModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
         <button type="button" id="subFreeModalConfirm" class="modal-delete" data-i18n="subscription_free_confirm_action">Confirm Basic</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="subBusinessDeleteModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="subBusinessDeleteTitle">
-    <div class="transaction-modal-content danger-modal">
-      <div class="danger-modal-icon" aria-hidden="true">
-        <svg viewBox="0 0 16 16" fill="none">
-          <path d="M8 3L14 13H2L8 3Z"></path>
-          <line x1="8" y1="7" x2="8" y2="10"></line>
-          <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
-        </svg>
-      </div>
-      <h3 id="subBusinessDeleteTitle">Delete this business?</h3>
-      <p id="subBusinessDeleteBody">This permanently deletes the selected business and its associated records.</p>
-      <label class="sub-business-delete-field" for="subBusinessDeletePassword">
-        <span>Confirm with your password</span>
-        <input id="subBusinessDeletePassword" type="password" autocomplete="current-password" />
-      </label>
-      <div class="modal-actions danger-actions">
-        <button type="button" id="subBusinessDeleteCancel" class="modal-cancel">Cancel</button>
-        <button type="button" id="subBusinessDeleteConfirm" class="modal-delete">Delete business</button>
       </div>
     </div>
   </div>

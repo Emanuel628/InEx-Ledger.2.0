@@ -13,13 +13,6 @@ const pricingState = {
   verifiedPricingCurrency: null
 };
 let currentSubscription = null;
-let pendingDeleteBusinessId = null;
-const subscriptionBusinessesState = {
-  items: [],
-  activeBusinessId: "",
-  error: "",
-  isLoaded: false
-};
 const businessSlotsState = {
   currentAdditionalBusinesses: 0,
   selectedAdditionalBusinesses: 0,
@@ -355,6 +348,11 @@ function buildStatusPanelMarkup(sub) {
     detail = getSelectedPlanCode(sub) !== "v1"
       ? `Basic is selected after trial, but Pro access stays live until ${fmtDate(sub.trialEndsAt)}.`
       : "Finish billing setup before the trial ends to avoid interruption.";
+  } else if (String(sub.status || "").toLowerCase() === "past_due" && sub.currentPeriodEnd) {
+    badgeClass = "sub-badge-canceling";
+    badgeLabel = "Past due";
+    headline = `Payment issue before ${fmtDate(sub.currentPeriodEnd)}`;
+    detail = "Update your payment method or open Stripe billing to keep Pro active without interruption.";
   } else if (sub.cancelAtPeriodEnd && sub.currentPeriodEnd) {
     badgeClass = "sub-badge-canceling";
     badgeLabel = tx("sub_mgmt_badge_canceling");
@@ -405,6 +403,41 @@ function buildStatusPanelMarkup(sub) {
     </div>`;
 }
 
+function renderPaymentMethodCard(paymentMethod, portalAvailable) {
+  const card = document.getElementById("subPaymentMethodCard");
+  if (!card) return;
+
+  let headline = "No payment method on file";
+  let detail = "Add or update a payment method in Stripe when you are ready to start or renew paid billing.";
+
+  if (paymentMethod?.type === "card") {
+    const brand = String(paymentMethod.brand || "Card").replace(/_/g, " ");
+    headline = `${brand} ending in ${paymentMethod.last4 || "****"}`;
+    detail = paymentMethod.expMonth && paymentMethod.expYear
+      ? `Expires ${String(paymentMethod.expMonth).padStart(2, "0")}/${paymentMethod.expYear}`
+      : "Managed securely in Stripe.";
+  } else if (paymentMethod?.type === "us_bank_account") {
+    headline = `${paymentMethod.bankName || "Bank account"} ending in ${paymentMethod.last4 || "****"}`;
+    detail = "Managed securely in Stripe.";
+  }
+
+  card.innerHTML = `
+    <div class="sub-detail-card-head">
+      <div>
+        <h3>Payment method</h3>
+        <p>Stripe stays the source of truth for cards, bank accounts, and billing details.</p>
+      </div>
+      ${portalAvailable ? '<button type="button" class="settings-secondary-btn" id="subPaymentMethodManage">Manage</button>' : ""}
+    </div>
+    <div class="sub-detail-card-body">
+      <strong class="sub-detail-primary">${escapeHtml(headline)}</strong>
+      <p class="sub-detail-secondary">${escapeHtml(detail)}</p>
+    </div>
+  `;
+
+  document.getElementById("subPaymentMethodManage")?.addEventListener("click", openCustomerPortal);
+}
+
 function initSubNav() {
   const navButtons = Array.from(document.querySelectorAll("[data-settings-target]"));
   if (!navButtons.length) return;
@@ -435,33 +468,6 @@ function initSubNav() {
       { rootMargin: "-20% 0px -55% 0px", threshold: [0.2, 0.4, 0.6] }
     );
     targets.forEach(({ target }) => observer.observe(target));
-  }
-}
-
-async function loadBusinessRoster() {
-  try {
-    const response = await apiFetch("/api/businesses");
-    if (!response || !response.ok) {
-      subscriptionBusinessesState.items = [];
-      subscriptionBusinessesState.activeBusinessId = "";
-      subscriptionBusinessesState.error = "Failed to load businesses.";
-      subscriptionBusinessesState.isLoaded = true;
-      return false;
-    }
-
-    const payload = await response.json().catch(() => null);
-    subscriptionBusinessesState.items = Array.isArray(payload?.businesses) ? payload.businesses : [];
-    subscriptionBusinessesState.activeBusinessId = payload?.active_business_id || "";
-    subscriptionBusinessesState.error = "";
-    subscriptionBusinessesState.isLoaded = true;
-    return true;
-  } catch (err) {
-    console.error("[Subscription] Failed to load businesses:", err);
-    subscriptionBusinessesState.items = [];
-    subscriptionBusinessesState.activeBusinessId = "";
-    subscriptionBusinessesState.error = "Failed to load businesses.";
-    subscriptionBusinessesState.isLoaded = true;
-    return false;
   }
 }
 
@@ -805,50 +811,33 @@ function renderBusinessAccessSection(sub) {
       </article>
     </div>`;
 
-  const rosterHtml = buildBusinessRosterMarkup(sub);
-
   if (!isProTier) {
     manager.innerHTML = `
       ${statsHtml}
-      <div class="sub-access-layout">
-        <div class="sub-access-main">
-          <div class="sub-access-message-card">
-            <p class="sub-access-upgrade-note">${escapeHtml(tx("subscription_business_access_upgrade_note"))}</p>
-          </div>
-        </div>
-        ${rosterHtml}
+      <div class="sub-access-message-card">
+        <p class="sub-access-upgrade-note">${escapeHtml(tx("subscription_business_access_upgrade_note"))}</p>
+        <p class="sub-access-settings-note">Manage business records from Settings once your plan includes more capacity.</p>
       </div>`;
-    wireBusinessRosterActions();
     return;
   }
 
   if (isCancelingPro) {
     manager.innerHTML = `
       ${statsHtml}
-      <div class="sub-access-layout">
-        <div class="sub-access-main">
-          <div class="sub-access-message-card">
-            <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceling_help"))}</p>
-          </div>
-        </div>
-        ${rosterHtml}
+      <div class="sub-access-message-card">
+        <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceling_help"))}</p>
+        <p class="sub-access-settings-note">Delete or edit businesses from Settings. Capacity changes resume once Pro is active again.</p>
       </div>`;
-    wireBusinessRosterActions();
     return;
   }
 
   if (isEndedProWithRemainingAccess) {
     manager.innerHTML = `
       ${statsHtml}
-      <div class="sub-access-layout">
-        <div class="sub-access-main">
-          <div class="sub-access-message-card">
-            <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceled_help"))}</p>
-          </div>
-        </div>
-        ${rosterHtml}
+      <div class="sub-access-message-card">
+        <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceled_help"))}</p>
+        <p class="sub-access-settings-note">Business administration stays in Settings. Start a new Pro cycle before changing paid capacity.</p>
       </div>`;
-    wireBusinessRosterActions();
     return;
   }
 
@@ -860,37 +849,32 @@ function renderBusinessAccessSection(sub) {
 
   manager.innerHTML = `
     ${statsHtml}
-    <div class="sub-access-layout">
-      <div class="sub-access-main">
-        <div class="sub-slots-panel">
-          <div class="sub-slots-panel-head">
-            <div class="sub-slots-panel-copy">
-              <h3>Business capacity</h3>
-              <p>Add or remove paid business slots. Changes stay aligned with the billing cycle and Stripe handles the billing math.</p>
-            </div>
-            <div class="sub-slots-price-pill">${escapeHtml(tx("subscription_extra_business_slots_help"))}</div>
-          </div>
-          <div class="sub-slots-actions">
-            <p class="sub-slots-state-label" id="slotsStateLabel">${escapeHtml(stateMsg)}</p>
-            <div class="sub-slots-btn-row">
-              <button type="button" id="removeSlotBtn" class="sub-slots-remove-btn"${extra <= 0 ? " disabled" : ""}>Remove a business</button>
-              <button type="button" id="addSlotBtn" class="sub-slots-add-btn">Add a business</button>
-            </div>
-            <div id="removeSlotConfirm" class="sub-slots-remove-confirm hidden">
-              <p>This removes 1 business slot from your bill. Make sure the business you want gone is deleted first.</p>
-              <div class="sub-slots-confirm-btns">
-                <button type="button" id="removeSlotCancelBtn" class="sub-slots-confirm-cancel">Keep it</button>
-                <button type="button" id="removeSlotConfirmBtn" class="sub-slots-confirm-ok">Yes, remove it</button>
-              </div>
-            </div>
+    <div class="sub-slots-panel">
+      <div class="sub-slots-panel-head">
+        <div class="sub-slots-panel-copy">
+          <h3>Business capacity</h3>
+          <p>These controls change the billed add-on count only. Edit or delete individual businesses from Settings.</p>
+        </div>
+        <div class="sub-slots-price-pill">${escapeHtml(tx("subscription_extra_business_slots_help"))}</div>
+      </div>
+      <div class="sub-slots-actions">
+        <p class="sub-slots-state-label" id="slotsStateLabel">${escapeHtml(stateMsg)}</p>
+        <div class="sub-slots-btn-row">
+          <button type="button" id="removeSlotBtn" class="sub-slots-remove-btn"${extra <= 0 ? " disabled" : ""}>Remove a business</button>
+          <button type="button" id="addSlotBtn" class="sub-slots-add-btn">Add a business</button>
+        </div>
+        <p class="sub-access-settings-note">Need to switch, rename, or delete a specific business? Go to Settings.</p>
+        <div id="removeSlotConfirm" class="sub-slots-remove-confirm hidden">
+          <p>This removes 1 business slot from your bill. Make sure the business you want gone is deleted first.</p>
+          <div class="sub-slots-confirm-btns">
+            <button type="button" id="removeSlotCancelBtn" class="sub-slots-confirm-cancel">Keep it</button>
+            <button type="button" id="removeSlotConfirmBtn" class="sub-slots-confirm-ok">Yes, remove it</button>
           </div>
         </div>
       </div>
-      ${rosterHtml}
     </div>`;
 
   wireSlotActions();
-  wireBusinessRosterActions();
 }
 
 async function loadSubscription() {
@@ -905,13 +889,15 @@ async function loadSubscription() {
     if (!isAuthenticated()) {
       if (statusBlock) statusBlock.innerHTML = `<p>${tx("sub_mgmt_not_signed_in")}</p>`;
       renderBusinessAccessSection(null);
+      renderPaymentMethodCard(null, false);
       return null;
     }
 
-    const res = await apiFetch("/api/billing/subscription");
+    const res = await apiFetch("/api/billing/overview");
     if (!res || !res.ok) {
       if (statusBlock) statusBlock.innerHTML = `<p class="sub-status-error">${tx("sub_mgmt_load_error")}</p>`;
       renderBusinessAccessSection(null);
+      renderPaymentMethodCard(null, false);
       return null;
     }
 
@@ -920,6 +906,7 @@ async function loadSubscription() {
     if (!sub) {
       if (statusBlock) statusBlock.innerHTML = `<p class="sub-status-error">${tx("sub_mgmt_load_error")}</p>`;
       renderBusinessAccessSection(null);
+      renderPaymentMethodCard(null, false);
       return null;
     }
 
@@ -932,11 +919,11 @@ async function loadSubscription() {
     }
     pricingState.additionalBusinesses = clampAdditionalBusinesses(Number(sub.additionalBusinesses || 0));
     updatePricingUI();
-    await loadBusinessRoster();
 
     if (statusBlock) {
       statusBlock.innerHTML = buildStatusPanelMarkup(sub);
     }
+    renderPaymentMethodCard(payload?.paymentMethod || null, payload?.portalAvailable === true);
 
     if (cancelModalBody && sub.currentPeriodEnd) {
       const endDate = fmtDate(sub.currentPeriodEnd);
@@ -958,6 +945,7 @@ async function loadSubscription() {
 
     updatePlanCardState(sub);
     renderBusinessAccessSection(sub);
+    await loadBillingHistory(Array.isArray(payload?.invoices) ? payload.invoices : []);
 
     if (planProBtn) {
       const action = getPrimaryPlanAction(sub);
@@ -1002,24 +990,26 @@ async function waitForSubscriptionActivation() {
   return loadSubscription();
 }
 
-async function loadBillingHistory() {
+async function loadBillingHistory(providedInvoices = null) {
   const list = document.getElementById("billingHistoryList");
   if (!list) return;
 
   try {
+    let invoices = providedInvoices;
     if (!isAuthenticated()) {
       list.innerHTML = `<p>${tx("sub_mgmt_not_signed_in")}</p>`;
       return;
     }
 
-    const res = await apiFetch("/api/billing/history");
-    if (!res || !res.ok) {
-      list.innerHTML = `<p class="sub-status-error">${tx("sub_mgmt_history_error")}</p>`;
-      return;
+    if (!Array.isArray(invoices)) {
+      const res = await apiFetch("/api/billing/history");
+      if (!res || !res.ok) {
+        list.innerHTML = `<p class="sub-status-error">${tx("sub_mgmt_history_error")}</p>`;
+        return;
+      }
+      const payload = await res.json().catch(() => null);
+      invoices = Array.isArray(payload?.invoices) ? payload.invoices : [];
     }
-
-    const payload = await res.json().catch(() => null);
-    const invoices = Array.isArray(payload?.invoices) ? payload.invoices : [];
 
     if (!invoices.length) {
       list.innerHTML = `<p class="sub-empty-msg">${tx("sub_mgmt_no_history")}</p>`;
@@ -1040,7 +1030,7 @@ async function loadBillingHistory() {
           ${invoices.map((inv) => `
             <tr>
               <td>${escapeHtml(fmtDate(inv.created))}</td>
-              <td>${escapeHtml(fmtAmount(inv.amount_paid, inv.currency))}</td>
+              <td>${escapeHtml(fmtAmount(inv.amount_paid || inv.amount_due, inv.currency))}</td>
               <td><span class="billing-status-badge billing-status-${escapeHtml(inv.status)}">${escapeHtml(inv.status || "-")}</span></td>
               <td>
                 ${inv.hosted_invoice_url || inv.invoice_pdf
@@ -1293,7 +1283,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   manageBillingBtn?.addEventListener("click", openCustomerPortal);
 
   wireFreeTierModal();
-  wireBusinessDeleteModal();
 
   const cancelBtn = document.getElementById("subCancelBtn");
   const cancelModal = document.getElementById("subCancelModal");
@@ -1316,7 +1305,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       cancelModal?.classList.add("hidden");
       showSubToast(tx("settings_cancel_sub_success"));
       currentSubscription = await loadSubscription();
-      await loadBillingHistory();
       cancelModalConfirm.disabled = false;
     } catch (err) {
       console.error("Cancel subscription failed", err);
@@ -1330,7 +1318,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     showSubToast(tx("sub_mgmt_checkout_success"));
     window.history.replaceState({}, "", window.location.pathname);
     currentSubscription = await waitForSubscriptionActivation();
-    await loadBillingHistory();
     return;
   } else if (params.get("checkout") === "cancel") {
     showSubToast(tx("sub_mgmt_checkout_cancelled"));
@@ -1338,5 +1325,5 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   currentSubscription = await loadSubscription();
-  await loadBillingHistory();
 });
+

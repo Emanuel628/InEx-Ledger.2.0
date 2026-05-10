@@ -17,7 +17,7 @@ const {
   syncStripeSubscriptionForBusiness
 } = require("../services/subscriptionService.js");
 const { buildStripePriceLookup } = require("../services/stripePriceConfig.js");
-const { decryptTaxId } = require("../services/taxIdService.js");
+const { decryptTaxId, encryptTaxId } = require("../services/taxIdService.js");
 const { verifyPassword } = require("../utils/authUtils.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
@@ -30,6 +30,10 @@ const businessDeleteLimiter = createBusinessDeleteLimiter();
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
 const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2026-02-25.clover";
 const { addonPriceIds: STRIPE_ADDON_PRICE_IDS } = buildStripePriceLookup();
+const VALID_REGIONS = new Set(["US", "CA"]);
+const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
+const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
+const FISCAL_YEAR_START_RE = /^((0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])|\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/;
 
 function getStripeSecretKey() {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -239,6 +243,136 @@ function normalizeBusinessPayload(payload = {}) {
   return { valid: true, normalized: { name, region, language } };
 }
 
+function normalizeOptionalTrimmedString(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function normalizeBusinessProfileRow(row) {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    ...row,
+    tax_id: decryptTaxId(row.tax_id),
+    business_type: row.business_type || null,
+    operating_name: row.operating_name || null,
+    business_activity_code: row.business_activity_code || null,
+    locked_through_date: row.locked_through_date || null,
+    locked_period_note: row.locked_period_note || null,
+    locked_period_updated_at: row.locked_period_updated_at || null
+  };
+}
+
+async function fetchOwnedBusinessProfile(userId, businessId) {
+  const result = await pool.query(
+    `SELECT id, name, region, language, fiscal_year_start, province,
+            business_type, tax_id, address, operating_name,
+            business_activity_code, locked_through_date, locked_period_note,
+            locked_period_updated_at, created_at
+       FROM businesses
+      WHERE id = $1
+        AND user_id = $2
+      LIMIT 1`,
+    [businessId, userId]
+  );
+
+  return normalizeBusinessProfileRow(result.rows[0] || null);
+}
+
+async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
+  const current = await fetchOwnedBusinessProfile(userId, businessId);
+  if (!current) {
+    return null;
+  }
+
+  const {
+    name,
+    region,
+    language,
+    fiscal_year_start,
+    province,
+    business_type,
+    tax_id,
+    address,
+    operating_name,
+    business_activity_code
+  } = payload;
+
+  const resolvedRegion = String(region || current.region || "US").toUpperCase();
+  const resolvedProvince = resolvedRegion === "CA"
+    ? String(province || current.province || "").toUpperCase() || null
+    : null;
+
+  if (region && !VALID_REGIONS.has(resolvedRegion)) {
+    return { error: "region must be 'US' or 'CA'" };
+  }
+  if (language && !VALID_LANGUAGES.has(String(language))) {
+    return { error: "language must be 'en', 'es', or 'fr'" };
+  }
+  if (fiscal_year_start != null && fiscal_year_start !== "" && !FISCAL_YEAR_START_RE.test(String(fiscal_year_start))) {
+    return { error: "fiscal_year_start must be in MM-DD format with valid month (01-12) and day (01-31)." };
+  }
+  if (resolvedProvince && !CA_PROVINCES.has(resolvedProvince)) {
+    return { error: "Invalid Canadian province code" };
+  }
+  if (resolvedRegion === "CA" && !resolvedProvince) {
+    return { error: "Province is required for Canadian businesses." };
+  }
+
+  const normalizedTaxId = Object.prototype.hasOwnProperty.call(payload, "tax_id")
+    ? normalizeOptionalTrimmedString(tax_id)
+    : current.tax_id;
+
+  const result = await pool.query(
+    `UPDATE businesses
+        SET name = COALESCE($1, name),
+            region = COALESCE($2, region),
+            language = COALESCE($3, language),
+            fiscal_year_start = COALESCE($4, fiscal_year_start),
+            province = $5,
+            business_type = $6,
+            tax_id = $7,
+            address = $8,
+            operating_name = $9,
+            business_activity_code = $10
+      WHERE id = $11
+        AND user_id = $12
+      RETURNING id, name, region, language, fiscal_year_start, province,
+                business_type, tax_id, address, operating_name,
+                business_activity_code, locked_through_date, locked_period_note,
+                locked_period_updated_at, created_at`,
+    [
+      normalizeOptionalTrimmedString(name),
+      resolvedRegion,
+      language || null,
+      fiscal_year_start || null,
+      resolvedProvince,
+      Object.prototype.hasOwnProperty.call(payload, "business_type")
+        ? normalizeOptionalTrimmedString(business_type)
+        : current.business_type,
+      normalizedTaxId ? encryptTaxId(normalizedTaxId) : null,
+      Object.prototype.hasOwnProperty.call(payload, "address")
+        ? normalizeOptionalTrimmedString(address)
+        : current.address,
+      Object.prototype.hasOwnProperty.call(payload, "operating_name")
+        ? normalizeOptionalTrimmedString(operating_name)
+        : current.operating_name,
+      Object.prototype.hasOwnProperty.call(payload, "business_activity_code")
+        ? normalizeOptionalTrimmedString(business_activity_code)
+        : current.business_activity_code,
+      businessId,
+      userId
+    ]
+  );
+
+  return { business: normalizeBusinessProfileRow(result.rows[0] || null) };
+}
+
 function buildBusinessLimitError(subscription, maxBusinessesAllowed) {
   const hasProAccess = subscription?.effectiveTier === "v1";
 
@@ -272,30 +406,30 @@ router.get("/", async (req, res) => {
 
 router.get("/:id/profile", async (req, res) => {
   try {
-    const businesses = await listBusinessesForUser(req.user.id);
-    const business = businesses.find((item) => item.id === req.params.id);
+    const business = await fetchOwnedBusinessProfile(req.user.id, req.params.id);
     if (!business) {
       return res.status(404).json({ error: "Business not found." });
     }
-
-    const result = await pool.query(
-      `SELECT id, name, region, language, fiscal_year_start, province,
-              business_type, tax_id, address, created_at
-       FROM businesses
-       WHERE id = $1
-       LIMIT 1`,
-      [req.params.id]
-    );
-
-    if (!result.rowCount) {
-      return res.status(404).json({ error: "Business not found." });
-    }
-
-    const row = result.rows[0];
-    res.json({ ...row, tax_id: decryptTaxId(row.tax_id) });
+    res.json(business);
   } catch (err) {
     logError("GET /businesses/:id/profile error:", err.message);
     res.status(500).json({ error: "Failed to load business profile." });
+  }
+});
+
+router.put("/:id/profile", async (req, res) => {
+  try {
+    const result = await updateOwnedBusinessProfile(req.user.id, req.params.id, req.body ?? {});
+    if (!result) {
+      return res.status(404).json({ error: "Business not found." });
+    }
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json(result.business);
+  } catch (err) {
+    logError("PUT /businesses/:id/profile error:", err.message);
+    res.status(500).json({ error: "Failed to update business profile." });
   }
 });
 

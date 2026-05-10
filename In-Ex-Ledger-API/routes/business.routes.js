@@ -18,7 +18,7 @@ router.use(requireCsrfProtection);
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
-const FISCAL_YEAR_START_RE = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+const FISCAL_YEAR_START_RE = /^((0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])|\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/;
 const BUSINESS_SELECT = `SELECT id, name, region, language, fiscal_year_start, province,
                                 business_type, tax_id, address, operating_name,
                                 business_activity_code, created_at

@@ -126,6 +126,9 @@ async function listBusinessesForUser(userId) {
             b.region,
             b.province,
             b.language,
+            b.business_type,
+            b.locked_through_date,
+            b.locked_period_updated_at,
             b.created_at,
             (u.active_business_id = b.id) AS is_active
      FROM businesses b
@@ -142,6 +145,9 @@ async function listBusinessesForUser(userId) {
     region: row.region || "US",
     province: row.province || "",
     language: row.language || "en",
+    business_type: row.business_type || "",
+    locked_through_date: row.locked_through_date || null,
+    locked_period_updated_at: row.locked_period_updated_at || null,
     created_at: row.created_at || "",
     is_active: row.is_active === true
   }));
