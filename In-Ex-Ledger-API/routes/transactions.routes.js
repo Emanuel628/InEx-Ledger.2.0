@@ -1080,6 +1080,176 @@ function extractRowData(row, cols) {
   return { amount, type, description, date };
 }
 
+// ─── Smart CSV Category Detection ────────────────────────────────────────────
+const CSV_CATEGORY_RULES = [
+  // Expense rules — ordered most-specific first
+  {
+    kind: "expense", name: "Bank Fees",
+    keywords: ["overdraft", "service charge", "maintenance fee", "wire transfer fee", "atm fee",
+      "foreign transaction", "bank fee", "interest charge", "nsf fee", "returned item",
+      "monthly fee", "account fee", "stop payment", "insufficient funds"]
+  },
+  {
+    kind: "expense", name: "Food & Dining",
+    keywords: ["mcdonald", "burger king", "wendy", "subway", "starbucks", "dunkin", "taco bell",
+      "chick-fil-a", "chickfila", "pizza hut", "domino", "kfc ", "chipotle", "panera",
+      "olive garden", "applebee", "denny", "ihop", "red lobster", "outback steakhouse",
+      "buffalo wild", "five guys", "shake shack", "popeye", "panda express", "sonic drive",
+      "arby", "dairy queen", "baskin robbins", "jamba juice", "smoothie king",
+      "doordash", "uber eats", "ubereats", "grubhub", "skip the dishes", "skipthedishes",
+      "postmates", "just eat", "foodora", "tim horton", "a&w restaurant", "harvey's",
+      "new york fries", "boston pizza", "pizza pizza", "pita pit", "mary brown", "st-hubert",
+      "baton rouge", "milestones", "earls restaurant", "moxies", "joey restaurant",
+      "cactus club", "white spot", "montana's", "kelseys", "jack astor", "swiss chalet",
+      "in-n-out", "whataburger", "wingstop", "raising cane", "zaxby", "culver",
+      "waffle house", "cracker barrel", "texas roadhouse", "longhorn steakhouse",
+      "the keg", "moxie"]
+  },
+  {
+    kind: "expense", name: "Groceries",
+    keywords: ["walmart supercenter", "walmart grocery", "walmart neighborhood", "costco",
+      "whole foods", "trader joe", "kroger", "safeway", "publix", "albertsons",
+      "h-e-b", "heb ", "aldi ", "lidl ", "wegman", "meijer", "stop & shop", "stopnshop",
+      "shoprite", "food lion", "giant eagle", "harris teeter", "winn dixie", "save-a-lot",
+      "no frills", "metro grocery", "loblaws", "sobeys", "iga grocery", "freshco",
+      "food basics", "giant tiger", "co-op food", "save-on-foods", "thrifty foods",
+      "overwaitea", "independent grocer", "real canadian superstore", "provigo", "maxi grocery",
+      "superstore", "walmart"]
+  },
+  {
+    kind: "expense", name: "Fuel & Gas",
+    keywords: ["shell gas", "shell station", "shell #", "chevron", "bp gas", "bp station",
+      "exxon", "mobil gas", "mobil #", "sunoco", "marathon gas", "speedway gas",
+      "circle k gas", "wawa gas", "sheetz", "pilot flying", "loves travel stop",
+      "petro canada", "petrocan", "esso", "husky gas", "ultramar", "pioneer gas",
+      "canadian tire gas", "petro-t", "irving oil", "kwik trip gas", "casey's gas"]
+  },
+  {
+    kind: "expense", name: "Ride Sharing & Taxi",
+    keywords: ["lyft", "didi", "waymo", "yellow cab", "blue cab", "green cab",
+      "taxicab", "rideshare", "uber"]
+  },
+  {
+    kind: "expense", name: "Travel",
+    keywords: ["delta air", "american airlines", "united airlines", "southwest air", "spirit air",
+      "air canada", "westjet", "jetblue", "frontier airlines", "alaska airlines",
+      "lufthansa", "british airways", "air france", "air transat", "porter airlines",
+      "flair airlines", "sunwing", "marriott", "hilton", "hyatt", "sheraton", "westin",
+      "holiday inn", "hampton inn", "doubletree", "residence inn", "four seasons",
+      "ritz carlton", "best western", "motel 6", "super 8", "comfort inn", "airbnb",
+      "vrbo", "booking.com", "expedia", "travelocity", "priceline", "hotels.com",
+      "trivago", "kayak", "orbitz", "amtrak", "via rail", "greyhound bus", "airport hotel",
+      "airport parking", "airlines"]
+  },
+  {
+    kind: "expense", name: "Software & Subscriptions",
+    keywords: ["netflix", "spotify", "hulu", "disney plus", "disney+", "amazon prime",
+      "apple tv+", "hbo max", "youtube premium", "adobe ", "microsoft 365", "microsoft office",
+      "github", "slack", "zoom", "dropbox", "google one", "google workspace",
+      "amazon web services", "aws ", "azure ", "digitalocean", "heroku", "notion ",
+      "figma ", "canva ", "mailchimp", "hubspot", "salesforce", "quickbooks", "xero",
+      "freshbooks", "wave apps", "shopify", "wix ", "squarespace", "godaddy",
+      "namecheap", "cloudflare", "twilio", "sendgrid", "anthropic", "openai",
+      "subscription fee", "membership renewal"]
+  },
+  {
+    kind: "expense", name: "Advertising & Marketing",
+    keywords: ["google ads", "google adwords", "facebook ads", "meta ads", "instagram ads",
+      "tiktok ads", "twitter ads", "pinterest ads", "linkedin ads", "bing ads",
+      "snapchat ads", "youtube ads", "constant contact", "hootsuite", "buffer ",
+      "sprout social", "semrush", "ahrefs", "klaviyo", "activecampaign"]
+  },
+  {
+    kind: "expense", name: "Phone & Internet",
+    keywords: ["rogers", "bell canada", "telus", "fido wireless", "koodo", "virgin mobile",
+      "freedom mobile", "shaw cable", "videotron", "eastlink", "at&t", "att wireless",
+      "att mobility", "verizon", "t-mobile", "tmobile", "sprint wireless", "comcast",
+      "xfinity", "spectrum ", "cox communication", "centurylink", "frontier comm",
+      "windstream", "google fi", "mint mobile", "visible wireless",
+      "internet service", "wireless service", "cellular service"]
+  },
+  {
+    kind: "expense", name: "Insurance",
+    keywords: ["allstate", "state farm", "geico", "progressive ins", "farmers insurance",
+      "nationwide ins", "liberty mutual", "usaa", "aetna", "blue cross", "cigna",
+      "united health", "sun life", "great-west life", "manulife", "canada life",
+      "desjardins ins", "intact insurance", "co-operators", "aviva canada",
+      "td insurance", "rbc insurance", "bmo insurance", "insurance premium", "insurance payment"]
+  },
+  {
+    kind: "expense", name: "Health & Wellness",
+    keywords: ["cvs pharmacy", "walgreens", "rite aid", "shoppers drug mart", "london drugs",
+      "pharmasave", "rexall", "loblaws pharmacy", "costco pharmacy", "planet fitness",
+      "goodlife fitness", "anytime fitness", "la fitness", "24 hour fitness", "equinox",
+      "crunch fitness", "ymca", "medical clinic", "dental office", "dentist", "optometrist",
+      "physio", "physiotherapy", "chiropractor", "massage therapy", "pharmacy", "drugstore",
+      "health clinic", "urgent care", "hospital"]
+  },
+  {
+    kind: "expense", name: "Office Supplies",
+    keywords: ["staples ", "office depot", "officemax", "office max", "uline ", "viking direct",
+      "grand & toy", "bureau en gros", "reliable office supplies"]
+  },
+  {
+    kind: "expense", name: "Shipping & Postage",
+    keywords: ["fedex", "ups store", "ups shipping", "usps", "dhl", "canada post",
+      "purolator", "canpar", "loomis express", "fleet courier", "postage", "courier service"]
+  },
+  {
+    kind: "expense", name: "Vehicle & Transportation",
+    keywords: ["autozone", "advance auto", "o'reilly auto", "oreilly auto", "napa auto",
+      "jiffy lube", "valvoline", "midas ", "meineke", "firestone", "goodyear", "pep boys",
+      "maaco", "enterprise rent", "budget rent-a", "avis ", "hertz ", "national car rental",
+      "dollar car", "thrifty car", "u-haul", "penske truck", "zipcar",
+      "parking lot", "parking meter", "car wash", "auto repair", "oil change", "dealership"]
+  },
+  {
+    kind: "expense", name: "Rent & Utilities",
+    keywords: ["rent payment", "hydro ", "bc hydro", "enbridge", "atco gas", "fortis bc",
+      "epcor", "alectra", "union gas", "pacific gas", "pge ", "con edison",
+      "national grid", "water utility", "sewage", "garbage collect", "monthly rent",
+      "apartment rent", "electric utility", "natural gas utility"]
+  },
+  {
+    kind: "expense", name: "Professional Services",
+    keywords: ["law firm", "attorney", "accountant", "cpa firm", "consulting", "fiverr",
+      "upwork", "toptal", "99designs", "freelance payment", "contractor payment",
+      "legal fee", "professional fee", "notary"]
+  },
+  {
+    kind: "expense", name: "Government & Taxes",
+    keywords: ["irs ", "cra ", "revenue canada", "revenu canada", "department of finance",
+      "government fee", "permit fee", "business license", "vehicle registration",
+      "tax payment", "government of canada", "service canada", "service ontario",
+      "dmv ", "property tax", "hst payment", "gst payment", "sales tax remittance"]
+  },
+
+  // Income rules
+  {
+    kind: "income", name: "Payroll Income",
+    keywords: ["payroll", "salary deposit", "direct deposit payroll", "adp ", "paychex",
+      "ceridian", "paylocity", "gusto payroll", "bamboohr", "kronos payroll",
+      "wages", "employment income", "employment deposit", "biweekly pay", "weekly pay"]
+  },
+  {
+    kind: "income", name: "Sales Revenue",
+    keywords: ["square ", "stripe", "paypal", "shopify", "amazon seller", "etsy ", "ebay sale",
+      "venmo", "zelle", "e-transfer", "interac e-transfer", "interac etransfer",
+      "payment received", "invoice payment", "client payment", "settlement deposit",
+      "transfer in", "deposit", "direct deposit"]
+  },
+];
+
+function detectCsvCategory(description, kind) {
+  const desc = description.toLowerCase();
+  for (const rule of CSV_CATEGORY_RULES) {
+    if (rule.kind !== kind) continue;
+    if (rule.keywords.some(kw => desc.includes(kw))) return rule.name;
+  }
+  return kind === "income" ? "Imported Income" : "Imported Expense";
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "CSV file is required." });
@@ -1128,30 +1298,35 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "Could not detect an amount column. Expected 'amount', 'withdrawal', 'deposit', or similar." });
     }
 
-    // Pre-load or resolve a default category for each type
-    const defaultCategoryMap = {};
-    for (const kind of ["income", "expense"]) {
-      const catName = kind === "income" ? "Imported Income" : "Imported Expense";
-      let cat = await pool.query(
-        "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
-        [businessId, catName]
+    // Pre-load all existing categories once; create missing ones on demand
+    const existingCats = await pool.query(
+      "SELECT id, name, kind FROM categories WHERE business_id = $1",
+      [businessId]
+    );
+    const categoryCache = new Map();
+    for (const cat of existingCats.rows) {
+      categoryCache.set(`${cat.kind}::${cat.name.toLowerCase()}`, cat.id);
+    }
+
+    async function getOrCreateCsvCategory(name, kind) {
+      const key = `${kind}::${name.toLowerCase()}`;
+      if (categoryCache.has(key)) return categoryCache.get(key);
+      let result = await pool.query(
+        `INSERT INTO categories (id, business_id, name, kind, created_at)
+         VALUES ($1, $2, $3, $4, now())
+         ON CONFLICT (business_id, lower(name)) DO NOTHING
+         RETURNING id`,
+        [crypto.randomUUID(), businessId, name, kind]
       );
-      if (!cat.rowCount) {
-        cat = await pool.query(
-          `INSERT INTO categories (id, business_id, name, kind, created_at)
-           VALUES ($1, $2, $3, $4, now())
-           ON CONFLICT (business_id, lower(name)) DO NOTHING
-           RETURNING id`,
-          [crypto.randomUUID(), businessId, catName, kind]
+      if (!result.rowCount) {
+        result = await pool.query(
+          "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
+          [businessId, name]
         );
-        if (!cat.rowCount) {
-          cat = await pool.query(
-            "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
-            [businessId, catName]
-          );
-        }
       }
-      defaultCategoryMap[kind] = cat.rows[0]?.id;
+      const id = result.rows[0]?.id;
+      if (id) categoryCache.set(key, id);
+      return id;
     }
 
     const results = { imported: 0, skipped: 0, errors: [] };
@@ -1177,9 +1352,10 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         continue;
       }
 
-      const categoryId = defaultCategoryMap[type];
+      const detectedCategory = detectCsvCategory(description, type);
+      const categoryId = await getOrCreateCsvCategory(detectedCategory, type);
       if (!categoryId) {
-        results.errors.push({ row: i + 2, reason: `Row ${i + 2}: could not resolve default ${type} category` });
+        results.errors.push({ row: i + 2, reason: `Row ${i + 2}: could not resolve category` });
         results.skipped++;
         continue;
       }
