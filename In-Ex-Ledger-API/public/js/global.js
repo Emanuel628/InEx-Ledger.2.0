@@ -493,7 +493,7 @@ function applyMileageNavLabel() {
 }
 
 const DYNAMIC_SIDEBAR_FAVORITES_KEY = "lb_dynamic_sidebar_favorites";
-const DYNAMIC_SIDEBAR_DEFAULT_FAVORITES = ["transactions", "receipts", "mileage", "accounts", "categories"];
+const DYNAMIC_SIDEBAR_DEFAULT_FAVORITES = ["transactions", "receipts", "invoices", "mileage", "accounts", "categories"];
 const DYNAMIC_SIDEBAR_CORE_FEATURE_IDS = new Set([
   "transactions",
   "receipts",
