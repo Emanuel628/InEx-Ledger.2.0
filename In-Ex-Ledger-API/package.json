@@ -45,6 +45,7 @@
     "helmet": "^8.1.0",
     "multer": "1.4.5-lts.1",
     "pg": "^8.11.5",
+    "plaid": "^42.2.0",
     "rate-limit-redis": "^4.3.1",
     "redis": "^5.11.0",
     "resend": "^3.0.0"
