@@ -1,14 +1,28 @@
 const express = require("express");
 const crypto = require("crypto");
+const { Resend } = require("resend");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
-const { logError } = require("../utils/logger.js");
+const { logError, logInfo } = require("../utils/logger.js");
 const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+const { sendInvoiceEmail } = require("../services/invoiceEmailService.js");
+const {
+  AUDIT_ACTIONS,
+  recordAuditEventForRequest
+} = require("../services/auditEventService.js");
+
+let cachedResendClient = null;
+function getResendClient() {
+  const key = String(process.env.RESEND_API_KEY || "").trim();
+  if (!key) return null;
+  if (!cachedResendClient) cachedResendClient = new Resend(key);
+  return cachedResendClient;
+}
 
 const router = express.Router();
 router.use(requireAuth);
@@ -293,6 +307,104 @@ router.patch("/:id/status", async (req, res) => {
   } catch (err) {
     logError("PATCH /invoices-v1/:id/status error:", err);
     res.status(500).json({ error: "Failed to update invoice status." });
+  }
+});
+
+/* ── POST /api/invoices-v1/:id/send ── email the invoice to the customer */
+router.post("/:id/send", async (req, res) => {
+  if (!UUID_RE.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid invoice ID." });
+  }
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    if (!await requireProPlan(businessId, res)) return;
+
+    const existing = await pool.query(
+      `SELECT i.*, b.name AS business_name
+         FROM invoices_v1 i
+         JOIN businesses b ON b.id = i.business_id
+        WHERE i.id = $1 AND i.business_id = $2
+        LIMIT 1`,
+      [req.params.id, businessId]
+    );
+    if (!existing.rowCount) return res.status(404).json({ error: "Invoice not found." });
+    const invoice = existing.rows[0];
+
+    const overrideEmail = String(req.body?.recipient_email || "").trim();
+    const recipientEmail = overrideEmail || invoice.customer_email;
+    if (!recipientEmail) {
+      return res.status(400).json({ error: "Invoice has no customer email. Add one before sending." });
+    }
+
+    const customMessage = String(req.body?.message || "").trim().slice(0, 2000) || null;
+
+    const resendClient = getResendClient();
+    let sendResult;
+    try {
+      sendResult = await sendInvoiceEmail(resendClient, {
+        invoice,
+        recipientEmail,
+        businessName: invoice.business_name,
+        senderName: req.user?.email || null,
+        customMessage
+      });
+    } catch (err) {
+      const status = err.status || 502;
+      logError("POST /invoices-v1/:id/send error:", err.message);
+      return res.status(status).json({ error: err.message, code: err.code || "email_failed" });
+    }
+
+    // Bump invoice status to "sent" when it was still a draft.
+    if (invoice.status === "draft") {
+      await pool.query(
+        "UPDATE invoices_v1 SET status = 'sent', updated_at = now() WHERE id = $1 AND business_id = $2",
+        [invoice.id, businessId]
+      );
+    }
+
+    // Record an outbound message so the activity shows up in Messages.
+    const messageId = crypto.randomUUID();
+    await pool.query(
+      `INSERT INTO messages
+         (id, sender_id, receiver_id, message_type, subject, body,
+          external_sender_email, external_sender_name, invoice_id)
+       VALUES ($1, $2, $2, 'invoice_sent', $3, $4, $5, $6, $7)`,
+      [
+        messageId,
+        req.user.id,
+        `Invoice ${invoice.invoice_number} sent to ${recipientEmail}`,
+        customMessage || `Invoice ${invoice.invoice_number} was emailed to ${recipientEmail}.`,
+        recipientEmail,
+        invoice.customer_name || null,
+        invoice.id
+      ]
+    );
+
+    await recordAuditEventForRequest(pool, req, {
+      userId: req.user.id,
+      businessId,
+      action: "invoice.sent",
+      metadata: {
+        invoice_id: invoice.id,
+        recipient: recipientEmail,
+        resend_id: sendResult?.data?.id || null
+      }
+    });
+
+    logInfo("Invoice email sent", {
+      invoiceId: invoice.id,
+      recipient: recipientEmail
+    });
+
+    res.json({
+      ok: true,
+      message_id: messageId,
+      recipient_email: recipientEmail,
+      resend_id: sendResult?.data?.id || null
+    });
+  } catch (err) {
+    logError("POST /invoices-v1/:id/send error:", err);
+    res.status(500).json({ error: "Failed to send invoice." });
   }
 });
 

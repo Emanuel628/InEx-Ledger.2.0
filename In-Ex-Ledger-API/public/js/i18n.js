@@ -324,6 +324,8 @@ const TRANSLATIONS = {
     nav_accounts: 'Accounts',
     nav_categories: 'Categories',
     nav_receipts: 'Receipts',
+    nav_invoices: 'Invoices',
+    nav_messages: 'Messages',
     nav_mileage: 'Mileage',
     page_kicker_ledger_setup: 'Ledger setup',
     page_kicker_document_trail: 'Document trail',
@@ -1597,6 +1599,8 @@ const TRANSLATIONS = {
     nav_accounts: 'Cuentas',
     nav_categories: 'Categorías',
     nav_receipts: 'Recibos',
+    nav_invoices: 'Facturas',
+    nav_messages: 'Mensajes',
     nav_mileage: 'Kilometraje',
     page_kicker_ledger_setup: 'Configuración del libro mayor',
     page_kicker_document_trail: 'Rastro de documentos',
@@ -2853,6 +2857,8 @@ const TRANSLATIONS = {
     nav_accounts: 'Comptes',
     nav_categories: 'Catégories',
     nav_receipts: 'Reçus',
+    nav_invoices: 'Factures',
+    nav_messages: 'Messages',
     nav_mileage: 'Kilométrage',
     page_kicker_ledger_setup: 'Configuration du grand livre',
     page_kicker_document_trail: 'Piste de documents',
@@ -4310,6 +4316,8 @@ const TRANSLATION_DRIFT_FIXES = {
     messages_type_it_support: 'IT Support',
     messages_type_support_request: 'Support Request',
     messages_type_general: 'General',
+    messages_type_invoice_sent: 'Invoice sent',
+    messages_type_invoice_reply: 'Invoice reply',
     messages_detail_to: 'To:',
     messages_detail_from: 'From:'
   },
@@ -4514,6 +4522,8 @@ const TRANSLATION_DRIFT_FIXES = {
     messages_type_it_support: 'Soporte técnico',
     messages_type_support_request: 'Solicitud de soporte',
     messages_type_general: 'General',
+    messages_type_invoice_sent: 'Factura enviada',
+    messages_type_invoice_reply: 'Respuesta a factura',
     messages_detail_to: 'Para:',
     messages_detail_from: 'De:'
   },
@@ -4718,6 +4728,8 @@ const TRANSLATION_DRIFT_FIXES = {
     messages_type_it_support: 'Support informatique',
     messages_type_support_request: 'Demande d\'assistance',
     messages_type_general: 'Général',
+    messages_type_invoice_sent: 'Facture envoyée',
+    messages_type_invoice_reply: 'Réponse à la facture',
     messages_detail_to: 'À :',
     messages_detail_from: 'De :'
   }
