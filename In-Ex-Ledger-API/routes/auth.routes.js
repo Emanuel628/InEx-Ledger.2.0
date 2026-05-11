@@ -25,6 +25,10 @@ const {
   recordAuditEventForRequest
 } = require("../services/auditEventService.js");
 const {
+  extractRequestContext,
+  deriveDeviceLabel
+} = require("../services/sessionContextService.js");
+const {
   getPreferredLanguageForUser,
   getPreferredLanguageForEmail,
   buildWelcomeVerificationEmail,
@@ -393,26 +397,28 @@ async function issueAuthenticatedSession(
   res,
   user,
   businessIdOverride = null,
-  { mfaAuthenticated = false } = {}
+  { mfaAuthenticated = false, req = null } = {}
 ) {
   const accessPayload = await buildAuthenticatedAccessPayload(user, businessIdOverride, {
     mfaAuthenticated
   });
 
   const { token: refreshToken, expiresAt } = await createRefreshToken(user.id, {
-    mfaAuthenticated: !!mfaAuthenticated
+    mfaAuthenticated: !!mfaAuthenticated,
+    req
   });
   setRefreshCookie(res, refreshToken, expiresAt);
 
   return accessPayload;
 }
 
-async function resetCurrentRefreshSession(res, user, { mfaAuthenticated = false } = {}) {
+async function resetCurrentRefreshSession(res, user, { mfaAuthenticated = false, req = null } = {}) {
   await revokeAllRefreshTokensForUser(user.id);
   // The caller decides whether the rotated session should remain MFA-authenticated
   // after the refresh-token rotation.
   const { token, expiresAt } = await createRefreshToken(user.id, {
-    mfaAuthenticated: !!mfaAuthenticated
+    mfaAuthenticated: !!mfaAuthenticated,
+    req
   });
   setRefreshCookie(res, token, expiresAt);
   return buildAuthenticatedAccessPayload(user, null, { mfaAuthenticated });
@@ -697,14 +703,26 @@ function hashMfaTrustToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-async function createRefreshToken(userId, { mfaAuthenticated = false } = {}) {
+async function createRefreshToken(userId, { mfaAuthenticated = false, req = null } = {}) {
   const token = crypto.randomBytes(REFRESH_TOKEN_BYTE_LENGTH).toString("hex");
   const hashed = hashRefreshToken(token);
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
+  const ctx = extractRequestContext(req);
+  const deviceLabel = deriveDeviceLabel(ctx.userAgent);
   await pool.query(
-    `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, mfa_authenticated)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [crypto.randomUUID(), userId, hashed, expiresAt, !!mfaAuthenticated]
+    `INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, mfa_authenticated,
+                                  last_used_at, ip_address, user_agent, device_label)
+     VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8)`,
+    [
+      crypto.randomUUID(),
+      userId,
+      hashed,
+      expiresAt,
+      !!mfaAuthenticated,
+      ctx.ipAddress,
+      ctx.userAgent,
+      deviceLabel
+    ]
   );
   return { token, expiresAt };
 }
@@ -999,7 +1017,7 @@ router.post("/complete-verified-signup", authLimiter, async (req, res) => {
       return res.status(403).json({ error: "Signup session does not match this device." });
     }
 
-    const session = await issueAuthenticatedSession(res, user);
+    const session = await issueAuthenticatedSession(res, user, null, { req });
     try {
       const recognizedDevice = await getRecognizedSignInDevice(user.id, currentFingerprintHash);
       if (recognizedDevice) {
@@ -1188,7 +1206,8 @@ router.post("/login", authLimiter, async (req, res) => {
     }
 
     const session = await issueAuthenticatedSession(res, user, businessId, {
-      mfaAuthenticated
+      mfaAuthenticated,
+      req
     });
     logInfo("User login succeeded", {
       userId: user.id,
@@ -1273,7 +1292,8 @@ router.post("/refresh", tokenRefreshLimiter, requireCsrfProtection, async (req, 
 
     await revokeRefreshTokenByHash(hashed);
     const refreshData = await createRefreshToken(result.rows[0].user_id, {
-      mfaAuthenticated: !!result.rows[0].mfa_authenticated
+      mfaAuthenticated: !!result.rows[0].mfa_authenticated,
+      req
     });
     setRefreshCookie(res, refreshData.token, refreshData.expiresAt);
 
@@ -1351,7 +1371,7 @@ router.get("/verify-email", async (req, res) => {
 
     if (result.rowCount === 0) return res.status(404).send("User not found.");
 
-    const session = await issueAuthenticatedSession(res, result.rows[0]);
+    const session = await issueAuthenticatedSession(res, result.rows[0], null, { req });
     const deviceContext = buildSignInDeviceContext(result.rows[0], req);
     if (deviceContext && !result.rows[0].mfa_enabled) {
       try {
@@ -1411,7 +1431,8 @@ router.post("/change-password", authLimiter, requireAuth, requireCsrfProtection,
     const nextHash = await hashPassword(newPassword);
     await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [nextHash, user.id]);
     const session = await resetCurrentRefreshSession(res, user, {
-      mfaAuthenticated: !!req.user?.mfa_authenticated
+      mfaAuthenticated: !!req.user?.mfa_authenticated,
+      req
     });
     await revokeTrustedMfaDevicesForUser(user.id);
     clearMfaTrustCookie(res);
@@ -1623,7 +1644,8 @@ router.post("/mfa/enable", requireAuth, requireCsrfProtection, authLimiter, asyn
 
     const refreshedUser = await findUserById(user.id);
     const session = await resetCurrentRefreshSession(res, refreshedUser, {
-      mfaAuthenticated: true
+      mfaAuthenticated: true,
+      req
     });
     await revokeTrustedMfaDevicesForUser(user.id);
     clearMfaTrustCookie(res);
@@ -1715,7 +1737,7 @@ router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter
     );
 
     const refreshedUser = await findUserById(user.id);
-    const session = await resetCurrentRefreshSession(res, refreshedUser);
+    const session = await resetCurrentRefreshSession(res, refreshedUser, { req });
     await revokeTrustedMfaDevicesForUser(user.id);
     clearMfaTrustCookie(res);
     logInfo("MFA disabled", {
@@ -1783,7 +1805,8 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
       setMfaTrustCookie(res, trustedDevice.token, trustedDevice.expiresAt);
     }
     const session = await issueAuthenticatedSession(res, refreshedUser, pending.business_id || null, {
-      mfaAuthenticated: true
+      mfaAuthenticated: true,
+      req
     });
     return res.status(200).json(session);
   } catch (err) {
