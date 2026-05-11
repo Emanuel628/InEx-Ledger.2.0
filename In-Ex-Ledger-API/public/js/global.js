@@ -500,7 +500,8 @@ const DYNAMIC_SIDEBAR_CORE_FEATURE_IDS = new Set([
   "mileage",
   "accounts",
   "categories",
-  "exports"
+  "exports",
+  "invoices"
 ]);
 const DYNAMIC_SIDEBAR_BUSINESS_FEATURE_IDS = new Set([
   "customers",
