@@ -15,6 +15,7 @@ const {
   AccountingPeriodLockedError
 } = require("../services/accountingLockService.js");
 const { seedDefaultCategoriesForBusiness } = require("../api/utils/seedDefaultsForBusiness.js");
+const { getUnmappedCategories } = require("../services/taxSummaryService.js");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -100,6 +101,27 @@ router.post("/", async (req, res) => {
     }
     logError("POST /categories error:", err.message);
     res.status(500).json({ error: "Failed to create category." });
+  }
+});
+
+/**
+ * GET /api/categories/unmapped?region=US|CA
+ * Returns categories with no tax line mapping for the given region (defaults to business region).
+ */
+router.get("/unmapped", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const requestedRegion = String(req.query.region || "").toUpperCase();
+    let region = requestedRegion === "CA" || requestedRegion === "US" ? requestedRegion : null;
+    if (!region) {
+      const bizRegion = await pool.query("SELECT region FROM businesses WHERE id = $1 LIMIT 1", [businessId]);
+      region = String(bizRegion.rows[0]?.region || "US").toUpperCase() === "CA" ? "CA" : "US";
+    }
+    const rows = await getUnmappedCategories(pool, { businessId, region });
+    res.json({ region, count: rows.length, categories: rows });
+  } catch (err) {
+    logError("GET /categories/unmapped error:", err.message);
+    res.status(500).json({ error: "Failed to load unmapped categories." });
   }
 });
 
