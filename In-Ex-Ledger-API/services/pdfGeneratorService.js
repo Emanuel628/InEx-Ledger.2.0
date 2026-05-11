@@ -793,6 +793,234 @@ function buildSupportPages(receipts, transactions, mileage, labels, currency, re
   return pages;
 }
 
+// =========================================================
+// Tax Packet additions (item 26): receipt coverage, payer
+// summary, tax-line breakdown. Computed from already-loaded
+// transactions / categories / receipts so we don't re-query.
+// =========================================================
+
+function computeReceiptCoverage(transactions, receipts) {
+  const expenseTxIds = new Set();
+  for (const t of transactions || []) {
+    if (String(t.type || "").toLowerCase() === "expense") {
+      expenseTxIds.add(t.id);
+    }
+  }
+  const expenseCount = expenseTxIds.size;
+  const withReceipt = new Set();
+  for (const r of receipts || []) {
+    const txId = r.transaction_id || r.transactionId;
+    if (expenseTxIds.has(txId)) withReceipt.add(txId);
+  }
+  const missing = Math.max(0, expenseCount - withReceipt.size);
+  const coveragePct = expenseCount === 0 ? null : Number(((withReceipt.size / expenseCount) * 100).toFixed(1));
+  return {
+    expense_count: expenseCount,
+    with_receipt: withReceipt.size,
+    missing,
+    coverage_pct: coveragePct
+  };
+}
+
+function expectedTaxFormForPayer({ region, total, transactionCount }) {
+  const r = String(region || "").toUpperCase();
+  if (r === "CA") {
+    return total >= 500 ? "T4A" : null;
+  }
+  if (total >= 20000 && transactionCount >= 200) return "1099-K";
+  if (total >= 600) return "1099-NEC";
+  return null;
+}
+
+function computePayerSummary(transactions, region) {
+  const byPayer = new Map();
+  for (const t of transactions || []) {
+    if (String(t.type || "").toLowerCase() !== "income") continue;
+    const rawName = t.payer_name || t.payerName || "";
+    const name = String(rawName || "").trim() || "(unspecified)";
+    if (!byPayer.has(name)) {
+      byPayer.set(name, { payer_name: name, total: 0, count: 0, declared_forms: new Map() });
+    }
+    const entry = byPayer.get(name);
+    const amount = Number(t.amount) || 0;
+    entry.total += amount;
+    entry.count += 1;
+    const form = t.tax_form_type || t.taxFormType || null;
+    if (form && form !== "none") {
+      entry.declared_forms.set(form, (entry.declared_forms.get(form) || 0) + amount);
+    }
+  }
+  const payers = Array.from(byPayer.values()).map((entry) => {
+    const declared = Array.from(entry.declared_forms.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    return {
+      payer_name: entry.payer_name,
+      total: Number(entry.total.toFixed(2)),
+      count: entry.count,
+      declared_form: declared,
+      expected_form: expectedTaxFormForPayer({ region, total: entry.total, transactionCount: entry.count })
+    };
+  });
+  payers.sort((a, b) => b.total - a.total);
+  return {
+    total_income: Number(payers.reduce((acc, p) => acc + p.total, 0).toFixed(2)),
+    payer_count: payers.length,
+    payers
+  };
+}
+
+function computeTaxLineSummary(transactions, categories, region) {
+  const taxKey = String(region || "").toUpperCase() === "CA" ? "tax_map_ca" : "tax_map_us";
+  const catMap = mapByKey(categories || [], "id");
+  const byLine = new Map();
+  let unmappedTotal = 0;
+  let unmappedCount = 0;
+  for (const t of transactions || []) {
+    const category = catMap[t.category_id || t.categoryId] || null;
+    const taxLine = category ? (category[taxKey] || null) : null;
+    const amount = Number(t.amount) || 0;
+    if (!taxLine) {
+      if (String(t.type || "").toLowerCase() === "expense") {
+        unmappedTotal += amount;
+        unmappedCount += 1;
+      }
+      continue;
+    }
+    if (!byLine.has(taxLine)) {
+      byLine.set(taxLine, { tax_line: taxLine, total: 0, count: 0 });
+    }
+    const entry = byLine.get(taxLine);
+    entry.total += amount;
+    entry.count += 1;
+  }
+  const lines = Array.from(byLine.values()).map((entry) => ({
+    tax_line: entry.tax_line,
+    total: Number(entry.total.toFixed(2)),
+    count: entry.count
+  }));
+  lines.sort((a, b) => b.total - a.total);
+  return {
+    lines,
+    unmapped_total: Number(unmappedTotal.toFixed(2)),
+    unmapped_count: unmappedCount
+  };
+}
+
+function buildTaxPacketPages({ transactions, categories, receipts, currency, region, labels }) {
+  const coverage = computeReceiptCoverage(transactions, receipts);
+  const payerSummary = computePayerSummary(transactions, region);
+  const taxLineSummary = computeTaxLineSummary(transactions, categories, region);
+
+  const pages = [];
+  let canvas = new PdfCanvas();
+  let y = 760;
+
+  const startPage = () => {
+    canvas = new PdfCanvas();
+    y = 760;
+    canvas.text(40, y, "Tax Packet Summary", 16, "F2");
+    y -= 28;
+  };
+
+  const pushPage = () => {
+    pages.push(canvas);
+    startPage();
+  };
+
+  const ensureSpace = (needed) => {
+    if (y - needed < 60) pushPage();
+  };
+
+  startPage();
+
+  // Receipt coverage block
+  canvas.text(40, y, "Receipt Coverage", 12, "F2");
+  y -= 20;
+  canvas.text(40, y, `Expense transactions: ${coverage.expense_count}`, 9); y -= 14;
+  canvas.text(40, y, `With receipt attached: ${coverage.with_receipt}`, 9); y -= 14;
+  canvas.text(40, y, `Missing receipts: ${coverage.missing}`, 9); y -= 14;
+  if (coverage.coverage_pct !== null) {
+    canvas.text(40, y, `Coverage: ${coverage.coverage_pct}%`, 9); y -= 14;
+  }
+  if (coverage.missing > 0) {
+    canvas.text(40, y, "Note: expenses without receipts may not be deductible if challenged.", 8);
+    y -= 14;
+  }
+  y -= 10;
+
+  // Payer summary
+  ensureSpace(60);
+  canvas.text(40, y, "Income by Payer (1099/T4A reconciliation)", 12, "F2");
+  y -= 20;
+  if (!payerSummary.payers.length) {
+    canvas.text(40, y, "No income transactions in this range.", 9);
+    y -= 18;
+  } else {
+    canvas.text(40, y, "Payer", 9, "F2");
+    canvas.text(260, y, "Count", 9, "F2");
+    canvas.text(320, y, "Total", 9, "F2");
+    canvas.text(420, y, "Declared", 9, "F2");
+    canvas.text(490, y, "Expected", 9, "F2");
+    y -= 16;
+    const topPayers = payerSummary.payers.slice(0, 12);
+    for (const p of topPayers) {
+      ensureSpace(14);
+      canvas.text(40, y, truncateText(p.payer_name, 36), 9);
+      canvas.text(260, y, String(p.count), 9);
+      canvas.text(320, y, formatCurrencyForPdf(p.total, currency), 9);
+      canvas.text(420, y, safeValue(p.declared_form, "—"), 9);
+      const expected = p.expected_form || "—";
+      const mismatch = p.expected_form && p.declared_form !== p.expected_form ? "*" : "";
+      canvas.text(490, y, `${expected}${mismatch}`, 9);
+      y -= 14;
+    }
+    if (payerSummary.payers.length > 12) {
+      canvas.text(40, y, `... and ${payerSummary.payers.length - 12} more payers`, 8);
+      y -= 14;
+    }
+    canvas.text(40, y, "* indicates the declared form differs from the expected form.", 8);
+    y -= 18;
+    canvas.text(40, y, `Total income: ${formatCurrencyForPdf(payerSummary.total_income, currency)}`, 9, "F2");
+    y -= 18;
+  }
+
+  // Tax-line summary
+  ensureSpace(60);
+  const lineLabel = String(region || "").toUpperCase() === "CA" ? "T2125 Line" : "Schedule C Line";
+  canvas.text(40, y, `Totals by ${lineLabel}`, 12, "F2");
+  y -= 20;
+  if (!taxLineSummary.lines.length) {
+    canvas.text(40, y, "No categories with tax-line mappings in this range.", 9);
+    y -= 18;
+  } else {
+    canvas.text(40, y, "Tax line", 9, "F2");
+    canvas.text(420, y, "Count", 9, "F2");
+    canvas.text(490, y, "Total", 9, "F2");
+    y -= 16;
+    for (const line of taxLineSummary.lines.slice(0, 20)) {
+      ensureSpace(14);
+      canvas.text(40, y, truncateText(line.tax_line, 60), 9);
+      canvas.text(420, y, String(line.count), 9);
+      canvas.text(490, y, formatCurrencyForPdf(line.total, currency), 9);
+      y -= 14;
+    }
+    if (taxLineSummary.lines.length > 20) {
+      canvas.text(40, y, `... and ${taxLineSummary.lines.length - 20} more lines`, 8);
+      y -= 14;
+    }
+  }
+  if (taxLineSummary.unmapped_count > 0) {
+    ensureSpace(28);
+    y -= 6;
+    canvas.text(40, y, `Unmapped expenses: ${taxLineSummary.unmapped_count} totaling ${formatCurrencyForPdf(taxLineSummary.unmapped_total, currency)}`, 9, "F2");
+    y -= 14;
+    canvas.text(40, y, "These transactions are uncategorized for tax purposes. Map their categories to a Schedule C or T2125 line.", 8);
+    y -= 14;
+  }
+
+  pages.push(canvas);
+  return pages;
+}
+
 function buildFooterText(labels, reportId, generatedAt, isSecure, pageNumber, totalPages) {
   const confidentiality = isSecure ? labels.footer_confidential : labels.badge_redacted;
   return truncateText(`${labels.footer_brand} | ${confidentiality} | ${reportId} | ${formatReportTimestamp(generatedAt)} | Page ${pageNumber}/${totalPages}`, 110);
@@ -898,6 +1126,7 @@ function buildPdfExport(options) {
       categoryPreviewEntries
     }),
     ...buildCategoryPages(transactions, categories, currency, labels, categoryPreviewEntries.length),
+    ...buildTaxPacketPages({ transactions, categories, receipts, currency, region, labels }),
     ...buildTransactionPages(transactions, accounts, categories, currency, labels),
     ...buildSupportPages(receipts, transactions, mileage, labels, currency, reviewInsights)
   ];
@@ -911,4 +1140,12 @@ function buildPdfExport(options) {
   return createPdfBytes(pageContents);
 }
 
-module.exports = { buildPdfExport };
+module.exports = {
+  buildPdfExport,
+  __private: {
+    computeReceiptCoverage,
+    computePayerSummary,
+    computeTaxLineSummary,
+    expectedTaxFormForPayer
+  }
+};
