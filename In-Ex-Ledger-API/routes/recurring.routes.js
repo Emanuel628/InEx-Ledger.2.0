@@ -18,8 +18,13 @@ const {
   materializeNextTemplateRun,
   verifyTemplateOwnership,
   mapRecurringRow,
-  computeNextRunDateForUpdate
+  computeNextRunDateForUpdate,
+  projectUpcomingOccurrences
 } = require("../services/recurringTransactionsService.js");
+const {
+  loadAccountingLockState,
+  isDateLocked
+} = require("../services/accountingLockService.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -288,6 +293,99 @@ router.delete("/:id", async (req, res) => {
   } catch (err) {
     logError("DELETE /recurring/:id error:", err);
     res.status(500).json({ error: "Failed to delete recurring transaction." });
+  }
+});
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * GET /api/recurring/:id/runs
+ * History of generated runs for a template (most recent first).
+ */
+router.get("/:id/runs", async (req, res) => {
+  if (!UUID_RE.test(String(req.params.id || ""))) {
+    return res.status(400).json({ error: "Invalid recurring transaction id." });
+  }
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const result = await pool.query(
+      `SELECT r.id, r.occurrence_date, r.transaction_id, r.created_at,
+              t.amount, t.cleared, t.description
+         FROM recurring_transaction_runs r
+    LEFT JOIN transactions t ON t.id = r.transaction_id
+        WHERE r.recurring_transaction_id = $1
+          AND r.business_id = $2
+        ORDER BY r.occurrence_date DESC, r.created_at DESC
+        LIMIT $3`,
+      [req.params.id, businessId, limit]
+    );
+    res.json({ runs: result.rows, count: result.rowCount });
+  } catch (err) {
+    logError("GET /recurring/:id/runs error:", err);
+    res.status(500).json({ error: "Failed to load recurring run history." });
+  }
+});
+
+/**
+ * GET /api/recurring/upcoming?days=30&per_template=5
+ * Projects upcoming occurrences across every active template, flagging any
+ * that would land inside a locked accounting period. Useful for a "what's
+ * about to post" sidebar / banner.
+ */
+router.get("/upcoming", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 365);
+    const perTemplate = Math.min(Math.max(parseInt(req.query.per_template, 10) || 5, 1), 20);
+    const today = new Date().toISOString().slice(0, 10);
+    const cutoff = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const templatesResult = await pool.query(
+      `SELECT id, description, cadence, next_run_date, end_date, account_id,
+              category_id, type, amount, active
+         FROM recurring_transactions
+        WHERE business_id = $1 AND active = true
+        ORDER BY next_run_date ASC`,
+      [businessId]
+    );
+
+    const lockState = await loadAccountingLockState(pool, businessId);
+    const lockedThrough = lockState?.lockedThroughDate || null;
+
+    const upcoming = [];
+    for (const template of templatesResult.rows) {
+      const projected = projectUpcomingOccurrences(template, perTemplate);
+      for (const date of projected) {
+        if (date < today) continue;
+        if (date > cutoff) break;
+        upcoming.push({
+          template_id: template.id,
+          description: template.description,
+          cadence: template.cadence,
+          amount: Number(template.amount || 0),
+          type: template.type,
+          account_id: template.account_id,
+          category_id: template.category_id,
+          occurrence_date: date,
+          locked_period: lockedThrough ? isDateLocked(date, lockedThrough) : false
+        });
+      }
+    }
+    upcoming.sort((a, b) => (a.occurrence_date < b.occurrence_date ? -1 : 1));
+
+    const blockedCount = upcoming.filter((entry) => entry.locked_period).length;
+
+    res.json({
+      today,
+      cutoff,
+      upcoming,
+      blocked_by_locked_period: blockedCount,
+      template_count: templatesResult.rowCount
+    });
+  } catch (err) {
+    logError("GET /recurring/upcoming error:", err);
+    res.status(500).json({ error: "Failed to load upcoming recurring runs." });
   }
 });
 
