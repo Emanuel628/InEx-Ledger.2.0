@@ -1195,6 +1195,28 @@ function extractRowData(row, cols) {
   return { amount, type, description, date };
 }
 
+const IMPORT_ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Validate optional start_date / end_date on the CSV import body.
+ * Returns either { error: "..." } or { startDate, endDate } with each
+ * field a YYYY-MM-DD string or null.
+ */
+function parseImportDateRange(body = {}) {
+  const start = String(body.start_date || "").trim();
+  const end = String(body.end_date || "").trim();
+  if (start && !IMPORT_ISO_DATE_RE.test(start)) {
+    return { error: "start_date must be YYYY-MM-DD." };
+  }
+  if (end && !IMPORT_ISO_DATE_RE.test(end)) {
+    return { error: "end_date must be YYYY-MM-DD." };
+  }
+  if (start && end && start > end) {
+    return { error: "start_date must be on or before end_date." };
+  }
+  return { startDate: start || null, endDate: end || null };
+}
+
 // ─── Smart CSV Category Detection ────────────────────────────────────────────
 const CSV_CATEGORY_RULES = [
   // Expense rules — ordered most-specific first
@@ -1385,6 +1407,15 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
 
     const skipDuplicates = String(req.body?.skip_duplicates ?? "true").toLowerCase() !== "false";
 
+    // Optional date-range filter. Rows outside the range are skipped (not errored).
+    // Either bound may be empty; an empty bound means "no limit on that side".
+    const dateRange = parseImportDateRange(req.body || {});
+    if (dateRange.error) {
+      return res.status(400).json({ error: dateRange.error });
+    }
+    const filterStartDate = dateRange.startDate;
+    const filterEndDate = dateRange.endDate;
+
     const accountCheck = await pool.query(
       "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
       [accountId, businessId]
@@ -1446,7 +1477,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       return id;
     }
 
-    const results = { imported: 0, skipped: 0, duplicates: 0, errors: [] };
+    const results = { imported: 0, skipped: 0, duplicates: 0, out_of_range: 0, errors: [] };
     const MAX_ROWS = 1000;
     const rowsToProcess = rows.slice(0, MAX_ROWS);
     const allowance = await assertCanCreateTransactions(pool, businessId, 0);
@@ -1466,6 +1497,15 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
 
       if (!date || !amount || !type || amount <= 0 || !description) {
         results.skipped++;
+        continue;
+      }
+
+      if (filterStartDate && date < filterStartDate) {
+        results.out_of_range++;
+        continue;
+      }
+      if (filterEndDate && date > filterEndDate) {
+        results.out_of_range++;
         continue;
       }
 
@@ -1564,9 +1604,14 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       totalRows: rowsToProcess.length
     });
 
+    const rangePart = (filterStartDate || filterEndDate)
+      ? `, ${results.out_of_range} outside date range`
+      : "";
     res.status(200).json({
-      message: `Import complete. ${results.imported} imported, ${results.duplicates} skipped as duplicate, ${results.skipped} skipped.`,
+      message: `Import complete. ${results.imported} imported, ${results.duplicates} skipped as duplicate, ${results.skipped} skipped${rangePart}.`,
       batch_id: batch.id,
+      start_date: filterStartDate,
+      end_date: filterEndDate,
       ...results
     });
   } catch (err) {
@@ -1719,5 +1764,6 @@ module.exports.__private = {
   parseCsv,
   normalizeDate,
   detectColumns,
-  extractRowData
+  extractRowData,
+  parseImportDateRange
 };

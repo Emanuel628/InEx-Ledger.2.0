@@ -91,3 +91,43 @@ test("parseCsv preserves embedded newlines inside quoted fields", () => {
   assert.equal(rows[0].description, "Vendor line 1\nVendor line 2");
   assert.equal(rows[0].amount, "-45.67");
 });
+
+test("parseImportDateRange returns nulls when both fields are empty", () => {
+  const { parseImportDateRange } = loadTransactionRouteModule().__private;
+  assert.deepEqual(parseImportDateRange({}), { startDate: null, endDate: null });
+  assert.deepEqual(parseImportDateRange({ start_date: "", end_date: "" }), { startDate: null, endDate: null });
+});
+
+test("parseImportDateRange accepts valid YYYY-MM-DD values", () => {
+  const { parseImportDateRange } = loadTransactionRouteModule().__private;
+  assert.deepEqual(
+    parseImportDateRange({ start_date: "2026-01-01", end_date: "2026-12-31" }),
+    { startDate: "2026-01-01", endDate: "2026-12-31" }
+  );
+  assert.deepEqual(
+    parseImportDateRange({ start_date: "2026-06-15" }),
+    { startDate: "2026-06-15", endDate: null }
+  );
+  assert.deepEqual(
+    parseImportDateRange({ end_date: "2026-06-15" }),
+    { startDate: null, endDate: "2026-06-15" }
+  );
+});
+
+test("parseImportDateRange rejects malformed start_date", () => {
+  const { parseImportDateRange } = loadTransactionRouteModule().__private;
+  const out = parseImportDateRange({ start_date: "2026/01/01" });
+  assert.match(out.error || "", /start_date/);
+});
+
+test("parseImportDateRange rejects malformed end_date", () => {
+  const { parseImportDateRange } = loadTransactionRouteModule().__private;
+  const out = parseImportDateRange({ end_date: "Jan 1 2026" });
+  assert.match(out.error || "", /end_date/);
+});
+
+test("parseImportDateRange rejects when start_date is after end_date", () => {
+  const { parseImportDateRange } = loadTransactionRouteModule().__private;
+  const out = parseImportDateRange({ start_date: "2026-12-31", end_date: "2026-01-01" });
+  assert.match(out.error || "", /on or before/);
+});
