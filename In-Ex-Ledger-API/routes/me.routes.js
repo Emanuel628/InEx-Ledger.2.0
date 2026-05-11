@@ -13,6 +13,7 @@ const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { logError, logInfo } = require("../utils/logger.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
+const { listAuditEventsForUser } = require("../services/auditEventService.js");
 
 const router = express.Router();
 
@@ -195,6 +196,23 @@ router.get("/", async (req, res) => {
   } catch (err) {
     logError("GET /me error:", err.message);
     res.status(500).json({ error: "Failed to load profile." });
+  }
+});
+
+/**
+ * GET /api/me/audit-events
+ * Recent sensitive actions for the authenticated user.
+ */
+router.get("/audit-events", async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit, 10);
+    const events = await listAuditEventsForUser(pool, req.user.id, {
+      limit: Number.isFinite(limit) ? limit : 50
+    });
+    res.json({ events });
+  } catch (err) {
+    logError("GET /me/audit-events error:", err.message);
+    res.status(500).json({ error: "Failed to load audit events." });
   }
 });
 
