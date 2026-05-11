@@ -504,7 +504,6 @@ const DYNAMIC_SIDEBAR_CORE_FEATURE_IDS = new Set([
 ]);
 const DYNAMIC_SIDEBAR_BUSINESS_FEATURE_IDS = new Set([
   "customers",
-  "invoices",
   "bills",
   "vendors",
   "projects",
