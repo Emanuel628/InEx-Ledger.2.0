@@ -39,6 +39,7 @@ const {
   getTaxLineSummaryForYear
 } = require("../services/taxSummaryService.js");
 const { getQuarterlyReminders } = require("../services/quarterlyTaxReminderService.js");
+const { getTaxDashboard } = require("../services/taxDashboardService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -1687,6 +1688,29 @@ router.get("/tax-summary/quarterly", async (req, res) => {
   } catch (err) {
     logError("GET /transactions/tax-summary/quarterly error:", err);
     res.status(500).json({ error: "Failed to load quarterly tax reminders." });
+  }
+});
+
+/* =========================================================
+   YEAR-END TAX DASHBOARD  —  GET /transactions/tax-summary/dashboard
+   ========================================================= */
+
+router.get("/tax-summary/dashboard", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const businessContext = await getBusinessRegionAndCurrency(businessId);
+    const requestedRegion = String(req.query.region || "").toUpperCase();
+    const region = requestedRegion === "CA" || requestedRegion === "US"
+      ? requestedRegion
+      : businessContext.region;
+    const year = parseYearOrCurrent(req.query.year);
+    const taxRateRaw = parseFloat(req.query.tax_rate);
+    const taxRateOverride = Number.isFinite(taxRateRaw) ? taxRateRaw : null;
+    const dashboard = await getTaxDashboard(pool, { businessId, year, region, taxRateOverride });
+    res.json(dashboard);
+  } catch (err) {
+    logError("GET /transactions/tax-summary/dashboard error:", err);
+    res.status(500).json({ error: "Failed to load tax dashboard." });
   }
 });
 
