@@ -31,7 +31,8 @@ const MAILBOX_META = {
 };
 
 const MESSAGE_TYPE_FILTERS = {
-  messages: (message) => !message.message_type || ["general", "cpa", "general_cpa"].includes(message.message_type),
+  messages: (message) => !message.message_type
+    || ["general", "cpa", "general_cpa", "invoice_sent", "invoice_reply"].includes(message.message_type),
   support: (message) => ["it_support", "support_request"].includes(message.message_type),
   notifications: (message) => message.message_type === "notification"
 };
@@ -326,7 +327,9 @@ function getTypeLabel(type) {
     general_cpa: translate("messages_type_review", "Review"),
     it_support: translate("messages_type_it_support", "IT Support"),
     support_request: translate("messages_type_support_request", "Support Request"),
-    general: translate("messages_type_general", "General")
+    general: translate("messages_type_general", "General"),
+    invoice_sent: translate("messages_type_invoice_sent", "Invoice sent"),
+    invoice_reply: translate("messages_type_invoice_reply", "Invoice reply")
   }[type] || type || "Message";
 }
 
@@ -471,10 +474,30 @@ async function openMessageDetail(id) {
         ? `${translate("messages_detail_to", "To")} <strong>${escapeHtml(counterpart)}</strong> - ${escapeHtml(dateStr)}`
         : `${translate("messages_detail_from", "From")} <strong>${escapeHtml(counterpart)}</strong> - ${escapeHtml(dateStr)}`;
     }
-    if (bodyEl) bodyEl.textContent = message.body || "";
+    if (bodyEl) {
+      bodyEl.textContent = message.body || "";
+      // For invoice-related messages, append an "Open invoice" link so the
+      // user can jump straight to the source invoice from a reply or the
+      // outbound record.
+      if (message.invoice_id) {
+        const link = document.createElement("a");
+        link.href = `invoices?focus=${encodeURIComponent(message.invoice_id)}`;
+        link.className = "message-invoice-link";
+        link.textContent = message.invoice_number
+          ? `Open invoice ${message.invoice_number}`
+          : "Open invoice";
+        const wrap = document.createElement("p");
+        wrap.style.marginTop = "12px";
+        wrap.appendChild(link);
+        bodyEl.appendChild(wrap);
+      }
+    }
     if (replyArea) replyArea.classList.add("hidden");
     if (replyInput) replyInput.value = "";
-    if (detailReplyBtn) detailReplyBtn.hidden = isSentMessage;
+    // Inbound invoice replies have no in-app sender to reply to; hide the
+    // in-app reply UI in that case.
+    const isInvoiceReply = message.message_type === "invoice_reply";
+    if (detailReplyBtn) detailReplyBtn.hidden = isSentMessage || isInvoiceReply;
 
     document.getElementById("messageDetailOverlay")?.classList.remove("hidden");
 

@@ -94,7 +94,7 @@ function renderInvoiceTable() {
       <td class="col-amount">${escapeHtml(fmtMoney(inv.total_amount, inv.currency))}</td>
       <td class="col-actions">
         <button class="tx-action-btn" data-action="edit" data-id="${escapeHtml(inv.id)}" title="Edit">Edit</button>
-        ${inv.status === "draft" ? `<button class="tx-action-btn action-send" data-action="send" data-id="${escapeHtml(inv.id)}" title="Mark as sent">Send</button>` : ""}
+        ${inv.status !== "void" && inv.status !== "paid" ? `<button class="tx-action-btn action-email" data-action="email" data-id="${escapeHtml(inv.id)}" title="Email invoice">Email</button>` : ""}
         ${inv.status === "sent" ? `<button class="tx-action-btn action-pay" data-action="pay" data-id="${escapeHtml(inv.id)}" title="Mark as paid">Mark paid</button>` : ""}
         ${inv.status === "draft" ? `<button class="tx-action-btn action-delete" data-action="delete" data-id="${escapeHtml(inv.id)}" title="Delete">Delete</button>` : ""}
       </td>
@@ -317,6 +317,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await loadInvoices();
 
+  // Auto-open the New Invoice panel when arriving via ?new=1 (e.g. from the
+  // Quick Add sidebar on the Transactions page).
+  if (params.get("new") === "1") {
+    openInvoicePanel(null);
+  }
+
   document.getElementById("newInvoiceBtn")?.addEventListener("click", () => openInvoicePanel(null));
   document.getElementById("invoicePanelClose")?.addEventListener("click", closeInvoicePanel);
 
@@ -343,8 +349,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (action === "edit") {
       openInvoicePanel(id);
-    } else if (action === "send") {
-      if (confirm("Mark this invoice as sent?")) await updateInvoiceStatus(id, "sent");
+    } else if (action === "email") {
+      openEmailModal(id);
     } else if (action === "pay") {
       if (confirm("Mark this invoice as paid?")) await updateInvoiceStatus(id, "paid");
     } else if (action === "delete") {
@@ -370,4 +376,77 @@ document.addEventListener("DOMContentLoaded", async () => {
     invoiceStatusFilter = e.target.value;
     await loadInvoices();
   });
+
+  // Email-invoice modal wiring
+  document.getElementById("invoiceEmailCancel")?.addEventListener("click", () => {
+    document.getElementById("invoiceEmailModal")?.classList.add("hidden");
+  });
+  document.getElementById("invoiceEmailModal")?.addEventListener("click", (e) => {
+    if (e.target.id === "invoiceEmailModal") {
+      document.getElementById("invoiceEmailModal").classList.add("hidden");
+    }
+  });
+  document.getElementById("invoiceEmailSend")?.addEventListener("click", async () => {
+    await submitInvoiceEmail();
+  });
 });
+
+/* ── Email invoice modal ─────────────────────────────────── */
+
+let pendingEmailInvoiceId = null;
+
+function openEmailModal(invoiceId) {
+  const modal = document.getElementById("invoiceEmailModal");
+  if (!modal) return;
+  const inv = invoiceList.find((i) => i.id === invoiceId);
+  if (!inv) return;
+  pendingEmailInvoiceId = invoiceId;
+  document.getElementById("invoiceEmailNumber").textContent = inv.invoice_number || "";
+  document.getElementById("invoiceEmailCustomer").textContent = inv.customer_name || "";
+  document.getElementById("invoiceEmailTo").value = inv.customer_email || "";
+  document.getElementById("invoiceEmailMessage").value = "";
+  document.getElementById("invoiceEmailError").hidden = true;
+  modal.classList.remove("hidden");
+  setTimeout(() => document.getElementById("invoiceEmailTo")?.focus(), 0);
+}
+
+async function submitInvoiceEmail() {
+  const id = pendingEmailInvoiceId;
+  if (!id) return;
+  const recipient = String(document.getElementById("invoiceEmailTo").value || "").trim();
+  const customMessage = String(document.getElementById("invoiceEmailMessage").value || "").trim();
+  const errorEl = document.getElementById("invoiceEmailError");
+  const sendBtn = document.getElementById("invoiceEmailSend");
+  errorEl.hidden = true;
+
+  if (!recipient || !recipient.includes("@")) {
+    errorEl.textContent = "Please enter a valid recipient email address.";
+    errorEl.hidden = false;
+    return;
+  }
+
+  sendBtn.disabled = true;
+  sendBtn.textContent = "Sending…";
+  try {
+    const res = await apiFetch(`/api/invoices-v1/${id}/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipient_email: recipient, message: customMessage || undefined })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      errorEl.textContent = data.error || "Failed to send invoice.";
+      errorEl.hidden = false;
+      return;
+    }
+    document.getElementById("invoiceEmailModal").classList.add("hidden");
+    pendingEmailInvoiceId = null;
+    await loadInvoices();
+  } catch (err) {
+    errorEl.textContent = "An unexpected error occurred.";
+    errorEl.hidden = false;
+  } finally {
+    sendBtn.disabled = false;
+    sendBtn.textContent = "Send email";
+  }
+}

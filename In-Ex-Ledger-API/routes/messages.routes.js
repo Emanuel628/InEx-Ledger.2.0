@@ -24,17 +24,25 @@ function isUuid(value) {
 function mapMessageRow(row, viewerId) {
   const isSender = row.sender_id === viewerId;
   const isArchived = isSender ? row.is_archived_by_sender : row.is_archived_by_receiver;
+  // For inbound external email (e.g. invoice_reply from a customer), sender_id
+  // is NULL — surface the external sender's name/email instead.
+  const senderName = row.sender_name || row.external_sender_name || row.external_sender_email || null;
+  const senderEmail = row.sender_email || row.external_sender_email || null;
   return {
     id: row.id,
     sender_id: row.sender_id,
-    sender_name: row.sender_name || null,
-    sender_email: row.sender_email || null,
+    sender_name: senderName,
+    sender_email: senderEmail,
+    external_sender_name: row.external_sender_name || null,
+    external_sender_email: row.external_sender_email || null,
     receiver_id: row.receiver_id,
     receiver_name: row.receiver_name || null,
     receiver_email: row.receiver_email || null,
     message_type: row.message_type,
     subject: row.subject || null,
     body: row.body,
+    invoice_id: row.invoice_id || null,
+    invoice_number: row.invoice_number || null,
     is_read: row.is_read,
     is_archived: isArchived || false,
     parent_id: row.parent_id || null,
@@ -119,10 +127,12 @@ router.get("/inbox", async (req, res) => {
               COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
               s.email AS sender_email,
               COALESCE(r.display_name, r.full_name, r.email) AS receiver_name,
-              r.email AS receiver_email
+              r.email AS receiver_email,
+              inv.invoice_number AS invoice_number
          FROM messages m
-         JOIN users s ON s.id = m.sender_id
-         JOIN users r ON r.id = m.receiver_id
+         LEFT JOIN users s ON s.id = m.sender_id
+         LEFT JOIN users r ON r.id = m.receiver_id
+         LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
         WHERE m.receiver_id = $1
           AND m.is_deleted_by_receiver = FALSE
           AND m.is_archived_by_receiver = $2
@@ -150,10 +160,12 @@ router.get("/sent", async (req, res) => {
               COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
               s.email AS sender_email,
               COALESCE(r.display_name, r.full_name, r.email) AS receiver_name,
-              r.email AS receiver_email
+              r.email AS receiver_email,
+              inv.invoice_number AS invoice_number
          FROM messages m
-         JOIN users s ON s.id = m.sender_id
-         JOIN users r ON r.id = m.receiver_id
+         LEFT JOIN users s ON s.id = m.sender_id
+         LEFT JOIN users r ON r.id = m.receiver_id
+         LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
         WHERE m.sender_id = $1
           AND m.is_deleted_by_sender = FALSE
           AND m.is_archived_by_sender = $2
@@ -181,10 +193,12 @@ router.get("/archived", async (req, res) => {
               COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
               s.email AS sender_email,
               COALESCE(r.display_name, r.full_name, r.email) AS receiver_name,
-              r.email AS receiver_email
+              r.email AS receiver_email,
+              inv.invoice_number AS invoice_number
          FROM messages m
-         JOIN users s ON s.id = m.sender_id
-         JOIN users r ON r.id = m.receiver_id
+         LEFT JOIN users s ON s.id = m.sender_id
+         LEFT JOIN users r ON r.id = m.receiver_id
+         LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
         WHERE (
           m.receiver_id = $1
           AND m.is_deleted_by_receiver = FALSE
@@ -219,10 +233,12 @@ router.get("/:id", async (req, res) => {
               COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
               s.email AS sender_email,
               COALESCE(r.display_name, r.full_name, r.email) AS receiver_name,
-              r.email AS receiver_email
+              r.email AS receiver_email,
+              inv.invoice_number AS invoice_number
          FROM messages m
-         JOIN users s ON s.id = m.sender_id
-         JOIN users r ON r.id = m.receiver_id
+         LEFT JOIN users s ON s.id = m.sender_id
+         LEFT JOIN users r ON r.id = m.receiver_id
+         LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
         WHERE m.id = $1
           AND (
             (m.receiver_id = $2 AND m.is_deleted_by_receiver = FALSE)
@@ -362,10 +378,12 @@ router.post("/", async (req, res) => {
               COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
               s.email AS sender_email,
               COALESCE(r.display_name, r.full_name, r.email) AS receiver_name,
-              r.email AS receiver_email
+              r.email AS receiver_email,
+              inv.invoice_number AS invoice_number
          FROM messages m
-         JOIN users s ON s.id = m.sender_id
-         JOIN users r ON r.id = m.receiver_id
+         LEFT JOIN users s ON s.id = m.sender_id
+         LEFT JOIN users r ON r.id = m.receiver_id
+         LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
         WHERE m.id = $1`,
       [result.rows[0].id]
     );
