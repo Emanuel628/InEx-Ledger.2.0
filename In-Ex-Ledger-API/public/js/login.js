@@ -14,7 +14,8 @@ function tx(key) {
 }
 const OFFLINE_ERROR_MESSAGE = "login_error_offline";
 const EXPIRED_SESSION_MESSAGE = "login_error_expired";
-const AUTOFILL_CLEAR_RETRY_DELAYS_MS = [200, 600, 1200];
+const AUTOFILL_CLEAR_RETRY_DELAYS_MS = [];
+/*const AUTOFILL_CLEAR_RETRY_DELAYS_MS = [200, 600, 1200];*/
 
 redirectIfAuthenticated();
 
