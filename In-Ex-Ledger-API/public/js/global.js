@@ -110,6 +110,13 @@ function renderCanonicalTopbarNavigation() {
       icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg>'
     },
     {
+       href: "/invoices",
+       route: "invoices",
+       i18n: "nav_invoices",
+       label: "Invoices",
+       icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5"></rect><path d="M5 5h6M5 8h6M5 11h4"></path></svg>'
+    },
+    {
       href: "/analytics",
       route: "analytics",
       i18n: "nav_analytics",
