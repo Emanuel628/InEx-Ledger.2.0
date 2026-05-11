@@ -444,11 +444,33 @@ function hasAdvancedTransactionPayload(normalized, fallbackCurrency) {
   );
 }
 
+const TRANSACTIONS_HARD_CAP = 50000;
+const TRANSACTIONS_DEFAULT_LIMIT = 100;
+const TRANSACTIONS_CAPPED_LIMIT = 5000;
+
 router.get("/", async (req, res) => {
   try {
     const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
-    const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
+    const wantsAll = ["true", "1", "yes"].includes(String(req.query.all || "").toLowerCase());
+    const requestedLimit = parseInt(req.query.limit, 10);
+    const limit = wantsAll
+      ? TRANSACTIONS_HARD_CAP
+      : Math.min(Math.max(requestedLimit || TRANSACTIONS_DEFAULT_LIMIT, 1), TRANSACTIONS_CAPPED_LIMIT);
     const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    const accountIdFilter = String(req.query.account_id || "").trim();
+    let accountFilterClause = "";
+    const params = [scope.businessIds];
+    if (accountIdFilter) {
+      if (!UUID_REGEX.test(accountIdFilter)) {
+        return res.status(400).json({ error: "Invalid account_id." });
+      }
+      params.push(accountIdFilter);
+      accountFilterClause = ` AND t.account_id = $${params.length}::uuid`;
+    }
+    params.push(limit, offset);
+    const limitParamIdx = params.length - 1;
+    const offsetParamIdx = params.length;
 
     const result = await pool.query(
       `SELECT t.id,
@@ -490,22 +512,35 @@ router.get("/", async (req, res) => {
        WHERE t.business_id = ANY($1::uuid[])
          AND t.deleted_at IS NULL
          AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
-         AND (t.is_void = false OR t.is_void IS NULL)
+         AND (t.is_void = false OR t.is_void IS NULL)${accountFilterClause}
        ORDER BY t.date DESC, t.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [scope.businessIds, limit, offset]
+       LIMIT $${limitParamIdx} OFFSET $${offsetParamIdx}`,
+      params
     );
 
+    const countParams = [scope.businessIds];
+    let countAccountClause = "";
+    if (accountIdFilter) {
+      countParams.push(accountIdFilter);
+      countAccountClause = ` AND account_id = $${countParams.length}::uuid`;
+    }
     const countResult = await pool.query(
-      "SELECT COUNT(*) FROM transactions WHERE business_id = ANY($1::uuid[]) AND deleted_at IS NULL AND (is_adjustment = false OR is_adjustment IS NULL) AND (is_void = false OR is_void IS NULL)",
-      [scope.businessIds]
+      `SELECT COUNT(*)
+         FROM transactions
+        WHERE business_id = ANY($1::uuid[])
+          AND deleted_at IS NULL
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND (is_void = false OR is_void IS NULL)${countAccountClause}`,
+      countParams
     );
 
     res.status(200).json({
       data: result.rows.map(decryptTransactionRow),
-      total: parseInt(countResult.rows[0].count),
+      total: parseInt(countResult.rows[0].count, 10),
       limit,
-      offset
+      offset,
+      account_id: accountIdFilter || null,
+      returned_all: wantsAll
     });
   } catch (err) {
     logError("GET /transactions error:", err);
