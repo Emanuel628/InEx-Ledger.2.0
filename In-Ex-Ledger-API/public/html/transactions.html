@@ -587,6 +587,30 @@
         </select>
       </div>
       <div class="form-field">
+        <label class="form-label">Date range <span class="csv-import-optional">(optional)</span></label>
+        <div class="csv-import-daterange">
+          <input
+            type="date"
+            id="csvImportStartDate"
+            class="form-control csv-import-date"
+            aria-label="Start date (optional)"
+            placeholder="Start date"
+          />
+          <span class="csv-import-daterange-sep" aria-hidden="true">to</span>
+          <input
+            type="date"
+            id="csvImportEndDate"
+            class="form-control csv-import-date"
+            aria-label="End date (optional)"
+            placeholder="End date"
+          />
+        </div>
+        <p class="csv-import-hint">
+          Only rows whose date falls within this range will be imported. Leave both empty to import the
+          <strong>entire CSV</strong>.
+        </p>
+      </div>
+      <div class="form-field">
         <label for="csvImportFile" class="form-label">CSV file</label>
         <input type="file" id="csvImportFile" accept=".csv,text/csv" class="form-control" />
         <p class="csv-import-hint">Your CSV needs columns for <strong>date</strong>, <strong>description</strong>, and either a single <strong>amount</strong> column or separate <strong>withdrawal</strong> and <strong>deposit</strong> columns. Re-importing the same file will create duplicate transactions.</p>

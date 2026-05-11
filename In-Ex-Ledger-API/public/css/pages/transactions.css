@@ -2242,6 +2242,42 @@ body {
   line-height: 1.5;
 }
 
+/* CSV import — optional date-range row */
+.csv-import-optional {
+  font-weight: 400;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.csv-import-daterange {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.csv-import-daterange .csv-import-date {
+  flex: 1 1 0;
+  min-width: 0;
+  /* Make the entire input area open the picker; the native indicator stays
+     visible but the whole field is the click target via cursor + JS. */
+  cursor: pointer;
+}
+.csv-import-daterange .csv-import-date::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
+.csv-import-daterange-sep {
+  color: var(--text-secondary);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+@media (max-width: 480px) {
+  .csv-import-daterange {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .csv-import-daterange-sep {
+    text-align: center;
+  }
+}
+
 /* ── C-04: Income/Expense intent buttons ─────────────────── */
 .txn-intent-btn.income-intent {
   background: #dcfce7;

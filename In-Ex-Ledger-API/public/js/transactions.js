@@ -3490,6 +3490,38 @@ function initCsvImport() {
       accounts.map((a) => `<option value="${escapeHtml(a.id)}">${escapeHtml(a.name)}</option>`).join("");
   }
 
+  function todayIsoDate() {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  // Make a date <input> entirely clickable: click anywhere in the field and
+  // the native picker pops up (where supported). Falls back to focus()
+  // for browsers without showPicker().
+  function wireDateFieldClickable(input) {
+    if (!input) return;
+    input.addEventListener("mousedown", (event) => {
+      // Don't double-trigger when the user clicks the native indicator itself.
+      if (typeof input.showPicker !== "function") return;
+      event.preventDefault();
+      input.focus();
+      try {
+        input.showPicker();
+      } catch (_) {
+        // showPicker can throw if the input isn't focused yet; focus alone
+        // is enough on Safari.
+      }
+    });
+  }
+
+  const startDateInput = document.getElementById("csvImportStartDate");
+  const endDateInput = document.getElementById("csvImportEndDate");
+  wireDateFieldClickable(startDateInput);
+  wireDateFieldClickable(endDateInput);
+
   importBtn.addEventListener("click", async () => {
     const canImport = await switchToActiveScopeIfNeeded();
     if (!canImport) {
@@ -3500,6 +3532,8 @@ function initCsvImport() {
     document.getElementById("csvImportStep2").hidden = true;
     document.getElementById("csvImportError").hidden = true;
     document.getElementById("csvImportFile").value = "";
+    if (startDateInput) startDateInput.value = todayIsoDate();
+    if (endDateInput) endDateInput.value = "";
     modal.classList.remove("hidden");
     modal.focus();
   });
@@ -3538,9 +3572,19 @@ function initCsvImport() {
       return;
     }
 
+    const startDateValue = startDateInput ? startDateInput.value.trim() : "";
+    const endDateValue = endDateInput ? endDateInput.value.trim() : "";
+    if (startDateValue && endDateValue && startDateValue > endDateValue) {
+      errorEl.textContent = "Start date must be on or before end date.";
+      errorEl.hidden = false;
+      return;
+    }
+
     const formData = new FormData();
     formData.append("file", fileInput.files[0]);
     formData.append("account_id", accountId);
+    if (startDateValue) formData.append("start_date", startDateValue);
+    if (endDateValue) formData.append("end_date", endDateValue);
 
     startBtn.disabled = true;
     startBtn.textContent = "Importing…";
@@ -3562,10 +3606,15 @@ function initCsvImport() {
       const resultEl = document.getElementById("csvImportResult");
       const errRows = (data.errors || []).slice(0, 10);
       const truncNote = data.truncated ? `<p class="csv-import-note">Only the first ${data.truncated_at} rows were processed.</p>` : "";
+      const outOfRange = Number(data.out_of_range || 0);
+      const outOfRangeStat = outOfRange > 0
+        ? `<div class="csv-stat"><span class="csv-stat-num">${escapeHtml(String(outOfRange))}</span> outside date range</div>`
+        : "";
       resultEl.innerHTML = `
         <div class="csv-import-success">
           <div class="csv-stat"><span class="csv-stat-num">${escapeHtml(String(data.imported))}</span> imported</div>
           <div class="csv-stat"><span class="csv-stat-num">${escapeHtml(String(data.skipped))}</span> skipped</div>
+          ${outOfRangeStat}
         </div>
         ${truncNote}
         ${errRows.length ? `<ul class="csv-error-list">${errRows.map((e) => `<li>${escapeHtml(e.reason)}</li>`).join("")}</ul>` : ""}
