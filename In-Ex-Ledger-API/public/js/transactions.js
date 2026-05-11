@@ -2163,12 +2163,58 @@ async function fetchCategoriesForTransactions() {
 }
 
 async function fetchTransactionsForPage() {
+  const batchSize = 500;
+  const allTransactions = [];
+  let offset = 0;
+  let total = null;
+
+  while (true) {
+    const params = new URLSearchParams({
+      limit: String(batchSize),
+      offset: String(offset)
+    });
+
+    if (getTransactionScope() === "all") {
+      params.set("scope", "all");
+    }
+
+    const response = await apiFetch(`/api/transactions?${params.toString()}`);
+
+    if (!response || !response.ok) {
+      const errorPayload = response ? await response.json().catch(() => null) : null;
+      throw new Error(errorPayload?.error || "Unable to load transactions.");
+    }
+
+    const payload = await response.json().catch(() => null);
+    const rows = Array.isArray(payload?.data) ? payload.data : [];
+
+    if (total === null) {
+      total = Number(payload?.total || 0);
+    }
+
+    allTransactions.push(...rows);
+
+    offset += rows.length;
+
+    if (rows.length === 0 || allTransactions.length >= total) {
+      break;
+    }
+
+    // Safety guard so a weird API response cannot loop forever.
+    if (rows.length < batchSize) {
+      break;
+    }
+  }
+
+  return allTransactions.map(normalizeTransaction).filter(Boolean);
+}
+/*async function fetchTransactionsForPage() {
   const query = buildTransactionScopeQuery();
   const noCacheQuery = query ? `${query}&_ts=${Date.now()}` : `?_ts=${Date.now()}`;
   const response = await apiFetch(`/api/transactions${noCacheQuery}`);
   if (!response || !response.ok) {
     throw new Error(txT("transactions_error_load", "Failed to load transactions."));
-  }
+  }*/
 
   const payload = await response.json().catch(() => null);
   const transactions = Array.isArray(payload)
