@@ -467,6 +467,25 @@ function computeNextRunDateForUpdate(normalized, previousTemplate) {
   };
 }
 
+/**
+ * Returns the next N upcoming run dates for a template, given its current
+ * next_run_date, cadence, and end_date. Stops at end_date when present.
+ */
+function projectUpcomingOccurrences(template, count = 5) {
+  const out = [];
+  if (!template?.next_run_date || !template?.cadence) return out;
+  let cursor = parseIsoDate(template.next_run_date);
+  const endDate = template.end_date ? parseIsoDate(template.end_date) : null;
+  const safeCount = Math.max(0, Math.min(Number(count) || 0, 50));
+  for (let i = 0; i < safeCount; i++) {
+    if (!cursor) break;
+    if (endDate && cursor > endDate) break;
+    out.push(formatIsoDate(cursor));
+    cursor = computeNextOccurrence(cursor, template.cadence);
+  }
+  return out;
+}
+
 module.exports = {
   VALID_CADENCES,
   RecurringTemplateValidationError,
@@ -476,5 +495,7 @@ module.exports = {
   materializeNextTemplateRun,
   verifyTemplateOwnership,
   mapRecurringRow,
-  computeNextRunDateForUpdate
+  computeNextRunDateForUpdate,
+  projectUpcomingOccurrences,
+  __private: { parseIsoDate, formatIsoDate, computeNextOccurrence, utcToday }
 };

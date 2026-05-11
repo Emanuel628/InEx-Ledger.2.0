@@ -54,11 +54,14 @@ function isCategoryNameConflict(err) {
 router.get("/", async (req, res) => {
   try {
     const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
+    const includeInactive = String(req.query.include_inactive || "").toLowerCase() === "true";
+    const activeFilter = includeInactive ? "" : " AND c.is_active = true";
     const result = await pool.query(
-      `SELECT c.id, c.business_id, b.name AS business_name, c.name, c.kind, c.color, c.tax_map_us, c.tax_map_ca, c.is_default, c.created_at
+      `SELECT c.id, c.business_id, b.name AS business_name, c.name, c.kind, c.color,
+              c.tax_map_us, c.tax_map_ca, c.is_default, c.is_active, c.created_at
        FROM categories c
        JOIN businesses b ON b.id = c.business_id
-       WHERE c.business_id = ANY($1::uuid[])
+       WHERE c.business_id = ANY($1::uuid[])${activeFilter}
        ORDER BY b.name ASC, c.kind, c.name
        LIMIT 500`,
       [scope.businessIds]
@@ -91,7 +94,7 @@ router.post("/", async (req, res) => {
     const result = await pool.query(
       `INSERT INTO categories (id, business_id, name, kind, color, tax_map_us, tax_map_ca)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, name, kind, color, tax_map_us, tax_map_ca, is_default, created_at`,
+       RETURNING id, name, kind, color, tax_map_us, tax_map_ca, is_default, is_active, created_at`,
       [crypto.randomUUID(), businessId, name.trim(), kind, color || null, tax_map_us || null, tax_map_ca || null]
     );
     res.status(201).json(result.rows[0]);
@@ -146,7 +149,7 @@ router.put("/:id", async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: "Invalid category ID." });
   }
-  const { name, kind, color, tax_map_us, tax_map_ca } = req.body ?? {};
+  const { name, kind, color, tax_map_us, tax_map_ca, is_active } = req.body ?? {};
 
   if (kind && !VALID_KINDS.has(kind)) {
     return res.status(400).json({ error: "kind must be 'income' or 'expense'" });
@@ -157,12 +160,15 @@ router.put("/:id", async (req, res) => {
   if (color !== undefined && color !== null && !VALID_COLORS.has(color)) {
     return res.status(400).json({ error: "color is invalid" });
   }
+  if (is_active !== undefined && typeof is_active !== "boolean") {
+    return res.status(400).json({ error: "is_active must be a boolean" });
+  }
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     const existing = await pool.query(
-      "SELECT id, name, kind, color, tax_map_us, tax_map_ca FROM categories WHERE id = $1 AND business_id = $2",
+      "SELECT id, name, kind, color, tax_map_us, tax_map_ca, is_active FROM categories WHERE id = $1 AND business_id = $2",
       [req.params.id, businessId]
     );
     if (existing.rowCount === 0) {
@@ -175,9 +181,10 @@ router.put("/:id", async (req, res) => {
     const newColor = color !== undefined ? (color ?? null) : current.color;
     const newTaxMapUs = tax_map_us !== undefined ? (tax_map_us ?? null) : current.tax_map_us;
     const newTaxMapCa = tax_map_ca !== undefined ? (tax_map_ca ?? null) : current.tax_map_ca;
+    const newIsActive = is_active !== undefined ? Boolean(is_active) : current.is_active;
 
     // Block classification changes that would retroactively alter locked-period history.
-    // Pure name or color changes are always permitted.
+    // Pure name, color, or activation changes are always permitted.
     const classificationChanging =
       newKind !== current.kind ||
       newTaxMapUs !== current.tax_map_us ||
@@ -194,10 +201,11 @@ router.put("/:id", async (req, res) => {
            kind = $2,
            color = $3,
            tax_map_us = $4,
-           tax_map_ca = $5
-       WHERE id = $6 AND business_id = $7
-       RETURNING id, name, kind, color, tax_map_us, tax_map_ca, is_default, created_at`,
-      [newName, newKind, newColor, newTaxMapUs, newTaxMapCa, req.params.id, businessId]
+           tax_map_ca = $5,
+           is_active = $6
+       WHERE id = $7 AND business_id = $8
+       RETURNING id, name, kind, color, tax_map_us, tax_map_ca, is_default, is_active, created_at`,
+      [newName, newKind, newColor, newTaxMapUs, newTaxMapCa, newIsActive, req.params.id, businessId]
     );
     res.json(result.rows[0]);
   } catch (err) {
@@ -261,6 +269,92 @@ router.delete("/:id", async (req, res) => {
   } catch (err) {
     logError("DELETE /categories/:id error:", err.message);
     res.status(500).json({ error: "Failed to delete category." });
+  }
+});
+
+/**
+ * POST /api/categories/:id/merge
+ * Body: { target_id }
+ *
+ * Moves every reference of :id to target_id (transactions, recurring
+ * templates) then deletes the source category. Refuses when either side
+ * touches a locked accounting period because that would silently rewrite
+ * history under a closed book.
+ *
+ * Both categories must belong to the caller's business and share the same
+ * kind (income/expense) — merging across kinds would corrupt totals.
+ */
+router.post("/:id/merge", async (req, res) => {
+  const sourceId = req.params.id;
+  const targetId = String(req.body?.target_id || "").trim();
+  if (!UUID_REGEX.test(sourceId) || !UUID_REGEX.test(targetId)) {
+    return res.status(400).json({ error: "Invalid category id." });
+  }
+  if (sourceId === targetId) {
+    return res.status(400).json({ error: "Source and target must be different categories." });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const businessId = await resolveBusinessIdForUser(req.user);
+
+    const rows = await client.query(
+      "SELECT id, kind FROM categories WHERE business_id = $1 AND id = ANY($2::uuid[])",
+      [businessId, [sourceId, targetId]]
+    );
+    if (rows.rowCount !== 2) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Source or target category not found." });
+    }
+    const source = rows.rows.find((r) => r.id === sourceId);
+    const target = rows.rows.find((r) => r.id === targetId);
+    if (source.kind !== target.kind) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Cannot merge across category kinds (income vs expense)." });
+    }
+
+    // Refuse if either category touches a locked period. The merge would
+    // implicitly re-classify those historical rows.
+    const lockState = await loadAccountingLockState(pool, businessId);
+    if (lockState?.lockedThroughDate) {
+      await assertNoLockedPeriodTransactionsForCategory(pool, businessId, sourceId, lockState);
+      await assertNoLockedPeriodTransactionsForCategory(pool, businessId, targetId, lockState);
+    }
+
+    const txResult = await client.query(
+      "UPDATE transactions SET category_id = $1 WHERE business_id = $2 AND category_id = $3 AND deleted_at IS NULL",
+      [targetId, businessId, sourceId]
+    );
+    const recurringResult = await client.query(
+      "UPDATE recurring_transactions SET category_id = $1 WHERE business_id = $2 AND category_id = $3",
+      [targetId, businessId, sourceId]
+    );
+
+    await client.query(
+      "DELETE FROM categories WHERE id = $1 AND business_id = $2",
+      [sourceId, businessId]
+    );
+
+    await client.query("COMMIT");
+    res.json({
+      message: "Categories merged.",
+      moved_transactions: txResult.rowCount,
+      moved_recurring: recurringResult.rowCount
+    });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    if (err instanceof AccountingPeriodLockedError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        locked_through_date: err.lockedThroughDate
+      });
+    }
+    logError("POST /categories/:id/merge error:", err.message);
+    res.status(500).json({ error: "Failed to merge categories." });
+  } finally {
+    client.release();
   }
 });
 
