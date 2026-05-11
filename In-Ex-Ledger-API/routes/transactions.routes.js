@@ -38,6 +38,7 @@ const {
   getPayerSummaryForYear,
   getTaxLineSummaryForYear
 } = require("../services/taxSummaryService.js");
+const { getQuarterlyReminders } = require("../services/quarterlyTaxReminderService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -1666,6 +1667,26 @@ router.get("/tax-summary/tax-lines", async (req, res) => {
   } catch (err) {
     logError("GET /transactions/tax-summary/tax-lines error:", err);
     res.status(500).json({ error: "Failed to load tax-line summary." });
+  }
+});
+
+/* =========================================================
+   QUARTERLY ESTIMATED TAX REMINDERS  —  GET /transactions/tax-summary/quarterly
+   ========================================================= */
+
+router.get("/tax-summary/quarterly", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const businessContext = await getBusinessRegionAndCurrency(businessId);
+    const requestedRegion = String(req.query.region || "").toUpperCase();
+    const region = requestedRegion === "CA" || requestedRegion === "US"
+      ? requestedRegion
+      : businessContext.region;
+    const reminders = getQuarterlyReminders(region);
+    res.json(reminders);
+  } catch (err) {
+    logError("GET /transactions/tax-summary/quarterly error:", err);
+    res.status(500).json({ error: "Failed to load quarterly tax reminders." });
   }
 });
 

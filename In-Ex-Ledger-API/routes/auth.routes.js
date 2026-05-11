@@ -21,6 +21,10 @@ const { getSubscriptionSnapshotForUser } = require("../services/subscriptionServ
 const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
+  AUDIT_ACTIONS,
+  recordAuditEventForRequest
+} = require("../services/auditEventService.js");
+const {
   getPreferredLanguageForUser,
   getPreferredLanguageForEmail,
   buildWelcomeVerificationEmail,
@@ -1040,6 +1044,10 @@ router.post("/login", authLimiter, async (req, res) => {
         email: maskEmail(email),
         ip: clientIp
       });
+      await recordAuditEventForRequest(pool, req, {
+        action: AUDIT_ACTIONS.LOGIN_FAILURE,
+        metadata: { reason: "unknown_email", email_mask: maskEmail(email) }
+      });
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
@@ -1068,6 +1076,11 @@ router.post("/login", authLimiter, async (req, res) => {
 
     const { match, legacy } = await verifyPassword(password, user.password_hash);
     if (!match) {
+      await recordAuditEventForRequest(pool, req, {
+        userId: user.id,
+        action: AUDIT_ACTIONS.LOGIN_FAILURE,
+        metadata: { reason: "wrong_password" }
+      });
       const failureState = await recordFailedLoginAttempt(user);
       if (failureState.lockedUntil) {
         logWarn("Account locked after failed login attempts", {
@@ -1183,6 +1196,16 @@ router.post("/login", authLimiter, async (req, res) => {
       mfaAuthenticated,
       recognizedDevice: !!recognizedDevice,
       firstSignIn: isFirstSignIn
+    });
+    await recordAuditEventForRequest(pool, req, {
+      userId: user.id,
+      businessId,
+      action: AUDIT_ACTIONS.LOGIN_SUCCESS,
+      metadata: {
+        mfa_authenticated: mfaAuthenticated,
+        first_sign_in: isFirstSignIn,
+        recognized_device: !!recognizedDevice
+      }
     });
     if (isFirstSignIn && deviceContext) {
       try {
