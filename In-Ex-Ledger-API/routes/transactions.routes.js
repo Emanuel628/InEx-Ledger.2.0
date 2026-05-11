@@ -26,6 +26,14 @@ const {
   BasicPlanLimitError,
   assertCanCreateTransactions
 } = require("../services/basicPlanUsageService.js");
+const {
+  createImportBatch,
+  finalizeImportBatch,
+  findDuplicateCandidates,
+  listImportBatches,
+  getImportBatch,
+  revertImportBatch
+} = require("../services/transactionImportService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -1369,6 +1377,8 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "account_id is required and must be a valid UUID." });
     }
 
+    const skipDuplicates = String(req.body?.skip_duplicates ?? "true").toLowerCase() !== "false";
+
     const accountCheck = await pool.query(
       "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
       [accountId, businessId]
@@ -1430,11 +1440,19 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       return id;
     }
 
-    const results = { imported: 0, skipped: 0, errors: [] };
+    const results = { imported: 0, skipped: 0, duplicates: 0, errors: [] };
     const MAX_ROWS = 1000;
     const rowsToProcess = rows.slice(0, MAX_ROWS);
     const allowance = await assertCanCreateTransactions(pool, businessId, 0);
     let remainingBasicSlots = Number.isFinite(allowance.remaining) ? allowance.remaining : Number.POSITIVE_INFINITY;
+
+    const batch = await createImportBatch(pool, {
+      businessId,
+      accountId,
+      source: "csv",
+      filename: req.file.originalname || null,
+      importedByUserId: req.user?.id || null
+    });
 
     for (let i = 0; i < rowsToProcess.length; i++) {
       const row = rowsToProcess[i];
@@ -1451,6 +1469,22 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         results.errors.push({ row: i + 2, reason: `Row ${i + 2}: date ${date} falls within a locked accounting period` });
         results.skipped++;
         continue;
+      }
+
+      if (skipDuplicates) {
+        const candidates = await findDuplicateCandidates(pool, {
+          businessId,
+          accountId,
+          date,
+          amount,
+          type,
+          description,
+          dateWindowDays: 2
+        });
+        if (candidates.length > 0) {
+          results.duplicates++;
+          continue;
+        }
       }
 
       const detectedCategory = detectCsvCategory(description, type);
@@ -1477,8 +1511,8 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         await pool.query(
           `INSERT INTO transactions
             (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted,
-             date, currency, tax_treatment, review_status, converted_amount)
-           VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8, $9, $10, $11, 'needs_review', $5)`,
+             date, currency, tax_treatment, review_status, converted_amount, import_batch_id, import_source)
+           VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8, $9, $10, $11, 'needs_review', $5, $12, 'csv')`,
           [
             crypto.randomUUID(),
             businessId,
@@ -1490,7 +1524,8 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
             encryptedDescription,
             date,
             fallbackCurrency,
-            taxTreatment
+            taxTreatment,
+            batch.id
           ]
         );
         results.imported++;
@@ -1516,13 +1551,76 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       results.truncated_at = MAX_ROWS;
     }
 
+    await finalizeImportBatch(pool, batch.id, {
+      imported: results.imported,
+      duplicate: results.duplicates,
+      failed: results.errors.length,
+      totalRows: rowsToProcess.length
+    });
+
     res.status(200).json({
-      message: `Import complete. ${results.imported} transaction(s) imported, ${results.skipped} skipped.`,
+      message: `Import complete. ${results.imported} imported, ${results.duplicates} skipped as duplicate, ${results.skipped} skipped.`,
+      batch_id: batch.id,
       ...results
     });
   } catch (err) {
     logError("POST /transactions/import/csv error:", err);
     res.status(500).json({ error: "CSV import failed." });
+  }
+});
+
+/* =========================================================
+   IMPORT BATCH HISTORY  —  GET /transactions/import/history
+   ========================================================= */
+router.get("/import/history", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const batches = await listImportBatches(pool, businessId, { limit: req.query.limit });
+    res.json({ batches });
+  } catch (err) {
+    logError("GET /transactions/import/history error:", err);
+    res.status(500).json({ error: "Failed to load import history." });
+  }
+});
+
+/* =========================================================
+   UNDO IMPORT BATCH  —  POST /transactions/import/:id/revert
+   ========================================================= */
+router.post("/import/:id/revert", async (req, res) => {
+  const batchId = String(req.params.id || "").trim();
+  if (!UUID_REGEX.test(batchId)) {
+    return res.status(400).json({ error: "Invalid import batch id." });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const batch = await getImportBatch(pool, businessId, batchId);
+    if (!batch) {
+      return res.status(404).json({ error: "Import batch not found." });
+    }
+    if (batch.status === "reverted") {
+      return res.status(409).json({ error: "This import batch has already been reverted." });
+    }
+
+    const lockState = await loadAccountingLockState(pool, businessId);
+    const result = await revertImportBatch(pool, {
+      businessId,
+      batchId,
+      userId: req.user?.id || null,
+      lockState
+    });
+
+    res.json({
+      message: `Reverted ${result.revertedCount} imported transaction(s).`,
+      batch_id: batchId,
+      reverted_count: result.revertedCount
+    });
+  } catch (err) {
+    if (err && err.code === "accounting_period_locked") {
+      return res.status(409).json({ error: err.message, code: err.code });
+    }
+    logError("POST /transactions/import/:id/revert error:", err);
+    res.status(500).json({ error: "Failed to revert import batch." });
   }
 });
 
