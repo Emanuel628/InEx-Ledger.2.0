@@ -17,6 +17,7 @@ const transactionFilters = {
   type: "all",
   search: "",
   category: "",
+  account: "",
   period: localStorage.getItem("lb_tx_period") || "this-month"
 };
 
@@ -254,6 +255,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   setInterval(() => renderGhostSuggestions(), 5 * 60 * 1000);
   wireTransactionSearch();
   wireTransactionCategoryFilter();
+  wireTransactionAccountFilter();
   wirePagination();
   wireTransactionModal();
   window.addEventListener("accountsUpdated", async () => {
@@ -928,6 +930,48 @@ function wireTransactionCategoryFilter() {
     transactionFilters.category = filter.value;
     applyFilters(true);
   });
+}
+
+function wireTransactionAccountFilter() {
+  const filter = document.getElementById("transactionAccountFilter");
+  if (!filter) {
+    return;
+  }
+  filter.addEventListener("change", () => {
+    transactionFilters.account = filter.value;
+    applyFilters(true);
+  });
+}
+
+function refreshAccountFilterOptions() {
+  const filter = document.getElementById("transactionAccountFilter");
+  if (!filter) {
+    return;
+  }
+  const accounts = Array.isArray(ledgerState.accounts) ? ledgerState.accounts : [];
+  const previousValue = transactionFilters.account || "";
+  const allLabel = txT("transactions_filter_all_accounts", "All accounts");
+  const optionsHtml = [`<option value="">${allLabel}</option>`]
+    .concat(
+      accounts
+        .slice()
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+        .map((account) => {
+          const id = account?.id || "";
+          const name = String(account?.name || "Unnamed account");
+          const safeId = id.replace(/"/g, "&quot;");
+          const safeName = name.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+          return `<option value="${safeId}">${safeName}</option>`;
+        })
+    )
+    .join("");
+  filter.innerHTML = optionsHtml;
+  if (previousValue && accounts.some((a) => a?.id === previousValue)) {
+    filter.value = previousValue;
+  } else {
+    filter.value = "";
+    transactionFilters.account = "";
+  }
 }
 
 function initSidebarTypeFilter() {
@@ -1852,6 +1896,9 @@ function getFilteredTransactions() {
   if (transactionFilters.category) {
     filtered = filtered.filter((tx) => tx.categoryId === transactionFilters.category);
   }
+  if (transactionFilters.account) {
+    filtered = filtered.filter((tx) => tx.accountId === transactionFilters.account);
+  }
   return filtered;
 }
 
@@ -1968,6 +2015,7 @@ async function refreshAccountOptions() {
   const accounts = await fetchAccountsForTransactions();
   ledgerState.accounts = accounts;
   populateAccountsFromStorage(accounts);
+  refreshAccountFilterOptions();
   updateHelpText(
     document.getElementById("accountHelp"),
     document.getElementById("categoryHelp")
@@ -2163,23 +2211,50 @@ async function fetchCategoriesForTransactions() {
 }
 
 async function fetchTransactionsForPage() {
-  const query = buildTransactionScopeQuery();
-  const noCacheQuery = query ? `${query}&_ts=${Date.now()}` : `?_ts=${Date.now()}`;
-  const response = await apiFetch(`/api/transactions${noCacheQuery}`);
-  if (!response || !response.ok) {
-    throw new Error(txT("transactions_error_load", "Failed to load transactions."));
+  const batchSize = 500;
+  const allTransactions = [];
+  let offset = 0;
+  let total = null;
+
+  while (true) {
+    const params = new URLSearchParams({
+      limit: String(batchSize),
+      offset: String(offset)
+    });
+
+    if (getTransactionScope() === "all") {
+      params.set("scope", "all");
+    }
+
+    const response = await apiFetch(`/api/transactions?${params.toString()}`);
+
+    if (!response || !response.ok) {
+      const errorPayload = response ? await response.json().catch(() => null) : null;
+      throw new Error(errorPayload?.error || "Unable to load transactions.");
+    }
+
+    const payload = await response.json().catch(() => null);
+    const rows = Array.isArray(payload?.data) ? payload.data : [];
+
+    if (total === null) {
+      total = Number(payload?.total || 0);
+    }
+
+    allTransactions.push(...rows);
+
+    offset += rows.length;
+
+    if (rows.length === 0 || allTransactions.length >= total) {
+      break;
+    }
+
+    // Safety guard so a weird API response cannot loop forever.
+    if (rows.length < batchSize) {
+      break;
+    }
   }
 
-  const payload = await response.json().catch(() => null);
-  const transactions = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload?.transactions)
-    ? payload.transactions
-    : Array.isArray(payload?.data)
-    ? payload.data
-    : [];
-
-  return transactions.map(normalizeTransaction).filter(Boolean);
+  return allTransactions.map(normalizeTransaction).filter(Boolean);
 }
 
 async function fetchReceiptLinksSnapshot() {
