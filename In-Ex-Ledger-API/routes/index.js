@@ -60,6 +60,7 @@ if (ENABLE_V2_BUSINESS) {
 
 router.use('/auth', require('./auth.routes.js'));
 router.use('/accounts', require('./accounts.routes.js'));
+router.use('/bank-connections', require('./bank-connections.routes.js'));
 router.use('/receipts', require('./receipts.routes.js'));
 router.use('/categories', require('./categories.routes.js'));
 router.use('/exports', require('./exports.routes.js'));
