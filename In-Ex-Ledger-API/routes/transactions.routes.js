@@ -34,6 +34,10 @@ const {
   getImportBatch,
   revertImportBatch
 } = require("../services/transactionImportService.js");
+const {
+  getPayerSummaryForYear,
+  getTaxLineSummaryForYear
+} = require("../services/taxSummaryService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -1621,6 +1625,47 @@ router.post("/import/:id/revert", async (req, res) => {
     }
     logError("POST /transactions/import/:id/revert error:", err);
     res.status(500).json({ error: "Failed to revert import batch." });
+  }
+});
+
+/* =========================================================
+   TAX SUMMARIES  —  GET /transactions/tax-summary/payers
+                     GET /transactions/tax-summary/tax-lines
+   ========================================================= */
+
+function parseYearOrCurrent(value) {
+  const n = parseInt(value, 10);
+  if (Number.isFinite(n) && n >= 2000 && n <= 2100) return n;
+  return new Date().getUTCFullYear();
+}
+
+router.get("/tax-summary/payers", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const { region } = await getBusinessRegionAndCurrency(businessId);
+    const year = parseYearOrCurrent(req.query.year);
+    const summary = await getPayerSummaryForYear(pool, { businessId, year, region });
+    res.json(summary);
+  } catch (err) {
+    logError("GET /transactions/tax-summary/payers error:", err);
+    res.status(500).json({ error: "Failed to load payer summary." });
+  }
+});
+
+router.get("/tax-summary/tax-lines", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const businessContext = await getBusinessRegionAndCurrency(businessId);
+    const requestedRegion = String(req.query.region || "").toUpperCase();
+    const region = requestedRegion === "CA" || requestedRegion === "US"
+      ? requestedRegion
+      : businessContext.region;
+    const year = parseYearOrCurrent(req.query.year);
+    const summary = await getTaxLineSummaryForYear(pool, { businessId, year, region });
+    res.json(summary);
+  } catch (err) {
+    logError("GET /transactions/tax-summary/tax-lines error:", err);
+    res.status(500).json({ error: "Failed to load tax-line summary." });
   }
 });
 
