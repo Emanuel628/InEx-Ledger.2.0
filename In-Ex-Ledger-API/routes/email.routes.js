@@ -23,6 +23,7 @@
 
 const express = require("express");
 const crypto = require("crypto");
+const { Resend } = require("resend");
 const { pool } = require("../db.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
@@ -31,7 +32,6 @@ const {
 } = require("../services/invoiceEmailService.js");
 
 const router = express.Router();
-const { Resend } = require("resend");
 function getResendClient() {
   const key = String(process.env.RESEND_API_KEY || "").trim();
   if (!key) return null;
