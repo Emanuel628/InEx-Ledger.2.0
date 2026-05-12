@@ -120,15 +120,33 @@ function parseReplyToken(token) {
  * Build a reply-to address. Returns null when no INVOICE_REPLY_BASE_EMAIL
  * is configured (the caller should fall back to the From address).
  */
+function normalizeEmailAddress(value) {
+  const raw = String(value || "").trim();
+
+  // Handles: Name <email@example.com>
+  const bracketMatch = raw.match(/<([^>]+)>/);
+  const email = (bracketMatch ? bracketMatch[1] : raw).trim();
+
+  // Remove accidental angle brackets around the whole address/local part.
+  return email.replace(/[<>]/g, "").trim();
+}
+
 function buildReplyToAddress(invoiceId) {
-  const base = getInvoiceReplyBaseEmail();
-  if (!base) return null;
+  const rawBase = getInvoiceReplyBaseEmail();
+  if (!rawBase) return null;
+
+  const base = normalizeEmailAddress(rawBase);
   const token = buildReplyToken(invoiceId);
   if (!token) return base;
+
   const at = base.lastIndexOf("@");
   if (at < 1) return base;
-  const local = base.slice(0, at);
-  const domain = base.slice(at);
+
+  const local = base.slice(0, at).replace(/[<>]/g, "").trim();
+  const domain = base.slice(at).replace(/[<>]/g, "").trim();
+
+  if (!local || !domain.startsWith("@")) return base;
+
   return `${local}+${token}${domain}`;
 }
 
