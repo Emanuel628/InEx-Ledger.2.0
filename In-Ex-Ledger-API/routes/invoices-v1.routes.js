@@ -349,18 +349,18 @@ router.post("/:id/send", async (req, res) => {
         customMessage
       });
     } catch (err) {
-  const status = err.status || 502;
-  logError("POST /invoices-v1/:id/send error:", {
-    message: err.message,
-    code: err.code || "email_failed",
-    details: err.details || null
-  });
-  return res.status(status).json({
-    error: err.message,
-    code: err.code || "email_failed",
-    details: err.details || null
-  });
-}
+      const status = err.status || 502;
+      logError("POST /invoices-v1/:id/send error:", {
+        message: err.message,
+        code: err.code || "email_failed", 
+        details: err.details || null
+      });
+      return res.status(status).json({
+        error: err.message,
+        code: err.code || "email_failed",
+        details: err.details || null
+      });
+    }
 
     // Bump invoice status to "sent" when it was still a draft.
     if (invoice.status === "draft") {
