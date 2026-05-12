@@ -533,6 +533,7 @@ function closeMessageDetail() {
   document.getElementById("messageDetailOverlay")?.classList.add("hidden");
   _currentMsgId = null;
   _currentMsgReceiverId = null;
+  _currentReplyMode = "in-app";
 }
 
 async function sendReply() {
