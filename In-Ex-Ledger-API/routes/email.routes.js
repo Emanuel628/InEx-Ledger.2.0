@@ -165,7 +165,18 @@ router.post("/inbound", express.json({ limit: "256kb" }), async (req, res) => {
       return res.status(200).json({ ok: true, ignored: "no_owner" });
     }
 
-    const from = pickFromAddress(payload);
+    let receivedEmail = null;
+
+try {
+  receivedEmail = await fetchReceivedEmailContent(payload);
+} catch (err) {
+  logWarn("inbound email webhook: failed to fetch received email content", {
+    message: err?.message || String(err),
+    emailId: payload?.data?.email_id || payload?.email_id || null
+  });
+}
+
+const from = pickFromAddress(receivedEmail || payload);
     const subject = String(payload?.subject || payload?.data?.subject || `Re: Invoice ${invoice.invoice_number}`).slice(0, 200);
     const body = pickBody(payload).trim() || "(reply received — body not included in Resend webhook metadata)";
 
