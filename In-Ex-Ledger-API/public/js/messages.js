@@ -507,7 +507,13 @@ async function openMessageDetail(id) {
     // Inbound invoice replies have no in-app sender to reply to; hide the
     // in-app reply UI in that case.
     const isInvoiceReply = message.message_type === "invoice_reply";
-    if (detailReplyBtn) detailReplyBtn.hidden = isSentMessage || isInvoiceReply;
+    if (detailReplyBtn) {detailReplyBtn.hidden = isSentMessage || isInvoiceReply;
+      
+    }
+
+if (detailEmailReplyBtn) {
+  detailEmailReplyBtn.hidden = !isInvoiceReply || !message.external_sender_email;
+}
 
     document.getElementById("messageDetailOverlay")?.classList.remove("hidden");
 
