@@ -31,6 +31,7 @@ const {
 } = require("../services/invoiceEmailService.js");
 
 const router = express.Router();
+const { Resend } = require("resend");
 
 function timingSafeStringEqual(a, b) {
   const ab = Buffer.from(String(a || ""));
