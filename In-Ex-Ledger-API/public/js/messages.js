@@ -545,8 +545,7 @@ async function sendReply() {
     return;
   }
 
-  if (!isUuid(_currentMsgReceiverId)) {
-    showToast(translate("messages_error_reply_recipient", "Reply recipient is unavailable."));
+  if (_currentReplyMode !== "email" && !isUuid(_currentMsgReceiverId)) {showToast(translate("messages_error_reply_recipient", "Reply recipient is unavailable."));
     return;
   }
 
@@ -556,8 +555,13 @@ async function sendReply() {
     button.textContent = translate("messages_sending", "Sending...");
   }
 
-  try {
-    const response = await apiFetch("/api/messages", {
+  const response = _currentReplyMode === "email"
+  ? await apiFetch(`/api/messages/${encodeURIComponent(_currentMsgId)}/reply-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body })
+    })
+  : await apiFetch("/api/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -567,7 +571,7 @@ async function sendReply() {
         parent_id: _currentMsgId
       })
     });
-
+    
     if (!response || !response.ok) {
       const error = response ? await response.json().catch(() => ({})) : {};
       throw new Error(error.error || "Failed to send reply");
