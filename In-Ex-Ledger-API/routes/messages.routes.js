@@ -240,6 +240,133 @@ router.get("/archived", async (req, res) => {
 
 // GET /api/messages/:id
 // Fetches a single message and marks it as read if the current user is the receiver.
+// POST /api/messages/:id/reply-email
+router.post("/:id/reply-email", async (req, res) => {
+  try {
+    const messageId = String(req.params.id || "").trim();
+    const replyBody = String(req.body?.body || "").trim().slice(0, 10000);
+
+    if (!isUuid(messageId)) {
+      return res.status(400).json({ error: "Invalid message ID." });
+    }
+
+    if (!replyBody) {
+      return res.status(400).json({ error: "Reply body is required." });
+    }
+
+    const resend = getResendClient();
+    if (!resend) {
+      return res.status(503).json({ error: "Email service is not configured." });
+    }
+
+    const { rows } = await pool.query(
+      `SELECT m.*,
+              inv.invoice_number,
+              inv.business_id,
+              b.name AS business_name,
+              b.user_id AS owner_id
+         FROM messages m
+         JOIN invoices_v1 inv ON inv.id = m.invoice_id
+         JOIN businesses b ON b.id = inv.business_id
+        WHERE m.id = $1
+          AND m.receiver_id = $2
+          AND m.message_type = 'invoice_reply'
+          AND m.external_sender_email IS NOT NULL
+        LIMIT 1`,
+      [messageId, req.user.id]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "Invoice reply message not found." });
+    }
+
+    const original = rows[0];
+
+    if (original.owner_id !== req.user.id) {
+      return res.status(403).json({ error: "You are not allowed to reply to this message." });
+    }
+
+    const replyTo = buildReplyToAddress(original.invoice_id);
+    const companyName = String(original.business_name || "InEx Ledger")
+      .replace(/[<>"]/g, "")
+      .trim()
+      .slice(0, 70);
+
+    const subject = String(original.subject || `Re: Invoice ${original.invoice_number}`).startsWith("Re:")
+      ? String(original.subject || `Re: Invoice ${original.invoice_number}`)
+      : `Re: ${original.subject || `Invoice ${original.invoice_number}`}`;
+
+    const references = [
+      original.external_references,
+      original.external_message_id
+    ].filter(Boolean).join(" ");
+
+    const payload = {
+      from: getInvoiceFromEmail(),
+      to: original.external_sender_email,
+      subject,
+      text: replyBody,
+      html: `<p>${escapeHtml(replyBody).replace(/\n/g, "<br/>")}</p>`,
+      headers: {
+        ...(original.external_message_id ? { "In-Reply-To": original.external_message_id } : {}),
+        ...(references ? { References: references } : {})
+      }
+    };
+
+    if (replyTo) {
+      const replyToDisplay = `${companyName} Billing <${replyTo}>`;
+      payload.replyTo = replyToDisplay;
+      payload.reply_to = replyToDisplay;
+    }
+
+    const sendResult = await resend.emails.send(payload);
+
+    if (sendResult?.error) {
+      return res.status(sendResult.error.statusCode || 502).json({
+        error: sendResult.error.message || "Failed to send email reply.",
+        details: sendResult.error
+      });
+    }
+
+    const outboundMessageId = crypto.randomUUID();
+
+    await pool.query(
+      `INSERT INTO messages
+         (id, sender_id, receiver_id, message_type, subject, body,
+          external_sender_email, external_sender_name, invoice_id, parent_id)
+       VALUES ($1, $2, $2, 'invoice_sent', $3, $4, $5, $6, $7, $8)`,
+      [
+        outboundMessageId,
+        req.user.id,
+        subject,
+        replyBody,
+        original.external_sender_email,
+        original.external_sender_name,
+        original.invoice_id,
+        original.id
+      ]
+    );
+
+    logInfo("invoice reply email sent", {
+      originalMessageId: original.id,
+      outboundMessageId,
+      invoiceId: original.invoice_id,
+      to: original.external_sender_email,
+      resendId: sendResult?.data?.id || null
+    });
+
+    res.json({
+      ok: true,
+      message_id: outboundMessageId,
+      resend_id: sendResult?.data?.id || null
+    });
+  } catch (err) {
+    logError("POST /messages/:id/reply-email error:", err.message);
+    res.status(500).json({ error: "Failed to send email reply." });
+  }
+});
+
+
 router.get("/:id", async (req, res) => {
   try {
     const messageId = String(req.params.id || "").trim();
