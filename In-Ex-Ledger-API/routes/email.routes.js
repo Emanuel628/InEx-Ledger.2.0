@@ -70,7 +70,7 @@ function pickRecipientList(payload) {
 }
 
 function pickFromAddress(payload) {
-  const f = payload?.from;
+  const f = payload?.from || payload?.data?.from;
   if (typeof f === "string") return { email: f, name: null };
   if (Array.isArray(f) && f[0]) return { email: f[0].email || f[0].address || null, name: f[0].name || null };
   if (f?.email) return { email: f.email, name: f.name || null };
