@@ -293,6 +293,8 @@ function renderMessageRow(message) {
       ? " message-avatar--archived"
       : "";
 
+ const threadCount = Number(message.thread_count || 0);
+  
   const statusBadges = [
     unread ? '<span class="message-state-badge is-unread">New</span>' : "",
     message.is_archived ? '<span class="message-state-badge is-archived">Archived</span>' : "",
