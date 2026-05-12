@@ -309,8 +309,15 @@ async function sendInvoiceEmail(resendClient, {
 };
 
 if (replyTo) {
-  payload.replyTo = replyTo;
-  payload.reply_to = replyTo;
+  const companyName = String(businessName || "InEx Ledger")
+    .replace(/[<>"]/g, "")
+    .trim()
+    .slice(0, 70);
+
+  const replyToDisplay = `${companyName} Billing <${replyTo}>`;
+
+  payload.replyTo = replyToDisplay;
+  payload.reply_to = replyToDisplay;
 }
 
 console.log("[invoice-email] replyTo debug", {
