@@ -476,7 +476,8 @@ async function openMessageDetail(id) {
     const replyArea = document.getElementById("replyArea");
     const replyInput = document.getElementById("replyInput");
     const detailReplyBtn = document.getElementById("detailReplyBtn");
-
+    const detailEmailReplyBtn = document.getElementById("detailEmailReplyBtn");
+    
     if (subjectEl) subjectEl.textContent = `${subject} (${typeLabel})`;
     if (fromEl) {
       fromEl.innerHTML = isSentMessage
