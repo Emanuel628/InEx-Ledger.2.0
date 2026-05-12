@@ -244,16 +244,34 @@ async function sendInvoiceEmail(resendClient, {
   const replyTo = buildReplyToAddress(invoice.id);
 
   const payload = {
-    from: fromAddress,
-    to: recipientEmail,
-    subject: body.subject,
-    html: body.html,
-    text: body.text
-  };
-  if (replyTo) payload.reply_to = replyTo;
+  from: fromAddress,
+  to: recipientEmail,
+  subject: body.subject,
+  html: body.html,
+  text: body.text
+};
 
-  return resendClient.emails.send(payload);
+if (replyTo) payload.replyTo = replyTo;
+
+const result = await resendClient.emails.send(payload);
+
+if (result?.error) {
+  const err = new Error(result.error.message || "Resend failed to send invoice email.");
+  err.status = result.error.statusCode || 502;
+  err.code = result.error.name || result.error.code || "resend_send_failed";
+  err.details = result.error;
+  throw err;
 }
+
+if (!result?.data?.id) {
+  const err = new Error("Resend did not return a message id.");
+  err.status = 502;
+  err.code = "resend_missing_message_id";
+  err.details = result || null;
+  throw err;
+}
+
+return result;
 
 module.exports = {
   buildInvoiceEmailBody,
