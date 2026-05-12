@@ -224,9 +224,10 @@ const body =
     const messageId = crypto.randomUUID();
     await pool.query(
       `INSERT INTO messages
-         (id, sender_id, receiver_id, message_type, subject, body,
-          external_sender_email, external_sender_name, invoice_id)
-       VALUES ($1, NULL, $2, 'invoice_reply', $3, $4, $5, $6, $7)`,
+   (id, sender_id, receiver_id, message_type, subject, body,
+    external_sender_email, external_sender_name, invoice_id,
+    external_message_id, external_references, external_in_reply_to)
+ VALUES ($1, NULL, $2, 'invoice_reply', $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         messageId,
         ownerId,
@@ -234,7 +235,10 @@ const body =
         body,
         from.email,
         from.name,
-        invoice.id
+        invoice.id,
+        receivedEmail?.message_id || payload?.data?.message_id || null,
+        receivedEmail?.headers?.references || receivedEmail?.headers?.References || null,
+        receivedEmail?.headers?.in_reply_to || receivedEmail?.headers?.["In-Reply-To"] || null
       ]
     );
 
