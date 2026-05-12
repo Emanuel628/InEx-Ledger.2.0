@@ -142,8 +142,8 @@ router.post("/inbound", express.json({ limit: "256kb" }), async (req, res) => {
     }
 
     const from = pickFromAddress(payload);
-    const subject = String(payload?.subject || `Re: Invoice ${invoice.invoice_number}`).slice(0, 200);
-    const body = pickBody(payload).trim() || "(empty reply)";
+    const subject = String(payload?.subject || payload?.data?.subject || `Re: Invoice ${invoice.invoice_number}`).slice(0, 200);
+    const body = pickBody(payload).trim() || "(reply received — body not included in Resend webhook metadata)";
 
     const messageId = crypto.randomUUID();
     await pool.query(
