@@ -38,6 +38,24 @@ function getResendClient() {
   return new Resend(key);
 }
 
+async function fetchReceivedEmailContent(payload) {
+  const emailId = payload?.data?.email_id || payload?.email_id;
+  if (!emailId) return null;
+
+  const resend = getResendClient();
+  if (!resend?.emails?.receiving?.get) return null;
+
+  const result = await resend.emails.receiving.get(emailId);
+
+  if (result?.error) {
+    const err = new Error(result.error.message || "Failed to fetch received email content.");
+    err.details = result.error;
+    throw err;
+  }
+
+  return result?.data || null;
+}
+
 function timingSafeStringEqual(a, b) {
   const ab = Buffer.from(String(a || ""));
   const bb = Buffer.from(String(b || ""));
