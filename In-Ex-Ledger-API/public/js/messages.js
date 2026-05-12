@@ -280,6 +280,7 @@ function renderMessageRow(message) {
   const initial = (counterpart[0] || "?").toUpperCase();
   const unread = !isSentMessage && !message.is_read;
   const typeLabel = getTypeLabel(message.message_type);
+  const threadCount = Number(message.thread_count || 0);
   const subject = message.subject || "(No subject)";
   const preview = buildPreview(message.body || "");
   const dateStr = formatRelativeDate(message.created_at);
