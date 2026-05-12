@@ -286,7 +286,9 @@ function renderMessageRow(message) {
   const dateStr = formatRelativeDate(message.created_at);
   const archiveLabel = message.is_archived ? "Unarchive" : "Archive";
   const directionLabel = isSentMessage ? "Sent" : "Received";
-
+  const threadCount = Number(message.thread_count || 0);
+  threadCount > 1 ? `<span class="message-state-badge">${threadCount} messages</span>` : "",
+  
   const avatarClass = ["support_request", "it_support"].includes(message.message_type)
     ? " message-avatar--support"
     : message.is_archived
