@@ -555,6 +555,7 @@ async function sendReply() {
     button.textContent = translate("messages_sending", "Sending...");
   }
 
+try {
   const response = _currentReplyMode === "email"
   ? await apiFetch(`/api/messages/${encodeURIComponent(_currentMsgId)}/reply-email`, {
       method: "POST",
