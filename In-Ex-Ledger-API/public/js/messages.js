@@ -431,7 +431,16 @@ function wireDetailPanel() {
       document.getElementById("replyInput")?.focus();
     }
   });
-
+    
+    document.getElementById("detailEmailReplyBtn")?.addEventListener("click", () => {
+  const area = document.getElementById("replyArea");
+  if (!area) return;
+  area.classList.toggle("hidden");
+  if (!area.classList.contains("hidden")) {
+    document.getElementById("replyInput")?.focus();
+  }
+    });
+    
   document.getElementById("detailArchiveBtn")?.addEventListener("click", () => {
     if (_currentMsgId) archiveMessage(_currentMsgId, true);
   });
