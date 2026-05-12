@@ -143,12 +143,10 @@ router.get("/inbox", async (req, res) => {
     const { rows } = await pool.query(
   `WITH visible_messages AS (
       SELECT m.*,
-             COALESCE(
-               CASE
-                 WHEN m.invoice_id IS NOT NULL THEN 'invoice:' || m.invoice_id::text
-                 ELSE 'message:' || m.id::text
-               END
-             ) AS thread_key
+             CASE
+               WHEN m.invoice_id IS NOT NULL THEN 'invoice:' || m.invoice_id::text
+               ELSE 'message:' || m.id::text
+             END AS thread_key
         FROM messages m
        WHERE m.receiver_id = $1
          AND m.is_deleted_by_receiver = FALSE
