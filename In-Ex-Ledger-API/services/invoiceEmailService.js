@@ -292,6 +292,7 @@ async function sendInvoiceEmail(resendClient, {
 
 if (replyTo) {
   payload.replyTo = replyTo;
+  payload.reply_to = replyTo;
 }
 
 console.log("[invoice-email] replyTo debug", {
