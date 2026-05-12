@@ -5,6 +5,9 @@ const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { Resend } = require("resend");
+const { getInvoiceFromEmail,buildReplyToAddress} = require("../services/invoiceEmailService.js");
+
 
 const router = express.Router();
 router.use(requireAuth);
@@ -19,6 +22,21 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 function isUuid(value) {
   return typeof value === "string" && UUID_RE.test(value);
+}
+
+function getResendClient() {
+  const key = String(process.env.RESEND_API_KEY || "").trim();
+  if (!key) return null;
+  return new Resend(key);
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function mapMessageRow(row, viewerId) {
