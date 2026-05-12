@@ -4,6 +4,18 @@ const crypto = require("crypto");
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const COMPACT_UUID_RE = /^[0-9a-f]{32}$/i;
+
+function compactUuid(value) {
+  return String(value || "").replace(/-/g, "").toLowerCase();
+}
+
+function expandCompactUuid(value) {
+  const hex = String(value || "").toLowerCase();
+  if (!COMPACT_UUID_RE.test(hex)) return null;
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 /**
  * Returns the configured "from" address for invoice emails.
  * Falls back through INVOICE_FROM_EMAIL -> RESEND_FROM_EMAIL -> EMAIL_FROM.
@@ -41,13 +53,22 @@ function getReplyHmacSecret() {
  */
 function buildReplyToken(invoiceId) {
   if (!invoiceId) return null;
+
+  const id = String(invoiceId).trim();
+  if (!UUID_RE.test(id)) return null;
+
+  const compactId = compactUuid(id);
   const secret = getReplyHmacSecret();
-  if (!secret) return String(invoiceId);
+
+  if (!secret) return compactId;
+
   const sig = crypto
     .createHmac("sha256", secret)
-    .update(String(invoiceId))
-    .digest("base64url");
-  return `${invoiceId}.${sig}`;
+    .update(compactId)
+    .digest("base64url")
+    .slice(0, 16);
+
+  return `${compactId}.${sig}`;
 }
 
 /**
@@ -57,24 +78,42 @@ function buildReplyToken(invoiceId) {
  */
 function parseReplyToken(token) {
   if (typeof token !== "string" || !token) return null;
+
   const parts = token.split(".");
-  const id = parts[0];
-  if (!UUID_RE.test(id)) return null;
+  const rawId = parts[0];
+
+  let compactId = null;
+  let invoiceId = null;
+
+  if (UUID_RE.test(rawId)) {
+    invoiceId = rawId.toLowerCase();
+    compactId = compactUuid(invoiceId);
+  } else if (COMPACT_UUID_RE.test(rawId)) {
+    compactId = rawId.toLowerCase();
+    invoiceId = expandCompactUuid(compactId);
+  }
+
+  if (!invoiceId || !compactId) return null;
 
   const secret = getReplyHmacSecret();
-  if (!secret) return id;
+  if (!secret) return invoiceId;
+
   const expected = crypto
     .createHmac("sha256", secret)
-    .update(id)
-    .digest("base64url");
+    .update(compactId)
+    .digest("base64url")
+    .slice(0, 16);
+
   const provided = parts[1] || "";
   if (provided.length !== expected.length) return null;
+
   try {
     if (!crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) return null;
   } catch (_) {
     return null;
   }
-  return id;
+
+  return invoiceId;
 }
 
 /**
@@ -253,15 +292,14 @@ async function sendInvoiceEmail(resendClient, {
 
 if (replyTo) {
   payload.replyTo = replyTo;
-  payload.reply_to = replyTo;
 }
 
 console.log("[invoice-email] replyTo debug", {
   invoiceId: invoice.id,
   replyBase: getInvoiceReplyBaseEmail(),
   replyTo,
-  payloadReplyTo: payload.replyTo || null,
-  payloadReply_to: payload.reply_to || null
+  replyToLocalLength: replyTo ? replyTo.split("@")[0].length : null,
+  payloadReplyTo: payload.replyTo || null
 });
 
 const result = await resendClient.emails.send(payload);
