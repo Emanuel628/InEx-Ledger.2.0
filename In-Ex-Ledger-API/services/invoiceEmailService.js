@@ -272,6 +272,7 @@ if (!result?.data?.id) {
 }
 
 return result;
+}
 
 module.exports = {
   buildInvoiceEmailBody,
