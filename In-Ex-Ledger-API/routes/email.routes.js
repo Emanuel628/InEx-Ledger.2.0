@@ -40,10 +40,33 @@ function getResendClient() {
 
 async function fetchReceivedEmailContent(payload) {
   const emailId = payload?.data?.email_id || payload?.email_id;
-  if (!emailId) return null;
+  if (!emailId) {
+    logWarn("inbound email webhook: missing email_id", {
+      payloadKeys: Object.keys(payload || {}),
+      dataKeys: Object.keys(payload?.data || {})
+    });
+    return null;
+  }
 
   const resend = getResendClient();
-  if (!resend?.emails?.receiving?.get) return null;
+  if (!resend) {
+    logWarn("inbound email webhook: Resend client unavailable");
+    return null;
+  }
+
+  logInfo("inbound email webhook: Resend receiving client shape", {
+    hasEmails: !!resend.emails,
+    hasReceiving: !!resend.emails?.receiving,
+    emailMethods: resend.emails ? Object.keys(resend.emails) : [],
+    receivingMethods: resend.emails?.receiving ? Object.keys(resend.emails.receiving) : []
+  });
+
+  if (!resend.emails?.receiving?.get) {
+    logWarn("inbound email webhook: Resend receiving get method unavailable", {
+      emailId
+    });
+    return null;
+  }
 
   const result = await resend.emails.receiving.get(emailId);
 
@@ -52,6 +75,14 @@ async function fetchReceivedEmailContent(payload) {
     err.details = result.error;
     throw err;
   }
+
+  logInfo("inbound email webhook: received email content fetched", {
+    emailId,
+    hasData: !!result?.data,
+    dataKeys: result?.data ? Object.keys(result.data) : [],
+    textLength: String(result?.data?.text || "").length,
+    htmlLength: String(result?.data?.html || "").length
+  });
 
   return result?.data || null;
 }
