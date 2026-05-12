@@ -32,6 +32,11 @@ const {
 
 const router = express.Router();
 const { Resend } = require("resend");
+function getResendClient() {
+  const key = String(process.env.RESEND_API_KEY || "").trim();
+  if (!key) return null;
+  return new Resend(key);
+}
 
 function timingSafeStringEqual(a, b) {
   const ab = Buffer.from(String(a || ""));
