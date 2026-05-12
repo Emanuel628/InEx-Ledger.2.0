@@ -47,6 +47,7 @@ function pickRecipientList(payload) {
   const out = [];
   const candidates = [
     payload?.to,
+    payload?.data?.to
     payload?.recipient,
     payload?.recipients,
     payload?.envelope?.to
