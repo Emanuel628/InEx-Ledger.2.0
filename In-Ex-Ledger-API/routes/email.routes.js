@@ -208,9 +208,11 @@ const body =
     );
 
     logInfo("inbound email webhook: invoice reply stored", {
-      invoiceId: invoice.id,
-      messageId,
-      from: from.email
+  invoiceId: invoice.id,
+  messageId,
+  from: from.email,
+  fetchedBody: !!receivedEmail,
+  bodyLength: body.length
     });
 
     res.json({
