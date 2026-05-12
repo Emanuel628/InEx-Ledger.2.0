@@ -180,10 +180,12 @@
       <div class="message-detail-body" id="messageDetailBody"></div>
       <div class="message-detail-footer">
         <div class="message-detail-actions">
-          <button type="button" class="msg-btn" id="detailReplyBtn" data-i18n="messages_detail_reply_btn">Reply</button>
-          <button type="button" class="msg-btn" id="detailArchiveBtn" data-i18n="messages_detail_archive_btn">Archive</button>
-          <button type="button" class="msg-btn danger" id="detailDeleteBtn" data-i18n="messages_detail_delete_btn">Delete</button>
-        </div>
+          <div class="message-detail-actions">
+             <button type="button" class="msg-btn" id="detailReplyBtn" data-i18n="messages_detail_reply_btn">Reply</button>
+             <button type="button" class="msg-btn" id="detailEmailReplyBtn" hidden>Reply by email</button>
+             <button type="button" class="msg-btn" id="detailArchiveBtn" data-i18n="messages_detail_archive_btn">Archive</button>
+             <button type="button" class="msg-btn danger" id="detailDeleteBtn" data-i18n="messages_detail_delete_btn">Delete</button>
+          </div>
       </div>
       <div class="message-reply-area hidden" id="replyArea">
         <textarea class="message-reply-input form-control" id="replyInput" placeholder="Write your reply..." maxlength="10000"></textarea>
