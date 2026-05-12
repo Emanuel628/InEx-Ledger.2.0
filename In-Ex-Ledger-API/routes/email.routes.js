@@ -177,8 +177,18 @@ try {
 }
 
 const from = pickFromAddress(receivedEmail || payload);
-    const subject = String(payload?.subject || payload?.data?.subject || `Re: Invoice ${invoice.invoice_number}`).slice(0, 200);
-    const body = pickBody(payload).trim() || "(reply received — body not included in Resend webhook metadata)";
+    const subject = String(
+  receivedEmail?.subject ||
+  payload?.subject ||
+  payload?.data?.subject ||
+  `Re: Invoice ${invoice.invoice_number}`
+).slice(0, 200);
+
+const body =
+  String(receivedEmail?.text || "").trim().slice(0, 50000) ||
+  String(receivedEmail?.html || "").trim().slice(0, 50000) ||
+  pickBody(payload).trim() ||
+  "(reply received — body not included in Resend webhook metadata)";
 
     const messageId = crypto.randomUUID();
     await pool.query(
