@@ -251,7 +251,18 @@ async function sendInvoiceEmail(resendClient, {
   text: body.text
 };
 
-if (replyTo) payload.replyTo = replyTo;
+if (replyTo) {
+  payload.replyTo = replyTo;
+  payload.reply_to = replyTo;
+}
+
+console.log("[invoice-email] replyTo debug", {
+  invoiceId: invoice.id,
+  replyBase: getInvoiceReplyBaseEmail(),
+  replyTo,
+  payloadReplyTo: payload.replyTo || null,
+  payloadReply_to: payload.reply_to || null
+});
 
 const result = await resendClient.emails.send(payload);
 
