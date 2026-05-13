@@ -426,17 +426,19 @@ document.getElementById(activeSidebarId)?.classList.add("is-active");
   const action = btn.dataset.action;
 
   if (action === "edit") {
-    openInvoicePanel(id);
-  } else if (action === "email") {
-    openEmailModal(id);
-  } else if (action === "pay") {
-    if (confirm("Mark this invoice as paid?")) await updateInvoiceStatus(id, "paid");
-  } else if (action === "delete") {
-    pendingDeleteId = id;
+  openInvoicePanel(id);
+} else if (action === "email") {
+  openEmailModal(id);
+} else if (action === "pay") {
+  if (confirm("Mark this invoice as paid?")) await updateInvoiceStatus(id, "paid");
+} else if (action === "restore") {
+  if (confirm("Restore this invoice?")) await restoreInvoice(id);
+} else if (action === "delete") {
+  pendingDeleteId = id;
 
     const inv = invoiceList.find((invoice) => invoice.id === id);
     const wasSent = inv && inv.status !== "draft";
-
+    
     const title = document.querySelector("#invoiceDeleteModal h3");
     const copy = document.querySelector("#invoiceDeleteModal p");
 
