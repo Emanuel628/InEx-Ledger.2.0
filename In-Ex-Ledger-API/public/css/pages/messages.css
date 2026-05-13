@@ -1132,7 +1132,13 @@
 }
 
 .message-thread-item.is-outbound {
-  background: rgba(248, 250, 252, 0.96);
+  background: rgba(248, 250, 252, 0.88);
+  backhround-color: rgba(100, 116, 139, 0.16);
+}
+
+.message-thread-item.is-inbound {
+  background: rgba(239, 246, 255, 0.72);
+  border-color: rgba(37, 99, 235, 0.14);
 }
 
 .message-thread-header {
