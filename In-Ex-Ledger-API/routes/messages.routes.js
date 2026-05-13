@@ -67,6 +67,7 @@ function mapMessageRow(row, viewerId) {
     created_at: row.created_at,
     updated_at: row.updated_at,
     thread_count: row.thread_count || 1,
+    thread_has_unread: Boolean(row.thread_has_unread || false),
   };
 }
 
