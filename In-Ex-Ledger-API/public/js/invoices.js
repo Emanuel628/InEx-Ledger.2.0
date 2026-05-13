@@ -400,8 +400,28 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (confirm("Mark this invoice as paid?")) await updateInvoiceStatus(id, "paid");
     } else if (action === "delete") {
       pendingDeleteId = id;
-      document.getElementById("invoiceDeleteModal").classList.remove("hidden");
     }
+
+  const inv = invoiceList.find((invoice) => invoice.id === id);
+  const wasSent = inv && inv.status !== "draft";
+
+  const title = document.querySelector("#invoiceDeleteModal h3");
+  const copy = document.querySelector("#invoiceDeleteModal p");
+
+  if (title) {
+    title.textContent = wasSent
+      ? "Delete sent invoice?"
+      : "Delete this draft invoice?";
+  }
+
+  if (copy) {
+    copy.textContent = wasSent
+      ? "This invoice has already been sent or recorded. Deleting it may remove history connected to customer communication and payment tracking. Are you sure you want to delete it?"
+      : "This draft invoice has not been sent yet. This cannot be undone.";
+  }
+
+  document.getElementById("invoiceDeleteModal").classList.remove("hidden");
+}
   });
 
   document.getElementById("invoiceDeleteCancel")?.addEventListener("click", () => {
