@@ -279,7 +279,7 @@ function renderMessageRow(message) {
     ? (message.receiver_name || message.receiver_email || "Unknown")
     : (message.sender_name || message.sender_email || "Unknown");
   const initial = (counterpart[0] || "?").toUpperCase();
-  const unread = !isSentMessage && !message.is_read;
+  const unread = (!isSentMessage && !message.is_read) || Boolean(message.thread_has_unread);
   const typeLabel = getTypeLabel(message.message_type);
   const threadCount = Number(message.thread_count || 0);
   const subject = message.subject || "(No subject)";
