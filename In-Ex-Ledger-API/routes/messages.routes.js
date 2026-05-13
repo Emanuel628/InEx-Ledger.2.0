@@ -424,6 +424,106 @@ router.post("/:id/reply-email", async (req, res) => {
 });
 
 
+// GET /api/messages/:id/thread
+// Returns the full visible conversation for a message.
+// For invoice messages, this groups by invoice_id so the user sees the whole email thread.
+router.get("/:id/thread", async (req, res) => {
+  try {
+    const messageId = String(req.params.id || "").trim();
+
+    if (!isUuid(messageId)) {
+      return res.status(400).json({ error: "Invalid message ID." });
+    }
+
+    const baseResult = await pool.query(
+      `SELECT id, invoice_id
+         FROM messages
+        WHERE id = $1
+          AND (
+            (receiver_id = $2 AND is_deleted_by_receiver = FALSE)
+            OR
+            (sender_id = $2 AND is_deleted_by_sender = FALSE)
+          )
+        LIMIT 1`,
+      [messageId, req.user.id]
+    );
+
+    if (!baseResult.rowCount) {
+      return res.status(404).json({ error: "Message not found." });
+    }
+
+    const baseMessage = baseResult.rows[0];
+
+    let rows;
+
+    if (baseMessage.invoice_id) {
+      const result = await pool.query(
+        `SELECT m.*,
+                COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
+                s.email AS sender_email,
+                COALESCE(r.display_name, r.full_name, r.email) AS receiver_name,
+                r.email AS receiver_email,
+                inv.invoice_number AS invoice_number
+           FROM messages m
+           LEFT JOIN users s ON s.id = m.sender_id
+           LEFT JOIN users r ON r.id = m.receiver_id
+           LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
+          WHERE m.invoice_id = $1
+            AND (
+              (m.receiver_id = $2 AND m.is_deleted_by_receiver = FALSE)
+              OR
+              (m.sender_id = $2 AND m.is_deleted_by_sender = FALSE)
+            )
+          ORDER BY m.created_at ASC`,
+        [baseMessage.invoice_id, req.user.id]
+      );
+
+      rows = result.rows;
+    } else {
+      const result = await pool.query(
+        `SELECT m.*,
+                COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
+                s.email AS sender_email,
+                COALESCE(r.display_name, r.full_name, r.email) AS receiver_name,
+                r.email AS receiver_email,
+                inv.invoice_number AS invoice_number
+           FROM messages m
+           LEFT JOIN users s ON s.id = m.sender_id
+           LEFT JOIN users r ON r.id = m.receiver_id
+           LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
+          WHERE m.id = $1
+            AND (
+              (m.receiver_id = $2 AND m.is_deleted_by_receiver = FALSE)
+              OR
+              (m.sender_id = $2 AND m.is_deleted_by_sender = FALSE)
+            )
+          LIMIT 1`,
+        [messageId, req.user.id]
+      );
+
+      rows = result.rows;
+    }
+
+    // Mark unread messages in this thread as read when the receiver opens it.
+    await pool.query(
+      `UPDATE messages
+          SET is_read = TRUE, updated_at = NOW()
+        WHERE id = ANY($1::uuid[])
+          AND receiver_id = $2
+          AND is_read = FALSE`,
+      [rows.map((row) => row.id), req.user.id]
+    );
+
+    res.json({
+      thread: rows.map((row) => mapMessageRow(row, req.user.id))
+    });
+  } catch (err) {
+    logError("GET /messages/:id/thread error:", err.message);
+    res.status(500).json({ error: "Failed to fetch message thread." });
+  }
+});
+
+
 router.get("/:id", async (req, res) => {
   try {
     const messageId = String(req.params.id || "").trim();
