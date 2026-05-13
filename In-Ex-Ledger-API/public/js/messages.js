@@ -286,8 +286,6 @@ function renderMessageRow(message) {
   const dateStr = formatRelativeDate(message.created_at);
   const archiveLabel = message.is_archived ? "Unarchive" : "Archive";
   const directionLabel = isSentMessage ? "Sent" : "Received";
-  const threadCount = Number(message.thread_count || 0);
-  threadCount > 1 ? `<span class="message-state-badge">${threadCount} messages</span>` : "",
   
   const avatarClass = ["support_request", "it_support"].includes(message.message_type)
     ? " message-avatar--support"
@@ -300,6 +298,7 @@ function renderMessageRow(message) {
   const statusBadges = [
     unread ? '<span class="message-state-badge is-unread">New</span>' : "",
     message.is_archived ? '<span class="message-state-badge is-archived">Archived</span>' : "",
+    threadCount > 1 ? `<span class="message-state-badge">${threadCount} messages</span>` : "",
     `<span class="message-direction-badge">${directionLabel}</span>`
   ].filter(Boolean).join("");
 
