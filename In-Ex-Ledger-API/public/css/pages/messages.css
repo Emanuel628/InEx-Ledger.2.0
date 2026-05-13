@@ -1110,13 +1110,15 @@
 }
 
 .message-thread-item.is-outbound {
-  background: rgba(248, 250, 252, 0.88);
-  border-color: rgba(100, 116, 139, 0.16);
+  background: rgba(248, 250, 252, 0.92);
+  border-color: rgba(100, 116, 139, 0.18);
+  border-left: 4px solid rgba(100, 116, 139, 0.35);
 }
 
 .message-thread-item.is-inbound {
-  background: rgba(239, 246, 255, 0.72);
-  border-color: rgba(37, 99, 235, 0.14);
+  background: rgba(239, 246, 255, 0.85);
+  border-color: rgba(37, 99, 235, 0.18);
+  border-left: 4px solid rgba(37, 99, 235, 0.35);
 }
 
 .message-thread-header {
