@@ -158,7 +158,8 @@ router.get("/inbox", async (req, res) => {
       SELECT vm.*,
              COUNT(*) OVER (PARTITION BY vm.thread_key)::int AS thread_count,
             BOOL_OR(vm.receiver_id = $1 AND vm.is_read = FALSE) OVER (PARTITION BY vm.thread_key) AS thread_has_unread,
-            ROW_NUMBER() OVER (PARTITION BY vm.thread_keyORDER BY vm.created_at DESC) AS rn
+            ROW_NUMBER() OVER (PARTITION BY vm.thread_key
+            ORDER BY vm.created_at DESC) AS rn
         FROM visible_messages vm
     )
     SELECT r.*,
