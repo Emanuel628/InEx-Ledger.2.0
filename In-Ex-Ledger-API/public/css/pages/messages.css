@@ -1115,4 +1115,59 @@
     flex-direction: column;
     align-items: flex-start;
   }
+  
+  .message-thread-item {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.92);
+  margin-bottom: 12px;
+}
+
+.message-thread-item.is-latest {
+  border-color: rgba(79, 70, 229, 0.35);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.message-thread-item.is-outbound {
+  background: rgba(248, 250, 252, 0.96);
+}
+
+.message-thread-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.message-thread-sender {
+  font-weight: 700;
+  color: var(--text-strong, #0f172a);
+}
+
+.message-thread-email {
+  margin-top: 2px;
+  font-size: 0.82rem;
+  color: var(--text-muted, #64748b);
+}
+
+.message-thread-date {
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748b);
+}
+
+.message-thread-subject {
+  font-size: 0.86rem;
+  font-weight: 650;
+  color: var(--text-muted, #475569);
+  margin-bottom: 10px;
+}
+
+.message-thread-body {
+  white-space: pre-wrap;
+  line-height: 1.55;
+  color: var(--text-body, #1e293b);
+}
 }
