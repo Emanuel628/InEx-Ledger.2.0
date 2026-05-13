@@ -588,7 +588,7 @@ function renderMessageThread(messages, currentUserId) {
         <div class="message-thread-header">
           <div>
             <div class="message-thread-sender">${escapeHtml(senderLabel)}</div>
-            ${senderEmail ? `<div class="message-thread-email">${escapeHtml(senderEmail)}</div>` : ""}
+            ${showSenderEmail ? `<div class="message-thread-email">${escapeHtml(senderEmail)}</div>` : ""}
           </div>
           <div class="message-thread-date">${escapeHtml(dateLabel)}</div>
         </div>
