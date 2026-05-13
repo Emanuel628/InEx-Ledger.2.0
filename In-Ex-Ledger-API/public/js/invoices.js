@@ -5,6 +5,31 @@ let activeInvoiceId = null;
 let pendingDeleteId = null;
 let invoiceStatusFilter = "";
 
+let invoiceDefaultCurrency = "CAD";
+
+function currencyForRegion(region) {
+  const normalized = String(region || "").trim().toUpperCase();
+  return normalized === "US" ? "USD" : "CAD";
+}
+
+async function loadInvoiceDefaults() {
+  try {
+    const res = await apiFetch("/api/me");
+    if (!res || !res.ok) return;
+
+    const profile = await res.json();
+    const region =
+      profile?.active_business?.region ||
+      profile?.onboarding?.data?.region ||
+      profile?.country ||
+      "CA";
+
+    invoiceDefaultCurrency = currencyForRegion(region);
+  } catch (_) {
+    invoiceDefaultCurrency = "CAD";
+  }
+}
+
 const STATUS_LABELS = { draft: "Draft", sent: "Sent", paid: "Paid", void: "Void" };
 const STATUS_CLASSES = { draft: "badge-draft", sent: "badge-sent", paid: "badge-paid", void: "badge-void" };
 
