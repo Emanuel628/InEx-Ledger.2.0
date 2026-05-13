@@ -568,7 +568,8 @@ function renderMessageThread(messages, currentUserId) {
     const subject = message.subject || "(No subject)";
     const body = message.body || "";
     const isLatest = index === messages.length - 1;
-
+    const isUnreadForUser = message.receiver_id === currentUserId && !message.is_read;
+    
     return `
       <article class="message-thread-item${isLatest ? " is-latest" : ""}${isCurrentUser ? " is-outbound" : " is-inbound"}">
         <div class="message-thread-header">
