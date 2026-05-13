@@ -547,11 +547,27 @@ _currentThread = messages;
     }, 80);
     
     
-    _mailboxMessages = _mailboxMessages.map((item) => item.id === message.id
-      ? { ...item, is_read: true }
-      : item);
+const openedThreadIds = new Set(messages.map((item) => item.id));
+const openedInvoiceId = message.invoice_id || null;
 
-    renderCurrentView();
+_mailboxMessages = _mailboxMessages.map((item) => {
+  const sameOpenedMessage = openedThreadIds.has(item.id);
+  const sameInvoiceThread = openedInvoiceId && item.invoice_id === openedInvoiceId;
+
+  if (sameOpenedMessage || sameInvoiceThread) {
+    return {
+      ...item,
+      is_read: true,
+      thread_has_unread: false
+    };
+  }
+
+  return item;
+});
+
+renderCurrentView();
+await updateUnreadBadge();
+    
   } catch {
     showToast(translate("messages_error_open", "Unable to open the selected message."));
   }
