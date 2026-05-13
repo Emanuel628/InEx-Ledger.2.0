@@ -193,23 +193,42 @@ router.get("/sent", async (req, res) => {
     const archived = req.query.archived === "true";
 
     const { rows } = await pool.query(
-      `SELECT m.*,
-              COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
-              s.email AS sender_email,
-              COALESCE(r.display_name, r.full_name, r.email) AS receiver_name,
-              r.email AS receiver_email,
-              inv.invoice_number AS invoice_number
-         FROM messages m
-         LEFT JOIN users s ON s.id = m.sender_id
-         LEFT JOIN users r ON r.id = m.receiver_id
-         LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
-        WHERE m.sender_id = $1
-          AND m.is_deleted_by_sender = FALSE
-          AND m.is_archived_by_sender = $2
-        ORDER BY m.created_at DESC
-        LIMIT $3 OFFSET $4`,
-      [req.user.id, archived, limit, offset]
-    );
+  `WITH visible_messages AS (
+      SELECT m.*,
+             CASE
+               WHEN m.invoice_id IS NOT NULL THEN 'invoice:' || m.invoice_id::text
+               ELSE 'message:' || m.id::text
+             END AS thread_key
+        FROM messages m
+       WHERE m.sender_id = $1
+         AND m.is_deleted_by_sender = FALSE
+         AND m.is_archived_by_sender = $2
+    ),
+    ranked AS (
+      SELECT vm.*,
+             COUNT(*) OVER (PARTITION BY vm.thread_key)::int AS thread_count,
+             ROW_NUMBER() OVER (
+               PARTITION BY vm.thread_key
+               ORDER BY vm.created_at DESC
+             ) AS rn
+        FROM visible_messages vm
+    )
+    SELECT r.*,
+           r.thread_count,
+           COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
+           s.email AS sender_email,
+           COALESCE(u.display_name, u.full_name, u.email) AS receiver_name,
+           u.email AS receiver_email,
+           inv.invoice_number AS invoice_number
+      FROM ranked r
+      LEFT JOIN users s ON s.id = r.sender_id
+      LEFT JOIN users u ON u.id = r.receiver_id
+      LEFT JOIN invoices_v1 inv ON inv.id = r.invoice_id
+     WHERE r.rn = 1
+     ORDER BY r.created_at DESC
+     LIMIT $3 OFFSET $4`,
+  [req.user.id, archived, limit, offset]
+);
 
     res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
   } catch (err) {
@@ -226,29 +245,48 @@ router.get("/archived", async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
     const { rows } = await pool.query(
-      `SELECT m.*,
-              COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
-              s.email AS sender_email,
-              COALESCE(r.display_name, r.full_name, r.email) AS receiver_name,
-              r.email AS receiver_email,
-              inv.invoice_number AS invoice_number
-         FROM messages m
-         LEFT JOIN users s ON s.id = m.sender_id
-         LEFT JOIN users r ON r.id = m.receiver_id
-         LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
-        WHERE (
+  `WITH visible_messages AS (
+      SELECT m.*,
+             CASE
+               WHEN m.invoice_id IS NOT NULL THEN 'invoice:' || m.invoice_id::text
+               ELSE 'message:' || m.id::text
+             END AS thread_key
+        FROM messages m
+       WHERE (
           m.receiver_id = $1
           AND m.is_deleted_by_receiver = FALSE
           AND m.is_archived_by_receiver = TRUE
-        ) OR (
+       ) OR (
           m.sender_id = $1
           AND m.is_deleted_by_sender = FALSE
           AND m.is_archived_by_sender = TRUE
-        )
-        ORDER BY m.created_at DESC
-        LIMIT $2 OFFSET $3`,
-      [req.user.id, limit, offset]
-    );
+       )
+    ),
+    ranked AS (
+      SELECT vm.*,
+             COUNT(*) OVER (PARTITION BY vm.thread_key)::int AS thread_count,
+             ROW_NUMBER() OVER (
+               PARTITION BY vm.thread_key
+               ORDER BY vm.created_at DESC
+             ) AS rn
+        FROM visible_messages vm
+    )
+    SELECT r.*,
+           r.thread_count,
+           COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
+           s.email AS sender_email,
+           COALESCE(u.display_name, u.full_name, u.email) AS receiver_name,
+           u.email AS receiver_email,
+           inv.invoice_number AS invoice_number
+      FROM ranked r
+      LEFT JOIN users s ON s.id = r.sender_id
+      LEFT JOIN users u ON u.id = r.receiver_id
+      LEFT JOIN invoices_v1 inv ON inv.id = r.invoice_id
+     WHERE r.rn = 1
+     ORDER BY r.created_at DESC
+     LIMIT $2 OFFSET $3`,
+  [req.user.id, limit, offset]
+);
 
     res.json({ messages: rows.map((r) => mapMessageRow(r, req.user.id)) });
   } catch (err) {
