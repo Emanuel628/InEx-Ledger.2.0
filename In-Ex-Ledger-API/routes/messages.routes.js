@@ -156,14 +156,13 @@ router.get("/inbox", async (req, res) => {
     ranked AS (
       SELECT vm.*,
              COUNT(*) OVER (PARTITION BY vm.thread_key)::int AS thread_count,
-             ROW_NUMBER() OVER (
-               PARTITION BY vm.thread_key
-               ORDER BY vm.created_at DESC
-             ) AS rn
+            BOOL_OR(vm.receiver_id = $1 AND vm.is_read = FALSE) OVER (PARTITION BY vm.thread_key) AS thread_has_unread,
+            ROW_NUMBER() OVER (PARTITION BY vm.thread_keyORDER BY vm.created_at DESC) AS rn
         FROM visible_messages vm
     )
     SELECT r.*,
            r.thread_count,
+           r.thread_has_unread
            COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
            s.email AS sender_email,
            COALESCE(u.display_name, u.full_name, u.email) AS receiver_name,
