@@ -515,7 +515,8 @@ _currentThread = messages;
     wrap.appendChild(link);
     bodyEl.appendChild(wrap);
   }
-}}
+}
+  
     if (replyArea) replyArea.classList.add("hidden");
     if (replyInput) replyInput.value = "";
     // Inbound invoice replies have no in-app sender to reply to; hide the
