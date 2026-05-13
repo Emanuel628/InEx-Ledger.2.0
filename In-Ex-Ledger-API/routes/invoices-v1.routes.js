@@ -470,4 +470,55 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+/* ── PATCH /api/invoices-v1/:id/restore ── restore soft-deleted invoice */
+router.patch("/:id/restore", async (req, res) => {
+  if (!UUID_RE.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid invoice ID." });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    if (!await requireProPlan(businessId, res)) return;
+
+    const existing = await pool.query(
+      "SELECT id, status, deleted_at FROM invoices_v1 WHERE id = $1 AND business_id = $2 LIMIT 1",
+      [req.params.id, businessId]
+    );
+
+    if (!existing.rowCount) {
+      return res.status(404).json({ error: "Invoice not found." });
+    }
+
+    if (!existing.rows[0].deleted_at) {
+      return res.status(409).json({ error: "Invoice is not deleted." });
+    }
+
+    const result = await pool.query(
+      `UPDATE invoices_v1
+          SET deleted_at = NULL,
+              deleted_by = NULL,
+              updated_at = NOW()
+        WHERE id = $1
+          AND business_id = $2
+        RETURNING *`,
+      [req.params.id, businessId]
+    );
+
+    await recordAuditEventForRequest(pool, req, {
+      userId: req.user.id,
+      businessId,
+      action: "invoice.restored",
+      metadata: {
+        invoice_id: req.params.id,
+        status: existing.rows[0].status
+      }
+    });
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    logError("PATCH /invoices-v1/:id/restore error:", err);
+    res.status(500).json({ error: "Failed to restore invoice." });
+  }
+});
+
 module.exports = router;
