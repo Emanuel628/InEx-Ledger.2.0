@@ -18,10 +18,20 @@ function fmtMoney(amount, currency) {
   }).format(n);
 }
 
-function fmtDate(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("en-CA", { year: "numeric", month: "short", day: "numeric" });
+function fmtDate(value) {
+  if (!value) return "—";
+
+  const raw = String(value);
+  const dateOnly = raw.includes("T") ? raw.slice(0, 10) : raw;
+  const d = new Date(`${dateOnly}T00:00:00`);
+
+  if (Number.isNaN(d.getTime())) return "—";
+
+  return d.toLocaleDateString("en-CA", {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  });
 }
 
 function isOverdue(invoice) {
