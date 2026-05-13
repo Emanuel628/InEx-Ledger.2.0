@@ -226,7 +226,7 @@ router.get("/:id", async (req, res) => {
     if (!await requireProPlan(businessId, res)) return;
 
     const result = await pool.query(
-      "SELECT * FROM invoices_v1 WHERE id = $1 AND business_id = $2 LIMIT 1",
+      "SELECT * FROM invoices_v1 WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1",
       [req.params.id, businessId]
     );
     if (!result.rowCount) return res.status(404).json({ error: "Invoice not found." });
@@ -248,7 +248,7 @@ router.put("/:id", async (req, res) => {
     if (!await requireProPlan(businessId, res)) return;
 
     const existing = await pool.query(
-      "SELECT id, status FROM invoices_v1 WHERE id = $1 AND business_id = $2 LIMIT 1",
+      "SELECT id, status FROM invoices_v1 WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1",
       [req.params.id, businessId]
     );
     if (!existing.rowCount) return res.status(404).json({ error: "Invoice not found." });
