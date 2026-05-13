@@ -533,6 +533,48 @@ if (detailEmailReplyBtn) {
   }
 }
 
+function renderMessageThread(messages, currentUserId) {
+  if (!Array.isArray(messages) || !messages.length) {
+    return "";
+  }
+
+  return messages.map((message, index) => {
+    const isCurrentUser = message.sender_id === currentUserId;
+    const isExternal = !message.sender_id && message.external_sender_email;
+
+    const senderLabel = isCurrentUser
+      ? "You"
+      : isExternal
+        ? (message.external_sender_name || message.external_sender_email || "Customer")
+        : (message.sender_name || message.sender_email || "Unknown");
+
+    const senderEmail = isExternal
+      ? message.external_sender_email
+      : isCurrentUser
+        ? message.sender_email
+        : message.sender_email;
+
+    const dateLabel = formatRelativeDate(message.created_at);
+    const subject = message.subject || "(No subject)";
+    const body = message.body || "";
+    const isLatest = index === messages.length - 1;
+
+    return `
+      <article class="message-thread-item${isLatest ? " is-latest" : ""}${isCurrentUser ? " is-outbound" : " is-inbound"}">
+        <div class="message-thread-header">
+          <div>
+            <div class="message-thread-sender">${escapeHtml(senderLabel)}</div>
+            ${senderEmail ? `<div class="message-thread-email">${escapeHtml(senderEmail)}</div>` : ""}
+          </div>
+          <div class="message-thread-date">${escapeHtml(dateLabel)}</div>
+        </div>
+        <div class="message-thread-subject">${escapeHtml(subject)}</div>
+        <div class="message-thread-body">${escapeHtml(body)}</div>
+      </article>
+    `;
+  }).join("");
+}
+
 function closeMessageDetail() {
   document.getElementById("messageDetailOverlay")?.classList.add("hidden");
   _currentMsgId = null;
