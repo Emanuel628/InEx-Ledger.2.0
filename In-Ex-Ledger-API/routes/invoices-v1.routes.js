@@ -130,12 +130,16 @@ async function generateInvoiceNumber(businessId) {
 }
 
 /* ── GET /api/invoices-v1 ── list invoices */
+/* ── GET /api/invoices-v1 ── list invoices */
 router.get("/", async (req, res) => {
   try {
-    const status = req.query.status ? String(req.query.status).toLowerCase() : null;
-const params = [businessId];
+    const businessId = await resolveBusinessIdForUser(req.user);
+    if (!await requireProPlan(businessId, res)) return;
 
-let where = "WHERE business_id = $1 AND deleted_at IS NULL";
+    const status = req.query.status ? String(req.query.status).toLowerCase() : null;
+    const params = [businessId];
+
+    let where = "WHERE business_id = $1 AND deleted_at IS NULL";
 
 if (status === "deleted") {
   where = "WHERE business_id = $1 AND deleted_at IS NOT NULL";
