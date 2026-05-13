@@ -263,7 +263,7 @@ function collectInvoicePayload(status) {
     customer_email: document.getElementById("invClientEmail")?.value?.trim() || "",
     issue_date: document.getElementById("invIssueDate")?.value || "",
     due_date: document.getElementById("invDueDate")?.value || "",
-    currency: document.getElementById("invCurrency")?.value || "CAD",
+    currency: document.getElementById("invCurrency")?.value || invoiceDefaultCurrency,
     tax_rate: taxRatePct / 100,
     line_items: lineItems,
     notes: document.getElementById("invNotes")?.value?.trim() || "",
