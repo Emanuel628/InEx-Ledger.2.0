@@ -132,16 +132,17 @@ async function generateInvoiceNumber(businessId) {
 /* ── GET /api/invoices-v1 ── list invoices */
 router.get("/", async (req, res) => {
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
-    if (!await requireProPlan(businessId, res)) return;
-
     const status = req.query.status ? String(req.query.status).toLowerCase() : null;
-    const params = [businessId];
-    let where = "WHERE business_id = $1 AND deleted_at IS NULL";
-    if (status && VALID_STATUSES.has(status)) {
-      where += " AND status = $2";
-      params.push(status);
-    }
+const params = [businessId];
+
+let where = "WHERE business_id = $1 AND deleted_at IS NULL";
+
+if (status === "deleted") {
+  where = "WHERE business_id = $1 AND deleted_at IS NOT NULL";
+} else if (status && VALID_STATUSES.has(status)) {
+  where += " AND status = $2";
+  params.push(status);
+}
 
     const result = await pool.query(
       `SELECT id, invoice_number, customer_name, customer_email, issue_date, due_date,
