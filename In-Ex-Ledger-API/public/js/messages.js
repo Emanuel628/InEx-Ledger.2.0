@@ -500,23 +500,22 @@ _currentThread = messages;
         : `${translate("messages_detail_from", "From")} <strong>${escapeHtml(counterpart)}</strong> - ${escapeHtml(dateStr)}`;
     }
     if (bodyEl) {
-      bodyEl.textContent = message.body || "";
-      // For invoice-related messages, append an "Open invoice" link so the
-      // user can jump straight to the source invoice from a reply or the
-      // outbound record.
-      if (message.invoice_id) {
-        const link = document.createElement("a");
-        link.href = `invoices?focus=${encodeURIComponent(message.invoice_id)}`;
-        link.className = "message-invoice-link";
-        link.textContent = message.invoice_number
-          ? `Open invoice ${message.invoice_number}`
-          : "Open invoice";
-        const wrap = document.createElement("p");
-        wrap.style.marginTop = "12px";
-        wrap.appendChild(link);
-        bodyEl.appendChild(wrap);
-      }
-    }
+  bodyEl.innerHTML = renderMessageThread(messages, currentUserId);
+
+  if (message.invoice_id) {
+    const link = document.createElement("a");
+    link.href = `invoices?focus=${encodeURIComponent(message.invoice_id)}`;
+    link.className = "message-invoice-link";
+    link.textContent = message.invoice_number
+      ? `Open invoice ${message.invoice_number}`
+      : "Open invoice";
+
+    const wrap = document.createElement("p");
+    wrap.style.marginTop = "12px";
+    wrap.appendChild(link);
+    bodyEl.appendChild(wrap);
+  }
+}}
     if (replyArea) replyArea.classList.add("hidden");
     if (replyInput) replyInput.value = "";
     // Inbound invoice replies have no in-app sender to reply to; hide the
