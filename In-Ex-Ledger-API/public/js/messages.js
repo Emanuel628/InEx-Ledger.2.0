@@ -571,7 +571,7 @@ function renderMessageThread(messages, currentUserId) {
     const isUnreadForUser = message.receiver_id === currentUserId && !message.is_read;
     
     return `
-      <article class="message-thread-item${isLatest ? " is-latest" : ""}${isCurrentUser ? " is-outbound" : " is-inbound"}">
+      <article id="message-thread-item-${escapeHtml(message.id)}" class="message-thread-item${isLatest ? " is-latest" : ""}${isCurrentUser ? " is-outbound" : " is-inbound"}${isUnreadForUser ? " is-unread-thread-message" : ""}">
         <div class="message-thread-header">
           <div>
             <div class="message-thread-sender">${escapeHtml(senderLabel)}</div>
