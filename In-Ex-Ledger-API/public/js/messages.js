@@ -459,10 +459,20 @@ function wireDetailPanel() {
 
 async function openMessageDetail(id) {
   try {
-    const response = await apiFetch(`/api/messages/${encodeURIComponent(id)}`);
-    if (!response || !response.ok) throw new Error("Failed to open message");
+    const response = await apiFetch(`/api/messages/${encodeURIComponent(id)}/thread`);
+if (!response || !response.ok) throw new Error("Failed to open message");
 
-    const { message } = await response.json();
+const { thread } = await response.json();
+const messages = Array.isArray(thread) ? thread : [];
+const message = messages[messages.length - 1];
+
+if (!message) {
+  throw new Error("Message not found");
+}
+
+_currentThread = messages;
+    
+    
     const currentUserId = getCurrentUserId();
     const isSentMessage = message.sender_id === currentUserId;
     const counterpart = isSentMessage
