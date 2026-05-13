@@ -574,6 +574,8 @@ function renderMessageThread(messages, currentUserId) {
       : isCurrentUser
         ? message.sender_email
         : message.sender_email;
+      
+    const showSenderEmail = senderEmail && senderLabel && String(senderEmail).toLowerCase() !== String(senderLabel).toLowerCase();
 
     const dateLabel = formatRelativeDate(message.created_at);
     const subject = message.subject || "(No subject)";
