@@ -421,7 +421,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   document.getElementById("invoiceDeleteModal").classList.remove("hidden");
-}
   });
 
   document.getElementById("invoiceDeleteCancel")?.addEventListener("click", () => {
