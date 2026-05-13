@@ -44,6 +44,7 @@ let _currentFilter = "messages";
 let _currentMsgId = null;
 let _currentMsgReceiverId = null;
 let _currentReplyMode = "in-app";
+let _currentThread = [];
 let _contacts = [];
 let _mailboxMessages = [];
 let _lastRefreshAt = null;
