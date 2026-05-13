@@ -360,6 +360,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   const filterSelect = document.getElementById("invoiceStatusFilter");
   if (filterSelect && invoiceStatusFilter) filterSelect.value = invoiceStatusFilter;
 
+  document.querySelectorAll(".app-sidebar .sidebar-link").forEach((link) => {
+  link.classList.remove("is-active");
+});
+
+const sidebarMap = {
+  "": "sidebarAll",
+  draft: "sidebarDraft",
+  sent: "sidebarSent",
+  paid: "sidebarPaid",
+  deleted: "sidebarDeleted"
+};
+
+const activeSidebarId = sidebarMap[invoiceStatusFilter] || "sidebarAll";
+document.getElementById(activeSidebarId)?.classList.add("is-active");
   await loadInvoices();
 
   // Auto-open the New Invoice panel when arriving via ?new=1 (e.g. from the
