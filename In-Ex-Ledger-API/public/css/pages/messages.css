@@ -1162,6 +1162,17 @@
   color: #1e293b;
 }
 
+.message-row.is-unread {
+  background: rgba(239, 246, 255, 0.9);
+  border-color: rgba(37, 99, 235, 0.28);
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.08);
+}
+
+.message-thread-item.is-unread-thread-message {
+  outline: 2px solid rgba(37, 99, 235, 0.28);
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.10);
+}
+
 @media (max-width: 520px) {
   .messages-page-actions,
   .messages-panel-kickers {
