@@ -139,6 +139,44 @@ function pickBody(payload) {
     || String(payload?.html || "").slice(0, 50000);
 }
 
+function cleanInboundReplyBody(rawBody) {
+  const body = String(rawBody || "").replace(/\r\n/g, "\n").trim();
+
+  if (!body) return "";
+
+  const cutMarkers = [
+    /^On .+ wrote:$/im,
+    /^From:\s.+$/im,
+    /^Sent:\s.+$/im,
+    /^To:\s.+$/im,
+    /^Subject:\s.+$/im,
+    /^-{2,}\s*Original Message\s*-{2,}$/im,
+    /^_{5,}$/im
+  ];
+
+  let cutIndex = -1;
+
+  for (const marker of cutMarkers) {
+    const match = body.match(marker);
+    if (match && typeof match.index === "number") {
+      if (cutIndex === -1 || match.index < cutIndex) {
+        cutIndex = match.index;
+      }
+    }
+  }
+
+  let cleaned = cutIndex >= 0 ? body.slice(0, cutIndex) : body;
+
+  cleaned = cleaned
+    .split("\n")
+    .filter((line) => !line.trim().startsWith(">"))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return cleaned;
+}
+
 /**
  * POST /api/email/inbound
  * Public webhook entry point.
@@ -215,10 +253,13 @@ const from = pickFromAddress(receivedEmail || payload);
   `Re: Invoice ${invoice.invoice_number}`
 ).slice(0, 200);
 
+const rawBody =
+  String(receivedEmail?.text || "").trim() ||
+  String(receivedEmail?.html || "").trim() ||
+  pickBody(payload).trim();
+
 const body =
-  String(receivedEmail?.text || "").trim().slice(0, 50000) ||
-  String(receivedEmail?.html || "").trim().slice(0, 50000) ||
-  pickBody(payload).trim() ||
+  cleanInboundReplyBody(rawBody).slice(0, 50000) ||
   "(reply received — body not included in Resend webhook metadata)";
 
     const messageId = crypto.randomUUID();
