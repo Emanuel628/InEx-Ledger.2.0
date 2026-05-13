@@ -400,6 +400,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
 
+  await loadInvoiceDefaults();
+
   // Status filter from URL
   const params = new URLSearchParams(window.location.search);
   invoiceStatusFilter = params.get("status") || "";
