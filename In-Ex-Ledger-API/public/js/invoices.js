@@ -387,41 +387,42 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Table action delegation
   document.getElementById("invoiceTableBody")?.addEventListener("click", async (e) => {
-    const btn = e.target.closest("[data-action]");
-    if (!btn) return;
-    const id = btn.dataset.id;
-    const action = btn.dataset.action;
+  const btn = e.target.closest("[data-action]");
+  if (!btn) return;
 
-    if (action === "edit") {
-      openInvoicePanel(id);
-    } else if (action === "email") {
-      openEmailModal(id);
-    } else if (action === "pay") {
-      if (confirm("Mark this invoice as paid?")) await updateInvoiceStatus(id, "paid");
-    } else if (action === "delete") {
-      pendingDeleteId = id;
+  const id = btn.dataset.id;
+  const action = btn.dataset.action;
+
+  if (action === "edit") {
+    openInvoicePanel(id);
+  } else if (action === "email") {
+    openEmailModal(id);
+  } else if (action === "pay") {
+    if (confirm("Mark this invoice as paid?")) await updateInvoiceStatus(id, "paid");
+  } else if (action === "delete") {
+    pendingDeleteId = id;
+
+    const inv = invoiceList.find((invoice) => invoice.id === id);
+    const wasSent = inv && inv.status !== "draft";
+
+    const title = document.querySelector("#invoiceDeleteModal h3");
+    const copy = document.querySelector("#invoiceDeleteModal p");
+
+    if (title) {
+      title.textContent = wasSent
+        ? "Delete sent invoice?"
+        : "Delete this draft invoice?";
     }
 
-  const inv = invoiceList.find((invoice) => invoice.id === id);
-  const wasSent = inv && inv.status !== "draft";
+    if (copy) {
+      copy.textContent = wasSent
+        ? "This invoice has already been sent or recorded. Deleting it may remove history connected to customer communication and payment tracking. Are you sure you want to delete it?"
+        : "This draft invoice has not been sent yet. This cannot be undone.";
+    }
 
-  const title = document.querySelector("#invoiceDeleteModal h3");
-  const copy = document.querySelector("#invoiceDeleteModal p");
-
-  if (title) {
-    title.textContent = wasSent
-      ? "Delete sent invoice?"
-      : "Delete this draft invoice?";
+    document.getElementById("invoiceDeleteModal").classList.remove("hidden");
   }
-
-  if (copy) {
-    copy.textContent = wasSent
-      ? "This invoice has already been sent or recorded. Deleting it may remove history connected to customer communication and payment tracking. Are you sure you want to delete it?"
-      : "This draft invoice has not been sent yet. This cannot be undone.";
-  }
-
-  document.getElementById("invoiceDeleteModal").classList.remove("hidden");
-  });
+});
 
   document.getElementById("invoiceDeleteCancel")?.addEventListener("click", () => {
     document.getElementById("invoiceDeleteModal").classList.add("hidden");
