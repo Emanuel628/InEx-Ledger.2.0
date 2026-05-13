@@ -270,7 +270,7 @@ router.put("/:id", async (req, res) => {
        SET customer_name=$1, customer_email=$2, issue_date=$3, due_date=$4, status=$5,
            currency=$6, line_items=$7, subtotal=$8, tax_rate=$9, tax_amount=$10,
            total_amount=$11, notes=$12, updated_at=now()
-       WHERE id=$13 AND business_id=$14
+       WHERE id=$13 AND business_id=$14 AND deleted_at IS NULL
        RETURNING *`,
       [customer_name, customer_email, issue_date, due_date, status, currency,
        JSON.stringify(line_items), subtotal, tax_rate, tax_amount, total_amount, notes,
@@ -298,7 +298,7 @@ router.patch("/:id/status", async (req, res) => {
     if (!await requireProPlan(businessId, res)) return;
 
     const result = await pool.query(
-      "UPDATE invoices_v1 SET status=$1, updated_at=now() WHERE id=$2 AND business_id=$3 RETURNING *",
+      "UPDATE invoices_v1 SET status=$1, updated_at=now() WHERE id=$2 AND business_id=$3 AND deleted_at IS NULL RETURNING *",
       [newStatus, req.params.id, businessId]
     );
     if (!result.rowCount) return res.status(404).json({ error: "Invoice not found." });
@@ -324,6 +324,7 @@ router.post("/:id/send", async (req, res) => {
          FROM invoices_v1 i
          JOIN businesses b ON b.id = i.business_id
         WHERE i.id = $1 AND i.business_id = $2
+        AND i.deleted_at IS NULL
         LIMIT 1`,
       [req.params.id, businessId]
     );
