@@ -417,24 +417,46 @@ router.post("/:id/send", async (req, res) => {
 });
 
 /* ── DELETE /api/invoices-v1/:id ── delete draft invoice */
+/* ── DELETE /api/invoices-v1/:id ── soft-delete invoice */
 router.delete("/:id", async (req, res) => {
   if (!UUID_RE.test(req.params.id)) {
     return res.status(400).json({ error: "Invalid invoice ID." });
   }
+
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     if (!await requireProPlan(businessId, res)) return;
 
     const existing = await pool.query(
-      "SELECT status FROM invoices_v1 WHERE id = $1 AND business_id = $2 LIMIT 1",
+      "SELECT id, status, deleted_at FROM invoices_v1 WHERE id = $1 AND business_id = $2 LIMIT 1",
       [req.params.id, businessId]
     );
-    if (!existing.rowCount) return res.status(404).json({ error: "Invoice not found." });
-    if (existing.rows[0].status !== "draft") {
-      return res.status(409).json({ error: "Only draft invoices can be deleted." });
+
+    if (!existing.rowCount || existing.rows[0].deleted_at) {
+      return res.status(404).json({ error: "Invoice not found." });
     }
 
-    await pool.query("DELETE FROM invoices_v1 WHERE id=$1 AND business_id=$2", [req.params.id, businessId]);
+    await pool.query(
+      `UPDATE invoices_v1
+          SET deleted_at = NOW(),
+              deleted_by = $1,
+              updated_at = NOW()
+        WHERE id = $2
+          AND business_id = $3
+          AND deleted_at IS NULL`,
+      [req.user.id, req.params.id, businessId]
+    );
+
+    await recordAuditEventForRequest(pool, req, {
+      userId: req.user.id,
+      businessId,
+      action: "invoice.deleted",
+      metadata: {
+        invoice_id: req.params.id,
+        previous_status: existing.rows[0].status
+      }
+    });
+
     res.json({ ok: true });
   } catch (err) {
     logError("DELETE /invoices-v1/:id error:", err);
