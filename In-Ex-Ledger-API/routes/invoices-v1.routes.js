@@ -137,7 +137,7 @@ router.get("/", async (req, res) => {
 
     const status = req.query.status ? String(req.query.status).toLowerCase() : null;
     const params = [businessId];
-    let where = "WHERE business_id = $1";
+    let where = "WHERE business_id = $1 AND deleted_at IS NULL";
     if (status && VALID_STATUSES.has(status)) {
       where += " AND status = $2";
       params.push(status);
