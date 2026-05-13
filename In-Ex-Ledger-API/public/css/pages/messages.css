@@ -944,7 +944,7 @@
   color: #223246;
   font-size: 14px;
   line-height: 1.68;
-  white-space: pre-wrap;
+  white-space: normal;
   word-break: break-word;
 }
 
