@@ -329,7 +329,7 @@ router.post("/:id/reply-email", async (req, res) => {
          JOIN businesses b ON b.id = inv.business_id
         WHERE m.id = $1
           AND m.receiver_id = $2
-          AND m.message_type = 'invoice_reply'
+          AND m.message_type IN ('invoice_sent', 'invoice_reply')
           AND m.external_sender_email IS NOT NULL
         LIMIT 1`,
       [messageId, req.user.id]
