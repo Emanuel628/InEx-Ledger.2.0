@@ -348,6 +348,24 @@ async function deleteInvoice(id) {
   }
 }
 
+async function restoreInvoice(id) {
+  try {
+    const res = await apiFetch(`/api/invoices-v1/${id}/restore`, {
+      method: "PATCH"
+    });
+
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(d.error || "Failed to restore invoice.");
+      return;
+    }
+
+    await loadInvoices();
+  } catch (err) {
+    alert("An unexpected error occurred.");
+  }
+}
+
 /* ── Event wiring ──────────────────────────────────────── */
 
 document.addEventListener("DOMContentLoaded", async () => {
