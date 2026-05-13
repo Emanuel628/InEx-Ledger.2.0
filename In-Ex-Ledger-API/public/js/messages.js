@@ -532,7 +532,18 @@ if (detailEmailReplyBtn) {
 }
 
     document.getElementById("messageDetailOverlay")?.classList.remove("hidden");
+    setTimeout(() => {
+      const unreadMessage = [...document.querySelectorAll(".message-thread-item.is-unread-thread-message")].at(-1);
+      const latestMessage = [...document.querySelectorAll(".message-thread-item")].at(-1);
+      const target = unreadMessage || latestMessage;
 
+      target?.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    }, 80);
+    
+    
     _mailboxMessages = _mailboxMessages.map((item) => item.id === message.id
       ? { ...item, is_read: true }
       : item);
