@@ -534,10 +534,6 @@ _currentThread = messages;
       detailEmailReplyBtn.hidden = !canEmailReply;
     }
 
-    if (detailEmailReplyBtn) {
-      detailEmailReplyBtn.hidden = !isInvoiceReply || !message.external_sender_email;
-    }
-
     document.getElementById("messageDetailOverlay")?.classList.remove("hidden");
     setTimeout(() => {
       const unreadMessage = [...document.querySelectorAll(".message-thread-item.is-unread-thread-message")].at(-1);
