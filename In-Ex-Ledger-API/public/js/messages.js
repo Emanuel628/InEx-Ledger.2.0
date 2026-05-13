@@ -521,15 +521,22 @@ _currentThread = messages;
     if (replyInput) replyInput.value = "";
     // Inbound invoice replies have no in-app sender to reply to; hide the
     // in-app reply UI in that case.
-    const isInvoiceReply = message.message_type === "invoice_reply";
-    _currentReplyMode = isInvoiceReply ? "email" : "in-app";
-    if (detailReplyBtn) {detailReplyBtn.hidden = isSentMessage || isInvoiceReply;
-      
+    const canEmailReply =
+    Boolean(message.invoice_id) &&
+    Boolean(message.external_sender_email) && ["invoice_sent", "invoice_reply"].includes(message.message_type); 
+    _currentReplyMode = canEmailReply ? "email" : "in-app";
+
+    if (detailReplyBtn) {
+      detailReplyBtn.hidden = isSentMessage || canEmailReply;
     }
 
-if (detailEmailReplyBtn) {
-  detailEmailReplyBtn.hidden = !isInvoiceReply || !message.external_sender_email;
-}
+    if (detailEmailReplyBtn) {
+      detailEmailReplyBtn.hidden = !canEmailReply;
+    }
+
+    if (detailEmailReplyBtn) {
+      detailEmailReplyBtn.hidden = !isInvoiceReply || !message.external_sender_email;
+    }
 
     document.getElementById("messageDetailOverlay")?.classList.remove("hidden");
     setTimeout(() => {
