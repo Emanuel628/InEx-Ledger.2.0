@@ -587,6 +587,7 @@ function renderMessageThread(messages, currentUserId) {
     const dateLabel = formatRelativeDate(message.created_at);
     const subject = message.subject || "(No subject)";
     const body = message.body || "";
+    const showThreadSubject = message.message_type !== "invoice_sent";
     const isLatest = index === messages.length - 1;
     const isUnreadForUser = message.receiver_id === currentUserId && !message.is_read;
     
@@ -599,7 +600,7 @@ function renderMessageThread(messages, currentUserId) {
           </div>
           <div class="message-thread-date">${escapeHtml(dateLabel)}</div>
         </div>
-        <div class="message-thread-subject">${escapeHtml(subject)}</div>
+        ${showThreadSubject ? `<div class="message-thread-subject">${escapeHtml(subject)}</div>` : ""}
         <div class="message-thread-body">${escapeHtml(body)}</div>
       </article>
     `;
