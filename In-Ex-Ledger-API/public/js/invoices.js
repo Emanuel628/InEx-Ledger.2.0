@@ -433,7 +433,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (pendingDeleteId) {
       await deleteInvoice(pendingDeleteId);
       pendingDeleteId = null;
-    });
+      }
+  });
 
   document.getElementById("invoiceStatusFilter")?.addEventListener("change", async (e) => {
     invoiceStatusFilter = e.target.value;
