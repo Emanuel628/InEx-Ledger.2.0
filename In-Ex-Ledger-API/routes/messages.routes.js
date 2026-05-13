@@ -162,7 +162,7 @@ router.get("/inbox", async (req, res) => {
     )
     SELECT r.*,
            r.thread_count,
-           r.thread_has_unread
+           r.thread_has_unread,
            COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
            s.email AS sender_email,
            COALESCE(u.display_name, u.full_name, u.email) AS receiver_name,
