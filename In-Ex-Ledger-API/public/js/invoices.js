@@ -103,11 +103,14 @@ function renderInvoiceTable() {
       <td><span class="badge ${statusClass}">${escapeHtml(STATUS_LABELS[inv.status] || inv.status)}</span></td>
       <td class="col-amount">${escapeHtml(fmtMoney(inv.total_amount, inv.currency))}</td>
       <td class="col-actions">
-        <button class="tx-action-btn" data-action="edit" data-id="${escapeHtml(inv.id)}" title="Edit">Edit</button>
-        ${inv.status === "draft" ? `<button class="tx-action-btn action-email" data-action="email" data-id="${escapeHtml(inv.id)}" title="Email invoice">Email</button>` : ""}
-        ${inv.status === "sent" ? `<button class="tx-action-btn action-pay" data-action="pay" data-id="${escapeHtml(inv.id)}" title="Mark as paid">Mark paid</button>` : ""}
-        <button class="tx-action-btn action-delete" data-action="delete" data-id="${escapeHtml(inv.id)}" title="Delete">Delete</button>
-      </td>
+      ${invoiceStatusFilter === "deleted"
+        ? `<button class="tx-action-btn action-restore" data-action="restore" data-id="${escapeHtml(inv.id)}" title="Restore">Restore</button>`: `
+      <button class="tx-action-btn" data-action="edit" data-id="${escapeHtml(inv.id)}" title="Edit">Edit</button>
+      ${inv.status === "draft" ? `<button class="tx-action-btn action-email" data-action="email" data-id="${escapeHtml(inv.id)}" title="Email invoice">Email</button>` : ""}
+      ${inv.status === "sent" ? `<button class="tx-action-btn action-pay" data-action="pay" data-id="${escapeHtml(inv.id)}" title="Mark paid">Mark paid</button>` : ""}
+      <button class="tx-action-btn action-delete" data-action="delete" data-id="${escapeHtml(inv.id)}" title="Delete">Delete</button>
+    `}
+</td>
     </tr>`;
   }).join("");
 }
