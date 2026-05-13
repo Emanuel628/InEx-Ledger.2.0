@@ -260,15 +260,50 @@ async function saveInvoice(status) {
       return;
     }
 
+    if (status === "sent") {
+  await sendInvoiceAfterSave(data);
+    }
+
     closeInvoicePanel();
     await loadInvoices();
+    
   } catch (err) {
-    errorEl.textContent = "An unexpected error occurred. Please try again.";
-    errorEl.hidden = false;
+  errorEl.textContent = err.message || "An unexpected error occurred. Please try again.";
+  errorEl.hidden = false;
+  
   } finally {
     submitBtn.disabled = false;
     draftBtn.disabled = false;
   }
+}
+
+async function sendInvoiceAfterSave(invoice) {
+  const invoiceId = invoice?.id;
+  const recipient = String(invoice?.customer_email || "").trim();
+
+  if (!invoiceId) {
+    throw new Error("Invoice was saved, but no invoice ID was returned.");
+  }
+
+  if (!recipient || !recipient.includes("@")) {
+    throw new Error("Invoice was saved, but no valid customer email was found.");
+  }
+
+  const res = await apiFetch(`/api/invoices-v1/${encodeURIComponent(invoiceId)}/send`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      recipient_email: recipient
+    })
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data.error || "Invoice was saved, but the email failed to send.");
+  }
+
+  return data;
 }
 
 async function updateInvoiceStatus(id, status) {
