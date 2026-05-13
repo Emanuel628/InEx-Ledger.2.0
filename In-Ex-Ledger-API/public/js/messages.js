@@ -538,6 +538,7 @@ function closeMessageDetail() {
   _currentMsgId = null;
   _currentMsgReceiverId = null;
   _currentReplyMode = "in-app";
+  _currentThread = [];
 }
 
 async function sendReply() {
