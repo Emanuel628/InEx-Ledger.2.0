@@ -187,7 +187,7 @@ function populateInvoiceForm(inv) {
   document.getElementById("invClientEmail").value = inv.customer_email || "";
   document.getElementById("invIssueDate").value = inv.issue_date || "";
   document.getElementById("invDueDate").value = inv.due_date || "";
-  document.getElementById("invCurrency").value = inv.currency || "CAD";
+  document.getElementById("invCurrency").value = inv.currency || invoiceDefaultCurrency;
   document.getElementById("invTaxRate").value = Number((Number(inv.tax_rate || 0) * 100).toFixed(3));
   document.getElementById("invNotes").value = inv.notes || "";
 
