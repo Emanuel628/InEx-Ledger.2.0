@@ -86,6 +86,20 @@ function renderVerificationLink(url) {
   linkNode.textContent = url || "";
 }
 
+function safeInternalNext(value, fallback = "/onboarding") {
+  const next = String(value || "").trim();
+
+  if (!next.startsWith("/") || next.startsWith("//")) {
+    return fallback;
+  }
+
+  if (/[\r\n]/.test(next)) {
+    return fallback;
+  }
+
+  return next;
+}
+
 function consumeVerifiedSessionFromHash() {
   const hash = String(window.location.hash || "").replace(/^#/, "");
   if (!hash) {
