@@ -61,7 +61,7 @@ test("getInvoiceFromEmail falls back through INVOICE_FROM_EMAIL -> RESEND_FROM_E
 
 test("buildReplyToken returns plain id when no HMAC secret configured", () => {
   withEnv({ INVOICE_REPLY_HMAC_SECRET: undefined, CSRF_SECRET: undefined }, () => {
-    assert.equal(buildReplyToken(SAMPLE_INVOICE.id), SAMPLE_INVOICE.id);
+    assert.equal(buildReplyToken(SAMPLE_INVOICE.id), SAMPLE_INVOICE.id.replace(/-/g, "").toLowerCase());
   });
 });
 
@@ -113,7 +113,7 @@ test("buildReplyToAddress plus-addresses the configured base", () => {
     CSRF_SECRET: undefined
   }, () => {
     const addr = buildReplyToAddress(SAMPLE_INVOICE.id);
-    assert.equal(addr, `invoices+${SAMPLE_INVOICE.id}@inexledger.com`);
+    assert.equal(addr, `invoices+${SAMPLE_INVOICE.id.replace(/-/g, "").toLowerCase()}@inexledger.com`);
   });
 });
 
@@ -212,7 +212,10 @@ test("sendInvoiceEmail passes from, to, subject, reply_to to the Resend client",
     assert.equal(calls[0].from, "InEx <pay@inex.app>");
     assert.equal(calls[0].to, "billing@acme.com");
     assert.ok(calls[0].subject.includes("INV-2026-0001"));
-    assert.equal(calls[0].reply_to, `invoices+${SAMPLE_INVOICE.id}@inex.app`);
+    assert.equal(
+      calls[0].reply_to,
+      `Sample Co Billing <invoices+${SAMPLE_INVOICE.id.replace(/-/g, "").toLowerCase()}@inex.app>`
+    );
     assert.equal(result.data.id, "resend-id-1");
   });
 });

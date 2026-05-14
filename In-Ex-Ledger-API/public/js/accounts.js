@@ -322,10 +322,16 @@ async function getApiErrorText(response, fallback) {
 
 function extractAccountHints(description) {
   const hints = new Set();
-  const re = /(?:\*{1,4}|[xX]{2,4})(\d{4})\b/g;
+  const desc = String(description || "");
+  // ****1234 or xxxx1234
+  const re1 = /(?:\*{1,4}|[xX]{2,4})[- ]?(\d{4})\b/g;
+  // acct/account/card/checking/chequing/savings [ending [in]] [*x] 1234
+  const re2 = /(?:acct|account|card|chequing|checking|savings|chk|ach)\s*(?:ending\s*(?:in\s*)?)?\s*[*xX]{0,4}(\d{4})\b/gi;
+  // "ending in 1234" or "ending 1234" standalone
+  const re3 = /\bending\s+(?:in\s+)?(\d{4})\b/gi;
   let m;
-  while ((m = re.exec(String(description || ""))) !== null) {
-    hints.add(m[1]);
+  for (const re of [re1, re2, re3]) {
+    while ((m = re.exec(desc)) !== null) hints.add(m[1]);
   }
   return [...hints];
 }
@@ -337,11 +343,13 @@ function detectAccountSuggestions(transactions, existingAccounts) {
   const existingNames = new Set(
     existingAccounts.map(a => String(a.name || "").toLowerCase())
   );
+  const existingIds = new Set(existingAccounts.map(a => String(a.id || "")));
 
   const counts = {};
   const samples = {};
 
   for (const txn of transactions) {
+    // Detect from description text
     for (const last4 of extractAccountHints(txn.description || "")) {
       if (dismissed.has(last4)) continue;
       const display = `****${last4}`;
@@ -349,6 +357,18 @@ function detectAccountSuggestions(transactions, existingAccounts) {
       if ([...existingNames].some(n => n.endsWith(last4))) continue;
       counts[last4] = (counts[last4] || 0) + 1;
       if (!samples[last4]) samples[last4] = String(txn.description || "");
+    }
+
+    // Detect from account_name on the transaction (e.g. imported under an account
+    // whose name itself contains a masked number not in the accounts list)
+    const txnAcctName = String(txn.account_name || txn.accountName || "");
+    for (const last4 of extractAccountHints(txnAcctName)) {
+      if (dismissed.has(last4)) continue;
+      const display = `****${last4}`;
+      if (existingNames.has(display.toLowerCase())) continue;
+      if ([...existingNames].some(n => n.endsWith(last4))) continue;
+      counts[last4] = (counts[last4] || 0) + 1;
+      if (!samples[last4]) samples[last4] = txnAcctName || String(txn.description || "");
     }
   }
 

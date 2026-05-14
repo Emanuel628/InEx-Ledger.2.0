@@ -13,11 +13,37 @@ const pricingState = {
   verifiedPricingCurrency: null
 };
 let currentSubscription = null;
+let pendingDeleteBusinessId = null;
+let subscriptionBusinessesState = {
+  isLoaded: false,
+  error: "",
+  items: [],
+  activeBusinessId: "",
+  billingOwnerBusinessId: ""
+};
 const businessSlotsState = {
   currentAdditionalBusinesses: 0,
   selectedAdditionalBusinesses: 0,
   isSaving: false
 };
+
+function syncSubscriptionBusinessesState(sub = currentSubscription) {
+  const profile = window.__LUNA_ME__ && typeof window.__LUNA_ME__ === "object" ? window.__LUNA_ME__ : {};
+  const businesses = typeof getBusinessCollection === "function"
+    ? getBusinessCollection(profile)
+    : (Array.isArray(profile.businesses) ? profile.businesses : []);
+  const activeBusiness = typeof getActiveBusiness === "function"
+    ? getActiveBusiness(profile)
+    : (profile.active_business || null);
+
+  subscriptionBusinessesState = {
+    isLoaded: true,
+    error: "",
+    items: Array.isArray(businesses) ? businesses : [],
+    activeBusinessId: activeBusiness?.id || profile.active_business_id || profile.business_id || "",
+    billingOwnerBusinessId: sub?.businessId || ""
+  };
+}
 
 function showSubToast(message) {
   const toast = document.getElementById("subToast");
@@ -498,7 +524,7 @@ function buildBusinessRosterMarkup(sub) {
 
   const businesses = Array.isArray(subscriptionBusinessesState.items) ? subscriptionBusinessesState.items : [];
   const activeId = subscriptionBusinessesState.activeBusinessId || "";
-  const billingOwnerId = sub?.businessId || "";
+  const billingOwnerId = subscriptionBusinessesState.billingOwnerBusinessId || sub?.businessId || "";
   const canDeleteMultiple = businesses.length > 1;
 
   return `
@@ -771,6 +797,7 @@ async function updateBusinessSlots() {
 function renderBusinessAccessSection(sub) {
   const manager = document.getElementById("businessSlotsManager");
   if (!manager) return;
+  syncSubscriptionBusinessesState(sub);
 
   const isProTier = !!sub && sub.effectiveTier === "v1";
   const isActiveTrial = isProTier && sub.isTrialing;
@@ -813,31 +840,37 @@ function renderBusinessAccessSection(sub) {
 
   if (!isProTier) {
     manager.innerHTML = `
+      ${buildBusinessRosterMarkup(sub)}
       ${statsHtml}
       <div class="sub-access-message-card">
         <p class="sub-access-upgrade-note">${escapeHtml(tx("subscription_business_access_upgrade_note"))}</p>
         <p class="sub-access-settings-note">Manage business records from Settings once your plan includes more capacity.</p>
       </div>`;
+    wireBusinessRosterActions();
     return;
   }
 
   if (isCancelingPro) {
     manager.innerHTML = `
+      ${buildBusinessRosterMarkup(sub)}
       ${statsHtml}
       <div class="sub-access-message-card">
         <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceling_help"))}</p>
         <p class="sub-access-settings-note">Delete or edit businesses from Settings. Capacity changes resume once Pro is active again.</p>
       </div>`;
+    wireBusinessRosterActions();
     return;
   }
 
   if (isEndedProWithRemainingAccess) {
     manager.innerHTML = `
+      ${buildBusinessRosterMarkup(sub)}
       ${statsHtml}
       <div class="sub-access-message-card">
         <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceled_help"))}</p>
         <p class="sub-access-settings-note">Business administration stays in Settings. Start a new Pro cycle before changing paid capacity.</p>
       </div>`;
+    wireBusinessRosterActions();
     return;
   }
 
@@ -848,6 +881,7 @@ function renderBusinessAccessSection(sub) {
       : `You have ${total} businesses: 1 included and ${extra} add-ons.`;
 
   manager.innerHTML = `
+    ${buildBusinessRosterMarkup(sub)}
     ${statsHtml}
     <div class="sub-slots-panel">
       <div class="sub-slots-panel-head">
@@ -874,6 +908,7 @@ function renderBusinessAccessSection(sub) {
       </div>
     </div>`;
 
+  wireBusinessRosterActions();
   wireSlotActions();
 }
 
@@ -911,6 +946,7 @@ async function loadSubscription() {
     }
 
     currentSubscription = sub;
+    syncSubscriptionBusinessesState(sub);
     if (sub.currency) {
       pricingState.currency = String(sub.currency).toLowerCase();
     }
@@ -1208,8 +1244,14 @@ function wireBusinessDeleteModal() {
         throw new Error(payload?.error || "Failed to delete business.");
       }
 
+      if (Array.isArray(payload?.businesses) && window.__LUNA_ME__ && typeof window.__LUNA_ME__ === "object") {
+        window.__LUNA_ME__.businesses = payload.businesses;
+      }
       if (payload?.active_business && typeof applyActivatedBusinessContext === "function") {
         applyActivatedBusinessContext(payload.active_business);
+      }
+      if (payload?.subscription && typeof applySubscriptionState === "function") {
+        applySubscriptionState(payload.subscription);
       }
       showSubToast("Business deleted.");
       closeBusinessDeleteModal();
@@ -1283,6 +1325,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   manageBillingBtn?.addEventListener("click", openCustomerPortal);
 
   wireFreeTierModal();
+  wireBusinessDeleteModal();
 
   const cancelBtn = document.getElementById("subCancelBtn");
   const cancelModal = document.getElementById("subCancelModal");

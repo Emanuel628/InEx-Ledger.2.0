@@ -553,6 +553,7 @@ test("mfa verification refuses to issue session when user becomes unverified", a
     const verifyResponse = await request(app)
       .post("/api/auth/mfa/verify")
       .set("User-Agent", "TestBrowser/1.0")
+      .set(makeCsrfHeaders())
       .send({
         mfaToken: loginResponse.body.mfa_token,
         code: codeMatch[1],
@@ -591,10 +592,11 @@ test("mfa sign-in trusts the device and skips another code on the next login", a
     const verifyResponse = await request(app)
       .post("/api/auth/mfa/verify")
       .set("User-Agent", "TestBrowser/1.0")
+      .set(makeCsrfHeaders())
       .send({
         mfaToken: firstLogin.body.mfa_token,
         code: codeMatch[1],
-        trustDevice: false
+        trustDevice: true
       });
 
     assert.equal(verifyResponse.status, 200);
@@ -694,6 +696,7 @@ test("mfa resend rotates the pending token and sends a fresh code", async () => 
     const resendResponse = await request(app)
       .post("/api/auth/mfa/resend")
       .set("User-Agent", "TestBrowser/1.0")
+      .set(makeCsrfHeaders())
       .send({ mfaToken: firstToken });
 
     assert.equal(resendResponse.status, 200);
@@ -737,6 +740,7 @@ test("multiple MFA code requests do not immediately invalidate the earlier chall
     const verifyFirst = await request(app)
       .post("/api/auth/mfa/verify")
       .set("User-Agent", "TestBrowser/1.0")
+      .set(makeCsrfHeaders())
       .send({
         mfaToken: firstLogin.body.mfa_token,
         code: firstCode[1]

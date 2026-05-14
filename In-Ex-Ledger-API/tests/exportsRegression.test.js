@@ -369,7 +369,7 @@ test("exports generate route returns the inline PDF buffer and stores only the r
   }
 });
 
-test("exports secure-export falls back to plaintext tax ID when JWE decrypt fails", async () => {
+test("exports secure-export rejects the request when JWE decrypt fails", async () => {
   const fixture = loadExportsRouter({ decryptErrorMessage: "decrypt failed" });
 
   try {
@@ -383,15 +383,13 @@ test("exports secure-export falls back to plaintext tax ID when JWE decrypt fail
         dateRange: { startDate: "2026-04-01", endDate: "2026-04-30" },
         includeTaxId: true,
         taxId_jwe: "broken_jwe",
-        taxId: "12-3456789",
         language: "en",
         currency: "USD",
         templateVersion: "v1"
       });
 
-    assert.equal(response.status, 200);
-    assert.equal(response.headers["content-type"], "application/pdf");
-    assert.match(response.body.toString("latin1"), /\(Tax ID: 12-3456789\) Tj/);
+    assert.equal(response.status, 400);
+    assert.match(String(response.body?.toString("utf8") || ""), /unable to decrypt tax id/i);
   } finally {
     fixture.cleanup();
   }

@@ -843,7 +843,7 @@ async function initAccountSettings() {
   await loadAndDisplaySubscription(statusLabel);
 }
 
-async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBody) {
+async function loadAndDisplaySubscription(statusLabel) {
   if (!statusLabel) return;
   try {
     const res = await apiFetch("/api/billing/subscription");
@@ -885,18 +885,6 @@ async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBod
     syncSettingsOverviewSummaries();
     if (settingsBusinessesState.length) {
       await renderBusinessList();
-    }
-
-    // Show cancel button only for active paid plans that aren't already canceling
-    const canCancel = sub.isPaid && !sub.cancelAtPeriodEnd;
-    if (cancelRow) {
-      cancelRow.hidden = !canCancel;
-    }
-
-    // Update cancel modal body with period end date
-    if (cancelModalBody && sub.currentPeriodEnd) {
-      const endDate = new Date(sub.currentPeriodEnd).toLocaleDateString(resolveDisplayLocale(), { month: "long", day: "numeric", year: "numeric" });
-      cancelModalBody.textContent = interpolateTranslatedMessage("settings_cancel_sub_modal_body_date", { date: endDate });
     }
   } catch (err) {
     console.error("Failed to load subscription for account settings", err);
@@ -2849,11 +2837,7 @@ function initDangerZone() {
           showSettingsToast(t("settings_delete_business_success"));
           closeModal();
           await renderBusinessList();
-          await loadAndDisplaySubscription(
-            document.getElementById("accountSubStatusLabel"),
-            document.getElementById("cancelSubscriptionRow"),
-            document.getElementById("cancelSubModalBody")
-          );
+          await loadAndDisplaySubscription(document.getElementById("accountSubStatusLabel"));
         } catch (err) {
           console.error("Business deletion failed", err);
           showSettingsToast(t("settings_delete_business_error"));
