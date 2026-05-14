@@ -152,7 +152,8 @@ async function savePrivacySettings(req, res) {
     // Determine the analytics_opt_in value to persist.
     // Only update it if a value was explicitly provided; otherwise keep the existing value.
     const nextAnalyticsOptIn = analyticsOptIn !== null ? analyticsOptIn : previousAnalyticsOptIn;
-
+    const nextMarketingEmailOptIn = marketingEmailOptIn !== null ? marketingEmailOptIn : previousMarketingEmailOptIn;
+    
     await pool.query(
       `INSERT INTO user_privacy_settings (user_id, data_sharing_opt_out, consent_given, analytics_opt_in, updated_at)
        VALUES ($1, $2, $3, $4, NOW())
