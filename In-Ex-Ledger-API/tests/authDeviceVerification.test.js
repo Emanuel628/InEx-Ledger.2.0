@@ -872,3 +872,64 @@ test("logout without MFA authentication does not rewrite the browser-level trust
     fixture.cleanup();
   }
 });
+
+test("forgot-password route is reachable and validates missing email with 400", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/auth/forgot-password")
+      .send({});
+
+    assert.equal(response.status, 400);
+    assert.match(String(response.body?.error || ""), /email is required/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("account-recovery route is reachable and validates missing emails with 400", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/auth/account-recovery")
+      .send({});
+
+    assert.equal(response.status, 400);
+    assert.match(String(response.body?.error || ""), /required/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("reset-password route is reachable and validates mismatched passwords with 400", async () => {
+  const fixture = loadAuthRouter({
+    nodeEnv: "test",
+    appBaseUrl: "https://app.inexledger.test"
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/auth/reset-password")
+      .send({
+        token: "tok",
+        password: "CorrectPassword1!",
+        confirmPassword: "DifferentPassword1!"
+      });
+
+    assert.equal(response.status, 400);
+    assert.match(String(response.body?.error || ""), /invalid input|passwords do not match/i);
+  } finally {
+    fixture.cleanup();
+  }
+});

@@ -1873,16 +1873,6 @@ router.post("/mfa/resend", requireCsrfProtection, authLimiter, async (req, res) 
   }
 });
 
-router.all([
-  "/forgot-password",
-  "/account-recovery",
-  "/reset-password",
-  "/recovery-email/request",
-  "/confirm-recovery-email"
-], (_req, res) => {
-  return res.status(404).json({ error: "Not found." });
-});
-
 /**
  * POST /forgot-password
  */
@@ -2182,6 +2172,16 @@ router.get("/confirm-recovery-email", async (req, res) => {
     logError("Confirm recovery email error:", err);
     return res.status(500).send("Recovery email confirmation failed.");
   }
+});
+
+router.all([
+  "/forgot-password",
+  "/account-recovery",
+  "/reset-password",
+  "/recovery-email/request",
+  "/confirm-recovery-email"
+], (_req, res) => {
+  return res.status(404).json({ error: "Not found." });
 });
 
 module.exports = router;

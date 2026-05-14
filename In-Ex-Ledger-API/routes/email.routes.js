@@ -183,12 +183,15 @@ function cleanInboundReplyBody(rawBody) {
  */
 router.post("/inbound", express.json({ limit: "256kb" }), async (req, res) => {
   const expected = String(process.env.INBOUND_EMAIL_WEBHOOK_SECRET || "").trim();
-  if (expected) {
-    const provided = req.get("x-inbound-secret") || req.get("x-webhook-secret") || "";
-    if (!timingSafeStringEqual(provided, expected)) {
-      logWarn("inbound email webhook rejected: bad secret");
-      return res.status(401).json({ ok: false, error: "Invalid webhook secret." });
-    }
+  if (!expected) {
+    logError("inbound email webhook misconfigured: INBOUND_EMAIL_WEBHOOK_SECRET is required");
+    return res.status(503).json({ ok: false, error: "Inbound email webhook is not configured." });
+  }
+
+  const provided = req.get("x-inbound-secret") || req.get("x-webhook-secret") || "";
+  if (!timingSafeStringEqual(provided, expected)) {
+    logWarn("inbound email webhook rejected: bad secret");
+    return res.status(401).json({ ok: false, error: "Invalid webhook secret." });
   }
 
   const payload = req.body || {};

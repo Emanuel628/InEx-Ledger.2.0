@@ -65,8 +65,8 @@ async function loadSessions() {
       throw new Error(payload.error || tx("sessions_error_load") || "Failed to load sessions.");
     }
 
-    const sessions = await res.json();
-    renderSessionsList(sessions);
+    const payload = await res.json();
+    renderSessionsList(payload?.sessions);
   } catch (err) {
     list.innerHTML = "";
     setSessionsMessage(err.message || tx("sessions_error_load") || "Failed to load sessions.", true);

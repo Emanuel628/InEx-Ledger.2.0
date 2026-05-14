@@ -116,13 +116,49 @@ test("POST /api/plaid/connections/:id/sync rejects invalid UUID (400) after conf
   assert.equal(res.status, 401);
 });
 
-test("POST /api/plaid/webhook is public and returns 200 when configured (or 503 otherwise)", async () => {
-  const router = require("../routes/plaid.routes.js");
-  const app = buildApp(router);
-  const res = await request(app)
-    .post("/api/plaid/webhook")
-    .send({ webhook_type: "TRANSACTIONS", webhook_code: "SYNC_UPDATES_AVAILABLE", item_id: "item-1" });
-  // Webhook is unauthenticated; status depends on whether env is set in
-  // the harness. Either way, it must not throw a 500.
-  assert.ok([200, 503].includes(res.status), `expected 200 or 503, got ${res.status}`);
+test("POST /api/plaid/webhook returns 503 when webhook secret is not configured", async () => {
+  const before = process.env.PLAID_WEBHOOK_SECRET;
+  delete process.env.PLAID_WEBHOOK_SECRET;
+  try {
+    const router = require("../routes/plaid.routes.js");
+    const app = buildApp(router);
+    const res = await request(app)
+      .post("/api/plaid/webhook")
+      .send({ webhook_type: "TRANSACTIONS", webhook_code: "SYNC_UPDATES_AVAILABLE", item_id: "item-1" });
+    assert.equal(res.status, 503);
+  } finally {
+    if (before === undefined) delete process.env.PLAID_WEBHOOK_SECRET;
+    else process.env.PLAID_WEBHOOK_SECRET = before;
+  }
+});
+
+test("POST /api/plaid/webhook rejects missing secret and accepts matching secret when configured", async () => {
+  const before = process.env.PLAID_WEBHOOK_SECRET;
+  const beforeClientId = process.env.PLAID_CLIENT_ID;
+  const beforeSecret = process.env.PLAID_SECRET;
+  process.env.PLAID_WEBHOOK_SECRET = "test-plaid-secret";
+  process.env.PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID || "test-client-id";
+  process.env.PLAID_SECRET = process.env.PLAID_SECRET || "test-plaid-api-secret";
+  try {
+    const router = require("../routes/plaid.routes.js");
+    const app = buildApp(router);
+    const rejected = await request(app)
+      .post("/api/plaid/webhook")
+      .send({ webhook_type: "TRANSACTIONS", webhook_code: "SYNC_UPDATES_AVAILABLE", item_id: "item-1" });
+    assert.equal(rejected.status, 401);
+
+    const accepted = await request(app)
+      .post("/api/plaid/webhook")
+      .set("x-plaid-webhook-secret", "test-plaid-secret")
+      .send({ webhook_type: "TRANSACTIONS", webhook_code: "SYNC_UPDATES_AVAILABLE", item_id: "item-1" });
+    assert.equal(accepted.status, 200);
+    assert.equal(accepted.body.ok, true);
+  } finally {
+    if (before === undefined) delete process.env.PLAID_WEBHOOK_SECRET;
+    else process.env.PLAID_WEBHOOK_SECRET = before;
+    if (beforeClientId === undefined) delete process.env.PLAID_CLIENT_ID;
+    else process.env.PLAID_CLIENT_ID = beforeClientId;
+    if (beforeSecret === undefined) delete process.env.PLAID_SECRET;
+    else process.env.PLAID_SECRET = beforeSecret;
+  }
 });

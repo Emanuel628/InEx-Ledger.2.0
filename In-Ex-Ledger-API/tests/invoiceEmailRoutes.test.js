@@ -72,15 +72,39 @@ test("POST /api/invoices-v1/:id/send rejects invalid UUID (400)", async () => {
   assert.equal(res.status, 400);
 });
 
-test("POST /api/email/inbound is public and ignores payloads with no recipients (200 ok)", async () => {
-  const router = require("../routes/email.routes.js");
-  const app = buildApp(router, "/api/email");
-  const res = await request(app)
-    .post("/api/email/inbound")
-    .send({ from: { email: "client@example.com" }, subject: "hi", text: "yo" });
-  assert.equal(res.status, 200);
-  assert.equal(res.body.ok, true);
-  assert.equal(res.body.ignored, "no_recipients");
+test("POST /api/email/inbound returns 503 when webhook secret is not configured", async () => {
+  const before = process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+  delete process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+  try {
+    const router = require("../routes/email.routes.js");
+    const app = buildApp(router, "/api/email");
+    const res = await request(app)
+      .post("/api/email/inbound")
+      .send({ from: { email: "client@example.com" }, subject: "hi", text: "yo" });
+    assert.equal(res.status, 503);
+  } finally {
+    if (before === undefined) delete process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+    else process.env.INBOUND_EMAIL_WEBHOOK_SECRET = before;
+  }
+});
+
+test("POST /api/email/inbound accepts authorized requests and ignores payloads with no recipients", async () => {
+  const before = process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+  process.env.INBOUND_EMAIL_WEBHOOK_SECRET = "test-inbound-secret";
+  try {
+    const router = require("../routes/email.routes.js");
+    const app = buildApp(router, "/api/email");
+    const res = await request(app)
+      .post("/api/email/inbound")
+      .set("x-inbound-secret", "test-inbound-secret")
+      .send({ from: { email: "client@example.com" }, subject: "hi", text: "yo" });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.ok, true);
+    assert.equal(res.body.ignored, "no_recipients");
+  } finally {
+    if (before === undefined) delete process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+    else process.env.INBOUND_EMAIL_WEBHOOK_SECRET = before;
+  }
 });
 
 test("POST /api/email/inbound rejects unauthorized when INBOUND_EMAIL_WEBHOOK_SECRET is set", async () => {
@@ -108,17 +132,25 @@ test("POST /api/email/inbound rejects unauthorized when INBOUND_EMAIL_WEBHOOK_SE
 });
 
 test("POST /api/email/inbound 200s with ignored=no_matching_invoice when recipient has no plus token", async () => {
-  const router = require("../routes/email.routes.js");
-  const app = buildApp(router, "/api/email");
-  const res = await request(app)
-    .post("/api/email/inbound")
-    .send({
-      from: { email: "client@example.com", name: "Client Co" },
-      to: [{ email: "invoices@inex.app" }],
-      subject: "Re: Invoice",
-      text: "Looks great"
-    });
-  assert.equal(res.status, 200);
-  assert.equal(res.body.ok, true);
-  assert.equal(res.body.ignored, "no_matching_invoice");
+  const before = process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+  process.env.INBOUND_EMAIL_WEBHOOK_SECRET = "test-inbound-secret";
+  try {
+    const router = require("../routes/email.routes.js");
+    const app = buildApp(router, "/api/email");
+    const res = await request(app)
+      .post("/api/email/inbound")
+      .set("x-inbound-secret", "test-inbound-secret")
+      .send({
+        from: { email: "client@example.com", name: "Client Co" },
+        to: [{ email: "invoices@inex.app" }],
+        subject: "Re: Invoice",
+        text: "Looks great"
+      });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.ok, true);
+    assert.equal(res.body.ignored, "no_matching_invoice");
+  } finally {
+    if (before === undefined) delete process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+    else process.env.INBOUND_EMAIL_WEBHOOK_SECRET = before;
+  }
 });

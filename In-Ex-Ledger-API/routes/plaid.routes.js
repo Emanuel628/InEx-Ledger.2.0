@@ -33,6 +33,18 @@ const {
 
 const router = express.Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PLAID_WEBHOOK_SECRET_HEADER_NAMES = ["x-plaid-webhook-secret", "x-webhook-secret"];
+
+function timingSafeStringEqual(a, b) {
+  const ab = Buffer.from(String(a || ""));
+  const bb = Buffer.from(String(b || ""));
+  if (ab.length !== bb.length) return false;
+  try {
+    return crypto.timingSafeEqual(ab, bb);
+  } catch (_) {
+    return false;
+  }
+}
 
 /**
  * Every authenticated route is gated on Plaid being configured. The webhook
@@ -418,6 +430,18 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
 router.post("/webhook", express.json({ limit: "100kb" }), async (req, res) => {
   if (!isPlaidConfigured()) {
     return res.status(503).json({ ok: false });
+  }
+  const expectedSecret = String(process.env.PLAID_WEBHOOK_SECRET || "").trim();
+  if (!expectedSecret) {
+    logError("plaid webhook misconfigured: PLAID_WEBHOOK_SECRET is required");
+    return res.status(503).json({ ok: false, error: "Plaid webhook is not configured." });
+  }
+  const providedSecret = PLAID_WEBHOOK_SECRET_HEADER_NAMES
+    .map((name) => req.get(name))
+    .find((value) => typeof value === "string" && value.length > 0) || "";
+  if (!timingSafeStringEqual(providedSecret, expectedSecret)) {
+    logWarn("plaid webhook rejected: bad secret");
+    return res.status(401).json({ ok: false, error: "Invalid webhook secret." });
   }
   const event = req.body || {};
   try {

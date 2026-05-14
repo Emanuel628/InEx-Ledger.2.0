@@ -1,18 +1,14 @@
 const SENSITIVE_KEYS = new Set([
-  // Tax identifiers — snake_case, camelCase, hyphen, JWE variants
-  "taxid", "taxid_jwe", "tax_id", "tax_id_jwe", "tax-id",
-  "taxId", "taxIdJwe", "taxIdjwe",
-  // US / Canada employer / business numbers
-  "ein", "ein_jwe", "einJwe",
-  "bn", "bn_jwe", "bnJwe",
-  // Social / national identifiers
-  "ssn", "ssn_jwe", "ssnJwe",
-  "sin", "sin_jwe", "sinJwe",
-  // Generic secrets / credentials that must never reach logs
-  "password", "password_hash", "passwordHash",
-  "token", "access_token", "refresh_token", "accessToken", "refreshToken",
-  "secret", "api_key", "apiKey", "private_key", "privateKey",
-  "credit_card", "creditCard", "card_number", "cardNumber", "cvv", "cvc"
+  // Compare against lowercased keys only.
+  "taxid", "taxid_jwe", "tax_id", "tax_id_jwe", "tax-id", "taxidjwe",
+  "ein", "ein_jwe", "einjwe",
+  "bn", "bn_jwe", "bnjwe",
+  "ssn", "ssn_jwe", "ssnjwe",
+  "sin", "sin_jwe", "sinjwe",
+  "password", "password_hash", "passwordhash",
+  "token", "access_token", "refresh_token", "accesstoken", "refreshtoken",
+  "secret", "api_key", "apikey", "private_key", "privatekey",
+  "credit_card", "creditcard", "card_number", "cardnumber", "cvv", "cvc"
 ]);
 
 const STRING_PATTERNS = [
