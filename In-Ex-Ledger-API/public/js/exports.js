@@ -1196,10 +1196,12 @@ async function renderExportHistory() {
   historyRows.innerHTML = merged.map((entry) => {
     const descriptor = describeHistoryEntry(entry);
     const formatClass = descriptor.formatLabel === "PDF" ? "pdf" : "csv";
-    const actionLabel = entry.format === PDF_FORMAT
-      ? escapeHtml(tx("exports_history_download_redacted") || "Download")
-      : escapeHtml(tx("exports_history_download_label"));
-    const dataAttr = `data-history-id="${escapeHtml(entry.id || "")}" data-history-format="${escapeHtml(entry.format || PDF_FORMAT)}"`;
+    const hasStoredRedactedPdf = entry.format === PDF_FORMAT && !!entry.contentHash;
+    const actionLabel = hasStoredRedactedPdf
+    ? escapeHtml(tx("exports_history_download_redacted") || "Download")
+    : escapeHtml(tx("exports_history_download_label") || "Download");
+    
+    const dataAttr = `data-history-id="${escapeHtml(entry.id || "")}" data-history-format="${escapeHtml(entry.format || PDF_FORMAT)}" data-history-mode="${hasStoredRedactedPdf ? "redacted" : "replay"}"`;
     return `
       <div class="history-item">
         <div class="history-file">
