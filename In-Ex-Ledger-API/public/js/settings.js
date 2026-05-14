@@ -840,44 +840,7 @@ function wireBusinessEditModal() {
 
 async function initAccountSettings() {
   const statusLabel = document.getElementById("accountSubStatusLabel");
-  const cancelRow = document.getElementById("cancelSubscriptionRow");
-  const cancelBtn = document.getElementById("cancelSubscriptionBtn");
-  const cancelModal = document.getElementById("cancelSubModal");
-  const cancelModalCancel = document.getElementById("cancelSubModalCancel");
-  const cancelModalConfirm = document.getElementById("cancelSubModalConfirm");
-  const cancelModalBody = document.getElementById("cancelSubModalBody");
-
-  const closeCancelModal = () => {
-    cancelModal?.classList.add("hidden");
-  };
-
-  cancelModalCancel?.addEventListener("click", closeCancelModal);
-
-  cancelBtn?.addEventListener("click", () => {
-    cancelModal?.classList.remove("hidden");
-  });
-
-  cancelModalConfirm?.addEventListener("click", async () => {
-    cancelModalConfirm.disabled = true;
-    try {
-      const res = await apiFetch("/api/billing/cancel", { method: "POST" });
-      const payload = res ? await res.json().catch(() => null) : null;
-      if (!res || !res.ok) {
-        showSettingsToast(payload?.error || t("settings_cancel_sub_error"));
-        cancelModalConfirm.disabled = false;
-        return;
-      }
-      closeCancelModal();
-      showSettingsToast(t("settings_cancel_sub_success"));
-      await loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBody);
-    } catch (err) {
-      console.error("Cancel subscription failed", err);
-      showSettingsToast(t("settings_cancel_sub_error"));
-      cancelModalConfirm.disabled = false;
-    }
-  });
-
-  await loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBody);
+  await loadAndDisplaySubscription(statusLabel);
 }
 
 async function loadAndDisplaySubscription(statusLabel, cancelRow, cancelModalBody) {
