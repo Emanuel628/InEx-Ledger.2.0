@@ -490,6 +490,76 @@ function normalizeMileageDistances(miles, km) {
   };
 }
 
+router.put("/costs/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid vehicle cost ID." });
+  }
+
+  const normalized = normalizeVehicleCostPayload(req.body);
+  if (normalized.error) {
+    return res.status(400).json({ error: normalized.error });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+
+    const existing = await pool.query(
+      `SELECT id, entry_date
+         FROM vehicle_costs
+        WHERE id = $1 AND business_id = $2
+        LIMIT 1`,
+      [req.params.id, businessId]
+    );
+
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ error: "Vehicle cost not found." });
+    }
+
+    const lockState = await loadAccountingLockState(pool, businessId);
+
+    // Block editing records already inside a locked period,
+    // and block moving a record into a locked period.
+    assertDateUnlocked(lockState, existing.rows[0].entry_date);
+    assertDateUnlocked(lockState, normalized.value.entryDate.slice(0, 10));
+
+    const result = await pool.query(
+      `UPDATE vehicle_costs
+          SET entry_type = $1,
+              entry_date = $2,
+              title = $3,
+              vendor = $4,
+              amount = $5,
+              notes = $6
+        WHERE id = $7 AND business_id = $8
+        RETURNING id, business_id, entry_type, entry_date, title, vendor, amount, notes, created_at`,
+      [
+        normalized.value.entryType,
+        normalized.value.entryDate,
+        normalized.value.title,
+        normalized.value.vendor,
+        normalized.value.amount,
+        normalized.value.notes,
+        req.params.id,
+        businessId
+      ]
+    );
+
+    return res.json(result.rows[0]);
+  } catch (err) {
+    if (err instanceof AccountingPeriodLockedError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        locked_through_date: err.lockedThroughDate,
+        transaction_date: err.transactionDate
+      });
+    }
+
+    logError("PUT /mileage/costs/:id error:", err.message);
+    return res.status(500).json({ error: "Failed to update vehicle cost." });
+  }
+});
+
 router.delete("/costs/:id", async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: "Invalid vehicle cost ID." });
