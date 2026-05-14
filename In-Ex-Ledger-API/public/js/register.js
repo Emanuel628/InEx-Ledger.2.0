@@ -77,6 +77,7 @@ async function handleRegisterSubmit(event) {
   const email = document.getElementById("email")?.value.trim() || "";
   const password = document.getElementById("password")?.value || "";
   const confirmPassword = document.getElementById("confirm-password")?.value || "";
+  const marketingEmailOptIn = document.getElementById("caslConsent")?.checked === true;
 
   hideRegisterError();
   if (!ensureConsent()) {
