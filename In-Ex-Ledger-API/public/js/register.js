@@ -118,7 +118,8 @@ async function handleRegisterSubmit(event) {
   body: JSON.stringify({
     email,
     password,
-    tos_consent: true
+    tos_consent: true,
+    marketing_email_opt_in: marketingEmailOptIn
   })
 });
 
