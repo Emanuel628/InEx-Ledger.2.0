@@ -96,7 +96,7 @@ function renderInvoiceStats() {
 
   const drafts = invoiceList.filter((inv) => inv.status === "draft").length;
   const overdue = invoiceList.filter(isOverdue).length;
-  const sampleCurrency = invoiceList[0]?.currency || "CAD";
+  const sampleCurrency = invoiceList[0]?.currency || invoiceDefaultCurrency;
 
   document.getElementById("statOutstanding").textContent = fmtMoney(outstanding, sampleCurrency);
   document.getElementById("statPaid30").textContent = fmtMoney(paid30, sampleCurrency);
