@@ -759,6 +759,13 @@ router.put("/:id", async (req, res) => {
 router.delete("/bulk-delete-all", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const ownerCheck = await pool.query(
+      "SELECT id FROM businesses WHERE id = $1 AND user_id = $2 LIMIT 1",
+      [businessId, req.user.id]
+    );
+    if (!ownerCheck.rowCount) {
+      return res.status(403).json({ error: "Only the business owner can delete all transactions." });
+    }
     const confirm = String(req.body?.confirm || "").trim();
     if (confirm !== "DELETE") {
       return res.status(400).json({ error: "Confirmation required. Send { confirm: 'DELETE' }." });

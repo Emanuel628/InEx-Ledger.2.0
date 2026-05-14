@@ -55,7 +55,7 @@ Rules used here:
   Group: Plaid webhook auth
   Covers: no Plaid webhook signature check
 
-- [ ] 30-60 min - Fix the business creation runtime bug by using the imported Node crypto API consistently.
+- [x] 30-60 min - Fix the business creation runtime bug by using the imported Node crypto API consistently.
   Files: `In-Ex-Ledger-API/routes/businesses.routes.js`
   Group: Business creation stability
   Covers: bare global `crypto.randomUUID()` on Node 18
@@ -74,7 +74,7 @@ Rules used here:
 
 ### Sensitive token and credential handling
 
-- [ ] 1-2 hours - Hash email-change tokens at rest the same way password-reset tokens are hashed.
+- [x] 1-2 hours - Hash email-change tokens at rest the same way password-reset tokens are hashed.
   Files: `In-Ex-Ledger-API/routes/auth.routes.js`
   Group: Token storage hardening
   Covers: plaintext pending email-change tokens in the database
@@ -99,7 +99,7 @@ Rules used here:
   Group: Privacy destructive actions
   Covers: irreversible erasure with MFA only
 
-- [ ] 1-2 hours - Restrict `DELETE /api/transactions/bulk-delete-all` to the intended privileged role instead of any authenticated business member.
+- [x] 1-2 hours - Restrict `DELETE /api/transactions/bulk-delete-all` to the intended privileged role instead of any authenticated business member.
   Files: `In-Ex-Ledger-API/routes/transactions.routes.js`
   Group: Transaction destructive actions
   Covers: no RBAC check on full-business transaction wipe

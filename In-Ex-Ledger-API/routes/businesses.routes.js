@@ -1,4 +1,5 @@
 const express = require("express");
+const crypto = require("crypto");
 const fs = require("fs");
 const { pool } = require("../db.js");
 const { requireAuth, requireMfaIfEnabled } = require("../middleware/auth.middleware.js");
@@ -448,7 +449,7 @@ router.post("/", async (req, res) => {
     const maxBusinessesAllowed = Number(subscription?.maxBusinessesAllowed || 1);
 
     await client.query("BEGIN");
-    const lockKey = BigInt("0x" + require("crypto").createHash("sha256").update(String(req.user.id)).digest("hex").slice(0, 15));
+    const lockKey = BigInt("0x" + crypto.createHash("sha256").update(String(req.user.id)).digest("hex").slice(0, 15));
     await client.query("SELECT pg_advisory_xact_lock($1)", [String(lockKey)]);
 
     const businessCountResult = await client.query(
@@ -478,7 +479,7 @@ router.post("/", async (req, res) => {
            (id, business_id, provider, plan_code, status, current_period_start, current_period_end)
          VALUES ($1, $2, 'stripe', $3, 'active', $4, $5)
          ON CONFLICT (business_id) DO NOTHING`,
-        [require("crypto").randomUUID(), businessId, PLAN_V1,
+        [crypto.randomUUID(), businessId, PLAN_V1,
          subscription.currentPeriodStart || new Date(),
          subscription.currentPeriodEnd || null]
       );
@@ -490,7 +491,7 @@ router.post("/", async (req, res) => {
             trial_started_at, trial_ends_at, current_period_start, current_period_end)
          VALUES ($1, $2, 'stripe', $3, 'trialing', $4, $5, $4, $5)
          ON CONFLICT (business_id) DO NOTHING`,
-        [require("crypto").randomUUID(), businessId, PLAN_V1,
+        [crypto.randomUUID(), businessId, PLAN_V1,
          subscription.trialStartedAt || new Date(),
          new Date(subscription.trialEndsAt)]
       );

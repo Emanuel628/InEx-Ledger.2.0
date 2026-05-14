@@ -215,6 +215,40 @@ async function consumeRecoveryEmailToken(token) {
   return result.rows[0] || null;
 }
 
+async function createEmailChangeToken(userId, email) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashValue(token);
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+  await pool.query("DELETE FROM email_change_requests WHERE user_id = $1", [userId]);
+  await pool.query(
+    `INSERT INTO email_change_requests (user_id, new_email, expires_at, token_hash)
+     VALUES ($1, $2, $3, $4)`,
+    [userId, email, expiresAt, tokenHash]
+  );
+
+  return { token, expiresAt };
+}
+
+async function consumeEmailChangeToken(token) {
+  const rawToken = String(token || "").trim();
+  if (!rawToken) {
+    return null;
+  }
+
+  const tokenHash = hashValue(rawToken);
+  await pool.query("DELETE FROM email_change_requests WHERE expires_at <= NOW()");
+  const result = await pool.query(
+    `DELETE FROM email_change_requests
+      WHERE (token_hash = $1 OR token::text = $2)
+        AND expires_at > NOW()
+      RETURNING user_id, new_email`,
+    [tokenHash, rawToken]
+  );
+
+  return result.rows[0] || null;
+}
+
 /* =========================================================
    5. LINK BUILDERS
    ========================================================= */
@@ -2094,13 +2128,7 @@ router.post("/request-email-change", requireAuth, requireCsrfProtection, authLim
       return res.status(409).json({ error: "Email already in use" });
     }
 
-    const token = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-    await pool.query("DELETE FROM email_change_requests WHERE user_id = $1", [req.user.id]);
-    await pool.query(
-      "INSERT INTO email_change_requests (token, user_id, new_email, expires_at) VALUES ($1, $2, $3, $4)",
-      [token, req.user.id, email, expiresAt]
-    );
+    const { token } = await createEmailChangeToken(req.user.id, email);
 
     const confirmLink = `${getAppBaseUrl(req)}/api/auth/confirm-email-change?token=${token}`;
     const lang = await getPreferredLanguageForUser(req.user.id);
@@ -2125,15 +2153,10 @@ router.get("/confirm-email-change", async (req, res) => {
   if (!token) return res.status(400).send("Token is required.");
 
   try {
-    await pool.query("DELETE FROM email_change_requests WHERE expires_at <= NOW()");
-    const result = await pool.query(
-      "DELETE FROM email_change_requests WHERE token = $1 AND expires_at > NOW() RETURNING user_id, new_email",
-      [token]
-    );
+    const result = await consumeEmailChangeToken(token);
+    if (!result?.user_id || !result?.new_email) return res.status(400).send("Invalid or expired link.");
 
-    if (result.rowCount === 0) return res.status(400).send("Invalid or expired link.");
-
-    const { user_id, new_email } = result.rows[0];
+    const { user_id, new_email } = result;
     await pool.query("UPDATE users SET email = $1 WHERE id = $2", [new_email, user_id]);
     await revokeAllRefreshTokensForUser(user_id);
     await revokeTrustedMfaDevicesForUser(user_id);

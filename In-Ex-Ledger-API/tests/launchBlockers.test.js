@@ -101,6 +101,11 @@ function loadTransactionsRouter(options = {}) {
             if (/SELECT id FROM accounts/i.test(sql)) {
               return { rowCount: 1, rows: [{ id: TEST_ACCOUNT_ID }] };
             }
+            if (/SELECT id FROM businesses WHERE id = \$1 AND user_id = \$2 LIMIT 1/i.test(sql)) {
+              return options.isBusinessOwner === false
+                ? { rowCount: 0, rows: [] }
+                : { rowCount: 1, rows: [{ id: TEST_BUSINESS_ID }] };
+            }
             if (/UPDATE transactions\s+SET account_id/i.test(sql)) {
               state.updateParams = params;
               return {
@@ -343,6 +348,23 @@ test("transactions bulk delete is blocked when the business has locked-period tr
     assert.equal(response.status, 409);
     assert.equal(response.body.code, "ACCOUNTING_PERIOD_LOCKED");
     assert.equal(response.body.locked_through_date, "2026-03-31");
+    assert.equal(fixture.state.bulkDeleteUpdateCalled, false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("transactions bulk delete is blocked for non-owner business members", async () => {
+  const fixture = loadTransactionsRouter({ isBusinessOwner: false });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .delete("/api/transactions/bulk-delete-all")
+      .send({ confirm: "DELETE" });
+
+    assert.equal(response.status, 403);
+    assert.equal(response.body.error, "Only the business owner can delete all transactions.");
     assert.equal(fixture.state.bulkDeleteUpdateCalled, false);
   } finally {
     fixture.cleanup();

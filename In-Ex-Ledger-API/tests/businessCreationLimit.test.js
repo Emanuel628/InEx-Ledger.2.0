@@ -158,3 +158,32 @@ test("business creation is allowed during Pro trial when slot capacity already e
     fixture.cleanup();
   }
 });
+
+test("businesses route loads without relying on a global crypto object", async () => {
+  const fixture = loadBusinessesRouterFixture({
+    businessCount: 0,
+    subscription: {
+      effectiveTier: "v1",
+      isPaid: true,
+      currentPeriodStart: new Date("2026-05-01T00:00:00Z"),
+      currentPeriodEnd: new Date("2026-06-01T00:00:00Z"),
+      maxBusinessesAllowed: 2
+    },
+    createBusinessForUserInTransaction: async () => "biz_limit_002",
+    listBusinesses: [
+      { id: "biz_limit_001", name: "Main", is_active: true },
+      { id: "biz_limit_002", name: "Second business", is_active: false }
+    ]
+  });
+
+  try {
+    const response = await request(fixture.app)
+      .post("/api/businesses")
+      .send({ name: "Second business", region: "US", language: "en" });
+
+    assert.equal(response.status, 201);
+    assert.equal(response.body?.active_business_id, "biz_limit_002");
+  } finally {
+    fixture.cleanup();
+  }
+});
