@@ -859,7 +859,11 @@ router.post("/register", authLimiter, async (req, res) => {
   // compliance and to prevent account creation via direct API calls that
   // bypass the front-end checkbox.
   const tosConsent = req.body?.tos_consent === true || req.body?.tosConsent === true;
-
+  
+  const marketingEmailOptIn =
+  req.body?.marketing_email_opt_in === true ||
+  req.body?.marketingEmailOptIn === true;
+  
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
