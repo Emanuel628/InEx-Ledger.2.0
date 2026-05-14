@@ -624,9 +624,13 @@ function convertMileageDistance(entry, useKilometers) {
 }
 
 function formatCurrency(value) {
-  return new Intl.NumberFormat("en-US", {
+  const region = String(window.LUNA_REGION || localStorage.getItem("lb_region") || "us").toLowerCase();
+  const currency = region === "ca" ? "CAD" : "USD";
+  const locale = region === "ca" ? "en-CA" : "en-US";
+
+  return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "USD"
+    currency
   }).format(Number(value || 0));
 }
 
