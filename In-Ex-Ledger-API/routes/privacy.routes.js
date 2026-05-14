@@ -118,12 +118,6 @@ router.get("/settings", async (req, res) => {
     res.status(500).json({ error: "Failed to load privacy settings." });
   }
 });
-    
-  } catch (err) {
-    logError("GET /privacy/settings error", { err: err.message });
-    res.status(500).json({ error: "Failed to load privacy settings." });
-  }
-});
 
 async function savePrivacySettings(req, res) {
   const dataSharingOptOut = typeof req.body?.dataSharingOptOut === "boolean" ? req.body.dataSharingOptOut : false;
