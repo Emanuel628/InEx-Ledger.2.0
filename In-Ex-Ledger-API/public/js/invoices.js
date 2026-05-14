@@ -225,7 +225,7 @@ function addLineItemRow(item) {
 
 function recalcTotals() {
   const rows = document.querySelectorAll(".invoice-line-row");
-  const currency = document.getElementById("invCurrency")?.value || "CAD";
+  const currency = document.getElementById("invCurrency")?.value || invoiceDefaultCurrency;
   const taxRatePct = Number(document.getElementById("invTaxRate")?.value || 0);
   const taxRate = taxRatePct / 100;
 
