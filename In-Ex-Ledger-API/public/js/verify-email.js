@@ -108,7 +108,7 @@ function consumeVerifiedSessionFromHash() {
 
   const params = new URLSearchParams(hash);
   const token = params.get("token");
-  const next = params.get("next") || "/onboarding";
+  const next = safeInternalNext(params.get("next"), "/onboarding");
   if (!token) {
     return false;
   }
