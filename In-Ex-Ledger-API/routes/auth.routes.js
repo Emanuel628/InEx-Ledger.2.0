@@ -1775,6 +1775,7 @@ router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter
 router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
   const mfaToken = req.body?.mfaToken;
   const code = req.body?.code;
+  const trustDevice = req.body?.trustDevice !== false;
 
   if (!mfaToken || !code) {
     return res.status(400).json({ error: "MFA token and code are required." });
