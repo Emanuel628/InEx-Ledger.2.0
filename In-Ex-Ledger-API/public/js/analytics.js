@@ -471,7 +471,7 @@ function scenarioRow(label, base, projected, type) {
 // ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
-function fmt(value) {
+function fmt(value, { absolute = false } = {}) {
   const n = Number(value) || 0;
   const rawRegion =
     (typeof localStorage !== "undefined" && (localStorage.getItem("lb_region") || localStorage.getItem("region"))) ||
@@ -479,12 +479,13 @@ function fmt(value) {
     "";
   const currency = String(rawRegion).toLowerCase() === "ca" ? "CAD" : "USD";
   const locale = (typeof navigator !== "undefined" && navigator.language) || "en-US";
+
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(Math.abs(n));
+  }).format(absolute ? Math.abs(n) : n);
 }
 
 function parseFloatOrNull(str) {
