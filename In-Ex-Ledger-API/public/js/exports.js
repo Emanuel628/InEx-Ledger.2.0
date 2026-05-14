@@ -1,4 +1,4 @@
-﻿const EXPORT_HISTORY_KEY = "ledger_export_history";
+const EXPORT_HISTORY_KEY = "ledger_export_history";
 const TRANSACTIONS_KEY = "ledger_transactions";
 const ACCOUNTS_KEY = "ledger_accounts";
 const CATEGORIES_KEY = "ledger_categories";
@@ -204,6 +204,17 @@ function setExportScope(select, value) {
 
 function buildScopeQuery() {
   return getExportScope() === "all" ? "?scope=all" : "";
+}
+
+function buildTransactionsExportQuery() {
+  const params = new URLSearchParams();
+  params.set("all", "true");
+
+  if (getExportScope() === "all") {
+    params.set("scope", "all");
+  }
+
+  return `?${params.toString()}`;
 }
 
 function getStoredBusinesses() {
