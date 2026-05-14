@@ -967,6 +967,31 @@ body {
   margin-left: auto;
 }
 
+.app-sidebar .sidebar-nav:not(.sidebar-filter-nav) .sidebar-link {
+  display: grid;
+  grid-template-columns: 22px 12px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+}
+
+.app-sidebar .sidebar-nav:not(.sidebar-filter-nav) .sidebar-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-sidebar .sidebar-nav:not(.sidebar-filter-nav) .sidebar-link-prefix {
+  width: 12px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.app-sidebar .sidebar-nav:not(.sidebar-filter-nav) .sidebar-link-text {
+  min-width: 0;
+}
+
 .app-content {
   flex: 1;
   padding: 24px;
