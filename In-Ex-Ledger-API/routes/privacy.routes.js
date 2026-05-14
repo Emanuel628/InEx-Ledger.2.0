@@ -106,12 +106,14 @@ router.get("/settings", async (req, res) => {
     const defaultOptOut = isQuebec;
 
     res.json({
-      dataSharingOptOut: row ? row.data_sharing_opt_out : defaultOptOut,
-      consentGiven: row ? row.consent_given : !defaultOptOut,
-      // analyticsOptIn is the Quebec-specific explicit opt-in; defaults to false (off)
-      analyticsOptIn: row ? Boolean(row.analytics_opt_in) : false,
-      dataResidency
-    });
+  dataSharingOptOut: row ? row.data_sharing_opt_out : defaultOptOut,
+  consentGiven: row ? row.consent_given : !defaultOptOut,
+  // analyticsOptIn is the Quebec-specific explicit opt-in; defaults to false (off)
+  analyticsOptIn: row ? Boolean(row.analytics_opt_in) : false,
+  marketingEmailOptIn: row ? Boolean(row.marketing_email_opt_in) : false,
+  dataResidency
+});
+    
   } catch (err) {
     logError("GET /privacy/settings error", { err: err.message });
     res.status(500).json({ error: "Failed to load privacy settings." });
