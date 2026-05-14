@@ -127,6 +127,11 @@ async function savePrivacySettings(req, res) {
   // Accepted but silently ignored for non-QC users.
   const analyticsOptIn = typeof req.body?.analyticsOptIn === "boolean" ? req.body.analyticsOptIn : null;
 
+  const marketingEmailOptIn =
+  typeof req.body?.marketingEmailOptIn === "boolean"
+    ? req.body.marketingEmailOptIn
+    : null;
+
   try {
     // Fetch the user's data_residency to determine if consent logging is required
     const userResult = await pool.query(
