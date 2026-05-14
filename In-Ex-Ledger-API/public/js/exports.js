@@ -511,12 +511,12 @@ function setupExportForm() {
     const downloadBtn = event.target.closest(".history-download");
     if (!downloadBtn) return;
     if (downloadBtn.dataset.historyId) {
-      if ((downloadBtn.dataset.historyFormat || PDF_FORMAT) === PDF_FORMAT) {
-        downloadBackendExport(downloadBtn.dataset.historyId);
-      } else {
-        replayHistoryEntry(downloadBtn.dataset.historyId);
-      }
-    }
+  if (downloadBtn.dataset.historyMode === "redacted") {
+    downloadBackendExport(downloadBtn.dataset.historyId);
+  } else {
+    replayHistoryEntry(downloadBtn.dataset.historyId);
+  }
+}
   });
 }
 
