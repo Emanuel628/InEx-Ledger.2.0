@@ -307,7 +307,7 @@ function syncExportScopeUi() {
 
 async function hydrateTransactionsCache() {
   try {
-    const response = await apiFetch(`/api/transactions${buildScopeQuery()}`);
+    const response = await apiFetch(`/api/transactions${buildTransactionsExportQuery()}`);
     if (!response || !response.ok) {
       transactionsCacheFresh = false;
       exportState.transactions = [];
