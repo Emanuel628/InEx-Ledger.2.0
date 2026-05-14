@@ -63,7 +63,7 @@ const GUIDED_SETUP_CONFIG = {
       "onboarding_guide_categories_point_1",
       "onboarding_guide_categories_point_2"
     ],
-    launchSelector: "#showCategoryModal",
+    launchSelector: "#addExpenseCategoryBtn, #addIncomeCategoryBtn",
     launchLabelKey: "onboarding_guide_categories_add",
     nextAction: "next",
     nextLabelKey: "onboarding_guide_next"
