@@ -2461,6 +2461,108 @@ function renderGhostSuggestions() {
   }
 }
 
+function getTotalTransactionPages(totalItems) {
+  return Math.max(1, Math.ceil((Number(totalItems) || 0) / PAGE_SIZE));
+}
+
+function clampTransactionPage(page, totalPages) {
+  const parsed = Number.parseInt(page, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+  return Math.min(parsed, Math.max(0, totalPages - 1));
+}
+
+function getCurrentTransactionPageItems() {
+  return getFilteredTransactions();
+}
+
+function goToTransactionPage(pageIndex) {
+  const totalPages = getTotalTransactionPages(getCurrentTransactionPageItems().length);
+  currentPage = clampTransactionPage(pageIndex, totalPages);
+  renderTransactionsTable(getCurrentTransactionPageItems());
+}
+
+function renderPagination(totalItems) {
+  const pagination = document.getElementById("txPagination");
+  const firstButton = document.getElementById("txFirstPage");
+  const prevButton = document.getElementById("txPrevPage");
+  const nextButton = document.getElementById("txNextPage");
+  const lastButton = document.getElementById("txLastPage");
+  const pageInput = document.getElementById("txPageInput");
+  const pageTotal = document.getElementById("txPageTotal");
+
+  if (!pagination) {
+    return;
+  }
+
+  const total = Number(totalItems) || 0;
+  const totalPages = getTotalTransactionPages(total);
+
+  if (total <= PAGE_SIZE) {
+    pagination.hidden = true;
+    currentPage = 0;
+    return;
+  }
+
+  currentPage = clampTransactionPage(currentPage, totalPages);
+  pagination.hidden = false;
+
+  if (pageInput) {
+    pageInput.max = String(totalPages);
+    pageInput.value = String(currentPage + 1);
+  }
+
+  if (pageTotal) {
+    pageTotal.textContent = `of ${totalPages}`;
+  }
+
+  const isFirstPage = currentPage <= 0;
+  const isLastPage = currentPage >= totalPages - 1;
+
+  if (firstButton) firstButton.disabled = isFirstPage;
+  if (prevButton) prevButton.disabled = isFirstPage;
+  if (nextButton) nextButton.disabled = isLastPage;
+  if (lastButton) lastButton.disabled = isLastPage;
+}
+
+function wirePagination() {
+  const firstButton = document.getElementById("txFirstPage");
+  const prevButton = document.getElementById("txPrevPage");
+  const nextButton = document.getElementById("txNextPage");
+  const lastButton = document.getElementById("txLastPage");
+  const pageInput = document.getElementById("txPageInput");
+
+  firstButton?.addEventListener("click", () => {
+    goToTransactionPage(0);
+  });
+
+  prevButton?.addEventListener("click", () => {
+    goToTransactionPage(currentPage - 1);
+  });
+
+  nextButton?.addEventListener("click", () => {
+    goToTransactionPage(currentPage + 1);
+  });
+
+  lastButton?.addEventListener("click", () => {
+    const totalPages = getTotalTransactionPages(getCurrentTransactionPageItems().length);
+    goToTransactionPage(totalPages - 1);
+  });
+
+  pageInput?.addEventListener("change", () => {
+    goToTransactionPage(Number.parseInt(pageInput.value, 10) - 1);
+  });
+
+  pageInput?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      goToTransactionPage(Number.parseInt(pageInput.value, 10) - 1);
+      pageInput.blur();
+    }
+  });
+}
+
 function renderTransactionsTable(filteredTransactions) {
   const tbody = document.querySelector("tbody");
   const transactions =
