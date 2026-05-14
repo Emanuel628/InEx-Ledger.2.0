@@ -1772,7 +1772,7 @@ router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter
   }
 });
 
-router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
+router.post("/mfa/verify", requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
   const mfaToken = req.body?.mfaToken;
   const code = req.body?.code;
   const trustDevice = req.body?.trustDevice !== false;
