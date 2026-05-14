@@ -1170,6 +1170,7 @@ async function fetchBackendExportHistory() {
       format: row.export_type || PDF_FORMAT,
       exportLang: row.language || "en",
       scope: row.scope || "active",
+      contentHash: row.content_hash || "",
       source: "backend"
     }));
   } catch {
