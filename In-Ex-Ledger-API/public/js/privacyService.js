@@ -101,11 +101,14 @@
             headers: authHeaders("POST"),
             credentials: "include",
             body: JSON.stringify({
-              dataSharingOptOut: !!merged.dataSharingOptOut,
+              dataSharingOptOut: !!merged.dataSharingOptOut, 
               consentGiven: !!merged.consentGiven,
               consentAt: merged.consentAt,
               termsVersion: merged.termsVersion,
-              privacyVersion: merged.privacyVersion
+              privacyVersion: merged.privacyVersion,
+              marketingEmailOptIn:
+              typeof merged.marketingEmailOptIn === "boolean"
+              ? merged.marketingEmailOptIn : undefined
             })
           });
           if (!res.ok) {
