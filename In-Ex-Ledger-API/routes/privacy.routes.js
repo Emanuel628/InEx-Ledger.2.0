@@ -87,16 +87,7 @@ function toCsv(rows) {
  */
 router.get("/settings", async (req, res) => {
   try {
-    const [privacyResult, userResult] = await Promise.all([
-      pool.query(
-        "SELECT data_sharing_opt_out, consent_given, analytics_opt_in FROM user_privacy_settings WHERE user_id = $1",
-        [req.user.id]
-      ),
-      pool.query(
-        "SELECT data_sharing_opt_out, consent_given, analytics_opt_in, marketing_email_opt_in FROM user_privacy_settings WHERE user_id = $1",
-        [req.user.id]
-        ),
-    ]);
+    const [privacyResult, userResult] = await Promise.all
 
     const row = privacyResult.rows[0];
     const dataResidency = userResult.rows[0]?.data_residency || "US";
