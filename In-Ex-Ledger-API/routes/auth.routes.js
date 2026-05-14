@@ -1837,7 +1837,7 @@ router.post("/mfa/verify", requireCsrfProtection, mfaVerifyLimiter, async (req, 
   }
 });
 
-router.post("/mfa/resend", authLimiter, async (req, res) => {
+router.post("/mfa/resend", requireCsrfProtection, authLimiter, async (req, res) => {
   const mfaToken = String(req.body?.mfaToken || "").trim();
   if (!mfaToken) {
     return res.status(400).json({ error: "MFA token is required." });
