@@ -433,8 +433,30 @@ router.post("/export", requireMfaIfEnabled, async (req, res) => {
  */
 router.post("/erase", requireMfaIfEnabled, async (req, res) => {
   const userId = req.user.id;
+  const password = req.body?.password;
   const ipAddress = req.ip || req.connection?.remoteAddress || null;
   const userAgent = req.get("user-agent") || null;
+
+  if (typeof password !== "string" || !password.trim()) {
+    return res.status(400).json({ error: "Password is required." });
+  }
+
+  try {
+    const userResult = await pool.query(
+      "SELECT password_hash FROM users WHERE id = $1 LIMIT 1",
+      [userId]
+    );
+    if (!userResult.rowCount) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    const { match } = await verifyPassword(password, userResult.rows[0].password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "Incorrect password." });
+    }
+  } catch (err) {
+    logError("POST /privacy/erase: failed to verify password", { userId, err: err.message });
+    return res.status(500).json({ error: "Erasure failed. Please try again or contact support." });
+  }
 
   // Resolve businesses before starting the transaction so it does not
   // execute inside the transaction (avoids lock contention and keeps the

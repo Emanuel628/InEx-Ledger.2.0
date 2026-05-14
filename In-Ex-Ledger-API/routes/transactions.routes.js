@@ -975,6 +975,22 @@ router.patch("/:id/review-status", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const existing = await pool.query(
+      `SELECT id, date
+         FROM transactions
+        WHERE id = $1
+          AND business_id = $2
+          AND deleted_at IS NULL
+          AND (is_adjustment = false OR is_adjustment IS NULL)
+          AND (is_void = false OR is_void IS NULL)
+        LIMIT 1`,
+      [req.params.id, businessId]
+    );
+    if (existing.rowCount === 0) {
+      return res.status(404).json({ error: "Transaction not found." });
+    }
+    await assertUnlockedBusinessDates(businessId, existing.rows[0].date);
+
     const result = await pool.query(
       `UPDATE transactions
          SET review_status = $1
@@ -986,9 +1002,6 @@ router.patch("/:id/review-status", async (req, res) => {
        RETURNING *`,
       [status, req.params.id, businessId]
     );
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Transaction not found." });
-    }
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     logError("PATCH /transactions/:id/review-status error:", err);

@@ -23,6 +23,7 @@ function loadMeRouter(options = {}) {
     unlinkCalls: [],
     clearedCookie: null,
     mfaEnabled: options.mfaEnabled ?? false,
+    dbMfaEnabled: options.dbMfaEnabled ?? options.mfaEnabled ?? false,
     validMfaReauthToken: options.validMfaReauthToken || "valid-delete-reauth-token",
     deleteError: options.deleteError || null,
     legacyConstraints: options.legacyConstraints || [],
@@ -55,9 +56,14 @@ function loadMeRouter(options = {}) {
                     rowCount: 1
                   };
                 }
-                if (/SELECT id, email, password_hash FROM users/i.test(sql)) {
+                if (/SELECT id, email, password_hash, mfa_enabled FROM users/i.test(sql)) {
                   return {
-                    rows: [{ id: state.userId, email: state.email, password_hash: state.passwordHash }],
+                    rows: [{
+                      id: state.userId,
+                      email: state.email,
+                      password_hash: state.passwordHash,
+                      mfa_enabled: state.dbMfaEnabled
+                    }],
                     rowCount: 1
                   };
                 }
@@ -401,6 +407,23 @@ test("account deletion succeeds for MFA-enabled users when mfaReauthToken is pro
 
     assert.equal(response.status, 200);
     assert.match(response.body.message, /deleted/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("account deletion requires MFA when the live user record has MFA enabled even if the JWT flag is stale", async () => {
+  const fixture = loadMeRouter({ mfaEnabled: false, dbMfaEnabled: true });
+
+  try {
+    const app = buildApp(fixture.router, fixture.state);
+    const response = await request(app)
+      .delete("/api/me")
+      .send({ password: "CorrectHorseBatteryStaple1!" });
+
+    assert.equal(response.status, 403);
+    assert.equal(response.body?.mfa_required, true);
+    assert.equal(response.body?.reauthenticate, true);
   } finally {
     fixture.cleanup();
   }

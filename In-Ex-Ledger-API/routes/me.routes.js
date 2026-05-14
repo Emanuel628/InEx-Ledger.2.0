@@ -583,7 +583,15 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
       return res.status(400).json({ error: "Password is required to delete your account." });
     }
 
-    if (req.user?.mfa_enabled) {
+    const userResult = await client.query(
+      "SELECT id, email, password_hash, mfa_enabled FROM users WHERE id = $1 LIMIT 1",
+      [req.user.id]
+    );
+    if (!userResult.rowCount) {
+      return res.status(404).json({ error: "User not found." });
+    }
+
+    if (userResult.rows[0].mfa_enabled === true) {
       if (!providedMfaReauthToken) {
         return res.status(403).json({
           error: "MFA verification required before deleting your account.",
@@ -622,25 +630,13 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
       }
     }
 
-    await client.query("BEGIN");
-    transactionOpen = true;
-
-    const userResult = await client.query(
-      "SELECT id, email, password_hash FROM users WHERE id = $1 LIMIT 1",
-      [req.user.id]
-    );
-    if (!userResult.rowCount) {
-      await client.query("ROLLBACK");
-      transactionOpen = false;
-      return res.status(404).json({ error: "User not found." });
-    }
-
     const { match } = await verifyPassword(password, userResult.rows[0].password_hash);
     if (!match) {
-      await client.query("ROLLBACK");
-      transactionOpen = false;
       return res.status(401).json({ error: "Incorrect password." });
     }
+
+    await client.query("BEGIN");
+    transactionOpen = true;
 
     const legacyConstraintResult = await client.query(
       `SELECT EXISTS(

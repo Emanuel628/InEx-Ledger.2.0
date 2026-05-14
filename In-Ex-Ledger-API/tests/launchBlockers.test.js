@@ -92,7 +92,7 @@ function loadTransactionsRouter(options = {}) {
             if (/SELECT COUNT\(\*\)/i.test(sql)) {
               return { rows: [{ count: "1" }], rowCount: 1 };
             }
-            if (/SELECT id, date FROM transactions/i.test(sql)) {
+            if (/SELECT id,\s*date\s+FROM transactions/i.test(sql)) {
               return {
                 rowCount: 1,
                 rows: [{ id: TEST_TRANSACTION_ID, date: "2026-05-01" }]
@@ -120,6 +120,21 @@ function loadTransactionsRouter(options = {}) {
                     currency: params[9],
                     payer_name: params[20],
                     tax_form_type: params[21]
+                  }
+                ]
+              };
+            }
+            if (/UPDATE transactions\s+SET review_status = \$1/i.test(sql)) {
+              return {
+                rowCount: 1,
+                rows: [
+                  {
+                    id: TEST_TRANSACTION_ID,
+                    business_id: TEST_BUSINESS_ID,
+                    review_status: params[0],
+                    date: "2026-05-01",
+                    description: "Client A",
+                    description_encrypted: null
                   }
                 ]
               };
@@ -194,7 +209,16 @@ function loadTransactionsRouter(options = {}) {
 
       return {
         AccountingPeriodLockedError,
-        assertDateUnlocked() {},
+        assertDateUnlocked(currentLockState, date) {
+          if (currentLockState?.lockedThroughDate && String(date || "") <= String(currentLockState.lockedThroughDate)) {
+            const error = new AccountingPeriodLockedError(
+              "Transaction date is inside a locked accounting period."
+            );
+            error.lockedThroughDate = currentLockState.lockedThroughDate;
+            error.transactionDate = date;
+            throw error;
+          }
+        },
         loadAccountingLockState: async () => lockState
       };
     }
@@ -320,6 +344,29 @@ test("transactions bulk delete is blocked when the business has locked-period tr
     assert.equal(response.body.code, "ACCOUNTING_PERIOD_LOCKED");
     assert.equal(response.body.locked_through_date, "2026-03-31");
     assert.equal(fixture.state.bulkDeleteUpdateCalled, false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("transactions review-status update is blocked when the transaction date falls in a locked period", async () => {
+  const fixture = loadTransactionsRouter({
+    lockState: {
+      lockedThroughDate: "2026-05-31",
+      isLocked: true
+    }
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .patch(`/api/transactions/${TEST_TRANSACTION_ID}/review-status`)
+      .send({ review_status: "matched" });
+
+    assert.equal(response.status, 409);
+    assert.equal(response.body.code, "accounting_period_locked");
+    assert.equal(response.body.locked_through_date, "2026-05-31");
+    assert.equal(response.body.transaction_date, "2026-05-01");
   } finally {
     fixture.cleanup();
   }
