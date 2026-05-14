@@ -97,8 +97,8 @@ function renderDashboard(data) {
   const seTaxLabel = isCA ? t("analytics_kpi_se_tax_ca") : t("analytics_kpi_se_tax_us");
   const seTaxNote = isCA ? t("analytics_kpi_se_tax_note_ca") : t("analytics_kpi_se_tax_note_us");
   const cards = [
-    kpiCard(t("analytics_kpi_total_income"), fmt(summary.total_income), t("analytics_kpi_trailing_12")),
-    kpiCard(t("analytics_kpi_total_expenses"), fmt(summary.total_expense), t("analytics_kpi_trailing_12")),
+    kpiCard(t("analytics_kpi_total_income"), fmt(summary.total_income, { absolute: true }), t("analytics_kpi_trailing_12")),
+    kpiCard(t("analytics_kpi_total_expenses"), fmt(summary.total_expense, { absolute: true }), t("analytics_kpi_trailing_12")),
     kpiCard(t("analytics_kpi_net_profit"), fmt(summary.net), t("analytics_kpi_trailing_12"), summary.net >= 0 ? "" : "kpi-value--negative")
   ];
   if (summary.has_tax_estimates) {
