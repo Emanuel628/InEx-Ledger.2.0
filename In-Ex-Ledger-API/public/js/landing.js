@@ -76,11 +76,27 @@ function setLandingText(selector, value) {
 
 function applyCanadianLandingCopy() {
   document.documentElement.dataset.region = "CA";
+
   Object.entries(CANADA_LANDING_COPY).forEach(([key, value]) => {
     document.querySelectorAll(`[data-i18n="${key}"]`).forEach((node) => {
       node.textContent = value;
     });
   });
+
+  // The current landing page is mostly hard-coded marketing markup.
+  // Keep the Canadian variant wired to the live selectors so regional copy
+  // does not silently drift out of sync.
+  setLandingText(".hero-kicker", CANADA_LANDING_COPY.landing_hero_kicker);
+  setLandingText(".hero h1", CANADA_LANDING_COPY.landing_hero_title);
+  setLandingText(".hero-lede", CANADA_LANDING_COPY.landing_hero_subtitle);
+  setLandingText(".hero-actions .button-primary", "Start free for 30 days");
+  setLandingText(
+    ".pricing-section .section-subtitle",
+    "A 30-day free trial gets you into the full product without asking for a card first."
+  );
+  setLandingText(".final-cta h2", "Keep the books current. Make tax season lighter.");
+  setLandingText(".final-cta .button-primary", "Start free for 30 days");
+
   scrubCanadianTaxWording();
 }
 
