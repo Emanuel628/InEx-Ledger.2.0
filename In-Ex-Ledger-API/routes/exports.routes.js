@@ -88,26 +88,6 @@ function resolveSecureExportTaxId(body, includeTaxId) {
   return decryptedTaxId;
 }
 
-  const encryptedTaxId = String(body?.taxId_jwe || "").trim();
-  if (encryptedTaxId) {
-    try {
-      return decryptJwe(encryptedTaxId);
-    } catch (error) {
-      logError("Secure export JWE decrypt failed; attempting plaintext fallback", { err: error.message });
-    }
-  }
-
-  const fallbackTaxId = String(body?.taxId || "").trim();
-  if (isValidTaxId(fallbackTaxId)) {
-    return fallbackTaxId;
-  }
-
-  const invalidFallback = fallbackTaxId.length > 0;
-  const exportError = new Error(invalidFallback ? "Invalid Tax ID format." : "Unable to validate Tax ID for secure export.");
-  exportError.status = 400;
-  throw exportError;
-}
-
 function buildExportMetadataRows(exportId, metadata) {
   return [
     ["start_date", metadata.startDate],
