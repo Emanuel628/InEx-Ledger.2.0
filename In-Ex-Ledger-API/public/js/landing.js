@@ -168,13 +168,27 @@ function initLandingPricingControls(region) {
   let billingMode = "monthly";
   const update = () => updateLandingPricing(billingMode, region);
 
-  document.querySelectorAll("[data-billing-mode], [data-billing-interval], [data-pricing-toggle]").forEach((btn) => {
+  const pricingToggleSelector = "[data-billing-toggle], [data-billing-mode], [data-billing-interval], [data-pricing-toggle]";
+
+  document.querySelectorAll(pricingToggleSelector).forEach((btn) => {
     btn.addEventListener("click", () => {
-      const next = String(btn.dataset.billingMode || btn.dataset.billingInterval || btn.dataset.pricingToggle || "").toLowerCase();
+      const next = String(
+        btn.dataset.billingToggle ||
+        btn.dataset.billingMode ||
+        btn.dataset.billingInterval ||
+        btn.dataset.pricingToggle ||
+        ""
+      ).toLowerCase();
       if (next === "monthly" || next === "yearly") {
         billingMode = next;
-        document.querySelectorAll("[data-billing-mode], [data-billing-interval], [data-pricing-toggle]").forEach((toggle) => {
-          const toggleValue = String(toggle.dataset.billingMode || toggle.dataset.billingInterval || toggle.dataset.pricingToggle || "").toLowerCase();
+        document.querySelectorAll(pricingToggleSelector).forEach((toggle) => {
+          const toggleValue = String(
+            toggle.dataset.billingToggle ||
+            toggle.dataset.billingMode ||
+            toggle.dataset.billingInterval ||
+            toggle.dataset.pricingToggle ||
+            ""
+          ).toLowerCase();
           toggle.classList.toggle("is-active", toggleValue === billingMode);
           toggle.setAttribute("aria-pressed", String(toggleValue === billingMode));
         });

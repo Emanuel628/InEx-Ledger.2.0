@@ -722,13 +722,24 @@ router.get("/pricing", billingReadLimiter, async (req, res) => {
 // Stripe. Gate them behind ENABLE_MOCK_BILLING=true so they are unreachable
 // in production.
 
-router.get("/mock-v1", async (_req, res) => {
-  res.json({ enabled: process.env.ENABLE_MOCK_BILLING === "true" });
+function isMockBillingAllowed() {
+  const stripeSecretKey = String(process.env.STRIPE_SECRET_KEY || "").trim();
+  const mockEnabled = process.env.ENABLE_MOCK_BILLING === "true";
+  const isProduction = String(process.env.NODE_ENV || "").trim().toLowerCase() === "production";
+  const isLiveStripeKey = /^sk_live_/i.test(stripeSecretKey);
+  return mockEnabled && !isProduction && !isLiveStripeKey;
+}
+
+router.get("/mock-v1", requireAuth, async (_req, res) => {
+  if (!isMockBillingAllowed()) {
+    return res.status(404).json({ error: "Not found." });
+  }
+  res.json({ enabled: true });
 });
 
 router.post("/mock-v1", requireAuth, requireCsrfProtection, async (req, res) => {
-  if (process.env.ENABLE_MOCK_BILLING !== "true") {
-    return res.status(403).json({ error: "Mock billing is not enabled in this environment." });
+  if (!isMockBillingAllowed()) {
+    return res.status(404).json({ error: "Not found." });
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
