@@ -143,10 +143,11 @@ async function savePrivacySettings(req, res) {
 
     // Fetch existing privacy row to detect changes for consent logging
     const existingResult = await pool.query(
-      "SELECT analytics_opt_in FROM user_privacy_settings WHERE user_id = $1",
+      "SELECT analytics_opt_in, marketing_email_opt_in FROM user_privacy_settings WHERE user_id = $1",
       [req.user.id]
-    );
+      );
     const previousAnalyticsOptIn = existingResult.rows[0]?.analytics_opt_in ?? false;
+    const previousMarketingEmailOptIn = existingResult.rows[0]?.marketing_email_opt_in ?? false;
 
     // Determine the analytics_opt_in value to persist.
     // Only update it if a value was explicitly provided; otherwise keep the existing value.
