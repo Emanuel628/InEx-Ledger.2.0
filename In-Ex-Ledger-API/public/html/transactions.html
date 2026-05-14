@@ -434,9 +434,15 @@
           </table>
         </div>
         <div class="tx-pagination" id="txPagination" hidden>
+          <button type="button" class="tx-page-btn" id="txFirstPage" aria-label="First page">&laquo;</button>
           <button type="button" class="tx-page-btn" id="txPrevPage" aria-label="Previous page">&#8249;</button>
-          <span class="tx-page-info" id="txPageInfo">Page 1</span>
+          
+          <label class="tx-page-jump" for="txPageInput"><span>Page</span>
+            <input type="number" id="txPageInput" min="1" value="1" inputmode="numeric" /><span id="txPageTotal">of 1</span>
+          </label>
+          
           <button type="button" class="tx-page-btn" id="txNextPage" aria-label="Next page">&#8250;</button>
+          <button type="button" class="tx-page-btn" id="txLastPage" aria-label="Last page">&raquo;</button>
         </div>
       </section>
 
