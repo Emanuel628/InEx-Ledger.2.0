@@ -154,15 +154,23 @@ async function savePrivacySettings(req, res) {
     const nextMarketingEmailOptIn = marketingEmailOptIn !== null ? marketingEmailOptIn : previousMarketingEmailOptIn;
     
     await pool.query(
-      `INSERT INTO user_privacy_settings (user_id, data_sharing_opt_out, consent_given, analytics_opt_in, updated_at)
-       VALUES ($1, $2, $3, $4, NOW())
-       ON CONFLICT (user_id) DO UPDATE
-         SET data_sharing_opt_out = EXCLUDED.data_sharing_opt_out,
-             consent_given = EXCLUDED.consent_given,
-             analytics_opt_in = EXCLUDED.analytics_opt_in,
-             updated_at = NOW()`,
-      [req.user.id, dataSharingOptOut, consentGiven, nextAnalyticsOptIn]
-    );
+  `INSERT INTO user_privacy_settings
+     (user_id, data_sharing_opt_out, consent_given, analytics_opt_in, marketing_email_opt_in, updated_at)
+   VALUES ($1, $2, $3, $4, $5, NOW())
+   ON CONFLICT (user_id) DO UPDATE
+     SET data_sharing_opt_out = EXCLUDED.data_sharing_opt_out,
+         consent_given = EXCLUDED.consent_given,
+         analytics_opt_in = EXCLUDED.analytics_opt_in,
+         marketing_email_opt_in = EXCLUDED.marketing_email_opt_in,
+         updated_at = NOW()`,
+  [
+    req.user.id,
+    dataSharingOptOut,
+    consentGiven,
+    nextAnalyticsOptIn,
+    nextMarketingEmailOptIn
+  ]
+);
 
     // Log explicit consent changes for Quebec users (Law 25 requirement).
     // Always log data-sharing opt-out changes.
