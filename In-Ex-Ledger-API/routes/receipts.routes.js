@@ -1,4 +1,5 @@
 const fs = require("fs");
+const fsp = fs.promises;
 const path = require("path");
 const crypto = require("crypto");
 const https = require("https");
@@ -58,6 +59,16 @@ const ALLOWED_EXTENSIONS = new Set([
   ".heif"
 ]);
 
+const MIME_BY_EXTENSION = new Map([
+  [".pdf", "application/pdf"],
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+  [".png", "image/png"],
+  [".webp", "image/webp"],
+  [".heic", "image/heic"],
+  [".heif", "image/heif"]
+]);
+
 const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -69,16 +80,10 @@ const upload = multer({
   storage: multer.memoryStorage(),
 
   fileFilter(_req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase();
-
-    // Mobile browsers sometimes send blank/odd mimetype; allow extension fallback
-    const okByMime = ALLOWED_MIME_TYPES.has(file.mimetype);
-    const okByExt = ALLOWED_EXTENSIONS.has(ext);
-
-    if (!okByMime && !okByExt) {
-      return cb(
-        new Error("Unsupported file type. Only receipt images or PDFs are allowed.")
-      );
+    if (!normalizeUploadedReceiptMimeType(file)) {
+      const error = new Error("Unsupported file type. Only receipt images or PDFs are allowed.");
+      error.status = 400;
+      return cb(error);
     }
 
     cb(null, true);
@@ -93,19 +98,41 @@ const upload = multer({
    Helpers
    ========================================================= */
 
-function readReceiptFileBytes(storagePath) {
-  return fs.readFileSync(storagePath);
+function normalizeUploadedReceiptMimeType(file) {
+  const rawMime = String(file?.mimetype || "").trim().toLowerCase();
+  const ext = path.extname(String(file?.originalname || "")).toLowerCase();
+
+  if (ALLOWED_MIME_TYPES.has(rawMime)) {
+    return rawMime;
+  }
+
+  const inferredMime = MIME_BY_EXTENSION.get(ext) || null;
+  if (inferredMime && (!rawMime || rawMime === "application/octet-stream")) {
+    return inferredMime;
+  }
+
+  return null;
 }
 
-function writeReceiptMirror(buffer, originalName) {
+function getSafeReceiptResponseMimeType(mimeType) {
+  const normalizedMime = String(mimeType || "").trim().toLowerCase();
+  return ALLOWED_MIME_TYPES.has(normalizedMime) ? normalizedMime : "application/octet-stream";
+}
+
+function shouldInlineReceiptMimeType(mimeType) {
+  const normalizedMime = String(mimeType || "").trim().toLowerCase();
+  return ALLOWED_MIME_TYPES.has(normalizedMime);
+}
+
+async function writeReceiptMirror(buffer, originalName) {
   if (!buffer?.length) {
     return null;
   }
 
   const ext = path.extname(String(originalName || "")).toLowerCase();
   const storagePath = path.join(storageDir, `${crypto.randomUUID()}${ext}`);
-  fs.mkdirSync(storageDir, { recursive: true });
-  fs.writeFileSync(storagePath, buffer);
+  await fsp.mkdir(storageDir, { recursive: true });
+  await fsp.writeFile(storagePath, buffer);
   return storagePath;
 }
 
@@ -236,10 +263,17 @@ router.post("/", upload.single("receipt"), async (req, res) => {
     const receiptId = crypto.randomUUID();
     const fileBytes = req.file.buffer;
     const fileHash = crypto.createHash("sha256").update(fileBytes).digest("hex");
+    const normalizedMimeType = normalizeUploadedReceiptMimeType(req.file);
     let storagePath = null;
 
+    if (!normalizedMimeType) {
+      return res.status(400).json({
+        error: "Unsupported file type. Only receipt images or PDFs are allowed."
+      });
+    }
+
     try {
-      storagePath = writeReceiptMirror(fileBytes, req.file.originalname);
+      storagePath = await writeReceiptMirror(fileBytes, req.file.originalname);
     } catch (mirrorErr) {
       const storageStatus = getReceiptStorageStatus();
       logWarn("Receipt disk mirror unavailable; storing receipt in database only", {
@@ -259,7 +293,7 @@ router.post("/", upload.single("receipt"), async (req, res) => {
         businessId,
         transactionId,
         req.file.originalname,
-        req.file.mimetype,
+        normalizedMimeType,
         storagePath,
         fileHash,
         fileBytes
@@ -269,7 +303,7 @@ router.post("/", upload.single("receipt"), async (req, res) => {
     return res.status(201).json({
       id: receiptId,
       filename: req.file.originalname,
-      mime_type: req.file.mimetype,
+      mime_type: normalizedMimeType,
       transaction_id: transactionId,
       created_at: new Date().toISOString(),
       is_viewable: true,
@@ -448,8 +482,12 @@ router.get("/:id", async (req, res) => {
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
 
-    res.setHeader("Content-Type", mime_type || "application/octet-stream");
-    res.setHeader("Content-Disposition", `inline; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    const responseMimeType = getSafeReceiptResponseMimeType(mime_type);
+    const dispositionType = shouldInlineReceiptMimeType(mime_type) ? "inline" : "attachment";
+
+    res.setHeader("Content-Type", responseMimeType);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Disposition", `${dispositionType}; filename*=UTF-8''${encodeURIComponent(filename)}`);
 
     if (file_bytes) {
       return res.send(Buffer.isBuffer(file_bytes) ? file_bytes : Buffer.from(file_bytes));
@@ -589,7 +627,7 @@ async function extractReceiptDataWithClaude(filePath, mimeType) {
       reason: "Receipt scan currently supports JPG, PNG, GIF, and WEBP images only."
     };
   }
-  const imageData = fs.readFileSync(filePath).toString("base64");
+  const imageData = (await fsp.readFile(filePath)).toString("base64");
 
   const requestBody = JSON.stringify({
     model: ANTHROPIC_RECEIPT_OCR_MODEL,
@@ -719,7 +757,7 @@ router.post("/:id/extract", async (req, res) => {
     if (file_bytes) {
       const ext = path.extname(String(storage_path || "")).toLowerCase() || ".bin";
       tempPath = path.join(storageDir, `${crypto.randomUUID()}-ocr${ext}`);
-      fs.writeFileSync(tempPath, Buffer.isBuffer(file_bytes) ? file_bytes : Buffer.from(file_bytes));
+      await fsp.writeFile(tempPath, Buffer.isBuffer(file_bytes) ? file_bytes : Buffer.from(file_bytes));
       ocrSourcePath = tempPath;
     }
 

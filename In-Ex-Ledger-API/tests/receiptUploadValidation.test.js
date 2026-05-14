@@ -19,7 +19,8 @@ function loadReceiptsRouter(options = {}) {
     transactionRow: options.transactionRow,
     insertParams: null,
     lockCheckDate: null,
-    queryCount: 0
+    queryCount: 0,
+    receiptRow: options.receiptRow || null
   };
 
   Module._load = function(requestName, parent, isMain) {
@@ -69,6 +70,13 @@ function loadReceiptsRouter(options = {}) {
               return { rowCount: 1, rows: [] };
             }
 
+            if (/SELECT id, filename, mime_type, storage_path, file_bytes\s+FROM receipts/i.test(sql)) {
+              if (!state.receiptRow) {
+                return { rowCount: 0, rows: [] };
+              }
+              return { rowCount: 1, rows: [state.receiptRow] };
+            }
+
             throw new Error(`Unexpected query in test double: ${sql}`);
           }
         }
@@ -90,6 +98,9 @@ function loadReceiptsRouter(options = {}) {
     if (requestName === "../services/receiptStorage.js" || /receiptStorage\.js$/.test(requestName)) {
       return {
         getReceiptStorageDir: () => storageDir,
+        resolveReceiptFilePath: (filePath) => filePath,
+        isManagedReceiptPath: () => true,
+        getReceiptStorageStatus: () => ({ directory: storageDir, mode: "filesystem" }),
         requirePersistentReceiptStorage(_req, _res, next) {
           next();
         }
@@ -229,6 +240,50 @@ test("receipt upload inserts only after transaction ownership and lock checks pa
     assert.equal(fixture.state.insertParams[1], fixture.state.businessId);
     assert.equal(fixture.state.insertParams[2], transactionId);
     assert.equal(fixture.state.lockCheckDate, "2026-04-15");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("receipt upload rejects mismatched MIME types even when the filename extension looks allowed", async () => {
+  const fixture = loadReceiptsRouter();
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/receipts")
+      .attach("receipt", Buffer.from("<html>evil</html>"), {
+        filename: "receipt.jpg",
+        contentType: "text/html"
+      });
+
+    assert.equal(response.status, 400);
+    assert.match(response.body.error, /unsupported file type/i);
+    assert.equal(fixture.state.insertParams, null);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("receipt download forces attachment and octet-stream for unsafe stored mime types", async () => {
+  const fixture = loadReceiptsRouter({
+    receiptRow: {
+      id: "00000000-0000-4000-8000-000000000444",
+      filename: "receipt.jpg",
+      mime_type: "text/html",
+      storage_path: null,
+      file_bytes: Buffer.from("<html>evil</html>")
+    }
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .get("/api/receipts/00000000-0000-4000-8000-000000000444");
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers["content-type"], "application/octet-stream");
+    assert.match(String(response.headers["content-disposition"] || ""), /^attachment;/i);
+    assert.equal(response.headers["x-content-type-options"], "nosniff");
   } finally {
     fixture.cleanup();
   }
