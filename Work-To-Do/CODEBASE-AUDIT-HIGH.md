@@ -36,7 +36,7 @@ Rules used here:
   Group: Recurring route validation
   Covers: `DELETE /:id`, `PATCH /:id/status`, `PUT /:id`
 
-- [ ] 15-30 min - Add missing route-level auth and validation guards to the V2 routers before service code is reached.
+- [x] 15-30 min - Add missing route-level auth and validation guards to the V2 routers before service code is reached.
   Files: `In-Ex-Ledger-API/routes/projects.routes.js`, `In-Ex-Ledger-API/routes/vendors.routes.js`, `In-Ex-Ledger-API/routes/customers.routes.js`, `In-Ex-Ledger-API/routes/bills.routes.js`, `In-Ex-Ledger-API/routes/billable-expenses.routes.js`
   Group: V2 route hardening
   Covers: missing `requireAuth` safety dependence on V2 middleware, no UUID validation, raw body pass-through, invalid bill status handling, `total_amount: 0` rejection

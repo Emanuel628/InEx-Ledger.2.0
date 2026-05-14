@@ -3,9 +3,21 @@ const express = require('express');
 const router = express.Router();
 
 const customerService = require('../services/customerService');
+const { requireAuth } = require('../middleware/auth.middleware.js');
+const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
 
-router.use(requireV2BusinessEnabled, requireV2Entitlement);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
+
+function isUuid(value) {
+	return UUID_RE.test(String(value || ''));
+}
+
+function hasCustomerPayload(body) {
+	return typeof body?.name === 'string' && body.name.trim().length > 0;
+}
 
 // List customers (GET /customers)
 router.get('/', async (req, res) => {
@@ -19,9 +31,9 @@ router.get('/', async (req, res) => {
 });
 
 // Create customer (POST /customers)
-router.post('/', async (req, res) => {
+router.post('/', requireCsrfProtection, async (req, res) => {
 	const businessId = req.business.id;
-	if (!req.body?.name) {
+	if (!hasCustomerPayload(req.body)) {
 		return res.status(400).json({ error: 'Customer name is required.' });
 	}
 	try {
@@ -35,6 +47,9 @@ router.post('/', async (req, res) => {
 // Get customer by ID (GET /customers/:id)
 router.get('/:id', async (req, res) => {
 	const businessId = req.business.id;
+	if (!isUuid(req.params.id)) {
+		return res.status(400).json({ error: 'Invalid customer id.' });
+	}
 	try {
 		const customer = await customerService.getCustomer(businessId, req.params.id);
 		if (!customer) {
@@ -47,9 +62,12 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update customer (PUT /customers/:id)
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireCsrfProtection, async (req, res) => {
 	const businessId = req.business.id;
-	if (!req.body?.name) {
+	if (!isUuid(req.params.id)) {
+		return res.status(400).json({ error: 'Invalid customer id.' });
+	}
+	if (!hasCustomerPayload(req.body)) {
 		return res.status(400).json({ error: 'Customer name is required.' });
 	}
 	try {
@@ -64,8 +82,11 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete customer (DELETE /customers/:id)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireCsrfProtection, async (req, res) => {
 	const businessId = req.business.id;
+	if (!isUuid(req.params.id)) {
+		return res.status(400).json({ error: 'Invalid customer id.' });
+	}
 	try {
 		const deleted = await customerService.deleteCustomer(businessId, req.params.id);
 		if (!deleted) {

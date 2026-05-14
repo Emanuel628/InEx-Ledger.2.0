@@ -3,9 +3,21 @@ const express = require('express');
 const router = express.Router();
 
 const vendorService = require('../services/vendorService');
+const { requireAuth } = require('../middleware/auth.middleware.js');
+const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
 
-router.use(requireV2BusinessEnabled, requireV2Entitlement);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
+
+function isUuid(value) {
+	return UUID_RE.test(String(value || ''));
+}
+
+function hasVendorPayload(body) {
+	return typeof body?.name === 'string' && body.name.trim().length > 0;
+}
 
 // List vendors (GET /vendors)
 router.get('/', async (req, res) => {
@@ -19,9 +31,9 @@ router.get('/', async (req, res) => {
 });
 
 // Create vendor (POST /vendors)
-router.post('/', async (req, res) => {
+router.post('/', requireCsrfProtection, async (req, res) => {
 	const businessId = req.business.id;
-	if (!req.body?.name) {
+	if (!hasVendorPayload(req.body)) {
 		return res.status(400).json({ error: 'Vendor name is required.' });
 	}
 	try {
@@ -35,6 +47,9 @@ router.post('/', async (req, res) => {
 // Get vendor by ID (GET /vendors/:id)
 router.get('/:id', async (req, res) => {
 	const businessId = req.business.id;
+	if (!isUuid(req.params.id)) {
+		return res.status(400).json({ error: 'Invalid vendor id.' });
+	}
 	try {
 		const vendor = await vendorService.getVendor(businessId, req.params.id);
 		if (!vendor) {
@@ -47,9 +62,12 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update vendor (PUT /vendors/:id)
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireCsrfProtection, async (req, res) => {
 	const businessId = req.business.id;
-	if (!req.body?.name) {
+	if (!isUuid(req.params.id)) {
+		return res.status(400).json({ error: 'Invalid vendor id.' });
+	}
+	if (!hasVendorPayload(req.body)) {
 		return res.status(400).json({ error: 'Vendor name is required.' });
 	}
 	try {
@@ -64,8 +82,11 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete vendor (DELETE /vendors/:id)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireCsrfProtection, async (req, res) => {
 	const businessId = req.business.id;
+	if (!isUuid(req.params.id)) {
+		return res.status(400).json({ error: 'Invalid vendor id.' });
+	}
 	try {
 		const deleted = await vendorService.deleteVendor(businessId, req.params.id);
 		if (!deleted) {
