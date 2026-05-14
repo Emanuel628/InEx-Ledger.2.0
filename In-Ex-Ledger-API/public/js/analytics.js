@@ -175,7 +175,7 @@ function renderThisMonth(cm) {
 
   grid.innerHTML = [
     `<div class="this-month-item">
-      <div class="this-month-val income">${fmt(cm.income)}</div>
+      <div class="this-month-val income">${fmt(cm.income, { absolute: true })}</div>
       <div class="this-month-key">${escapeHtml(t("analytics_legend_income"))} ${pctBadge(cm.income_vs_prior_pct, false)}</div>
     </div>`,
     `<div class="this-month-item">
