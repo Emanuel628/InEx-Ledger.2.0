@@ -38,7 +38,7 @@ function fmtMoney(amount, currency) {
   const locale = (typeof navigator !== "undefined" && navigator.language) || "en-CA";
   return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: currency || "CAD",
+    currency: currency || invoiceDefaultCurrency,
     minimumFractionDigits: 2
   }).format(n);
 }
