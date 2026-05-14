@@ -174,7 +174,7 @@ function resetInvoiceForm() {
   const due = new Date();
   due.setDate(due.getDate() + 30);
   document.getElementById("invDueDate").value = due.toISOString().slice(0, 10);
-  document.getElementById("invCurrency").value = "CAD";
+  document.getElementById("invCurrency").value = invoiceDefaultCurrency;
   document.getElementById("invTaxRate").value = "0";
   document.getElementById("invNotes").value = "";
   document.getElementById("lineItemRows").innerHTML = "";
