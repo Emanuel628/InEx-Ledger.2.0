@@ -274,7 +274,7 @@ function barRow(label, value, max, type) {
   return `<div class="bar-row">
     <span class="bar-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
     <div class="bar-track"><div class="bar-fill ${escapeHtml(type)} ${resolveBarPctClass(pct)}"></div></div>
-    <span class="bar-amount">${fmt(value)}</span>
+    <span class="bar-amount">${fmt(value, { absolute: true })}</span>
   </div>`;
 }
 
