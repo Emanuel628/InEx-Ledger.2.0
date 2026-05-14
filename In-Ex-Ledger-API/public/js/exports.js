@@ -1692,7 +1692,6 @@ async function submitSecureExport(taxId, startDate, endDate) {
       dateRange: { startDate, endDate },
       includeTaxId: true,
       taxId_jwe,
-      taxId,
       language: exportLang,
       currency,
       templateVersion: "v1"
