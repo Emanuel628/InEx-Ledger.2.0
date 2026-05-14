@@ -1815,9 +1815,11 @@ router.post("/mfa/verify", mfaVerifyLimiter, async (req, res) => {
 
     await consumeMfaEmailChallenge(challenge.id);
     const refreshedUser = await findUserById(user.id);
-    if (refreshedUser.mfa_enabled) {
+    if (refreshedUser.mfa_enabled && trustDevice) {
       const trustedDevice = await createTrustedMfaDevice(refreshedUser, req);
       setMfaTrustCookie(res, trustedDevice.token, trustedDevice.expiresAt);
+    } else {
+      clearMfaTrustCookie(res);
     }
     const session = await issueAuthenticatedSession(res, refreshedUser, pending.business_id || null, {
       mfaAuthenticated: true,
