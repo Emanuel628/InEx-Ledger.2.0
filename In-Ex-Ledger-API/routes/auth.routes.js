@@ -863,11 +863,6 @@ router.post("/register", authLimiter, async (req, res) => {
   req.body?.marketing_email_opt_in === true ||
   req.body?.marketingEmailOptIn === true;
   
-  
-  const marketingEmailOptIn =
-  req.body?.marketing_email_opt_in === true ||
-  req.body?.marketingEmailOptIn === true;
-  
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
