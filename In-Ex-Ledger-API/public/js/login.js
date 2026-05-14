@@ -114,7 +114,10 @@ async function handleLoginSubmit(event) {
     const response = await fetch(buildApiUrl("/api/auth/login"), {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(typeof csrfHeader === "function" ? csrfHeader("POST") : {})
+      },
       body: JSON.stringify({ email, password })
     });
 
