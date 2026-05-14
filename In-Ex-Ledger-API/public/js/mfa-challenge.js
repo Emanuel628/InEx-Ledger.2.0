@@ -81,6 +81,7 @@ async function handleMfaChallengeSubmit(event) {
         "Content-Type": "application/json",
         ...(typeof csrfHeader === "function" ? csrfHeader("POST") : {})
       },
+        
       body: JSON.stringify({
         mfaToken: currentMfaToken,
         code,
