@@ -137,7 +137,7 @@ async function loadTransactionMap() {
   transactionMap = {};
 
   try {
-    const response = await apiFetch(buildReceiptsNoCachePath("/api/transactions"));
+    const response = await apiFetch(buildReceiptsNoCachePath("/api/transactions?all=true"));
     if (!response || !response.ok) {
       return;
     }
