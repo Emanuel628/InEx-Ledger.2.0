@@ -179,7 +179,7 @@ function renderThisMonth(cm) {
       <div class="this-month-key">${escapeHtml(t("analytics_legend_income"))} ${pctBadge(cm.income_vs_prior_pct, false)}</div>
     </div>`,
     `<div class="this-month-item">
-      <div class="this-month-val expense">${fmt(cm.expense)}</div>
+      <div class="this-month-val expense">${fmt(cm.expense, { absolute: true })}</div>
       <div class="this-month-key">${escapeHtml(t("analytics_legend_expenses"))} ${pctBadge(cm.expense_vs_prior_pct, true)}</div>
     </div>`,
     `<div class="this-month-item">
