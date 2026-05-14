@@ -205,9 +205,12 @@ router.get("/", async (req, res) => {
  */
 router.get("/audit-events", async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit, 10);
+    const parsedLimit = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), 200)
+      : 50;
     const events = await listAuditEventsForUser(pool, req.user.id, {
-      limit: Number.isFinite(limit) ? limit : 50
+      limit
     });
     res.json({ events });
   } catch (err) {

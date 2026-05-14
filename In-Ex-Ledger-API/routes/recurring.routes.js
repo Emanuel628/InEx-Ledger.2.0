@@ -31,6 +31,12 @@ router.use(requireAuth);
 router.use(requireCsrfProtection);
 router.use(createDataApiLimiter({ max: 80 }));
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validateRecurringIdParam(id) {
+  return UUID_RE.test(String(id || ""));
+}
+
 router.use(async (req, res, next) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
@@ -129,6 +135,9 @@ router.post("/", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
+  if (!validateRecurringIdParam(req.params.id)) {
+    return res.status(400).json({ error: "Invalid recurring transaction id." });
+  }
   const validation = normalizeRecurringPayload(req.body);
   if (!validation.valid) {
     return res.status(400).json({ error: validation.message });
@@ -209,6 +218,9 @@ router.put("/:id", async (req, res) => {
 });
 
 router.patch("/:id/status", async (req, res) => {
+  if (!validateRecurringIdParam(req.params.id)) {
+    return res.status(400).json({ error: "Invalid recurring transaction id." });
+  }
   if (typeof req.body?.active !== "boolean") {
     return res.status(400).json({ error: "active must be true or false" });
   }
@@ -235,6 +247,9 @@ router.patch("/:id/status", async (req, res) => {
 });
 
 router.post("/:id/run", async (req, res) => {
+  if (!validateRecurringIdParam(req.params.id)) {
+    return res.status(400).json({ error: "Invalid recurring transaction id." });
+  }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await materializeNextTemplateRun(businessId, req.params.id);
@@ -278,6 +293,9 @@ router.post("/:id/run", async (req, res) => {
 });
 
 router.delete("/:id", async (req, res) => {
+  if (!validateRecurringIdParam(req.params.id)) {
+    return res.status(400).json({ error: "Invalid recurring transaction id." });
+  }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
@@ -296,14 +314,12 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
 /**
  * GET /api/recurring/:id/runs
  * History of generated runs for a template (most recent first).
  */
 router.get("/:id/runs", async (req, res) => {
-  if (!UUID_RE.test(String(req.params.id || ""))) {
+  if (!validateRecurringIdParam(req.params.id)) {
     return res.status(400).json({ error: "Invalid recurring transaction id." });
   }
   try {
