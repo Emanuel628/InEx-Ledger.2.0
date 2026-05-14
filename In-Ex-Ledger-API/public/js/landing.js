@@ -67,6 +67,13 @@ async function detectLandingRegion() {
   return fallbackLandingRegionFromLocale();
 }
 
+function setLandingText(selector, value) {
+  const node = document.querySelector(selector);
+  if (node && value) {
+    node.textContent = value;
+  }
+}
+
 function applyCanadianLandingCopy() {
   document.documentElement.dataset.region = "CA";
   Object.entries(CANADA_LANDING_COPY).forEach(([key, value]) => {
