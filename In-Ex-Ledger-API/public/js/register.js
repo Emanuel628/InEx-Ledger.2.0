@@ -108,11 +108,18 @@ async function handleRegisterSubmit(event) {
 
   try {
     const regResponse = await fetch(buildApiUrl("/api/auth/register"), {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, tos_consent: true })
-    });
+  method: "POST",
+  credentials: "include",
+  headers: {
+    "Content-Type": "application/json",
+    ...(typeof csrfHeader === "function" ? csrfHeader("POST") : {})
+  },
+  body: JSON.stringify({
+    email,
+    password,
+    tos_consent: true
+  })
+});
 
     const regBody = await regResponse.json().catch(() => null);
 
