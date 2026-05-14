@@ -124,8 +124,8 @@ async function handleMfaChallengeResend(event) {
     const response = await fetch(buildApiUrl("/api/auth/mfa/resend"), {
       method: "POST",
       credentials: "include",
-      headers: {
-        "Content-Type": "application/json"
+      headers: {"Content-Type": "application/json",
+        ...(typeof csrfHeader === "function" ? csrfHeader("POST") : {})
       },
       body: JSON.stringify({
         mfaToken: currentMfaToken
