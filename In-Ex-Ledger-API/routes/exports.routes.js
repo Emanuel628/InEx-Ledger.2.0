@@ -63,6 +63,32 @@ function resolveSecureExportTaxId(body, includeTaxId) {
   }
 
   const encryptedTaxId = String(body?.taxId_jwe || "").trim();
+  if (!encryptedTaxId) {
+    const exportError = new Error("taxId_jwe is required when includeTaxId is true.");
+    exportError.status = 400;
+    throw exportError;
+  }
+
+  let decryptedTaxId = "";
+  try {
+    decryptedTaxId = decryptJwe(encryptedTaxId);
+  } catch (error) {
+    logError("Secure export JWE decrypt failed", { err: error.message });
+    const exportError = new Error("Unable to decrypt Tax ID for secure export.");
+    exportError.status = 400;
+    throw exportError;
+  }
+
+  if (!isValidTaxId(decryptedTaxId)) {
+    const exportError = new Error("Invalid Tax ID format.");
+    exportError.status = 400;
+    throw exportError;
+  }
+
+  return decryptedTaxId;
+}
+
+  const encryptedTaxId = String(body?.taxId_jwe || "").trim();
   if (encryptedTaxId) {
     try {
       return decryptJwe(encryptedTaxId);
