@@ -3952,3 +3952,69 @@ tr.tx-highlight {
     width: 100% !important;
   }
 }
+
+/* Mobile view: final safety pass */
+@media (max-width: 720px) {
+  .app-shell {
+    display: block !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .app-shell > .app-sidebar,
+  .app-sidebar {
+    display: none !important;
+  }
+
+  .app-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 16px 12px 28px !important;
+    box-sizing: border-box !important;
+  }
+
+  .page-header,
+  .page-header-actions,
+  .transactions-toolbar,
+  .transactions-toolbar-tools,
+  .transactions-toolbar-controls,
+  .transaction-drawer-head,
+  .tax-banner {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .stats-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .transaction-form-grid,
+  .entry-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .table-wrapper {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .transactions-table {
+    min-width: 860px !important;
+  }
+
+  .scope-select-wrap,
+  .tx-period-picker,
+  .page-add-button,
+  .toolbar-search,
+  .toolbar-search input,
+  .toolbar-select,
+  .toolbar-import-button,
+  .drawer-submit {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
