@@ -317,3 +317,34 @@ main.help-main {
   transform: translateY(-1px);
 }
 
+}
+
+.support-contact-avatar {
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  width: 28px;
+
+  height: 28px;
+
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.22);
+
+  color: #fff;
+
+  font-size: 14px;
+
+  font-weight: 800;
+
+}
+
+.support-contact-name {
+
+  color: inherit;
+}
+
