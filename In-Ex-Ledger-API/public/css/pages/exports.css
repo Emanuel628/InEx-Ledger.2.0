@@ -670,3 +670,24 @@
     width: 100%;
   }
 }
+
+/* Desktop-on-mobile: preserve desktop export layout at desktop-ish widths */
+@media (min-width: 821px) {
+  .exports-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .history-card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .history-columns,
+  .history-item {
+    min-width: 860px;
+  }
+
+  .history-actions {
+    flex-wrap: nowrap;
+  }
+}
