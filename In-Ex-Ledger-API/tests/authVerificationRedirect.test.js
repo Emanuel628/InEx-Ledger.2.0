@@ -8,7 +8,6 @@ const request = require("supertest");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-auth-verification-secret";
 
-const { verifyToken } = require("../middleware/auth.middleware.js");
 const AUTH_ROUTE_PATH = require.resolve("../routes/auth.routes.js");
 
 function loadAuthRouter() {
@@ -205,16 +204,7 @@ test("verify-email marks the user verified and redirects into an authenticated s
     const params = new URLSearchParams(hash);
     assert.equal(params.get("verified"), "true");
     assert.equal(params.get("next"), "/onboarding");
-
-    const accessToken = params.get("token");
-    assert.ok(accessToken, "redirect hash should contain an access token");
-
-    const decoded = verifyToken(accessToken);
-    assert.equal(decoded.id, "user_verified_1");
-    assert.equal(decoded.email, "verified@example.com");
-    assert.equal(decoded.email_verified, true);
-    assert.equal(decoded.business_id, "biz_verified_1");
-    assert.equal(decoded.mfa_enabled, false);
+    assert.equal(params.get("token"), null);
     assert.ok(Array.isArray(fixture.state.refreshTokenInsert), "refresh token should be persisted");
     assert.ok(Array.isArray(fixture.state.recognizedDeviceInsert), "verified-email sign-in should register the current device");
   } finally {

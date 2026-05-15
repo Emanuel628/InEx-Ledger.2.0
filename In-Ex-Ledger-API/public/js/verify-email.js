@@ -107,17 +107,20 @@ function consumeVerifiedSessionFromHash() {
   }
 
   const params = new URLSearchParams(hash);
-  const token = params.get("token");
+  const token = String(params.get("token") || "").trim();
+  const verified = params.get("verified") === "true";
   const next = safeInternalNext(params.get("next"), "/onboarding");
-  if (!token) {
+  if (!token && !verified) {
     return false;
   }
 
   try {
-    if (typeof setToken === "function") {
-      setToken(token);
-    } else {
-      sessionStorage.setItem("token", token);
+    if (token) {
+      if (typeof setToken === "function") {
+        setToken(token);
+      } else {
+        sessionStorage.setItem("token", token);
+      }
     }
     localStorage.removeItem(VERIFICATION_STATE_KEY);
     localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
@@ -129,6 +132,20 @@ function consumeVerifiedSessionFromHash() {
 
   updateStatus(tx("verify_email_status_success"));
   window.history.replaceState({}, document.title, "/verify-email");
+  if (!token && typeof refreshAccessToken === "function") {
+    refreshAccessToken()
+      .then((refreshed) => {
+        if (refreshed) {
+          window.location.replace(next);
+          return;
+        }
+        window.location.replace("/login");
+      })
+      .catch(() => {
+        window.location.replace("/login");
+      });
+    return true;
+  }
   window.location.replace(next);
   return true;
 }

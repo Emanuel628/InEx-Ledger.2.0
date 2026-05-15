@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const token = new URLSearchParams(window.location.search).get("token") || "";
+    const token = new URLSearchParams(String(window.location.hash || "").replace(/^#/, "")).get("token") || "";
     const password = String(document.getElementById("password")?.value || "");
     const confirmPassword = String(document.getElementById("confirmPassword")?.value || "");
     const submitButton = form.querySelector("button[type=\"submit\"]");
@@ -81,6 +81,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       form.reset();
       setResetPasswordMessage(payload?.message || "Password updated successfully. Redirecting to sign in...", "success");
+      if (window.location.hash) {
+        window.history.replaceState({}, document.title, "/reset-password");
+      }
       window.setTimeout(() => {
         window.location.href = "/login?password_reset=true";
       }, 1200);

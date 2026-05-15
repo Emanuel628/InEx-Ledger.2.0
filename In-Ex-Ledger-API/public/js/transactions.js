@@ -3741,6 +3741,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initCsvImport();
   initOcrPrefill();
   initDrawerCloseBtn();
+  initQuickAddTriggers();
   initTaxBannerControls();
   initPeriodPicker();
   initTransactionUndoBar();
@@ -3764,6 +3765,19 @@ function initTransactionUndoBar() {
 function initDrawerCloseBtn() {
   const closeBtn = document.getElementById("txDrawerClose");
   closeBtn?.addEventListener("click", () => closeTransactionDrawer());
+}
+
+function initQuickAddTriggers() {
+  const toggle = document.getElementById("addTxTogglePage");
+  if (!toggle) {
+    return;
+  }
+  document.querySelectorAll("[data-quick-add-trigger], [data-quick-add-link]").forEach((element) => {
+    element.addEventListener("click", (event) => {
+      event.preventDefault();
+      toggle.click();
+    });
+  });
 }
 
 function initTaxBannerControls() {

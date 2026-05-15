@@ -111,12 +111,12 @@ Rules used here:
 
 ### Frontend auth-flow safety
 
-- [ ] 1-2 hours - Replace inline handlers and introduce a real CSP rollout plan for authenticated and auth pages.
+- [x] 1-2 hours - Replace inline handlers and introduce a real CSP rollout plan for authenticated and auth pages.
   Files: `In-Ex-Ledger-API/public/html/transactions.html`, `In-Ex-Ledger-API/public/html/login.html`, app/auth page HTML broadly
   Group: CSP enablement
   Covers: inline `onclick`, inline `onfocus`, and the current inability to deploy a strict CSP
 
-- [ ] 1-2 hours - Stop exposing live session/bootstrap tokens in URL-based auth flows.
+- [x] 1-2 hours - Stop exposing live session/bootstrap tokens in URL-based auth flows.
   Files: `In-Ex-Ledger-API/routes/auth.routes.js`, `In-Ex-Ledger-API/public/js/verify-email.js`, `In-Ex-Ledger-API/public/html/reset-password.html`, related auth pages
   Group: URL token exposure
   Covers: verify-email access token in URL fragment, reset token in query string
@@ -186,7 +186,7 @@ Rules used here:
   Group: Tax estimate correctness
   Covers: flat US 24 percent estimate, HST/GST used as Canadian income tax, non-income transactions counted as expenses
 
-- [ ] 1 day+ - Add a real CSP across app and auth pages once inline handlers and unsafe patterns are removed.
+- [x] 1 day+ - Add a real CSP across app and auth pages once inline handlers and unsafe patterns are removed.
   Files: app/auth HTML templates broadly, `server.js` CSP configuration
   Group: Platform XSS hardening
   Covers: current absence of CSP on app pages and auth pages

@@ -257,7 +257,7 @@ function buildVerificationLink(req, token) {
 }
 
 function buildPasswordResetLink(req, token) {
-  return `${getAppBaseUrl(req)}/reset-password?token=${token}`;
+  return `${getAppBaseUrl(req)}/reset-password#token=${token}`;
 }
 
 function createVerificationStatusToken(email) {
@@ -1430,7 +1430,6 @@ router.get("/verify-email", async (req, res) => {
     }
     const redirectHash = new URLSearchParams({
       verified: "true",
-      token: session.token,
       next: "/onboarding"
     }).toString();
 
