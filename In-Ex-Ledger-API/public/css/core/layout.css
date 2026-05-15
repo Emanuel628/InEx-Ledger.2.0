@@ -1346,8 +1346,6 @@ body[data-theme="light"] select option {
   .topbar-nav a[href="analytics"] span:not(.nav-icon),
   .topbar-nav a[href="invoices"] span:not(.nav-icon),
   .topbar-nav a[href="settings"] span:not(.nav-icon),
-  .topbar-nav a[href="messages"] span:not(.nav-icon):not(.nav-msg-badge),
-  .topbar-nav a[data-nav-messages] span:not(.nav-icon):not(.nav-msg-badge),
   .topbar-nav a[data-nav-help] span:not(.nav-icon) {
     display: none !important;
   }
