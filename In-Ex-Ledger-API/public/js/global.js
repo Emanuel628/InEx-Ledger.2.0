@@ -341,12 +341,35 @@ function injectDesktopMobileLink() {
     return;
   }
 
+  if (document.querySelector(".mobile-view-link")) {
+    return;
+  }
+
   const wrapper = document.createElement("div");
   wrapper.className = "mobile-desktop-link mobile-view-link";
+  wrapper.style.position = "fixed";
+  wrapper.style.left = "16px";
+  wrapper.style.right = "16px";
+  wrapper.style.bottom = "16px";
+  wrapper.style.zIndex = "9999";
+  wrapper.style.textAlign = "center";
+  wrapper.style.pointerEvents = "none";
 
   const link = document.createElement("a");
   link.href = "#";
   link.textContent = "Mobile View";
+  link.style.display = "inline-flex";
+  link.style.alignItems = "center";
+  link.style.justifyContent = "center";
+  link.style.minHeight = "44px";
+  link.style.padding = "0 18px";
+  link.style.borderRadius = "999px";
+  link.style.background = "#102236";
+  link.style.color = "#fff";
+  link.style.fontWeight = "700";
+  link.style.textDecoration = "none";
+  link.style.boxShadow = "0 14px 32px rgba(15, 25, 35, 0.22)";
+  link.style.pointerEvents = "auto";
 
   link.addEventListener("click", function (e) {
     e.preventDefault();
