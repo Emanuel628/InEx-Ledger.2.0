@@ -1331,21 +1331,34 @@ body[data-theme="light"] select option {
 }
 
 /* At 1100px collapse lower-priority nav items (Help, Messages, Settings) to icon-only */
-@media (max-width: 1100px) and (min-width: 1025px) {
-  .topbar-nav a[data-nav-help] span:not(.nav-icon),
+/* Desktop/tablet topbar: compact lower-priority nav before mobile collapse */
+@media (max-width: 1320px) and (min-width: 1025px) {
+  .topbar-nav {
+    gap: 6px !important;
+    overflow: hidden !important;
+  }
+
+  .topbar-nav a {
+    padding: 6px 8px !important;
+    flex: 0 0 auto !important;
+  }
+
+  .topbar-nav a[href="analytics"] span:not(.nav-icon),
+  .topbar-nav a[href="invoices"] span:not(.nav-icon),
+  .topbar-nav a[href="settings"] span:not(.nav-icon),
+  .topbar-nav a[href="messages"] span:not(.nav-icon):not(.nav-msg-badge),
   .topbar-nav a[data-nav-messages] span:not(.nav-icon):not(.nav-msg-badge),
-  .topbar-nav a[href="settings"] span:not(.nav-icon) {
+  .topbar-nav a[data-nav-help] span:not(.nav-icon) {
     display: none !important;
   }
-  .topbar-nav a[data-nav-help],
-  .topbar-nav a[data-nav-messages],
-  .topbar-nav a[href="settings"] {
-    padding: 6px 8px !important;
+
+  .topbar-hamburger {
+    display: none !important;
   }
 }
 
+/* Mobile/tablet topbar: hamburger only */
 @media (max-width: 1024px) {
-  @media (max-width: 1024px) {
   .app-topbar,
   .settings-topbar,
   .accounts-topbar,
@@ -1358,24 +1371,33 @@ body[data-theme="light"] select option {
   .help-topbar {
     height: 56px !important;
     min-height: 56px !important;
+    max-height: 56px !important;
     padding: 0 12px !important;
+    display: flex !important;
+    flex-direction: row !important;
     align-items: center !important;
+    justify-content: space-between !important;
     gap: 10px !important;
     flex-wrap: nowrap !important;
+    overflow: visible !important;
   }
 
   .topbar-left {
     width: auto !important;
     flex: 1 1 auto !important;
     min-width: 0 !important;
+    display: flex !important;
+    align-items: center !important;
     justify-content: flex-start !important;
     gap: 10px !important;
+    flex-wrap: nowrap !important;
   }
 
   .topbar-brand {
     min-width: 0 !important;
     max-width: calc(100vw - 112px) !important;
     overflow: hidden !important;
+    flex-shrink: 1 !important;
   }
 
   .topbar-brand-text {
@@ -1390,6 +1412,12 @@ body[data-theme="light"] select option {
   }
 
   .topbar-hamburger {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 38px !important;
+    height: 38px !important;
+    padding: 0 !important;
     order: 2 !important;
     flex: 0 0 auto !important;
   }
@@ -1398,9 +1426,18 @@ body[data-theme="light"] select option {
     order: 3 !important;
     flex: 0 0 auto !important;
     margin-left: 0 !important;
+    width: 38px !important;
+    height: 38px !important;
+    max-width: 38px !important;
+    min-width: 38px !important;
+    padding: 5px !important;
+  }
+
+  .user-avatar {
+    width: 28px !important;
+    height: 28px !important;
   }
 }
-
 
 @media (max-width: 720px) {
   .app-topbar,
@@ -1492,14 +1529,6 @@ body[data-theme="light"] select option {
 
 .topbar-hamburger svg {
   display: block;
-}
-
-@media (max-width: 1024px) {
-  .topbar-hamburger {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
 }
 
 /* ── Mobile nav overlay ──────────────────────────────────── */
@@ -1624,74 +1653,6 @@ body[data-theme="light"] select option {
   }
 }
 
-/* Mobile topbar hardening: prevent crumpled headers across all app pages */
-@media (max-width: 1024px) {
-  .app-topbar,
-  .settings-topbar,
-  .accounts-topbar,
-  .exports-topbar,
-  .receipts-topbar,
-  .categories-topbar,
-  .mileage-topbar,
-  .messages-topbar,
-  .analytics-topbar,
-  .help-topbar {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    height: 56px !important;
-    min-height: 56px !important;
-    max-height: 56px !important;
-    overflow: visible !important;
-  }
-
-  .topbar-left {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
-    min-width: 0 !important;
-  }
-
-  .topbar-brand {
-    display: inline-flex !important;
-    align-items: center !important;
-    min-width: 0 !important;
-    overflow: hidden !important;
-  }
-
-  .topbar-brand-text {
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-  }
-
-  .topbar-nav {
-    display: none !important;
-  }
-
-  .topbar-hamburger {
-    align-items: center !important;
-    justify-content: center !important;
-    width: 38px !important;
-    height: 38px !important;
-    padding: 0 !important;
-  }
-
-  .user-pill {
-    width: 38px !important;
-    height: 38px !important;
-    max-width: 38px !important;
-    min-width: 38px !important;
-    padding: 5px !important;
-  }
-
-  .user-avatar {
-    width: 28px !important;
-    height: 28px !important;
-  }
-  
-}
 /* Topbar overlap fix: desktop-width mobile view must not show hamburger */
 @media (min-width: 1025px) {
   .topbar-hamburger {
