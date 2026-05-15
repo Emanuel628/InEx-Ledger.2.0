@@ -224,17 +224,28 @@ router.get("/", async (req, res) => {
    POST /receipts — Upload Receipt
    ========================================================= */
 
-router.post("/", upload.single("receipt"), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "Receipt file is required." });
-  }
-
+async function checkReceiptPlanAccess(req, res, next) {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     if (!hasFeatureAccess(subscription, "receipts")) {
       return res.status(402).json({ error: "Receipt uploads require an active InEx Ledger Pro plan." });
     }
+    req._receiptsBusinessId = businessId;
+    next();
+  } catch (err) {
+    logError("Receipt plan gate error:", err);
+    res.status(500).json({ error: "Failed to verify plan access." });
+  }
+}
+
+router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "Receipt file is required." });
+  }
+
+  try {
+    const businessId = req._receiptsBusinessId || await resolveBusinessIdForUser(req.user);
 
     let transactionId = req.body.transaction_id;
     if (typeof transactionId === "string") {

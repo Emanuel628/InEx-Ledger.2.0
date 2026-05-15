@@ -146,6 +146,16 @@ async function seedDefaultsForBusiness(db = pool, businessId) {
   }
 
   await seedDefaultCategoriesForBusiness(targetDb, businessId);
+
+  const trialDays = Number(process.env.DEFAULT_TRIAL_DAYS || 30);
+  const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+  await targetDb.query(
+    `INSERT INTO business_subscriptions
+       (id, business_id, provider, plan_code, status, trial_started_at, trial_ends_at)
+     VALUES ($1, $2, 'stripe', 'v1', 'trialing', NOW(), $3)
+     ON CONFLICT (business_id) DO NOTHING`,
+    [crypto.randomUUID(), businessId, trialEndsAt.toISOString()]
+  );
 }
 
 module.exports = { seedDefaultsForBusiness, seedDefaultCategoriesForBusiness, getDefaultCategoriesForRegion };

@@ -16,8 +16,12 @@ function buildEntitlements(subscription) {
     effective_tier: effectiveTier,
     quick_add_sidebar_enabled: isPro || isBusiness,
     business_quick_add_enabled: isBusiness,
-    recurring_templates_enabled: isBusiness,
-    export_history_enabled: isPro || isBusiness
+    recurring_templates_enabled: isPro || isBusiness,
+    export_history_enabled: isPro || isBusiness,
+    receipts_enabled: isPro || isBusiness,
+    edge_case_tools_enabled: isPro || isBusiness,
+    tax_estimates_enabled: isPro || isBusiness,
+    advanced_exports_enabled: isPro || isBusiness
   };
 }
 

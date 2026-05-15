@@ -1,6 +1,6 @@
 // V2/Business feature flag and entitlement middleware
 
-const { getSubscriptionSnapshotForBusiness } = require("../../services/subscriptionService.js");
+const { getSubscriptionSnapshotForBusiness, PLAN_BUSINESS } = require("../../services/subscriptionService.js");
 const { resolveBusinessIdForUser } = require("./resolveBusinessIdForUser.js");
 
 async function requireV2BusinessEnabled(req, res, next) {
@@ -19,7 +19,7 @@ async function requireV2BusinessEnabled(req, res, next) {
     req.business = req.business || {};
     req.business.id = businessId;
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    if (!subscription || subscription.effectiveTier !== 'v2') {
+    if (!subscription || subscription.effectiveTier !== PLAN_BUSINESS) {
       return res.status(403).json({ error: 'Your current plan does not include Business features.' });
     }
     req.business.subscription = subscription;
@@ -29,8 +29,10 @@ async function requireV2BusinessEnabled(req, res, next) {
   }
 }
 
-
 function requireV2Entitlement(req, res, next) {
+  if (!req.business?.subscription) {
+    return res.status(403).json({ error: 'Business entitlement check failed.' });
+  }
   next();
 }
 

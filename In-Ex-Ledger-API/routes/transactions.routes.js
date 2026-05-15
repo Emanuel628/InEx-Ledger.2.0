@@ -542,9 +542,9 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
+  let client = null;
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    await assertCanCreateTransactions(pool, businessId, 1);
     const businessTaxContext = await getBusinessRegionAndCurrency(businessId);
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
     const validation = validateTransactionPayload(req.body, businessTaxContext.currency);
@@ -583,7 +583,16 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "category_id is invalid" });
     }
 
-    const result = await pool.query(
+    // Acquire a per-business advisory lock so the count check and INSERT are
+    // atomic. Two concurrent requests at the free-tier cap cannot both pass
+    // the check and both insert — the second one will re-read the updated count
+    // while the lock is held by the first.
+    client = await pool.connect();
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [businessId]);
+    await assertCanCreateTransactions(client, businessId, 1, { subscription });
+
+    const result = await client.query(
       `INSERT INTO transactions
         (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted, date, note,
          currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
@@ -622,11 +631,15 @@ router.post("/", async (req, res) => {
         taxFormType
       ]
     );
+    await client.query("COMMIT");
 
     res.status(201).json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
+    if (client) await client.query("ROLLBACK").catch(() => {});
     logError("POST /transactions error:", err);
     return handleTransactionMutationError(res, err, "Failed to save transaction.");
+  } finally {
+    if (client) client.release();
   }
 });
 
@@ -1444,7 +1457,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    if (!hasFeatureAccess(subscription, "receipts")) {
+    if (!hasFeatureAccess(subscription, "advanced_exports")) {
       return res.status(402).json({ error: "CSV import requires an active InEx Ledger Pro plan." });
     }
 

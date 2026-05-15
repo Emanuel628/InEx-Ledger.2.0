@@ -210,6 +210,10 @@ router.post("/history", exportGrantLimiter, async (req, res) => {
     const user = req.user;
     user.business_id = await resolveBusinessIdForUser(user);
     const businessId = user.business_id;
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    if (!hasFeatureAccess(subscription, "pdf_exports")) {
+      return res.status(402).json({ error: "Export history requires an active Pro plan." });
+    }
     const format = String(req.body?.format || "").toLowerCase();
     const dateRange = validateDateRange(req.body);
     const language = String(req.body?.language || "en").toLowerCase();
