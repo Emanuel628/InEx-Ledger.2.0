@@ -503,3 +503,60 @@
   }
 }
 
+/* Mobile view: final safety pass */
+@media (max-width: 720px) {
+  .receipts-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 16px 12px 24px !important;
+    box-sizing: border-box !important;
+  }
+
+  .receipts-page-header,
+  .receipts-card-head,
+  .receipt-modal-actions,
+  .modal-actions,
+  .receipt-row-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .receipt-drop-zone,
+  .receipts-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .receipts-card {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .receipts-table {
+    min-width: 760px !important;
+  }
+
+  .upload-btn,
+  .receipt-secondary-btn,
+  .receipt-primary-btn,
+  .receipt-link-btn,
+  .receipt-scan-btn,
+  .receipt-delete-btn,
+  .receipt-file-button,
+  .receipt-bottom-upload-btn,
+  .receipt-refresh-btn,
+  .drawer-submit,
+  .modal-cancel {
+    width: 100% !important;
+  }
+
+  .receipt-modal-card,
+  .transaction-modal-content {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    padding: 22px 18px !important;
+    box-sizing: border-box !important;
+  }
+}
+
