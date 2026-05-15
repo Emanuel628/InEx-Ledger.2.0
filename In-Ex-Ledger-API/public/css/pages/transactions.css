@@ -1937,59 +1937,6 @@ body {
 }
 
 @media (max-width: 640px) {
-  .app-topbar {
-    padding: 10px 12px;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .topbar-left {
-    width: 100%;
-    gap: 10px;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .topbar-brand {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .topbar-brand-text {
-    font-size: 14px;
-  }
-
-  .user-pill {
-    margin-left: auto;
-    max-width: 44vw;
-  }
-
-  .user-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .app-content {
-    padding: 14px 12px 20px;
-  }
-
-  .app-sidebar {
-    grid-template-columns: 1fr 1fr;
-    gap: 8px 12px;
-    padding: 12px;
-  }
-
-  .sidebar-section-label {
-    padding: 0 0 4px;
-  }
-
-  .sidebar-link {
-    padding: 10px 8px;
-    font-size: 12px;
-    border-radius: 10px;
-  }
-
   .page-header {
     flex-direction: column;
     align-items: stretch;
