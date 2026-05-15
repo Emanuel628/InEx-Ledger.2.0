@@ -716,6 +716,34 @@ function getCurrentThreadIds() {
     : [];
 }
 
+async function archiveMessages(ids, closeDetail = false) {
+  try {
+    await Promise.all(ids.map((id) =>
+      apiFetch(`/api/messages/${encodeURIComponent(id)}/archive`, { method: "PATCH" })
+    ));
+
+    showToast("Thread archived.");
+    if (closeDetail) closeMessageDetail();
+    await loadMessages();
+  } catch {
+    showToast("Unable to archive thread. Please try again.");
+  }
+}
+
+async function deleteMessages(ids, closeDetail = false) {
+  try {
+    await Promise.all(ids.map((id) =>
+      apiFetch(`/api/messages/${encodeURIComponent(id)}`, { method: "DELETE" })
+    ));
+
+    showToast("Thread deleted.");
+    if (closeDetail) closeMessageDetail();
+    await loadMessages();
+  } catch {
+    showToast("Unable to delete thread. Please try again.");
+  }
+}
+
 async function deleteMessage(id, closeDetail = false) {
   try {
     const response = await apiFetch(`/api/messages/${encodeURIComponent(id)}`, { method: "DELETE" });
