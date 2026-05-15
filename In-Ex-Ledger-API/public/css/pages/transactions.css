@@ -739,34 +739,6 @@ tbody tr:last-child {
     border-spacing: 0;
   }
 
-  .transactions-table th {
-    display: none;
-  }
-
-  .transactions-table tbody tr {
-    display: block;
-    margin-bottom: 16px;
-    background: var(--card-bg);
-    border-radius: 16px;
-    padding: 14px;
-    box-shadow: var(--shadow-sm);
-  }
-
-  .transactions-table tbody td {
-    display: flex;
-    justify-content: space-between;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 8px 0;
-  }
-
-  .transactions-table tbody td:last-child {
-    border-bottom: none;
-  }
-
-  .transactions-table tbody td span {
-    display: inline-block;
-  }
-}
 .txn-entry-selector {
   display: flex;
   gap: 12px;
