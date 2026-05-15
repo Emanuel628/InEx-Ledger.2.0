@@ -456,3 +456,27 @@ textarea.form-control {
     border-radius: 20px;
   }
 }
+
+/* Desktop-on-mobile: preserve desktop mileage layout at desktop-ish widths */
+@media (min-width: 1025px) {
+  .mileage-summary-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .mileage-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .form-field--wide {
+    grid-column: span 2;
+  }
+
+  .mileage-table {
+    min-width: 860px;
+  }
+
+  .mileage-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
