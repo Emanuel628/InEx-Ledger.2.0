@@ -1042,3 +1042,73 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Mobile view: final safety pass */
+@media (max-width: 560px) {
+  .marketing-header,
+  .marketing-main {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    box-sizing: border-box !important;
+  }
+
+  .marketing-header {
+    position: static !important;
+    margin-top: 8px !important;
+    padding: 12px !important;
+    border-radius: 16px !important;
+  }
+
+  .marketing-nav,
+  .marketing-nav-sections {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .marketing-nav-sections {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .hero,
+  .problem-section,
+  .workflow-section,
+  .fit-section,
+  .pricing-section,
+  .faq-section,
+  .final-cta,
+  .pricing-card {
+    padding: 18px !important;
+    border-radius: 20px !important;
+    box-sizing: border-box !important;
+  }
+
+  .hero,
+  .problem-grid,
+  .workflow-grid,
+  .fit-grid,
+  .hero-device-grid,
+  .pricing-feature-list {
+    grid-template-columns: 1fr !important;
+  }
+
+  .hero-actions,
+  .final-cta-actions,
+  .pricing-card-header,
+  .final-cta {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .button,
+  .pricing-cta-btn,
+  .marketing-nav-cta,
+  .marketing-nav-signin {
+    width: 100% !important;
+  }
+
+  .pricing-price-block {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
