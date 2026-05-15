@@ -1623,3 +1623,72 @@ body[data-theme="light"] select option {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Mobile topbar hardening: prevent crumpled headers across all app pages */
+@media (max-width: 1024px) {
+  .app-topbar,
+  .settings-topbar,
+  .accounts-topbar,
+  .exports-topbar,
+  .receipts-topbar,
+  .categories-topbar,
+  .mileage-topbar,
+  .messages-topbar,
+  .analytics-topbar,
+  .help-topbar {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    max-height: 56px !important;
+    overflow: visible !important;
+  }
+
+  .topbar-left {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    min-width: 0 !important;
+  }
+
+  .topbar-brand {
+    display: inline-flex !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .topbar-brand-text {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .topbar-nav {
+    display: none !important;
+  }
+
+  .topbar-hamburger {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 38px !important;
+    height: 38px !important;
+    padding: 0 !important;
+  }
+
+  .user-pill {
+    width: 38px !important;
+    height: 38px !important;
+    max-width: 38px !important;
+    min-width: 38px !important;
+    padding: 5px !important;
+  }
+
+  .user-avatar {
+    width: 28px !important;
+    height: 28px !important;
+  }
+}
