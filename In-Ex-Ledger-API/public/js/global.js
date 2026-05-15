@@ -387,6 +387,16 @@ function injectDesktopMobileLink() {
   document.body.appendChild(wrapper);
 }
 
+function initViewportSwitchLinks() {
+  try {
+    injectMobileDesktopLink();
+  } catch (_) {}
+
+  try {
+    injectDesktopMobileLink();
+  } catch (_) {}
+}
+
 function injectMobileMenu() {
   const topbar = document.querySelector(".app-topbar");
   const nav = document.querySelector(".app-topbar .topbar-nav");
@@ -1429,8 +1439,7 @@ document.addEventListener("DOMContentLoaded", () => {
   applyDateInputConstraints();
   markRequiredFields();
   disableNumberInputWheel();
-  injectMobileDesktopLink();
-  injectDesktopMobileLink();
+  initViewportSwitchLinks();
   applyMileageNavLabel();
   window.addEventListener("lunaDistanceUnitChanged", applyMileageNavLabel);
   window.addEventListener("lunaLanguageChanged", applyMileageNavLabel);
@@ -1467,6 +1476,12 @@ document.addEventListener("DOMContentLoaded", () => {
     applyDesktopViewport();
   }
 })();
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initViewportSwitchLinks);
+} else {
+  initViewportSwitchLinks();
+}
 
 window.applyGlobalTheme = applyGlobalTheme;
 window.setGlobalTheme = setGlobalTheme;
