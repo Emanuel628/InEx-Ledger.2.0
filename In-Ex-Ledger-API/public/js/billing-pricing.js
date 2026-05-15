@@ -13,6 +13,16 @@
   const BILLING_CURRENCIES = Object.freeze(["usd", "cad"]);
   const BILLING_INTERVALS = Object.freeze(["monthly", "yearly"]);
 
+  function deepFreeze(value) {
+    if (!value || typeof value !== "object" || Object.isFrozen(value)) {
+      return value;
+    }
+    Object.getOwnPropertyNames(value).forEach((key) => {
+      deepFreeze(value[key]);
+    });
+    return Object.freeze(value);
+  }
+
   function normalizeCurrency(currency) {
     const normalized = String(currency || "usd").toLowerCase();
     return BILLING_CURRENCIES.includes(normalized) ? normalized : "usd";
@@ -48,7 +58,9 @@
     return pricing.base + getAddonTotal(currency, interval, additionalBusinesses);
   }
 
-  global.billingPricing = {
+  deepFreeze(PRICING_TABLE);
+
+  global.billingPricing = Object.freeze({
     BILLING_CURRENCIES,
     BILLING_INTERVALS,
     PRICING_TABLE,
@@ -58,5 +70,5 @@
     formatMoney,
     getAddonTotal,
     getGrandTotal
-  };
+  });
 })(window);

@@ -16,7 +16,8 @@ async function getEffectiveTierForRequest(req) {
 
 router.get('/arap-summary', ...businessTierOnly, async (req, res) => {
   try {
-    res.json(await arApService.getArApSummary(req.business.id));
+    const businessId = await resolveBusinessIdForUser(req.user);
+    res.json(await arApService.getArApSummary(businessId));
   } catch (_) {
     res.status(500).json({ error: 'Failed to load AR/AP summary.' });
   }
@@ -24,7 +25,10 @@ router.get('/arap-summary', ...businessTierOnly, async (req, res) => {
 
 // Optional paid-feature preload endpoints should not create noisy 402 console errors
 // when a page checks for data the current plan does not include.
-router.get('/recurring', requireAuth, async (req, res, next) => {
+router.use('/recurring', requireAuth, async (req, res, next) => {
+  if (req.method !== 'GET' || (req.path !== '/' && req.path !== '')) {
+    return next();
+  }
   try {
     const tier = await getEffectiveTierForRequest(req);
     if (tier !== PLAN_BUSINESS && tier !== PLAN_PRO) {
@@ -32,7 +36,7 @@ router.get('/recurring', requireAuth, async (req, res, next) => {
     }
     return next();
   } catch (_) {
-    return next();
+    return res.status(503).json({ error: 'Failed to load recurring preview.' });
   }
 });
 
@@ -44,7 +48,7 @@ router.get('/exports/history', requireAuth, async (req, res, next) => {
     }
     return next();
   } catch (_) {
-    return next();
+    return res.status(503).json({ error: 'Failed to load export history preview.' });
   }
 });
 

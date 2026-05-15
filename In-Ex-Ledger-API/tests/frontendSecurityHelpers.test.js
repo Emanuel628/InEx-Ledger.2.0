@@ -1,0 +1,172 @@
+"use strict";
+
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
+
+function loadScript(relativePath, contextExtras = {}) {
+  const scriptPath = path.resolve(__dirname, "..", relativePath);
+  const source = fs.readFileSync(scriptPath, "utf8");
+  const context = vm.createContext({
+    window: {},
+    console,
+    setTimeout,
+    clearTimeout,
+    URL: {
+      createObjectURL() { return "blob:test"; },
+      revokeObjectURL() {}
+    },
+    document: {
+      createElement() {
+        return {
+          click() {},
+          remove() {}
+        };
+      },
+      body: {
+        appendChild() {},
+        removeChild() {}
+      }
+    },
+    localStorage: {
+      _store: new Map(),
+      getItem(key) {
+        return this._store.has(key) ? this._store.get(key) : null;
+      },
+      setItem(key, value) {
+        this._store.set(key, String(value));
+      },
+      removeItem(key) {
+        this._store.delete(key);
+      }
+    },
+    ...contextExtras
+  });
+  vm.runInContext(source, context, { filename: scriptPath });
+  return context;
+}
+
+test("billing-pricing exports a frozen pricing helper object", () => {
+  const context = loadScript("public/js/billing-pricing.js");
+  assert.equal(Object.isFrozen(context.window.billingPricing), true);
+  assert.equal(Object.isFrozen(context.window.billingPricing.PRICING_TABLE), true);
+  assert.equal(
+    Object.isFrozen(context.window.billingPricing.PRICING_TABLE.usd.monthly),
+    true
+  );
+});
+
+test("privacyService does not persist local settings when the server save fails", async () => {
+  const fetchCalls = [];
+  const context = loadScript("public/js/privacyService.js", {
+    fetch: async (url) => {
+      fetchCalls.push(url);
+      if (url === "/health") {
+        return { ok: true };
+      }
+      if (url === "/api/privacy/settings") {
+        throw new Error("network down");
+      }
+      throw new Error(`Unexpected fetch url: ${url}`);
+    }
+  });
+
+  context.localStorage.setItem("lb_privacy_settings", JSON.stringify({
+    dataSharingOptOut: false,
+    consentGiven: false
+  }));
+
+  await assert.rejects(
+    context.window.privacyService.setPrivacySettings({ dataSharingOptOut: true }),
+    /network down/
+  );
+
+  const saved = JSON.parse(context.localStorage.getItem("lb_privacy_settings"));
+  assert.equal(saved.dataSharingOptOut, false);
+  assert.deepEqual(fetchCalls, ["/health", "/api/privacy/settings"]);
+});
+
+test("privacyService surfaces server deletion errors to the caller", async () => {
+  const context = loadScript("public/js/privacyService.js", {
+    fetch: async (url) => {
+      if (url === "/health") {
+        return { ok: true };
+      }
+      if (url === "/api/privacy/delete") {
+        return {
+          ok: false,
+          async json() {
+            return { error: "Incorrect password" };
+          }
+        };
+      }
+      throw new Error(`Unexpected fetch url: ${url}`);
+    }
+  });
+
+  await assert.rejects(
+    context.window.privacyService.deleteBusinessData({ password: "bad" }),
+    /Incorrect password/
+  );
+});
+
+test("jwe-utils deduplicates concurrent public-key fetches", async () => {
+  let fetchCalls = 0;
+  const context = loadScript("public/js/jwe-utils.js", {
+    fetch: async () => {
+      fetchCalls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      return {
+        ok: true,
+        async json() {
+          return {
+            kid: "kid_test_001",
+            jwk: {
+              kty: "RSA",
+              n: "abc",
+              e: "AQAB",
+              alg: "RSA-OAEP-256",
+              use: "enc"
+            }
+          };
+        }
+      };
+    }
+  });
+
+  const [first, second] = await Promise.all([
+    context.window.exportCrypto.fetchExportPublicKey(),
+    context.window.exportCrypto.fetchExportPublicKey()
+  ]);
+
+  assert.equal(fetchCalls, 1);
+  assert.equal(first.kid, "kid_test_001");
+  assert.equal(second.kid, "kid_test_001");
+});
+
+test("jwe-utils rejects mismatched server key metadata instead of masking it", async () => {
+  const context = loadScript("public/js/jwe-utils.js", {
+    fetch: async () => ({
+      ok: true,
+      async json() {
+        return {
+          kid: "kid_test_002",
+          jwk: {
+            kty: "RSA",
+            n: "abc",
+            e: "AQAB",
+            alg: "RSA1_5",
+            use: "enc"
+          }
+        };
+      }
+    })
+  });
+
+  await assert.rejects(
+    context.window.exportCrypto.fetchExportPublicKey(),
+    /Unexpected export public key algorithm/
+  );
+});

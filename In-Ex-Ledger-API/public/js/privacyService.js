@@ -1,27 +1,45 @@
 (function () {
   const STORAGE_KEY = "lb_privacy_settings";
+  const REQUEST_TIMEOUT_MS = 5000;
   let apiReady = undefined;
   const API_BASE = "";
+
   const buildApiUrl = (path) => {
     if (typeof path !== "string") return API_BASE;
     return path.startsWith("/") ? `${API_BASE}${path}` : `${API_BASE}/${path}`;
   };
 
+  async function fetchWithTimeout(url, options = {}) {
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const timeoutId = controller
+      ? setTimeout(() => controller.abort(new Error("Request timed out.")), REQUEST_TIMEOUT_MS)
+      : null;
+
+    try {
+      return await fetch(url, {
+        ...options,
+        ...(controller ? { signal: controller.signal } : {})
+      });
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    }
+  }
+
   async function apiAvailable() {
-    // Always retry if last check failed, only cache success
     if (apiReady === true) {
       return true;
     }
     try {
-      const res = await fetch(buildApiUrl("/health"));
+      const res = await fetchWithTimeout(buildApiUrl("/health"));
       if (res.ok) {
         apiReady = true;
         return true;
-      } else {
-        apiReady = undefined;
-        return false;
       }
-    } catch (err) {
+      apiReady = undefined;
+      return false;
+    } catch (_) {
       apiReady = undefined;
       return false;
     }
@@ -41,28 +59,26 @@
     return headers;
   }
 
+  function defaultPrivacySettings() {
+    return {
+      dataSharingOptOut: false,
+      consentGiven: false,
+      consentAt: null,
+      termsVersion: null,
+      privacyVersion: null
+    };
+  }
+
   function readLocalSettings() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return {
-        dataSharingOptOut: false,
-        consentGiven: false,
-        consentAt: null,
-        termsVersion: null,
-        privacyVersion: null
-      };
+      return defaultPrivacySettings();
     }
 
     try {
       return JSON.parse(raw);
-    } catch (err) {
-      return {
-        dataSharingOptOut: false,
-        consentGiven: false,
-        consentAt: null,
-        termsVersion: null,
-        privacyVersion: null
-      };
+    } catch (_) {
+      return defaultPrivacySettings();
     }
   }
 
@@ -74,18 +90,21 @@
     try {
       if (await apiAvailable()) {
         try {
-          const res = await fetch(buildApiUrl("/api/privacy/settings"), {
+          const res = await fetchWithTimeout(buildApiUrl("/api/privacy/settings"), {
             headers: authHeaders()
           });
           if (res.ok) {
             return res.json();
           }
-        } catch (err) {
-          // fall through to local settings
+          if (res.status === 401 || res.status === 403) {
+            throw new Error("Authentication required to load privacy settings.");
+          }
+        } catch (_) {
+          // Fall through to cached local settings.
         }
       }
-    } catch (err) {
-      // Defensive: should never throw
+    } catch (_) {
+      // Fall through to cached local settings.
     }
     return readLocalSettings();
   }
@@ -93,35 +112,35 @@
   async function setPrivacySettings(partial) {
     const base = readLocalSettings();
     const merged = { ...base, ...partial };
-    try {
-      if (await apiAvailable()) {
-        try {
-          const res = await fetch(buildApiUrl("/api/privacy/settings"), {
-            method: "POST",
-            headers: authHeaders("POST"),
-            credentials: "include",
-            body: JSON.stringify({
-              dataSharingOptOut: !!merged.dataSharingOptOut, 
-              consentGiven: !!merged.consentGiven,
-              consentAt: merged.consentAt,
-              termsVersion: merged.termsVersion,
-              privacyVersion: merged.privacyVersion,
-              marketingEmailOptIn:
-              typeof merged.marketingEmailOptIn === "boolean"
-              ? merged.marketingEmailOptIn : undefined
-            })
-          });
-          if (!res.ok) {
-            // Server rejected the change — do not update local state.
-            return base;
-          }
-        } catch (err) {
-          // Network failure is non-fatal; fall through to persist locally.
-        }
-      }
-    } catch (err) {
-      // Defensive: should never throw
+
+    if (!(await apiAvailable())) {
+      throw new Error("Privacy settings are unavailable while the server is unreachable.");
     }
+
+    const res = await fetchWithTimeout(buildApiUrl("/api/privacy/settings"), {
+      method: "POST",
+      headers: authHeaders("POST"),
+      credentials: "include",
+      body: JSON.stringify({
+        dataSharingOptOut: !!merged.dataSharingOptOut,
+        consentGiven: !!merged.consentGiven,
+        consentAt: merged.consentAt,
+        termsVersion: merged.termsVersion,
+        privacyVersion: merged.privacyVersion,
+        marketingEmailOptIn:
+          typeof merged.marketingEmailOptIn === "boolean"
+            ? merged.marketingEmailOptIn
+            : undefined
+      })
+    }).catch((err) => {
+      throw new Error(err?.message || "Privacy settings are unavailable while the server is unreachable.");
+    });
+
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null);
+      throw new Error(payload?.error || "Failed to save privacy settings.");
+    }
+
     persistLocalSettings(merged);
     return merged;
   }
@@ -138,13 +157,11 @@
   }
 
   async function exportMyData() {
-    const fileName = `inex-ledger-my-data-${new Date()
-      .toISOString()
-      .slice(0, 10)}.json`;
+    const fileName = `inex-ledger-my-data-${new Date().toISOString().slice(0, 10)}.json`;
     try {
       if (await apiAvailable()) {
         try {
-          const res = await fetch(buildApiUrl("/api/privacy/export"), {
+          const res = await fetchWithTimeout(buildApiUrl("/api/privacy/export"), {
             method: "POST",
             headers: authHeaders("POST"),
             credentials: "include"
@@ -154,47 +171,38 @@
             downloadBlob(blob, fileName);
             return;
           }
-        } catch (err) {
-          // fall through to local export
+        } catch (_) {
+          // Fall through to the unavailable error below.
         }
       }
-    } catch (err) {
-      // Defensive: should never throw
+    } catch (_) {
+      // Fall through to the unavailable error below.
     }
     throw new Error("Data export is unavailable while the server is unreachable.");
   }
 
-  function newRequestId() {
-    if (window.crypto && crypto.randomUUID) {
-      return crypto.randomUUID();
-    }
-    return `local-${Date.now()}`;
-  }
-
   async function deleteBusinessData(options = {}) {
     const password = typeof options?.password === "string" ? options.password : "";
-    try {
-      if (await apiAvailable()) {
-        try {
-          const res = await fetch(buildApiUrl("/api/privacy/delete"), {
-            method: "POST",
-            headers: authHeaders("POST"),
-            credentials: "include",
-            body: JSON.stringify({ scope: "business_data", password })
-          });
-          if (res.ok) {
-            return res.json();
-          }
-          const payload = await res.json().catch(() => null);
-          throw new Error(payload?.error || "Failed to delete business data.");
-        } catch (err) {
-          // fall through to local delete
-        }
-      }
-    } catch (err) {
-      // Defensive: should never throw
+
+    if (!(await apiAvailable())) {
+      throw new Error("Business data deletion is unavailable while the server is unreachable.");
     }
-    throw new Error("Business data deletion is unavailable while the server is unreachable.");
+
+    const res = await fetchWithTimeout(buildApiUrl("/api/privacy/delete"), {
+      method: "POST",
+      headers: authHeaders("POST"),
+      credentials: "include",
+      body: JSON.stringify({ scope: "business_data", password })
+    }).catch((err) => {
+      throw new Error(err?.message || "Business data deletion is unavailable while the server is unreachable.");
+    });
+
+    if (res.ok) {
+      return res.json();
+    }
+
+    const payload = await res.json().catch(() => null);
+    throw new Error(payload?.error || "Failed to delete business data.");
   }
 
   window.privacyService = {

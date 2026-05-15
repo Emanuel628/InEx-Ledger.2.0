@@ -1,9 +1,7 @@
 const express = require('express');
-const { verifyToken } = require('../middleware/auth.middleware.js');
-const { pool } = require('../db.js');
-const { resolveBusinessIdForUser } = require('../api/utils/resolveBusinessIdForUser.js');
 
 const router = express.Router();
+const TRUST_EDGE_REGION_HEADERS = process.env.TRUST_EDGE_REGION_HEADERS === 'true';
 
 function normalizeRegion(value) {
   const raw = String(value || '').trim().toUpperCase();
@@ -12,18 +10,22 @@ function normalizeRegion(value) {
   return null;
 }
 
-function detectRegionFromRequest(req) {
-  const headerCandidates = [
-    req.get('cf-ipcountry'),
-    req.get('x-vercel-ip-country'),
-    req.get('x-country-code'),
-    req.get('x-appengine-country'),
-    req.get('cloudfront-viewer-country')
-  ];
+function detectRegionFromRequest(req, options = {}) {
+  const trustEdgeHeaders = options.trustEdgeHeaders ?? TRUST_EDGE_REGION_HEADERS;
 
-  for (const candidate of headerCandidates) {
-    const normalized = normalizeRegion(candidate);
-    if (normalized) return { region: normalized, source: 'edge_header' };
+  if (trustEdgeHeaders) {
+    const headerCandidates = [
+      req.get('cf-ipcountry'),
+      req.get('x-vercel-ip-country'),
+      req.get('x-country-code'),
+      req.get('x-appengine-country'),
+      req.get('cloudfront-viewer-country')
+    ];
+
+    for (const candidate of headerCandidates) {
+      const normalized = normalizeRegion(candidate);
+      if (normalized) return { region: normalized, source: 'edge_header' };
+    }
   }
 
   const acceptLanguage = String(req.get('accept-language') || '').toLowerCase();
@@ -34,52 +36,13 @@ function detectRegionFromRequest(req) {
   return { region: 'US', source: 'default' };
 }
 
-function getBearerToken(req) {
-  const authHeader = String(req.get('authorization') || '').trim();
-  return authHeader.toLowerCase().startsWith('bearer ')
-    ? authHeader.slice('bearer '.length).trim()
-    : '';
-}
-
-async function updateAuthenticatedBusinessRegionIfNeeded(req, region) {
-  const token = getBearerToken(req);
-  if (!token) return false;
-
-  let user;
-  try {
-    user = verifyToken(token);
-  } catch (_) {
-    return false;
-  }
-
-  if (!user?.id) return false;
-  const businessId = await resolveBusinessIdForUser(user);
-  await pool.query(
-    `UPDATE businesses
-        SET region = $2,
-            updated_at = NOW()
-      WHERE id = $1
-        AND region IS DISTINCT FROM $2`,
-    [businessId, region]
-  );
-  return true;
-}
-
-router.get('/detect', async (req, res) => {
+router.get('/detect', (req, res) => {
   const detected = detectRegionFromRequest(req);
-  let persisted = false;
-
-  try {
-    persisted = await updateAuthenticatedBusinessRegionIfNeeded(req, detected.region);
-  } catch (_) {
-    persisted = false;
-  }
-
   res.json({
     region: detected.region,
     country: detected.region,
     source: detected.source,
-    persisted
+    persisted: false
   });
 });
 

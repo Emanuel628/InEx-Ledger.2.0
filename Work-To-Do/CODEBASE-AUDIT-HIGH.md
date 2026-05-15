@@ -65,7 +65,7 @@ Rules used here:
   Group: Audit events safety
   Covers: unbounded user-supplied limit causing massive reads
 
-- [ ] 30-60 min - Fix the pricing display and checkout trust boundary so browser-side price tables are advisory only.
+- [x] 30-60 min - Fix the pricing display and checkout trust boundary so browser-side price tables are advisory only.
   Files: `In-Ex-Ledger-API/public/js/billing-pricing.js`, related checkout callers
   Group: Client pricing tamper resistance
   Covers: mutable `window.billingPricing`, client-side total tampering prior to checkout
@@ -130,7 +130,7 @@ Rules used here:
   Group: Encryption consistency
   Covers: plaintext plus encrypted description stored simultaneously
 
-- [ ] Half day - Fix `privacyService.js` so server failures do not create split-brain local-vs-server privacy settings and real server error messages propagate back to the caller.
+- [x] Half day - Fix `privacyService.js` so server failures do not create split-brain local-vs-server privacy settings and real server error messages propagate back to the caller.
   Files: `In-Ex-Ledger-API/public/js/privacyService.js`
   Group: Privacy client state
   Covers: localStorage writes on network failure, swallowed server error messages in delete flow
@@ -140,7 +140,7 @@ Rules used here:
   Group: Recurring consistency
   Covers: template committed before `materializeTemplateRuns`, 500 after partial success
 
-- [ ] Half day - Fix `routes/index.js` pre-checks so they fail closed instead of throwing or silently allowing access when dependencies fail.
+- [x] Half day - Fix `routes/index.js` pre-checks so they fail closed instead of throwing or silently allowing access when dependencies fail.
   Files: `In-Ex-Ledger-API/routes/index.js`
   Group: Core route gating
   Covers: `/arap-summary` `req.business` crash, dead recurring pre-load guard, `/exports/history` guard falling through on DB error
@@ -157,7 +157,7 @@ Rules used here:
   Group: Receipt I/O performance
   Covers: `fs.readFileSync`, `fs.mkdirSync`, `fs.writeFileSync`, dead sync helper
 
-- [ ] Half day - Fix the JWE utility concurrency and response validation path so encryption bootstrapping is safe under parallel callers.
+- [x] Half day - Fix the JWE utility concurrency and response validation path so encryption bootstrapping is safe under parallel callers.
   Files: `In-Ex-Ledger-API/public/js/jwe-utils.js`
   Group: Browser JWE bootstrap
   Covers: `keyPromise` race, masked `alg`/`use`, missing response validation
@@ -176,7 +176,7 @@ Rules used here:
   Group: Billing session lifecycle
   Covers: defeated idempotency key, second checkout exposure for `past_due`
 
-- [ ] 1 day+ - Make region detection a read-only, trusted-header-aware flow instead of an unaudited DB write on GET.
+- [x] 1 day+ - Make region detection a read-only, trusted-header-aware flow instead of an unaudited DB write on GET.
   Files: `In-Ex-Ledger-API/routes/region.routes.js`
   Group: Region and compliance
   Covers: header spoofing, DB mutation on GET, no CSRF, tax/compliance side effects

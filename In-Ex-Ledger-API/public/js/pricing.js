@@ -1,7 +1,9 @@
 const pricingState = {
   currency: "usd",
   interval: "monthly",
-  additionalBusinesses: 0
+  additionalBusinesses: 0,
+  verifiedPricing: null,
+  verifiedPricingCurrency: null
 };
 
 const billingPricingUtils = window.billingPricing || {};
@@ -15,6 +17,12 @@ function formatMoney(currency, amount) {
 }
 
 function getCurrentPricing() {
+  if (
+    pricingState.verifiedPricing?.[pricingState.interval] &&
+    pricingState.verifiedPricingCurrency === pricingState.currency
+  ) {
+    return pricingState.verifiedPricing[pricingState.interval];
+  }
   if (typeof billingPricingUtils.getPricing === "function") {
     return billingPricingUtils.getPricing(pricingState.currency, pricingState.interval);
   }
@@ -53,6 +61,30 @@ async function loadVerifiedPricingContext() {
     }
   } catch (_) {
     // Fall back to the default pricing table currency.
+  }
+  return pricingState.currency;
+}
+
+async function loadVerifiedPricing() {
+  try {
+    const res = await fetch("/api/billing/pricing", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+    if (!res.ok) {
+      return loadVerifiedPricingContext();
+    }
+    const payload = await res.json().catch(() => null);
+    const currency = String(payload?.currency || "").toLowerCase();
+    if (BILLING_CURRENCIES.includes(currency)) {
+      pricingState.currency = currency;
+      pricingState.verifiedPricingCurrency = currency;
+    }
+    if (payload?.pricing?.monthly && payload?.pricing?.yearly) {
+      pricingState.verifiedPricing = payload.pricing;
+    }
+  } catch (_) {
+    return loadVerifiedPricingContext();
   }
   return pricingState.currency;
 }
@@ -113,8 +145,8 @@ function renderPricing() {
     const intervalLabel = pricingState.interval === "yearly" ? "yearly" : "monthly";
     totalFootnote.textContent =
       pricingState.additionalBusinesses > 0
-        ? `Base Pro ${intervalLabel} pricing plus ${pricingState.additionalBusinesses} additional business ${pricingState.additionalBusinesses === 1 ? "slot" : "slots"} at ${addonUnitText} each.`
-        : `Base Pro ${intervalLabel} pricing only. Start with a 30-day free trial by creating your account.`;
+        ? `Base Pro ${intervalLabel} pricing plus ${pricingState.additionalBusinesses} additional business ${pricingState.additionalBusinesses === 1 ? "slot" : "slots"} at ${addonUnitText} each. Final checkout pricing is verified by the server.`
+        : `Base Pro ${intervalLabel} pricing only. Start with a 30-day free trial by creating your account. Final checkout pricing is verified by the server.`;
   }
 
   setActiveToggle("[data-interval]", pricingState.interval, "data-interval");
@@ -236,7 +268,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireToggles();
   wireAdditionalBusinesses();
   updateCtaLabels();
-  await loadVerifiedPricingContext();
+  await loadVerifiedPricing();
   renderPricing();
 });
 
