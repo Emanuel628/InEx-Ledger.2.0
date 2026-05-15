@@ -439,3 +439,52 @@ main {
   }
 }
 
+/* Mobile view: final safety pass */
+@media (max-width: 560px) {
+  .register-main {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    padding: 18px 0 40px !important;
+    box-sizing: border-box !important;
+  }
+
+  .register-layout,
+  .register-trial-points,
+  .password-requirements {
+    grid-template-columns: 1fr !important;
+  }
+
+  .register-form-col,
+  .register-value-col,
+  .register-value-inner,
+  .password-block {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .register-form-col {
+    padding: 20px 0 0 !important;
+  }
+
+  .register-value-inner,
+  .password-block {
+    padding: 16px 14px !important;
+  }
+
+  .password-meter-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .password-meter-row .password-strength-text {
+    white-space: normal !important;
+  }
+
+  .auth-submit,
+  .register-form input,
+  .register-form select {
+    width: 100% !important;
+  }
+}
+
