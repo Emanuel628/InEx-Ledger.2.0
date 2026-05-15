@@ -314,39 +314,29 @@ function injectSkipLink() {
 }
 
 function injectMobileDesktopLink() {
-  if (!isMobileDevice() || isDesktopViewRequested()) {
-    return;
-  }
-  const wrapper = document.createElement("div");
-  wrapper.className = "mobile-desktop-link";
-  const link = document.createElement("a");
-  link.href = "#";
-  link.setAttribute("data-i18n", "mobile_desktop_version");
-  link.textContent = "Desktop Version";
-  link.addEventListener("click", function (e) {
-    e.preventDefault();
-    try {
-      localStorage.setItem(DESKTOP_VIEW_KEY, "true");
-    } catch (_) {}
-    const url = new URL(window.location.href);
-    url.searchParams.set("view", "desktop");
-    window.location.href = url.toString();
-  });
-  wrapper.appendChild(link);
-  document.body.appendChild(wrapper);
+  injectViewportSwitchLink();
 }
 
 function injectDesktopMobileLink() {
-  if (!isDesktopViewRequested()) {
+  injectViewportSwitchLink();
+}
+
+function injectViewportSwitchLink() {
+  const desktopRequested = isDesktopViewRequested();
+
+  if (!desktopRequested && !isMobileDevice()) {
     return;
   }
 
-  if (document.querySelector(".mobile-view-link")) {
-    return;
-  }
+  document.querySelectorAll(".mobile-desktop-link, .mobile-view-link").forEach(function (node) {
+    node.remove();
+  });
 
   const wrapper = document.createElement("div");
-  wrapper.className = "mobile-desktop-link mobile-view-link";
+  wrapper.className = desktopRequested
+    ? "mobile-desktop-link mobile-view-link"
+    : "mobile-desktop-link desktop-view-link";
+
   wrapper.style.position = "fixed";
   wrapper.style.display = "block";
   wrapper.style.left = "16px";
@@ -358,7 +348,7 @@ function injectDesktopMobileLink() {
 
   const link = document.createElement("a");
   link.href = "#";
-  link.textContent = "Mobile View";
+  link.textContent = desktopRequested ? "Mobile View" : "Desktop Version";
   link.style.display = "inline-flex";
   link.style.alignItems = "center";
   link.style.justifyContent = "center";
@@ -375,12 +365,22 @@ function injectDesktopMobileLink() {
   link.addEventListener("click", function (e) {
     e.preventDefault();
 
-    try {
-      localStorage.removeItem(DESKTOP_VIEW_KEY);
-    } catch (_) {}
-
     const url = new URL(window.location.href);
-    url.searchParams.delete("view");
+
+    if (desktopRequested) {
+      try {
+        localStorage.removeItem(DESKTOP_VIEW_KEY);
+      } catch (_) {}
+
+      url.searchParams.delete("view");
+    } else {
+      try {
+        localStorage.setItem(DESKTOP_VIEW_KEY, "true");
+      } catch (_) {}
+
+      url.searchParams.set("view", "desktop");
+    }
+
     window.location.href = url.toString();
   });
 
@@ -390,11 +390,7 @@ function injectDesktopMobileLink() {
 
 function initViewportSwitchLinks() {
   try {
-    injectMobileDesktopLink();
-  } catch (_) {}
-
-  try {
-    injectDesktopMobileLink();
+    injectViewportSwitchLink();
   } catch (_) {}
 }
 
