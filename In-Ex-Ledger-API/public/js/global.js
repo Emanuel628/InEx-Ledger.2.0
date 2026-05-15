@@ -337,12 +337,13 @@ function injectViewportSwitchLink() {
     ? "mobile-desktop-link mobile-view-link"
     : "mobile-desktop-link desktop-view-link";
 
-  wrapper.style.position = "fixed";
+  wrapper.style.position = "static";
   wrapper.style.display = "block";
-  wrapper.style.left = "16px";
-  wrapper.style.right = "16px";
-  wrapper.style.bottom = "16px";
-  wrapper.style.zIndex = "9999";
+  wrapper.style.margin = "28px auto 20px";
+  wrapper.style.padding = "0";
+  wrapper.style.background = "transparent";
+  wrapper.style.border = "none";
+  wrapper.style.boxShadow = "none";
   wrapper.style.textAlign = "center";
   wrapper.style.pointerEvents = "none";
 
@@ -359,7 +360,7 @@ function injectViewportSwitchLink() {
   link.style.color = "#fff";
   link.style.fontWeight = "700";
   link.style.textDecoration = "none";
-  link.style.boxShadow = "0 14px 32px rgba(15, 25, 35, 0.22)";
+  link.style.boxShadow = "none";
   link.style.pointerEvents = "auto";
 
   link.addEventListener("click", function (e) {
