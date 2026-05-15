@@ -1662,4 +1662,8 @@ body[data-theme="light"] select option {
   }
 }
 
+.mobile-view-link {
+  display: block !important;
+}
+
 
