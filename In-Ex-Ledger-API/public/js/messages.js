@@ -446,9 +446,15 @@ function wireDetailPanel() {
   }
     });
     
-  document.getElementById("detailArchiveBtn")?.addEventListener("click", () => {
-    if (_currentMsgId) archiveMessage(_currentMsgId, true);
-  });
+  document.getElementById("detailArchiveBtn")?.addEventListener("click", async () => {
+  const ids = getCurrentThreadIds();
+  if (ids.length > 1) {
+    await archiveMessages(ids, true);
+    return;
+  }
+
+  if (_currentMsgId) archiveMessage(_currentMsgId, true);
+});
 
   document.getElementById("detailDeleteBtn")?.addEventListener("click", () => {
     if (_currentMsgId) deleteMessage(_currentMsgId, true);
