@@ -1239,5 +1239,108 @@
   }
 }
 
+/* Mobile view: final safety pass */
+@media (max-width: 720px) {
+  .app-shell {
+    display: block !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .app-sidebar {
+    display: none !important;
+  }
+
+  .messages-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 16px 12px 24px !important;
+    box-sizing: border-box !important;
+  }
+
+  .messages-page-header,
+  .messages-page-actions,
+  .messages-panel-header,
+  .messages-panel-tools,
+  .messages-focus-banner,
+  .messages-focus-main,
+  .message-row-main,
+  .message-row-meta,
+  .message-detail-header,
+  .message-detail-actions,
+  .compose-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .messages-overview-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .message-row {
+    grid-template-columns: 40px minmax(0, 1fr) !important;
+    min-width: 0 !important;
+    padding: 14px !important;
+  }
+
+  .message-avatar {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 14px !important;
+  }
+
+  .message-row-actions {
+    grid-column: 1 / -1 !important;
+    justify-content: stretch !important;
+  }
+
+  .message-row-actions > *,
+  .messages-compose-btn,
+  .messages-focus-btn,
+  .messages-sync-pill,
+  .msg-btn,
+  .compose-cancel,
+  .compose-send,
+  .message-reply-send {
+    width: 100% !important;
+  }
+
+  .messages-tabs {
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .messages-tab {
+    flex: 1 0 auto !important;
+    min-width: 96px !important;
+  }
+
+  .message-detail-overlay,
+  .compose-overlay {
+    padding: 10px !important;
+    align-items: flex-start !important;
+    overflow-y: auto !important;
+  }
+
+  .message-detail-panel,
+  .compose-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: calc(100vh - 20px) !important;
+    border-radius: 18px !important;
+    box-sizing: border-box !important;
+  }
+
+  .compose-modal {
+    overflow-y: auto !important;
+    padding: 22px 18px !important;
+  }
+
+  .message-detail-body {
+    padding: 18px !important;
+  }
+}
 
 
