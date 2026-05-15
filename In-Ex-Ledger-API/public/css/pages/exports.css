@@ -691,3 +691,53 @@
     flex-wrap: nowrap;
   }
 }
+
+/* Mobile view: final safety pass */
+@media (max-width: 720px) {
+  .exports-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 16px 12px 24px !important;
+    box-sizing: border-box !important;
+  }
+
+  .exports-grid,
+  .date-grid,
+  .secure-export-input-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .exports-title-row,
+  .summary-row,
+  .export-summary-actions,
+  .history-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .exports-card,
+  .history-card,
+  .exports-info-popover {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .export-btn,
+  .secure-export-toggle-btn,
+  .history-download,
+  .history-delete,
+  .exports-info-btn,
+  .preset-chip {
+    width: 100% !important;
+  }
+
+  .history-item {
+    grid-template-columns: 1fr !important;
+    min-width: 0 !important;
+  }
+
+  .history-card {
+    overflow-x: hidden !important;
+  }
+}
