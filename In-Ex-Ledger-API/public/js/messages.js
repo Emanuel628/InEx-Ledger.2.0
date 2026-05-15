@@ -456,9 +456,15 @@ function wireDetailPanel() {
   if (_currentMsgId) archiveMessage(_currentMsgId, true);
 });
 
-  document.getElementById("detailDeleteBtn")?.addEventListener("click", () => {
-    if (_currentMsgId) deleteMessage(_currentMsgId, true);
-  });
+ document.getElementById("detailDeleteBtn")?.addEventListener("click", async () => {
+  const ids = getCurrentThreadIds();
+  if (ids.length > 1) {
+    await deleteMessages(ids, true);
+    return;
+  }
+
+  if (_currentMsgId) deleteMessage(_currentMsgId, true);
+});
 
   document.getElementById("replySendBtn")?.addEventListener("click", sendReply);
 }
