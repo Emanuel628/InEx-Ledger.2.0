@@ -647,46 +647,7 @@ async function refreshSettingsBusinessContext(payload, fallbackBusinessId = "") 
 function openAddBusinessModal() {
   if (typeof openBusinessCreationModal === "function") {
     openBusinessCreationModal();
-    return;
   }
-  const name = window.prompt(t("settings_add_business_prompt") || "New business name:");
-  if (!name || !name.trim()) return;
-  void (async () => {
-    try {
-      const res = await apiFetch("/api/businesses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), region: "US", language: "en" })
-      });
-      if (!res || !res.ok) {
-        const err = res ? await res.json().catch(() => null) : null;
-        showSettingsToast(err?.error || t("settings_add_business_error"));
-        return;
-      }
-      const payload = await res.json().catch(() => null);
-      const createdBusinessId = payload?.business?.id || payload?.id || "";
-      const activatedViaCreate = await refreshSettingsBusinessContext(payload, createdBusinessId);
-      if (activatedViaCreate) {
-        return;
-      }
-
-      if (createdBusinessId) {
-        const activateRes = await apiFetch(`/api/businesses/${createdBusinessId}/activate`, { method: "POST" });
-        if (activateRes?.ok) {
-          const activatePayload = await activateRes.json().catch(() => null);
-          const refreshed = await refreshSettingsBusinessContext(activatePayload, createdBusinessId);
-          if (refreshed) {
-            return;
-          }
-        }
-      }
-
-      showSettingsToast(t("settings_business_added"));
-      await renderBusinessList();
-    } catch {
-      showSettingsToast(t("settings_add_business_error"));
-    }
-  })();
 }
 
 let pendingDeleteBusinessId = null;
@@ -2580,11 +2541,21 @@ function clearAccountDeletionState() {
 }
 
 async function revokeAllSessionsFromSettings(button) {
-  if (!window.confirm(t("sessions_confirm_revoke_all"))) {
+  if (button && !button.dataset.confirmPending) {
+    button.dataset.confirmPending = "1";
+    const originalLabel = button.textContent;
+    button.textContent = t("common_confirm_action") || "Tap again to confirm";
+    setTimeout(() => {
+      if (button.dataset.confirmPending) {
+        delete button.dataset.confirmPending;
+        button.textContent = originalLabel;
+      }
+    }, 4000);
     return;
   }
 
   if (button) {
+    delete button.dataset.confirmPending;
     button.disabled = true;
   }
 

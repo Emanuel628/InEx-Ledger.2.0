@@ -164,6 +164,12 @@
   font-size: 15px;
 }
 
+.pricing-checkout-error {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #c0392b;
+}
+
 .pricing-hero-points {
   display: flex;
   flex-wrap: wrap;

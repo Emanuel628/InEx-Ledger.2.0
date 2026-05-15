@@ -6,7 +6,8 @@ const { pool } = require("../db.js");
 const { verifyToken } = require("../middleware/auth.middleware.js");
 
 function normalizeEmail(email) {
-  return String(email || "").trim().toLowerCase();
+  const normalized = String(email || "").trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) ? normalized : "";
 }
 
 router.get("/", async (req, res) => {

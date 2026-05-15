@@ -217,7 +217,11 @@ async function launchCheckout() {
 
     throw new Error("Stripe checkout did not return a URL.");
   } catch (err) {
-    window.alert(err.message || "Unable to start checkout.");
+    const errorEl = document.getElementById("pricingCheckoutError");
+    if (errorEl) {
+      errorEl.textContent = err.message || "Unable to start checkout.";
+      errorEl.classList.remove("hidden");
+    }
     if (button) {
       button.disabled = false;
       button.textContent = originalText;

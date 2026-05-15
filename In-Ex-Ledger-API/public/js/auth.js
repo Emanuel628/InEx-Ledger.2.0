@@ -1198,7 +1198,7 @@ function showAccountMenuNotice(message) {
     showSettingsToast(message);
     return;
   }
-  window.alert(message);
+  console.warn("[AccountMenuNotice]", message);
 }
 
 function effectiveTier() {

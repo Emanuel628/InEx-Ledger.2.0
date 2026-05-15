@@ -260,14 +260,17 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    await pool.query(
+    const del = await pool.query(
       "DELETE FROM categories WHERE id = $1 AND business_id = $2",
       [req.params.id, businessId]
     );
+    if (del.rowCount === 0) {
+      return res.status(404).json({ error: "Category not found." });
+    }
 
     res.json({ message: "Category deleted." });
   } catch (err) {
-    logError("DELETE /categories/:id error:", err.message);
+    logError("DELETE /categories/:id error:", err.stack || err);
     res.status(500).json({ error: "Failed to delete category." });
   }
 });

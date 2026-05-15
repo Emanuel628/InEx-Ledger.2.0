@@ -187,7 +187,7 @@ Reason for this exact order:
   Group: Placeholder script cleanup
   Covers: function-guarded auth bypass pattern, `console.log` production stubs
 
-- [ ] 15-30 min - Replace `window.alert()` / `window.prompt()` / `window.confirm()` fallbacks that remain as cleanup leftovers.
+- [x] 15-30 min - Replace `window.alert()` / `window.prompt()` / `window.confirm()` fallbacks that remain as cleanup leftovers.
   Files: `pricing.js`, `settings.js`, `auth.js`, any remaining browser-dialog callers
   Group: Native dialog cleanup
   Covers: checkout errors, account notices, add-business fallback, other blocking browser dialogs
@@ -240,17 +240,17 @@ Reason for this exact order:
 
 ### Small route correctness
 
-- [ ] 30-60 min - Add row-count checks and 404 correctness to soft-delete/update paths that currently return success too loosely.
+- [x] 30-60 min - Add row-count checks and 404 correctness to soft-delete/update paths that currently return success too loosely.
   Files: `categories.routes.js`, similar endpoints
   Group: 404 semantics
   Covers: delete returning 200 after race conditions
 
-- [ ] 30-60 min - Tighten small validation mismatches and permissive helpers that currently just "work by accident."
+- [x] 30-60 min - Tighten small validation mismatches and permissive helpers that currently just "work by accident."
   Files: `sessions.routes.js`, `check-email-verified.routes.js`, `receipts.routes.js`
   Group: Validation polish
   Covers: overly broad UUID regex, weak email normalization, string-based lock-error check
 
-- [ ] 30-60 min - Stop leaking internal helper surfaces that do not need to be public.
+- [x] 30-60 min - Stop leaking internal helper surfaces that do not need to be public.
   Files: `receipts.routes.js`
   Group: Internal API cleanup
   Covers: `module.exports.__private` exposing internal OCR helpers
