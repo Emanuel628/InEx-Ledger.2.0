@@ -336,6 +336,34 @@ function injectMobileDesktopLink() {
   document.body.appendChild(wrapper);
 }
 
+function injectDesktopMobileLink() {
+  if (!isMobileDevice() || !isDesktopViewRequested()) {
+    return;
+  }
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "mobile-desktop-link mobile-view-link";
+
+  const link = document.createElement("a");
+  link.href = "#";
+  link.textContent = "Mobile View";
+
+  link.addEventListener("click", function (e) {
+    e.preventDefault();
+
+    try {
+      localStorage.removeItem(DESKTOP_VIEW_KEY);
+    } catch (_) {}
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("view");
+    window.location.href = url.toString();
+  });
+
+  wrapper.appendChild(link);
+  document.body.appendChild(wrapper);
+}
+
 function injectMobileMenu() {
   const topbar = document.querySelector(".app-topbar");
   const nav = document.querySelector(".app-topbar .topbar-nav");
@@ -1379,6 +1407,7 @@ document.addEventListener("DOMContentLoaded", () => {
   markRequiredFields();
   disableNumberInputWheel();
   injectMobileDesktopLink();
+  injectDesktopMobileLink();
   applyMileageNavLabel();
   window.addEventListener("lunaDistanceUnitChanged", applyMileageNavLabel);
   window.addEventListener("lunaLanguageChanged", applyMileageNavLabel);
