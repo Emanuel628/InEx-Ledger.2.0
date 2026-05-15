@@ -1693,13 +1693,3 @@ body[data-theme="light"] select option {
   }
 }
 
-/* Desktop-view mode: keep full top nav visible even on mobile devices */
-html[data-desktop-view="true"] .topbar-nav,
-body[data-desktop-view="true"] .topbar-nav {
-  display: flex !important;
-}
-
-html[data-desktop-view="true"] .topbar-hamburger,
-body[data-desktop-view="true"] .topbar-hamburger {
-  display: none !important;
-}
