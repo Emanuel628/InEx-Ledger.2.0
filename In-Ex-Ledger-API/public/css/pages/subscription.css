@@ -1813,3 +1813,46 @@ body {
     justify-content: flex-start;
   }
 }
+
+/* Desktop-on-mobile: preserve billing desktop layout at desktop-ish widths */
+@media (min-width: 981px) {
+  .sub-no-sidebar {
+    max-width: 1180px;
+  }
+
+  .sub-hero-shell {
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.9fr);
+  }
+
+  .sub-plans-grid {
+    grid-template-columns: 1fr 1.12fr 1fr;
+  }
+
+  .sub-billing-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sub-access-layout {
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  }
+
+  .sub-status-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sub-slots-panel-head,
+  .sub-slots-workbench,
+  .sub-slots-footer {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .billing-history-list {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .billing-history-table {
+    min-width: 760px;
+  }
+}
