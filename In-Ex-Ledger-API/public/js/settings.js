@@ -153,7 +153,6 @@ function hideCpaSettingsUi() {
   }
 }
 
-console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
