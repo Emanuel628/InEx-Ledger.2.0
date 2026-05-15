@@ -18,6 +18,10 @@ const TEST_CATEGORY_ID = "00000000-0000-4000-8000-000000000103";
 const TEST_BUSINESS_ID = "00000000-0000-4000-8000-000000000104";
 const TEST_USER_ID = "00000000-0000-4000-8000-000000000105";
 
+process.env.FIELD_ENCRYPTION_KEY =
+  process.env.FIELD_ENCRYPTION_KEY ||
+  "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
 function buildApp(router) {
   const app = express();
   app.use(express.json());
@@ -412,6 +416,38 @@ test("transactions PUT stores encrypted descriptions without duplicating plain t
   }
 });
 
+test("transactions POST fails closed when description encryption is unavailable", async () => {
+  const previousKey = process.env.FIELD_ENCRYPTION_KEY;
+  delete process.env.FIELD_ENCRYPTION_KEY;
+  delete require.cache[require.resolve("../services/encryptionService.js")];
+  const fixture = loadTransactionsRouter();
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/transactions")
+      .send({
+        account_id: TEST_ACCOUNT_ID,
+        category_id: TEST_CATEGORY_ID,
+        amount: 1200,
+        type: "income",
+        date: "2026-05-01",
+        description: "Consulting retainer"
+      });
+
+    assert.equal(response.status, 500);
+    assert.equal(fixture.state.insertParams, null);
+  } finally {
+    if (previousKey === undefined) {
+      delete process.env.FIELD_ENCRYPTION_KEY;
+    } else {
+      process.env.FIELD_ENCRYPTION_KEY = previousKey;
+    }
+    delete require.cache[require.resolve("../services/encryptionService.js")];
+    fixture.cleanup();
+  }
+});
+
 test("transactions bulk delete is blocked when the business has locked-period transactions", async () => {
   const fixture = loadTransactionsRouter({
     lockState: {
@@ -479,9 +515,9 @@ test("transactions review-status update is blocked when the transaction date fal
 test("production env validation requires FIELD_ENCRYPTION_KEY and Stripe price IDs", () => {
   const previousEnv = { ...process.env };
 
-  try {
-    process.env = {
-      ...previousEnv,
+    try {
+      process.env = {
+        ...previousEnv,
       DATABASE_URL: "postgresql://example",
       JWT_SECRET: "secret",
       APP_BASE_URL: "https://app.example.com",
@@ -497,11 +533,12 @@ test("production env validation requires FIELD_ENCRYPTION_KEY and Stripe price I
       STRIPE_PRO_Y_CA: "price_4",
       STRIPE_ADDL_M_US: "price_5",
       STRIPE_ADDL_Y_US: "price_6",
-      STRIPE_ADDL_M_CA: "price_7",
-      STRIPE_ADDL_Y_CA: "price_8"
-    };
+        STRIPE_ADDL_M_CA: "price_7",
+        STRIPE_ADDL_Y_CA: "price_8"
+      };
+      delete process.env.FIELD_ENCRYPTION_KEY;
 
-    assert.throws(
+      assert.throws(
       () => validateEnvironmentOrThrow("production"),
       (error) => {
         assert.equal(error.code, "ENV_VALIDATION_FAILED");

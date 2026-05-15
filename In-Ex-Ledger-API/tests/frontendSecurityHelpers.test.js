@@ -212,3 +212,57 @@ test("auth trial helpers ignore tampered local trial flags when server subscript
   assert.equal(context.isTrialValid(), false);
   assert.equal(context.effectiveTier(), "free");
 });
+
+test("auth tier helpers fail closed when there is no server subscription bootstrap", () => {
+  const storage = {
+    _store: new Map(),
+    getItem(key) {
+      return this._store.has(key) ? this._store.get(key) : null;
+    },
+    setItem(key, value) {
+      this._store.set(key, String(value));
+    }
+  };
+  const context = loadScript("public/js/auth.js", {
+    window: {
+      location: { href: "/" }
+    },
+    document: {
+      addEventListener() {},
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      body: {
+        appendChild() {},
+        removeChild() {}
+      }
+    },
+    localStorage: storage,
+    sessionStorage: storage
+  });
+
+  storage.setItem("lb_subscription", JSON.stringify({
+    effectiveTier: "v1",
+    effectiveStatus: "trialing",
+    trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  }));
+
+  assert.equal(context.isTrialValid(), false);
+  assert.equal(context.effectiveTier(), "free");
+});
+
+test("trial.js ignores stored subscription fallback and does not mint a synthetic fresh trial window", () => {
+  const context = loadScript("public/js/trial.js", {
+    window: {},
+    getStoredSubscriptionState() {
+      return {
+        effectiveTier: "v1",
+        effectiveStatus: "trialing",
+        trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      };
+    }
+  });
+
+  assert.equal(context.getTrialRemaining(), null);
+  assert.equal(context.getTrialRemainingForDisplay(), 0);
+  assert.equal(context.formatTrialRemaining(), "Trial status unavailable.");
+});

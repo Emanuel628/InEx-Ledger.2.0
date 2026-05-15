@@ -372,33 +372,18 @@ function tryDecrypt(value) {
   }
 }
 
-/**
- * Attempts to encrypt a transaction description using AES-256-GCM.
- * In production this fails closed when FIELD_ENCRYPTION_KEY is missing.
- * Outside production it falls back to plain-text storage with a warning so
- * local development and older test fixtures can still run.
- */
 function tryEncryptDescription(description) {
   if (!description) return null;
-  try {
-    return encrypt(description);
-  } catch (encryptErr) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("FIELD_ENCRYPTION_KEY is required in production to store transaction descriptions.");
-    }
-    logError(
-      "[transactions] Field encryption unavailable — description stored as plain text. " +
-      "Set FIELD_ENCRYPTION_KEY to enable at-rest encryption:",
-      encryptErr.message
-    );
-    return null;
+  if (!String(process.env.FIELD_ENCRYPTION_KEY || "").trim()) {
+    throw new Error("FIELD_ENCRYPTION_KEY is required to store transaction descriptions.");
   }
+  return encrypt(description);
 }
 
 function buildStoredDescriptionColumns(description) {
   const encryptedDescription = tryEncryptDescription(description);
   return {
-    description: encryptedDescription ? null : (description || null),
+    description: null,
     descriptionEncrypted: encryptedDescription
   };
 }

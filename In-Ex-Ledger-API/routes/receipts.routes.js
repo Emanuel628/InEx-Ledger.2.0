@@ -31,7 +31,6 @@ const {
 
 const router = express.Router();
 const storageDir = getReceiptStorageDir();
-fs.mkdirSync(storageDir, { recursive: true });
 router.use(requireAuth);
 router.use(requireCsrfProtection);
 router.use(createReceiptLimiter());
@@ -101,14 +100,14 @@ const upload = multer({
 function normalizeUploadedReceiptMimeType(file) {
   const rawMime = String(file?.mimetype || "").trim().toLowerCase();
   const ext = path.extname(String(file?.originalname || "")).toLowerCase();
-
-  if (ALLOWED_MIME_TYPES.has(rawMime)) {
-    return rawMime;
-  }
-
   const inferredMime = MIME_BY_EXTENSION.get(ext) || null;
-  if (inferredMime && (!rawMime || rawMime === "application/octet-stream")) {
-    return inferredMime;
+
+  if (
+    ALLOWED_MIME_TYPES.has(rawMime) &&
+    ALLOWED_EXTENSIONS.has(ext) &&
+    inferredMime === rawMime
+  ) {
+    return rawMime;
   }
 
   return null;
@@ -140,21 +139,31 @@ function isUuid(value) {
   return typeof value === "string" && UUID_RE.test(value);
 }
 
-function safeUnlink(filePath) {
+async function safeUnlink(filePath) {
   if (!filePath) return;
   try {
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    await fsp.unlink(filePath);
   } catch (err) {
+    if (err?.code === "ENOENT") {
+      return;
+    }
     logError("Failed to delete file:", filePath, err);
   }
 }
 
-function moveFileIfExists(fromPath, toPath) {
-  if (!fromPath || !fs.existsSync(fromPath)) {
+async function moveFileIfExists(fromPath, toPath) {
+  if (!fromPath || !toPath) {
     return false;
   }
-  fs.renameSync(fromPath, toPath);
-  return true;
+  try {
+    await fsp.rename(fromPath, toPath);
+    return true;
+  } catch (err) {
+    if (err?.code === "ENOENT") {
+      return false;
+    }
+    throw err;
+  }
 }
 
 /* =========================================================
@@ -311,7 +320,7 @@ router.post("/", upload.single("receipt"), async (req, res) => {
     });
   } catch (err) {
     if (err.name === "AccountingPeriodLockedError") {
-      safeUnlink(req.file?.path);
+      await safeUnlink(req.file?.path);
       return res.status(409).json({
         error: err.message,
         code: err.code,
@@ -568,7 +577,7 @@ router.delete("/:id", async (req, res) => {
       : null;
 
     if (storagePath && pendingDeletePath) {
-      movedToPending = moveFileIfExists(storagePath, pendingDeletePath);
+      movedToPending = await moveFileIfExists(storagePath, pendingDeletePath);
     }
 
     await client.query(
@@ -580,7 +589,7 @@ router.delete("/:id", async (req, res) => {
     await client.query("COMMIT");
 
     if (movedToPending) {
-      safeUnlink(pendingDeletePath);
+      await safeUnlink(pendingDeletePath);
     }
 
     return res.json({ ok: true });
@@ -590,10 +599,13 @@ router.delete("/:id", async (req, res) => {
     } catch (rollbackErr) {
       logError("DELETE /receipts/:id rollback error:", rollbackErr);
     }
-    if (movedToPending && pendingDeletePath && storagePath && fs.existsSync(pendingDeletePath)) {
+    if (movedToPending && pendingDeletePath && storagePath) {
       try {
-        fs.renameSync(pendingDeletePath, storagePath);
+        await fsp.rename(pendingDeletePath, storagePath);
       } catch (restoreErr) {
+        if (restoreErr?.code === "ENOENT") {
+          return res.status(500).json({ error: "Failed to delete receipt." });
+        }
         logError("Failed to restore receipt after delete error:", restoreErr);
       }
     }
@@ -763,7 +775,7 @@ router.post("/:id/extract", async (req, res) => {
 
     const ocrResult = await extractReceiptDataWithClaude(ocrSourcePath, mime_type);
     if (tempPath) {
-      safeUnlink(tempPath);
+      await safeUnlink(tempPath);
     }
     return res.json(ocrResult);
   } catch (err) {
@@ -773,8 +785,3 @@ router.post("/:id/extract", async (req, res) => {
 });
 
 module.exports = router;
-module.exports.__private = {
-  extractReceiptDataWithClaude,
-  ANTHROPIC_MEDIA_TYPES,
-  ANTHROPIC_RECEIPT_OCR_MODEL
-};

@@ -2,6 +2,11 @@
 
 Source: Claude full-repo audit, reorganized for execution.
 
+Post-review status:
+- Verified and closed the remaining partials from the follow-up review on 2026-05-15.
+- Items 6, 8, 15, 19, 20, and 22 are now fully addressed in code and tests.
+- Item 25 was confirmed already resolved by the refactor in `routes/index.js`; no additional patch was required.
+
 Rules used here:
 - Sorted from shortest expected fix to longest expected fix.
 - Grouped when the same fix shape touches nearby files.

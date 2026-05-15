@@ -11,6 +11,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const BILL_STATUS_VALUES = new Set(['draft', 'open', 'sent', 'partial', 'paid', 'void']);
 
 router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
+router.use((req, res, next) => (
+	["POST", "PUT", "PATCH", "DELETE"].includes(req.method)
+		? requireCsrfProtection(req, res, next)
+		: next()
+));
 
 function isUuid(value) {
 	return UUID_RE.test(String(value || ''));
@@ -51,7 +56,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create bill (POST /bills)
-router.post('/', requireCsrfProtection, async (req, res) => {
+router.post('/', async (req, res) => {
 	const businessId = req.business.id;
 	if (!hasBillPayload(req.body)) {
 		return res.status(400).json({ error: 'Missing required bill fields.' });
@@ -82,7 +87,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update bill (PUT /bills/:id)
-router.put('/:id', requireCsrfProtection, async (req, res) => {
+router.put('/:id', async (req, res) => {
 	const businessId = req.business.id;
 	if (!isUuid(req.params.id)) {
 		return res.status(400).json({ error: 'Invalid bill id.' });
@@ -102,7 +107,7 @@ router.put('/:id', requireCsrfProtection, async (req, res) => {
 });
 
 // Delete bill (DELETE /bills/:id)
-router.delete('/:id', requireCsrfProtection, async (req, res) => {
+router.delete('/:id', async (req, res) => {
 	const businessId = req.business.id;
 	if (!isUuid(req.params.id)) {
 		return res.status(400).json({ error: 'Invalid bill id.' });

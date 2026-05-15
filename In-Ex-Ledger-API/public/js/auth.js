@@ -216,6 +216,11 @@ function getStoredSubscriptionState() {
   }
 }
 
+function getAuthoritativeSubscriptionState() {
+  const subscription = window.__LUNA_ME__?.subscription;
+  return subscription && typeof subscription === "object" ? subscription : null;
+}
+
 function getMaxBusinessesAllowedFromSubscription(subscription = getStoredSubscriptionState()) {
   const max = Number(subscription?.maxBusinessesAllowed);
   if (Number.isFinite(max) && max >= 1) {
@@ -788,9 +793,9 @@ async function apiFetch(url, options = {}) {
 }
 
 function isTrialValid() {
-  const subscription = window.__LUNA_ME__?.subscription || getStoredSubscriptionState();
+  const subscription = getAuthoritativeSubscriptionState();
   if (!subscription || typeof subscription !== "object") {
-    return true;
+    return false;
   }
 
   if (subscription.effectiveStatus === "trial_expired") {
@@ -1197,17 +1202,13 @@ function showAccountMenuNotice(message) {
 }
 
 function effectiveTier() {
-  const subscription = window.__LUNA_ME__?.subscription || getStoredSubscriptionState();
+  const subscription = getAuthoritativeSubscriptionState();
   if (subscription && typeof subscription === "object") {
     if (subscription.effectiveStatus === "trialing") {
       return isTrialValid() ? "v1" : "free";
     }
 
-    if (subscription.effectiveTier === "v1") {
-      return "v1";
-    }
-
-    return "free";
+    return subscription.effectiveTier || "free";
   }
 
   return "free";

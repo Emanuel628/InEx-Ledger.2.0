@@ -2,6 +2,8 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
+const Module = require("node:module");
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const request = require("supertest");
@@ -38,6 +40,99 @@ function buildApp(router) {
   app.use(ensureCsrfCookie);
   app.use("/api/plaid", router);
   return app;
+}
+
+function buildWebhookApp(router) {
+  const app = express();
+  app.use(cookieParser());
+  app.use("/api/plaid", router);
+  return app;
+}
+
+function base64UrlEncode(value) {
+  return Buffer.from(value).toString("base64url");
+}
+
+function signPlaidVerificationJwt({ privateKey, keyId, bodyBuffer, issuedAt = Math.floor(Date.now() / 1000) }) {
+  const header = {
+    alg: "ES256",
+    kid: keyId,
+    typ: "JWT"
+  };
+  const payload = {
+    iat: issuedAt,
+    request_body_sha256: crypto.createHash("sha256").update(bodyBuffer).digest("hex")
+  };
+  const headerSegment = base64UrlEncode(JSON.stringify(header));
+  const payloadSegment = base64UrlEncode(JSON.stringify(payload));
+  const signingInput = `${headerSegment}.${payloadSegment}`;
+  const signature = crypto.sign(
+    "sha256",
+    Buffer.from(signingInput, "utf8"),
+    { key: privateKey, dsaEncoding: "ieee-p1363" }
+  );
+  return `${signingInput}.${signature.toString("base64url")}`;
+}
+
+function loadWebhookRouter() {
+  const originalLoad = Module._load.bind(Module);
+  const keyPair = crypto.generateKeyPairSync("ec", { namedCurve: "P-256" });
+  const keyId = "plaid-test-key-id";
+
+  Module._load = function(requestName, parent, isMain) {
+    if (requestName === "../services/plaidService.js" || /plaidService\.js$/.test(requestName)) {
+      return {
+        isPlaidConfigured: () => true,
+        getPlaidClient() {
+          return {
+            async webhookVerificationKeyGet({ key_id }) {
+              assert.equal(key_id, keyId);
+              return {
+                data: {
+                  key: keyPair.publicKey.export({ format: "jwk" })
+                }
+              };
+            }
+          };
+        },
+        getCountryCodes: () => ["US"],
+        plaidTransactionToCanonical() {
+          throw new Error("not used");
+        },
+        plaidAccountToRow() {
+          throw new Error("not used");
+        },
+        describePlaidError(err) {
+          return { message: err.message, code: err.code || "plaid_error" };
+        }
+      };
+    }
+    if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
+      return {
+        logInfo() {},
+        logWarn() {},
+        logError() {}
+      };
+    }
+    return originalLoad(requestName, parent, isMain);
+  };
+
+  delete require.cache[require.resolve("../routes/plaid.routes.js")];
+
+  try {
+    return {
+      router: require("../routes/plaid.routes.js"),
+      keyPair,
+      keyId,
+      cleanup() {
+        delete require.cache[require.resolve("../routes/plaid.routes.js")];
+        Module._load = originalLoad;
+      }
+    };
+  } catch (error) {
+    Module._load = originalLoad;
+    throw error;
+  }
 }
 
 function withoutPlaidEnv(fn) {
@@ -117,48 +212,53 @@ test("POST /api/plaid/connections/:id/sync rejects invalid UUID (400) after conf
 });
 
 test("POST /api/plaid/webhook returns 503 when webhook secret is not configured", async () => {
-  const before = process.env.PLAID_WEBHOOK_SECRET;
-  delete process.env.PLAID_WEBHOOK_SECRET;
+  const fixture = loadWebhookRouter();
   try {
-    const router = require("../routes/plaid.routes.js");
-    const app = buildApp(router);
+    const app = buildWebhookApp(fixture.router);
     const res = await request(app)
       .post("/api/plaid/webhook")
       .send({ webhook_type: "TRANSACTIONS", webhook_code: "SYNC_UPDATES_AVAILABLE", item_id: "item-1" });
-    assert.equal(res.status, 503);
+    assert.equal(res.status, 401);
   } finally {
-    if (before === undefined) delete process.env.PLAID_WEBHOOK_SECRET;
-    else process.env.PLAID_WEBHOOK_SECRET = before;
+    fixture.cleanup();
   }
 });
 
-test("POST /api/plaid/webhook rejects missing secret and accepts matching secret when configured", async () => {
-  const before = process.env.PLAID_WEBHOOK_SECRET;
-  const beforeClientId = process.env.PLAID_CLIENT_ID;
-  const beforeSecret = process.env.PLAID_SECRET;
-  process.env.PLAID_WEBHOOK_SECRET = "test-plaid-secret";
-  process.env.PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID || "test-client-id";
-  process.env.PLAID_SECRET = process.env.PLAID_SECRET || "test-plaid-api-secret";
+test("POST /api/plaid/webhook accepts a valid Plaid-Verification JWT and rejects body tampering", async () => {
+  const fixture = loadWebhookRouter();
   try {
-    const router = require("../routes/plaid.routes.js");
-    const app = buildApp(router);
+    const app = buildWebhookApp(fixture.router);
+    const payload = {
+      webhook_type: "TRANSACTIONS",
+      webhook_code: "SYNC_UPDATES_AVAILABLE",
+      item_id: "item-1"
+    };
+    const bodyBuffer = Buffer.from(JSON.stringify(payload));
+    const signedJwt = signPlaidVerificationJwt({
+      privateKey: fixture.keyPair.privateKey,
+      keyId: fixture.keyId,
+      bodyBuffer
+    });
+
     const rejected = await request(app)
       .post("/api/plaid/webhook")
-      .send({ webhook_type: "TRANSACTIONS", webhook_code: "SYNC_UPDATES_AVAILABLE", item_id: "item-1" });
+      .send(payload);
     assert.equal(rejected.status, 401);
 
     const accepted = await request(app)
       .post("/api/plaid/webhook")
-      .set("x-plaid-webhook-secret", "test-plaid-secret")
-      .send({ webhook_type: "TRANSACTIONS", webhook_code: "SYNC_UPDATES_AVAILABLE", item_id: "item-1" });
+      .set("Plaid-Verification", signedJwt)
+      .set("Content-Type", "application/json")
+      .send(bodyBuffer.toString("utf8"));
     assert.equal(accepted.status, 200);
     assert.equal(accepted.body.ok, true);
+
+    const tampered = await request(app)
+      .post("/api/plaid/webhook")
+      .set("Plaid-Verification", signedJwt)
+      .send({ ...payload, item_id: "item-2" });
+    assert.equal(tampered.status, 401);
   } finally {
-    if (before === undefined) delete process.env.PLAID_WEBHOOK_SECRET;
-    else process.env.PLAID_WEBHOOK_SECRET = before;
-    if (beforeClientId === undefined) delete process.env.PLAID_CLIENT_ID;
-    else process.env.PLAID_CLIENT_ID = beforeClientId;
-    if (beforeSecret === undefined) delete process.env.PLAID_SECRET;
-    else process.env.PLAID_SECRET = beforeSecret;
+    fixture.cleanup();
   }
 });

@@ -9,6 +9,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 // All routes require V2 feature flag and entitlement
 router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
+router.use((req, res, next) => (
+  ["POST", "PUT", "PATCH", "DELETE"].includes(req.method)
+    ? requireCsrfProtection(req, res, next)
+    : next()
+));
 
 function isUuid(value) {
   return UUID_RE.test(String(value || ''));
@@ -43,7 +48,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create project
-router.post('/', requireCsrfProtection, async (req, res) => {
+router.post('/', async (req, res) => {
   if (!hasProjectPayload(req.body)) {
     return res.status(400).json({ error: 'Project name is required.' });
   }
@@ -56,7 +61,7 @@ router.post('/', requireCsrfProtection, async (req, res) => {
 });
 
 // Update project
-router.put('/:id', requireCsrfProtection, async (req, res) => {
+router.put('/:id', async (req, res) => {
   if (!isUuid(req.params.id)) {
     return res.status(400).json({ error: 'Invalid project id.' });
   }
@@ -73,7 +78,7 @@ router.put('/:id', requireCsrfProtection, async (req, res) => {
 });
 
 // Delete project
-router.delete('/:id', requireCsrfProtection, async (req, res) => {
+router.delete('/:id', async (req, res) => {
   if (!isUuid(req.params.id)) {
     return res.status(400).json({ error: 'Invalid project id.' });
   }

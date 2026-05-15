@@ -22,14 +22,6 @@ function getAuthoritativeTrialSubscription() {
   if (window.__LUNA_ME__?.subscription && typeof window.__LUNA_ME__.subscription === "object") {
     return window.__LUNA_ME__.subscription;
   }
-
-  if (typeof getStoredSubscriptionState === "function") {
-    const stored = getStoredSubscriptionState();
-    if (stored && typeof stored === "object") {
-      return stored;
-    }
-  }
-
   return null;
 }
 
@@ -38,7 +30,10 @@ function startTrial(durationDays = DEFAULT_TRIAL_DAYS) {
 }
 
 function formatTrialRemaining() {
-  const remainingMs = getTrialRemainingForDisplay();
+  const remainingMs = getTrialRemaining();
+  if (remainingMs === null) {
+    return "Trial status unavailable.";
+  }
 
   const totalDays = Math.floor(remainingMs / (1000 * 60 * 60 * 24));
   const remainderMs = remainingMs % (1000 * 60 * 60 * 24);
@@ -78,5 +73,5 @@ function getTrialRemainingForDisplay() {
   if (remaining !== null) {
     return remaining;
   }
-  return DEFAULT_TRIAL_DAYS * 24 * 60 * 60 * 1000;
+  return 0;
 }

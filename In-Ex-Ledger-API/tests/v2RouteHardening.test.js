@@ -11,6 +11,7 @@ const VENDORS_ROUTE_PATH = require.resolve("../routes/vendors.routes.js");
 const CUSTOMERS_ROUTE_PATH = require.resolve("../routes/customers.routes.js");
 const BILLS_ROUTE_PATH = require.resolve("../routes/bills.routes.js");
 const BILLABLE_EXPENSES_ROUTE_PATH = require.resolve("../routes/billable-expenses.routes.js");
+const INVOICES_ROUTE_PATH = require.resolve("../routes/invoices.routes.js");
 
 function loadRouter(routePath, routeName) {
   const originalLoad = Module._load.bind(Module);
@@ -156,6 +157,27 @@ function loadRouter(routePath, routeName) {
         }
       };
     }
+    if (requestName === "../services/invoiceService") {
+      return {
+        listInvoices: async () => [],
+        createInvoice: async (...args) => {
+          state.serviceCalls.push({ routeName, method: "createInvoice", args });
+          return { id: "invoice_1" };
+        },
+        getInvoice: async (...args) => {
+          state.serviceCalls.push({ routeName, method: "getInvoice", args });
+          return null;
+        },
+        updateInvoice: async (...args) => {
+          state.serviceCalls.push({ routeName, method: "updateInvoice", args });
+          return { id: "invoice_1" };
+        },
+        deleteInvoice: async (...args) => {
+          state.serviceCalls.push({ routeName, method: "deleteInvoice", args });
+          return true;
+        }
+      };
+    }
 
     return originalLoad(requestName, parent, isMain);
   };
@@ -292,6 +314,31 @@ test("billable expenses create rejects malformed payloads before the service lay
       });
 
     assert.equal(response.status, 400);
+    assert.equal(fixture.state.serviceCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("invoices routes require auth independently of V2 middleware", async () => {
+  const fixture = loadRouter(INVOICES_ROUTE_PATH, "invoices");
+  try {
+    const response = await request(fixture.app).get("/api/test");
+    assert.equal(response.status, 401);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("invoices delete enforces CSRF on mutations at the router level", async () => {
+  const fixture = loadRouter(INVOICES_ROUTE_PATH, "invoices");
+  try {
+    const response = await authed(
+      request(fixture.app)
+        .delete("/api/test/00000000-0000-4000-8000-000000009006")
+    );
+
+    assert.equal(response.status, 403);
     assert.equal(fixture.state.serviceCalls.length, 0);
   } finally {
     fixture.cleanup();

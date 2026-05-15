@@ -33,7 +33,9 @@ const {
 
 const router = express.Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const PLAID_WEBHOOK_SECRET_HEADER_NAMES = ["x-plaid-webhook-secret", "x-webhook-secret"];
+const PLAID_WEBHOOK_VERIFICATION_HEADER = "plaid-verification";
+const PLAID_WEBHOOK_MAX_AGE_SECONDS = 5 * 60;
+const plaidWebhookKeyCache = new Map();
 
 function timingSafeStringEqual(a, b) {
   const ab = Buffer.from(String(a || ""));
@@ -44,6 +46,100 @@ function timingSafeStringEqual(a, b) {
   } catch (_) {
     return false;
   }
+}
+
+function decodeBase64Url(value) {
+  const normalized = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  return Buffer.from(normalized + padding, "base64");
+}
+
+function decodeJsonSegment(segment) {
+  return JSON.parse(decodeBase64Url(segment).toString("utf8"));
+}
+
+function parseJwtSegments(jwt) {
+  const parts = String(jwt || "").split(".");
+  if (parts.length !== 3) {
+    throw new Error("Malformed Plaid verification token.");
+  }
+  return {
+    headerSegment: parts[0],
+    payloadSegment: parts[1],
+    signatureSegment: parts[2]
+  };
+}
+
+async function getPlaidWebhookVerificationKey(kid) {
+  const cached = plaidWebhookKeyCache.get(kid);
+  if (cached?.expiredAt && cached.expiredAt > Date.now()) {
+    return cached.key;
+  }
+
+  const client = getPlaidClient();
+  const response = await client.webhookVerificationKeyGet({ key_id: kid });
+  const key = response?.data?.key || null;
+  if (!key) {
+    throw new Error("Plaid webhook verification key lookup returned no key.");
+  }
+
+  const expiredAt = Number(key.expired_at || 0) * 1000;
+  plaidWebhookKeyCache.set(kid, {
+    key,
+    expiredAt: Number.isFinite(expiredAt) && expiredAt > Date.now()
+      ? expiredAt
+      : Date.now() + (15 * 60 * 1000)
+  });
+  return key;
+}
+
+async function verifyPlaidWebhook(rawBody, signedJwt) {
+  const { headerSegment, payloadSegment, signatureSegment } = parseJwtSegments(signedJwt);
+  const header = decodeJsonSegment(headerSegment);
+
+  if (header?.alg !== "ES256") {
+    throw new Error("Unsupported Plaid webhook verification algorithm.");
+  }
+  if (!header?.kid) {
+    throw new Error("Missing Plaid webhook verification key id.");
+  }
+
+  const key = await getPlaidWebhookVerificationKey(header.kid);
+  const publicKey = crypto.createPublicKey({ key, format: "jwk" });
+  const signingInput = Buffer.from(`${headerSegment}.${payloadSegment}`, "utf8");
+  const signature = decodeBase64Url(signatureSegment);
+  const verified = crypto.verify(
+    "sha256",
+    signingInput,
+    { key: publicKey, dsaEncoding: "ieee-p1363" },
+    signature
+  );
+
+  if (!verified) {
+    throw new Error("Invalid Plaid webhook signature.");
+  }
+
+  const payload = decodeJsonSegment(payloadSegment);
+  const issuedAtSeconds = Number(payload?.iat);
+  if (!Number.isFinite(issuedAtSeconds)) {
+    throw new Error("Missing Plaid webhook issued-at timestamp.");
+  }
+
+  const nowSeconds = Date.now() / 1000;
+  if (
+    issuedAtSeconds > nowSeconds + PLAID_WEBHOOK_MAX_AGE_SECONDS ||
+    nowSeconds - issuedAtSeconds > PLAID_WEBHOOK_MAX_AGE_SECONDS
+  ) {
+    throw new Error("Expired Plaid webhook verification token.");
+  }
+
+  const expectedHash = String(payload?.request_body_sha256 || "").trim().toLowerCase();
+  const actualHash = crypto.createHash("sha256").update(rawBody).digest("hex");
+  if (!timingSafeStringEqual(actualHash, expectedHash)) {
+    throw new Error("Plaid webhook body hash mismatch.");
+  }
+
+  return payload;
 }
 
 /**
@@ -427,21 +523,26 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
  * The webhook never returns anything sensitive — only a 200 ack so Plaid
  * doesn't retry the same event indefinitely.
  */
-router.post("/webhook", express.json({ limit: "100kb" }), async (req, res) => {
+router.post("/webhook", express.json({
+  limit: "100kb",
+  verify(req, _res, buf) {
+    req.rawBody = Buffer.from(buf);
+  }
+}), async (req, res) => {
   if (!isPlaidConfigured()) {
     return res.status(503).json({ ok: false });
   }
-  const expectedSecret = String(process.env.PLAID_WEBHOOK_SECRET || "").trim();
-  if (!expectedSecret) {
-    logError("plaid webhook misconfigured: PLAID_WEBHOOK_SECRET is required");
-    return res.status(503).json({ ok: false, error: "Plaid webhook is not configured." });
+  const signedJwt = String(req.get(PLAID_WEBHOOK_VERIFICATION_HEADER) || "").trim();
+  if (!signedJwt) {
+    logWarn("plaid webhook rejected: missing Plaid-Verification header");
+    return res.status(401).json({ ok: false, error: "Missing Plaid verification header." });
   }
-  const providedSecret = PLAID_WEBHOOK_SECRET_HEADER_NAMES
-    .map((name) => req.get(name))
-    .find((value) => typeof value === "string" && value.length > 0) || "";
-  if (!timingSafeStringEqual(providedSecret, expectedSecret)) {
-    logWarn("plaid webhook rejected: bad secret");
-    return res.status(401).json({ ok: false, error: "Invalid webhook secret." });
+
+  try {
+    await verifyPlaidWebhook(req.rawBody || Buffer.from(JSON.stringify(req.body || {})), signedJwt);
+  } catch (err) {
+    logWarn("plaid webhook rejected:", err.message);
+    return res.status(401).json({ ok: false, error: "Invalid Plaid webhook signature." });
   }
   const event = req.body || {};
   try {
