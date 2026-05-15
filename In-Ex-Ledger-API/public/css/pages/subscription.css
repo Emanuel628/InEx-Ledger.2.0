@@ -1856,3 +1856,93 @@ body {
     min-width: 760px;
   }
 }
+
+/* Mobile view: final safety pass */
+@media (max-width: 720px) {
+  .sub-no-sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 16px 12px 32px !important;
+    box-sizing: border-box !important;
+  }
+
+  .sub-hero-shell,
+  .sub-plans-grid,
+  .sub-billing-detail-grid,
+  .sub-access-layout,
+  .sub-status-stats,
+  .sub-access-overview,
+  .sub-faq-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sub-status-inner,
+  .sub-control-row,
+  .sub-trust-strip,
+  .sub-detail-card-head,
+  .sub-slots-panel-head,
+  .sub-slots-workbench,
+  .sub-slots-footer,
+  .sub-business-roster-head,
+  .sub-business-item,
+  .sub-business-item-actions,
+  .modal-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .sub-plan-card,
+  .sub-status-spotlight,
+  .sub-detail-card,
+  .sub-slots-panel,
+  .sub-business-roster-card,
+  .sub-checkout-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 20px 18px !important;
+    box-sizing: border-box !important;
+  }
+
+  .sub-toggle,
+  .sub-quantity-control,
+  .sub-quantity-control-slots {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .sub-cta-primary,
+  .sub-cta-outline,
+  .sub-slots-save-btn,
+  .sub-slots-add-btn,
+  .sub-slots-remove-btn,
+  .sub-slots-confirm-cancel,
+  .sub-slots-confirm-ok,
+  .drawer-submit,
+  .modal-cancel {
+    width: 100% !important;
+  }
+
+  .billing-history-list {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .billing-history-table {
+    min-width: 720px !important;
+  }
+
+  #subCheckoutModal {
+    align-items: flex-start !important;
+    overflow-y: auto !important;
+    padding: 12px !important;
+  }
+
+  .sub-checkout-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .sub-checkout-row strong {
+    text-align: left !important;
+  }
+}
