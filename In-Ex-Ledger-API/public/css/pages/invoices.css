@@ -543,3 +543,66 @@
     width: min(640px, 100vw);
   }
 }
+
+/* Mobile view: final safety pass */
+@media (max-width: 720px) {
+  .app-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 16px 12px 24px !important;
+    box-sizing: border-box !important;
+  }
+
+  .page-header,
+  .transactions-toolbar,
+  .invoice-panel-header,
+  .invoice-form-actions,
+  .modal-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .stats-row,
+  .invoice-form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .table-wrapper {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .transactions-table {
+    min-width: 760px !important;
+  }
+
+  .invoice-panel {
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }
+
+  .invoice-panel-inner {
+    padding: 20px 16px 28px !important;
+  }
+
+  .invoice-line-items {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .invoice-line-header,
+  .invoice-line-row {
+    min-width: 520px !important;
+  }
+
+  .page-add-button,
+  .drawer-submit,
+  .modal-cancel,
+  .modal-delete,
+  .tx-action-btn,
+  .invoice-add-line {
+    width: 100%;
+  }
+}
