@@ -348,6 +348,7 @@ function injectDesktopMobileLink() {
   const wrapper = document.createElement("div");
   wrapper.className = "mobile-desktop-link mobile-view-link";
   wrapper.style.position = "fixed";
+  wrapper.style.display = "block";
   wrapper.style.left = "16px";
   wrapper.style.right = "16px";
   wrapper.style.bottom = "16px";
