@@ -302,4 +302,29 @@ main.help-main {
   text-decoration: none;
 }
 
+/* Desktop-on-mobile: preserve desktop help layout at desktop-ish widths */
+@media (min-width: 1025px) {
+  .help-layout {
+    grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  }
+
+  .help-sidebar {
+    position: sticky;
+    top: 84px;
+  }
+
+  .help-hero {
+    grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  }
+
+  .help-grid-two,
+  .help-note-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .help-dl {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+}
+
 
