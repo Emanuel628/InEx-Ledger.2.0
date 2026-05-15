@@ -523,3 +523,23 @@
   outline-offset: -2px;
   background: rgba(79, 70, 229, 0.06) !important;
 }
+
+/* Desktop-on-mobile: preserve desktop invoice layout when forced desktop viewport is active */
+@media (min-width: 721px) {
+  .stats-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .transactions-table {
+    min-width: 860px;
+  }
+
+  .invoice-panel {
+    width: min(640px, 100vw);
+  }
+}
