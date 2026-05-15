@@ -162,6 +162,27 @@ function openInvoicePanel(invoiceId) {
   panel.querySelector("#invClientName")?.focus();
 }
 
+function focusInvoiceFromUrl(invoiceId) {
+  if (!invoiceId) return false;
+
+  const invoice = invoiceList.find((item) => item.id === invoiceId);
+  if (!invoice) return false;
+
+  openInvoicePanel(invoiceId);
+
+  const row = document.querySelector(`tr[data-id="${CSS.escape(invoiceId)}"]`);
+  if (row) {
+    row.classList.add("invoice-row-focus");
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    window.setTimeout(() => {
+      row.classList.remove("invoice-row-focus");
+    }, 2500);
+  }
+
+  return true;
+}
+
 function closeInvoicePanel() {
   document.getElementById("invoicePanel").hidden = true;
   activeInvoiceId = null;
