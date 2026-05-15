@@ -1401,8 +1401,8 @@ body[data-theme="light"] select option {
   }
 }
 
+
 @media (max-width: 720px) {
-  @media (max-width: 720px) {
   .app-topbar,
   .settings-topbar,
   .accounts-topbar,
