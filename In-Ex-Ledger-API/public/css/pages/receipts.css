@@ -482,3 +482,24 @@
     overflow-x: auto;
   }
 }
+
+/* Desktop-on-mobile: preserve readable receipt table and page layout */
+@media (min-width: 641px) {
+  .receipts-content {
+    min-width: 0;
+  }
+
+  .receipts-card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .receipts-table {
+    min-width: 860px;
+  }
+
+  .receipt-row-actions {
+    flex-wrap: wrap;
+  }
+}
+
