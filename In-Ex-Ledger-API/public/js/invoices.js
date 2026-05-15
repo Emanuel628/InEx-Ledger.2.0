@@ -275,7 +275,7 @@ async function saveInvoice(status) {
   const errorEl = document.getElementById("invoiceFormError");
   errorEl.hidden = true;
 
-  const payload = collectInvoicePayload(status);
+const payload = collectInvoicePayload(status === "sent" ? "draft" : status);
 
   const submitBtn = document.getElementById("invoiceSubmit");
   const draftBtn = document.getElementById("invoiceSaveDraft");
