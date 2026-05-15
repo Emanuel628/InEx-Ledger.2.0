@@ -294,14 +294,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 25, 35, 0.45);
 }
 
 .receipt-modal.hidden {
   display: none;
 }
 
+.receipt-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 25, 35, 0.45);
+}
+
 .receipt-modal-card {
+  position: relative;
+  z-index: 1;
   width: min(420px, calc(100vw - 32px));
   padding: 28px;
   border-radius: 14px;

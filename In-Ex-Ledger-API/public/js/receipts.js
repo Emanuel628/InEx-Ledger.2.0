@@ -6,6 +6,7 @@ let transactionMap = {};
 let activeReceiptLinkId = null;
 let receiptsLoading = false;
 let receiptsLoadFailed = false;
+let lastReceiptLinkTrigger = null;
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
@@ -395,10 +396,19 @@ function renderTransactionCell(transactionId, receiptId) {
 }
 
 function wireReceiptLinkModal() {
+  const modal = document.getElementById("receiptLinkModal");
   const cancelButton = document.getElementById("receiptLinkCancel");
   const saveButton = document.getElementById("receiptLinkSave");
+  const backdrop = modal?.querySelector("[data-receipt-link-close]");
 
   cancelButton?.addEventListener("click", closeReceiptLinkModal);
+  backdrop?.addEventListener("click", closeReceiptLinkModal);
+  modal?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeReceiptLinkModal();
+    }
+  });
   saveButton?.addEventListener("click", async () => {
     const select = document.getElementById("receiptLinkSelect");
     await saveReceiptLink(activeReceiptLinkId, select?.value || "");
@@ -414,6 +424,7 @@ function openReceiptLinkModal(receiptId) {
   }
 
   activeReceiptLinkId = receiptId;
+  lastReceiptLinkTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   const transactions = Object.values(transactionMap)
     .sort((left, right) => String(right.date || "").localeCompare(String(left.date || "")));
   select.innerHTML = `<option value="">${escapeHtml(tx("receipts_not_attached"))}</option>`;
@@ -428,6 +439,7 @@ function openReceiptLinkModal(receiptId) {
   });
   select.value = receipt.transaction_id || "";
   modal.classList.remove("hidden");
+  select.focus();
 }
 
 function closeReceiptLinkModal() {
@@ -436,6 +448,10 @@ function closeReceiptLinkModal() {
     modal.classList.add("hidden");
   }
   activeReceiptLinkId = null;
+  if (lastReceiptLinkTrigger?.isConnected) {
+    lastReceiptLinkTrigger.focus();
+  }
+  lastReceiptLinkTrigger = null;
 }
 
 async function saveReceiptLink(receiptId, transactionId) {

@@ -192,7 +192,7 @@ Reason for this exact order:
   Group: Native dialog cleanup
   Covers: checkout errors, account notices, add-business fallback, other blocking browser dialogs
 
-- [ ] 15-30 min - Add missing favicon declarations to auth/marketing pages.
+- [x] 15-30 min - Add missing favicon declarations to auth/marketing pages.
   Files: auth and marketing HTML templates broadly
   Group: Head metadata polish
   Covers: repeated favicon 404s
@@ -218,22 +218,22 @@ Reason for this exact order:
 
 ### HTML semantics and accessibility polish
 
-- [ ] 30-60 min - Fix mislabeled or semantically invalid form/table markup on app pages.
+- [x] 30-60 min - Fix mislabeled or semantically invalid form/table markup on app pages.
   Files: `accounts.html`, `transactions.html`, `mfa-challenge.html`
   Group: Markup semantics
   Covers: non-functional account-type label, undo button inside `<th>`, page heading level cleanup
 
-- [ ] 30-60 min - Add missing close affordances and focus quality-of-life improvements for simpler modals.
+- [x] 30-60 min - Add missing close affordances and focus quality-of-life improvements for simpler modals.
   Files: `receipts.html`, related modal JS
   Group: Modal polish
   Covers: receipts link modal lacking backdrop close
 
-- [ ] 30-60 min - Standardize translated nav labels and missing `data-i18n` attributes.
+- [x] 30-60 min - Standardize translated nav labels and missing `data-i18n` attributes.
   Files: `categories.html`, `transactions.html`, other affected templates
   Group: i18n markup polish
   Covers: Analytics link translation misses and similar template drift
 
-- [ ] 30-60 min - Update document language handling so translated pages do not keep `<html lang="en">`.
+- [x] 30-60 min - Update document language handling so translated pages do not keep `<html lang="en">`.
   Files: shared page templates, i18n bootstrapping
   Group: Screen-reader pronunciation
   Covers: auth/public pages staying English-tagged after language changes
