@@ -738,7 +738,7 @@ tbody tr:last-child {
   .transactions-table {
     border-spacing: 0;
   }
-
+}
 .txn-entry-selector {
   display: flex;
   gap: 12px;
