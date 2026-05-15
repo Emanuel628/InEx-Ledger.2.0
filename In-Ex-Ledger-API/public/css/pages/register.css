@@ -427,3 +427,15 @@ main {
   }
 }
 
+/* Desktop-on-mobile: preserve two-column registration layout at desktop-ish widths */
+@media (min-width: 1025px) {
+  .register-layout {
+    grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1fr);
+  }
+
+  .register-value-col,
+  .register-form-col {
+    min-width: 0;
+  }
+}
+
