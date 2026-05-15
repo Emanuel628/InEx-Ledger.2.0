@@ -444,6 +444,11 @@ const sidebarMap = {
 const activeSidebarId = sidebarMap[invoiceStatusFilter] || "sidebarAll";
 document.getElementById(activeSidebarId)?.classList.add("is-active");
   await loadInvoices();
+  
+  const focusId = params.get("focus") || "";
+  if (focusId) {
+    focusInvoiceFromUrl(focusId);
+  }
 
   // Auto-open the New Invoice panel when arriving via ?new=1 (e.g. from the
   // Quick Add sidebar on the Transactions page).
