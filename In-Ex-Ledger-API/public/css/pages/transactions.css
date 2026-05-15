@@ -2041,26 +2041,6 @@ body {
 }
 
 @media (max-width: 520px) {
-  .app-topbar {
-    padding: 10px 10px 12px;
-  }
-
-  .user-pill {
-    max-width: 100%;
-  }
-
-  .app-sidebar {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar-nav {
-    gap: 6px;
-  }
-
-  .sidebar-link {
-    justify-content: flex-start;
-  }
-
   .page-title {
     font-size: 20px;
   }
