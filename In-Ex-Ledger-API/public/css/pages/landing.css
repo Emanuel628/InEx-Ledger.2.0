@@ -996,3 +996,49 @@ body {
     font-size: 30px;
   }
 }
+
+/* Desktop-on-mobile: preserve desktop marketing layout at desktop-ish widths */
+@media (min-width: 1025px) {
+  .marketing-header,
+  .marketing-main {
+    width: min(1268px, calc(100vw - 32px));
+  }
+
+  .marketing-header {
+    flex-wrap: nowrap;
+  }
+
+  .marketing-nav {
+    flex-wrap: nowrap;
+    width: auto;
+  }
+
+  .marketing-nav-sections {
+    order: initial;
+    width: auto;
+    overflow: visible;
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1.02fr) minmax(380px, 0.98fr);
+  }
+
+  .problem-grid,
+  .workflow-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .fit-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+  }
+
+  .pricing-card-header,
+  .final-cta {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .pricing-feature-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
