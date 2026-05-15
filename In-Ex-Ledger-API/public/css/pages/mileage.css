@@ -480,3 +480,62 @@ textarea.form-control {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* Mobile view: final safety pass */
+@media (max-width: 720px) {
+  .mileage-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 16px 12px 24px !important;
+    box-sizing: border-box !important;
+  }
+
+  .mileage-header-card,
+  .mileage-card-head,
+  .mileage-history-toolbar,
+  .mileage-form-actions,
+  .mileage-modal-actions,
+  .mileage-date-range {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .mileage-summary-grid,
+  .mileage-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .form-field--wide {
+    grid-column: auto !important;
+  }
+
+  .mileage-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .mileage-table {
+    min-width: 760px !important;
+  }
+
+  .mileage-mode-toggle,
+  .mileage-search,
+  .mileage-search input,
+  .mileage-date-filter,
+  .mileage-filter-select,
+  .mileage-save-btn,
+  .mileage-modal-save-btn,
+  .mileage-modal-cancel-btn,
+  .mileage-page-btn,
+  .mileage-delete,
+  .mileage-edit-btn {
+    width: 100% !important;
+  }
+
+  .mileage-modal-panel {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    padding: 22px 18px !important;
+    box-sizing: border-box !important;
+  }
+}
