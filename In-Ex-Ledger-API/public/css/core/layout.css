@@ -1690,5 +1690,17 @@ body[data-theme="light"] select option {
     width: 28px !important;
     height: 28px !important;
   }
+  
 }
+/* Topbar overlap fix: desktop-width mobile view must not show hamburger */
+@media (min-width: 1025px) {
+  .topbar-hamburger {
+    display: none !important;
+  }
+
+  .app-topbar .topbar-nav {
+    display: flex !important;
+  }
+}
+
 
