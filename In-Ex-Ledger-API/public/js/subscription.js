@@ -333,6 +333,11 @@ function getPrimaryPlanAction(sub) {
   }
 
   const selectedPlanCode = getSelectedPlanCode(sub);
+  const status = String(sub.status || sub.effectiveStatus || "").toLowerCase();
+
+  if (status === "unpaid" && sub.stripeSubscriptionId) {
+    return { mode: "portal", label: "Update payment method", disabled: false };
+  }
 
   if (sub.isPaid && sub.cancelAtPeriodEnd && sub.stripeSubscriptionId && !sub.isTrialing) {
     return { mode: "resume", label: "Keep Pro active", disabled: false };
@@ -374,6 +379,11 @@ function buildStatusPanelMarkup(sub) {
     detail = getSelectedPlanCode(sub) !== "v1"
       ? `Basic is selected after trial, but Pro access stays live until ${fmtDate(sub.trialEndsAt)}.`
       : "Finish billing setup before the trial ends to avoid interruption.";
+  } else if (String(sub.status || "").toLowerCase() === "unpaid") {
+    badgeClass = "sub-badge-canceling";
+    badgeLabel = "Payment required";
+    headline = "Unpaid subscription needs attention";
+    detail = "Open Stripe billing to update your payment method and resolve the unpaid invoice before starting another checkout.";
   } else if (String(sub.status || "").toLowerCase() === "past_due" && sub.currentPeriodEnd) {
     badgeClass = "sub-badge-canceling";
     badgeLabel = "Past due";
@@ -1108,6 +1118,10 @@ async function resumeSubscription() {
 async function handlePrimaryPlanAction() {
   const actionMode = document.getElementById("planProBtn")?.dataset.actionMode || "checkout";
   if (actionMode === "current") {
+    return;
+  }
+  if (actionMode === "portal") {
+    await openCustomerPortal();
     return;
   }
   if (actionMode === "resume") {

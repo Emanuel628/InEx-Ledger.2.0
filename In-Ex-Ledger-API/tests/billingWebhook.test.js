@@ -47,6 +47,7 @@ function loadBillingRouter(options = {}) {
     syncCalls: [],
     freePlanCalls: [],
     customerUpdates: [],
+    emailSends: [],
     reserveResult: options.reserveResult ?? true,
     releaseCalls: [],
     processingError: options.processingError || null,
@@ -91,6 +92,17 @@ function loadBillingRouter(options = {}) {
             }
             if (/SELECT business_id\s+FROM business_subscriptions\s+WHERE stripe_customer_id = \$1/i.test(sql)) {
               return { rows: state.customerBusinessId ? [{ business_id: state.customerBusinessId }] : [], rowCount: state.customerBusinessId ? 1 : 0 };
+            }
+            if (/SELECT u\.id AS user_id,/i.test(sql) && /FROM businesses b/i.test(sql)) {
+              return {
+                rows: [{
+                  user_id: "user_test_001",
+                  email: "owner@example.com",
+                  display_name: "Owner Example",
+                  business_name: "Test Business"
+                }],
+                rowCount: 1
+              };
             }
             return { rows: [], rowCount: 0 };
           }
@@ -193,10 +205,16 @@ function loadBillingRouter(options = {}) {
     }
 
     if (requestName === "resend") {
+      const emailSends = state.emailSends;
       return {
         Resend: class Resend {
           constructor() {
-            this.emails = { send: async () => ({ id: "email_test_123" }) };
+            this.emails = {
+              send: async (payload) => {
+                emailSends.push(payload);
+                return { id: "email_test_123" };
+              }
+            };
           }
         }
       };
@@ -209,6 +227,7 @@ function loadBillingRouter(options = {}) {
   process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
   process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_billing_webhook";
   process.env.APP_BASE_URL = process.env.APP_BASE_URL || "https://app.inexledger.test";
+  process.env.RESEND_API_KEY = process.env.RESEND_API_KEY || "re_test_billing_webhook";
 
   try {
     const router = require("../routes/billing.routes.js");
@@ -234,6 +253,7 @@ function loadBillingRouter(options = {}) {
         delete process.env.STRIPE_WEBHOOK_SECRET;
         delete process.env.STRIPE_SECRET_KEY;
         delete process.env.APP_BASE_URL;
+        delete process.env.RESEND_API_KEY;
       }
     };
   } catch (err) {
@@ -242,6 +262,7 @@ function loadBillingRouter(options = {}) {
     delete process.env.STRIPE_WEBHOOK_SECRET;
     delete process.env.STRIPE_SECRET_KEY;
     delete process.env.APP_BASE_URL;
+    delete process.env.RESEND_API_KEY;
     throw err;
   }
 }
@@ -432,6 +453,31 @@ test("webhook: invoice.payment_succeeded re-syncs the subscription using the sto
     assert.equal(res.status, 200);
     assert.equal(fixture.state.syncCalls.length, 1);
     assert.equal(fixture.state.syncCalls[0].bizId, "biz_test_lookup");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("webhook: invoice.payment_failed sends an email that directs the user to update billing", async () => {
+  const fixture = loadBillingRouter({ customerBusinessId: "biz_test_lookup" });
+
+  try {
+    const { event } = buildWebhookEvent("invoice.payment_failed", {
+      id: "in_test_failed_123",
+      object: "invoice",
+      customer: "cus_test123",
+      amount_due: 4200,
+      currency: "usd",
+      number: "INV-2026-001",
+      created: Math.floor(Date.now() / 1000),
+      hosted_invoice_url: "https://billing.stripe.com/invoice/test_123"
+    });
+
+    const res = await sendWebhook(fixture.app, event);
+    assert.equal(res.status, 200);
+    assert.equal(fixture.state.emailSends.length, 1);
+    assert.equal(fixture.state.emailSends[0].to, "owner@example.com");
+    assert.equal(fixture.state.emailSends[0].from, "InEx Ledger <noreply@inexledger.com>");
   } finally {
     fixture.cleanup();
   }

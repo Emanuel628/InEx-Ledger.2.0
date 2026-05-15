@@ -8,6 +8,7 @@ const pricingState = {
 
 const billingPricingUtils = window.billingPricing || {};
 const BILLING_CURRENCIES = billingPricingUtils.BILLING_CURRENCIES || ["usd", "cad"];
+const MAX_ADDITIONAL_BUSINESSES = 100;
 
 function formatMoney(currency, amount) {
   if (typeof billingPricingUtils.formatMoney === "function") {
@@ -155,7 +156,7 @@ function renderPricing() {
 function clampAdditionalBusinesses(value) {
   const next = Number.parseInt(value, 10);
   if (Number.isNaN(next) || next < 0) return 0;
-  if (next > 25) return 25;
+  if (next > MAX_ADDITIONAL_BUSINESSES) return MAX_ADDITIONAL_BUSINESSES;
   return next;
 }
 

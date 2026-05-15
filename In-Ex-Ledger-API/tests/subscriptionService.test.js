@@ -170,6 +170,23 @@ test("deriveEffectiveState downgrades past_due subscriptions after the grace per
   assert.equal(snapshot.isPaid, false);
 });
 
+test("deriveEffectiveState preserves unpaid status so the UI can direct the user back to Stripe", () => {
+  const snapshot = deriveEffectiveState({
+    id: "sub_unpaid",
+    business_id: "biz_unpaid",
+    provider: "stripe",
+    plan_code: PLAN_V1,
+    status: "unpaid",
+    stripe_subscription_id: "sub_unpaid_123",
+    current_period_end: isoDateFromNow(-1)
+  });
+
+  assert.equal(snapshot.effectiveTier, PLAN_FREE);
+  assert.equal(snapshot.effectiveStatus, "unpaid");
+  assert.equal(snapshot.isPaid, false);
+  assert.equal(snapshot.stripeSubscriptionId, "sub_unpaid_123");
+});
+
 test("deriveEffectiveState preserves v1 access for canceled subscriptions with remaining period", () => {
   // Stripe fires customer.subscription.updated (status → "canceled") when a
   // subscription is cancelled immediately mid-period.  The user paid through

@@ -137,6 +137,9 @@ function deriveEffectiveState(row) {
   } else if (isActivePaid || isGracePeriod || isPastDueGracePeriod || isCanceledWithRemainingAccess) {
     effectiveTier = PLAN_V1;
     effectiveStatus = row.status;
+  } else if (row?.status === "unpaid" && row?.plan_code === PLAN_V1) {
+    effectiveTier = PLAN_FREE;
+    effectiveStatus = "unpaid";
   } else if (row?.status === "trialing" && resolvedTrialEndsAt && resolvedTrialEndsAt.getTime() <= now) {
     effectiveTier = PLAN_FREE;
     effectiveStatus = "trial_expired";

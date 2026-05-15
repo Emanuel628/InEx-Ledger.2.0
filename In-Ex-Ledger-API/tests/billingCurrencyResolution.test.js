@@ -11,7 +11,8 @@ const BILLING_ROUTE_PATH = require.resolve("../routes/billing.routes.js");
 function loadBillingRouter({
   country = "Canada",
   existingStripeSubscription = null,
-  subscriptionSnapshots = null
+  subscriptionSnapshots = null,
+  searchedStripeCustomerId = null
 } = {}) {
   const state = {
     stripeRequests: [],
@@ -277,6 +278,15 @@ function loadBillingRouter({
       };
     }
 
+    if (String(url).includes("/customers/search?")) {
+      return {
+        ok: true,
+        json: async () => ({
+          data: searchedStripeCustomerId ? [{ id: searchedStripeCustomerId }] : []
+        })
+      };
+    }
+
     if (String(url).includes("/subscriptions?customer=")) {
       return {
         ok: true,
@@ -406,9 +416,44 @@ test("billing checkout ignores client currency and uses verified region currency
     assert.ok(checkoutRequest, "Stripe checkout request should be created");
     assert.equal(checkoutRequest.body.get("line_items[0][price]"), "price_month_cad");
     assert.equal(checkoutRequest.body.get("line_items[1][price]"), "price_addon_month_cad");
+    assert.equal(checkoutRequest.body.get("allow_promotion_codes"), "true");
     assert.equal(checkoutRequest.body.get("metadata[currency]"), "cad");
     assert.equal(checkoutRequest.body.get("metadata[country_code]"), "ca");
     assert.equal(checkoutRequest.body.get("metadata[currency_source]"), "ip_geolocation");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout reuses an existing Stripe customer found by metadata search before creating a new one", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    searchedStripeCustomerId: "cus_existing_456"
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 0
+      });
+
+    assert.equal(res.status, 200);
+
+    const customerSearchRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).includes("/customers/search?")
+    );
+    const customerCreateRequests = fixture.state.stripeRequests.filter((entry) =>
+      String(entry.url).endsWith("/customers")
+    );
+    const checkoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+
+    assert.ok(customerSearchRequest, "Stripe customer metadata search should run before customer creation");
+    assert.equal(customerCreateRequests.length, 0, "existing Stripe customer should be reused");
+    assert.equal(checkoutRequest?.body?.get("customer"), "cus_existing_456");
   } finally {
     fixture.cleanup();
   }
@@ -556,6 +601,37 @@ test("billing checkout blocks new sessions for past-due subscriptions", async ()
 
     assert.equal(res.status, 409);
     assert.match(String(res.body?.error || ""), /past-due stripe subscription/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout blocks unpaid subscriptions with a targeted payment-update message", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [
+      {
+        isPaid: false,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        isCanceledWithRemainingAccess: false,
+        effectiveStatus: "unpaid",
+        stripeSubscriptionId: "sub_unpaid_123"
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 0
+      });
+
+    assert.equal(res.status, 409);
+    assert.match(String(res.body?.error || ""), /unpaid stripe subscription/i);
+    assert.match(String(res.body?.error || ""), /update the payment method/i);
   } finally {
     fixture.cleanup();
   }

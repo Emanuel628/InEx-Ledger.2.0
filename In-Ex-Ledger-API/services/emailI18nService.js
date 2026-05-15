@@ -484,6 +484,30 @@ const BILLING_LIFECYCLE = {
       text: ({ summary, invoiceUrl }) =>
         `Votre paiement InEx Ledger a été reçu.\n\n${summary}${invoiceUrl ? `\n\nFacture : ${invoiceUrl}` : ""}`
     }
+  },
+  payment_failed: {
+    en: {
+      subject: "Your InEx Ledger payment needs attention",
+      eyebrow: "InEx Ledger billing",
+      heading: "Payment failed",
+      body: "We could not process your latest subscription payment. Update your payment method in Stripe to keep Pro access from being interrupted.",
+      detailsLabel: "Payment details",
+      actionLabel: "Update payment",
+      footer: "Open the billing page to review the failed invoice and retry with an updated payment method.",
+      text: ({ summary, billingUrl, invoiceUrl }) =>
+        `Your InEx Ledger subscription payment failed.\n\n${summary}\n\nUpdate payment: ${billingUrl}${invoiceUrl ? `\n\nInvoice: ${invoiceUrl}` : ""}`
+    },
+    fr: {
+      subject: "Votre paiement InEx Ledger nécessite votre attention",
+      eyebrow: "Facturation InEx Ledger",
+      heading: "Échec du paiement",
+      body: "Nous n'avons pas pu traiter votre dernier paiement d'abonnement. Mettez à jour votre mode de paiement dans Stripe pour éviter une interruption de l'accès Pro.",
+      detailsLabel: "Détails du paiement",
+      actionLabel: "Mettre à jour le paiement",
+      footer: "Ouvrez la page de facturation pour consulter la facture échouée et réessayer avec un mode de paiement mis à jour.",
+      text: ({ summary, billingUrl, invoiceUrl }) =>
+        `Le paiement de votre abonnement InEx Ledger a échoué.\n\n${summary}\n\nMettre à jour le paiement : ${billingUrl}${invoiceUrl ? `\n\nFacture : ${invoiceUrl}` : ""}`
+    }
   }
 };
 

@@ -405,6 +405,25 @@ async function findBusinessByStripeCustomerId(stripeCustomerId) {
   return result.rows[0]?.business_id || null;
 }
 
+function escapeStripeSearchLiteral(value) {
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'");
+}
+
+async function findStripeCustomerByBusinessId(businessId) {
+  if (!businessId) {
+    return null;
+  }
+
+  const query = `metadata['business_id']:'${escapeStripeSearchLiteral(businessId)}'`;
+  const payload = await stripeGet(
+    `/customers/search?query=${encodeURIComponent(query)}&limit=1`
+  );
+  const customers = Array.isArray(payload?.data) ? payload.data : [];
+  return customers[0] || null;
+}
+
 async function ensureStripeCustomer(businessId, user) {
   await getSubscriptionSnapshotForBusiness(businessId);
 
@@ -426,6 +445,27 @@ async function ensureStripeCustomer(businessId, user) {
     if (stripeCustomerId) {
       await client.query("COMMIT");
       return stripeCustomerId;
+    }
+
+    try {
+      const existingStripeCustomer = await findStripeCustomerByBusinessId(businessId);
+      if (existingStripeCustomer?.id) {
+        await client.query(
+          `UPDATE business_subscriptions
+              SET stripe_customer_id = $2,
+                  updated_at = NOW()
+            WHERE business_id = $1`,
+          [businessId, existingStripeCustomer.id]
+        );
+        await client.query("COMMIT");
+        return existingStripeCustomer.id;
+      }
+    } catch (searchErr) {
+      logWarn("Stripe customer metadata search failed before create", {
+        businessId,
+        userId: user?.id,
+        err: searchErr.message
+      });
     }
 
     const customer = await stripeRequest("/customers", {
@@ -791,7 +831,9 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
     const blockingStatus = getCheckoutBlockingStatus(subscription);
     if (subscription.stripeSubscriptionId && (blockingStatus === "past_due" || blockingStatus === "unpaid")) {
       return res.status(409).json({
-        error: "This account already has a past-due Stripe subscription. Resolve the existing billing issue in Subscription before starting another checkout."
+        error: blockingStatus === "unpaid"
+          ? "This account has an unpaid Stripe subscription. Update the payment method in Subscription before starting another checkout."
+          : "This account already has a past-due Stripe subscription. Resolve the existing billing issue in Subscription before starting another checkout."
       });
     }
 
@@ -851,6 +893,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
     const sessionPayload = {
       mode: "subscription",
       customer: customerId,
+      allow_promotion_codes: true,
       "line_items[0][price]": priceSelection.basePriceId,
       "line_items[0][quantity]": 1,
       success_url: buildAppUrl("/subscription?checkout=success"),
@@ -1442,12 +1485,23 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
         }
       }
     } else if (event.type === "invoice.payment_failed") {
-      // Stripe also fires customer.subscription.updated (status → past_due) which
-      // handles the DB sync. Log here for observability and alerting.
       const customerId = object?.customer;
       const businessId = customerId
         ? await findBusinessByStripeCustomerId(customerId)
         : null;
+      if (businessId) {
+        await sendBillingEmail({
+          businessId,
+          kind: "payment_failed",
+          details: [
+            { label: "Amount due", value: formatBillingCurrencyAmount(object?.amount_due, object?.currency) },
+            { label: "Invoice", value: String(object?.number || object?.id || "-") },
+            { label: "Attempted on", value: formatDateLabel(object?.created ? new Date(object.created * 1000) : null) }
+          ],
+          actionUrl: buildAppUrl("/subscription"),
+          invoiceUrl: object?.hosted_invoice_url || object?.invoice_pdf || ""
+        });
+      }
       logWarn(
         "Stripe invoice.payment_failed — business:",
         businessId || "unknown",
