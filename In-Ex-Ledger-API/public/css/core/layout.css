@@ -1671,7 +1671,6 @@ body[data-theme="light"] select option {
   }
 
   .topbar-hamburger {
-    display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
     width: 38px !important;
