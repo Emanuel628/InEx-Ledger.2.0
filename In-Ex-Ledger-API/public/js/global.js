@@ -142,6 +142,11 @@ function renderCanonicalTopbarNavigation() {
 
   const currentRoute = normalizeRoute(window.location.pathname);
   document.querySelectorAll(".app-topbar .topbar-nav").forEach((nav) => {
+    if (nav.dataset.publicNav === "true") {
+      nav.classList.add("is-ready");
+      return;
+    }
+    
     nav.innerHTML = links.map((link) => {
       const activeClass = currentRoute === link.route ? " is-active" : "";
       const i18nAttr = link.i18n ? ` data-i18n="${link.i18n}"` : "";
