@@ -20,24 +20,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof enforceTrial === "function") enforceTrial();
 
   wireAccountForm();
-  wireBottomAddButton();
   wireAccountTypeChips();
   wireAccountDeleteModal();
   await renderAccountList();
   setInterval(() => refreshAccountGhosts(), 5 * 60 * 1000);
   updateReceiptsDot();
 });
-
-function wireBottomAddButton() {
-  const btn = document.getElementById("showAccountFormBottom");
-  const formContainer = document.getElementById("accountFormContainer");
-  const nameInput = document.getElementById("account-name");
-  btn?.addEventListener("click", () => {
-    if (formContainer) formContainer.hidden = false;
-    nameInput?.focus();
-    formContainer?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  });
-}
 
 function wireAccountTypeChips() {
   const chips = document.querySelectorAll("[data-chip-type]");
@@ -142,20 +130,6 @@ function wireAccountForm() {
         submitButton.disabled = false;
       }
     }
-  });
-}
-
-function populateAccountTypes(selectElement) {
-  if (!selectElement) {
-    return;
-  }
-
-  selectElement.innerHTML = `<option value="">${escapeHtml(tx("accounts_select_type"))}</option>`;
-  ACCOUNT_TYPES.forEach((type) => {
-    const option = document.createElement("option");
-    option.value = type.value;
-    option.textContent = tx(type.labelKey);
-    selectElement.appendChild(option);
   });
 }
 

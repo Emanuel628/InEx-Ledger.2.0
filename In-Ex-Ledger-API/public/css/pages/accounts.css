@@ -34,10 +34,6 @@
   filter: saturate(1.02);
 }
 
-.accounts-add-btn--bottom {
-  min-width: 220px;
-}
-
 .account-form-card,
 .accounts-list .account-card,
 .accounts-empty {
@@ -208,12 +204,6 @@
 
 .accounts-loading {
   text-align: center;
-}
-
-.accounts-bottom-bar {
-  display: flex;
-  justify-content: flex-start;
-  margin-top: 18px;
 }
 
 .accounts-toast {

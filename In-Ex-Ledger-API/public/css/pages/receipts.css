@@ -16,7 +16,6 @@
   display: none;
 }
 
-.upload-btn,
 .receipt-primary-btn {
   min-height: 48px;
   padding: 0 18px;
@@ -31,7 +30,6 @@
   transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
 }
 
-.upload-btn:hover,
 .receipt-primary-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 18px 30px rgba(36, 109, 187, 0.22);
@@ -207,11 +205,6 @@
   cursor: pointer;
   color: var(--accent2);
   text-decoration: none;
-}
-
-.receipt-file-missing,
-.receipt-transaction-label {
-  color: var(--ink2);
 }
 
 .receipt-transaction-link:hover {
@@ -454,7 +447,6 @@
     align-items: stretch;
   }
 
-  .upload-btn,
   .receipt-secondary-btn,
   .receipt-primary-btn,
   .receipt-link-btn,
@@ -537,7 +529,6 @@
     min-width: 760px !important;
   }
 
-  .upload-btn,
   .receipt-secondary-btn,
   .receipt-primary-btn,
   .receipt-link-btn,

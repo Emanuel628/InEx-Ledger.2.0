@@ -54,28 +54,6 @@ body {
   min-height: 100vh;
 }
 
-main {
-  max-width: 480px;
-  margin: 80px auto 0;
-  padding: 0 16px;
-}
-
-.auth-card {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  padding: 36px 40px;
-  border: 0.5px solid var(--border);
-  box-shadow: var(--shadow-card);
-  margin: 0;
-}
-
-.auth-card h2 {
-  font-size: 20px;
-  font-weight: 500;
-  color: var(--ink);
-  margin-bottom: 24px !important;
-}
-
 .auth-form {
   display: flex;
   flex-direction: column;
@@ -220,10 +198,6 @@ main {
 
 footer {
   margin-top: 40px;
-}
-
-body {
-  background: var(--page-bleed);
 }
 
 .auth-header {

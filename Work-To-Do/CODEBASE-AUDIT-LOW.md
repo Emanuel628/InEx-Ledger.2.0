@@ -162,12 +162,12 @@ Reason for this exact order:
 
 ### Dead code, dead CSS, stale logging
 
-- [ ] 15-30 min - Remove or wire up obviously dead Accounts CSS/JS affordances.
+- [x] 15-30 min - Remove or wire up obviously dead Accounts CSS/JS affordances.
   Files: `In-Ex-Ledger-API/public/css/pages/accounts.css`, `public/js/accounts.js`
   Group: Accounts dead UI
   Covers: `.accounts-add-btn--bottom`, `.accounts-bottom-bar`, missing `showAccountFormBottom`, unused `populateAccountTypes()`
 
-- [ ] 15-30 min - Remove dead Categories and Receipts CSS selectors that no longer match generated markup.
+- [x] 15-30 min - Remove dead Categories and Receipts CSS selectors that no longer match generated markup.
   Files: `In-Ex-Ledger-API/public/css/pages/categories.css`, `public/css/pages/receipts.css`
   Group: Dead page CSS
   Covers: `.category-item-pills`, `.categories-secondary-btn`, `.empty-add-btn`, `.receipt-file-missing`, `.receipt-transaction-label`, `.upload-btn`
@@ -177,7 +177,7 @@ Reason for this exact order:
   Group: Console cleanup
   Covers: protected-page logs, i18n language-change logs
 
-- [ ] 15-30 min - Remove dead CSS and duplicate declarations in auth stylesheets.
+- [x] 15-30 min - Remove dead CSS and duplicate declarations in auth stylesheets.
   Files: `login.css`, `register.css`, `onboarding.css`, `verify-email.css`, `forgot-password.css`, `reset-password.css`
   Group: Auth CSS cleanup
   Covers: duplicated `body/main/auth-card` rules, imported boilerplate duplication
