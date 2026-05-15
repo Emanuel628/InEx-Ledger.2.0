@@ -293,30 +293,13 @@ main.help-main {
 }
 
 .support-contact-pill {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 40px;
-  padding: 6px 12px 6px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
   text-decoration: none;
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
-  transition: background 160ms ease, transform 160ms ease;
+  cursor: pointer;
 }
 
 .support-contact-pill:hover,
 .support-contact-pill:focus-visible {
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
   text-decoration: none;
-  transform: translateY(-1px);
-}
-
 }
 
 
