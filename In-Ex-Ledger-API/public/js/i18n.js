@@ -58,7 +58,6 @@ function setCurrentLanguage(lang) {
   localStorage.setItem('lb_language', normalized);
   window.LUNA_LANGUAGE = normalized;
   applyTranslations(normalized);
-  console.log('[i18n] language:', normalized);
   return normalized;
 }
 
@@ -221,7 +220,6 @@ function applyTranslations(languageOverride) {
     node.setAttribute('title', t(key));
   });
 
-  console.log('[i18n] language:', language);
   if (typeof window !== 'undefined' && typeof CustomEvent === 'function') {
     window.dispatchEvent(
       new CustomEvent('lunaLanguageChanged', { detail: language })
@@ -394,6 +392,8 @@ const TRANSLATIONS = {
     auth_sign_out: 'Sign out',
     auth_error_create_business: 'Unable to create business.',
     auth_error_switch_business: 'Unable to switch businesses.',
+    filters_advanced_unavailable: 'Advanced filter presets are not available yet.',
+    tax_widget_controls_unavailable: 'Tax scenario controls are not available yet.',
     login_need_account: "Don't have an account?",
     login_create_account: 'Create one',
     forgot_password_title: 'Forgot your password?',
@@ -1669,6 +1669,8 @@ const TRANSLATIONS = {
     auth_sign_out: 'Cerrar sesión',
     auth_error_create_business: 'No se pudo crear el negocio.',
     auth_error_switch_business: 'No se pudo cambiar de negocio.',
+    filters_advanced_unavailable: 'Los filtros avanzados todavia no estan disponibles.',
+    tax_widget_controls_unavailable: 'Los controles de escenarios fiscales todavia no estan disponibles.',
     login_need_account: '¿Aún no tienes cuenta?',
     login_create_account: 'Crear una',
     forgot_password_title: '¿Olvidaste tu contraseña?',
@@ -2928,6 +2930,8 @@ const TRANSLATIONS = {
     auth_sign_out: 'Se déconnecter',
     auth_error_create_business: 'Impossible de créer l’entreprise.',
     auth_error_switch_business: 'Impossible de changer d’entreprise.',
+    filters_advanced_unavailable: 'Les préréglages de filtres avancés ne sont pas encore disponibles.',
+    tax_widget_controls_unavailable: 'Les contrôles de scénarios fiscaux ne sont pas encore disponibles.',
     login_need_account: 'Vous n\'avez pas de compte ?',
     login_create_account: 'Créer un compte',
     forgot_password_title: 'Mot de passe oublié ?',

@@ -187,7 +187,7 @@ router.delete("/:id", async (req, res) => {
 
     res.json({ message: "Account deleted successfully." });
   } catch (err) {
-    logError("DELETE account error:", err.message);
+    logError("DELETE account error:", err.stack || err);
     res.status(500).json({ error: "Delete failed." });
   }
 });

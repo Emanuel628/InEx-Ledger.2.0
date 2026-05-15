@@ -4,6 +4,7 @@ const { migrationStats } = require("../db.js");
 const { getRateLimiterHealth } = require("../middleware/rateLimiter.js");
 const { getReceiptStorageStatus } = require("../services/receiptStorage.js");
 const { buildDiagnostics } = require("../services/diagnosticsService.js");
+const { logError } = require("../utils/logger.js");
 
 const router = express.Router();
 
@@ -40,6 +41,7 @@ router.get("/diagnostics", requireAuth, (req, res) => {
     });
     res.json(diagnostics);
   } catch (err) {
+    logError("GET /api/system/diagnostics error:", err.stack || err);
     res.status(500).json({ error: "Failed to load diagnostics." });
   }
 });

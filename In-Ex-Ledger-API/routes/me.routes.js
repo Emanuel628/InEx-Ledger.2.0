@@ -1,7 +1,6 @@
 const express = require("express");
 const crypto = require("crypto");
 const fs = require("fs");
-const path = require("path");
 const bcrypt = require("bcrypt");
 const rateLimit = require("express-rate-limit");
 const { pool } = require("../db.js");

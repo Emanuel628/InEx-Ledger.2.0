@@ -100,7 +100,6 @@ let transactionBusinessContext = {
   activeBusinessId: "",
   businesses: []
 };
-console.log("[AUTH] Protected page loaded:", window.location.pathname);
 
 let legacyTransactionStoragePurged = false;
 

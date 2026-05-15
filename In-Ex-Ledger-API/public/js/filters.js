@@ -2,11 +2,25 @@ requireAuthAndTier("v1");
 
 function ensureV1Filters() {
   if (effectiveTier() !== "v1") {
-    window.location.href = "upgrade";
+    window.location.href = "/upgrade";
     return false;
   }
 
   return true;
+}
+
+function showFiltersUnavailableNotice() {
+  const message = typeof t === "function"
+    ? t("filters_advanced_unavailable")
+    : "Advanced filter presets are not available yet.";
+
+  if (typeof showSettingsToast === "function") {
+    showSettingsToast(message);
+    return;
+  }
+  if (typeof showAccountMenuNotice === "function") {
+    showAccountMenuNotice(message);
+  }
 }
 
 function wireFilterActions() {
@@ -18,7 +32,7 @@ function wireFilterActions() {
     applyBtn.addEventListener("click", (e) => {
       e.preventDefault();
       if (!ensureV1Filters()) return;
-      console.log("Applying advanced filters...");
+      showFiltersUnavailableNotice();
     });
   }
 
@@ -26,7 +40,7 @@ function wireFilterActions() {
     saveBtn.addEventListener("click", (e) => {
       e.preventDefault();
       if (!ensureV1Filters()) return;
-      console.log("Saving advanced filter...");
+      showFiltersUnavailableNotice();
     });
   }
 
@@ -34,7 +48,7 @@ function wireFilterActions() {
     clearBtn.addEventListener("click", (e) => {
       e.preventDefault();
       if (!ensureV1Filters()) return;
-      console.log("Clearing filter presets...");
+      showFiltersUnavailableNotice();
     });
   }
 }

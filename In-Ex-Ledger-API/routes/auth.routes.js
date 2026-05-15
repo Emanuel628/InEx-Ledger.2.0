@@ -91,7 +91,7 @@ const MFA_EMAIL_CODE_EXPIRY_MS = MFA_EMAIL_CODE_EXPIRY_MINUTES * 60 * 1000;
 const REFRESH_TOKEN_BYTE_LENGTH = 48;
 const ACCESS_TOKEN_EXPIRY_SECONDS = Number(process.env.ACCESS_TOKEN_EXPIRY_SECONDS) || 15 * 60;
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS) || 12;
-const MAX_MFA_ATTEMPTS = 8;
+const MAX_MFA_ATTEMPTS = Math.max(3, Number(process.env.MAX_MFA_ATTEMPTS) || 8);
 const MFA_REAUTH_TOKEN_EXPIRY_SECONDS = Number(process.env.MFA_REAUTH_TOKEN_EXPIRY_SECONDS) || 5 * 60;
 
 class EmailNotVerifiedError extends Error {
@@ -175,7 +175,7 @@ async function consumePasswordResetToken(token) {
   await pool.query("DELETE FROM password_reset_tokens WHERE expires_at <= NOW()");
   const result = await pool.query(
     `DELETE FROM password_reset_tokens
-      -- TODO(2026-07): remove token::text fallback after all pre-migration UUID reset tokens have expired.
+      -- Legacy UUID token rows can still exist from the pre-hash migration window.
       WHERE (token_hash = $1 OR token::text = $2)
         AND expires_at > NOW()
       RETURNING email`,
