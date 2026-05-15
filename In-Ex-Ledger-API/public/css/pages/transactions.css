@@ -3867,3 +3867,42 @@ tr.tx-highlight {
 .tx-bulk-cancel-btn:hover {
   background: rgba(255,255,255,0.08);
 }
+
+/* Mobile cleanup: global layout owns topbar/sidebar; Transactions owns only page content */
+@media (max-width: 640px) {
+  .transactions-toolbar-tools,
+  .transactions-toolbar-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .transactions-toolbar-controls > *,
+  .toolbar-search,
+  .toolbar-search input,
+  .toolbar-select,
+  .toolbar-import-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .transactions-table {
+    min-width: 760px;
+  }
+
+  .tx-pagination {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tx-page-jump {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+}
