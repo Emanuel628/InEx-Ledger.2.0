@@ -337,7 +337,7 @@ function injectMobileDesktopLink() {
 }
 
 function injectDesktopMobileLink() {
-  if (!isMobileDevice() || !isDesktopViewRequested()) {
+  if (!isDesktopViewRequested()) {
     return;
   }
 
