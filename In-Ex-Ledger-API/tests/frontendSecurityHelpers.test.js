@@ -170,3 +170,45 @@ test("jwe-utils rejects mismatched server key metadata instead of masking it", a
     /Unexpected export public key algorithm/
   );
 });
+
+test("auth trial helpers ignore tampered local trial flags when server subscription state says trial expired", () => {
+  const storage = {
+    _store: new Map(),
+    getItem(key) {
+      return this._store.has(key) ? this._store.get(key) : null;
+    },
+    setItem(key, value) {
+      this._store.set(key, String(value));
+    },
+    removeItem(key) {
+      this._store.delete(key);
+    }
+  };
+  const context = loadScript("public/js/auth.js", {
+    window: {
+      location: { href: "/" }
+    },
+    document: {
+      addEventListener() {},
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      body: {
+        appendChild() {},
+        removeChild() {}
+      }
+    },
+    localStorage: storage,
+    sessionStorage: storage
+  });
+
+  storage.setItem("luna_trial_expired", "false");
+  storage.setItem("luna_trial_ends_at", String(Date.now() + 30 * 24 * 60 * 60 * 1000));
+  storage.setItem("lb_subscription", JSON.stringify({
+    effectiveTier: "free",
+    effectiveStatus: "trial_expired",
+    trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  }));
+
+  assert.equal(context.isTrialValid(), false);
+  assert.equal(context.effectiveTier(), "free");
+});

@@ -7,7 +7,7 @@ const express = require("express");
 const request = require("supertest");
 
 const EXPORTS_ROUTE_PATH = require.resolve("../routes/exports.routes.js");
-const { buildPdfExport } = require("../services/pdfGeneratorService.js");
+const { buildPdfExport, __private: pdfPrivate } = require("../services/pdfGeneratorService.js");
 
 function buildTestPdf() {
   return buildPdfExport({
@@ -324,6 +324,30 @@ test("buildPdfExport writes literal Helvetica text commands instead of UTF-16 he
   assert.match(pdf, /\(Invoice \\\(April\\\) \| Paye\.\.\.\) Tj/);
   assert.doesNotMatch(pdf, /<FEFF/i);
   assert.doesNotMatch(pdf, /[^\x00-\x7F]/);
+});
+
+test("buildPdfExport disables automatic tax estimates in favor of manual review messaging", () => {
+  const pdf = buildTestPdf().toString("latin1");
+
+  assert.match(pdf, /\(Tax Review Status\) Tj/);
+  assert.match(pdf, /\(Tax calculation: Manual review required\) Tj/);
+  assert.match(pdf, /\(Automatic tax estimation is\) Tj/);
+  assert.match(pdf, /\(disabled\. Review income, expenses,\) Tj/);
+  assert.doesNotMatch(pdf, /\(Estimated tax:/);
+});
+
+test("pdf totals exclude transfer-like rows from expense calculations", () => {
+  const totals = pdfPrivate.calculateTotals([
+    { type: "income", amount: "1000.00" },
+    { type: "expense", amount: "250.00" },
+    { type: "transfer", amount: "900.00" },
+    { type: "refund", amount: "75.00" }
+  ]);
+
+  assert.equal(totals.income, 1000);
+  assert.equal(totals.expenses, 250);
+  assert.equal(totals.netProfit, 750);
+  assert.equal(totals.estimatedTax, null);
 });
 
 test("exports generate route returns the inline PDF buffer and stores only the redacted copy", async () => {

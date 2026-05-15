@@ -110,10 +110,9 @@ router.post("/", async (req, res) => {
       ]
     );
 
-    await client.query("COMMIT");
-    await materializeTemplateRuns(businessId, result.rows[0].id);
+    await materializeTemplateRuns(businessId, result.rows[0].id, { client });
 
-    const refreshed = await pool.query(
+    const refreshed = await client.query(
       `SELECT id, business_id, account_id, category_id, amount, type, description, note,
               cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
               created_at, updated_at
@@ -121,6 +120,7 @@ router.post("/", async (req, res) => {
       [result.rows[0].id, businessId]
     );
 
+    await client.query("COMMIT");
     res.status(201).json(mapRecurringRow(refreshed.rows[0]));
   } catch (err) {
     await client.query("ROLLBACK");
@@ -202,9 +202,20 @@ router.put("/:id", async (req, res) => {
       ]
     );
 
+    await materializeTemplateRuns(businessId, req.params.id, { client });
+
+    const refreshed = await client.query(
+      `SELECT id, business_id, account_id, category_id, amount, type, description, note,
+              cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
+              created_at, updated_at
+       FROM recurring_transactions
+       WHERE id = $1 AND business_id = $2
+       LIMIT 1`,
+      [req.params.id, businessId]
+    );
+
     await client.query("COMMIT");
-    await materializeTemplateRuns(businessId, req.params.id);
-    res.json(mapRecurringRow(result.rows[0]));
+    res.json(mapRecurringRow(refreshed.rows[0] || result.rows[0]));
   } catch (err) {
     await client.query("ROLLBACK");
     logError("PUT /recurring/:id error:", err);

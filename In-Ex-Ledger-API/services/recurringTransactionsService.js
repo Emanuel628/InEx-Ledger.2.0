@@ -189,10 +189,14 @@ async function processDueRecurringTransactions(businessId) {
   }
 }
 
-async function materializeTemplateRuns(businessId, templateId) {
-  const client = await pool.connect();
+async function materializeTemplateRuns(businessId, templateId, options = {}) {
+  const externalClient = options?.client || null;
+  const client = externalClient || await pool.connect();
+  const managesTransaction = !externalClient;
   try {
-    await client.query("BEGIN");
+    if (managesTransaction) {
+      await client.query("BEGIN");
+    }
 
     const templateResult = await client.query(
       `SELECT id, business_id, account_id, category_id, amount, type, description, note,
@@ -205,13 +209,17 @@ async function materializeTemplateRuns(businessId, templateId) {
     );
 
     if (!templateResult.rowCount) {
-      await client.query("ROLLBACK");
+      if (managesTransaction) {
+        await client.query("ROLLBACK");
+      }
       return;
     }
 
     const template = templateResult.rows[0];
     if (!template.active) {
-      await client.query("COMMIT");
+      if (managesTransaction) {
+        await client.query("COMMIT");
+      }
       return;
     }
 
@@ -311,13 +319,19 @@ async function materializeTemplateRuns(businessId, templateId) {
       ]
     );
 
-    await client.query("COMMIT");
+    if (managesTransaction) {
+      await client.query("COMMIT");
+    }
     return createdAny;
   } catch (error) {
-    await client.query("ROLLBACK");
+    if (managesTransaction) {
+      await client.query("ROLLBACK");
+    }
     throw error;
   } finally {
-    client.release();
+    if (managesTransaction) {
+      client.release();
+    }
   }
 }
 

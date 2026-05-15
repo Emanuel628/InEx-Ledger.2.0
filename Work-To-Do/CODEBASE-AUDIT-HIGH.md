@@ -125,7 +125,7 @@ Rules used here:
 
 ### Data integrity and at-rest protections
 
-- [ ] Half day - Remove the plain-text transaction description storage path or fully document why encrypted descriptions are duplicated in plain text.
+- [x] Half day - Remove the plain-text transaction description storage path or fully document why encrypted descriptions are duplicated in plain text.
   Files: `In-Ex-Ledger-API/routes/transactions.routes.js`, related transaction storage code
   Group: Encryption consistency
   Covers: plaintext plus encrypted description stored simultaneously
@@ -135,7 +135,7 @@ Rules used here:
   Group: Privacy client state
   Covers: localStorage writes on network failure, swallowed server error messages in delete flow
 
-- [ ] Half day - Move recurring template creation and initial materialization into a single consistent unit or provide a compensating recovery path.
+- [x] Half day - Move recurring template creation and initial materialization into a single consistent unit or provide a compensating recovery path.
   Files: `In-Ex-Ledger-API/routes/recurring.routes.js`
   Group: Recurring consistency
   Covers: template committed before `materializeTemplateRuns`, 500 after partial success
@@ -145,7 +145,7 @@ Rules used here:
   Group: Core route gating
   Covers: `/arap-summary` `req.business` crash, dead recurring pre-load guard, `/exports/history` guard falling through on DB error
 
-- [ ] Half day - Make trial enforcement server-authoritative instead of localStorage-authoritative.
+- [x] Half day - Make trial enforcement server-authoritative instead of localStorage-authoritative.
   Files: `In-Ex-Ledger-API/public/js/trial.js`, backend subscription/trial enforcement paths
   Group: Trial entitlement integrity
   Covers: editable localStorage trial expiry, undeclared globals, fresh private-window trial reset
@@ -171,7 +171,7 @@ Rules used here:
   Group: Billing environment safety
   Covers: authenticated self-upgrade path via `POST /api/billing/mock-v1`
 
-- [ ] 1 day+ - Rework billing checkout idempotency and state guards so retries do not create duplicate checkout sessions and `past_due` accounts cannot open conflicting billing flows.
+- [x] 1 day+ - Rework billing checkout idempotency and state guards so retries do not create duplicate checkout sessions and `past_due` accounts cannot open conflicting billing flows.
   Files: `In-Ex-Ledger-API/routes/billing.routes.js`
   Group: Billing session lifecycle
   Covers: defeated idempotency key, second checkout exposure for `past_due`
@@ -181,7 +181,7 @@ Rules used here:
   Group: Region and compliance
   Covers: header spoofing, DB mutation on GET, no CSRF, tax/compliance side effects
 
-- [ ] 1 day+ - Correct PDF tax estimation logic before treating it as real user-facing tax guidance.
+- [x] 1 day+ - Correct PDF tax estimation logic before treating it as real user-facing tax guidance.
   Files: `In-Ex-Ledger-API/public/js/pdf_export.js`
   Group: Tax estimate correctness
   Covers: flat US 24 percent estimate, HST/GST used as Canadian income tax, non-income transactions counted as expenses

@@ -395,6 +395,14 @@ function tryEncryptDescription(description) {
   }
 }
 
+function buildStoredDescriptionColumns(description) {
+  const encryptedDescription = tryEncryptDescription(description);
+  return {
+    description: encryptedDescription ? null : (description || null),
+    descriptionEncrypted: encryptedDescription
+  };
+}
+
 async function assertUnlockedBusinessDates(businessId, ...dates) {
   const lockState = await loadAccountingLockState(pool, businessId);
   dates.filter(Boolean).forEach((date) => assertDateUnlocked(lockState, date));
@@ -570,7 +578,7 @@ router.post("/", async (req, res) => {
     const payerName = type === "income" ? (String(req.body.payer_name || "").trim().slice(0, 200) || null) : null;
     const taxFormType = type === "income" && VALID_TAX_FORMS.has(req.body.tax_form_type) ? req.body.tax_form_type : null;
     await assertUnlockedBusinessDates(businessId, date);
-    const encryptedDescription = tryEncryptDescription(description);
+    const storedDescription = buildStoredDescriptionColumns(description);
 
     const accountCheck = await pool.query(
       "SELECT id FROM accounts WHERE id = $1 AND business_id = $2",
@@ -608,8 +616,8 @@ router.post("/", async (req, res) => {
         amount,
         type,
         cleared,
-        description || null,
-        encryptedDescription,
+        storedDescription.description,
+        storedDescription.descriptionEncrypted,
         date,
         note || null,
         validation.normalized.currency || businessTaxContext.currency,
@@ -681,7 +689,7 @@ router.put("/:id", async (req, res) => {
       return res.status(400).json({ error: "category_id is invalid" });
     }
 
-    const encryptedDescription = tryEncryptDescription(description);
+    const storedDescription = buildStoredDescriptionColumns(description);
     const payerName = type === "income" ? (String(req.body.payer_name || "").trim().slice(0, 200) || null) : null;
     const taxFormType = type === "income" && VALID_TAX_FORMS.has(req.body.tax_form_type) ? req.body.tax_form_type : null;
 
@@ -722,8 +730,8 @@ router.put("/:id", async (req, res) => {
         amount,
         type,
         cleared,
-        description || null,
-        encryptedDescription,
+        storedDescription.description,
+        storedDescription.descriptionEncrypted,
         date,
         note || null,
         validation.normalized.currency || businessTaxContext.currency,
@@ -1605,7 +1613,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         continue;
       }
 
-      const encryptedDescription = tryEncryptDescription(description);
+      const storedDescription = buildStoredDescriptionColumns(description);
       const taxTreatment = type === "income" ? "income" : "operating";
 
       try {
@@ -1621,8 +1629,8 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
             categoryId,
             amount,
             type,
-            description,
-            encryptedDescription,
+            storedDescription.description,
+            storedDescription.descriptionEncrypted,
             date,
             fallbackCurrency,
             taxTreatment,

@@ -1,8 +1,3 @@
-const CA_TAX_RATES = {
-  AB: 0.05, BC: 0.12, MB: 0.12, NB: 0.15, NL: 0.15, NS: 0.15,
-  NT: 0.05, NU: 0.05, ON: 0.13, PE: 0.15, QC: 0.14975, SK: 0.11, YT: 0.05
-};
-
 class PdfCanvas {
   constructor() {
     this.commands = [];
@@ -62,27 +57,26 @@ function pdfLiteral(text) {
   return `(${escapePdfLiteral(text)})`;
 }
 
-function resolvePdfTaxRate(region, province) {
-  const normalizedRegion = String(region || '').toLowerCase();
-  const normalizedProvince = String(province || '').toUpperCase();
-  if (normalizedRegion === 'ca') return CA_TAX_RATES[normalizedProvince] || 0.05;
-  return 0.24;
-}
-
 function calculateTotals(transactions, region, province) {
   let income = 0;
   let expenses = 0;
   (transactions || []).forEach((txn) => {
     const amount = Math.abs(Number(txn.amount) || 0);
-    if (String(txn.type || '').toLowerCase() === 'income') income += amount;
-    else expenses += amount;
+    const normalizedType = String(txn.type || '').toLowerCase();
+    if (normalizedType === 'income') {
+      income += amount;
+      return;
+    }
+    if (normalizedType === 'expense') {
+      expenses += amount;
+    }
   });
   const netProfit = income - expenses;
   return {
     income,
     expenses,
     netProfit,
-    estimatedTax: Math.max(0, netProfit) * resolvePdfTaxRate(region, province)
+    estimatedTax: null
   };
 }
 
@@ -352,7 +346,7 @@ function buildIdentityPage(data) {
 
   canvas.text(330, 555, labels.tax_estimate_title, 12, 'F2');
   buildKeyValueRows(canvas, 330, 535, [
-    [labels.estimated_tax, formatCurrencyForPdf(totals.estimatedTax, currency)]
+    [labels.estimated_tax, 'Manual review required']
   ]);
   wrapText(labels.estimated_tax_disclaimer, 34).forEach((line, index) => {
     canvas.text(330, 519 - (index * 14), line, 9);

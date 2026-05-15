@@ -31,6 +31,7 @@ function buildApp(router) {
 function loadTransactionsRouter(options = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = {
+    insertParams: null,
     updateParams: null,
     bulkDeleteUpdateCalled: false
   };
@@ -105,6 +106,29 @@ function loadTransactionsRouter(options = {}) {
               return options.isBusinessOwner === false
                 ? { rowCount: 0, rows: [] }
                 : { rowCount: 1, rows: [{ id: TEST_BUSINESS_ID }] };
+            }
+            if (/INSERT INTO transactions/i.test(sql)) {
+              state.insertParams = params;
+              return {
+                rowCount: 1,
+                rows: [
+                  {
+                    id: TEST_TRANSACTION_ID,
+                    account_id: params[2],
+                    category_id: params[3],
+                    amount: params[4],
+                    type: params[5],
+                    cleared: params[6],
+                    description: params[7],
+                    description_encrypted: params[8],
+                    date: params[9],
+                    note: params[10],
+                    currency: params[11],
+                    payer_name: params[22],
+                    tax_form_type: params[23]
+                  }
+                ]
+              };
             }
             if (/UPDATE transactions\s+SET account_id/i.test(sql)) {
               state.updateParams = params;
@@ -325,6 +349,64 @@ test("transactions PUT persists payer and tax form updates for income transactio
     assert.equal(fixture.state.updateParams[21], "1099-NEC");
     assert.equal(response.body.payer_name, "Freelance Marketplace");
     assert.equal(response.body.tax_form_type, "1099-NEC");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("transactions POST stores encrypted descriptions without duplicating plain text when encryption is available", async () => {
+  const fixture = loadTransactionsRouter();
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/transactions")
+      .send({
+        account_id: TEST_ACCOUNT_ID,
+        category_id: TEST_CATEGORY_ID,
+        amount: 1200,
+        type: "income",
+        date: "2026-05-02",
+        description: "Client B",
+        note: "Invoice",
+        payer_name: "Freelance Marketplace",
+        tax_form_type: "1099-NEC"
+      });
+
+    assert.equal(response.status, 201);
+    assert.ok(Array.isArray(fixture.state.insertParams));
+    assert.equal(fixture.state.insertParams[7], null);
+    assert.equal(fixture.state.insertParams[8], "enc:Client B");
+    assert.equal(response.body.description, "Client B");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("transactions PUT stores encrypted descriptions without duplicating plain text when encryption is available", async () => {
+  const fixture = loadTransactionsRouter();
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .put(`/api/transactions/${TEST_TRANSACTION_ID}`)
+      .send({
+        account_id: TEST_ACCOUNT_ID,
+        category_id: TEST_CATEGORY_ID,
+        amount: 4500,
+        type: "income",
+        date: "2026-05-02",
+        description: "Client B",
+        note: "Platform payout",
+        payer_name: "Freelance Marketplace",
+        tax_form_type: "1099-NEC"
+      });
+
+    assert.equal(response.status, 200);
+    assert.ok(Array.isArray(fixture.state.updateParams));
+    assert.equal(fixture.state.updateParams[5], null);
+    assert.equal(fixture.state.updateParams[6], "enc:Client B");
+    assert.equal(response.body.description, "Client B");
   } finally {
     fixture.cleanup();
   }

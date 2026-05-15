@@ -244,7 +244,8 @@ function loadBillingRouter({
   global.fetch = async (url, options = {}) => {
     state.stripeRequests.push({
       url,
-      body: options.body ? new URLSearchParams(options.body) : null
+      body: options.body ? new URLSearchParams(options.body) : null,
+      headers: options.headers || {}
     });
 
     if (String(url).includes("/prices/")) {
@@ -491,6 +492,70 @@ test("billing checkout blocks duplicate subscription creation when Stripe alread
 
     assert.equal(res.status, 409);
     assert.match(String(res.body?.error || ""), /already has an active|overlapping/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout reuses a deterministic Stripe idempotency key for identical retries", async () => {
+  const fixture = loadBillingRouter({ country: "Canada" });
+
+  try {
+    const first = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 1
+      });
+    const second = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 1
+      });
+
+    assert.equal(first.status, 200);
+    assert.equal(second.status, 200);
+
+    const checkoutRequests = fixture.state.stripeRequests.filter((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+
+    assert.equal(checkoutRequests.length, 2);
+    assert.equal(
+      checkoutRequests[0].headers["Idempotency-Key"],
+      checkoutRequests[1].headers["Idempotency-Key"]
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout blocks new sessions for past-due subscriptions", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [
+      {
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        isCanceledWithRemainingAccess: false,
+        effectiveStatus: "past_due",
+        stripeSubscriptionId: "sub_past_due_123"
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 0
+      });
+
+    assert.equal(res.status, 409);
+    assert.match(String(res.body?.error || ""), /past-due stripe subscription/i);
   } finally {
     fixture.cleanup();
   }

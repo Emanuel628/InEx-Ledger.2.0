@@ -8,10 +8,11 @@ const request = require("supertest");
 
 const ROUTE_PATH = require.resolve("../routes/recurring.routes.js");
 
-function loadRecurringRouter() {
+function loadRecurringRouter(options = {}) {
   const originalLoad = Module._load.bind(Module);
   const state = {
-    dbTouched: false
+    dbTouched: false,
+    queries: []
   };
 
   Module._load = function(requestName, parent, isMain) {
@@ -76,7 +77,12 @@ function loadRecurringRouter() {
             active: true
           }
         }),
-        materializeTemplateRuns: async () => ({}),
+        materializeTemplateRuns: async () => {
+          if (options.materializeError) {
+            throw options.materializeError;
+          }
+          return {};
+        },
         materializeNextTemplateRun: async () => ({ found: true, created: false }),
         verifyTemplateOwnership: async () => ({}),
         mapRecurringRow: (row) => row,
@@ -105,6 +111,7 @@ function loadRecurringRouter() {
         pool: {
           async query() {
             state.dbTouched = true;
+            state.queries.push(arguments[0]);
             return { rowCount: 0, rows: [] };
           },
           async connect() {
@@ -112,6 +119,45 @@ function loadRecurringRouter() {
             return {
               async query() {
                 state.dbTouched = true;
+                state.queries.push(arguments[0]);
+                const sql = String(arguments[0] || "");
+                if (/INSERT INTO recurring_transactions/i.test(sql)) {
+                  return {
+                    rowCount: 1,
+                    rows: [
+                      {
+                        id: "00000000-0000-4000-8000-000000000799",
+                        business_id: "00000000-0000-4000-8000-000000000712"
+                      }
+                    ]
+                  };
+                }
+                if (/SELECT id, business_id, account_id, category_id, amount, type, description, note/i.test(sql)) {
+                  return {
+                    rowCount: 1,
+                    rows: [
+                      {
+                        id: "00000000-0000-4000-8000-000000000799",
+                        business_id: "00000000-0000-4000-8000-000000000712",
+                        account_id: "00000000-0000-4000-8000-000000000713",
+                        category_id: "00000000-0000-4000-8000-000000000714",
+                        amount: 1,
+                        type: "expense",
+                        description: "Rent",
+                        note: null,
+                        cadence: "monthly",
+                        start_date: "2026-05-01",
+                        next_run_date: "2026-05-01",
+                        end_date: null,
+                        last_run_date: null,
+                        cleared_default: false,
+                        active: true,
+                        created_at: "2026-05-01T00:00:00.000Z",
+                        updated_at: "2026-05-01T00:00:00.000Z"
+                      }
+                    ]
+                  };
+                }
                 return { rowCount: 0, rows: [] };
               },
               release() {}
@@ -184,6 +230,24 @@ test("recurring DELETE rejects invalid ids before touching the database", async 
     assert.equal(response.status, 400);
     assert.match(response.body.error, /invalid recurring transaction id/i);
     assert.equal(fixture.state.dbTouched, false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("recurring POST rolls back template creation when initial materialization fails", async () => {
+  const fixture = loadRecurringRouter({
+    materializeError: new Error("materialization failed")
+  });
+  try {
+    const response = await request(fixture.app)
+      .post("/api/recurring")
+      .send({ amount: 1 });
+
+    assert.equal(response.status, 500);
+    assert.match(response.body.error, /materialization failed/i);
+    assert.equal(fixture.state.queries.some((sql) => /COMMIT/i.test(String(sql))), false);
+    assert.equal(fixture.state.queries.some((sql) => /ROLLBACK/i.test(String(sql))), true);
   } finally {
     fixture.cleanup();
   }

@@ -788,6 +788,13 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
     }
 
+    const blockingStatus = getCheckoutBlockingStatus(subscription);
+    if (subscription.stripeSubscriptionId && (blockingStatus === "past_due" || blockingStatus === "unpaid")) {
+      return res.status(409).json({
+        error: "This account already has a past-due Stripe subscription. Resolve the existing billing issue in Subscription before starting another checkout."
+      });
+    }
+
     if (subscription.isPaid && !subscription.cancelAtPeriodEnd && !subscription.isCanceledWithRemainingAccess) {
       return res.status(409).json({
         error: "This account already has paid Pro access or an overlapping paid period. Use Subscription to manage it instead of starting another checkout."
@@ -796,7 +803,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
 
     if (subscription.cancelAtPeriodEnd && subscription.stripeSubscriptionId && !subscription.isTrialing) {
       return res.status(409).json({
-        error: "This Pro subscription is already active and scheduled to end. Use Keep Pro active instead of starting a new checkout."
+        error: "This Pro subscription is already active and scheduled to end. Use Keep Pro active instead of starting another checkout."
       });
     }
 
@@ -1093,17 +1100,25 @@ function resolveCheckoutCurrency(subscription, billingContext) {
   return normalizeCurrency(billingContext?.currency || "usd");
 }
 
+function getCheckoutBlockingStatus(subscription = {}) {
+  return String(subscription?.effectiveStatus || subscription?.status || "").trim().toLowerCase();
+}
+
 function buildCheckoutIdempotencyKey({ businessId, billingInterval, currency, additionalBusinesses, userId }) {
-  return [
-    "checkout",
-    businessId,
-    billingInterval,
-    currency,
-    additionalBusinesses,
-    userId || "anonymous",
-    Date.now(),
-    crypto.randomUUID()
-  ].join(":");
+  const digest = crypto
+    .createHash("sha256")
+    .update([
+      "checkout",
+      businessId,
+      billingInterval,
+      currency,
+      String(additionalBusinesses),
+      userId || "anonymous"
+    ].join(":"))
+    .digest("hex")
+    .slice(0, 32);
+
+  return `checkout:${businessId}:${digest}`;
 }
 
 router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {

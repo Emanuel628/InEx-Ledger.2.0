@@ -18,13 +18,23 @@ function enforceTrial() {
 
 const DEFAULT_TRIAL_DAYS = 30;
 
+function getAuthoritativeTrialSubscription() {
+  if (window.__LUNA_ME__?.subscription && typeof window.__LUNA_ME__.subscription === "object") {
+    return window.__LUNA_ME__.subscription;
+  }
+
+  if (typeof getStoredSubscriptionState === "function") {
+    const stored = getStoredSubscriptionState();
+    if (stored && typeof stored === "object") {
+      return stored;
+    }
+  }
+
+  return null;
+}
 
 function startTrial(durationDays = DEFAULT_TRIAL_DAYS) {
-  const now = Date.now();
-  const endsAt = now + durationDays * 24 * 60 * 60 * 1000;
-
-  localStorage.setItem(TRIAL_EXPIRED_KEY, "false");
-  localStorage.setItem(TRIAL_ENDS_AT_KEY, endsAt.toString());
+  return durationDays;
 }
 
 function formatTrialRemaining() {
@@ -50,8 +60,13 @@ function formatTrialRemaining() {
 }
 
 function getTrialRemaining() {
-  const endsAt = Number(localStorage.getItem(TRIAL_ENDS_AT_KEY));
-  if (!endsAt) {
+  const subscription = getAuthoritativeTrialSubscription();
+  if (!subscription || subscription.effectiveStatus !== "trialing" || !subscription.trialEndsAt) {
+    return null;
+  }
+
+  const endsAt = new Date(subscription.trialEndsAt).getTime();
+  if (!Number.isFinite(endsAt)) {
     return null;
   }
 

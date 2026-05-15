@@ -10,7 +10,7 @@ const PDF_LABELS = {
     entity_section_title: 'Entity Summary',
     reporting_section_title: 'Reporting Metadata',
     financial_summary_title: 'Financial Summary',
-    tax_estimate_title: 'Tax Estimate',
+    tax_estimate_title: 'Tax Review Status',
     review_flags_title: 'Quick Review Flags',
     legal_name: 'Legal business name',
     business_name: 'Operating name (DBA)',
@@ -34,8 +34,8 @@ const PDF_LABELS = {
     uncategorized_transactions: 'Uncategorized transactions',
     review_flagged_transactions: 'Review-flagged transactions',
     receipt_coverage: 'Receipt coverage',
-    estimated_tax: 'Estimated tax',
-    estimated_tax_disclaimer: 'Estimate only. Not tax advice. Subject to accountant review.',
+    estimated_tax: 'Tax calculation',
+    estimated_tax_disclaimer: 'Automatic tax estimation is disabled. Review income, expenses, and jurisdiction-specific obligations with your accountant before filing.',
     category_breakdown_title: 'Category Totals and Suggested Tax Mapping',
     no_category_data: 'No category totals were recorded for this reporting period.',
     transaction_log_title: 'Detailed Transaction Ledger',
@@ -74,11 +74,6 @@ const PDF_LABELS = {
   },
   es: {},
   fr: {}
-};
-
-const CA_TAX_RATES = {
-  AB: 0.05, BC: 0.12, MB: 0.12, NB: 0.15, NL: 0.15, NS: 0.15,
-  NT: 0.05, NU: 0.05, ON: 0.13, PE: 0.15, QC: 0.14975, SK: 0.11, YT: 0.05
 };
 
 function getPdfLabels(lang) {
@@ -145,27 +140,26 @@ function pdfLiteral(text) {
   return `(${escapePdfLiteral(text)})`;
 }
 
-function resolvePdfTaxRate(region, province) {
-  const normalizedRegion = String(region || '').toLowerCase();
-  const normalizedProvince = String(province || '').toUpperCase();
-  if (normalizedRegion === 'ca') return CA_TAX_RATES[normalizedProvince] || 0.05;
-  return 0.24;
-}
-
 function calculateTotals(transactions, region, province) {
   let income = 0;
   let expenses = 0;
   (transactions || []).forEach((txn) => {
     const amount = Math.abs(Number(txn.amount) || 0);
-    if (String(txn.type || '').toLowerCase() === 'income') income += amount;
-    else expenses += amount;
+    const normalizedType = String(txn.type || '').toLowerCase();
+    if (normalizedType === 'income') {
+      income += amount;
+      return;
+    }
+    if (normalizedType === 'expense') {
+      expenses += amount;
+    }
   });
   const netProfit = income - expenses;
   return {
     income,
     expenses,
     netProfit,
-    estimatedTax: Math.max(0, netProfit) * resolvePdfTaxRate(region, province)
+    estimatedTax: null
   };
 }
 
@@ -435,7 +429,7 @@ function buildIdentityPage(data) {
 
   canvas.text(330, 555, labels.tax_estimate_title, 12, 'F2');
   buildKeyValueRows(canvas, 330, 535, [
-    [labels.estimated_tax, formatCurrencyForPdf(totals.estimatedTax, currency)]
+    [labels.estimated_tax, 'Manual review required']
   ]);
   wrapText(labels.estimated_tax_disclaimer, 34).forEach((line, index) => {
     canvas.text(330, 519 - (index * 14), line, 9);
@@ -1143,6 +1137,7 @@ function buildPdfExport(options) {
 module.exports = {
   buildPdfExport,
   __private: {
+    calculateTotals,
     computeReceiptCoverage,
     computePayerSummary,
     computeTaxLineSummary,

@@ -788,14 +788,26 @@ async function apiFetch(url, options = {}) {
 }
 
 function isTrialValid() {
-  const forcedFlag = localStorage.getItem(TRIAL_EXPIRED_KEY);
-  if (forcedFlag !== null) {
-    return forcedFlag === "false";
+  const subscription = window.__LUNA_ME__?.subscription || getStoredSubscriptionState();
+  if (!subscription || typeof subscription !== "object") {
+    return true;
   }
 
-  const endsAt = Number(localStorage.getItem(TRIAL_ENDS_AT_KEY));
-  if (!endsAt) {
+  if (subscription.effectiveStatus === "trial_expired") {
+    return false;
+  }
+
+  if (subscription.effectiveStatus !== "trialing") {
+    return subscription.effectiveTier === "v1";
+  }
+
+  if (!subscription.trialEndsAt) {
     return true;
+  }
+
+  const endsAt = new Date(subscription.trialEndsAt).getTime();
+  if (!Number.isFinite(endsAt)) {
+    return false;
   }
 
   return Date.now() < endsAt;
@@ -1185,7 +1197,7 @@ function showAccountMenuNotice(message) {
 }
 
 function effectiveTier() {
-  const subscription = getStoredSubscriptionState();
+  const subscription = window.__LUNA_ME__?.subscription || getStoredSubscriptionState();
   if (subscription && typeof subscription === "object") {
     if (subscription.effectiveStatus === "trialing") {
       return isTrialValid() ? "v1" : "free";
@@ -1198,17 +1210,7 @@ function effectiveTier() {
     return "free";
   }
 
-  const tier = localStorage.getItem(TIER_KEY);
-
-  if (!tier) {
-    return "free";
-  }
-
-  if (tier === "trial" && isTrialValid()) {
-    return "v1";
-  }
-
-  return tier;
+  return "free";
 }
 
 function effectivePlanName() {
