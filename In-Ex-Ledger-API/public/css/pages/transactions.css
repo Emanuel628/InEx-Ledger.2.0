@@ -3902,3 +3902,53 @@ tr.tx-highlight {
     justify-content: center;
   }
 }
+
+/* Emergency Transactions layout reset: prevents stats/table sections from stretching in desktop-on-mobile */
+.stats-row {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  align-items: stretch !important;
+  gap: 16px !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 0 24px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.stat-card {
+  min-height: 0 !important;
+  height: auto !important;
+  align-self: stretch !important;
+}
+
+.stat-card-copy {
+  min-height: 0 !important;
+}
+
+.transactions-panel {
+  min-height: 0 !important;
+}
+
+.app-content {
+  min-width: 0 !important;
+}
+
+@media (max-width: 1024px) {
+  .stats-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .stats-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stat-card {
+    width: 100% !important;
+  }
+}
