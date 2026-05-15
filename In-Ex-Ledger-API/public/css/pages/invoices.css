@@ -516,10 +516,10 @@
   .invoice-line-row {
     grid-template-columns: 1fr 70px 100px 86px 30px;
   }
-  
-  .invoice-row-focus {
+}
+
+.invoice-row-focus {
   outline: 2px solid rgba(79, 70, 229, 0.45);
   outline-offset: -2px;
   background: rgba(79, 70, 229, 0.06) !important;
-  }
 }
