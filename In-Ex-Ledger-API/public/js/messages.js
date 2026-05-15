@@ -698,6 +698,12 @@ async function archiveMessage(id, closeDetail = false) {
   }
 }
 
+function getCurrentThreadIds() {
+  return Array.isArray(_currentThread)
+    ? _currentThread.map((message) => message.id).filter(isUuid)
+    : [];
+}
+
 async function deleteMessage(id, closeDetail = false) {
   try {
     const response = await apiFetch(`/api/messages/${encodeURIComponent(id)}`, { method: "DELETE" });
