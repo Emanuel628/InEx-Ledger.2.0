@@ -1201,5 +1201,43 @@
   }
 }
 
+/* Desktop-on-mobile: preserve desktop message layout at desktop-ish widths */
+@media (min-width: 1025px) {
+  .messages-overview-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .messages-page-header,
+  .messages-panel-header,
+  .messages-focus-banner {
+    flex-direction: row;
+    align-items: flex-end;
+  }
+
+  .messages-panel-header,
+  .messages-focus-banner {
+    align-items: flex-start;
+  }
+
+  .message-row {
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+  }
+
+  .message-row-actions {
+    grid-column: auto;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .messages-list-shell {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .message-row {
+    min-width: 860px;
+  }
+}
+
 
 
