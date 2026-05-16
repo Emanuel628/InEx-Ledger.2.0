@@ -1,18 +1,3 @@
-.transactions-page {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 32px 28px 72px;
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-
-.transactions-page .mobile-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
 main {
   max-width: 1180px;
   margin: 0 auto;
@@ -28,89 +13,6 @@ section {
   font-size: 12px;
   color: var(--accent2);
   font-weight: 500;
-}
-
-.kpi-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-}
-
-.kpi-row .summary-card {
-  min-height: 120px;
-}
-
-.summary-card {
-  background: linear-gradient(
-    180deg,
-    var(--card-bg) 0%,
-    rgba(99, 102, 241, 0.02) 100%
-  );
-  border-radius: 20px;
-  padding: 28px;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
-}
-
-.summary-label {
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-
-.summary-value {
-  font-size: 2.1rem;
-  font-weight: 800;
-  color: var(--text-main);
-  margin-top: 6px;
-}
-
-.tax-hero {
-  background: linear-gradient(
-    180deg,
-    var(--card-bg) 0%,
-    rgba(99, 102, 241, 0.05) 100%
-  );
-  border-radius: 22px;
-  padding: 40px;
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.tax-hero-title {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-}
-
-.tax-hero-value {
-  font-size: 2.6rem;
-  font-weight: 800;
-  margin-top: 8px;
-}
-
-.transactions-card {
-  background: linear-gradient(
-    180deg,
-    var(--card-bg) 0%,
-    rgba(99, 102, 241, 0.015) 100%
-  );
-  border-radius: 22px;
-  padding: 34px;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
-}
-
-.transactions-card .mobile-toolbar {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
 .ledger-toolbar input,
@@ -300,15 +202,7 @@ section {
   font-size: 0.72rem;
 }
 
-main {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding-bottom: 40px;
-}
 
-section {
-  margin-bottom: 20px;
-}
 
 .sidebar {
   background: linear-gradient(
@@ -319,9 +213,6 @@ section {
   border-right: 1px solid var(--border);
 }
 
-form {
-  margin-top: 20px;
-}
 
 .tx-card {
   background: var(--card-bg);
@@ -601,41 +492,6 @@ tbody tr:last-child {
 .placeholder {
   text-align: center;
   opacity: 0.7;
-}
-
-.tax-hero {
-  margin-top: 0;
-  margin-bottom: 16px;
-  padding: 22px;
-}
-
-.tax-amount {
-  font-size: 2rem;
-  font-weight: 700;
-  margin: 8px 0;
-}
-
-.tax-subline {
-  font-size: 0.9rem;
-  opacity: 0.9;
-}
-
-.tax-hero.upsell button {
-  margin-top: 12px;
-}
-
-.ytd-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.ytd-card {
-  background: var(--bg-card, rgba(255, 255, 255, 0.02));
-  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
-  border-radius: 12px;
-  padding: 16px;
 }
 
 @media (max-width: 768px) {

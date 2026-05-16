@@ -166,6 +166,8 @@ function showLoginReasonMessage() {
     showLoginMessage(tx("login_success_verified"), "is-success");
   } else if (params.get("email_changed") === "true") {
     showLoginMessage(tx("login_success_email_changed"), "is-success");
+  } else if (params.get("password_reset") === "true") {
+    showLoginMessage(tx("login_success_password_reset"), "is-success");
   }
 }
 

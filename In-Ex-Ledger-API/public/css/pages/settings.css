@@ -136,7 +136,7 @@
 .nav-link:hover .chevron,
 .nav-link:focus .chevron {
   background: var(--accent);
-  color: #fff;
+  color: var(--surface);
   transform: scale(1.05);
   box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
 }
@@ -211,7 +211,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface);
   top: 2px;
   left: 2px;
   box-shadow: 0 3px 10px rgba(15, 23, 42, 0.25);
@@ -361,7 +361,7 @@
 
 .cpa-access-tag.revoked {
   background: rgba(239, 68, 68, 0.14);
-  color: #b91c1c;
+  color: var(--red);
 }
 
 .cpa-access-actions {
@@ -373,7 +373,7 @@
 .cpa-access-revoke {
   border: 1px solid rgba(239, 68, 68, 0.22);
   background: transparent;
-  color: #b91c1c;
+  color: var(--red);
   border-radius: 10px;
   padding: 8px 12px;
   font-weight: 600;
@@ -753,7 +753,7 @@
   padding: 0 14px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.32);
-  background: #ffffff;
+  background: var(--surface);
   color: #224974;
   font-size: 12px;
   font-weight: 700;
@@ -803,7 +803,7 @@
 }
 
 .settings-tab.is-active {
-  background: #ffffff;
+  background: var(--surface);
   color: #2563eb;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
 }
@@ -1102,7 +1102,7 @@ body {
 .settings-primary-btn {
   padding: 8px 18px;
   background: var(--accent2);
-  color: #fff;
+  color: var(--surface);
   border: none;
   border-radius: 7px;
   font-size: 13px;
@@ -1178,7 +1178,7 @@ body {
   left: 3px;
   width: 14px;
   height: 14px;
-  background: #fff;
+  background: var(--surface);
   border-radius: 50%;
   transition: transform 0.15s ease;
 }
@@ -1221,7 +1221,7 @@ body {
   gap: 16px;
   padding: 14px 28px;
   background: var(--accent);
-  color: #fff;
+  color: var(--surface);
   border-radius: 0;
   box-shadow: 0 -2px 12px rgba(15, 25, 35, 0.14);
 }
@@ -1259,7 +1259,7 @@ body {
   border: 0.5px solid rgba(255, 255, 255, 0.28);
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  color: var(--surface);
   font-size: 13px;
   font-weight: 500;
 }
@@ -1328,7 +1328,7 @@ body {
 }
 
 .settings-password-meter .meter-bar.is-weak {
-  background: #b91c1c;
+  background: var(--red);
 }
 
 .settings-password-meter .meter-bar.is-fair {
@@ -1353,7 +1353,7 @@ body {
 
 .password-strength-text.is-weak,
 .password-match-message.is-error {
-  color: #b91c1c;
+  color: var(--red);
 }
 
 .password-strength-text.is-fair {
@@ -1641,7 +1641,7 @@ body {
 .modal-delete {
   padding: 8px 16px;
   background: var(--red);
-  color: #fff;
+  color: var(--surface);
   border: none;
   border-radius: 7px;
   font-size: 13px;
@@ -1667,7 +1667,7 @@ body {
   gap: 10px;
   padding: 12px 16px;
   background: var(--accent);
-  color: #fff;
+  color: var(--surface);
   border-radius: var(--radius);
   font-size: 13px;
   min-width: 240px;
@@ -1808,7 +1808,7 @@ body {
   font-size: 11px;
   font-weight: 600;
   background: var(--primary, #2563eb);
-  color: #fff;
+  color: var(--surface);
   white-space: nowrap;
 }
 
@@ -1900,11 +1900,11 @@ body {
 .settings-page .settings-nav-item.is-active {
   background: var(--accent2);
   border-color: var(--accent2);
-  color: #ffffff;
+  color: var(--surface);
 }
 
 .settings-page .settings-nav-danger {
-  color: #b91c1c;
+  color: var(--red);
 }
 
 .settings-page .settings-nav-danger.is-active {
@@ -2119,7 +2119,7 @@ body {
   padding: 10px 12px;
   border-radius: 14px;
   border: 1px solid rgba(148, 163, 184, 0.24);
-  background: #ffffff;
+  background: var(--surface);
   color: #0f172a;
   font-size: 14px;
 }
@@ -2152,7 +2152,7 @@ body {
 .settings-page .modal-cancel {
   padding: 10px 16px;
   border: 1px solid rgba(148, 163, 184, 0.24);
-  background: #ffffff;
+  background: var(--surface);
   color: #0f172a;
 }
 
@@ -2193,14 +2193,14 @@ body {
   padding: 16px 18px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 18px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .settings-page .security-fieldset {
   padding: 20px;
   border: 1px solid rgba(226, 232, 240, 0.92);
   border-radius: 20px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .settings-page .settings-password-meter {
@@ -2220,7 +2220,7 @@ body {
 .settings-page .mfa-setup-panel,
 .settings-page .mfa-recovery-wrap {
   border-radius: 18px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .settings-page .danger-card {
@@ -2289,11 +2289,11 @@ body {
 .settings-page .settings-save-bar .settings-secondary-btn {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  color: var(--surface);
 }
 
 .settings-page .settings-save-bar .settings-primary-btn {
-  background: #ffffff;
+  background: var(--surface);
   color: #0f172a;
   box-shadow: none;
 }
@@ -2452,7 +2452,7 @@ body {
   padding: 0 16px;
   border-radius: 999px;
   background: var(--accent2);
-  color: #fff;
+  color: var(--surface);
   text-decoration: none;
   font-size: 13px;
   font-weight: 600;

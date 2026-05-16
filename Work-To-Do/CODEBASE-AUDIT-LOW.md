@@ -259,44 +259,44 @@ Reason for this exact order:
 
 ### CSS deduplication and token cleanup
 
-- [ ] 1-2 hours - Merge the identical legal page styles into one shared legal stylesheet.
+- [x] 1-2 hours - Merge the identical legal page styles into one shared legal stylesheet.
   Files: `legal.css`, `privacy.css`, `terms.css`
   Group: Legal CSS dedup
   Covers: byte-for-byte identical files, global bare `<p>` selector drift
 
-- [ ] 1-2 hours - Merge the nearly identical settings legacy stylesheets into one shared base.
+- [x] 1-2 hours - Merge the nearly identical settings legacy stylesheets into one shared base.
   Files: `change-email.css`, `account-profile.css`, `region-settings.css`, `fiscal-settings.css`, `mfa.css`
   Group: Settings legacy CSS dedup
   Covers: duplicated boilerplate across five files
 
-- [ ] 1-2 hours - Replace hardcoded page-level hex colors with CSS variables in Settings and auth-adjacent stylesheets.
+- [x] 1-2 hours - Replace hardcoded page-level hex colors with CSS variables in Settings and auth-adjacent stylesheets.
   Files: `settings.css`, `login.css`, `register.css`, related page CSS
   Group: Theme token consistency
   Covers: hardcoded blues/grays/greens/browns bypassing token system
 
-- [ ] 1-2 hours - Remove broad unscoped CSS selectors from page-specific stylesheets.
+- [x] 1-2 hours - Remove broad unscoped CSS selectors from page-specific stylesheets.
   Files: `transactions.css`, `settings.css`, legal CSS files
   Group: CSS scope cleanup
   Covers: bare `main`, `section`, `form`, `body`, `p` selectors with page bleed
 
-- [ ] 1-2 hours - Clean up stale or conflicting transaction page CSS from prior design iterations.
+- [x] 1-2 hours - Clean up stale or conflicting transaction page CSS from prior design iterations.
   Files: `transactions.css`
   Group: Transactions CSS cleanup
   Covers: duplicate bare selectors, dead `.transactions-page` / `.summary-card` / `.tax-hero` / `.transactions-card` / `.ytd-*` rules, false-confidence `.income-only-field` modal selector
 
 ### Small product and copy polish
 
-- [ ] 1-2 hours - Fill in currently English-only or empty localization surfaces.
+- [x] 1-2 hours - Fill in currently English-only or empty localization surfaces.
   Files: `categories-backend.js`, `trial.js`, `pdf_labels.js`, `i18n.js`
   Group: Localization cleanup
   Covers: hardcoded English toast strings, hardcoded trial strings, empty `es` and `fr` PDF label maps, raw key fallback behavior
 
-- [ ] 1-2 hours - Add missing footer/canonical polish to public/legal/help pages.
+- [x] 1-2 hours - Add missing footer/canonical polish to public/legal/help pages.
   Files: `pricing.html`, `help.html`, `privacy.html`, related templates
   Group: Public page polish
   Covers: missing pricing footer, missing help footer, missing canonical tag, inconsistent copyright
 
-- [ ] 1-2 hours - Clean up dead or misleading state/query parameters in auth flows.
+- [x] 1-2 hours - Clean up dead or misleading state/query parameters in auth flows.
   Files: `register.js`, `verify-email.js`, `login.js`, `reset-password.js`
   Group: Auth flow polish
   Covers: unread `?email=sent`, unread `?password_reset=true`, spoofable success-query UX, hollow autofill retry array

@@ -426,7 +426,7 @@ async function loadBusinessRegion() {
     const response = await apiFetch("/api/business");
     if (!response || !response.ok) {
       currentRegion = null;
-      showCategoriesToast("Error: Unable to load business region. Please set your region in Settings.");
+      showCategoriesToast(tx("categories_error_region_load"));
       return;
     }
     const business = await response.json();
@@ -438,12 +438,12 @@ async function loadBusinessRegion() {
       return;
     } else {
       currentRegion = null;
-      showCategoriesToast("Error: Business region is missing or invalid. Please set your region in Settings.");
+      showCategoriesToast(tx("categories_error_region_invalid"));
       return;
     }
   } catch (error) {
     console.warn("[Categories] Unable to load business region", error);
-    showCategoriesToast("Error: Unable to load business region. Please set your region in Settings.");
+    showCategoriesToast(tx("categories_error_region_load"));
   }
   currentRegion = null;
 }
