@@ -44,6 +44,7 @@ const {
   buildDeviceFingerprint,
   fetchIpLocation
 } = require("../services/signInSecurityService.js");
+const { normalizeEmail } = require("../utils/emailNormalization.js");
 
 const router = express.Router();
 
@@ -112,25 +113,6 @@ const MFA_PENDING_TOKEN_EXPIRY_SECONDS = MFA_EMAIL_CODE_EXPIRY_MINUTES * 60;
 const MAX_LOGIN_ATTEMPTS = Number(process.env.MAX_LOGIN_ATTEMPTS) || 5;
 const LOGIN_LOCKOUT_MINUTES = Number(process.env.LOGIN_LOCKOUT_MINUTES) || 15;
 const VERIFICATION_STATUS_TOKEN_EXPIRY_SECONDS = Number(process.env.VERIFICATION_STATUS_TOKEN_EXPIRY_SECONDS) || 24 * 60 * 60;
-
-function normalizeEmail(email) {
-  const normalized = String(email ?? "").trim().toLowerCase();
-  if (!normalized) {
-    return "";
-  }
-  if (/\.{2,}/.test(normalized)) {
-    return "";
-  }
-  const atIndex = normalized.indexOf("@");
-  if (atIndex <= 0 || atIndex !== normalized.lastIndexOf("@")) {
-    return "";
-  }
-  const domain = normalized.slice(atIndex + 1);
-  if (!domain || domain.startsWith(".") || domain.endsWith(".") || !domain.includes(".")) {
-    return "";
-  }
-  return normalized;
-}
 
 async function createVerificationToken(email) {
   const token = crypto.randomUUID();

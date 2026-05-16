@@ -90,3 +90,18 @@ test("check-email-verified rejects invalid verification state tokens", async () 
     fixture.cleanup();
   }
 });
+
+test("check-email-verified rejects signed states whose email payload fails shared normalization", async () => {
+  const fixture = loadRoute({ verified: false });
+
+  try {
+    const response = await request(fixture.app)
+      .get("/api/check-email-verified")
+      .query({ state: makeState("person@example..com") });
+
+    assert.equal(response.status, 401);
+    assert.match(String(response.body?.error || ""), /invalid verification state/i);
+  } finally {
+    fixture.cleanup();
+  }
+});

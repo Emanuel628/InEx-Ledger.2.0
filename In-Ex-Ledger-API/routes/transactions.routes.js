@@ -51,6 +51,10 @@ const MAX_PERCENT = 100;
 const TRANSACTION_UNDO_STACK_LIMIT = 20;
 const REFERENCE_RATE_CURRENCIES = new Set(["USD", "CAD", "EUR", "GBP", "AUD", "JPY"]);
 const EXCHANGE_RATE_REFERENCE_TIMEOUT_MS = 5000;
+const MAX_TRANSACTION_DESCRIPTION_LENGTH = 500;
+const MAX_TRANSACTION_NOTE_LENGTH = 2000;
+const MAX_TRANSACTION_REVIEW_NOTES_LENGTH = 1000;
+const MAX_TRANSACTION_PAYER_NAME_LENGTH = 200;
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -183,6 +187,20 @@ function parseOptionalDate(value, fieldName) {
   return { valid: true, value: raw.slice(0, 10) };
 }
 
+function normalizeOptionalTextField(value, fieldName, maxLength) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    return { valid: true, value: null };
+  }
+  if (normalized.length > maxLength) {
+    return {
+      valid: false,
+      message: `${fieldName} must be ${maxLength} characters or fewer`
+    };
+  }
+  return { valid: true, value: normalized };
+}
+
 function normalizeTransactionTaxPayload(payload, fallbackCurrency) {
   const currency = normalizeCurrencyCode(payload?.currency, fallbackCurrency);
   const sourceAmountResult = parseOptionalDecimal(payload?.source_amount, "source_amount", {
@@ -229,6 +247,15 @@ function normalizeTransactionTaxPayload(payload, fallbackCurrency) {
     return personalUsePctResult;
   }
 
+  const reviewNotesResult = normalizeOptionalTextField(
+    payload?.review_notes,
+    "review_notes",
+    MAX_TRANSACTION_REVIEW_NOTES_LENGTH
+  );
+  if (!reviewNotesResult.valid) {
+    return reviewNotesResult;
+  }
+
   const taxTreatmentRaw = String(payload?.tax_treatment || "").trim().toLowerCase();
   const taxTreatment = taxTreatmentRaw || null;
   if (taxTreatment && !VALID_TAX_TREATMENTS.has(taxTreatment)) {
@@ -258,7 +285,7 @@ function normalizeTransactionTaxPayload(payload, fallbackCurrency) {
     taxTreatment === "capital" ||
     taxTreatment === "split_use" ||
     taxTreatment === "nondeductible" ||
-    String(payload?.review_notes || "").trim().length > 0;
+    reviewNotesResult.value !== null;
 
   return {
       valid: true,
@@ -276,9 +303,9 @@ function normalizeTransactionTaxPayload(payload, fallbackCurrency) {
         tax_treatment: taxTreatment,
         indirect_tax_amount: indirectTaxAmountResult.value,
         indirect_tax_recoverable: payload?.indirect_tax_recoverable === true,
-      personal_use_pct: personalUsePctResult.value,
-      review_status: reviewStatus || (hasEdgeCaseSignals ? "needs_review" : "ready"),
-      review_notes: String(payload?.review_notes || "").trim() || null
+        personal_use_pct: personalUsePctResult.value,
+        review_status: reviewStatus || (hasEdgeCaseSignals ? "needs_review" : "ready"),
+        review_notes: reviewNotesResult.value
     }
   };
 }
@@ -336,6 +363,33 @@ function validateTransactionPayload(payload, fallbackCurrency = "USD") {
     return taxPayload;
   }
 
+  const descriptionResult = normalizeOptionalTextField(
+    payload?.description,
+    "description",
+    MAX_TRANSACTION_DESCRIPTION_LENGTH
+  );
+  if (!descriptionResult.valid) {
+    return descriptionResult;
+  }
+
+  const noteResult = normalizeOptionalTextField(
+    payload?.note,
+    "note",
+    MAX_TRANSACTION_NOTE_LENGTH
+  );
+  if (!noteResult.valid) {
+    return noteResult;
+  }
+
+  const payerNameResult = normalizeOptionalTextField(
+    payload?.payer_name,
+    "payer_name",
+    MAX_TRANSACTION_PAYER_NAME_LENGTH
+  );
+  if (!payerNameResult.valid) {
+    return payerNameResult;
+  }
+
   return {
     valid: true,
     normalized: {
@@ -345,6 +399,9 @@ function validateTransactionPayload(payload, fallbackCurrency = "USD") {
       date,
       type,
       cleared: cleared === true,
+      description: descriptionResult.value,
+      note: noteResult.value,
+      payer_name: type === "income" ? payerNameResult.value : null,
       ...taxPayload.normalized
     }
   };
@@ -559,9 +616,7 @@ router.post("/", async (req, res) => {
       return res.status(402).json({ error: "Advanced transaction fields require an active InEx Ledger Pro plan." });
     }
 
-    const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
-    const { description, note } = req.body;
-    const payerName = type === "income" ? (String(req.body.payer_name || "").trim().slice(0, 200) || null) : null;
+    const { account_id, category_id, amount, type, date, cleared, description, note, payer_name: payerName } = validation.normalized;
     const taxFormType = type === "income" && VALID_TAX_FORMS.has(req.body.tax_form_type) ? req.body.tax_form_type : null;
     await assertUnlockedBusinessDates(businessId, date);
     const storedDescription = buildStoredDescriptionColumns(description);
@@ -614,7 +669,7 @@ router.post("/", async (req, res) => {
         storedDescription.description,
         storedDescription.descriptionEncrypted,
         date,
-        note || null,
+        note,
         validation.normalized.currency || businessTaxContext.currency,
         validation.normalized.source_amount,
         validation.normalized.exchange_rate,
@@ -662,8 +717,7 @@ router.put("/:id", async (req, res) => {
     ) {
       return res.status(402).json({ error: "Advanced transaction fields require an active InEx Ledger Pro plan." });
     }
-    const { account_id, category_id, amount, type, date, cleared } = validation.normalized;
-    const { description, note } = req.body;
+    const { account_id, category_id, amount, type, date, cleared, description, note, payer_name: payerName } = validation.normalized;
 
     // Verify the original transaction exists and belongs to this business
     const originalResult = await pool.query(
@@ -689,7 +743,6 @@ router.put("/:id", async (req, res) => {
     }
 
     const storedDescription = buildStoredDescriptionColumns(description);
-    const payerName = type === "income" ? (String(req.body.payer_name || "").trim().slice(0, 200) || null) : null;
     const taxFormType = type === "income" && VALID_TAX_FORMS.has(req.body.tax_form_type) ? req.body.tax_form_type : null;
 
     const result = await pool.query(
@@ -732,7 +785,7 @@ router.put("/:id", async (req, res) => {
         storedDescription.description,
         storedDescription.descriptionEncrypted,
         date,
-        note || null,
+        note,
         validation.normalized.currency || businessTaxContext.currency,
         validation.normalized.source_amount,
         validation.normalized.exchange_rate,

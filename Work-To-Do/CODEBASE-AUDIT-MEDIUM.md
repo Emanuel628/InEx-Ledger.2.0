@@ -87,7 +87,7 @@ Rules used here:
 
 ### Data-shape and input validation
 
-- [ ] 30-60 min - Add server-side max-length validation for the common free-text fields already identified.
+- [x] 30-60 min - Add server-side max-length validation for the common free-text fields already identified.
   Files: `accounts.routes.js`, `transactions.routes.js`, `me.routes.js`
   Group: Text input bounds
   Covers: account names, transaction descriptions, transaction notes, onboarding/business/profile names
@@ -97,7 +97,7 @@ Rules used here:
   Group: Tax and region normalization
   Covers: arbitrary `tax_map_us` / `tax_map_ca`, untrimmed region values, `YYYY-MM-DD` vs `MM-DD` fiscal-year mismatch
 
-- [ ] 30-60 min - Normalize email parsing behavior across auth and email-verification code paths.
+- [x] 30-60 min - Normalize email parsing behavior across auth and email-verification code paths.
   Files: `auth.routes.js`, `check-email-verified.routes.js`
   Group: Email normalization
   Covers: different normalization rules between route files

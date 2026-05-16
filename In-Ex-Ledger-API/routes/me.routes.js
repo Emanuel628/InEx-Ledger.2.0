@@ -37,6 +37,9 @@ const LEGACY_CPA_AUDIT_USER_CONSTRAINTS = [
   "cpa_audit_logs_owner_user_id_fkey",
   "cpa_audit_logs_actor_user_id_fkey"
 ];
+const MAX_BUSINESS_NAME_LENGTH = 200;
+const MAX_STARTER_ACCOUNT_NAME_LENGTH = 120;
+const MAX_PROFILE_NAME_LENGTH = 120;
 
 function normalizeOptionalTrimmedString(value) {
   if (typeof value !== "string") {
@@ -44,6 +47,17 @@ function normalizeOptionalTrimmedString(value) {
   }
   const trimmed = value.trim();
   return trimmed || null;
+}
+
+function normalizeOptionalTrimmedStringWithLimit(value, maxLength) {
+  const normalized = normalizeOptionalTrimmedString(value);
+  if (!normalized) {
+    return normalized;
+  }
+  if (normalized.length > maxLength) {
+    return { error: `Must be ${maxLength} characters or fewer.` };
+  }
+  return normalized;
 }
 
 function normalizeUiPreferences(input) {
@@ -243,7 +257,10 @@ router.put("/onboarding", async (req, res) => {
   const businessName = String(req.body?.business_name || "").trim();
   const businessType = String(req.body?.business_type || "").trim();
   const starterAccountType = String(req.body?.starter_account_type || "").trim().toLowerCase();
-  const starterAccountName = normalizeOptionalTrimmedString(req.body?.starter_account_name);
+  const starterAccountName = normalizeOptionalTrimmedStringWithLimit(
+    req.body?.starter_account_name,
+    MAX_STARTER_ACCOUNT_NAME_LENGTH
+  );
   const startFocus = String(req.body?.start_focus || "").trim().toLowerCase();
   const region = String(req.body?.region || "").trim().toUpperCase();
   const province = String(req.body?.province || "").trim().toUpperCase();
@@ -251,6 +268,9 @@ router.put("/onboarding", async (req, res) => {
 
   if (!businessName) {
     return res.status(400).json({ error: "Business name is required." });
+  }
+  if (businessName.length > MAX_BUSINESS_NAME_LENGTH) {
+    return res.status(400).json({ error: `Business name must be ${MAX_BUSINESS_NAME_LENGTH} characters or fewer.` });
   }
   if (!VALID_BUSINESS_TYPES.has(businessType)) {
     return res.status(400).json({ error: "Choose a valid business type." });
@@ -269,6 +289,9 @@ router.put("/onboarding", async (req, res) => {
   }
   if (region === "CA" && !CA_PROVINCES.has(province)) {
     return res.status(400).json({ error: "Choose a valid province." });
+  }
+  if (starterAccountName?.error) {
+    return res.status(400).json({ error: `Starter account name ${starterAccountName.error}` });
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
@@ -529,6 +552,20 @@ router.post("/onboarding/replay", async (req, res) => {
  */
 router.put("/", async (req, res) => {
   const body = req.body ?? {};
+  const fullName = "full_name" in body
+    ? normalizeOptionalTrimmedStringWithLimit(body.full_name, MAX_PROFILE_NAME_LENGTH)
+    : null;
+  const displayName = "display_name" in body
+    ? normalizeOptionalTrimmedStringWithLimit(body.display_name, MAX_PROFILE_NAME_LENGTH)
+    : null;
+
+  if (fullName?.error) {
+    return res.status(400).json({ error: `Full name ${fullName.error}` });
+  }
+  if (displayName?.error) {
+    return res.status(400).json({ error: `Display name ${displayName.error}` });
+  }
+
   try {
     const result = await pool.query(
       `UPDATE users
@@ -537,8 +574,8 @@ router.put("/", async (req, res) => {
        WHERE id = $3
        RETURNING id, email, full_name, display_name, created_at`,
       [
-        'full_name' in body ? normalizeOptionalTrimmedString(body.full_name) : null,
-        'display_name' in body ? normalizeOptionalTrimmedString(body.display_name) : null,
+        fullName,
+        displayName,
         req.user.id,
         'full_name' in body,
         'display_name' in body

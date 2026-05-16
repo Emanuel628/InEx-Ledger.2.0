@@ -4,11 +4,7 @@ const express = require("express");
 const router = express.Router();
 const { pool } = require("../db.js");
 const { verifyToken } = require("../middleware/auth.middleware.js");
-
-function normalizeEmail(email) {
-  const normalized = String(email || "").trim().toLowerCase();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) ? normalized : "";
-}
+const { normalizeEmail } = require("../utils/emailNormalization.js");
 
 router.get("/", async (req, res) => {
   const state = String(req.query.state || "").trim();

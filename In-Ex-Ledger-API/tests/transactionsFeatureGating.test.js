@@ -172,3 +172,25 @@ test("basic plan rejects advanced transaction payload fields", async () => {
     fixture.cleanup();
   }
 });
+
+test("transactions reject oversized description fields with 400 before any insert work", async () => {
+  const fixture = loadRouter({ effectiveTier: "v1" });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/transactions")
+      .send({
+        account_id: "11111111-1111-4111-8111-111111111111",
+        category_id: "22222222-2222-4222-8222-222222222222",
+        amount: 45,
+        type: "expense",
+        date: "2026-04-26",
+        description: "x".repeat(501)
+      });
+
+    assert.equal(res.status, 400);
+    assert.match(String(res.body?.error || ""), /description/i);
+  } finally {
+    fixture.cleanup();
+  }
+});

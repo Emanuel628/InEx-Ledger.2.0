@@ -45,6 +45,18 @@ function loadMeRouterFixture() {
             if (/FROM users\s+WHERE id = \$1/i.test(sql)) {
               return { rows: [userRow], rowCount: 1 };
             }
+            if (/UPDATE users\s+SET full_name = CASE WHEN \$4::boolean THEN \$1 ELSE full_name END,/i.test(sql)) {
+              return {
+                rows: [{
+                  id: "user-1",
+                  email: "user@example.com",
+                  full_name: params[0],
+                  display_name: params[1],
+                  created_at: new Date().toISOString()
+                }],
+                rowCount: 1
+              };
+            }
             throw new Error(`Unhandled pool SQL: ${sql}`);
           },
           async connect() {
@@ -219,6 +231,48 @@ test("PUT /api/me/onboarding replaces pre-seeded accounts before starter account
     assert.ok(insertIdx !== -1, "onboarding should insert starter account");
     assert.ok(deleteIdx < insertIdx, "account cleanup should happen before starter insert");
     assert.equal(fixture.state.clientReleased, true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("PUT /api/me/onboarding rejects oversized business names before opening a transaction", async () => {
+  const fixture = loadMeRouterFixture();
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .put("/api/me/onboarding")
+      .send({
+        business_name: "B".repeat(201),
+        business_type: "sole_proprietor",
+        region: "US",
+        language: "en"
+      });
+
+    assert.equal(response.status, 400);
+    assert.match(String(response.body?.error || ""), /Business name/i);
+    assert.equal(fixture.state.txQueries.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("PUT /api/me rejects oversized profile names before issuing the update", async () => {
+  const fixture = loadMeRouterFixture();
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .put("/api/me")
+      .send({
+        full_name: "A".repeat(121)
+      });
+
+    assert.equal(response.status, 400);
+    assert.match(String(response.body?.error || ""), /Full name/i);
+    const profileUpdateQuery = fixture.state.dbQueries.find((entry) =>
+      /UPDATE users\s+SET full_name/i.test(entry.sql)
+    );
+    assert.equal(profileUpdateQuery, undefined);
   } finally {
     fixture.cleanup();
   }
