@@ -163,12 +163,12 @@ Rules used here:
   Group: Region route correctness
   Covers: lowercasing the full Authorization header, no rate limiter
 
-- [ ] 1-2 hours - Make crypto public-key serving safer under rotation and anonymous polling.
+- [x] 1-2 hours - Make crypto public-key serving safer under rotation and anonymous polling.
   Files: `crypto.routes.js`
   Group: Public key distribution
   Covers: stale parsed key at module load, anonymous unlimited polling, cache semantics
 
-- [ ] 1-2 hours - Add rate limits and logging to V2 and system routes that currently have neither.
+- [x] 1-2 hours - Add rate limits and logging to V2 and system routes that currently have neither.
   Files: `system.routes.js`, V2 route files
   Group: Route observability and abuse control
   Covers: unauthenticated `/health`, unauthenticated `/links`, no rate limiting on V2 routers, missing `logError` usage

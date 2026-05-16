@@ -3,12 +3,15 @@ const router = express.Router();
 const ProjectService = require('../services/projectService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
 const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
+const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
+const { logError } = require('../utils/logger.js');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // All routes require V2 feature flag and entitlement
 router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
+router.use(createDataApiLimiter({ keyPrefix: 'rl:v2:projects' }));
 router.use((req, res, next) => (
   ["POST", "PUT", "PATCH", "DELETE"].includes(req.method)
     ? requireCsrfProtection(req, res, next)
@@ -23,12 +26,17 @@ function hasProjectPayload(body) {
   return typeof body?.name === 'string' && body.name.trim().length > 0;
 }
 
+function formatRouteError(err) {
+  return err instanceof Error ? err.message : String(err || 'unknown_error');
+}
+
 // List projects
 router.get('/', async (req, res) => {
   try {
     const projects = await ProjectService.listProjects(req.business.id);
     res.json({ projects });
   } catch (err) {
+    logError('GET /projects failed', { err: formatRouteError(err), businessId: req.business?.id });
     res.status(500).json({ error: 'Failed to list projects' });
   }
 });
@@ -43,6 +51,7 @@ router.get('/:id', async (req, res) => {
     if (!project) return res.status(404).json({ error: 'Project not found' });
     res.json({ project });
   } catch (err) {
+    logError('GET /projects/:id failed', { err: formatRouteError(err), businessId: req.business?.id, projectId: req.params.id });
     res.status(500).json({ error: 'Failed to get project' });
   }
 });
@@ -56,6 +65,7 @@ router.post('/', async (req, res) => {
     const project = await ProjectService.createProject(req.business.id, req.body);
     res.status(201).json({ project });
   } catch (err) {
+    logError('POST /projects failed', { err: formatRouteError(err), businessId: req.business?.id });
     res.status(400).json({ error: 'Failed to create project' });
   }
 });
@@ -73,6 +83,7 @@ router.put('/:id', async (req, res) => {
     if (!project) return res.status(404).json({ error: 'Project not found' });
     res.json({ project });
   } catch (err) {
+    logError('PUT /projects/:id failed', { err: formatRouteError(err), businessId: req.business?.id, projectId: req.params.id });
     res.status(400).json({ error: 'Failed to update project' });
   }
 });
@@ -87,6 +98,7 @@ router.delete('/:id', async (req, res) => {
     if (!deleted) return res.status(404).json({ error: 'Project not found' });
     res.json({ success: true });
   } catch (err) {
+    logError('DELETE /projects/:id failed', { err: formatRouteError(err), businessId: req.business?.id, projectId: req.params.id });
     res.status(400).json({ error: 'Failed to delete project' });
   }
 });

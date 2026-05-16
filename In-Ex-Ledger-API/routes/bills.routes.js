@@ -5,12 +5,15 @@ const router = express.Router();
 const billService = require('../services/billService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
 const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
+const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
+const { logError } = require('../utils/logger.js');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BILL_STATUS_VALUES = new Set(['draft', 'open', 'sent', 'partial', 'paid', 'void']);
 
 router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
+router.use(createDataApiLimiter({ keyPrefix: 'rl:v2:bills' }));
 router.use((req, res, next) => (
 	["POST", "PUT", "PATCH", "DELETE"].includes(req.method)
 		? requireCsrfProtection(req, res, next)
@@ -44,6 +47,10 @@ function hasBillPayload(body) {
 	);
 }
 
+function formatRouteError(err) {
+	return err instanceof Error ? err.message : String(err || 'unknown_error');
+}
+
 // List bills (GET /bills)
 router.get('/', async (req, res) => {
 	const businessId = req.business.id;
@@ -51,6 +58,7 @@ router.get('/', async (req, res) => {
 		const bills = await billService.listBills(businessId);
 		res.json(bills);
 	} catch (err) {
+		logError('GET /bills failed', { err: formatRouteError(err), businessId });
 		res.status(500).json({ error: 'Failed to load bills.' });
 	}
 });
@@ -65,6 +73,7 @@ router.post('/', async (req, res) => {
 		const bill = await billService.createBill(businessId, req.body);
 		res.status(201).json(bill);
 	} catch (err) {
+		logError('POST /bills failed', { err: formatRouteError(err), businessId });
 		res.status(500).json({ error: 'Failed to create bill.' });
 	}
 });
@@ -82,6 +91,7 @@ router.get('/:id', async (req, res) => {
 		}
 		res.json(bill);
 	} catch (err) {
+		logError('GET /bills/:id failed', { err: formatRouteError(err), businessId, billId: req.params.id });
 		res.status(500).json({ error: 'Failed to load bill.' });
 	}
 });
@@ -102,6 +112,7 @@ router.put('/:id', async (req, res) => {
 		}
 		res.json(bill);
 	} catch (err) {
+		logError('PUT /bills/:id failed', { err: formatRouteError(err), businessId, billId: req.params.id });
 		res.status(500).json({ error: 'Failed to update bill.' });
 	}
 });
@@ -119,6 +130,7 @@ router.delete('/:id', async (req, res) => {
 		}
 		res.json({ success: true });
 	} catch (err) {
+		logError('DELETE /bills/:id failed', { err: formatRouteError(err), businessId, billId: req.params.id });
 		res.status(500).json({ error: 'Failed to delete bill.' });
 	}
 });

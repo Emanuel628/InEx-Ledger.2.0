@@ -1,34 +1,59 @@
 const express = require("express");
-const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { logError } = require("../utils/logger.js");
+const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 
 const router = express.Router();
+const exportPublicKeyLimiter = createDataApiLimiter({
+  keyPrefix: "rl:crypto:export-public-key",
+  keyStrategy: "ip",
+  max: 30
+});
 
-const PUBLIC_KEY_JSON = process.env.EXPORT_PUBLIC_KEY_JWK;
-const KEY_KID = process.env.EXPORT_PUBLIC_KEY_KID || "export-key-1";
-let parsedKey = null;
+let cachedRawKey = null;
+let cachedParsedKey = null;
 
-if (PUBLIC_KEY_JSON) {
+function getParsedExportPublicKey() {
+  const publicKeyJson = process.env.EXPORT_PUBLIC_KEY_JWK;
+  if (!publicKeyJson) {
+    cachedRawKey = null;
+    cachedParsedKey = null;
+    return null;
+  }
+
+  if (publicKeyJson === cachedRawKey && cachedParsedKey) {
+    return cachedParsedKey;
+  }
+
   try {
-    parsedKey = JSON.parse(PUBLIC_KEY_JSON);
+    const parsed = JSON.parse(publicKeyJson);
+    cachedRawKey = publicKeyJson;
+    cachedParsedKey = parsed;
+    return parsed;
   } catch (err) {
     logError("Failed to parse EXPORT_PUBLIC_KEY_JWK:", err.message);
+    cachedRawKey = publicKeyJson;
+    cachedParsedKey = null;
+    return null;
   }
 }
 
-router.get("/export-public-key", (req, res) => {
+router.get("/export-public-key", exportPublicKeyLimiter, (req, res) => {
+  const parsedKey = getParsedExportPublicKey();
+  const keyKid = process.env.EXPORT_PUBLIC_KEY_KID || "export-key-1";
   if (!parsedKey) {
     return res.status(503).json({ error: "Export public key not configured." });
   }
 
-  res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=60");
+  res.setHeader("Cache-Control", "public, max-age=60, must-revalidate");
+  res.setHeader("X-Content-Type-Options", "nosniff");
   res.json({
     jwk: {
       ...parsedKey,
       use: "enc",
       alg: "RSA-OAEP-256"
     },
-    kid: KEY_KID,
-    expiresAt: Date.now() + 300_000
+    kid: keyKid,
+    expiresAt: Date.now() + 60_000
   });
 });
 

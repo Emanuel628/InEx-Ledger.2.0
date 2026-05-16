@@ -5,11 +5,14 @@ const router = express.Router();
 const customerService = require('../services/customerService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
 const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
+const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
+const { logError } = require('../utils/logger.js');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 router.use(requireAuth, requireV2BusinessEnabled, requireV2Entitlement);
+router.use(createDataApiLimiter({ keyPrefix: 'rl:v2:customers' }));
 router.use((req, res, next) => (
 	["POST", "PUT", "PATCH", "DELETE"].includes(req.method)
 		? requireCsrfProtection(req, res, next)
@@ -24,6 +27,10 @@ function hasCustomerPayload(body) {
 	return typeof body?.name === 'string' && body.name.trim().length > 0;
 }
 
+function formatRouteError(err) {
+	return err instanceof Error ? err.message : String(err || 'unknown_error');
+}
+
 // List customers (GET /customers)
 router.get('/', async (req, res) => {
 	const businessId = req.business.id;
@@ -31,6 +38,7 @@ router.get('/', async (req, res) => {
 		const customers = await customerService.listCustomers(businessId);
 		res.json(customers);
 	} catch (err) {
+		logError('GET /customers failed', { err: formatRouteError(err), businessId });
 		res.status(500).json({ error: 'Failed to load customers.' });
 	}
 });
@@ -45,6 +53,7 @@ router.post('/', async (req, res) => {
 		const customer = await customerService.createCustomer(businessId, req.body);
 		res.status(201).json(customer);
 	} catch (err) {
+		logError('POST /customers failed', { err: formatRouteError(err), businessId });
 		res.status(500).json({ error: 'Failed to create customer.' });
 	}
 });
@@ -62,6 +71,7 @@ router.get('/:id', async (req, res) => {
 		}
 		res.json(customer);
 	} catch (err) {
+		logError('GET /customers/:id failed', { err: formatRouteError(err), businessId, customerId: req.params.id });
 		res.status(500).json({ error: 'Failed to load customer.' });
 	}
 });
@@ -82,6 +92,7 @@ router.put('/:id', async (req, res) => {
 		}
 		res.json(customer);
 	} catch (err) {
+		logError('PUT /customers/:id failed', { err: formatRouteError(err), businessId, customerId: req.params.id });
 		res.status(500).json({ error: 'Failed to update customer.' });
 	}
 });
@@ -99,6 +110,7 @@ router.delete('/:id', async (req, res) => {
 		}
 		res.json({ success: true });
 	} catch (err) {
+		logError('DELETE /customers/:id failed', { err: formatRouteError(err), businessId, customerId: req.params.id });
 		res.status(500).json({ error: 'Failed to delete customer.' });
 	}
 });

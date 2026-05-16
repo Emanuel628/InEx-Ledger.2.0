@@ -2,13 +2,19 @@ const express = require("express");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { migrationStats } = require("../db.js");
 const { getRateLimiterHealth } = require("../middleware/rateLimiter.js");
+const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { getReceiptStorageStatus } = require("../services/receiptStorage.js");
 const { buildDiagnostics } = require("../services/diagnosticsService.js");
 const { logError } = require("../utils/logger.js");
 
 const router = express.Router();
+const publicSystemLimiter = createDataApiLimiter({
+  keyPrefix: "rl:system:public",
+  keyStrategy: "ip",
+  max: 60
+});
 
-router.get("/health", (req, res) => {
+router.get("/health", publicSystemLimiter, (req, res) => {
   res.json({
     status: "ok",
     service: "inex-ledger",
@@ -16,7 +22,7 @@ router.get("/health", (req, res) => {
   });
 });
 
-router.get("/links", (req, res) => {
+router.get("/links", publicSystemLimiter, (req, res) => {
   res.json({
     login: "/login",
     register: "/register",

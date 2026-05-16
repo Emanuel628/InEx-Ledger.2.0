@@ -16,7 +16,9 @@ const INVOICES_ROUTE_PATH = require.resolve("../routes/invoices.routes.js");
 function loadRouter(routePath, routeName) {
   const originalLoad = Module._load.bind(Module);
   const state = {
-    serviceCalls: []
+    serviceCalls: [],
+    logErrors: [],
+    forceProjectListError: false
   };
 
   Module._load = function(requestName, parent, isMain) {
@@ -41,6 +43,18 @@ function loadRouter(routePath, routeName) {
         }
       };
     }
+    if (requestName === "../middleware/rate-limit.middleware.js" || /rate-limit\.middleware\.js$/.test(requestName)) {
+      return {
+        createDataApiLimiter() {
+          return (req, res, next) => {
+            if (req.headers["x-test-rate-limit"] === "block") {
+              return res.status(429).json({ error: "Too many requests." });
+            }
+            next();
+          };
+        }
+      };
+    }
     if (requestName === "../api/utils/requireV2BusinessEnabled" || /requireV2BusinessEnabled\.js$/.test(requestName)) {
       return {
         requireV2BusinessEnabled(req, _res, next) {
@@ -52,9 +66,21 @@ function loadRouter(routePath, routeName) {
         }
       };
     }
+    if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
+      return {
+        logError(message, context) {
+          state.logErrors.push({ message, context });
+        }
+      };
+    }
     if (requestName === "../services/projectService") {
       return {
-        listProjects: async () => [],
+        listProjects: async () => {
+          if (state.forceProjectListError) {
+            throw new Error("project list exploded");
+          }
+          return [];
+        },
         getProject: async (...args) => {
           state.serviceCalls.push({ routeName, method: "getProject", args });
           return null;
@@ -221,6 +247,22 @@ test("projects routes require auth independently of V2 middleware", async () => 
   }
 });
 
+test("projects routes enforce their route-level limiter before the service layer", async () => {
+  const fixture = loadRouter(PROJECTS_ROUTE_PATH, "projects");
+  try {
+    const response = await authed(
+      request(fixture.app)
+        .get("/api/test")
+        .set("x-test-rate-limit", "block")
+    );
+
+    assert.equal(response.status, 429);
+    assert.equal(fixture.state.serviceCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("projects create rejects missing names before the service layer", async () => {
   const fixture = loadRouter(PROJECTS_ROUTE_PATH, "projects");
   try {
@@ -315,6 +357,21 @@ test("billable expenses create rejects malformed payloads before the service lay
 
     assert.equal(response.status, 400);
     assert.equal(fixture.state.serviceCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("projects list logs service failures instead of swallowing them silently", async () => {
+  const fixture = loadRouter(PROJECTS_ROUTE_PATH, "projects");
+  try {
+    fixture.state.forceProjectListError = true;
+    const response = await authed(request(fixture.app).get("/api/test"));
+
+    assert.equal(response.status, 500);
+    assert.equal(fixture.state.logErrors.length, 1);
+    assert.match(fixture.state.logErrors[0].message, /GET \/projects failed/);
+    assert.match(String(fixture.state.logErrors[0].context?.err || ""), /project list exploded/);
   } finally {
     fixture.cleanup();
   }
