@@ -6,7 +6,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 
-const { computeChecksum, hasRequiredColumns, isCompatibleHistoricalMigrationChecksum } = require("../db.js");
+const {
+  computeChecksum,
+  getCanonicalMigrationFilename,
+  hasRequiredColumns,
+  isCompatibleHistoricalMigrationChecksum
+} = require("../db.js");
 
 const migrationsDir = path.join(__dirname, "..", "db", "migrations");
 
@@ -75,6 +80,23 @@ test("billable expenses checksum compatibility only allows the known historical 
   assert.equal(
     isCompatibleHistoricalMigrationChecksum("some_other_migration.sql", "511cb26e8a82e807a87fbaa40d11ff521c37ae4363761fd42170120a175009ba"),
     false
+  );
+});
+
+test("historical exports migration filename alias resolves to the canonical filename", () => {
+  assert.equal(
+    getCanonicalMigrationFilename("20260510_fix_exports_schema.sql"),
+    "026_fix_exports_schema.sql"
+  );
+
+  assert.equal(
+    getCanonicalMigrationFilename("026_fix_exports_schema.sql"),
+    "026_fix_exports_schema.sql"
+  );
+
+  assert.equal(
+    getCanonicalMigrationFilename("045_drop_cpa_audit_user_fks.sql"),
+    "045_drop_cpa_audit_user_fks.sql"
   );
 });
 

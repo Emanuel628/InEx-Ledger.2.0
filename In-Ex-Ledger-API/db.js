@@ -111,6 +111,11 @@ const MIGRATION_CHECKSUM_COMPATIBILITY = {
     "fb3d6f923d83707347a58d95dd7b9e6557b98c903fd1d1d060af81088986eebf"
   ])
 };
+const HISTORICAL_MIGRATION_FILENAME_ALIASES = {
+  "026_fix_exports_schema.sql": new Set([
+    "20260510_fix_exports_schema.sql"
+  ])
+};
 
 pool.on('error', (err) => {
   console.error('Unexpected database pool error:', err.message);
@@ -194,6 +199,20 @@ function isCompatibleHistoricalMigrationChecksum(filename, storedChecksum) {
   return !!allowedChecksums && allowedChecksums.has(storedChecksum);
 }
 
+function getCanonicalMigrationFilename(filename) {
+  if (HISTORICAL_MIGRATION_FILENAME_ALIASES[filename]) {
+    return filename;
+  }
+
+  for (const [canonicalFilename, aliases] of Object.entries(HISTORICAL_MIGRATION_FILENAME_ALIASES)) {
+    if (aliases.has(filename)) {
+      return canonicalFilename;
+    }
+  }
+
+  return filename;
+}
+
 function hasRequiredColumns(actualColumns, requiredColumns) {
   const actual = new Set(actualColumns);
   return requiredColumns.every((columnName) => actual.has(columnName));
@@ -244,6 +263,80 @@ async function repairAppliedMigrationChecksum(filename, checksum) {
       [filename, checksum]
     )
   );
+}
+
+async function normalizeHistoricalMigrationAliases() {
+  const aliasEntries = Object.entries(HISTORICAL_MIGRATION_FILENAME_ALIASES);
+  if (!aliasEntries.length) {
+    return;
+  }
+
+  const client = await withRetry(() => pool.connect());
+  try {
+    await client.query('BEGIN');
+
+    for (const [canonicalFilename, aliasSet] of aliasEntries) {
+      const aliases = Array.from(aliasSet);
+      if (!aliases.length) {
+        continue;
+      }
+
+      const result = await client.query(
+        `SELECT filename
+           FROM schema_migrations
+          WHERE filename = $1
+             OR filename = ANY($2::text[])
+          ORDER BY CASE WHEN filename = $1 THEN 0 ELSE 1 END, filename`,
+        [canonicalFilename, aliases]
+      );
+
+      if (!result.rowCount) {
+        continue;
+      }
+
+      const canonicalRow = result.rows.find((row) => row.filename === canonicalFilename);
+      const aliasRows = result.rows.filter((row) => row.filename !== canonicalFilename);
+
+      if (canonicalRow) {
+        if (aliasRows.length) {
+          await client.query(
+            'DELETE FROM schema_migrations WHERE filename = ANY($1::text[])',
+            [aliasRows.map((row) => row.filename)]
+          );
+          console.warn(
+            `Removed ${aliasRows.length} legacy migration alias entr${aliasRows.length === 1 ? 'y' : 'ies'} for ${canonicalFilename}.`
+          );
+        }
+        continue;
+      }
+
+      const [primaryAlias, ...extraAliases] = aliasRows;
+      await client.query(
+        'UPDATE schema_migrations SET filename = $2 WHERE filename = $1',
+        [primaryAlias.filename, canonicalFilename]
+      );
+      if (extraAliases.length) {
+        await client.query(
+          'DELETE FROM schema_migrations WHERE filename = ANY($1::text[])',
+          [extraAliases.map((row) => row.filename)]
+        );
+      }
+      console.warn(
+        `Normalized historical migration alias ${primaryAlias.filename} -> ${canonicalFilename}.`
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackErr) {
+      console.error(`ROLLBACK failed while normalizing migration aliases: ${rollbackErr.message}`);
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // Run a single migration file inside a transaction and record it on success
@@ -304,6 +397,7 @@ async function initDatabase() {
   }
 
   await bootstrapMigrationsTable();
+  await normalizeHistoricalMigrationAliases();
   const appliedMap = await getAppliedMigrations();
 
   let newCount = 0;
@@ -365,6 +459,7 @@ module.exports = {
   withRetry,
   computeChecksum,
   normalizeChecksumContent,
+  getCanonicalMigrationFilename,
   hasRequiredColumns,
   isCompatibleHistoricalMigrationChecksum,
   migrationStats,

@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const { pool, withRetry, computeChecksum } = require("../db.js");
+const { pool, withRetry, computeChecksum, getCanonicalMigrationFilename } = require("../db.js");
 
 const BOOTSTRAP_SQL = `
   CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -78,22 +78,26 @@ function buildDriftReport(appliedRows, currentChecksums, fileFilter) {
   const missingFiles = [];
 
   for (const row of appliedRows) {
-    if (fileFilter && row.filename !== fileFilter) {
+    const canonicalFilename = getCanonicalMigrationFilename(row.filename);
+
+    if (fileFilter && row.filename !== fileFilter && canonicalFilename !== fileFilter) {
       continue;
     }
 
-    if (!currentChecksums.has(row.filename)) {
+    if (!currentChecksums.has(canonicalFilename)) {
       missingFiles.push({
         filename: row.filename,
+        canonicalFilename,
         appliedAt: row.applied_at
       });
       continue;
     }
 
-    const currentChecksum = currentChecksums.get(row.filename);
+    const currentChecksum = currentChecksums.get(canonicalFilename);
     if (currentChecksum !== row.checksum) {
       drifted.push({
         filename: row.filename,
+        canonicalFilename,
         appliedAt: row.applied_at,
         storedChecksum: row.checksum,
         currentChecksum
@@ -113,7 +117,10 @@ function printReport({ drifted, missingFiles }) {
   if (missingFiles.length) {
     console.error("Applied migrations missing from disk:");
     for (const item of missingFiles) {
-      console.error(`- ${item.filename} (applied ${item.appliedAt})`);
+      const aliasNote = item.canonicalFilename !== item.filename
+        ? ` -> expected ${item.canonicalFilename}`
+        : "";
+      console.error(`- ${item.filename}${aliasNote} (applied ${item.appliedAt})`);
     }
   }
 
@@ -121,6 +128,9 @@ function printReport({ drifted, missingFiles }) {
     console.error("Applied migrations with checksum drift:");
     for (const item of drifted) {
       console.error(`- ${item.filename}`);
+      if (item.canonicalFilename !== item.filename) {
+        console.error(`  canonical: ${item.canonicalFilename}`);
+      }
       console.error(`  stored:  ${item.storedChecksum}`);
       console.error(`  current: ${item.currentChecksum}`);
     }
@@ -165,7 +175,12 @@ async function main() {
   const currentChecksums = loadCurrentMigrationChecksums(migrationsDir);
   const appliedRows = await loadAppliedMigrations();
 
-  if (args.file && !appliedRows.some((row) => row.filename === args.file)) {
+  if (
+    args.file &&
+    !appliedRows.some((row) =>
+      row.filename === args.file || getCanonicalMigrationFilename(row.filename) === args.file
+    )
+  ) {
     console.log(`Applied migration not present in schema_migrations yet: ${args.file}. Nothing to repair.`);
     return;
   }
