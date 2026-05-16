@@ -151,6 +151,21 @@ function getPdfLabels(lang) {
   return { ...PDF_LABELS.en, ...PDF_LABELS[lang] };
 }
 
+const FLAG_CODE_MAP = {
+  'Uncategorized': 'UC',
+  'Needs category': 'NC',
+  'Missing description': 'MD',
+  'Negative expense': 'NE',
+  'Mixed-use': 'MU',
+  'Review': 'RV',
+  'Indirect tax': 'IX',
+  'FX': 'FX',
+  'Needs tax mapping': 'TM',
+  'Special category': 'SC'
+};
+const FLAG_CODE_LEGEND = 'UC=Uncategorized  NC=Needs category  TM=Tax map missing  MD=No description  SC=Meals/auto/home  MU=Mixed-use  RV=Review';
+
+
 const SCHEDULE_C_LINE_MAP = {
   gross_receipts: 'Line 1 — Gross receipts or sales',
   gross_receipts_sales: 'Line 1 — Gross receipts or sales',
@@ -601,6 +616,7 @@ function deriveBusinessAmounts(txn, category, options = {}) {
 
   let deductibleAmount = netAmount;
   let nonDeductibleAmount = 0;
+  let requiresAllocation = false;
   const warnings = [];
 
   if (isExpense && isMealsLike(categoryName, taxMapping, text)) {
@@ -610,10 +626,15 @@ function deriveBusinessAmounts(txn, category, options = {}) {
   }
 
   if (isExpense && isVehicleLike(categoryName, taxMapping, text)) {
+    requiresAllocation = true;
     warnings.push(region === 'CA' ? PDF_LABELS.en.warning_vehicle_ca : PDF_LABELS.en.warning_vehicle_us);
   }
   if (isExpense && isHomeOfficeLike(categoryName, taxMapping, text)) {
+    requiresAllocation = true;
     warnings.push(region === 'CA' ? PDF_LABELS.en.warning_home_office_ca : PDF_LABELS.en.warning_home_office_us);
+  }
+  if (isExpense && !isMealsLike(categoryName, taxMapping, text) && /phone|internet|telephone/i.test(`${categoryName} ${taxMapping} ${text}`)) {
+    requiresAllocation = true;
   }
   if (isExpense && isTravelLike(categoryName, taxMapping, text)) {
     warnings.push(PDF_LABELS.en.warning_travel);
@@ -634,6 +655,7 @@ function deriveBusinessAmounts(txn, category, options = {}) {
     netAmount: Number(netAmount.toFixed(2)),
     deductibleAmount: Number(deductibleAmount.toFixed(2)),
     nonDeductibleAmount: Number(nonDeductibleAmount.toFixed(2)),
+    requiresAllocation,
     warnings: Array.from(new Set(warnings))
   };
 }
@@ -645,6 +667,9 @@ function classifyExcludedTransaction(txn, category, region) {
   const text = buildTransactionText(txn);
   const combined = `${categoryName} ${taxMapping} ${text}`;
 
+  if (/^(payroll|wages?|salary|w-?2|employee\s+wages?)\b/i.test(categoryName)) {
+    return PDF_LABELS.en.reason_payroll;
+  }
   if (normalizedType === 'transfer' || /(transfer|credit card payment|cc payment|internal transfer|online transfer from sav|online transfer to sav)/i.test(combined)) {
     return PDF_LABELS.en.reason_transfer;
   }
@@ -928,7 +953,7 @@ function buildIdentityPage(data) {
   const {
     labels, totals, currency, legalName, operatingName, taxId, naics, businessName,
     startDate, endDate, reportId, generatedAt, accountingBasis, region, province,
-    reviewInsights, isSecure, categoryPreviewEntries = [], address = "", fiscalYearStart = "",
+    reviewInsights, isSecure, address = "", fiscalYearStart = "",
     materialParticipation, gstHstRegistered, gstHstNumber, gstHstMethod
   } = data;
 
@@ -995,27 +1020,15 @@ function buildIdentityPage(data) {
     [labels.uncategorized_transactions, String(reviewInsights.uncategorizedCount)],
     ['Imported (needs real category)', String(reviewInsights.needsCategoryCount || 0)],
     ['Expenses missing tax mapping', String(reviewInsights.unmappedTaxCount || 0)],
+    ['Meals, auto, home-office items (SC)', String(reviewInsights.specialCategoryCount || 0)],
     [labels.review_flagged_transactions, String(reviewInsights.reviewFlagCount)],
     ['Possible duplicate transactions', String(reviewInsights.duplicateCount)],
     [labels.receipt_coverage, reviewInsights.receiptCoverageText],
     [labels.transfers_excluded_title, String(reviewInsights.excludedCount || 0)]
   ]);
 
-  if (categoryPreviewEntries.length) {
-    canvas.text(40, 318, labels.category_breakdown_title, 12, 'F2');
-    canvas.text(40, 296, labels.col_category, 9, 'F2');
-    canvas.text(220, 296, labels.col_tax_mapping, 9, 'F2');
-    canvas.text(470, 296, labels.col_amount, 9, 'F2');
-    canvas.text(540, 296, labels.col_review_status, 9, 'F2');
-    let categoryY = 276;
-    categoryPreviewEntries.forEach((row) => {
-      canvas.text(40, categoryY, truncateText(row.categoryName, 28), 8);
-      canvas.text(220, categoryY, truncateText(row.taxMapping, 40), 8);
-      canvas.text(470, categoryY, row.amount, 8);
-      canvas.text(540, categoryY, row.reviewStatus, 8);
-      categoryY -= 14;
-    });
-  }
+  canvas.text(40, 210, 'Category totals and tax mapping: see next section', 9);
+  canvas.text(40, 196, 'Detailed transaction ledger: see appendix pages', 9);
 
   return canvas;
 }
@@ -1050,64 +1063,59 @@ function buildCategoryPages(transactions, categories, currency, labels, embedded
   });
 }
 
-function buildContentsPage(labels, region) {
+function buildContentsPage(labels, region, taxYear, gstHstRegistered) {
   const canvas = new PdfCanvas();
   const normalizedRegion = normalizeRegionCode(region);
-  const rows = normalizedRegion === 'CA'
+  const tocRows = normalizedRegion === 'CA'
     ? [
         '1. Entity and tax profile',
-        '2. Workpaper contents',
-        '3. CRA rules snapshot',
-        '4. Category totals by T2125 mapping',
-        '5. Income / T4A reconciliation',
-        '6. Deductibility adjustments and GST/HST review',
-        '7. Detailed transaction ledger',
-        '8. Excluded transfers, payroll, and personal review',
-        '9. Support schedules and disclosure'
+        '2. Workpaper contents and CRA rules snapshot',
+        '3. Category totals by T2125 mapping',
+        '4. Income / T4A reconciliation',
+        '5. Deductibility adjustments and GST/HST review',
+        '6. Detailed transaction ledger',
+        '7. Excluded transfers, payroll, and personal review',
+        '8. Support schedules and disclosure'
       ]
     : [
         '1. Entity and tax profile',
-        '2. Workpaper contents',
-        '3. IRS rules snapshot',
-        '4. Category totals by Schedule C mapping',
-        '5. Income / 1099 reconciliation',
-        '6. Deductibility adjustments and receipt review',
-        '7. Detailed transaction ledger',
-        '8. Excluded transfers, payroll, and personal review',
-        '9. Support schedules and disclosure'
+        '2. Workpaper contents and IRS rules snapshot',
+        '3. Category totals by Schedule C mapping',
+        '4. Income / 1099 reconciliation',
+        '5. Deductibility adjustments and receipt review',
+        '6. Detailed transaction ledger',
+        '7. Excluded transfers, payroll, and personal review',
+        '8. Support schedules and disclosure'
       ];
 
   canvas.text(40, 760, labels.toc_title, 16, 'F2');
   let y = 724;
-  rows.forEach((row) => {
+  tocRows.forEach((row) => {
     canvas.text(40, y, row, 10);
     y -= 20;
   });
-  canvas.text(40, 500, normalizedRegion === 'CA' ? labels.profile_note_ca : labels.profile_note_us, 9);
-  return [canvas];
-}
+  canvas.text(40, y - 4, normalizedRegion === 'CA' ? labels.profile_note_ca : labels.profile_note_us, 9);
 
-function buildRulesSnapshotPage(labels, region, taxYear, gstHstRegistered) {
-  const normalizedRegion = normalizeRegionCode(region);
-  const canvas = new PdfCanvas();
-  canvas.text(40, 760, labels.tax_rules_title, 16, 'F2');
-  const necThreshold = taxYear >= 2026 ? '$2,000' : '$600';
-  const rows = normalizedRegion === 'CA'
+  // Rules snapshot on same page
+  const necThreshold = (taxYear || 0) >= 2026 ? '$2,000' : '$600';
+  const ruleRows = normalizedRegion === 'CA'
     ? [
         [labels.tax_rules_ca_threshold, '$500 payer support threshold'],
         [labels.tax_rules_meals, '50% deductible unless special exception applies'],
         [labels.tax_rules_vehicle, 'CRA logbook support is expected'],
         [labels.tax_rules_receipts, 'Keep vendor/date/amount/GST details'],
-        [labels.tax_rules_gst, gstHstRegistered ? 'Net-of-tracked GST/HST in this export' : 'Gross amounts retained because business is not registered']
+        [labels.tax_rules_gst, gstHstRegistered ? 'Net-of-tracked GST/HST in this export' : 'Gross amounts retained (not registered)']
       ]
     : [
-        [labels.tax_rules_us_threshold, `${necThreshold} per payer for tax year ${taxYear}`],
-        [labels.tax_rules_meals, '50% deductible unless a specific exception applies'],
-        [labels.tax_rules_vehicle, 'Mileage or actual-expense support still required'],
-        [labels.tax_rules_receipts, 'Travel, meals, and lodging need stronger support'],
+        [labels.tax_rules_us_threshold, `${necThreshold} per payer for tax year ${taxYear}; verify with preparer`],
+        [labels.tax_rules_meals, '50% deductible; business purpose required'],
+        [labels.tax_rules_vehicle, 'Mileage log or actual-expense records required'],
+        [labels.tax_rules_receipts, 'Travel, meals, lodging, and gifts need stronger support'],
         [labels.tax_rules_gst, 'Not applicable to US Schedule C reporting']
       ];
-  buildKeyValueRows(canvas, 40, 720, rows, 10, 20);
+
+  canvas.text(40, 460, labels.tax_rules_title, 12, 'F2');
+  buildKeyValueRows(canvas, 40, 440, ruleRows, 10, 20);
   return [canvas];
 }
 
@@ -1168,12 +1176,13 @@ function buildExclusionPages(transactions, currency, labels) {
 }
 
 function buildDeductionPages(transactions, currency, labels, region) {
-  const rows = (transactions || [])
+  const isCA = normalizeRegionCode(region) === 'CA';
+  const expenseRows = (transactions || [])
     .filter((txn) => String(txn.type || '').toLowerCase() !== 'income')
     .map((txn) => {
       const category = txn.__category || null;
       const details = txn.__businessAmounts || deriveBusinessAmounts(txn, category, { region });
-      if (!(details.nonDeductibleAmount > 0 || details.taxAmount > 0 || details.warnings.length)) {
+      if (!(details.nonDeductibleAmount > 0 || details.taxAmount > 0 || details.warnings.length || details.requiresAllocation)) {
         return null;
       }
       return {
@@ -1182,30 +1191,59 @@ function buildDeductionPages(transactions, currency, labels, region) {
         gross: formatCurrencyForPdf(details.grossAmount, currency),
         tax: formatCurrencyForPdf(details.taxAmount, currency),
         net: formatCurrencyForPdf(details.netAmount, currency),
-        allowed: formatCurrencyForPdf(details.deductibleAmount, currency),
-        blocked: formatCurrencyForPdf(details.nonDeductibleAmount, currency),
-        warning: truncateText(details.warnings.join(' | '), 44)
+        allowed: details.requiresAllocation ? 'TBD' : formatCurrencyForPdf(details.deductibleAmount, currency),
+        blocked: details.requiresAllocation ? 'TBD' : formatCurrencyForPdf(details.nonDeductibleAmount, currency),
+        warning: truncateText(details.warnings.join(' | '), 50),
+        requiresAllocation: details.requiresAllocation
       };
     })
     .filter(Boolean);
 
-  if (!rows.length) return [];
+  if (!expenseRows.length) return [];
 
-  return chunkArray(rows, 14).map((chunk, index) => {
+  // Build grouped summary counts for page 1 header
+  const mealsRows = expenseRows.filter((r) => /50% meals/i.test(r.warning));
+  const vehicleRows = expenseRows.filter((r) => r.requiresAllocation && /mileage|logbook|vehicle/i.test(r.warning));
+  const homeOfficeRows = expenseRows.filter((r) => r.requiresAllocation && /home.office|form 8829|business.use.of.home/i.test(r.warning));
+
+  const titleBase = isCA ? labels.deductions_title_ca : labels.deductions_title_us;
+  const pages = [];
+
+  chunkArray(expenseRows, 14).forEach((chunk, index) => {
     const canvas = new PdfCanvas();
-    const titleBase = normalizeRegionCode(region) === 'CA' ? labels.deductions_title_ca : labels.deductions_title_us;
     const title = index === 0 ? titleBase : `${titleBase} - ${labels.section_continued}`;
     canvas.text(40, 760, title, 16, 'F2');
-    canvas.text(40, 730, labels.col_date, 8, 'F2');
-    canvas.text(95, 730, labels.col_payee_memo, 8, 'F2');
-    canvas.text(250, 730, labels.deduction_gross, 8, 'F2');
-    canvas.text(308, 730, labels.deduction_tax_component, 8, 'F2');
-    canvas.text(360, 730, labels.deduction_net, 8, 'F2');
-    canvas.text(418, 730, labels.deduction_allowed, 8, 'F2');
-    canvas.text(480, 730, labels.deduction_disallowed, 8, 'F2');
-    canvas.text(40, 712, labels.deduction_warning, 8, 'F2');
-    let y = 690;
+
+    let headerY = 738;
+    if (index === 0) {
+      // Summary counts so CPA sees the big picture before the wall of rows
+      if (mealsRows.length) {
+        canvas.text(40, headerY, `Meals requiring 50% review: ${mealsRows.length} transactions — 50% limit applied automatically below`, 9);
+        headerY -= 14;
+      }
+      if (vehicleRows.length) {
+        canvas.text(40, headerY, `Vehicle requiring mileage/actual-expense support: ${vehicleRows.length} transactions — deductible amount shown as TBD`, 9);
+        headerY -= 14;
+      }
+      if (homeOfficeRows.length) {
+        canvas.text(40, headerY, `Home-office requiring sq-ft allocation: ${homeOfficeRows.length} transactions — deductible amount shown as TBD`, 9);
+        headerY -= 14;
+      }
+      headerY -= 4;
+    }
+
+    const colY = headerY - 4;
+    canvas.text(40, colY, labels.col_date, 8, 'F2');
+    canvas.text(95, colY, labels.col_payee_memo, 8, 'F2');
+    canvas.text(250, colY, labels.deduction_gross, 8, 'F2');
+    canvas.text(308, colY, labels.deduction_tax_component, 8, 'F2');
+    canvas.text(360, colY, labels.deduction_net, 8, 'F2');
+    canvas.text(418, colY, labels.deduction_allowed, 8, 'F2');
+    canvas.text(480, colY, labels.deduction_disallowed, 8, 'F2');
+    canvas.text(40, colY - 16, labels.deduction_warning, 8, 'F2');
+    let y = colY - 36;
     chunk.forEach((row) => {
+      if (y < 60) return;
       canvas.text(40, y, row.date, 8);
       canvas.text(95, y, row.description, 8);
       canvas.text(250, y, row.gross, 8);
@@ -1217,8 +1255,9 @@ function buildDeductionPages(transactions, currency, labels, region) {
       canvas.text(40, y, row.warning, 8);
       y -= 18;
     });
-    return canvas;
+    pages.push(canvas);
   });
+  return pages;
 }
 
 function buildTransactionPages(transactions, accounts, categories, currency, labels, region) {
@@ -1261,34 +1300,38 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
     );
     // Build conditional note — only when there is genuinely useful extra detail
     const noteParts = [];
+    // Line 2: account / category / payer
+    const accountCatStr = `${safeValue(account?.name, '-')} / ${safeValue(category?.name, 'Uncategorized')}`;
+    noteParts.push(truncateText(accountCatStr, 32));
     if (isIncome && (txn.payer_name || txn.payerName)) {
       noteParts.push(`Payer: ${truncateText(txn.payer_name || txn.payerName, 22)}`);
     }
     if (isIncome && (txn.tax_form_type || txn.taxFormType)) {
       noteParts.push(`Form: ${txn.tax_form_type || txn.taxFormType}`);
     }
-    if (businessAmounts.warnings.length) {
-      noteParts.push(truncateText(businessAmounts.warnings.join(' | '), 55));
-    }
-    if (businessAmounts.nonDeductibleAmount > 0) {
+    if (businessAmounts.requiresAllocation) {
+      noteParts.push('Allocation pending — business-use % required');
+    } else if (businessAmounts.nonDeductibleAmount > 0) {
       noteParts.push(`Non-deductible: ${formatCurrencyForPdf(businessAmounts.nonDeductibleAmount, currency)}`);
     }
+    if (businessAmounts.warnings.length && !businessAmounts.requiresAllocation) {
+      noteParts.push(truncateText(businessAmounts.warnings[0], 42));
+    }
     if (!(txn.receipt_id || txn.receiptId) && !isIncome && flags.includes('Special category')) {
-      noteParts.push('No receipt on file');
+      noteParts.push('No receipt');
     }
     const amountValue = isIncome ? businessAmounts.netAmount : businessAmounts.deductibleAmount;
+    const flagCodes = flags.length
+      ? flags.map((f) => FLAG_CODE_MAP[f] || f.slice(0, 2).toUpperCase()).join(' ')
+      : labels.review_ok;
     rowItems.push({
       isHeader: false,
       date: dateStr.slice(5),
-      payeeMemo: truncateText(buildTransactionText(txn) || '(No description)', 32),
-      accountCat: truncateText(
-        `${safeValue(account?.name, '-')} / ${safeValue(category?.name, 'Uncategorized')}`,
-        20
-      ),
+      payeeMemo: truncateText(buildTransactionText(txn) || '(No description)', 42),
       taxMapping: shortenTaxLine(taxMapRaw),
       amountStr: (isIncome ? '+' : '') + formatCurrencyForPdf(amountValue, currency),
-      flagStr: flags.length ? truncateText(flags.join(', '), 14) : labels.review_ok,
-      note: noteParts.length ? noteParts.join(' | ') : null
+      flagStr: flagCodes,
+      note: noteParts.join(' | ')
     });
   });
 
@@ -1300,16 +1343,16 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
   const startNewPage = () => {
     const c = new PdfCanvas();
     c.text(40, 760, labels.transaction_log_title, 16, 'F2');
-    if (!isFirstPage) c.text(200, 760, `(${labels.section_continued})`, 9);
+    if (!isFirstPage) c.text(220, 760, `(${labels.section_continued})`, 9);
     isFirstPage = false;
-    c.text(40, 732, labels.col_date, 9, 'F2');
-    c.text(90, 732, labels.col_payee_memo, 9, 'F2');
-    c.text(272, 732, labels.col_account_category, 9, 'F2');
-    c.text(392, 732, labels.col_tax_map_short, 9, 'F2');
-    c.text(492, 732, labels.col_amount, 9, 'F2');
-    c.text(549, 732, labels.col_flag, 9, 'F2');
+    c.text(40, 738, labels.col_date, 9, 'F2');
+    c.text(90, 738, labels.col_payee_memo, 9, 'F2');
+    c.text(340, 738, labels.col_tax_map_short, 9, 'F2');
+    c.text(462, 738, labels.col_amount, 9, 'F2');
+    c.text(530, 738, labels.col_flag, 9, 'F2');
+    c.text(40, 724, FLAG_CODE_LEGEND, 7);
     canvasObj = c;
-    y = 708;
+    y = 706;
   };
 
   startNewPage();
@@ -1320,19 +1363,16 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
       canvasObj.text(40, y, item.label, 9, 'F2');
       y -= 22;
     } else {
-      const needed = 14 + (item.note ? 12 : 0);
+      const needed = 14 + 12; // primary row + note line always shown
       if (y - needed < 60) { pages.push(canvasObj); startNewPage(); }
       canvasObj.text(40, y, item.date, 8);
       canvasObj.text(90, y, item.payeeMemo, 8);
-      canvasObj.text(272, y, item.accountCat, 8);
-      canvasObj.text(392, y, item.taxMapping, 8);
-      canvasObj.text(492, y, item.amountStr, 8);
-      canvasObj.text(549, y, item.flagStr, 8);
-      y -= 14;
-      if (item.note) {
-        canvasObj.text(90, y, truncateText(item.note, 70), 7);
-        y -= 12;
-      }
+      canvasObj.text(340, y, item.taxMapping, 8);
+      canvasObj.text(462, y, item.amountStr, 8);
+      canvasObj.text(530, y, item.flagStr, 8);
+      y -= 13;
+      canvasObj.text(90, y, truncateText(item.note, 76), 7);
+      y -= 12;
     }
   });
 
@@ -1497,10 +1537,10 @@ function buildCpaChecklistPage(opts) {
   const receiptOk = reviewInsights.expenseTransactionCount > 0 && reviewInsights.missingReceiptCount === 0;
   checkRow(receiptOk, 'Receipts attached to all expense transactions',
     `${reviewInsights.receiptLinkedCount} of ${reviewInsights.expenseTransactionCount} covered`);
-  checkRow(reviewInsights.uncategorizedCount === 0, 'All transactions categorized',
-    reviewInsights.uncategorizedCount > 0 ? `${reviewInsights.uncategorizedCount} uncategorized` : 'All categorized');
-  checkRow((reviewInsights.needsCategoryCount || 0) === 0, 'No imported categories needing reassignment',
-    (reviewInsights.needsCategoryCount || 0) > 0 ? `${reviewInsights.needsCategoryCount} transaction(s) in Imported Expense/Income — assign a real category` : 'None detected');
+  checkRow(reviewInsights.uncategorizedCount === 0, 'No transactions without a category assigned',
+    reviewInsights.uncategorizedCount > 0 ? `${reviewInsights.uncategorizedCount} still need a category` : 'All assigned');
+  checkRow((reviewInsights.needsCategoryCount || 0) === 0, 'No imported categories — all mapped to real categories',
+    (reviewInsights.needsCategoryCount || 0) > 0 ? `${reviewInsights.needsCategoryCount} in Imported Expense/Income — assign real category before filing` : 'None detected');
   checkRow(reviewInsights.unmappedExpenseCount === 0, 'All expense categories mapped to tax line',
     reviewInsights.unmappedExpenseCount > 0 ? `${reviewInsights.unmappedExpenseCount} expense(s) with unmapped category` : 'All mapped');
   checkRow(reviewInsights.duplicateCount === 0, 'No duplicate transactions detected',
@@ -2078,9 +2118,6 @@ function buildPdfExport(options) {
     region: normalizedRegion
   });
   const isSecure = Boolean(String(taxId || '').trim());
-  const categoryEntries = buildCategoryBuckets(includedTransactions, categories, labels, effectiveCurrency, normalizedRegion);
-  const categoryPreviewEntries = categoryEntries.slice(0, 12);
-
   const canvases = [
     buildIdentityPage({
       labels,
@@ -2107,12 +2144,10 @@ function buildPdfExport(options) {
       gstHstNumber,
       gstHstMethod,
       reviewInsights,
-      isSecure,
-      categoryPreviewEntries
+      isSecure
     }),
-    ...buildContentsPage(labels, normalizedRegion),
-    ...buildRulesSnapshotPage(labels, normalizedRegion, taxYear, gstHstRegistered),
-    ...buildCategoryPages(includedTransactions, categories, effectiveCurrency, labels, categoryPreviewEntries.length, normalizedRegion),
+    ...buildContentsPage(labels, normalizedRegion, taxYear, gstHstRegistered),
+    ...buildCategoryPages(includedTransactions, categories, effectiveCurrency, labels, 0, normalizedRegion),
     ...buildTaxPacketPages({ transactions: includedTransactions, categories, receipts, currency: effectiveCurrency, region: normalizedRegion, labels, taxYear }),
     ...buildDeductionPages(includedTransactions, effectiveCurrency, labels, normalizedRegion),
     ...buildTransactionPages(includedTransactions, accounts, categories, effectiveCurrency, labels, normalizedRegion),
