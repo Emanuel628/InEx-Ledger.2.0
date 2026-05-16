@@ -1,5 +1,13 @@
 let resetPasswordSubmitting = false;
 
+function isStrongResetPassword(password) {
+  const value = String(password || "");
+  return value.length >= 8 &&
+    /[A-Z]/.test(value) &&
+    /\d/.test(value) &&
+    /[^A-Za-z0-9]/.test(value);
+}
+
 function setResetPasswordMessage(text, tone = "") {
   const message = document.getElementById("resetPasswordMessage");
   if (!message) {
@@ -54,6 +62,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (!password || !confirmPassword) {
       setResetPasswordMessage("Enter and confirm your new password.");
+      return;
+    }
+    if (!isStrongResetPassword(password)) {
+      setResetPasswordMessage("Password must be at least 8 characters and include an uppercase letter, number, and symbol.");
       return;
     }
     if (password !== confirmPassword) {

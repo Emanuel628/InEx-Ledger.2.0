@@ -50,6 +50,7 @@ const MAX_TRANSACTION_AMOUNT = 999999999.99;
 const MAX_PERCENT = 100;
 const TRANSACTION_UNDO_STACK_LIMIT = 20;
 const REFERENCE_RATE_CURRENCIES = new Set(["USD", "CAD", "EUR", "GBP", "AUD", "JPY"]);
+const EXCHANGE_RATE_REFERENCE_TIMEOUT_MS = 5000;
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -941,11 +942,23 @@ router.get("/exchange-rate-reference", async (req, res) => {
         ? `https://api.frankfurter.app/latest?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
         : `https://api.frankfurter.app/${effectiveDate}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
 
-    const response = await fetch(endpoint, {
-      headers: {
-        accept: "application/json"
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const timeoutId = controller
+      ? setTimeout(() => controller.abort(), EXCHANGE_RATE_REFERENCE_TIMEOUT_MS)
+      : null;
+    let response;
+    try {
+      response = await fetch(endpoint, {
+        headers: {
+          accept: "application/json"
+        },
+        ...(controller ? { signal: controller.signal } : {})
+      });
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
-    });
+    }
 
     if (!response.ok) {
       logWarn("GET /transactions/exchange-rate-reference upstream error", {
@@ -972,6 +985,10 @@ router.get("/exchange-rate-reference", async (req, res) => {
       advisory: "Reference only. Confirm the final rate independently before filing or reconciliation."
     });
   } catch (err) {
+    if (err?.name === "AbortError") {
+      logWarn("GET /transactions/exchange-rate-reference timed out", err);
+      return res.status(504).json({ error: "Reference exchange rate lookup timed out." });
+    }
     logError("GET /transactions/exchange-rate-reference error:", err);
     res.status(500).json({ error: "Failed to load the reference exchange rate." });
   }

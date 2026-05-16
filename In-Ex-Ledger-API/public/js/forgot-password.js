@@ -1,5 +1,10 @@
 let forgotPasswordSubmitting = false;
 
+function isForgotPasswordEmailValid(email) {
+  const normalized = String(email || "").trim();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("forgotPasswordForm");
   const message = document.getElementById("forgotPasswordMessage");
@@ -21,6 +26,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!email) {
       message.textContent = "Enter your email address.";
+      message.hidden = false;
+      return;
+    }
+    if (!isForgotPasswordEmailValid(email)) {
+      message.textContent = "Enter a valid email address.";
       message.hidden = false;
       return;
     }

@@ -70,17 +70,17 @@ Rules used here:
   Group: A11y markup
   Covers: missing dialog roles, missing `aria-pressed`, missing focus movement / announcement wiring targets
 
-- [ ] 30-60 min - Add missing email-format and password-complexity client validation to recovery pages.
+- [x] 30-60 min - Add missing email-format and password-complexity client validation to recovery pages.
   Files: `In-Ex-Ledger-API/public/js/forgot-password.js`, `In-Ex-Ledger-API/public/js/reset-password.js`
   Group: Recovery page UX
   Covers: no email format check, no client-side password-strength feedback
 
-- [ ] 30-60 min - Fix `POST /api/consent/cookie` to require CSRF protection.
+- [x] 30-60 min - Fix `POST /api/consent/cookie` to require CSRF protection.
   Files: `In-Ex-Ledger-API/routes/consent.routes.js`
   Group: Consent write protection
   Covers: cross-origin consent flipping
 
-- [ ] 30-60 min - Add missing timeouts to slow external/network-backed requests.
+- [x] 30-60 min - Add missing timeouts to slow external/network-backed requests.
   Files: `In-Ex-Ledger-API/routes/transactions.routes.js`, `In-Ex-Ledger-API/public/js/privacyService.js`
   Group: Request timeout hygiene
   Covers: Frankfurter FX proxy timeout, privacy health-check timeout

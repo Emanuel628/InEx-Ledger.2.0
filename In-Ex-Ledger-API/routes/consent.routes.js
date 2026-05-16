@@ -3,6 +3,7 @@ const express = require("express");
 const { pool } = require("../db.js");
 const { createRouteLimiter } = require("../middleware/rate-limit.middleware.js");
 const { verifyToken } = require("../middleware/auth.middleware.js");
+const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { logError } = require("../utils/logger.js");
 
 const router = express.Router();
@@ -120,7 +121,7 @@ router.get("/cookie", consentLimiter, async (req, res) => {
   }
 });
 
-router.post("/cookie", consentLimiter, async (req, res) => {
+router.post("/cookie", consentLimiter, requireCsrfProtection, async (req, res) => {
   const { decision, version } = req.body || {};
 
   if (!VALID_DECISIONS.has(decision)) {

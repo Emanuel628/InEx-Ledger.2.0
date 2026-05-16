@@ -70,6 +70,17 @@ function loadConsentRouterFixture(overrides = {}) {
       };
     }
 
+    if (requestName === "../middleware/csrf.middleware.js" || /csrf\.middleware\.js$/.test(requestName)) {
+      return {
+        requireCsrfProtection(req, res, next) {
+          if (!req.headers["x-csrf-token"]) {
+            return res.status(403).json({ error: "CSRF token missing or invalid." });
+          }
+          next();
+        }
+      };
+    }
+
     if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
       return {
         logError() {}
@@ -102,6 +113,7 @@ test("POST /api/consent/cookie stores consent against the signed-in user resolve
   try {
     const response = await request(fixture.app)
       .post("/api/consent/cookie")
+      .set("x-csrf-token", "test-csrf")
       .set("Cookie", ["refresh_token=refresh_cookie_value"])
       .send({ decision: "accepted", version: "1" });
 
@@ -115,6 +127,21 @@ test("POST /api/consent/cookie stores consent against the signed-in user resolve
     assert.equal(fixture.state.inserted[1], "user_cookie_123");
     assert.equal(fixture.state.inserted[2], "accepted");
     assert.equal(response.body?.record?.decision, "accepted");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("POST /api/consent/cookie rejects requests without a CSRF token", async () => {
+  const fixture = loadConsentRouterFixture();
+
+  try {
+    const response = await request(fixture.app)
+      .post("/api/consent/cookie")
+      .send({ decision: "accepted", version: "1" });
+
+    assert.equal(response.status, 403);
+    assert.equal(fixture.state.inserted, null);
   } finally {
     fixture.cleanup();
   }
