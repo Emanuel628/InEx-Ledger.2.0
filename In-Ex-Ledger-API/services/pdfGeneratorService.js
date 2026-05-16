@@ -49,7 +49,7 @@ const PDF_LABELS = {
     review_missing_description: 'Transactions missing description',
     review_possible_duplicates: 'Possible duplicate transactions',
     review_negative_expenses: 'Negative expense entries',
-    review_mixed_use: 'Mixed-use or personal-use entries',
+    review_mixed_use: 'Explicitly split-use / partial personal (tagged)',
     review_special_categories: 'Meals, auto, travel, or home-office items',
     review_missing_receipts: 'Expense transactions without receipt attachment',
     review_samples_title: 'Sample items for review',
@@ -1581,11 +1581,11 @@ function buildCpaChecklistPage(opts) {
       `${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)} — sq ft ratio required`);
   }
   if (reviewInsights.mixedUseCount > 0) {
-    checkRow(false, 'Mixed-use / split items — personal portion must be excluded',
-      `${reviewInsights.mixedUseCount} item(s) require allocation`);
+    checkRow(false, 'Split-use tagged transactions — personal portion must be excluded',
+      `${reviewInsights.mixedUseCount} item(s) have explicit split_use tag`);
   }
   if (reviewInsights.vehicleCount === 0 && reviewInsights.mealsCount === 0 && reviewInsights.homeOfficeCount === 0 && reviewInsights.mixedUseCount === 0) {
-    checkRow(true, 'No allocation-required categories detected', '');
+    checkRow(true, 'No allocation-required categories or split-use items detected', '');
   }
 
   sectionHead('Financial Review');
