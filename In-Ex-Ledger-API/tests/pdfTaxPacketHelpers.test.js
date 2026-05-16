@@ -8,7 +8,11 @@ const {
     computeReceiptCoverage,
     computePayerSummary,
     computeTaxLineSummary,
-    expectedTaxFormForPayer
+    expectedTaxFormForPayer,
+    validateExportProfile,
+    summarizeExportTransactions,
+    deriveBusinessAmounts,
+    resolveBusinessCurrency
   }
 } = require("../services/pdfGeneratorService.js");
 
@@ -42,6 +46,11 @@ test("expectedTaxFormForPayer applies US thresholds correctly", () => {
   assert.equal(expectedTaxFormForPayer({ region: "US", total: 599, transactionCount: 1 }), null);
   assert.equal(expectedTaxFormForPayer({ region: "US", total: 25000, transactionCount: 250 }), "1099-K");
   assert.equal(expectedTaxFormForPayer({ region: "US", total: 25000, transactionCount: 50 }), "1099-NEC");
+});
+
+test("expectedTaxFormForPayer uses 2026 NEC threshold when tax year is 2026 or later", () => {
+  assert.equal(expectedTaxFormForPayer({ region: "US", total: 1500, transactionCount: 1, taxYear: 2026 }), null);
+  assert.equal(expectedTaxFormForPayer({ region: "US", total: 2000, transactionCount: 1, taxYear: 2026 }), "1099-NEC");
 });
 
 test("expectedTaxFormForPayer applies CA T4A threshold", () => {
@@ -95,4 +104,57 @@ test("computeTaxLineSummary picks tax_map_us or tax_map_ca based on region and s
   // Only c1 has a CA mapping; everything else is unmapped
   assert.equal(summaryCa.lines.length, 1);
   assert.equal(summaryCa.lines[0].tax_line, "T2125 Line 8810");
+});
+
+test("validateExportProfile blocks incomplete US and Canada workpapers", () => {
+  assert.throws(
+    () => validateExportProfile({ region: "US", legalName: "Acme", naics: "541611", address: "123 Main", accountingMethod: "cash" }),
+    /Material participation/
+  );
+
+  assert.throws(
+    () => validateExportProfile({
+      region: "CA",
+      legalName: "Maple Co",
+      taxId: "123456789",
+      naics: "541611",
+      address: "456 Rue",
+      accountingMethod: "cash",
+      province: "QC",
+      fiscalYearStart: "01-01",
+      gstHstRegistered: true
+    }),
+    /GST\/HST registration number/
+  );
+});
+
+test("summarizeExportTransactions excludes transfer and payroll rows from business totals", () => {
+  const categories = [
+    { id: "c1", name: "Transfers", tax_map_us: null, tax_map_ca: null },
+    { id: "c2", name: "Sales", tax_map_us: "Schedule C Line 1", tax_map_ca: "T2125 Line 8000" }
+  ];
+  const transactions = [
+    { id: "t1", type: "expense", description: "Online Transfer from SAV", amount: 250, category_id: "c1" },
+    { id: "t2", type: "income", description: "PAYRO ACME INC", amount: 1200, category_id: "c2" },
+    { id: "t3", type: "income", description: "Client invoice", amount: 800, category_id: "c2" }
+  ];
+  const summary = summarizeExportTransactions(transactions, categories, { region: "US" });
+  assert.equal(summary.included.length, 1);
+  assert.equal(summary.excluded.length, 2);
+  assert.equal(summary.excluded[0].__exclusionReason != null, true);
+});
+
+test("deriveBusinessAmounts splits meals and removes tracked GST/HST in Canada", () => {
+  const category = { name: "Meals", tax_map_ca: "T2125 Line 8523" };
+  const tx = { type: "expense", amount: 115, indirect_tax_amount: 15 };
+  const result = deriveBusinessAmounts(tx, category, { region: "CA", gstHstRegistered: true });
+  assert.equal(result.netAmount, 100);
+  assert.equal(result.deductibleAmount, 50);
+  assert.equal(result.nonDeductibleAmount, 50);
+});
+
+test("resolveBusinessCurrency ties the export currency to the business jurisdiction", () => {
+  assert.equal(resolveBusinessCurrency("CA", "USD"), "CAD");
+  assert.equal(resolveBusinessCurrency("US", "CAD"), "CAD");
+  assert.equal(resolveBusinessCurrency("US", ""), "USD");
 });

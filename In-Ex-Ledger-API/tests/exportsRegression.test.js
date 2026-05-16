@@ -51,7 +51,10 @@ function buildTestPdf() {
     reportId: "EXP-20260430-TEST",
     naics: "541611",
     region: "us",
-    province: ""
+    province: "",
+    address: "123 Main St, New York, NY",
+    accountingMethod: "cash",
+    materialParticipation: true
   });
 }
 
@@ -127,7 +130,18 @@ function loadExportsRouter(options = {}) {
         notes: "Client travel"
       }
     ],
-    business: { name: "Acme", region: "us", province: "" }
+    business: {
+      name: "Acme",
+      region: "us",
+      province: "",
+      address: "123 Main St, New York, NY",
+      tax_id: "12-3456789",
+      fiscal_year_start: "01-01",
+      accounting_method: "cash",
+      material_participation: true,
+      business_activity_code: "541611",
+      operating_name: "Acme"
+    }
   };
   const decryptErrorMessage = options.decryptErrorMessage || "";
 
@@ -312,15 +326,19 @@ test("buildPdfExport writes literal Helvetica text commands instead of UTF-16 he
   const pdf = buildTestPdf().toString("latin1");
 
   assert.match(pdf, /\/BaseFont \/Helvetica/);
-  assert.match(pdf, /\(Bookkeeping Export for CPA Review\) Tj/);
+  assert.match(pdf, /\(US CPA Workpaper Export\) Tj/);
   assert.match(pdf, /\(Secure Export\) Tj/);
   assert.match(pdf, /\(Export ID: EXP-20260430-TEST\) Tj/);
   assert.match(pdf, /\(Tax ID: 12-3456789\) Tj/);
   assert.match(pdf, /\(Legal business name: Jose Consulting\) Tj/);
   assert.match(pdf, /\(Operating name \\\(DBA\\\): Cafe Etude\) Tj/);
+  assert.match(pdf, /\(Business address: 123 Main St, New York, NY\) Tj/);
+  assert.match(pdf, /\(US Filing Profile\) Tj/);
+  assert.match(pdf, /\(Workpaper Contents\) Tj/);
+  assert.match(pdf, /\(Jurisdiction Rules Snapshot\) Tj/);
   assert.match(pdf, /\(Category Totals and Suggested Tax Mapping\) Tj/);
   assert.match(pdf, /\(Detailed Transaction Ledger\) Tj/);
-  assert.match(pdf, /\(Review Items and Exceptions\) Tj/);
+  assert.match(pdf, /\(Final CPA Workpaper Note\) Tj/);
   assert.match(pdf, /\(Invoice \\\(April\\\) \| Paye\.\.\.\) Tj/);
   assert.doesNotMatch(pdf, /<FEFF/i);
   assert.doesNotMatch(pdf, /[^\x00-\x7F]/);

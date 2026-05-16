@@ -437,7 +437,12 @@ async function initBusinessProfileForm() {
       fiscalYearStart: document.getElementById("fiscal-year").value,
       address: addressParts.join("\n"),
       operatingName: document.getElementById("operating-name").value.trim(),
-      businessActivityCode: document.getElementById("business-activity-code").value.trim()
+      businessActivityCode: document.getElementById("business-activity-code").value.trim(),
+      accountingMethod: document.getElementById("accounting-method").value,
+      materialParticipation: document.getElementById("material-participation").value,
+      gstHstRegistered: document.getElementById("gst-hst-registered").checked,
+      gstHstNumber: document.getElementById("gst-hst-number").value.trim(),
+      gstHstMethod: document.getElementById("gst-hst-method").value
     };
 
     const savedBusiness = await saveBusinessProfileToApi(nextProfile);
@@ -451,7 +456,18 @@ async function initBusinessProfileForm() {
       fiscalYearStart: savedBusiness?.fiscal_year_start || nextProfile.fiscalYearStart,
       address: savedBusiness?.address || nextProfile.address,
       operatingName: savedBusiness?.operating_name || nextProfile.operatingName,
-      businessActivityCode: savedBusiness?.business_activity_code || nextProfile.businessActivityCode
+      businessActivityCode: savedBusiness?.business_activity_code || nextProfile.businessActivityCode,
+      accountingMethod: savedBusiness?.accounting_method || nextProfile.accountingMethod,
+      materialParticipation:
+        typeof savedBusiness?.material_participation === "boolean"
+          ? (savedBusiness.material_participation ? "yes" : "no")
+          : nextProfile.materialParticipation,
+      gstHstRegistered:
+        typeof savedBusiness?.gst_hst_registered === "boolean"
+          ? savedBusiness.gst_hst_registered
+          : nextProfile.gstHstRegistered,
+      gstHstNumber: savedBusiness?.gst_hst_number || nextProfile.gstHstNumber,
+      gstHstMethod: savedBusiness?.gst_hst_method || nextProfile.gstHstMethod
     };
     saveBusinessProfile(savedProfile);
     settingsOverviewState.businessProfile = savedProfile;
@@ -468,7 +484,17 @@ async function initBusinessProfileForm() {
                   fiscal_year_start: savedProfile.fiscalYearStart || business?.fiscal_year_start || null,
                   address: savedProfile.address || business?.address || null,
                   operating_name: savedProfile.operatingName || business?.operating_name || null,
-                  business_activity_code: savedProfile.businessActivityCode || business?.business_activity_code || null
+                  business_activity_code: savedProfile.businessActivityCode || business?.business_activity_code || null,
+                  accounting_method: savedProfile.accountingMethod || business?.accounting_method || null,
+                  material_participation:
+                    savedProfile.materialParticipation === "yes"
+                      ? true
+                      : savedProfile.materialParticipation === "no"
+                        ? false
+                        : business?.material_participation ?? null,
+                  gst_hst_registered: Boolean(savedProfile.gstHstRegistered),
+                  gst_hst_number: savedProfile.gstHstNumber || business?.gst_hst_number || null,
+                  gst_hst_method: savedProfile.gstHstMethod || business?.gst_hst_method || null
                 }
               : business
           ));
@@ -481,7 +507,17 @@ async function initBusinessProfileForm() {
             fiscal_year_start: savedProfile.fiscalYearStart || window.__LUNA_ME__.active_business.fiscal_year_start || null,
             address: savedProfile.address || window.__LUNA_ME__.active_business.address || null,
             operating_name: savedProfile.operatingName || window.__LUNA_ME__.active_business.operating_name || null,
-            business_activity_code: savedProfile.businessActivityCode || window.__LUNA_ME__.active_business.business_activity_code || null
+            business_activity_code: savedProfile.businessActivityCode || window.__LUNA_ME__.active_business.business_activity_code || null,
+            accounting_method: savedProfile.accountingMethod || window.__LUNA_ME__.active_business.accounting_method || null,
+            material_participation:
+              savedProfile.materialParticipation === "yes"
+                ? true
+                : savedProfile.materialParticipation === "no"
+                  ? false
+                  : window.__LUNA_ME__.active_business.material_participation ?? null,
+            gst_hst_registered: Boolean(savedProfile.gstHstRegistered),
+            gst_hst_number: savedProfile.gstHstNumber || window.__LUNA_ME__.active_business.gst_hst_number || null,
+            gst_hst_method: savedProfile.gstHstMethod || window.__LUNA_ME__.active_business.gst_hst_method || null
           });
         }
       }
@@ -511,6 +547,11 @@ function applyBusinessProfileForm(profile) {
   document.getElementById("fiscal-year").value = profile.fiscalYearStart || "";
   document.getElementById("operating-name").value = profile.operatingName || "";
   document.getElementById("business-activity-code").value = profile.businessActivityCode || "";
+  document.getElementById("accounting-method").value = profile.accountingMethod || "";
+  document.getElementById("material-participation").value = profile.materialParticipation || "";
+  document.getElementById("gst-hst-registered").checked = profile.gstHstRegistered === true;
+  document.getElementById("gst-hst-number").value = profile.gstHstNumber || "";
+  document.getElementById("gst-hst-method").value = profile.gstHstMethod || "";
 
   const addrParts = (profile.address || "").split("\n");
   document.getElementById("address-line1").value = addrParts[0] || "";
@@ -995,7 +1036,12 @@ async function loadBusinessProfile() {
     fiscalYearStart: "",
     address: "",
     operatingName: "",
-    businessActivityCode: ""
+    businessActivityCode: "",
+    accountingMethod: "",
+    materialParticipation: "",
+    gstHstRegistered: false,
+    gstHstNumber: "",
+    gstHstMethod: ""
   };
 
   try {
@@ -1011,7 +1057,15 @@ async function loadBusinessProfile() {
       fiscalYearStart: business?.fiscal_year_start || "",
       address: business?.address || "",
       operatingName: business?.operating_name || "",
-      businessActivityCode: business?.business_activity_code || ""
+      businessActivityCode: business?.business_activity_code || "",
+      accountingMethod: business?.accounting_method || "",
+      materialParticipation:
+        typeof business?.material_participation === "boolean"
+          ? (business.material_participation ? "yes" : "no")
+          : "",
+      gstHstRegistered: business?.gst_hst_registered === true,
+      gstHstNumber: business?.gst_hst_number || "",
+      gstHstMethod: business?.gst_hst_method || ""
     };
     saveBusinessProfile(profile);
     return profile;
@@ -1034,7 +1088,17 @@ async function saveBusinessProfileToApi(profile) {
         business_type: profile.type || null,
         address: profile.address || null,
         operating_name: profile.operatingName || null,
-        business_activity_code: profile.businessActivityCode || null
+        business_activity_code: profile.businessActivityCode || null,
+        accounting_method: profile.accountingMethod || null,
+        material_participation:
+          profile.materialParticipation === "yes"
+            ? true
+            : profile.materialParticipation === "no"
+              ? false
+              : null,
+        gst_hst_registered: Boolean(profile.gstHstRegistered),
+        gst_hst_number: profile.gstHstNumber || null,
+        gst_hst_method: profile.gstHstMethod || null
       })
     });
 

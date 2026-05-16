@@ -439,7 +439,14 @@ async function hydrateBusinessProfileCache() {
       ein: "",
       taxId: "",
       fiscalYearStart: "",
-      address: ""
+      address: "",
+      naics: "",
+      accountingMethod: "",
+      materialParticipation: null,
+      gstHstRegistered: false,
+      gstHstNumber: "",
+      gstHstMethod: "",
+      operatingName: ""
     };
     return;
   }
@@ -461,7 +468,14 @@ async function hydrateBusinessProfileCache() {
       ein: business.tax_id || "",
       taxId: business.tax_id || "",
       fiscalYearStart: business.fiscal_year_start || "",
-      address: business.address || ""
+      address: business.address || "",
+      naics: business.business_activity_code || "",
+      accountingMethod: business.accounting_method || "",
+      materialParticipation: typeof business.material_participation === "boolean" ? business.material_participation : null,
+      gstHstRegistered: business.gst_hst_registered === true,
+      gstHstNumber: business.gst_hst_number || "",
+      gstHstMethod: business.gst_hst_method || "",
+      operatingName: business.operating_name || ""
     };
   } catch (error) {
     console.warn("[Exports] Unable to hydrate business profile", error);
@@ -922,17 +936,24 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
       currency: getCurrencyForRegion(region),
       legalName: businessProfile.name || "",
       businessName: businessProfile.name || batch.businessName || "",
-      operatingName: "",
+      operatingName: businessProfile.operatingName || "",
       taxId,
-      naics: "",
+      naics: businessProfile.naics || "",
       generatedAt,
       reportId,
       region,
-      province
+      province,
+      fiscalYearStart: businessProfile.fiscalYearStart || "",
+      address: businessProfile.address || "",
+      accountingMethod: businessProfile.accountingMethod || "",
+      materialParticipation: typeof businessProfile.materialParticipation === "boolean" ? businessProfile.materialParticipation : null,
+      gstHstRegistered: businessProfile.gstHstRegistered === true,
+      gstHstNumber: businessProfile.gstHstNumber || "",
+      gstHstMethod: businessProfile.gstHstMethod || ""
     });
     } catch (pdfErr) {
       console.error("[Exports] PDF generation failed:", pdfErr);
-      showExportToast(tx("exports_error_generic") || "PDF export failed. Please try again.");
+      showExportToast(pdfErr?.message || tx("exports_error_generic") || "PDF export failed. Please try again.");
       return;
     }
     const filename = explicitFilename && batches.length === 1
@@ -1556,7 +1577,15 @@ function buildExportBatches(transactions, scope) {
       taxId: "",
       ein: "",
       type: "",
-      address: ""
+      address: "",
+      fiscalYearStart: "",
+      naics: "",
+      accountingMethod: "",
+      materialParticipation: null,
+      gstHstRegistered: false,
+      gstHstNumber: "",
+      gstHstMethod: "",
+      operatingName: ""
     }
   })).filter((batch) => batch.transactions.length > 0);
 }
@@ -1585,7 +1614,14 @@ async function fetchBusinessProfileById(businessId, fallbackName = "Business") {
       ein: "",
       type: "",
       address: "",
-      fiscalYearStart: ""
+      fiscalYearStart: "",
+      naics: "",
+      accountingMethod: "",
+      materialParticipation: null,
+      gstHstRegistered: false,
+      gstHstNumber: "",
+      gstHstMethod: "",
+      operatingName: ""
     };
   }
 
@@ -1605,7 +1641,14 @@ async function fetchBusinessProfileById(businessId, fallbackName = "Business") {
       ein: business.tax_id || "",
       taxId: business.tax_id || "",
       fiscalYearStart: business.fiscal_year_start || "",
-      address: business.address || ""
+      address: business.address || "",
+      naics: business.business_activity_code || "",
+      accountingMethod: business.accounting_method || "",
+      materialParticipation: typeof business.material_participation === "boolean" ? business.material_participation : null,
+      gstHstRegistered: business.gst_hst_registered === true,
+      gstHstNumber: business.gst_hst_number || "",
+      gstHstMethod: business.gst_hst_method || "",
+      operatingName: business.operating_name || ""
     };
   } catch (error) {
     console.warn("[Exports] Unable to hydrate business profile", businessId, error);
@@ -1615,7 +1658,14 @@ async function fetchBusinessProfileById(businessId, fallbackName = "Business") {
       ein: "",
       type: "",
       address: "",
-      fiscalYearStart: ""
+      fiscalYearStart: "",
+      naics: "",
+      accountingMethod: "",
+      materialParticipation: null,
+      gstHstRegistered: false,
+      gstHstNumber: "",
+      gstHstMethod: "",
+      operatingName: ""
     };
   }
 }

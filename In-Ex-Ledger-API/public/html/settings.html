@@ -227,6 +227,40 @@
               <label for="business-activity-code">Business activity code</label>
               <input type="text" id="business-activity-code" name="business_activity_code" placeholder="NAICS / business activity code" />
             </div>
+            <div class="form-field">
+              <label for="accounting-method">Accounting method</label>
+              <select id="accounting-method" name="accounting_method">
+                <option value="">Select method</option>
+                <option value="cash">Cash</option>
+                <option value="accrual">Accrual</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="material-participation">Material participation (US)</label>
+              <select id="material-participation" name="material_participation">
+                <option value="">Select</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label class="checkbox-inline" for="gst-hst-registered">
+                <input type="checkbox" id="gst-hst-registered" name="gst_hst_registered" />
+                <span>GST/HST registered (Canada)</span>
+              </label>
+            </div>
+            <div class="form-field">
+              <label for="gst-hst-number">GST/HST registration number</label>
+              <input type="text" id="gst-hst-number" name="gst_hst_number" placeholder="Optional unless registered" />
+            </div>
+            <div class="form-field">
+              <label for="gst-hst-method">GST/HST accounting method</label>
+              <select id="gst-hst-method" name="gst_hst_method">
+                <option value="">Select method</option>
+                <option value="regular">Regular</option>
+                <option value="quick">Quick Method</option>
+              </select>
+            </div>
             <div class="form-field form-field-full">
               <label data-i18n="settings_label_business_address">Business address</label>
               <div class="address-grid">

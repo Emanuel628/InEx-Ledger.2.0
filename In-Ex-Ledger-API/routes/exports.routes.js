@@ -10,6 +10,7 @@ const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForU
 const { issueExportGrant, verifyExportGrant } = require("../services/exportGrantService.js");
 const { saveRedactedPdf, buildRedactedStream, deleteExportFile } = require("../services/exportStorage.js");
 const { decryptJwe } = require("../services/jweDecryptService.js");
+const { decryptTaxId } = require("../services/taxIdService.js");
 const { buildPdfExport } = require("../services/pdfGeneratorService.js");
 const { pool } = require("../db.js");
 const { logError, logInfo } = require("../utils/logger.js");
@@ -393,7 +394,13 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
            ORDER BY entry_date ASC, created_at ASC`,
           [businessId, grantStartDate, grantEndDate]
         ),
-        pool.query(`SELECT name, region, province, operating_name, business_activity_code FROM businesses WHERE id = $1`, [businessId])
+        pool.query(
+          `SELECT name, region, province, operating_name, business_activity_code,
+                  fiscal_year_start, address, tax_id, accounting_method,
+                  material_participation, gst_hst_registered, gst_hst_number, gst_hst_method
+             FROM businesses WHERE id = $1`,
+          [businessId]
+        )
       ]);
 
     const business = bizResult.rows[0] || {};
@@ -423,6 +430,14 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       legalName: business.name || "",
       operatingName: business.operating_name || "",
       naics: business.business_activity_code || "",
+      fiscalYearStart: business.fiscal_year_start || "",
+      address: business.address || "",
+      storedTaxId: decryptTaxId(business.tax_id) || "",
+      accountingMethod: business.accounting_method || "",
+      materialParticipation: business.material_participation,
+      gstHstRegistered: business.gst_hst_registered === true,
+      gstHstNumber: business.gst_hst_number || "",
+      gstHstMethod: business.gst_hst_method || "",
       generatedAt,
       reportId,
       region,
@@ -465,6 +480,12 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     res.setHeader("Cache-Control", "private, no-store, max-age=0");
     return res.send(fullPdfBuffer);
   } catch (err) {
+    if (err?.status) {
+      return res.status(err.status).json({
+        error: err.message,
+        missingFields: Array.isArray(err.missingFields) ? err.missingFields : undefined
+      });
+    }
     logError("Export generation error", { body: sanitizedBody, err: err.message });
     return res.status(500).json({ error: "Failed to generate export." });
   }
@@ -635,7 +656,10 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
           [businessId, dateRange.startDate, dateRange.endDate]
         ),
         pool.query(
-          `SELECT name, region, province, operating_name, business_activity_code FROM businesses WHERE id = $1`,
+          `SELECT name, region, province, operating_name, business_activity_code,
+                  fiscal_year_start, address, tax_id, accounting_method,
+                  material_participation, gst_hst_registered, gst_hst_number, gst_hst_method
+             FROM businesses WHERE id = $1`,
           [businessId]
         )
       ]);
@@ -681,6 +705,14 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       legalName: business.name || "",
       operatingName: business.operating_name || "",
       naics: business.business_activity_code || "",
+      fiscalYearStart: business.fiscal_year_start || "",
+      address: business.address || "",
+      storedTaxId: decryptTaxId(business.tax_id) || "",
+      accountingMethod: business.accounting_method || "",
+      materialParticipation: business.material_participation,
+      gstHstRegistered: business.gst_hst_registered === true,
+      gstHstNumber: business.gst_hst_number || "",
+      gstHstMethod: business.gst_hst_method || "",
       generatedAt,
       reportId,
       region,
@@ -724,7 +756,10 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     return res.send(fullPdfBuffer);
   } catch (err) {
     if (err?.status) {
-      return res.status(err.status).json({ error: err.message });
+      return res.status(err.status).json({
+        error: err.message,
+        missingFields: Array.isArray(err.missingFields) ? err.missingFields : undefined
+      });
     }
     logError("Secure export error", { body: sanitizedBody, err: err.message });
     return res.status(500).json({ error: "Failed to generate secure export." });

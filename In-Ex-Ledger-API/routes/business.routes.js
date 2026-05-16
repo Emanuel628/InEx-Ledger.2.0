@@ -19,9 +19,13 @@ const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
 const FISCAL_YEAR_START_RE = /^((0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])|\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/;
+const VALID_ACCOUNTING_METHODS = new Set(["cash", "accrual"]);
+const VALID_GST_HST_METHODS = new Set(["regular", "quick"]);
 const BUSINESS_SELECT = `SELECT id, name, region, language, fiscal_year_start, province,
                                 business_type, tax_id, address, operating_name,
-                                business_activity_code, created_at
+                                business_activity_code, accounting_method,
+                                material_participation, gst_hst_registered,
+                                gst_hst_number, gst_hst_method, created_at
                          FROM businesses
                          WHERE id = $1`;
 
@@ -46,6 +50,11 @@ function normalizeBusinessRow(row) {
     address: null,
     operating_name: null,
     business_activity_code: null,
+    accounting_method: null,
+    material_participation: null,
+    gst_hst_registered: false,
+    gst_hst_number: null,
+    gst_hst_method: null,
     ...row,
     tax_id: decryptTaxId(row.tax_id)
   };
@@ -67,7 +76,12 @@ async function updateBusinessRow(businessId, payload) {
     tax_id,
     address,
     operating_name,
-    business_activity_code
+    business_activity_code,
+    accounting_method,
+    material_participation,
+    gst_hst_registered,
+    gst_hst_number,
+    gst_hst_method
   } = payload;
   const normalizedTaxId = normalizeOptionalTrimmedString(tax_id);
   const encryptedTaxId = normalizedTaxId ? encryptTaxId(normalizedTaxId) : null;
@@ -82,11 +96,18 @@ async function updateBusinessRow(businessId, payload) {
          tax_id = $7,
          address = $8,
          operating_name = $9,
-         business_activity_code = $10
-     WHERE id = $11
+         business_activity_code = $10,
+         accounting_method = $11,
+         material_participation = $12,
+         gst_hst_registered = $13,
+         gst_hst_number = $14,
+         gst_hst_method = $15
+     WHERE id = $16
      RETURNING id, name, region, language, fiscal_year_start, province,
                business_type, tax_id, address, operating_name,
-               business_activity_code, created_at`,
+               business_activity_code, accounting_method,
+               material_participation, gst_hst_registered,
+               gst_hst_number, gst_hst_method, created_at`,
     [
       normalizeOptionalTrimmedString(name),
       region || null,
@@ -98,6 +119,11 @@ async function updateBusinessRow(businessId, payload) {
       address,
       normalizeOptionalTrimmedString(operating_name),
       normalizeOptionalTrimmedString(business_activity_code),
+      accounting_method || null,
+      typeof material_participation === "boolean" ? material_participation : null,
+      typeof gst_hst_registered === "boolean" ? gst_hst_registered : false,
+      normalizeOptionalTrimmedString(gst_hst_number),
+      gst_hst_method || null,
       businessId
     ]
   );
@@ -132,7 +158,12 @@ router.put("/", async (req, res) => {
     tax_id,
     address,
     operating_name,
-    business_activity_code
+    business_activity_code,
+    accounting_method,
+    material_participation,
+    gst_hst_registered,
+    gst_hst_number,
+    gst_hst_method
   } = req.body ?? {};
 
   if (region && !VALID_REGIONS.has(region)) {
@@ -143,6 +174,18 @@ router.put("/", async (req, res) => {
   }
   if (fiscal_year_start != null && fiscal_year_start !== "" && !FISCAL_YEAR_START_RE.test(String(fiscal_year_start))) {
     return res.status(400).json({ error: "fiscal_year_start must be in MM-DD format with valid month (01-12) and day (01-31)." });
+  }
+  if (accounting_method != null && accounting_method !== "" && !VALID_ACCOUNTING_METHODS.has(String(accounting_method).toLowerCase())) {
+    return res.status(400).json({ error: "accounting_method must be 'cash' or 'accrual'" });
+  }
+  if (gst_hst_method != null && gst_hst_method !== "" && !VALID_GST_HST_METHODS.has(String(gst_hst_method).toLowerCase())) {
+    return res.status(400).json({ error: "gst_hst_method must be 'regular' or 'quick'" });
+  }
+  if (material_participation != null && typeof material_participation !== "boolean") {
+    return res.status(400).json({ error: "material_participation must be a boolean value." });
+  }
+  if (gst_hst_registered != null && typeof gst_hst_registered !== "boolean") {
+    return res.status(400).json({ error: "gst_hst_registered must be a boolean value." });
   }
 
   try {
@@ -176,6 +219,21 @@ router.put("/", async (req, res) => {
     const resolvedBusinessActivityCode = 'business_activity_code' in body
       ? normalizeOptionalTrimmedString(business_activity_code)
       : current.business_activity_code;
+    const resolvedAccountingMethod = 'accounting_method' in body
+      ? normalizeOptionalTrimmedString(accounting_method)
+      : current.accounting_method;
+    const resolvedMaterialParticipation = 'material_participation' in body
+      ? material_participation
+      : current.material_participation;
+    const resolvedGstHstRegistered = 'gst_hst_registered' in body
+      ? gst_hst_registered
+      : Boolean(current.gst_hst_registered);
+    const resolvedGstHstNumber = 'gst_hst_number' in body
+      ? normalizeOptionalTrimmedString(gst_hst_number)
+      : current.gst_hst_number;
+    const resolvedGstHstMethod = 'gst_hst_method' in body
+      ? normalizeOptionalTrimmedString(gst_hst_method)
+      : current.gst_hst_method;
 
     const updated = await updateBusinessRow(businessId, {
       name,
@@ -187,7 +245,12 @@ router.put("/", async (req, res) => {
       tax_id: resolvedTaxId,
       address: resolvedAddress,
       operating_name: resolvedOperatingName,
-      business_activity_code: resolvedBusinessActivityCode
+      business_activity_code: resolvedBusinessActivityCode,
+      accounting_method: resolvedAccountingMethod,
+      material_participation: resolvedMaterialParticipation,
+      gst_hst_registered: resolvedGstHstRegistered,
+      gst_hst_number: resolvedRegion === "CA" && resolvedGstHstRegistered ? resolvedGstHstNumber : null,
+      gst_hst_method: resolvedRegion === "CA" && resolvedGstHstRegistered ? resolvedGstHstMethod : null
     });
     res.json(updated);
   } catch (err) {

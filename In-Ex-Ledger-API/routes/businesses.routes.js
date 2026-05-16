@@ -34,6 +34,8 @@ const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
 const FISCAL_YEAR_START_RE = /^((0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])|\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/;
+const VALID_ACCOUNTING_METHODS = new Set(["cash", "accrual"]);
+const VALID_GST_HST_METHODS = new Set(["regular", "quick"]);
 
 async function updateAnchorAdditionalBusinesses(client, businessId, additionalBusinesses) {
   await client.query(
@@ -209,6 +211,11 @@ function normalizeBusinessProfileRow(row) {
     business_type: row.business_type || null,
     operating_name: row.operating_name || null,
     business_activity_code: row.business_activity_code || null,
+    accounting_method: row.accounting_method || null,
+    material_participation: typeof row.material_participation === "boolean" ? row.material_participation : null,
+    gst_hst_registered: row.gst_hst_registered === true,
+    gst_hst_number: row.gst_hst_number || null,
+    gst_hst_method: row.gst_hst_method || null,
     locked_through_date: row.locked_through_date || null,
     locked_period_note: row.locked_period_note || null,
     locked_period_updated_at: row.locked_period_updated_at || null
@@ -219,7 +226,9 @@ async function fetchOwnedBusinessProfile(userId, businessId) {
   const result = await pool.query(
     `SELECT id, name, region, language, fiscal_year_start, province,
             business_type, tax_id, address, operating_name,
-            business_activity_code, locked_through_date, locked_period_note,
+            business_activity_code, accounting_method, material_participation,
+            gst_hst_registered, gst_hst_number, gst_hst_method,
+            locked_through_date, locked_period_note,
             locked_period_updated_at, created_at
        FROM businesses
       WHERE id = $1
@@ -247,7 +256,12 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
     tax_id,
     address,
     operating_name,
-    business_activity_code
+    business_activity_code,
+    accounting_method,
+    material_participation,
+    gst_hst_registered,
+    gst_hst_number,
+    gst_hst_method
   } = payload;
 
   const resolvedRegion = String(region || current.region || "US").toUpperCase();
@@ -270,10 +284,25 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
   if (resolvedRegion === "CA" && !resolvedProvince) {
     return { error: "Province is required for Canadian businesses." };
   }
+  if (accounting_method && !VALID_ACCOUNTING_METHODS.has(String(accounting_method).trim().toLowerCase())) {
+    return { error: "accounting_method must be 'cash' or 'accrual'" };
+  }
+  if (gst_hst_method && !VALID_GST_HST_METHODS.has(String(gst_hst_method).trim().toLowerCase())) {
+    return { error: "gst_hst_method must be 'regular' or 'quick'" };
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, "material_participation") && typeof material_participation !== "boolean") {
+    return { error: "material_participation must be a boolean" };
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, "gst_hst_registered") && typeof gst_hst_registered !== "boolean") {
+    return { error: "gst_hst_registered must be a boolean" };
+  }
 
   const normalizedTaxId = Object.prototype.hasOwnProperty.call(payload, "tax_id")
     ? normalizeOptionalTrimmedString(tax_id)
     : current.tax_id;
+  const resolvedGstRegistered = Object.prototype.hasOwnProperty.call(payload, "gst_hst_registered")
+    ? gst_hst_registered
+    : current.gst_hst_registered;
 
   const result = await pool.query(
     `UPDATE businesses
@@ -286,12 +315,19 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
             tax_id = $7,
             address = $8,
             operating_name = $9,
-            business_activity_code = $10
-      WHERE id = $11
-        AND user_id = $12
+            business_activity_code = $10,
+            accounting_method = $11,
+            material_participation = $12,
+            gst_hst_registered = $13,
+            gst_hst_number = $14,
+            gst_hst_method = $15
+      WHERE id = $16
+        AND user_id = $17
       RETURNING id, name, region, language, fiscal_year_start, province,
                 business_type, tax_id, address, operating_name,
-                business_activity_code, locked_through_date, locked_period_note,
+                business_activity_code, accounting_method, material_participation,
+                gst_hst_registered, gst_hst_number, gst_hst_method,
+                locked_through_date, locked_period_note,
                 locked_period_updated_at, created_at`,
     [
       normalizeOptionalTrimmedString(name),
@@ -312,6 +348,19 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
       Object.prototype.hasOwnProperty.call(payload, "business_activity_code")
         ? normalizeOptionalTrimmedString(business_activity_code)
         : current.business_activity_code,
+      Object.prototype.hasOwnProperty.call(payload, "accounting_method")
+        ? normalizeOptionalTrimmedString(String(accounting_method || "").toLowerCase())
+        : current.accounting_method,
+      Object.prototype.hasOwnProperty.call(payload, "material_participation")
+        ? material_participation
+        : current.material_participation,
+      resolvedRegion === "CA" ? resolvedGstRegistered : false,
+      resolvedRegion === "CA" && resolvedGstRegistered
+        ? normalizeOptionalTrimmedString(gst_hst_number)
+        : null,
+      resolvedRegion === "CA" && resolvedGstRegistered
+        ? normalizeOptionalTrimmedString(String(gst_hst_method || "").toLowerCase())
+        : null,
       businessId,
       userId
     ]
