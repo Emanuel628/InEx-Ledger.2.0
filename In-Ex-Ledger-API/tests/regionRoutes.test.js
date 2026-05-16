@@ -63,3 +63,19 @@ test("region detect can trust edge headers only when explicitly enabled", async 
     fixture.cleanup();
   }
 });
+
+test("region detect is rate limited", async () => {
+  const fixture = loadRegionRouter();
+
+  try {
+    let lastResponse = null;
+    for (let index = 0; index < 121; index += 1) {
+      lastResponse = await request(fixture.app).get("/api/region/detect");
+    }
+
+    assert.equal(lastResponse.status, 429);
+    assert.equal(lastResponse.body?.error, "Too many requests. Please try again later.");
+  } finally {
+    fixture.cleanup();
+  }
+});

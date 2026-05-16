@@ -84,6 +84,16 @@ function renderSessionsList(sessions) {
 
   list.innerHTML = sessions.map((session) => {
     const expiringSoon = isExpiringSoon(session.expires_at);
+    const sessionMeta = [
+      session.device_label ? `<span class="session-card-label">${escapeHtml(session.device_label)}</span>` : "",
+      session.ip_address ? `<span class="session-card-date">${escapeHtml(session.ip_address)}</span>` : "",
+      session.mfa_authenticated
+        ? `<span class="session-expiring-badge">${escapeHtml(tx("sessions_mfa_authenticated") || "MFA verified")}</span>`
+        : "",
+      session.is_current
+        ? `<span class="session-expiring-badge">${escapeHtml(tx("sessions_current_badge") || "Current session")}</span>`
+        : ""
+    ].filter(Boolean).join(" ");
     return `
       <article class="session-card" data-session-id="${escapeHtml(session.id)}">
         <div class="session-card-icon" aria-hidden="true">
@@ -98,6 +108,11 @@ function renderSessionsList(sessions) {
             <span class="session-card-date">${escapeHtml(formatSessionDate(session.created_at))}</span>
           </div>
           <div class="session-card-meta">
+            <span class="session-card-label">${escapeHtml(tx("sessions_last_active") || "Last active")}</span>
+            <span class="session-card-date">${escapeHtml(formatSessionDate(session.last_active_at))}</span>
+          </div>
+          <div class="session-card-meta">${sessionMeta}</div>
+          <div class="session-card-meta">
             <span class="session-card-label" data-i18n="sessions_expires">Expires</span>
             <span class="session-card-date${expiringSoon ? " session-expiring-soon" : ""}">
               ${escapeHtml(formatSessionDate(session.expires_at))}
@@ -109,6 +124,7 @@ function renderSessionsList(sessions) {
           type="button"
           class="session-revoke-btn"
           data-session-revoke="${escapeHtml(session.id)}"
+          data-session-current="${session.is_current ? "true" : "false"}"
           aria-label="${escapeHtml(tx("sessions_revoke_label") || "Revoke session")}"
         >${escapeHtml(tx("sessions_revoke") || "Revoke")}</button>
       </article>
@@ -118,15 +134,19 @@ function renderSessionsList(sessions) {
   list.querySelectorAll("[data-session-revoke]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const sessionId = btn.getAttribute("data-session-revoke");
+      const isCurrentSession = btn.getAttribute("data-session-current") === "true";
       if (!sessionId) return;
+      if (isCurrentSession && !window.confirm(tx("sessions_confirm_revoke_current") || "Revoking this session will sign you out on this device. Continue?")) {
+        return;
+      }
       btn.disabled = true;
-      await revokeSession(sessionId);
+      await revokeSession(sessionId, { isCurrentSession });
       btn.disabled = false;
     });
   });
 }
 
-async function revokeSession(sessionId) {
+async function revokeSession(sessionId, { isCurrentSession = false } = {}) {
   setSessionsMessage("");
 
   try {
@@ -140,7 +160,20 @@ async function revokeSession(sessionId) {
       throw new Error(payload.error || tx("sessions_error_revoke") || "Failed to revoke session.");
     }
 
+    const payload = await res.json().catch(() => ({}));
     showSessionsToast(tx("sessions_revoked") || "Session revoked.");
+    if (payload?.current_session_revoked || isCurrentSession) {
+      window.setTimeout(() => {
+        if (typeof markLoginReset === "function") {
+          markLoginReset();
+        }
+        if (typeof clearToken === "function") {
+          clearToken();
+        }
+        window.location.href = "/login";
+      }, 900);
+      return;
+    }
     await loadSessions();
   } catch (err) {
     setSessionsMessage(err.message || tx("sessions_error_revoke") || "Failed to revoke session.", true);
@@ -165,10 +198,14 @@ async function revokeAllSessions() {
       throw new Error(payload.error || tx("sessions_error_revoke_all") || "Failed to revoke all sessions.");
     }
 
+    await res.json().catch(() => ({}));
     showSessionsToast(tx("sessions_all_revoked") || "All sessions revoked. Signing out...");
     window.setTimeout(() => {
       if (typeof markLoginReset === "function") {
         markLoginReset();
+      }
+      if (typeof clearToken === "function") {
+        clearToken();
       }
       window.location.href = "/login";
     }, 1200);

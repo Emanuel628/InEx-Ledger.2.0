@@ -1,7 +1,15 @@
 const express = require('express');
+const rateLimit = require("express-rate-limit");
 
 const router = express.Router();
 const TRUST_EDGE_REGION_HEADERS = process.env.TRUST_EDGE_REGION_HEADERS === 'true';
+const detectLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests. Please try again later." }
+});
 
 function normalizeRegion(value) {
   const raw = String(value || '').trim().toUpperCase();
@@ -36,7 +44,7 @@ function detectRegionFromRequest(req, options = {}) {
   return { region: 'US', source: 'default' };
 }
 
-router.get('/detect', (req, res) => {
+router.get('/detect', detectLimiter, (req, res) => {
   const detected = detectRegionFromRequest(req);
   res.json({
     region: detected.region,

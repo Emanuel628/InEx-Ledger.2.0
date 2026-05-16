@@ -1014,7 +1014,7 @@ router.post("/send-verification", authLimiter, async (req, res) => {
   }
 });
 
-router.post("/complete-verified-signup", authLimiter, async (req, res) => {
+router.post("/complete-verified-signup", requireCsrfProtection, authLimiter, async (req, res) => {
   const rawToken = String(req.body?.signupBootstrapToken || "").trim();
   if (!rawToken) {
     return res.status(400).json({ error: "Signup bootstrap token is required." });
@@ -1602,7 +1602,7 @@ router.post("/mfa/reauth", requireAuth, requireCsrfProtection, mfaVerifyLimiter,
   }
 });
 
-router.post("/mfa/enable", requireAuth, requireCsrfProtection, authLimiter, async (req, res) => {
+router.post("/mfa/enable", requireAuth, requireCsrfProtection, mfaVerifyLimiter, async (req, res) => {
   const code = String(req.body?.code || "").trim();
   const mfaToken = String(req.body?.mfaToken || "").trim();
 

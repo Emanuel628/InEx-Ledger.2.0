@@ -226,14 +226,19 @@ async function finalizeVerifiedSignup() {
   const signupBootstrapToken = String(localStorage.getItem(SIGNUP_BOOTSTRAP_KEY) || "").trim();
   if (signupBootstrapToken) {
     try {
-      const response = await fetch("/api/auth/complete-verified-signup", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ signupBootstrapToken })
-      });
+      const response = typeof apiFetch === "function"
+        ? await apiFetch("/api/auth/complete-verified-signup", {
+            method: "POST",
+            body: JSON.stringify({ signupBootstrapToken })
+          })
+        : await fetch("/api/auth/complete-verified-signup", {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ signupBootstrapToken })
+          });
       const payload = response ? await response.json().catch(() => null) : null;
       if (response && response.ok && payload?.token) {
         if (typeof setToken === "function") {

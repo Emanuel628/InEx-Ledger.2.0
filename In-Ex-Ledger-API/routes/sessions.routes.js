@@ -73,6 +73,15 @@ router.delete("/:id", sessionsMutationLimiter, async (req, res) => {
     if (!UUID_RE.test(sessionId)) {
       return res.status(400).json({ error: "Invalid session ID." });
     }
+    const currentTokenHash = getCurrentTokenHash(req);
+    const currentSessionResult = currentTokenHash
+      ? await pool.query(
+          "SELECT id FROM refresh_tokens WHERE user_id = $1 AND token_hash = $2 AND revoked = false LIMIT 1",
+          [req.user.id, currentTokenHash]
+        )
+      : { rows: [] };
+    const currentSessionId = currentSessionResult.rows[0]?.id || null;
+    const revokingCurrentSession = currentSessionId === sessionId;
     const result = await pool.query(
       "UPDATE refresh_tokens SET revoked = true WHERE id = $1 AND user_id = $2 RETURNING id",
       [sessionId, req.user.id]
@@ -83,9 +92,12 @@ router.delete("/:id", sessionsMutationLimiter, async (req, res) => {
     await recordAuditEventForRequest(pool, req, {
       userId: req.user.id,
       action: AUDIT_ACTIONS.SESSION_REVOKED,
-      metadata: { session_id: sessionId, scope: "single" }
+      metadata: { session_id: sessionId, scope: "single", current_session: revokingCurrentSession }
     });
-    res.json({ message: "Session revoked." });
+    if (revokingCurrentSession) {
+      res.clearCookie(REFRESH_TOKEN_COOKIE, { path: "/" });
+    }
+    res.json({ message: "Session revoked.", current_session_revoked: revokingCurrentSession });
   } catch (err) {
     logError("DELETE /sessions/:id error:", err.message);
     res.status(500).json({ error: "Failed to revoke session." });
@@ -99,6 +111,7 @@ router.delete("/:id", sessionsMutationLimiter, async (req, res) => {
  */
 router.delete("/", sessionsMutationLimiter, async (req, res) => {
   try {
+    const currentTokenHash = getCurrentTokenHash(req);
     const result = await pool.query(
       "UPDATE refresh_tokens SET revoked = true WHERE user_id = $1 AND revoked = false RETURNING id",
       [req.user.id]
@@ -108,7 +121,14 @@ router.delete("/", sessionsMutationLimiter, async (req, res) => {
       action: AUDIT_ACTIONS.SESSION_REVOKED,
       metadata: { scope: "all", revoked_count: result.rowCount }
     });
-    res.json({ message: "All sessions revoked.", revoked_count: result.rowCount });
+    if (currentTokenHash) {
+      res.clearCookie(REFRESH_TOKEN_COOKIE, { path: "/" });
+    }
+    res.json({
+      message: "All sessions revoked.",
+      revoked_count: result.rowCount,
+      current_session_revoked: !!currentTokenHash
+    });
   } catch (err) {
     logError("DELETE /sessions error:", err.message);
     res.status(500).json({ error: "Failed to revoke sessions." });

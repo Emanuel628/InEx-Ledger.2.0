@@ -166,6 +166,23 @@ test("route inventory: billing webhook explicitly skips CSRF (expected exception
   );
 });
 
+test("route inventory: complete-verified-signup now enforces CSRF and MFA enable uses the stricter limiter", () => {
+  const source = readRouteSource("auth.routes.js");
+  const completeSignupRouteMatch = source.match(/router\.post\s*\(\s*["']\/complete-verified-signup["'][^)]*\)/s);
+  assert.ok(completeSignupRouteMatch, "auth.routes.js should define POST /complete-verified-signup");
+  assert.ok(
+    completeSignupRouteMatch[0].includes("requireCsrfProtection"),
+    "POST /complete-verified-signup should include requireCsrfProtection"
+  );
+
+  const mfaEnableRouteMatch = source.match(/router\.post\s*\(\s*["']\/mfa\/enable["'][^)]*\)/s);
+  assert.ok(mfaEnableRouteMatch, "auth.routes.js should define POST /mfa/enable");
+  assert.ok(
+    mfaEnableRouteMatch[0].includes("mfaVerifyLimiter"),
+    "POST /mfa/enable should use mfaVerifyLimiter"
+  );
+});
+
 // ---------------------------------------------------------------------------
 // 2. Frontend CSRF Compliance
 // ---------------------------------------------------------------------------

@@ -138,12 +138,12 @@ Rules used here:
 
 ### Route correctness and guard consistency
 
-- [ ] 1-2 hours - Add CSRF or more appropriate protection to the remaining state-changing auth routes and consistency-check their limiters.
+- [x] 1-2 hours - Add CSRF or more appropriate protection to the remaining state-changing auth routes and consistency-check their limiters.
   Files: `auth.routes.js`
   Group: Auth route consistency
   Covers: `POST /complete-verified-signup`, `POST /mfa/enable` limiter inconsistency
 
-- [ ] 1-2 hours - Fix sessions route behavior around self-revoke, current-session visibility, and browser cookie cleanup.
+- [x] 1-2 hours - Fix sessions route behavior around self-revoke, current-session visibility, and browser cookie cleanup.
   Files: `sessions.routes.js`, `public/js/sessions.js`
   Group: Sessions behavior
   Covers: dangling refresh cookie after revoke-all, no warning on revoking current session, missing current/IP/device/MFA render data
@@ -158,7 +158,7 @@ Rules used here:
   Group: Onboarding backend consistency
   Covers: duplicate simultaneous deletes without locking
 
-- [ ] 1-2 hours - Harden `GET /api/region/detect` and `getBearerToken`.
+- [x] 1-2 hours - Harden `GET /api/region/detect` and `getBearerToken`.
   Files: `region.routes.js`
   Group: Region route correctness
   Covers: lowercasing the full Authorization header, no rate limiter
