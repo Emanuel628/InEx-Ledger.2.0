@@ -4,6 +4,16 @@ This is the single source of truth for cleanup work that is not finished yet.
 
 Do not create separate phase cleanup docs for the same effort. Add unfinished items here instead.
 
+## Codebase Audit Triage
+
+Claude's full codebase audit has been normalized into three active work files under `Work-To-Do/`.
+
+- High severity: `Work-To-Do/CODEBASE-AUDIT-HIGH.md`
+- Medium severity: `Work-To-Do/CODEBASE-AUDIT-MEDIUM.md`
+- Low severity: `Work-To-Do/CODEBASE-AUDIT-LOW.md`
+
+Each file is ordered from shortest estimated fix to longest, with nearby work grouped together.
+
 ## Current Status Summary
 
 - Phase 1: Partially complete. Patch files are removed, but `global.js` still needs direct Quick Add gating.

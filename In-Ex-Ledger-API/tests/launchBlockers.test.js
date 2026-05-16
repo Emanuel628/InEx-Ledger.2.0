@@ -49,6 +49,21 @@ function loadTransactionsRouter(options = {}) {
     if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
       return {
         pool: {
+          async connect() {
+            const self = this;
+            return {
+              async query(sql, params) {
+                if (/^BEGIN$/i.test(sql) || /^COMMIT$/i.test(sql) || /^ROLLBACK$/i.test(sql)) {
+                  return { rows: [], rowCount: 0 };
+                }
+                if (/pg_advisory_xact_lock/i.test(sql)) {
+                  return { rows: [], rowCount: 0 };
+                }
+                return self.query(sql, params);
+              },
+              release() {}
+            };
+          },
           async query(sql, params) {
             if (/SELECT region FROM businesses/i.test(sql)) {
               return { rows: [{ region: "US" }], rowCount: 1 };
