@@ -116,7 +116,7 @@ Rules used here:
   Group: Verify-email polling
   Covers: endless 3-second polling loop
 
-- [ ] 1-2 hours - Fix onboarding tour/runtime issues and province validation bypass.
+- [x] 1-2 hours - Fix onboarding tour/runtime issues and province validation bypass.
   Files: `In-Ex-Ledger-API/public/js/onboarding.js`, `In-Ex-Ledger-API/public/js/onboarding-page.js`, `In-Ex-Ledger-API/public/html/onboarding.html`
   Group: Onboarding runtime
   Covers: missing `getWorkTypeTourNote`, JS-submitted form bypassing native province validation, dead hidden business type field, duplicated region storage keys
@@ -131,7 +131,7 @@ Rules used here:
   Group: Receipts UX integrity
   Covers: filename-fed `window.confirm()` spoofing, UTC-to-local receipt date drift
 
-- [ ] 1-2 hours - Remove sensitive or semi-sensitive auth/bootstrap values from durable browser storage where session-scoped storage is sufficient.
+- [x] 1-2 hours - Remove sensitive or semi-sensitive auth/bootstrap values from durable browser storage where session-scoped storage is sufficient.
   Files: `register.js`, `login.js`, `auth.js`
   Group: Frontend auth storage
   Covers: `verification_state`, `signup_bootstrap_token`, pending MFA token, full subscription object in localStorage
@@ -153,7 +153,7 @@ Rules used here:
   Group: Privacy export/delete integrity
   Covers: incomplete cleanup join, incomplete exported data set, duplicate Quebec consent log writes
 
-- [ ] 1-2 hours - Fix `POST /api/me/onboarding` race behavior and missing transaction-safe sequencing.
+- [x] 1-2 hours - Fix `POST /api/me/onboarding` race behavior and missing transaction-safe sequencing.
   Files: `me.routes.js`
   Group: Onboarding backend consistency
   Covers: duplicate simultaneous deletes without locking

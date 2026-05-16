@@ -66,7 +66,7 @@ function loadMeRouterFixture() {
                 if (/^BEGIN$/i.test(sql) || /^COMMIT$/i.test(sql) || /^ROLLBACK$/i.test(sql)) {
                   return { rows: [], rowCount: 0 };
                 }
-                if (/SELECT onboarding_completed FROM users WHERE id = \$1 LIMIT 1/i.test(sql)) {
+                if (/SELECT onboarding_completed FROM users WHERE id = \$1 FOR UPDATE/i.test(sql)) {
                   return { rows: [{ onboarding_completed: false }], rowCount: 1 };
                 }
                 if (/UPDATE businesses/i.test(sql)) {
@@ -225,8 +225,10 @@ test("PUT /api/me/onboarding replaces pre-seeded accounts before starter account
     assert.deepEqual(fixture.state.resolvedOptions[0], { seedDefaults: false });
 
     const txSql = fixture.state.txQueries.map((entry) => entry.sql);
+    const lockSql = txSql.find((sql) => /SELECT onboarding_completed FROM users WHERE id = \$1 FOR UPDATE/i.test(sql));
     const deleteIdx = txSql.findIndex((sql) => /DELETE FROM accounts WHERE business_id = \$1/i.test(sql));
     const insertIdx = txSql.findIndex((sql) => /INSERT INTO accounts/i.test(sql));
+    assert.ok(lockSql, "onboarding should lock the user row before mutating starter-account state");
     assert.ok(deleteIdx !== -1, "onboarding should clear pre-seeded accounts");
     assert.ok(insertIdx !== -1, "onboarding should insert starter account");
     assert.ok(deleteIdx < insertIdx, "account cleanup should happen before starter insert");

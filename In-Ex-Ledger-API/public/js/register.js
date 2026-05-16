@@ -19,6 +19,25 @@ const OFFLINE_ERROR_MESSAGE = "login_error_offline";
 const VERIFICATION_STATE_KEY = "pendingVerificationState";
 const SIGNUP_BOOTSTRAP_KEY = "pendingSignupBootstrapToken";
 
+function setTransientSignupValue(key, value) {
+  const normalized = String(value || "").trim();
+  try {
+    if (normalized) {
+      sessionStorage.setItem(key, normalized);
+    } else {
+      sessionStorage.removeItem(key);
+    }
+  } catch (_) {
+    // Ignore session storage failures and fall back to clearing any stale local copy.
+  }
+
+  try {
+    localStorage.removeItem(key);
+  } catch (_) {
+    // Ignore local storage cleanup failures.
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   form = document.getElementById("registerForm");
   if (!form) {
@@ -133,17 +152,9 @@ async function handleRegisterSubmit(event) {
     persistLanguage();
     await persistConsent();
     const verificationState = String(regBody?.verification_state || "").trim();
-    if (verificationState) {
-      localStorage.setItem(VERIFICATION_STATE_KEY, verificationState);
-    } else {
-      localStorage.removeItem(VERIFICATION_STATE_KEY);
-    }
+    setTransientSignupValue(VERIFICATION_STATE_KEY, verificationState);
     const signupBootstrapToken = String(regBody?.signup_bootstrap_token || "").trim();
-    if (signupBootstrapToken) {
-      localStorage.setItem(SIGNUP_BOOTSTRAP_KEY, signupBootstrapToken);
-    } else {
-      localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
-    }
+    setTransientSignupValue(SIGNUP_BOOTSTRAP_KEY, signupBootstrapToken);
     localStorage.removeItem("pendingVerificationEmail");
     window.location.href = "/verify-email";
   } catch (err) {

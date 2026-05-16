@@ -175,6 +175,29 @@ function getOnboardingData() {
   return window.__LUNA_ME__?.onboarding?.data || window.__LUNA_ONBOARDING__?.data || {};
 }
 
+function getWorkTypeTourNote(page) {
+  const onboardingData = getOnboardingData();
+  const startFocus = String(onboardingData.start_focus || "").trim().toLowerCase();
+  const region = String(onboardingData.region || "").trim().toUpperCase();
+  const regionLabel = region === "CA" ? "Canadian" : "US";
+
+  if (startFocus === "exports" && page === "exports") {
+    return `${regionLabel} filing defaults are already set from onboarding. Review your categories and receipts before generating a handoff export.`;
+  }
+
+  if (startFocus === "receipts" && page === "receipts") {
+    return "Since receipts were your starting focus, attach one real receipt here before you build more of the ledger.";
+  }
+
+  if (startFocus === "mileage" && page === "mileage") {
+    return "Mileage was part of your setup focus, so log one real business trip here while the details are still fresh.";
+  }
+
+  const setupNotes = Array.isArray(onboardingData.setup_notes) ? onboardingData.setup_notes : [];
+  const firstNote = setupNotes.find((note) => typeof note === "string" && note.trim());
+  return firstNote ? String(firstNote).trim() : "";
+}
+
 function maybeShowOnboardingTour(page, profile) {
   const onboarding = profile?.onboarding || {};
   if (!onboarding.completed || document.getElementById("onboardingTourCard")) {

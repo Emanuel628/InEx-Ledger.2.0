@@ -301,7 +301,7 @@ router.put("/onboarding", async (req, res) => {
       await client.query("BEGIN");
 
       const currentUser = await client.query(
-        "SELECT onboarding_completed FROM users WHERE id = $1 LIMIT 1",
+        "SELECT onboarding_completed FROM users WHERE id = $1 FOR UPDATE",
         [req.user.id]
       );
       const alreadyCompleted = !!currentUser.rows[0]?.onboarding_completed;

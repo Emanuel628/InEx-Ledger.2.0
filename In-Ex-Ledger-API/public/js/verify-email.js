@@ -17,13 +17,70 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
+function getTransientSignupValue(key) {
+  try {
+    const sessionValue = sessionStorage.getItem(key);
+    if (sessionValue) {
+      return sessionValue;
+    }
+  } catch (_) {
+    // Ignore session storage read failures.
+  }
+
+  try {
+    const legacyValue = localStorage.getItem(key);
+    if (legacyValue) {
+      try {
+        sessionStorage.setItem(key, legacyValue);
+      } catch (_) {
+        // Ignore session storage write failures during migration.
+      }
+      localStorage.removeItem(key);
+      return legacyValue;
+    }
+  } catch (_) {
+    // Ignore local storage read failures.
+  }
+
+  return "";
+}
+
+function setTransientSignupValue(key, value) {
+  const normalized = String(value || "").trim();
+  try {
+    if (normalized) {
+      sessionStorage.setItem(key, normalized);
+    } else {
+      sessionStorage.removeItem(key);
+    }
+  } catch (_) {
+    // Ignore session storage write failures.
+  }
+
+  try {
+    localStorage.removeItem(key);
+  } catch (_) {
+    // Ignore stale local storage cleanup failures.
+  }
+}
+
+function clearTransientSignupState() {
+  setTransientSignupValue(VERIFICATION_STATE_KEY, "");
+  setTransientSignupValue(SIGNUP_BOOTSTRAP_KEY, "");
+  try {
+    localStorage.removeItem("pendingVerificationEmail");
+  } catch (_) {
+    // Ignore optional local state cleanup failures.
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   statusNode = document.getElementById("verificationStatus");
   linkNode = document.getElementById("verificationLink");
   resendButton = document.getElementById("resendVerificationButton");
   resendLinkTrigger = document.getElementById("resendVerificationLink");
   continueButton = document.getElementById("continueToLoginButton");
-  verificationState = localStorage.getItem(VERIFICATION_STATE_KEY) || "";
+  verificationState = getTransientSignupValue(VERIFICATION_STATE_KEY);
 
   wireActions();
 
@@ -140,9 +197,7 @@ function consumeVerifiedSessionFromHash() {
         sessionStorage.setItem("token", token);
       }
     }
-    localStorage.removeItem(VERIFICATION_STATE_KEY);
-    localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
-    localStorage.removeItem("pendingVerificationEmail");
+    clearTransientSignupState();
   } catch (_) {
     updateStatus(tx("verify_email_status_success"));
     return true;
@@ -170,7 +225,7 @@ function consumeVerifiedSessionFromHash() {
 }
 
 async function resendVerification() {
-  const state = verificationState || localStorage.getItem(VERIFICATION_STATE_KEY) || "";
+  const state = verificationState || getTransientSignupValue(VERIFICATION_STATE_KEY) || "";
 
   if (!state) {
     updateStatus(tx("verify_email_status_register"), true);
@@ -204,7 +259,7 @@ async function resendVerification() {
 
     if (payload?.verification_state) {
       verificationState = String(payload.verification_state);
-      localStorage.setItem(VERIFICATION_STATE_KEY, verificationState);
+      setTransientSignupValue(VERIFICATION_STATE_KEY, verificationState);
     }
     renderVerificationLink("");
     updateStatus(payload?.message || tx("verify_email_status_resent"));
@@ -223,7 +278,7 @@ function goToLogin() {
 }
 
 async function finalizeVerifiedSignup() {
-  const signupBootstrapToken = String(localStorage.getItem(SIGNUP_BOOTSTRAP_KEY) || "").trim();
+  const signupBootstrapToken = getTransientSignupValue(SIGNUP_BOOTSTRAP_KEY);
   if (signupBootstrapToken) {
     try {
       const response = typeof apiFetch === "function"
@@ -246,9 +301,7 @@ async function finalizeVerifiedSignup() {
         } else {
           sessionStorage.setItem("token", payload.token);
         }
-        localStorage.removeItem(VERIFICATION_STATE_KEY);
-        localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
-        localStorage.removeItem("pendingVerificationEmail");
+        clearTransientSignupState();
         updateStatus(tx("verify_email_status_success"));
         window.location.replace(payload?.next || "/onboarding");
         return;
@@ -262,9 +315,7 @@ async function finalizeVerifiedSignup() {
     if (typeof refreshAccessToken === "function") {
       const refreshed = await refreshAccessToken();
       if (refreshed) {
-        localStorage.removeItem(VERIFICATION_STATE_KEY);
-        localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
-        localStorage.removeItem("pendingVerificationEmail");
+        clearTransientSignupState();
         updateStatus(tx("verify_email_status_success"));
         window.location.replace("/onboarding");
         return;
@@ -274,9 +325,7 @@ async function finalizeVerifiedSignup() {
     // Fall through to manual login if cookie-based recovery is unavailable.
   }
 
-  localStorage.removeItem(VERIFICATION_STATE_KEY);
-  localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
-  localStorage.removeItem("pendingVerificationEmail");
+  clearTransientSignupState();
   updateStatus(tx("verify_email_status_success"));
   stopVerificationPolling();
   setTimeout(() => {

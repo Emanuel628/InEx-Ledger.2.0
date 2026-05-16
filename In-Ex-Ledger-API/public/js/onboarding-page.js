@@ -2,6 +2,7 @@ let onboardingForm = null;
 let onboardingMessage = null;
 let onboardingSubmitting = false;
 let onboardingAccountNameTouched = false;
+const ONBOARDING_REGION_KEY = "lb_region";
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const GUIDED_SETUP_STEPS = new Set(["categories", "accounts", "transactions"]);
 const STARTER_ACCOUNT_NAME_PRESETS = {
@@ -86,7 +87,7 @@ async function handleOnboardingSubmit(event) {
 
   const payload = {
     business_name: document.getElementById("onboardingBusinessName")?.value.trim() || "",
-    business_type: "sole_proprietor",
+    business_type: resolveOnboardingBusinessType(),
     starter_account_type: document.getElementById("onboardingStarterAccountType")?.value || "checking",
     starter_account_name: document.getElementById("onboardingStarterAccountName")?.value.trim() || "",
     region: document.getElementById("onboardingRegion")?.value || "US",
@@ -102,7 +103,7 @@ async function handleOnboardingSubmit(event) {
     return;
   }
   if (!payload.starter_account_name) {
-    setOnboardingMessage("Enter a name for your first account.");
+    setOnboardingMessage(tx("onboarding_error_account_name"));
     return;
   }
 
@@ -125,8 +126,7 @@ async function handleOnboardingSubmit(event) {
       return;
     }
 
-    localStorage.setItem("lb_region", payload.region.toLowerCase());
-    localStorage.setItem("region", payload.region);
+    localStorage.setItem(ONBOARDING_REGION_KEY, payload.region.toLowerCase());
     window.LUNA_REGION = payload.region.toLowerCase();
     if (typeof setCurrentLanguage === "function") {
       setCurrentLanguage(payload.language);
@@ -141,6 +141,11 @@ async function handleOnboardingSubmit(event) {
     submitButton?.removeAttribute("disabled");
     onboardingSubmitting = false;
   }
+}
+
+function resolveOnboardingBusinessType() {
+  const value = document.getElementById("onboardingBusinessType")?.value;
+  return String(value || "sole_proprietor").trim() || "sole_proprietor";
 }
 
 function syncStarterAccountName() {

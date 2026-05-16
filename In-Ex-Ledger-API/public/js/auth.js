@@ -164,6 +164,24 @@ function consumeLoginResetFlag() {
   }
 }
 
+function buildStoredSubscriptionState(subscription) {
+  if (!subscription || typeof subscription !== "object") {
+    return null;
+  }
+
+  return {
+    effectiveTier: String(subscription.effectiveTier || ""),
+    effectiveStatus: String(subscription.effectiveStatus || ""),
+    trialEndsAt: subscription.trialEndsAt || null,
+    maxBusinessesAllowed: Number.isFinite(Number(subscription.maxBusinessesAllowed))
+      ? Number(subscription.maxBusinessesAllowed)
+      : null,
+    additionalBusinesses: Number.isFinite(Number(subscription.additionalBusinesses))
+      ? Number(subscription.additionalBusinesses)
+      : null
+  };
+}
+
 function applySubscriptionState(subscription) {
   if (!subscription || typeof subscription !== "object") {
     return;
@@ -173,7 +191,12 @@ function applySubscriptionState(subscription) {
     window.__LUNA_ME__.subscription = subscription;
   }
 
-  localStorage.setItem(SUBSCRIPTION_KEY, JSON.stringify(subscription));
+  const storedSubscription = buildStoredSubscriptionState(subscription);
+  if (storedSubscription) {
+    localStorage.setItem(SUBSCRIPTION_KEY, JSON.stringify(storedSubscription));
+  } else {
+    localStorage.removeItem(SUBSCRIPTION_KEY);
+  }
 
   if (subscription.trialEndsAt) {
     localStorage.setItem(TRIAL_ENDS_AT_KEY, String(new Date(subscription.trialEndsAt).getTime()));

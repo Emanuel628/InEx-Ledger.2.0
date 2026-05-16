@@ -250,6 +250,58 @@ test("auth tier helpers fail closed when there is no server subscription bootstr
   assert.equal(context.effectiveTier(), "free");
 });
 
+test("auth stores only the minimal subscription snapshot in localStorage", () => {
+  const storage = {
+    _store: new Map(),
+    getItem(key) {
+      return this._store.has(key) ? this._store.get(key) : null;
+    },
+    setItem(key, value) {
+      this._store.set(key, String(value));
+    },
+    removeItem(key) {
+      this._store.delete(key);
+    }
+  };
+  const context = loadScript("public/js/auth.js", {
+    window: {
+      location: { href: "/" }
+    },
+    document: {
+      addEventListener() {},
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      body: {
+        appendChild() {},
+        removeChild() {}
+      }
+    },
+    localStorage: storage,
+    sessionStorage: storage
+  });
+
+  context.applySubscriptionState({
+    effectiveTier: "v1",
+    effectiveStatus: "active",
+    trialEndsAt: "2026-06-01T00:00:00.000Z",
+    maxBusinessesAllowed: 5,
+    additionalBusinesses: 4,
+    stripeCustomerId: "cus_secret",
+    stripeSubscriptionId: "sub_secret"
+  });
+
+  const stored = JSON.parse(storage.getItem("lb_subscription"));
+  assert.deepEqual(stored, {
+    effectiveTier: "v1",
+    effectiveStatus: "active",
+    trialEndsAt: "2026-06-01T00:00:00.000Z",
+    maxBusinessesAllowed: 5,
+    additionalBusinesses: 4
+  });
+  assert.equal("stripeCustomerId" in stored, false);
+  assert.equal("stripeSubscriptionId" in stored, false);
+});
+
 test("auth apiFetch can return an expected 401 without forcing logout when explicitly allowed", async () => {
   const localStorage = {
     _store: new Map(),
