@@ -28,6 +28,7 @@ const {
 } = require("../services/emailI18nService.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const { stripeRequest, stripeGet } = require("../services/stripeClient.js");
+const { normalizeFiscalYearStart } = require("../utils/fiscalYear.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -39,7 +40,6 @@ const { base: BASE_PRICE_ENV, addon: ADDON_PRICE_ENV } = buildStripePriceEnvMap(
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
-const FISCAL_YEAR_START_RE = /^((0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])|\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/;
 const VALID_ACCOUNTING_METHODS = new Set(["cash", "accrual"]);
 const VALID_GST_HST_METHODS = new Set(["regular", "quick"]);
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "InEx Ledger <noreply@inexledger.com>";
@@ -452,10 +452,13 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
     gst_hst_method
   } = payload;
 
-  const resolvedRegion = String(region || current.region || "US").toUpperCase();
+  const resolvedRegion = String(region || current.region || "US").trim().toUpperCase();
   const resolvedProvince = resolvedRegion === "CA"
-    ? String(province || current.province || "").toUpperCase() || null
+    ? String(province || current.province || "").trim().toUpperCase() || null
     : null;
+  const normalizedFiscalYear = Object.prototype.hasOwnProperty.call(payload, "fiscal_year_start")
+    ? normalizeFiscalYearStart(fiscal_year_start)
+    : { valid: true, value: current.fiscal_year_start };
 
   if (region && !VALID_REGIONS.has(resolvedRegion)) {
     return { error: "region must be 'US' or 'CA'" };
@@ -463,8 +466,8 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
   if (language && !VALID_LANGUAGES.has(String(language))) {
     return { error: "language must be 'en', 'es', or 'fr'" };
   }
-  if (fiscal_year_start != null && fiscal_year_start !== "" && !FISCAL_YEAR_START_RE.test(String(fiscal_year_start))) {
-    return { error: "fiscal_year_start must be in MM-DD format with valid month (01-12) and day (01-31)." };
+  if (!normalizedFiscalYear.valid) {
+    return { error: normalizedFiscalYear.error };
   }
   if (resolvedProvince && !CA_PROVINCES.has(resolvedProvince)) {
     return { error: "Invalid Canadian province code" };
@@ -521,7 +524,7 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
       normalizeOptionalTrimmedString(name),
       resolvedRegion,
       language || null,
-      fiscal_year_start || null,
+      normalizedFiscalYear.value,
       resolvedProvince,
       Object.prototype.hasOwnProperty.call(payload, "business_type")
         ? normalizeOptionalTrimmedString(business_type)

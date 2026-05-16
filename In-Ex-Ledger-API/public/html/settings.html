@@ -218,7 +218,7 @@
             </div>
             <div class="form-field">
               <label for="fiscal-year" data-i18n="settings_label_fiscal_year_start">Fiscal year start</label>
-              <input type="date" id="fiscal-year" name="fiscal_year_start" />
+              <input type="date" id="fiscal-year" name="fiscal_year_start" min="2000-01-01" max="2000-12-31" />
             </div>
             <div class="form-field">
               <label for="operating-name">Operating name (DBA)</label>
@@ -760,7 +760,7 @@
           </div>
           <div class="form-field">
             <label for="businessEditFiscalYear">Fiscal year start</label>
-            <input type="date" id="businessEditFiscalYear" />
+            <input type="date" id="businessEditFiscalYear" min="2000-01-01" max="2000-12-31" />
           </div>
           <div class="form-field">
             <label for="businessEditOperatingName">Operating name (DBA)</label>
@@ -807,6 +807,6 @@
   <script src="../js/trial.js?v=20260408a"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
   <script src="../js/privacyService.js?v=20260514a"></script>
-  <script src="../js/settings.js?v=20260516b"></script>
+  <script src="../js/settings.js?v=20260516c"></script>
 </body>
 </html>

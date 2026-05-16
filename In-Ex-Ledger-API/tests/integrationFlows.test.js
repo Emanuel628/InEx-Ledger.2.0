@@ -546,6 +546,23 @@ test("categories: POST with invalid color returns 400", async () => {
   assert.match(res.body.error, /color/);
 });
 
+test("categories: POST with invalid tax map returns 400", async () => {
+  const router = require("../routes/categories.routes.js");
+  const app = buildApp(router, "/api/categories");
+  const token = makeToken();
+  const csrf = generateCsrfToken();
+
+  const res = await request(app)
+    .post("/api/categories")
+    .set("Authorization", `Bearer ${token}`)
+    .set(CSRF_HEADER_NAME, csrf)
+    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
+    .send({ name: "My Category", kind: "expense", tax_map_us: "fuchsia_line" });
+
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /tax_map_us/);
+});
+
 // ---------------------------------------------------------------------------
 // 7. Account validation (400 before DB hit)
 // ---------------------------------------------------------------------------

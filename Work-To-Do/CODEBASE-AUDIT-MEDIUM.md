@@ -92,7 +92,7 @@ Rules used here:
   Group: Text input bounds
   Covers: account names, transaction descriptions, transaction notes, onboarding/business/profile names
 
-- [ ] 30-60 min - Add explicit whitelists and normalization for category tax mapping and region/fiscal-year inputs.
+- [x] 30-60 min - Add explicit whitelists and normalization for category tax mapping and region/fiscal-year inputs.
   Files: `categories.routes.js`, `businesses.routes.js`, `settings.html` / `settings.js`
   Group: Tax and region normalization
   Covers: arbitrary `tax_map_us` / `tax_map_ca`, untrimmed region values, `YYYY-MM-DD` vs `MM-DD` fiscal-year mismatch

@@ -268,10 +268,35 @@ function resolveDisplayLocale() {
 
 function formatFiscalYearSummary(value) {
   if (!value) return t("settings_overview_fiscal_not_set");
-  const date = new Date(value);
+  const displayValue = fiscalYearStorageToInput(value);
+  const date = displayValue ? new Date(`${displayValue}T00:00:00`) : new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   const formatted = date.toLocaleDateString(resolveDisplayLocale(), { month: "short", day: "numeric" });
   return interpolateTranslatedMessage("settings_overview_fiscal_year", { date: formatted });
+}
+
+function fiscalYearStorageToInput(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return normalized;
+  }
+  if (/^\d{2}-\d{2}$/.test(normalized)) {
+    return `2000-${normalized}`;
+  }
+  return "";
+}
+
+function fiscalYearInputToStorage(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return normalized.slice(5);
+  }
+  if (/^\d{2}-\d{2}$/.test(normalized)) {
+    return normalized;
+  }
+  return normalized;
 }
 
 function formatSettingsDate(value, options = {}) {
@@ -466,7 +491,7 @@ async function initBusinessProfileForm() {
     const nextProfile = {
       name: document.getElementById("business-name").value.trim(),
       type: document.getElementById("business-type-select").value,
-      fiscalYearStart: document.getElementById("fiscal-year").value,
+      fiscalYearStart: fiscalYearInputToStorage(document.getElementById("fiscal-year").value),
       address: addressParts.join("\n"),
       operatingName: document.getElementById("operating-name").value.trim(),
       businessActivityCode: document.getElementById("business-activity-code").value.trim(),
@@ -576,7 +601,7 @@ async function initBusinessProfileForm() {
 function applyBusinessProfileForm(profile) {
   document.getElementById("business-name").value = profile.name || "";
   document.getElementById("business-type-select").value = profile.type || "sole_proprietor";
-  document.getElementById("fiscal-year").value = profile.fiscalYearStart || "";
+  document.getElementById("fiscal-year").value = fiscalYearStorageToInput(profile.fiscalYearStart);
   document.getElementById("operating-name").value = profile.operatingName || "";
   document.getElementById("business-activity-code").value = profile.businessActivityCode || "";
   document.getElementById("accounting-method").value = profile.accountingMethod || "";
@@ -805,7 +830,7 @@ async function openBusinessEditModal(businessId) {
   document.getElementById("businessEditId").value = businessId;
   document.getElementById("businessEditName").value = payload.name || "";
   document.getElementById("businessEditType").value = payload.business_type || "sole_proprietor";
-  document.getElementById("businessEditFiscalYear").value = payload.fiscal_year_start || "";
+  document.getElementById("businessEditFiscalYear").value = fiscalYearStorageToInput(payload.fiscal_year_start);
   document.getElementById("businessEditOperatingName").value = payload.operating_name || "";
   document.getElementById("businessEditActivityCode").value = payload.business_activity_code || "";
   modal?.classList.remove("hidden");
@@ -846,7 +871,7 @@ function wireBusinessEditModal() {
         body: JSON.stringify({
           name: document.getElementById("businessEditName").value.trim(),
           business_type: document.getElementById("businessEditType").value,
-          fiscal_year_start: document.getElementById("businessEditFiscalYear").value || null,
+          fiscal_year_start: fiscalYearInputToStorage(document.getElementById("businessEditFiscalYear").value),
           operating_name: document.getElementById("businessEditOperatingName").value.trim(),
           business_activity_code: document.getElementById("businessEditActivityCode").value.trim()
         })

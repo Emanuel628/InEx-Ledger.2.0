@@ -16,6 +16,7 @@ const {
 } = require("../services/accountingLockService.js");
 const { seedDefaultCategoriesForBusiness } = require("../api/utils/seedDefaultsForBusiness.js");
 const { getUnmappedCategories } = require("../services/taxSummaryService.js");
+const { normalizeCategoryTaxMap } = require("../utils/taxMappings.js");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -88,6 +89,14 @@ router.post("/", async (req, res) => {
   if (color && !VALID_COLORS.has(color)) {
     return res.status(400).json({ error: "color is invalid" });
   }
+  const normalizedUsTaxMap = normalizeCategoryTaxMap(tax_map_us, "US");
+  if (!normalizedUsTaxMap.valid) {
+    return res.status(400).json({ error: normalizedUsTaxMap.error });
+  }
+  const normalizedCaTaxMap = normalizeCategoryTaxMap(tax_map_ca, "CA");
+  if (!normalizedCaTaxMap.valid) {
+    return res.status(400).json({ error: normalizedCaTaxMap.error });
+  }
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
@@ -95,7 +104,15 @@ router.post("/", async (req, res) => {
       `INSERT INTO categories (id, business_id, name, kind, color, tax_map_us, tax_map_ca)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, name, kind, color, tax_map_us, tax_map_ca, is_default, is_active, created_at`,
-      [crypto.randomUUID(), businessId, name.trim(), kind, color || null, tax_map_us || null, tax_map_ca || null]
+      [
+        crypto.randomUUID(),
+        businessId,
+        name.trim(),
+        kind,
+        color || null,
+        normalizedUsTaxMap.value ?? null,
+        normalizedCaTaxMap.value ?? null
+      ]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -163,6 +180,14 @@ router.put("/:id", async (req, res) => {
   if (is_active !== undefined && typeof is_active !== "boolean") {
     return res.status(400).json({ error: "is_active must be a boolean" });
   }
+  const normalizedUsTaxMap = normalizeCategoryTaxMap(tax_map_us, "US");
+  if (!normalizedUsTaxMap.valid) {
+    return res.status(400).json({ error: normalizedUsTaxMap.error });
+  }
+  const normalizedCaTaxMap = normalizeCategoryTaxMap(tax_map_ca, "CA");
+  if (!normalizedCaTaxMap.valid) {
+    return res.status(400).json({ error: normalizedCaTaxMap.error });
+  }
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
@@ -179,8 +204,8 @@ router.put("/:id", async (req, res) => {
     const newName = name !== undefined ? normalizeOptionalTrimmedString(name) : current.name;
     const newKind = kind !== undefined ? (kind ?? null) : current.kind;
     const newColor = color !== undefined ? (color ?? null) : current.color;
-    const newTaxMapUs = tax_map_us !== undefined ? (tax_map_us ?? null) : current.tax_map_us;
-    const newTaxMapCa = tax_map_ca !== undefined ? (tax_map_ca ?? null) : current.tax_map_ca;
+    const newTaxMapUs = tax_map_us !== undefined ? (normalizedUsTaxMap.value ?? null) : current.tax_map_us;
+    const newTaxMapCa = tax_map_ca !== undefined ? (normalizedCaTaxMap.value ?? null) : current.tax_map_ca;
     const newIsActive = is_active !== undefined ? Boolean(is_active) : current.is_active;
 
     // Block classification changes that would retroactively alter locked-period history.
