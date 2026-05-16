@@ -1622,6 +1622,14 @@ body {
   margin-top: 6px;
 }
 
+.settings-inline-error {
+  margin: 12px 0 0;
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .modal-actions.danger-actions {
   display: flex;
   gap: 10px;

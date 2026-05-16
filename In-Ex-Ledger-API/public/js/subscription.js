@@ -55,6 +55,18 @@ function showSubToast(message) {
   subToastTimer = setTimeout(() => toast.classList.add("hidden"), SUB_TOAST_MS);
 }
 
+function setBusinessDeleteError(message = "") {
+  const errorNode = document.getElementById("subBusinessDeleteError");
+  if (!errorNode) return;
+  if (!message) {
+    errorNode.textContent = "";
+    errorNode.classList.add("hidden");
+    return;
+  }
+  errorNode.textContent = message;
+  errorNode.classList.remove("hidden");
+}
+
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
@@ -1215,12 +1227,14 @@ function openBusinessDeleteModal(businessId, businessName) {
   if (passwordInput) {
     passwordInput.value = "";
   }
+  setBusinessDeleteError("");
   modal?.classList.remove("hidden");
   setTimeout(() => passwordInput?.focus(), 0);
 }
 
 function closeBusinessDeleteModal() {
   pendingDeleteBusinessId = null;
+  setBusinessDeleteError("");
   document.getElementById("subBusinessDeleteModal")?.classList.add("hidden");
 }
 
@@ -1241,14 +1255,16 @@ function wireBusinessDeleteModal() {
     const password = passwordInput?.value || "";
     if (!pendingDeleteBusinessId) return;
     if (!password) {
-      showSubToast("Enter your password to delete this business.");
+      setBusinessDeleteError("Enter your password to delete this business.");
       passwordInput?.focus();
       return;
     }
 
     confirmBtn.disabled = true;
+    setBusinessDeleteError("");
     try {
       const res = await apiFetch(`/api/businesses/${pendingDeleteBusinessId}`, {
+        allowUnauthorizedResponse: true,
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password })
@@ -1272,7 +1288,9 @@ function wireBusinessDeleteModal() {
       currentSubscription = await loadSubscription();
       await loadBillingHistory();
     } catch (err) {
-      showSubToast(err.message || "Failed to delete business.");
+      const message = err.message || "Failed to delete business.";
+      setBusinessDeleteError(message);
+      passwordInput?.focus();
     } finally {
       confirmBtn.disabled = false;
     }

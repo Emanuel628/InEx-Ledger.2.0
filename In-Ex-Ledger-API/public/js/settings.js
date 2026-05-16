@@ -693,6 +693,18 @@ function openAddBusinessModal() {
 
 let pendingDeleteBusinessId = null;
 
+function setDangerModalError(message = "") {
+  const errorNode = document.getElementById("dangerModalError");
+  if (!errorNode) return;
+  if (!message) {
+    errorNode.textContent = "";
+    errorNode.classList.add("hidden");
+    return;
+  }
+  errorNode.textContent = message;
+  errorNode.classList.remove("hidden");
+}
+
 async function openDeleteBusinessModal(bizId, bizName) {
   const modal = document.getElementById("dangerModal");
   const title = document.getElementById("dangerModalTitle");
@@ -710,6 +722,7 @@ async function openDeleteBusinessModal(bizId, bizName) {
   confirmWrap.classList.add("hidden");
   passwordWrap.classList.remove("hidden");
   if (passwordInput) passwordInput.value = "";
+  setDangerModalError("");
   confirmButton.disabled = false;
   modal.classList.remove("hidden");
 
@@ -2705,6 +2718,7 @@ function initDangerZone() {
     pendingDeleteBusinessId = null;
     if (confirmInput) confirmInput.value = "";
     if (passwordInput) passwordInput.value = "";
+    setDangerModalError("");
     resetDeleteAccountMfaState();
     confirmWrap.classList.add("hidden");
     if (passwordWrap) passwordWrap.classList.add("hidden");
@@ -2714,6 +2728,7 @@ function initDangerZone() {
   const openModal = (action) => {
     dangerAction = action;
     if (confirmInput) confirmInput.value = "";
+    setDangerModalError("");
     if (action === "delete_transactions") {
       title.textContent = "Delete all transactions?";
       body.textContent = "This will permanently remove every transaction in your ledger. This cannot be undone.";
@@ -2833,20 +2848,22 @@ function initDangerZone() {
       if (dangerAction === "delete_business") {
         const password = passwordInput?.value || "";
         if (!password) {
-          showSettingsToast(t("settings_enter_password_confirm"));
+          setDangerModalError(t("settings_enter_password_confirm"));
           passwordInput?.focus();
           return;
         }
         confirmButton.disabled = true;
+        setDangerModalError("");
         try {
           const res = await apiFetch(`/api/businesses/${pendingDeleteBusinessId}`, {
+            allowUnauthorizedResponse: true,
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ password })
           });
           const payload = res ? await res.json().catch(() => null) : null;
           if (!res || !res.ok) {
-            showSettingsToast(payload?.error || t("settings_delete_business_error"));
+            setDangerModalError(payload?.error || t("settings_delete_business_error"));
             confirmButton.disabled = false;
             return;
           }
@@ -2874,7 +2891,7 @@ function initDangerZone() {
           await loadAndDisplaySubscription(document.getElementById("accountSubStatusLabel"));
         } catch (err) {
           console.error("Business deletion failed", err);
-          showSettingsToast(t("settings_delete_business_error"));
+          setDangerModalError(err.message || t("settings_delete_business_error"));
           confirmButton.disabled = false;
         }
         return;

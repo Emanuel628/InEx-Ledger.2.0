@@ -1,6 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const fs = require("fs");
+const { Resend } = require("resend");
 const { pool } = require("../db.js");
 const { requireAuth, requireMfaIfEnabled } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
@@ -17,10 +18,14 @@ const {
   getSubscriptionSnapshotForBusiness,
   syncStripeSubscriptionForBusiness
 } = require("../services/subscriptionService.js");
-const { buildStripePriceLookup } = require("../services/stripePriceConfig.js");
+const { buildStripePriceEnvMap, buildStripePriceLookup } = require("../services/stripePriceConfig.js");
 const { decryptTaxId, encryptTaxId } = require("../services/taxIdService.js");
 const { verifyPassword } = require("../utils/authUtils.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
+const {
+  getPreferredLanguageForUser,
+  buildBusinessLifecycleEmail
+} = require("../services/emailI18nService.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const { stripeRequest, stripeGet } = require("../services/stripeClient.js");
 
@@ -30,12 +35,195 @@ router.use(requireCsrfProtection);
 
 const businessDeleteLimiter = createBusinessDeleteLimiter();
 const { addonPriceIds: STRIPE_ADDON_PRICE_IDS } = buildStripePriceLookup();
+const { base: BASE_PRICE_ENV, addon: ADDON_PRICE_ENV } = buildStripePriceEnvMap();
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
 const FISCAL_YEAR_START_RE = /^((0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])|\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/;
 const VALID_ACCOUNTING_METHODS = new Set(["cash", "accrual"]);
 const VALID_GST_HST_METHODS = new Set(["regular", "quick"]);
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "InEx Ledger <noreply@inexledger.com>";
+let resendClient = null;
+
+function getResend() {
+  if (!resendClient) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error("RESEND_API_KEY is not configured");
+    }
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendClient;
+}
+
+function buildAppUrl(path) {
+  const base = (process.env.APP_BASE_URL || "").trim();
+  if (!base) {
+    throw new Error("APP_BASE_URL is not configured");
+  }
+  const parsed = new URL(base);
+  const isLocalhost =
+    parsed.hostname === "localhost" ||
+    parsed.hostname === "127.0.0.1" ||
+    parsed.hostname === "[::1]";
+
+  if (parsed.protocol !== "https:" && !isLocalhost) {
+    throw new Error("APP_BASE_URL must use HTTPS");
+  }
+  if (parsed.hostname === "inexledger.com") {
+    parsed.hostname = "www.inexledger.com";
+  }
+  const normalizedBase = parsed.toString().replace(/\/+$/, "");
+  return `${normalizedBase}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function normalizeBillingCurrency(currency) {
+  return String(currency || "usd").trim().toLowerCase() === "cad" ? "cad" : "usd";
+}
+
+function normalizeBillingInterval(interval) {
+  return String(interval || "").trim().toLowerCase() === "yearly" ? "yearly" : "monthly";
+}
+
+function parseStripeUnitAmount(price) {
+  const raw = price?.unit_amount_decimal ?? price?.unit_amount;
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) {
+    throw new Error("Stripe price is missing a valid unit amount");
+  }
+  return numeric / 100;
+}
+
+async function buildVerifiedPricingTable(currency) {
+  const normalizedCurrency = normalizeBillingCurrency(currency);
+  const monthlyBaseEnv = BASE_PRICE_ENV.monthly?.[normalizedCurrency];
+  const yearlyBaseEnv = BASE_PRICE_ENV.yearly?.[normalizedCurrency];
+  const monthlyAddonEnv = ADDON_PRICE_ENV.monthly?.[normalizedCurrency];
+  const yearlyAddonEnv = ADDON_PRICE_ENV.yearly?.[normalizedCurrency];
+
+  const [monthlyBasePrice, yearlyBasePrice, monthlyAddonPrice, yearlyAddonPrice] = await Promise.all([
+    stripeGet(`/prices/${encodeURIComponent(process.env[monthlyBaseEnv] || "")}`),
+    stripeGet(`/prices/${encodeURIComponent(process.env[yearlyBaseEnv] || "")}`),
+    stripeGet(`/prices/${encodeURIComponent(process.env[monthlyAddonEnv] || "")}`),
+    stripeGet(`/prices/${encodeURIComponent(process.env[yearlyAddonEnv] || "")}`)
+  ]);
+
+  return {
+    monthly: {
+      base: parseStripeUnitAmount(monthlyBasePrice),
+      addon: parseStripeUnitAmount(monthlyAddonPrice)
+    },
+    yearly: {
+      base: parseStripeUnitAmount(yearlyBasePrice),
+      addon: parseStripeUnitAmount(yearlyAddonPrice)
+    }
+  };
+}
+
+function formatBillingCurrencyAmount(amount, currency) {
+  const normalizedCurrency = String(currency || "usd").toUpperCase();
+  const numeric = Number(amount || 0);
+  if (!Number.isFinite(numeric)) {
+    return `${normalizedCurrency} 0.00`;
+  }
+  const locale = normalizedCurrency === "CAD" ? "en-CA" : "en-US";
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: normalizedCurrency,
+      minimumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
+      maximumFractionDigits: 2
+    }).format(numeric);
+  } catch (_) {
+    return `${normalizedCurrency} ${numeric.toFixed(2)}`;
+  }
+}
+
+async function buildBusinessLifecycleDetails(subscription, businessCount) {
+  const safeBusinessCount = Math.max(Number(businessCount) || 0, 0);
+  const additionalBusinesses = Math.max(Number(subscription?.additionalBusinesses || 0), 0);
+  const currency = normalizeBillingCurrency(subscription?.currency);
+  const interval = normalizeBillingInterval(subscription?.billingInterval);
+  const details = [
+    { label: "Businesses now", value: String(safeBusinessCount) },
+    { label: "Paid add-on slots", value: String(additionalBusinesses) }
+  ];
+
+  if (!subscription || subscription.effectiveTier !== PLAN_V1) {
+    details.push({ label: "Updated monthly total", value: `${formatBillingCurrencyAmount(0, currency)} / month` });
+    return details;
+  }
+
+  if (subscription.isTrialing) {
+    details.push({ label: "Updated monthly total", value: `${formatBillingCurrencyAmount(0, currency)} during trial` });
+    return details;
+  }
+
+  const pricing = await buildVerifiedPricingTable(currency);
+  const activePricing = pricing[interval];
+  const monthlyPricing = pricing.monthly;
+  const billedTotal = activePricing.base + (activePricing.addon * additionalBusinesses);
+  const monthlyEquivalent = monthlyPricing.base + (monthlyPricing.addon * additionalBusinesses);
+
+  details.push({
+    label: interval === "yearly" ? "Updated billed total" : "Updated monthly total",
+    value: `${formatBillingCurrencyAmount(billedTotal, currency)} / ${interval === "yearly" ? "year" : "month"}`
+  });
+
+  if (interval === "yearly") {
+    details.push({
+      label: "Monthly equivalent",
+      value: `${formatBillingCurrencyAmount(monthlyEquivalent, currency)} / month`
+    });
+  }
+
+  return details;
+}
+
+async function sendBusinessLifecycleEmail({ userId, kind, businessName, subscription, businessCount }) {
+  try {
+    if (!userId) {
+      return;
+    }
+
+    const contactResult = await pool.query(
+      `SELECT email
+         FROM users
+        WHERE id = $1
+        LIMIT 1`,
+      [userId]
+    );
+    const contact = contactResult.rows[0] || null;
+    if (!contact?.email) {
+      return;
+    }
+
+    const lang = await getPreferredLanguageForUser(userId);
+    const details = [
+      { label: "Business", value: businessName || "Business" },
+      ...(await buildBusinessLifecycleDetails(subscription, businessCount))
+    ];
+    const actionUrl = buildAppUrl("/subscription");
+    const emailContent = buildBusinessLifecycleEmail(lang, kind, {
+      details,
+      actionUrl
+    });
+
+    await getResend().emails.send({
+      from: RESEND_FROM_EMAIL,
+      to: contact.email,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      text: emailContent.text
+    });
+    logInfo("Business lifecycle email sent", { userId, kind, to: contact.email });
+  } catch (err) {
+    logWarn("Business lifecycle email failed", {
+      userId,
+      kind,
+      err: err.message
+    });
+  }
+}
 
 async function updateAnchorAdditionalBusinesses(client, businessId, additionalBusinesses) {
   await client.query(
@@ -496,6 +684,19 @@ router.post("/", async (req, res) => {
     req.user.business_id = businessId;
     const nextBusinesses = await listBusinessesForUser(req.user.id);
     const activeBusiness = nextBusinesses.find((business) => business.id === businessId) || null;
+    const nextBillingBusinessId =
+      await findBillingAnchorBusinessIdForUser(req.user.id, activeBusinessId) || activeBusinessId;
+    const nextSubscription = nextBillingBusinessId
+      ? await getSubscriptionSnapshotForBusiness(nextBillingBusinessId)
+      : null;
+
+    await sendBusinessLifecycleEmail({
+      userId: req.user.id,
+      kind: "added",
+      businessName: activeBusiness?.name || validation.normalized.name,
+      subscription: nextSubscription,
+      businessCount: nextBusinesses.length
+    });
 
     res.status(201).json({
       active_business_id: businessId,
@@ -553,12 +754,13 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
   try {
     // Verify that the business belongs to this user
     const ownerCheck = await pool.query(
-      "SELECT id FROM businesses WHERE id = $1 AND user_id = $2 LIMIT 1",
+      "SELECT id, name FROM businesses WHERE id = $1 AND user_id = $2 LIMIT 1",
       [businessId, req.user.id]
     );
     if (!ownerCheck.rowCount) {
       return res.status(404).json({ error: "Business not found." });
     }
+    const businessName = ownerCheck.rows[0]?.name || "Business";
 
     const activeBusinessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
     const billingBusinessId =
@@ -724,6 +926,14 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
     const nextSubscription = nextBillingBusinessId
       ? await getSubscriptionSnapshotForBusiness(nextBillingBusinessId)
       : null;
+
+    await sendBusinessLifecycleEmail({
+      userId: req.user.id,
+      kind: "deleted",
+      businessName,
+      subscription: nextSubscription,
+      businessCount: businesses.length
+    });
 
     res.status(200).json({
       message: "Business deleted.",

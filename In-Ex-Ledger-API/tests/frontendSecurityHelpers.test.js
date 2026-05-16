@@ -250,6 +250,77 @@ test("auth tier helpers fail closed when there is no server subscription bootstr
   assert.equal(context.effectiveTier(), "free");
 });
 
+test("auth apiFetch can return an expected 401 without forcing logout when explicitly allowed", async () => {
+  const localStorage = {
+    _store: new Map(),
+    getItem(key) {
+      return this._store.has(key) ? this._store.get(key) : null;
+    },
+    setItem(key, value) {
+      this._store.set(key, String(value));
+    },
+    removeItem(key) {
+      this._store.delete(key);
+    },
+    clear() {
+      this._store.clear();
+    }
+  };
+  const sessionStorage = {
+    _store: new Map(),
+    getItem(key) {
+      return this._store.has(key) ? this._store.get(key) : null;
+    },
+    setItem(key, value) {
+      this._store.set(key, String(value));
+    },
+    removeItem(key) {
+      this._store.delete(key);
+    },
+    clear() {
+      this._store.clear();
+    }
+  };
+  const fetchCalls = [];
+  const context = loadScript("public/js/auth.js", {
+    window: {
+      location: { href: "/subscription" },
+      __AUTH_GUARD_STATE__: { running: false, count: 0, lastError: null }
+    },
+    document: {
+      cookie: "",
+      addEventListener() {},
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      body: {
+        appendChild() {},
+        removeChild() {}
+      }
+    },
+    localStorage,
+    sessionStorage,
+    fetch: async (url) => {
+      fetchCalls.push(url);
+      if (String(url).includes("/api/auth/refresh")) {
+        return { ok: false, status: 401, async json() { return {}; } };
+      }
+      return { ok: false, status: 401, async json() { return { error: "Incorrect password." }; } };
+    },
+    FormData: class FormData {}
+  });
+
+  context.setToken("token_123");
+  const response = await context.apiFetch("/api/businesses/biz_123", {
+    method: "DELETE",
+    allowUnauthorizedResponse: true
+  });
+
+  assert.equal(response.status, 401);
+  assert.equal(context.window.location.href, "/subscription");
+  assert.equal(context.getToken(), "token_123");
+  assert.equal(fetchCalls.length, 2);
+});
+
 test("trial.js ignores stored subscription fallback and does not mint a synthetic fresh trial window", () => {
   const context = loadScript("public/js/trial.js", {
     window: {},

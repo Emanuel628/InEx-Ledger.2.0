@@ -556,6 +556,97 @@ function buildBillingLifecycleEmail(lang, kind, options = {}) {
   };
 }
 
+const BUSINESS_LIFECYCLE = {
+  added: {
+    en: {
+      subject: "A business was added to your InEx Ledger workspace",
+      eyebrow: "InEx Ledger businesses",
+      heading: "Business added",
+      body: "A new business was added to your workspace. Review the updated business count and billing summary below.",
+      detailsLabel: "Workspace details",
+      actionLabel: "Open billing",
+      footer: "Use Settings to switch or edit businesses, and Subscription to review billing changes.",
+      text: ({ summary, actionUrl }) =>
+        `A new business was added to your InEx Ledger workspace.\n\n${summary}\n\nReview details: ${actionUrl}`
+    },
+    fr: {
+      subject: "Une entreprise a été ajoutée à votre espace InEx Ledger",
+      eyebrow: "Entreprises InEx Ledger",
+      heading: "Entreprise ajoutée",
+      body: "Une nouvelle entreprise a été ajoutée à votre espace. Consultez ci-dessous le nombre d’entreprises et le résumé de facturation mis à jour.",
+      detailsLabel: "Détails de l’espace",
+      actionLabel: "Ouvrir la facturation",
+      footer: "Utilisez les Paramètres pour changer ou modifier les entreprises et Abonnement pour revoir les changements de facturation.",
+      text: ({ summary, actionUrl }) =>
+        `Une nouvelle entreprise a été ajoutée à votre espace InEx Ledger.\n\n${summary}\n\nConsulter les détails : ${actionUrl}`
+    }
+  },
+  deleted: {
+    en: {
+      subject: "A business was deleted from your InEx Ledger workspace",
+      eyebrow: "InEx Ledger businesses",
+      heading: "Business deleted",
+      body: "A business was deleted from your workspace. Review the updated business count and billing summary below.",
+      detailsLabel: "Workspace details",
+      actionLabel: "Open billing",
+      footer: "Use Settings to confirm the remaining businesses and Subscription to review the updated billing state.",
+      text: ({ summary, actionUrl }) =>
+        `A business was deleted from your InEx Ledger workspace.\n\n${summary}\n\nReview details: ${actionUrl}`
+    },
+    fr: {
+      subject: "Une entreprise a été supprimée de votre espace InEx Ledger",
+      eyebrow: "Entreprises InEx Ledger",
+      heading: "Entreprise supprimée",
+      body: "Une entreprise a été supprimée de votre espace. Consultez ci-dessous le nombre d’entreprises et le résumé de facturation mis à jour.",
+      detailsLabel: "Détails de l’espace",
+      actionLabel: "Ouvrir la facturation",
+      footer: "Utilisez les Paramètres pour confirmer les entreprises restantes et Abonnement pour revoir l’état de facturation mis à jour.",
+      text: ({ summary, actionUrl }) =>
+        `Une entreprise a été supprimée de votre espace InEx Ledger.\n\n${summary}\n\nConsulter les détails : ${actionUrl}`
+    }
+  }
+};
+
+function buildBusinessLifecycleEmail(lang, kind, options = {}) {
+  const l = normalizeEmailLang(lang);
+  const bucket = BUSINESS_LIFECYCLE[kind] || BUSINESS_LIFECYCLE.added;
+  const s = bucket[l] || bucket.en;
+  const details = Array.isArray(options.details)
+    ? options.details.filter((detail) => detail && detail.label && detail.value)
+    : [];
+  const safeActionUrl = sanitizeHttpUrl(options.actionUrl);
+  const summary = details.map((detail) => `${detail.label}: ${detail.value}`).join("\n");
+  const detailHtml = details.length
+    ? `
+      <div style="margin: 20px 0; padding: 16px 18px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc;">
+        <div style="margin: 0 0 10px; color: #0f172a; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">${escapeHtml(s.detailsLabel)}</div>
+        ${details
+          .map(
+            (detail) =>
+              `<div style="display: flex; gap: 8px; margin: 0 0 8px; color: #334155; font-size: 14px; line-height: 1.5;"><strong style="min-width: 148px; color: #0f172a;">${escapeHtml(detail.label)}</strong><span>${escapeHtml(detail.value)}</span></div>`
+          )
+          .join("")}
+      </div>`
+    : "";
+  const html = wrapEmailHtml(
+    `<div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85;">${s.eyebrow}</div>
+     <h1 style="margin: 12px 0 0; font-size: 28px; line-height: 1.15;">${s.heading}</h1>`,
+    `<p style="margin: 0 0 14px; color: #0f172a; font-size: 15px; line-height: 1.6;">${s.body}</p>
+     ${detailHtml}
+     ${safeActionUrl ? ctaButton(safeActionUrl, s.actionLabel) : ""}
+     <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.6;">${s.footer}</p>`
+  );
+
+  return {
+    subject: s.subject,
+    html,
+    text: s.text({
+      summary,
+      actionUrl: safeActionUrl
+    })
+  };
+}
+
 module.exports = {
   getPreferredLanguageForUser,
   getPreferredLanguageForEmail,
@@ -565,6 +656,7 @@ module.exports = {
   buildNewSignInAlertEmail,
   buildEmailChangeEmail,
   buildBillingLifecycleEmail,
+  buildBusinessLifecycleEmail,
   buildMfaEmailContent,
   normalizeEmailLang
 };

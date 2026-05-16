@@ -759,14 +759,18 @@ async function redirectIfAuthenticated() {
 }
 
 async function apiFetch(url, options = {}) {
+  const {
+    allowUnauthorizedResponse = false,
+    ...fetchOptions
+  } = options;
   const apiUrl = buildApiUrl(url);
-  const method = String(options.method || "GET").toUpperCase();
+  const method = String(fetchOptions.method || "GET").toUpperCase();
   const buildHeaders = () => {
-    const base = options.body instanceof FormData ? {} : { "Content-Type": "application/json" };
-    return { ...base, ...(options.headers || {}), ...authHeader(), ...csrfHeader(method) };
+    const base = fetchOptions.body instanceof FormData ? {} : { "Content-Type": "application/json" };
+    return { ...base, ...(fetchOptions.headers || {}), ...authHeader(), ...csrfHeader(method) };
   };
   let response = await fetch(apiUrl, {
-    ...options,
+    ...fetchOptions,
     credentials: "include",
     headers: buildHeaders()
   });
@@ -775,14 +779,14 @@ async function apiFetch(url, options = {}) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {
       response = await fetch(apiUrl, {
-        ...options,
+        ...fetchOptions,
         credentials: "include",
         headers: buildHeaders()
       });
     }
   }
 
-  if (response.status === 401) {
+  if (response.status === 401 && !allowUnauthorizedResponse) {
     markLoginReset();
     clearToken();
     window.location.href = LOGIN_PAGE;

@@ -35,6 +35,14 @@
   font-size: 14px;
 }
 
+.sub-inline-error {
+  margin: 12px 0 0;
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .sub-status-inner {
   display: flex;
   align-items: center;
