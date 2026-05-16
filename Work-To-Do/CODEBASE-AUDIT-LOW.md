@@ -305,17 +305,17 @@ Reason for this exact order:
 
 ### Structural but low-risk cleanup
 
-- [ ] Half day - Remove dead utility code and misleading signatures that increase future maintenance cost.
+- [x] Half day - Remove dead utility code and misleading signatures that increase future maintenance cost.
   Files: `taxReminders.js`, `pdf_export.js`, `global.js`, `theme-boot.js`, `encryptionService.js`, `taxIdService.js`
   Group: Utility cleanup
   Covers: unpruned dismissal list, dead PDF page builders, dead global theme parameter, theme version mismatch write churn, silent `encrypt(null)`, legacy decrypt returning ciphertext
 
-- [ ] Half day - Normalize small billing/crypto/platform polish items while the related systems are already under review.
+- [x] Half day - Normalize small billing/crypto/platform polish items while the related systems are already under review.
   Files: `billing.routes.js`, `businesses.routes.js`, `crypto.routes.js`, `exportGrantService.js`, `pdfWorkerClient.js`
   Group: Platform polish
   Covers: duplicated Stripe helpers, no billing-failure user notification, small advisory-lock collision risk, public-key cache semantics, export-grant cleanup doing write work on every verification call, verbose worker error messages
 
-- [ ] Half day - Sweep the app for repeated "low-signal but everywhere" inconsistencies and standardize them in one pass.
+- [x] Half day - Sweep the app for repeated "low-signal but everywhere" inconsistencies and standardize them in one pass.
   Files: broad template/CSS sweep
   Group: Consistency sweep
   Covers: missing `defer` on blocking scripts, relative-vs-absolute href drift, hardcoded SVG/data-URI colors, deprecated mobile scrolling rule, large typography edge cases

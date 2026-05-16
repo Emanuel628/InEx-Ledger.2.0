@@ -120,8 +120,11 @@ async function verifyExportGrant(token) {
     throw new Error("Grant token action is not supported.");
   }
 
+  // Opportunistic TTL cleanup — runs on ~1% of calls to keep the table bounded
+  if (Math.random() < 0.01) {
+    await pool.query("DELETE FROM export_grant_jtis WHERE expires_at <= NOW()");
+  }
   // Atomically consume the JTI — if it was already used or expired, rowCount will be 0
-  await pool.query("DELETE FROM export_grant_jtis WHERE expires_at <= NOW()");
   const result = await pool.query(
     "DELETE FROM export_grant_jtis WHERE jti = $1 AND expires_at > NOW() RETURNING jti",
     [payload.jti]

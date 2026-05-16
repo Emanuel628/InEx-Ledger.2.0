@@ -50,7 +50,7 @@ function applyGlobalTheme() {
 }
 
 function setGlobalTheme(theme) {
-  const normalized = DEFAULT_THEME;
+  const normalized = theme === "dark" ? "dark" : DEFAULT_THEME;
   persistDefaultTheme();
   applyThemeToDocument(normalized);
   if (typeof window !== "undefined" && typeof CustomEvent === "function") {
@@ -311,14 +311,6 @@ function injectSkipLink() {
   link.setAttribute("data-i18n", "a11y_skip_to_main");
   link.textContent = "Skip to main content";
   document.body.insertBefore(link, document.body.firstChild);
-}
-
-function injectMobileDesktopLink() {
-  injectViewportSwitchLink();
-}
-
-function injectDesktopMobileLink() {
-  injectViewportSwitchLink();
 }
 
 function injectViewportSwitchLink() {
@@ -1023,7 +1015,14 @@ function ensureDynamicSidebarQuickPanel() {
       if (el.type === "file") return el.files && el.files.length > 0;
       return el.value && el.value.trim() !== "" && el.defaultValue !== el.value;
     });
-    if (hasInput && !window.confirm("Close without saving? Your changes will be lost.")) return;
+    if (hasInput) {
+      if (!panel.dataset.closePending) {
+        panel.dataset.closePending = "1";
+        setTimeout(() => { delete panel.dataset.closePending; }, 3000);
+        return;
+      }
+      delete panel.dataset.closePending;
+    }
     closeDynamicSidebarQuickPanel(panel);
   }
 

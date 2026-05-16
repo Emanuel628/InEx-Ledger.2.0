@@ -532,7 +532,6 @@
 
   .table-wrapper {
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .transactions-table {

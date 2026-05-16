@@ -1231,7 +1231,6 @@
 
   .messages-list-shell {
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .message-row {

@@ -1849,7 +1849,6 @@ body {
 
   .billing-history-list {
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .billing-history-table {

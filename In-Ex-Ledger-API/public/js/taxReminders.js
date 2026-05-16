@@ -31,15 +31,31 @@
     } catch (_) { return "US"; }
   }
 
+  const DISMISS_TTL_MS = 365 * DAY_MS;
+
   function getDismissed() {
-    try { return JSON.parse(localStorage.getItem(DISMISS_KEY) || "[]"); } catch (_) { return []; }
+    try {
+      const raw = JSON.parse(localStorage.getItem(DISMISS_KEY) || "[]");
+      const cutoff = Date.now() - DISMISS_TTL_MS;
+      return raw.filter((entry) => {
+        if (typeof entry === "object" && entry !== null) return (entry.ts || 0) > cutoff;
+        return true; // keep legacy string entries
+      }).map((entry) => (typeof entry === "object" ? entry.key : entry));
+    } catch (_) { return []; }
   }
 
   function dismiss(key) {
     try {
-      const list = getDismissed();
-      if (!list.includes(key)) list.push(key);
-      localStorage.setItem(DISMISS_KEY, JSON.stringify(list));
+      const cutoff = Date.now() - DISMISS_TTL_MS;
+      const raw = JSON.parse(localStorage.getItem(DISMISS_KEY) || "[]");
+      const pruned = raw.filter((entry) => {
+        if (typeof entry === "object" && entry !== null) return (entry.ts || 0) > cutoff;
+        return true; // keep legacy string entries
+      });
+      if (!pruned.some((e) => (typeof e === "object" ? e.key : e) === key)) {
+        pruned.push({ key, ts: Date.now() });
+      }
+      localStorage.setItem(DISMISS_KEY, JSON.stringify(pruned));
     } catch (_) {}
   }
 

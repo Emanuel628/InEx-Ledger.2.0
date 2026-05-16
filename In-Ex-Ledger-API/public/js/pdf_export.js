@@ -463,63 +463,6 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
   });
 }
 
-function buildReceiptsPages(receipts, transactions, labels) {
-  const txMap = mapByKey(transactions, 'id');
-  const rows = (receipts || []).map((receipt) => {
-    const txnId = receipt.transaction_id || receipt.transactionId;
-    const txn = txMap[txnId];
-    if (!txn) return null;
-    return {
-      receiptId: receipt.id || '',
-      txDate: txn.date || '',
-      txDescription: truncateText(txn.description || '(No description)', 28),
-      fileName: truncateText(receipt.filename || 'Not specified', 22)
-    };
-  }).filter(Boolean);
-
-  if (!rows.length) return [];
-
-  return chunkArray(rows, 22).map((chunk) => {
-    const canvas = new PdfCanvas();
-    canvas.text(40, 760, labels.receipts_index_title, 16);
-    canvas.text(40, 730, 'Receipt ID', 10);
-    canvas.text(150, 730, 'Tx Date', 10);
-    canvas.text(240, 730, 'Tx Description', 10);
-    canvas.text(430, 730, 'File Name', 10);
-    let y = 708;
-    chunk.forEach((row) => {
-      canvas.text(40, y, row.receiptId, 9);
-      canvas.text(150, y, row.txDate, 9);
-      canvas.text(240, y, row.txDescription, 9);
-      canvas.text(430, y, row.fileName, 9);
-      y -= 16;
-    });
-    return canvas;
-  });
-}
-
-function buildMileagePage(mileage, labels) {
-  if (!Array.isArray(mileage) || !mileage.length) return [];
-  const totalMiles = mileage.reduce((sum, row) => sum + Math.abs(Number(row.miles) || 0), 0);
-  const totalKm = mileage.reduce((sum, row) => sum + Math.abs(Number(row.km) || 0), 0);
-  const totalDistance = mileage.reduce((sum, row) => {
-    const start = Number(row.odometer_start);
-    const end = Number(row.odometer_end);
-    return Number.isFinite(start) && Number.isFinite(end) ? sum + Math.abs(end - start) : sum;
-  }, 0);
-  const businessPct = totalDistance > 0 ? (totalKm / totalDistance) * 100 : null;
-
-  const canvas = new PdfCanvas();
-  canvas.text(40, 760, labels.mileage_summary_title, 16);
-  let y = 724;
-  if (totalMiles > 0) { canvas.text(40, y, `Total business miles: ${formatDistance(totalMiles)} mi`, 11); y -= 18; }
-  if (totalKm > 0) { canvas.text(40, y, `Total business kilometers: ${formatDistance(totalKm)} km`, 11); y -= 18; }
-  if (businessPct !== null) { canvas.text(40, y, `Business-use percentage: ${businessPct.toFixed(1)}%`, 11); y -= 18; }
-  y -= 6;
-  canvas.text(40, y, labels.mileage_note_csv, 10);
-  return [canvas];
-}
-
 function buildReviewAndDisclosurePage(transactions, categories, receipts, labels, currency, region, reviewInsights) {
   const canvas = new PdfCanvas();
   canvas.text(40, 760, labels.review_items_title, 16);

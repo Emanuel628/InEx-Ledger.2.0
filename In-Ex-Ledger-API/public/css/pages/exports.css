@@ -679,7 +679,6 @@
 
   .history-card {
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .history-columns,

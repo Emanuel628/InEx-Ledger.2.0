@@ -10,7 +10,7 @@
 
   try {
     localStorage.setItem("lb_theme", "light");
-    localStorage.setItem("lb_theme_version", "2");
+    localStorage.setItem("lb_theme_version", "3");
   } catch (_) {}
 
   document.documentElement.setAttribute("data-theme", theme);

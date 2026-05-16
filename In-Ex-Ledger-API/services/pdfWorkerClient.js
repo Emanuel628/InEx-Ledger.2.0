@@ -26,7 +26,7 @@ async function callWorker(job) {
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      throw new Error(`Worker error ${response.status}: ${body}`);
+      throw new Error(`Worker error ${response.status}: ${body.slice(0, 200)}`);
     }
 
     const payload = await response.json();

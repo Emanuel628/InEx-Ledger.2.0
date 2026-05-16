@@ -22,72 +22,18 @@ const { decryptTaxId, encryptTaxId } = require("../services/taxIdService.js");
 const { verifyPassword } = require("../utils/authUtils.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { stripeRequest, stripeGet } = require("../services/stripeClient.js");
 
 const router = express.Router();
 router.use(requireAuth);
 router.use(requireCsrfProtection);
 
 const businessDeleteLimiter = createBusinessDeleteLimiter();
-const STRIPE_API_BASE = "https://api.stripe.com/v1";
-const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2026-02-25.clover";
 const { addonPriceIds: STRIPE_ADDON_PRICE_IDS } = buildStripePriceLookup();
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
 const FISCAL_YEAR_START_RE = /^((0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])|\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/;
-
-function getStripeSecretKey() {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    throw new Error("STRIPE_SECRET_KEY is not configured");
-  }
-  return process.env.STRIPE_SECRET_KEY;
-}
-
-function encodeFormBody(payload) {
-  const params = new URLSearchParams();
-  Object.entries(payload).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      params.append(key, String(value));
-    }
-  });
-  return params.toString();
-}
-
-async function stripeRequest(path, payload) {
-  const response = await fetch(`${STRIPE_API_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${getStripeSecretKey()}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Stripe-Version": STRIPE_API_VERSION
-    },
-    body: encodeFormBody(payload)
-  });
-
-  const json = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(json?.error?.message || `Stripe request failed (${response.status})`);
-  }
-
-  return json;
-}
-
-async function stripeGet(path) {
-  const response = await fetch(`${STRIPE_API_BASE}${path}`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${getStripeSecretKey()}`,
-      "Stripe-Version": STRIPE_API_VERSION
-    }
-  });
-
-  const json = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(json?.error?.message || `Stripe request failed (${response.status})`);
-  }
-
-  return json;
-}
 
 async function updateAnchorAdditionalBusinesses(client, businessId, additionalBusinesses) {
   await client.query(

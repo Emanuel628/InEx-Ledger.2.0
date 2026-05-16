@@ -558,7 +558,6 @@ tbody tr:last-child {
     width: 100%;
     overflow-x: auto;
     white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
   }
 
   thead,
@@ -3740,7 +3739,6 @@ tr.tx-highlight {
 
   .table-wrapper {
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .transactions-table {

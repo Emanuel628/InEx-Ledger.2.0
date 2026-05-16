@@ -477,7 +477,6 @@ textarea.form-control {
 
   .mileage-table-wrap {
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 }
 

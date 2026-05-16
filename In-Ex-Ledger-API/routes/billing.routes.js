@@ -25,11 +25,9 @@ const {
 } = require("../services/signInSecurityService.js");
 const { pool } = require("../db.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { getStripeSecretKey, stripeRequest, stripeGet, STRIPE_API_BASE, STRIPE_API_VERSION } = require("../services/stripeClient.js");
 
 const router = express.Router();
-
-const STRIPE_API_BASE = "https://api.stripe.com/v1";
-const STRIPE_API_VERSION = process.env.STRIPE_API_VERSION || "2026-02-25.clover";
 
 const billingMutationLimiter = createBillingMutationLimiter();
 
@@ -119,13 +117,6 @@ async function releaseWebhookEvent(eventId) {
       WHERE event_id = $1`,
     [eventId]
   );
-}
-
-function getStripeSecretKey() {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    throw new Error("STRIPE_SECRET_KEY is not configured");
-  }
-  return process.env.STRIPE_SECRET_KEY;
 }
 
 function requireEnvValue(name) {
@@ -294,53 +285,6 @@ function resolveStripePriceSelection({ billingInterval, currency, additionalBusi
     basePriceId,
     addonPriceId
   };
-}
-
-function encodeFormBody(payload) {
-  const params = new URLSearchParams();
-  Object.entries(payload).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      params.append(key, String(value));
-    }
-  });
-  return params.toString();
-}
-
-async function stripeRequest(path, payload, options = {}) {
-  const response = await fetch(`${STRIPE_API_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${getStripeSecretKey()}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Stripe-Version": STRIPE_API_VERSION,
-      ...(options.idempotencyKey ? { "Idempotency-Key": String(options.idempotencyKey) } : {})
-    },
-    body: encodeFormBody(payload)
-  });
-
-  const json = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(json?.error?.message || `Stripe request failed (${response.status})`);
-  }
-
-  return json;
-}
-
-async function stripeGet(path) {
-  const response = await fetch(`${STRIPE_API_BASE}${path}`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${getStripeSecretKey()}`,
-      "Stripe-Version": STRIPE_API_VERSION
-    }
-  });
-
-  const json = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(json?.error?.message || `Stripe request failed (${response.status})`);
-  }
-
-  return json;
 }
 
 function parseStripeUnitAmount(price) {
@@ -1055,16 +999,7 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
     });
 
     // Sync the updated state from Stripe
-    const stripeSubResponse = await fetch(
-      `${STRIPE_API_BASE}/subscriptions/${subscription.stripeSubscriptionId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${getStripeSecretKey()}`,
-          "Stripe-Version": STRIPE_API_VERSION
-        }
-      }
-    );
-    const stripeSub = await stripeSubResponse.json().catch(() => null);
+    const stripeSub = await stripeGet(`/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`).catch(() => null);
     if (stripeSub && !stripeSub.error) {
       await syncStripeSubscriptionForBusiness(billingBusinessId, stripeSub);
     }
@@ -1425,16 +1360,7 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
         if (object?.customer) {
           await updateStripeCustomerForBusiness(businessId, object.customer);
         }
-        const subResponse = await fetch(
-          `${STRIPE_API_BASE}/subscriptions/${subscriptionId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${getStripeSecretKey()}`,
-              "Stripe-Version": STRIPE_API_VERSION
-            }
-          }
-        );
-        const sub = await subResponse.json().catch(() => null);
+        const sub = await stripeGet(`/subscriptions/${encodeURIComponent(subscriptionId)}`).catch(() => null);
         if (sub && !sub.error) {
           await syncStripeSubscriptionForBusiness(businessId, sub);
           await sendBillingEmail({
@@ -1457,16 +1383,7 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
         ? await findBusinessByStripeCustomerId(object.customer)
         : null;
       if (subscriptionId && businessId) {
-        const subResponse = await fetch(
-          `${STRIPE_API_BASE}/subscriptions/${subscriptionId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${getStripeSecretKey()}`,
-              "Stripe-Version": STRIPE_API_VERSION
-            }
-          }
-        );
-        const sub = await subResponse.json().catch(() => null);
+        const sub = await stripeGet(`/subscriptions/${encodeURIComponent(subscriptionId)}`).catch(() => null);
         if (sub && !sub.error) {
           await syncStripeSubscriptionForBusiness(businessId, sub);
           await sendBillingEmail({

@@ -145,7 +145,7 @@ async function handleRegisterSubmit(event) {
       localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
     }
     localStorage.removeItem("pendingVerificationEmail");
-    window.location.href = "/verify-email?email=sent";
+    window.location.href = "/verify-email";
   } catch (err) {
     console.error("Register request failed:", err);
     showRegisterError(tx(OFFLINE_ERROR_MESSAGE));
