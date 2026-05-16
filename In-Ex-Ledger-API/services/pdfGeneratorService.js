@@ -319,7 +319,6 @@ function validateExportProfile(profile) {
   };
 
   if (!hasValue(profile.legalName || profile.businessName)) addMissing('legal_name', 'Legal business name');
-  if (!hasValue(profile.taxId || profile.storedTaxId)) addMissing('tax_id', region === 'CA' ? 'Business number / SIN' : 'Tax ID (EIN / SSN)');
   if (!hasValue(profile.naics)) addMissing('business_activity_code', region === 'CA' ? 'Industry / activity code' : 'Business activity code');
   if (!hasValue(profile.address)) addMissing('address', 'Business address');
   if (!hasValue(profile.accountingMethod)) addMissing('accounting_method', 'Accounting method');
