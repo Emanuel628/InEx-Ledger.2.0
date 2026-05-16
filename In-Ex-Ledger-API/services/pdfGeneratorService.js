@@ -323,7 +323,6 @@ const T2125_LINE_MAP = {
   t4a_20: 'T4A Box 20 — Self-employment income',
   t4a_28: 'T4A Box 28 — Other income',
   cash_income: 'Line 8000 — Gross business income',
-  sales: 'Line 8000 — Gross business income',
 };
 
 function normalizeRegionCode(region) {
@@ -604,11 +603,15 @@ function resolveIndirectTaxAmount(txn, options = {}) {
 }
 
 function isMealsLike(categoryName, taxMapping, text) {
-  return /(meal|meals|dining|restaurant|entertainment)/i.test(`${categoryName} ${taxMapping} ${text}`);
+  const catTax = `${categoryName} ${taxMapping}`;
+  if (/(meal|meals|dining|restaurant|entertainment|meals_entertainment)/i.test(catTax)) return true;
+  // Only check transaction text for merchant names common to meals
+  return /(meal|dining|restaurant)/i.test(text);
 }
 
 function isVehicleLike(categoryName, taxMapping, text) {
-  return /(vehicle|auto|fuel|gas|repair|insurance|mileage|truck|car)/i.test(`${categoryName} ${taxMapping} ${text}`);
+  // Restrict to category/tax-mapping only — "repair" or "insurance" appear in non-vehicle contexts
+  return /(vehicle|auto|mileage|motor_vehicle|car_truck|car[_ ]truck|fuel[_ ]gas)/i.test(`${categoryName} ${taxMapping}`);
 }
 
 function isTravelLike(categoryName, taxMapping, text) {
@@ -616,7 +619,8 @@ function isTravelLike(categoryName, taxMapping, text) {
 }
 
 function isHomeOfficeLike(categoryName, taxMapping, text) {
-  return /(home office|workspace|mortgage|rent|utilities|internet)/i.test(`${categoryName} ${taxMapping} ${text}`);
+  const combined = `${categoryName} ${taxMapping}`;
+  return /(home[_\s]office|home[_\s]business|business[_\s]use[_\s]of[_\s]home|9945)/i.test(combined);
 }
 
 function deriveBusinessAmounts(txn, category, options = {}) {
@@ -652,7 +656,7 @@ function deriveBusinessAmounts(txn, category, options = {}) {
     requiresAllocation = true;
     warnings.push(region === 'CA' ? PDF_LABELS.en.warning_home_office_ca : PDF_LABELS.en.warning_home_office_us);
   }
-  if (isExpense && !isMealsLike(categoryName, taxMapping, text) && /phone|internet|telephone/i.test(`${categoryName} ${taxMapping} ${text}`)) {
+  if (isExpense && !isMealsLike(categoryName, taxMapping, text) && /phone|internet|telephone/i.test(`${categoryName} ${taxMapping}`)) {
     requiresAllocation = true;
   }
   if (isExpense && isTravelLike(categoryName, taxMapping, text)) {
@@ -1470,12 +1474,12 @@ function buildReviewAndDisclosurePage(transactions, categories, receipts, labels
   const summaryRows = [
     ['[CRITICAL] ' + labels.review_uncategorized, reviewInsights.uncategorizedCount],
     ['[CRITICAL] Imported categories — not yet mapped to real categories', reviewInsights.needsCategoryCount || 0],
-    ['[HIGH]     ' + labels.review_missing_description, reviewInsights.missingDescriptionCount],
-    ['[HIGH]     ' + labels.review_possible_duplicates, reviewInsights.duplicateCount],
-    ['[HIGH]     ' + labels.review_negative_expenses, reviewInsights.negativeExpenseCount],
-    ['[HIGH]     ' + labels.review_mixed_use, reviewInsights.mixedUseCount],
-    ['[MEDIUM]   ' + labels.review_special_categories, reviewInsights.specialCategoryCount],
-    ['[MEDIUM]   ' + labels.review_missing_receipts, reviewInsights.missingReceiptCount]
+    ['[HIGH] ' + labels.review_missing_description, reviewInsights.missingDescriptionCount],
+    ['[HIGH] ' + labels.review_possible_duplicates, reviewInsights.duplicateCount],
+    ['[HIGH] ' + labels.review_negative_expenses, reviewInsights.negativeExpenseCount],
+    ['[HIGH] ' + labels.review_mixed_use, reviewInsights.mixedUseCount],
+    ['[MEDIUM] ' + labels.review_special_categories, reviewInsights.specialCategoryCount],
+    ['[MEDIUM] ' + labels.review_missing_receipts, reviewInsights.missingReceiptCount]
   ];
 
   let hasAnyReviewItem = false;
@@ -1738,12 +1742,12 @@ function buildSupportPages(receipts, transactions, mileage, labels, currency, re
   [
     ['[CRITICAL] ' + labels.review_uncategorized, reviewInsights.uncategorizedCount],
     ['[CRITICAL] Imported categories (not mapped)', reviewInsights.needsCategoryCount || 0],
-    ['[HIGH]     ' + labels.review_missing_description, reviewInsights.missingDescriptionCount],
-    ['[HIGH]     ' + labels.review_possible_duplicates, reviewInsights.duplicateCount],
-    ['[HIGH]     ' + labels.review_negative_expenses, reviewInsights.negativeExpenseCount],
-    ['[HIGH]     ' + labels.review_mixed_use, reviewInsights.mixedUseCount],
-    ['[MEDIUM]   ' + labels.review_special_categories, reviewInsights.specialCategoryCount],
-    ['[MEDIUM]   ' + labels.review_missing_receipts, reviewInsights.missingReceiptCount]
+    ['[HIGH] ' + labels.review_missing_description, reviewInsights.missingDescriptionCount],
+    ['[HIGH] ' + labels.review_possible_duplicates, reviewInsights.duplicateCount],
+    ['[HIGH] ' + labels.review_negative_expenses, reviewInsights.negativeExpenseCount],
+    ['[HIGH] ' + labels.review_mixed_use, reviewInsights.mixedUseCount],
+    ['[MEDIUM] ' + labels.review_special_categories, reviewInsights.specialCategoryCount],
+    ['[MEDIUM] ' + labels.review_missing_receipts, reviewInsights.missingReceiptCount]
   ].forEach(([label, count]) => {
     canvas.text(40, y, `${label}: ${count}`, 9);
     y -= 13;
