@@ -253,11 +253,24 @@ const T2125_LINE_MAP = {
   rent_other: 'Line 8912 — Rent',
   repairs: 'Line 8960 — Repairs and maintenance',
   repairs_maintenance: 'Line 8960 — Repairs and maintenance',
+  taxes_licenses: 'Line 8760 — Business taxes, fees, and licences',
+  licenses: 'Line 8760 — Business taxes, fees, and licences',
+  taxes: 'Line 8760 — Business taxes, fees, and licences',
+  management_fees: 'Line 8871 — Management and administration fees',
+  admin_fees: 'Line 8871 — Management and administration fees',
   wages: 'Line 9060 — Salaries, wages, and benefits',
   salaries_wages: 'Line 9060 — Salaries, wages, and benefits',
-  travel: 'Line 9100 — Travel expenses',
+  employee_benefits: 'Line 9060 — Salaries, wages, and benefits',
+  employee_benefit_programs: 'Line 9060 — Salaries, wages, and benefits',
+  travel: 'Line 9200 — Travel expenses',
+  property_taxes: 'Line 9180 — Property taxes',
+  delivery: 'Line 9275 — Delivery, freight, and express',
+  freight: 'Line 9275 — Delivery, freight, and express',
+  shipping: 'Line 9275 — Delivery, freight, and express',
   utilities: 'Line 9220 — Utilities',
   telephone: 'Line 9270 — Telephone and utilities',
+  phone: 'Line 9270 — Telephone and utilities',
+  internet: 'Line 9270 — Telephone and utilities',
   vehicle: 'Line 9281 — Motor vehicle expenses',
   auto: 'Line 9281 — Motor vehicle expenses',
   fuel: 'Line 9281 — Motor vehicle expenses (fuel)',
@@ -266,14 +279,20 @@ const T2125_LINE_MAP = {
   depreciation: 'Line 9936 — Capital cost allowance (CCA)',
   cca: 'Line 9936 — Capital cost allowance (CCA)',
   home_office: 'Line 9945 — Business-use-of-home expenses',
-  software: 'Line 9270 — Other expenses (software)',
-  software_subscriptions: 'Line 9270 — Other expenses (software subscriptions)',
-  subscriptions: 'Line 9270 — Other expenses (subscriptions)',
-  bank_fees: 'Line 9270 — Other expenses (bank charges)',
-  bank_charges: 'Line 9270 — Other expenses (bank charges)',
+  software: 'Line 8810 — Office expenses (software)',
+  software_subscriptions: 'Line 8810 — Office expenses (software subscriptions)',
+  subscriptions: 'Line 8810 — Office expenses (subscriptions)',
+  bank_fees: 'Line 8710 — Interest and bank charges',
+  bank_charges: 'Line 8710 — Interest and bank charges',
   professional_development: 'Line 9270 — Other expenses (professional development)',
   education: 'Line 9270 — Other expenses (professional development)',
+  training: 'Line 9270 — Other expenses (professional development)',
   other_expenses: 'Line 9270 — Other expenses',
+  other_income: 'Line 8230 — Other income',
+  commission_income: 'Line 8000 — Gross business income',
+  contract_labor: 'Line 9270 — Other expenses (subcontractors)',
+  commissions: 'Line 9270 — Other expenses (commissions paid)',
+  commissions_and_fees: 'Line 9270 — Other expenses (commissions paid)',
 };
 
 function normalizeRegionCode(region) {
@@ -630,8 +649,14 @@ function classifyExcludedTransaction(txn, category, region) {
   if (normalizedType === 'transfer' || /(transfer|credit card payment|cc payment|internal transfer|online transfer from sav|online transfer to sav)/i.test(combined)) {
     return PDF_LABELS.en.reason_transfer;
   }
+  if (/(payment to chase|chase credit crd|chase crd|citi\s*card\s*online|capital one\s*mobile\s*pmt|capital one\s*online\s*pmt|amazon corp syf pay|synchrony bank|affirm\s*\*?\s*pay|klarna|valley bank bill pay|elan financial|discover e-?payment|autopay payment|online payment thank you|amex\s*autopay|bank of america\s*online|discover\s*card\s*pay|barclaycard|credit\s*card\s*autopay|minimum payment|statement balance)/i.test(text)) {
+    return 'Credit card payment — not deductible (deduct the underlying card charges instead)';
+  }
   if (/\bpayro\b|payroll|w-2\b|salary deposit|employer deposit/i.test(text)) {
     return PDF_LABELS.en.reason_payroll;
+  }
+  if (/(wire\s*fee|wire\s*transfer\s*fee|outgoing wire|incoming wire|international wire)/i.test(text) && normalizedType !== 'income') {
+    return 'Wire / bank transfer fee — review if business-related';
   }
   if (normalizedType === 'income' && /irs\s+treas|tax\s+refund|irs\s+tax\b/i.test(text)) {
     return 'Tax refund — not Schedule C income (report on Form 1040 Line 4)';
@@ -699,8 +724,8 @@ function buildCategoryBuckets(transactions, categories, labels, currency, region
     existing.amount += String(txn.type || '').toLowerCase() === 'income'
       ? Number(txn.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn))
       : Number(txn.__businessAmounts?.deductibleAmount ?? normalizeMoneyAmount(txn));
-    if (/^Unmapped\b/.test(taxMapping) || categoryName === 'Uncategorized') existing.needsAction = true;
-    if (getTransactionFlags(txn, category).length) existing.needsReview = true;
+    if (/^Unmapped\b/.test(taxMapping) || categoryName === 'Uncategorized' || /^Imported\s+(Expense|Income)\b/i.test(categoryName)) existing.needsAction = true;
+    if (getTransactionFlags(txn, category, region).length) existing.needsReview = true;
     if (isSpecialReviewCategory(categoryName, taxMapping)) existing.hasSpecialCategory = true;
     buckets.set(bucketKey, existing);
   });
@@ -715,7 +740,13 @@ function buildCategoryBuckets(transactions, categories, labels, currency, region
         ? labels.review_action_needed
         : (bucket.needsReview || bucket.hasSpecialCategory ? labels.review_review : labels.review_ok)
     }))
-    .sort((a, b) => b.sortAmount - a.sortAmount);
+    .sort((a, b) => {
+      const priorityOf = (r) => r === labels.review_action_needed ? 0 : r === labels.review_review ? 1 : 2;
+      const pa = priorityOf(a.reviewStatus);
+      const pb = priorityOf(b.reviewStatus);
+      if (pa !== pb) return pa - pb;
+      return b.sortAmount - a.sortAmount;
+    });
 }
 
 function normalizeDuplicateKey(txn) {
@@ -725,22 +756,33 @@ function normalizeDuplicateKey(txn) {
 }
 
 function isSpecialReviewCategory(categoryName, taxMapping) {
-  return /(meal|travel|vehicle|auto|fuel|car|mileage|home office)/i.test(`${categoryName} ${taxMapping}`);
+  return /(meal|travel|vehicle|auto|fuel|car|mileage|home office|food|dining|restaurant|entertainment|phone|internet|telephone)/i.test(`${categoryName} ${taxMapping}`);
 }
 
-function getTransactionFlags(txn, category) {
+function getTransactionFlags(txn, category, region = 'us') {
   const flags = [];
+  const isCA = normalizeRegionCode(region) === 'CA';
   const taxTreatment = String(txn.tax_treatment || txn.taxTreatment || '').toLowerCase();
   const reviewStatus = String(txn.review_status || txn.reviewStatus || '').toLowerCase();
   const categoryName = category?.name || '';
-  const taxMapping = category?.tax_label || category?.taxLabel || '';
-  if (!txn.category_id && !txn.categoryId) flags.push('Uncategorized');
+  const taxKey = isCA ? 'tax_map_ca' : 'tax_map_us';
+  const taxMapping = category?.[taxKey] || category?.tax_label || category?.taxLabel || '';
+  const isImportedCategory = /^Imported\s+(Expense|Income)\b/i.test(categoryName);
+  const hasCategoryId = !!(txn.category_id || txn.categoryId);
+
+  if (!hasCategoryId) {
+    flags.push('Uncategorized');
+  } else if (isImportedCategory) {
+    flags.push('Needs category');
+  }
   if (!String(txn.description || '').trim()) flags.push('Missing description');
   if (String(txn.type || '').toLowerCase() !== 'income' && Number(txn.amount) < 0) flags.push('Negative expense');
   if (taxTreatment === 'split_use' || Number(txn.personal_use_pct ?? txn.personalUsePct) > 0) flags.push('Mixed-use');
   if (reviewStatus && reviewStatus !== 'ready') flags.push('Review');
   if (Number(txn.indirect_tax_amount ?? txn.indirectTaxAmount) > 0) flags.push('Indirect tax');
-  if (String(txn.currency || '').toUpperCase() && String(txn.currency || '').toUpperCase() !== 'USD' && String(txn.currency || '').toUpperCase() !== 'CAD') flags.push('FX');
+  const currencyCode = String(txn.currency || '').toUpperCase();
+  if (currencyCode && currencyCode !== 'USD' && currencyCode !== 'CAD') flags.push('FX');
+  if (hasCategoryId && !isImportedCategory && !taxMapping.trim()) flags.push('Needs tax mapping');
   if (isSpecialReviewCategory(categoryName, taxMapping)) flags.push('Special category');
   return Array.from(new Set(flags));
 }
@@ -785,8 +827,17 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
   const expenseTransactions = (transactions || []).filter((txn) => String(txn.type || '').toLowerCase() !== 'income');
   const receiptLinkedCount = expenseTransactions.filter((txn) => txn.receipt_id || txn.receiptId).length;
 
+  const excludedArray = Array.isArray(meta.excluded) ? meta.excluded : [];
+  const excludedCount = excludedArray.length > 0 ? excludedArray.length : (Number(meta.excludedCount) || 0);
+  const exclusionReasonBreakdown = {};
+  excludedArray.forEach((txn) => {
+    const reason = txn.__exclusionReason || 'Excluded';
+    exclusionReasonBreakdown[reason] = (exclusionReasonBreakdown[reason] || 0) + 1;
+  });
+
   const samples = [];
   let uncategorizedCount = 0;
+  let needsCategoryCount = 0;
   let missingDescriptionCount = 0;
   let duplicateCount = 0;
   let negativeExpenseCount = 0;
@@ -800,16 +851,19 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
   let homeOfficeCount = 0;
   let homeOfficeTotal = 0;
   let unmappedExpenseCount = 0;
+  let unmappedTaxCount = 0;
 
   (transactions || []).forEach((txn) => {
     const category = categoryMap[txn.category_id || txn.categoryId] || null;
-    const flags = getTransactionFlags(txn, category);
+    const flags = getTransactionFlags(txn, category, region);
     const taxSlug = String(category?.[taxKey] || category?.tax_label || category?.taxLabel || '').toLowerCase();
     const catName = String(category?.name || '').toLowerCase();
     const isExpense = String(txn.type || '').toLowerCase() === 'expense';
     const amount = Math.abs(Number(txn.amount) || 0);
 
-    if (!txn.category_id && !txn.categoryId) uncategorizedCount += 1;
+    if (flags.includes('Uncategorized')) uncategorizedCount += 1;
+    if (flags.includes('Needs category')) needsCategoryCount += 1;
+    if (flags.includes('Needs tax mapping')) unmappedTaxCount += 1;
     if (!String(txn.description || '').trim()) missingDescriptionCount += 1;
     if (duplicateMap.get(normalizeDuplicateKey(txn)) > 1) duplicateCount += 1;
     if (isExpense && Number(txn.amount) < 0) negativeExpenseCount += 1;
@@ -841,6 +895,7 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
     transactionCount: (transactions || []).length,
     expenseTransactionCount: expenseTransactions.length,
     uncategorizedCount,
+    needsCategoryCount,
     missingDescriptionCount,
     duplicateCount,
     negativeExpenseCount,
@@ -850,11 +905,13 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
     receiptLinkedCount,
     missingReceiptCount: Math.max(0, expenseTransactions.length - receiptLinkedCount),
     receiptCoverageText: `${receiptLinkedCount} of ${expenseTransactions.length || 0}`,
-    excludedCount: Number(meta.excludedCount) || 0,
+    excludedCount,
+    exclusionReasonBreakdown,
     vehicleCount, vehicleTotal,
     mealsCount, mealsTotal,
     homeOfficeCount, homeOfficeTotal,
     unmappedExpenseCount,
+    unmappedTaxCount,
     samples
   };
 }
@@ -937,6 +994,8 @@ function buildIdentityPage(data) {
   canvas.text(40, 430, labels.review_flags_title, 12, 'F2');
   buildKeyValueRows(canvas, 40, 410, [
     [labels.uncategorized_transactions, String(reviewInsights.uncategorizedCount)],
+    ['Imported (needs real category)', String(reviewInsights.needsCategoryCount || 0)],
+    ['Expenses missing tax mapping', String(reviewInsights.unmappedTaxCount || 0)],
     [labels.review_flagged_transactions, String(reviewInsights.reviewFlagCount)],
     ['Possible duplicate transactions', String(reviewInsights.duplicateCount)],
     [labels.receipt_coverage, reviewInsights.receiptCoverageText],
@@ -1055,26 +1114,55 @@ function buildRulesSnapshotPage(labels, region, taxYear, gstHstRegistered) {
 
 function buildExclusionPages(transactions, currency, labels) {
   if (!transactions.length) return [];
-  return chunkArray(transactions, 18).map((chunk, index) => {
+
+  const sorted = [...transactions].sort((a, b) => {
+    const da = a.date ? new Date(a.date).getTime() : 0;
+    const db = b.date ? new Date(b.date).getTime() : 0;
+    return da - db;
+  });
+
+  const reasonCounts = {};
+  sorted.forEach((txn) => {
+    const r = txn.__exclusionReason || labels.reason_transfer || 'Excluded';
+    reasonCounts[r] = (reasonCounts[r] || 0) + 1;
+  });
+  const reasonSummaryLines = Object.entries(reasonCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([reason, count]) => `${count}x ${reason}`);
+
+  const ITEMS_PER_PAGE = 16;
+  return chunkArray(sorted, ITEMS_PER_PAGE).map((chunk, index) => {
     const canvas = new PdfCanvas();
     const title = index === 0
       ? labels.exclusions_schedule_title
       : `${labels.exclusions_schedule_title} - ${labels.section_continued}`;
     canvas.text(40, 760, title, 16, 'F2');
-    canvas.text(40, 730, labels.col_date, 9, 'F2');
-    canvas.text(120, 730, labels.col_payee_memo, 9, 'F2');
-    canvas.text(360, 730, labels.exclusions_reason, 9, 'F2');
-    canvas.text(520, 730, labels.exclusions_booked_amount, 9, 'F2');
-    let y = 706;
+
+    let headerY = 736;
+    if (index === 0) {
+      canvas.text(40, headerY, 'Summary by exclusion reason:', 9, 'F2');
+      headerY -= 12;
+      reasonSummaryLines.slice(0, 4).forEach((line) => {
+        canvas.text(40, headerY, truncateText(line, 90), 8);
+        headerY -= 11;
+      });
+      headerY -= 4;
+    }
+
+    canvas.text(40, headerY, labels.col_date, 9, 'F2');
+    canvas.text(120, headerY, labels.col_payee_memo, 9, 'F2');
+    canvas.text(360, headerY, labels.exclusions_reason, 9, 'F2');
+    canvas.text(520, headerY, labels.exclusions_booked_amount, 9, 'F2');
+    let y = headerY - 16;
     chunk.forEach((txn) => {
       canvas.text(40, y, normalizePdfDate(txn.date), 8);
-      canvas.text(120, y, truncateText(buildTransactionText(txn) || '(No description)', 42), 8);
+      canvas.text(120, y, truncateText(buildTransactionText(txn) || '(No description)', 38), 8);
       canvas.text(360, y, truncateText(txn.__exclusionReason || labels.reason_transfer, 26), 8);
       canvas.text(520, y, formatCurrencyForPdf(normalizeMoneyAmount(txn), currency), 8);
       y -= 16;
     });
     if (index === 0) {
-      canvas.text(40, 80, labels.transfers_excluded_note, 8);
+      canvas.text(40, 50, labels.transfers_excluded_note, 8);
     }
     return canvas;
   });
@@ -1984,6 +2072,7 @@ function buildPdfExport(options) {
   const excludedTransactions = transactionSummary.excluded;
   const totals = calculateTotals(includedTransactions, region, province);
   const reviewInsights = buildReviewInsights(includedTransactions, categories, receipts, {
+    excluded: excludedTransactions,
     excludedCount: excludedTransactions.length,
     region: normalizedRegion
   });
