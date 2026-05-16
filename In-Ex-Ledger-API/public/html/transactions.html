@@ -621,7 +621,7 @@
       <div class="form-field">
         <label for="csvImportFile" class="form-label">CSV file</label>
         <input type="file" id="csvImportFile" accept=".csv,text/csv" class="form-control" />
-        <p class="csv-import-hint">Your CSV needs columns for <strong>date</strong>, <strong>description</strong>, and either a single <strong>amount</strong> column or separate <strong>withdrawal</strong> and <strong>deposit</strong> columns. Re-importing the same file will create duplicate transactions.</p>
+        <p class="csv-import-hint">Your CSV needs columns for <strong>date</strong>, <strong>description</strong>, and either a single <strong>amount</strong> column or separate <strong>withdrawal</strong> and <strong>deposit</strong> columns. Duplicate rows are skipped by default, but review the import summary before posting.</p>
       </div>
       <p id="csvImportError" class="error-text" hidden></p>
       <div class="modal-actions">

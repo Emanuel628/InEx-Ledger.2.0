@@ -46,13 +46,15 @@
             name="mfaChallengeCode"
             inputmode="numeric"
             autocomplete="one-time-code"
+            maxlength="6"
+            pattern="[0-9]{6}"
             placeholder="123456"
             required
           />
         </div>
 
         <label class="auth-checkbox">
-          <input type="checkbox" id="mfaTrustDevice" checked />
+          <input type="checkbox" id="mfaTrustDevice" />
           <span>Trust this device for this account</span>
         </label>
         <p class="auth-helper">
@@ -73,7 +75,7 @@
 <script src="../js/global.js?v=20260510c"></script>
   <script src="../js/i18n.js?v=20260510c"></script>
   <script src="../js/auth.js?v=20260510b"></script>
-  <script src="../js/mfa-challenge.js?v=20260514a"></script>
+  <script src="../js/mfa-challenge.js?v=20260516a"></script>
 </body>
 </html>
 

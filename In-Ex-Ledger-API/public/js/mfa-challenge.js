@@ -16,6 +16,9 @@ function getPendingMfaEmail() {
   return sessionStorage.getItem("lb_pending_mfa_email") || "";
 }
 
+function normalizeMfaCode(value) {
+  return String(value || "").replace(/\D/g, "").slice(0, 6);
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!syncPendingMfaToken()) {
@@ -33,8 +36,15 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   const trustToggle = document.getElementById("mfaTrustDevice");
   if (trustToggle) {
-    trustToggle.checked = true;
+    trustToggle.checked = false;
   }
+  const codeInput = document.getElementById("mfaChallengeCode");
+  codeInput?.addEventListener("input", () => {
+    const next = normalizeMfaCode(codeInput.value);
+    if (codeInput.value !== next) {
+      codeInput.value = next;
+    }
+  });
 
   mfaChallengeForm?.addEventListener("submit", handleMfaChallengeSubmit);
   document.getElementById("mfaChallengeResend")?.addEventListener("click", handleMfaChallengeResend);
@@ -59,14 +69,22 @@ async function handleMfaChallengeSubmit(event) {
     return;
   }
 
-  const code = document.getElementById("mfaChallengeCode")?.value.trim() || "";
+  const codeInput = document.getElementById("mfaChallengeCode");
+  const code = normalizeMfaCode(codeInput?.value);
   const trustToggle = document.getElementById("mfaTrustDevice");
-  const trustDevice = trustToggle ? trustToggle.checked : true;
+  const trustDevice = trustToggle ? trustToggle.checked : false;
   const submitButton = mfaChallengeForm.querySelector("button[type=\"submit\"]");
 
   clearMfaChallengeError();
   if (!code) {
     showMfaChallengeError(tx("mfa_challenge_error_missing"));
+    codeInput?.focus();
+    return;
+  }
+
+  if (!/^\d{6}$/.test(code)) {
+    showMfaChallengeError(tx("mfa_challenge_error_verify"));
+    codeInput?.focus();
     return;
   }
 

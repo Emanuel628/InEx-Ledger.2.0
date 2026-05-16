@@ -126,7 +126,7 @@ function consumeVerifiedSessionFromHash() {
     localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
     localStorage.removeItem("pendingVerificationEmail");
   } catch (_) {
-    updateStatus(tx("verify_email_status_success"), true);
+    updateStatus(tx("verify_email_status_success"));
     return true;
   }
 

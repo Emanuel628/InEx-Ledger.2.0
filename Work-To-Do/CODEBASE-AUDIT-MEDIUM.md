@@ -11,37 +11,37 @@ Rules used here:
 
 ### Quick validation and copy fixes
 
-- [ ] 15-30 min - Trim and reject blank account names consistently on create and update.
+- [x] 15-30 min - Trim and reject blank account names consistently on create and update.
   Files: `In-Ex-Ledger-API/routes/accounts.routes.js`
   Group: Accounts validation
   Covers: whitespace-only names, `PUT` guard allowing silent no-op / null behavior
 
-- [ ] 15-30 min - Add client-side MFA input sanity checks and make "Trust this device" opt-in.
+- [x] 15-30 min - Add client-side MFA input sanity checks and make "Trust this device" opt-in.
   Files: `In-Ex-Ledger-API/public/html/mfa-challenge.html`, `In-Ex-Ledger-API/public/js/mfa-challenge.js`
   Group: MFA UX hardening
   Covers: pre-checked trust box, no 6-digit validation, no maxlength
 
-- [ ] 15-30 min - Fix incorrect UI copy in change-email and transactions CSV import hints.
+- [x] 15-30 min - Fix incorrect UI copy in change-email and transactions CSV import hints.
   Files: `In-Ex-Ledger-API/public/html/change-email.html`, `In-Ex-Ledger-API/public/html/transactions.html`
   Group: Auth and import copy
   Covers: change-email destination copy, duplicate-warning mismatch with `skip_duplicates`
 
-- [ ] 15-30 min - Fix login password autocomplete to `current-password`.
+- [x] 15-30 min - Fix login password autocomplete to `current-password`.
   Files: `In-Ex-Ledger-API/public/html/login.html`
   Group: Login UX
   Covers: password manager autofill breakage
 
-- [ ] 15-30 min - Add null checks in category modal reset and stop overwriting change handlers.
+- [x] 15-30 min - Add null checks in category modal reset and stop overwriting change handlers.
   Files: `In-Ex-Ledger-API/public/js/categories-backend.js`
   Group: Categories frontend safety
   Covers: missing null check on `category-color`, `select.onchange` overwrite
 
-- [ ] 15-30 min - Fix the verify-email success/error styling regression in `consumeVerifiedSessionFromHash`.
+- [x] 15-30 min - Fix the verify-email success/error styling regression in `consumeVerifiedSessionFromHash`.
   Files: `In-Ex-Ledger-API/public/js/verify-email.js`
   Group: Verify-email UX
   Covers: success message rendered with error styling
 
-- [ ] 15-30 min - Add missing cache-buster consistency and asset hygiene where the page is already being touched.
+- [x] 15-30 min - Add missing cache-buster consistency and asset hygiene where the page is already being touched.
   Files: `In-Ex-Ledger-API/public/html/pricing.html`, `In-Ex-Ledger-API/public/html/subscription.html`, legal page asset tags
   Group: Asset hygiene
   Covers: missing pricing CSS cache-buster, mixed asset versions on subscription page, uncached `privacy.js`

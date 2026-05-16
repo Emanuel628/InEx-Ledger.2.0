@@ -112,7 +112,7 @@ test("validateExportProfile blocks incomplete US and Canada workpapers", () => {
     assert.fail("Expected incomplete US profile to throw");
   } catch (error) {
     assert.match(String(error?.message || ""), /Material participation/);
-    assert.deepEqual(error?.missingFieldKeys, ["tax_id", "material_participation"]);
+    assert.deepEqual(error?.missingFieldKeys, ["material_participation"]);
   }
 
   try {

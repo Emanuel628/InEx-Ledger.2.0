@@ -205,7 +205,10 @@ function closeCategoryModal() {
   modal?.classList.add("hidden");
   form?.reset();
   if (message) message.textContent = "";
-  document.getElementById("category-color").value = "blue";
+  const colorInput = document.getElementById("category-color");
+  if (colorInput) {
+    colorInput.value = "blue";
+  }
   populateTaxLabelOptions("income");
   document.querySelectorAll(".color-swatch").forEach((item) => {
     item.classList.remove("is-active");
@@ -411,7 +414,7 @@ function populateTaxLabelOptions(type) {
     hint.style.display = text ? "block" : "none";
   }
 
-  select.onchange = function() {
+  const updateHint = () => {
     if (hint) {
       const selected = options.find(opt => opt.value === select.value);
       const text = buildHintText(selected);
@@ -419,6 +422,12 @@ function populateTaxLabelOptions(type) {
       hint.style.display = text ? "block" : "none";
     }
   };
+  if (typeof select.__categoryTaxHintHandler === "function") {
+    select.removeEventListener("change", select.__categoryTaxHintHandler);
+  }
+  select.__categoryTaxHintHandler = updateHint;
+  select.addEventListener("change", select.__categoryTaxHintHandler);
+  updateHint();
 }
 
 async function loadBusinessRegion() {

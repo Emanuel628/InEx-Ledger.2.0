@@ -17,6 +17,11 @@ const {
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card", "cash", "loan", "custom"];
+const MAX_ACCOUNT_NAME_LENGTH = 120;
+
+function normalizeAccountName(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
 const router = express.Router();
 router.use(requireAuth);
@@ -51,9 +56,14 @@ router.get("/", async (req, res) => {
  */
 router.post("/", async (req, res) => {
   const { name, type } = req.body;
+  const normalizedName = normalizeAccountName(name);
 
-  if (!name || !type) {
+  if (!normalizedName || !type) {
     return res.status(400).json({ error: "Account name and type are required." });
+  }
+
+  if (normalizedName.length > MAX_ACCOUNT_NAME_LENGTH) {
+    return res.status(400).json({ error: `Account name must be ${MAX_ACCOUNT_NAME_LENGTH} characters or fewer.` });
   }
 
   if (!ALLOWED_ACCOUNT_TYPES.includes(type)) {
@@ -67,7 +77,7 @@ router.post("/", async (req, res) => {
       `INSERT INTO accounts (id, business_id, name, type)
        VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [crypto.randomUUID(), businessId, name, type]
+      [crypto.randomUUID(), businessId, normalizedName, type]
     );
 
     res.status(201).json(result.rows[0]);
@@ -90,9 +100,19 @@ router.put("/:id", async (req, res) => {
     return res.status(400).json({ error: "Invalid account ID." });
   }
   const { name, type } = req.body;
+  const hasName = Object.prototype.hasOwnProperty.call(req.body || {}, "name");
+  const normalizedName = normalizeAccountName(name);
 
-  if (!name && !type) {
+  if (!hasName && !type) {
     return res.status(400).json({ error: "At least one of name or type is required." });
+  }
+
+  if (hasName && !normalizedName) {
+    return res.status(400).json({ error: "Account name cannot be blank." });
+  }
+
+  if (hasName && normalizedName.length > MAX_ACCOUNT_NAME_LENGTH) {
+    return res.status(400).json({ error: `Account name must be ${MAX_ACCOUNT_NAME_LENGTH} characters or fewer.` });
   }
 
   if (type && !ALLOWED_ACCOUNT_TYPES.includes(type)) {
@@ -124,7 +144,7 @@ router.put("/:id", async (req, res) => {
               type = COALESCE($2, type)
         WHERE id = $3 AND business_id = $4
         RETURNING *`,
-      [name || null, type || null, req.params.id, businessId]
+      [hasName ? normalizedName : null, type || null, req.params.id, businessId]
     );
 
     res.json(result.rows[0]);

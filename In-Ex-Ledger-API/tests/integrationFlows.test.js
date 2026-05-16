@@ -583,6 +583,40 @@ test("accounts: POST with invalid type returns 400", async () => {
   assert.match(res.body.error, /type/);
 });
 
+test("accounts: POST with blank name returns 400", async () => {
+  const router = require("../routes/accounts.routes.js");
+  const app = buildApp(router, "/api/accounts");
+  const token = makeToken();
+  const csrf = generateCsrfToken();
+
+  const res = await request(app)
+    .post("/api/accounts")
+    .set("Authorization", `Bearer ${token}`)
+    .set(CSRF_HEADER_NAME, csrf)
+    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
+    .send({ name: "   ", type: "checking" });
+
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /name/i);
+});
+
+test("accounts: PUT with blank name returns 400", async () => {
+  const router = require("../routes/accounts.routes.js");
+  const app = buildApp(router, "/api/accounts");
+  const token = makeToken();
+  const csrf = generateCsrfToken();
+
+  const res = await request(app)
+    .put("/api/accounts/00000000-0000-4000-8000-000000000001")
+    .set("Authorization", `Bearer ${token}`)
+    .set(CSRF_HEADER_NAME, csrf)
+    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
+    .send({ name: "   " });
+
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /blank/i);
+});
+
 // ---------------------------------------------------------------------------
 // 8. Business validation (400 before DB hit)
 // ---------------------------------------------------------------------------
