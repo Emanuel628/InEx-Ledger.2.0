@@ -159,6 +159,12 @@ function renderCanonicalTopbarNavigation() {
     }).join("");
     nav.classList.add("is-ready");
   });
+
+  document.querySelectorAll(".app-topbar .topbar-brand").forEach((brand) => {
+    if (brand.getAttribute("href") !== "/") {
+      brand.setAttribute("href", "/transactions");
+    }
+  });
 }
 
 function highlightNavigation() {

@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>InEx Ledger - Transactions</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260514c">
   <link rel="stylesheet" href="/css/pages/transactions.css?v=20260514c">
 </head>
@@ -218,11 +219,11 @@
           <button type="button" id="txUndoDeleteButton" class="tx-header-undo-btn" hidden>Undo</button>
         </div>
 
-        <div id="txDrawer" hidden>
+        <div id="txDrawer" hidden role="dialog" aria-modal="true" aria-labelledby="txDrawerTitle">
           <form id="transactionForm" method="post" novalidate>
             <div class="transaction-drawer-card">
               <div class="transaction-drawer-head">
-                <h3 class="drawer-title">Add transaction</h3>
+                <h3 class="drawer-title" id="txDrawerTitle">Add transaction</h3>
                 <div class="txn-entry-selector">
                   <button type="button" class="txn-intent-btn income-intent" data-intent="income" data-i18n="transactions_intent_income">+ Income</button>
                   <button type="button" class="txn-intent-btn expense-intent" data-intent="expense" data-i18n="transactions_intent_expense">+ Expense</button>

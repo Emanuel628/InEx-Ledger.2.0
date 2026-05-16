@@ -50,22 +50,22 @@ Rules used here:
 
 ### Repeated app-shell and navigation issues
 
-- [ ] 30-60 min - Replace the hardcoded user-pill content with the real authenticated user/business chrome on all affected pages.
+- [x] 30-60 min - Replace the hardcoded user-pill content with the real authenticated user/business chrome on all affected pages.
   Files: `In-Ex-Ledger-API/public/html/accounts.html`, `categories.html`, `receipts.html`, `sessions.html`, `settings.html`, `help.html`, plus any remaining app pages using the same static pill
   Group: Shared app chrome
   Covers: hardcoded `U / InEx Ledger` or `U / Guide` across multiple pages
 
-- [ ] 30-60 min - Standardize relative vs root-relative nav/footer links across auth, marketing, legal, and app pages.
+- [x] 30-60 min - Standardize relative vs root-relative nav/footer links across auth, marketing, legal, and app pages.
   Files: `landing.html`, `pricing.html`, `register.html`, legal pages, sessions page, other affected templates
   Group: Link normalization
   Covers: `privacy` vs `/privacy`, `terms` vs `/terms`, broken relative app nav on sessions
 
-- [ ] 30-60 min - Add `noindex` meta tags to authenticated app pages that currently rely only on server headers.
+- [x] 30-60 min - Add `noindex` meta tags to authenticated app pages that currently rely only on server headers.
   Files: authenticated HTML templates broadly
   Group: Search indexing
   Covers: missing page-level `robots` meta on app pages
 
-- [ ] 30-60 min - Add basic accessibility attributes to billing and modal controls that are already structurally present.
+- [x] 30-60 min - Add basic accessibility attributes to billing and modal controls that are already structurally present.
   Files: `subscription.html`, `pricing.html`, `transactions.html`
   Group: A11y markup
   Covers: missing dialog roles, missing `aria-pressed`, missing focus movement / announcement wiring targets

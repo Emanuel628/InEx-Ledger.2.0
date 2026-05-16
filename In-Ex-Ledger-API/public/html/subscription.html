@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>Subscription | InEx Ledger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260510c" />
   <link rel="stylesheet" href="/css/pages/settings.css?v=20260516b" />
   <link rel="stylesheet" href="/css/pages/subscription.css?v=20260516a" />
@@ -125,8 +126,8 @@
               <div class="sub-control-row">
                 <span class="sub-control-label" data-i18n="subscription_billing_interval_label">Billing</span>
                 <div class="sub-toggle" role="group" aria-label="Billing interval">
-                  <button type="button" class="sub-toggle-btn is-active" data-billing-interval="monthly" data-i18n="subscription_billing_monthly">Monthly</button>
-                  <button type="button" class="sub-toggle-btn" data-billing-interval="yearly" data-i18n="subscription_billing_yearly">Yearly</button>
+                  <button type="button" class="sub-toggle-btn is-active" data-billing-interval="monthly" data-i18n="subscription_billing_monthly" aria-pressed="true">Monthly</button>
+                  <button type="button" class="sub-toggle-btn" data-billing-interval="yearly" data-i18n="subscription_billing_yearly" aria-pressed="false">Yearly</button>
                 </div>
               </div>
               <div class="sub-control-row">
@@ -206,7 +207,7 @@
   </div>
 
   <!-- Cancel subscription modal -->
-  <div id="subCancelModal" class="transaction-modal hidden">
+  <div id="subCancelModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="subCancelModalTitle" aria-describedby="subCancelModalBody">
     <div class="transaction-modal-content danger-modal">
       <div class="danger-modal-icon" aria-hidden="true">
         <svg viewBox="0 0 16 16" fill="none">
@@ -215,7 +216,7 @@
           <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
         </svg>
       </div>
-      <h3 data-i18n="settings_cancel_sub_modal_title">Cancel subscription?</h3>
+      <h3 id="subCancelModalTitle" data-i18n="settings_cancel_sub_modal_title">Cancel subscription?</h3>
       <p id="subCancelModalBody" data-i18n="settings_cancel_sub_modal_body">Your subscription will remain active until the end of the current billing period.</p>
       <div class="modal-actions danger-actions">
         <button type="button" id="subCancelModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
@@ -225,7 +226,7 @@
   </div>
 
   <!-- Switch to Basic modal -->
-  <div id="subFreeModal" class="transaction-modal hidden">
+  <div id="subFreeModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="subFreeModalTitle" aria-describedby="subFreeModalBody">
     <div class="transaction-modal-content danger-modal">
       <div class="danger-modal-icon" aria-hidden="true">
         <svg viewBox="0 0 16 16" fill="none">
@@ -234,7 +235,7 @@
           <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
         </svg>
       </div>
-      <h3 data-i18n="subscription_free_confirm_title">Switch to Basic?</h3>
+      <h3 id="subFreeModalTitle" data-i18n="subscription_free_confirm_title">Switch to Basic?</h3>
       <p id="subFreeModalBody" data-i18n="subscription_free_confirm_body_generic">This business will move to Basic.</p>
       <div class="modal-actions danger-actions">
         <button type="button" id="subFreeModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>

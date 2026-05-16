@@ -215,9 +215,11 @@ function updatePricingUI() {
   const decrementBtn = document.querySelector("[data-qty-action='decrease']");
   const incrementBtn = document.querySelector("[data-qty-action='increase']");
 
-  intervalButtons.forEach((btn) =>
-    btn.classList.toggle("is-active", btn.dataset.billingInterval === pricingState.billingInterval)
-  );
+  intervalButtons.forEach((btn) => {
+    const isActive = btn.dataset.billingInterval === pricingState.billingInterval;
+    btn.classList.toggle("is-active", isActive);
+    btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
 
   if (additionalInput) {
     additionalInput.value = String(pricingState.additionalBusinesses);

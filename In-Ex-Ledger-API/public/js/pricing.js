@@ -42,7 +42,9 @@ function getGrandTotal() {
 
 function setActiveToggle(selector, activeValue, attrName) {
   document.querySelectorAll(selector).forEach((btn) => {
-    btn.classList.toggle("is-active", btn.getAttribute(attrName) === activeValue);
+    const isActive = btn.getAttribute(attrName) === activeValue;
+    btn.classList.toggle("is-active", isActive);
+    btn.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
 }
 
