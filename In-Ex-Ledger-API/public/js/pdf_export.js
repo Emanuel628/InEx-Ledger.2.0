@@ -71,6 +71,11 @@ const SCHEDULE_C_LINE_MAP = {
 
 const T2125_LINE_MAP = {
   gross_income: 'Line 8000 — Gross business income',
+  gross_receipts: 'Line 8000 — Gross business income',
+  gross_receipts_sales: 'Line 8000 — Gross business income',
+  sales: 'Line 8000 — Gross business income',
+  sales_revenue: 'Line 8000 — Gross business income',
+  revenue: 'Line 8000 — Gross business income',
   business_income: 'Line 8000 — Gross business income',
   advertising: 'Line 8520 — Advertising',
   marketing: 'Line 8520 — Advertising',
@@ -80,6 +85,7 @@ const T2125_LINE_MAP = {
   entertainment: 'Line 8523 — Meals and entertainment (50%)',
   bad_debts: 'Line 8590 — Bad debts',
   insurance: 'Line 8690 — Insurance',
+  insurance_other_than_health: 'Line 8690 — Insurance',
   interest: 'Line 8710 — Interest',
   bank_interest: 'Line 8710 — Interest',
   other_interest: 'Line 8710 — Interest',
@@ -188,11 +194,19 @@ function normalizeTaxLineText(value, region) {
 
 function shortenTaxLine(text) {
   if (!text) return text;
-  // "Unmapped Schedule C line" / "Unmapped T2125 line" → compact form
   if (/^Unmapped\b/i.test(text)) return 'Unmapped';
-  // "Line 27a/Part V — Other expenses (software subscriptions)" → "Ln 27a Other (software...)"
-  // Keep "Line X — Description" truncated cleanly
-  return text;
+  // "Line 27a/Part V — Other expenses (software)" → "L27a Other"
+  // "Line 15 — Insurance (other than health)" → "L15 Insurance"
+  const m = text.match(/^Line\s+(\S+(?:\s+\S+)?)\s*[—\-]\s*(.+)$/i);
+  if (!m) return text;
+  const lineRef = m[1].trim().replace(/\/Part\s+[IVX]+/i, '').trim();
+  const desc = m[2].trim()
+    .replace(/\s*\([^)]+\)/g, '')
+    .replace(/\s+(expenses?|programs?|plans?|activities?)$/i, '')
+    .trim();
+  const result = `L${lineRef} ${desc}`;
+  if (result.length <= 22) return result;
+  return result.slice(0, 22).replace(/\s+\S*$/, '').trim();
 }
 
 function buildTransactionText(txn) {
@@ -598,7 +612,7 @@ function buildCategoryPages(transactions, categories, currency, labels, region, 
     return [canvas];
   }
 
-  return chunkArray(remainingEntries, 22).map((chunk) => {
+  return chunkArray(remainingEntries, 30).map((chunk) => {
     const canvas = new PdfCanvas();
     canvas.text(40, 760, labels.category_breakdown_title, 16, 'F2');
     canvas.text(40, 730, labels.col_category, 10, 'F2');
@@ -666,17 +680,17 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
       noteParts.push(`Form: ${txn.tax_form_type || txn.taxFormType}`);
     }
     if (!(txn.receipt_id || txn.receiptId) && !isIncome && flags.includes('Special category')) {
-      noteParts.push('No receipt on file');
+      noteParts.push(labels.no_receipt_on_file || 'No receipt on file');
     }
 
     rowItems.push({
       isHeader: false,
       date: dateStr.slice(5),
-      payeeMemo: truncateText(buildTransactionText(txn) || '(No description)', 34),
-      categoryName: truncateText(safeValue(category?.name, 'Uncategorized'), 26),
-      taxMapping: truncateText(shortenTaxLine(taxMapRaw), 20),
+      payeeMemo: truncateText(buildTransactionText(txn) || '(No description)', 28),
+      categoryName: truncateText(safeValue(category?.name, 'Uncategorized'), 22),
+      taxMapping: shortenTaxLine(taxMapRaw),
       amountStr: (isIncome ? '+' : '') + formatCurrencyForPdf(amount, currency),
-      flagStr: flags.length ? truncateText(flags.join(', '), 14) : labels.review_ok,
+      flagStr: flags.length ? truncateText(flags.join(', '), 16) : labels.review_ok,
       note: noteParts.length ? noteParts.join(' | ') : null
     });
   });
@@ -692,11 +706,11 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
     if (!isFirstPage) c.text(220, 760, '(continued)', 9);
     isFirstPage = false;
     c.text(40, 732, labels.col_date, 9, 'F2');
-    c.text(88, 732, labels.col_payee_memo, 9, 'F2');
-    c.text(295, 732, 'Category', 9, 'F2');
-    c.text(415, 732, 'Tax line', 9, 'F2');
-    c.text(496, 732, labels.col_amount, 9, 'F2');
-    c.text(553, 732, labels.col_flag, 9, 'F2');
+    c.text(86, 732, labels.col_payee_memo, 9, 'F2');
+    c.text(262, 732, 'Category', 9, 'F2');
+    c.text(368, 732, 'Tax line', 9, 'F2');
+    c.text(482, 732, labels.col_amount, 9, 'F2');
+    c.text(538, 732, labels.col_flag, 9, 'F2');
     canvasObj = c;
     y = 708;
   };
@@ -712,14 +726,14 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
       const needed = 14 + (item.note ? 11 : 0);
       if (y - needed < 60) { pages.push(canvasObj); startNewPage(); }
       canvasObj.text(40, y, item.date, 8);
-      canvasObj.text(88, y, item.payeeMemo, 8);
-      canvasObj.text(295, y, item.categoryName, 8);
-      canvasObj.text(415, y, item.taxMapping, 8);
-      canvasObj.text(496, y, item.amountStr, 8);
-      canvasObj.text(553, y, item.flagStr, 8);
+      canvasObj.text(86, y, item.payeeMemo, 8);
+      canvasObj.text(262, y, item.categoryName, 8);
+      canvasObj.text(368, y, item.taxMapping, 8);
+      canvasObj.text(482, y, item.amountStr, 8);
+      canvasObj.text(538, y, item.flagStr, 8);
       y -= 14;
       if (item.note) {
-        canvasObj.text(88, y, truncateText(item.note, 76), 7);
+        canvasObj.text(86, y, truncateText(item.note, 76), 7);
         y -= 11;
       }
     }
@@ -731,15 +745,15 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
 
 function buildExclusionPages(excludedTransactions, currency, labels) {
   if (!excludedTransactions.length) return [];
-  return chunkArray(excludedTransactions, 20).map((chunk, index) => {
+  return chunkArray(excludedTransactions, 30).map((chunk, index) => {
     const canvas = new PdfCanvas();
     const title = index === 0
-      ? 'Excluded Transfers, Payroll, and Personal Items'
-      : 'Excluded Items (continued)';
+      ? (labels.exclusion_title || 'Excluded Transfers, Payroll, and Personal Items')
+      : (labels.exclusion_continued || 'Excluded Items (continued)');
     canvas.text(40, 760, title, 16, 'F2');
     canvas.text(40, 730, labels.col_date, 9, 'F2');
     canvas.text(120, 730, labels.col_payee_memo, 9, 'F2');
-    canvas.text(360, 730, 'Reason for exclusion', 9, 'F2');
+    canvas.text(360, 730, labels.exclusion_reason || 'Reason for exclusion', 9, 'F2');
     canvas.text(520, 730, labels.col_amount, 9, 'F2');
     let y = 706;
     chunk.forEach((txn) => {
@@ -748,10 +762,10 @@ function buildExclusionPages(excludedTransactions, currency, labels) {
       canvas.text(120, y, truncateText(buildTransactionText(txn) || '(No description)', 42), 8);
       canvas.text(360, y, truncateText(txn.__exclusionReason || 'Excluded', 28), 8);
       canvas.text(520, y, formatCurrencyForPdf(Math.abs(Number(txn.amount) || 0), currency), 8);
-      y -= 16;
+      y -= 14;
     });
     if (index === 0) {
-      canvas.text(40, 80, 'Transfer-like items, payroll wages, and personal-use items should be reviewed separately and are not treated as business P&L.', 8);
+      canvas.text(40, 80, labels.exclusion_note || 'Transfer-like items, payroll wages, and personal-use items should be reviewed separately and are not treated as business P&L.', 8);
     }
     return canvas;
   });
@@ -826,7 +840,7 @@ function buildSupportPages(receipts, transactions, mileage, labels, currency, re
   const startPage = () => {
     canvas = new PdfCanvas();
     y = 760;
-    canvas.text(40, y, 'Supporting Schedules and Review', 16, 'F2');
+    canvas.text(40, y, labels.support_title || 'Supporting Schedules and Review', 16, 'F2');
     y -= 28;
   };
 
@@ -844,10 +858,10 @@ function buildSupportPages(receipts, transactions, mileage, labels, currency, re
   if (receiptRows.length) {
     canvas.text(40, y, labels.receipts_index_title, 12, 'F2');
     y -= 20;
-    canvas.text(40, y, 'Receipt ID', 9, 'F2');
-    canvas.text(170, y, 'Tx Date', 9, 'F2');
-    canvas.text(250, y, 'Tx Description', 9, 'F2');
-    canvas.text(430, y, 'File Name', 9, 'F2');
+    canvas.text(40, y, labels.col_receipt_id || 'Receipt ID', 9, 'F2');
+    canvas.text(170, y, labels.col_tx_date || 'Tx Date', 9, 'F2');
+    canvas.text(250, y, labels.col_tx_description || 'Tx Description', 9, 'F2');
+    canvas.text(430, y, labels.col_file_name || 'File Name', 9, 'F2');
     y -= 18;
     receiptRows.forEach((row) => {
       ensureSpace(18);
@@ -867,8 +881,8 @@ function buildSupportPages(receipts, transactions, mileage, labels, currency, re
     ensureSpace(84);
     canvas.text(40, y, labels.mileage_summary_title, 12, 'F2');
     y -= 20;
-    if (totalMiles > 0) { canvas.text(40, y, `Total business miles: ${formatDistance(totalMiles)} mi`, 9); y -= 14; }
-    if (totalKm > 0) { canvas.text(40, y, `Total business kilometers: ${formatDistance(totalKm)} km`, 9); y -= 14; }
+    if (totalMiles > 0) { canvas.text(40, y, `${labels.total_business_miles || 'Total business miles'}: ${formatDistance(totalMiles)} mi`, 9); y -= 14; }
+    if (totalKm > 0) { canvas.text(40, y, `${labels.total_business_km || 'Total business kilometers'}: ${formatDistance(totalKm)} km`, 9); y -= 14; }
     canvas.text(40, y, labels.mileage_note_csv, 9);
     y -= 18;
   }
@@ -1006,7 +1020,7 @@ function buildPdfExport(options) {
   const totals = calculateTotals(included);
   const reviewInsights = buildReviewInsights(included, categories, excluded.length);
   const categoryEntries = buildCategoryBuckets(included, categories, labels, currency, region);
-  const categoryPreviewEntries = categoryEntries.slice(0, 6);
+  const categoryPreviewEntries = categoryEntries.slice(0, 12);
 
   const canvases = [
     buildIdentityPage({

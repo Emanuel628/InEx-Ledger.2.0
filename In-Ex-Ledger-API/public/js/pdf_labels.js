@@ -68,7 +68,19 @@ const _PDF_LABELS = {
     review_review: 'Review',
     review_action_needed: 'Action needed',
     footer_brand: 'InEx Ledger',
-    footer_confidential: 'Confidential'
+    footer_confidential: 'Confidential',
+    exclusion_title: 'Excluded Transfers, Payroll, and Personal Items',
+    exclusion_continued: 'Excluded Items (continued)',
+    exclusion_reason: 'Reason for exclusion',
+    exclusion_note: 'Transfer-like items, payroll wages, and personal-use items should be reviewed separately and are not treated as business P&L.',
+    support_title: 'Supporting Schedules and Review',
+    col_receipt_id: 'Receipt ID',
+    col_tx_date: 'Tx Date',
+    col_tx_description: 'Tx Description',
+    col_file_name: 'File Name',
+    total_business_miles: 'Total business miles',
+    total_business_km: 'Total business kilometers',
+    no_receipt_on_file: 'No receipt on file'
   },
   es: {
     report_title: 'Exportación contable para revisión del contador',
@@ -139,7 +151,19 @@ const _PDF_LABELS = {
     review_review: 'Revisar',
     review_action_needed: 'Acción requerida',
     footer_brand: 'InEx Ledger',
-    footer_confidential: 'Confidencial'
+    footer_confidential: 'Confidencial',
+    exclusion_title: 'Transferencias, nómina y gastos personales excluidos',
+    exclusion_continued: 'Elementos excluidos (continuación)',
+    exclusion_reason: 'Razón de exclusión',
+    exclusion_note: 'Las transferencias, salarios de nómina y artículos de uso personal deben revisarse por separado y no se tratan como ganancias y pérdidas del negocio.',
+    support_title: 'Cronogramas de soporte y revisión',
+    col_receipt_id: 'ID de recibo',
+    col_tx_date: 'Fecha Tx',
+    col_tx_description: 'Descripción Tx',
+    col_file_name: 'Nombre de archivo',
+    total_business_miles: 'Millas de negocio totales',
+    total_business_km: 'Kilómetros de negocio totales',
+    no_receipt_on_file: 'Sin recibo adjunto'
   },
   fr: {
     report_title: 'Export comptable pour révision CPA',
@@ -210,7 +234,19 @@ const _PDF_LABELS = {
     review_review: 'À réviser',
     review_action_needed: 'Action requise',
     footer_brand: 'InEx Ledger',
-    footer_confidential: 'Confidentiel'
+    footer_confidential: 'Confidentiel',
+    exclusion_title: 'Transferts, salaires et dépenses personnelles exclus',
+    exclusion_continued: 'Éléments exclus (suite)',
+    exclusion_reason: "Raison d'exclusion",
+    exclusion_note: "Les virements, salaires et dépenses personnelles doivent être examinés séparément et ne sont pas traités comme des gains et pertes commerciales.",
+    support_title: 'Annexes de soutien et révision',
+    col_receipt_id: 'ID du reçu',
+    col_tx_date: 'Date Tx',
+    col_tx_description: 'Description Tx',
+    col_file_name: 'Nom du fichier',
+    total_business_miles: 'Total des miles professionnels',
+    total_business_km: 'Total des kilomètres professionnels',
+    no_receipt_on_file: 'Aucun reçu joint'
   }
 };
 

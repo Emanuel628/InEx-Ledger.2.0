@@ -224,6 +224,11 @@ const SCHEDULE_C_LINE_MAP = {
 
 const T2125_LINE_MAP = {
   gross_income: 'Line 8000 — Gross business income',
+  gross_receipts: 'Line 8000 — Gross business income',
+  gross_receipts_sales: 'Line 8000 — Gross business income',
+  sales: 'Line 8000 — Gross business income',
+  sales_revenue: 'Line 8000 — Gross business income',
+  revenue: 'Line 8000 — Gross business income',
   business_income: 'Line 8000 — Gross business income',
   advertising: 'Line 8520 — Advertising',
   marketing: 'Line 8520 — Advertising',
@@ -233,6 +238,7 @@ const T2125_LINE_MAP = {
   entertainment: 'Line 8523 — Meals and entertainment (50%)',
   bad_debts: 'Line 8590 — Bad debts',
   insurance: 'Line 8690 — Insurance',
+  insurance_other_than_health: 'Line 8690 — Insurance',
   interest: 'Line 8710 — Interest',
   bank_interest: 'Line 8710 — Interest',
   other_interest: 'Line 8710 — Interest',
@@ -501,6 +507,21 @@ function normalizeTaxLineText(value, region) {
   const slugKey = text.toLowerCase().replace(/[-\s]+/g, '_');
   const map = normalizeRegionCode(region) === 'CA' ? T2125_LINE_MAP : SCHEDULE_C_LINE_MAP;
   return map[slugKey] || map[text.toLowerCase()] || text;
+}
+
+function shortenTaxLine(text) {
+  if (!text) return text;
+  if (/^Unmapped\b/i.test(text)) return 'Unmapped';
+  const m = text.match(/^Line\s+(\S+(?:\s+\S+)?)\s*[—\-]\s*(.+)$/i);
+  if (!m) return text;
+  const lineRef = m[1].trim().replace(/\/Part\s+[IVX]+/i, '').trim();
+  const desc = m[2].trim()
+    .replace(/\s*\([^)]+\)/g, '')
+    .replace(/\s+(expenses?|programs?|plans?|activities?)$/i, '')
+    .trim();
+  const result = `L${lineRef} ${desc}`;
+  if (result.length <= 22) return result;
+  return result.slice(0, 22).replace(/\s+\S*$/, '').trim();
 }
 
 function buildTransactionText(txn) {
@@ -1146,7 +1167,7 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
         `${safeValue(account?.name, '-')} / ${safeValue(category?.name, 'Uncategorized')}`,
         20
       ),
-      taxMapping: truncateText(taxMapRaw, 22),
+      taxMapping: shortenTaxLine(taxMapRaw),
       amountStr: (isIncome ? '+' : '') + formatCurrencyForPdf(amountValue, currency),
       flagStr: flags.length ? truncateText(flags.join(', '), 14) : labels.review_ok,
       note: noteParts.length ? noteParts.join(' | ') : null
