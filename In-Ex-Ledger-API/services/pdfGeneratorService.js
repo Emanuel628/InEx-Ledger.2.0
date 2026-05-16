@@ -878,7 +878,8 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
     exclusionReasonBreakdown[reason] = (exclusionReasonBreakdown[reason] || 0) + 1;
   });
 
-  const samples = [];
+  const FLAG_SEVERITY = { 'Uncategorized': 0, 'Needs category': 1, 'Needs tax mapping': 2, 'Review': 3, 'Negative expense': 4, 'Missing description': 5, 'Mixed-use': 6, 'Indirect tax': 7, 'FX': 8, 'Special category': 9 };
+  const allFlagged = [];
   let uncategorizedCount = 0;
   let needsCategoryCount = 0;
   let missingDescriptionCount = 0;
@@ -912,13 +913,10 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
     if (isExpense && Number(txn.amount) < 0) negativeExpenseCount += 1;
     if (flags.includes('Mixed-use')) mixedUseCount += 1;
     if (flags.includes('Special category')) specialCategoryCount += 1;
-    if (flags.length) reviewFlagCount += 1;
-    if (flags.length && samples.length < 6) {
-      samples.push({
-        reason: flags.join(', '),
-        description: truncateText(txn.description || '(No description)', 36),
-        amount
-      });
+    if (flags.length) {
+      reviewFlagCount += 1;
+      const topSeverity = Math.min(...flags.map((f) => FLAG_SEVERITY[f] ?? 99));
+      allFlagged.push({ severity: topSeverity, amount, flags, description: txn.description || '(No description)' });
     }
 
     if (isExpense) {
@@ -933,6 +931,13 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
       if ((txn.category_id || txn.categoryId) && !taxSlug) unmappedExpenseCount += 1;
     }
   });
+
+  allFlagged.sort((a, b) => a.severity !== b.severity ? a.severity - b.severity : b.amount - a.amount);
+  const samples = allFlagged.slice(0, 6).map((item) => ({
+    reason: item.flags.join(', '),
+    description: truncateText(item.description, 36),
+    amount: item.amount
+  }));
 
   return {
     transactionCount: (transactions || []).length,
@@ -1463,20 +1468,21 @@ function buildReviewAndDisclosurePage(transactions, categories, receipts, labels
 
   let y = 730;
   const summaryRows = [
-    [labels.review_uncategorized, reviewInsights.uncategorizedCount],
-    [labels.review_missing_description, reviewInsights.missingDescriptionCount],
-    [labels.review_possible_duplicates, reviewInsights.duplicateCount],
-    [labels.review_negative_expenses, reviewInsights.negativeExpenseCount],
-    [labels.review_mixed_use, reviewInsights.mixedUseCount],
-    [labels.review_special_categories, reviewInsights.specialCategoryCount],
-    [labels.review_missing_receipts, reviewInsights.missingReceiptCount]
+    ['[CRITICAL] ' + labels.review_uncategorized, reviewInsights.uncategorizedCount],
+    ['[CRITICAL] Imported categories — not yet mapped to real categories', reviewInsights.needsCategoryCount || 0],
+    ['[HIGH]     ' + labels.review_missing_description, reviewInsights.missingDescriptionCount],
+    ['[HIGH]     ' + labels.review_possible_duplicates, reviewInsights.duplicateCount],
+    ['[HIGH]     ' + labels.review_negative_expenses, reviewInsights.negativeExpenseCount],
+    ['[HIGH]     ' + labels.review_mixed_use, reviewInsights.mixedUseCount],
+    ['[MEDIUM]   ' + labels.review_special_categories, reviewInsights.specialCategoryCount],
+    ['[MEDIUM]   ' + labels.review_missing_receipts, reviewInsights.missingReceiptCount]
   ];
 
   let hasAnyReviewItem = false;
   summaryRows.forEach(([label, count]) => {
     if (count > 0) hasAnyReviewItem = true;
-    canvas.text(40, y, `${label}: ${count}`, 10);
-    y -= 16;
+    canvas.text(40, y, `${label}: ${count}`, 9);
+    y -= 14;
   });
 
   if (!hasAnyReviewItem) {
@@ -1730,16 +1736,17 @@ function buildSupportPages(receipts, transactions, mileage, labels, currency, re
   canvas.text(40, y, labels.review_items_title, 12, 'F2');
   y -= 20;
   [
-    [labels.review_uncategorized, reviewInsights.uncategorizedCount],
-    [labels.review_missing_description, reviewInsights.missingDescriptionCount],
-    [labels.review_possible_duplicates, reviewInsights.duplicateCount],
-    [labels.review_negative_expenses, reviewInsights.negativeExpenseCount],
-    [labels.review_mixed_use, reviewInsights.mixedUseCount],
-    [labels.review_special_categories, reviewInsights.specialCategoryCount],
-    [labels.review_missing_receipts, reviewInsights.missingReceiptCount]
+    ['[CRITICAL] ' + labels.review_uncategorized, reviewInsights.uncategorizedCount],
+    ['[CRITICAL] Imported categories (not mapped)', reviewInsights.needsCategoryCount || 0],
+    ['[HIGH]     ' + labels.review_missing_description, reviewInsights.missingDescriptionCount],
+    ['[HIGH]     ' + labels.review_possible_duplicates, reviewInsights.duplicateCount],
+    ['[HIGH]     ' + labels.review_negative_expenses, reviewInsights.negativeExpenseCount],
+    ['[HIGH]     ' + labels.review_mixed_use, reviewInsights.mixedUseCount],
+    ['[MEDIUM]   ' + labels.review_special_categories, reviewInsights.specialCategoryCount],
+    ['[MEDIUM]   ' + labels.review_missing_receipts, reviewInsights.missingReceiptCount]
   ].forEach(([label, count]) => {
     canvas.text(40, y, `${label}: ${count}`, 9);
-    y -= 14;
+    y -= 13;
   });
 
   if ((reviewInsights.samples || []).length) {
