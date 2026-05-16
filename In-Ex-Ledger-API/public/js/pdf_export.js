@@ -767,7 +767,7 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
     }
     const category = categoryMap[txn.category_id || txn.categoryId] || null;
     const account = accountMap[txn.account_id || txn.accountId] || null;
-    const flags = getTransactionFlags(txn, category);
+    const flags = getTransactionFlags(txn, category, region);
     const isIncome = String(txn.type || '').toLowerCase() === 'income';
     const amount = Math.abs(Number(txn.amount) || 0);
     const taxMapRaw = normalizeTaxLineText(
@@ -964,6 +964,8 @@ function buildCpaChecklistPage(opts) {
     `${reviewInsights.receiptLinkedCount} of ${reviewInsights.expenseTransactionCount} covered`);
   checkRow(reviewInsights.uncategorizedCount === 0, 'All transactions categorized',
     reviewInsights.uncategorizedCount > 0 ? `${reviewInsights.uncategorizedCount} uncategorized` : 'All categorized');
+  checkRow((reviewInsights.needsCategoryCount || 0) === 0, 'No imported categories needing reassignment',
+    (reviewInsights.needsCategoryCount || 0) > 0 ? `${reviewInsights.needsCategoryCount} transaction(s) in Imported Expense/Income — assign a real category` : 'None detected');
   checkRow(reviewInsights.unmappedExpenseCount === 0, 'All expense categories mapped to tax line',
     reviewInsights.unmappedExpenseCount > 0 ? `${reviewInsights.unmappedExpenseCount} expense transaction(s) with unmapped category` : 'All mapped');
   checkRow(reviewInsights.duplicateCount === 0, 'No duplicate transactions detected',
