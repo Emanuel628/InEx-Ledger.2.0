@@ -237,6 +237,27 @@ function normalizeTaxLineText(value, region) {
   return map[slugKey] || map[text.toLowerCase()] || text;
 }
 
+function inferTaxLineFromCategoryName(categoryName, isCA) {
+  const name = String(categoryName || '').toLowerCase().replace(/[&+]/g, ' ');
+  if (isCA) {
+    if (/fuel|gas|\bmotor\b|vehicle|auto|mileage/.test(name)) return 'Line 9281 — Motor vehicle (mileage/actual support req.)';
+    if (/meal|food|dining|restaurant|entertainment/.test(name)) return 'Line 8523 — Meals & entertainment (50% limit)';
+    if (/phone|internet|telephone/.test(name)) return 'Line 9270 — Telephone & utilities (allocation req.)';
+  } else {
+    if (/fuel|gas|\bmotor\b|vehicle|auto|mileage/.test(name)) return 'Line 9 — Car and truck (mileage/actual support req.)';
+    if (/meal|food|dining|restaurant|entertainment/.test(name)) return 'Line 24b — Deductible meals (business purpose req.)';
+    if (/phone|internet|telephone/.test(name)) return 'Line 25/27a — Phone/utilities (business-use allocation req.)';
+  }
+  return null;
+}
+
+function resolveTaxLine(taxMapValue, categoryName, region) {
+  const isCA = String(region || '').toUpperCase() === 'CA';
+  const resolved = normalizeTaxLineText(taxMapValue, region);
+  if (!/^Unmapped\b/i.test(resolved)) return resolved;
+  return inferTaxLineFromCategoryName(categoryName, isCA) || resolved;
+}
+
 function shortenTaxLine(text) {
   if (!text) return text;
   if (/^Unmapped\b/i.test(text)) return 'Unmapped';
@@ -271,10 +292,10 @@ function classifyExcludedTransaction(txn, category) {
   const combined = `${categoryName} ${taxMapping} ${text}`;
 
   if (normalizedType === 'transfer' || /(transfer|credit card payment|cc payment|internal transfer|online transfer from sav|online transfer to sav)/i.test(combined)) {
-    return 'Transfer / credit-card payment';
+    return 'Transfer / CC payment';
   }
   if (/(payment to chase|chase credit crd|chase crd|citi\s*card\s*online|capital one\s*mobile\s*pmt|capital one\s*online\s*pmt|amazon corp syf pay|synchrony bank|affirm\s*\*?\s*pay|klarna|valley bank bill pay|elan financial|discover e-?payment|autopay payment|online payment thank you|amex\s*autopay|bank of america\s*online|discover\s*card\s*pay|barclaycard|credit\s*card\s*autopay|minimum payment|statement balance)/i.test(text)) {
-    return 'Credit card payment — not deductible (deduct the underlying card charges instead)';
+    return 'CC payment — deduct underlying charges';
   }
   if (/^(payroll|wages?|salary|w-?2|employee\s+wages?)\b/i.test(categoryName)) {
     return 'Payroll / wage deposit';
@@ -283,16 +304,16 @@ function classifyExcludedTransaction(txn, category) {
     return 'Payroll / wage deposit';
   }
   if (/(wire\s*fee|wire\s*transfer\s*fee|outgoing wire|incoming wire|international wire)/i.test(text) && normalizedType !== 'income') {
-    return 'Wire / bank transfer fee — review if business-related';
+    return 'Wire/bank fee — review if business';
   }
   if (normalizedType === 'income' && /irs\s+treas|tax\s+refund|irs\s+tax\b/i.test(text)) {
-    return 'Tax refund — not Schedule C income (report on Form 1040 Line 4)';
+    return 'Tax refund — not Schedule C income';
   }
   if (normalizedType === 'income' && /state\s+of\s+[a-z]|\bnjstt\b|state\s+treas|dept\s+of\s+revenue/i.test(text)) {
-    return 'State tax refund — not Schedule C income';
+    return 'State tax refund — not Sch C income';
   }
   if (normalizedType === 'income' && /\bfidelity\b|\bvanguard\b|\bschwab\b|\bmerrill\b|\brobinhood\b|e\*?trade\b|tdameritrade|td\s+ameritrade/i.test(text)) {
-    return 'Investment account — not Schedule C income (verify source)';
+    return 'Investment account — not Sch C income';
   }
   if (/(grocery|groceries|supermarket|whole foods|trader joe|kroger|safeway|publix|aldi|food lion|stop\s*&\s*shop|netflix|hulu|disney plus|disney\+|spotify|amazon prime|apple music|planet fitness|anytime fitness|gym membership|haircut|barber shop|vagaro|nail salon|crosscountry|cross\s*country\s*mortgage|mortgage payment|personal expense|family expense)/i.test(combined)) {
     return 'Potential personal use';
@@ -301,7 +322,7 @@ function classifyExcludedTransaction(txn, category) {
     return 'Potential personal use';
   }
   if (/(refund|reimbursement)/i.test(text) && normalizedType !== 'income') {
-    return 'Refund / reimbursement review';
+    return 'Refund / reimbursement';
   }
   return null;
 }
@@ -610,8 +631,9 @@ function buildCategoryBuckets(transactions, categories, labels, currency, region
     const categoryId = txn.category_id || txn.categoryId || '';
     const category = categoryMap[categoryId] || null;
     const categoryName = safeValue(category?.name, 'Uncategorized');
-    const taxMapping = normalizeTaxLineText(
+    const taxMapping = resolveTaxLine(
       category?.[taxKey] || category?.tax_label || category?.taxLabel,
+      categoryName,
       region
     );
     const bucketKey = `${categoryId || 'uncategorized'}::${String(txn.type || 'expense').toLowerCase()}`;
@@ -711,26 +733,27 @@ function buildIdentityPage(data) {
   }
 
   canvas.text(330, 690, labels.reporting_section_title, 12, 'F2');
-  buildKeyValueRows(canvas, 330, 670, reportingRows);
-
-  canvas.text(330, 570, labels.financial_summary_title, 12, 'F2');
-  buildKeyValueRows(canvas, 330, 550, [
+  let rightY = buildKeyValueRows(canvas, 330, 670, reportingRows);
+  rightY -= 14;
+  canvas.text(330, rightY, labels.financial_summary_title, 12, 'F2');
+  rightY -= 20;
+  rightY = buildKeyValueRows(canvas, 330, rightY, [
     [labels.gross_income, formatCurrencyForPdf(totals.income, currency)],
     [labels.total_expenses, formatCurrencyForPdf(totals.expenses, currency)],
     [labels.net_profit, formatCurrencyForPdf(totals.netProfit, currency)],
     [labels.transaction_count, String(reviewInsights.transactionCount)]
   ]);
-
-  canvas.text(330, 470, labels.tax_estimate_title, 12, 'F2');
-  buildKeyValueRows(canvas, 330, 450, [
-    [labels.estimated_tax, 'Manual review required']
-  ]);
+  rightY -= 14;
+  canvas.text(330, rightY, labels.tax_estimate_title, 12, 'F2');
+  rightY -= 20;
+  buildKeyValueRows(canvas, 330, rightY, [[labels.estimated_tax, 'Manual review required']]);
+  rightY -= 16;
   wrapText(labels.estimated_tax_disclaimer, 34).forEach((line, index) => {
-    canvas.text(330, 434 - (index * 14), line, 9);
+    canvas.text(330, rightY - (index * 14), line, 9);
   });
 
   canvas.text(40, 550, labels.review_flags_title, 12, 'F2');
-  buildKeyValueRows(canvas, 40, 530, [
+  let leftY = buildKeyValueRows(canvas, 40, 530, [
     [labels.uncategorized_transactions, String(reviewInsights.uncategorizedCount)],
     ['Imported (needs real category)', String(reviewInsights.needsCategoryCount || 0)],
     ['Expenses missing tax mapping', String(reviewInsights.unmappedTaxCount || 0)],
@@ -739,6 +762,27 @@ function buildIdentityPage(data) {
     [labels.receipt_coverage, reviewInsights.receiptCoverageText],
     ['Excluded non-business items', String(reviewInsights.excludedCount || 0)]
   ]);
+
+  // CPA Action Required — fills dead space on page 1
+  const actionItems = [];
+  if ((reviewInsights.needsCategoryCount || 0) > 0) actionItems.push(`${reviewInsights.needsCategoryCount} imported transactions need a real category assigned`);
+  if ((reviewInsights.unmappedTaxCount || 0) > 0) actionItems.push(`${reviewInsights.unmappedTaxCount} transactions missing formal tax-line mapping`);
+  if (reviewInsights.missingReceiptCount > 0) actionItems.push(`${reviewInsights.missingReceiptCount} expense transactions missing receipt attachment`);
+  if (reviewInsights.vehicleCount > 0) actionItems.push(`${reviewInsights.vehicleCount} vehicle/fuel items — mileage log or actual expense records required`);
+  if (reviewInsights.mealsCount > 0) actionItems.push(`${reviewInsights.mealsCount} meal items — 50% limit, document business purpose for each`);
+  if (reviewInsights.uncategorizedCount > 0) actionItems.push(`${reviewInsights.uncategorizedCount} transactions are uncategorized`);
+
+  if (actionItems.length) {
+    const boxTop = Math.min(leftY - 20, 390);
+    const actionTitle = isCA ? 'CPA Action Required Before Filing T2125' : 'CPA Action Required Before Filing Schedule C';
+    canvas.text(40, boxTop, actionTitle, 11, 'F2');
+    let actionY = boxTop - 18;
+    actionItems.forEach((item) => {
+      canvas.text(40, actionY, `[!] ${item}`, 9);
+      actionY -= 14;
+    });
+    canvas.text(40, actionY - 6, 'See CPA Workpaper Checklist (last pages) for full action items.', 8);
+  }
 
   return canvas;
 }
@@ -805,8 +849,9 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
     const flags = getTransactionFlags(txn, category, region);
     const isIncome = String(txn.type || '').toLowerCase() === 'income';
     const amount = Math.abs(Number(txn.amount) || 0);
-    const taxMapRaw = normalizeTaxLineText(
+    const taxMapRaw = resolveTaxLine(
       category?.[taxKey] || category?.tax_label || category?.taxLabel,
+      category?.name || '',
       region
     );
 
@@ -846,16 +891,21 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
     const c = new PdfCanvas();
     c.text(40, 760, labels.transaction_log_title, 16, 'F2');
     if (!isFirstPage) c.text(220, 760, '(continued)', 9);
-    isFirstPage = false;
     c.text(40, 732, labels.col_date, 9, 'F2');
     c.text(86, 732, labels.col_payee_memo, 9, 'F2');
     c.text(262, 732, 'Category', 9, 'F2');
     c.text(368, 732, 'Tax line', 9, 'F2');
     c.text(482, 732, labels.col_amount, 9, 'F2');
     c.text(538, 732, labels.col_flag, 9, 'F2');
-    c.text(40, 720, FLAG_CODE_LEGEND, 6);
-    canvasObj = c;
-    y = 706;
+    if (isFirstPage) {
+      c.text(40, 720, FLAG_CODE_LEGEND, 6);
+      canvasObj = c;
+      y = 706;
+    } else {
+      canvasObj = c;
+      y = 718;
+    }
+    isFirstPage = false;
   };
 
   startNewPage();
@@ -968,8 +1018,15 @@ function buildCpaChecklistPage(opts) {
   const checkRow = (isOk, label, note) => {
     const mark = isOk ? '[OK]' : '[!] ';
     canvas.text(40, y, mark, 9, isOk ? 'F1' : 'F2');
-    canvas.text(82, y, label, 9);
-    if (note) canvas.text(310, y, truncateText(note, 40), 9);
+    canvas.text(82, y, truncateText(label, 34), 9);
+    if (note) {
+      const noteLines = wrapText(note, 42);
+      canvas.text(310, y, noteLines[0], 8);
+      if (noteLines.length > 1) {
+        y -= 11;
+        canvas.text(310, y, truncateText(noteLines[1], 42), 8);
+      }
+    }
     y -= 14;
   };
 
@@ -1068,9 +1125,11 @@ function buildReviewAndDisclosurePage(transactions, categories, receipts, labels
 
   let hasAnyReviewItem = false;
   summaryRows.forEach(([label, count]) => {
-    if (count > 0) hasAnyReviewItem = true;
-    canvas.text(40, y, `${label}: ${count}`, 10);
-    y -= 16;
+    if (count > 0) {
+      hasAnyReviewItem = true;
+      canvas.text(40, y, `${label}: ${count}`, 10);
+      y -= 16;
+    }
   });
 
   if (!hasAnyReviewItem) {
@@ -1225,8 +1284,10 @@ function buildSupportPages(receipts, transactions, mileage, labels, currency, re
     [labels.review_special_categories, reviewInsights.specialCategoryCount],
     [labels.review_missing_receipts, reviewInsights.missingReceiptCount]
   ].forEach(([label, count]) => {
-    canvas.text(40, y, `${label}: ${count}`, 9);
-    y -= 14;
+    if (count > 0) {
+      canvas.text(40, y, `${label}: ${count}`, 9);
+      y -= 14;
+    }
   });
 
   if ((reviewInsights.samples || []).length) {
