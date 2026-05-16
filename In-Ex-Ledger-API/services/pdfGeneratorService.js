@@ -772,6 +772,9 @@ function summarizeExportTransactions(transactions, categories, options = {}) {
 }
 
 function buildReviewInsights(transactions, categories, receipts, meta = {}) {
+  const region = meta.region || 'us';
+  const isCA = normalizeRegionCode(region) === 'CA';
+  const taxKey = isCA ? 'tax_map_ca' : 'tax_map_us';
   const categoryMap = mapByKey(categories, 'id');
   const duplicateMap = new Map();
   (transactions || []).forEach((txn) => {
@@ -790,14 +793,26 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
   let mixedUseCount = 0;
   let specialCategoryCount = 0;
   let reviewFlagCount = 0;
+  let vehicleCount = 0;
+  let vehicleTotal = 0;
+  let mealsCount = 0;
+  let mealsTotal = 0;
+  let homeOfficeCount = 0;
+  let homeOfficeTotal = 0;
+  let unmappedExpenseCount = 0;
 
   (transactions || []).forEach((txn) => {
     const category = categoryMap[txn.category_id || txn.categoryId] || null;
     const flags = getTransactionFlags(txn, category);
+    const taxSlug = String(category?.[taxKey] || category?.tax_label || category?.taxLabel || '').toLowerCase();
+    const catName = String(category?.name || '').toLowerCase();
+    const isExpense = String(txn.type || '').toLowerCase() === 'expense';
+    const amount = Math.abs(Number(txn.amount) || 0);
+
     if (!txn.category_id && !txn.categoryId) uncategorizedCount += 1;
     if (!String(txn.description || '').trim()) missingDescriptionCount += 1;
     if (duplicateMap.get(normalizeDuplicateKey(txn)) > 1) duplicateCount += 1;
-    if (String(txn.type || '').toLowerCase() !== 'income' && Number(txn.amount) < 0) negativeExpenseCount += 1;
+    if (isExpense && Number(txn.amount) < 0) negativeExpenseCount += 1;
     if (flags.includes('Mixed-use')) mixedUseCount += 1;
     if (flags.includes('Special category')) specialCategoryCount += 1;
     if (flags.length) reviewFlagCount += 1;
@@ -805,8 +820,20 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
       samples.push({
         reason: flags.join(', '),
         description: truncateText(txn.description || '(No description)', 36),
-        amount: Math.abs(Number(txn.amount) || 0)
+        amount
       });
+    }
+
+    if (isExpense) {
+      const combined = `${catName} ${taxSlug}`;
+      if (/\b(vehicle|auto|fuel|truck|mileage|car_and_truck)\b/.test(combined) || /\bgas\b/.test(combined) || /\bcar\b/.test(catName)) {
+        vehicleCount += 1; vehicleTotal += amount;
+      } else if (/\b(meal|meals|meals_entertainment|dining|entertainment|deductible_meals)\b/.test(combined)) {
+        mealsCount += 1; mealsTotal += amount;
+      } else if (/home[_\s]?office|home[_\s]?business/.test(combined)) {
+        homeOfficeCount += 1; homeOfficeTotal += amount;
+      }
+      if ((txn.category_id || txn.categoryId) && !taxSlug) unmappedExpenseCount += 1;
     }
   });
 
@@ -824,6 +851,10 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
     missingReceiptCount: Math.max(0, expenseTransactions.length - receiptLinkedCount),
     receiptCoverageText: `${receiptLinkedCount} of ${expenseTransactions.length || 0}`,
     excludedCount: Number(meta.excludedCount) || 0,
+    vehicleCount, vehicleTotal,
+    mealsCount, mealsTotal,
+    homeOfficeCount, homeOfficeTotal,
+    unmappedExpenseCount,
     samples
   };
 }
@@ -1328,6 +1359,104 @@ function buildReviewAndDisclosurePage(transactions, categories, receipts, labels
   return [canvas];
 }
 
+function buildCpaChecklistPage(opts) {
+  const {
+    labels, region, isSecure, naics, entityType, accountingBasis, accountingMethod,
+    totals, reviewInsights, currency, legalName, province,
+    materialParticipation, gstHstRegistered, mileage
+  } = opts;
+
+  const isCA = normalizeRegionCode(region) === 'CA';
+  const effectiveAccountingMethod = accountingBasis || accountingMethod || '';
+  const canvas = new PdfCanvas();
+  const pageTitle = isCA
+    ? 'CPA Workpaper Checklist — Canada T2125'
+    : 'CPA Workpaper Checklist — US Schedule C';
+  canvas.text(40, 760, pageTitle, 16, 'F2');
+  canvas.text(40, 742, 'Review each item with your tax preparer before submission.', 9);
+
+  let y = 718;
+  const hasMileageData = Array.isArray(mileage) && mileage.length > 0;
+  const hasNegativeProfit = totals.netProfit < 0;
+
+  const checkRow = (isOk, label, note) => {
+    const mark = isOk ? '[OK]' : '[!] ';
+    canvas.text(40, y, mark, 9, isOk ? 'F1' : 'F2');
+    canvas.text(82, y, label, 9);
+    if (note) canvas.text(310, y, truncateText(note, 40), 9);
+    y -= 14;
+  };
+
+  const sectionHead = (title) => {
+    y -= 6;
+    canvas.text(40, y, title, 11, 'F2');
+    y -= 16;
+  };
+
+  sectionHead('Entity and Filing Profile');
+  checkRow(Boolean(legalName), 'Legal business name', legalName ? truncateText(legalName, 32) : 'Not set');
+  checkRow(Boolean(naics), 'Business activity code (NAICS/BAC)', naics || 'Not specified — required before filing');
+  checkRow(isSecure, 'Tax ID on record', isSecure ? 'Present (secure export)' : 'Withheld — redacted export');
+  checkRow(Boolean(entityType), 'Entity type', entityType || 'Not specified');
+  checkRow(Boolean(effectiveAccountingMethod), 'Accounting method', effectiveAccountingMethod || 'Not specified');
+  if (isCA) {
+    checkRow(Boolean(province), 'Province', province || 'Not specified — required for T2125');
+    checkRow(gstHstRegistered !== null, 'GST/HST registration status', gstHstRegistered ? 'Registered' : 'Not registered / not provided');
+  } else {
+    checkRow(materialParticipation !== null, 'Material participation', materialParticipation === true ? 'Yes' : materialParticipation === false ? 'No' : 'Not specified — confirm with preparer');
+  }
+
+  sectionHead('Documentation and Receipt Coverage');
+  const receiptOk = reviewInsights.expenseTransactionCount > 0 && reviewInsights.missingReceiptCount === 0;
+  checkRow(receiptOk, 'Receipts attached to all expense transactions',
+    `${reviewInsights.receiptLinkedCount} of ${reviewInsights.expenseTransactionCount} covered`);
+  checkRow(reviewInsights.uncategorizedCount === 0, 'All transactions categorized',
+    reviewInsights.uncategorizedCount > 0 ? `${reviewInsights.uncategorizedCount} uncategorized` : 'All categorized');
+  checkRow(reviewInsights.unmappedExpenseCount === 0, 'All expense categories mapped to tax line',
+    reviewInsights.unmappedExpenseCount > 0 ? `${reviewInsights.unmappedExpenseCount} expense(s) with unmapped category` : 'All mapped');
+  checkRow(reviewInsights.duplicateCount === 0, 'No duplicate transactions detected',
+    reviewInsights.duplicateCount > 0 ? `${reviewInsights.duplicateCount} possible duplicate(s)` : 'None detected');
+  checkRow(true, 'Personal/transfer items excluded from P&L',
+    `${reviewInsights.excludedCount} item(s) excluded and shown in separate schedule`);
+
+  sectionHead('Deductibility and Allocation');
+  if (reviewInsights.vehicleCount > 0) {
+    checkRow(hasMileageData, isCA ? 'Vehicle — CRA logbook required' : 'Vehicle — mileage log or actual expense doc',
+      `${reviewInsights.vehicleCount} tx, ${formatCurrencyForPdf(reviewInsights.vehicleTotal, currency)}${hasMileageData ? ' — mileage data present' : ' — no mileage log'}`);
+  }
+  if (reviewInsights.mealsCount > 0) {
+    checkRow(false, isCA ? 'Meals — 50% limit, CRA support required' : 'Meals — 50% limit, business purpose required',
+      `${reviewInsights.mealsCount} tx, ${formatCurrencyForPdf(reviewInsights.mealsTotal, currency)}`);
+  }
+  if (reviewInsights.homeOfficeCount > 0) {
+    checkRow(false, isCA ? 'Home office — T2125 Part 7 allocation needed' : 'Home office — Form 8829 allocation needed',
+      `${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)} — sq ft ratio required`);
+  }
+  if (reviewInsights.mixedUseCount > 0) {
+    checkRow(false, 'Mixed-use / split items — personal portion must be excluded',
+      `${reviewInsights.mixedUseCount} item(s) require allocation`);
+  }
+  if (reviewInsights.vehicleCount === 0 && reviewInsights.mealsCount === 0 && reviewInsights.homeOfficeCount === 0 && reviewInsights.mixedUseCount === 0) {
+    checkRow(true, 'No allocation-required categories detected', '');
+  }
+
+  sectionHead('Financial Review');
+  checkRow(!hasNegativeProfit, 'Net profit / loss',
+    `Income ${formatCurrencyForPdf(totals.income, currency)}, Expenses ${formatCurrencyForPdf(totals.expenses, currency)}` +
+    (hasNegativeProfit ? ` — Net loss: review at-risk / passive rules` : ''));
+  checkRow(reviewInsights.negativeExpenseCount === 0, 'No negative expense entries',
+    reviewInsights.negativeExpenseCount > 0 ? `${reviewInsights.negativeExpenseCount} negative expense(s) — verify credits/refunds` : 'None detected');
+  checkRow(reviewInsights.missingDescriptionCount === 0, 'All transactions have descriptions',
+    reviewInsights.missingDescriptionCount > 0 ? `${reviewInsights.missingDescriptionCount} missing description(s)` : 'All present');
+
+  canvas.text(40, 80, '[OK] = Ready for review    [!] = CPA attention required before filing', 8);
+  canvas.text(40, 66, isCA
+    ? 'Confirm province, GST/HST registration, fiscal year, and net-of-GST treatment with preparer before filing T2125.'
+    : 'Confirm NAICS code, material participation, and 1099-NEC reconciliation with preparer before filing Schedule C.', 8);
+
+  return [canvas];
+}
+
 function buildSupportPages(receipts, transactions, mileage, labels, currency, reviewInsights, region) {
   const txMap = mapByKey(transactions, 'id');
   const receiptRows = (receipts || []).map((receipt) => {
@@ -1385,23 +1514,67 @@ function buildSupportPages(receipts, transactions, mileage, labels, currency, re
     y -= 10;
   }
 
-  if (Array.isArray(mileage) && mileage.length) {
-    const totalMiles = mileage.reduce((sum, row) => sum + Math.abs(Number(row.miles) || 0), 0);
-    const totalKm = mileage.reduce((sum, row) => sum + Math.abs(Number(row.km) || 0), 0);
-    const totalDistance = mileage.reduce((sum, row) => {
-      const start = Number(row.odometer_start);
-      const end = Number(row.odometer_end);
-      return Number.isFinite(start) && Number.isFinite(end) ? sum + Math.abs(end - start) : sum;
-    }, 0);
-    const businessPct = totalDistance > 0 ? (totalKm / totalDistance) * 100 : null;
+  const isCA = normalizeRegionCode(region) === 'CA';
 
-    ensureSpace(84);
-    canvas.text(40, y, labels.mileage_summary_title, 12, 'F2');
-    y -= 20;
-    if (totalMiles > 0) { canvas.text(40, y, `Total business miles: ${formatDistance(totalMiles)} mi`, 9); y -= 14; }
-    if (totalKm > 0) { canvas.text(40, y, `Total business kilometers: ${formatDistance(totalKm)} km`, 9); y -= 14; }
-    if (businessPct !== null) { canvas.text(40, y, `Business-use percentage: ${businessPct.toFixed(1)}%`, 9); y -= 14; }
-    canvas.text(40, y, labels.mileage_note_csv, 9);
+  if (reviewInsights.vehicleCount > 0 || (Array.isArray(mileage) && mileage.length)) {
+    ensureSpace(120);
+    canvas.text(40, y, isCA ? 'Motor Vehicle Expenses — T2125 Part 4' : 'Vehicle Expenses — Schedule C Line 9', 12, 'F2');
+    y -= 18;
+
+    if (reviewInsights.vehicleCount > 0) {
+      canvas.text(40, y, `Detected vehicle/fuel transactions: ${reviewInsights.vehicleCount}`, 9);
+      y -= 14;
+      canvas.text(40, y, `Total vehicle expense amount: ${formatCurrencyForPdf(reviewInsights.vehicleTotal, currency)}`, 9);
+      y -= 14;
+    }
+
+    if (Array.isArray(mileage) && mileage.length) {
+      const totalMiles = mileage.reduce((sum, row) => sum + Math.abs(Number(row.miles) || 0), 0);
+      const totalKm = mileage.reduce((sum, row) => sum + Math.abs(Number(row.km) || 0), 0);
+      const totalDistance = mileage.reduce((sum, row) => {
+        const start = Number(row.odometer_start);
+        const end = Number(row.odometer_end);
+        return Number.isFinite(start) && Number.isFinite(end) ? sum + Math.abs(end - start) : sum;
+      }, 0);
+      const businessPct = totalDistance > 0 ? (totalKm / totalDistance) * 100 : null;
+      canvas.text(40, y, labels.mileage_summary_title, 10, 'F2');
+      y -= 14;
+      if (totalMiles > 0) { canvas.text(40, y, `Total business miles: ${formatDistance(totalMiles)} mi`, 9); y -= 14; }
+      if (totalKm > 0) { canvas.text(40, y, `Total business kilometers: ${formatDistance(totalKm)} km`, 9); y -= 14; }
+      if (businessPct !== null) { canvas.text(40, y, `Business-use percentage: ${businessPct.toFixed(1)}%`, 9); y -= 14; }
+      canvas.text(40, y, labels.mileage_note_csv, 9);
+      y -= 14;
+    }
+
+    canvas.text(40, y, isCA
+      ? 'CRA requires a logbook: date, destination, business purpose, and odometer readings for each trip.'
+      : 'IRS requires a contemporaneous mileage log or actual expense records — not both methods in the same year.', 8);
+    y -= 18;
+  }
+
+  if (reviewInsights.homeOfficeCount > 0) {
+    ensureSpace(90);
+    canvas.text(40, y, isCA ? 'Business-Use-of-Home — T2125 Part 7' : 'Home Office Deduction — Form 8829', 12, 'F2');
+    y -= 18;
+    canvas.text(40, y, `Detected home office transactions: ${reviewInsights.homeOfficeCount}`, 9);
+    y -= 14;
+    canvas.text(40, y, `Total home office amount: ${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)}`, 9);
+    y -= 14;
+    canvas.text(40, y, isCA
+      ? 'Allocation: calculate business sq ft / total home sq ft. Deduction limited to net business income before this expense.'
+      : 'Calculate business-use % using sq ft method or other IRS-approved method. Use simplified method or actual expenses (Form 8829).', 8);
+    y -= 18;
+  }
+
+  if (reviewInsights.mealsCount > 0) {
+    ensureSpace(70);
+    canvas.text(40, y, isCA ? 'Meals and Entertainment — T2125 Line 8523' : 'Meals — Schedule C Line 24b', 12, 'F2');
+    y -= 18;
+    canvas.text(40, y, `Detected meal/entertainment transactions: ${reviewInsights.mealsCount}`, 9);
+    y -= 14;
+    canvas.text(40, y, `Total meals amount: ${formatCurrencyForPdf(reviewInsights.mealsTotal, currency)} (50% limit applies — deductible: ${formatCurrencyForPdf(reviewInsights.mealsTotal * 0.5, currency)})`, 9);
+    y -= 14;
+    canvas.text(40, y, 'Document: business purpose, names of attendees, and date for each meal.', 8);
     y -= 18;
   }
 
@@ -1771,6 +1944,7 @@ function buildPdfExport(options) {
     accountingBasis,
     fiscalYearStart = '',
     address = '',
+    entityType = '',
     accountingMethod = '',
     materialParticipation = null,
     gstHstRegistered = false,
@@ -1810,11 +1984,12 @@ function buildPdfExport(options) {
   const excludedTransactions = transactionSummary.excluded;
   const totals = calculateTotals(includedTransactions, region, province);
   const reviewInsights = buildReviewInsights(includedTransactions, categories, receipts, {
-    excludedCount: excludedTransactions.length
+    excludedCount: excludedTransactions.length,
+    region: normalizedRegion
   });
   const isSecure = Boolean(String(taxId || '').trim());
   const categoryEntries = buildCategoryBuckets(includedTransactions, categories, labels, effectiveCurrency, normalizedRegion);
-  const categoryPreviewEntries = categoryEntries.slice(0, 6);
+  const categoryPreviewEntries = categoryEntries.slice(0, 12);
 
   const canvases = [
     buildIdentityPage({
@@ -1831,6 +2006,8 @@ function buildPdfExport(options) {
       reportId: effectiveReportId,
       generatedAt: effectiveGeneratedAt,
       accountingBasis: accountingMethod || accountingBasis,
+      accountingMethod,
+      entityType: entityType || '',
       region: normalizedRegion,
       province,
       fiscalYearStart,
@@ -1850,6 +2027,12 @@ function buildPdfExport(options) {
     ...buildDeductionPages(includedTransactions, effectiveCurrency, labels, normalizedRegion),
     ...buildTransactionPages(includedTransactions, accounts, categories, effectiveCurrency, labels, normalizedRegion),
     ...buildExclusionPages(excludedTransactions, effectiveCurrency, labels),
+    ...buildCpaChecklistPage({
+      labels, region: normalizedRegion, isSecure, naics, entityType: entityType || '',
+      accountingBasis: accountingMethod || accountingBasis, accountingMethod,
+      totals, reviewInsights, currency: effectiveCurrency, legalName, province,
+      materialParticipation, gstHstRegistered, mileage
+    }),
     ...buildSupportPages(receipts, includedTransactions, mileage, labels, effectiveCurrency, reviewInsights, normalizedRegion)
   ];
 

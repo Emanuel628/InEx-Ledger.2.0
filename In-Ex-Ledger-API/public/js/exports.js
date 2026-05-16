@@ -997,6 +997,7 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
       province,
       fiscalYearStart: businessProfile.fiscalYearStart || "",
       address: businessProfile.address || "",
+      entityType: businessProfile.type || "",
       accountingMethod: businessProfile.accountingMethod || "",
       materialParticipation: typeof businessProfile.materialParticipation === "boolean" ? businessProfile.materialParticipation : null,
       gstHstRegistered: businessProfile.gstHstRegistered === true,

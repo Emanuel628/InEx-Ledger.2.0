@@ -397,7 +397,8 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
         pool.query(
           `SELECT name, region, province, operating_name, business_activity_code,
                   fiscal_year_start, address, tax_id, accounting_method,
-                  material_participation, gst_hst_registered, gst_hst_number, gst_hst_method
+                  material_participation, gst_hst_registered, gst_hst_number, gst_hst_method,
+                  business_type
              FROM businesses WHERE id = $1`,
           [businessId]
         )
@@ -429,6 +430,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       businessName: business.name || "",
       legalName: business.name || "",
       operatingName: business.operating_name || "",
+      entityType: business.business_type || "",
       naics: business.business_activity_code || "",
       fiscalYearStart: business.fiscal_year_start || "",
       address: business.address || "",
@@ -659,7 +661,8 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
         pool.query(
           `SELECT name, region, province, operating_name, business_activity_code,
                   fiscal_year_start, address, tax_id, accounting_method,
-                  material_participation, gst_hst_registered, gst_hst_number, gst_hst_method
+                  material_participation, gst_hst_registered, gst_hst_number, gst_hst_method,
+                  business_type
              FROM businesses WHERE id = $1`,
           [businessId]
         )
@@ -705,6 +708,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       businessName: business.name || "",
       legalName: business.name || "",
       operatingName: business.operating_name || "",
+      entityType: business.business_type || "",
       naics: business.business_activity_code || "",
       fiscalYearStart: business.fiscal_year_start || "",
       address: business.address || "",
