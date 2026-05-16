@@ -401,11 +401,16 @@
   font-weight: 700;
   text-decoration: underline;
   cursor: pointer;
+  transition: transform 140ms ease;
 }
 
 .secure-export-show-me-link:hover,
 .secure-export-show-me-link:focus-visible {
-  color: var(--ink);
+  color: var(--accent);
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  transform: scale(1.06);
 }
 
 .secure-export-guide-copy {
