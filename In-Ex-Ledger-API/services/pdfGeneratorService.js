@@ -303,11 +303,27 @@ const T2125_LINE_MAP = {
   education: 'Line 9270 — Other expenses (professional development)',
   training: 'Line 9270 — Other expenses (professional development)',
   other_expenses: 'Line 9270 — Other expenses',
+  other_expense: 'Line 9270 — Other expenses',
   other_income: 'Line 8230 — Other income',
   commission_income: 'Line 8000 — Gross business income',
   contract_labor: 'Line 9270 — Other expenses (subcontractors)',
   commissions: 'Line 9270 — Other expenses (commissions paid)',
   commissions_and_fees: 'Line 9270 — Other expenses (commissions paid)',
+  // Keys matching VALID_CA_TAX_MAPS values
+  delivery_freight: 'Line 9275 — Delivery, freight, and express',
+  interest_bank_charges: 'Line 8710 — Interest and bank charges',
+  legal_accounting: 'Line 8860 — Legal, accounting, and professional fees',
+  business_tax_fees_licenses_memberships: 'Line 8760 — Business taxes, fees, and licences',
+  salaries_wages_benefits: 'Line 9060 — Salaries, wages, and benefits',
+  maintenance_repairs: 'Line 8960 — Repairs and maintenance',
+  motor_vehicle: 'Line 9281 — Motor vehicle expenses',
+  gst_hst_paid: 'Input Tax Credit (ITC) — GST/HST paid on business expenses',
+  gst_hst_collected: 'Line 8000 — Gross business income (GST/HST collected)',
+  subsidies_grants: 'Line 8230 — Other income (subsidies/grants)',
+  t4a_20: 'T4A Box 20 — Self-employment income',
+  t4a_28: 'T4A Box 28 — Other income',
+  cash_income: 'Line 8000 — Gross business income',
+  sales: 'Line 8000 — Gross business income',
 };
 
 function normalizeRegionCode(region) {
@@ -537,6 +553,9 @@ function normalizeTaxLineText(value, region) {
   const text = String(value || '').trim();
   if (!text) return normalizeRegionCode(region) === 'CA' ? 'Unmapped T2125 line' : 'Unmapped Schedule C line';
   if (/^(Line\s+\d|T\d{4}|8\d{3}|9\d{3})/i.test(text)) return text;
+  // Handle legacy ca_XXXX / t2125_XXXX stored values — strip prefix, treat as line number
+  const legacyMatch = text.match(/^(?:ca|t2125)_(\d+)$/i);
+  if (legacyMatch) return `Line ${legacyMatch[1]}`;
   const slugKey = text.toLowerCase().replace(/[-\s]+/g, '_');
   const map = normalizeRegionCode(region) === 'CA' ? T2125_LINE_MAP : SCHEDULE_C_LINE_MAP;
   return map[slugKey] || map[text.toLowerCase()] || text;
@@ -972,7 +991,7 @@ function buildIdentityPage(data) {
     [isSecure ? labels.tax_id : labels.tax_id_redacted, isSecure ? safeValue(taxId) : labels.tax_id_withheld],
     [labels.business_activity_code, safeValue(naics)],
     [labels.jurisdiction, formatJurisdiction(region, province)],
-    [labels.address, safeValue(address)],
+    ...(isSecure ? [[labels.address, safeValue(address)]] : []),
     ...(String(fiscalYearStart || '').trim() ? [[labels.fiscal_year_start, fiscalYearStart]] : [])
   ]);
 
