@@ -454,9 +454,9 @@ function maybeLoadOnboardingRuntime(profile = {}) {
     document.head.appendChild(link);
   }
 
-  if (!document.querySelector('script[data-onboarding-runtime="true"]')) {
+  if (!document.querySelector('script[src*="onboarding.js"]')) {
     const script = document.createElement("script");
-    script.src = "/js/onboarding.js?v=20260510a";
+    script.src = "/js/onboarding.js?v=20260514a";
     script.dataset.onboardingRuntime = "true";
     document.body.appendChild(script);
   }
