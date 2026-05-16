@@ -610,8 +610,8 @@ function isMealsLike(categoryName, taxMapping, text) {
 }
 
 function isVehicleLike(categoryName, taxMapping, text) {
-  // Restrict to category/tax-mapping only — "repair" or "insurance" appear in non-vehicle contexts
-  return /(vehicle|auto|mileage|motor_vehicle|car_truck|car[_ ]truck|fuel[_ ]gas)/i.test(`${categoryName} ${taxMapping}`);
+  // Include standalone fuel/gas so "Fuel & Gas" category is detected alongside compound slugs
+  return /(vehicle|auto|mileage|motor_vehicle|car_truck|car[_ ]truck|fuel[_ ]gas|\bfuel\b|\bgas\b)/i.test(`${categoryName} ${taxMapping}`);
 }
 
 function isTravelLike(categoryName, taxMapping, text) {

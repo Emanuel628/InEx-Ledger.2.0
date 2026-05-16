@@ -11,6 +11,7 @@ const SCHEDULE_C_LINE_MAP = {
   advertising: 'Line 8 — Advertising',
   marketing: 'Line 8 — Advertising',
   car_and_truck: 'Line 9 — Car and truck expenses',
+  car_truck: 'Line 9 — Car and truck expenses',
   vehicle: 'Line 9 — Car and truck expenses',
   auto: 'Line 9 — Car and truck expenses',
   fuel: 'Line 9 — Car and truck expenses',
@@ -18,15 +19,19 @@ const SCHEDULE_C_LINE_MAP = {
   mileage: 'Line 9 — Car and truck expenses',
   commissions: 'Line 10 — Commissions and fees',
   commissions_and_fees: 'Line 10 — Commissions and fees',
+  commissions_fees: 'Line 10 — Commissions and fees',
   contract_labor: 'Line 11 — Contract labor',
   depletion: 'Line 12 — Depletion',
   depreciation: 'Line 13 — Depreciation and section 179',
+  depreciation_section179: 'Line 13 — Depreciation and section 179',
   employee_benefits: 'Line 14 — Employee benefit programs',
   employee_benefit_programs: 'Line 14 — Employee benefit programs',
   insurance: 'Line 15 — Insurance (other than health)',
   insurance_other_than_health: 'Line 15 — Insurance (other than health)',
   mortgage_interest: 'Line 16a — Mortgage interest',
+  interest_mortgage: 'Line 16a — Mortgage interest',
   other_interest: 'Line 16b — Other interest',
+  interest_other: 'Line 16b — Other interest',
   interest: 'Line 16b — Other interest',
   bank_interest: 'Line 16b — Other interest',
   legal_professional: 'Line 17 — Legal and professional services',
@@ -67,6 +72,12 @@ const SCHEDULE_C_LINE_MAP = {
   education: 'Line 27a/Part V — Other expenses (education/training)',
   training: 'Line 27a/Part V — Other expenses (education/training)',
   other_expenses: 'Line 27a/Part V — Other expenses',
+  other_expense: 'Line 27a/Part V — Other expenses',
+  nonemployee_compensation: 'Line 1 — Gross receipts (1099-NEC income)',
+  payment_card_income: 'Line 1 — Gross receipts (1099-K / payment card)',
+  misc_income: 'Line 6 — Other income',
+  interest_income: 'Line 6 — Other income (interest)',
+  cash_unreported_income: 'Line 1 — Gross receipts (cash income)',
 };
 
 const T2125_LINE_MAP = {
@@ -140,6 +151,21 @@ const T2125_LINE_MAP = {
   contract_labor: 'Line 9270 — Other expenses (subcontractors)',
   commissions: 'Line 9270 — Other expenses (commissions paid)',
   commissions_and_fees: 'Line 9270 — Other expenses (commissions paid)',
+  other_expense: 'Line 9270 — Other expenses',
+  other_income: 'Line 8230 — Other income',
+  delivery_freight: 'Line 9275 — Delivery, freight, and express',
+  interest_bank_charges: 'Line 8710 — Interest and bank charges',
+  legal_accounting: 'Line 8860 — Legal, accounting, and professional fees',
+  business_tax_fees_licenses_memberships: 'Line 8760 — Business taxes, fees, and licences',
+  salaries_wages_benefits: 'Line 9060 — Salaries, wages, and benefits',
+  maintenance_repairs: 'Line 8960 — Repairs and maintenance',
+  motor_vehicle: 'Line 9281 — Motor vehicle expenses',
+  gst_hst_paid: 'Input Tax Credit (ITC) — GST/HST paid on business expenses',
+  gst_hst_collected: 'Line 8000 — Gross business income (GST/HST collected)',
+  subsidies_grants: 'Line 8230 — Other income (subsidies/grants)',
+  t4a_20: 'T4A Box 20 — Self-employment income',
+  t4a_28: 'T4A Box 28 — Other income',
+  cash_income: 'Line 8000 — Gross business income',
 };
 
 class PdfCanvas {
@@ -249,6 +275,9 @@ function classifyExcludedTransaction(txn, category) {
   }
   if (/(payment to chase|chase credit crd|chase crd|citi\s*card\s*online|capital one\s*mobile\s*pmt|capital one\s*online\s*pmt|amazon corp syf pay|synchrony bank|affirm\s*\*?\s*pay|klarna|valley bank bill pay|elan financial|discover e-?payment|autopay payment|online payment thank you|amex\s*autopay|bank of america\s*online|discover\s*card\s*pay|barclaycard|credit\s*card\s*autopay|minimum payment|statement balance)/i.test(text)) {
     return 'Credit card payment — not deductible (deduct the underlying card charges instead)';
+  }
+  if (/^(payroll|wages?|salary|w-?2|employee\s+wages?)\b/i.test(categoryName)) {
+    return 'Payroll / wage deposit';
   }
   if (/\bpayro\b|payroll|w-2\b|salary deposit|employer deposit/i.test(text)) {
     return 'Payroll / wage deposit';
@@ -433,6 +462,19 @@ function getTransactionFlags(txn, category, region = 'us') {
   return Array.from(new Set(flags));
 }
 
+const FLAG_CODE_MAP = {
+  'Uncategorized': 'UC',
+  'Needs category': 'NC',
+  'Missing description': 'MD',
+  'Negative expense': 'NE',
+  'Mixed-use': 'MU',
+  'Indirect tax': 'IX',
+  'FX': 'FX',
+  'Needs tax mapping': 'TM',
+  'Special category': 'SC'
+};
+const FLAG_CODE_LEGEND = 'Flags: UC=Uncategorized  NC=Needs cat  TM=No tax map  MD=No desc  SC=Meals/auto/home  MU=Mixed-use';
+
 function normalizeDuplicateKey(txn) {
   const description = String(txn.description || txn.note || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const amount = Math.abs(Number(txn.amount) || 0).toFixed(2);
@@ -460,7 +502,12 @@ function buildReviewInsights(transactions, categories, excluded = [], region = '
     exclusionReasonBreakdown[reason] = (exclusionReasonBreakdown[reason] || 0) + 1;
   });
 
-  const samples = [];
+  const FLAG_SEVERITY = {
+    'Uncategorized': 0, 'Needs category': 1, 'Needs tax mapping': 2,
+    'Negative expense': 3, 'Missing description': 4, 'Mixed-use': 5,
+    'Indirect tax': 6, 'FX': 7, 'Special category': 8
+  };
+  const allFlagged = [];
   let uncategorizedCount = 0;
   let needsCategoryCount = 0;
   let missingDescriptionCount = 0;
@@ -494,13 +541,10 @@ function buildReviewInsights(transactions, categories, excluded = [], region = '
     if (isExpense && Number(txn.amount) < 0) negativeExpenseCount += 1;
     if (flags.includes('Mixed-use')) mixedUseCount += 1;
     if (flags.includes('Special category')) specialCategoryCount += 1;
-    if (flags.length) reviewFlagCount += 1;
-    if (flags.length && samples.length < 6) {
-      samples.push({
-        reason: flags.join(', '),
-        description: truncateText(buildTransactionText(txn) || '(No description)', 36),
-        amount
-      });
+    if (flags.length) {
+      reviewFlagCount += 1;
+      const topSeverity = Math.min(...flags.map((f) => FLAG_SEVERITY[f] ?? 99));
+      allFlagged.push({ severity: topSeverity, amount, flags, description: buildTransactionText(txn) || '(No description)' });
     }
 
     if (isExpense) {
@@ -520,6 +564,13 @@ function buildReviewInsights(transactions, categories, excluded = [], region = '
       }
     }
   });
+
+  allFlagged.sort((a, b) => a.severity !== b.severity ? a.severity - b.severity : b.amount - a.amount);
+  const samples = allFlagged.slice(0, 6).map((item) => ({
+    reason: item.flags.join(', '),
+    description: truncateText(item.description, 36),
+    amount: item.amount
+  }));
 
   return {
     transactionCount: (transactions || []).length,
@@ -612,7 +663,7 @@ function buildIdentityPage(data) {
   const {
     labels, totals, currency, legalName, operatingName, taxId, naics, businessName,
     startDate, endDate, reportId, generatedAt, accountingBasis, accountingMethod,
-    region, province, reviewInsights, isSecure, categoryPreviewEntries = [],
+    region, province, reviewInsights, isSecure,
     address = '', fiscalYearStart = '', entityType = '', materialParticipation = null,
     gstHstRegistered = false, gstHstNumber = ''
   } = data;
@@ -638,7 +689,7 @@ function buildIdentityPage(data) {
     [labels.jurisdiction, formatJurisdiction(region, province)],
   ];
   if (hasValue(operatingName)) entityRows.splice(1, 0, [labels.business_name, operatingName]);
-  if (hasValue(address)) entityRows.push(['Business address', address]);
+  if (isSecure && hasValue(address)) entityRows.push(['Business address', address]);
   if (isCA && hasValue(fiscalYearStart)) entityRows.push(['Fiscal year start', fiscalYearStart]);
   if (isCA && gstHstRegistered) entityRows.push(['GST/HST registered', gstHstNumber ? `Yes — ${gstHstNumber}` : 'Yes']);
 
@@ -688,22 +739,6 @@ function buildIdentityPage(data) {
     [labels.receipt_coverage, reviewInsights.receiptCoverageText],
     ['Excluded non-business items', String(reviewInsights.excludedCount || 0)]
   ]);
-
-  if (categoryPreviewEntries.length) {
-    canvas.text(40, 380, labels.category_breakdown_title, 12, 'F2');
-    canvas.text(40, 358, labels.col_category, 9, 'F2');
-    canvas.text(220, 358, labels.col_tax_mapping, 9, 'F2');
-    canvas.text(470, 358, labels.col_amount, 9, 'F2');
-    canvas.text(540, 358, labels.col_review_status, 9, 'F2');
-    let categoryY = 338;
-    categoryPreviewEntries.forEach((row) => {
-      canvas.text(40, categoryY, truncateText(row.categoryName, 28), 8);
-      canvas.text(220, categoryY, truncateText(row.taxMapping, 40), 8);
-      canvas.text(470, categoryY, row.amount, 8);
-      canvas.text(540, categoryY, row.reviewStatus, 8);
-      categoryY -= 14;
-    });
-  }
 
   return canvas;
 }
@@ -797,7 +832,7 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
       categoryName: truncateText(safeValue(category?.name, 'Uncategorized'), 22),
       taxMapping: shortenTaxLine(taxMapRaw),
       amountStr: (isIncome ? '+' : '') + formatCurrencyForPdf(amount, currency),
-      flagStr: flags.length ? truncateText(flags.join(', '), 16) : labels.review_ok,
+      flagStr: flags.length ? flags.map((f) => FLAG_CODE_MAP[f] || f.slice(0, 2).toUpperCase()).join(' ') : labels.review_ok,
       note: noteParts.length ? noteParts.join(' | ') : null
     });
   });
@@ -818,8 +853,9 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
     c.text(368, 732, 'Tax line', 9, 'F2');
     c.text(482, 732, labels.col_amount, 9, 'F2');
     c.text(538, 732, labels.col_flag, 9, 'F2');
+    c.text(40, 720, FLAG_CODE_LEGEND, 6);
     canvasObj = c;
-    y = 708;
+    y = 706;
   };
 
   startNewPage();
@@ -962,12 +998,13 @@ function buildCpaChecklistPage(opts) {
   const receiptOk = reviewInsights.expenseTransactionCount > 0 && reviewInsights.missingReceiptCount === 0;
   checkRow(receiptOk, 'Receipts attached to all expense transactions',
     `${reviewInsights.receiptLinkedCount} of ${reviewInsights.expenseTransactionCount} covered`);
-  checkRow(reviewInsights.uncategorizedCount === 0, 'All transactions categorized',
-    reviewInsights.uncategorizedCount > 0 ? `${reviewInsights.uncategorizedCount} uncategorized` : 'All categorized');
-  checkRow((reviewInsights.needsCategoryCount || 0) === 0, 'No imported categories needing reassignment',
-    (reviewInsights.needsCategoryCount || 0) > 0 ? `${reviewInsights.needsCategoryCount} transaction(s) in Imported Expense/Income — assign a real category` : 'None detected');
-  checkRow(reviewInsights.unmappedExpenseCount === 0, 'All expense categories mapped to tax line',
-    reviewInsights.unmappedExpenseCount > 0 ? `${reviewInsights.unmappedExpenseCount} expense transaction(s) with unmapped category` : 'All mapped');
+  const allCategorized = reviewInsights.uncategorizedCount === 0 && (reviewInsights.needsCategoryCount || 0) === 0;
+  checkRow(allCategorized, 'All transactions categorized',
+    reviewInsights.uncategorizedCount > 0 ? `${reviewInsights.uncategorizedCount} uncategorized — assign a category` :
+    (reviewInsights.needsCategoryCount || 0) > 0 ? `${reviewInsights.needsCategoryCount} imported — replace Imported Expense/Income with a real category` :
+    'All categorized');
+  checkRow(reviewInsights.unmappedExpenseCount === 0 && (reviewInsights.unmappedTaxCount || 0) === 0, 'All categories mapped to tax line',
+    (reviewInsights.unmappedTaxCount || 0) > 0 ? `${reviewInsights.unmappedTaxCount} transaction(s) missing tax-line mapping` : 'All mapped');
   checkRow(reviewInsights.duplicateCount === 0, 'No duplicate transactions detected',
     reviewInsights.duplicateCount > 0 ? `${reviewInsights.duplicateCount} possible duplicate(s)` : 'None detected');
   checkRow(true, 'Personal/transfer items excluded from P&L',
@@ -1314,8 +1351,9 @@ function buildPdfExport(options) {
 
   const totals = calculateTotals(included);
   const reviewInsights = buildReviewInsights(included, categories, excluded, region);
-  const categoryEntries = buildCategoryBuckets(included, categories, labels, currency, region);
-  const categoryPreviewEntries = categoryEntries.slice(0, 12);
+
+  // Normalize multiline address (newlines → commas) to prevent PDF rendering artifacts
+  const normalizedAddress = String(address || '').replace(/\r?\n+/g, ', ').replace(/,\s*,/g, ',').replace(/,\s*$/, '').trim();
 
   const sharedIdentityData = {
     labels,
@@ -1336,8 +1374,7 @@ function buildPdfExport(options) {
     province,
     reviewInsights,
     isSecure,
-    categoryPreviewEntries,
-    address,
+    address: normalizedAddress,
     fiscalYearStart,
     entityType,
     materialParticipation,
@@ -1347,7 +1384,7 @@ function buildPdfExport(options) {
 
   const canvases = [
     buildIdentityPage(sharedIdentityData),
-    ...buildCategoryPages(included, categories, currency, labels, region, categoryPreviewEntries.length),
+    ...buildCategoryPages(included, categories, currency, labels, region),
     ...buildTransactionPages(included, accounts, categories, currency, labels, region),
     ...buildExclusionPages(excluded, currency, labels),
     ...buildCpaChecklistPage({
