@@ -5,7 +5,7 @@
   <title>InEx Ledger - Exports</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="/css/app.css?v=20260510c" />
-  <link rel="stylesheet" href="/css/pages/exports.css?v=20260510f" />
+  <link rel="stylesheet" href="/css/pages/exports.css?v=20260516a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -186,6 +186,10 @@
               <span data-i18n="secure_export_modal_checkbox_label">I certify I am authorized to provide this taxpayer identification for this export and I have read and agree to the acknowledgment above.</span>
             </label>
             <p id="exportInlineTaxIdError" class="secure-export-error hidden" role="alert" aria-live="polite"></p>
+            <div id="exportInlineTaxIdGuide" class="secure-export-guide hidden">
+              <button type="button" id="exportProfileShowMeBtn" class="secure-export-show-me-link">Show me</button>
+              <span id="exportProfileShowMeText" class="secure-export-guide-copy">We will take you straight to the missing business profile fields and highlight them.</span>
+            </div>
           </div>
 
           <div class="summary-panel" id="exportSummaryPanel">
@@ -255,7 +259,7 @@
   <script src="../js/jwe-utils.js?v=20260502e"></script>
   <script src="../js/pdf_labels.js?v=20260502e"></script>
   <script src="../js/pdf_export.js?v=20260507a"></script>
-  <script src="../js/exports.js?v=20260514a"></script>
+  <script src="../js/exports.js?v=20260516a"></script>
 </body>
 </html>
 

@@ -380,6 +380,39 @@
   font-size: 12px;
 }
 
+.secure-export-guide {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.secure-export-guide.hidden {
+  display: none;
+}
+
+.secure-export-show-me-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.secure-export-show-me-link:hover,
+.secure-export-show-me-link:focus-visible {
+  color: var(--ink);
+}
+
+.secure-export-guide-copy {
+  font-size: 11.5px;
+  color: var(--ink3);
+}
+
 .secure-export-error.hidden,
 .secure-export-canada-text.hidden {
   display: none;

@@ -107,13 +107,16 @@ test("computeTaxLineSummary picks tax_map_us or tax_map_ca based on region and s
 });
 
 test("validateExportProfile blocks incomplete US and Canada workpapers", () => {
-  assert.throws(
-    () => validateExportProfile({ region: "US", legalName: "Acme", naics: "541611", address: "123 Main", accountingMethod: "cash" }),
-    /Material participation/
-  );
+  try {
+    validateExportProfile({ region: "US", legalName: "Acme", naics: "541611", address: "123 Main", accountingMethod: "cash" });
+    assert.fail("Expected incomplete US profile to throw");
+  } catch (error) {
+    assert.match(String(error?.message || ""), /Material participation/);
+    assert.deepEqual(error?.missingFieldKeys, ["tax_id", "material_participation"]);
+  }
 
-  assert.throws(
-    () => validateExportProfile({
+  try {
+    validateExportProfile({
       region: "CA",
       legalName: "Maple Co",
       taxId: "123456789",
@@ -123,9 +126,12 @@ test("validateExportProfile blocks incomplete US and Canada workpapers", () => {
       province: "QC",
       fiscalYearStart: "01-01",
       gstHstRegistered: true
-    }),
-    /GST\/HST registration number/
-  );
+    });
+    assert.fail("Expected incomplete CA profile to throw");
+  } catch (error) {
+    assert.match(String(error?.message || ""), /GST\/HST registration number/);
+    assert.deepEqual(error?.missingFieldKeys, ["gst_hst_number", "gst_hst_method"]);
+  }
 });
 
 test("summarizeExportTransactions excludes transfer and payroll rows from business totals", () => {

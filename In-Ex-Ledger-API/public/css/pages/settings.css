@@ -1208,6 +1208,33 @@ body {
   max-width: 420px;
 }
 
+.settings-export-guide-note {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  max-width: none;
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  background: rgba(37, 99, 168, 0.08);
+  color: var(--ink2);
+}
+
+.settings-export-guide-note.hidden {
+  display: none;
+}
+
+.form-field.is-export-profile-missing label,
+.form-field.is-export-profile-missing .checkbox-inline span {
+  color: var(--red);
+}
+
+.form-field.is-export-profile-missing input,
+.form-field.is-export-profile-missing select,
+input.is-export-profile-missing,
+select.is-export-profile-missing {
+  border-color: rgba(220, 38, 38, 0.72);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
 .settings-save-bar {
   position: fixed;
   left: 0;

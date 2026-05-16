@@ -72,6 +72,18 @@ const SETTINGS_BUSINESS_TYPE_KEYS = {
   partnership: "settings_business_type_partnership",
   corporation: "settings_business_type_corporation"
 };
+const EXPORT_PROFILE_GUIDE_QUERY_KEY = "export_profile_missing";
+const EXPORT_PROFILE_GUIDE_FIELD_IDS = {
+  legal_name: ["business-name"],
+  business_activity_code: ["business-activity-code"],
+  address: ["address-line1", "address-city", "address-state", "address-postal", "address-country"],
+  accounting_method: ["accounting-method"],
+  material_participation: ["material-participation"],
+  province: ["address-state"],
+  fiscal_year_start: ["fiscal-year"],
+  gst_hst_number: ["gst-hst-number"],
+  gst_hst_method: ["gst-hst-method"]
+};
 
 let privacySettings = {
   dataSharingOptOut: null,
@@ -100,6 +112,7 @@ let settingsOverviewState = {
 let settingsBusinessesState = [];
 let settingsSubscriptionState = null;
 let settingsPricingState = null;
+let activeExportProfileGuideKeys = [];
 
 function isCpaUiEnabled() {
   return window.__LUNA_FLAGS__?.cpaUiEnabled === true;
@@ -163,6 +176,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     initSettingsNav();
     initSettingsTabs();
     await initBusinessProfileForm();
+    applyExportProfileGuideFromQuery();
     await initAccountingLockPanel();
     await initAccountSettings();
     if (isCpaUiEnabled()) {
@@ -182,20 +196,38 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
+function normalizeExportProfileGuideKeys(rawValue) {
+  return Array.from(new Set(
+    String(rawValue || "")
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter((value) => /^[a-z_]+$/.test(value))
+  ));
+}
+
+function setSettingsPanelCollapsed(panel, collapsed) {
+  if (!panel) {
+    return;
+  }
+  panel.classList.toggle("is-collapsed", collapsed);
+  const toggle = panel.querySelector("[data-settings-panel-toggle]");
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    toggle.textContent = collapsed ? "Expand" : "Collapse";
+  }
+}
+
+function setActiveSettingsNavTarget(targetId) {
+  document.querySelectorAll("[data-settings-nav-item]").forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.settingsTarget === targetId);
+  });
+}
+
 function initCollapsibleSettingsPanels() {
   const panels = Array.from(document.querySelectorAll("[data-collapsible-panel]"));
   if (!panels.length) {
     return;
   }
-
-  const setCollapsed = (panel, collapsed) => {
-    panel.classList.toggle("is-collapsed", collapsed);
-    const toggle = panel.querySelector("[data-settings-panel-toggle]");
-    if (toggle) {
-      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
-      toggle.textContent = collapsed ? "Expand" : "Collapse";
-    }
-  };
 
   panels.forEach((panel) => {
     const toggle = panel.querySelector("[data-settings-panel-toggle]");
@@ -203,9 +235,9 @@ function initCollapsibleSettingsPanels() {
       return;
     }
 
-    setCollapsed(panel, panel.dataset.collapsedDefault === "true");
+    setSettingsPanelCollapsed(panel, panel.dataset.collapsedDefault === "true");
     toggle.addEventListener("click", () => {
-      setCollapsed(panel, !panel.classList.contains("is-collapsed"));
+      setSettingsPanelCollapsed(panel, !panel.classList.contains("is-collapsed"));
     });
   });
 }
@@ -2548,9 +2580,7 @@ function initSettingsNav() {
     .filter((entry) => entry.target);
 
   const setActiveTarget = (targetId) => {
-    navButtons.forEach((button) => {
-      button.classList.toggle("is-active", button.dataset.settingsTarget === targetId);
-    });
+    setActiveSettingsNavTarget(targetId);
   };
 
   targets.forEach(({ button, target }) => {
@@ -2578,6 +2608,81 @@ function initSettingsNav() {
 
     targets.forEach(({ target }) => observer.observe(target));
   }
+}
+
+function clearExportProfileGuide() {
+  activeExportProfileGuideKeys.forEach((key) => {
+    const ids = EXPORT_PROFILE_GUIDE_FIELD_IDS[key] || [];
+    ids.forEach((id) => {
+      const field = document.getElementById(id);
+      if (!field) {
+        return;
+      }
+      field.classList.remove("is-export-profile-missing");
+      field.closest(".form-field")?.classList.remove("is-export-profile-missing");
+    });
+  });
+  activeExportProfileGuideKeys = [];
+  document.getElementById("exportProfileGuideNote")?.classList.add("hidden");
+}
+
+function attachExportProfileGuideListeners(field) {
+  if (!field || field.dataset.exportGuideBound === "true") {
+    return;
+  }
+  const clearField = () => {
+    field.classList.remove("is-export-profile-missing");
+    field.closest(".form-field")?.classList.remove("is-export-profile-missing");
+    if (!document.querySelector(".is-export-profile-missing")) {
+      document.getElementById("exportProfileGuideNote")?.classList.add("hidden");
+    }
+  };
+  field.addEventListener("input", clearField);
+  field.addEventListener("change", clearField);
+  field.dataset.exportGuideBound = "true";
+}
+
+function applyExportProfileGuideFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const keys = normalizeExportProfileGuideKeys(params.get(EXPORT_PROFILE_GUIDE_QUERY_KEY));
+  if (!keys.length) {
+    return;
+  }
+
+  clearExportProfileGuide();
+  activeExportProfileGuideKeys = keys;
+
+  const panel = document.getElementById("settings-business");
+  setSettingsPanelCollapsed(panel, false);
+  setActiveSettingsNavTarget("settings-business");
+
+  const note = document.getElementById("exportProfileGuideNote");
+  note?.classList.remove("hidden");
+
+  const fields = keys.flatMap((key) => (EXPORT_PROFILE_GUIDE_FIELD_IDS[key] || []))
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+
+  fields.forEach((field) => {
+    field.classList.add("is-export-profile-missing");
+    field.closest(".form-field")?.classList.add("is-export-profile-missing");
+    attachExportProfileGuideListeners(field);
+  });
+
+  const firstField = fields[0];
+  if (firstField) {
+    panel?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => {
+      firstField.focus({ preventScroll: true });
+      firstField.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+  }
+
+  params.delete(EXPORT_PROFILE_GUIDE_QUERY_KEY);
+  params.delete("export_profile_source");
+  const nextQuery = params.toString();
+  const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash || ""}`;
+  window.history.replaceState({}, "", nextUrl);
 }
 
 function getPasswordScore(password) {

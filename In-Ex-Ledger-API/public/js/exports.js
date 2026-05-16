@@ -31,6 +31,60 @@ let exportState = {
   mileage: [],
   businessProfile: {}
 };
+const EXPORT_PROFILE_MISSING_QUERY_KEY = "export_profile_missing";
+
+function normalizeMissingFieldKeys(values) {
+  const source = Array.isArray(values) ? values : [values];
+  return Array.from(new Set(
+    source
+      .flatMap((value) => String(value || "").split(","))
+      .map((value) => value.trim().toLowerCase())
+      .filter((value) => /^[a-z_]+$/.test(value))
+  ));
+}
+
+function buildExportProfileGuideUrl(missingFieldKeys) {
+  const keys = normalizeMissingFieldKeys(missingFieldKeys);
+  if (!keys.length) {
+    return "settings";
+  }
+  const params = new URLSearchParams();
+  params.set(EXPORT_PROFILE_MISSING_QUERY_KEY, keys.join(","));
+  params.set("export_profile_source", "exports");
+  return `settings?${params.toString()}`;
+}
+
+function hideExportProfileGuide() {
+  const guide = document.getElementById("exportInlineTaxIdGuide");
+  const button = document.getElementById("exportProfileShowMeBtn");
+  if (button) {
+    button.onclick = null;
+  }
+  if (guide) {
+    guide.classList.add("hidden");
+  }
+}
+
+function showSecureExportInlineError(message, missingFieldKeys = []) {
+  const errorEl = document.getElementById("exportInlineTaxIdError");
+  if (errorEl) {
+    errorEl.textContent = String(message || "");
+    errorEl.classList.toggle("hidden", !message);
+  }
+
+  const keys = normalizeMissingFieldKeys(missingFieldKeys);
+  const guide = document.getElementById("exportInlineTaxIdGuide");
+  const button = document.getElementById("exportProfileShowMeBtn");
+  if (!guide || !button || !keys.length) {
+    hideExportProfileGuide();
+    return;
+  }
+
+  button.onclick = () => {
+    window.location.href = buildExportProfileGuideUrl(keys);
+  };
+  guide.classList.remove("hidden");
+}
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
@@ -284,6 +338,7 @@ function syncExportScopeUi() {
       taxIdCheckbox.checked = false;
       if (inlineTaxId) {
         inlineTaxId.hidden = true;
+        hideExportProfileGuide();
         const inp = document.getElementById("exportInlineTaxIdInput");
         if (inp) inp.value = "";
         const cb = document.getElementById("exportInlineTaxIdCheckbox");
@@ -565,27 +620,20 @@ function setupPdfButton() {
     if (includeTaxId) {
       const taxIdInput = document.getElementById("exportInlineTaxIdInput");
       const agreementCheckbox = document.getElementById("exportInlineTaxIdCheckbox");
-      const errorEl = document.getElementById("exportInlineTaxIdError");
-      const setError = (msg) => {
-        if (errorEl) { errorEl.textContent = msg; errorEl.classList.remove("hidden"); }
-      };
-      const clearError = () => {
-        if (errorEl) { errorEl.textContent = ""; errorEl.classList.add("hidden"); }
-      };
-      clearError();
+      showSecureExportInlineError("");
       const taxId = taxIdInput?.value?.trim() || "";
       if (!taxId) {
-        setError(tx("secure_export_modal_error_taxid"));
+        showSecureExportInlineError(tx("secure_export_modal_error_taxid"));
         taxIdInput?.focus();
         return;
       }
       if (!isValidTaxId(taxId)) {
-        setError(tx("secure_export_modal_error_taxid_format"));
+        showSecureExportInlineError(tx("secure_export_modal_error_taxid_format"));
         taxIdInput?.focus();
         return;
       }
       if (!agreementCheckbox?.checked) {
-        setError(tx("secure_export_modal_error_checkbox"));
+        showSecureExportInlineError(tx("secure_export_modal_error_checkbox"));
         return;
       }
       button.disabled = true;
@@ -598,7 +646,10 @@ function setupPdfButton() {
         }
       } catch (err) {
         if (taxIdInput) taxIdInput.value = "";
-        setError(err?.message || tx("secure_export_modal_error_generic"));
+        showSecureExportInlineError(
+          err?.message || tx("secure_export_modal_error_generic"),
+          err?.missingFieldKeys || []
+        );
       } finally {
         syncPdfState();
       }
@@ -710,6 +761,7 @@ function wireInlineTaxId() {
       errorEl.textContent = "";
       errorEl.classList.add("hidden");
     }
+    hideExportProfileGuide();
     if (hideSection) {
       section.hidden = true;
       checkbox.checked = false;
@@ -1753,13 +1805,19 @@ async function submitSecureExport(taxId, startDate, endDate) {
 
   if (!response || !response.ok) {
     let errorMessage = tx("secure_export_modal_error_generic");
+    let missingFieldKeys = [];
     try {
       const payload = await response.json();
       if (payload?.error && typeof payload.error === "string") {
         errorMessage = payload.error;
       }
+      if (Array.isArray(payload?.missingFieldKeys)) {
+        missingFieldKeys = normalizeMissingFieldKeys(payload.missingFieldKeys);
+      }
     } catch {}
-    throw new Error(errorMessage);
+    const error = new Error(errorMessage);
+    error.missingFieldKeys = missingFieldKeys;
+    throw error;
   }
 
   const blob = await response.blob();

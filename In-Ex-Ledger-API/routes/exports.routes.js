@@ -483,7 +483,8 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     if (err?.status) {
       return res.status(err.status).json({
         error: err.message,
-        missingFields: Array.isArray(err.missingFields) ? err.missingFields : undefined
+        missingFields: Array.isArray(err.missingFields) ? err.missingFields : undefined,
+        missingFieldKeys: Array.isArray(err.missingFieldKeys) ? err.missingFieldKeys : undefined
       });
     }
     logError("Export generation error", { body: sanitizedBody, err: err.message });
@@ -758,7 +759,8 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     if (err?.status) {
       return res.status(err.status).json({
         error: err.message,
-        missingFields: Array.isArray(err.missingFields) ? err.missingFields : undefined
+        missingFields: Array.isArray(err.missingFields) ? err.missingFields : undefined,
+        missingFieldKeys: Array.isArray(err.missingFieldKeys) ? err.missingFieldKeys : undefined
       });
     }
     logError("Secure export error", { body: sanitizedBody, err: err.message });
