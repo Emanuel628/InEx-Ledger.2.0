@@ -1,5 +1,9 @@
 const SCHEDULE_C_LINE_MAP = {
   gross_receipts: 'Line 1 — Gross receipts or sales',
+  gross_receipts_sales: 'Line 1 — Gross receipts or sales',
+  sales: 'Line 1 — Gross receipts or sales',
+  sales_revenue: 'Line 1 — Gross receipts or sales',
+  revenue: 'Line 1 — Gross receipts or sales',
   business_income: 'Line 1 — Gross receipts or sales',
   returns_allowances: 'Line 2 — Returns and allowances',
   cost_of_goods_sold: 'Line 4 — Cost of goods sold',
@@ -175,11 +179,20 @@ function pdfLiteral(text) {
 function normalizeTaxLineText(value, region) {
   const text = String(value || '').trim();
   const isCA = String(region || '').toUpperCase() === 'CA';
-  if (!text) return isCA ? 'Unmapped T2125 line' : 'Unmapped Schedule C line';
+  if (!text) return isCA ? 'Unmapped T2125' : 'Unmapped Sch C';
   if (/^(Line\s+\d|T\d{4}|8\d{3}|9\d{3})/i.test(text)) return text;
   const slugKey = text.toLowerCase().replace(/[-\s]+/g, '_');
   const map = isCA ? T2125_LINE_MAP : SCHEDULE_C_LINE_MAP;
   return map[slugKey] || map[text.toLowerCase()] || text;
+}
+
+function shortenTaxLine(text) {
+  if (!text) return text;
+  // "Unmapped Schedule C line" / "Unmapped T2125 line" → compact form
+  if (/^Unmapped\b/i.test(text)) return 'Unmapped';
+  // "Line 27a/Part V — Other expenses (software subscriptions)" → "Ln 27a Other (software...)"
+  // Keep "Line X — Description" truncated cleanly
+  return text;
 }
 
 function buildTransactionText(txn) {
@@ -213,7 +226,7 @@ function classifyExcludedTransaction(txn, category) {
   if (normalizedType === 'income' && /\bfidelity\b|\bvanguard\b|\bschwab\b|\bmerrill\b|\brobinhood\b|e\*?trade\b|tdameritrade|td\s+ameritrade/i.test(text)) {
     return 'Investment account — not Schedule C income (verify source)';
   }
-  if (/(grocery|groceries|supermarket|whole foods|trader joe|kroger|safeway|publix|aldi|food lion|stop\s*&\s*shop|netflix|hulu|disney plus|disney\+|spotify|amazon prime|apple music|planet fitness|anytime fitness|gym membership|haircut|barber shop|vagaro|nail salon|crosscountry mortgage|mortgage payment|personal expense|family expense)/i.test(combined)) {
+  if (/(grocery|groceries|supermarket|whole foods|trader joe|kroger|safeway|publix|aldi|food lion|stop\s*&\s*shop|netflix|hulu|disney plus|disney\+|spotify|amazon prime|apple music|planet fitness|anytime fitness|gym membership|haircut|barber shop|vagaro|nail salon|crosscountry|cross\s*country\s*mortgage|mortgage payment|personal expense|family expense)/i.test(combined)) {
     return 'Potential personal use';
   }
   if (String(txn?.tax_treatment || txn?.taxTreatment || '').toLowerCase() === 'split_use' || Number(txn?.personal_use_pct ?? txn?.personalUsePct) > 0) {
@@ -642,6 +655,10 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
     );
 
     const noteParts = [];
+    const accountName = safeValue(account?.name, '');
+    if (accountName && accountName !== 'Not specified') {
+      noteParts.push(`Acct: ${truncateText(accountName, 28)}`);
+    }
     if (isIncome && (txn.payer_name || txn.payerName)) {
       noteParts.push(`Payer: ${truncateText(txn.payer_name || txn.payerName, 22)}`);
     }
@@ -655,12 +672,9 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
     rowItems.push({
       isHeader: false,
       date: dateStr.slice(5),
-      payeeMemo: truncateText(buildTransactionText(txn) || '(No description)', 32),
-      accountCat: truncateText(
-        `${safeValue(account?.name, '-')} / ${safeValue(category?.name, 'Uncategorized')}`,
-        22
-      ),
-      taxMapping: truncateText(taxMapRaw, 22),
+      payeeMemo: truncateText(buildTransactionText(txn) || '(No description)', 34),
+      categoryName: truncateText(safeValue(category?.name, 'Uncategorized'), 26),
+      taxMapping: truncateText(shortenTaxLine(taxMapRaw), 20),
       amountStr: (isIncome ? '+' : '') + formatCurrencyForPdf(amount, currency),
       flagStr: flags.length ? truncateText(flags.join(', '), 14) : labels.review_ok,
       note: noteParts.length ? noteParts.join(' | ') : null
@@ -675,14 +689,14 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
   const startNewPage = () => {
     const c = new PdfCanvas();
     c.text(40, 760, labels.transaction_log_title, 16, 'F2');
-    if (!isFirstPage) c.text(200, 760, '(continued)', 9);
+    if (!isFirstPage) c.text(220, 760, '(continued)', 9);
     isFirstPage = false;
     c.text(40, 732, labels.col_date, 9, 'F2');
-    c.text(90, 732, labels.col_payee_memo, 9, 'F2');
-    c.text(272, 732, labels.col_account_category, 9, 'F2');
-    c.text(392, 732, labels.col_tax_map_short, 9, 'F2');
-    c.text(492, 732, labels.col_amount, 9, 'F2');
-    c.text(549, 732, labels.col_flag, 9, 'F2');
+    c.text(88, 732, labels.col_payee_memo, 9, 'F2');
+    c.text(295, 732, 'Category', 9, 'F2');
+    c.text(415, 732, 'Tax line', 9, 'F2');
+    c.text(496, 732, labels.col_amount, 9, 'F2');
+    c.text(553, 732, labels.col_flag, 9, 'F2');
     canvasObj = c;
     y = 708;
   };
@@ -695,18 +709,18 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
       canvasObj.text(40, y, item.label, 9, 'F2');
       y -= 22;
     } else {
-      const needed = 14 + (item.note ? 12 : 0);
+      const needed = 14 + (item.note ? 11 : 0);
       if (y - needed < 60) { pages.push(canvasObj); startNewPage(); }
       canvasObj.text(40, y, item.date, 8);
-      canvasObj.text(90, y, item.payeeMemo, 8);
-      canvasObj.text(272, y, item.accountCat, 8);
-      canvasObj.text(392, y, item.taxMapping, 8);
-      canvasObj.text(492, y, item.amountStr, 8);
-      canvasObj.text(549, y, item.flagStr, 8);
+      canvasObj.text(88, y, item.payeeMemo, 8);
+      canvasObj.text(295, y, item.categoryName, 8);
+      canvasObj.text(415, y, item.taxMapping, 8);
+      canvasObj.text(496, y, item.amountStr, 8);
+      canvasObj.text(553, y, item.flagStr, 8);
       y -= 14;
       if (item.note) {
-        canvasObj.text(90, y, truncateText(item.note, 70), 7);
-        y -= 12;
+        canvasObj.text(88, y, truncateText(item.note, 76), 7);
+        y -= 11;
       }
     }
   });

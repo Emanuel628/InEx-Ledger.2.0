@@ -153,6 +153,10 @@ function getPdfLabels(lang) {
 
 const SCHEDULE_C_LINE_MAP = {
   gross_receipts: 'Line 1 — Gross receipts or sales',
+  gross_receipts_sales: 'Line 1 — Gross receipts or sales',
+  sales: 'Line 1 — Gross receipts or sales',
+  sales_revenue: 'Line 1 — Gross receipts or sales',
+  revenue: 'Line 1 — Gross receipts or sales',
   business_income: 'Line 1 — Gross receipts or sales',
   returns_allowances: 'Line 2 — Returns and allowances',
   cost_of_goods_sold: 'Line 4 — Cost of goods sold',
@@ -617,7 +621,7 @@ function classifyExcludedTransaction(txn, category, region) {
   if (normalizedType === 'income' && /\bfidelity\b|\bvanguard\b|\bschwab\b|\bmerrill\b|\brobinhood\b|e\*?trade\b|tdameritrade|td\s+ameritrade/i.test(text)) {
     return 'Investment account — not Schedule C income (verify source)';
   }
-  if (/(grocery|groceries|supermarket|whole foods|trader joe|kroger|safeway|publix|aldi|food lion|stop\s*&\s*shop|netflix|hulu|disney plus|disney\+|spotify|amazon prime|apple music|planet fitness|anytime fitness|gym membership|haircut|barber shop|vagaro|nail salon|crosscountry mortgage|mortgage payment|personal expense|family expense)/i.test(combined)) {
+  if (/(grocery|groceries|supermarket|whole foods|trader joe|kroger|safeway|publix|aldi|food lion|stop\s*&\s*shop|netflix|hulu|disney plus|disney\+|spotify|amazon prime|apple music|planet fitness|anytime fitness|gym membership|haircut|barber shop|vagaro|nail salon|crosscountry|cross\s*country\s*mortgage|mortgage payment|personal expense|family expense)/i.test(combined)) {
     return PDF_LABELS.en.reason_personal;
   }
   if (String(txn?.tax_treatment || txn?.taxTreatment || '').toLowerCase() === 'split_use' || Number(txn?.personal_use_pct ?? txn?.personalUsePct) > 0) {
