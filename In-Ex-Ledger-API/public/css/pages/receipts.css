@@ -316,6 +316,10 @@
   box-shadow: 0 20px 60px rgba(15, 25, 35, 0.18);
 }
 
+.receipt-modal-card--danger {
+  border: 1px solid rgba(185, 28, 28, 0.18);
+}
+
 .receipt-modal-card h3 {
   margin: 0;
   color: #102236;
@@ -348,6 +352,16 @@
   justify-content: flex-end;
   gap: 12px;
   margin-top: 22px;
+}
+
+.receipt-danger-btn {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.receipt-danger-btn:hover {
+  background: #991b1b;
+  border-color: #991b1b;
 }
 
 .transaction-modal {
@@ -556,4 +570,3 @@
     box-sizing: border-box !important;
   }
 }
-

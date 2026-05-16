@@ -106,12 +106,12 @@ Rules used here:
 
 ### Frontend state and lifecycle issues
 
-- [ ] 1-2 hours - Stop long-lived background fetchers and window/global data leaks on Accounts and Receipts.
+- [x] 1-2 hours - Stop long-lived background fetchers and window/global data leaks on Accounts and Receipts.
   Files: `In-Ex-Ledger-API/public/js/accounts.js`, `In-Ex-Ledger-API/public/js/receipts.js`
   Group: Frontend lifecycle cleanup
   Covers: leaked `window.__accountsCache`, uncleared `setInterval`, repeated full `/api/transactions` refresh, bare `fetch()` on upload/preview, object URL timeout behavior
 
-- [ ] 1-2 hours - Replace the verify-email infinite poll loop with a bounded retry window and a visible fallback state.
+- [x] 1-2 hours - Replace the verify-email infinite poll loop with a bounded retry window and a visible fallback state.
   Files: `In-Ex-Ledger-API/public/js/verify-email.js`
   Group: Verify-email polling
   Covers: endless 3-second polling loop
@@ -126,7 +126,7 @@ Rules used here:
   Group: Transactions frontend consistency
   Covers: duplicate `renderPagination`, duplicate `wirePagination`, no-op `updateTransactionSelectionHeader`
 
-- [ ] 1-2 hours - Fix the receipts confirm-dialog and date-parsing issues without relying on unsafe browser-native dialogs.
+- [x] 1-2 hours - Fix the receipts confirm-dialog and date-parsing issues without relying on unsafe browser-native dialogs.
   Files: `In-Ex-Ledger-API/public/js/receipts.js`
   Group: Receipts UX integrity
   Covers: filename-fed `window.confirm()` spoofing, UTC-to-local receipt date drift

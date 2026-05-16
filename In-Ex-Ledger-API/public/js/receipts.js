@@ -7,6 +7,8 @@ let activeReceiptLinkId = null;
 let receiptsLoading = false;
 let receiptsLoadFailed = false;
 let lastReceiptLinkTrigger = null;
+let lastReceiptDeleteTrigger = null;
+let activeReceiptDeleteId = null;
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
@@ -28,6 +30,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireReceiptUpload();
   wireReceiptDropZone();
   wireReceiptLinkModal();
+  wireReceiptDeleteModal();
   await loadTransactionMap();
   await loadReceipts();
   updateReceiptsDot();
@@ -112,15 +115,13 @@ async function uploadReceipt(file) {
   const formData = new FormData();
   formData.append("receipt", file);
 
-  const response = await fetch(buildApiUrl("/api/receipts"), {
+  const response = await apiFetch("/api/receipts", {
     method: "POST",
-    credentials: "include",
-    headers: {
-      ...authHeader(),
-      ...(typeof csrfHeader === "function" ? csrfHeader("POST") : {})
-    },
     body: formData
   });
+  if (!response) {
+    throw new Error(tx("receipts_error_upload"));
+  }
 
   if (response.status === 402) {
     throw new Error(tx("receipts_error_v1_required"));
@@ -442,6 +443,27 @@ function openReceiptLinkModal(receiptId) {
   select.focus();
 }
 
+function wireReceiptDeleteModal() {
+  const modal = document.getElementById("receiptDeleteModal");
+  const cancelButton = document.getElementById("receiptDeleteCancel");
+  const confirmButton = document.getElementById("receiptDeleteConfirm");
+  const backdrop = modal?.querySelector("[data-receipt-delete-close]");
+
+  cancelButton?.addEventListener("click", closeReceiptDeleteModal);
+  backdrop?.addEventListener("click", closeReceiptDeleteModal);
+  modal?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeReceiptDeleteModal();
+    }
+  });
+  confirmButton?.addEventListener("click", async () => {
+    const receiptId = activeReceiptDeleteId;
+    closeReceiptDeleteModal();
+    await executeReceiptDelete(receiptId);
+  });
+}
+
 function closeReceiptLinkModal() {
   const modal = document.getElementById("receiptLinkModal");
   if (modal) {
@@ -497,7 +519,34 @@ async function deleteReceiptRecord(receiptId) {
   }
 
   const receiptName = receipt.filename || tx("receipts_this_receipt");
-  if (!window.confirm(`${tx("receipts_confirm_delete_prefix")} "${receiptName}"? ${tx("receipts_confirm_delete_suffix")}`)) {
+  const modal = document.getElementById("receiptDeleteModal");
+  const body = document.getElementById("receiptDeleteBody");
+  if (!modal || !body) {
+    await executeReceiptDelete(receiptId);
+    return;
+  }
+
+  activeReceiptDeleteId = receiptId;
+  lastReceiptDeleteTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  body.textContent = `${tx("receipts_confirm_delete_prefix")} "${receiptName}"? ${tx("receipts_confirm_delete_suffix")}`;
+  modal.classList.remove("hidden");
+  document.getElementById("receiptDeleteConfirm")?.focus();
+}
+
+function closeReceiptDeleteModal() {
+  const modal = document.getElementById("receiptDeleteModal");
+  if (modal) {
+    modal.classList.add("hidden");
+  }
+  activeReceiptDeleteId = null;
+  if (lastReceiptDeleteTrigger?.isConnected) {
+    lastReceiptDeleteTrigger.focus();
+  }
+  lastReceiptDeleteTrigger = null;
+}
+
+async function executeReceiptDelete(receiptId) {
+  if (!receiptId) {
     return;
   }
 
@@ -517,13 +566,12 @@ async function deleteReceiptRecord(receiptId) {
 }
 
 async function openReceiptPreview(receiptId, filename) {
-  const response = await fetch(buildApiUrl(`/api/receipts/${receiptId}`), {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      ...authHeader()
-    }
+  const response = await apiFetch(`/api/receipts/${receiptId}`, {
+    method: "GET"
   });
+  if (!response) {
+    throw new Error(tx("receipts_error_open"));
+  }
 
   if (response.status === 404) {
     receiptRecords = receiptRecords.filter((record) => record?.id !== receiptId);
@@ -547,9 +595,12 @@ async function openReceiptPreview(receiptId, filename) {
     document.body.appendChild(link);
     link.click();
     link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return;
   }
-
-  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+  const revoke = () => URL.revokeObjectURL(url);
+  previewWindow.addEventListener("beforeunload", revoke, { once: true });
+  window.addEventListener("pagehide", revoke, { once: true });
 }
 
 function ensureV1Tier() {
@@ -572,7 +623,10 @@ function formatReceiptDate(value) {
   if (!value) {
     return "-";
   }
-  const date = new Date(value);
+  const isoDateMatch = /^(\d{4})-(\d{2})-(\d{2})(?:T|$)/.exec(String(value));
+  const date = isoDateMatch
+    ? new Date(Number(isoDateMatch[1]), Number(isoDateMatch[2]) - 1, Number(isoDateMatch[3]))
+    : new Date(value);
   if (Number.isNaN(date.getTime())) {
     return value;
   }

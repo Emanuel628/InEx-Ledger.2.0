@@ -10,6 +10,7 @@ const ACCOUNT_TYPES = [
 ];
 const ACCOUNTS_TOAST_MS = 3000;
 let accountsToastTimer = null;
+let accountRecordsCache = [];
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
@@ -23,7 +24,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireAccountTypeChips();
   wireAccountDeleteModal();
   await renderAccountList();
-  setInterval(() => refreshAccountGhosts(), 5 * 60 * 1000);
   updateReceiptsDot();
 });
 
@@ -156,7 +156,6 @@ async function renderAccountList() {
     }
 
     const accounts = await response.json();
-    window.__accountsCache = accounts;
     syncAccountsCache(accounts);
     if (!Array.isArray(accounts) || accounts.length === 0) {
       container.innerHTML = `<div class="accounts-empty">${escapeHtml(tx("accounts_no_accounts"))}</div>`;
@@ -194,7 +193,7 @@ async function renderAccountList() {
 }
 
 async function deleteAccount(accountId) {
-  const account = (window.__accountsCache || []).find((a) => a.id === accountId);
+  const account = accountRecordsCache.find((a) => a.id === accountId);
   const name = account?.name || "this account";
   const modal = document.getElementById("accountDeleteModal");
   const body = document.getElementById("accountDeleteModalBody");
@@ -230,6 +229,7 @@ async function executeDeleteAccount(accountId) {
 
 function syncAccountsCache(accounts) {
   const normalized = Array.isArray(accounts) ? accounts : [];
+  accountRecordsCache = normalized;
   window.dispatchEvent(new CustomEvent("accountsUpdated", { detail: normalized }));
 }
 
@@ -290,6 +290,17 @@ async function getApiErrorText(response, fallback) {
   return fallback || tx("common_error");
 }
 
+function readStoredStringArray(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map((value) => String(value)) : [];
+  } catch {
+    return [];
+  }
+}
+
 // ─── Account Ghost Suggestions ────────────────────────────────────────────────
 // Detects masked card/account numbers (e.g. ****1234) in transaction
 // descriptions and suggests adding them as accounts if not already tracked.
@@ -311,9 +322,7 @@ function extractAccountHints(description) {
 }
 
 function detectAccountSuggestions(transactions, existingAccounts) {
-  const dismissed = new Set(
-    JSON.parse(localStorage.getItem(ACCOUNT_SUGGESTIONS_DISMISSED_KEY) || "[]")
-  );
+  const dismissed = new Set(readStoredStringArray(ACCOUNT_SUGGESTIONS_DISMISSED_KEY));
   const existingNames = new Set(
     existingAccounts.map(a => String(a.name || "").toLowerCase())
   );
@@ -402,9 +411,7 @@ function renderAccountGhosts(suggestions) {
     });
 
     card.querySelector(".acc-ghost-dismiss-btn").addEventListener("click", () => {
-      const dismissed = new Set(
-        JSON.parse(localStorage.getItem(ACCOUNT_SUGGESTIONS_DISMISSED_KEY) || "[]")
-      );
+      const dismissed = new Set(readStoredStringArray(ACCOUNT_SUGGESTIONS_DISMISSED_KEY));
       dismissed.add(s.last4);
       localStorage.setItem(ACCOUNT_SUGGESTIONS_DISMISSED_KEY, JSON.stringify([...dismissed]));
       card.remove();
@@ -419,9 +426,9 @@ function renderAccountGhosts(suggestions) {
 }
 
 async function refreshAccountGhosts() {
-  const accounts = window.__accountsCache || [];
+  const accounts = accountRecordsCache;
   try {
-    const res = await apiFetch("/api/transactions");
+    const res = await apiFetch("/api/transactions?all=true");
     if (!res || !res.ok) return;
     const payload = await res.json().catch(() => null);
     const transactions = Array.isArray(payload)

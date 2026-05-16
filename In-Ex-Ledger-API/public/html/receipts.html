@@ -133,6 +133,18 @@
     </div>
   </div>
 
+  <div id="receiptDeleteModal" class="receipt-modal hidden" role="dialog" aria-modal="true" aria-labelledby="receiptDeleteTitle" aria-describedby="receiptDeleteBody">
+    <div class="receipt-modal-backdrop" data-receipt-delete-close></div>
+    <div class="receipt-modal-card receipt-modal-card--danger">
+      <h3 id="receiptDeleteTitle" data-i18n="receipts_confirm_delete_title">Delete receipt?</h3>
+      <p id="receiptDeleteBody" data-i18n="receipts_confirm_delete_body">This action cannot be undone.</p>
+      <div class="receipt-modal-actions">
+        <button type="button" id="receiptDeleteCancel" class="receipt-secondary-btn" data-i18n="common_cancel">Cancel</button>
+        <button type="button" id="receiptDeleteConfirm" class="receipt-primary-btn receipt-danger-btn" data-i18n="common_delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/escape-html.js?v=20260410a"></script>
 <script src="../js/global.js?v=20260510c"></script>
   <script src="../js/i18n.js?v=20260510e"></script>

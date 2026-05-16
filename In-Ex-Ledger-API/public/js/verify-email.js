@@ -10,6 +10,9 @@ let continueButton;
 let verificationState = "";
 const VERIFICATION_STATE_KEY = "pendingVerificationState";
 const SIGNUP_BOOTSTRAP_KEY = "pendingSignupBootstrapToken";
+const VERIFY_EMAIL_POLL_INTERVAL_MS = 3000;
+const VERIFY_EMAIL_MAX_POLLS = 40;
+let verificationPollTimer = null;
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
@@ -34,18 +37,26 @@ document.addEventListener("DOMContentLoaded", () => {
   } else {
     updateStatus(tx("verify_email_status_register"), true);
   }
+
+  window.addEventListener("beforeunload", stopVerificationPolling, { once: true });
 });
 function startVerificationPolling() {
   if (!verificationState) return;
-  let polling = true;
+  stopVerificationPolling();
+  let remainingPolls = VERIFY_EMAIL_MAX_POLLS;
   async function poll() {
-    if (!polling) return;
+    if (!verificationState || remainingPolls <= 0) {
+      stopVerificationPolling();
+      updateStatus(tx("verify_email_status_poll_timeout") || "We are still waiting for verification. Check your inbox, then resend the email if needed.", true);
+      return;
+    }
+    remainingPolls -= 1;
     try {
       const response = await fetch(`/api/check-email-verified?state=${encodeURIComponent(verificationState)}`);
       if (response.ok) {
         const data = await response.json();
         if (data.verified) {
-          polling = false;
+          stopVerificationPolling();
           await finalizeVerifiedSignup();
           return;
         }
@@ -53,9 +64,16 @@ function startVerificationPolling() {
     } catch (e) {
       // ignore errors, keep polling
     }
-    setTimeout(poll, 3000);
+    verificationPollTimer = window.setTimeout(poll, VERIFY_EMAIL_POLL_INTERVAL_MS);
   }
   poll();
+}
+
+function stopVerificationPolling() {
+  if (verificationPollTimer) {
+    window.clearTimeout(verificationPollTimer);
+    verificationPollTimer = null;
+  }
 }
 
 function wireActions() {
@@ -131,6 +149,7 @@ function consumeVerifiedSessionFromHash() {
   }
 
   updateStatus(tx("verify_email_status_success"));
+  stopVerificationPolling();
   window.history.replaceState({}, document.title, "/verify-email");
   if (!token && typeof refreshAccessToken === "function") {
     refreshAccessToken()
@@ -254,6 +273,7 @@ async function finalizeVerifiedSignup() {
   localStorage.removeItem(SIGNUP_BOOTSTRAP_KEY);
   localStorage.removeItem("pendingVerificationEmail");
   updateStatus(tx("verify_email_status_success"));
+  stopVerificationPolling();
   setTimeout(() => {
     window.location.replace("/login");
   }, 1200);

@@ -337,3 +337,67 @@ test("trial.js ignores stored subscription fallback and does not mint a syntheti
   assert.equal(context.getTrialRemainingForDisplay(), 0);
   assert.equal(context.formatTrialRemaining(), "Trial status unavailable.");
 });
+
+test("accounts ghost suggestions tolerate corrupted dismissed-suggestions storage", () => {
+  const localStorage = {
+    _store: new Map([["lb_account_suggestions_dismissed", "{bad json"]]),
+    getItem(key) {
+      return this._store.has(key) ? this._store.get(key) : null;
+    },
+    setItem(key, value) {
+      this._store.set(key, String(value));
+    },
+    removeItem(key) {
+      this._store.delete(key);
+    }
+  };
+  const context = loadScript("public/js/accounts.js", {
+    document: {
+      addEventListener() {},
+      getElementById() { return null; },
+      querySelectorAll() { return []; }
+    },
+    window: {
+      dispatchEvent() {}
+    },
+    localStorage,
+    CustomEvent: class CustomEvent {
+      constructor(name, init = {}) {
+        this.type = name;
+        this.detail = init.detail;
+      }
+    }
+  });
+
+  const suggestions = context.detectAccountSuggestions(
+    [{ description: "Card ending in 1234" }],
+    []
+  );
+
+  assert.equal(suggestions.length, 1);
+  assert.equal(suggestions[0].last4, "1234");
+});
+
+test("receipts date formatting keeps ISO calendar dates stable", () => {
+  const context = loadScript("public/js/receipts.js", {
+    document: {
+      addEventListener() {},
+      getElementById() { return null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      body: {
+        appendChild() {},
+        removeChild() {}
+      }
+    },
+    window: {
+      location: { href: "/" },
+      open() { return null; },
+      setTimeout,
+      clearTimeout,
+      addEventListener() {}
+    }
+  });
+
+  assert.equal(context.formatReceiptDate("2026-05-01T00:00:00.000Z"), "5/1/2026");
+});
