@@ -955,7 +955,7 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
     const status = txn.__status;
     const amount = Number(txn?.__businessAmounts?.deductibleAmount ?? txn?.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn));
     if (status.needsCategory) needsCategoryCount += 1;
-    if (!status.isMapped && String(txn?.type || "").toLowerCase() === "expense") unmappedTaxCount += 1;
+    if (!status.needsCategory && !status.isMapped && String(txn?.type || "").toLowerCase() === "expense") unmappedTaxCount += 1;
     if (status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag))) mappedNeedsSupportCount += 1;
     if (status.flags.includes("MD")) missingDescriptionCount += 1;
     if (status.flags.includes("DUP")) duplicateCount += 1;
@@ -1163,9 +1163,9 @@ function drawReportHeader(canvas, { title, subtitle, badges = [] }) {
   const width = PAGE.width - PAGE.margin * 2;
   const top = PAGE.height - PAGE.margin;
   const titleY = top - 20;
-  const subtitleY = top - 40;
-  const badgeRowY = top - 62;
-  const bandHeight = 96;
+  const subtitleY = top - 44;
+  const badgeRowY = top - 70;
+  const bandHeight = 104;
   canvas.drawFilledRect(left, top - bandHeight, width, bandHeight, COLORS.fill2);
   canvas.drawRect(left, top - bandHeight, width, bandHeight);
   canvas.text(left + 12, titleY, title, 18, "F2");
@@ -1180,7 +1180,7 @@ function drawReportHeader(canvas, { title, subtitle, badges = [] }) {
   return {
     top,
     bottom: top - bandHeight,
-    contentStartY: top - 114
+    contentStartY: top - 120
   };
 }
 
@@ -1236,7 +1236,7 @@ function buildIdentityPage(data) {
 
   const actionLines = [
     `${reviewInsights.needsCategoryCount} imported / uncategorized transactions need real category assignment.`,
-    `${reviewInsights.unmappedTaxCount} transactions remain truly unmapped after category review.`,
+    `${reviewInsights.unmappedTaxCount} categorized transactions remain truly unmapped after category review.`,
     `${reviewInsights.mappedNeedsSupportCount} mapped transactions still need support or final confirmation.`,
     `${reviewInsights.expenseWithoutReceiptAttachmentCount} expense transactions do not have receipt attachments.`,
     `${reviewInsights.vehicleCount} vehicle items require mileage or actual-expense support.`,
@@ -1292,8 +1292,9 @@ function formatSupportStatus(status) {
   return "Mapped";
 }
 
-function buildCategoryPages(transactions, categories, currency, labels, embeddedCount = 0, region = "US") {
+function buildCategoryPages(transactions, categories, receipts, currency, labels, embeddedCount = 0, region = "US") {
   const rows = buildCategoryBuckets(transactions, currency).slice(embeddedCount);
+  const coverage = computeReceiptCoverage(transactions, receipts);
   const totals = {
     needsCategory: rows.filter((row) => row.mappingStatus === "Needs category").reduce((sum, row) => sum + row.amount, 0),
     mappedNeedsSupport: rows.filter((row) => row.mappingStatus === "Needs support").reduce((sum, row) => sum + row.amount, 0),
@@ -1337,7 +1338,7 @@ function buildCategoryPages(transactions, categories, currency, labels, embedded
       const riskCardTop = Math.max(y - 10, 210);
       canvas.drawCard(40, riskCardTop, 532, 76, "Support Risk Summary", [
         `Support-risk categories: ${rows.filter((row) => row.mappingStatus === "Needs support").length} | Mapped transactions requiring support/final confirmation: ${mappedSupportTransactions.length}`,
-        `Expense transactions without receipt attachment: ${transactions.filter((txn) => String(txn.type || "").toLowerCase() === "expense" && !txn.__status.needsCategory && txn.__status.needsReceipt).length} | Vehicle/logbook categories: ${rows.filter((row) => /mileage/i.test(row.supportStatus)).length} | Meals/business-purpose categories: ${rows.filter((row) => /business purpose/i.test(row.supportStatus)).length} | Phone/internet allocation categories: ${rows.filter((row) => /allocation/i.test(row.supportStatus)).length}`
+        `Expense transactions without receipt attachment: ${coverage.missing} | Vehicle/logbook categories: ${rows.filter((row) => /mileage/i.test(row.supportStatus)).length} | Meals/business-purpose categories: ${rows.filter((row) => /business purpose/i.test(row.supportStatus)).length} | Phone/internet allocation categories: ${rows.filter((row) => /allocation/i.test(row.supportStatus)).length}`
       ], { maxChars: 92 });
       canvas.drawCard(40, riskCardTop - 88, 532, 54, "Summary note", [
         `Amount needing real category: ${formatCurrencyForPdf(totals.needsCategory, currency)} | Mapped but requiring support: ${formatCurrencyForPdf(totals.mappedNeedsSupport, currency)} | Mapped and support-ready: ${formatCurrencyForPdf(totals.mappedReady, currency)}`
@@ -1793,7 +1794,7 @@ function buildPdfExportDocument(options) {
       reviewInsights,
       isSecure
     }),
-    ...buildCategoryPages(includedTransactions, categories, effectiveCurrency, labels, 0, normalizedRegion),
+    ...buildCategoryPages(includedTransactions, categories, receipts, effectiveCurrency, labels, 0, normalizedRegion),
     ...buildTaxPacketPages({ transactions: includedTransactions, categories, receipts, currency: effectiveCurrency, region: normalizedRegion, labels, taxYear }),
     ...buildTransactionPages(includedTransactions, accounts, categories, effectiveCurrency, labels, normalizedRegion),
     ...buildExclusionPages(excludedTransactions, effectiveCurrency, labels),

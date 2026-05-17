@@ -249,9 +249,9 @@ test("buildPdfExport returns a valid PDF buffer with premium section titles and 
 
 test("shared header renders badges on their own reserved row", () => {
   const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
-  assert.match(pdf, /1 0 0 1 52\.00 712\.00 Tm\s+\(Prepared for Schedule C bookkeeping review\) Tj/s);
-  assert.match(pdf, /1 0 0 1 [0-9]+\.[0-9]{2} 689\.50 Tm\s+\(Secure Export\) Tj/s);
-  assert.match(pdf, /1 0 0 1 [0-9]+\.[0-9]{2} 689\.50 Tm\s+\(Draft - CPA Review Required\) Tj/s);
+  assert.match(pdf, /1 0 0 1 52\.00 708\.00 Tm\s+\(Prepared for Schedule C bookkeeping review\) Tj/s);
+  assert.match(pdf, /1 0 0 1 [0-9]+\.[0-9]{2} 681\.50 Tm\s+\(Secure Export\) Tj/s);
+  assert.match(pdf, /1 0 0 1 [0-9]+\.[0-9]{2} 681\.50 Tm\s+\(Draft - CPA Review Required\) Tj/s);
 });
 
 test("excluded section uses short reason codes and not truncated prose strings", () => {
@@ -330,6 +330,15 @@ test("receipt and support metrics use distinct wording", () => {
   assert.match(pdf, /\(Without receipt attachment: 3\) Tj/);
   assert.match(pdf, /Mapped transactions requiring support\/final confirmation: 3/i);
   assert.match(pdf, /Support-risk categories: 3 \| Mapped transactions requiring support\/final confirmation: 3/i);
+  assert.match(pdf, /Expense transactions without receipt attachment: 3/i);
+});
+
+test("executive summary and mapping pages keep truly unmapped counts consistent", () => {
+  const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
+  assert.match(pdf, /1 imported \/ uncategorized transactions need real category assignment\./i);
+  assert.match(pdf, /0 categorized transactions remain truly unmapped after category review\./i);
+  assert.match(pdf, /\(Truly unmapped\) Tj[\s\S]{0,120}\(0 transactions \| \$0\.00\) Tj/i);
+  assert.match(pdf, /Truly unmapped expenses: 0 totaling \$0\.00/i);
 });
 
 test("obvious non-P&L items render under excluded codes instead of ledger tax mapping", () => {
