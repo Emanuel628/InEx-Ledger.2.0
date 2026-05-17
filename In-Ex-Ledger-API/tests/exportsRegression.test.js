@@ -247,6 +247,13 @@ test("buildPdfExport returns a valid PDF buffer with premium section titles and 
   assert.doesNotMatch(pdf, /\(TM\) Tj/);
 });
 
+test("shared header renders badges on their own reserved row", () => {
+  const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
+  assert.match(pdf, /1 0 0 1 52\.00 712\.00 Tm\s+\(Prepared for Schedule C bookkeeping review\) Tj/s);
+  assert.match(pdf, /1 0 0 1 [0-9]+\.[0-9]{2} 689\.50 Tm\s+\(Secure Export\) Tj/s);
+  assert.match(pdf, /1 0 0 1 [0-9]+\.[0-9]{2} 689\.50 Tm\s+\(Draft - CPA Review Required\) Tj/s);
+});
+
 test("excluded section uses short reason codes and not truncated prose strings", () => {
   const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
   assert.match(pdf, /\(CC PAY\) Tj/);
@@ -290,11 +297,32 @@ test("secure and redacted exports keep the same classification totals and sectio
 
 test("mapping summary wording does not claim unmapped rows are mapped", () => {
   const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
-  assert.match(pdf, /\(Needs category \/ no tax l/);
+  assert.match(pdf, /\(Needs category\) Tj/);
   assert.match(pdf, /\(Mapped review line\) Tj/);
   assert.match(pdf, /\(Mapped support-ready\) Tj/);
-  assert.match(pdf, /\(Truly unmapped after catego/);
+  assert.match(pdf, /\(Truly unmapped\) Tj/);
   assert.doesNotMatch(pdf, /Unmapped[\s\S]{0,120}Status Mapped/i);
+});
+
+test("category and support labels use compact canonical wording instead of chopped prose", () => {
+  const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
+  assert.match(pdf, /\(L24b Meals\) Tj/);
+  assert.match(pdf, /\(L9 Vehicle\) Tj/);
+  assert.match(pdf, /\(L25\/27a Phone\/util\) Tj/);
+  assert.match(pdf, /\(Support: Business purpose needed\) Tj/);
+  assert.match(pdf, /\(Support: Needs allocation\) Tj/);
+  assert.match(pdf, /\(Support: Needs mileage log\) Tj/);
+  assert.doesNotMatch(pdf, /Meals and enterta\.\.\./i);
+  assert.doesNotMatch(pdf, /Needs category \/ no t\.\.\./i);
+});
+
+test("receipt and support metrics use distinct wording", () => {
+  const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
+  assert.match(pdf, /expense transactions do not have receipt attachments/i);
+  assert.match(pdf, /\(With receipt attachment: 1\) Tj/);
+  assert.match(pdf, /\(Without receipt attachment: 3\) Tj/);
+  assert.match(pdf, /Mapped transactions requiring support\/final confirmation: 3/i);
+  assert.match(pdf, /Support-risk categories: 4 \| Mapped transactions requiring support\/final confirmation: 3/i);
 });
 
 test("obvious non-P&L items render under excluded codes instead of ledger tax mapping", () => {
@@ -366,7 +394,9 @@ test("Canada export resolves T2125 review lines", () => {
     gstHstRegistered: true,
     gstHstNumber: "123456789RT0001",
     gstHstMethod: "regular",
-    fiscalYearStart: "01-01",
+    fiscalYearStart: "2025-12-31",
+    entityType: "llc",
+    naics: "0628-12345",
     categories: [
       { id: "cat_income", name: "Sales Revenue", kind: "income", tax_map_us: "", tax_map_ca: "Line 8000 - Gross business income" },
       { id: "cat_fuel", name: "Fuel & Gas", kind: "expense", tax_map_us: "", tax_map_ca: "" },
@@ -378,9 +408,14 @@ test("Canada export resolves T2125 review lines", () => {
   })).toString("latin1");
   assert.match(pdf, /\(Canada CPA Workpaper Export\) Tj/);
   assert.match(pdf, /\(Prepared for T2125 bookkeeping review\) Tj/);
-  assert.match(pdf, /\(L9281 Motor vehicle expenses\) Tj/);
-  assert.match(pdf, /\(L8523 Meals and entertain/);
-  assert.match(pdf, /\(L9270 Telephone and utili/);
+  assert.match(pdf, /\(L9281 Motor vehicle\) Tj/);
+  assert.match(pdf, /\(L8523 Meals\) Tj/);
+  assert.match(pdf, /\(L9270 Phone\/util\) Tj/);
+  assert.match(pdf, /\(Entity type: Foreign\/US LLC - confirm\) Tj/);
+  assert.match(pdf, /\(Canadian filing treatment\) Tj/);
+  assert.match(pdf, /\(Code validation: Needs review\) Tj/);
+  assert.match(pdf, /\(Fiscal year: 2025-12-31 to 2026-12-30 \| GST\/HST method: regular\) Tj/);
+  assert.match(pdf, /\(Confirm fiscal year with preparer\.\) Tj/);
 });
 
 test("route generate stores nonzero page count metadata and saves only the redacted copy", async () => {

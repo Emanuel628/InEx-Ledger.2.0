@@ -497,6 +497,47 @@ function normalizeExportCategoryName(category) {
   return String(category?.name || "").trim();
 }
 
+function normalizeEntityTypeDisplay(entityType, region) {
+  const raw = String(entityType || "").trim().toLowerCase();
+  if (!raw) return "Not specified";
+  const map = {
+    sole_prop: "Sole proprietorship",
+    soleproprietorship: "Sole proprietorship",
+    sole_proprietorship: "Sole proprietorship",
+    partnership: "Partnership",
+    corporation: "Corporation",
+    corp: "Corporation",
+    llc: normalizeRegionCode(region) === "CA" ? "Foreign/US LLC - confirm Canadian filing treatment" : "LLC",
+    ltd: "Corporation",
+    inc: "Corporation"
+  };
+  return map[raw] || raw.replace(/[_-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function getActivityCodeValidation(region, code) {
+  const value = String(code || "").trim();
+  if (!value) return "Needs review";
+  if (normalizeRegionCode(region) === "CA") return /^\d{6}$/.test(value) ? "Matches 6-digit industry code format" : "Needs review";
+  return /^\d{6}$/.test(value) ? "Matches 6-digit business activity code format" : "Needs review";
+}
+
+function formatFiscalYearDisplay(fiscalYearStart, endDate) {
+  const raw = String(fiscalYearStart || "").trim();
+  if (!raw) return "Fiscal year not specified";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const start = new Date(`${raw}T12:00:00Z`);
+    if (!Number.isNaN(start.getTime())) {
+      const end = new Date(start);
+      end.setUTCFullYear(end.getUTCFullYear() + 1);
+      end.setUTCDate(end.getUTCDate() - 1);
+      return `Fiscal year: ${normalizePdfDate(start)} to ${normalizePdfDate(end)}`;
+    }
+  }
+  if (/^\d{2}-\d{2}$/.test(raw)) return `Fiscal year starts annually on ${raw}`;
+  if (endDate) return `Fiscal year start: ${raw} | Confirm with preparer`;
+  return `Fiscal year start: ${raw}`;
+}
+
 function inferCategorySlug(txn, category, nature) {
   const categoryName = normalizeExportCategoryName(category);
   if (!categoryName) return nature === "business_income" ? "needs_category" : "needs_category";
@@ -678,14 +719,14 @@ function buildTransactionStatus(txn, category, context = {}) {
     : (flags.length ? "review" : "mapped");
 
   const supportPhrases = [];
-  if (categoryStatus === "needs_category") supportPhrases.push("Assign real category");
-  if (needsReceipt) supportPhrases.push("Receipt/support needed");
-  if (needsBusinessPurpose) supportPhrases.push("Business purpose required");
-  if (needsMileageLog) supportPhrases.push("Mileage/actual support required");
-  if (needsAllocation) supportPhrases.push("Allocation required");
-  if (needsHomeOfficeSupport) supportPhrases.push("Square-foot support required");
-  if (needsCapitalAssetReview) supportPhrases.push("Depreciation review required");
-  if (flags.includes("RR")) supportPhrases.push("Refund/reversal match review");
+  if (categoryStatus === "needs_category") supportPhrases.push("Assign category");
+  if (needsReceipt) supportPhrases.push("Receipt needed");
+  if (needsBusinessPurpose) supportPhrases.push("Business purpose needed");
+  if (needsMileageLog) supportPhrases.push("Mileage log needed");
+  if (needsAllocation) supportPhrases.push("Allocation needed");
+  if (needsHomeOfficeSupport) supportPhrases.push("Home-office support needed");
+  if (needsCapitalAssetReview) supportPhrases.push("Capital asset review");
+  if (flags.includes("RR")) supportPhrases.push("Refund/reversal review");
   if (flags.includes("RV")) supportPhrases.push("CPA review required");
 
   return {
@@ -951,6 +992,7 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
     transactionCount: (transactions || []).length,
     expenseTransactionCount: coverage.expense_count,
     receiptLinkedCount: coverage.with_receipt,
+    expenseWithoutReceiptAttachmentCount: coverage.missing,
     receiptCoverageText: `${coverage.with_receipt} of ${coverage.expense_count}`,
     missingReceiptCount,
     needsCategoryCount,
@@ -1002,12 +1044,58 @@ function buildExclusionSummary(excluded, currency) {
 function shortenTaxLine(text) {
   const value = String(text || "").trim();
   if (!value) return "Unmapped";
-  if (/^Line\s+\d+/i.test(value)) {
-    const match = value.match(/^Line\s+([^ ]+)\s+-\s+(.+)$/i);
-    if (!match) return value;
-    return truncateText(`L${match[1]} ${match[2].replace(/\s+\(.+\)$/, "")}`, 28);
+  if (/^Needs category \/ no tax line yet$/i.test(value)) return "Needs category";
+  const compactMap = [
+    [/^Line 1\b.*gross receipts/i, "L1 Gross receipts"],
+    [/^Line 6\b.*other income/i, "L6 Other income"],
+    [/^Line 8\b.*advertising/i, "L8 Advertising"],
+    [/^Line 9\b/i, "L9 Vehicle"],
+    [/^Line 11\b/i, "L11 Contract labor"],
+    [/^Line 13\b/i, "L13 Depreciation"],
+    [/^Line 15\b/i, "L15 Insurance"],
+    [/^Line 17\b/i, "L17 Legal/accounting"],
+    [/^Line 18\b/i, "L18 Office"],
+    [/^Line 20b\b/i, "L20b Rent/lease"],
+    [/^Line 21\b/i, "L21 Repairs"],
+    [/^Line 22\b/i, "L22 Supplies"],
+    [/^Line 23\b/i, "L23 Taxes/licenses"],
+    [/^Line 24a\b/i, "L24a Travel"],
+    [/^Line 24b\b/i, "L24b Meals"],
+    [/^Line 25\/27a\b.*phone/i, "L25/27a Phone/util"],
+    [/^Line 25\b.*utilities/i, "L25 Utilities"],
+    [/^Line 27a\b.*software/i, "L27a Software"],
+    [/^Line 27a\b.*other expenses/i, "L27a Other expenses"],
+    [/^Line 30\b/i, "L30 Home office"],
+    [/^Line 8000\b/i, "L8000 Gross income"],
+    [/^Line 8230\b/i, "L8230 Other income"],
+    [/^Line 8520\b/i, "L8520 Advertising"],
+    [/^Line 8523\b/i, "L8523 Meals"],
+    [/^Line 8690\b/i, "L8690 Insurance"],
+    [/^Line 8710\b/i, "L8710 Interest/bank"],
+    [/^Line 8760\b/i, "L8760 Taxes/licenses"],
+    [/^Line 8810\b/i, "L8810 Office"],
+    [/^Line 8811\b/i, "L8811 Supplies"],
+    [/^Line 8860\b/i, "L8860 Professional fees"],
+    [/^Line 8912\b/i, "L8912 Rent"],
+    [/^Line 8960\b/i, "L8960 Repairs"],
+    [/^Line 9060\b/i, "L9060 Wages"],
+    [/^Line 9200\b/i, "L9200 Travel"],
+    [/^Line 9220\b/i, "L9220 Utilities"],
+    [/^Line 9270\b.*telephone/i, "L9270 Phone/util"],
+    [/^Line 9270\b/i, "L9270 Other expenses"],
+    [/^Line 9281\b/i, "L9281 Motor vehicle"],
+    [/^Line 9936\b/i, "L9936 CCA review"],
+    [/^Line 9945\b/i, "L9945 Home office"],
+    [/^Cost of goods sold/i, "COGS / resale"]
+  ];
+  for (const [pattern, label] of compactMap) {
+    if (pattern.test(value)) return label;
   }
-  return truncateText(value, 28);
+  if (/^Line\s+\d+/i.test(value)) {
+    const match = value.match(/^Line\s+([^ ]+)/i);
+    if (match) return `L${match[1]}`;
+  }
+  return truncateText(value, 24);
 }
 
 function resolveBusinessCurrency(region, currency) {
@@ -1063,9 +1151,8 @@ function drawReportHeader(canvas, { title, subtitle, badges = [] }) {
   const top = PAGE.height - PAGE.margin;
   const titleY = top - 20;
   const subtitleY = top - 40;
-  const badgeRowY = top - 40;
-  const stackedBadgeRowY = top - 58;
-  const bandHeight = 82;
+  const badgeRowY = top - 62;
+  const bandHeight = 96;
   canvas.drawFilledRect(left, top - bandHeight, width, bandHeight, COLORS.fill2);
   canvas.drawRect(left, top - bandHeight, width, bandHeight);
   canvas.text(left + 12, titleY, title, 18, "F2");
@@ -1073,22 +1160,16 @@ function drawReportHeader(canvas, { title, subtitle, badges = [] }) {
 
   const badgeWidths = badges.map((badge) => Math.max(44, String(badge.text || "").length * 5.6 + 12));
   const badgeTotalWidth = badgeWidths.reduce((sum, widthValue) => sum + widthValue, 0) + Math.max(0, badges.length - 1) * 8;
-  const subtitleWidth = estimateTextWidth(subtitle, 9);
-  const subtitleRightEdge = left + 12 + subtitleWidth;
-  const badgeStartXSameRow = right - 12 - badgeTotalWidth;
-  const canFitOnSubtitleRow = badgeStartXSameRow >= subtitleRightEdge + 20;
-
-  let badgeX = canFitOnSubtitleRow ? badgeStartXSameRow : left + 12;
-  const badgeY = canFitOnSubtitleRow ? badgeRowY : stackedBadgeRowY;
+  let badgeX = Math.max(left + 12, right - 12 - badgeTotalWidth);
   badges.forEach((badge) => {
-    const widthValue = canvas.drawBadge(badgeX, badgeY, badge.text, badge.variant);
+    const widthValue = canvas.drawBadge(badgeX, badgeRowY, badge.text, badge.variant);
     badgeX += widthValue + 8;
   });
 
   return {
     top,
     bottom: top - bandHeight,
-    contentStartY: canFitOnSubtitleRow ? top - 96 : top - 112
+    contentStartY: top - 114
   };
 }
 
@@ -1115,8 +1196,9 @@ function buildIdentityPage(data) {
     `Legal business name: ${safeValue(legalName)}`,
     ...(String(operatingName || "").trim() ? [`Operating name (DBA): ${operatingName}`] : []),
     `Tax ID: ${isSecure ? safeValue(taxId) : "Withheld"}`,
-    `Entity type: ${safeValue(entityType)}`,
+    `Entity type: ${normalizeEntityTypeDisplay(entityType, regionCode)}`,
     `Business activity code: ${safeValue(naics)}`,
+    `Code validation: ${getActivityCodeValidation(regionCode, naics)}`,
     `Jurisdiction: ${regionCode}${province ? `-${String(province).toUpperCase()}` : ""}`,
     `Accounting method: ${safeValue(accountingMethod || accountingBasis)}`
   ]);
@@ -1143,7 +1225,7 @@ function buildIdentityPage(data) {
     `${reviewInsights.needsCategoryCount} imported / uncategorized transactions need real category assignment.`,
     `${reviewInsights.unmappedTaxCount} transactions remain truly unmapped after category review.`,
     `${reviewInsights.mappedNeedsSupportCount} mapped transactions still need support or final confirmation.`,
-    `${reviewInsights.missingReceiptCount} expense transactions are missing receipt/support.`,
+    `${reviewInsights.expenseWithoutReceiptAttachmentCount} expense transactions do not have receipt attachments.`,
     `${reviewInsights.vehicleCount} vehicle items require mileage or actual-expense support.`,
     `${reviewInsights.mealsCount} meal items require business-purpose support.`,
     `${reviewInsights.phoneAllocationCount} phone/internet items require business-use allocation.`
@@ -1151,7 +1233,8 @@ function buildIdentityPage(data) {
   canvas.drawCard(40, metricY - 88, 532, 172, "CPA Action Required", actionLines, { maxChars: 88 });
   canvas.text(52, metricY - 242, labels.not_filed, 9, "F2");
   if (regionCode === "CA") {
-    canvas.text(52, metricY - 258, `Fiscal year start: ${safeValue(fiscalYearStart)} | GST/HST method: ${gstHstRegistered ? safeValue(gstHstMethod) : "Not registered"}`, 8);
+    canvas.text(52, metricY - 258, `${formatFiscalYearDisplay(fiscalYearStart, endDate)} | GST/HST method: ${gstHstRegistered ? safeValue(gstHstMethod) : "Not registered"}`, 8);
+    canvas.text(52, metricY - 272, "Confirm fiscal year with preparer.", 8);
   } else {
     canvas.text(52, metricY - 258, `Business address: ${safeValue(address)}`, 8);
   }
@@ -1170,7 +1253,7 @@ function buildCategoryBuckets(transactions, currency) {
       type: String(txn.type || "").toLowerCase() === "income" ? "Income" : "Expense",
       taxLine: status.taxLineDisplay,
       amount: 0,
-      mappingStatus: status.needsCategory ? "Needs category" : (!status.isMapped ? "Unmapped" : (status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag)) ? "Mapped - needs support" : "Mapped")),
+      mappingStatus: status.needsCategory ? "Needs category" : (!status.isMapped ? "Unmapped" : (status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag)) ? "Needs support" : "Mapped")),
       supportStatus: formatSupportStatus(status)
     };
     bucket.amount += Number(txn.__businessAmounts?.deductibleAmount ?? txn.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn));
@@ -1186,13 +1269,13 @@ function buildCategoryBuckets(transactions, currency) {
 function formatSupportStatus(status) {
   if (status.needsCategory) return "Needs category";
   if (!status.isMapped) return "Unmapped";
-  if (status.needsMileageLog) return "Mapped - mileage support required";
-  if (status.needsBusinessPurpose) return "Mapped - business purpose required";
-  if (status.needsHomeOfficeSupport) return "Mapped - home-office support required";
-  if (status.needsCapitalAssetReview) return "Mapped - capital asset review";
-  if (status.needsAllocation) return "Mapped - allocation required";
-  if (status.needsReceipt) return "Mapped - receipt/support review";
-  if (status.needsFinalConfirmation) return "Mapped - final confirmation needed";
+  if (status.needsMileageLog) return "Needs mileage log";
+  if (status.needsBusinessPurpose) return "Business purpose needed";
+  if (status.needsHomeOfficeSupport) return "Needs home-office support";
+  if (status.needsCapitalAssetReview) return "Capital asset review";
+  if (status.needsAllocation) return "Needs allocation";
+  if (status.needsReceipt) return "Needs receipt/support";
+  if (status.needsFinalConfirmation) return "Needs final confirmation";
   return "Mapped";
 }
 
@@ -1239,7 +1322,8 @@ function buildCategoryPages(transactions, categories, currency, labels, embedded
     if (index === 0) {
       const riskCardTop = Math.max(y - 10, 210);
       canvas.drawCard(40, riskCardTop, 532, 76, "Support Risk Summary", [
-        `Missing receipt/support count: ${rows.filter((row) => /receipt\/support/i.test(row.supportStatus)).length} | Vehicle/logbook categories: ${rows.filter((row) => /mileage/i.test(row.supportStatus)).length} | Meals/business-purpose categories: ${rows.filter((row) => /business purpose/i.test(row.supportStatus)).length} | Phone/internet allocation categories: ${rows.filter((row) => /allocation/i.test(row.supportStatus)).length}`
+        `Support-risk categories: ${rows.filter((row) => row.supportStatus !== "Mapped").length} | Mapped transactions requiring support/final confirmation: ${transactions.filter((txn) => txn.__status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag))).length}`,
+        `Expense transactions without receipt attachment: ${transactions.filter((txn) => String(txn.type || "").toLowerCase() === "expense" && !txn.__status.needsCategory && txn.__status.needsReceipt).length} | Vehicle/logbook categories: ${rows.filter((row) => /mileage/i.test(row.supportStatus)).length} | Meals/business-purpose categories: ${rows.filter((row) => /business purpose/i.test(row.supportStatus)).length} | Phone/internet allocation categories: ${rows.filter((row) => /allocation/i.test(row.supportStatus)).length}`
       ], { maxChars: 92 });
       canvas.drawCard(40, riskCardTop - 88, 532, 54, "Summary note", [
         `Amount needing real category: ${formatCurrencyForPdf(totals.needsCategory, currency)} | Mapped but requiring support: ${formatCurrencyForPdf(totals.mappedNeedsSupport, currency)} | Mapped and support-ready: ${formatCurrencyForPdf(totals.mappedReady, currency)}`
@@ -1258,9 +1342,9 @@ function buildTaxPacketPages({ transactions, categories, receipts, currency, reg
   const cardTop = header.contentStartY - 8;
   canvas.drawCard(40, cardTop, 252, 96, "Receipt Review", [
     `Expense transactions: ${coverage.expense_count}`,
-    `With receipt: ${coverage.with_receipt}`,
-    `Missing receipt/support: ${coverage.missing}`,
-    `Coverage: ${coverage.coverage_pct == null ? "-" : `${coverage.coverage_pct}%`}`
+    `With receipt attachment: ${coverage.with_receipt}`,
+    `Without receipt attachment: ${coverage.missing}`,
+    `Mapped transactions requiring support/final confirmation: ${transactions.filter((txn) => txn.__status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag))).length}`
   ]);
   canvas.drawCard(320, cardTop, 252, 96, labels.payer_review, [
     `Payers detected: ${payerSummary.payer_count}`,
@@ -1293,51 +1377,41 @@ function buildTaxPacketPages({ transactions, categories, receipts, currency, reg
 
   const expenseBucketRows = [
     {
-      bucket: "Needs category / no tax line yet",
+      bucket: "Needs category",
       count: lineSummary.imported_count,
       amount: lineSummary.imported_total,
-      meaning: "Category must be assigned before tax mapping"
+      meaning: "Assign real category before tax mapping."
     },
     {
       bucket: "Mapped review line",
       count: lineSummary.mapped_review_count,
       amount: lineSummary.mapped_review_total,
-      meaning: "Tax line resolved, support or final confirmation still required"
+      meaning: "Tax line resolved; support still required."
     },
     {
       bucket: "Mapped support-ready",
       count: lineSummary.mapped_ready_count,
       amount: lineSummary.mapped_ready_total,
-      meaning: "Mapped with no major support flags"
+      meaning: "Mapped with no major support flags."
     },
     {
-      bucket: "Truly unmapped after category review",
+      bucket: "Truly unmapped",
       count: lineSummary.unmapped_count,
       amount: lineSummary.unmapped_total,
-      meaning: "Category exists but no tax line resolved"
+      meaning: "Category exists but no tax line resolved."
     }
-  ];
-  const lineCols = [
-    { key: "bucket", label: "Bucket", x: 40, width: 190 },
-    { key: "count", label: "Count", x: 236, width: 42, align: "right" },
-    { key: "amountDisplay", label: "Amount", x: 286, width: 86, align: "right" },
-    { key: "meaning", label: "Meaning", x: 384, width: 188 }
   ];
   y -= 14;
   canvas.drawSectionHeader("Expense Mapping Summary", 40, y);
-  y -= 24;
-  canvas.drawTableHeader(lineCols, y);
-  y -= 18;
-  expenseBucketRows.forEach((line, index) => {
-    canvas.drawTableRow(lineCols, {
-      bucket: truncateText(line.bucket, 30),
-      count: String(line.count),
-      amountDisplay: formatCurrencyForPdf(line.amount, currency),
-      meaning: truncateText(line.meaning, 34)
-    }, y, { fillGray: index % 2 === 0 ? 0.985 : null });
-    y -= 12;
+  y -= 30;
+  expenseBucketRows.forEach((line) => {
+    canvas.drawCard(40, y, 532, 52, line.bucket, [
+      `${line.count} transactions | ${formatCurrencyForPdf(line.amount, currency)}`,
+      line.meaning
+    ], { maxChars: 90 });
+    y -= 64;
   });
-  y -= 8;
+  y -= 4;
   canvas.drawCard(40, y, 532, 96, "Mapping Totals", [
     `Truly unmapped expenses: ${lineSummary.unmapped_count} totaling ${formatCurrencyForPdf(lineSummary.unmapped_total, currency)}`,
     `Mapped review-line expenses: ${lineSummary.mapped_review_count} totaling ${formatCurrencyForPdf(lineSummary.mapped_review_total, currency)}`,
