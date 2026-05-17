@@ -117,6 +117,20 @@ test("imported income refund or reversal has NC and RR", () => {
   assert.ok(status.flags.includes("RR"));
 });
 
+test("imported income with unknown source is not mapped-ready gross receipts by default", () => {
+  const status = buildTransactionStatus(
+    { id: "inc2", type: "income", amount: 120, description: "Zelle payment from Mike" },
+    { id: "c1", name: "Imported Income", tax_map_us: "" },
+    { region: "US" }
+  );
+  assert.equal(status.needsCategory, true);
+  assert.equal(status.isMapped, false);
+  assert.equal(status.supportStatus, "category_required");
+  assert.equal(status.taxLineDisplay, "Needs category / no tax line yet");
+  assert.ok(status.flags.includes("NC"));
+  assert.ok(status.flags.includes("RV"));
+});
+
 test("classifyExcludedTransaction returns structured exclusion objects", () => {
   const ccPay = classifyExcludedTransaction(
     { type: "expense", description: "Online payment thank you", amount: 200 },
@@ -131,6 +145,56 @@ test("classifyExcludedTransaction returns structured exclusion objects", () => {
     includeInPnl: false,
     severity: "info"
   });
+});
+
+test("transfer and non-P&L payment patterns are excluded with structured codes", () => {
+  const cases = [
+    { description: "TRANSFER TO SAV XXXXX7188", type: "expense", expected: "TRANSFER" },
+    { description: "Online Realtime Transfer to Affinity", type: "expense", expected: "TRANSFER" },
+    { description: "CITI CARD ONLINE PAYMENT", type: "expense", expected: "CC_PAY" },
+    { description: "Payment to Chase card ending in 6289", type: "expense", expected: "CC_PAY" },
+    { description: "CAPITAL ONE MOBILE PMT", type: "expense", expected: "CC_PAY" },
+    { description: "AFFIRM * PAY", type: "expense", expected: "LOAN_DEBT" },
+    { description: "KLARNA* KLARNA", type: "expense", expected: "LOAN_DEBT" },
+    { description: "AMAZON CORP SYF PAYMNT", type: "expense", expected: "CC_PAY" },
+    { description: "GIVAUDAN FLAVORS PAYROLL", type: "income", expected: "PAYROLL" },
+    { description: "IRS TREAS 310 TAX REF", type: "income", expected: "TAX_REF" },
+    { description: "STATE OF N.J. NJSTTAXRFD", type: "income", expected: "TAX_REF" },
+    { description: "Cash Redemption", type: "income", expected: "CASHBACK" },
+    { description: "Reversal: APPLE.COM/BILL", type: "income", expected: "REFUND_REV" }
+  ];
+
+  for (const { description, type, expected } of cases) {
+    const reason = classifyExcludedTransaction(
+      { type, description, amount: 50 },
+      { id: "c1", name: type === "income" ? "Imported Income" : "Imported Expense", tax_map_us: "" },
+      "US"
+    );
+    assert.equal(reason?.code, expected, description);
+    assert.equal(reason?.includeInPnl, false, description);
+  }
+});
+
+test("summarizeExportTransactions routes transfers, card payments, payroll, refunds, and reversals out of included totals", () => {
+  const categories = [
+    { id: "sales", name: "Sales Revenue", tax_map_us: "Line 1 - Gross receipts or sales" },
+    { id: "imported_expense", name: "Imported Expense", tax_map_us: "" },
+    { id: "imported_income", name: "Imported Income", tax_map_us: "" }
+  ];
+  const summary = summarizeExportTransactions([
+    { id: "t1", type: "expense", amount: 300, category_id: "imported_expense", description: "TRANSFER TO SAV XXXXX7188" },
+    { id: "t2", type: "expense", amount: 250, category_id: "imported_expense", description: "CITI CARD ONLINE PAYMENT" },
+    { id: "t3", type: "expense", amount: 90, category_id: "imported_expense", description: "AFFIRM * PAY" },
+    { id: "t4", type: "income", amount: 1100, category_id: "imported_income", description: "GIVAUDAN FLAVORS PAYROLL" },
+    { id: "t5", type: "income", amount: 150, category_id: "imported_income", description: "IRS TREAS 310 TAX REF" },
+    { id: "t6", type: "income", amount: 25, category_id: "imported_income", description: "Cash Redemption" },
+    { id: "t7", type: "income", amount: 40, category_id: "imported_income", description: "Reversal: APPLE.COM/BILL" },
+    { id: "t8", type: "income", amount: 900, category_id: "sales", description: "Client invoice", payer_name: "Acme Client", tax_form_type: "1099-NEC" }
+  ], categories, { region: "US" });
+
+  assert.equal(summary.included.length, 1);
+  assert.equal(summary.excluded.length, 7);
+  assert.deepEqual(summary.excluded.map((row) => row.__exclusionReason.code).sort(), ["TRANSFER", "CC_PAY", "LOAN_DEBT", "PAYROLL", "TAX_REF", "CASHBACK", "REFUND_REV"].sort());
 });
 
 test("exclusion summary includes count and amount by code", () => {
@@ -226,9 +290,9 @@ test("resolveBusinessCurrency and normalizeRegionCode keep jurisdiction stable",
 });
 
 test("Canada mappings resolve review lines for fuel, meals, and phone", () => {
-  const fuel = buildTransactionStatus({ type: "expense", amount: 10, description: "Gas" }, { name: "Fuel & Gas", tax_map_ca: "" }, { region: "CA" });
-  const meals = buildTransactionStatus({ type: "expense", amount: 10, description: "Lunch" }, { name: "Food & Dining", tax_map_ca: "" }, { region: "CA" });
-  const phone = buildTransactionStatus({ type: "expense", amount: 10, description: "Phone" }, { name: "Phone & Internet", tax_map_ca: "" }, { region: "CA" });
+  const fuel = buildTransactionStatus({ type: "expense", amount: 10, description: "Gas", categoryId: "c1" }, { id: "c1", name: "Fuel & Gas", tax_map_ca: "" }, { region: "CA" });
+  const meals = buildTransactionStatus({ type: "expense", amount: 10, description: "Lunch", categoryId: "c2" }, { id: "c2", name: "Food & Dining", tax_map_ca: "" }, { region: "CA" });
+  const phone = buildTransactionStatus({ type: "expense", amount: 10, description: "Phone", categoryId: "c3" }, { id: "c3", name: "Phone & Internet", tax_map_ca: "" }, { region: "CA" });
   assert.match(fuel.taxLineDisplay, /Line 9281/i);
   assert.match(meals.taxLineDisplay, /Line 8523/i);
   assert.match(phone.taxLineDisplay, /Line 9270/i);

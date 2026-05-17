@@ -236,6 +236,8 @@ test("buildPdfExport returns a valid PDF buffer with premium section titles and 
   const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
   assert.match(pdf, /^%PDF-/);
   assert.match(pdf, /\(US CPA Workpaper Export\) Tj/);
+  assert.match(pdf, /\(Prepared for Schedule C bookkeeping review\) Tj/);
+  assert.match(pdf, /\(Secure Export\) Tj/);
   assert.match(pdf, /\(Executive Summary\) Tj/);
   assert.match(pdf, /\(Tax Mapping Summary\) Tj/);
   assert.match(pdf, /\(CPA Workpaper Checklist\) Tj/);
@@ -249,6 +251,8 @@ test("excluded section uses short reason codes and not truncated prose strings",
   const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
   assert.match(pdf, /\(CC PAY\) Tj/);
   assert.doesNotMatch(pdf, /CC payment - deduct und/i);
+  assert.doesNotMatch(pdf, /Tax refund - not Schedu/i);
+  assert.doesNotMatch(pdf, /Investment account - no/i);
 });
 
 test("checklist labels are not truncated and unsupported rows do not claim OK", () => {
@@ -284,6 +288,76 @@ test("secure and redacted exports keep the same classification totals and sectio
   assert.doesNotMatch(redactedText, /\(Tax ID: 12-3456789\) Tj/);
 });
 
+test("mapping summary wording does not claim unmapped rows are mapped", () => {
+  const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
+  assert.match(pdf, /\(Needs category \/ no tax l/);
+  assert.match(pdf, /\(Mapped review line\) Tj/);
+  assert.match(pdf, /\(Mapped support-ready\) Tj/);
+  assert.match(pdf, /\(Truly unmapped after catego/);
+  assert.doesNotMatch(pdf, /Unmapped[\s\S]{0,120}Status Mapped/i);
+});
+
+test("obvious non-P&L items render under excluded codes instead of ledger tax mapping", () => {
+  const pdf = buildPdfExport(buildFixtureOptions({
+    transactions: [
+      {
+        id: "tx_income",
+        type: "income",
+        amount: "1200.00",
+        categoryId: "cat_income",
+        accountId: "acc_main",
+        date: "2026-04-01",
+        description: "Client A invoice",
+        payer_name: "Acme Platform",
+        tax_form_type: "1099-K"
+      },
+      {
+        id: "tx_transfer",
+        type: "expense",
+        amount: "300.00",
+        categoryId: "cat_imported_expense",
+        accountId: "acc_main",
+        date: "2026-04-02",
+        description: "TRANSFER TO SAV XXXXX7188"
+      },
+      {
+        id: "tx_cc_pay",
+        type: "expense",
+        amount: "250.00",
+        categoryId: "cat_imported_expense",
+        accountId: "acc_main",
+        date: "2026-04-03",
+        description: "CITI CARD ONLINE PAYMENT"
+      },
+      {
+        id: "tx_tax_ref",
+        type: "income",
+        amount: "125.00",
+        categoryId: "cat_imported_income",
+        accountId: "acc_main",
+        date: "2026-04-04",
+        description: "IRS TREAS 310 TAX REF"
+      },
+      {
+        id: "tx_cashback",
+        type: "income",
+        amount: "25.00",
+        categoryId: "cat_imported_income",
+        accountId: "acc_main",
+        date: "2026-04-05",
+        description: "Cash Redemption"
+      }
+    ]
+  })).toString("latin1");
+
+  assert.match(pdf, /\(TRANSFER\) Tj/);
+  assert.match(pdf, /\(CC PAY\) Tj/);
+  assert.match(pdf, /\(TAX REF\) Tj/);
+  assert.match(pdf, /\(CASHBACK\) Tj/);
+  assert.doesNotMatch(pdf, /\(TRANSFER TO SAV XXXXX7188\) Tj[\s\S]{0,220}\(Needs category \/ no tax line yet\) Tj/);
+  assert.doesNotMatch(pdf, /\(CITI CARD ONLINE PAYMENT\) Tj[\s\S]{0,220}\(Needs category \/ no tax line yet\) Tj/);
+});
+
 test("Canada export resolves T2125 review lines", () => {
   const pdf = buildPdfExport(buildFixtureOptions({
     region: "ca",
@@ -303,6 +377,7 @@ test("Canada export resolves T2125 review lines", () => {
     ]
   })).toString("latin1");
   assert.match(pdf, /\(Canada CPA Workpaper Export\) Tj/);
+  assert.match(pdf, /\(Prepared for T2125 bookkeeping review\) Tj/);
   assert.match(pdf, /\(L9281 Motor vehicle expenses\) Tj/);
   assert.match(pdf, /\(L8523 Meals and entertain/);
   assert.match(pdf, /\(L9270 Telephone and utili/);

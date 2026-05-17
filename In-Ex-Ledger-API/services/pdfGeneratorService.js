@@ -68,6 +68,157 @@ const EXCLUSION_DEFINITIONS = {
   REVIEW: { label: "REVIEW", title: "Needs review", description: "Excluded pending client or CPA review.", includeInPnl: false, severity: "review" }
 };
 
+const NATURE_PATTERNS = {
+  payroll_or_wages: [
+    /\bpayro\b/i,
+    /\bpayroll\b/i,
+    /\bwages?\b/i,
+    /\bsalary\b/i,
+    /\bgivaudan flavors payroll\b/i,
+    /\bemployer deposit\b/i,
+    /\bdirect deposit.*payroll\b/i
+  ],
+  credit_card_payment: [
+    /\bciti card online payment\b/i,
+    /\bpayment to chase card\b/i,
+    /\bchase credit card payment\b/i,
+    /\bcapital one mobile pmt\b/i,
+    /\bamex payment\b/i,
+    /\bdiscover e-?payment\b/i,
+    /\bonline payment thank you\b/i,
+    /\bcredit card autopay\b/i,
+    /\bamazon corp syf paymnt\b/i,
+    /\bsynchrony\b/i,
+    /\bsyf\b/i,
+    /\bpaypal credit\b/i,
+    /\bvalley bank bill pay\b/i,
+    /\bvenmo credit\b/i
+  ],
+  loan_or_debt_payment: [
+    /\baffirm\b/i,
+    /\bklarna\b/i,
+    /\bloan payment\b/i,
+    /\bdebt payment\b/i,
+    /\bmortgage\b/i,
+    /\bstudent loan\b/i,
+    /\bnelnet\b/i,
+    /\bnavient\b/i,
+    /\bmohela\b/i,
+    /\bsallie mae\b/i,
+    /\bsofi\b/i,
+    /\blendingclub\b/i,
+    /\bauto loan\b/i,
+    /\bcar loan\b/i,
+    /\bpersonal loan\b/i
+  ],
+  transfer: [
+    /\btransfer to sav\b/i,
+    /\btransfer from sav\b/i,
+    /\bonline transfer to sav\b/i,
+    /\bonline transfer from sav\b/i,
+    /\bonline realtime transfer\b/i,
+    /\brealtime transfer\b/i,
+    /\binternal transfer\b/i,
+    /\bchecking\/savings transfer\b/i,
+    /\bsavings transfer\b/i,
+    /\bchecking transfer\b/i,
+    /\baffinity transfer\b/i,
+    /\bxfer\b/i,
+    /\btransfer\b/i
+  ],
+  investment_transfer: [
+    /\bfidelity\b/i,
+    /\bvanguard\b/i,
+    /\bschwab\b/i,
+    /\brobinhood\b/i,
+    /\bquestrade\b/i,
+    /\bwealthsimple\b/i,
+    /\bbrokerage\b/i,
+    /\binvestment transfer\b/i
+  ],
+  tax_refund: [
+    /\birs treas\b/i,
+    /\btax ref\b/i,
+    /\btax refund\b/i,
+    /\bnjsttaxrfd\b/i,
+    /\bstate of n\.j\.\b/i,
+    /\bstate tax refund\b/i,
+    /\bcra refund\b/i,
+    /\bdept of revenue\b/i
+  ],
+  tax_payment: [
+    /\birs eftps\b/i,
+    /\bcra remittance\b/i,
+    /\bgst\/hst payment\b/i,
+    /\bsales tax payment\b/i,
+    /\btax payment\b/i
+  ],
+  cashback_or_reward: [
+    /\bcash redemption\b/i,
+    /\bcashback\b/i,
+    /\bcash back\b/i,
+    /\brewards?\b/i,
+    /\breward redemption\b/i,
+    /\bstatement credit.*reward\b/i,
+    /\bpoints redemption\b/i
+  ],
+  refund_or_reversal: [
+    /\breversal:\b/i,
+    /\breversal\b/i,
+    /\bmerchant refund\b/i,
+    /\bapple\.com\/bill\b/i,
+    /\bwalmart credit\b/i,
+    /\brefund\b/i,
+    /\breimburse/i,
+    /\bcredit\/refund\b/i
+  ],
+  owner_draw: [
+    /\bowner draw\b/i,
+    /\bdrawing account\b/i
+  ],
+  owner_contribution: [
+    /\bowner contribution\b/i,
+    /\bcapital contribution\b/i
+  ],
+  bank_wire_or_fee_review: [
+    /\bonline domestic wire transfer\b/i,
+    /\bonline domestic wire fee\b/i,
+    /\bwire transfer\b/i,
+    /\bwire fee\b/i
+  ],
+  personal_expense: [
+    /\bnetflix\b/i,
+    /\bspotify\b/i,
+    /\bbeauty\b/i,
+    /\bpersonal care\b/i,
+    /\bgrocery\b/i,
+    /\bwhole foods\b/i,
+    /\btrader joe\b/i,
+    /\bmortgage\b/i,
+    /\bfamily expense\b/i,
+    /\bpersonal expense\b/i,
+    /\bhaircut\b/i,
+    /\bgym membership\b/i
+  ]
+};
+
+const LIKELY_BUSINESS_INCOME_PATTERNS = [
+  /\binvoice\b/i,
+  /\bclient\b/i,
+  /\bcustomer\b/i,
+  /\bsales?\b/i,
+  /\bservice\b/i,
+  /\b1099-k\b/i,
+  /\b1099-nec\b/i,
+  /\bt4a\b/i,
+  /\bstripe\b/i,
+  /\bsquare\b/i,
+  /\bshopify\b/i,
+  /\bpaypal\b/i,
+  /\bvenmo\b/i,
+  /\bzelle\b/i
+];
+
 function getPdfLabels(lang) {
   return PDF_LABELS[String(lang || "en").toLowerCase()] || PDF_LABELS.en;
 }
@@ -331,6 +482,10 @@ function buildTransactionText(txn) {
   ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
 }
 
+function matchesAnyPattern(text, patterns) {
+  return (patterns || []).some((pattern) => pattern.test(text));
+}
+
 function maskTaxId(value) {
   const text = String(value || "").trim();
   if (!text) return "Withheld";
@@ -359,24 +514,38 @@ function inferCategorySlug(txn, category, nature) {
   return "other_expense";
 }
 
+function isLikelyConfirmedBusinessIncome(txn, category) {
+  const categoryName = normalizeExportCategoryName(category);
+  const text = `${categoryName} ${buildTransactionText(txn)}`.trim();
+  if (/^sales revenue$|^service revenue$|^other business income$/i.test(categoryName)) return true;
+  if (txn?.tax_form_type || txn?.taxFormType) return true;
+  if (txn?.payer_name || txn?.payerName) {
+    const payer = String(txn?.payer_name || txn?.payerName).trim();
+    if (payer && !/\b(state of|irs|cra|department of revenue)\b/i.test(payer)) return true;
+  }
+  return matchesAnyPattern(text, LIKELY_BUSINESS_INCOME_PATTERNS);
+}
+
 function classifyTransactionNature(txn, category) {
   const type = String(txn?.type || "").toLowerCase();
   const categoryName = normalizeExportCategoryName(category).toLowerCase();
   const text = `${categoryName} ${buildTransactionText(txn).toLowerCase()}`;
 
-  if (/\bpayro\b|payroll|salary|w-2|t4\b|employer deposit|direct deposit.*payroll/.test(text)) return "payroll_or_wages";
-  if (/(payment to chase|credit card autopay|online payment thank you|pay credit card|statement balance|minimum payment|amex autopay|discover e-?payment|capital one.*pmt|paypal credit|venmo credit)/.test(text)) return "credit_card_payment";
-  if (type === "transfer" || /(internal transfer|ach transfer|bank transfer|wire transfer|online transfer|zelle to own|from savings|to savings)/.test(text)) return "transfer";
-  if (/loan payment|mortgage|student loan|nelnet|navient|sofi|personal loan|auto loan/.test(text)) return "loan_or_debt_payment";
-  if (/owner draw|drawing account/.test(text)) return "owner_draw";
-  if (/owner contribution|capital contribution/.test(text)) return "owner_contribution";
-  if (/fidelity|vanguard|schwab|robinhood|questrade|wealthsimple|brokerage|investment/.test(text)) return "investment_transfer";
-  if (type === "income" && /irs|tax refund|state tax ref|dept of revenue|cra refund/.test(text)) return "tax_refund";
-  if (type !== "income" && /\btax payment|irs eftps|cra remittance|gst\/hst payment|sales tax payment/.test(text)) return "tax_payment";
-  if (/cash back|cash redemption|reward redemption|statement credit.*reward|points redemption/.test(text)) return "cashback_or_reward";
-  if (/refund|reversal|chargeback|reimburse/.test(text)) return "refund_or_reversal";
-  if (/personal expense|family expense|netflix|spotify|whole foods|trader joe|haircut|gym membership/.test(text)) return "personal_expense";
   if (/split/i.test(String(txn?.tax_treatment || txn?.taxTreatment || ""))) return "split_transaction";
+  if (matchesAnyPattern(text, NATURE_PATTERNS.payroll_or_wages)) return "payroll_or_wages";
+  if (matchesAnyPattern(text, NATURE_PATTERNS.credit_card_payment)) return "credit_card_payment";
+  if (matchesAnyPattern(text, NATURE_PATTERNS.loan_or_debt_payment)) return "loan_or_debt_payment";
+  if (matchesAnyPattern(text, NATURE_PATTERNS.investment_transfer)) return "investment_transfer";
+  if (matchesAnyPattern(text, NATURE_PATTERNS.bank_wire_or_fee_review)) return "bank_wire_or_fee_review";
+  if (type === "transfer" || matchesAnyPattern(text, NATURE_PATTERNS.transfer)) return "transfer";
+  if (matchesAnyPattern(text, NATURE_PATTERNS.owner_draw)) return "owner_draw";
+  if (matchesAnyPattern(text, NATURE_PATTERNS.owner_contribution)) return "owner_contribution";
+  if (type === "income" && matchesAnyPattern(text, NATURE_PATTERNS.tax_refund)) return "tax_refund";
+  if (type !== "income" && matchesAnyPattern(text, NATURE_PATTERNS.tax_payment)) return "tax_payment";
+  if (matchesAnyPattern(text, NATURE_PATTERNS.cashback_or_reward)) return "cashback_or_reward";
+  if (matchesAnyPattern(text, NATURE_PATTERNS.refund_or_reversal)) return "refund_or_reversal";
+  if (matchesAnyPattern(text, NATURE_PATTERNS.personal_expense)) return "personal_expense";
+  if (type === "income" && !isLikelyConfirmedBusinessIncome(txn, category)) return "unknown_needs_review";
   if (type === "income") return "business_income";
   if (type === "expense") return "business_expense";
   return "unknown_needs_review";
@@ -396,7 +565,8 @@ function classifyExcludedTransaction(txn, category, region) {
     owner_draw: "OWNER_DRAW",
     owner_contribution: "OWNER_CONTRIB",
     refund_or_reversal: "REFUND_REV",
-    cashback_or_reward: "CASHBACK"
+    cashback_or_reward: "CASHBACK",
+    bank_wire_or_fee_review: "WIRE_FEE"
   };
   const code = map[nature] || null;
   if (!code) return null;
@@ -433,7 +603,8 @@ function buildTransactionStatus(txn, category, context = {}) {
   const nature = classifyTransactionNature(txn, category);
   const categorySlug = inferCategorySlug(txn, category, nature);
   const taxLineDisplay = resolveTaxLineFromCategory({ categorySlug, category, region });
-  const isExpense = String(txn?.type || "").toLowerCase() !== "income";
+  const isIncome = String(txn?.type || "").toLowerCase() === "income";
+  const isExpense = !isIncome;
   const flags = [];
   const text = buildTransactionText(txn).toLowerCase();
   const hasReceipt = Boolean(txn?.receipt_id || txn?.receiptId || context.receiptTxIds?.has(txn?.id));
@@ -469,10 +640,11 @@ function buildTransactionStatus(txn, category, context = {}) {
   const needsHomeOfficeSupport = categorySlug === "home_office";
   const needsCapitalAssetReview = categorySlug === "equipment_capital_asset";
   const needsReceipt = isExpense && !hasReceipt && !["needs_category"].includes(categorySlug);
+  const incomeNeedsReview = isIncome && (importedIncome || nature === "unknown_needs_review");
 
   if (nature === "refund_or_reversal" || nature === "cashback_or_reward") flags.push("RR");
   if (nature === "transfer" || nature === "credit_card_payment") flags.push("TR");
-  if (nature === "unknown_needs_review") flags.push("RV");
+  if (nature === "unknown_needs_review" || incomeNeedsReview) flags.push("RV");
 
   if (categoryStatus === "needs_category") {
     supportStatus = importedIncome && /refund|reversal|cash.?back|reward/.test(text) ? "refund_reversal_match_needed" : "payer_support_needed";
@@ -524,9 +696,11 @@ function buildTransactionStatus(txn, category, context = {}) {
     supportStatus,
     severity,
     flags: Array.from(new Set(flags)),
-    taxLineDisplay: taxLineDisplay || (nature === "business_income" ? (region === "CA" ? "Line 8000 - Gross business income" : "Line 1 - Gross receipts or sales") : "Unmapped"),
+    taxLineDisplay: categoryStatus === "needs_category"
+      ? "Needs category / no tax line yet"
+      : (taxLineDisplay || (nature === "business_income" ? (region === "CA" ? "Line 8000 - Gross business income" : "Line 1 - Gross receipts or sales") : "Unmapped")),
     supportSummary: supportPhrases.join(" + ") || "Mapped",
-    isMapped: Boolean(taxLineDisplay) || nature === "business_income",
+    isMapped: categoryStatus !== "needs_category" && (Boolean(taxLineDisplay) || nature === "business_income"),
     needsCategory: categoryStatus === "needs_category",
     needsFinalConfirmation,
     needsReceipt,
@@ -878,16 +1052,44 @@ function ensureSpace(state, requiredHeight, startNewPage) {
   if (state.y - requiredHeight < PAGE.bottom) startNewPage();
 }
 
-function drawHeaderBand(canvas, title, subtitle, badges = []) {
-  canvas.drawFilledRect(PAGE.margin, PAGE.height - 92, PAGE.width - PAGE.margin * 2, 52, COLORS.fill2);
-  canvas.drawRect(PAGE.margin, PAGE.height - 92, PAGE.width - PAGE.margin * 2, 52);
-  canvas.text(PAGE.margin + 12, PAGE.height - 64, title, 18, "F2");
-  canvas.text(PAGE.margin + 12, PAGE.height - 80, subtitle, 9);
-  let badgeX = PAGE.width - PAGE.margin - 10;
-  badges.slice().reverse().forEach((badge) => {
-    const width = canvas.drawBadge(badgeX - 70, PAGE.height - 64, badge.text, badge.variant);
-    badgeX -= width + 8;
+function estimateTextWidth(text, size = 10) {
+  return String(text || "").length * size * 0.48;
+}
+
+function drawReportHeader(canvas, { title, subtitle, badges = [] }) {
+  const left = PAGE.margin;
+  const right = PAGE.width - PAGE.margin;
+  const width = PAGE.width - PAGE.margin * 2;
+  const top = PAGE.height - PAGE.margin;
+  const titleY = top - 20;
+  const subtitleY = top - 40;
+  const badgeRowY = top - 40;
+  const stackedBadgeRowY = top - 58;
+  const bandHeight = 82;
+  canvas.drawFilledRect(left, top - bandHeight, width, bandHeight, COLORS.fill2);
+  canvas.drawRect(left, top - bandHeight, width, bandHeight);
+  canvas.text(left + 12, titleY, title, 18, "F2");
+  canvas.text(left + 12, subtitleY, subtitle, 9);
+
+  const badgeWidths = badges.map((badge) => Math.max(44, String(badge.text || "").length * 5.6 + 12));
+  const badgeTotalWidth = badgeWidths.reduce((sum, widthValue) => sum + widthValue, 0) + Math.max(0, badges.length - 1) * 8;
+  const subtitleWidth = estimateTextWidth(subtitle, 9);
+  const subtitleRightEdge = left + 12 + subtitleWidth;
+  const badgeStartXSameRow = right - 12 - badgeTotalWidth;
+  const canFitOnSubtitleRow = badgeStartXSameRow >= subtitleRightEdge + 20;
+
+  let badgeX = canFitOnSubtitleRow ? badgeStartXSameRow : left + 12;
+  const badgeY = canFitOnSubtitleRow ? badgeRowY : stackedBadgeRowY;
+  badges.forEach((badge) => {
+    const widthValue = canvas.drawBadge(badgeX, badgeY, badge.text, badge.variant);
+    badgeX += widthValue + 8;
   });
+
+  return {
+    top,
+    bottom: top - bandHeight,
+    contentStartY: canFitOnSubtitleRow ? top - 96 : top - 112
+  };
 }
 
 function buildIdentityPage(data) {
@@ -900,15 +1102,16 @@ function buildIdentityPage(data) {
 
   const regionCode = normalizeRegionCode(region);
   const canvas = new PdfCanvas();
-  drawHeaderBand(canvas, regionCode === "CA" ? labels.ca_report_title : labels.us_report_title, regionCode === "CA" ? "Prepared for T2125 bookkeeping review" : "Prepared for Schedule C bookkeeping review", [
+  const header = drawReportHeader(canvas, { title: regionCode === "CA" ? labels.ca_report_title : labels.us_report_title, subtitle: regionCode === "CA" ? "Prepared for T2125 bookkeeping review" : "Prepared for Schedule C bookkeeping review", badges: [
     { text: isSecure ? labels.secure_badge : labels.redacted_badge, variant: "neutral" },
     { text: labels.draft_badge, variant: "warning" }
-  ]);
+  ] });
 
-  canvas.text(PAGE.margin, 672, labels.executive_summary, 13, "F2");
-  canvas.drawDivider(664);
+  canvas.text(PAGE.margin, header.contentStartY, labels.executive_summary, 13, "F2");
+  canvas.drawDivider(header.contentStartY - 8);
 
-  canvas.drawCard(40, 642, 252, 126, "Entity / Profile", [
+  const cardTop = header.contentStartY - 22;
+  canvas.drawCard(40, cardTop, 252, 126, "Entity / Profile", [
     `Legal business name: ${safeValue(legalName)}`,
     ...(String(operatingName || "").trim() ? [`Operating name (DBA): ${operatingName}`] : []),
     `Tax ID: ${isSecure ? safeValue(taxId) : "Withheld"}`,
@@ -918,7 +1121,7 @@ function buildIdentityPage(data) {
     `Accounting method: ${safeValue(accountingMethod || accountingBasis)}`
   ]);
 
-  canvas.drawCard(320, 642, 252, 126, "Reporting", [
+  canvas.drawCard(320, cardTop, 252, 126, "Reporting", [
     `Reporting period: ${startDate} to ${endDate}`,
     `Currency: ${currency}`,
     `Export ID: ${reportId}`,
@@ -929,7 +1132,7 @@ function buildIdentityPage(data) {
       : `Province / GST-HST: ${safeValue(province)} | ${gstHstRegistered ? safeValue(gstHstNumber, "Registered") : "Not registered"}`
   ]);
 
-  const metricY = 494;
+  const metricY = cardTop - 148;
   canvas.drawMetricCard(40, metricY, 112, 72, "Gross income", formatCurrencyForPdf(totals.income, currency), null);
   canvas.drawMetricCard(160, metricY, 112, 72, "Total expenses", formatCurrencyForPdf(totals.expenses, currency), null);
   canvas.drawMetricCard(280, metricY, 112, 72, "Net profit/loss", formatCurrencyForPdf(totals.netProfit, currency), null);
@@ -945,12 +1148,12 @@ function buildIdentityPage(data) {
     `${reviewInsights.mealsCount} meal items require business-purpose support.`,
     `${reviewInsights.phoneAllocationCount} phone/internet items require business-use allocation.`
   ];
-  canvas.drawCard(40, 406, 532, 172, "CPA Action Required", actionLines, { maxChars: 88 });
-  canvas.text(52, 252, labels.not_filed, 9, "F2");
+  canvas.drawCard(40, metricY - 88, 532, 172, "CPA Action Required", actionLines, { maxChars: 88 });
+  canvas.text(52, metricY - 242, labels.not_filed, 9, "F2");
   if (regionCode === "CA") {
-    canvas.text(52, 236, `Fiscal year start: ${safeValue(fiscalYearStart)} | GST/HST method: ${gstHstRegistered ? safeValue(gstHstMethod) : "Not registered"}`, 8);
+    canvas.text(52, metricY - 258, `Fiscal year start: ${safeValue(fiscalYearStart)} | GST/HST method: ${gstHstRegistered ? safeValue(gstHstMethod) : "Not registered"}`, 8);
   } else {
-    canvas.text(52, 236, `Business address: ${safeValue(address)}`, 8);
+    canvas.text(52, metricY - 258, `Business address: ${safeValue(address)}`, 8);
   }
 
   return canvas;
@@ -1004,11 +1207,12 @@ function buildCategoryPages(transactions, categories, currency, labels, embedded
   const chunks = chunkArray(rows, 18);
   return chunks.map((chunk, index) => {
     const canvas = new PdfCanvas();
-    drawHeaderBand(canvas, labels.mapping_summary, normalizeRegionCode(region) === "CA" ? "T2125 category and tax-line resolution" : "Schedule C category and tax-line resolution", [{ text: labels.draft_badge, variant: "warning" }]);
-    canvas.drawMetricCard(40, 670, 126, 70, "Needs category", formatCurrencyForPdf(totals.needsCategory, currency), "Imported / uncategorized");
-    canvas.drawMetricCard(178, 670, 126, 70, "Needs support", formatCurrencyForPdf(totals.mappedNeedsSupport, currency), "Mapped but incomplete");
-    canvas.drawMetricCard(316, 670, 126, 70, "Mapped ready", formatCurrencyForPdf(totals.mappedReady, currency), "Mapped");
-    canvas.drawMetricCard(454, 670, 118, 70, "Included total", formatCurrencyForPdf(totals.included, currency), "Income + expense");
+    const header = drawReportHeader(canvas, { title: labels.mapping_summary, subtitle: normalizeRegionCode(region) === "CA" ? "T2125 category and tax-line resolution" : "Schedule C category and tax-line resolution", badges: [{ text: labels.draft_badge, variant: "warning" }] });
+    const metricTop = header.contentStartY - 8;
+    canvas.drawMetricCard(40, metricTop, 126, 70, "Needs category", formatCurrencyForPdf(totals.needsCategory, currency), "Imported / uncategorized");
+    canvas.drawMetricCard(178, metricTop, 126, 70, "Needs support", formatCurrencyForPdf(totals.mappedNeedsSupport, currency), "Mapped but incomplete");
+    canvas.drawMetricCard(316, metricTop, 126, 70, "Mapped ready", formatCurrencyForPdf(totals.mappedReady, currency), "Mapped");
+    canvas.drawMetricCard(454, metricTop, 118, 70, "Included total", formatCurrencyForPdf(totals.included, currency), "Income + expense");
     const columns = [
       { key: "category", label: "Category", x: 40, width: 132 },
       { key: "type", label: "Type", x: 180, width: 48 },
@@ -1017,7 +1221,7 @@ function buildCategoryPages(transactions, categories, currency, labels, embedded
       { key: "mappingStatus", label: "Mapping status", x: 490, width: 82 },
       { key: "supportStatus", label: "Support status", x: 40, width: 520 }
     ];
-    let y = 560;
+    let y = metricTop - 110;
     canvas.drawTableHeader(columns.slice(0, 5), y);
     y -= 20;
     chunk.forEach((row, rowIndex) => {
@@ -1032,8 +1236,12 @@ function buildCategoryPages(transactions, categories, currency, labels, embedded
       canvas.text(40, y, `Support: ${row.supportStatus}`, 7);
       y -= 12;
     });
-    if (index === 0 && chunk.length < 10) {
-      canvas.drawCard(40, 154, 532, 60, "Summary", [
+    if (index === 0) {
+      const riskCardTop = Math.max(y - 10, 210);
+      canvas.drawCard(40, riskCardTop, 532, 76, "Support Risk Summary", [
+        `Missing receipt/support count: ${rows.filter((row) => /receipt\/support/i.test(row.supportStatus)).length} | Vehicle/logbook categories: ${rows.filter((row) => /mileage/i.test(row.supportStatus)).length} | Meals/business-purpose categories: ${rows.filter((row) => /business purpose/i.test(row.supportStatus)).length} | Phone/internet allocation categories: ${rows.filter((row) => /allocation/i.test(row.supportStatus)).length}`
+      ], { maxChars: 92 });
+      canvas.drawCard(40, riskCardTop - 88, 532, 54, "Summary note", [
         `Amount needing real category: ${formatCurrencyForPdf(totals.needsCategory, currency)} | Mapped but requiring support: ${formatCurrencyForPdf(totals.mappedNeedsSupport, currency)} | Mapped and support-ready: ${formatCurrencyForPdf(totals.mappedReady, currency)}`
       ], { maxChars: 92 });
     }
@@ -1046,14 +1254,15 @@ function buildTaxPacketPages({ transactions, categories, receipts, currency, reg
   const payerSummary = computePayerSummary(transactions, region, taxYear);
   const lineSummary = computeTaxLineSummary(transactions, categories, region);
   const canvas = new PdfCanvas();
-  drawHeaderBand(canvas, normalizeRegionCode(region) === "CA" ? labels.tax_packet_title_ca : labels.tax_packet_title_us, normalizeRegionCode(region) === "CA" ? "Payer/form review and T2125 line summary" : "Payer/form review and Schedule C line summary", [{ text: labels.draft_badge, variant: "warning" }]);
-  canvas.drawCard(40, 662, 252, 96, "Receipt Review", [
+  const header = drawReportHeader(canvas, { title: normalizeRegionCode(region) === "CA" ? labels.tax_packet_title_ca : labels.tax_packet_title_us, subtitle: normalizeRegionCode(region) === "CA" ? "Payer/form review and T2125 line summary" : "Payer/form review and Schedule C line summary", badges: [{ text: labels.draft_badge, variant: "warning" }] });
+  const cardTop = header.contentStartY - 8;
+  canvas.drawCard(40, cardTop, 252, 96, "Receipt Review", [
     `Expense transactions: ${coverage.expense_count}`,
     `With receipt: ${coverage.with_receipt}`,
     `Missing receipt/support: ${coverage.missing}`,
     `Coverage: ${coverage.coverage_pct == null ? "-" : `${coverage.coverage_pct}%`}`
   ]);
-  canvas.drawCard(320, 662, 252, 96, labels.payer_review, [
+  canvas.drawCard(320, cardTop, 252, 96, labels.payer_review, [
     `Payers detected: ${payerSummary.payer_count}`,
     `Income total: ${formatCurrencyForPdf(payerSummary.total_income, currency)}`,
     `Expected form indicator is informational; confirm with preparer.`
@@ -1066,7 +1275,7 @@ function buildTaxPacketPages({ transactions, categories, receipts, currency, reg
     { key: "declared", label: "Declared", x: 392, width: 72 },
     { key: "expected", label: "Expected", x: 474, width: 98 }
   ];
-  let y = 538;
+  let y = cardTop - 124;
   canvas.drawSectionHeader(labels.payer_review, 40, y);
   y -= 24;
   canvas.drawTableHeader(payerCols, y);
@@ -1082,24 +1291,49 @@ function buildTaxPacketPages({ transactions, categories, receipts, currency, reg
     y -= 12;
   });
 
+  const expenseBucketRows = [
+    {
+      bucket: "Needs category / no tax line yet",
+      count: lineSummary.imported_count,
+      amount: lineSummary.imported_total,
+      meaning: "Category must be assigned before tax mapping"
+    },
+    {
+      bucket: "Mapped review line",
+      count: lineSummary.mapped_review_count,
+      amount: lineSummary.mapped_review_total,
+      meaning: "Tax line resolved, support or final confirmation still required"
+    },
+    {
+      bucket: "Mapped support-ready",
+      count: lineSummary.mapped_ready_count,
+      amount: lineSummary.mapped_ready_total,
+      meaning: "Mapped with no major support flags"
+    },
+    {
+      bucket: "Truly unmapped after category review",
+      count: lineSummary.unmapped_count,
+      amount: lineSummary.unmapped_total,
+      meaning: "Category exists but no tax line resolved"
+    }
+  ];
   const lineCols = [
-    { key: "tax_line", label: "Expense tax line", x: 40, width: 290 },
-    { key: "count", label: "Count", x: 338, width: 40, align: "right" },
-    { key: "total", label: "Total", x: 390, width: 86, align: "right" },
-    { key: "status", label: "Status", x: 486, width: 86 }
+    { key: "bucket", label: "Bucket", x: 40, width: 190 },
+    { key: "count", label: "Count", x: 236, width: 42, align: "right" },
+    { key: "amountDisplay", label: "Amount", x: 286, width: 86, align: "right" },
+    { key: "meaning", label: "Meaning", x: 384, width: 188 }
   ];
   y -= 14;
   canvas.drawSectionHeader("Expense Mapping Summary", 40, y);
   y -= 24;
   canvas.drawTableHeader(lineCols, y);
   y -= 18;
-  lineSummary.expense_lines.slice(0, 10).forEach((line, index) => {
-    const status = /review|required/i.test(line.tax_line) ? "Mapped review line" : "Mapped";
+  expenseBucketRows.forEach((line, index) => {
     canvas.drawTableRow(lineCols, {
-      tax_line: truncateText(shortenTaxLine(line.tax_line), 42),
+      bucket: truncateText(line.bucket, 30),
       count: String(line.count),
-      total: formatCurrencyForPdf(line.total, currency),
-      status
+      amountDisplay: formatCurrencyForPdf(line.amount, currency),
+      meaning: truncateText(line.meaning, 34)
     }, y, { fillGray: index % 2 === 0 ? 0.985 : null });
     y -= 12;
   });
@@ -1118,7 +1352,7 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
   const sorted = [...(transactions || [])].sort((a, b) => normalizePdfDate(a.date).localeCompare(normalizePdfDate(b.date)));
   if (!sorted.length) {
     const canvas = new PdfCanvas();
-    drawHeaderBand(canvas, labels.ledger_title, "No included transactions in this period", [{ text: labels.draft_badge, variant: "warning" }]);
+    drawReportHeader(canvas, { title: labels.ledger_title, subtitle: "No included transactions in this period", badges: [{ text: labels.draft_badge, variant: "warning" }] });
     return [canvas];
   }
   const pages = [];
@@ -1126,10 +1360,10 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
   const state = { y: 0, firstPage: true };
   const startPage = () => {
     canvas = new PdfCanvas();
-    drawHeaderBand(canvas, labels.ledger_title, "Primary line: date, payee, tax line, amount, flags", [{ text: labels.draft_badge, variant: "warning" }]);
-    canvas.drawSectionHeader(state.firstPage ? "Flag Legend" : "Flag legend shown on first ledger page", 40, 676);
+    const header = drawReportHeader(canvas, { title: labels.ledger_title, subtitle: "Primary line: date, payee, tax line, amount, flags", badges: [{ text: labels.draft_badge, variant: "warning" }] });
+    canvas.drawSectionHeader(state.firstPage ? "Flag Legend" : "Flag legend shown on first ledger page", 40, header.contentStartY);
     if (state.firstPage) {
-      let legendY = 652;
+      let legendY = header.contentStartY - 24;
       const legendChunks = chunkArray(Object.entries(FLAG_DESCRIPTIONS), 7);
       legendChunks.forEach((chunk, columnIndex) => {
         let colY = legendY;
@@ -1139,9 +1373,9 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
           colY -= 11;
         });
       });
-      state.y = 564;
+      state.y = header.contentStartY - 112;
     } else {
-      state.y = 652;
+      state.y = header.contentStartY - 24;
     }
     state.firstPage = false;
   };
@@ -1197,8 +1431,8 @@ function buildExclusionPages(transactions, currency, labels) {
   let firstPage = true;
   while (index < rows.length || firstPage) {
     const canvas = new PdfCanvas();
-    drawHeaderBand(canvas, firstPage ? labels.exclusions_title : `${labels.exclusions_title} - continued`, "Short reason codes shown; full legend appears on the first excluded-items page", [{ text: labels.draft_badge, variant: "warning" }]);
-    let y = 674;
+    const header = drawReportHeader(canvas, { title: firstPage ? labels.exclusions_title : `${labels.exclusions_title} - continued`, subtitle: "Short reason codes shown; full legend appears on the first excluded-items page", badges: [{ text: labels.draft_badge, variant: "warning" }] });
+    let y = header.contentStartY - 4;
     if (firstPage) {
       canvas.drawCard(40, y, 532, 118, "Exclusion Summary", summary.map((row) => `${row.label} - ${row.count} items - ${row.amount_display}`), { maxChars: 92 });
       y -= 132;
@@ -1237,7 +1471,7 @@ function buildCpaChecklistPage(opts) {
   const { labels, region, reviewInsights, currency } = opts;
   const isCA = normalizeRegionCode(region) === "CA";
   const canvas = new PdfCanvas();
-  drawHeaderBand(canvas, labels.checklist_title, isCA ? "T2125 bookkeeping workpaper checklist" : "Schedule C bookkeeping workpaper checklist", [{ text: labels.draft_badge, variant: "warning" }]);
+  const header = drawReportHeader(canvas, { title: labels.checklist_title, subtitle: isCA ? "T2125 bookkeeping workpaper checklist" : "Schedule C bookkeeping workpaper checklist", badges: [{ text: labels.draft_badge, variant: "warning" }] });
   const items = [
     { badge: reviewInsights.missingReceiptCount > 0 ? "ACTION" : "OK", title: "Receipts", description: `${reviewInsights.receiptLinkedCount} of ${reviewInsights.expenseTransactionCount} expense transactions have attached receipts.` },
     { badge: reviewInsights.needsCategoryCount > 0 ? "ACTION" : "OK", title: "Category cleanup", description: `${reviewInsights.needsCategoryCount} imported or uncategorized transactions need real business categories before filing.` },
@@ -1246,7 +1480,7 @@ function buildCpaChecklistPage(opts) {
     { badge: reviewInsights.phoneAllocationCount > 0 ? "ACTION" : "OK", title: "Phone / Internet allocation", description: `${reviewInsights.phoneAllocationCount} phone/internet transactions totaling ${formatCurrencyForPdf(reviewInsights.phoneAllocationTotal, currency)} require business-use allocation.` },
     { badge: reviewInsights.excludedCount > 0 ? "OK" : "REVIEW", title: "Excluded non-business items", description: `${reviewInsights.excludedCount} non-business items were excluded from P&L and listed in a separate schedule.` }
   ];
-  let y = 672;
+  let y = header.contentStartY - 4;
   items.forEach((item) => {
     const badgeVariant = item.badge === "ACTION" ? "warning" : item.badge === "OK" ? "success" : "neutral";
     canvas.drawCard(40, y, 532, 86, item.title, [item.description], { maxChars: 90 });
@@ -1286,33 +1520,34 @@ function summarizeVehicleCosts(vehicleCosts, currency) {
 
 function buildSupportPages(receipts, transactions, mileage, vehicleCosts, labels, currency, reviewInsights, region) {
   const canvas = new PdfCanvas();
-  drawHeaderBand(canvas, labels.support_title, normalizeRegionCode(region) === "CA" ? "Support dashboard and final CRA review notes" : "Support dashboard and final IRS review notes", [{ text: labels.draft_badge, variant: "warning" }]);
+  const header = drawReportHeader(canvas, { title: labels.support_title, subtitle: normalizeRegionCode(region) === "CA" ? "Support dashboard and final CRA review notes" : "Support dashboard and final IRS review notes", badges: [{ text: labels.draft_badge, variant: "warning" }] });
   const vehicleSummary = summarizeVehicleCosts(vehicleCosts, currency);
-  canvas.drawCard(40, 666, 252, 126, "Vehicle Review", [
+  const top = header.contentStartY - 8;
+  canvas.drawCard(40, top, 252, 126, "Vehicle Review", [
     `Transactions: ${reviewInsights.vehicleCount}`,
     `Ledger total: ${formatCurrencyForPdf(reviewInsights.vehicleTotal, currency)}`,
     `Mileage log status: ${(mileage || []).length ? "Mileage entries present" : "Mileage log needed"}`,
     `Actual-expense support: Receipts and allocation still required`,
     ...(vehicleSummary.total > 0 ? vehicleSummary.lines : ["No separate vehicle cost schedule attached. Fuel/auto transactions detected from ledger require mileage/actual support."])
   ], { maxChars: 34 });
-  canvas.drawCard(320, 666, 252, 126, "Meals Review", [
+  canvas.drawCard(320, top, 252, 126, "Meals Review", [
     `Transactions: ${reviewInsights.mealsCount}`,
     `Total amount: ${formatCurrencyForPdf(reviewInsights.mealsTotal, currency)}`,
     `Potential 50% limited amount: ${formatCurrencyForPdf(reviewInsights.mealsTotal * 0.5, currency)}`,
     `Business purpose required for each meal entry`
   ], { maxChars: 34 });
-  canvas.drawCard(40, 520, 252, 96, "Phone / Internet / Utilities", [
+  canvas.drawCard(40, top - 146, 252, 96, "Phone / Internet / Utilities", [
     `Transactions: ${reviewInsights.phoneAllocationCount}`,
     `Total amount: ${formatCurrencyForPdf(reviewInsights.phoneAllocationTotal, currency)}`,
     `Business-use percentage needed before final deduction`
   ], { maxChars: 34 });
-  canvas.drawCard(320, 520, 252, 96, "Receipt Review", [
+  canvas.drawCard(320, top - 146, 252, 96, "Receipt Review", [
     `With receipt: ${reviewInsights.receiptLinkedCount}`,
     `Missing receipt: ${reviewInsights.missingReceiptCount}`,
     `Coverage: ${reviewInsights.expenseTransactionCount ? `${((reviewInsights.receiptLinkedCount / reviewInsights.expenseTransactionCount) * 100).toFixed(1)}%` : "-"}`
   ], { maxChars: 34 });
   if (reviewInsights.homeOfficeCount > 0) {
-    canvas.drawCard(40, 410, 252, 74, "Home Office Review", [
+    canvas.drawCard(40, top - 256, 252, 74, "Home Office Review", [
       `Total amount: ${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)}`,
       `Square-foot allocation and support needed`
     ], { maxChars: 34 });
@@ -1322,8 +1557,8 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, labels
     .sort((a, b) => Number(b.__businessAmounts?.deductibleAmount ?? b.__businessAmounts?.netAmount ?? 0) - Number(a.__businessAmounts?.deductibleAmount ?? a.__businessAmounts?.netAmount ?? 0))
     .slice(0, 5)
     .map((txn) => `${truncateText(buildTransactionText(txn) || "(No description)", 34)} - ${formatCurrencyForPdf(Number(txn.__businessAmounts?.deductibleAmount ?? txn.__businessAmounts?.netAmount ?? 0), currency)} - ${txn.__status.flags.join(" ")}`);
-  canvas.drawCard(320, 410, 252, 132, "Top Exceptions", topExceptions.length ? topExceptions : ["No large flagged exceptions detected."], { maxChars: 34 });
-  canvas.drawCard(40, 222, 532, 78, "Final Disclosure", [
+  canvas.drawCard(320, top - 256, 252, 132, "Top Exceptions", topExceptions.length ? topExceptions : ["No large flagged exceptions detected."], { maxChars: 34 });
+  canvas.drawCard(40, top - 444, 532, 78, "Final Disclosure", [
     "Potential deductible amounts shown here are bookkeeping workpaper estimates only.",
     "Draft - CPA review required. Not a filed tax return."
   ], { maxChars: 90 });
