@@ -650,10 +650,10 @@ const DYNAMIC_SIDEBAR_FEATURES = [
     id: "invoices",
     label: "Invoices",
     labelKey: "nav_invoices",
-    route: "invoices",
+    route: "invoices?new=1",
     group: "Business",
-    actionLabel: "Open invoices",
-    actionKey: "quick_add_action_open_invoices",
+    actionLabel: "New invoice",
+    actionKey: "quick_add_action_new_invoice",
     icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg>'
   },
   {
@@ -1098,6 +1098,10 @@ function renderDynamicSidebarQuickAction(feature, body) {
     renderQuickCategoryForm(body, feature);
     return;
   }
+  if (feature.id === "invoices") {
+    renderQuickInvoiceForm(body, feature);
+    return;
+  }
   renderDynamicSidebarOpenPage(body, feature);
 }
 
@@ -1365,6 +1369,91 @@ function renderQuickCategoryForm(body, feature) {
       dispatchDynamicSidebarSaved("categories");
     } catch (error) {
       setDynamicSidebarMessage(form, error.message || "Unable to save category.");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+function renderQuickInvoiceForm(body, feature) {
+  const today = new Date().toISOString().slice(0, 10);
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + 30);
+  const defaultDueDate = dueDate.toISOString().slice(0, 10);
+  const defaultCurrency = getDynamicSidebarCurrency();
+
+  body.innerHTML = `
+    <form class="dynamic-sidebar-form" data-quick-invoice-form>
+      <label>Client name<input name="customer_name" type="text" autocomplete="organization" required></label>
+      <label>Client email<input name="customer_email" type="email" autocomplete="email"></label>
+      <label>Issue date<input name="issue_date" type="date" value="${today}" required></label>
+      <label>Due date<input name="due_date" type="date" value="${defaultDueDate}"></label>
+      <label>Currency<select name="currency">
+        <option value="CAD"${defaultCurrency === "CAD" ? " selected" : ""}>CAD</option>
+        <option value="USD"${defaultCurrency === "USD" ? " selected" : ""}>USD</option>
+        <option value="EUR">EUR</option>
+        <option value="GBP">GBP</option>
+      </select></label>
+      <label>Tax rate (%)<input name="tax_rate" type="number" min="0" max="100" step="0.001" inputmode="decimal" value="0"></label>
+      <fieldset class="dynamic-sidebar-fieldset">
+        <legend>Line item</legend>
+        <label>Description<input name="line_description" type="text" autocomplete="off" required></label>
+        <div class="dynamic-sidebar-inline-fields">
+          <label>Qty<input name="line_quantity" type="number" min="0.01" step="0.01" inputmode="decimal" value="1" required></label>
+          <label>Unit price<input name="line_unit_price" type="number" min="0" step="0.01" inputmode="decimal" required></label>
+        </div>
+      </fieldset>
+      <label>Notes<textarea name="notes" rows="3"></textarea></label>
+      <div class="dynamic-sidebar-form-actions">
+        <a href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(gT("common_open_full_editor", "Open full editor"))}</a>
+        <button type="submit">${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</button>
+      </div>
+      <div class="dynamic-sidebar-form-message" data-quick-message></div>
+    </form>
+  `;
+
+  const form = body.querySelector("[data-quick-invoice-form]");
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = form.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    setDynamicSidebarMessage(form, "");
+
+    try {
+      const quantity = Number(form.elements.line_quantity.value || 0);
+      const unitPrice = Number(form.elements.line_unit_price.value || 0);
+      const lineItems = [{
+        description: form.elements.line_description.value.trim(),
+        quantity,
+        unit_price: unitPrice
+      }];
+
+      const response = await dynamicSidebarApiFetch("/api/invoices-v1", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_name: form.elements.customer_name.value.trim(),
+          customer_email: form.elements.customer_email.value.trim(),
+          issue_date: form.elements.issue_date.value,
+          due_date: form.elements.due_date.value,
+          currency: form.elements.currency.value,
+          tax_rate: Number(form.elements.tax_rate.value || 0) / 100,
+          line_items: lineItems,
+          notes: form.elements.notes.value.trim(),
+          status: "draft"
+        })
+      });
+      await assertDynamicSidebarResponse(response, "Unable to save invoice.");
+      form.reset();
+      form.elements.issue_date.value = today;
+      form.elements.due_date.value = defaultDueDate;
+      form.elements.currency.value = defaultCurrency;
+      form.elements.tax_rate.value = "0";
+      form.elements.line_quantity.value = "1";
+      setDynamicSidebarMessage(form, "Draft saved.");
+      dispatchDynamicSidebarSaved("invoices");
+    } catch (error) {
+      setDynamicSidebarMessage(form, error.message || "Unable to save invoice.");
     } finally {
       submit.disabled = false;
     }
