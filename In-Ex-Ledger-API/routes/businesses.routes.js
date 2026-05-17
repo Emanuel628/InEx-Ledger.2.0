@@ -909,7 +909,6 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
             nextBillingBusinessId,
             err: stripeErr.message
           });
-          throw stripeErr;
         }
       }
     } catch (err) {

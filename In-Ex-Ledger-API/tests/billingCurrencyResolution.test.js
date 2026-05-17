@@ -12,13 +12,15 @@ function loadBillingRouter({
   country = "Canada",
   existingStripeSubscription = null,
   subscriptionSnapshots = null,
-  searchedStripeCustomerId = null
+  searchedStripeCustomerId = null,
+  missingSubscriptionRow = false
 } = {}) {
   const state = {
     stripeRequests: [],
     stripeCustomerId: null,
     normalizationUpdates: 0,
-    country
+    country,
+    missingSubscriptionRow
   };
 
   const originalLoad = Module._load.bind(Module);
@@ -30,6 +32,9 @@ function loadBillingRouter({
         pool: {
           async query(sql) {
             if (/SELECT stripe_customer_id/i.test(sql)) {
+              if (state.missingSubscriptionRow) {
+                return { rows: [], rowCount: 0 };
+              }
               return state.stripeCustomerId
                 ? { rows: [{ stripe_customer_id: state.stripeCustomerId }], rowCount: 1 }
                 : { rows: [], rowCount: 0 };
@@ -45,12 +50,19 @@ function loadBillingRouter({
               async query(sql, params = []) {
                 if (/SELECT pg_advisory_xact_lock/i.test(sql)) return { rows: [], rowCount: 1 };
                 if (/SELECT stripe_customer_id/i.test(sql)) {
+                  if (state.missingSubscriptionRow) {
+                    return { rows: [], rowCount: 0 };
+                  }
                   return state.stripeCustomerId
                     ? { rows: [{ stripe_customer_id: state.stripeCustomerId }], rowCount: 1 }
                     : { rows: [], rowCount: 0 };
                 }
                 if (/UPDATE business_subscriptions\s+SET stripe_customer_id/i.test(sql)) {
                   state.stripeCustomerId = params[1] || null;
+                  return { rows: [], rowCount: 1 };
+                }
+                if (/INSERT INTO business_subscriptions[\s\S]*stripe_customer_id/i.test(sql)) {
+                  state.stripeCustomerId = params[3] || null;
                   return { rows: [], rowCount: 1 };
                 }
                 if (/UPDATE business_subscriptions\s+SET cancel_at_period_end = false/i.test(sql)) {
@@ -475,6 +487,32 @@ test("billing checkout reuses an existing Stripe customer found by metadata sear
     assert.ok(customerSearchRequest, "Stripe customer metadata search should run before customer creation");
     assert.equal(customerCreateRequests.length, 0, "existing Stripe customer should be reused");
     assert.equal(checkoutRequest?.body?.get("customer"), "cus_existing_456");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout persists a created Stripe customer even when the subscription row is missing", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    missingSubscriptionRow: true
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 0
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(fixture.state.stripeCustomerId, "cus_test_123");
+
+    const customerInsert = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/customers")
+    );
+    assert.ok(customerInsert, "Stripe customer should still be created and persisted");
   } finally {
     fixture.cleanup();
   }

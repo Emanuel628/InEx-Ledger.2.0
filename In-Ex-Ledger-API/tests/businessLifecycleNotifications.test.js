@@ -16,7 +16,8 @@ function loadBusinessesRouterFixture(options = {}) {
     businessCount: options.businessCount ?? 1,
     businesses: options.businesses ?? [
       { id: "biz_main_001", name: "Main", is_active: true }
-    ]
+    ],
+    stripeSyncFailed: false
   };
 
   Module._load = function (requestName, parent, isMain) {
@@ -133,13 +134,26 @@ function loadBusinessesRouterFixture(options = {}) {
 
     if (requestName === "../services/stripeClient.js" || /stripeClient\.js$/.test(requestName)) {
       return {
-        stripeRequest: async () => ({}),
+        stripeRequest: async (path) => {
+          if (options.failStripeSubscriptionSync && String(path).includes("/subscriptions/")) {
+            state.stripeSyncFailed = true;
+            throw new Error("stripe sync failed");
+          }
+          return {};
+        },
         stripeGet: async (path) => {
           stripeCalls.push(path);
           if (path.includes(process.env.STRIPE_PRO_M_US)) return { unit_amount: 1200 };
           if (path.includes(process.env.STRIPE_PRO_Y_US)) return { unit_amount: 12240 };
           if (path.includes(process.env.STRIPE_ADDL_M_US)) return { unit_amount: 500 };
           if (path.includes(process.env.STRIPE_ADDL_Y_US)) return { unit_amount: 5100 };
+          if (String(path).includes("/subscriptions/")) {
+            return {
+              id: "sub_delete_123",
+              items: { data: [] },
+              metadata: {}
+            };
+          }
           return { unit_amount: 0 };
         }
       };
@@ -197,6 +211,7 @@ function loadBusinessesRouterFixture(options = {}) {
 
   return {
     app,
+    state,
     sentEmails,
     stripeCalls,
     cleanup() {
@@ -275,6 +290,43 @@ test("business deletion sends a lifecycle email with the updated zero-dollar tot
     assert.equal(fixture.sentEmails[0].subject, "business:deleted");
     assert.match(fixture.sentEmails[0].text, /Business: Delete Me LLC/);
     assert.match(fixture.sentEmails[0].text, /Updated monthly total: \$0 \/ month/);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("business deletion still succeeds when post-commit Stripe slot sync fails", async () => {
+  process.env.RESEND_API_KEY = process.env.RESEND_API_KEY || "re_test_123";
+  process.env.APP_BASE_URL = process.env.APP_BASE_URL || "https://www.inexledger.com";
+
+  const fixture = loadBusinessesRouterFixture({
+    currentBusinessCount: 2,
+    businesses: [
+      { id: "biz_keep_002", name: "Keep Me", is_active: true }
+    ],
+    subscription: {
+      businessId: "biz_delete_001",
+      effectiveTier: "v1",
+      effectiveStatus: "active",
+      additionalBusinesses: 1,
+      billingInterval: "monthly",
+      currency: "usd",
+      stripeSubscriptionId: "sub_delete_123",
+      stripeCustomerId: "cus_delete_123"
+    },
+    deletedBusinessName: "Delete Me LLC",
+    failStripeSubscriptionSync: true
+  });
+
+  try {
+    const response = await request(fixture.app)
+      .delete("/api/businesses/biz_main_001")
+      .send({ password: "secret" });
+
+    assert.equal(response.status, 200);
+    assert.equal(fixture.state.stripeSyncFailed, true);
+    assert.equal(fixture.sentEmails.length, 1);
+    assert.match(response.body?.message || "", /deleted/i);
   } finally {
     fixture.cleanup();
   }

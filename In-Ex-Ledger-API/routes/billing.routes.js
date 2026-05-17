@@ -7,6 +7,7 @@ const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createBillingMutationLimiter } = require("../middleware/rateLimitTiers.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const {
+  PLAN_FREE,
   findBillingAnchorBusinessIdForUser,
   getSubscriptionSnapshotForBusiness,
   updateStripeCustomerForBusiness,
@@ -340,6 +341,24 @@ async function findStripeCustomerByBusinessId(businessId) {
   return customers[0] || null;
 }
 
+async function persistStripeCustomerIdForBusiness(client, businessId, stripeCustomerId) {
+  return client.query(
+    `INSERT INTO business_subscriptions (
+        id,
+        business_id,
+        provider,
+        plan_code,
+        status,
+        stripe_customer_id
+     )
+     VALUES ($1, $2, 'stripe', $3, 'free', $4)
+     ON CONFLICT (business_id) DO UPDATE
+       SET stripe_customer_id = EXCLUDED.stripe_customer_id,
+           updated_at = NOW()`,
+    [crypto.randomUUID(), businessId, PLAN_FREE, stripeCustomerId]
+  );
+}
+
 async function ensureStripeCustomer(businessId, user) {
   await getSubscriptionSnapshotForBusiness(businessId);
 
@@ -366,13 +385,7 @@ async function ensureStripeCustomer(businessId, user) {
     try {
       const existingStripeCustomer = await findStripeCustomerByBusinessId(businessId);
       if (existingStripeCustomer?.id) {
-        await client.query(
-          `UPDATE business_subscriptions
-              SET stripe_customer_id = $2,
-                  updated_at = NOW()
-            WHERE business_id = $1`,
-          [businessId, existingStripeCustomer.id]
-        );
+        await persistStripeCustomerIdForBusiness(client, businessId, existingStripeCustomer.id);
         await client.query("COMMIT");
         return existingStripeCustomer.id;
       }
@@ -391,13 +404,7 @@ async function ensureStripeCustomer(businessId, user) {
       "metadata[user_id]": user.id
     });
 
-    await client.query(
-      `UPDATE business_subscriptions
-          SET stripe_customer_id = $2,
-              updated_at = NOW()
-        WHERE business_id = $1`,
-      [businessId, customer.id]
-    );
+    await persistStripeCustomerIdForBusiness(client, businessId, customer.id);
     await client.query("COMMIT");
     return customer.id;
   } catch (err) {

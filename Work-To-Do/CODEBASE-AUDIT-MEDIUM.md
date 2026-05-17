@@ -182,7 +182,7 @@ Rules used here:
   Group: Billing cache consistency
   Covers: in-process `Map` caches, shared NAT currency bleed, stale worker-local price data
 
-- [ ] Half day - Make Stripe customer creation and business-anchor migration resilient to partial failure.
+- [x] Half day - Make Stripe customer creation and business-anchor migration resilient to partial failure.
   Files: `billing.routes.js`, `businesses.routes.js`
   Group: Stripe consistency
   Covers: dangling Stripe customers, webhook race during billing-anchor migration, 500 after already-committed business deletion
