@@ -941,12 +941,6 @@ async function exportCsv(startDate, endDate, recordHistory = true, explicitFilen
 }
 
 async function exportPdf(startDate, endDate, recordHistory = true, explicitFilename, exportLangOverride) {
-  if (typeof buildPdfExport !== "function") {
-    console.warn("PDF export helper is not available.");
-    showExportToast(tx("exports_error_generic") || "PDF export is unavailable. Please refresh and try again.");
-    return;
-  }
-
   if (!transactionsCacheFresh) {
     showExportToast(tx("exports_error_stale_data"));
     return;
@@ -961,6 +955,36 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
 
   if (!batches.length) {
     showExportToast(tx("exports_no_data"));
+    return;
+  }
+
+  if (scope !== "all") {
+    const filename = explicitFilename && batches.length === 1
+      ? explicitFilename
+      : makePdfFilename(startDate, endDate, batches[0]);
+    try {
+      await submitBackendPdfExport({
+        startDate,
+        endDate,
+        includeTaxId,
+        exportLang,
+        currency: getCurrencyForRegion(String(batches[0]?.region || getRegion()).toLowerCase()),
+        filename
+      });
+      showExportToast(tx("exports_generated_pdf"));
+      if (recordHistory) {
+        await renderExportHistory();
+      }
+    } catch (pdfErr) {
+      console.error("[Exports] Backend PDF generation failed:", pdfErr);
+      showExportToast(pdfErr?.message || tx("exports_error_generic") || "PDF export failed. Please try again.");
+    }
+    return;
+  }
+
+  if (typeof buildPdfExport !== "function") {
+    console.warn("PDF export helper is not available.");
+    showExportToast(tx("exports_error_generic") || "PDF export is unavailable. Please refresh and try again.");
     return;
   }
 
@@ -1038,6 +1062,87 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
     await Promise.all(historyEntries.map((entry) => recordExportHistory(entry)));
     await renderExportHistory();
   }
+}
+
+async function requestPdfGrant({ startDate, endDate, includeTaxId, exportLang, currency }) {
+  const response = await apiFetch("/api/exports/request-grant", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      exportType: "pdf",
+      includeTaxId,
+      dateRange: { startDate, endDate },
+      language: exportLang,
+      currency,
+      templateVersion: "v1"
+    })
+  });
+
+  if (!response || !response.ok) {
+    let errorMessage = tx("exports_error_generic") || "PDF export failed. Please try again.";
+    try {
+      const payload = await response.json();
+      if (payload?.error && typeof payload.error === "string") {
+        errorMessage = payload.error;
+      }
+    } catch {}
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+async function encryptExportTaxIdIfNeeded(includeTaxId) {
+  if (!includeTaxId) return "";
+  const businessProfile = readBusinessProfile();
+  const taxId = String(businessProfile?.ein || businessProfile?.taxId || "").trim();
+  if (!taxId) {
+    throw new Error("Tax ID is missing from the business profile.");
+  }
+  if (!window.exportCrypto?.encryptTaxId) {
+    throw new Error(tx("secure_export_modal_error_generic") || "Secure export is unavailable.");
+  }
+  return window.exportCrypto.encryptTaxId(taxId);
+}
+
+async function submitBackendPdfExport({ startDate, endDate, includeTaxId, exportLang, currency, filename }) {
+  const grant = await requestPdfGrant({ startDate, endDate, includeTaxId, exportLang, currency });
+  const taxId_jwe = await encryptExportTaxIdIfNeeded(includeTaxId);
+  const response = await apiFetch("/api/exports/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      grantToken: grant?.grantToken,
+      ...(taxId_jwe ? { taxId_jwe } : {})
+    })
+  });
+
+  if (!response || !response.ok) {
+    let errorMessage = tx("exports_error_generic") || "PDF export failed. Please try again.";
+    let missingFieldKeys = [];
+    try {
+      const payload = await response.json();
+      if (payload?.error && typeof payload.error === "string") {
+        errorMessage = payload.error;
+      }
+      if (Array.isArray(payload?.missingFieldKeys)) {
+        missingFieldKeys = normalizeMissingFieldKeys(payload.missingFieldKeys);
+      }
+    } catch {}
+    const error = new Error(errorMessage);
+    error.missingFieldKeys = missingFieldKeys;
+    throw error;
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename || `inex-ledger-export-${startDate}_to_${endDate}.pdf`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 function buildBasicCsv(transactions, includeBusiness = false) {
