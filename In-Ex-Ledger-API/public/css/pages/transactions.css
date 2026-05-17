@@ -2774,6 +2774,12 @@ textarea.form-control {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(15, 25, 35, 0.1);
+  border-radius: 12px;
+  background: #fff;
+  color: #334155;
 }
 
 .tx-page-jump span {
@@ -2782,7 +2788,26 @@ textarea.form-control {
 }
 
 #txPageInput {
+  width: 3ch;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
   text-align: center;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+#txPageInput::-webkit-outer-spin-button,
+#txPageInput::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+#txPageInput:focus {
+  outline: none;
 }
 
 .recurring-bottom-bar {
