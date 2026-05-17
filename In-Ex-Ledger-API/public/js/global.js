@@ -1052,8 +1052,12 @@ function hideDynamicSidebarBackdrop() {
 function openDynamicSidebarQuickPanel(feature, anchor, panel) {
   const anchorRect = anchor.getBoundingClientRect();
   const featureLabel = getDynamicSidebarFeatureLabel(feature);
+  const top = Math.max(68, Math.min(anchorRect.top, window.innerHeight - 420));
+  const bottomMargin = 20;
+  const availableHeight = Math.max(320, window.innerHeight - top - bottomMargin);
   panel.hidden = false;
-  panel.style.top = `${Math.max(68, Math.min(anchorRect.top, window.innerHeight - 420))}px`;
+  panel.style.top = `${top}px`;
+  panel.style.maxHeight = `${availableHeight}px`;
   showDynamicSidebarBackdrop();
   panel.innerHTML = `
     <div class="dynamic-sidebar-quick-header">
@@ -1072,6 +1076,7 @@ function openDynamicSidebarQuickPanel(feature, anchor, panel) {
 function closeDynamicSidebarQuickPanel(panel) {
   if (!panel) return;
   panel.hidden = true;
+  panel.style.maxHeight = "";
   panel.innerHTML = "";
   hideDynamicSidebarBackdrop();
 }

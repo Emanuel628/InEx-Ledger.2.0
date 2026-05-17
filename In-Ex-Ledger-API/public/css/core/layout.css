@@ -588,7 +588,9 @@ body[data-theme="light"] select option {
   z-index: 70;
   width: min(360px, calc(100vw - 260px));
   max-height: calc(100vh - 84px);
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 0.5px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
@@ -606,6 +608,13 @@ body[data-theme="light"] select option {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+  flex: 0 0 auto;
+}
+
+.dynamic-sidebar-quick-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .dynamic-sidebar-quick-kicker {
@@ -642,6 +651,7 @@ body[data-theme="light"] select option {
 .dynamic-sidebar-form {
   display: grid;
   gap: 10px;
+  padding-bottom: 8px;
 }
 
 .dynamic-sidebar-form label {
