@@ -78,7 +78,7 @@ function buildFullCpaCsv(dataset, options = {}) {
     "Date",
     "Description",
     "Raw Type",
-    "Amount",
+    "Gross Amount",
     "Currency",
     "Account",
     "Category",

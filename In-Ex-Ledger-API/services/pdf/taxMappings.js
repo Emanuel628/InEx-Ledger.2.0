@@ -111,6 +111,43 @@ const CATEGORY_NAME_HINTS = [
   [/imported expense|imported income|uncategorized/i, "needs_category"]
 ];
 
+const NORMALIZED_TAX_MAP_ALIASES = {
+  gross_receipts_or_sales: "sales_revenue",
+  gross_business_income: "sales_revenue",
+  other_income: "other_business_income",
+  returns_and_allowances: "refunds_reimbursements",
+  refund_reimbursement_review: "refunds_reimbursements",
+  advertising: "advertising",
+  office_expense: "office_expense",
+  supplies: "business_supplies",
+  legal_and_professional_services: "legal_accounting",
+  legal_accounting_and_professional_fees: "legal_accounting",
+  insurance_other_than_health: "insurance_business",
+  insurance: "insurance_business",
+  car_and_truck_expenses: "vehicle_fuel",
+  motor_vehicle_expenses: "vehicle_fuel",
+  taxes_and_licenses: "taxes_licenses",
+  business_taxes_fees_and_licences: "taxes_licenses",
+  utilities: "utilities",
+  telephone_and_utilities: "phone_internet",
+  phone_and_internet: "phone_internet",
+  rent: "rent_lease",
+  rent_lease: "rent_lease",
+  repairs_and_maintenance: "repairs_maintenance",
+  travel_expenses: "travel",
+  travel: "travel",
+  meals: "meals",
+  meals_and_entertainment: "meals",
+  wages: "wages",
+  salaries_wages_and_benefits: "wages",
+  depreciation: "equipment_capital_asset",
+  capital_cost_allowance_review: "equipment_capital_asset",
+  business_use_of_home: "home_office",
+  home_office: "home_office",
+  other_expenses: "other_expense",
+  interest_and_bank_charges: "bank_fees"
+};
+
 function normalizeRegionCode(region) {
   return String(region || "").toUpperCase() === "CA" ? "CA" : "US";
 }
@@ -142,7 +179,14 @@ function resolveTaxLineFromCategory({ categorySlug, category, region }) {
   if (direct) {
     if (/^line\s+\d|^cost of goods/i.test(direct.toLowerCase())) return direct;
     const map = getLineMap(region);
-    return map[normalizeTaxMapKey(direct)] || direct;
+    const normalizedKey = normalizeTaxMapKey(direct);
+    const aliasKey = NORMALIZED_TAX_MAP_ALIASES[normalizedKey] || normalizedKey;
+    if (map[aliasKey]) return map[aliasKey];
+    return direct
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b[a-z]/g, (char) => char.toUpperCase());
   }
   const map = getLineMap(region);
   return map[categorySlug] || null;

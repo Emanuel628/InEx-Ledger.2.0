@@ -22,6 +22,21 @@ function normalizeAmount(value) {
   return Number.isFinite(num) ? Number(num.toFixed(2)) : 0;
 }
 
+function normalizeIsoDate(value) {
+  if (!value) return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+  }
+  const raw = String(value).trim();
+  const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoMatch) return isoMatch[1];
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+  }
+  return raw;
+}
+
 function resolveSignedAmount(txn) {
   const gross = normalizeAmount(txn?.amount);
   return String(txn?.type || "").toLowerCase() === "income" ? gross : -gross;
@@ -187,7 +202,7 @@ function buildNormalizedRow(enrichedTxn, context) {
     id: enrichedTxn.id,
     businessId: business?.id || enrichedTxn.business_id || enrichedTxn.businessId || "",
     businessName,
-    date: String(enrichedTxn.date || "").slice(0, 10),
+    date: normalizeIsoDate(enrichedTxn.date),
     description: String(enrichedTxn.description || enrichedTxn.note || "").trim(),
     rawType: String(enrichedTxn.type || "").toLowerCase(),
     amount: normalizeAmount(enrichedTxn.amount),
@@ -227,7 +242,7 @@ function buildNormalizedRow(enrichedTxn, context) {
     taxFormType: enrichedTxn.tax_form_type || enrichedTxn.taxFormType || "",
     sourceAmount: enrichedTxn.source_amount ?? enrichedTxn.sourceAmount ?? "",
     exchangeRate: enrichedTxn.exchange_rate ?? enrichedTxn.exchangeRate ?? "",
-    exchangeDate: String(enrichedTxn.exchange_date || enrichedTxn.exchangeDate || "").slice(0, 10),
+    exchangeDate: normalizeIsoDate(enrichedTxn.exchange_date || enrichedTxn.exchangeDate),
     convertedAmount: enrichedTxn.converted_amount ?? enrichedTxn.convertedAmount ?? "",
     taxTreatment: enrichedTxn.tax_treatment || enrichedTxn.taxTreatment || "",
     indirectTaxAmount: enrichedTxn.indirect_tax_amount ?? enrichedTxn.indirectTaxAmount ?? "",
