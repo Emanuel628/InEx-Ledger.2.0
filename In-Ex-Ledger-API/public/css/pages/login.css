@@ -149,7 +149,7 @@ body {
 .auth-error {
   margin-top: 16px;
   font-size: 13px;
-  color: var(--red);
+  color: #dc2626;
   line-height: 1.4;
 }
 
