@@ -113,11 +113,12 @@ function buildFixtureOptions(overrides = {}) {
 
 function loadExportsRouter(options = {}) {
   const originalLoad = Module._load.bind(Module);
-  const state = { insertedMetadata: null, released: false, savedRedacted: null, vehicleCostQueryCount: 0 };
-  const grantPayload = {
+  const state = { insertedMetadata: null, insertedExport: null, released: false, savedRedacted: null, vehicleCostQueryCount: 0 };
+  const grantPayload = options.grantPayload || {
     action: "generate_pdf",
     businessId: "biz_test",
     userId: "user_test",
+    exportType: "pdf",
     includeTaxId: true,
     jti: "grant_jti_123",
     dateRange: { startDate: "2026-04-01", endDate: "2026-04-30" },
@@ -127,7 +128,15 @@ function loadExportsRouter(options = {}) {
 
   Module._load = function(requestName, parent, isMain) {
     if (/auth\.middleware\.js$/.test(requestName)) {
-      return { requireAuth(req, _res, next) { req.user = { id: "user_test", email_verified: true }; next(); } };
+      return {
+        requireAuth(req, res, next) {
+          if (options.authDenied) {
+            return res.status(401).json({ error: "Unauthorized" });
+          }
+          req.user = { id: "user_test", email_verified: true };
+          next();
+        }
+      };
     }
     if (/csrf\.middleware\.js$/.test(requestName)) {
       return { requireCsrfProtection(_req, _res, next) { next(); } };
@@ -143,7 +152,7 @@ function loadExportsRouter(options = {}) {
     }
     if (/exportGrantService\.js$/.test(requestName)) {
       return {
-        issueExportGrant: async () => { throw new Error("not used"); },
+        issueExportGrant: async (payload) => options.issueGrantResult || { token: "grant_token_123", expiresAt: Date.now() + 60_000, payload },
         verifyExportGrant: async () => grantPayload
       };
     }
@@ -185,6 +194,7 @@ function loadExportsRouter(options = {}) {
             return {
               async query(sql, params) {
                 if (/INSERT INTO export_metadata/i.test(sql)) state.insertedMetadata = params;
+                if (/INSERT INTO exports/i.test(sql)) state.insertedExport = params;
                 return { rowCount: 1, rows: [] };
               },
               release() { state.released = true; }
@@ -250,8 +260,8 @@ test("buildPdfExport returns a valid PDF buffer with premium section titles and 
 test("shared header renders badges on their own reserved row", () => {
   const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
   assert.match(pdf, /1 0 0 1 52\.00 708\.00 Tm\s+\(Prepared for Schedule C bookkeeping review\) Tj/s);
-  assert.match(pdf, /52\.00 672\.00 84\.80 16\.00 re f[\s\S]{0,120}1 0 0 1 69\.44 681\.50 Tm\s+\(Secure Export\) Tj/s);
-  assert.match(pdf, /144\.80 672\.00 163\.20 16\.00 re f[\s\S]{0,120}1 0 0 1 174\.56 681\.50 Tm\s+\(Draft - CPA Review Required\) Tj/s);
+  assert.match(pdf, /52\.00 672\.00 84\.80 16\.00 re f[\s\S]{0,120}1 0 0 1 69\.44 680\.00 Tm\s+\(Secure Export\) Tj/s);
+  assert.match(pdf, /144\.80 672\.00 163\.20 16\.00 re f[\s\S]{0,120}1 0 0 1 174\.56 680\.00 Tm\s+\(Draft - CPA Review Required\) Tj/s);
 });
 
 test("excluded section uses short reason codes and not truncated prose strings", () => {
@@ -469,6 +479,82 @@ test("route exposes backend-authoritative tax mapping rules", async () => {
     assert.equal(response.body.source, "backend-authoritative");
     assert.ok(response.body.rules.jurisdiction_maps.US.sales_revenue);
     assert.ok(response.body.rules.jurisdiction_maps.CA.meals);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("CSV grant route requires auth", async () => {
+  const fixture = loadExportsRouter({ authDenied: true });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/exports/request-grant")
+      .send({ exportType: "csv_full", dateRange: { startDate: "2026-04-01", endDate: "2026-04-30" } });
+    assert.equal(response.status, 401);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("CSV grant route rejects invalid date ranges and includeTaxId", async () => {
+  let fixture = loadExportsRouter();
+  try {
+    let app = buildApp(fixture.router);
+    let response = await request(app)
+      .post("/api/exports/request-grant")
+      .send({ exportType: "csv_full", dateRange: { startDate: "2026-04-30", endDate: "2026-04-01" } });
+    assert.equal(response.status, 400);
+  } finally {
+    fixture.cleanup();
+  }
+
+  fixture = loadExportsRouter();
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/exports/request-grant")
+      .send({ exportType: "csv_full", includeTaxId: true, dateRange: { startDate: "2026-04-01", endDate: "2026-04-30" } });
+    assert.equal(response.status, 400);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("CSV generate route returns backend-authoritative CSV and records export history", async () => {
+  const fixture = loadExportsRouter({
+    grantPayload: {
+      action: "generate_pdf",
+      businessId: "biz_test",
+      userId: "user_test",
+      exportType: "csv_full",
+      includeTaxId: false,
+      jti: "grant_jti_csv",
+      dateRange: { startDate: "2026-04-01", endDate: "2026-04-30" },
+      metadata: { language: "en", currency: "USD" }
+    }
+  });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/exports/generate")
+      .buffer(true)
+      .parse(parseBinaryResponse)
+      .send({ grantToken: "grant_token_123" });
+
+    const csv = response.body.toString("utf8");
+    assert.equal(response.status, 200);
+    assert.equal(response.headers["content-type"], "text/csv; charset=utf-8");
+    assert.equal(csv.charCodeAt(0), 0xFEFF);
+    assert.match(csv, /Transaction Nature,Included In P&L,Inclusion Status,Exclusion Code/);
+    assert.match(csv, /CC PAY/);
+    assert.doesNotMatch(csv, /Tax ID/i);
+    assert.ok(Array.isArray(fixture.state.insertedExport));
+    assert.equal(fixture.state.insertedExport[3], "csv_full");
+    assert.ok(Array.isArray(fixture.state.insertedMetadata));
+    const filenameIndex = fixture.state.insertedMetadata.indexOf("filename");
+    assert.equal(filenameIndex >= 0, true);
+    assert.match(String(fixture.state.insertedMetadata[filenameIndex + 1]), /cpa-workpaper/i);
   } finally {
     fixture.cleanup();
   }

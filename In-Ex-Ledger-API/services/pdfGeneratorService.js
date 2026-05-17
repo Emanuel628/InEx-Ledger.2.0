@@ -317,7 +317,7 @@ class PdfCanvas {
     this.drawRect(x, y - 10, width, 16);
     const textWidth = normalized.length * fontSize * 0.48;
     const textX = x + Math.max(4, (width - textWidth) / 2);
-    this.text(textX, y - 0.5, normalized, fontSize, "F2");
+    this.text(textX, y - 2, normalized, fontSize, "F2");
     return width;
   }
 

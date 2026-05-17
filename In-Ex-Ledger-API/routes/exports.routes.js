@@ -12,6 +12,8 @@ const { saveRedactedPdf, buildRedactedStream, deleteExportFile } = require("../s
 const { decryptJwe } = require("../services/jweDecryptService.js");
 const { decryptTaxId } = require("../services/taxIdService.js");
 const { buildPdfExport, buildPdfExportDocument, __private: pdfPrivate } = require("../services/pdfGeneratorService.js");
+const { buildNormalizedExportDataset } = require("../services/exportDatasetService.js");
+const { buildCsvBundle } = require("../services/csvExportService.js");
 const { pool } = require("../db.js");
 const { logError, logInfo } = require("../utils/logger.js");
 const { sanitizePayload } = require("../utils/logSanitizer.js");
@@ -37,6 +39,7 @@ function requireEmailVerified(req, res, next) {
 router.use(requireEmailVerified);
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const SUPPORTED_EXPORT_TYPES = new Set(["pdf", "csv_basic", "csv_full", "csv_excluded", "csv_category_summary"]);
 const SSN_RE = /^(\d{3}-\d{2}-\d{4}|\d{9})$/;
 const EIN_RE = /^(\d{2}-\d{7}|\d{9})$/;
 const SIN_RE = /^(\d{3}-\d{3}-\d{3}|\d{9})$/;
@@ -117,6 +120,77 @@ function createPdfReportId(rawDate = new Date()) {
     String(date.getDate()).padStart(2, "0")
   ].join("");
   return `EXP-${stamp}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
+}
+
+function buildCsvFilename(exportType, startDate, endDate) {
+  const suffixMap = {
+    csv_basic: "basic-ledger",
+    csv_full: "cpa-workpaper",
+    csv_excluded: "excluded-items",
+    csv_category_summary: "category-summary"
+  };
+  const suffix = suffixMap[exportType] || "export";
+  return `inex-ledger-${suffix}-${startDate}_to_${endDate}.csv`;
+}
+
+async function fetchExportSourceRows(businessId, startDate, endDate) {
+  const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult] =
+    await Promise.all([
+      pool.query(
+        `SELECT id, account_id, category_id, amount, type, description, date, note,
+                currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
+                indirect_tax_amount, indirect_tax_recoverable, personal_use_pct,
+                review_status, review_notes, payer_name, tax_form_type
+         FROM transactions
+         WHERE business_id = $1
+           AND date >= $2 AND date <= $3
+           AND deleted_at IS NULL
+           AND (is_void = false OR is_void IS NULL)
+           AND (is_adjustment = false OR is_adjustment IS NULL)
+         ORDER BY date ASC, created_at ASC`,
+        [businessId, startDate, endDate]
+      ),
+      pool.query(`SELECT id, name, type FROM accounts WHERE business_id = $1`, [businessId]),
+      pool.query(`SELECT id, name, kind, tax_map_us, tax_map_ca FROM categories WHERE business_id = $1`, [businessId]),
+      pool.query(
+        `SELECT r.id, r.transaction_id, r.filename
+         FROM receipts r
+         JOIN transactions t ON t.id = r.transaction_id
+         WHERE r.business_id = $1 AND t.date >= $2 AND t.date <= $3 AND t.deleted_at IS NULL`,
+        [businessId, startDate, endDate]
+      ),
+      pool.query(
+        `SELECT id, trip_date, purpose, destination, miles, km, odometer_start, odometer_end
+         FROM mileage WHERE business_id = $1 AND trip_date >= $2 AND trip_date <= $3
+         ORDER BY trip_date ASC`,
+        [businessId, startDate, endDate]
+      ),
+      pool.query(
+        `SELECT id, entry_type, entry_date, title, vendor, amount, notes, created_at
+         FROM vehicle_costs
+         WHERE business_id = $1 AND entry_date >= $2 AND entry_date <= $3
+         ORDER BY entry_date ASC, created_at ASC`,
+        [businessId, startDate, endDate]
+      ),
+      pool.query(
+        `SELECT id, name, region, province, operating_name, business_activity_code,
+                fiscal_year_start, address, tax_id, accounting_method,
+                material_participation, gst_hst_registered, gst_hst_number, gst_hst_method,
+                business_type
+           FROM businesses WHERE id = $1`,
+        [businessId]
+      )
+    ]);
+
+  return {
+    transactions: txResult.rows,
+    accounts: accountResult.rows,
+    categories: categoryResult.rows,
+    receipts: receiptResult.rows,
+    mileage: mileageResult.rows,
+    vehicleCosts: vehicleCostResult.rows,
+    business: bizResult.rows[0] || {}
+  };
 }
 
 async function storeCompletedExport({
@@ -225,7 +299,7 @@ router.post("/history", exportGrantLimiter, async (req, res) => {
     if (!dateRange) {
       return res.status(400).json({ error: "Valid startDate and endDate are required." });
     }
-    if (![ "pdf", "csv_full", "csv_basic" ].includes(format)) {
+    if (!SUPPORTED_EXPORT_TYPES.has(format)) {
       return res.status(400).json({ error: "Unsupported export format." });
     }
 
@@ -245,7 +319,7 @@ router.post("/history", exportGrantLimiter, async (req, res) => {
       scope,
       filename,
       notes: batchMode ? "Client-generated batch export history entry" : "Client-generated export history entry",
-      fullVersionAvailable: format !== "pdf"
+      fullVersionAvailable: false
     });
     logInfo("Export history recorded", {
       userId: user.id,
@@ -286,8 +360,12 @@ router.post("/request-grant", exportGrantLimiter, async (req, res) => {
       return res.status(400).json({ error: "Valid startDate and endDate are required." });
     }
 
-    if (exportType === "pdf" && !hasFeatureAccess(subscription, "pdf_exports")) {
-      return res.status(402).json({ error: "PDF exports require an active InEx Ledger Pro plan." });
+    if (!SUPPORTED_EXPORT_TYPES.has(exportType)) {
+      return res.status(400).json({ error: "Unsupported export type." });
+    }
+
+    if (exportType !== "csv_basic" && !hasFeatureAccess(subscription, "pdf_exports")) {
+      return res.status(402).json({ error: "Premium exports require an active InEx Ledger Pro plan." });
     }
 
     if (includeTaxId && exportType !== "pdf") {
@@ -333,8 +411,8 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     return res.status(401).json({ error: err.message || "Invalid grant token." });
   }
 
-  if (grantPayload.action !== "generate_pdf") {
-    return res.status(400).json({ error: "Only PDF generation is supported via this endpoint." });
+  if (!SUPPORTED_EXPORT_TYPES.has(String(grantPayload.exportType || "").toLowerCase())) {
+    return res.status(400).json({ error: "Unsupported export type." });
   }
 
   if (grantPayload.includeTaxId && !req.body?.taxId_jwe) {
@@ -356,64 +434,15 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       return res.status(400).json({ error: "Grant token contains invalid date range." });
     }
 
+    const exportType = String(grantPayload.exportType || "pdf").toLowerCase();
     const exportLang = grantPayload.metadata?.language || "en";
     const currency = grantPayload.metadata?.currency || "USD";
     const includeTaxId = grantPayload.includeTaxId;
 
-    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult] =
-      await Promise.all([
-        pool.query(
-          `SELECT id, account_id, category_id, amount, type, description, date, note,
-                  currency, source_amount, exchange_rate, tax_treatment,
-                  indirect_tax_amount, indirect_tax_recoverable, personal_use_pct,
-                  review_status, payer_name, tax_form_type
-           FROM transactions
-           WHERE business_id = $1
-             AND date >= $2 AND date <= $3
-             AND deleted_at IS NULL
-             AND (is_void = false OR is_void IS NULL)
-             AND (is_adjustment = false OR is_adjustment IS NULL)
-           ORDER BY date ASC, created_at ASC`,
-          [businessId, grantStartDate, grantEndDate]
-        ),
-        pool.query(`SELECT id, name, type FROM accounts WHERE business_id = $1`, [businessId]),
-        pool.query(
-          `SELECT id, name, kind, tax_map_us, tax_map_ca FROM categories WHERE business_id = $1`,
-          [businessId]
-        ),
-        pool.query(
-          `SELECT r.id, r.transaction_id, r.filename
-           FROM receipts r
-           JOIN transactions t ON t.id = r.transaction_id
-           WHERE r.business_id = $1 AND t.date >= $2 AND t.date <= $3 AND t.deleted_at IS NULL`,
-          [businessId, grantStartDate, grantEndDate]
-        ),
-        pool.query(
-          `SELECT id, trip_date, purpose, destination, miles, km, odometer_start, odometer_end
-           FROM mileage WHERE business_id = $1 AND trip_date >= $2 AND trip_date <= $3
-           ORDER BY trip_date ASC`,
-          [businessId, grantStartDate, grantEndDate]
-        ),
-        pool.query(
-          `SELECT id, entry_type, entry_date, title, vendor, amount, notes, created_at
-           FROM vehicle_costs
-           WHERE business_id = $1 AND entry_date >= $2 AND entry_date <= $3
-           ORDER BY entry_date ASC, created_at ASC`,
-          [businessId, grantStartDate, grantEndDate]
-        ),
-        pool.query(
-          `SELECT name, region, province, operating_name, business_activity_code,
-                  fiscal_year_start, address, tax_id, accounting_method,
-                  material_participation, gst_hst_registered, gst_hst_number, gst_hst_method,
-                  business_type
-             FROM businesses WHERE id = $1`,
-          [businessId]
-        )
-      ]);
-
-    const business = bizResult.rows[0] || {};
+    const sourceRows = await fetchExportSourceRows(businessId, grantStartDate, grantEndDate);
+    const business = sourceRows.business || {};
     const region = String(business.region || "us").toLowerCase();
-    const categories = categoryResult.rows.map((c) => ({
+    const categories = sourceRows.categories.map((c) => ({
       ...c,
       taxLabel: region === "ca" ? (c.tax_map_ca || "") : (c.tax_map_us || "")
     }));
@@ -424,12 +453,12 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     const reportId = createPdfReportId(generatedAt);
 
     const sharedOptions = {
-      transactions: txResult.rows,
-      accounts: accountResult.rows,
+      transactions: sourceRows.transactions,
+      accounts: sourceRows.accounts,
       categories,
-      receipts: receiptResult.rows,
-      mileage: mileageResult.rows,
-      vehicleCosts: vehicleCostResult.rows,
+      receipts: sourceRows.receipts,
+      mileage: sourceRows.mileage,
+      vehicleCosts: sourceRows.vehicleCosts,
       startDate: grantStartDate,
       endDate: grantEndDate,
       exportLang,
@@ -452,6 +481,62 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       region,
       province: business.province || ""
     };
+
+    if (exportType !== "pdf") {
+      if (includeTaxId) {
+        return res.status(400).json({ error: "Tax ID may not be requested for CSV exports." });
+      }
+
+      const dataset = buildNormalizedExportDataset({
+        transactions: sourceRows.transactions,
+        accounts: sourceRows.accounts,
+        categories,
+        receipts: sourceRows.receipts,
+        mileage: sourceRows.mileage,
+        vehicleCosts: sourceRows.vehicleCosts,
+        business,
+        region,
+        province: business.province || "",
+        startDate: grantStartDate,
+        endDate: grantEndDate,
+        currency
+      });
+      const csvBuffer = buildCsvBundle(dataset, {
+        exportType,
+        includeBusiness: exportType !== "csv_basic"
+      });
+      const contentHash = crypto.createHash("sha256").update(csvBuffer).digest("hex");
+      const filename = buildCsvFilename(exportType, grantStartDate, grantEndDate);
+      await storeCompletedExport({
+        businessId,
+        userId: user.id,
+        exportType,
+        startDate: grantStartDate,
+        endDate: grantEndDate,
+        includeTaxId: false,
+        grantJti: grantPayload.jti,
+        contentHash,
+        filePath: null,
+        language: exportLang,
+        currency,
+        pageCount: 0,
+        scope: "active",
+        filename,
+        notes: "CSV generated via grant",
+        fullVersionAvailable: false
+      });
+      logInfo("CSV export generated via grant", {
+        userId: user.id,
+        businessId,
+        startDate: grantStartDate,
+        endDate: grantEndDate,
+        exportType
+      });
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.setHeader("Cache-Control", "private, no-store, max-age=0");
+      return res.send(csvBuffer);
+    }
 
     const fullPdf = buildPdfExportDocument({ ...sharedOptions, taxId });
     const redactedPdf = buildPdfExportDocument({ ...sharedOptions, taxId: "" });

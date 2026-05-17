@@ -883,7 +883,7 @@ function updateExportSummary() {
   summaryNet.textContent = formatMoney(net, currencyRegion);
 }
 
-async function exportCsv(startDate, endDate, recordHistory = true, explicitFilename, tierOverride, exportLangOverride) {
+async function exportCsv(startDate, endDate, recordHistory = true, explicitFilename, tierOverride, exportLangOverride, formatOverride) {
   if (!transactionsCacheFresh) {
     showExportToast(tx("exports_error_stale_data"));
     return;
@@ -892,51 +892,43 @@ async function exportCsv(startDate, endDate, recordHistory = true, explicitFilen
   const exportLang = clampExportLang(exportLangOverride || getCurrentExportLanguage());
   const scope = getExportScope();
   const transactions = filterTransactions(startDate, endDate);
-  const isFull = tier === "v1";
-  const format = isFull ? CSV_FULL_FORMAT : CSV_BASIC_FORMAT;
-  const batches = buildExportBatches(transactions, scope);
-  const historyEntries = [];
+  const format = formatOverride || (tier === "v1" ? CSV_FULL_FORMAT : CSV_BASIC_FORMAT);
 
-  if (!batches.length) {
+  if (!transactions.length) {
     showExportToast(tx("exports_no_data"));
     return;
   }
 
-  batches.forEach((batch, index) => {
-    const currency = batch.region ? getCurrencyForRegion(batch.region) : getCurrencyForRegion(getRegion());
-    const filename = explicitFilename && batches.length === 1
-      ? explicitFilename
-      : isFull
-      ? makeExportFilename(startDate, endDate, batch)
-      : makeBasicFilename(startDate, endDate, batch);
-    const csvContent = isFull
-      ? buildFullCsv(batch.transactions, currency, scope === "all")
-      : buildBasicCsv(batch.transactions, scope === "all");
+  if (scope === "all") {
+    showExportToast("Premium CSV export is available one business at a time. Multi-business CSV batching is temporarily disabled while the backend export engine is finalized.");
+    return;
+  }
 
-    window.setTimeout(() => {
-      downloadFile(csvContent, filename, "text/csv");
-    }, index * 120);
+  const activeBusiness = getBusinessesInScope()[0] || null;
+  const currency = getCurrencyForRegion(String(activeBusiness?.region || getRegion()).toLowerCase());
+  const filename = explicitFilename
+    || (format === CSV_FULL_FORMAT
+      ? makeExportFilename(startDate, endDate, activeBusiness || {})
+      : format === CSV_BASIC_FORMAT
+        ? makeBasicFilename(startDate, endDate, activeBusiness || {})
+        : makeCsvFilenameForFormat(format, startDate, endDate));
 
-    historyEntries.push({
-      id: `exp_${Date.now()}_${index}`,
+  try {
+    await submitBackendCsvExport({
       startDate,
       endDate,
-      exportedAt: new Date().toISOString(),
-      filename,
-      tier,
-      format,
       exportLang,
-      scope,
-      businessId: batch.businessId || "",
-      batchMode: batches.length > 1
+      currency,
+      filename,
+      exportType: format
     });
-  });
-
-  showExportToast(batches.length > 1 ? `${tx("exports_exported_prefix")} ${batches.length} CSV ${tx("exports_exported_suffix")}` : tx("exports_generated_csv"));
-
-  if (recordHistory) {
-    await Promise.all(historyEntries.map((entry) => recordExportHistory(entry)));
-    await renderExportHistory();
+    showExportToast(tx("exports_generated_csv"));
+    if (recordHistory) {
+      await renderExportHistory();
+    }
+  } catch (csvErr) {
+    console.error("[Exports] Backend CSV generation failed:", csvErr);
+    showExportToast(csvErr?.message || tx("exports_error_generic") || "CSV export failed. Please try again.");
   }
 }
 
@@ -986,11 +978,33 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
 }
 
 async function requestPdfGrant({ startDate, endDate, includeTaxId, exportLang, currency }) {
+  return requestExportGrant({
+    exportType: "pdf",
+    includeTaxId,
+    startDate,
+    endDate,
+    exportLang,
+    currency
+  });
+}
+
+async function requestCsvGrant({ startDate, endDate, exportLang, currency, exportType }) {
+  return requestExportGrant({
+    exportType,
+    includeTaxId: false,
+    startDate,
+    endDate,
+    exportLang,
+    currency
+  });
+}
+
+async function requestExportGrant({ exportType, includeTaxId, startDate, endDate, exportLang, currency }) {
   const response = await apiFetch("/api/exports/request-grant", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      exportType: "pdf",
+      exportType,
       includeTaxId,
       dateRange: { startDate, endDate },
       language: exportLang,
@@ -1066,6 +1080,37 @@ async function submitBackendPdfExport({ startDate, endDate, includeTaxId, export
   URL.revokeObjectURL(url);
 }
 
+async function submitBackendCsvExport({ startDate, endDate, exportLang, currency, filename, exportType }) {
+  const grant = await requestCsvGrant({ startDate, endDate, exportLang, currency, exportType });
+  const response = await apiFetch("/api/exports/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ grantToken: grant?.grantToken })
+  });
+
+  if (!response || !response.ok) {
+    let errorMessage = tx("exports_error_generic") || "CSV export failed. Please try again.";
+    try {
+      const payload = await response.json();
+      if (payload?.error && typeof payload.error === "string") {
+        errorMessage = payload.error;
+      }
+    } catch {}
+    throw new Error(errorMessage);
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename || `inex-ledger-export-${startDate}_to_${endDate}.csv`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+// LEGACY FALLBACK ONLY. Backend CSV export is authoritative.
 function buildBasicCsv(transactions, includeBusiness = false) {
   const rows = [[
     ...(includeBusiness ? ["Business"] : []),
@@ -1093,6 +1138,7 @@ function buildBasicCsv(transactions, includeBusiness = false) {
   return rows.map((row) => row.map(escapeCsv).join(",")).join("\n");
 }
 
+// LEGACY FALLBACK ONLY. Backend CSV export is authoritative.
 function buildFullCsv(transactions, currency, includeBusiness = false) {
   const accounts = mapById(getAccounts());
   const categories = mapById(getCategories());
@@ -1394,7 +1440,7 @@ async function replayHistoryEntry(entryId) {
   }
 
   const tier = entry.tier || (entry.format === CSV_FULL_FORMAT ? "v1" : "free");
-  await exportCsv(entry.startDate, entry.endDate, false, entry.filename, tier, entry.exportLang);
+  await exportCsv(entry.startDate, entry.endDate, false, entry.filename, tier, entry.exportLang, entry.format);
 }
 
 function describeHistoryEntry(entry) {
@@ -1429,9 +1475,12 @@ function buildHistoryFilename(entry) {
     return `export_${entry.start_date}_to_${entry.end_date}.pdf`;
   }
   if (format === CSV_FULL_FORMAT) {
-    return `export_${entry.start_date}_to_${entry.end_date}.csv`;
+    return `inex-ledger-cpa-workpaper-${entry.start_date}_to_${entry.end_date}.csv`;
   }
-  return `basic_export_${entry.start_date}_to_${entry.end_date}.csv`;
+  if (format === CSV_BASIC_FORMAT) {
+    return `inex-ledger-basic-ledger-${entry.start_date}_to_${entry.end_date}.csv`;
+  }
+  return makeCsvFilenameForFormat(format, entry.start_date, entry.end_date);
 }
 
 function filterTransactions(startDate, endDate) {
@@ -1534,11 +1583,21 @@ function resolveTransactionType(transaction, category) {
 }
 
 function makeExportFilename(startDate, endDate, batch) {
-  return `inex-ledger-${buildExportFileSlug(batch)}-export-${startDate}_to_${endDate}.csv`;
+  return `inex-ledger-cpa-workpaper-${startDate}_to_${endDate}.csv`;
 }
 
 function makeBasicFilename(startDate, endDate, batch) {
-  return `inex-ledger-${buildExportFileSlug(batch)}-basic-export-${startDate}_to_${endDate}.csv`;
+  return `inex-ledger-basic-ledger-${startDate}_to_${endDate}.csv`;
+}
+
+function makeCsvFilenameForFormat(format, startDate, endDate) {
+  if (format === "csv_excluded") {
+    return `inex-ledger-excluded-items-${startDate}_to_${endDate}.csv`;
+  }
+  if (format === "csv_category_summary") {
+    return `inex-ledger-category-summary-${startDate}_to_${endDate}.csv`;
+  }
+  return `inex-ledger-export-${startDate}_to_${endDate}.csv`;
 }
 
 function makePdfFilename(startDate, endDate, batch) {
