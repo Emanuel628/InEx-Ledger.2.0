@@ -204,8 +204,9 @@ const ALLOWED_ORIGINS = [
   'https://inexledger.com',
   'https://www.inexledger.com',
   'https://inex-ledger20-production.up.railway.app',
-  'http://localhost:5173',
-  'http://localhost:3000'
+  ...(process.env.NODE_ENV !== 'production'
+    ? ['http://localhost:5173', 'http://localhost:3000']
+    : [])
 ];
 
 logInfo('SYSTEM START: INEX_LEDGER_PROD_2026');

@@ -78,6 +78,16 @@ const SCHEDULE_C_LINE_MAP = {
   misc_income: 'Line 6 — Other income',
   interest_income: 'Line 6 — Other income (interest)',
   cash_unreported_income: 'Line 1 — Gross receipts (cash income)',
+  phone_internet: 'Line 25/27a — Utilities / Phone & internet (allocation req.)',
+  merchant_fees: 'Line 27a/Part V — Other expenses (merchant/platform fees)',
+  web_hosting_domain: 'Line 27a/Part V — Other expenses (web hosting/domain)',
+  materials_ingredients: 'Line 22 — Supplies (materials/ingredients)',
+  packaging: 'Line 22 — Supplies (packaging)',
+  inventory_cogs: 'Line 4 — Cost of goods sold',
+  vehicle_fuel: 'Line 9 — Car and truck expenses (fuel)',
+  vehicle_maintenance: 'Line 9 — Car and truck expenses (maintenance)',
+  vehicle_parking_tolls: 'Line 9 — Car and truck expenses (parking/tolls)',
+  capital_asset: 'Line 13 — Depreciation / Section 179 review',
 };
 
 const T2125_LINE_MAP = {
@@ -166,6 +176,19 @@ const T2125_LINE_MAP = {
   t4a_20: 'T4A Box 20 — Self-employment income',
   t4a_28: 'T4A Box 28 — Other income',
   cash_income: 'Line 8000 — Gross business income',
+  phone_internet: 'Line 9270 — Telephone and utilities (allocation req.)',
+  merchant_fees: 'Line 9270 — Other expenses (merchant/platform fees)',
+  web_hosting_domain: 'Line 8810 — Office expenses (web hosting/domain)',
+  materials_ingredients: 'Line 8811 — Supplies (materials/ingredients)',
+  packaging: 'Line 8811 — Supplies (packaging)',
+  inventory_cogs: 'Cost of goods sold / Purchases for resale',
+  vehicle_fuel: 'Line 9281 — Motor vehicle expenses (fuel)',
+  vehicle_maintenance: 'Line 9281 — Motor vehicle expenses (maintenance)',
+  vehicle_parking_tolls: 'Line 9281 — Motor vehicle expenses (parking/tolls)',
+  capital_asset: 'Line 9936 — Capital cost allowance review',
+  rent_lease_vehicles: 'Line 8912 — Rent (vehicles/equipment)',
+  rent_lease_other: 'Line 8912 — Rent',
+  repairs_maintenance: 'Line 8960 — Repairs and maintenance',
 };
 
 class PdfCanvas {
@@ -240,13 +263,37 @@ function normalizeTaxLineText(value, region) {
 function inferTaxLineFromCategoryName(categoryName, isCA) {
   const name = String(categoryName || '').toLowerCase().replace(/[&+]/g, ' ');
   if (isCA) {
-    if (/fuel|gas|\bmotor\b|vehicle|auto|mileage/.test(name)) return 'Line 9281 — Motor vehicle (mileage/actual support req.)';
+    if (/fuel|gas|\bmotor\b|\bvehicle\b|\bauto\b|mileage|car expense/.test(name)) return 'Line 9281 — Motor vehicle (mileage/actual support req.)';
     if (/meal|food|dining|restaurant|entertainment/.test(name)) return 'Line 8523 — Meals & entertainment (50% limit)';
     if (/phone|internet|telephone/.test(name)) return 'Line 9270 — Telephone & utilities (allocation req.)';
+    if (/home\s*office|home\s*business/.test(name)) return 'Line 9945 — Business-use-of-home (allocation req.)';
+    if (/\btravel\b/.test(name)) return 'Line 9200 — Travel expenses';
+    if (/supply|supplies|material|ingredient|packaging/.test(name)) return 'Line 8811 — Supplies';
+    if (/software|subscription|saas/.test(name)) return 'Line 8810 — Office expenses (software)';
+    if (/bank\s*fee|service\s*charge/.test(name)) return 'Line 8710 — Interest and bank charges';
+    if (/insurance/.test(name)) return 'Line 8690 — Insurance';
+    if (/legal|accounting|professional/.test(name)) return 'Line 8860 — Legal, accounting, and professional fees';
+    if (/rent|lease/.test(name)) return 'Line 8912 — Rent';
+    if (/utilities|electric|water|heat/.test(name)) return 'Line 9220 — Utilities';
+    if (/advertising|marketing/.test(name)) return 'Line 8520 — Advertising';
+    if (/repair|maintenance/.test(name)) return 'Line 8960 — Repairs and maintenance';
+    if (/office|supplies/.test(name)) return 'Line 8810 — Office expenses';
   } else {
-    if (/fuel|gas|\bmotor\b|vehicle|auto|mileage/.test(name)) return 'Line 9 — Car and truck (mileage/actual support req.)';
+    if (/fuel|gas|\bmotor\b|\bvehicle\b|\bauto\b|mileage|car expense/.test(name)) return 'Line 9 — Car and truck (mileage/actual support req.)';
     if (/meal|food|dining|restaurant|entertainment/.test(name)) return 'Line 24b — Deductible meals (business purpose req.)';
     if (/phone|internet|telephone/.test(name)) return 'Line 25/27a — Phone/utilities (business-use allocation req.)';
+    if (/home\s*office|home\s*business/.test(name)) return 'Line 30 — Home office (Form 8829 allocation req.)';
+    if (/\btravel\b/.test(name)) return 'Line 24a — Travel';
+    if (/supply|supplies|material|ingredient|packaging/.test(name)) return 'Line 22 — Supplies';
+    if (/software|subscription|saas/.test(name)) return 'Line 27a — Other expenses (software/subscriptions)';
+    if (/bank\s*fee|service\s*charge/.test(name)) return 'Line 27a — Other expenses (bank fees)';
+    if (/insurance/.test(name)) return 'Line 15 — Insurance (other than health)';
+    if (/legal|accounting|professional/.test(name)) return 'Line 17 — Legal and professional services';
+    if (/rent|lease/.test(name)) return 'Line 20b — Rent/lease (other property)';
+    if (/utilities|electric|water|heat/.test(name)) return 'Line 25 — Utilities';
+    if (/advertising|marketing/.test(name)) return 'Line 8 — Advertising';
+    if (/repair|maintenance/.test(name)) return 'Line 21 — Repairs and maintenance';
+    if (/office|supplies/.test(name)) return 'Line 18 — Office expense';
   }
   return null;
 }
@@ -284,6 +331,22 @@ function buildTransactionText(txn) {
     .trim();
 }
 
+const EXCLUSION_CODE_LEGEND = [
+  'TRANSFER   = Account-to-account transfer; excluded from P&L',
+  'CC PAYMENT = Credit-card payment; deduct the underlying card charges instead',
+  'PAYROLL    = Wage/payroll deposit; not Schedule C / T2125 business income',
+  'PERSONAL   = Likely personal item; verify with client before including',
+  'TAX REFUND = Tax refund; not business gross receipts',
+  'INVESTMENT = Investment/brokerage movement; excluded from business P&L',
+  'LOAN/DEBT  = Loan or debt principal; not automatically deductible',
+  'OWNER DRAW = Owner draw from business funds',
+  'OWNER CONT = Owner contribution to business capital',
+  'REFUND/REV = Refund or reversal; match to the original transaction',
+  'CASHBACK   = Cashback or reward credit; not business income by default',
+  'WIRE FEE   = Wire/bank transfer fee; review if business-related',
+  'REVIEW     = Requires client or CPA review before inclusion in P&L'
+];
+
 function classifyExcludedTransaction(txn, category) {
   const normalizedType = String(txn?.type || '').toLowerCase();
   const categoryName = category?.name || '';
@@ -291,39 +354,60 @@ function classifyExcludedTransaction(txn, category) {
   const text = buildTransactionText(txn);
   const combined = `${categoryName} ${taxMapping} ${text}`;
 
-  if (normalizedType === 'transfer' || /(transfer|credit card payment|cc payment|internal transfer|online transfer from sav|online transfer to sav)/i.test(combined)) {
-    return 'Transfer / CC payment';
+  // Payroll — check before transfer to avoid misclassifying employer ACH deposits
+  if (/^(payroll|wages?|salary|w-?2|employee\s+wages?)\b/i.test(categoryName)) return 'PAYROLL';
+  if (/\bpayro\b|payroll|w-2\b|salary deposit|employer deposit|direct deposit.*payroll/i.test(text)) return 'PAYROLL';
+
+  // Credit card payments (check before generic transfer)
+  if (/(payment to chase|chase credit crd|chase crd|citi\s*card\s*online|capital one\s*mobile\s*pmt|capital one\s*online\s*pmt|amazon corp syf pay|synchrony bank|affirm\s*\*?\s*pay|klarna|valley bank bill pay|elan financial|discover e-?payment|autopay payment|online payment thank you|amex\s*autopay|bank of america\s*online|discover\s*card\s*pay|barclaycard|credit\s*card\s*autopay|minimum payment|statement balance|comenity|pay credit card|venmo\s+credit|paypal\s+credit)/i.test(text)) {
+    return 'CC PAYMENT';
   }
-  if (/(payment to chase|chase credit crd|chase crd|citi\s*card\s*online|capital one\s*mobile\s*pmt|capital one\s*online\s*pmt|amazon corp syf pay|synchrony bank|affirm\s*\*?\s*pay|klarna|valley bank bill pay|elan financial|discover e-?payment|autopay payment|online payment thank you|amex\s*autopay|bank of america\s*online|discover\s*card\s*pay|barclaycard|credit\s*card\s*autopay|minimum payment|statement balance)/i.test(text)) {
-    return 'CC payment — deduct underlying charges';
+
+  // Transfers (account-to-account)
+  if (normalizedType === 'transfer' || /(transfer|internal transfer|online transfer from sav|online transfer to sav|ach transfer|bank transfer|wire transfer to)/i.test(combined)) {
+    return 'TRANSFER';
   }
-  if (/^(payroll|wages?|salary|w-?2|employee\s+wages?)\b/i.test(categoryName)) {
-    return 'Payroll / wage deposit';
+
+  // Cashback / rewards
+  if (/cash\s*back|cash\s*reward|cash\s*redemption|rewards?\s+redemption|point[s]?\s+redemption|airline\s+miles|statement\s+credit.*reward/i.test(text)) {
+    return 'CASHBACK';
   }
-  if (/\bpayro\b|payroll|w-2\b|salary deposit|employer deposit/i.test(text)) {
-    return 'Payroll / wage deposit';
+
+  // Tax refunds
+  if (normalizedType === 'income' && /irs\s+treas|irs\s+tax\b|tax\s+refund/i.test(text)) return 'TAX REFUND';
+  if (normalizedType === 'income' && /state\s+of\s+[a-z]|\bnjstt\b|state\s+treas|dept\s+of\s+revenue|state\s+tax\s+ref/i.test(text)) return 'TAX REFUND';
+
+  // Investment / brokerage
+  if (/\bfidelity\b|\bvanguard\b|\bschwab\b|\bmerrill\b|\brobinhood\b|e\*?trade\b|tdameritrade|td\s+ameritrade|wealthsimple|questrade|acorns|betterment|stash\s+invest/i.test(text)) return 'INVESTMENT';
+  if (/brokerage|investment\s+account|brokerage\s+transfer/i.test(text)) return 'INVESTMENT';
+
+  // Loan / debt payments
+  if (/\bloan\s+payment|\bmortgage\s+payment|\bstudent\s+loan|\bnelnet\b|\bmohela\b|\bsallie\s+mae\b|\bfedloan\b|\bnavient\b|\bauto\s+loan|\bcar\s+loan|\bpersonal\s+loan|\bsofi\b|\blendingclub\b/i.test(text)) {
+    return 'LOAN/DEBT';
   }
+
+  // Owner draw / contribution
+  if (/owner\s+draw|drawing\s+account/i.test(combined)) return 'OWNER DRAW';
+  if (/owner\s+contribution|capital\s+contribution/i.test(combined)) return 'OWNER CONT';
+
+  // Wire / bank fees
   if (/(wire\s*fee|wire\s*transfer\s*fee|outgoing wire|incoming wire|international wire)/i.test(text) && normalizedType !== 'income') {
-    return 'Wire/bank fee — review if business';
+    return 'WIRE FEE';
   }
-  if (normalizedType === 'income' && /irs\s+treas|tax\s+refund|irs\s+tax\b/i.test(text)) {
-    return 'Tax refund — not Schedule C income';
-  }
-  if (normalizedType === 'income' && /state\s+of\s+[a-z]|\bnjstt\b|state\s+treas|dept\s+of\s+revenue/i.test(text)) {
-    return 'State tax refund — not Sch C income';
-  }
-  if (normalizedType === 'income' && /\bfidelity\b|\bvanguard\b|\bschwab\b|\bmerrill\b|\brobinhood\b|e\*?trade\b|tdameritrade|td\s+ameritrade/i.test(text)) {
-    return 'Investment account — not Sch C income';
-  }
-  if (/(grocery|groceries|supermarket|whole foods|trader joe|kroger|safeway|publix|aldi|food lion|stop\s*&\s*shop|netflix|hulu|disney plus|disney\+|spotify|amazon prime|apple music|planet fitness|anytime fitness|gym membership|haircut|barber shop|vagaro|nail salon|crosscountry|cross\s*country\s*mortgage|mortgage payment|personal expense|family expense)/i.test(combined)) {
-    return 'Potential personal use';
+
+  // Personal items
+  if (/(grocery|groceries|supermarket|whole foods|trader joe|kroger|safeway|publix|aldi|food lion|stop\s*&\s*shop|netflix|hulu|disney plus|disney\+|spotify|amazon prime|apple music|planet fitness|anytime fitness|gym membership|haircut|barber shop|vagaro|nail salon|crosscountry|cross\s*country\s*mortgage|personal expense|family expense)/i.test(combined)) {
+    return 'PERSONAL';
   }
   if (String(txn?.tax_treatment || txn?.taxTreatment || '').toLowerCase() === 'split_use' || Number(txn?.personal_use_pct ?? txn?.personalUsePct) > 0) {
-    return 'Potential personal use';
+    return 'PERSONAL';
   }
-  if (/(refund|reimbursement)/i.test(text) && normalizedType !== 'income') {
-    return 'Refund / reimbursement';
+
+  // Refund / reversal
+  if (/(refund|reimbursement|reversal)/i.test(text) && normalizedType !== 'income') {
+    return 'REFUND/REV';
   }
+
   return null;
 }
 
@@ -478,8 +562,26 @@ function getTransactionFlags(txn, category, region = 'us') {
   if (Number(txn.indirect_tax_amount ?? txn.indirectTaxAmount) > 0) flags.push('Indirect tax');
   const currencyCode = String(txn.currency || '').toUpperCase();
   if (currencyCode && currencyCode !== 'USD' && currencyCode !== 'CAD') flags.push('FX');
-  if (hasCategoryId && !isImportedCategory && !taxMapping.trim()) flags.push('Needs tax mapping');
-  if (isSpecialReviewCategory(categoryName, taxMapping)) flags.push('Special category');
+  if (hasCategoryId && !isImportedCategory) {
+    const resolved = resolveTaxLine(taxMapping, categoryName, region);
+    if (/^Unmapped\b/i.test(resolved)) {
+      flags.push('Needs tax mapping');
+    } else {
+      const lcat = (categoryName + ' ' + resolved).toLowerCase();
+      const isVehicle = /\b(fuel|gas|vehicle|auto|mileage|car.truck)\b/.test(lcat) || /line 9\b|line 9281/.test(lcat);
+      const isMeals = /\b(meal|food|dining|restaurant|entertainment)\b/.test(lcat) || /line 24b|line 8523/.test(lcat);
+      const isPhone = /phone|internet|telephone/.test(lcat) || /line 25\/27a|line 9270/.test(lcat);
+      const isHomeOff = /home.office|home.business/.test(lcat) || /line 30\b|line 9945/.test(lcat);
+      const isCapital = /depreciation|capital.asset|section.179|\bcca\b/.test(lcat) || /line 13\b|line 9936/.test(lcat);
+      const isTravel = /\btravel\b/.test(lcat) || /line 24a/.test(lcat);
+      if (isVehicle) flags.push('Vehicle — mileage log');
+      else if (isMeals) flags.push('Meals — business purpose');
+      else if (isPhone) flags.push('Phone — allocation needed');
+      else if (isHomeOff) flags.push('Home office — allocation');
+      else if (isCapital) flags.push('Capital asset review');
+      else if (isTravel) flags.push('Travel — support needed');
+    }
+  }
   return Array.from(new Set(flags));
 }
 
@@ -491,10 +593,16 @@ const FLAG_CODE_MAP = {
   'Mixed-use': 'MU',
   'Indirect tax': 'IX',
   'FX': 'FX',
-  'Needs tax mapping': 'TM',
-  'Special category': 'SC'
+  'Needs tax mapping': 'UM',
+  'Special category': 'SC',
+  'Vehicle — mileage log': 'ML',
+  'Meals — business purpose': 'BP',
+  'Phone — allocation needed': 'AL',
+  'Home office — allocation': 'HO',
+  'Capital asset review': 'CA',
+  'Travel — support needed': 'TR'
 };
-const FLAG_CODE_LEGEND = 'Flags: UC=Uncategorized  NC=Needs cat  TM=No tax map  MD=No desc  SC=Meals/auto/home  MU=Mixed-use';
+const FLAG_CODE_LEGEND = 'Flags: UC=Uncategorized  NC=Needs cat  UM=Unmapped  ML=Mileage log  BP=Business purpose  AL=Allocation  HO=Home-office  CA=Capital asset  MD=No desc';
 
 function normalizeDuplicateKey(txn) {
   const description = String(txn.description || txn.note || '').trim().toLowerCase().replace(/\s+/g, ' ');
