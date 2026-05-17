@@ -2769,6 +2769,22 @@ textarea.form-control {
   color: #334155;
 }
 
+.tx-page-jump {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.tx-page-jump span {
+  display: inline-flex;
+  align-items: center;
+}
+
+#txPageInput {
+  text-align: center;
+}
+
 .recurring-bottom-bar {
   padding: 0 22px 22px;
 }
