@@ -142,9 +142,13 @@ async function savePrivacySettings(req, res) {
 
     // Fetch existing privacy row to detect changes for consent logging
     const existingResult = await pool.query(
-      "SELECT analytics_opt_in, marketing_email_opt_in FROM user_privacy_settings WHERE user_id = $1",
+      `SELECT data_sharing_opt_out, consent_given, analytics_opt_in, marketing_email_opt_in
+         FROM user_privacy_settings
+        WHERE user_id = $1`,
       [req.user.id]
-      );
+    );
+    const previousDataSharingOptOut = existingResult.rows[0]?.data_sharing_opt_out;
+    const previousConsentGiven = existingResult.rows[0]?.consent_given;
     const previousAnalyticsOptIn = existingResult.rows[0]?.analytics_opt_in ?? false;
     const previousMarketingEmailOptIn = existingResult.rows[0]?.marketing_email_opt_in ?? false;
 
@@ -178,13 +182,22 @@ async function savePrivacySettings(req, res) {
       const ipAddress = req.ip || req.connection?.remoteAddress || null;
       const userAgent = String(req.get("user-agent") || "").slice(0, MAX_USER_AGENT_LENGTH) || null;
 
-      // Log data-sharing opt-out change
-      const action = dataSharingOptOut ? "opt_out" : "opt_in";
-      await pool.query(
-        `INSERT INTO privacy_consent_log (user_id, data_residency, action, ip_address, user_agent)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [req.user.id, dataResidency, action, ipAddress, userAgent]
-      );
+      const privacyChoiceChanged =
+        previousDataSharingOptOut === undefined
+        || previousDataSharingOptOut === null
+        || previousDataSharingOptOut !== dataSharingOptOut
+        || previousConsentGiven === undefined
+        || previousConsentGiven === null
+        || previousConsentGiven !== consentGiven;
+
+      if (privacyChoiceChanged) {
+        const action = dataSharingOptOut ? "opt_out" : "opt_in";
+        await pool.query(
+          `INSERT INTO privacy_consent_log (user_id, data_residency, action, ip_address, user_agent)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [req.user.id, dataResidency, action, ipAddress, userAgent]
+        );
+      }
 
       // Log analytics opt-in consent separately when the QC user explicitly enables/disables
       // tracking.  This block is already scoped to QC (outer if above); the extra
@@ -245,7 +258,12 @@ router.post("/export", requireMfaIfEnabled, async (req, res) => {
       mileageResult,
       vehicleCostResult,
       recurringResult,
-      privacySettingsResult
+      receiptsResult,
+      exportHistoryResult,
+      bankConnectionsResult,
+      invoicesResult,
+      privacySettingsResult,
+      consentLogResult
     ] = await Promise.all([
       pool.query(
         "SELECT id, email, full_name, display_name, created_at FROM users WHERE id = $1",
@@ -342,9 +360,61 @@ router.post("/export", requireMfaIfEnabled, async (req, res) => {
           ORDER BY created_at DESC`,
         [businessIds]
       ),
+      pool.query(
+        `SELECT id, business_id, transaction_id, filename, mime_type, uploaded_at, file_hash
+           FROM receipts
+          WHERE business_id = ANY($1::uuid[])
+          ORDER BY uploaded_at DESC`,
+        [businessIds]
+      ),
+      pool.query(
+        `SELECT e.id,
+                e.business_id,
+                e.user_id,
+                e.export_type,
+                e.status,
+                e.created_at,
+                e.completed_at,
+                COALESCE(
+                  jsonb_object_agg(m.key, m.value) FILTER (WHERE m.key IS NOT NULL),
+                  '{}'::jsonb
+                ) AS metadata
+           FROM exports e
+           LEFT JOIN export_metadata m ON m.export_id = e.id
+          WHERE e.business_id = ANY($1::uuid[])
+          GROUP BY e.id
+          ORDER BY e.created_at DESC`,
+        [businessIds]
+      ),
+      pool.query(
+        `SELECT id, business_id, provider, external_item_id, institution_name,
+                institution_logo_url, status, last_synced_at, last_error,
+                created_at, updated_at
+           FROM bank_connections
+          WHERE business_id = ANY($1::uuid[])
+          ORDER BY created_at DESC`,
+        [businessIds]
+      ),
+      pool.query(
+        `SELECT id, business_id, invoice_number, customer_name, customer_email,
+                issue_date, due_date, status, currency, line_items,
+                subtotal, tax_rate, tax_amount, total_amount, notes,
+                deleted_at, created_at, updated_at
+           FROM invoices_v1
+          WHERE business_id = ANY($1::uuid[])
+          ORDER BY created_at DESC`,
+        [businessIds]
+      ),
       // Privacy preferences
       pool.query(
         "SELECT data_sharing_opt_out, consent_given, analytics_opt_in, updated_at FROM user_privacy_settings WHERE user_id = $1",
+        [req.user.id]
+      ),
+      pool.query(
+        `SELECT data_residency, action, ip_address, user_agent, created_at
+           FROM privacy_consent_log
+          WHERE user_id = $1
+          ORDER BY created_at DESC`,
         [req.user.id]
       )
     ]);
@@ -408,7 +478,12 @@ router.post("/export", requireMfaIfEnabled, async (req, res) => {
       mileage: mileageResult.rows,
       vehicleCosts: vehicleCostResult.rows,
       recurringTransactions: recurringResult.rows,
+      receipts: receiptsResult.rows,
+      exportHistory: exportHistoryResult.rows,
+      bankConnections: bankConnectionsResult.rows,
+      invoices: invoicesResult.rows,
       privacySettings: privacySettingsResult.rows[0] || null,
+      privacyConsentLog: consentLogResult.rows,
       auditLog: auditLogResult.rows
     };
 
@@ -601,12 +676,15 @@ router.post("/delete", requireMfaIfEnabled, async (req, res) => {
       .map((row) => row.storage_path)
       .filter((filePath) => isManagedReceiptPath(filePath));
     const exportFiles = await client.query(
-      `SELECT DISTINCT m.value AS file_path
+      `SELECT DISTINCT metadata.file_path
          FROM exports e
-         JOIN export_metadata m ON m.export_id = e.id
+         LEFT JOIN LATERAL (
+           SELECT MAX(CASE WHEN key = 'file_path' THEN value END) AS file_path
+             FROM export_metadata
+            WHERE export_id = e.id
+         ) metadata ON TRUE
         WHERE e.business_id = ANY($1::uuid[])
-          AND m.key = 'file_path'
-          AND m.value IS NOT NULL`,
+          AND metadata.file_path IS NOT NULL`,
       [businessIds]
     );
     const exportPaths = exportFiles.rows
@@ -642,7 +720,10 @@ router.post("/delete", requireMfaIfEnabled, async (req, res) => {
     await client.query("DELETE FROM receipts WHERE business_id = ANY($1::uuid[])", [businessIds]);
     await client.query("DELETE FROM mileage WHERE business_id = ANY($1::uuid[])", [businessIds]);
     await client.query("DELETE FROM vehicle_costs WHERE business_id = ANY($1::uuid[])", [businessIds]);
+    await client.query("DELETE FROM invoices_v1 WHERE business_id = ANY($1::uuid[])", [businessIds]);
+    await client.query("DELETE FROM bank_connections WHERE business_id = ANY($1::uuid[])", [businessIds]);
     await client.query("DELETE FROM exports WHERE business_id = ANY($1::uuid[])", [businessIds]);
+    await client.query("DELETE FROM business_subscriptions WHERE business_id = ANY($1::uuid[])", [businessIds]);
     await client.query("DELETE FROM accounts WHERE business_id = ANY($1::uuid[])", [businessIds]);
     await client.query("DELETE FROM categories WHERE business_id = ANY($1::uuid[])", [businessIds]);
 

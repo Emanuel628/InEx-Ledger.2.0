@@ -148,7 +148,7 @@ Rules used here:
   Group: Sessions behavior
   Covers: dangling refresh cookie after revoke-all, no warning on revoking current session, missing current/IP/device/MFA render data
 
-- [ ] 1-2 hours - Fix `POST /api/privacy/delete` cleanup and export completeness gaps.
+- [x] 1-2 hours - Fix `POST /api/privacy/delete` cleanup and export completeness gaps.
   Files: `privacy.routes.js`
   Group: Privacy export/delete integrity
   Covers: incomplete cleanup join, incomplete exported data set, duplicate Quebec consent log writes
