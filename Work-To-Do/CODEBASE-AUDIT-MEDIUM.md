@@ -177,7 +177,7 @@ Rules used here:
 
 ### Billing, subscription, and customer state
 
-- [ ] Half day - Make billing caches safe for multi-worker deployments and per-user currency context.
+- [x] Half day - Make billing caches safe for multi-worker deployments and per-user currency context.
   Files: `In-Ex-Ledger-API/routes/billing.routes.js`
   Group: Billing cache consistency
   Covers: in-process `Map` caches, shared NAT currency bleed, stale worker-local price data

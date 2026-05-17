@@ -34,14 +34,10 @@ const billingMutationLimiter = createBillingMutationLimiter();
 const BILLING_INTERVALS = new Set(["monthly", "yearly"]);
 const BILLING_CURRENCIES = new Set(["usd", "cad"]);
 const MAX_ADDITIONAL_BUSINESSES = 100;
-const BILLING_CONTEXT_CACHE_TTL_MS = 15 * 60 * 1000;
-const STRIPE_PRICE_CACHE_TTL_MS = 15 * 60 * 1000;
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || process.env.EMAIL_FROM || "InEx Ledger <noreply@inexledger.com>";
 
 const { base: BASE_PRICE_ENV, addon: ADDON_PRICE_ENV } = buildStripePriceEnvMap();
 const { addonPriceIds: STRIPE_ADDON_PRICE_IDS, metadataByPriceId: STRIPE_PRICE_METADATA_BY_ID } = buildStripePriceLookup();
-const billingContextCache = new Map();
-const stripePriceCache = new Map();
 let resendClient = null;
 
 class BillingValidationError extends Error {
@@ -239,28 +235,14 @@ function resolveCurrencyForCountry(countryCode) {
 
 async function resolveBillingContext(req) {
   const ipAddress = getVerifiedClientIp(req);
-  const cached = ipAddress ? billingContextCache.get(ipAddress) : null;
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.value;
-  }
-
   const location = await fetchIpLocation(ipAddress);
   const countryCode = normalizeCountryCode(location?.country);
-  const context = {
+  return {
     ipAddress: ipAddress || null,
     countryCode,
     currency: resolveCurrencyForCountry(countryCode),
     source: countryCode ? "ip_geolocation" : "default_usd"
   };
-
-  if (ipAddress) {
-    billingContextCache.set(ipAddress, {
-      value: context,
-      expiresAt: Date.now() + BILLING_CONTEXT_CACHE_TTL_MS
-    });
-  }
-
-  return context;
 }
 
 function resolveStripePriceSelection({ billingInterval, currency, additionalBusinesses }) {
@@ -297,17 +279,7 @@ function parseStripeUnitAmount(price) {
 }
 
 async function fetchStripePrice(priceId) {
-  const cached = stripePriceCache.get(priceId);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.value;
-  }
-
-  const price = await stripeGet(`/prices/${encodeURIComponent(priceId)}`);
-  stripePriceCache.set(priceId, {
-    value: price,
-    expiresAt: Date.now() + STRIPE_PRICE_CACHE_TTL_MS
-  });
-  return price;
+  return stripeGet(`/prices/${encodeURIComponent(priceId)}`);
 }
 
 async function buildVerifiedPricingTable(currency) {

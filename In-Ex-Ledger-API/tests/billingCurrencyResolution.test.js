@@ -17,7 +17,8 @@ function loadBillingRouter({
   const state = {
     stripeRequests: [],
     stripeCustomerId: null,
-    normalizationUpdates: 0
+    normalizationUpdates: 0,
+    country
   };
 
   const originalLoad = Module._load.bind(Module);
@@ -163,7 +164,7 @@ function loadBillingRouter({
     ) {
       return {
         normalizeIpAddress: (value) => String(value || "").trim(),
-        fetchIpLocation: async () => (country ? { country } : null)
+        fetchIpLocation: async () => (state.country ? { country: state.country } : null)
       };
     }
 
@@ -420,6 +421,26 @@ test("billing checkout ignores client currency and uses verified region currency
     assert.equal(checkoutRequest.body.get("metadata[currency]"), "cad");
     assert.equal(checkoutRequest.body.get("metadata[country_code]"), "ca");
     assert.equal(checkoutRequest.body.get("metadata[currency_source]"), "ip_geolocation");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing pricing context does not stay pinned to a stale IP cache when the verified region changes", async () => {
+  const fixture = loadBillingRouter({ country: "Canada" });
+
+  try {
+    const first = await request(fixture.app).get("/api/billing/pricing-context");
+    assert.equal(first.status, 200);
+    assert.equal(first.body.currency, "cad");
+
+    fixture.state.country = "United States";
+
+    const second = await request(fixture.app).get("/api/billing/pricing-context");
+    assert.equal(second.status, 200);
+    assert.equal(second.body.currency, "usd");
+    assert.equal(second.body.country_code, "us");
+    assert.equal(second.body.source, "ip_geolocation");
   } finally {
     fixture.cleanup();
   }
