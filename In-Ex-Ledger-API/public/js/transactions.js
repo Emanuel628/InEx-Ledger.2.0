@@ -1909,74 +1909,6 @@ function applyFilters(resetPage = false) {
   renderTotals();
 }
 
-function renderPaginationLegacyUnused(totalCount) {
-  const bar = document.getElementById("txPagination");
-  const prevBtn = document.getElementById("txPrevPage");
-  const nextBtn = document.getElementById("txNextPage");
-  const info = document.getElementById("txPageInfo");
-  if (!bar) return;
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-  bar.hidden = totalPages <= 1;
-  if (totalPages <= 1) return;
-  const start = currentPage * PAGE_SIZE + 1;
-  const end = Math.min((currentPage + 1) * PAGE_SIZE, totalCount);
-  if (info) info.textContent = `${start}–${end} of ${totalCount}`;
-  if (prevBtn) prevBtn.disabled = currentPage === 0;
-  if (nextBtn) nextBtn.disabled = currentPage >= totalPages - 1;
-}
-
-function wirePaginationLegacyUnused() {
-  document.getElementById("txPrevPage")?.addEventListener("click", () => {
-    if (currentPage > 0) { currentPage--; applyFilters(); }
-  });
-  document.getElementById("txNextPage")?.addEventListener("click", () => {
-    const totalPages = Math.ceil(getFilteredTransactions().length / PAGE_SIZE);
-    if (currentPage < totalPages - 1) { currentPage++; applyFilters(); }
-  });
-}
-
-function normalizeTransactionDateValue(value) {
-  const raw = String(value || "").slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
-}
-
-function getCurrentDateParts() {
-  const now = new Date();
-  return {
-    year: now.getFullYear(),
-    month: now.getMonth()
-  };
-}
-
-function matchesTransactionPeriod(txn, period = transactionFilters.period) {
-  if (period === "all") {
-    return true;
-  }
-  const normalizedDate = normalizeTransactionDateValue(txn?.date);
-  if (!normalizedDate) {
-    return false;
-  }
-
-  const [yearString, monthString] = normalizedDate.split("-");
-  const year = Number(yearString);
-  const monthIndex = Number(monthString) - 1;
-  if (!Number.isFinite(year) || !Number.isFinite(monthIndex)) {
-    return false;
-  }
-
-  const { year: currentYear, month: currentMonth } = getCurrentDateParts();
-  if (period === "this-month") {
-    return year === currentYear && monthIndex === currentMonth;
-  }
-  if (period === "ytd") {
-    return year === currentYear;
-  }
-  if (period === "last-month") {
-    const lastMonthDate = new Date(currentYear, currentMonth - 1, 1);
-    return year === lastMonthDate.getFullYear() && monthIndex === lastMonthDate.getMonth();
-  }
-  return true;
-}
 
 function getFilteredTransactions() {
   return ledgerState.transactions || [];
@@ -4188,3 +4120,4 @@ function initOcrPrefill() {
     if (tryPrefill() || attempts >= 20) clearInterval(interval);
   }, 50);
 }
+
