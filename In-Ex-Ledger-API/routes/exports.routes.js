@@ -11,7 +11,7 @@ const { issueExportGrant, verifyExportGrant } = require("../services/exportGrant
 const { saveRedactedPdf, buildRedactedStream, deleteExportFile } = require("../services/exportStorage.js");
 const { decryptJwe } = require("../services/jweDecryptService.js");
 const { decryptTaxId } = require("../services/taxIdService.js");
-const { buildPdfExport } = require("../services/pdfGeneratorService.js");
+const { buildPdfExport, buildPdfExportDocument, __private: pdfPrivate } = require("../services/pdfGeneratorService.js");
 const { pool } = require("../db.js");
 const { logError, logInfo } = require("../utils/logger.js");
 const { sanitizePayload } = require("../utils/logSanitizer.js");
@@ -264,6 +264,13 @@ router.post("/history", exportGrantLimiter, async (req, res) => {
   }
 });
 
+router.get("/tax-mapping-rules", exportGrantLimiter, async (_req, res) => {
+  return res.json({
+    source: "backend-authoritative",
+    rules: pdfPrivate.getTaxMappingRules()
+  });
+});
+
 router.post("/request-grant", exportGrantLimiter, async (req, res) => {
   const sanitizedBody = sanitizePayload(req.body);
   try {
@@ -446,8 +453,10 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       province: business.province || ""
     };
 
-    const fullPdfBuffer = buildPdfExport({ ...sharedOptions, taxId });
-    const redactedBuffer = buildPdfExport({ ...sharedOptions, taxId: "" });
+    const fullPdf = buildPdfExportDocument({ ...sharedOptions, taxId });
+    const redactedPdf = buildPdfExportDocument({ ...sharedOptions, taxId: "" });
+    const fullPdfBuffer = fullPdf.buffer;
+    const redactedBuffer = redactedPdf.buffer;
 
     const jobId = crypto.randomUUID();
     const filename = `inex-ledger-export-${grantStartDate}_to_${grantEndDate}.pdf`;
@@ -464,7 +473,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       filePath,
       language: exportLang,
       currency,
-      pageCount: 0,
+      pageCount: redactedPdf.pageCount,
       notes: "Generated via grant",
       fullVersionAvailable: false
     });
@@ -724,8 +733,10 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       province: business.province || ""
     };
 
-    const fullPdfBuffer = buildPdfExport({ ...sharedOptions, taxId });
-    const redactedBuffer = buildPdfExport({ ...sharedOptions, taxId: "" });
+    const fullPdf = buildPdfExportDocument({ ...sharedOptions, taxId });
+    const redactedPdf = buildPdfExportDocument({ ...sharedOptions, taxId: "" });
+    const fullPdfBuffer = fullPdf.buffer;
+    const redactedBuffer = redactedPdf.buffer;
 
     const jobId = crypto.randomUUID();
     const filename = `inex-ledger-export-${dateRange.startDate}_to_${dateRange.endDate}.pdf`;
@@ -742,7 +753,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       filePath,
       language: exportLang,
       currency,
-      pageCount: 0,
+      pageCount: redactedPdf.pageCount,
       notes: "Generated via secure export",
       fullVersionAvailable: false
     });

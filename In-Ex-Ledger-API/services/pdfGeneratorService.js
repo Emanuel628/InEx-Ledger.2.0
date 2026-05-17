@@ -1,377 +1,97 @@
-'use strict';
+"use strict";
+
+const {
+  normalizeRegionCode,
+  resolveCategorySlugFromName,
+  resolveTaxLineFromCategory,
+  getTaxMappingRules
+} = require("./pdf/taxMappings.js");
 
 const PDF_LABELS = {
   en: {
-    report_title: 'Bookkeeping Export for CPA Review',
-    report_subtitle_secure: 'Contains taxpayer identification provided for confidential professional use.',
-    report_subtitle_redacted: 'Taxpayer identification withheld for general sharing.',
-    badge_secure: 'Secure Export',
-    badge_redacted: 'Redacted Export',
-    entity_section_title: 'Entity Summary',
-    reporting_section_title: 'Reporting Metadata',
-    financial_summary_title: 'Financial Summary',
-    tax_estimate_title: 'Tax Review Status',
-    review_flags_title: 'Quick Review Flags',
-    legal_name: 'Legal business name',
-    business_name: 'Operating name (DBA)',
-    tax_id: 'Tax ID',
-    tax_id_redacted: 'Tax ID (redacted)',
-    tax_id_withheld: 'Withheld',
-    reporting_period: 'Reporting period',
-    business_activity_code: 'Business activity code',
-    jurisdiction: 'Jurisdiction',
-    accounting_basis: 'Accounting basis',
-    accounting_basis_unspecified: 'Not specified',
-    currency: 'Currency',
-    export_created: 'Export created',
-    export_id: 'Export ID',
-    prepared_from: 'Prepared from',
-    prepared_from_value: 'InEx Ledger',
-    gross_income: 'Gross income',
-    total_expenses: 'Total expenses',
-    net_profit: 'Net profit / loss',
-    transaction_count: 'Transactions included',
-    uncategorized_transactions: 'Uncategorized transactions',
-    review_flagged_transactions: 'Review-flagged transactions',
-    receipt_coverage: 'Receipt coverage',
-    estimated_tax: 'Tax calculation',
-    estimated_tax_disclaimer: 'Automatic tax estimation is disabled. Review income, expenses, and jurisdiction-specific obligations with your accountant before filing.',
-    category_breakdown_title: 'Category Totals and Suggested Tax Mapping',
-    no_category_data: 'No category totals were recorded for this reporting period.',
-    transaction_log_title: 'Detailed Transaction Ledger',
-    no_transaction_data: 'No transactions were recorded for this reporting period.',
-    receipts_index_title: 'Receipt Support Index',
-    mileage_summary_title: 'Mileage Summary',
-    mileage_note_csv: 'Full detailed mileage log remains available in CSV export.',
-    review_items_title: 'Review Items and Exceptions',
-    review_items_none: 'No review items were identified from the current bookkeeping rules.',
-    review_uncategorized: 'Uncategorized transactions',
-    review_missing_description: 'Transactions missing description',
-    review_possible_duplicates: 'Possible duplicate transactions',
-    review_negative_expenses: 'Negative expense entries',
-    review_mixed_use: 'Explicitly split-use / partial personal (tagged)',
-    review_special_categories: 'Meals, auto, travel, or home-office items',
-    review_missing_receipts: 'Expense transactions without receipt attachment',
-    review_samples_title: 'Sample items for review',
-    disclosure_title: 'Disclosure',
-    disclosure_body: 'This report was prepared from bookkeeping records maintained in InEx Ledger for the reporting period shown. It is intended as a supporting workpaper for accounting or tax preparation review. It is not a filed tax return and may include user-entered data subject to professional review.',
-    us_report_title: 'US CPA Workpaper Export',
-    ca_report_title: 'Canada CPA Workpaper Export',
-    us_report_subtitle: 'Prepared for Schedule C and related IRS bookkeeping review.',
-    ca_report_subtitle: 'Prepared for T2125 and related CRA bookkeeping review.',
-    validation_title: 'Export Requirements',
-    validation_blocked_prefix: 'Export blocked due to missing required business details:',
-    us_tax_profile_title: 'US Filing Profile',
-    ca_tax_profile_title: 'Canada Filing Profile',
-    address: 'Business address',
-    fiscal_year_start: 'Fiscal year start',
-    province: 'Province',
-    accounting_method: 'Accounting method',
-    material_participation: 'Material participation',
-    gst_hst_registered: 'GST/HST registered',
-    gst_hst_number: 'GST/HST number',
-    gst_hst_method: 'GST/HST accounting method',
-    tax_packet_title_us: 'US Schedule C Workpaper Summary',
-    tax_packet_title_ca: 'Canada T2125 Workpaper Summary',
-    tax_packet_payer_title_us: 'Income by payer (1099 reconciliation)',
-    tax_packet_payer_title_ca: 'Income by payer (T4A reconciliation)',
-    tax_packet_line_title_us: 'Totals by Schedule C mapping',
-    tax_packet_line_title_ca: 'Totals by T2125 mapping',
-    transfers_excluded_title: 'Excluded from income and expense totals',
-    transfers_excluded_note: 'Transfer-like items, payroll wages, and personal-use items should be reviewed separately and are not treated as business P&L support.',
-    toc_title: 'Workpaper Contents',
-    profile_note_us: 'Schedule C support requires the business header, material participation, and payer reconciliation to be reviewed before filing.',
-    profile_note_ca: 'T2125 support requires province, fiscal year, GST/HST profile, and net-of-tax treatment to be reviewed before filing.',
-    tax_rules_title: 'Jurisdiction Rules Snapshot',
-    tax_rules_us_threshold: '1099-NEC threshold',
-    tax_rules_ca_threshold: 'T4A support threshold',
-    tax_rules_meals: 'Meals and entertainment',
-    tax_rules_vehicle: 'Vehicle support',
-    tax_rules_receipts: 'Receipt rule',
-    tax_rules_gst: 'GST/HST treatment',
-    exclusions_schedule_title: 'Transfers, Payroll, and Personal Review Schedule',
-    exclusions_reason: 'Reason',
-    exclusions_booked_amount: 'Booked amount',
-    deductions_title_us: 'Deductibility Adjustments and IRS Warnings',
-    deductions_title_ca: 'Deductibility Adjustments and CRA Warnings',
-    deduction_gross: 'Gross',
-    deduction_tax_component: 'Tax',
-    deduction_net: 'Net',
-    deduction_allowed: 'Deductible',
-    deduction_disallowed: 'Non-deductible',
-    deduction_warning: 'Warning',
-    section_continued: 'continued',
-    type_income: 'Income',
-    type_expense: 'Expense',
-    type_transfer: 'Transfer',
-    reason_transfer: 'Transfer / credit-card payment',
-    reason_payroll: 'Payroll / wage deposit',
-    reason_personal: 'Potential personal use',
-    reason_refund: 'Refund / reimbursement review',
-    warning_meals_us: '50% meals limit applies. Review business purpose and attendees.',
-    warning_meals_ca: '50% meals limit applies. CRA support still required.',
-    warning_vehicle_us: 'Mileage log or actual-expense support required.',
-    warning_vehicle_ca: 'CRA logbook required or deduction may be denied.',
-    warning_receipt_us: 'Receipt required under IRC 274(d) for travel, meals, or lodging support.',
-    warning_receipt_ca: 'Receipt support required. GST/HST detail should be retained when registered.',
-    warning_home_office_us: 'Home-office deduction requires Form 8829 support.',
-    warning_home_office_ca: 'Business-use-of-home is limited and may carry forward.',
-    warning_travel: 'Business purpose, destination, and dates should be documented.',
-    warning_gst_income: 'Indirect tax tracked separately from business income.',
-    warning_gst_expense: 'Tracked GST/HST removed from deductible expense total.',
-    warning_unmapped: 'Category still requires explicit tax-line review.',
-    line_other_expenses_us: 'Schedule C Part V - Other expenses',
-    line_other_expenses_ca: 'T2125 Line 9270 - Other expenses',
-    final_disclaimer_title: 'Final CPA Workpaper Note',
-    final_disclaimer_body_us: 'This US export is a bookkeeping workpaper for Schedule C and related review. It excludes transfers, payroll wages, and flagged personal-use items from business totals where detected, but final classification remains the preparer\'s responsibility.',
-    final_disclaimer_body_ca: 'This Canada export is a bookkeeping workpaper for T2125 and related CRA review. GST/HST treatment depends on the indirect tax captured in the ledger and still requires preparer confirmation before filing.',
-    col_category: 'InEx Category',
-    col_tax_mapping: 'Suggested tax mapping',
-    col_amount: 'Amount',
-    col_review_status: 'Review',
-    col_date: 'Date',
-    col_tx_id: 'Tx ID',
-    col_payee_memo: 'Payee / Memo',
-    col_account_category: 'Account / Category',
-    col_tax_map_short: 'Tax map',
-    col_flag: 'Flag',
-    col_type_receipt: 'Type / Receipt',
-    review_ok: 'OK',
-    review_review: 'Review',
-    review_action_needed: 'Action needed',
-    footer_brand: 'InEx Ledger',
-    footer_confidential: 'Confidential'
-  },
-  es: {},
-  fr: {}
+    us_report_title: "US CPA Workpaper Export",
+    ca_report_title: "Canada CPA Workpaper Export",
+    secure_badge: "Secure Export",
+    redacted_badge: "Redacted Export",
+    draft_badge: "Draft - CPA Review Required",
+    not_filed: "This export is a bookkeeping workpaper, not a filed return.",
+    executive_summary: "Executive Summary",
+    mapping_summary: "Tax Mapping Summary",
+    tax_packet_title_us: "Schedule C Workpaper Review",
+    tax_packet_title_ca: "T2125 Workpaper Review",
+    ledger_title: "Detailed Transaction Ledger",
+    exclusions_title: "Excluded Items Schedule",
+    checklist_title: "CPA Workpaper Checklist",
+    support_title: "Supporting Schedules and Final Disclosure",
+    payer_review: "Payer/Form Review",
+    footer_brand: "InEx Ledger"
+  }
+};
+
+const PAGE = { width: 612, height: 792, margin: 40, top: 752, bottom: 52 };
+const COLORS = { black: 0, dark: 0.15, mid: 0.45, light: 0.9, fill: 0.96, fill2: 0.93 };
+
+const FLAG_DESCRIPTIONS = {
+  NC: "Needs business category assignment before filing.",
+  UM: "No jurisdiction-specific tax line resolved after category review.",
+  FC: "Final confirmation still required before relying on the mapped line.",
+  RS: "Receipt or support is missing.",
+  BP: "Business purpose documentation is required.",
+  AL: "Business-use allocation is required.",
+  ML: "Mileage log or actual-expense support is required.",
+  HO: "Home-office support and square-foot allocation are required.",
+  CA: "Capital asset / depreciation review is required.",
+  PR: "Possible personal-use item.",
+  TR: "Possible transfer or balance movement.",
+  RR: "Refund, reversal, or cashback review is required.",
+  DUP: "Possible duplicate transaction.",
+  MD: "Description is missing or too weak.",
+  FX: "Foreign currency / conversion review is required.",
+  IT: "Indirect tax review is required.",
+  RV: "CPA review is required before filing."
+};
+
+const EXCLUSION_DEFINITIONS = {
+  TRANSFER: { label: "TRANSFER", title: "Transfer", description: "Account-to-account transfer excluded from business P&L.", includeInPnl: false, severity: "info" },
+  CC_PAY: { label: "CC PAY", title: "Credit card payment", description: "Credit-card payment excluded from P&L; deduct underlying card charges instead.", includeInPnl: false, severity: "info" },
+  PAYROLL: { label: "PAYROLL", title: "Payroll / wages", description: "Payroll or wage item excluded from sole-prop income/expense totals.", includeInPnl: false, severity: "info" },
+  PERSONAL: { label: "PERSONAL", title: "Personal item", description: "Likely personal-use item excluded pending client confirmation.", includeInPnl: false, severity: "review" },
+  TAX_REF: { label: "TAX REF", title: "Tax refund", description: "Tax refund excluded from operating income.", includeInPnl: false, severity: "info" },
+  TAX_PAY: { label: "TAX PAY", title: "Tax payment", description: "Tax payment excluded from operating expenses pending preparer treatment.", includeInPnl: false, severity: "review" },
+  INVEST: { label: "INVEST", title: "Investment transfer", description: "Investment or brokerage movement excluded from business P&L.", includeInPnl: false, severity: "info" },
+  LOAN_DEBT: { label: "LOAN/DEBT", title: "Loan or debt payment", description: "Loan or debt principal movement excluded; interest must be reviewed separately.", includeInPnl: false, severity: "review" },
+  OWNER_DRAW: { label: "OWNER DRAW", title: "Owner draw", description: "Owner draw excluded from business P&L.", includeInPnl: false, severity: "info" },
+  OWNER_CONTRIB: { label: "OWNER CONTRIB", title: "Owner contribution", description: "Owner contribution excluded from business P&L.", includeInPnl: false, severity: "info" },
+  REFUND_REV: { label: "REFUND/REV", title: "Refund or reversal", description: "Refund, reimbursement, or reversal excluded until matched to the originating entry.", includeInPnl: false, severity: "review" },
+  CASHBACK: { label: "CASHBACK", title: "Cashback or reward", description: "Cashback or reward credit excluded from sales by default.", includeInPnl: false, severity: "review" },
+  WIRE_FEE: { label: "WIRE FEE", title: "Wire fee", description: "Wire or transfer fee excluded until business purpose is confirmed.", includeInPnl: false, severity: "review" },
+  REVIEW: { label: "REVIEW", title: "Needs review", description: "Excluded pending client or CPA review.", includeInPnl: false, severity: "review" }
 };
 
 function getPdfLabels(lang) {
-  if (!lang || !PDF_LABELS[lang]) return PDF_LABELS.en;
-  return { ...PDF_LABELS.en, ...PDF_LABELS[lang] };
+  return PDF_LABELS[String(lang || "en").toLowerCase()] || PDF_LABELS.en;
 }
 
-const FLAG_CODE_MAP = {
-  'Uncategorized': 'UC',
-  'Needs category': 'NC',
-  'Missing description': 'MD',
-  'Negative expense': 'NE',
-  'Mixed-use': 'MU',
-  'Review': 'RV',
-  'Indirect tax': 'IX',
-  'FX': 'FX',
-  'Needs tax mapping': 'TM',
-  'Special category': 'SC'
-};
-const FLAG_CODE_LEGEND = 'UC=Uncategorized  NC=Needs category  TM=Tax map missing  MD=No description  SC=Meals/auto/home  MU=Mixed-use  RV=Review';
-
-
-const SCHEDULE_C_LINE_MAP = {
-  gross_receipts: 'Line 1 — Gross receipts or sales',
-  gross_receipts_sales: 'Line 1 — Gross receipts or sales',
-  sales: 'Line 1 — Gross receipts or sales',
-  sales_revenue: 'Line 1 — Gross receipts or sales',
-  revenue: 'Line 1 — Gross receipts or sales',
-  business_income: 'Line 1 — Gross receipts or sales',
-  returns_allowances: 'Line 2 — Returns and allowances',
-  cost_of_goods_sold: 'Line 4 — Cost of goods sold',
-  other_income: 'Line 6 — Other income',
-  advertising: 'Line 8 — Advertising',
-  marketing: 'Line 8 — Advertising',
-  car_and_truck: 'Line 9 — Car and truck expenses',
-  vehicle: 'Line 9 — Car and truck expenses',
-  auto: 'Line 9 — Car and truck expenses',
-  fuel: 'Line 9 — Car and truck expenses',
-  gas: 'Line 9 — Car and truck expenses',
-  mileage: 'Line 9 — Car and truck expenses',
-  commissions: 'Line 10 — Commissions and fees',
-  commissions_and_fees: 'Line 10 — Commissions and fees',
-  contract_labor: 'Line 11 — Contract labor',
-  depletion: 'Line 12 — Depletion',
-  depreciation: 'Line 13 — Depreciation and section 179',
-  employee_benefits: 'Line 14 — Employee benefit programs',
-  employee_benefit_programs: 'Line 14 — Employee benefit programs',
-  insurance: 'Line 15 — Insurance (other than health)',
-  insurance_other_than_health: 'Line 15 — Insurance (other than health)',
-  mortgage_interest: 'Line 16a — Mortgage interest',
-  other_interest: 'Line 16b — Other interest',
-  interest: 'Line 16b — Other interest',
-  bank_interest: 'Line 16b — Other interest',
-  legal_professional: 'Line 17 — Legal and professional services',
-  legal: 'Line 17 — Legal and professional services',
-  professional_services: 'Line 17 — Legal and professional services',
-  accounting: 'Line 17 — Legal and professional services',
-  office_expense: 'Line 18 — Office expense',
-  office: 'Line 18 — Office expense',
-  office_supplies: 'Line 18 — Office expense',
-  pension: 'Line 19 — Pension and profit-sharing plans',
-  pension_profit_sharing: 'Line 19 — Pension and profit-sharing plans',
-  rent_vehicles: 'Line 20a — Rent/lease (vehicles, machinery)',
-  rent_lease_vehicles: 'Line 20a — Rent/lease (vehicles, machinery)',
-  rent_other: 'Line 20b — Rent/lease (other property)',
-  rent_lease_other: 'Line 20b — Rent/lease (other property)',
-  rent: 'Line 20b — Rent/lease (other property)',
-  repairs: 'Line 21 — Repairs and maintenance',
-  repairs_maintenance: 'Line 21 — Repairs and maintenance',
-  supplies: 'Line 22 — Supplies',
-  taxes_licenses: 'Line 23 — Taxes and licenses',
-  taxes: 'Line 23 — Taxes and licenses',
-  licenses: 'Line 23 — Taxes and licenses',
-  travel: 'Line 24a — Travel',
-  meals: 'Line 24b — Deductible meals (50% limit)',
-  meals_entertainment: 'Line 24b — Deductible meals (50% limit)',
-  dining: 'Line 24b — Deductible meals (50% limit)',
-  entertainment: 'Line 24b — Deductible meals (50% limit)',
-  deductible_meals: 'Line 24b — Deductible meals (50% limit)',
-  utilities: 'Line 25 — Utilities',
-  wages: 'Line 26 — Wages',
-  home_office: 'Line 30 — Home office (Form 8829)',
-  software: 'Line 27a/Part V — Other expenses (software)',
-  software_subscriptions: 'Line 27a/Part V — Other expenses (software subscriptions)',
-  subscriptions: 'Line 27a/Part V — Other expenses (subscriptions)',
-  bank_fees: 'Line 27a/Part V — Other expenses (bank fees)',
-  bank_charges: 'Line 27a/Part V — Other expenses (bank charges)',
-  professional_development: 'Line 27a/Part V — Other expenses (education/training)',
-  education: 'Line 27a/Part V — Other expenses (education/training)',
-  training: 'Line 27a/Part V — Other expenses (education/training)',
-  other_expenses: 'Line 27a/Part V — Other expenses',
-};
-
-const T2125_LINE_MAP = {
-  gross_income: 'Line 8000 — Gross business income',
-  gross_receipts: 'Line 8000 — Gross business income',
-  gross_receipts_sales: 'Line 8000 — Gross business income',
-  sales: 'Line 8000 — Gross business income',
-  sales_revenue: 'Line 8000 — Gross business income',
-  revenue: 'Line 8000 — Gross business income',
-  business_income: 'Line 8000 — Gross business income',
-  advertising: 'Line 8520 — Advertising',
-  marketing: 'Line 8520 — Advertising',
-  meals: 'Line 8523 — Meals and entertainment (50%)',
-  meals_entertainment: 'Line 8523 — Meals and entertainment (50%)',
-  dining: 'Line 8523 — Meals and entertainment (50%)',
-  entertainment: 'Line 8523 — Meals and entertainment (50%)',
-  bad_debts: 'Line 8590 — Bad debts',
-  insurance: 'Line 8690 — Insurance',
-  insurance_other_than_health: 'Line 8690 — Insurance',
-  interest: 'Line 8710 — Interest',
-  bank_interest: 'Line 8710 — Interest',
-  other_interest: 'Line 8710 — Interest',
-  legal_professional: 'Line 8860 — Legal, accounting, and professional fees',
-  professional_services: 'Line 8860 — Legal, accounting, and professional fees',
-  accounting: 'Line 8860 — Legal, accounting, and professional fees',
-  office_expense: 'Line 8810 — Office expenses',
-  office: 'Line 8810 — Office expenses',
-  office_supplies: 'Line 8810 — Office expenses',
-  supplies: 'Line 8811 — Supplies',
-  rent: 'Line 8912 — Rent',
-  rent_other: 'Line 8912 — Rent',
-  repairs: 'Line 8960 — Repairs and maintenance',
-  repairs_maintenance: 'Line 8960 — Repairs and maintenance',
-  taxes_licenses: 'Line 8760 — Business taxes, fees, and licences',
-  licenses: 'Line 8760 — Business taxes, fees, and licences',
-  taxes: 'Line 8760 — Business taxes, fees, and licences',
-  management_fees: 'Line 8871 — Management and administration fees',
-  admin_fees: 'Line 8871 — Management and administration fees',
-  wages: 'Line 9060 — Salaries, wages, and benefits',
-  salaries_wages: 'Line 9060 — Salaries, wages, and benefits',
-  employee_benefits: 'Line 9060 — Salaries, wages, and benefits',
-  employee_benefit_programs: 'Line 9060 — Salaries, wages, and benefits',
-  travel: 'Line 9200 — Travel expenses',
-  property_taxes: 'Line 9180 — Property taxes',
-  delivery: 'Line 9275 — Delivery, freight, and express',
-  freight: 'Line 9275 — Delivery, freight, and express',
-  shipping: 'Line 9275 — Delivery, freight, and express',
-  utilities: 'Line 9220 — Utilities',
-  telephone: 'Line 9270 — Telephone and utilities',
-  phone: 'Line 9270 — Telephone and utilities',
-  internet: 'Line 9270 — Telephone and utilities',
-  vehicle: 'Line 9281 — Motor vehicle expenses',
-  auto: 'Line 9281 — Motor vehicle expenses',
-  fuel: 'Line 9281 — Motor vehicle expenses (fuel)',
-  gas: 'Line 9281 — Motor vehicle expenses (fuel)',
-  mileage: 'Line 9281 — Motor vehicle expenses (mileage)',
-  depreciation: 'Line 9936 — Capital cost allowance (CCA)',
-  cca: 'Line 9936 — Capital cost allowance (CCA)',
-  home_office: 'Line 9945 — Business-use-of-home expenses',
-  software: 'Line 8810 — Office expenses (software)',
-  software_subscriptions: 'Line 8810 — Office expenses (software subscriptions)',
-  subscriptions: 'Line 8810 — Office expenses (subscriptions)',
-  bank_fees: 'Line 8710 — Interest and bank charges',
-  bank_charges: 'Line 8710 — Interest and bank charges',
-  professional_development: 'Line 9270 — Other expenses (professional development)',
-  education: 'Line 9270 — Other expenses (professional development)',
-  training: 'Line 9270 — Other expenses (professional development)',
-  other_expenses: 'Line 9270 — Other expenses',
-  other_expense: 'Line 9270 — Other expenses',
-  other_income: 'Line 8230 — Other income',
-  commission_income: 'Line 8000 — Gross business income',
-  contract_labor: 'Line 9270 — Other expenses (subcontractors)',
-  commissions: 'Line 9270 — Other expenses (commissions paid)',
-  commissions_and_fees: 'Line 9270 — Other expenses (commissions paid)',
-  // Keys matching VALID_CA_TAX_MAPS values
-  delivery_freight: 'Line 9275 — Delivery, freight, and express',
-  interest_bank_charges: 'Line 8710 — Interest and bank charges',
-  legal_accounting: 'Line 8860 — Legal, accounting, and professional fees',
-  business_tax_fees_licenses_memberships: 'Line 8760 — Business taxes, fees, and licences',
-  salaries_wages_benefits: 'Line 9060 — Salaries, wages, and benefits',
-  maintenance_repairs: 'Line 8960 — Repairs and maintenance',
-  motor_vehicle: 'Line 9281 — Motor vehicle expenses',
-  gst_hst_paid: 'Input Tax Credit (ITC) — GST/HST paid on business expenses',
-  gst_hst_collected: 'Line 8000 — Gross business income (GST/HST collected)',
-  subsidies_grants: 'Line 8230 — Other income (subsidies/grants)',
-  t4a_20: 'T4A Box 20 — Self-employment income',
-  t4a_28: 'T4A Box 28 — Other income',
-  cash_income: 'Line 8000 — Gross business income',
-};
-
-function normalizeRegionCode(region) {
-  return String(region || '').toUpperCase() === 'CA' ? 'CA' : 'US';
+function normalizePdfText(text) {
+  return String(text || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E\n]/g, (char) => {
+      if (char === "\n") return "\n";
+      return "?";
+    });
 }
 
-function resolveBusinessCurrency(region, fallbackCurrency) {
-  const normalized = normalizeRegionCode(region);
-  return normalized === 'CA' ? 'CAD' : (String(fallbackCurrency || 'USD').toUpperCase() || 'USD');
+function escapePdfLiteral(text) {
+  return normalizePdfText(text)
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)")
+    .replace(/\n/g, "\\n");
 }
 
-function normalizeYesNo(value) {
-  if (value === true) return 'Yes';
-  if (value === false) return 'No';
-  return 'Not specified';
-}
-
-function validateExportProfile(profile) {
-  const region = normalizeRegionCode(profile.region);
-  const missing = [];
-  const hasValue = (value) => String(value || '').trim().length > 0;
-  const addMissing = (key, label) => {
-    missing.push({ key, label });
-  };
-
-  if (!hasValue(profile.legalName || profile.businessName)) addMissing('legal_name', 'Legal business name');
-  if (!hasValue(profile.naics)) addMissing('business_activity_code', region === 'CA' ? 'Industry / activity code' : 'Business activity code');
-  if (!hasValue(profile.address)) addMissing('address', 'Business address');
-  if (!hasValue(profile.accountingMethod)) addMissing('accounting_method', 'Accounting method');
-
-  if (region === 'CA') {
-    if (!hasValue(profile.province)) addMissing('province', 'Province of business operations');
-    if (!hasValue(profile.fiscalYearStart)) addMissing('fiscal_year_start', 'Fiscal year start');
-    if (profile.gstHstRegistered) {
-      if (!hasValue(profile.gstHstNumber)) addMissing('gst_hst_number', 'GST/HST registration number');
-      if (!hasValue(profile.gstHstMethod)) addMissing('gst_hst_method', 'GST/HST accounting method');
-    }
-  } else if (profile.materialParticipation !== true && profile.materialParticipation !== false) {
-    addMissing('material_participation', 'Material participation');
-  }
-
-  if (missing.length) {
-    const error = new Error(`Missing required export profile fields: ${missing.map((item) => item.label).join(', ')}`);
-    error.code = 'EXPORT_PROFILE_INCOMPLETE';
-    error.status = 400;
-    error.missingFields = missing.map((item) => item.label);
-    error.missingFieldKeys = missing.map((item) => item.key);
-    throw error;
-  }
+function pdfLiteral(text) {
+  return `(${escapePdfLiteral(text)})`;
 }
 
 class PdfCanvas {
@@ -379,105 +99,211 @@ class PdfCanvas {
     this.commands = [];
   }
 
-  text(x, y, text, size = 11, font = 'F1') {
-    const fx = Number.isFinite(x) ? x.toFixed(2) : '0.00';
-    const fy = Number.isFinite(y) ? y.toFixed(2) : '0.00';
-    this.commands.push('BT');
+  text(x, y, text, size = 10, font = "F1") {
+    const fx = Number(x || 0).toFixed(2);
+    const fy = Number(y || 0).toFixed(2);
+    this.commands.push("BT");
     this.commands.push(`/${font} ${size} Tf`);
     this.commands.push(`1 0 0 1 ${fx} ${fy} Tm`);
     this.commands.push(`${pdfLiteral(text)} Tj`);
-    this.commands.push('ET');
+    this.commands.push("ET");
+  }
+
+  setStrokeGray(gray) {
+    this.commands.push(`${Number(gray).toFixed(3)} G`);
+  }
+
+  setFillGray(gray) {
+    this.commands.push(`${Number(gray).toFixed(3)} g`);
+  }
+
+  drawLine(x1, y1, x2, y2) {
+    this.commands.push(`${x1.toFixed(2)} ${y1.toFixed(2)} m ${x2.toFixed(2)} ${y2.toFixed(2)} l S`);
+  }
+
+  drawRect(x, y, width, height) {
+    this.commands.push(`${x.toFixed(2)} ${y.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)} re S`);
+  }
+
+  drawFilledRect(x, y, width, height, fillGray = COLORS.fill) {
+    this.setFillGray(fillGray);
+    this.commands.push(`${x.toFixed(2)} ${y.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)} re f`);
+    this.setFillGray(COLORS.black);
+  }
+
+  drawDivider(y) {
+    this.setStrokeGray(COLORS.light);
+    this.drawLine(PAGE.margin, y, PAGE.width - PAGE.margin, y);
+    this.setStrokeGray(COLORS.black);
+  }
+
+  drawRightAlignedText(xRight, y, text, size = 10, font = "F1") {
+    const normalized = normalizePdfText(text);
+    const widthEstimate = normalized.length * size * 0.48;
+    this.text(xRight - widthEstimate, y, normalized, size, font);
+  }
+
+  drawWrappedText(x, y, text, maxChars = 72, lineHeight = 12, size = 10, font = "F1") {
+    const lines = wrapText(text, maxChars);
+    lines.forEach((line, index) => {
+      this.text(x, y - (index * lineHeight), line, size, font);
+    });
+    return y - (lines.length * lineHeight);
+  }
+
+  drawSectionHeader(title, x, y, options = {}) {
+    const width = options.width || (PAGE.width - PAGE.margin * 2);
+    this.drawFilledRect(x, y - 14, width, 20, COLORS.fill2);
+    this.text(x + 8, y, title, options.size || 11, "F2");
+  }
+
+  drawBadge(x, y, text, variant = "neutral") {
+    const fillGray = variant === "warning" ? 0.88 : variant === "success" ? 0.92 : 0.94;
+    const width = Math.max(44, String(text || "").length * 5.6 + 12);
+    this.drawFilledRect(x, y - 10, width, 16, fillGray);
+    this.drawRect(x, y - 10, width, 16);
+    this.text(x + 6, y - 0.5, text, 8, "F2");
+    return width;
+  }
+
+  drawCard(x, yTop, width, height, title, lines, options = {}) {
+    this.drawFilledRect(x, yTop - height, width, height, options.fillGray ?? COLORS.fill);
+    this.drawRect(x, yTop - height, width, height);
+    this.text(x + 10, yTop - 18, title, 11, "F2");
+    let y = yTop - 34;
+    for (const line of lines || []) {
+      y = this.drawWrappedText(x + 10, y, line, options.maxChars || Math.max(18, Math.floor((width - 18) / 5.6)), 11, 9);
+    }
+    return yTop - height;
+  }
+
+  drawMetricCard(x, yTop, width, height, label, value, note, status) {
+    this.drawCard(x, yTop, width, height, label, [String(value || ""), ...(note ? [note] : [])], { fillGray: COLORS.fill });
+    if (status) this.drawBadge(x + width - 58, yTop - 18, status, status === "Action" ? "warning" : "neutral");
+  }
+
+  drawKeyValueBlock(x, yTop, rows, options = {}) {
+    let y = yTop;
+    const valueX = x + (options.valueOffset || 122);
+    rows.forEach(([label, value]) => {
+      this.text(x, y, label, options.labelSize || 9, "F2");
+      this.drawWrappedText(valueX, y, safeValue(value, "-"), options.maxChars || 24, 11, options.valueSize || 9);
+      y -= options.rowGap || 14;
+    });
+    return y;
+  }
+
+  drawTableHeader(columns, y) {
+    this.drawFilledRect(PAGE.margin, y - 12, PAGE.width - PAGE.margin * 2, 18, COLORS.fill2);
+    columns.forEach((column) => {
+      if (column.align === "right") {
+        this.drawRightAlignedText(column.x + column.width, y, column.label, 8, "F2");
+      } else {
+        this.text(column.x, y, column.label, 8, "F2");
+      }
+    });
+  }
+
+  drawTableRow(columns, values, y, options = {}) {
+    if (options.fillGray != null) this.drawFilledRect(PAGE.margin, y - 10, PAGE.width - PAGE.margin * 2, options.rowHeight || 14, options.fillGray);
+    columns.forEach((column) => {
+      const value = values[column.key] == null ? "" : String(values[column.key]);
+      if (column.align === "right") {
+        this.drawRightAlignedText(column.x + column.width, y, value, column.size || 8, column.font || "F1");
+      } else {
+        this.text(column.x, y, value, column.size || 8, column.font || "F1");
+      }
+    });
   }
 
   addFooter(pageNumber, totalPages, footerText) {
-    this.text(40, 28, footerText || `Page ${pageNumber}/${totalPages}`, 8);
+    this.drawDivider(36);
+    this.text(PAGE.margin, 24, footerText || `Page ${pageNumber}/${totalPages}`, 8);
   }
 
   build() {
-    return this.commands.join('\n');
+    return this.commands.join("\n");
   }
 }
 
-function normalizePdfText(text) {
-  return String(text || '')
-    .replace(/\u00df/g, 'ss')
-    .replace(/\u00c6/g, 'AE')
-    .replace(/\u00e6/g, 'ae')
-    .replace(/\u0152/g, 'OE')
-    .replace(/\u0153/g, 'oe')
-    .replace(/\u00d8/g, 'O')
-    .replace(/\u00f8/g, 'o')
-    .replace(/\u0141/g, 'L')
-    .replace(/\u0142/g, 'l')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\r\n?/g, '\n')
-    .replace(/\u2013|\u2014|\u2212/g, '-')
-    .replace(/\u2018|\u2019/g, "'")
-    .replace(/\u201c|\u201d/g, '"')
-    .replace(/\u2026/g, '...')
-    .replace(/\u2022/g, '*')
-    .replace(/\u00a0/g, ' ')
-    .replace(/[^\x20-\x7E\n]/g, '?');
+function safeValue(value, fallback = "Not specified") {
+  const text = String(value || "").trim();
+  return text || fallback;
 }
 
-function escapePdfLiteral(text) {
-  return normalizePdfText(text)
-    .replace(/\\/g, '\\\\')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)')
-    .replace(/\n/g, '\\n');
+function coerceBoolean(value) {
+  if (value === true || value === false) return value;
+  if (value == null) return false;
+  return /^(true|1|yes)$/i.test(String(value));
 }
 
-function pdfLiteral(text) {
-  return `(${escapePdfLiteral(text)})`;
+function normalizeMoneyAmount(txn) {
+  return Math.abs(Number(txn?.amount) || 0);
 }
 
-function calculateTotals(transactions, region, province) {
-  let income = 0;
-  let expenses = 0;
-  (transactions || []).forEach((txn) => {
-    const amount = Number(
-      String(txn.type || '').toLowerCase() === 'income'
-        ? (txn.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn))
-        : (txn.__businessAmounts?.deductibleAmount ?? normalizeMoneyAmount(txn))
-    ) || 0;
-    const normalizedType = String(txn.type || '').toLowerCase();
-    if (normalizedType === 'income') {
-      income += amount;
-      return;
-    }
-    if (normalizedType === 'expense') {
-      expenses += amount;
-    }
-  });
-  const netProfit = income - expenses;
-  return {
-    income,
-    expenses,
-    netProfit,
-    estimatedTax: null
-  };
+function resolveIndirectTaxAmount(txn) {
+  return Math.abs(Number(txn?.indirect_tax_amount ?? txn?.indirectTaxAmount) || 0);
 }
 
-function formatCurrencyForPdf(value, currency) {
-  const formatter = new Intl.NumberFormat(currency === 'CAD' ? 'en-CA' : 'en-US', {
-    style: 'currency',
-    currency,
+function formatCurrencyForPdf(value, currency = "USD") {
+  const safeCurrency = String(currency || "USD").toUpperCase();
+  return new Intl.NumberFormat(safeCurrency === "CAD" ? "en-CA" : "en-US", {
+    style: "currency",
+    currency: safeCurrency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  });
-  return formatter.format(Number(value) || 0);
+  }).format(Number(value) || 0);
 }
 
 function formatDistance(value) {
   return Number(value || 0).toFixed(2);
 }
 
+function normalizePdfDate(value) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatReportTimestamp(rawValue) {
+  const date = rawValue ? new Date(rawValue) : new Date();
+  if (Number.isNaN(date.getTime())) return String(rawValue || "");
+  return date.toISOString().slice(0, 16).replace("T", " ");
+}
+
+function buildReportId(rawValue) {
+  if (rawValue) return String(rawValue);
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const random = Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, "0");
+  return `EXP-${stamp}-${random}`;
+}
+
 function truncateText(value, maxLength) {
-  const text = String(value || '');
+  const text = String(value || "");
   if (text.length <= maxLength) return text;
   return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function wrapText(text, maxLength) {
+  const words = String(text || "").split(/\s+/).filter(Boolean);
+  if (!words.length) return [""];
+  const lines = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxLength && current) {
+      lines.push(current);
+      current = word;
+    } else if (word.length > maxLength && !current) {
+      lines.push(word.slice(0, maxLength));
+      current = word.slice(maxLength);
+    } else {
+      current = next;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
 }
 
 function mapByKey(items, key) {
@@ -488,1549 +314,1024 @@ function mapByKey(items, key) {
 }
 
 function chunkArray(items, size) {
-  const result = [];
-  for (let i = 0; i < items.length; i += size) result.push(items.slice(i, i + size));
-  return result;
-}
-
-function wrapText(text, maxLength) {
-  const words = String(text || '').split(/\s+/).filter(Boolean);
-  const lines = [];
-  let current = '';
-  words.forEach((word) => {
-    const next = current ? `${current} ${word}` : word;
-    if (next.length > maxLength && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = next;
-    }
-  });
-  if (current) lines.push(current);
-  return lines.length ? lines : [''];
-}
-
-function safeValue(value, fallback = 'Not specified') {
-  const text = String(value || '').trim();
-  return text || fallback;
-}
-
-function coerceBoolean(value) {
-  if (value === true || value === false) return value;
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'true') return true;
-    if (normalized === 'false') return false;
-  }
-  return false;
-}
-
-function formatReportTimestamp(rawValue) {
-  const date = rawValue ? new Date(rawValue) : new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
-}
-
-function buildReportId(rawValue) {
-  if (rawValue) return String(rawValue);
-  const stamp = formatReportTimestamp(new Date()).replace(/[-: ]/g, '').slice(0, 8);
-  const random = Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, '0');
-  return `EXP-${stamp}-${random}`;
-}
-
-function formatJurisdiction(region, province) {
-  const normalizedRegion = String(region || '').toUpperCase() === 'CA' ? 'CA' : 'US';
-  const normalizedProvince = String(province || '').toUpperCase();
-  return normalizedProvince ? `${normalizedRegion}-${normalizedProvince}` : normalizedRegion;
-}
-
-function normalizeTaxLineText(value, region) {
-  const text = String(value || '').trim();
-  if (!text) return normalizeRegionCode(region) === 'CA' ? 'Unmapped T2125 line' : 'Unmapped Schedule C line';
-  if (/^(Line\s+\d|T\d{4}|8\d{3}|9\d{3})/i.test(text)) return text;
-  // Handle legacy ca_XXXX / t2125_XXXX stored values — strip prefix, treat as line number
-  const legacyMatch = text.match(/^(?:ca|t2125)_(\d+)$/i);
-  if (legacyMatch) return `Line ${legacyMatch[1]}`;
-  const slugKey = text.toLowerCase().replace(/[-\s]+/g, '_');
-  const map = normalizeRegionCode(region) === 'CA' ? T2125_LINE_MAP : SCHEDULE_C_LINE_MAP;
-  return map[slugKey] || map[text.toLowerCase()] || text;
-}
-
-function shortenTaxLine(text) {
-  if (!text) return text;
-  if (/^Unmapped\b/i.test(text)) return 'Unmapped';
-  const m = text.match(/^Line\s+(\S+(?:\s+\S+)?)\s*[—\-]\s*(.+)$/i);
-  if (!m) return text;
-  const lineRef = m[1].trim().replace(/\/Part\s+[IVX]+/i, '').trim();
-  const desc = m[2].trim()
-    .replace(/\s*\([^)]+\)/g, '')
-    .replace(/\s+(expenses?|programs?|plans?|activities?)$/i, '')
-    .trim();
-  const result = `L${lineRef} ${desc}`;
-  if (result.length <= 22) return result;
-  return result.slice(0, 22).replace(/\s+\S*$/, '').trim();
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
 }
 
 function buildTransactionText(txn) {
   return [
-    txn.description,
-    txn.note,
-    txn.memo,
-    txn.payee,
-    txn.payee_name,
-    txn.payer_name,
-    txn.reference
-  ]
-    .filter(Boolean)
-    .join(' ')
-    .replace(/\s+https?:\/\/\S+/g, '')
-    .replace(/https?:\/\/\S+/g, '')
-    .trim();
+    txn?.description,
+    txn?.note,
+    txn?.memo,
+    txn?.merchant,
+    txn?.payee,
+    txn?.payer_name,
+    txn?.reference
+  ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
 }
 
-function normalizeMoneyAmount(txn) {
-  return Math.abs(Number(txn?.amount) || 0);
+function maskTaxId(value) {
+  const text = String(value || "").trim();
+  if (!text) return "Withheld";
+  if (text.length <= 4) return text;
+  return `${text.slice(0, Math.min(5, text.length - 2))}***`;
 }
 
-function resolveIndirectTaxAmount(txn, options = {}) {
-  const tracked = Math.abs(Number(txn?.indirect_tax_amount ?? txn?.indirectTaxAmount) || 0);
-  if (!tracked) return 0;
-  return coerceBoolean(options.gstHstRegistered) ? Math.min(tracked, normalizeMoneyAmount(txn)) : tracked;
+function normalizeExportCategoryName(category) {
+  return String(category?.name || "").trim();
 }
 
-function isMealsLike(categoryName, taxMapping, text) {
-  const catTax = `${categoryName} ${taxMapping}`;
-  if (/(meal|meals|dining|restaurant|entertainment|meals_entertainment)/i.test(catTax)) return true;
-  // Only check transaction text for merchant names common to meals
-  return /(meal|dining|restaurant)/i.test(text);
+function inferCategorySlug(txn, category, nature) {
+  const categoryName = normalizeExportCategoryName(category);
+  if (!categoryName) return nature === "business_income" ? "needs_category" : "needs_category";
+  const normalizedName = categoryName.toLowerCase();
+  if (/^imported expense/i.test(categoryName)) return "needs_category";
+  if (/^imported income/i.test(categoryName)) return "needs_category";
+  const fromName = resolveCategorySlugFromName(categoryName);
+  if (fromName) return fromName;
+  const text = `${normalizedName} ${buildTransactionText(txn).toLowerCase()}`;
+  if (nature === "business_income") {
+    if (/service/i.test(text)) return "service_revenue";
+    if (/refund|reimburse/i.test(text)) return "refunds_reimbursements";
+    return "sales_revenue";
+  }
+  return "other_expense";
 }
 
-function isVehicleLike(categoryName, taxMapping, text) {
-  // Include standalone fuel/gas so "Fuel & Gas" category is detected alongside compound slugs
-  return /(vehicle|auto|mileage|motor_vehicle|car_truck|car[_ ]truck|fuel[_ ]gas|\bfuel\b|\bgas\b)/i.test(`${categoryName} ${taxMapping}`);
+function classifyTransactionNature(txn, category) {
+  const type = String(txn?.type || "").toLowerCase();
+  const categoryName = normalizeExportCategoryName(category).toLowerCase();
+  const text = `${categoryName} ${buildTransactionText(txn).toLowerCase()}`;
+
+  if (/\bpayro\b|payroll|salary|w-2|t4\b|employer deposit|direct deposit.*payroll/.test(text)) return "payroll_or_wages";
+  if (/(payment to chase|credit card autopay|online payment thank you|pay credit card|statement balance|minimum payment|amex autopay|discover e-?payment|capital one.*pmt|paypal credit|venmo credit)/.test(text)) return "credit_card_payment";
+  if (type === "transfer" || /(internal transfer|ach transfer|bank transfer|wire transfer|online transfer|zelle to own|from savings|to savings)/.test(text)) return "transfer";
+  if (/loan payment|mortgage|student loan|nelnet|navient|sofi|personal loan|auto loan/.test(text)) return "loan_or_debt_payment";
+  if (/owner draw|drawing account/.test(text)) return "owner_draw";
+  if (/owner contribution|capital contribution/.test(text)) return "owner_contribution";
+  if (/fidelity|vanguard|schwab|robinhood|questrade|wealthsimple|brokerage|investment/.test(text)) return "investment_transfer";
+  if (type === "income" && /irs|tax refund|state tax ref|dept of revenue|cra refund/.test(text)) return "tax_refund";
+  if (type !== "income" && /\btax payment|irs eftps|cra remittance|gst\/hst payment|sales tax payment/.test(text)) return "tax_payment";
+  if (/cash back|cash redemption|reward redemption|statement credit.*reward|points redemption/.test(text)) return "cashback_or_reward";
+  if (/refund|reversal|chargeback|reimburse/.test(text)) return "refund_or_reversal";
+  if (/personal expense|family expense|netflix|spotify|whole foods|trader joe|haircut|gym membership/.test(text)) return "personal_expense";
+  if (/split/i.test(String(txn?.tax_treatment || txn?.taxTreatment || ""))) return "split_transaction";
+  if (type === "income") return "business_income";
+  if (type === "expense") return "business_expense";
+  return "unknown_needs_review";
 }
 
-function isTravelLike(categoryName, taxMapping, text) {
-  return /(travel|lodging|hotel|airfare|flight|uber|lyft|taxi)/i.test(`${categoryName} ${taxMapping} ${text}`);
-}
-
-function isHomeOfficeLike(categoryName, taxMapping, text) {
-  const combined = `${categoryName} ${taxMapping}`;
-  return /(home[_\s]office|home[_\s]business|business[_\s]use[_\s]of[_\s]home|9945)/i.test(combined);
+function classifyExcludedTransaction(txn, category, region) {
+  const nature = classifyTransactionNature(txn, category, region);
+  const map = {
+    transfer: "TRANSFER",
+    credit_card_payment: "CC_PAY",
+    payroll_or_wages: "PAYROLL",
+    personal_expense: "PERSONAL",
+    tax_refund: "TAX_REF",
+    tax_payment: "TAX_PAY",
+    investment_transfer: "INVEST",
+    loan_or_debt_payment: "LOAN_DEBT",
+    owner_draw: "OWNER_DRAW",
+    owner_contribution: "OWNER_CONTRIB",
+    refund_or_reversal: "REFUND_REV",
+    cashback_or_reward: "CASHBACK"
+  };
+  const code = map[nature] || null;
+  if (!code) return null;
+  return { code, ...EXCLUSION_DEFINITIONS[code] };
 }
 
 function deriveBusinessAmounts(txn, category, options = {}) {
-  const region = normalizeRegionCode(options.region);
   const amount = normalizeMoneyAmount(txn);
-  const taxAmount = resolveIndirectTaxAmount(txn, options);
-  const isExpense = String(txn?.type || '').toLowerCase() !== 'income';
-  const categoryName = category?.name || '';
-  const taxMapping = category?.tax_label || category?.taxLabel || category?.tax_map_us || category?.tax_map_ca || '';
-  const text = buildTransactionText(txn);
-
+  const region = normalizeRegionCode(options.region);
+  const gstHstRegistered = coerceBoolean(options.gstHstRegistered);
+  const taxAmount = resolveIndirectTaxAmount(txn);
+  const categorySlug = inferCategorySlug(txn, category, classifyTransactionNature(txn, category));
   let netAmount = amount;
-  if (region === 'CA' && coerceBoolean(options.gstHstRegistered) && taxAmount > 0) {
+  if (region === "CA" && gstHstRegistered && taxAmount > 0) {
     netAmount = Math.max(0, amount - taxAmount);
   }
-
   let deductibleAmount = netAmount;
   let nonDeductibleAmount = 0;
-  let requiresAllocation = false;
-  const warnings = [];
-
-  if (isExpense && isMealsLike(categoryName, taxMapping, text)) {
+  if (categorySlug === "meals") {
     deductibleAmount = Number((netAmount * 0.5).toFixed(2));
     nonDeductibleAmount = Number((netAmount - deductibleAmount).toFixed(2));
-    warnings.push(region === 'CA' ? PDF_LABELS.en.warning_meals_ca : PDF_LABELS.en.warning_meals_us);
   }
-
-  if (isExpense && isVehicleLike(categoryName, taxMapping, text)) {
-    requiresAllocation = true;
-    warnings.push(region === 'CA' ? PDF_LABELS.en.warning_vehicle_ca : PDF_LABELS.en.warning_vehicle_us);
-  }
-  if (isExpense && isHomeOfficeLike(categoryName, taxMapping, text)) {
-    requiresAllocation = true;
-    warnings.push(region === 'CA' ? PDF_LABELS.en.warning_home_office_ca : PDF_LABELS.en.warning_home_office_us);
-  }
-  if (isExpense && !isMealsLike(categoryName, taxMapping, text) && /phone|internet|telephone/i.test(`${categoryName} ${taxMapping}`)) {
-    requiresAllocation = true;
-  }
-  if (isExpense && isTravelLike(categoryName, taxMapping, text)) {
-    warnings.push(PDF_LABELS.en.warning_travel);
-    if (!(txn?.receipt_id || txn?.receiptId)) {
-      warnings.push(region === 'CA' ? PDF_LABELS.en.warning_receipt_ca : PDF_LABELS.en.warning_receipt_us);
-    }
-  }
-  if (isExpense && !category) {
-    warnings.push(PDF_LABELS.en.warning_unmapped);
-  }
-  if (region === 'CA' && taxAmount > 0) {
-    warnings.push(isExpense ? PDF_LABELS.en.warning_gst_expense : PDF_LABELS.en.warning_gst_income);
-  }
-
   return {
     grossAmount: Number(amount.toFixed(2)),
     taxAmount: Number(taxAmount.toFixed(2)),
     netAmount: Number(netAmount.toFixed(2)),
     deductibleAmount: Number(deductibleAmount.toFixed(2)),
-    nonDeductibleAmount: Number(nonDeductibleAmount.toFixed(2)),
-    requiresAllocation,
-    warnings: Array.from(new Set(warnings))
+    nonDeductibleAmount: Number(nonDeductibleAmount.toFixed(2))
   };
 }
 
-function classifyExcludedTransaction(txn, category, region) {
-  const normalizedType = String(txn?.type || '').toLowerCase();
-  const categoryName = category?.name || '';
-  const taxMapping = category?.tax_label || category?.taxLabel || category?.tax_map_us || category?.tax_map_ca || '';
-  const text = buildTransactionText(txn);
-  const combined = `${categoryName} ${taxMapping} ${text}`;
+function buildTransactionStatus(txn, category, context = {}) {
+  const region = normalizeRegionCode(context.region);
+  const nature = classifyTransactionNature(txn, category);
+  const categorySlug = inferCategorySlug(txn, category, nature);
+  const taxLineDisplay = resolveTaxLineFromCategory({ categorySlug, category, region });
+  const isExpense = String(txn?.type || "").toLowerCase() !== "income";
+  const flags = [];
+  const text = buildTransactionText(txn).toLowerCase();
+  const hasReceipt = Boolean(txn?.receipt_id || txn?.receiptId || context.receiptTxIds?.has(txn?.id));
+  const importedIncome = /^imported income/i.test(normalizeExportCategoryName(category));
+  const importedExpense = /^imported expense/i.test(normalizeExportCategoryName(category));
+  const missingCategoryId = !(txn?.category_id || txn?.categoryId);
+  const duplicate = context.duplicateKeys?.get(normalizeDuplicateKey(txn)) > 1;
+  const personalUsePct = Number(txn?.personal_use_pct ?? txn?.personalUsePct) || 0;
+  const currencyCode = String(txn?.currency || "").toUpperCase();
 
-  if (/^(payroll|wages?|salary|w-?2|employee\s+wages?)\b/i.test(categoryName)) {
-    return PDF_LABELS.en.reason_payroll;
-  }
-  if (normalizedType === 'transfer' || /(transfer|credit card payment|cc payment|internal transfer|online transfer from sav|online transfer to sav)/i.test(combined)) {
-    return PDF_LABELS.en.reason_transfer;
-  }
-  if (/(payment to chase|chase credit crd|chase crd|citi\s*card\s*online|capital one\s*mobile\s*pmt|capital one\s*online\s*pmt|amazon corp syf pay|synchrony bank|affirm\s*\*?\s*pay|klarna|valley bank bill pay|elan financial|discover e-?payment|autopay payment|online payment thank you|amex\s*autopay|bank of america\s*online|discover\s*card\s*pay|barclaycard|credit\s*card\s*autopay|minimum payment|statement balance)/i.test(text)) {
-    return 'Credit card payment — not deductible (deduct the underlying card charges instead)';
-  }
-  if (/\bpayro\b|payroll|w-2\b|salary deposit|employer deposit/i.test(text)) {
-    return PDF_LABELS.en.reason_payroll;
-  }
-  if (/(wire\s*fee|wire\s*transfer\s*fee|outgoing wire|incoming wire|international wire)/i.test(text) && normalizedType !== 'income') {
-    return 'Wire / bank transfer fee — review if business-related';
-  }
-  if (normalizedType === 'income' && /irs\s+treas|tax\s+refund|irs\s+tax\b/i.test(text)) {
-    return 'Tax refund — not Schedule C income (report on Form 1040 Line 4)';
-  }
-  if (normalizedType === 'income' && /state\s+of\s+[a-z]|\bnjstt\b|state\s+treas|dept\s+of\s+revenue/i.test(text)) {
-    return 'State tax refund — not Schedule C income';
-  }
-  if (normalizedType === 'income' && /\bfidelity\b|\bvanguard\b|\bschwab\b|\bmerrill\b|\brobinhood\b|e\*?trade\b|tdameritrade|td\s+ameritrade/i.test(text)) {
-    return 'Investment account — not Schedule C income (verify source)';
-  }
-  if (/(grocery|groceries|supermarket|whole foods|trader joe|kroger|safeway|publix|aldi|food lion|stop\s*&\s*shop|netflix|hulu|disney plus|disney\+|spotify|amazon prime|apple music|planet fitness|anytime fitness|gym membership|haircut|barber shop|vagaro|nail salon|crosscountry|cross\s*country\s*mortgage|mortgage payment|personal expense|family expense)/i.test(combined)) {
-    return PDF_LABELS.en.reason_personal;
-  }
-  if (String(txn?.tax_treatment || txn?.taxTreatment || '').toLowerCase() === 'split_use' || Number(txn?.personal_use_pct ?? txn?.personalUsePct) > 0) {
-    return PDF_LABELS.en.reason_personal;
-  }
-  if (/(refund|reimbursement)/i.test(text) && normalizedType !== 'income') {
-    return PDF_LABELS.en.reason_refund;
-  }
-  return null;
-}
+  let categoryStatus = "mapped";
+  let taxMapStatus = taxLineDisplay ? "mapped" : "unmapped";
+  let supportStatus = "ready";
 
-function normalizePdfDate(value) {
-  if (!value) return '';
-  if (value instanceof Date) {
-    if (Number.isNaN(value.getTime())) return '';
-    return value.toISOString().slice(0, 10);
+  if (missingCategoryId || importedExpense || importedIncome || categorySlug === "needs_category") {
+    categoryStatus = "needs_category";
+    flags.push("NC");
   }
-  const text = String(value).trim();
-  if (!text) return '';
-  const parsed = new Date(text);
-  if (!Number.isNaN(parsed.getTime()) && /^\d{4}-\d{2}-\d{2}/.test(parsed.toISOString())) {
-    return parsed.toISOString().slice(0, 10);
+  if ((importedExpense || (missingCategoryId && isExpense)) && !flags.includes("UM")) {
+    flags.push("UM");
   }
-  return text;
-}
+  if (!String(txn?.description || txn?.note || "").trim()) flags.push("MD");
+  if (duplicate) flags.push("DUP");
+  if (personalUsePct > 0 || /personal/.test(text)) flags.push("PR");
+  if (currencyCode && !["USD", "CAD", ""].includes(currencyCode)) flags.push("FX");
+  if (resolveIndirectTaxAmount(txn) > 0) flags.push("IT");
 
-function maskTaxId(value) {
-  const text = String(value || '').trim();
-  if (!text) return 'No Tax ID';
-  if (text.length <= 5) return text;
-  return `${text.slice(0, 5)}***`;
-}
+  const mappedReviewCategory = ["vehicle_fuel", "vehicle_maintenance", "vehicle_parking_tolls", "meals", "phone_internet", "insurance_vehicle", "home_office", "equipment_capital_asset", "travel"].includes(categorySlug);
+  const needsFinalConfirmation = mappedReviewCategory;
+  const needsMileageLog = ["vehicle_fuel", "vehicle_maintenance", "vehicle_parking_tolls", "insurance_vehicle"].includes(categorySlug);
+  const needsBusinessPurpose = ["meals", "travel"].includes(categorySlug);
+  const needsAllocation = ["phone_internet", "insurance_vehicle", "vehicle_fuel", "vehicle_maintenance", "home_office"].includes(categorySlug);
+  const needsHomeOfficeSupport = categorySlug === "home_office";
+  const needsCapitalAssetReview = categorySlug === "equipment_capital_asset";
+  const needsReceipt = isExpense && !hasReceipt && !["needs_category"].includes(categorySlug);
 
-function buildCategoryBuckets(transactions, categories, labels, currency, region) {
-  const categoryMap = mapByKey(categories, 'id');
-  const buckets = new Map();
-  const taxKey = normalizeRegionCode(region) === 'CA' ? 'tax_map_ca' : 'tax_map_us';
+  if (nature === "refund_or_reversal" || nature === "cashback_or_reward") flags.push("RR");
+  if (nature === "transfer" || nature === "credit_card_payment") flags.push("TR");
+  if (nature === "unknown_needs_review") flags.push("RV");
 
-  (transactions || []).forEach((txn) => {
-    const categoryId = txn.category_id || txn.categoryId || '';
-    const category = categoryMap[categoryId] || null;
-    const categoryName = safeValue(category?.name, 'Uncategorized');
-    const taxMapping = normalizeTaxLineText(category?.[taxKey] || category?.tax_label || category?.taxLabel, region);
-    const bucketKey = `${categoryId || 'uncategorized'}::${String(txn.type || 'expense').toLowerCase()}`;
-    const existing = buckets.get(bucketKey) || {
-      categoryName: categoryName,
-      taxMapping,
-      amount: 0,
-      needsReview: false,
-      needsAction: false,
-      hasSpecialCategory: false,
-      type: String(txn.type || 'expense').toLowerCase()
-    };
-    existing.amount += String(txn.type || '').toLowerCase() === 'income'
-      ? Number(txn.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn))
-      : Number(txn.__businessAmounts?.deductibleAmount ?? normalizeMoneyAmount(txn));
-    if (/^Unmapped\b/.test(taxMapping) || categoryName === 'Uncategorized' || /^Imported\s+(Expense|Income)\b/i.test(categoryName)) existing.needsAction = true;
-    if (getTransactionFlags(txn, category, region).length) existing.needsReview = true;
-    if (isSpecialReviewCategory(categoryName, taxMapping)) existing.hasSpecialCategory = true;
-    buckets.set(bucketKey, existing);
-  });
+  if (categoryStatus === "needs_category") {
+    supportStatus = importedIncome && /refund|reversal|cash.?back|reward/.test(text) ? "refund_reversal_match_needed" : "payer_support_needed";
+  }
 
-  return Array.from(buckets.values())
-    .map((bucket) => ({
-      categoryName: bucket.type === 'income' ? `${bucket.categoryName} (income)` : bucket.categoryName,
-      taxMapping: bucket.taxMapping,
-      amount: formatCurrencyForPdf(bucket.amount, currency),
-      sortAmount: bucket.amount,
-      reviewStatus: bucket.needsAction
-        ? labels.review_action_needed
-        : (bucket.needsReview || bucket.hasSpecialCategory ? labels.review_review : labels.review_ok)
-    }))
-    .sort((a, b) => {
-      const priorityOf = (r) => r === labels.review_action_needed ? 0 : r === labels.review_review ? 1 : 2;
-      const pa = priorityOf(a.reviewStatus);
-      const pb = priorityOf(b.reviewStatus);
-      if (pa !== pb) return pa - pb;
-      return b.sortAmount - a.sortAmount;
-    });
+  if (!taxLineDisplay && categoryStatus !== "needs_category" && nature !== "business_income") {
+    taxMapStatus = "unmapped";
+    flags.push("UM");
+  }
+
+  if (needsFinalConfirmation) flags.push("FC");
+  if (needsReceipt) flags.push("RS");
+  if (needsBusinessPurpose) flags.push("BP");
+  if (needsAllocation) flags.push("AL");
+  if (needsMileageLog) flags.push("ML");
+  if (needsHomeOfficeSupport) flags.push("HO");
+  if (needsCapitalAssetReview) flags.push("CA");
+
+  if (categoryStatus === "needs_category") supportStatus = "category_required";
+  else if (needsHomeOfficeSupport) supportStatus = "home_office_support_needed";
+  else if (needsCapitalAssetReview) supportStatus = "capital_asset_review_needed";
+  else if (needsMileageLog) supportStatus = "mileage_log_needed";
+  else if (needsBusinessPurpose) supportStatus = "business_purpose_needed";
+  else if (needsAllocation) supportStatus = "allocation_needed";
+  else if (needsReceipt) supportStatus = "receipt_missing";
+  else if (nature === "refund_or_reversal" || nature === "cashback_or_reward") supportStatus = "refund_reversal_match_needed";
+  else if (flags.includes("RV")) supportStatus = "cpa_review";
+
+  const severity = categoryStatus === "needs_category" || taxMapStatus === "unmapped"
+    ? "action"
+    : (flags.length ? "review" : "mapped");
+
+  const supportPhrases = [];
+  if (categoryStatus === "needs_category") supportPhrases.push("Assign real category");
+  if (needsReceipt) supportPhrases.push("Receipt/support needed");
+  if (needsBusinessPurpose) supportPhrases.push("Business purpose required");
+  if (needsMileageLog) supportPhrases.push("Mileage/actual support required");
+  if (needsAllocation) supportPhrases.push("Allocation required");
+  if (needsHomeOfficeSupport) supportPhrases.push("Square-foot support required");
+  if (needsCapitalAssetReview) supportPhrases.push("Depreciation review required");
+  if (flags.includes("RR")) supportPhrases.push("Refund/reversal match review");
+  if (flags.includes("RV")) supportPhrases.push("CPA review required");
+
+  return {
+    nature,
+    categorySlug,
+    categoryStatus,
+    taxMapStatus,
+    supportStatus,
+    severity,
+    flags: Array.from(new Set(flags)),
+    taxLineDisplay: taxLineDisplay || (nature === "business_income" ? (region === "CA" ? "Line 8000 - Gross business income" : "Line 1 - Gross receipts or sales") : "Unmapped"),
+    supportSummary: supportPhrases.join(" + ") || "Mapped",
+    isMapped: Boolean(taxLineDisplay) || nature === "business_income",
+    needsCategory: categoryStatus === "needs_category",
+    needsFinalConfirmation,
+    needsReceipt,
+    needsBusinessPurpose,
+    needsAllocation,
+    needsMileageLog,
+    needsHomeOfficeSupport,
+    needsCapitalAssetReview
+  };
 }
 
 function normalizeDuplicateKey(txn) {
-  const description = String(txn.description || txn.note || '').trim().toLowerCase().replace(/\s+/g, ' ');
-  const amount = Math.abs(Number(txn.amount) || 0).toFixed(2);
-  return `${normalizePdfDate(txn.date)}|${amount}|${description}`;
-}
-
-function isSpecialReviewCategory(categoryName, taxMapping) {
-  return /(meal|travel|vehicle|auto|fuel|car|mileage|home office|food|dining|restaurant|entertainment|phone|internet|telephone)/i.test(`${categoryName} ${taxMapping}`);
-}
-
-function getTransactionFlags(txn, category, region = 'us') {
-  const flags = [];
-  const isCA = normalizeRegionCode(region) === 'CA';
-  const taxTreatment = String(txn.tax_treatment || txn.taxTreatment || '').toLowerCase();
-  const reviewStatus = String(txn.review_status || txn.reviewStatus || '').toLowerCase();
-  const categoryName = category?.name || '';
-  const taxKey = isCA ? 'tax_map_ca' : 'tax_map_us';
-  const taxMapping = category?.[taxKey] || category?.tax_label || category?.taxLabel || '';
-  const isImportedCategory = /^Imported\s+(Expense|Income)\b/i.test(categoryName);
-  const hasCategoryId = !!(txn.category_id || txn.categoryId);
-
-  if (!hasCategoryId) {
-    flags.push('Uncategorized');
-  } else if (isImportedCategory) {
-    flags.push('Needs category');
-  }
-  if (!String(txn.description || '').trim()) flags.push('Missing description');
-  if (String(txn.type || '').toLowerCase() !== 'income' && Number(txn.amount) < 0) flags.push('Negative expense');
-  if (taxTreatment === 'split_use' || Number(txn.personal_use_pct ?? txn.personalUsePct) > 0) flags.push('Mixed-use');
-  if (reviewStatus && reviewStatus !== 'ready') flags.push('Review');
-  if (Number(txn.indirect_tax_amount ?? txn.indirectTaxAmount) > 0) flags.push('Indirect tax');
-  const currencyCode = String(txn.currency || '').toUpperCase();
-  if (currencyCode && currencyCode !== 'USD' && currencyCode !== 'CAD') flags.push('FX');
-  if (hasCategoryId && !isImportedCategory && !taxMapping.trim()) flags.push('Needs tax mapping');
-  if (isSpecialReviewCategory(categoryName, taxMapping)) flags.push('Special category');
-  return Array.from(new Set(flags));
+  return `${normalizePdfDate(txn?.date)}|${Math.abs(Number(txn?.amount) || 0).toFixed(2)}|${String(txn?.description || txn?.note || "").trim().toLowerCase().replace(/\s+/g, " ")}`;
 }
 
 function summarizeExportTransactions(transactions, categories, options = {}) {
-  const region = normalizeRegionCode(options.region);
-  const categoryMap = mapByKey(categories || [], 'id');
+  const categoryMap = mapByKey(categories || [], "id");
+  const receiptTxIds = new Set((options.receipts || []).map((receipt) => receipt?.transaction_id || receipt?.transactionId));
+  const duplicateKeys = new Map();
+  for (const txn of transactions || []) {
+    const key = normalizeDuplicateKey(txn);
+    duplicateKeys.set(key, (duplicateKeys.get(key) || 0) + 1);
+  }
+
   const included = [];
   const excluded = [];
 
   for (const txn of transactions || []) {
-    const category = categoryMap[txn.category_id || txn.categoryId] || null;
-    const exclusionReason = classifyExcludedTransaction(txn, category, region);
-    const amounts = deriveBusinessAmounts(txn, category, options);
+    const category = categoryMap[txn?.category_id || txn?.categoryId] || txn?.__category || null;
+    const exclusionReason = classifyExcludedTransaction(txn, category, options.region);
+    const businessAmounts = deriveBusinessAmounts(txn, category, options);
+    const status = buildTransactionStatus(txn, category, {
+      region: options.region,
+      receiptTxIds,
+      duplicateKeys
+    });
     const enriched = {
       ...txn,
       __category: category,
-      __businessAmounts: amounts,
+      __businessAmounts: businessAmounts,
+      __status: status,
       __exclusionReason: exclusionReason
     };
-    if (exclusionReason) {
-      excluded.push(enriched);
-    } else {
-      included.push(enriched);
-    }
+    if (exclusionReason) excluded.push(enriched);
+    else included.push(enriched);
   }
 
   return { included, excluded };
 }
 
-function buildReviewInsights(transactions, categories, receipts, meta = {}) {
-  const region = meta.region || 'us';
-  const isCA = normalizeRegionCode(region) === 'CA';
-  const taxKey = isCA ? 'tax_map_ca' : 'tax_map_us';
-  const categoryMap = mapByKey(categories, 'id');
-  const duplicateMap = new Map();
-  (transactions || []).forEach((txn) => {
-    const key = normalizeDuplicateKey(txn);
-    duplicateMap.set(key, (duplicateMap.get(key) || 0) + 1);
-  });
-
-  const expenseTransactions = (transactions || []).filter((txn) => String(txn.type || '').toLowerCase() !== 'income');
-  const receiptLinkedCount = expenseTransactions.filter((txn) => txn.receipt_id || txn.receiptId).length;
-
-  const excludedArray = Array.isArray(meta.excluded) ? meta.excluded : [];
-  const excludedCount = excludedArray.length > 0 ? excludedArray.length : (Number(meta.excludedCount) || 0);
-  const exclusionReasonBreakdown = {};
-  excludedArray.forEach((txn) => {
-    const reason = txn.__exclusionReason || 'Excluded';
-    exclusionReasonBreakdown[reason] = (exclusionReasonBreakdown[reason] || 0) + 1;
-  });
-
-  const FLAG_SEVERITY = { 'Uncategorized': 0, 'Needs category': 1, 'Needs tax mapping': 2, 'Review': 3, 'Negative expense': 4, 'Missing description': 5, 'Mixed-use': 6, 'Indirect tax': 7, 'FX': 8, 'Special category': 9 };
-  const allFlagged = [];
-  let uncategorizedCount = 0;
-  let needsCategoryCount = 0;
-  let missingDescriptionCount = 0;
-  let duplicateCount = 0;
-  let negativeExpenseCount = 0;
-  let mixedUseCount = 0;
-  let specialCategoryCount = 0;
-  let reviewFlagCount = 0;
-  let vehicleCount = 0;
-  let vehicleTotal = 0;
-  let mealsCount = 0;
-  let mealsTotal = 0;
-  let homeOfficeCount = 0;
-  let homeOfficeTotal = 0;
-  let unmappedExpenseCount = 0;
-  let unmappedTaxCount = 0;
-
-  (transactions || []).forEach((txn) => {
-    const category = categoryMap[txn.category_id || txn.categoryId] || null;
-    const flags = getTransactionFlags(txn, category, region);
-    const taxSlug = String(category?.[taxKey] || category?.tax_label || category?.taxLabel || '').toLowerCase();
-    const catName = String(category?.name || '').toLowerCase();
-    const isExpense = String(txn.type || '').toLowerCase() === 'expense';
-    const amount = Math.abs(Number(txn.amount) || 0);
-
-    if (flags.includes('Uncategorized')) uncategorizedCount += 1;
-    if (flags.includes('Needs category')) needsCategoryCount += 1;
-    if (flags.includes('Needs tax mapping')) unmappedTaxCount += 1;
-    if (!String(txn.description || '').trim()) missingDescriptionCount += 1;
-    if (duplicateMap.get(normalizeDuplicateKey(txn)) > 1) duplicateCount += 1;
-    if (isExpense && Number(txn.amount) < 0) negativeExpenseCount += 1;
-    if (flags.includes('Mixed-use')) mixedUseCount += 1;
-    if (flags.includes('Special category')) specialCategoryCount += 1;
-    if (flags.length) {
-      reviewFlagCount += 1;
-      const topSeverity = Math.min(...flags.map((f) => FLAG_SEVERITY[f] ?? 99));
-      allFlagged.push({ severity: topSeverity, amount, flags, description: txn.description || '(No description)' });
-    }
-
-    if (isExpense) {
-      const combined = `${catName} ${taxSlug}`;
-      if (/\b(vehicle|auto|fuel|truck|mileage|car_and_truck)\b/.test(combined) || /\bgas\b/.test(combined) || /\bcar\b/.test(catName)) {
-        vehicleCount += 1; vehicleTotal += amount;
-      } else if (/\b(meal|meals|meals_entertainment|dining|entertainment|deductible_meals)\b/.test(combined)) {
-        mealsCount += 1; mealsTotal += amount;
-      } else if (/home[_\s]?office|home[_\s]?business/.test(combined)) {
-        homeOfficeCount += 1; homeOfficeTotal += amount;
-      }
-      if ((txn.category_id || txn.categoryId) && !taxSlug) unmappedExpenseCount += 1;
-    }
-  });
-
-  allFlagged.sort((a, b) => a.severity !== b.severity ? a.severity - b.severity : b.amount - a.amount);
-  const samples = allFlagged.slice(0, 6).map((item) => ({
-    reason: item.flags.join(', '),
-    description: truncateText(item.description, 36),
-    amount: item.amount
-  }));
-
+function calculateTotals(transactions) {
+  let income = 0;
+  let expenses = 0;
+  for (const txn of transactions || []) {
+    const type = String(txn?.type || "").toLowerCase();
+    if (type === "income") income += Number(txn?.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn));
+    else if (type === "expense") expenses += Number(txn?.__businessAmounts?.deductibleAmount ?? normalizeMoneyAmount(txn));
+  }
   return {
-    transactionCount: (transactions || []).length,
-    expenseTransactionCount: expenseTransactions.length,
-    uncategorizedCount,
-    needsCategoryCount,
-    missingDescriptionCount,
-    duplicateCount,
-    negativeExpenseCount,
-    mixedUseCount,
-    specialCategoryCount,
-    reviewFlagCount,
-    receiptLinkedCount,
-    missingReceiptCount: Math.max(0, expenseTransactions.length - receiptLinkedCount),
-    receiptCoverageText: `${receiptLinkedCount} of ${expenseTransactions.length || 0}`,
-    excludedCount,
-    exclusionReasonBreakdown,
-    vehicleCount, vehicleTotal,
-    mealsCount, mealsTotal,
-    homeOfficeCount, homeOfficeTotal,
-    unmappedExpenseCount,
-    unmappedTaxCount,
-    samples
+    income: Number(income.toFixed(2)),
+    expenses: Number(expenses.toFixed(2)),
+    netProfit: Number((income - expenses).toFixed(2)),
+    estimatedTax: null
   };
 }
-
-function buildKeyValueRows(canvas, x, startY, rows, size = 10, gap = 16) {
-  let y = startY;
-  rows.forEach(([label, value]) => {
-    canvas.text(x, y, `${label}: ${value}`, size);
-    y -= gap;
-  });
-  return y;
-}
-
-function buildIdentityPage(data) {
-  const {
-    labels, totals, currency, legalName, operatingName, taxId, naics, businessName,
-    startDate, endDate, reportId, generatedAt, accountingBasis, region, province,
-    reviewInsights, isSecure, address = "", fiscalYearStart = "",
-    materialParticipation, gstHstRegistered, gstHstNumber, gstHstMethod
-  } = data;
-
-  const normalizedRegion = normalizeRegionCode(region);
-  const canvas = new PdfCanvas();
-  let y = 760;
-  canvas.text(40, y, normalizedRegion === 'CA' ? labels.ca_report_title : labels.us_report_title, 18, 'F2'); y -= 20;
-  canvas.text(40, y, normalizedRegion === 'CA' ? labels.ca_report_subtitle : labels.us_report_subtitle, 10); y -= 16;
-  canvas.text(40, y, isSecure ? labels.report_subtitle_secure : labels.report_subtitle_redacted, 10); y -= 18;
-  canvas.text(40, y, isSecure ? labels.badge_secure : labels.badge_redacted, 11, 'F2');
-
-  canvas.text(40, 690, labels.entity_section_title, 12, 'F2');
-  buildKeyValueRows(canvas, 40, 670, [
-    [labels.legal_name, safeValue(legalName || businessName)],
-    ...(String(operatingName || '').trim() ? [[labels.business_name, operatingName]] : []),
-    [isSecure ? labels.tax_id : labels.tax_id_redacted, isSecure ? safeValue(taxId) : labels.tax_id_withheld],
-    [labels.business_activity_code, safeValue(naics)],
-    [labels.jurisdiction, formatJurisdiction(region, province)],
-    ...(isSecure ? [[labels.address, safeValue(address)]] : []),
-    ...(String(fiscalYearStart || '').trim() ? [[labels.fiscal_year_start, fiscalYearStart]] : [])
-  ]);
-
-  canvas.text(330, 690, labels.reporting_section_title, 12, 'F2');
-  buildKeyValueRows(canvas, 330, 670, [
-    [labels.reporting_period, `${startDate} to ${endDate}`],
-    ...(String(accountingBasis || '').trim() ? [[labels.accounting_basis, accountingBasis]] : []),
-    [labels.currency, currency],
-    [labels.export_created, formatReportTimestamp(generatedAt)],
-    [labels.export_id, reportId],
-    [labels.prepared_from, labels.prepared_from_value]
-  ]);
-
-  canvas.text(40, 590, normalizedRegion === 'CA' ? labels.ca_tax_profile_title : labels.us_tax_profile_title, 12, 'F2');
-  buildKeyValueRows(canvas, 40, 570, normalizedRegion === 'CA'
-    ? [
-        [labels.province, safeValue(province)],
-        [labels.gst_hst_registered, gstHstRegistered ? 'Yes' : 'No'],
-        [labels.gst_hst_number, gstHstRegistered ? safeValue(gstHstNumber) : 'Not registered'],
-        [labels.gst_hst_method, gstHstRegistered ? safeValue(gstHstMethod) : 'Not registered']
-      ]
-    : [
-        [labels.material_participation, normalizeYesNo(materialParticipation)]
-      ]
-  );
-
-  canvas.text(330, 590, labels.financial_summary_title, 12, 'F2');
-  buildKeyValueRows(canvas, 330, 570, [
-    [labels.gross_income, formatCurrencyForPdf(totals.income, currency)],
-    [labels.total_expenses, formatCurrencyForPdf(totals.expenses, currency)],
-    [labels.net_profit, formatCurrencyForPdf(totals.netProfit, currency)],
-    [labels.transaction_count, String(reviewInsights.transactionCount)]
-  ]);
-
-  canvas.text(330, 500, labels.tax_estimate_title, 12, 'F2');
-  buildKeyValueRows(canvas, 330, 480, [
-    [labels.estimated_tax, 'Manual review required']
-  ]);
-  wrapText(labels.estimated_tax_disclaimer, 34).forEach((line, index) => {
-    canvas.text(330, 464 - (index * 14), line, 9);
-  });
-
-  canvas.text(40, 430, labels.review_flags_title, 12, 'F2');
-  buildKeyValueRows(canvas, 40, 410, [
-    [labels.uncategorized_transactions, String(reviewInsights.uncategorizedCount)],
-    ['Imported (needs real category)', String(reviewInsights.needsCategoryCount || 0)],
-    ['Expenses missing tax mapping', String(reviewInsights.unmappedTaxCount || 0)],
-    ['Meals, auto, home-office items (SC)', String(reviewInsights.specialCategoryCount || 0)],
-    [labels.review_flagged_transactions, String(reviewInsights.reviewFlagCount)],
-    ['Possible duplicate transactions', String(reviewInsights.duplicateCount)],
-    [labels.receipt_coverage, reviewInsights.receiptCoverageText],
-    [labels.transfers_excluded_title, String(reviewInsights.excludedCount || 0)]
-  ]);
-
-  canvas.text(40, 210, 'Category totals and tax mapping: see next section', 9);
-  canvas.text(40, 196, 'Detailed transaction ledger: see appendix pages', 9);
-
-  return canvas;
-}
-
-function buildCategoryPages(transactions, categories, currency, labels, embeddedCount = 0, region = 'US') {
-  const entries = buildCategoryBuckets(transactions, categories, labels, currency, region);
-  const remainingEntries = entries.slice(embeddedCount);
-  if (!remainingEntries.length) {
-    if (entries.length) return [];
-    const canvas = new PdfCanvas();
-    canvas.text(40, 760, labels.category_breakdown_title, 16, 'F2');
-    canvas.text(40, 720, labels.no_category_data, 11);
-    return [canvas];
-  }
-
-  return chunkArray(remainingEntries, 22).map((chunk) => {
-    const canvas = new PdfCanvas();
-    canvas.text(40, 760, labels.category_breakdown_title, 16, 'F2');
-    canvas.text(40, 730, labels.col_category, 10, 'F2');
-    canvas.text(220, 730, labels.col_tax_mapping, 10, 'F2');
-    canvas.text(470, 730, labels.col_amount, 10, 'F2');
-    canvas.text(540, 730, labels.col_review_status, 10, 'F2');
-    let y = 708;
-    chunk.forEach((row) => {
-      canvas.text(40, y, truncateText(row.categoryName, 28), 9);
-      canvas.text(220, y, truncateText(row.taxMapping, 40), 9);
-      canvas.text(470, y, row.amount, 9);
-      canvas.text(540, y, row.reviewStatus, 9);
-      y -= 18;
-    });
-    return canvas;
-  });
-}
-
-function buildContentsPage(labels, region, taxYear, gstHstRegistered) {
-  const canvas = new PdfCanvas();
-  const normalizedRegion = normalizeRegionCode(region);
-  const tocRows = normalizedRegion === 'CA'
-    ? [
-        '1. Entity and tax profile',
-        '2. Workpaper contents and CRA rules snapshot',
-        '3. Category totals by T2125 mapping',
-        '4. Income / T4A reconciliation',
-        '5. Deductibility adjustments and GST/HST review',
-        '6. Detailed transaction ledger',
-        '7. Excluded transfers, payroll, and personal review',
-        '8. Support schedules and disclosure'
-      ]
-    : [
-        '1. Entity and tax profile',
-        '2. Workpaper contents and IRS rules snapshot',
-        '3. Category totals by Schedule C mapping',
-        '4. Income / 1099 reconciliation',
-        '5. Deductibility adjustments and receipt review',
-        '6. Detailed transaction ledger',
-        '7. Excluded transfers, payroll, and personal review',
-        '8. Support schedules and disclosure'
-      ];
-
-  canvas.text(40, 760, labels.toc_title, 16, 'F2');
-  let y = 724;
-  tocRows.forEach((row) => {
-    canvas.text(40, y, row, 10);
-    y -= 20;
-  });
-  canvas.text(40, y - 4, normalizedRegion === 'CA' ? labels.profile_note_ca : labels.profile_note_us, 9);
-
-  // Rules snapshot on same page
-  const necThreshold = (taxYear || 0) >= 2026 ? '$2,000' : '$600';
-  const ruleRows = normalizedRegion === 'CA'
-    ? [
-        [labels.tax_rules_ca_threshold, '$500 payer support threshold'],
-        [labels.tax_rules_meals, '50% deductible unless special exception applies'],
-        [labels.tax_rules_vehicle, 'CRA logbook support is expected'],
-        [labels.tax_rules_receipts, 'Keep vendor/date/amount/GST details'],
-        [labels.tax_rules_gst, gstHstRegistered ? 'Net-of-tracked GST/HST in this export' : 'Gross amounts retained (not registered)']
-      ]
-    : [
-        [labels.tax_rules_us_threshold, `${necThreshold} per payer for tax year ${taxYear}; verify with preparer`],
-        [labels.tax_rules_meals, '50% deductible; business purpose required'],
-        [labels.tax_rules_vehicle, 'Mileage log or actual-expense records required'],
-        [labels.tax_rules_receipts, 'Travel, meals, lodging, and gifts need stronger support'],
-        [labels.tax_rules_gst, 'Not applicable to US Schedule C reporting']
-      ];
-
-  canvas.text(40, 460, labels.tax_rules_title, 12, 'F2');
-  buildKeyValueRows(canvas, 40, 440, ruleRows, 10, 20);
-  return [canvas];
-}
-
-function buildExclusionPages(transactions, currency, labels) {
-  if (!transactions.length) return [];
-
-  const sorted = [...transactions].sort((a, b) => {
-    const da = a.date ? new Date(a.date).getTime() : 0;
-    const db = b.date ? new Date(b.date).getTime() : 0;
-    return da - db;
-  });
-
-  const reasonCounts = {};
-  sorted.forEach((txn) => {
-    const r = txn.__exclusionReason || labels.reason_transfer || 'Excluded';
-    reasonCounts[r] = (reasonCounts[r] || 0) + 1;
-  });
-  const reasonSummaryLines = Object.entries(reasonCounts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([reason, count]) => `${count}x ${reason}`);
-
-  const ITEMS_PER_PAGE = 16;
-  return chunkArray(sorted, ITEMS_PER_PAGE).map((chunk, index) => {
-    const canvas = new PdfCanvas();
-    const title = index === 0
-      ? labels.exclusions_schedule_title
-      : `${labels.exclusions_schedule_title} - ${labels.section_continued}`;
-    canvas.text(40, 760, title, 16, 'F2');
-
-    let headerY = 736;
-    if (index === 0) {
-      canvas.text(40, headerY, 'Summary by exclusion reason:', 9, 'F2');
-      headerY -= 12;
-      reasonSummaryLines.slice(0, 4).forEach((line) => {
-        canvas.text(40, headerY, truncateText(line, 90), 8);
-        headerY -= 11;
-      });
-      headerY -= 4;
-    }
-
-    canvas.text(40, headerY, labels.col_date, 9, 'F2');
-    canvas.text(120, headerY, labels.col_payee_memo, 9, 'F2');
-    canvas.text(360, headerY, labels.exclusions_reason, 9, 'F2');
-    canvas.text(520, headerY, labels.exclusions_booked_amount, 9, 'F2');
-    let y = headerY - 16;
-    chunk.forEach((txn) => {
-      canvas.text(40, y, normalizePdfDate(txn.date), 8);
-      canvas.text(120, y, truncateText(buildTransactionText(txn) || '(No description)', 38), 8);
-      canvas.text(360, y, truncateText(txn.__exclusionReason || labels.reason_transfer, 26), 8);
-      canvas.text(520, y, formatCurrencyForPdf(normalizeMoneyAmount(txn), currency), 8);
-      y -= 16;
-    });
-    if (index === 0) {
-      canvas.text(40, 50, labels.transfers_excluded_note, 8);
-    }
-    return canvas;
-  });
-}
-
-function buildDeductionPages(transactions, currency, labels, region) {
-  const isCA = normalizeRegionCode(region) === 'CA';
-  const expenseRows = (transactions || [])
-    .filter((txn) => String(txn.type || '').toLowerCase() !== 'income')
-    .map((txn) => {
-      const category = txn.__category || null;
-      const details = txn.__businessAmounts || deriveBusinessAmounts(txn, category, { region });
-      if (!(details.nonDeductibleAmount > 0 || details.taxAmount > 0 || details.warnings.length || details.requiresAllocation)) {
-        return null;
-      }
-      return {
-        date: normalizePdfDate(txn.date),
-        description: truncateText(buildTransactionText(txn) || '(No description)', 28),
-        gross: formatCurrencyForPdf(details.grossAmount, currency),
-        tax: formatCurrencyForPdf(details.taxAmount, currency),
-        net: formatCurrencyForPdf(details.netAmount, currency),
-        allowed: details.requiresAllocation ? 'TBD' : formatCurrencyForPdf(details.deductibleAmount, currency),
-        blocked: details.requiresAllocation ? 'TBD' : formatCurrencyForPdf(details.nonDeductibleAmount, currency),
-        warning: truncateText(details.warnings.join(' | '), 50),
-        requiresAllocation: details.requiresAllocation
-      };
-    })
-    .filter(Boolean);
-
-  if (!expenseRows.length) return [];
-
-  // Build grouped summary counts for page 1 header
-  const mealsRows = expenseRows.filter((r) => /50% meals/i.test(r.warning));
-  const vehicleRows = expenseRows.filter((r) => r.requiresAllocation && /mileage|logbook|vehicle/i.test(r.warning));
-  const homeOfficeRows = expenseRows.filter((r) => r.requiresAllocation && /home.office|form 8829|business.use.of.home/i.test(r.warning));
-
-  const titleBase = isCA ? labels.deductions_title_ca : labels.deductions_title_us;
-  const pages = [];
-
-  chunkArray(expenseRows, 14).forEach((chunk, index) => {
-    const canvas = new PdfCanvas();
-    const title = index === 0 ? titleBase : `${titleBase} - ${labels.section_continued}`;
-    canvas.text(40, 760, title, 16, 'F2');
-
-    let headerY = 738;
-    if (index === 0) {
-      // Summary counts so CPA sees the big picture before the wall of rows
-      if (mealsRows.length) {
-        canvas.text(40, headerY, `Meals requiring 50% review: ${mealsRows.length} transactions — 50% limit applied automatically below`, 9);
-        headerY -= 14;
-      }
-      if (vehicleRows.length) {
-        canvas.text(40, headerY, `Vehicle requiring mileage/actual-expense support: ${vehicleRows.length} transactions — deductible amount shown as TBD`, 9);
-        headerY -= 14;
-      }
-      if (homeOfficeRows.length) {
-        canvas.text(40, headerY, `Home-office requiring sq-ft allocation: ${homeOfficeRows.length} transactions — deductible amount shown as TBD`, 9);
-        headerY -= 14;
-      }
-      headerY -= 4;
-    }
-
-    const colY = headerY - 4;
-    canvas.text(40, colY, labels.col_date, 8, 'F2');
-    canvas.text(95, colY, labels.col_payee_memo, 8, 'F2');
-    canvas.text(250, colY, labels.deduction_gross, 8, 'F2');
-    canvas.text(308, colY, labels.deduction_tax_component, 8, 'F2');
-    canvas.text(360, colY, labels.deduction_net, 8, 'F2');
-    canvas.text(418, colY, labels.deduction_allowed, 8, 'F2');
-    canvas.text(480, colY, labels.deduction_disallowed, 8, 'F2');
-    canvas.text(40, colY - 16, labels.deduction_warning, 8, 'F2');
-    let y = colY - 36;
-    chunk.forEach((row) => {
-      if (y < 60) return;
-      canvas.text(40, y, row.date, 8);
-      canvas.text(95, y, row.description, 8);
-      canvas.text(250, y, row.gross, 8);
-      canvas.text(308, y, row.tax, 8);
-      canvas.text(360, y, row.net, 8);
-      canvas.text(418, y, row.allowed, 8);
-      canvas.text(480, y, row.blocked, 8);
-      y -= 12;
-      canvas.text(40, y, row.warning, 8);
-      y -= 18;
-    });
-    pages.push(canvas);
-  });
-  return pages;
-}
-
-function buildTransactionPages(transactions, accounts, categories, currency, labels, region) {
-  const accountMap = mapByKey(accounts, 'id');
-  const categoryMap = mapByKey(categories, 'id');
-  const taxKey = normalizeRegionCode(region) === 'CA' ? 'tax_map_ca' : 'tax_map_us';
-  const sorted = (transactions || [])
-    .slice()
-    .sort((a, b) => normalizePdfDate(a.date).localeCompare(normalizePdfDate(b.date)));
-
-  if (!sorted.length) {
-    const canvas = new PdfCanvas();
-    canvas.text(40, 760, labels.transaction_log_title, 16, 'F2');
-    canvas.text(40, 720, labels.no_transaction_data, 11);
-    return [canvas];
-  }
-
-  // Build row items with monthly group headers
-  const rowItems = [];
-  let lastMonth = '';
-  sorted.forEach((txn) => {
-    const dateStr = normalizePdfDate(txn.date);
-    const monthKey = dateStr.slice(0, 7);
-    if (monthKey !== lastMonth) {
-      lastMonth = monthKey;
-      const d = new Date(dateStr + 'T12:00:00Z');
-      const monthLabel = Number.isNaN(d.getTime())
-        ? monthKey
-        : d.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-      rowItems.push({ isHeader: true, label: monthLabel });
-    }
-    const category = categoryMap[txn.category_id || txn.categoryId] || null;
-    const account = accountMap[txn.account_id || txn.accountId] || null;
-    const flags = getTransactionFlags(txn, category, region);
-    const businessAmounts = txn.__businessAmounts || deriveBusinessAmounts(txn, category, { region });
-    const isIncome = String(txn.type || '').toLowerCase() === 'income';
-    const taxMapRaw = normalizeTaxLineText(
-      category?.[taxKey] || category?.tax_label || category?.taxLabel,
-      region
-    );
-    // Build conditional note — only when there is genuinely useful extra detail
-    const noteParts = [];
-    // Line 2: account / category / payer
-    const accountCatStr = `${safeValue(account?.name, '-')} / ${safeValue(category?.name, 'Uncategorized')}`;
-    noteParts.push(truncateText(accountCatStr, 32));
-    if (isIncome && (txn.payer_name || txn.payerName)) {
-      noteParts.push(`Payer: ${truncateText(txn.payer_name || txn.payerName, 22)}`);
-    }
-    if (isIncome && (txn.tax_form_type || txn.taxFormType)) {
-      noteParts.push(`Form: ${txn.tax_form_type || txn.taxFormType}`);
-    }
-    if (businessAmounts.requiresAllocation) {
-      noteParts.push('Allocation pending — business-use % required');
-    } else if (businessAmounts.nonDeductibleAmount > 0) {
-      noteParts.push(`Non-deductible: ${formatCurrencyForPdf(businessAmounts.nonDeductibleAmount, currency)}`);
-    }
-    if (businessAmounts.warnings.length && !businessAmounts.requiresAllocation) {
-      noteParts.push(truncateText(businessAmounts.warnings[0], 42));
-    }
-    if (!(txn.receipt_id || txn.receiptId) && !isIncome && flags.includes('Special category')) {
-      noteParts.push('No receipt');
-    }
-    const amountValue = isIncome ? businessAmounts.netAmount : businessAmounts.deductibleAmount;
-    const flagCodes = flags.length
-      ? flags.map((f) => FLAG_CODE_MAP[f] || f.slice(0, 2).toUpperCase()).join(' ')
-      : labels.review_ok;
-    rowItems.push({
-      isHeader: false,
-      date: dateStr.slice(5),
-      payeeMemo: truncateText(buildTransactionText(txn) || '(No description)', 42),
-      taxMapping: shortenTaxLine(taxMapRaw),
-      amountStr: (isIncome ? '+' : '') + formatCurrencyForPdf(amountValue, currency),
-      flagStr: flagCodes,
-      note: noteParts.join(' | ')
-    });
-  });
-
-  const pages = [];
-  let canvasObj = null;
-  let y = 0;
-  let isFirstPage = true;
-
-  const startNewPage = () => {
-    const c = new PdfCanvas();
-    c.text(40, 760, labels.transaction_log_title, 16, 'F2');
-    if (!isFirstPage) c.text(220, 760, `(${labels.section_continued})`, 9);
-    isFirstPage = false;
-    c.text(40, 738, labels.col_date, 9, 'F2');
-    c.text(90, 738, labels.col_payee_memo, 9, 'F2');
-    c.text(340, 738, labels.col_tax_map_short, 9, 'F2');
-    c.text(462, 738, labels.col_amount, 9, 'F2');
-    c.text(530, 738, labels.col_flag, 9, 'F2');
-    c.text(40, 724, FLAG_CODE_LEGEND, 7);
-    canvasObj = c;
-    y = 706;
-  };
-
-  startNewPage();
-
-  rowItems.forEach((item) => {
-    if (item.isHeader) {
-      if (y - 22 < 60) { pages.push(canvasObj); startNewPage(); }
-      canvasObj.text(40, y, item.label, 9, 'F2');
-      y -= 22;
-    } else {
-      const needed = 14 + 12; // primary row + note line always shown
-      if (y - needed < 60) { pages.push(canvasObj); startNewPage(); }
-      canvasObj.text(40, y, item.date, 8);
-      canvasObj.text(90, y, item.payeeMemo, 8);
-      canvasObj.text(340, y, item.taxMapping, 8);
-      canvasObj.text(462, y, item.amountStr, 8);
-      canvasObj.text(530, y, item.flagStr, 8);
-      y -= 13;
-      canvasObj.text(90, y, truncateText(item.note, 76), 7);
-      y -= 12;
-    }
-  });
-
-  pages.push(canvasObj);
-  return pages;
-}
-
-function buildReceiptsPages(receipts, transactions, labels) {
-  const txMap = mapByKey(transactions, 'id');
-  const rows = (receipts || []).map((receipt) => {
-    const txnId = receipt.transaction_id || receipt.transactionId;
-    const txn = txMap[txnId];
-    if (!txn) return null;
-    return {
-      receiptId: receipt.id || '',
-      txDate: normalizePdfDate(txn.date),
-      txDescription: truncateText(txn.description || '(No description)', 28),
-      fileName: truncateText(receipt.filename || 'Not specified', 22)
-    };
-  }).filter(Boolean);
-
-  if (!rows.length) return [];
-
-  return chunkArray(rows, 22).map((chunk) => {
-    const canvas = new PdfCanvas();
-    canvas.text(40, 760, labels.receipts_index_title, 16);
-    canvas.text(40, 730, 'Receipt ID', 10);
-    canvas.text(150, 730, 'Tx Date', 10);
-    canvas.text(240, 730, 'Tx Description', 10);
-    canvas.text(430, 730, 'File Name', 10);
-    let y = 708;
-    chunk.forEach((row) => {
-      canvas.text(40, y, row.receiptId, 9);
-      canvas.text(150, y, row.txDate, 9);
-      canvas.text(240, y, row.txDescription, 9);
-      canvas.text(430, y, row.fileName, 9);
-      y -= 16;
-    });
-    return canvas;
-  });
-}
-
-function buildMileagePage(mileage, labels) {
-  if (!Array.isArray(mileage) || !mileage.length) return [];
-  const totalMiles = mileage.reduce((sum, row) => sum + Math.abs(Number(row.miles) || 0), 0);
-  const totalKm = mileage.reduce((sum, row) => sum + Math.abs(Number(row.km) || 0), 0);
-  const totalDistance = mileage.reduce((sum, row) => {
-    const start = Number(row.odometer_start);
-    const end = Number(row.odometer_end);
-    return Number.isFinite(start) && Number.isFinite(end) ? sum + Math.abs(end - start) : sum;
-  }, 0);
-  const businessPct = totalDistance > 0 ? (totalKm / totalDistance) * 100 : null;
-
-  const canvas = new PdfCanvas();
-  canvas.text(40, 760, labels.mileage_summary_title, 16);
-  let y = 724;
-  if (totalMiles > 0) { canvas.text(40, y, `Total business miles: ${formatDistance(totalMiles)} mi`, 11); y -= 18; }
-  if (totalKm > 0) { canvas.text(40, y, `Total business kilometers: ${formatDistance(totalKm)} km`, 11); y -= 18; }
-  if (businessPct !== null) { canvas.text(40, y, `Business-use percentage: ${businessPct.toFixed(1)}%`, 11); y -= 18; }
-  y -= 6;
-  canvas.text(40, y, labels.mileage_note_csv, 10);
-  return [canvas];
-}
-
-function buildReviewAndDisclosurePage(transactions, categories, receipts, labels, currency, region, reviewInsights) {
-  const categoryMap = mapByKey(categories, 'id');
-  const canvas = new PdfCanvas();
-  canvas.text(40, 760, labels.review_items_title, 16);
-
-  let y = 730;
-  const summaryRows = [
-    ['[CRITICAL] ' + labels.review_uncategorized, reviewInsights.uncategorizedCount],
-    ['[CRITICAL] Imported categories — not yet mapped to real categories', reviewInsights.needsCategoryCount || 0],
-    ['[HIGH] ' + labels.review_missing_description, reviewInsights.missingDescriptionCount],
-    ['[HIGH] ' + labels.review_possible_duplicates, reviewInsights.duplicateCount],
-    ['[HIGH] ' + labels.review_negative_expenses, reviewInsights.negativeExpenseCount],
-    ['[HIGH] ' + labels.review_mixed_use, reviewInsights.mixedUseCount],
-    ['[MEDIUM] ' + labels.review_special_categories, reviewInsights.specialCategoryCount],
-    ['[MEDIUM] ' + labels.review_missing_receipts, reviewInsights.missingReceiptCount]
-  ];
-
-  let hasAnyReviewItem = false;
-  summaryRows.forEach(([label, count]) => {
-    if (count > 0) hasAnyReviewItem = true;
-    canvas.text(40, y, `${label}: ${count}`, 9);
-    y -= 14;
-  });
-
-  if (!hasAnyReviewItem) {
-    canvas.text(40, y - 8, labels.review_items_none, 10);
-    y -= 28;
-  } else {
-    y -= 8;
-    canvas.text(40, y, labels.review_samples_title, 11);
-    y -= 18;
-    (reviewInsights.samples || []).slice(0, 5).forEach((sample) => {
-      canvas.text(40, y, truncateText(sample.reason, 26), 9);
-      canvas.text(210, y, truncateText(sample.description, 32), 9);
-      canvas.text(480, y, formatCurrencyForPdf(sample.amount, currency), 9);
-      y -= 15;
-    });
-  }
-
-  y -= 12;
-  canvas.text(40, y, labels.disclosure_title, 11);
-  y -= 18;
-  wrapText(labels.disclosure_body, 86).forEach((line) => {
-    canvas.text(40, y, line, 9);
-    y -= 13;
-  });
-
-  return [canvas];
-}
-
-function buildCpaChecklistPage(opts) {
-  const {
-    labels, region, isSecure, naics, entityType, accountingBasis, accountingMethod,
-    totals, reviewInsights, currency, legalName, province,
-    materialParticipation, gstHstRegistered, mileage
-  } = opts;
-
-  const isCA = normalizeRegionCode(region) === 'CA';
-  const effectiveAccountingMethod = accountingBasis || accountingMethod || '';
-  const canvas = new PdfCanvas();
-  const pageTitle = isCA
-    ? 'CPA Workpaper Checklist — Canada T2125'
-    : 'CPA Workpaper Checklist — US Schedule C';
-  canvas.text(40, 760, pageTitle, 16, 'F2');
-  canvas.text(40, 742, 'Review each item with your tax preparer before submission.', 9);
-
-  let y = 718;
-  const hasMileageData = Array.isArray(mileage) && mileage.length > 0;
-  const hasNegativeProfit = totals.netProfit < 0;
-
-  const checkRow = (isOk, label, note) => {
-    const mark = isOk ? '[OK]' : '[!] ';
-    canvas.text(40, y, mark, 9, isOk ? 'F1' : 'F2');
-    canvas.text(82, y, label, 9);
-    if (note) canvas.text(310, y, truncateText(note, 40), 9);
-    y -= 14;
-  };
-
-  const sectionHead = (title) => {
-    y -= 6;
-    canvas.text(40, y, title, 11, 'F2');
-    y -= 16;
-  };
-
-  sectionHead('Entity and Filing Profile');
-  checkRow(Boolean(legalName), 'Legal business name', legalName ? truncateText(legalName, 32) : 'Not set');
-  checkRow(Boolean(naics), 'Business activity code (NAICS/BAC)', naics || 'Not specified — required before filing');
-  checkRow(isSecure, 'Tax ID on record', isSecure ? 'Present (secure export)' : 'Withheld — redacted export');
-  checkRow(Boolean(entityType), 'Entity type', entityType || 'Not specified');
-  checkRow(Boolean(effectiveAccountingMethod), 'Accounting method', effectiveAccountingMethod || 'Not specified');
-  if (isCA) {
-    checkRow(Boolean(province), 'Province', province || 'Not specified — required for T2125');
-    checkRow(gstHstRegistered !== null, 'GST/HST registration status', gstHstRegistered ? 'Registered' : 'Not registered / not provided');
-  } else {
-    checkRow(materialParticipation !== null, 'Material participation', materialParticipation === true ? 'Yes' : materialParticipation === false ? 'No' : 'Not specified — confirm with preparer');
-  }
-
-  sectionHead('Documentation and Receipt Coverage');
-  const receiptOk = reviewInsights.expenseTransactionCount > 0 && reviewInsights.missingReceiptCount === 0;
-  checkRow(receiptOk, 'Receipts attached to all expense transactions',
-    `${reviewInsights.receiptLinkedCount} of ${reviewInsights.expenseTransactionCount} covered`);
-  checkRow(reviewInsights.uncategorizedCount === 0, 'No transactions without a category assigned',
-    reviewInsights.uncategorizedCount > 0 ? `${reviewInsights.uncategorizedCount} still need a category` : 'All assigned');
-  checkRow((reviewInsights.needsCategoryCount || 0) === 0, 'No imported categories — all mapped to real categories',
-    (reviewInsights.needsCategoryCount || 0) > 0 ? `${reviewInsights.needsCategoryCount} in Imported Expense/Income — assign real category before filing` : 'None detected');
-  checkRow(reviewInsights.unmappedExpenseCount === 0, 'All expense categories mapped to tax line',
-    reviewInsights.unmappedExpenseCount > 0 ? `${reviewInsights.unmappedExpenseCount} expense(s) with unmapped category` : 'All mapped');
-  checkRow(reviewInsights.duplicateCount === 0, 'No duplicate transactions detected',
-    reviewInsights.duplicateCount > 0 ? `${reviewInsights.duplicateCount} possible duplicate(s)` : 'None detected');
-  checkRow(true, 'Personal/transfer items excluded from P&L',
-    `${reviewInsights.excludedCount} item(s) excluded and shown in separate schedule`);
-
-  sectionHead('Deductibility and Allocation');
-  if (reviewInsights.vehicleCount > 0) {
-    checkRow(hasMileageData, isCA ? 'Vehicle — CRA logbook required' : 'Vehicle — mileage log or actual expense doc',
-      `${reviewInsights.vehicleCount} tx, ${formatCurrencyForPdf(reviewInsights.vehicleTotal, currency)}${hasMileageData ? ' — mileage data present' : ' — no mileage log'}`);
-  }
-  if (reviewInsights.mealsCount > 0) {
-    checkRow(false, isCA ? 'Meals — 50% limit, CRA support required' : 'Meals — 50% limit, business purpose required',
-      `${reviewInsights.mealsCount} tx, ${formatCurrencyForPdf(reviewInsights.mealsTotal, currency)}`);
-  }
-  if (reviewInsights.homeOfficeCount > 0) {
-    checkRow(false, isCA ? 'Home office — T2125 Part 7 allocation needed' : 'Home office — Form 8829 allocation needed',
-      `${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)} — sq ft ratio required`);
-  }
-  if (reviewInsights.mixedUseCount > 0) {
-    checkRow(false, 'Split-use tagged transactions — personal portion must be excluded',
-      `${reviewInsights.mixedUseCount} item(s) have explicit split_use tag`);
-  }
-  if (reviewInsights.vehicleCount === 0 && reviewInsights.mealsCount === 0 && reviewInsights.homeOfficeCount === 0 && reviewInsights.mixedUseCount === 0) {
-    checkRow(true, 'No allocation-required categories or split-use items detected', '');
-  }
-
-  sectionHead('Financial Review');
-  checkRow(!hasNegativeProfit, 'Net profit / loss',
-    `Income ${formatCurrencyForPdf(totals.income, currency)}, Expenses ${formatCurrencyForPdf(totals.expenses, currency)}` +
-    (hasNegativeProfit ? ` — Net loss: review at-risk / passive rules` : ''));
-  checkRow(reviewInsights.negativeExpenseCount === 0, 'No negative expense entries',
-    reviewInsights.negativeExpenseCount > 0 ? `${reviewInsights.negativeExpenseCount} negative expense(s) — verify credits/refunds` : 'None detected');
-  checkRow(reviewInsights.missingDescriptionCount === 0, 'All transactions have descriptions',
-    reviewInsights.missingDescriptionCount > 0 ? `${reviewInsights.missingDescriptionCount} missing description(s)` : 'All present');
-
-  canvas.text(40, 80, '[OK] = Ready for review    [!] = CPA attention required before filing', 8);
-  canvas.text(40, 66, isCA
-    ? 'Confirm province, GST/HST registration, fiscal year, and net-of-GST treatment with preparer before filing T2125.'
-    : 'Confirm NAICS code, material participation, and 1099-NEC reconciliation with preparer before filing Schedule C.', 8);
-
-  return [canvas];
-}
-
-function buildSupportPages(receipts, transactions, mileage, labels, currency, reviewInsights, region) {
-  const txMap = mapByKey(transactions, 'id');
-  const receiptRows = (receipts || []).map((receipt) => {
-    const txnId = receipt.transaction_id || receipt.transactionId;
-    const txn = txMap[txnId];
-    if (!txn) return null;
-    return {
-      receiptId: truncateText(receipt.id || '', 28),
-      txDate: normalizePdfDate(txn.date),
-      txDescription: truncateText(txn.description || '(No description)', 26),
-      fileName: truncateText(receipt.filename || 'Not specified', 20)
-    };
-  }).filter(Boolean);
-
-  const pages = [];
-  let canvas = new PdfCanvas();
-  let y = 760;
-
-  const startPage = () => {
-    canvas = new PdfCanvas();
-    y = 760;
-    canvas.text(40, y, 'Supporting Schedules and Review', 16, 'F2');
-    y -= 28;
-  };
-
-  const pushPage = () => {
-    pages.push(canvas);
-    startPage();
-  };
-
-  const ensureSpace = (needed) => {
-    if (y - needed < 60) {
-      pushPage();
-    }
-  };
-
-  startPage();
-
-  if (receiptRows.length) {
-    canvas.text(40, y, labels.receipts_index_title, 12, 'F2');
-    y -= 20;
-    canvas.text(40, y, 'Receipt ID', 9, 'F2');
-    canvas.text(170, y, 'Tx Date', 9, 'F2');
-    canvas.text(250, y, 'Tx Description', 9, 'F2');
-    canvas.text(430, y, 'File Name', 9, 'F2');
-    y -= 18;
-    receiptRows.forEach((row) => {
-      ensureSpace(18);
-      canvas.text(40, y, row.receiptId, 8);
-      canvas.text(170, y, row.txDate, 8);
-      canvas.text(250, y, row.txDescription, 8);
-      canvas.text(430, y, row.fileName, 8);
-      y -= 14;
-    });
-    y -= 10;
-  }
-
-  const isCA = normalizeRegionCode(region) === 'CA';
-
-  if (reviewInsights.vehicleCount > 0 || (Array.isArray(mileage) && mileage.length)) {
-    ensureSpace(120);
-    canvas.text(40, y, isCA ? 'Motor Vehicle Expenses — T2125 Part 4' : 'Vehicle Expenses — Schedule C Line 9', 12, 'F2');
-    y -= 18;
-
-    if (reviewInsights.vehicleCount > 0) {
-      canvas.text(40, y, `Detected vehicle/fuel transactions: ${reviewInsights.vehicleCount}`, 9);
-      y -= 14;
-      canvas.text(40, y, `Total vehicle expense amount: ${formatCurrencyForPdf(reviewInsights.vehicleTotal, currency)}`, 9);
-      y -= 14;
-    }
-
-    if (Array.isArray(mileage) && mileage.length) {
-      const totalMiles = mileage.reduce((sum, row) => sum + Math.abs(Number(row.miles) || 0), 0);
-      const totalKm = mileage.reduce((sum, row) => sum + Math.abs(Number(row.km) || 0), 0);
-      const totalDistance = mileage.reduce((sum, row) => {
-        const start = Number(row.odometer_start);
-        const end = Number(row.odometer_end);
-        return Number.isFinite(start) && Number.isFinite(end) ? sum + Math.abs(end - start) : sum;
-      }, 0);
-      const businessPct = totalDistance > 0 ? (totalKm / totalDistance) * 100 : null;
-      canvas.text(40, y, labels.mileage_summary_title, 10, 'F2');
-      y -= 14;
-      if (totalMiles > 0) { canvas.text(40, y, `Total business miles: ${formatDistance(totalMiles)} mi`, 9); y -= 14; }
-      if (totalKm > 0) { canvas.text(40, y, `Total business kilometers: ${formatDistance(totalKm)} km`, 9); y -= 14; }
-      if (businessPct !== null) { canvas.text(40, y, `Business-use percentage: ${businessPct.toFixed(1)}%`, 9); y -= 14; }
-      canvas.text(40, y, labels.mileage_note_csv, 9);
-      y -= 14;
-    }
-
-    canvas.text(40, y, isCA
-      ? 'CRA requires a logbook: date, destination, business purpose, and odometer readings for each trip.'
-      : 'IRS requires a contemporaneous mileage log or actual expense records — not both methods in the same year.', 8);
-    y -= 18;
-  }
-
-  if (reviewInsights.homeOfficeCount > 0) {
-    ensureSpace(90);
-    canvas.text(40, y, isCA ? 'Business-Use-of-Home — T2125 Part 7' : 'Home Office Deduction — Form 8829', 12, 'F2');
-    y -= 18;
-    canvas.text(40, y, `Detected home office transactions: ${reviewInsights.homeOfficeCount}`, 9);
-    y -= 14;
-    canvas.text(40, y, `Total home office amount: ${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)}`, 9);
-    y -= 14;
-    canvas.text(40, y, isCA
-      ? 'Allocation: calculate business sq ft / total home sq ft. Deduction limited to net business income before this expense.'
-      : 'Calculate business-use % using sq ft method or other IRS-approved method. Use simplified method or actual expenses (Form 8829).', 8);
-    y -= 18;
-  }
-
-  if (reviewInsights.mealsCount > 0) {
-    ensureSpace(70);
-    canvas.text(40, y, isCA ? 'Meals and Entertainment — T2125 Line 8523' : 'Meals — Schedule C Line 24b', 12, 'F2');
-    y -= 18;
-    canvas.text(40, y, `Detected meal/entertainment transactions: ${reviewInsights.mealsCount}`, 9);
-    y -= 14;
-    canvas.text(40, y, `Total meals amount: ${formatCurrencyForPdf(reviewInsights.mealsTotal, currency)} (50% limit applies — deductible: ${formatCurrencyForPdf(reviewInsights.mealsTotal * 0.5, currency)})`, 9);
-    y -= 14;
-    canvas.text(40, y, 'Document: business purpose, names of attendees, and date for each meal.', 8);
-    y -= 18;
-  }
-
-  ensureSpace(170);
-  canvas.text(40, y, labels.review_items_title, 12, 'F2');
-  y -= 20;
-  [
-    ['[CRITICAL] ' + labels.review_uncategorized, reviewInsights.uncategorizedCount],
-    ['[CRITICAL] Imported categories (not mapped)', reviewInsights.needsCategoryCount || 0],
-    ['[HIGH] ' + labels.review_missing_description, reviewInsights.missingDescriptionCount],
-    ['[HIGH] ' + labels.review_possible_duplicates, reviewInsights.duplicateCount],
-    ['[HIGH] ' + labels.review_negative_expenses, reviewInsights.negativeExpenseCount],
-    ['[HIGH] ' + labels.review_mixed_use, reviewInsights.mixedUseCount],
-    ['[MEDIUM] ' + labels.review_special_categories, reviewInsights.specialCategoryCount],
-    ['[MEDIUM] ' + labels.review_missing_receipts, reviewInsights.missingReceiptCount]
-  ].forEach(([label, count]) => {
-    canvas.text(40, y, `${label}: ${count}`, 9);
-    y -= 13;
-  });
-
-  if ((reviewInsights.samples || []).length) {
-    y -= 6;
-    canvas.text(40, y, labels.review_samples_title, 10, 'F2');
-    y -= 16;
-    reviewInsights.samples.slice(0, 5).forEach((sample) => {
-      ensureSpace(16);
-      canvas.text(40, y, truncateText(sample.reason, 26), 8);
-      canvas.text(210, y, truncateText(sample.description, 32), 8);
-      canvas.text(480, y, formatCurrencyForPdf(sample.amount, currency), 8);
-      y -= 13;
-    });
-  } else {
-    y -= 6;
-    canvas.text(40, y, labels.review_items_none, 9);
-    y -= 16;
-  }
-
-  ensureSpace(80);
-  canvas.text(40, y, labels.final_disclaimer_title, 10, 'F2');
-  y -= 16;
-  wrapText(normalizeRegionCode(region) === 'CA' ? labels.final_disclaimer_body_ca : labels.final_disclaimer_body_us, 88).forEach((line) => {
-    ensureSpace(12);
-    canvas.text(40, y, line, 8);
-    y -= 12;
-  });
-
-  pages.push(canvas);
-  return pages;
-}
-
-// =========================================================
-// Tax Packet additions (item 26): receipt coverage, payer
-// summary, tax-line breakdown. Computed from already-loaded
-// transactions / categories / receipts so we don't re-query.
-// =========================================================
 
 function computeReceiptCoverage(transactions, receipts) {
-  const expenseTxIds = new Set();
-  for (const t of transactions || []) {
-    if (String(t.type || "").toLowerCase() === "expense") {
-      expenseTxIds.add(t.id);
-    }
-  }
-  const expenseCount = expenseTxIds.size;
+  const expenseTxIds = new Set((transactions || []).filter((t) => String(t.type || "").toLowerCase() === "expense").map((t) => t.id));
   const withReceipt = new Set();
-  for (const r of receipts || []) {
-    const txId = r.transaction_id || r.transactionId;
+  for (const receipt of receipts || []) {
+    const txId = receipt?.transaction_id || receipt?.transactionId;
     if (expenseTxIds.has(txId)) withReceipt.add(txId);
   }
-  const missing = Math.max(0, expenseCount - withReceipt.size);
+  const expenseCount = expenseTxIds.size;
   const coveragePct = expenseCount === 0 ? null : Number(((withReceipt.size / expenseCount) * 100).toFixed(1));
   return {
     expense_count: expenseCount,
     with_receipt: withReceipt.size,
-    missing,
+    missing: Math.max(0, expenseCount - withReceipt.size),
     coverage_pct: coveragePct
   };
 }
 
 function expectedTaxFormForPayer({ region, total, transactionCount, taxYear }) {
-  const r = String(region || "").toUpperCase();
-  if (r === "CA") {
-    return total >= 500 ? "T4A" : null;
-  }
+  const normalizedRegion = normalizeRegionCode(region);
+  if (normalizedRegion === "CA") return total >= 500 ? "T4A" : null;
   if (total >= 20000 && transactionCount >= 200) return "1099-K";
   const necThreshold = Number(taxYear) >= 2026 ? 2000 : 600;
-  if (total >= necThreshold) return "1099-NEC";
-  return null;
+  return total >= necThreshold ? "1099-NEC" : null;
 }
 
 function computePayerSummary(transactions, region, taxYear) {
   const byPayer = new Map();
-  for (const t of transactions || []) {
-    if (String(t.type || "").toLowerCase() !== "income") continue;
-    const rawName = t.payer_name || t.payerName || "";
-    const name = String(rawName || "").trim() || "(unspecified)";
-    if (!byPayer.has(name)) {
-      byPayer.set(name, { payer_name: name, total: 0, count: 0, declared_forms: new Map() });
-    }
-    const entry = byPayer.get(name);
-    const amount = Number(t.__businessAmounts?.netAmount ?? t.amount) || 0;
+  for (const txn of transactions || []) {
+    if (String(txn?.type || "").toLowerCase() !== "income") continue;
+    const payer = String(txn?.payer_name || txn?.payerName || "").trim() || "(unspecified)";
+    const entry = byPayer.get(payer) || { payer_name: payer, total: 0, count: 0, declared_forms: new Map() };
+    const amount = Number(txn?.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn));
     entry.total += amount;
     entry.count += 1;
-    const form = t.tax_form_type || t.taxFormType || null;
-    if (form && form !== "none") {
-      entry.declared_forms.set(form, (entry.declared_forms.get(form) || 0) + amount);
-    }
+    const form = txn?.tax_form_type || txn?.taxFormType || null;
+    if (form && form !== "none") entry.declared_forms.set(form, (entry.declared_forms.get(form) || 0) + amount);
+    byPayer.set(payer, entry);
   }
-  const payers = Array.from(byPayer.values()).map((entry) => {
-    const declared = Array.from(entry.declared_forms.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-    return {
-      payer_name: entry.payer_name,
-      total: Number(entry.total.toFixed(2)),
-      count: entry.count,
-      declared_form: declared,
-      expected_form: expectedTaxFormForPayer({ region, total: entry.total, transactionCount: entry.count, taxYear })
-    };
-  });
-  payers.sort((a, b) => b.total - a.total);
+  const payers = Array.from(byPayer.values()).map((entry) => ({
+    payer_name: entry.payer_name,
+    total: Number(entry.total.toFixed(2)),
+    count: entry.count,
+    declared_form: Array.from(entry.declared_forms.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || null,
+    expected_form: expectedTaxFormForPayer({ region, total: entry.total, transactionCount: entry.count, taxYear })
+  })).sort((a, b) => b.total - a.total);
   return {
-    total_income: Number(payers.reduce((acc, p) => acc + p.total, 0).toFixed(2)),
+    total_income: Number(payers.reduce((sum, payer) => sum + payer.total, 0).toFixed(2)),
     payer_count: payers.length,
     payers
   };
 }
 
 function computeTaxLineSummary(transactions, categories, region) {
-  const taxKey = String(region || "").toUpperCase() === "CA" ? "tax_map_ca" : "tax_map_us";
-  const catMap = mapByKey(categories || [], "id");
-  const byLine = new Map();
-  let unmappedTotal = 0;
-  let unmappedCount = 0;
-  for (const t of transactions || []) {
-    const category = t.__category || catMap[t.category_id || t.categoryId] || null;
-    const taxLine = category ? (category[taxKey] || null) : null;
-    const amount = Number(
-      String(t.type || '').toLowerCase() === 'income'
-        ? (t.__businessAmounts?.netAmount ?? t.amount)
-        : (t.__businessAmounts?.deductibleAmount ?? t.amount)
-    ) || 0;
-    if (!taxLine) {
-      if (String(t.type || "").toLowerCase() === "expense") {
-        unmappedTotal += amount;
-        unmappedCount += 1;
-      }
-      continue;
+  const categoryMap = mapByKey(categories || [], "id");
+  const incomeLines = new Map();
+  const expenseLines = new Map();
+  let unmapped_total = 0;
+  let unmapped_count = 0;
+  let mapped_review_total = 0;
+  let mapped_review_count = 0;
+  let mapped_ready_total = 0;
+  let mapped_ready_count = 0;
+  let imported_total = 0;
+  let imported_count = 0;
+
+  for (const txn of transactions || []) {
+    const category = txn.__category || categoryMap[txn?.category_id || txn?.categoryId] || null;
+    const status = txn.__status || buildTransactionStatus(txn, category, { region });
+    const amount = String(txn?.type || "").toLowerCase() === "income"
+      ? Number(txn?.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn))
+      : Number(txn?.__businessAmounts?.deductibleAmount ?? normalizeMoneyAmount(txn));
+
+    if (status.needsCategory) {
+      imported_total += amount;
+      imported_count += 1;
+    } else if (!status.isMapped && String(txn?.type || "").toLowerCase() === "expense") {
+      unmapped_total += amount;
+      unmapped_count += 1;
+    } else if (status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag)) && String(txn?.type || "").toLowerCase() === "expense") {
+      mapped_review_total += amount;
+      mapped_review_count += 1;
+    } else if (String(txn?.type || "").toLowerCase() === "expense") {
+      mapped_ready_total += amount;
+      mapped_ready_count += 1;
     }
-    if (!byLine.has(taxLine)) {
-      byLine.set(taxLine, { tax_line: taxLine, total: 0, count: 0 });
-    }
-    const entry = byLine.get(taxLine);
+
+    const targetMap = String(txn?.type || "").toLowerCase() === "income" ? incomeLines : expenseLines;
+    const key = status.taxLineDisplay;
+    const entry = targetMap.get(key) || { tax_line: key, total: 0, count: 0 };
     entry.total += amount;
     entry.count += 1;
+    targetMap.set(key, entry);
   }
-  const lines = Array.from(byLine.values()).map((entry) => ({
-    tax_line: entry.tax_line,
-    total: Number(entry.total.toFixed(2)),
-    count: entry.count
-  }));
-  lines.sort((a, b) => b.total - a.total);
+
   return {
-    lines,
-    unmapped_total: Number(unmappedTotal.toFixed(2)),
-    unmapped_count: unmappedCount
+    income_lines: Array.from(incomeLines.values()).map((entry) => ({ ...entry, total: Number(entry.total.toFixed(2)) })).sort((a, b) => b.total - a.total),
+    expense_lines: Array.from(expenseLines.values()).map((entry) => ({ ...entry, total: Number(entry.total.toFixed(2)) })).sort((a, b) => b.total - a.total),
+    unmapped_total: Number(unmapped_total.toFixed(2)),
+    unmapped_count,
+    mapped_review_total: Number(mapped_review_total.toFixed(2)),
+    mapped_review_count,
+    mapped_ready_total: Number(mapped_ready_total.toFixed(2)),
+    mapped_ready_count,
+    imported_total: Number(imported_total.toFixed(2)),
+    imported_count
   };
+}
+
+function buildReviewInsights(transactions, categories, receipts, meta = {}) {
+  const coverage = computeReceiptCoverage(transactions, receipts);
+  const excluded = Array.isArray(meta.excluded) ? meta.excluded : [];
+  const byExclusionCode = {};
+  let needsCategoryCount = 0;
+  let unmappedTaxCount = 0;
+  let mappedNeedsSupportCount = 0;
+  let missingDescriptionCount = 0;
+  let duplicateCount = 0;
+  let missingReceiptCount = 0;
+  let vehicleCount = 0;
+  let vehicleTotal = 0;
+  let mealsCount = 0;
+  let mealsTotal = 0;
+  let phoneAllocationCount = 0;
+  let phoneAllocationTotal = 0;
+  let homeOfficeCount = 0;
+  let homeOfficeTotal = 0;
+  let capitalAssetCount = 0;
+  let capitalAssetTotal = 0;
+  const flagged = [];
+
+  for (const txn of transactions || []) {
+    const status = txn.__status;
+    const amount = Number(txn?.__businessAmounts?.deductibleAmount ?? txn?.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn));
+    if (status.needsCategory) needsCategoryCount += 1;
+    if (!status.isMapped && String(txn?.type || "").toLowerCase() === "expense") unmappedTaxCount += 1;
+    if (status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag))) mappedNeedsSupportCount += 1;
+    if (status.flags.includes("MD")) missingDescriptionCount += 1;
+    if (status.flags.includes("DUP")) duplicateCount += 1;
+    if (status.flags.includes("RS")) missingReceiptCount += 1;
+    if (["vehicle_fuel", "vehicle_maintenance", "vehicle_parking_tolls", "insurance_vehicle"].includes(status.categorySlug)) {
+      vehicleCount += 1;
+      vehicleTotal += amount;
+    }
+    if (status.categorySlug === "meals") {
+      mealsCount += 1;
+      mealsTotal += amount;
+    }
+    if (status.categorySlug === "phone_internet") {
+      phoneAllocationCount += 1;
+      phoneAllocationTotal += amount;
+    }
+    if (status.categorySlug === "home_office") {
+      homeOfficeCount += 1;
+      homeOfficeTotal += amount;
+    }
+    if (status.categorySlug === "equipment_capital_asset") {
+      capitalAssetCount += 1;
+      capitalAssetTotal += amount;
+    }
+    if (status.flags.length) {
+      flagged.push({
+        amount,
+        description: buildTransactionText(txn) || "(No description)",
+        reason: status.flags.join(" ")
+      });
+    }
+  }
+
+  for (const txn of excluded) {
+    const code = txn?.__exclusionReason?.code || "REVIEW";
+    const amount = normalizeMoneyAmount(txn);
+    if (!byExclusionCode[code]) {
+      byExclusionCode[code] = { code, label: EXCLUSION_DEFINITIONS[code]?.label || code, count: 0, amount: 0 };
+    }
+    byExclusionCode[code].count += 1;
+    byExclusionCode[code].amount += amount;
+  }
+
+  flagged.sort((a, b) => b.amount - a.amount);
+
+  return {
+    transactionCount: (transactions || []).length,
+    expenseTransactionCount: coverage.expense_count,
+    receiptLinkedCount: coverage.with_receipt,
+    receiptCoverageText: `${coverage.with_receipt} of ${coverage.expense_count}`,
+    missingReceiptCount,
+    needsCategoryCount,
+    unmappedTaxCount,
+    mappedNeedsSupportCount,
+    missingDescriptionCount,
+    duplicateCount,
+    uncategorizedCount: needsCategoryCount,
+    reviewFlagCount: flagged.length,
+    excludedCount: excluded.length,
+    exclusionReasonBreakdown: Object.fromEntries(Object.entries(byExclusionCode).map(([code, row]) => [code, row.count])),
+    exclusionSummary: Object.values(byExclusionCode).map((row) => ({ ...row, amount: Number(row.amount.toFixed(2)) })).sort((a, b) => b.amount - a.amount),
+    vehicleCount,
+    vehicleTotal: Number(vehicleTotal.toFixed(2)),
+    mealsCount,
+    mealsTotal: Number(mealsTotal.toFixed(2)),
+    phoneAllocationCount,
+    phoneAllocationTotal: Number(phoneAllocationTotal.toFixed(2)),
+    homeOfficeCount,
+    homeOfficeTotal: Number(homeOfficeTotal.toFixed(2)),
+    capitalAssetCount,
+    capitalAssetTotal: Number(capitalAssetTotal.toFixed(2)),
+    samples: flagged.slice(0, 6).map((item) => ({
+      reason: item.reason,
+      description: truncateText(item.description, 42),
+      amount: item.amount
+    }))
+  };
+}
+
+function buildExclusionSummary(excluded, currency) {
+  const summary = {};
+  for (const txn of excluded || []) {
+    const code = txn?.__exclusionReason?.code || "REVIEW";
+    if (!summary[code]) {
+      const definition = EXCLUSION_DEFINITIONS[code] || EXCLUSION_DEFINITIONS.REVIEW;
+      summary[code] = { code, label: definition.label, count: 0, amount: 0, title: definition.title, description: definition.description };
+    }
+    summary[code].count += 1;
+    summary[code].amount += normalizeMoneyAmount(txn);
+  }
+  return Object.values(summary).map((row) => ({
+    ...row,
+    amount_display: formatCurrencyForPdf(row.amount, currency),
+    amount: Number(row.amount.toFixed(2))
+  })).sort((a, b) => b.amount - a.amount);
+}
+
+function shortenTaxLine(text) {
+  const value = String(text || "").trim();
+  if (!value) return "Unmapped";
+  if (/^Line\s+\d+/i.test(value)) {
+    const match = value.match(/^Line\s+([^ ]+)\s+-\s+(.+)$/i);
+    if (!match) return value;
+    return truncateText(`L${match[1]} ${match[2].replace(/\s+\(.+\)$/, "")}`, 28);
+  }
+  return truncateText(value, 28);
+}
+
+function resolveBusinessCurrency(region, currency) {
+  const normalizedRegion = normalizeRegionCode(region);
+  const desired = String(currency || "").toUpperCase();
+  if (!desired) return normalizedRegion === "CA" ? "CAD" : "USD";
+  return desired;
+}
+
+function normalizeYesNo(value) {
+  if (value === true) return "Yes";
+  if (value === false) return "No";
+  return "Not specified";
+}
+
+function validateExportProfile(profile = {}) {
+  const region = normalizeRegionCode(profile.region);
+  const missing = [];
+  if (!String(profile.legalName || profile.businessName || "").trim()) missing.push(["legal_name", "Legal business name"]);
+  if (!String(profile.naics || "").trim()) missing.push(["business_activity_code", "Business activity code"]);
+  if (!String(profile.address || "").trim()) missing.push(["address", "Business address"]);
+  if (!String(profile.accountingMethod || profile.accountingBasis || "").trim()) missing.push(["accounting_method", "Accounting method"]);
+  if (region === "US") {
+    if (profile.materialParticipation == null) missing.push(["material_participation", "Material participation"]);
+  } else {
+    if (!String(profile.province || "").trim()) missing.push(["province", "Province"]);
+    if (!String(profile.fiscalYearStart || "").trim()) missing.push(["fiscal_year_start", "Fiscal year start"]);
+    if (coerceBoolean(profile.gstHstRegistered)) {
+      if (!String(profile.gstHstNumber || "").trim()) missing.push(["gst_hst_number", "GST/HST registration number"]);
+      if (!String(profile.gstHstMethod || "").trim()) missing.push(["gst_hst_method", "GST/HST accounting method"]);
+    }
+  }
+  if (!missing.length) return;
+  const error = new Error(`Export blocked due to missing required business details: ${missing.map(([, label]) => label).join(", ")}`);
+  error.status = 400;
+  error.missingFieldKeys = missing.map(([key]) => key);
+  error.missingFields = missing.map(([, label]) => label);
+  throw error;
+}
+
+function ensureSpace(state, requiredHeight, startNewPage) {
+  if (state.y - requiredHeight < PAGE.bottom) startNewPage();
+}
+
+function drawHeaderBand(canvas, title, subtitle, badges = []) {
+  canvas.drawFilledRect(PAGE.margin, PAGE.height - 92, PAGE.width - PAGE.margin * 2, 52, COLORS.fill2);
+  canvas.drawRect(PAGE.margin, PAGE.height - 92, PAGE.width - PAGE.margin * 2, 52);
+  canvas.text(PAGE.margin + 12, PAGE.height - 64, title, 18, "F2");
+  canvas.text(PAGE.margin + 12, PAGE.height - 80, subtitle, 9);
+  let badgeX = PAGE.width - PAGE.margin - 10;
+  badges.slice().reverse().forEach((badge) => {
+    const width = canvas.drawBadge(badgeX - 70, PAGE.height - 64, badge.text, badge.variant);
+    badgeX -= width + 8;
+  });
+}
+
+function buildIdentityPage(data) {
+  const {
+    labels, totals, currency, legalName, operatingName, taxId, naics, startDate, endDate,
+    reportId, generatedAt, accountingBasis, accountingMethod, entityType, region, province,
+    fiscalYearStart, address, materialParticipation, gstHstRegistered, gstHstNumber, gstHstMethod,
+    reviewInsights, isSecure
+  } = data;
+
+  const regionCode = normalizeRegionCode(region);
+  const canvas = new PdfCanvas();
+  drawHeaderBand(canvas, regionCode === "CA" ? labels.ca_report_title : labels.us_report_title, regionCode === "CA" ? "Prepared for T2125 bookkeeping review" : "Prepared for Schedule C bookkeeping review", [
+    { text: isSecure ? labels.secure_badge : labels.redacted_badge, variant: "neutral" },
+    { text: labels.draft_badge, variant: "warning" }
+  ]);
+
+  canvas.text(PAGE.margin, 672, labels.executive_summary, 13, "F2");
+  canvas.drawDivider(664);
+
+  canvas.drawCard(40, 642, 252, 126, "Entity / Profile", [
+    `Legal business name: ${safeValue(legalName)}`,
+    ...(String(operatingName || "").trim() ? [`Operating name (DBA): ${operatingName}`] : []),
+    `Tax ID: ${isSecure ? safeValue(taxId) : "Withheld"}`,
+    `Entity type: ${safeValue(entityType)}`,
+    `Business activity code: ${safeValue(naics)}`,
+    `Jurisdiction: ${regionCode}${province ? `-${String(province).toUpperCase()}` : ""}`,
+    `Accounting method: ${safeValue(accountingMethod || accountingBasis)}`
+  ]);
+
+  canvas.drawCard(320, 642, 252, 126, "Reporting", [
+    `Reporting period: ${startDate} to ${endDate}`,
+    `Currency: ${currency}`,
+    `Export ID: ${reportId}`,
+    `Prepared from: InEx Ledger`,
+    `Export created: ${formatReportTimestamp(generatedAt)}`,
+    regionCode === "US"
+      ? `Material participation: ${normalizeYesNo(materialParticipation)}`
+      : `Province / GST-HST: ${safeValue(province)} | ${gstHstRegistered ? safeValue(gstHstNumber, "Registered") : "Not registered"}`
+  ]);
+
+  const metricY = 494;
+  canvas.drawMetricCard(40, metricY, 112, 72, "Gross income", formatCurrencyForPdf(totals.income, currency), null);
+  canvas.drawMetricCard(160, metricY, 112, 72, "Total expenses", formatCurrencyForPdf(totals.expenses, currency), null);
+  canvas.drawMetricCard(280, metricY, 112, 72, "Net profit/loss", formatCurrencyForPdf(totals.netProfit, currency), null);
+  canvas.drawMetricCard(400, metricY, 82, 72, "Included", String(reviewInsights.transactionCount), "Transactions");
+  canvas.drawMetricCard(490, metricY, 82, 72, "Excluded", String(reviewInsights.excludedCount), "Transactions");
+
+  const actionLines = [
+    `${reviewInsights.needsCategoryCount} imported / uncategorized transactions need real category assignment.`,
+    `${reviewInsights.unmappedTaxCount} transactions remain truly unmapped after category review.`,
+    `${reviewInsights.mappedNeedsSupportCount} mapped transactions still need support or final confirmation.`,
+    `${reviewInsights.missingReceiptCount} expense transactions are missing receipt/support.`,
+    `${reviewInsights.vehicleCount} vehicle items require mileage or actual-expense support.`,
+    `${reviewInsights.mealsCount} meal items require business-purpose support.`,
+    `${reviewInsights.phoneAllocationCount} phone/internet items require business-use allocation.`
+  ];
+  canvas.drawCard(40, 406, 532, 172, "CPA Action Required", actionLines, { maxChars: 88 });
+  canvas.text(52, 252, labels.not_filed, 9, "F2");
+  if (regionCode === "CA") {
+    canvas.text(52, 236, `Fiscal year start: ${safeValue(fiscalYearStart)} | GST/HST method: ${gstHstRegistered ? safeValue(gstHstMethod) : "Not registered"}`, 8);
+  } else {
+    canvas.text(52, 236, `Business address: ${safeValue(address)}`, 8);
+  }
+
+  return canvas;
+}
+
+function buildCategoryBuckets(transactions, currency) {
+  const buckets = new Map();
+  for (const txn of transactions || []) {
+    const status = txn.__status;
+    const categoryName = normalizeExportCategoryName(txn.__category) || (String(txn.type || "").toLowerCase() === "income" ? "Imported Income" : "Imported Expense");
+    const key = `${String(txn.type || "").toLowerCase()}::${categoryName}::${status.taxLineDisplay}::${status.supportStatus}`;
+    const bucket = buckets.get(key) || {
+      category: categoryName,
+      type: String(txn.type || "").toLowerCase() === "income" ? "Income" : "Expense",
+      taxLine: status.taxLineDisplay,
+      amount: 0,
+      mappingStatus: status.needsCategory ? "Needs category" : (!status.isMapped ? "Unmapped" : (status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag)) ? "Mapped - needs support" : "Mapped")),
+      supportStatus: formatSupportStatus(status)
+    };
+    bucket.amount += Number(txn.__businessAmounts?.deductibleAmount ?? txn.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn));
+    buckets.set(key, bucket);
+  }
+  return Array.from(buckets.values()).map((bucket) => ({
+    ...bucket,
+    amountDisplay: formatCurrencyForPdf(bucket.amount, currency),
+    amount: Number(bucket.amount.toFixed(2))
+  })).sort((a, b) => b.amount - a.amount);
+}
+
+function formatSupportStatus(status) {
+  if (status.needsCategory) return "Needs category";
+  if (!status.isMapped) return "Unmapped";
+  if (status.needsMileageLog) return "Mapped - mileage support required";
+  if (status.needsBusinessPurpose) return "Mapped - business purpose required";
+  if (status.needsHomeOfficeSupport) return "Mapped - home-office support required";
+  if (status.needsCapitalAssetReview) return "Mapped - capital asset review";
+  if (status.needsAllocation) return "Mapped - allocation required";
+  if (status.needsReceipt) return "Mapped - receipt/support review";
+  if (status.needsFinalConfirmation) return "Mapped - final confirmation needed";
+  return "Mapped";
+}
+
+function buildCategoryPages(transactions, categories, currency, labels, embeddedCount = 0, region = "US") {
+  const rows = buildCategoryBuckets(transactions, currency).slice(embeddedCount);
+  const totals = {
+    needsCategory: rows.filter((row) => row.mappingStatus === "Needs category").reduce((sum, row) => sum + row.amount, 0),
+    mappedNeedsSupport: rows.filter((row) => /^Mapped -/.test(row.supportStatus)).reduce((sum, row) => sum + row.amount, 0),
+    mappedReady: rows.filter((row) => row.supportStatus === "Mapped").reduce((sum, row) => sum + row.amount, 0),
+    included: rows.reduce((sum, row) => sum + row.amount, 0)
+  };
+  const chunks = chunkArray(rows, 18);
+  return chunks.map((chunk, index) => {
+    const canvas = new PdfCanvas();
+    drawHeaderBand(canvas, labels.mapping_summary, normalizeRegionCode(region) === "CA" ? "T2125 category and tax-line resolution" : "Schedule C category and tax-line resolution", [{ text: labels.draft_badge, variant: "warning" }]);
+    canvas.drawMetricCard(40, 670, 126, 70, "Needs category", formatCurrencyForPdf(totals.needsCategory, currency), "Imported / uncategorized");
+    canvas.drawMetricCard(178, 670, 126, 70, "Needs support", formatCurrencyForPdf(totals.mappedNeedsSupport, currency), "Mapped but incomplete");
+    canvas.drawMetricCard(316, 670, 126, 70, "Mapped ready", formatCurrencyForPdf(totals.mappedReady, currency), "Mapped");
+    canvas.drawMetricCard(454, 670, 118, 70, "Included total", formatCurrencyForPdf(totals.included, currency), "Income + expense");
+    const columns = [
+      { key: "category", label: "Category", x: 40, width: 132 },
+      { key: "type", label: "Type", x: 180, width: 48 },
+      { key: "taxLine", label: "Tax line", x: 232, width: 166 },
+      { key: "amountDisplay", label: "Amount", x: 408, width: 72, align: "right" },
+      { key: "mappingStatus", label: "Mapping status", x: 490, width: 82 },
+      { key: "supportStatus", label: "Support status", x: 40, width: 520 }
+    ];
+    let y = 560;
+    canvas.drawTableHeader(columns.slice(0, 5), y);
+    y -= 20;
+    chunk.forEach((row, rowIndex) => {
+      canvas.drawTableRow(columns.slice(0, 5), {
+        category: truncateText(row.category, 24),
+        type: row.type,
+        taxLine: truncateText(shortenTaxLine(row.taxLine), 30),
+        amountDisplay: row.amountDisplay,
+        mappingStatus: truncateText(row.mappingStatus, 18)
+      }, y, { fillGray: rowIndex % 2 === 0 ? 0.985 : null });
+      y -= 12;
+      canvas.text(40, y, `Support: ${row.supportStatus}`, 7);
+      y -= 12;
+    });
+    if (index === 0 && chunk.length < 10) {
+      canvas.drawCard(40, 154, 532, 60, "Summary", [
+        `Amount needing real category: ${formatCurrencyForPdf(totals.needsCategory, currency)} | Mapped but requiring support: ${formatCurrencyForPdf(totals.mappedNeedsSupport, currency)} | Mapped and support-ready: ${formatCurrencyForPdf(totals.mappedReady, currency)}`
+      ], { maxChars: 92 });
+    }
+    return canvas;
+  });
 }
 
 function buildTaxPacketPages({ transactions, categories, receipts, currency, region, labels, taxYear }) {
   const coverage = computeReceiptCoverage(transactions, receipts);
   const payerSummary = computePayerSummary(transactions, region, taxYear);
-  const taxLineSummary = computeTaxLineSummary(transactions, categories, region);
+  const lineSummary = computeTaxLineSummary(transactions, categories, region);
+  const canvas = new PdfCanvas();
+  drawHeaderBand(canvas, normalizeRegionCode(region) === "CA" ? labels.tax_packet_title_ca : labels.tax_packet_title_us, normalizeRegionCode(region) === "CA" ? "Payer/form review and T2125 line summary" : "Payer/form review and Schedule C line summary", [{ text: labels.draft_badge, variant: "warning" }]);
+  canvas.drawCard(40, 662, 252, 96, "Receipt Review", [
+    `Expense transactions: ${coverage.expense_count}`,
+    `With receipt: ${coverage.with_receipt}`,
+    `Missing receipt/support: ${coverage.missing}`,
+    `Coverage: ${coverage.coverage_pct == null ? "-" : `${coverage.coverage_pct}%`}`
+  ]);
+  canvas.drawCard(320, 662, 252, 96, labels.payer_review, [
+    `Payers detected: ${payerSummary.payer_count}`,
+    `Income total: ${formatCurrencyForPdf(payerSummary.total_income, currency)}`,
+    `Expected form indicator is informational; confirm with preparer.`
+  ]);
 
+  const payerCols = [
+    { key: "payer", label: "Payer", x: 40, width: 210 },
+    { key: "count", label: "Count", x: 258, width: 38, align: "right" },
+    { key: "total", label: "Total", x: 304, width: 80, align: "right" },
+    { key: "declared", label: "Declared", x: 392, width: 72 },
+    { key: "expected", label: "Expected", x: 474, width: 98 }
+  ];
+  let y = 538;
+  canvas.drawSectionHeader(labels.payer_review, 40, y);
+  y -= 24;
+  canvas.drawTableHeader(payerCols, y);
+  y -= 18;
+  payerSummary.payers.slice(0, 8).forEach((payer, index) => {
+    canvas.drawTableRow(payerCols, {
+      payer: truncateText(payer.payer_name, 34),
+      count: String(payer.count),
+      total: formatCurrencyForPdf(payer.total, currency),
+      declared: payer.declared_form || "-",
+      expected: payer.expected_form || "-"
+    }, y, { fillGray: index % 2 === 0 ? 0.985 : null });
+    y -= 12;
+  });
+
+  const lineCols = [
+    { key: "tax_line", label: "Expense tax line", x: 40, width: 290 },
+    { key: "count", label: "Count", x: 338, width: 40, align: "right" },
+    { key: "total", label: "Total", x: 390, width: 86, align: "right" },
+    { key: "status", label: "Status", x: 486, width: 86 }
+  ];
+  y -= 14;
+  canvas.drawSectionHeader("Expense Mapping Summary", 40, y);
+  y -= 24;
+  canvas.drawTableHeader(lineCols, y);
+  y -= 18;
+  lineSummary.expense_lines.slice(0, 10).forEach((line, index) => {
+    const status = /review|required/i.test(line.tax_line) ? "Mapped review line" : "Mapped";
+    canvas.drawTableRow(lineCols, {
+      tax_line: truncateText(shortenTaxLine(line.tax_line), 42),
+      count: String(line.count),
+      total: formatCurrencyForPdf(line.total, currency),
+      status
+    }, y, { fillGray: index % 2 === 0 ? 0.985 : null });
+    y -= 12;
+  });
+  y -= 8;
+  canvas.drawCard(40, y, 532, 96, "Mapping Totals", [
+    `Truly unmapped expenses: ${lineSummary.unmapped_count} totaling ${formatCurrencyForPdf(lineSummary.unmapped_total, currency)}`,
+    `Mapped review-line expenses: ${lineSummary.mapped_review_count} totaling ${formatCurrencyForPdf(lineSummary.mapped_review_total, currency)}`,
+    `Mapped support-ready expenses: ${lineSummary.mapped_ready_count} totaling ${formatCurrencyForPdf(lineSummary.mapped_ready_total, currency)}`,
+    `Imported / needs-category items: ${lineSummary.imported_count} totaling ${formatCurrencyForPdf(lineSummary.imported_total, currency)}`
+  ], { maxChars: 94 });
+  return [canvas];
+}
+
+function buildTransactionPages(transactions, accounts, categories, currency, labels, region) {
+  const accountMap = mapByKey(accounts || [], "id");
+  const sorted = [...(transactions || [])].sort((a, b) => normalizePdfDate(a.date).localeCompare(normalizePdfDate(b.date)));
+  if (!sorted.length) {
+    const canvas = new PdfCanvas();
+    drawHeaderBand(canvas, labels.ledger_title, "No included transactions in this period", [{ text: labels.draft_badge, variant: "warning" }]);
+    return [canvas];
+  }
   const pages = [];
-  let canvas = new PdfCanvas();
-  let y = 760;
-
+  let canvas = null;
+  const state = { y: 0, firstPage: true };
   const startPage = () => {
     canvas = new PdfCanvas();
-    y = 760;
-    canvas.text(40, y, normalizeRegionCode(region) === 'CA' ? labels.tax_packet_title_ca : labels.tax_packet_title_us, 16, "F2");
-    y -= 28;
+    drawHeaderBand(canvas, labels.ledger_title, "Primary line: date, payee, tax line, amount, flags", [{ text: labels.draft_badge, variant: "warning" }]);
+    canvas.drawSectionHeader(state.firstPage ? "Flag Legend" : "Flag legend shown on first ledger page", 40, 676);
+    if (state.firstPage) {
+      let legendY = 652;
+      const legendChunks = chunkArray(Object.entries(FLAG_DESCRIPTIONS), 7);
+      legendChunks.forEach((chunk, columnIndex) => {
+        let colY = legendY;
+        const x = columnIndex * 266 + 40;
+        chunk.forEach(([code, description]) => {
+          canvas.text(x, colY, `${code} - ${description}`, 7);
+          colY -= 11;
+        });
+      });
+      state.y = 564;
+    } else {
+      state.y = 652;
+    }
+    state.firstPage = false;
   };
-
-  const pushPage = () => {
-    pages.push(canvas);
-    startPage();
-  };
-
-  const ensureSpace = (needed) => {
-    if (y - needed < 60) pushPage();
-  };
-
   startPage();
 
-  // Receipt coverage block
-  canvas.text(40, y, "Receipt Coverage", 12, "F2");
-  y -= 20;
-  canvas.text(40, y, `Expense transactions: ${coverage.expense_count}`, 9); y -= 14;
-  canvas.text(40, y, `With receipt attached: ${coverage.with_receipt}`, 9); y -= 14;
-  canvas.text(40, y, `Missing receipts: ${coverage.missing}`, 9); y -= 14;
-  if (coverage.coverage_pct !== null) {
-    canvas.text(40, y, `Coverage: ${coverage.coverage_pct}%`, 9); y -= 14;
+  let currentMonth = "";
+  for (const txn of sorted) {
+    const monthKey = normalizePdfDate(txn.date).slice(0, 7);
+    if (monthKey !== currentMonth) {
+      ensureSpace(state, 24, () => { pages.push(canvas); startPage(); });
+      currentMonth = monthKey;
+      canvas.drawSectionHeader(new Date(`${monthKey}-01T12:00:00Z`).toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }), 40, state.y);
+      state.y -= 26;
+    }
+    const status = txn.__status;
+    const account = accountMap[txn?.account_id || txn?.accountId] || null;
+    const primaryHeight = buildTransactionText(txn).length > 56 ? 28 : 14;
+    const secondaryNeeded = status.supportSummary ? 14 : 0;
+    ensureSpace(state, 22 + primaryHeight + secondaryNeeded, () => { pages.push(canvas); startPage(); });
+    const amountValue = String(txn.type || "").toLowerCase() === "income"
+      ? Number(txn.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn))
+      : Number(txn.__businessAmounts?.deductibleAmount ?? normalizeMoneyAmount(txn));
+    const payeeLines = wrapText(buildTransactionText(txn) || "(No description)", 42);
+    canvas.text(40, state.y, normalizePdfDate(txn.date), 8);
+    canvas.text(104, state.y, payeeLines[0], 8);
+    canvas.text(346, state.y, truncateText(shortenTaxLine(status.taxLineDisplay), 26), 8);
+    canvas.drawRightAlignedText(496, state.y, formatCurrencyForPdf(amountValue, currency), 8);
+    canvas.text(506, state.y, status.flags.join(" "), 8, "F2");
+    state.y -= 12;
+    if (payeeLines[1]) {
+      canvas.text(104, state.y, payeeLines[1], 8);
+      state.y -= 12;
+    }
+    const categoryName = normalizeExportCategoryName(txn.__category) || (String(txn.type || "").toLowerCase() === "income" ? "Imported Income" : "Imported Expense");
+    const detail = String(txn.type || "").toLowerCase() === "income"
+      ? `Cat: ${categoryName} | Payer: ${safeValue(txn.payer_name || txn.payerName, "-")} | Support: ${status.supportSummary || "Confirm payer/form"}`
+      : `Acct: ${safeValue(account?.name, "-")} | Cat: ${categoryName} | Support: ${status.supportSummary}`;
+    canvas.text(104, state.y, truncateText(detail, 90), 7);
+    state.y -= 14;
+    canvas.drawDivider(state.y + 4);
+    state.y -= 6;
   }
-  if (coverage.missing > 0) {
-    canvas.text(40, y, "Note: expenses without receipts may not be deductible if challenged.", 8);
-    y -= 14;
-  }
-  y -= 10;
-
-  // Payer summary
-  ensureSpace(60);
-  canvas.text(40, y, normalizeRegionCode(region) === 'CA' ? labels.tax_packet_payer_title_ca : labels.tax_packet_payer_title_us, 12, "F2");
-  y -= 20;
-  if (!payerSummary.payers.length) {
-    canvas.text(40, y, "No income transactions in this range.", 9);
-    y -= 18;
-  } else {
-    canvas.text(40, y, "Payer", 9, "F2");
-    canvas.text(260, y, "Count", 9, "F2");
-    canvas.text(320, y, "Total", 9, "F2");
-    canvas.text(420, y, "Declared", 9, "F2");
-    canvas.text(490, y, "Expected", 9, "F2");
-    y -= 16;
-    const topPayers = payerSummary.payers.slice(0, 12);
-    let hasNoDeclaration = false;
-    let hasMismatch = false;
-    for (const p of topPayers) {
-      ensureSpace(14);
-      canvas.text(40, y, truncateText(p.payer_name, 36), 9);
-      canvas.text(260, y, String(p.count), 9);
-      canvas.text(320, y, formatCurrencyForPdf(p.total, currency), 9);
-      canvas.text(420, y, safeValue(p.declared_form, "—"), 9);
-      const expected = p.expected_form || "—";
-      const noDecl = Boolean(p.expected_form && !p.declared_form);
-      const mismatched = Boolean(p.expected_form && p.declared_form && p.declared_form !== p.expected_form);
-      if (noDecl) hasNoDeclaration = true;
-      if (mismatched) hasMismatch = true;
-      const marker = noDecl ? "*" : (mismatched ? "†" : "");
-      canvas.text(490, y, `${expected}${marker}`, 9);
-      y -= 14;
-    }
-    if (payerSummary.payers.length > 12) {
-      canvas.text(40, y, `... and ${payerSummary.payers.length - 12} more payers`, 8);
-      y -= 14;
-    }
-    if (hasNoDeclaration) {
-      canvas.text(40, y, "* No form declared — form may be required based on payment threshold.", 8);
-      y -= 12;
-    }
-    if (hasMismatch) {
-      canvas.text(40, y, "+ Declared form differs from expected form — verify with payer.", 8);
-      y -= 12;
-    }
-    y -= 6;
-    canvas.text(40, y, `Total income: ${formatCurrencyForPdf(payerSummary.total_income, currency)}`, 9, "F2");
-    y -= 18;
-  }
-
-  // Tax-line summary
-  ensureSpace(60);
-  canvas.text(40, y, normalizeRegionCode(region) === 'CA' ? labels.tax_packet_line_title_ca : labels.tax_packet_line_title_us, 12, "F2");
-  y -= 20;
-  if (!taxLineSummary.lines.length) {
-    canvas.text(40, y, "No categories with tax-line mappings in this range.", 9);
-    y -= 18;
-  } else {
-    canvas.text(40, y, "Tax line", 9, "F2");
-    canvas.text(420, y, "Count", 9, "F2");
-    canvas.text(490, y, "Total", 9, "F2");
-    y -= 16;
-    for (const line of taxLineSummary.lines.slice(0, 20)) {
-      ensureSpace(14);
-      canvas.text(40, y, truncateText(line.tax_line, 60), 9);
-      canvas.text(420, y, String(line.count), 9);
-      canvas.text(490, y, formatCurrencyForPdf(line.total, currency), 9);
-      y -= 14;
-    }
-    if (taxLineSummary.lines.length > 20) {
-      canvas.text(40, y, `... and ${taxLineSummary.lines.length - 20} more lines`, 8);
-      y -= 14;
-    }
-  }
-  if (taxLineSummary.unmapped_count > 0) {
-    ensureSpace(28);
-    y -= 6;
-    canvas.text(40, y, `Unmapped expenses: ${taxLineSummary.unmapped_count} totaling ${formatCurrencyForPdf(taxLineSummary.unmapped_total, currency)}`, 9, "F2");
-    y -= 14;
-    canvas.text(40, y, `These transactions are uncategorized for tax purposes. Map their categories to a ${normalizeRegionCode(region) === 'CA' ? 'T2125' : 'Schedule C'} line.`, 8);
-    y -= 14;
-  }
-
   pages.push(canvas);
   return pages;
 }
 
+function buildExclusionPages(transactions, currency, labels) {
+  if (!transactions.length) return [];
+  const rows = [...transactions].sort((a, b) => normalizePdfDate(a.date).localeCompare(normalizePdfDate(b.date)));
+  const summary = buildExclusionSummary(rows, currency);
+  const pages = [];
+  let index = 0;
+  let firstPage = true;
+  while (index < rows.length || firstPage) {
+    const canvas = new PdfCanvas();
+    drawHeaderBand(canvas, firstPage ? labels.exclusions_title : `${labels.exclusions_title} - continued`, "Short reason codes shown; full legend appears on the first excluded-items page", [{ text: labels.draft_badge, variant: "warning" }]);
+    let y = 674;
+    if (firstPage) {
+      canvas.drawCard(40, y, 532, 118, "Exclusion Summary", summary.map((row) => `${row.label} - ${row.count} items - ${row.amount_display}`), { maxChars: 92 });
+      y -= 132;
+      const legendLines = Object.entries(EXCLUSION_DEFINITIONS).map(([, entry]) => `${entry.label}: ${entry.description}`);
+      canvas.drawCard(40, y, 532, 110, "Legend", legendLines.slice(0, 8), { maxChars: 90 });
+      y -= 124;
+    }
+    const perPage = firstPage ? 24 : 30;
+    const chunk = rows.slice(index, index + perPage);
+    const cols = [
+      { key: "date", label: "Date", x: 40, width: 62 },
+      { key: "payee", label: "Payee / Memo", x: 110, width: 294 },
+      { key: "code", label: "Reason", x: 412, width: 64 },
+      { key: "amount", label: "Booked amount", x: 486, width: 86, align: "right" }
+    ];
+    canvas.drawTableHeader(cols, y);
+    y -= 18;
+    chunk.forEach((txn, rowIndex) => {
+      canvas.drawTableRow(cols, {
+        date: normalizePdfDate(txn.date),
+        payee: truncateText(buildTransactionText(txn) || "(No description)", 50),
+        code: txn.__exclusionReason?.label || txn.__exclusionReason?.code || "REVIEW",
+        amount: formatCurrencyForPdf(normalizeMoneyAmount(txn), currency)
+      }, y, { fillGray: rowIndex % 2 === 0 ? 0.985 : null });
+      y -= 12;
+    });
+    index += chunk.length;
+    firstPage = false;
+    pages.push(canvas);
+    if (!chunk.length) break;
+  }
+  return pages;
+}
+
+function buildCpaChecklistPage(opts) {
+  const { labels, region, reviewInsights, currency } = opts;
+  const isCA = normalizeRegionCode(region) === "CA";
+  const canvas = new PdfCanvas();
+  drawHeaderBand(canvas, labels.checklist_title, isCA ? "T2125 bookkeeping workpaper checklist" : "Schedule C bookkeeping workpaper checklist", [{ text: labels.draft_badge, variant: "warning" }]);
+  const items = [
+    { badge: reviewInsights.missingReceiptCount > 0 ? "ACTION" : "OK", title: "Receipts", description: `${reviewInsights.receiptLinkedCount} of ${reviewInsights.expenseTransactionCount} expense transactions have attached receipts.` },
+    { badge: reviewInsights.needsCategoryCount > 0 ? "ACTION" : "OK", title: "Category cleanup", description: `${reviewInsights.needsCategoryCount} imported or uncategorized transactions need real business categories before filing.` },
+    { badge: reviewInsights.vehicleCount > 0 ? "ACTION" : "OK", title: "Vehicle support", description: `${reviewInsights.vehicleCount} vehicle/fuel transactions totaling ${formatCurrencyForPdf(reviewInsights.vehicleTotal, currency)} need mileage or actual-expense support.` },
+    { badge: reviewInsights.mealsCount > 0 ? "REVIEW" : "OK", title: "Meals", description: `${reviewInsights.mealsCount} meal transactions totaling ${formatCurrencyForPdf(reviewInsights.mealsTotal, currency)} require business purpose documentation. Potential 50% limit applies.` },
+    { badge: reviewInsights.phoneAllocationCount > 0 ? "ACTION" : "OK", title: "Phone / Internet allocation", description: `${reviewInsights.phoneAllocationCount} phone/internet transactions totaling ${formatCurrencyForPdf(reviewInsights.phoneAllocationTotal, currency)} require business-use allocation.` },
+    { badge: reviewInsights.excludedCount > 0 ? "OK" : "REVIEW", title: "Excluded non-business items", description: `${reviewInsights.excludedCount} non-business items were excluded from P&L and listed in a separate schedule.` }
+  ];
+  let y = 672;
+  items.forEach((item) => {
+    const badgeVariant = item.badge === "ACTION" ? "warning" : item.badge === "OK" ? "success" : "neutral";
+    canvas.drawCard(40, y, 532, 86, item.title, [item.description], { maxChars: 90 });
+    canvas.drawBadge(52, y - 20, item.badge, badgeVariant);
+    y -= 98;
+  });
+  return [canvas];
+}
+
+function summarizeVehicleCosts(vehicleCosts, currency) {
+  const buckets = { fuel: 0, insurance: 0, repairs: 0, tolls: 0, registration: 0, other: 0 };
+  for (const row of vehicleCosts || []) {
+    const key = String(row?.entry_type || row?.title || "").toLowerCase();
+    const amount = Math.abs(Number(row?.amount) || 0);
+    if (/fuel|gas/.test(key)) buckets.fuel += amount;
+    else if (/insurance/.test(key)) buckets.insurance += amount;
+    else if (/repair|maintenance/.test(key)) buckets.repairs += amount;
+    else if (/toll|parking/.test(key)) buckets.tolls += amount;
+    else if (/registration|licen/.test(key)) buckets.registration += amount;
+    else buckets.other += amount;
+  }
+  const total = Object.values(buckets).reduce((sum, value) => sum + value, 0);
+  return {
+    ...buckets,
+    total,
+    lines: [
+      `Fuel: ${formatCurrencyForPdf(buckets.fuel, currency)}`,
+      `Insurance: ${formatCurrencyForPdf(buckets.insurance, currency)}`,
+      `Repairs: ${formatCurrencyForPdf(buckets.repairs, currency)}`,
+      `Tolls / parking: ${formatCurrencyForPdf(buckets.tolls, currency)}`,
+      `Registration: ${formatCurrencyForPdf(buckets.registration, currency)}`,
+      `Other vehicle costs: ${formatCurrencyForPdf(buckets.other, currency)}`,
+      `Total vehicle costs: ${formatCurrencyForPdf(total, currency)}`
+    ]
+  };
+}
+
+function buildSupportPages(receipts, transactions, mileage, vehicleCosts, labels, currency, reviewInsights, region) {
+  const canvas = new PdfCanvas();
+  drawHeaderBand(canvas, labels.support_title, normalizeRegionCode(region) === "CA" ? "Support dashboard and final CRA review notes" : "Support dashboard and final IRS review notes", [{ text: labels.draft_badge, variant: "warning" }]);
+  const vehicleSummary = summarizeVehicleCosts(vehicleCosts, currency);
+  canvas.drawCard(40, 666, 252, 126, "Vehicle Review", [
+    `Transactions: ${reviewInsights.vehicleCount}`,
+    `Ledger total: ${formatCurrencyForPdf(reviewInsights.vehicleTotal, currency)}`,
+    `Mileage log status: ${(mileage || []).length ? "Mileage entries present" : "Mileage log needed"}`,
+    `Actual-expense support: Receipts and allocation still required`,
+    ...(vehicleSummary.total > 0 ? vehicleSummary.lines : ["No separate vehicle cost schedule attached. Fuel/auto transactions detected from ledger require mileage/actual support."])
+  ], { maxChars: 34 });
+  canvas.drawCard(320, 666, 252, 126, "Meals Review", [
+    `Transactions: ${reviewInsights.mealsCount}`,
+    `Total amount: ${formatCurrencyForPdf(reviewInsights.mealsTotal, currency)}`,
+    `Potential 50% limited amount: ${formatCurrencyForPdf(reviewInsights.mealsTotal * 0.5, currency)}`,
+    `Business purpose required for each meal entry`
+  ], { maxChars: 34 });
+  canvas.drawCard(40, 520, 252, 96, "Phone / Internet / Utilities", [
+    `Transactions: ${reviewInsights.phoneAllocationCount}`,
+    `Total amount: ${formatCurrencyForPdf(reviewInsights.phoneAllocationTotal, currency)}`,
+    `Business-use percentage needed before final deduction`
+  ], { maxChars: 34 });
+  canvas.drawCard(320, 520, 252, 96, "Receipt Review", [
+    `With receipt: ${reviewInsights.receiptLinkedCount}`,
+    `Missing receipt: ${reviewInsights.missingReceiptCount}`,
+    `Coverage: ${reviewInsights.expenseTransactionCount ? `${((reviewInsights.receiptLinkedCount / reviewInsights.expenseTransactionCount) * 100).toFixed(1)}%` : "-"}`
+  ], { maxChars: 34 });
+  if (reviewInsights.homeOfficeCount > 0) {
+    canvas.drawCard(40, 410, 252, 74, "Home Office Review", [
+      `Total amount: ${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)}`,
+      `Square-foot allocation and support needed`
+    ], { maxChars: 34 });
+  }
+  const topExceptions = [...(transactions || [])]
+    .filter((txn) => txn.__status.flags.length)
+    .sort((a, b) => Number(b.__businessAmounts?.deductibleAmount ?? b.__businessAmounts?.netAmount ?? 0) - Number(a.__businessAmounts?.deductibleAmount ?? a.__businessAmounts?.netAmount ?? 0))
+    .slice(0, 5)
+    .map((txn) => `${truncateText(buildTransactionText(txn) || "(No description)", 34)} - ${formatCurrencyForPdf(Number(txn.__businessAmounts?.deductibleAmount ?? txn.__businessAmounts?.netAmount ?? 0), currency)} - ${txn.__status.flags.join(" ")}`);
+  canvas.drawCard(320, 410, 252, 132, "Top Exceptions", topExceptions.length ? topExceptions : ["No large flagged exceptions detected."], { maxChars: 34 });
+  canvas.drawCard(40, 222, 532, 78, "Final Disclosure", [
+    "Potential deductible amounts shown here are bookkeeping workpaper estimates only.",
+    "Draft - CPA review required. Not a filed tax return."
+  ], { maxChars: 90 });
+  return [canvas];
+}
+
 function buildFooterText(labels, reportId, generatedAt, isSecure, pageNumber, totalPages, legalName, taxId) {
-  const confidentiality = isSecure ? labels.footer_confidential : labels.badge_redacted;
-  return truncateText(`${safeValue(legalName, labels.footer_brand)} | ${maskTaxId(taxId)} | ${reportId} | ${formatReportTimestamp(generatedAt)} | ${confidentiality} | Page ${pageNumber}/${totalPages}`, 110);
+  return truncateText(`${safeValue(legalName, labels.footer_brand)} | ${maskTaxId(taxId)} | ${reportId} | ${formatReportTimestamp(generatedAt)} | ${isSecure ? labels.secure_badge : labels.redacted_badge} | Page ${pageNumber}/${totalPages}`, 110);
 }
 
 function buildObject(id, body) {
@@ -2042,25 +1343,21 @@ function createPdfBytes(pageContents) {
   const objects = [];
   const pageEntries = [];
   let nextId = 5;
-
   pageContents.forEach((content) => {
     const contentId = nextId++;
     const pageId = nextId++;
     pageEntries.push({ contentId, pageId, content });
   });
-
-  objects.push(buildObject(1, '<< /Type /Catalog /Pages 2 0 R >>'));
-  objects.push(buildObject(2, `<< /Type /Pages /Count ${pageEntries.length} /Kids [${pageEntries.map((entry) => `${entry.pageId} 0 R`).join(' ')}] >>`));
-  objects.push(buildObject(3, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'));
-  objects.push(buildObject(4, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>'));
-
+  objects.push(buildObject(1, "<< /Type /Catalog /Pages 2 0 R >>"));
+  objects.push(buildObject(2, `<< /Type /Pages /Count ${pageEntries.length} /Kids [${pageEntries.map((entry) => `${entry.pageId} 0 R`).join(" ")}] >>`));
+  objects.push(buildObject(3, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"));
+  objects.push(buildObject(4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>"));
   pageEntries.forEach((entry) => {
     const length = encoder.encode(entry.content).length;
     objects.push(buildObject(entry.contentId, `<< /Length ${length} >>\nstream\n${entry.content}\nendstream`));
     objects.push(buildObject(entry.pageId, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${entry.contentId} 0 R >>`));
   });
-
-  const parts = ['%PDF-1.3\n'];
+  const parts = ["%PDF-1.3\n"];
   const offsets = [0];
   let offset = encoder.encode(parts[0]).length;
   objects.forEach((obj) => {
@@ -2068,61 +1365,57 @@ function createPdfBytes(pageContents) {
     parts.push(obj);
     offset += encoder.encode(obj).length;
   });
-
   const xrefStart = offset;
   parts.push(`xref\n0 ${objects.length + 1}\n`);
-  parts.push('0000000000 65535 f \n');
-  offsets.slice(1).forEach((value) => {
-    parts.push(`${String(value).padStart(10, '0')} 00000 n \n`);
-  });
+  parts.push("0000000000 65535 f \n");
+  offsets.slice(1).forEach((value) => parts.push(`${String(value).padStart(10, "0")} 00000 n \n`));
   parts.push(`trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`);
-  return Buffer.from(encoder.encode(parts.join('')));
+  return Buffer.from(encoder.encode(parts.join("")));
 }
 
-function buildPdfExport(options) {
+function buildPdfExportDocument(options) {
   const {
     transactions = [],
     accounts = [],
     categories = [],
     receipts = [],
     mileage = [],
-    startDate = '',
-    endDate = '',
-    exportLang = 'en',
-    currency = 'USD',
-    legalName = '',
-    businessName = '',
-    operatingName = '',
-    taxId = '',
-    storedTaxId = '',
-    naics = '',
-    region = 'us',
-    province = '',
+    vehicleCosts = [],
+    startDate = "",
+    endDate = "",
+    exportLang = "en",
+    currency = "USD",
+    legalName = "",
+    businessName = "",
+    operatingName = "",
+    taxId = "",
+    storedTaxId = "",
+    naics = "",
+    region = "us",
+    province = "",
     generatedAt,
     reportId,
     accountingBasis,
-    fiscalYearStart = '',
-    address = '',
-    entityType = '',
-    accountingMethod = '',
+    fiscalYearStart = "",
+    address = "",
+    entityType = "",
+    accountingMethod = "",
     materialParticipation = null,
     gstHstRegistered = false,
-    gstHstNumber = '',
-    gstHstMethod = ''
-  } = options;
+    gstHstNumber = "",
+    gstHstMethod = ""
+  } = options || {};
 
   validateExportProfile({
-    legalName,
+    legalName: legalName || businessName,
     businessName,
-    taxId,
-    storedTaxId,
     naics,
+    address,
+    accountingMethod: accountingMethod || accountingBasis,
+    materialParticipation,
     region,
     province,
     fiscalYearStart,
-    address,
-    accountingMethod,
-    materialParticipation,
     gstHstRegistered,
     gstHstNumber,
     gstHstMethod
@@ -2133,38 +1426,38 @@ function buildPdfExport(options) {
   const effectiveReportId = buildReportId(reportId);
   const normalizedRegion = normalizeRegionCode(region);
   const effectiveCurrency = resolveBusinessCurrency(normalizedRegion, currency);
-  const resolvedTaxId = String(taxId || storedTaxId || '');
-  const taxYear = Number(String(endDate || '').slice(0, 4)) || new Date().getFullYear();
+  const resolvedTaxId = String(taxId || storedTaxId || "");
+  const taxYear = Number(String(endDate || "").slice(0, 4)) || new Date().getFullYear();
   const transactionSummary = summarizeExportTransactions(transactions, categories, {
     region: normalizedRegion,
-    gstHstRegistered
+    gstHstRegistered,
+    receipts
   });
   const includedTransactions = transactionSummary.included;
   const excludedTransactions = transactionSummary.excluded;
-  const totals = calculateTotals(includedTransactions, region, province);
+  const totals = calculateTotals(includedTransactions);
   const reviewInsights = buildReviewInsights(includedTransactions, categories, receipts, {
     excluded: excludedTransactions,
-    excludedCount: excludedTransactions.length,
     region: normalizedRegion
   });
-  const isSecure = Boolean(String(taxId || '').trim());
+  const isSecure = Boolean(String(taxId || "").trim());
+
   const canvases = [
     buildIdentityPage({
       labels,
       totals,
       currency: effectiveCurrency,
-      legalName,
+      legalName: legalName || businessName,
       operatingName,
       taxId: resolvedTaxId,
       naics,
-      businessName,
       startDate,
       endDate,
       reportId: effectiveReportId,
       generatedAt: effectiveGeneratedAt,
-      accountingBasis: accountingMethod || accountingBasis,
+      accountingBasis,
       accountingMethod,
-      entityType: entityType || '',
+      entityType,
       region: normalizedRegion,
       province,
       fiscalYearStart,
@@ -2176,32 +1469,33 @@ function buildPdfExport(options) {
       reviewInsights,
       isSecure
     }),
-    ...buildContentsPage(labels, normalizedRegion, taxYear, gstHstRegistered),
     ...buildCategoryPages(includedTransactions, categories, effectiveCurrency, labels, 0, normalizedRegion),
     ...buildTaxPacketPages({ transactions: includedTransactions, categories, receipts, currency: effectiveCurrency, region: normalizedRegion, labels, taxYear }),
-    ...buildDeductionPages(includedTransactions, effectiveCurrency, labels, normalizedRegion),
     ...buildTransactionPages(includedTransactions, accounts, categories, effectiveCurrency, labels, normalizedRegion),
     ...buildExclusionPages(excludedTransactions, effectiveCurrency, labels),
-    ...buildCpaChecklistPage({
-      labels, region: normalizedRegion, isSecure, naics, entityType: entityType || '',
-      accountingBasis: accountingMethod || accountingBasis, accountingMethod,
-      totals, reviewInsights, currency: effectiveCurrency, legalName, province,
-      materialParticipation, gstHstRegistered, mileage
-    }),
-    ...buildSupportPages(receipts, includedTransactions, mileage, labels, effectiveCurrency, reviewInsights, normalizedRegion)
+    ...buildCpaChecklistPage({ labels, region: normalizedRegion, reviewInsights, currency: effectiveCurrency }),
+    ...buildSupportPages(receipts, includedTransactions, mileage, vehicleCosts, labels, effectiveCurrency, reviewInsights, normalizedRegion)
   ];
 
-  const totalPages = canvases.length;
+  const pageCount = canvases.length;
   const pageContents = canvases.map((canvas, index) => {
-    canvas.addFooter(index + 1, totalPages, buildFooterText(labels, effectiveReportId, effectiveGeneratedAt, isSecure, index + 1, totalPages, legalName || businessName, resolvedTaxId));
+    canvas.addFooter(index + 1, pageCount, buildFooterText(labels, effectiveReportId, effectiveGeneratedAt, isSecure, index + 1, pageCount, legalName || businessName, resolvedTaxId));
     return canvas.build();
   });
+  return {
+    buffer: createPdfBytes(pageContents),
+    pageCount,
+    reportId: effectiveReportId
+  };
+}
 
-  return createPdfBytes(pageContents);
+function buildPdfExport(options) {
+  return buildPdfExportDocument(options).buffer;
 }
 
 module.exports = {
   buildPdfExport,
+  buildPdfExportDocument,
   __private: {
     calculateTotals,
     computeReceiptCoverage,
@@ -2213,6 +1507,10 @@ module.exports = {
     deriveBusinessAmounts,
     classifyExcludedTransaction,
     normalizeRegionCode,
-    resolveBusinessCurrency
+    resolveBusinessCurrency,
+    buildTransactionStatus,
+    buildReviewInsights,
+    buildExclusionSummary,
+    getTaxMappingRules
   }
 };
