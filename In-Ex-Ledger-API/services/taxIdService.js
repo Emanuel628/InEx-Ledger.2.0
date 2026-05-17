@@ -18,7 +18,10 @@ const LEGACY_PREFIX = 'enc:';
 const CURRENT_PREFIX = 'enc:v1:';
 
 function getLegacyKey() {
-  const secret = process.env.JWT_SECRET || '';
+  const secret = String(process.env.TAX_ID_LEGACY_KEY || '').trim();
+  if (!secret) {
+    return null;
+  }
   return crypto.createHash('sha256').update(secret).digest();
 }
 
@@ -28,6 +31,7 @@ function decryptLegacy(stored) {
     if (parts.length !== 3) return stored;
     const [ivB64, authTagB64, encryptedB64] = parts;
     const key = getLegacyKey();
+    if (!key) return null;
     const iv = Buffer.from(ivB64, 'base64');
     const authTag = Buffer.from(authTagB64, 'base64');
     const encrypted = Buffer.from(encryptedB64, 'base64');

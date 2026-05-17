@@ -26,11 +26,10 @@ const AUTH_TAG_BYTES = 16;     // 128-bit authentication tag
 const ENCRYPTED_PREFIX = 'enc:v1:';
 
 let _key = null;
+let _keySource = null;
 
 function getKey() {
-  if (_key) return _key;
-
-  const raw = process.env.FIELD_ENCRYPTION_KEY;
+  const raw = String(process.env.FIELD_ENCRYPTION_KEY || '').trim();
   if (!raw) {
     throw new Error(
       'Missing required environment variable: FIELD_ENCRYPTION_KEY ' +
@@ -38,7 +37,11 @@ function getKey() {
     );
   }
 
-  const keyBuf = Buffer.from(raw.trim(), 'hex');
+  if (_key && _keySource === raw) {
+    return _key;
+  }
+
+  const keyBuf = Buffer.from(raw, 'hex');
   if (keyBuf.length !== 32) {
     throw new Error(
       `FIELD_ENCRYPTION_KEY must decode to exactly 32 bytes (got ${keyBuf.length})`
@@ -46,6 +49,7 @@ function getKey() {
   }
 
   _key = keyBuf;
+  _keySource = raw;
   return _key;
 }
 

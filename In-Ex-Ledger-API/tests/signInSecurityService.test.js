@@ -7,8 +7,14 @@ const {
   normalizeIpAddress,
   extractClientIp,
   buildDeviceFingerprint,
-  fetchIpLocation
+  fetchIpLocation,
+  resolveGeolocationApiUrl
 } = require("../services/signInSecurityService.js");
+
+test.afterEach(() => {
+  delete process.env.GEOLOCATION_API_URL;
+  delete process.env.GEOLOCATION_ALLOWED_HOSTS;
+});
 
 test("buildDeviceFingerprint is stable for same user-agent and IP", () => {
   const first = buildDeviceFingerprint({
@@ -81,4 +87,22 @@ test("fetchIpLocation skips lookup for private IP addresses", async () => {
   const location = await fetchIpLocation("10.1.2.3", { fetchImpl: fakeFetch });
   assert.equal(location, null);
   assert.equal(called, false);
+});
+
+test("resolveGeolocationApiUrl rejects unsafe or unapproved endpoints", () => {
+  process.env.GEOLOCATION_API_URL = "http://127.0.0.1/{ip}";
+  assert.equal(resolveGeolocationApiUrl("203.0.113.10"), null);
+
+  process.env.GEOLOCATION_API_URL = "https://evil.example/{ip}";
+  assert.equal(resolveGeolocationApiUrl("203.0.113.10"), null);
+});
+
+test("resolveGeolocationApiUrl allows configured approved hosts", () => {
+  process.env.GEOLOCATION_API_URL = "https://geo.example.test/lookup?ip={ip}";
+  process.env.GEOLOCATION_ALLOWED_HOSTS = "geo.example.test";
+
+  assert.equal(
+    resolveGeolocationApiUrl("203.0.113.10"),
+    "https://geo.example.test/lookup?ip=203.0.113.10"
+  );
 });

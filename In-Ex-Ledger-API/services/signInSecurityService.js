@@ -3,6 +3,9 @@
 const crypto = require("crypto");
 const net = require("net");
 
+const DEFAULT_GEOLOCATION_API_URL = "https://ipapi.co/{ip}/json/";
+const DEFAULT_ALLOWED_GEOLOCATION_HOSTS = new Set(["ipapi.co", "www.ipapi.co"]);
+
 function normalizeUserAgent(userAgent) {
   return String(userAgent || "").trim().slice(0, 512);
 }
@@ -79,18 +82,55 @@ function parseLocation(payload) {
   return { city: city || null, country: country || null };
 }
 
+function resolveAllowedGeolocationHosts() {
+  const configured = String(process.env.GEOLOCATION_ALLOWED_HOSTS || "").trim();
+  if (!configured) {
+    return new Set(DEFAULT_ALLOWED_GEOLOCATION_HOSTS);
+  }
+
+  return new Set(
+    configured
+      .split(",")
+      .map((value) => String(value || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+function resolveGeolocationApiUrl(ipAddress) {
+  const apiTemplate = String(process.env.GEOLOCATION_API_URL || DEFAULT_GEOLOCATION_API_URL).trim();
+  if (!apiTemplate || !apiTemplate.includes("{ip}")) {
+    return null;
+  }
+
+  const apiUrl = apiTemplate.replace("{ip}", encodeURIComponent(ipAddress));
+
+  try {
+    const parsed = new URL(apiUrl);
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.username ||
+      parsed.password ||
+      !resolveAllowedGeolocationHosts().has(parsed.hostname.toLowerCase())
+    ) {
+      return null;
+    }
+    return parsed.toString();
+  } catch (_) {
+    return null;
+  }
+}
+
 async function fetchIpLocation(ipAddress, { fetchImpl = globalThis.fetch } = {}) {
   const ip = normalizeIpAddress(ipAddress);
   if (!ip || isPrivateIp(ip) || typeof fetchImpl !== "function") {
     return null;
   }
 
-  const apiTemplate = String(process.env.GEOLOCATION_API_URL || "https://ipapi.co/{ip}/json/").trim();
-  if (!apiTemplate) {
+  const apiUrl = resolveGeolocationApiUrl(ip);
+  if (!apiUrl) {
     return null;
   }
   const timeoutMs = Math.max(100, Number(process.env.GEOLOCATION_TIMEOUT_MS) || 3000);
-  const apiUrl = apiTemplate.includes("{ip}") ? apiTemplate.replace("{ip}", encodeURIComponent(ip)) : apiTemplate;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -120,5 +160,6 @@ module.exports = {
   buildDeviceFingerprint,
   isPrivateIp,
   parseLocation,
-  fetchIpLocation
+  fetchIpLocation,
+  resolveGeolocationApiUrl
 };

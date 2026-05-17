@@ -62,6 +62,11 @@ const LEGACY_HTML_REDIRECTS = new Map([
   ['/mfa.html', '/settings#settings-security']
 ]);
 const INDEXABLE_PUBLIC_PAGES = new Set(["landing", "pricing", "legal", "privacy", "terms"]);
+const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const ORIGINLESS_API_WRITE_ALLOWLIST = new Set([
+  "/api/billing/webhook",
+  "/api/email/inbound"
+]);
 
 function setStaticAssetCacheHeaders(res, filePath) {
   const normalizedPath = String(filePath || '').toLowerCase();
@@ -123,8 +128,41 @@ function resolveRequestedPageName(requestPath) {
 }
 
 function getNormalizedRequestHost(req) {
-  const forwardedHost = String(req.headers['x-forwarded-host'] || req.headers.host || '').trim();
-  return forwardedHost.split(',')[0].trim().toLowerCase();
+  const directHost = String(req.headers.host || '').trim();
+  return directHost.split(',')[0].trim().toLowerCase();
+}
+
+function isOriginlessRequestAllowed(req) {
+  if (!req.path.startsWith('/api/')) {
+    return true;
+  }
+
+  if (SAFE_HTTP_METHODS.has(String(req.method || '').toUpperCase())) {
+    return true;
+  }
+
+  return ORIGINLESS_API_WRITE_ALLOWLIST.has(req.path);
+}
+
+function buildCorsOptions(req, callback) {
+  const origin = String(req.headers.origin || '').trim();
+  if (!origin) {
+    if (isOriginlessRequestAllowed(req)) {
+      return callback(null, { origin: false, credentials: true });
+    }
+    const error = new Error('Origin header required for this request.');
+    error.status = 403;
+    return callback(error);
+  }
+
+  if (ALLOWED_ORIGINS.indexOf(origin) !== -1) {
+    return callback(null, { origin: true, credentials: true });
+  }
+
+  logWarn(`CORS: Blocked request from ${origin}`);
+  const error = new Error('Not allowed by CORS');
+  error.status = 403;
+  return callback(error);
 }
 
 function isBlockedV2PageRequest(requestPath) {
@@ -222,19 +260,7 @@ app.use(helmet({
     }
   }
 }));
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow server-to-server or local testing with no origin
-    if (!origin) return callback(null, true);
-    if (ALLOWED_ORIGINS.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      logWarn(`CORS: Blocked request from ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
+app.use(cors(buildCorsOptions));
 
 /* =========================================================
    MIDDLEWARE STACK

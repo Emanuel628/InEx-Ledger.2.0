@@ -209,12 +209,12 @@ Rules used here:
   Group: Security middleware truthfulness
   Covers: CSRF fallback to `JWT_SECRET`, in-memory fallback still reported as healthy/enforced
 
-- [ ] Half day - Harden server redirect/CORS behavior around forwarded headers and originless callers.
+- [x] Half day - Harden server redirect/CORS behavior around forwarded headers and originless callers.
   Files: `In-Ex-Ledger-API/server.js`
   Group: Edge request handling
   Covers: `X-Forwarded-Host` redirect trust, blanket allow on missing `Origin`
 
-- [ ] Half day - Review and restrict outbound geolocation configuration and encryption-key lifecycle behavior.
+- [x] Half day - Review and restrict outbound geolocation configuration and encryption-key lifecycle behavior.
   Files: `signInSecurityService.js`, `encryptionService.js`, `taxIdService.js`
   Group: Service configuration safety
   Covers: configurable geolocation SSRF risk, forever-cached encryption key, JWT-secret-derived legacy tax ID key
@@ -238,7 +238,7 @@ Rules used here:
   Group: Plan-limit race conditions
   Covers: CSV import row-limit race, transaction-cap TOCTOU race
 
-- [ ] 1 day+ - Add missing tests for privacy service and the untested route families.
+- [x] 1 day+ - Add missing tests for privacy service and the untested route families.
   Files: `In-Ex-Ledger-API/tests/*`, plus new test files for `privacyService.js`, V2 routes, `system.routes.js`, `crypto.routes.js`, `bank-connections.routes.js`, entitlements
   Group: Test coverage expansion
   Covers: zero tests for V2 routes, no `privacyService` tests, missing entitlements/system/crypto/bank-connections coverage
