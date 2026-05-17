@@ -499,26 +499,30 @@ function normalizeExportCategoryName(category) {
 
 function normalizeEntityTypeDisplay(entityType, region) {
   const raw = String(entityType || "").trim().toLowerCase();
-  if (!raw) return "Not specified";
+  if (!raw) return { label: "Not specified", note: "" };
   const map = {
-    sole_prop: "Sole proprietorship",
-    soleproprietorship: "Sole proprietorship",
-    sole_proprietorship: "Sole proprietorship",
-    partnership: "Partnership",
-    corporation: "Corporation",
-    corp: "Corporation",
-    llc: normalizeRegionCode(region) === "CA" ? "Foreign/US LLC - confirm Canadian filing treatment" : "LLC",
-    ltd: "Corporation",
-    inc: "Corporation"
+    sole_prop: { label: "Sole proprietorship", note: "" },
+    soleproprietorship: { label: "Sole proprietorship", note: "" },
+    sole_proprietorship: { label: "Sole proprietorship", note: "" },
+    partnership: { label: "Partnership", note: "" },
+    corporation: { label: "Corporation", note: "" },
+    corp: { label: "Corporation", note: "" },
+    llc: normalizeRegionCode(region) === "CA"
+      ? { label: "Foreign/US LLC", note: "Confirm in Canada" }
+      : { label: "LLC", note: "" },
+    ltd: { label: "Corporation", note: "" },
+    inc: { label: "Corporation", note: "" }
   };
-  return map[raw] || raw.replace(/[_-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  return map[raw] || {
+    label: raw.replace(/[_-]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()),
+    note: ""
+  };
 }
 
 function getActivityCodeValidation(region, code) {
   const value = String(code || "").trim();
   if (!value) return "Needs review";
-  if (normalizeRegionCode(region) === "CA") return /^\d{6}$/.test(value) ? "Matches 6-digit industry code format" : "Needs review";
-  return /^\d{6}$/.test(value) ? "Matches 6-digit business activity code format" : "Needs review";
+  return /^\d{6}$/.test(value) ? "Format OK" : "Needs review";
 }
 
 function formatFiscalYearDisplay(fiscalYearStart, endDate) {
@@ -536,6 +540,15 @@ function formatFiscalYearDisplay(fiscalYearStart, endDate) {
   if (/^\d{2}-\d{2}$/.test(raw)) return `Fiscal year starts annually on ${raw}`;
   if (endDate) return `Fiscal year start: ${raw} | Confirm with preparer`;
   return `Fiscal year start: ${raw}`;
+}
+
+function statusNeedsSupport(status) {
+  return Boolean(
+    status &&
+    !status.needsCategory &&
+    status.isMapped &&
+    status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag))
+  );
 }
 
 function inferCategorySlug(txn, category, nature) {
@@ -1158,9 +1171,7 @@ function drawReportHeader(canvas, { title, subtitle, badges = [] }) {
   canvas.text(left + 12, titleY, title, 18, "F2");
   canvas.text(left + 12, subtitleY, subtitle, 9);
 
-  const badgeWidths = badges.map((badge) => Math.max(44, String(badge.text || "").length * 5.6 + 12));
-  const badgeTotalWidth = badgeWidths.reduce((sum, widthValue) => sum + widthValue, 0) + Math.max(0, badges.length - 1) * 8;
-  let badgeX = Math.max(left + 12, right - 12 - badgeTotalWidth);
+  let badgeX = left + 12;
   badges.forEach((badge) => {
     const widthValue = canvas.drawBadge(badgeX, badgeRowY, badge.text, badge.variant);
     badgeX += widthValue + 8;
@@ -1182,6 +1193,7 @@ function buildIdentityPage(data) {
   } = data;
 
   const regionCode = normalizeRegionCode(region);
+  const entityTypeDisplay = normalizeEntityTypeDisplay(entityType, regionCode);
   const canvas = new PdfCanvas();
   const header = drawReportHeader(canvas, { title: regionCode === "CA" ? labels.ca_report_title : labels.us_report_title, subtitle: regionCode === "CA" ? "Prepared for T2125 bookkeeping review" : "Prepared for Schedule C bookkeeping review", badges: [
     { text: isSecure ? labels.secure_badge : labels.redacted_badge, variant: "neutral" },
@@ -1196,9 +1208,10 @@ function buildIdentityPage(data) {
     `Legal business name: ${safeValue(legalName)}`,
     ...(String(operatingName || "").trim() ? [`Operating name (DBA): ${operatingName}`] : []),
     `Tax ID: ${isSecure ? safeValue(taxId) : "Withheld"}`,
-    `Entity type: ${normalizeEntityTypeDisplay(entityType, regionCode)}`,
+    `Entity type: ${entityTypeDisplay.label}`,
+    ...(entityTypeDisplay.note ? [`Filing treatment: ${entityTypeDisplay.note}`] : []),
     `Business activity code: ${safeValue(naics)}`,
-    `Code validation: ${getActivityCodeValidation(regionCode, naics)}`,
+    `Validation: ${getActivityCodeValidation(regionCode, naics)}`,
     `Jurisdiction: ${regionCode}${province ? `-${String(province).toUpperCase()}` : ""}`,
     `Accounting method: ${safeValue(accountingMethod || accountingBasis)}`
   ]);
@@ -1283,7 +1296,7 @@ function buildCategoryPages(transactions, categories, currency, labels, embedded
   const rows = buildCategoryBuckets(transactions, currency).slice(embeddedCount);
   const totals = {
     needsCategory: rows.filter((row) => row.mappingStatus === "Needs category").reduce((sum, row) => sum + row.amount, 0),
-    mappedNeedsSupport: rows.filter((row) => /^Mapped -/.test(row.supportStatus)).reduce((sum, row) => sum + row.amount, 0),
+    mappedNeedsSupport: rows.filter((row) => row.mappingStatus === "Needs support").reduce((sum, row) => sum + row.amount, 0),
     mappedReady: rows.filter((row) => row.supportStatus === "Mapped").reduce((sum, row) => sum + row.amount, 0),
     included: rows.reduce((sum, row) => sum + row.amount, 0)
   };
@@ -1320,9 +1333,10 @@ function buildCategoryPages(transactions, categories, currency, labels, embedded
       y -= 12;
     });
     if (index === 0) {
+      const mappedSupportTransactions = transactions.filter((txn) => statusNeedsSupport(txn.__status));
       const riskCardTop = Math.max(y - 10, 210);
       canvas.drawCard(40, riskCardTop, 532, 76, "Support Risk Summary", [
-        `Support-risk categories: ${rows.filter((row) => row.supportStatus !== "Mapped").length} | Mapped transactions requiring support/final confirmation: ${transactions.filter((txn) => txn.__status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag))).length}`,
+        `Support-risk categories: ${rows.filter((row) => row.mappingStatus === "Needs support").length} | Mapped transactions requiring support/final confirmation: ${mappedSupportTransactions.length}`,
         `Expense transactions without receipt attachment: ${transactions.filter((txn) => String(txn.type || "").toLowerCase() === "expense" && !txn.__status.needsCategory && txn.__status.needsReceipt).length} | Vehicle/logbook categories: ${rows.filter((row) => /mileage/i.test(row.supportStatus)).length} | Meals/business-purpose categories: ${rows.filter((row) => /business purpose/i.test(row.supportStatus)).length} | Phone/internet allocation categories: ${rows.filter((row) => /allocation/i.test(row.supportStatus)).length}`
       ], { maxChars: 92 });
       canvas.drawCard(40, riskCardTop - 88, 532, 54, "Summary note", [
@@ -1337,6 +1351,7 @@ function buildTaxPacketPages({ transactions, categories, receipts, currency, reg
   const coverage = computeReceiptCoverage(transactions, receipts);
   const payerSummary = computePayerSummary(transactions, region, taxYear);
   const lineSummary = computeTaxLineSummary(transactions, categories, region);
+  const mappedSupportTransactions = transactions.filter((txn) => statusNeedsSupport(txn.__status));
   const canvas = new PdfCanvas();
   const header = drawReportHeader(canvas, { title: normalizeRegionCode(region) === "CA" ? labels.tax_packet_title_ca : labels.tax_packet_title_us, subtitle: normalizeRegionCode(region) === "CA" ? "Payer/form review and T2125 line summary" : "Payer/form review and Schedule C line summary", badges: [{ text: labels.draft_badge, variant: "warning" }] });
   const cardTop = header.contentStartY - 8;
@@ -1344,7 +1359,7 @@ function buildTaxPacketPages({ transactions, categories, receipts, currency, reg
     `Expense transactions: ${coverage.expense_count}`,
     `With receipt attachment: ${coverage.with_receipt}`,
     `Without receipt attachment: ${coverage.missing}`,
-    `Mapped transactions requiring support/final confirmation: ${transactions.filter((txn) => txn.__status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag))).length}`
+    `Mapped transactions requiring support/final confirmation: ${mappedSupportTransactions.length}`
   ]);
   canvas.drawCard(320, cardTop, 252, 96, labels.payer_review, [
     `Payers detected: ${payerSummary.payer_count}`,

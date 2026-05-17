@@ -304,6 +304,13 @@ test("mapping summary wording does not claim unmapped rows are mapped", () => {
   assert.doesNotMatch(pdf, /Unmapped[\s\S]{0,120}Status Mapped/i);
 });
 
+test("category metrics keep support totals aligned with the new status model", () => {
+  const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
+  assert.match(pdf, /\(Needs support\) Tj/);
+  assert.match(pdf, /\(\$137\.00\) Tj/);
+  assert.match(pdf, /Support-risk categories: 3 \| Mapped transactions requiring support\/final confirmation: 3/i);
+});
+
 test("category and support labels use compact canonical wording instead of chopped prose", () => {
   const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
   assert.match(pdf, /\(L24b Meals\) Tj/);
@@ -322,7 +329,7 @@ test("receipt and support metrics use distinct wording", () => {
   assert.match(pdf, /\(With receipt attachment: 1\) Tj/);
   assert.match(pdf, /\(Without receipt attachment: 3\) Tj/);
   assert.match(pdf, /Mapped transactions requiring support\/final confirmation: 3/i);
-  assert.match(pdf, /Support-risk categories: 4 \| Mapped transactions requiring support\/final confirmation: 3/i);
+  assert.match(pdf, /Support-risk categories: 3 \| Mapped transactions requiring support\/final confirmation: 3/i);
 });
 
 test("obvious non-P&L items render under excluded codes instead of ledger tax mapping", () => {
@@ -411,9 +418,9 @@ test("Canada export resolves T2125 review lines", () => {
   assert.match(pdf, /\(L9281 Motor vehicle\) Tj/);
   assert.match(pdf, /\(L8523 Meals\) Tj/);
   assert.match(pdf, /\(L9270 Phone\/util\) Tj/);
-  assert.match(pdf, /\(Entity type: Foreign\/US LLC - confirm\) Tj/);
-  assert.match(pdf, /\(Canadian filing treatment\) Tj/);
-  assert.match(pdf, /\(Code validation: Needs review\) Tj/);
+  assert.match(pdf, /\(Entity type: Foreign\/US LLC\) Tj/);
+  assert.match(pdf, /\(Filing treatment: Confirm in Canada\) Tj/);
+  assert.match(pdf, /\(Validation: Needs review\) Tj/);
   assert.match(pdf, /\(Fiscal year: 2025-12-31 to 2026-12-30 \| GST\/HST method: regular\) Tj/);
   assert.match(pdf, /\(Confirm fiscal year with preparer\.\) Tj/);
 });
