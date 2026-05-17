@@ -256,6 +256,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireTransactionCategoryFilter();
   wireTransactionAccountFilter();
   wirePagination();
+  wireTransactionSelectionHeader();
   wireTransactionModal();
   window.addEventListener("accountsUpdated", async () => {
     await refreshAccountOptions();
@@ -1310,8 +1311,32 @@ function buildRecurringEmptyStateMarkup() {
   `;
 }
 
-function updateTransactionSelectionHeader(visibleTransactions = []) {
-  void visibleTransactions;
+function getVisibleTransactionPageItems(transactions = getCurrentTransactionPageItems()) {
+  const pageStart = currentPage * PAGE_SIZE;
+  return transactions.slice(pageStart, pageStart + PAGE_SIZE);
+}
+
+function updateTransactionSelectionHeader(visibleTransactions = getCurrentTransactionPageItems()) {
+  const headerCheckbox = document.getElementById("txSelectPage");
+  const headerLabel = document.getElementById("txSelectPageLabel");
+  if (!headerCheckbox) {
+    return;
+  }
+
+  const pageTransactions = getVisibleTransactionPageItems(visibleTransactions);
+  const selectableIds = pageTransactions.map((txn) => String(txn.id));
+  const selectedVisibleCount = selectableIds.filter((id) => selectedTransactionIds.has(id)).length;
+  const totalVisibleCount = selectableIds.length;
+
+  headerCheckbox.disabled = totalVisibleCount === 0;
+  headerCheckbox.checked = totalVisibleCount > 0 && selectedVisibleCount === totalVisibleCount;
+  headerCheckbox.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < totalVisibleCount;
+
+  if (headerLabel) {
+    headerLabel.textContent = totalVisibleCount > 0
+      ? `Select ${totalVisibleCount} transactions on this page`
+      : "No transactions available on this page";
+  }
 }
 
 function syncBulkBar() {
@@ -1325,6 +1350,51 @@ function syncBulkBar() {
   } else {
     bar.hidden = true;
   }
+}
+
+function wireTransactionSelectionHeader() {
+  const headerCheckbox = document.getElementById("txSelectPage");
+  if (!headerCheckbox || headerCheckbox.dataset.wired === "true") {
+    return;
+  }
+
+  headerCheckbox.dataset.wired = "true";
+  headerCheckbox.addEventListener("change", () => {
+    const visibleTransactions = getVisibleTransactionPageItems();
+    const visibleIds = visibleTransactions.map((txn) => String(txn.id));
+
+    if (headerCheckbox.checked) {
+      visibleIds.forEach((id) => selectedTransactionIds.add(id));
+    } else {
+      visibleIds.forEach((id) => selectedTransactionIds.delete(id));
+    }
+
+    const tbody = document.querySelector("tbody");
+    visibleIds.forEach((id) => {
+      const checkbox = tbody?.querySelector(`.tx-row-select[data-id="${id}"]`);
+      if (!checkbox) {
+        return;
+      }
+      checkbox.checked = headerCheckbox.checked;
+      checkbox.closest("tr")?.classList.toggle("is-selected", headerCheckbox.checked);
+    });
+
+    if (selectedTransactionIds.size === 1) {
+      const remainingId = [...selectedTransactionIds][0];
+      const remainingCheckbox = tbody?.querySelector(`.tx-row-select[data-id="${remainingId}"]`);
+      const isAllScope = getTransactionScope() === "all";
+      if (remainingCheckbox) {
+        openRowActionPopup(remainingId, remainingCheckbox, isAllScope);
+      } else {
+        closeRowActionPopup();
+      }
+    } else {
+      closeRowActionPopup();
+    }
+
+    syncBulkBar();
+    updateTransactionSelectionHeader(getCurrentTransactionPageItems());
+  });
 }
 
 function setTransactionUndoState({ message = "", canUndo = false, isError = false } = {}) {
@@ -1794,7 +1864,7 @@ function applyFilters(resetPage = false) {
   renderTotals(filtered);
 }
 
-function renderPagination(totalCount) {
+function renderPaginationLegacyUnused(totalCount) {
   const bar = document.getElementById("txPagination");
   const prevBtn = document.getElementById("txPrevPage");
   const nextBtn = document.getElementById("txNextPage");
@@ -1810,7 +1880,7 @@ function renderPagination(totalCount) {
   if (nextBtn) nextBtn.disabled = currentPage >= totalPages - 1;
 }
 
-function wirePagination() {
+function wirePaginationLegacyUnused() {
   document.getElementById("txPrevPage")?.addEventListener("click", () => {
     if (currentPage > 0) { currentPage--; applyFilters(); }
   });
@@ -2574,12 +2644,14 @@ function renderTransactionsTable(filteredTransactions) {
 
   if (transactionsLoading && filteredTransactions === undefined) {
     tbody.innerHTML = `<tr class="placeholder-row"><td colspan="8" class="placeholder placeholder-cell">${txT("transactions_loading", "Loading transactions...")}</td></tr>`;
+    syncBulkBar();
     updateTransactionSelectionHeader();
     return;
   }
 
   if (hasTransactionsLoadFailed && filteredTransactions === undefined) {
     tbody.innerHTML = `<tr class="placeholder-row"><td colspan="8" class="placeholder placeholder-cell">${txT("transactions_error_load", "Unable to load transactions. Please refresh.")}</td></tr>`;
+    syncBulkBar();
     updateTransactionSelectionHeader();
     return;
   }
@@ -2603,6 +2675,7 @@ function renderTransactionsTable(filteredTransactions) {
         openTransactionDrawer();
       });
     }
+    syncBulkBar();
     updateTransactionSelectionHeader();
     return;
   }
@@ -2731,6 +2804,7 @@ function renderTransactionsTable(filteredTransactions) {
     });
   });
 
+  syncBulkBar();
   updateTransactionSelectionHeader(transactions);
 
   maybeScrollToHighlightedTransaction();

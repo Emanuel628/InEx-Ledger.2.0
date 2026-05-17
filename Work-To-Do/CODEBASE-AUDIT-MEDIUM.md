@@ -121,7 +121,7 @@ Rules used here:
   Group: Onboarding runtime
   Covers: missing `getWorkTypeTourNote`, JS-submitted form bypassing native province validation, dead hidden business type field, duplicated region storage keys
 
-- [ ] 1-2 hours - Fix transactions pagination/selection implementation drift caused by duplicate function definitions and dead header-selection code.
+- [x] 1-2 hours - Fix transactions pagination/selection implementation drift caused by duplicate function definitions and dead header-selection code.
   Files: `In-Ex-Ledger-API/public/js/transactions.js`
   Group: Transactions frontend consistency
   Covers: duplicate `renderPagination`, duplicate `wirePagination`, no-op `updateTransactionSelectionHeader`
