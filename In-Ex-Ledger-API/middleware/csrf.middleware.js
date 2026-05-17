@@ -12,9 +12,9 @@ const CSRF_COOKIE_OPTIONS = {
 };
 
 function getCsrfSecret() {
-  const secret = process.env.CSRF_SECRET || process.env.JWT_SECRET;
+  const secret = process.env.CSRF_SECRET;
   if (!secret) {
-    throw new Error("Missing CSRF signing secret. Set CSRF_SECRET or JWT_SECRET.");
+    throw new Error("Missing CSRF signing secret. Set CSRF_SECRET.");
   }
   return secret;
 }

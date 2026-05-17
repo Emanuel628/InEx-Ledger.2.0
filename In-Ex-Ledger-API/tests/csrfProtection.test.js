@@ -2,6 +2,7 @@ const assert = require("node:assert");
 const test = require("node:test");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret";
+process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-csrf-secret";
 
 const {
   CSRF_COOKIE_NAME,

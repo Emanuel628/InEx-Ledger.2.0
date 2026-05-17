@@ -32,6 +32,7 @@ const request = require("supertest");
 
 // Ensure required env vars are present before any module that reads them loads.
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-integration-flows-secret";
+process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-csrf-secret-integration-flows";
 process.env.DATABASE_URL =
   process.env.DATABASE_URL || "postgresql://inex:inex@localhost:5432/inex_ledger_test";
 process.env.FIELD_ENCRYPTION_KEY =

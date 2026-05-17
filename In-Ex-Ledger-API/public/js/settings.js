@@ -114,6 +114,55 @@ let settingsSubscriptionState = null;
 let settingsPricingState = null;
 let activeExportProfileGuideKeys = [];
 
+function resolveSettingsThemePreference() {
+  try {
+    const storedVersion = localStorage.getItem("lb_theme_version");
+    const storedTheme = localStorage.getItem("lb_theme");
+    const normalizedTheme = storedTheme === "dark" ? "dark" : SETTINGS_DEFAULT_THEME;
+    if (storedVersion !== SETTINGS_THEME_VERSION || storedTheme !== normalizedTheme) {
+      localStorage.setItem("lb_theme", normalizedTheme);
+      localStorage.setItem("lb_theme_version", SETTINGS_THEME_VERSION);
+    }
+    return normalizedTheme;
+  } catch (_) {
+    return SETTINGS_DEFAULT_THEME;
+  }
+}
+
+function normalizeAddressFieldValue(value) {
+  return String(value || "").replace(/[\r\n]+/g, " ").trim();
+}
+
+function serializeBusinessAddress(parts) {
+  const normalizedParts = Array.isArray(parts)
+    ? parts.map(normalizeAddressFieldValue)
+    : [];
+  while (normalizedParts.length && !normalizedParts[normalizedParts.length - 1]) {
+    normalizedParts.pop();
+  }
+  return normalizedParts.join("\n");
+}
+
+function parseBusinessAddress(value) {
+  return String(value || "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((part) => String(part || "").trim())
+    .slice(0, 6);
+}
+
+function updateSettingsProfile(transformer) {
+  if (!window.__LUNA_ME__ || typeof window.__LUNA_ME__ !== "object" || typeof transformer !== "function") {
+    return null;
+  }
+  const nextProfile = transformer(window.__LUNA_ME__);
+  if (!nextProfile || typeof nextProfile !== "object") {
+    return window.__LUNA_ME__;
+  }
+  window.__LUNA_ME__ = nextProfile;
+  return nextProfile;
+}
+
 function isCpaUiEnabled() {
   return window.__LUNA_FLAGS__?.cpaUiEnabled === true;
 }
@@ -243,13 +292,7 @@ function initCollapsibleSettingsPanels() {
 }
 
 function resolveSavedTheme() {
-  const storedVersion = localStorage.getItem("lb_theme_version");
-  const storedTheme = localStorage.getItem("lb_theme");
-  if (storedVersion !== SETTINGS_THEME_VERSION || storedTheme !== SETTINGS_DEFAULT_THEME) {
-    localStorage.setItem("lb_theme", SETTINGS_DEFAULT_THEME);
-    localStorage.setItem("lb_theme_version", SETTINGS_THEME_VERSION);
-  }
-  return SETTINGS_DEFAULT_THEME;
+  return resolveSettingsThemePreference();
 }
 
 function getBusinessProfile() {
@@ -479,20 +522,18 @@ async function initBusinessProfileForm() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const addressParts = [
-      document.getElementById("address-line1").value.trim(),
-      document.getElementById("address-line2").value.trim(),
-      document.getElementById("address-city").value.trim(),
-      document.getElementById("address-state").value.trim(),
-      document.getElementById("address-postal").value.trim(),
-      document.getElementById("address-country").value.trim()
+      document.getElementById("address-line1").value,
+      document.getElementById("address-line2").value,
+      document.getElementById("address-city").value,
+      document.getElementById("address-state").value,
+      document.getElementById("address-postal").value,
+      document.getElementById("address-country").value
     ];
-    // Strip trailing empty parts so we don't store trailing newlines
-    while (addressParts.length && !addressParts[addressParts.length - 1]) addressParts.pop();
     const nextProfile = {
       name: document.getElementById("business-name").value.trim(),
       type: document.getElementById("business-type-select").value,
       fiscalYearStart: fiscalYearInputToStorage(document.getElementById("fiscal-year").value),
-      address: addressParts.join("\n"),
+      address: serializeBusinessAddress(addressParts),
       operatingName: document.getElementById("operating-name").value.trim(),
       businessActivityCode: document.getElementById("business-activity-code").value.trim(),
       accountingMethod: document.getElementById("accounting-method").value,
@@ -528,11 +569,11 @@ async function initBusinessProfileForm() {
     };
     saveBusinessProfile(savedProfile);
     settingsOverviewState.businessProfile = savedProfile;
-    if (window.__LUNA_ME__ && typeof window.__LUNA_ME__ === "object") {
-      const activeBusinessId = window.__LUNA_ME__?.active_business_id || window.__LUNA_ME__?.active_business?.id || "";
+    const updatedProfile = updateSettingsProfile((profile) => {
+      const activeBusinessId = profile?.active_business_id || profile?.active_business?.id || "";
       if (activeBusinessId) {
-        if (Array.isArray(window.__LUNA_ME__.businesses)) {
-          window.__LUNA_ME__.businesses = window.__LUNA_ME__.businesses.map((business) => (
+        const nextBusinesses = Array.isArray(profile.businesses)
+          ? profile.businesses.map((business) => (
             business?.id === activeBusinessId
               ? {
                   ...business,
@@ -554,33 +595,43 @@ async function initBusinessProfileForm() {
                   gst_hst_method: savedProfile.gstHstMethod || business?.gst_hst_method || null
                 }
               : business
-          ));
-        }
-        if (window.__LUNA_ME__.active_business && window.__LUNA_ME__.active_business.id === activeBusinessId) {
-          applyActivatedBusinessContext({
-            ...window.__LUNA_ME__.active_business,
-            name: savedProfile.name || window.__LUNA_ME__.active_business.name || "",
-            business_type: savedProfile.type || window.__LUNA_ME__.active_business.business_type || null,
-            fiscal_year_start: savedProfile.fiscalYearStart || window.__LUNA_ME__.active_business.fiscal_year_start || null,
-            address: savedProfile.address || window.__LUNA_ME__.active_business.address || null,
-            operating_name: savedProfile.operatingName || window.__LUNA_ME__.active_business.operating_name || null,
-            business_activity_code: savedProfile.businessActivityCode || window.__LUNA_ME__.active_business.business_activity_code || null,
-            accounting_method: savedProfile.accountingMethod || window.__LUNA_ME__.active_business.accounting_method || null,
-            material_participation:
-              savedProfile.materialParticipation === "yes"
-                ? true
-                : savedProfile.materialParticipation === "no"
-                  ? false
-                  : window.__LUNA_ME__.active_business.material_participation ?? null,
-            gst_hst_registered: Boolean(savedProfile.gstHstRegistered),
-            gst_hst_number: savedProfile.gstHstNumber || window.__LUNA_ME__.active_business.gst_hst_number || null,
-            gst_hst_method: savedProfile.gstHstMethod || window.__LUNA_ME__.active_business.gst_hst_method || null
-          });
-        }
+          ))
+          : profile.businesses;
+        const nextActiveBusiness =
+          profile.active_business && profile.active_business.id === activeBusinessId
+            ? {
+                ...profile.active_business,
+                name: savedProfile.name || profile.active_business.name || "",
+                business_type: savedProfile.type || profile.active_business.business_type || null,
+                fiscal_year_start: savedProfile.fiscalYearStart || profile.active_business.fiscal_year_start || null,
+                address: savedProfile.address || profile.active_business.address || null,
+                operating_name: savedProfile.operatingName || profile.active_business.operating_name || null,
+                business_activity_code: savedProfile.businessActivityCode || profile.active_business.business_activity_code || null,
+                accounting_method: savedProfile.accountingMethod || profile.active_business.accounting_method || null,
+                material_participation:
+                  savedProfile.materialParticipation === "yes"
+                    ? true
+                    : savedProfile.materialParticipation === "no"
+                      ? false
+                      : profile.active_business.material_participation ?? null,
+                gst_hst_registered: Boolean(savedProfile.gstHstRegistered),
+                gst_hst_number: savedProfile.gstHstNumber || profile.active_business.gst_hst_number || null,
+                gst_hst_method: savedProfile.gstHstMethod || profile.active_business.gst_hst_method || null
+              }
+            : profile.active_business;
+        return {
+          ...profile,
+          businesses: nextBusinesses,
+          active_business: nextActiveBusiness
+        };
       }
-      if (typeof updateAuthenticatedChrome === "function") {
-        updateAuthenticatedChrome(window.__LUNA_ME__);
-      }
+      return profile;
+    });
+    if (updatedProfile?.active_business) {
+      applyActivatedBusinessContext(updatedProfile.active_business);
+    }
+    if (updatedProfile && typeof updateAuthenticatedChrome === "function") {
+      updateAuthenticatedChrome(updatedProfile);
     }
     settingsBusinessesState = settingsBusinessesState.map((business) => (
       business?.id === (window.__LUNA_ME__?.active_business_id || "")
@@ -610,7 +661,7 @@ function applyBusinessProfileForm(profile) {
   document.getElementById("gst-hst-number").value = profile.gstHstNumber || "";
   document.getElementById("gst-hst-method").value = profile.gstHstMethod || "";
 
-  const addrParts = (profile.address || "").split("\n");
+  const addrParts = parseBusinessAddress(profile.address);
   document.getElementById("address-line1").value = addrParts[0] || "";
   document.getElementById("address-line2").value = addrParts[1] || "";
   document.getElementById("address-city").value = addrParts[2] || "";
@@ -1125,7 +1176,7 @@ async function loadBusinessProfile() {
       name: business?.name || "",
       type: business?.business_type || "sole_proprietor",
       fiscalYearStart: business?.fiscal_year_start || "",
-      address: business?.address || "",
+      address: serializeBusinessAddress(parseBusinessAddress(business?.address || "")),
       operatingName: business?.operating_name || "",
       businessActivityCode: business?.business_activity_code || "",
       accountingMethod: business?.accounting_method || "",
@@ -2999,9 +3050,7 @@ function initDangerZone() {
           }
           if (Array.isArray(payload?.businesses)) {
             settingsBusinessesState = payload.businesses;
-            if (window.__LUNA_ME__ && typeof window.__LUNA_ME__ === "object") {
-              window.__LUNA_ME__.businesses = payload.businesses;
-            }
+            updateSettingsProfile((profile) => ({ ...profile, businesses: payload.businesses }));
           }
           if (payload?.active_business && typeof applyActivatedBusinessContext === "function") {
             applyActivatedBusinessContext(payload.active_business);

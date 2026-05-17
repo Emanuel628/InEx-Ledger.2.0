@@ -9,6 +9,7 @@ const request = require("supertest");
 const cookieParser = require("cookie-parser");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-auth-device-verification-secret";
+process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-auth-device-verification-csrf-secret";
 
 const { signToken, verifyToken } = require("../middleware/auth.middleware.js");
 const {
@@ -45,6 +46,7 @@ function loadAuthRouter(options = {}) {
   process.env.RESEND_API_KEY = process.env.RESEND_API_KEY || "test-resend-api-key";
   process.env.RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "InEx Ledger <noreply@example.com>";
   process.env.JWT_SECRET = process.env.JWT_SECRET || "test-auth-device-verification-secret";
+  process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-auth-device-verification-csrf-secret";
 
   const state = {
     user: {

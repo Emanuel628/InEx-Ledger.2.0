@@ -109,10 +109,10 @@ function buildFallbackHealthState({ lastError, redisConfigured }) {
   const fallbackActive = enabled && required;
 
   return {
-    available: fallbackActive ? true : !required,
+    available: fallbackActive ? false : !required,
     enabled,
     lastError,
-    mode: fallbackActive ? "enforced" : (required ? "degraded" : "disabled"),
+    mode: fallbackActive ? "degraded" : (required ? "degraded" : "disabled"),
     redisConfigured,
     redisConnected: false
   };
@@ -432,12 +432,12 @@ async function createLimiter({
         logWarn("Redis unavailable; rate limiting will use in-memory store", { tier: keyPrefix });
       }
       markLimiterHealth({
-        available: true,
+        available: false,
         enabled: true,
         lastError: process.env.REDIS_URL
           ? "Redis unavailable; rate limiting using in-memory store"
           : "REDIS_URL is not configured; using in-memory store",
-        mode: "enforced",
+        mode: "degraded",
         redisConfigured: Boolean(process.env.REDIS_URL),
         redisConnected: false
       });
@@ -544,12 +544,12 @@ async function initializeRateLimiterProtection() {
       { redisConfigured: Boolean(process.env.REDIS_URL) }
     );
     markLimiterHealth({
-      available: true,
+      available: false,
       enabled: true,
       lastError: process.env.REDIS_URL
         ? "Redis unavailable; rate limiting using in-memory store"
         : "REDIS_URL is not configured; using in-memory store",
-      mode: required ? "enforced" : "enabled",
+      mode: required ? "degraded" : "enabled",
       redisConfigured: Boolean(process.env.REDIS_URL),
       redisConnected: false
     });

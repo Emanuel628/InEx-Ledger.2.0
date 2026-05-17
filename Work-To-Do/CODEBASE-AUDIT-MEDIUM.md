@@ -192,19 +192,19 @@ Rules used here:
   Group: Subscription state correctness
   Covers: free selection during trial still writing `PLAN_V1`, `current_period_end = null` treated as indefinite access
 
-- [ ] Half day - Tighten `subscription.js` redirect, invoice link, polling, and timestamp handling.
+- [x] Half day - Tighten `subscription.js` redirect, invoice link, polling, and timestamp handling.
   Files: `In-Ex-Ledger-API/public/js/subscription.js`
   Group: Subscription frontend safety
   Covers: redirect URL parsing, unvalidated invoice URLs, 8-call activation polling loop, millisecond timestamp misformatting
 
-- [ ] Half day - Replace silent theme resets and unsafe global state mutation in Settings with explicit, versioned preference migration.
+- [x] Half day - Replace silent theme resets and unsafe global state mutation in Settings with explicit, versioned preference migration.
   Files: `In-Ex-Ledger-API/public/js/settings.js`
   Group: Settings state management
   Covers: theme reset on version mismatch, direct `window.__LUNA_ME__` mutation, newline-corrupted address storage
 
 ### Platform and middleware
 
-- [ ] Half day - Stop sharing JWT and CSRF secrets by fallback, and report rate-limiter health truthfully when Redis is degraded.
+- [x] Half day - Stop sharing JWT and CSRF secrets by fallback, and report rate-limiter health truthfully when Redis is degraded.
   Files: `In-Ex-Ledger-API/middleware/csrf.middleware.js`, `middleware/rateLimiter.js`, `services/healthCheckService.js`
   Group: Security middleware truthfulness
   Covers: CSRF fallback to `JWT_SECRET`, in-memory fallback still reported as healthy/enforced

@@ -22,6 +22,7 @@
 
 // Ensure required env vars are set before any module that reads them is loaded.
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-harness-jwt-secret";
+process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-harness-csrf-secret";
 process.env.DATABASE_URL =
   process.env.DATABASE_URL || "postgresql://inex:inex@localhost:5432/inex_ledger_test";
 process.env.FIELD_ENCRYPTION_KEY =

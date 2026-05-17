@@ -103,18 +103,18 @@ test("production limiter uses in-memory store when Redis is unavailable", async 
   assert.ok(first.body.ok);
   await request(app).get("/").expect(429);
   const health = getRateLimiterHealth();
-  assert.strictEqual(health.mode, "enforced");
-  assert.strictEqual(health.available, true);
+  assert.strictEqual(health.mode, "degraded");
+  assert.strictEqual(health.available, false);
 });
 
-test("production rate limiter health stays enforced during startup when Redis is not configured", async () => {
+test("production rate limiter health is degraded during startup when Redis is not configured", async () => {
   process.env.NODE_ENV = "production";
   process.env.RATE_LIMIT_ENABLED = "true";
   delete process.env.REDIS_URL;
 
   const health = await initializeRateLimiterProtection();
-  assert.strictEqual(health.mode, "enforced");
-  assert.strictEqual(health.available, true);
+  assert.strictEqual(health.mode, "degraded");
+  assert.strictEqual(health.available, false);
   assert.strictEqual(health.redisConfigured, false);
   assert.strictEqual(health.redisConnected, false);
 });

@@ -4,6 +4,9 @@ const billingPricingUtils = window.billingPricing || {};
 const BILLING_INTERVALS = billingPricingUtils.BILLING_INTERVALS || ["monthly", "yearly"];
 const BILLING_CURRENCIES = billingPricingUtils.BILLING_CURRENCIES || ["usd", "cad"];
 const MAX_ADDITIONAL_BUSINESSES = 100;
+const BILLING_REDIRECT_HOSTS = new Set(["checkout.stripe.com", "billing.stripe.com"]);
+const SUBSCRIPTION_ACTIVATION_POLL_WINDOW_MS = 15_000;
+const SUBSCRIPTION_ACTIVATION_POLL_INTERVAL_MS = 1_500;
 const pricingState = {
   billingInterval: "monthly",
   currency: "usd",
@@ -71,9 +74,18 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
+function resolveTimestampMs(ts) {
+  if (ts == null || ts === "") return NaN;
+  const numeric = typeof ts === "number" ? ts : Number(ts);
+  if (Number.isFinite(numeric)) {
+    return Math.abs(numeric) >= 1_000_000_000_000 ? numeric : numeric * 1000;
+  }
+  return new Date(ts).getTime();
+}
+
 function fmtDate(ts) {
   if (!ts) return "-";
-  const ms = typeof ts === "number" ? ts * 1000 : new Date(ts).getTime();
+  const ms = resolveTimestampMs(ts);
   if (Number.isNaN(ms)) return "-";
   return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
@@ -193,14 +205,19 @@ async function loadVerifiedPricing() {
 function isAllowedBillingRedirect(url) {
   if (!url) return false;
   try {
-    const parsed = new URL(url, window.location.origin);
-    return parsed.protocol === "https:" && (
-      parsed.hostname === "checkout.stripe.com" ||
-      parsed.hostname === "billing.stripe.com"
-    );
+    const parsed = new URL(url);
+    return parsed.protocol === "https:"
+      && !parsed.username
+      && !parsed.password
+      && BILLING_REDIRECT_HOSTS.has(parsed.hostname);
   } catch (_) {
     return false;
   }
+}
+
+function getSafeInvoiceUrl(invoice) {
+  const candidate = String(invoice?.hosted_invoice_url || invoice?.invoice_pdf || "").trim();
+  return isAllowedBillingRedirect(candidate) ? candidate : "";
 }
 
 function updatePricingUI() {
@@ -1039,15 +1056,21 @@ async function loadSubscription() {
 }
 
 async function waitForSubscriptionActivation() {
-  const maxAttempts = 8;
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+  const deadline = Date.now() + SUBSCRIPTION_ACTIVATION_POLL_WINDOW_MS;
+  let latest = null;
+  while (Date.now() < deadline) {
     const sub = await loadSubscription();
+    latest = sub;
     if (sub?.effectiveTier === "v1" && (sub.isPaid || sub.isTrialing)) {
       return sub;
     }
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    if (Date.now() + SUBSCRIPTION_ACTIVATION_POLL_INTERVAL_MS >= deadline) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, SUBSCRIPTION_ACTIVATION_POLL_INTERVAL_MS));
   }
-  return loadSubscription();
+  showSubToast("Checkout succeeded, but billing is still syncing. Refresh in a moment if Pro access does not appear yet.");
+  return latest || loadSubscription();
 }
 
 async function loadBillingHistory(providedInvoices = null) {
@@ -1093,8 +1116,8 @@ async function loadBillingHistory(providedInvoices = null) {
               <td>${escapeHtml(fmtAmount(inv.amount_paid || inv.amount_due, inv.currency))}</td>
               <td><span class="billing-status-badge billing-status-${escapeHtml(inv.status)}">${escapeHtml(inv.status || "-")}</span></td>
               <td>
-                ${inv.hosted_invoice_url || inv.invoice_pdf
-                  ? `<a href="${escapeHtml(inv.hosted_invoice_url || inv.invoice_pdf)}" target="_blank" rel="noopener noreferrer" class="billing-invoice-link">${tx("sub_mgmt_view_invoice")}</a>`
+                ${getSafeInvoiceUrl(inv)
+                  ? `<a href="${escapeHtml(getSafeInvoiceUrl(inv))}" target="_blank" rel="noopener noreferrer" class="billing-invoice-link">${tx("sub_mgmt_view_invoice")}</a>`
                   : "-"}
               </td>
             </tr>
@@ -1277,7 +1300,10 @@ function wireBusinessDeleteModal() {
       }
 
       if (Array.isArray(payload?.businesses) && window.__LUNA_ME__ && typeof window.__LUNA_ME__ === "object") {
-        window.__LUNA_ME__.businesses = payload.businesses;
+        window.__LUNA_ME__ = {
+          ...window.__LUNA_ME__,
+          businesses: payload.businesses
+        };
       }
       if (payload?.active_business && typeof applyActivatedBusinessContext === "function") {
         applyActivatedBusinessContext(payload.active_business);

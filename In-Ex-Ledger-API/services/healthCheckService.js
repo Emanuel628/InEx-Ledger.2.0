@@ -2,15 +2,19 @@
 
 function buildHealthCheckResponse({
   dbState,
-  rateLimiting,
-  receiptStorage,
+  rateLimiting = {},
+  receiptStorage = {},
   uptimeSeconds = process.uptime(),
   now = new Date().toISOString()
 }) {
+  const rateLimitingHealthy =
+    rateLimiting.mode !== "degraded" && rateLimiting.available !== false;
+  const receiptStorageHealthy =
+    receiptStorage.mode !== "degraded" && receiptStorage.available !== false;
   const healthy =
     dbState === "ready" &&
-    rateLimiting.mode !== "degraded" &&
-    receiptStorage.mode !== "degraded";
+    rateLimitingHealthy &&
+    receiptStorageHealthy;
 
   let overallStatus;
   if (healthy) {

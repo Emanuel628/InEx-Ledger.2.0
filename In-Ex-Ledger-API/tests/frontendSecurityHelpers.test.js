@@ -453,3 +453,77 @@ test("receipts date formatting keeps ISO calendar dates stable", () => {
 
   assert.equal(context.formatReceiptDate("2026-05-01T00:00:00.000Z"), "5/1/2026");
 });
+
+test("subscription helpers preserve millisecond timestamps and reject non-Stripe invoice urls", () => {
+  const context = loadScript("public/js/subscription.js", {
+    window: {
+      billingPricing: {},
+      location: { href: "/", search: "", pathname: "/subscription" }
+    },
+    URL,
+    document: {
+      addEventListener() {},
+      getElementById() { return null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; }
+    },
+    apiFetch: async () => ({ ok: true, async json() { return {}; } }),
+    isAuthenticated() { return true; },
+    escapeHtml(value) { return String(value); }
+  });
+
+  assert.equal(context.resolveTimestampMs(1715904000), 1715904000000);
+  assert.equal(context.fmtDate(1715904000), context.fmtDate(1715904000000));
+  assert.equal(
+    context.getSafeInvoiceUrl({ hosted_invoice_url: "https://billing.stripe.com/invoice/acct_test/invst_123" }),
+    "https://billing.stripe.com/invoice/acct_test/invst_123"
+  );
+  assert.equal(
+    context.getSafeInvoiceUrl({ hosted_invoice_url: "https://evil.example/invoice" }),
+    ""
+  );
+});
+
+test("settings helpers preserve a valid stored theme during version migration and normalize multiline addresses", () => {
+  const localStorage = {
+    _store: new Map([
+      ["lb_theme", "dark"],
+      ["lb_theme_version", "2"]
+    ]),
+    getItem(key) {
+      return this._store.has(key) ? this._store.get(key) : null;
+    },
+    setItem(key, value) {
+      this._store.set(key, String(value));
+    },
+    removeItem(key) {
+      this._store.delete(key);
+    }
+  };
+  const context = loadScript("public/js/settings.js", {
+    window: { __LUNA_FLAGS__: {} },
+    document: {
+      addEventListener() {},
+      getElementById() { return null; },
+      querySelector() { return null; },
+      querySelectorAll() { return []; },
+      body: { classList: { remove() {} } }
+    },
+    localStorage,
+    DEFAULT_THEME: "light",
+    THEME_VERSION: "3",
+    t(key) { return key; }
+  });
+
+  assert.equal(context.resolveSavedTheme(), "dark");
+  assert.equal(localStorage.getItem("lb_theme"), "dark");
+  assert.equal(localStorage.getItem("lb_theme_version"), "3");
+  assert.equal(
+    context.serializeBusinessAddress(["123 Main St\nSuite 1", "", "Toronto", "ON", "", "CA"]),
+    "123 Main St Suite 1\n\nToronto\nON\n\nCA"
+  );
+  assert.deepEqual(
+    Array.from(context.parseBusinessAddress("123 Main St\r\nSuite 1\r\nToronto\r\nON\r\nM5V 2T6\r\nCA")),
+    ["123 Main St", "Suite 1", "Toronto", "ON", "M5V 2T6", "CA"]
+  );
+});

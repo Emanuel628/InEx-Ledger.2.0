@@ -19,6 +19,7 @@ const cookieParser = require("cookie-parser");
 const request = require("supertest");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret-for-e2e";
+process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-csrf-secret-for-e2e";
 
 const {
   CSRF_COOKIE_NAME,

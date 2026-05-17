@@ -38,9 +38,12 @@ function resolveSavedTheme() {
   try {
     const storedVersion = localStorage.getItem("lb_theme_version");
     const storedTheme = localStorage.getItem("lb_theme");
-    if (storedVersion !== THEME_VERSION || storedTheme !== DEFAULT_THEME) {
-      persistDefaultTheme();
+    const normalizedTheme = storedTheme === "dark" ? "dark" : DEFAULT_THEME;
+    if (storedVersion !== THEME_VERSION || storedTheme !== normalizedTheme) {
+      localStorage.setItem("lb_theme", normalizedTheme);
+      localStorage.setItem("lb_theme_version", THEME_VERSION);
     }
+    return normalizedTheme;
   } catch (_) {}
   return DEFAULT_THEME;
 }

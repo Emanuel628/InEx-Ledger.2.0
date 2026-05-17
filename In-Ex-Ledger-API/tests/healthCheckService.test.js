@@ -45,3 +45,16 @@ test("health check returns 503 while startup or retry states are still in progre
   assert.equal(response.body.status, "retrying");
   assert.deepEqual(response.body.database, { state: "retrying" });
 });
+
+test("health check returns 503 when a dependency reports unavailable despite a non-degraded mode", () => {
+  const response = buildHealthCheckResponse({
+    dbState: "ready",
+    rateLimiting: { mode: "enabled", available: false },
+    receiptStorage: { mode: "enforced", available: true },
+    uptimeSeconds: 12.34,
+    now: "2026-04-12T12:00:00.000Z"
+  });
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.body.status, "degraded");
+});
