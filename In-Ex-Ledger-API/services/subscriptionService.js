@@ -98,6 +98,7 @@ function deriveEffectiveState(row) {
   const trialPlanSelection = metadata.trial_plan_selection === PLAN_FREE ? PLAN_FREE : PLAN_V1;
   const resolvedTrialEndsAt = trialEndsAt || (trialStartedAt ? addDays(trialStartedAt, DEFAULT_TRIAL_DAYS) : null);
   const currentPeriodEnd = normalizeDate(row?.current_period_end);
+  const hasTrialPlanSelection = row?.status === "trialing" && resolvedTrialEndsAt;
   const pastDueStartedAt = resolvePastDueStartedAt(row);
   const pastDueGraceEndsAt = pastDueStartedAt ? addDays(pastDueStartedAt, BILLING_PAST_DUE_GRACE_DAYS) : null;
   const isTrialing = Boolean(
@@ -106,7 +107,8 @@ function deriveEffectiveState(row) {
   const isActivePaid =
     Boolean(row?.status === "active" &&
     row?.plan_code === PLAN_V1 &&
-    (!currentPeriodEnd || currentPeriodEnd.getTime() > now));
+    currentPeriodEnd &&
+    currentPeriodEnd.getTime() > now);
   const isPastDueGracePeriod =
     Boolean(row?.status === "past_due" &&
     row?.plan_code === PLAN_V1 &&
@@ -163,7 +165,7 @@ function deriveEffectiveState(row) {
     businessId: row?.business_id || null,
     provider: row?.provider || "stripe",
     planCode: row?.plan_code || PLAN_FREE,
-    selectedPlanCode: isTrialing ? trialPlanSelection : (row?.plan_code || PLAN_FREE),
+    selectedPlanCode: hasTrialPlanSelection ? trialPlanSelection : (row?.plan_code || PLAN_FREE),
     planName: getPlanDisplayName(row?.plan_code || PLAN_FREE),
     status: row?.status || "inactive",
     effectiveTier,

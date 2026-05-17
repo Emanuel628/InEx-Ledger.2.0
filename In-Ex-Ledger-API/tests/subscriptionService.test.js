@@ -67,6 +67,26 @@ test("deriveEffectiveState downgrades expired trials to free", () => {
   assert.equal(snapshot.isPaid, false);
 });
 
+test("deriveEffectiveState preserves a trial downgrade selection after the trial expires", () => {
+  const snapshot = deriveEffectiveState({
+    id: "sub_expired_trial_basic_selected",
+    business_id: "biz_trial_expired_basic_selected",
+    provider: "stripe",
+    plan_code: PLAN_V1,
+    status: "trialing",
+    trial_ends_at: isoDateFromNow(-1),
+    current_period_end: isoDateFromNow(-1),
+    metadata_json: {
+      trial_plan_selection: PLAN_FREE
+    }
+  });
+
+  assert.equal(snapshot.effectiveTier, PLAN_FREE);
+  assert.equal(snapshot.effectiveStatus, "trial_expired");
+  assert.equal(snapshot.selectedPlanCode, PLAN_FREE);
+  assert.equal(snapshot.isTrialDowngradedToFree, false);
+});
+
 test("deriveEffectiveState keeps trialing subscriptions active when trial_ends_at is missing", () => {
   const snapshot = deriveEffectiveState({
     id: "sub_trial_missing_end",
@@ -115,6 +135,22 @@ test("deriveEffectiveState keeps active paid plans on v1", () => {
   assert.equal(snapshot.effectiveStatus, "active");
   assert.equal(snapshot.isPaid, true);
   assert.equal(snapshot.cancelAtPeriodEnd, false);
+});
+
+test("deriveEffectiveState does not treat missing current_period_end as indefinite paid access", () => {
+  const snapshot = deriveEffectiveState({
+    id: "sub_active_missing_period_end",
+    business_id: "biz_active_missing_period_end",
+    provider: "stripe",
+    plan_code: PLAN_V1,
+    status: "active",
+    current_period_end: null,
+    cancel_at_period_end: false
+  });
+
+  assert.equal(snapshot.effectiveTier, PLAN_FREE);
+  assert.equal(snapshot.effectiveStatus, "active");
+  assert.equal(snapshot.isPaid, false);
 });
 
 test("deriveEffectiveState preserves grace-period access for canceling subscriptions", () => {

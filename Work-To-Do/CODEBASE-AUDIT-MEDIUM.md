@@ -187,7 +187,7 @@ Rules used here:
   Group: Stripe consistency
   Covers: dangling Stripe customers, webhook race during billing-anchor migration, 500 after already-committed business deletion
 
-- [ ] Half day - Fix `subscriptionService` trial-plan persistence bugs before doing more billing work on top of it.
+- [x] Half day - Fix `subscriptionService` trial-plan persistence bugs before doing more billing work on top of it.
   Files: `In-Ex-Ledger-API/services/subscriptionService.js`
   Group: Subscription state correctness
   Covers: free selection during trial still writing `PLAN_V1`, `current_period_end = null` treated as indefinite access
