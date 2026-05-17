@@ -168,10 +168,21 @@
   border-bottom: none;
 }
 
-.col-amount,
-.transactions-table td.col-amount,
-.transactions-table td:last-child {
+.transactions-table th.col-amount,
+.transactions-table td.col-amount {
   text-align: right;
+}
+
+.transactions-table th.col-actions {
+  text-align: right;
+}
+
+.transactions-table td.col-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  white-space: nowrap;
 }
 
 .placeholder {
