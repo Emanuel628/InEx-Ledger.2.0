@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 
 WORKDIR /app
 
@@ -13,11 +13,12 @@ ENV NODE_ENV=production
 ENV PORT=8080
 # Enable rate limiting in production; falls back to in-memory store when REDIS_URL is not set
 ENV RATE_LIMIT_ENABLED=true
+# Enforce strict TLS certificate validation for production database connections by default.
+ENV DB_SSL_REJECT_UNAUTHORIZED=true
 # Confirm receipt storage persistence. Requires a persistent volume mounted at /app/storage/receipts.
 ENV RECEIPT_STORAGE_PERSISTENT=true
-# Enforce strict TLS certificate validation for the database connection.
-# Set to "false" only when connecting to Postgres with a self-signed certificate chain
-# (e.g. a private CA).  Never set NODE_TLS_REJECT_UNAUTHORIZED=0 as a workaround.
+# Set DB_SSL_REJECT_UNAUTHORIZED="false" only when connecting to Postgres with a
+# self-signed certificate chain. Never set NODE_TLS_REJECT_UNAUTHORIZED=0.
 # For self-signed CAs, supply DB_SSL_CA_CERT=/path/to/ca.pem at runtime instead.
 
 
