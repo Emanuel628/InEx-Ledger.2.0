@@ -223,17 +223,17 @@ Rules used here:
 
 ### Scaling and data-volume behavior
 
-- [ ] 1 day+ - Replace repeated fixed `LIMIT 500` list endpoints with real pagination metadata where the UI actually needs full datasets.
+- [x] 1 day+ - Replace repeated fixed `LIMIT 500` list endpoints with real pagination metadata where the UI actually needs full datasets.
   Files: `accounts.routes.js`, `categories.routes.js`, related list endpoints and clients
   Group: List pagination
   Covers: silent truncation without client signal across multiple pages
 
-- [ ] 1 day+ - Move transaction list paging/filtering back to the server instead of loading up to 50,000 rows into the browser.
+- [x] 1 day+ - Move transaction list paging/filtering back to the server instead of loading up to 50,000 rows into the browser.
   Files: `transactions.routes.js`, `public/js/transactions.js`
   Group: Transaction scalability
   Covers: client-side pagination on full in-memory transaction loads
 
-- [ ] 1 day+ - Revisit plan limits and TOCTOU enforcement around imports and transaction creation.
+- [x] 1 day+ - Revisit plan limits and TOCTOU enforcement around imports and transaction creation.
   Files: `transactions.routes.js`, `services/basicPlanUsageService.js`
   Group: Plan-limit race conditions
   Covers: CSV import row-limit race, transaction-cap TOCTOU race

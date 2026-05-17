@@ -7,6 +7,7 @@ const cookieParser = require("cookie-parser");
 const request = require("supertest");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret-tx-filters";
+process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-csrf-secret-tx-filters";
 process.env.DATABASE_URL =
   process.env.DATABASE_URL || "postgresql://local:test@localhost:5432/inex_ledger_test";
 
@@ -65,8 +66,20 @@ function makeStubbedPool() {
           rowCount: 1
         };
       }
-      if (/SELECT COUNT/.test(sql)) {
-        return { rows: [{ count: "1" }], rowCount: 1 };
+      if (/transaction_count/i.test(sql)) {
+        return {
+          rows: [{
+            transaction_count: 1,
+            income_total: "0",
+            expense_total: "10",
+            current_month_count: 1,
+            current_year_income: "0",
+            current_year_expenses: "10",
+            previous_year_income: "0",
+            previous_year_expenses: "0"
+          }],
+          rowCount: 1
+        };
       }
       return { rows: [], rowCount: 0 };
     }
@@ -180,4 +193,46 @@ test("GET /api/transactions caps an explicit huge limit to 5000 when all is not 
     .set(csrfHeaders(csrf));
   assert.equal(res.status, 200);
   assert.equal(res.body.limit, 5000);
+});
+
+test("GET /api/transactions returns 400 when category_id is not a valid UUID", async () => {
+  const { router } = loadTransactionsRouterWithStubs();
+  const app = buildApp(router);
+  const csrf = "csrf-bad-category";
+  const auth = makeToken();
+  const res = await request(app)
+    .get("/api/transactions?category_id=not-a-uuid")
+    .set("Authorization", `Bearer ${auth}`)
+    .set(csrfHeaders(csrf));
+  assert.equal(res.status, 400);
+  assert.match(res.body.error || "", /category_id/i);
+});
+
+test("GET /api/transactions threads type, category, search, and period filters into the SQL", async () => {
+  const { router, stubbedPool } = loadTransactionsRouterWithStubs();
+  const app = buildApp(router);
+  const csrf = "csrf-filter-combo";
+  const auth = makeToken();
+  const categoryId = "33333333-3333-4333-8333-333333333333";
+  const res = await request(app)
+    .get(`/api/transactions?type=income&category_id=${categoryId}&search=stripe&period=last-month`)
+    .set("Authorization", `Bearer ${auth}`)
+    .set(csrfHeaders(csrf));
+
+  assert.equal(res.status, 200);
+  assert.equal(res.body.type, "income");
+  assert.equal(res.body.category_id, categoryId);
+  assert.equal(res.body.search, "stripe");
+  assert.equal(res.body.period, "last-month");
+  assert.equal(res.body.summary.transaction_count, 1);
+
+  const mainQuery = stubbedPool.calls.find((c) => /SELECT t\.id/.test(c.sql));
+  assert.ok(mainQuery, "main SELECT should have been issued");
+  assert.match(mainQuery.sql, /t\.category_id =/i);
+  assert.match(mainQuery.sql, /t\.type =/i);
+  assert.match(mainQuery.sql, /COALESCE\(t\.description, ''\) ILIKE/i);
+  assert.match(mainQuery.sql, /t\.date >=/i);
+  assert.ok(mainQuery.params.includes(categoryId));
+  assert.ok(mainQuery.params.includes("income"));
+  assert.ok(mainQuery.params.includes("%stripe%"));
 });

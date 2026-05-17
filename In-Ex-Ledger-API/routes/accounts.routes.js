@@ -18,6 +18,8 @@ const {
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card", "cash", "loan", "custom"];
 const MAX_ACCOUNT_NAME_LENGTH = 120;
+const ACCOUNTS_DEFAULT_LIMIT = 500;
+const ACCOUNTS_MAX_LIMIT = 2000;
 
 function normalizeAccountName(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -34,6 +36,9 @@ router.use(createDataApiLimiter());
 router.get("/", async (req, res) => {
   try {
     const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
+    const requestedLimit = parseInt(req.query.limit, 10);
+    const limit = Math.min(Math.max(requestedLimit || ACCOUNTS_DEFAULT_LIMIT, 1), ACCOUNTS_MAX_LIMIT);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const result = await pool.query(
       `SELECT a.*,
               b.name AS business_name
@@ -41,10 +46,23 @@ router.get("/", async (req, res) => {
        JOIN businesses b ON b.id = a.business_id
        WHERE a.business_id = ANY($1::uuid[])
        ORDER BY b.name ASC, a.created_at DESC
-       LIMIT 500`,
+       LIMIT $2 OFFSET $3`,
+      [scope.businessIds, limit, offset]
+    );
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS count
+         FROM accounts
+        WHERE business_id = ANY($1::uuid[])`,
       [scope.businessIds]
     );
-    res.json(result.rows);
+    const total = Number(countResult.rows[0]?.count || 0);
+    res.json({
+      data: result.rows,
+      total,
+      limit,
+      offset,
+      has_more: offset + result.rows.length < total
+    });
   } catch (err) {
     logError("GET accounts error:", err.stack || err);
     res.status(500).json({ error: "A server error occurred while retrieving accounts. Please try again or contact support if the problem persists." });

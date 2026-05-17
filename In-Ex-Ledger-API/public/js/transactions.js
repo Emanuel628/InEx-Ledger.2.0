@@ -6,7 +6,14 @@ const STORAGE_KEYS = {
 const ledgerState = {
   transactions: [],
   accounts: [],
-  categories: []
+  categories: [],
+  transactionMeta: {
+    total: 0,
+    limit: 0,
+    offset: 0,
+    hasMore: false
+  },
+  transactionSummary: null
 };
 
 const recurringState = {
@@ -269,7 +276,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const upsell = document.getElementById("tax-upsell");
   const advancedDetails = document.getElementById("transactionAdvancedDetails");
   const upsellDismissed = isTransactionsUpsellDismissed();
-  const hasTransactions = (ledgerState.transactions || []).length > 0;
+  const hasTransactions = getTransactionTotalCount() > 0;
 
   if (cockpit) {
     cockpit.hidden = tier === "free" || !hasTransactions;
@@ -853,11 +860,41 @@ function updateHelpText(accountHelp, categoryHelp) {
   }
 }
 
-async function loadTransactions() {
+function extractListPayload(payload, fallbackKey = "data") {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (Array.isArray(payload?.[fallbackKey])) {
+    return payload[fallbackKey];
+  }
+  return [];
+}
+
+function getTransactionTotalCount() {
+  return Number(ledgerState.transactionMeta?.total || 0);
+}
+
+function getTransactionSummary() {
+  return ledgerState.transactionSummary || null;
+}
+
+async function loadTransactions(options = {}) {
+  const resetPage = options?.resetPage === true;
+  if (resetPage) {
+    currentPage = 0;
+  }
   setTransactionsLoading(true);
   try {
     hasTransactionsLoadFailed = false;
-    const transactions = await fetchTransactionsForPage();
+    let payload = await fetchTransactionsForPage(currentPage);
+    let totalPages = getTotalTransactionPages(payload?.meta?.total || 0);
+    if (totalPages > 0 && currentPage > totalPages - 1) {
+      currentPage = totalPages - 1;
+      payload = await fetchTransactionsForPage(currentPage);
+      totalPages = getTotalTransactionPages(payload?.meta?.total || 0);
+    }
+
+    const transactions = Array.isArray(payload?.transactions) ? payload.transactions : [];
     let receiptSnapshot = { byTransactionId: {}, unattachedCount: 0 };
     try {
       receiptSnapshot = await fetchReceiptLinksSnapshot();
@@ -869,17 +906,26 @@ async function loadTransactions() {
       ...transaction,
       receiptId: receiptSnapshot.byTransactionId[transaction.id] || transaction.receiptId || ""
     }));
+    ledgerState.transactionMeta = {
+      total: Number(payload?.meta?.total || 0),
+      limit: Number(payload?.meta?.limit || PAGE_SIZE),
+      offset: Number(payload?.meta?.offset || 0),
+      hasMore: payload?.meta?.hasMore === true
+    };
+    ledgerState.transactionSummary = payload?.summary || null;
     unattachedReceiptsCount = receiptSnapshot.unattachedCount;
   } catch (error) {
     console.error("Failed to load transactions:", error);
     hasTransactionsLoadFailed = true;
     ledgerState.transactions = [];
+    ledgerState.transactionMeta = { total: 0, limit: PAGE_SIZE, offset: 0, hasMore: false };
+    ledgerState.transactionSummary = null;
     unattachedReceiptsCount = 0;
   } finally {
     renderAccountOptions();
     renderCategoryOptions();
     setTransactionsLoading(false);
-    applyFilters(true);
+    applyFilters();
     renderGhostSuggestions();
     syncTransactionUndoBar();
     void syncTransactionUndoAvailability({ preserveMessage: !!transactionUndoMessage });
@@ -916,7 +962,7 @@ function wireTransactionSearch() {
     }
     debounceTimer = setTimeout(() => {
       transactionFilters.search = searchInput.value;
-      applyFilters(true);
+      void loadTransactions({ resetPage: true });
     }, 150);
   });
 }
@@ -928,7 +974,7 @@ function wireTransactionCategoryFilter() {
   }
   filter.addEventListener("change", () => {
     transactionFilters.category = filter.value;
-    applyFilters(true);
+    void loadTransactions({ resetPage: true });
   });
 }
 
@@ -939,7 +985,7 @@ function wireTransactionAccountFilter() {
   }
   filter.addEventListener("change", () => {
     transactionFilters.account = filter.value;
-    applyFilters(true);
+    void loadTransactions({ resetPage: true });
   });
 }
 
@@ -1003,7 +1049,7 @@ function initSidebarTypeFilter() {
           : `transactions?type=${transactionFilters.type}`;
       window.history.replaceState({}, "", nextUrl);
       syncSidebarState();
-      applyFilters(true);
+      void loadTransactions({ resetPage: true });
     });
   });
 }
@@ -1859,9 +1905,8 @@ function setEditingMode(enabled) {
 
 function applyFilters(resetPage = false) {
   if (resetPage) currentPage = 0;
-  const filtered = getFilteredTransactions();
-  renderTransactionsTable(filtered);
-  renderTotals(filtered);
+  renderTransactionsTable();
+  renderTotals();
 }
 
 function renderPaginationLegacyUnused(totalCount) {
@@ -1934,41 +1979,7 @@ function matchesTransactionPeriod(txn, period = transactionFilters.period) {
 }
 
 function getFilteredTransactions() {
-  const transactions = ledgerState.transactions || [];
-  const term = (transactionFilters.search || "").trim().toLowerCase();
-  let filtered = transactions.filter((tx) => matchesTransactionPeriod(tx));
-  if (transactionFilters.type === "income" || transactionFilters.type === "expense") {
-    filtered = filtered.filter((tx) => tx.type === transactionFilters.type);
-  }
-  if (term) {
-    filtered = filtered.filter((tx) => {
-      const desc = (tx.description || "").toLowerCase();
-      const cat = (tx.categoryName || getCategoryName(tx.categoryId) || "").toLowerCase();
-      const acct = (tx.accountName || getAccountName(tx.accountId) || "").toLowerCase();
-      const dest = (tx.destination || "").toLowerCase();
-      const notes = (tx.note || "").toLowerCase();
-      const review = (tx.reviewNotes || "").toLowerCase();
-      const treatment = (tx.taxTreatment || "").toLowerCase();
-      const currency = (tx.currency || "").toLowerCase();
-      return (
-        desc.includes(term) ||
-        cat.includes(term) ||
-        acct.includes(term) ||
-        dest.includes(term) ||
-        notes.includes(term) ||
-        review.includes(term) ||
-        treatment.includes(term) ||
-        currency.includes(term)
-      );
-    });
-  }
-  if (transactionFilters.category) {
-    filtered = filtered.filter((tx) => tx.categoryId === transactionFilters.category);
-  }
-  if (transactionFilters.account) {
-    filtered = filtered.filter((tx) => tx.accountId === transactionFilters.account);
-  }
-  return filtered;
+  return ledgerState.transactions || [];
 }
 
 async function handleTransactionDelete(transactionId) {
@@ -2098,12 +2109,8 @@ async function fetchAccountsForTransactions() {
       return [];
     }
 
-    const accounts = await response.json();
-    if (!Array.isArray(accounts)) {
-      return [];
-    }
-
-    return accounts;
+    const payload = await response.json().catch(() => null);
+    return extractListPayload(payload);
   } catch (error) {
     console.warn("[Transactions] Unable to refresh accounts", error);
     return [];
@@ -2259,12 +2266,8 @@ async function fetchCategoriesForTransactions() {
       return [];
     }
 
-    const categories = await response.json().catch(() => []);
-    if (!Array.isArray(categories)) {
-      return [];
-    }
-
-    return categories.map((category) => ({
+    const payload = await response.json().catch(() => null);
+    return extractListPayload(payload).map((category) => ({
       id: category.id,
       businessId: category.businessId || category.business_id || "",
       businessName: category.businessName || category.business_name || "",
@@ -2279,51 +2282,46 @@ async function fetchCategoriesForTransactions() {
   }
 }
 
-async function fetchTransactionsForPage() {
-  const batchSize = 500;
-  const allTransactions = [];
-  let offset = 0;
-  let total = null;
+async function fetchTransactionsForPage(pageIndex = currentPage) {
+  const params = new URLSearchParams({
+    limit: String(PAGE_SIZE),
+    offset: String(Math.max(0, pageIndex) * PAGE_SIZE),
+    period: transactionFilters.period || "all"
+  });
 
-  while (true) {
-    const params = new URLSearchParams({
-      limit: String(batchSize),
-      offset: String(offset)
-    });
-
-    if (getTransactionScope() === "all") {
-      params.set("scope", "all");
-    }
-
-    const response = await apiFetch(`/api/transactions?${params.toString()}`);
-
-    if (!response || !response.ok) {
-      const errorPayload = response ? await response.json().catch(() => null) : null;
-      throw new Error(errorPayload?.error || "Unable to load transactions.");
-    }
-
-    const payload = await response.json().catch(() => null);
-    const rows = Array.isArray(payload?.data) ? payload.data : [];
-
-    if (total === null) {
-      total = Number(payload?.total || 0);
-    }
-
-    allTransactions.push(...rows);
-
-    offset += rows.length;
-
-    if (rows.length === 0 || allTransactions.length >= total) {
-      break;
-    }
-
-    // Safety guard so a weird API response cannot loop forever.
-    if (rows.length < batchSize) {
-      break;
-    }
+  if (getTransactionScope() === "all") {
+    params.set("scope", "all");
+  }
+  if (transactionFilters.type && transactionFilters.type !== "all") {
+    params.set("type", transactionFilters.type);
+  }
+  if (transactionFilters.search && String(transactionFilters.search).trim()) {
+    params.set("search", String(transactionFilters.search).trim());
+  }
+  if (transactionFilters.category) {
+    params.set("category_id", transactionFilters.category);
+  }
+  if (transactionFilters.account) {
+    params.set("account_id", transactionFilters.account);
   }
 
-  return allTransactions.map(normalizeTransaction).filter(Boolean);
+  const response = await apiFetch(`/api/transactions?${params.toString()}`);
+  if (!response || !response.ok) {
+    const errorPayload = response ? await response.json().catch(() => null) : null;
+    throw new Error(errorPayload?.error || "Unable to load transactions.");
+  }
+
+  const payload = await response.json().catch(() => null);
+  return {
+    transactions: extractListPayload(payload).map(normalizeTransaction).filter(Boolean),
+    meta: {
+      total: Number(payload?.total || 0),
+      limit: Number(payload?.limit || PAGE_SIZE),
+      offset: Number(payload?.offset || 0),
+      hasMore: payload?.has_more === true
+    },
+    summary: payload?.summary || null
+  };
 }
 
 async function fetchReceiptLinksSnapshot() {
@@ -2543,13 +2541,13 @@ function clampTransactionPage(page, totalPages) {
 }
 
 function getCurrentTransactionPageItems() {
-  return getFilteredTransactions();
+  return ledgerState.transactions || [];
 }
 
 function goToTransactionPage(pageIndex) {
-  const totalPages = getTotalTransactionPages(getCurrentTransactionPageItems().length);
+  const totalPages = getTotalTransactionPages(getTransactionTotalCount());
   currentPage = clampTransactionPage(pageIndex, totalPages);
-  renderTransactionsTable(getCurrentTransactionPageItems());
+  void loadTransactions();
 }
 
 function renderPagination(totalItems) {
@@ -2615,7 +2613,7 @@ function wirePagination() {
   });
 
   lastButton?.addEventListener("click", () => {
-    const totalPages = getTotalTransactionPages(getCurrentTransactionPageItems().length);
+    const totalPages = getTotalTransactionPages(getTransactionTotalCount());
     goToTransactionPage(totalPages - 1);
   });
 
@@ -2636,7 +2634,7 @@ function renderTransactionsTable(filteredTransactions) {
   const tbody = document.querySelector("tbody");
   const transactions =
     filteredTransactions !== undefined ? filteredTransactions : ledgerState.transactions || [];
-  const isFilteredView = filteredTransactions !== undefined;
+  const totalTransactions = getTransactionTotalCount();
 
   if (!tbody) return;
 
@@ -2657,7 +2655,13 @@ function renderTransactionsTable(filteredTransactions) {
   }
 
   if (transactions.length === 0) {
-    if (isFilteredView && ledgerState.transactions.length > 0) {
+    const hasActiveFilters =
+      (transactionFilters.type && transactionFilters.type !== "all") ||
+      !!String(transactionFilters.search || "").trim() ||
+      !!transactionFilters.category ||
+      !!transactionFilters.account ||
+      transactionFilters.period !== "this-month";
+    if (hasActiveFilters || totalTransactions === 0 && transactionFilters.period !== "this-month") {
       tbody.innerHTML = `<tr class="placeholder-row"><td colspan="8" class="placeholder placeholder-cell">${txT("transactions_empty_filtered", "No matching transactions.")}</td></tr>`;
     } else {
       tbody.innerHTML = `
@@ -2685,12 +2689,9 @@ function renderTransactionsTable(filteredTransactions) {
   const isAllScope = getTransactionScope() === "all";
   const canUseEdgeCaseTools = effectiveTier() === "v1";
   tbody.innerHTML = "";
+  renderPagination(totalTransactions);
 
-  const pageStart = currentPage * PAGE_SIZE;
-  const pageTransactions = transactions.slice(pageStart, pageStart + PAGE_SIZE);
-  renderPagination(transactions.length);
-
-  pageTransactions.forEach((txn) => {
+  transactions.forEach((txn) => {
     const row = document.createElement("tr");
     row.id = `txn-${txn.id}`;
     const txnId = String(txn.id);
@@ -2845,10 +2846,29 @@ function renderTotals(filteredTransactions = getFilteredTransactions()) {
   const isAllScope = getTransactionScope() === "all";
   const mixedCurrencies = hasMixedCurrenciesInScope();
   const scopeRegion = getScopeCurrencyRegion();
+  const summary = getTransactionSummary();
 
-  const totals = calculateTotals(filteredTransactions);
-  const comparison = calculateYearComparisons(filteredTransactions);
-  const transactionsCount = filteredTransactions.length;
+  const totals = summary
+    ? {
+      income: Number(summary.income_total || 0),
+      expenses: Number(summary.expense_total || 0)
+    }
+    : calculateTotals(filteredTransactions);
+  const comparison = summary
+    ? {
+      income: computePercentDelta(
+        Number(summary.current_year_income || 0),
+        Number(summary.previous_year_income || 0)
+      ),
+      expenses: computePercentDelta(
+        Number(summary.current_year_expenses || 0),
+        Number(summary.previous_year_expenses || 0)
+      )
+    }
+    : calculateYearComparisons(filteredTransactions);
+  const transactionsCount = summary
+    ? Number(summary.transaction_count || 0)
+    : filteredTransactions.length;
   if (incomeLabel) {
     incomeLabel.textContent = isAllScope && mixedCurrencies ? txT("exports_per_business", "Per-business") : formatCurrency(totals.income, scopeRegion);
   }
@@ -2870,7 +2890,10 @@ function renderTotals(filteredTransactions = getFilteredTransactions()) {
     transactionCountValue.textContent = String(transactionsCount);
   }
   if (transactionCountDelta) {
-    transactionCountDelta.textContent = `${countTransactionsThisMonth(filteredTransactions)} ${txT("transactions_this_month", "this month")}`;
+    const monthCount = summary
+      ? Number(summary.current_month_count || 0)
+      : countTransactionsThisMonth(filteredTransactions);
+    transactionCountDelta.textContent = `${monthCount} ${txT("transactions_this_month", "this month")}`;
   }
 
   const tier = effectiveTier();
@@ -3885,7 +3908,7 @@ function initPeriodPicker() {
       chip.classList.add("is-active");
       transactionFilters.period = chip.dataset.period || "this-month";
       localStorage.setItem("lb_tx_period", transactionFilters.period);
-      applyFilters(true);
+      void loadTransactions({ resetPage: true });
       window.dispatchEvent(new CustomEvent("txPeriodChanged", { detail: chip.dataset.period }));
     });
   });

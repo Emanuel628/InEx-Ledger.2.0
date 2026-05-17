@@ -32,6 +32,8 @@ const CATEGORY_NAME_UNIQUE_CONSTRAINTS = new Set([
   "categories_business_name_unique",
   "categories_business_name_unique_ci"
 ]);
+const CATEGORIES_DEFAULT_LIMIT = 500;
+const CATEGORIES_MAX_LIMIT = 2000;
 const CATEGORY_REGION_FILTER_SQL = `
   (
     c.is_default = false
@@ -133,6 +135,9 @@ router.get("/", async (req, res) => {
     const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
     const includeInactive = String(req.query.include_inactive || "").toLowerCase() === "true";
     const activeFilter = includeInactive ? "" : " AND c.is_active = true";
+    const requestedLimit = parseInt(req.query.limit, 10);
+    const limit = Math.min(Math.max(requestedLimit || CATEGORIES_DEFAULT_LIMIT, 1), CATEGORIES_MAX_LIMIT);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const result = await pool.query(
       `SELECT c.id, c.business_id, b.name AS business_name, c.name, c.kind, c.color,
               b.region AS business_region, c.tax_map_us, c.tax_map_ca, c.is_default, c.is_active, c.created_at
@@ -141,10 +146,25 @@ router.get("/", async (req, res) => {
        WHERE c.business_id = ANY($1::uuid[])${activeFilter}
          AND ${CATEGORY_REGION_FILTER_SQL}
        ORDER BY b.name ASC, c.kind, c.name
-       LIMIT 500`,
+       LIMIT $2 OFFSET $3`,
+      [scope.businessIds, limit, offset]
+    );
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS count
+         FROM categories c
+         JOIN businesses b ON b.id = c.business_id
+        WHERE c.business_id = ANY($1::uuid[])${activeFilter}
+          AND ${CATEGORY_REGION_FILTER_SQL}`,
       [scope.businessIds]
     );
-    res.json(result.rows);
+    const total = Number(countResult.rows[0]?.count || 0);
+    res.json({
+      data: result.rows,
+      total,
+      limit,
+      offset,
+      has_more: offset + result.rows.length < total
+    });
   } catch (err) {
     logError("GET /categories error:", err.message);
     res.status(500).json({ error: "Failed to load categories." });
@@ -165,6 +185,14 @@ router.post("/", async (req, res) => {
   }
   if (color && !VALID_COLORS.has(color)) {
     return res.status(400).json({ error: "color is invalid" });
+  }
+  const explicitUsTaxMap = normalizeCategoryTaxMap(tax_map_us, "US");
+  if (!explicitUsTaxMap.valid) {
+    return res.status(400).json({ error: explicitUsTaxMap.error });
+  }
+  const explicitCaTaxMap = normalizeCategoryTaxMap(tax_map_ca, "CA");
+  if (!explicitCaTaxMap.valid) {
+    return res.status(400).json({ error: explicitCaTaxMap.error });
   }
   try {
     const businessId = await resolveBusinessIdForUser(req.user);

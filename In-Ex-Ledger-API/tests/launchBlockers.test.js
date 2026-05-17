@@ -68,6 +68,21 @@ function loadTransactionsRouter(options = {}) {
             if (/SELECT region FROM businesses/i.test(sql)) {
               return { rows: [{ region: "US" }], rowCount: 1 };
             }
+            if (/transaction_count/i.test(sql)) {
+              return {
+                rows: [{
+                  transaction_count: 1,
+                  income_total: "1200.00",
+                  expense_total: "0",
+                  current_month_count: 1,
+                  current_year_income: "1200.00",
+                  current_year_expenses: "0",
+                  previous_year_income: "0",
+                  previous_year_expenses: "0"
+                }],
+                rowCount: 1
+              };
+            }
             if (/FROM transactions t/i.test(sql) && /JOIN businesses/i.test(sql)) {
               return {
                 rowCount: 1,
@@ -108,9 +123,6 @@ function loadTransactionsRouter(options = {}) {
                   }
                 ]
               };
-            }
-            if (/SELECT COUNT\(\*\)/i.test(sql)) {
-              return { rows: [{ count: "1" }], rowCount: 1 };
             }
             if (/SELECT id,\s*date\s+FROM transactions/i.test(sql)) {
               return {

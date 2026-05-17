@@ -498,30 +498,163 @@ function hasAdvancedTransactionPayload(normalized, fallbackCurrency) {
 const TRANSACTIONS_HARD_CAP = 50000;
 const TRANSACTIONS_DEFAULT_LIMIT = 100;
 const TRANSACTIONS_CAPPED_LIMIT = 5000;
+const VALID_TRANSACTION_PERIODS = new Set(["this-month", "last-month", "ytd", "all"]);
+
+function getTransactionPeriodBounds(period, now = new Date()) {
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+
+  if (period === "this-month") {
+    return {
+      start: new Date(Date.UTC(year, month, 1, 0, 0, 0, 0)).toISOString().slice(0, 10),
+      end: new Date(Date.UTC(year, month + 1, 1, 0, 0, 0, 0)).toISOString().slice(0, 10)
+    };
+  }
+
+  if (period === "last-month") {
+    return {
+      start: new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)).toISOString().slice(0, 10),
+      end: new Date(Date.UTC(year, month, 1, 0, 0, 0, 0)).toISOString().slice(0, 10)
+    };
+  }
+
+  if (period === "ytd") {
+    return {
+      start: new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0)).toISOString().slice(0, 10),
+      end: new Date(Date.UTC(year + 1, 0, 1, 0, 0, 0, 0)).toISOString().slice(0, 10)
+    };
+  }
+
+  return null;
+}
+
+function buildTransactionListFilters(query, now = new Date()) {
+  const wantsAll = ["true", "1", "yes"].includes(String(query.all || "").toLowerCase());
+  const requestedLimit = parseInt(query.limit, 10);
+  const limit = wantsAll
+    ? TRANSACTIONS_HARD_CAP
+    : Math.min(Math.max(requestedLimit || TRANSACTIONS_DEFAULT_LIMIT, 1), TRANSACTIONS_CAPPED_LIMIT);
+  const offset = Math.max(parseInt(query.offset, 10) || 0, 0);
+  const accountId = String(query.account_id || "").trim();
+  const categoryId = String(query.category_id || "").trim();
+  const type = String(query.type || "").trim().toLowerCase();
+  const period = String(query.period || "all").trim().toLowerCase() || "all";
+
+  if (accountId && !UUID_REGEX.test(accountId)) {
+    return { valid: false, error: "Invalid account_id." };
+  }
+  if (categoryId && !UUID_REGEX.test(categoryId)) {
+    return { valid: false, error: "Invalid category_id." };
+  }
+  if (type && type !== "income" && type !== "expense") {
+    return { valid: false, error: "Invalid type filter." };
+  }
+  if (!VALID_TRANSACTION_PERIODS.has(period)) {
+    return { valid: false, error: "Invalid period filter." };
+  }
+
+  return {
+    valid: true,
+    wantsAll,
+    limit,
+    offset,
+    accountId,
+    categoryId,
+    type: type || "",
+    search: String(query.search || "").trim(),
+    period,
+    periodBounds: getTransactionPeriodBounds(period, now)
+  };
+}
+
+function buildTransactionListWhereClause(scopeBusinessIds, filters) {
+  const params = [scopeBusinessIds];
+  const clauses = [
+    "t.business_id = ANY($1::uuid[])",
+    "t.deleted_at IS NULL",
+    "(t.is_adjustment = false OR t.is_adjustment IS NULL)",
+    "(t.is_void = false OR t.is_void IS NULL)"
+  ];
+
+  if (filters.accountId) {
+    params.push(filters.accountId);
+    clauses.push(`t.account_id = $${params.length}::uuid`);
+  }
+
+  if (filters.categoryId) {
+    params.push(filters.categoryId);
+    clauses.push(`t.category_id = $${params.length}::uuid`);
+  }
+
+  if (filters.type) {
+    params.push(filters.type);
+    clauses.push(`t.type = $${params.length}`);
+  }
+
+  if (filters.periodBounds) {
+    params.push(filters.periodBounds.start);
+    clauses.push(`t.date >= $${params.length}`);
+    params.push(filters.periodBounds.end);
+    clauses.push(`t.date < $${params.length}`);
+  }
+
+  if (filters.search) {
+    params.push(`%${filters.search}%`);
+    const searchParam = `$${params.length}`;
+    clauses.push(`(
+      COALESCE(t.description, '') ILIKE ${searchParam}
+      OR COALESCE(t.note, '') ILIKE ${searchParam}
+      OR COALESCE(t.review_notes, '') ILIKE ${searchParam}
+      OR COALESCE(t.tax_treatment, '') ILIKE ${searchParam}
+      OR COALESCE(t.currency, '') ILIKE ${searchParam}
+      OR COALESCE(t.payer_name, '') ILIKE ${searchParam}
+      OR COALESCE(a.name, '') ILIKE ${searchParam}
+      OR COALESCE(c.name, '') ILIKE ${searchParam}
+      OR COALESCE(b.name, '') ILIKE ${searchParam}
+    )`);
+  }
+
+  return {
+    whereSql: clauses.join("\n         AND "),
+    params
+  };
+}
 
 router.get("/", async (req, res) => {
   try {
     const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
-    const wantsAll = ["true", "1", "yes"].includes(String(req.query.all || "").toLowerCase());
-    const requestedLimit = parseInt(req.query.limit, 10);
-    const limit = wantsAll
-      ? TRANSACTIONS_HARD_CAP
-      : Math.min(Math.max(requestedLimit || TRANSACTIONS_DEFAULT_LIMIT, 1), TRANSACTIONS_CAPPED_LIMIT);
-    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
-
-    const accountIdFilter = String(req.query.account_id || "").trim();
-    let accountFilterClause = "";
-    const params = [scope.businessIds];
-    if (accountIdFilter) {
-      if (!UUID_REGEX.test(accountIdFilter)) {
-        return res.status(400).json({ error: "Invalid account_id." });
-      }
-      params.push(accountIdFilter);
-      accountFilterClause = ` AND t.account_id = $${params.length}::uuid`;
+    const filters = buildTransactionListFilters(req.query);
+    if (!filters.valid) {
+      return res.status(400).json({ error: filters.error });
     }
-    params.push(limit, offset);
+
+    const { whereSql, params: filterParams } = buildTransactionListWhereClause(scope.businessIds, filters);
+    const params = [...filterParams];
+    params.push(filters.limit, filters.offset);
     const limitParamIdx = params.length - 1;
     const offsetParamIdx = params.length;
+
+    const now = new Date();
+    const currentMonthBounds = getTransactionPeriodBounds("this-month", now);
+    const currentYearBounds = getTransactionPeriodBounds("ytd", now);
+    const previousYearStart = new Date(Date.UTC(now.getUTCFullYear() - 1, 0, 1, 0, 0, 0, 0)).toISOString().slice(0, 10);
+    const previousYearEnd = new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0)).toISOString().slice(0, 10);
+
+    const summaryParams = [
+      ...filterParams,
+      currentMonthBounds.start,
+      currentMonthBounds.end,
+      currentYearBounds.start,
+      currentYearBounds.end,
+      previousYearStart,
+      previousYearEnd
+    ];
+    const summaryMonthStartParam = `$${filterParams.length + 1}`;
+    const summaryMonthEndParam = `$${filterParams.length + 2}`;
+    const summaryCurrentYearStartParam = `$${filterParams.length + 3}`;
+    const summaryCurrentYearEndParam = `$${filterParams.length + 4}`;
+    const summaryPreviousYearStartParam = `$${filterParams.length + 5}`;
+    const summaryPreviousYearEndParam = `$${filterParams.length + 6}`;
 
     const result = await pool.query(
       `SELECT t.id,
@@ -560,38 +693,81 @@ router.get("/", async (req, res) => {
        JOIN businesses b ON b.id = t.business_id
        LEFT JOIN accounts a ON a.id = t.account_id
        LEFT JOIN categories c ON c.id = t.category_id
-       WHERE t.business_id = ANY($1::uuid[])
-         AND t.deleted_at IS NULL
-         AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
-         AND (t.is_void = false OR t.is_void IS NULL)${accountFilterClause}
+       WHERE ${whereSql}
        ORDER BY t.date DESC, t.created_at DESC
        LIMIT $${limitParamIdx} OFFSET $${offsetParamIdx}`,
       params
     );
 
-    const countParams = [scope.businessIds];
-    let countAccountClause = "";
-    if (accountIdFilter) {
-      countParams.push(accountIdFilter);
-      countAccountClause = ` AND account_id = $${countParams.length}::uuid`;
-    }
-    const countResult = await pool.query(
-      `SELECT COUNT(*)
-         FROM transactions
-        WHERE business_id = ANY($1::uuid[])
-          AND deleted_at IS NULL
-          AND (is_adjustment = false OR is_adjustment IS NULL)
-          AND (is_void = false OR is_void IS NULL)${countAccountClause}`,
-      countParams
+    const summaryResult = await pool.query(
+      `SELECT COUNT(*)::int AS transaction_count,
+              COALESCE(SUM(CASE WHEN t.type = 'income' THEN ABS(t.amount) ELSE 0 END), 0)::numeric AS income_total,
+              COALESCE(SUM(CASE WHEN t.type = 'expense' THEN ABS(t.amount) ELSE 0 END), 0)::numeric AS expense_total,
+              COUNT(*) FILTER (
+                WHERE t.date >= ${summaryMonthStartParam}
+                  AND t.date < ${summaryMonthEndParam}
+              )::int AS current_month_count,
+              COALESCE(SUM(CASE
+                WHEN t.type = 'income'
+                 AND t.date >= ${summaryCurrentYearStartParam}
+                 AND t.date < ${summaryCurrentYearEndParam}
+                THEN ABS(t.amount)
+                ELSE 0
+              END), 0)::numeric AS current_year_income,
+              COALESCE(SUM(CASE
+                WHEN t.type = 'expense'
+                 AND t.date >= ${summaryCurrentYearStartParam}
+                 AND t.date < ${summaryCurrentYearEndParam}
+                THEN ABS(t.amount)
+                ELSE 0
+              END), 0)::numeric AS current_year_expenses,
+              COALESCE(SUM(CASE
+                WHEN t.type = 'income'
+                 AND t.date >= ${summaryPreviousYearStartParam}
+                 AND t.date < ${summaryPreviousYearEndParam}
+                THEN ABS(t.amount)
+                ELSE 0
+              END), 0)::numeric AS previous_year_income,
+              COALESCE(SUM(CASE
+                WHEN t.type = 'expense'
+                 AND t.date >= ${summaryPreviousYearStartParam}
+                 AND t.date < ${summaryPreviousYearEndParam}
+                THEN ABS(t.amount)
+                ELSE 0
+              END), 0)::numeric AS previous_year_expenses
+         FROM transactions t
+         JOIN businesses b ON b.id = t.business_id
+         LEFT JOIN accounts a ON a.id = t.account_id
+         LEFT JOIN categories c ON c.id = t.category_id
+        WHERE ${whereSql}`,
+      summaryParams
     );
+
+    const summaryRow = summaryResult.rows[0] || {};
+    const total = Number(summaryRow.transaction_count || 0);
 
     res.status(200).json({
       data: result.rows.map(decryptTransactionRow),
-      total: parseInt(countResult.rows[0].count, 10),
-      limit,
-      offset,
-      account_id: accountIdFilter || null,
-      returned_all: wantsAll
+      total,
+      limit: filters.limit,
+      offset: filters.offset,
+      has_more: filters.offset + result.rows.length < total,
+      account_id: filters.accountId || null,
+      category_id: filters.categoryId || null,
+      type: filters.type || "all",
+      search: filters.search || "",
+      period: filters.period,
+      returned_all: filters.wantsAll,
+      summary: {
+        transaction_count: total,
+        income_total: Number(summaryRow.income_total || 0),
+        expense_total: Number(summaryRow.expense_total || 0),
+        current_month_count: Number(summaryRow.current_month_count || 0),
+        current_year_income: Number(summaryRow.current_year_income || 0),
+        current_year_expenses: Number(summaryRow.current_year_expenses || 0),
+        previous_year_income: Number(summaryRow.previous_year_income || 0),
+        previous_year_expenses: Number(summaryRow.previous_year_expenses || 0)
+      }
     });
   } catch (err) {
     logError("GET /transactions error:", err);
@@ -1523,6 +1699,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     return res.status(400).json({ error: "CSV file is required." });
   }
 
+  let client = null;
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
@@ -1577,20 +1754,10 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "Could not detect an amount column. Expected 'amount', 'withdrawal', 'deposit', or similar." });
     }
 
-    // Pre-load all existing categories once; create missing ones on demand
-    const existingCats = await pool.query(
-      "SELECT id, name, kind FROM categories WHERE business_id = $1",
-      [businessId]
-    );
-    const categoryCache = new Map();
-    for (const cat of existingCats.rows) {
-      categoryCache.set(`${cat.kind}::${cat.name.toLowerCase()}`, cat.id);
-    }
-
-    async function getOrCreateCsvCategory(name, kind) {
+    async function getOrCreateCsvCategory(db, categoryCache, name, kind) {
       const key = `${kind}::${name.toLowerCase()}`;
       if (categoryCache.has(key)) return categoryCache.get(key);
-      let result = await pool.query(
+      let result = await db.query(
         `INSERT INTO categories (id, business_id, name, kind, created_at)
          VALUES ($1, $2, $3, $4, now())
          ON CONFLICT (business_id, lower(name)) DO NOTHING
@@ -1598,7 +1765,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         [crypto.randomUUID(), businessId, name, kind]
       );
       if (!result.rowCount) {
-        result = await pool.query(
+        result = await db.query(
           "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
           [businessId, name]
         );
@@ -1611,10 +1778,23 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     const results = { imported: 0, skipped: 0, duplicates: 0, out_of_range: 0, errors: [] };
     const MAX_ROWS = 1000;
     const rowsToProcess = rows.slice(0, MAX_ROWS);
-    const allowance = await assertCanCreateTransactions(pool, businessId, 0);
+    client = await pool.connect();
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [businessId]);
+
+    const existingCats = await client.query(
+      "SELECT id, name, kind FROM categories WHERE business_id = $1",
+      [businessId]
+    );
+    const categoryCache = new Map();
+    for (const cat of existingCats.rows) {
+      categoryCache.set(`${cat.kind}::${cat.name.toLowerCase()}`, cat.id);
+    }
+
+    const allowance = await assertCanCreateTransactions(client, businessId, 0, { subscription });
     let remainingBasicSlots = Number.isFinite(allowance.remaining) ? allowance.remaining : Number.POSITIVE_INFINITY;
 
-    const batch = await createImportBatch(pool, {
+    const batch = await createImportBatch(client, {
       businessId,
       accountId,
       source: "csv",
@@ -1649,7 +1829,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       }
 
       if (skipDuplicates) {
-        const candidates = await findDuplicateCandidates(pool, {
+        const candidates = await findDuplicateCandidates(client, {
           businessId,
           accountId,
           date,
@@ -1665,7 +1845,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       }
 
       const detectedCategory = detectCsvCategory(description, type);
-      const categoryId = await getOrCreateCsvCategory(detectedCategory, type);
+      const categoryId = await getOrCreateCsvCategory(client, categoryCache, detectedCategory, type);
       if (!categoryId) {
         results.errors.push({ row: i + 2, reason: `Row ${i + 2}: could not resolve category` });
         results.skipped++;
@@ -1685,7 +1865,8 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       const taxTreatment = type === "income" ? "income" : "operating";
 
       try {
-        await pool.query(
+        await assertCanCreateTransactions(client, businessId, 1, { subscription });
+        await client.query(
           `INSERT INTO transactions
             (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted,
              date, currency, tax_treatment, review_status, converted_amount, import_batch_id, import_source)
@@ -1728,12 +1909,13 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       results.truncated_at = MAX_ROWS;
     }
 
-    await finalizeImportBatch(pool, batch.id, {
+    await finalizeImportBatch(client, batch.id, {
       imported: results.imported,
       duplicate: results.duplicates,
       failed: results.errors.length,
       totalRows: rowsToProcess.length
     });
+    await client.query("COMMIT");
 
     const rangePart = (filterStartDate || filterEndDate)
       ? `, ${results.out_of_range} outside date range`
@@ -1746,8 +1928,11 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       ...results
     });
   } catch (err) {
+    if (client) await client.query("ROLLBACK").catch(() => {});
     logError("POST /transactions/import/csv error:", err);
     res.status(500).json({ error: "CSV import failed." });
+  } finally {
+    if (client) client.release();
   }
 });
 

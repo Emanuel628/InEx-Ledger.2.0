@@ -108,6 +108,16 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
+function extractCategoriesPayload(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+  return [];
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
@@ -271,7 +281,7 @@ async function loadCategories() {
     if (!response || !response.ok) {
       throw new Error(tx("categories_error_load"));
     }
-    let categories = await response.json().catch(() => []);
+    let categories = extractCategoriesPayload(await response.json().catch(() => null));
     if (Array.isArray(categories) && categories.length === 0) {
       categories = await migrateLegacyCategories();
     }
@@ -496,8 +506,7 @@ async function migrateLegacyCategories() {
   if (!refreshed || !refreshed.ok) {
     throw new Error(tx("categories_error_reload"));
   }
-  const payload = await refreshed.json().catch(() => []);
-  return Array.isArray(payload) ? payload : [];
+  return extractCategoriesPayload(await refreshed.json().catch(() => null));
 }
 
 async function refreshReceiptsDot() {

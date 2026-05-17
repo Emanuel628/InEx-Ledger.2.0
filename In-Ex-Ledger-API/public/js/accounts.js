@@ -16,6 +16,16 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
+function extractAccountsPayload(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (Array.isArray(payload?.data)) {
+    return payload.data;
+  }
+  return [];
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
@@ -155,7 +165,7 @@ async function renderAccountList() {
       throw new Error(tx("accounts_error_load"));
     }
 
-    const accounts = await response.json();
+    const accounts = extractAccountsPayload(await response.json().catch(() => null));
     syncAccountsCache(accounts);
     if (!Array.isArray(accounts) || accounts.length === 0) {
       container.innerHTML = `<div class="accounts-empty">${escapeHtml(tx("accounts_no_accounts"))}</div>`;

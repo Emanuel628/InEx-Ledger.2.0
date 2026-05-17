@@ -1150,8 +1150,16 @@ function renderQuickTransactionForm(body, feature) {
     dynamicSidebarFetchJson("/api/accounts"),
     dynamicSidebarFetchJson("/api/categories")
   ]).then(([accountsPayload, categoriesPayload]) => {
-    const accounts = Array.isArray(accountsPayload) ? accountsPayload : accountsPayload?.accounts || [];
-    categories = Array.isArray(categoriesPayload) ? categoriesPayload : categoriesPayload?.categories || [];
+    const accounts = Array.isArray(accountsPayload)
+      ? accountsPayload
+      : Array.isArray(accountsPayload?.data)
+      ? accountsPayload.data
+      : accountsPayload?.accounts || [];
+    categories = Array.isArray(categoriesPayload)
+      ? categoriesPayload
+      : Array.isArray(categoriesPayload?.data)
+      ? categoriesPayload.data
+      : categoriesPayload?.categories || [];
     accountSelect.innerHTML = `<option value="">Select account</option>${accounts.map((account) => `<option value="${escapeDynamicSidebarAttr(account.id)}">${escapeDynamicSidebarHtml(account.name || "Account")}</option>`).join("")}`;
     updateQuickTransactionCategories(categorySelect, categories, typeSelect.value);
   }).catch(() => {

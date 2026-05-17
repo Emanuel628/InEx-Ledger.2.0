@@ -416,7 +416,8 @@ async function hydrateAccountsCache() {
     if (!response || !response.ok) {
       return;
     }
-    const accounts = await response.json().catch(() => []);
+    const payload = await response.json().catch(() => null);
+    const accounts = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
     if (Array.isArray(accounts)) {
       exportState.accounts = accounts.map((account) => ({
         ...account,
@@ -438,7 +439,8 @@ async function hydrateCategoriesCache() {
     if (!response || !response.ok) {
       return;
     }
-    const categories = await response.json().catch(() => []);
+    const payload = await response.json().catch(() => null);
+    const categories = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
     if (Array.isArray(categories)) {
       exportState.categories = categories.map((category) => {
         const businessRegion = String(category.businessRegion || category.business_region || "").toUpperCase() === "CA" ? "CA" : "US";
