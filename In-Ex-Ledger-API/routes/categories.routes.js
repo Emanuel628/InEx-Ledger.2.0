@@ -32,6 +32,19 @@ const CATEGORY_NAME_UNIQUE_CONSTRAINTS = new Set([
   "categories_business_name_unique",
   "categories_business_name_unique_ci"
 ]);
+const CATEGORY_REGION_FILTER_SQL = `
+  (
+    c.is_default = false
+    OR (
+      COALESCE(UPPER(b.region), 'US') = 'US'
+      AND (c.tax_map_ca IS NULL OR c.tax_map_us IS NOT NULL)
+    )
+    OR (
+      COALESCE(UPPER(b.region), 'US') = 'CA'
+      AND (c.tax_map_us IS NULL OR c.tax_map_ca IS NOT NULL)
+    )
+  )
+`;
 
 function normalizeOptionalTrimmedString(value) {
   if (typeof value !== "string") {
@@ -49,6 +62,69 @@ function isCategoryNameConflict(err) {
   );
 }
 
+function normalizeBusinessRegion(region) {
+  return String(region || "").toUpperCase() === "CA" ? "CA" : "US";
+}
+
+function hasMeaningfulTaxMap(value) {
+  return value !== undefined && value !== null && String(value).trim() !== "";
+}
+
+async function loadBusinessRegion(businessId) {
+  const result = await pool.query(
+    "SELECT region FROM businesses WHERE id = $1 LIMIT 1",
+    [businessId]
+  );
+  return normalizeBusinessRegion(result.rows[0]?.region);
+}
+
+function resolveRegionScopedCategoryMaps({ businessRegion, tax_map_us, tax_map_ca, currentUs = null, currentCa = null }) {
+  const normalizedRegion = normalizeBusinessRegion(businessRegion);
+
+  if (normalizedRegion === "US" && hasMeaningfulTaxMap(tax_map_ca)) {
+    return { valid: false, error: "tax_map_ca is not allowed for US businesses." };
+  }
+  if (normalizedRegion === "CA" && hasMeaningfulTaxMap(tax_map_us)) {
+    return { valid: false, error: "tax_map_us is not allowed for Canada businesses." };
+  }
+
+  const normalizedUsTaxMap = normalizeCategoryTaxMap(tax_map_us, "US");
+  if (!normalizedUsTaxMap.valid) {
+    return { valid: false, error: normalizedUsTaxMap.error };
+  }
+  const normalizedCaTaxMap = normalizeCategoryTaxMap(tax_map_ca, "CA");
+  if (!normalizedCaTaxMap.valid) {
+    return { valid: false, error: normalizedCaTaxMap.error };
+  }
+
+  return {
+    valid: true,
+    taxMapUs: normalizedRegion === "US"
+      ? (tax_map_us !== undefined ? (normalizedUsTaxMap.value ?? null) : currentUs)
+      : null,
+    taxMapCa: normalizedRegion === "CA"
+      ? (tax_map_ca !== undefined ? (normalizedCaTaxMap.value ?? null) : currentCa)
+      : null
+  };
+}
+
+async function deactivateRegionIncompatibleDefaultCategories(db, businessId, businessRegion) {
+  const normalizedRegion = normalizeBusinessRegion(businessRegion);
+  const mismatchSql = normalizedRegion === "CA"
+    ? "tax_map_us IS NOT NULL AND tax_map_ca IS NULL"
+    : "tax_map_ca IS NOT NULL AND tax_map_us IS NULL";
+
+  await db.query(
+    `UPDATE categories
+        SET is_active = false
+      WHERE business_id = $1
+        AND is_default = true
+        AND is_active = true
+        AND ${mismatchSql}`,
+    [businessId]
+  );
+}
+
 /**
  * GET /api/categories
  */
@@ -59,10 +135,11 @@ router.get("/", async (req, res) => {
     const activeFilter = includeInactive ? "" : " AND c.is_active = true";
     const result = await pool.query(
       `SELECT c.id, c.business_id, b.name AS business_name, c.name, c.kind, c.color,
-              c.tax_map_us, c.tax_map_ca, c.is_default, c.is_active, c.created_at
+              b.region AS business_region, c.tax_map_us, c.tax_map_ca, c.is_default, c.is_active, c.created_at
        FROM categories c
        JOIN businesses b ON b.id = c.business_id
        WHERE c.business_id = ANY($1::uuid[])${activeFilter}
+         AND ${CATEGORY_REGION_FILTER_SQL}
        ORDER BY b.name ASC, c.kind, c.name
        LIMIT 500`,
       [scope.businessIds]
@@ -89,17 +166,17 @@ router.post("/", async (req, res) => {
   if (color && !VALID_COLORS.has(color)) {
     return res.status(400).json({ error: "color is invalid" });
   }
-  const normalizedUsTaxMap = normalizeCategoryTaxMap(tax_map_us, "US");
-  if (!normalizedUsTaxMap.valid) {
-    return res.status(400).json({ error: normalizedUsTaxMap.error });
-  }
-  const normalizedCaTaxMap = normalizeCategoryTaxMap(tax_map_ca, "CA");
-  if (!normalizedCaTaxMap.valid) {
-    return res.status(400).json({ error: normalizedCaTaxMap.error });
-  }
-
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const businessRegion = await loadBusinessRegion(businessId);
+    const scopedTaxMaps = resolveRegionScopedCategoryMaps({
+      businessRegion,
+      tax_map_us,
+      tax_map_ca
+    });
+    if (!scopedTaxMaps.valid) {
+      return res.status(400).json({ error: scopedTaxMaps.error });
+    }
     const result = await pool.query(
       `INSERT INTO categories (id, business_id, name, kind, color, tax_map_us, tax_map_ca)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -110,8 +187,8 @@ router.post("/", async (req, res) => {
         name.trim(),
         kind,
         color || null,
-        normalizedUsTaxMap.value ?? null,
-        normalizedCaTaxMap.value ?? null
+        scopedTaxMaps.taxMapUs,
+        scopedTaxMaps.taxMapCa
       ]
     );
     res.status(201).json(result.rows[0]);
@@ -148,6 +225,8 @@ router.get("/unmapped", async (req, res) => {
 router.post("/defaults", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const businessRegion = await loadBusinessRegion(businessId);
+    await deactivateRegionIncompatibleDefaultCategories(pool, businessId, businessRegion);
     const inserted = await seedDefaultCategoriesForBusiness(pool, businessId);
     return res.status(200).json({
       inserted_count: inserted.length,
@@ -180,17 +259,9 @@ router.put("/:id", async (req, res) => {
   if (is_active !== undefined && typeof is_active !== "boolean") {
     return res.status(400).json({ error: "is_active must be a boolean" });
   }
-  const normalizedUsTaxMap = normalizeCategoryTaxMap(tax_map_us, "US");
-  if (!normalizedUsTaxMap.valid) {
-    return res.status(400).json({ error: normalizedUsTaxMap.error });
-  }
-  const normalizedCaTaxMap = normalizeCategoryTaxMap(tax_map_ca, "CA");
-  if (!normalizedCaTaxMap.valid) {
-    return res.status(400).json({ error: normalizedCaTaxMap.error });
-  }
-
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    const businessRegion = await loadBusinessRegion(businessId);
 
     const existing = await pool.query(
       "SELECT id, name, kind, color, tax_map_us, tax_map_ca, is_active FROM categories WHERE id = $1 AND business_id = $2",
@@ -204,8 +275,18 @@ router.put("/:id", async (req, res) => {
     const newName = name !== undefined ? normalizeOptionalTrimmedString(name) : current.name;
     const newKind = kind !== undefined ? (kind ?? null) : current.kind;
     const newColor = color !== undefined ? (color ?? null) : current.color;
-    const newTaxMapUs = tax_map_us !== undefined ? (normalizedUsTaxMap.value ?? null) : current.tax_map_us;
-    const newTaxMapCa = tax_map_ca !== undefined ? (normalizedCaTaxMap.value ?? null) : current.tax_map_ca;
+    const scopedTaxMaps = resolveRegionScopedCategoryMaps({
+      businessRegion,
+      tax_map_us,
+      tax_map_ca,
+      currentUs: current.tax_map_us,
+      currentCa: current.tax_map_ca
+    });
+    if (!scopedTaxMaps.valid) {
+      return res.status(400).json({ error: scopedTaxMaps.error });
+    }
+    const newTaxMapUs = scopedTaxMaps.taxMapUs;
+    const newTaxMapCa = scopedTaxMaps.taxMapCa;
     const newIsActive = is_active !== undefined ? Boolean(is_active) : current.is_active;
 
     // Block classification changes that would retroactively alter locked-period history.

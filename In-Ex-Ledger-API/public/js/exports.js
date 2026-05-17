@@ -440,14 +440,18 @@ async function hydrateCategoriesCache() {
     }
     const categories = await response.json().catch(() => []);
     if (Array.isArray(categories)) {
-      exportState.categories = categories.map((category) => ({
+      exportState.categories = categories.map((category) => {
+        const businessRegion = String(category.businessRegion || category.business_region || "").toUpperCase() === "CA" ? "CA" : "US";
+        return {
         id: category.id,
         businessId: category.businessId || category.business_id || "",
         businessName: category.businessName || category.business_name || "",
+        businessRegion,
         name: category.name,
         type: category.kind || category.type || "",
-        taxLabel: category.tax_map_us || category.tax_map_ca || ""
-      }));
+        taxLabel: (businessRegion === "CA" ? category.tax_map_ca : category.tax_map_us) || ""
+      };
+      });
       return;
     }
     exportState.categories = [];

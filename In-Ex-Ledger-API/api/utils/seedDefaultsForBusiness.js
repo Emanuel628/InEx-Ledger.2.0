@@ -105,7 +105,13 @@ async function seedDefaultCategoriesForBusiness(db = pool, businessId) {
       `
       INSERT INTO categories (id, business_id, name, kind, color, tax_map_us, tax_map_ca, is_default, created_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, true, now())
-      ON CONFLICT DO NOTHING
+      ON CONFLICT (business_id, name) DO UPDATE
+        SET kind = EXCLUDED.kind,
+            color = EXCLUDED.color,
+            tax_map_us = EXCLUDED.tax_map_us,
+            tax_map_ca = EXCLUDED.tax_map_ca,
+            is_default = true,
+            is_active = true
       RETURNING id, business_id, name, kind, color, tax_map_us, tax_map_ca, is_default, created_at
       `,
       [
