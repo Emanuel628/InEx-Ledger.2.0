@@ -250,8 +250,8 @@ test("buildPdfExport returns a valid PDF buffer with premium section titles and 
 test("shared header renders badges on their own reserved row", () => {
   const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
   assert.match(pdf, /1 0 0 1 52\.00 708\.00 Tm\s+\(Prepared for Schedule C bookkeeping review\) Tj/s);
-  assert.match(pdf, /1 0 0 1 [0-9]+\.[0-9]{2} 681\.50 Tm\s+\(Secure Export\) Tj/s);
-  assert.match(pdf, /1 0 0 1 [0-9]+\.[0-9]{2} 681\.50 Tm\s+\(Draft - CPA Review Required\) Tj/s);
+  assert.match(pdf, /52\.00 672\.00 84\.80 16\.00 re f[\s\S]{0,120}1 0 0 1 69\.44 681\.50 Tm\s+\(Secure Export\) Tj/s);
+  assert.match(pdf, /144\.80 672\.00 163\.20 16\.00 re f[\s\S]{0,120}1 0 0 1 174\.56 681\.50 Tm\s+\(Draft - CPA Review Required\) Tj/s);
 });
 
 test("excluded section uses short reason codes and not truncated prose strings", () => {

@@ -310,10 +310,14 @@ class PdfCanvas {
 
   drawBadge(x, y, text, variant = "neutral") {
     const fillGray = variant === "warning" ? 0.88 : variant === "success" ? 0.92 : 0.94;
-    const width = Math.max(44, String(text || "").length * 5.6 + 12);
+    const normalized = normalizePdfText(text);
+    const fontSize = 8;
+    const width = Math.max(44, normalized.length * 5.6 + 12);
     this.drawFilledRect(x, y - 10, width, 16, fillGray);
     this.drawRect(x, y - 10, width, 16);
-    this.text(x + 6, y - 0.5, text, 8, "F2");
+    const textWidth = normalized.length * fontSize * 0.48;
+    const textX = x + Math.max(4, (width - textWidth) / 2);
+    this.text(textX, y - 0.5, normalized, fontSize, "F2");
     return width;
   }
 
