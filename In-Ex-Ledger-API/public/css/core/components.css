@@ -194,7 +194,7 @@ button,
 .btn-primary,
 .primary-cta {
   border: none;
-  background: var(--accent2);
+  background: var(--accent2, #2563a8);
   color: white;
   border-radius: 7px;
   padding: 8px 18px;
