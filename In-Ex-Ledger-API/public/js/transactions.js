@@ -96,6 +96,7 @@ const selectedRecurringTemplateIds = new Set();
 let transactionUndoMessage = "";
 let transactionUndoAvailable = false;
 let transactionUndoError = false;
+let transactionUndoKind = "transaction";
 let transactionFxReferenceState = null;
 let transactionFxReferenceDismissed = false;
 let transactionFxReferenceRequestId = 0;
@@ -1192,10 +1193,6 @@ async function deleteRecurringTemplate(templateId) {
     return;
   }
 
-  if (!window.confirm(`Delete recurring template "${template.description}"? Future occurrences will stop.`)) {
-    return;
-  }
-
   const response = await apiFetch(`/api/recurring/${templateId}`, {
     method: "DELETE"
   });
@@ -1203,10 +1200,49 @@ async function deleteRecurringTemplate(templateId) {
   if (!response || !response.ok) {
     const errorPayload = response ? await response.json().catch(() => null) : null;
     setRecurringFormMessage(errorPayload?.error || "Unable to delete recurring template.");
+    setTransactionUndoState({
+      message: errorPayload?.error || "Unable to delete recurring template.",
+      canUndo: false,
+      isError: true,
+      kind: "recurring"
+    });
+    return;
+  }
+
+  selectedRecurringTemplateIds.delete(String(templateId));
+  await loadRecurringTemplates();
+  setTransactionUndoState({
+    message: txT("transactions_recurring_delete_success", "Recurring template deleted."),
+    canUndo: true,
+    isError: false,
+    kind: "recurring"
+  });
+}
+
+async function handleUndoDeletedRecurringTemplate() {
+  const response = await apiFetch("/api/recurring/undo-delete", {
+    method: "POST"
+  });
+
+  if (!response || !response.ok) {
+    const errorPayload = response ? await response.json().catch(() => null) : null;
+    const status = response?.status || 0;
+    setTransactionUndoState({
+      message: errorPayload?.error || "Unable to restore the recurring template.",
+      canUndo: status !== 404,
+      isError: true,
+      kind: "recurring"
+    });
     return;
   }
 
   await loadRecurringTemplates();
+  setTransactionUndoState({
+    message: txT("transactions_recurring_undo_success", "Recurring template restored."),
+    canUndo: false,
+    isError: false,
+    kind: "recurring"
+  });
 }
 
 function validateRecurringForm(payload) {
@@ -1443,14 +1479,19 @@ function wireTransactionSelectionHeader() {
   });
 }
 
-function setTransactionUndoState({ message = "", canUndo = false, isError = false } = {}) {
+function setTransactionUndoState({ message = "", canUndo = false, isError = false, kind = "transaction" } = {}) {
   transactionUndoMessage = String(message || "").trim();
   transactionUndoAvailable = !!canUndo;
   transactionUndoError = !!isError;
+  transactionUndoKind = kind;
   syncTransactionUndoBar();
 }
 
 async function syncTransactionUndoAvailability({ preserveMessage = true } = {}) {
+  if (transactionUndoKind === "recurring" && transactionUndoAvailable) {
+    syncTransactionUndoBar();
+    return;
+  }
   try {
     const response = await apiFetch("/api/transactions/undo-delete-status");
     if (!response || !response.ok) {
@@ -1465,6 +1506,7 @@ async function syncTransactionUndoAvailability({ preserveMessage = true } = {}) 
       transactionUndoError = false;
     }
     transactionUndoAvailable = remainingUndoCount > 0;
+    transactionUndoKind = "transaction";
     syncTransactionUndoBar();
   } catch (_) {
     // Keep the local undo state if the status probe fails.
@@ -3782,7 +3824,11 @@ function initTransactionUndoBar() {
   undoButton?.addEventListener("click", async () => {
     undoButton.disabled = true;
     try {
-      await handleUndoArchivedTransaction();
+      if (transactionUndoKind === "recurring") {
+        await handleUndoDeletedRecurringTemplate();
+      } else {
+        await handleUndoArchivedTransaction();
+      }
     } finally {
       syncTransactionUndoBar();
     }
@@ -4006,6 +4052,14 @@ function initRecurringRowActionPopup() {
     closeRecurringRowActionPopup();
     if (templateId) {
       await toggleRecurringTemplateStatus(templateId, !template.active);
+    }
+  });
+
+  document.getElementById("recurringPopupDelete")?.addEventListener("click", async () => {
+    const templateId = _popupRecurringTemplateId;
+    closeRecurringRowActionPopup();
+    if (templateId) {
+      await deleteRecurringTemplate(templateId);
     }
   });
 

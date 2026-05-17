@@ -55,11 +55,12 @@ router.get("/", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     const result = await pool.query(
-      `SELECT id, business_id, account_id, category_id, amount, type, description, note,
-              cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
-              created_at, updated_at
+       `SELECT id, business_id, account_id, category_id, amount, type, description, note,
+               cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
+               created_at, updated_at
        FROM recurring_transactions
        WHERE business_id = $1
+         AND deleted_at IS NULL
        ORDER BY active DESC, next_run_date ASC, created_at DESC
        LIMIT 500`,
       [businessId]
@@ -113,10 +114,10 @@ router.post("/", async (req, res) => {
     await materializeTemplateRuns(businessId, result.rows[0].id, { client });
 
     const refreshed = await client.query(
-      `SELECT id, business_id, account_id, category_id, amount, type, description, note,
-              cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
-              created_at, updated_at
-       FROM recurring_transactions WHERE id = $1 AND business_id = $2 LIMIT 1`,
+       `SELECT id, business_id, account_id, category_id, amount, type, description, note,
+               cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
+               created_at, updated_at
+       FROM recurring_transactions WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1`,
       [result.rows[0].id, businessId]
     );
 
@@ -150,11 +151,11 @@ router.put("/:id", async (req, res) => {
     await client.query("BEGIN");
 
     const existing = await client.query(
-      `SELECT id, business_id, account_id, category_id, amount, type, description, note,
-              cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
-              created_at, updated_at
+       `SELECT id, business_id, account_id, category_id, amount, type, description, note,
+               cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
+               created_at, updated_at
        FROM recurring_transactions
-       WHERE id = $1 AND business_id = $2
+       WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL
        FOR UPDATE`,
       [req.params.id, businessId]
     );
@@ -182,7 +183,7 @@ router.put("/:id", async (req, res) => {
            cleared_default = $11,
            active = $12,
            updated_at = NOW()
-       WHERE id = $13 AND business_id = $14
+       WHERE id = $13 AND business_id = $14 AND deleted_at IS NULL
        RETURNING *`,
       [
         normalized.accountId,
@@ -239,9 +240,9 @@ router.patch("/:id/status", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
-      `UPDATE recurring_transactions
+       `UPDATE recurring_transactions
        SET active = $1, updated_at = NOW()
-       WHERE id = $2 AND business_id = $3
+       WHERE id = $2 AND business_id = $3 AND deleted_at IS NULL
        RETURNING *`,
       [req.body.active, req.params.id, businessId]
     );
@@ -276,10 +277,10 @@ router.post("/:id/run", async (req, res) => {
     }
 
     const template = await pool.query(
-      `SELECT id, business_id, account_id, category_id, amount, type, description, note,
-              cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
-              created_at, updated_at
-       FROM recurring_transactions WHERE id = $1 AND business_id = $2 LIMIT 1`,
+       `SELECT id, business_id, account_id, category_id, amount, type, description, note,
+               cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
+               created_at, updated_at
+       FROM recurring_transactions WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL LIMIT 1`,
       [req.params.id, businessId]
     );
     if (!template.rowCount) {
@@ -310,7 +311,10 @@ router.delete("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const result = await pool.query(
-      "DELETE FROM recurring_transactions WHERE id = $1 AND business_id = $2",
+      `UPDATE recurring_transactions
+       SET deleted_at = NOW(), updated_at = NOW()
+       WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL
+       RETURNING id, description`,
       [req.params.id, businessId]
     );
 
@@ -318,10 +322,45 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ error: "Recurring transaction not found." });
     }
 
-    res.json({ message: "Recurring transaction deleted." });
+    res.json({
+      message: "Recurring transaction deleted.",
+      recurring: result.rows[0]
+    });
   } catch (err) {
     logError("DELETE /recurring/:id error:", err);
     res.status(500).json({ error: "Failed to delete recurring transaction." });
+  }
+});
+
+router.post("/undo-delete", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const result = await pool.query(
+      `WITH latest_deleted AS (
+         SELECT id
+         FROM recurring_transactions
+         WHERE business_id = $1 AND deleted_at IS NOT NULL
+         ORDER BY deleted_at DESC, updated_at DESC, created_at DESC
+         LIMIT 1
+       )
+       UPDATE recurring_transactions
+       SET deleted_at = NULL, updated_at = NOW()
+       WHERE id IN (SELECT id FROM latest_deleted)
+       RETURNING *`,
+      [businessId]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ error: "No recurring transaction is available to restore." });
+    }
+
+    res.json({
+      message: "Recurring transaction restored.",
+      recurring: mapRecurringRow(result.rows[0])
+    });
+  } catch (err) {
+    logError("POST /recurring/undo-delete error:", err);
+    res.status(500).json({ error: "Failed to restore recurring transaction." });
   }
 });
 
@@ -371,8 +410,8 @@ router.get("/upcoming", async (req, res) => {
     const templatesResult = await pool.query(
       `SELECT id, description, cadence, next_run_date, end_date, account_id,
               category_id, type, amount, active
-         FROM recurring_transactions
-        WHERE business_id = $1 AND active = true
+        FROM recurring_transactions
+        WHERE business_id = $1 AND active = true AND deleted_at IS NULL
         ORDER BY next_run_date ASC`,
       [businessId]
     );

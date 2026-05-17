@@ -172,11 +172,12 @@ function mapRecurringRow(row) {
 
 async function processDueRecurringTransactions(businessId) {
   const dueTemplates = await pool.query(
-    `SELECT id, business_id, account_id, category_id, amount, type, description, note,
-            cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
-            created_at, updated_at
+     `SELECT id, business_id, account_id, category_id, amount, type, description, note,
+             cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
+             created_at, updated_at
      FROM recurring_transactions
      WHERE business_id = $1
+       AND deleted_at IS NULL
        AND active = TRUE
        AND next_run_date <= CURRENT_DATE
        AND (end_date IS NULL OR next_run_date <= end_date)
@@ -203,7 +204,7 @@ async function materializeTemplateRuns(businessId, templateId, options = {}) {
               cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
               created_at, updated_at
        FROM recurring_transactions
-       WHERE id = $1 AND business_id = $2
+       WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL
        FOR UPDATE`,
       [templateId, businessId]
     );
@@ -345,7 +346,7 @@ async function materializeNextTemplateRun(businessId, templateId) {
               cadence, start_date, next_run_date, end_date, last_run_date, cleared_default, active,
               created_at, updated_at
        FROM recurring_transactions
-       WHERE id = $1 AND business_id = $2
+       WHERE id = $1 AND business_id = $2 AND deleted_at IS NULL
        FOR UPDATE`,
       [templateId, businessId]
     );

@@ -112,6 +112,33 @@ function loadRecurringRouter(options = {}) {
           async query() {
             state.dbTouched = true;
             state.queries.push(arguments[0]);
+            const sql = String(arguments[0] || "");
+            if (/WITH latest_deleted/i.test(sql)) {
+              return {
+                rowCount: 1,
+                rows: [
+                  {
+                    id: "00000000-0000-4000-8000-000000000799",
+                    business_id: "00000000-0000-4000-8000-000000000712",
+                    account_id: "00000000-0000-4000-8000-000000000713",
+                    category_id: "00000000-0000-4000-8000-000000000714",
+                    amount: 1,
+                    type: "expense",
+                    description: "Rent",
+                    note: null,
+                    cadence: "monthly",
+                    start_date: "2026-05-01",
+                    next_run_date: "2026-05-01",
+                    end_date: null,
+                    last_run_date: null,
+                    cleared_default: false,
+                    active: true,
+                    created_at: "2026-05-01T00:00:00.000Z",
+                    updated_at: "2026-05-01T00:00:00.000Z"
+                  }
+                ]
+              };
+            }
             return { rowCount: 0, rows: [] };
           },
           async connect() {
@@ -230,6 +257,21 @@ test("recurring DELETE rejects invalid ids before touching the database", async 
     assert.equal(response.status, 400);
     assert.match(response.body.error, /invalid recurring transaction id/i);
     assert.equal(fixture.state.dbTouched, false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("recurring undo-delete restores the latest deleted template", async () => {
+  const fixture = loadRecurringRouter();
+  try {
+    const response = await request(fixture.app)
+      .post("/api/recurring/undo-delete")
+      .send({});
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.message, "Recurring transaction restored.");
+    assert.match(String(fixture.state.queries.find((sql) => /WITH latest_deleted/i.test(String(sql))) || ""), /UPDATE recurring_transactions/i);
   } finally {
     fixture.cleanup();
   }
