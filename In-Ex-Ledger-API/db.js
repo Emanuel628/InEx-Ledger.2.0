@@ -104,6 +104,12 @@ const pool = new Pool({
 });
 
 const MIGRATION_CHECKSUM_COMPATIBILITY = {
+  "007_add_marketing_email_opt_in.sql": new Set([
+    // Original ALTER TABLE form, before conversion to a no-op in favour of 026_create_user_privacy_settings.sql
+    crypto.createHash('sha256').update(
+      'ALTER TABLE user_privacy_settings\nADD COLUMN IF NOT EXISTS marketing_email_opt_in BOOLEAN NOT NULL DEFAULT FALSE;'
+    ).digest('hex')
+  ]),
   "20260419_create_billable_expenses_table.sql": new Set([
     // Historical applied form with inline projects FK.
     "d25041a060a490bb68b9d783adeeb87f6a72ec0aae4858e8f80369c264e639dc",
