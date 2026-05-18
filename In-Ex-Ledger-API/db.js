@@ -111,6 +111,13 @@ const MIGRATION_CHECKSUM_COMPATIBILITY = {
   "97cf7d6d00a2eb548dcc980aac87854f9b19ef9ac11fdd472fea0cb6fe79211c"
 ]),
 
+  "026_create_user_privacy_settings.sql": new Set([
+    // Original CREATE TABLE form before marketing_email_opt_in was added.
+    "fbe614f6d662a8f42f838df1427433989055563054c5955f89903d3b7a0d80f1",
+    // Original CREATE TABLE form with trailing newline.
+    "29c81dfe38bff05b839bf684049ae91ca4fcce75ed5b97a20170156030425bc"
+  ]),
+
 "026_create_user_privacy_settings.sql": new Set([
   // Original CREATE TABLE form without marketing_email_opt_in.
   "d2135ef1cff3a1c9cb129f5d2dba1da4b52cd0c0"
