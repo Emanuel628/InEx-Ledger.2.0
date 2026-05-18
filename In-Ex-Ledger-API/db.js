@@ -104,24 +104,20 @@ const pool = new Pool({
 });
 
 const MIGRATION_CHECKSUM_COMPATIBILITY = {
+  const MIGRATION_CHECKSUM_COMPATIBILITY = {
   "007_add_marketing_email_opt_in.sql": new Set([
-  // Original ALTER TABLE form without trailing newline.
-  "844cb9c4570b648c7cd6f605feea9f9cab94f8065cbee9f319c924c389dc8a48",
-  // Original ALTER TABLE form with trailing newline.
-  "97cf7d6d00a2eb548dcc980aac87854f9b19ef9ac11fdd472fea0cb6fe79211c"
-]),
-
-  "026_create_user_privacy_settings.sql": new Set([
-    // Original CREATE TABLE form before marketing_email_opt_in was added.
-    "fbe614f6d662a8f42f838df1427433989055563054c5955f89903d3b7a0d80f1",
-    // Original CREATE TABLE form with trailing newline.
-    "29c81dfe38bff05b839bf684049ae91ca4fcce75ed5b97a20170156030425bc"
+    // Original ALTER TABLE form without trailing newline.
+    "844cb9c4570b648c7cd6f605feea9f9cab94f8065cbee9f319c924c389dc8a48",
+    // Original ALTER TABLE form with trailing newline.
+    "97cf7d6d00a2eb548dcc980aac87854f9b19ef9ac11fdd472fea0cb6fe79211c"
   ]),
 
-"026_create_user_privacy_settings.sql": new Set([
-  // Original CREATE TABLE form without marketing_email_opt_in.
-  "d2135ef1cff3a1c9cb129f5d2dba1da4b52cd0c0"
-]),
+  "026_create_user_privacy_settings.sql": new Set([
+    // Original CREATE TABLE form before marketing_email_opt_in was added, without trailing newline.
+    "fbe614f6d662a8f42f838df1427433989055563054c5955f89903d3b7a0d80f1",
+    // Original CREATE TABLE form before marketing_email_opt_in was added, with trailing newline.
+    "29c81dfe38bff05b839bf684049ae91ca4fcce75ed5b97a20170156030425bcf"
+  ]),
 
   "20260419_create_billable_expenses_table.sql": new Set([
     // Historical applied form with inline projects FK.
@@ -130,6 +126,8 @@ const MIGRATION_CHECKSUM_COMPATIBILITY = {
     "fb3d6f923d83707347a58d95dd7b9e6557b98c903fd1d1d060af81088986eebf"
   ])
 };
+  
+  
 const HISTORICAL_MIGRATION_FILENAME_ALIASES = {
   "026_fix_exports_schema.sql": new Set([
     "20260510_fix_exports_schema.sql"
