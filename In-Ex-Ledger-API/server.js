@@ -297,7 +297,7 @@ for (const [legacyPath, nextPath] of LEGACY_HTML_REDIRECTS.entries()) {
 
 app.use((req, res, next) => {
   if (isBlockedV2PageRequest(req.path)) {
-    return res.status(404).send('Not Found');
+    return res.redirect(302, '/settings?feature=v2-business');
   }
   next();
 });
