@@ -418,7 +418,34 @@ logInfo('MOUNTED: /api (Core Routes)');
    ========================================================= */
 
 app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  return res.status(404).send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Page not found | InEx Ledger</title>
+  <link rel="stylesheet" href="/css/app.css?v=20260508a" />
+</head>
+<body>
+  <main class="auth-page">
+    <section class="auth-card">
+      <p class="eyebrow">404</p>
+      <h1>Page not found</h1>
+      <p>The page you’re looking for doesn’t exist or may have moved.</p>
+      <div class="auth-actions">
+        <a class="button button-primary" href="/">Go home</a>
+        <a class="button button-secondary" href="/login">Sign in</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
+  `);
 });
 
 // eslint-disable-next-line no-unused-vars
