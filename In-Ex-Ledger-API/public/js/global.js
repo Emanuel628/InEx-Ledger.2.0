@@ -1762,12 +1762,17 @@ window.LUNA_TAX = {
     // Persist to DB for compliance audit trail (best-effort, fire-and-forget)
     try {
       var headers = { 'Content-Type': 'application/json' };
+      if (typeof csrfHeader === 'function') {
+        Object.assign(headers, csrfHeader('POST'));
+      }
+      
       if (typeof getToken === 'function') {
         var token = getToken();
         if (token) {
           headers.Authorization = 'Bearer ' + token;
         }
       }
+      
       window.fetch('/api/consent/cookie', {
         method: 'POST',
         credentials: 'include',
