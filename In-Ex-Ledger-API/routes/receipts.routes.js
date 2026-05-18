@@ -191,7 +191,8 @@ router.get("/", async (req, res) => {
         r.storage_path,
         r.uploaded_at,
         r.uploaded_at AS created_at,
-        r.file_hash
+        r.file_hash,
+        r.file_bytes
       FROM receipts r
       JOIN businesses b ON b.id = r.business_id
       WHERE r.business_id = ANY($1::uuid[])
