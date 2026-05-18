@@ -3912,4 +3912,51 @@ tr.tx-highlight {
     width: 100% !important;
     max-width: 100% !important;
   }
+  
+  @media (max-width: 768px) {
+  .transactions-page .stats-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .transactions-page .stat-value {
+    font-size: clamp(1.45rem, 6vw, 1.9rem);
+  }
+}
+
+@media (max-width: 520px) {
+  .transactions-page .stats-row {
+    grid-template-columns: 1fr;
+  }
+}
+}
+
+/* Prevent KPI currency values from breaking across lines */
+.transactions-page .stats-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.transactions-page .stat-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.transactions-page .stat-card-copy {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.transactions-page .stat-value {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  line-height: 1.02;
+  font-size: clamp(1.7rem, 2.35vw, 2.2rem);
+  letter-spacing: -0.04em;
+}
+
+.transactions-page .stat-label,
+.transactions-page .stat-delta {
+  white-space: nowrap;
 }
