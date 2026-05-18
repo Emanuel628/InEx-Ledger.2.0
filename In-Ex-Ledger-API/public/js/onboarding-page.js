@@ -63,10 +63,43 @@ function hydrateOnboardingDefaults(profile = {}) {
   if (elStarterAccountType) {
     elStarterAccountType.value = onboardingData.starter_account_type || "checking";
   }
-  const elStarterAccountName = document.getElementById("onboardingStarterAccountName");
+  
+    const elStarterAccountName = document.getElementById("onboardingStarterAccountName");
   if (elStarterAccountName) {
     elStarterAccountName.value = onboardingData.starter_account_name || "";
   }
+
+  const elBusinessActivityCode = document.getElementById("onboardingBusinessActivityCode");
+  if (elBusinessActivityCode) {
+    elBusinessActivityCode.value =
+      onboardingData.business_activity_code ||
+      business.business_activity_code ||
+      "";
+  }
+
+  const elAccountingMethod = document.getElementById("onboardingAccountingMethod");
+  if (elAccountingMethod) {
+    elAccountingMethod.value =
+      onboardingData.accounting_method ||
+      business.accounting_method ||
+      "cash";
+  }
+
+  const elMaterialParticipation = document.getElementById("onboardingMaterialParticipation");
+  if (elMaterialParticipation) {
+    elMaterialParticipation.value =
+      onboardingData.material_participation ||
+      (business.material_participation === false ? "no" : "yes");
+  }
+
+  const elBusinessAddress = document.getElementById("onboardingBusinessAddress");
+  if (elBusinessAddress) {
+    elBusinessAddress.value =
+      onboardingData.address ||
+      business.address ||
+      "";
+  }
+
   syncStarterAccountName();
   updateOnboardingPlanPreview();
 
@@ -85,13 +118,17 @@ async function handleOnboardingSubmit(event) {
     localStorage.getItem("lb_language") ||
     "en";
 
-  const payload = {
+    const payload = {
     business_name: document.getElementById("onboardingBusinessName")?.value.trim() || "",
     business_type: resolveOnboardingBusinessType(),
     starter_account_type: document.getElementById("onboardingStarterAccountType")?.value || "checking",
     starter_account_name: document.getElementById("onboardingStarterAccountName")?.value.trim() || "",
     region: document.getElementById("onboardingRegion")?.value || "US",
     province: document.getElementById("onboardingProvince")?.value || "",
+    business_activity_code: document.getElementById("onboardingBusinessActivityCode")?.value.trim() || "",
+    accounting_method: document.getElementById("onboardingAccountingMethod")?.value || "cash",
+    material_participation: document.getElementById("onboardingMaterialParticipation")?.value || "yes",
+    address: document.getElementById("onboardingBusinessAddress")?.value.trim() || "",
     language: savedLanguage
   };
 
@@ -102,8 +139,25 @@ async function handleOnboardingSubmit(event) {
     setOnboardingMessage(tx("onboarding_error_province"));
     return;
   }
-  if (!payload.starter_account_name) {
+  
+    if (!payload.starter_account_name) {
     setOnboardingMessage(tx("onboarding_error_account_name"));
+    return;
+  }
+  if (!payload.business_activity_code) {
+    setOnboardingMessage("Business activity code is required for PDF exports.");
+    return;
+  }
+  if (!payload.accounting_method) {
+    setOnboardingMessage("Accounting method is required for PDF exports.");
+    return;
+  }
+  if (!payload.material_participation) {
+    setOnboardingMessage("Business activity status is required for PDF exports.");
+    return;
+  }
+  if (!payload.address) {
+    setOnboardingMessage("Business address is required for PDF exports.");
     return;
   }
 
