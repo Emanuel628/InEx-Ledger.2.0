@@ -104,7 +104,6 @@ const pool = new Pool({
 });
 
 const MIGRATION_CHECKSUM_COMPATIBILITY = {
-  const MIGRATION_CHECKSUM_COMPATIBILITY = {
   "007_add_marketing_email_opt_in.sql": new Set([
     // Original ALTER TABLE form without trailing newline.
     "844cb9c4570b648c7cd6f605feea9f9cab94f8065cbee9f319c924c389dc8a48",
