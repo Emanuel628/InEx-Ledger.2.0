@@ -211,11 +211,12 @@ router.put("/", async (req, res) => {
     ? normalizeOptionalTrimmedString(fiscal_year_start)
     : current.fiscal_year_start;
     
+    const body = req.body ?? {};
+    
     if (resolvedRegion === "CA" && !resolvedFiscalYearStart) {
       return res.status(400).json({ error: "fiscal_year_start is required for Canadian businesses." });
     }
 
-    const body = req.body ?? {};
     const resolvedBusinessType = 'business_type' in body
       ? normalizeOptionalTrimmedString(business_type)
       : current.business_type;
