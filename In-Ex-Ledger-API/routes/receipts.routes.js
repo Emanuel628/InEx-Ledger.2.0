@@ -192,7 +192,7 @@ router.get("/", async (req, res) => {
         r.uploaded_at,
         r.uploaded_at AS created_at,
         r.file_hash,
-        r.file_bytes
+        (r.file_bytes IS NOT NULL) AS has_file_bytes
       FROM receipts r
       JOIN businesses b ON b.id = r.business_id
       WHERE r.business_id = ANY($1::uuid[])
@@ -202,11 +202,21 @@ router.get("/", async (req, res) => {
     const result = await pool.query(sql, [scope.businessIds]);
 
     const rows = (result.rows || []).map((row) => {
-      const resolvedStoragePath = resolveReceiptFilePath(row.storage_path);
-      return {
-        ...row,
-        is_viewable: !!resolvedStoragePath || !!row.file_bytes
-      };
+    const resolvedStoragePath = resolveReceiptFilePath(row.storage_path);
+    return {
+      id: row.id,
+      business_id: row.business_id,
+      business_name: row.business_name,
+      transaction_id: row.transaction_id,
+      filename: row.filename,
+      mime_type: row.mime_type,
+      storage_path: row.storage_path,
+      uploaded_at: row.uploaded_at,
+      created_at: row.created_at,
+      file_hash: row.file_hash,
+      has_file_bytes: !!row.has_file_bytes,
+      is_viewable: !!resolvedStoragePath || !!row.has_file_bytes
+    };
     });
 
     res.setHeader("Cache-Control", "private, no-store, must-revalidate");
