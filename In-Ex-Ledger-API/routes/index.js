@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const arApService = require('../services/arApService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
+const { logWarn } = require('../utils/logger.js');
 const { resolveBusinessIdForUser } = require('../api/utils/resolveBusinessIdForUser.js');
 const { getSubscriptionSnapshotForBusiness, PLAN_PRO, PLAN_BUSINESS } = require('../services/subscriptionService.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled.js');
@@ -35,7 +36,8 @@ router.use('/recurring', requireAuth, async (req, res, next) => {
       return res.json([]);
     }
     return next();
-  } catch (_) {
+  } catch (err) {
+    logWarn('Recurring preload failed:', err?.message || err);
     return res.status(503).json({ error: 'Failed to load recurring preview.' });
   }
 });
