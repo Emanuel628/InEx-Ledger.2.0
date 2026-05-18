@@ -1109,6 +1109,29 @@ body {
   font-weight: 500;
 }
 
+.settings-save-bar .settings-primary-btn {
+  background: #2f80d0;
+  color: #ffffff;
+  border: 0;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.settings-save-bar .settings-primary-btn:hover,
+.settings-save-bar .settings-primary-btn:focus,
+.settings-save-bar .settings-primary-btn:focus-visible,
+.settings-save-bar .settings-primary-btn:active {
+  background: #2f80d0;
+  color: #ffffff;
+  box-shadow: none;
+  outline: none;
+}
+
+.settings-save-bar .settings-primary-btn:active {
+  transform: translateY(0);
+}
+
 .settings-row {
   display: flex;
   align-items: center;
