@@ -1576,15 +1576,17 @@ function buildCpaChecklistPage(opts) {
   ];
   let y = header.contentStartY - 4;
   items.forEach((item) => {
+  items.forEach((item) => {
   const badgeVariant = item.badge === "ACTION" ? "warning" : item.badge === "OK" ? "success" : "neutral";
+
   canvas.drawCard(40, y, 532, 86, item.title, [item.description], { maxChars: 90 });
 
-  // Place status badge below the title line so it does not overlap card headings.
-  canvas.drawBadge(52, y - 38, item.badge, badgeVariant);
-  
+  // Keep status badge in the card header, right-aligned, away from title/description text.
+  const badgeWidth = Math.max(44, String(item.badge || "").length * 5.6 + 12);
+  canvas.drawBadge(560 - badgeWidth, y - 18, item.badge, badgeVariant);
+
   y -= 98;
-  
-  });
+});
   return [canvas];
 }
 
