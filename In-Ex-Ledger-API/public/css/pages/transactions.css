@@ -922,12 +922,18 @@ body {
   margin-bottom: 6px;
 }
 
-/*.stat-value {
-  font-size: 22px;
+.stat-value {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  line-height: 1.02;
+  font-size: clamp(18px, 2vw, 22px);
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
   color: var(--ink);
-}---*/
+}
 
 .stat-value-income {
   color: var(--green);
