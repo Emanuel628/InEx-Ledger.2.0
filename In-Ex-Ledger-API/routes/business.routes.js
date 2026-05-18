@@ -206,6 +206,14 @@ router.put("/", async (req, res) => {
     if (resolvedRegion === "CA" && !resolvedProvince) {
       return res.status(400).json({ error: "Province is required for Canadian businesses." });
     }
+    
+    const resolvedFiscalYearStart = 'fiscal_year_start' in body
+    ? normalizeOptionalTrimmedString(fiscal_year_start)
+    : current.fiscal_year_start;
+    
+    if (resolvedRegion === "CA" && !resolvedFiscalYearStart) {
+      return res.status(400).json({ error: "fiscal_year_start is required for Canadian businesses." });
+    }
 
     const body = req.body ?? {};
     const resolvedBusinessType = 'business_type' in body
@@ -220,11 +228,24 @@ router.put("/", async (req, res) => {
       ? normalizeOptionalTrimmedString(business_activity_code)
       : current.business_activity_code;
     const resolvedAccountingMethod = 'accounting_method' in body
-      ? normalizeOptionalTrimmedString(accounting_method)
-      : current.accounting_method;
+    ? normalizeOptionalTrimmedString(String(accounting_method || "").toLowerCase())
+    : current.accounting_method;
+
     const resolvedMaterialParticipation = 'material_participation' in body
-      ? material_participation
-      : current.material_participation;
+     ? material_participation
+     : current.material_participation;
+    
+    if (!resolvedAccountingMethod) {
+      return res.status(400).json({ error: "accounting_method is required." })
+    }
+    
+    if (!VALID_ACCOUNTING_METHODS.has(resolvedAccountingMethod)) {
+       return res.status(400).json({ error: "accounting_method must be 'cash' or 'accrual'" })
+    }
+    
+    if (resolvedRegion === "US" && typeof resolvedMaterialParticipation !== "boolean") {
+      return res.status(400).json({ error: "material_participation is required for US businesses." });
+    }
     const resolvedGstHstRegistered = 'gst_hst_registered' in body
       ? gst_hst_registered
       : Boolean(current.gst_hst_registered);
@@ -239,7 +260,7 @@ router.put("/", async (req, res) => {
       name,
       region: resolvedRegion,
       language,
-      fiscal_year_start,
+      fiscal_year_start: resolvedFiscalYearStart,
       province: resolvedProvince,
       business_type: resolvedBusinessType,
       tax_id: resolvedTaxId,
