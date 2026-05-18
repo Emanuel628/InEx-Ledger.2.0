@@ -150,7 +150,11 @@ async function handleRegisterSubmit(event) {
     }
 
     persistLanguage();
-    await persistConsent();
+    try {
+      await persistConsent();
+    } catch (consentErr) {
+       console.warn("Post-registration privacy settings save skipped:", consentErr)
+    }
     const verificationState = String(regBody?.verification_state || "").trim();
     setTransientSignupValue(VERIFICATION_STATE_KEY, verificationState);
     const signupBootstrapToken = String(regBody?.signup_bootstrap_token || "").trim();
