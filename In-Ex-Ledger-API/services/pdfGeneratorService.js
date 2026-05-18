@@ -1576,10 +1576,14 @@ function buildCpaChecklistPage(opts) {
   ];
   let y = header.contentStartY - 4;
   items.forEach((item) => {
-    const badgeVariant = item.badge === "ACTION" ? "warning" : item.badge === "OK" ? "success" : "neutral";
-    canvas.drawCard(40, y, 532, 86, item.title, [item.description], { maxChars: 90 });
-    canvas.drawBadge(52, y - 20, item.badge, badgeVariant);
-    y -= 98;
+  const badgeVariant = item.badge === "ACTION" ? "warning" : item.badge === "OK" ? "success" : "neutral";
+  canvas.drawCard(40, y, 532, 86, item.title, [item.description], { maxChars: 90 });
+
+  // Place status badge below the title line so it does not overlap card headings.
+  canvas.drawBadge(52, y - 38, item.badge, badgeVariant);
+  
+  y -= 98;
+  
   });
   return [canvas];
 }
