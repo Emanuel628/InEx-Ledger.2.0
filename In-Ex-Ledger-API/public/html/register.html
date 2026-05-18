@@ -83,7 +83,7 @@
           <p class="register-intro">One email, one password. You'll confirm before setup begins.</p>
         </div>
 
-        <form id="registerForm" class="auth-form register-form">
+        <form id="registerForm" class="auth-form register-form" method="post" action="/api/auth/register" onsubmit="return false;">
           <div class="form-field">
             <label for="email" data-i18n="register_email_label">Email address</label>
             <input type="email" id="email" name="email" required autocomplete="email" />
