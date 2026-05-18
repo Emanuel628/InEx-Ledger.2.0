@@ -922,12 +922,12 @@ body {
   margin-bottom: 6px;
 }
 
-.stat-value {
+/*.stat-value {
   font-size: 22px;
   font-weight: 500;
   letter-spacing: -0.02em;
   color: var(--ink);
-}
+}---*/
 
 .stat-value-income {
   color: var(--green);
