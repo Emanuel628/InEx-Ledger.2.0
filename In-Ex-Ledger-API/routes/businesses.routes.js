@@ -475,9 +475,6 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
   if (resolvedRegion === "CA" && !resolvedProvince) {
     return { error: "Province is required for Canadian businesses." };
   }
-  if (accounting_method && !VALID_ACCOUNTING_METHODS.has(String(accounting_method).trim().toLowerCase())) {
-    return { error: "accounting_method must be 'cash' or 'accrual'" };
-  }
   if (gst_hst_method && !VALID_GST_HST_METHODS.has(String(gst_hst_method).trim().toLowerCase())) {
     return { error: "gst_hst_method must be 'regular' or 'quick'" };
   }
@@ -486,6 +483,32 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
   }
   if (Object.prototype.hasOwnProperty.call(payload, "gst_hst_registered") && typeof gst_hst_registered !== "boolean") {
     return { error: "gst_hst_registered must be a boolean" };
+  }
+  
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(payload, key);
+
+  const resolvedAccountingMethod = hasOwn("accounting_method")
+  ? normalizeOptionalTrimmedString(String(accounting_method || "").toLowerCase())
+  : current.accounting_method;
+
+  const resolvedMaterialParticipation = hasOwn("material_participation")
+  ? material_participation
+  : current.material_participation;
+  
+  if (!resolvedAccountingMethod) {
+    return { error: "accounting_method is required." };
+  }
+  
+  if (!VALID_ACCOUNTING_METHODS.has(resolvedAccountingMethod)) {
+    return { error: "accounting_method must be 'cash' or 'accrual'" };
+  }
+  
+  if (resolvedRegion === "US" && typeof resolvedMaterialParticipation !== "boolean") {
+    return { error: "material_participation is required for US businesses." }
+  }
+  
+  if (resolvedRegion === "CA" && !normalizedFiscalYear.value) {
+    return { error: "fiscal_year_start is required for Canadian businesses." };
   }
 
   const normalizedTaxId = Object.prototype.hasOwnProperty.call(payload, "tax_id")
@@ -539,12 +562,8 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
       Object.prototype.hasOwnProperty.call(payload, "business_activity_code")
         ? normalizeOptionalTrimmedString(business_activity_code)
         : current.business_activity_code,
-      Object.prototype.hasOwnProperty.call(payload, "accounting_method")
-        ? normalizeOptionalTrimmedString(String(accounting_method || "").toLowerCase())
-        : current.accounting_method,
-      Object.prototype.hasOwnProperty.call(payload, "material_participation")
-        ? material_participation
-        : current.material_participation,
+      resolvedAccountingMethod,
+      resolvedMaterialParticipation,
       resolvedRegion === "CA" ? resolvedGstRegistered : false,
       resolvedRegion === "CA" && resolvedGstRegistered
         ? normalizeOptionalTrimmedString(gst_hst_number)
