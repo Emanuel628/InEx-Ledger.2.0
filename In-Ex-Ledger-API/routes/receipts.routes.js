@@ -189,12 +189,13 @@ router.get("/", async (req, res) => {
         r.filename,
         r.mime_type,
         r.storage_path,
-        r.created_at,
+        r.uploaded_at,
+        r.uploaded_at AS created_at,
         r.file_hash
       FROM receipts r
       JOIN businesses b ON b.id = r.business_id
       WHERE r.business_id = ANY($1::uuid[])
-      ORDER BY b.name ASC, r.created_at DESC NULLS LAST
+      ORDER BY b.name ASC, r.uploaded_at DESC NULLS LAST
       LIMIT 500
     `;
     const result = await pool.query(sql, [scope.businessIds]);

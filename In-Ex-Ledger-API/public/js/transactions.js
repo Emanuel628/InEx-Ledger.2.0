@@ -3704,7 +3704,7 @@ function initCsvImport() {
     document.getElementById("csvImportStep2").hidden = true;
     document.getElementById("csvImportError").hidden = true;
     document.getElementById("csvImportFile").value = "";
-    if (startDateInput) startDateInput.value = todayIsoDate();
+    if (startDateInput) startDateInput.value = "";
     if (endDateInput) endDateInput.value = "";
     modal.classList.remove("hidden");
     modal.focus();

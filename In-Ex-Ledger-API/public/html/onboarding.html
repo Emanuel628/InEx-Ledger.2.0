@@ -96,6 +96,44 @@
             </select>
           </div>
 
+          <div class="form-field">
+            <label for="onboardingBusinessActivityCode">Business activity code</label>
+            <input
+              type="text"
+              id="onboardingBusinessActivityCode"
+              autocomplete="off"
+              placeholder="NAICS / business activity code"
+              required
+            />
+          </div>
+
+          <div class="form-field">
+            <label for="onboardingAccountingMethod">Accounting method</label>
+            <select id="onboardingAccountingMethod" required>
+              <option value="cash">Cash</option>
+              <option value="accrual">Accrual</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label for="onboardingMaterialParticipation">Are you active in this business?</label>
+            <select id="onboardingMaterialParticipation" required>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+
+          <div class="form-field form-field-full">
+            <label for="onboardingBusinessAddress">Business address</label>
+            <textarea
+              id="onboardingBusinessAddress"
+              rows="3"
+              autocomplete="street-address"
+              placeholder="Street, city, state/province, ZIP/postal code, country"
+              required
+            ></textarea>
+          </div>
+
         </div>
 
         <p id="onboardingMessage" class="auth-error" role="alert" aria-live="polite" hidden></p>
@@ -106,12 +144,13 @@
       </form>
     </section>
   </main>
-
   <script src="../js/escape-html.js?v=20260410a"></script>
   <script src="../js/global.js?v=20260510c"></script>
   <script src="../js/i18n.js?v=20260510c"></script>
   <script src="../js/auth.js?v=20260518a"></script>
   <script src="../js/onboarding-page.js?v=20260516a"></script>
+  <script src="../js/auth.js?v=20260516a"></script>
+  <script src="../js/onboarding-page.js?v=20260518a"></script>
 </body>
 </html>
 
