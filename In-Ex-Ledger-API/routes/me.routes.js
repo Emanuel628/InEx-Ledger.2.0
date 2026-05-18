@@ -37,9 +37,14 @@ const LEGACY_CPA_AUDIT_USER_CONSTRAINTS = [
   "cpa_audit_logs_owner_user_id_fkey",
   "cpa_audit_logs_actor_user_id_fkey"
 ];
+
 const MAX_BUSINESS_NAME_LENGTH = 200;
 const MAX_STARTER_ACCOUNT_NAME_LENGTH = 120;
 const MAX_PROFILE_NAME_LENGTH = 120;
+const MAX_BUSINESS_ACTIVITY_CODE_LENGTH = 50;
+const MAX_BUSINESS_ADDRESS_LENGTH = 500;
+const VALID_ACCOUNTING_METHODS = new Set(["cash", "accrual"]);
+const VALID_MATERIAL_PARTICIPATION = new Set(["yes", "no"]);
 
 function normalizeOptionalTrimmedString(value) {
   if (typeof value !== "string") {
@@ -264,6 +269,10 @@ router.put("/onboarding", async (req, res) => {
   const startFocus = String(req.body?.start_focus || "").trim().toLowerCase();
   const region = String(req.body?.region || "").trim().toUpperCase();
   const province = String(req.body?.province || "").trim().toUpperCase();
+  const businessActivityCode = String(req.body?.business_activity_code || "").trim();
+  const accountingMethod = String(req.body?.accounting_method || "").trim().toLowerCase();
+  const materialParticipation = String(req.body?.material_participation || "").trim().toLowerCase();
+  const businessAddress = String(req.body?.address || "").trim();
   const language = String(req.body?.language || "").trim();
 
   if (!businessName) {
@@ -287,8 +296,26 @@ router.put("/onboarding", async (req, res) => {
   if (startFocus && !VALID_START_FOCUS.has(startFocus)) {
     return res.status(400).json({ error: "Choose a valid starting workflow." });
   }
-  if (region === "CA" && !CA_PROVINCES.has(province)) {
+    if (region === "CA" && !CA_PROVINCES.has(province)) {
     return res.status(400).json({ error: "Choose a valid province." });
+  }
+  if (!businessActivityCode) {
+    return res.status(400).json({ error: "Business activity code is required for PDF exports." });
+  }
+  if (businessActivityCode.length > MAX_BUSINESS_ACTIVITY_CODE_LENGTH) {
+    return res.status(400).json({ error: `Business activity code must be ${MAX_BUSINESS_ACTIVITY_CODE_LENGTH} characters or fewer.` });
+  }
+  if (!VALID_ACCOUNTING_METHODS.has(accountingMethod)) {
+    return res.status(400).json({ error: "Choose a valid accounting method." });
+  }
+  if (!VALID_MATERIAL_PARTICIPATION.has(materialParticipation)) {
+    return res.status(400).json({ error: "Choose whether you are active in this business." });
+  }
+  if (!businessAddress) {
+    return res.status(400).json({ error: "Business address is required for PDF exports." });
+  }
+  if (businessAddress.length > MAX_BUSINESS_ADDRESS_LENGTH) {
+    return res.status(400).json({ error: `Business address must be ${MAX_BUSINESS_ADDRESS_LENGTH} characters or fewer.` });
   }
   if (starterAccountName?.error) {
     return res.status(400).json({ error: `Starter account name ${starterAccountName.error}` });
@@ -325,9 +352,24 @@ router.put("/onboarding", async (req, res) => {
                 province = CASE
                   WHEN $3 = 'CA' THEN $5
                   ELSE NULL
-                END
-          WHERE id = $6`,
-        [businessName, businessType, region, language, province || null, businessId]
+                END,
+                business_activity_code = $6,
+                accounting_method = $7,
+                material_participation = $8,
+                address = $9
+          WHERE id = $10`,
+        [
+          businessName,
+          businessType,
+          region,
+          language,
+          province || null,
+          businessActivityCode,
+          accountingMethod,
+          materialParticipation === "yes",
+          businessAddress,
+          businessId
+        ]
       );
 
       if (!alreadyCompleted) {
@@ -341,7 +383,7 @@ router.put("/onboarding", async (req, res) => {
           [crypto.randomUUID(), businessId, starterName, normalizedStarterAccountType]
         );
       }
-
+      
       const onboardingData = {
         business_name: businessName,
         business_type: businessType,
@@ -350,6 +392,10 @@ router.put("/onboarding", async (req, res) => {
         start_focus: normalizedStartFocus,
         region,
         province: region === "CA" ? province : "",
+        business_activity_code: businessActivityCode,
+        accounting_method: accountingMethod,
+        material_participation: materialParticipation,
+        address: businessAddress,
         language,
         recommended_categories: onboardingRecommendations.recommended_categories,
         setup_notes: onboardingRecommendations.setup_notes,
