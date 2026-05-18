@@ -70,11 +70,13 @@ Both runs were against a fresh local stack (Postgres 16, Node 22, `NODE_ENV=deve
 - `services/stripePriceConfig.js` actually reads `STRIPE_PRO_M_US`, `STRIPE_PRO_Y_US`, `STRIPE_ADDL_M_US`, ….
 - Result: anyone following `.env.example` literally cannot configure billing. `GET /api/billing/pricing` returns 500 (`"STRIPE_PRO_M_US is not configured"`) on `/pricing` and `/subscription` for everyone. Pricing page falls back to a hard-coded `$12/month` so it still renders, but no real price ever loads.
 
-### 6. `CSRF_SECRET` is required at runtime but missing from `.env.example`
-- `middleware/csrf.middleware.js:17` throws `Missing CSRF signing secret. Set CSRF_SECRET.` on the very first request.
-- Without it, every request returns HTTP 500, including `/health` — meaning a deploy following `.env.example` will fail the healthcheck and never serve traffic.
-- `services/envValidationService.js` does not fail-fast on this var.
-- Same issue (less severe) for `INBOUND_EMAIL_WEBHOOK_SECRET` and `INVOICE_REPLY_HMAC_SECRET` — both consumed in routes but absent from `.env.example`.
+### 6. `CSRF_SECRET` is required in dev but only validated in production
+- The variable itself is well-known: documented in `Docs/PROJECT-README.md:184`, `Docs/PRODUCTION-READINESS.md:18`, `Docs/BACKUP-RESTORE.md:21`, and listed in `services/envValidationService.js:22`.
+- However `envValidationService.collectRequiredEnvironmentVariables()` only adds it to the required list when `NODE_ENV === "production"`. In development the validator passes startup without it.
+- `middleware/csrf.middleware.js:17` then throws `Missing CSRF signing secret. Set CSRF_SECRET.` on the very first request, returning HTTP 500 for everything — including `/health`.
+- Net effect for a developer: server starts cleanly, `npm start` looks healthy, then every request 500s with no startup hint.
+- Same gap for `INBOUND_EMAIL_WEBHOOK_SECRET` and `INVOICE_REPLY_HMAC_SECRET`: required by routes/services at runtime but not in the validator's dev list, and not in `.env.example`.
+- Either add these to the dev required list in `envValidationService.js`, or include them with placeholder values in `.env.example`.
 
 ---
 
@@ -184,7 +186,7 @@ Both runs were against a fresh local stack (Postgres 16, Node 22, `NODE_ENV=deve
 3. Fix `routes/receipts.routes.js:192` `r.created_at` → `r.uploaded_at` (issue #3).
 4. Remove the silent `startDateInput.value = todayIsoDate()` default in the CSV import modal, or change the label to "Date range (defaults to today onward)" (issue #4).
 5. Reconcile Stripe env-var names between `.env.example` and `stripePriceConfig.js` (issue #5).
-6. Add `CSRF_SECRET` (and `INBOUND_EMAIL_WEBHOOK_SECRET`, `INVOICE_REPLY_HMAC_SECRET`) to `.env.example` and to `envValidationService.js` so missing values are caught at startup (issue #6).
+6. Move `CSRF_SECRET` (and `INBOUND_EMAIL_WEBHOOK_SECRET`, `INVOICE_REPLY_HMAC_SECRET`) out of the production-only block in `envValidationService.js` so dev startups also fail fast — or include them with placeholder values in `.env.example` (issue #6).
 7. Add Business activity code / address / Accounting method / Material participation to onboarding, or warn before letting the user click Export PDF (issue #7).
 8. Make `js/register.js` defer the `setPrivacySettings()` call until the auth cookie is observable, or accept the bearer just returned in the register response (issue #8).
 9. Either send the CSRF header from `js/global.js` consent calls, or move `POST /api/consent/cookie` to the CSRF-exempt list (issue #9).
