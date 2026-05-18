@@ -126,7 +126,18 @@ async function createVerificationToken(email) {
 }
 
 async function consumeVerificationToken(token) {
-  await pool.query("DELETE FROM verification_tokens WHERE expires_at <= NOW()");
+  await pool.query(`
+    WITH expired AS (
+      SELECT token
+      FROM verification_tokens
+      WHERE expires_at <= NOW()
+      ORDER BY expires_at ASC
+      LIMIT 500
+    )
+    DELETE FROM verification_tokens
+    WHERE token IN (SELECT token FROM expired)
+  `);
+
   const result = await pool.query(
     "DELETE FROM verification_tokens WHERE token = $1 AND expires_at > NOW() RETURNING email",
     [token]
