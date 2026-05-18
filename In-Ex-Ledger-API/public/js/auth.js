@@ -668,11 +668,17 @@ async function requireValidSessionOrRedirect() {
   window.__AUTH_GUARD_STATE__.running = true;
   window.__AUTH_GUARD_STATE__.count += 1;
 
-  const token = getToken();
-  if (!token) {
-    window.__AUTH_GUARD_STATE__.running = false;
-    window.location.href = LOGIN_PAGE;
-    return;
+    let token = getToken();
+    if (!token) {
+      const refreshed = await refreshAccessToken();
+      token = refreshed ? getToken() : "";
+
+    if (!token) {
+      window.__AUTH_GUARD_STATE__.running = false;
+      window.__AUTH_GUARD_STATE__.lastError = "expired";
+      window.location.href = `${LOGIN_PAGE}?reason=expired`;
+      return;
+    }
   }
 
   const loadProfile = async () => {
