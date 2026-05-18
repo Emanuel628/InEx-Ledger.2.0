@@ -1289,7 +1289,9 @@ router.post("/login", authLimiter, async (req, res) => {
     res.status(200).json(session);
   } catch (err) {
     logError("Login error:", err);
-    res.status(500).json({ error: "Login failed" });
+    res.status(503).json({
+      error: "Sign-in is temporarily unavailable. Please try again in a moment."
+    });
   }
 });
 
