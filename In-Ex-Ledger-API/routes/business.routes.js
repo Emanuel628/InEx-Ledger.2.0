@@ -207,11 +207,12 @@ router.put("/", async (req, res) => {
       return res.status(400).json({ error: "Province is required for Canadian businesses." });
     }
     
+    const body = req.body ?? {};
+    
     const resolvedFiscalYearStart = 'fiscal_year_start' in body
     ? normalizeOptionalTrimmedString(fiscal_year_start)
     : current.fiscal_year_start;
     
-    const body = req.body ?? {};
     
     if (resolvedRegion === "CA" && !resolvedFiscalYearStart) {
       return res.status(400).json({ error: "fiscal_year_start is required for Canadian businesses." });
