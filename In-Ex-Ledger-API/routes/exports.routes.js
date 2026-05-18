@@ -13,6 +13,7 @@ const { decryptJwe } = require("../services/jweDecryptService.js");
 const { decryptTaxId } = require("../services/taxIdService.js");
 const { buildPdfExport, buildPdfExportDocument, __private: pdfPrivate } = require("../services/pdfGeneratorService.js");
 const { buildNormalizedExportDataset } = require("../services/exportDatasetService.js");
+const { decrypt: decryptField } = require("../services/encryptionService.js");
 const { buildCsvBundle } = require("../services/csvExportService.js");
 const { pool } = require("../db.js");
 const { logError, logInfo } = require("../utils/logger.js");
@@ -137,7 +138,7 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
   const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult] =
     await Promise.all([
       pool.query(
-        `SELECT id, account_id, category_id, amount, type, description, date, note,
+        `SELECT id, account_id, category_id, amount, type, description, description_encrypted, date, note,
                 currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
                 indirect_tax_amount, indirect_tax_recoverable, personal_use_pct,
                 review_status, review_notes, payer_name, tax_form_type
@@ -183,7 +184,23 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
     ]);
 
   return {
-    transactions: txResult.rows,
+    transactions: txResult.rows.map((row) => {
+      let resolvedDescription = row.description;
+      if (row.description_encrypted) {
+        try {
+          resolvedDescription = decryptField(row.description_encrypted);
+        } catch (decryptErr) {
+          logError("Export: failed to decrypt description_encrypted for transaction", {
+            transactionId: row.id,
+            err: decryptErr.message
+          });
+          // Fall back to plaintext description (may be null)
+          resolvedDescription = row.description;
+        }
+      }
+      const { description_encrypted, ...rest } = row;
+      return { ...rest, description: resolvedDescription };
+    }),
     accounts: accountResult.rows,
     categories: categoryResult.rows,
     receipts: receiptResult.rows,
