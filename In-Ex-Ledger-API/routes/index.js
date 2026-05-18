@@ -38,7 +38,7 @@ router.use('/recurring', requireAuth, async (req, res, next) => {
     return next();
   } catch (err) {
     logWarn('Recurring preload failed:', err?.message || err);
-    return res.status(503).json({ error: 'Failed to load recurring preview.' });
+    return res.json([]);
   }
 });
 

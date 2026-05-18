@@ -125,7 +125,15 @@ async function createVerificationToken(email) {
   return { token, expiresAt };
 }
 
-async function consumeVerificationToken(token) {
+let lastVerificationTokenGcAt = 0;
+const VERIFICATION_TOKEN_GC_INTERVAL_MS = 60_000;
+
+async function pruneExpiredVerificationTokensIfNeeded(now = Date.now()) {
+  if (now - lastVerificationTokenGcAt < VERIFICATION_TOKEN_GC_INTERVAL_MS) {
+    return;
+  }
+
+  lastVerificationTokenGcAt = now;
   await pool.query(`
     WITH expired AS (
       SELECT token
@@ -137,12 +145,29 @@ async function consumeVerificationToken(token) {
     DELETE FROM verification_tokens
     WHERE token IN (SELECT token FROM expired)
   `);
+}
+
+async function consumeVerificationToken(token) {
+  await pruneExpiredVerificationTokensIfNeeded();
 
   const result = await pool.query(
     "DELETE FROM verification_tokens WHERE token = $1 AND expires_at > NOW() RETURNING email",
     [token]
   );
   return result.rows[0]?.email ?? null;
+}
+
+function isTransientLoginInfrastructureError(err) {
+  const code = String(err?.code || "").trim().toUpperCase();
+  return (
+    code.startsWith("08")
+    || code === "53"
+    || code === "57P01"
+    || code === "57P03"
+    || code === "ETIMEDOUT"
+    || code === "ECONNRESET"
+    || code === "ECONNREFUSED"
+  );
 }
 
 /* =========================================================
@@ -1289,9 +1314,13 @@ router.post("/login", authLimiter, async (req, res) => {
     res.status(200).json(session);
   } catch (err) {
     logError("Login error:", err);
-    res.status(503).json({
-      error: "Sign-in is temporarily unavailable. Please try again in a moment."
-    });
+    if (isTransientLoginInfrastructureError(err)) {
+      return res.status(503).json({
+        error: "Sign-in is temporarily unavailable. Please try again in a moment."
+      });
+    }
+
+    return res.status(500).json({ error: "Login failed" });
   }
 });
 

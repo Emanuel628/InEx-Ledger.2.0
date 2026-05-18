@@ -150,17 +150,18 @@ body {
   margin-top: 16px;
   font-size: 13px;
   font-weight: 800;
-  color: #dc2626 !important;
+  color: #dc2626;
   line-height: 1.4;
 }
 
 .auth-error.is-error {
-  color: #dc2626 !important;
+  color: #dc2626;
   font-weight: 800;
 }
 
 .auth-error.is-success {
   color: #1a7a4a;
+  font-weight: 700;
 }
 
 .auth-error[hidden] {

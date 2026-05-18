@@ -378,17 +378,17 @@ router.put("/onboarding", async (req, res) => {
         const existingAccounts = await client.query(
           "SELECT id FROM accounts WHERE business_id = $1 LIMIT 1",
           [businessId]
+        );
+
+        if (existingAccounts.rowCount === 0) {
+          await client.query(
+            `INSERT INTO accounts (id, business_id, name, type)
+            VALUES ($1, $2, $3, $4)`,
+            [crypto.randomUUID(), businessId, starterName, normalizedStarterAccountType]
           );
-          
-      if (existingAccounts.rowCount === 0) {
-        await client.query(
-          `INSERT INTO accounts (id, business_id, name, type)
-          VALUES ($1, $2, $3, $4)`,
-          [crypto.randomUUID(), businessId, starterName, normalizedStarterAccountType]
-          );
+        }
       }
-      }
-      
+
       const onboardingData = {
         business_name: businessName,
         business_type: businessType,
