@@ -72,10 +72,7 @@ function loadMeRouterFixture() {
                 if (/UPDATE businesses/i.test(sql)) {
                   return { rows: [], rowCount: 1 };
                 }
-                if (/DELETE FROM accounts WHERE business_id = \$1/i.test(sql)) {
-                  return { rows: [], rowCount: 3 };
-                }
-                if (/SELECT 1 FROM accounts WHERE business_id = \$1 LIMIT 1/i.test(sql)) {
+                if (/SELECT id FROM accounts WHERE business_id = \$1 LIMIT 1/i.test(sql)) {
                   return { rows: [], rowCount: 0 };
                 }
                 if (/INSERT INTO accounts/i.test(sql)) {
@@ -205,7 +202,7 @@ test("GET /api/me resolves business without account pre-seeding", async () => {
   }
 });
 
-test("PUT /api/me/onboarding replaces pre-seeded accounts before starter account insert", async () => {
+test("PUT /api/me/onboarding creates a starter account when the business has none", async () => {
   const fixture = loadMeRouterFixture();
   try {
     const app = buildApp(fixture.router);
@@ -218,7 +215,11 @@ test("PUT /api/me/onboarding replaces pre-seeded accounts before starter account
         language: "en",
         starter_account_type: "checking",
         starter_account_name: "Primary Checking",
-        start_focus: "transactions"
+        start_focus: "transactions",
+        business_activity_code: "541611",
+        accounting_method: "cash",
+        material_participation: "yes",
+        address: "123 Main St, Miami, FL 33101, USA"
       });
 
     assert.equal(response.status, 200);
@@ -226,12 +227,12 @@ test("PUT /api/me/onboarding replaces pre-seeded accounts before starter account
 
     const txSql = fixture.state.txQueries.map((entry) => entry.sql);
     const lockSql = txSql.find((sql) => /SELECT onboarding_completed FROM users WHERE id = \$1 FOR UPDATE/i.test(sql));
-    const deleteIdx = txSql.findIndex((sql) => /DELETE FROM accounts WHERE business_id = \$1/i.test(sql));
+    const existingIdx = txSql.findIndex((sql) => /SELECT id FROM accounts WHERE business_id = \$1 LIMIT 1/i.test(sql));
     const insertIdx = txSql.findIndex((sql) => /INSERT INTO accounts/i.test(sql));
     assert.ok(lockSql, "onboarding should lock the user row before mutating starter-account state");
-    assert.ok(deleteIdx !== -1, "onboarding should clear pre-seeded accounts");
+    assert.ok(existingIdx !== -1, "onboarding should check for an existing starter account before inserting");
     assert.ok(insertIdx !== -1, "onboarding should insert starter account");
-    assert.ok(deleteIdx < insertIdx, "account cleanup should happen before starter insert");
+    assert.ok(existingIdx < insertIdx, "account existence check should happen before starter insert");
     assert.equal(fixture.state.clientReleased, true);
   } finally {
     fixture.cleanup();
