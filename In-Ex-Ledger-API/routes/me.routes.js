@@ -175,7 +175,14 @@ function buildStarterAccountName(starterAccountType, region = "US") {
 }
 
 router.use(requireAuth);
-router.use(requireCsrfProtection);
+
+router.use((req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
+    return next();
+  }
+  return requireCsrfProtection(req, res, next);
+});
+
 router.use(createDataApiLimiter());
 
 router.get("/", async (req, res) => {
