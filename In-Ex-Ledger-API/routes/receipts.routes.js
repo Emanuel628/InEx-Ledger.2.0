@@ -166,42 +166,77 @@ async function moveFileIfExists(fromPath, toPath) {
   }
 }
 
-/* =========================================================
-   GET /receipts — List Receipts (Newest First)
-   ========================================================= */
+function getErrorDiagnostic(err) {
+  return {
+    name: err?.name || null,
+    message: err?.message || String(err || "Unknown error"),
+    code: err?.code || null,
+    severity: err?.severity || null,
+    detail: err?.detail || null,
+    hint: err?.hint || null,
+    table: err?.table || null,
+    column: err?.column || null,
+    constraint: err?.constraint || null,
+    routine: err?.routine || null
+  };
+}
 
-router.get("/", async (req, res) => {
-  try {
-    const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
+function isRecoverableReceiptSchemaError(err) {
+  const message = String(err?.message || "").toLowerCase();
+  return err?.code === "42703" || /column\s+.*\s+does not exist/.test(message);
+}
 
-    if (!scope.businessIds.length) {
-      return res.status(400).json({
-        error: "Missing business context"
-      });
-    }
+async function ensureReceiptListSchema() {
+  await pool.query(`
+    ALTER TABLE receipts
+      ADD COLUMN IF NOT EXISTS storage_path TEXT,
+      ADD COLUMN IF NOT EXISTS file_hash TEXT,
+      ADD COLUMN IF NOT EXISTS file_bytes BYTEA,
+      ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMPTZ DEFAULT now()
+  `);
 
-    const sql = `
-      SELECT
-        r.id,
-        r.business_id,
-        b.name AS business_name,
-        r.transaction_id,
-        r.filename,
-        r.mime_type,
-        r.storage_path,
-        r.uploaded_at,
-        r.uploaded_at AS created_at,
-        r.file_hash,
-        (r.file_bytes IS NOT NULL) AS has_file_bytes
-      FROM receipts r
-      JOIN businesses b ON b.id = r.business_id
-      WHERE r.business_id = ANY($1::uuid[])
-      ORDER BY b.name ASC, r.uploaded_at DESC NULLS LAST
-      LIMIT 500
-    `;
-    const result = await pool.query(sql, [scope.businessIds]);
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+          FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'receipts'
+           AND column_name = 'created_at'
+      ) THEN
+        EXECUTE 'UPDATE receipts SET uploaded_at = COALESCE(uploaded_at, created_at, now()) WHERE uploaded_at IS NULL';
+      ELSE
+        UPDATE receipts SET uploaded_at = COALESCE(uploaded_at, now()) WHERE uploaded_at IS NULL;
+      END IF;
+    END $$
+  `);
+}
 
-    const rows = (result.rows || []).map((row) => {
+function buildReceiptListSql() {
+  return `
+    SELECT
+      r.id,
+      r.business_id,
+      b.name AS business_name,
+      r.transaction_id,
+      r.filename,
+      r.mime_type,
+      r.storage_path,
+      r.uploaded_at,
+      r.uploaded_at AS created_at,
+      r.file_hash,
+      (r.file_bytes IS NOT NULL) AS has_file_bytes
+    FROM receipts r
+    JOIN businesses b ON b.id = r.business_id
+    WHERE r.business_id = ANY($1::uuid[])
+    ORDER BY b.name ASC, r.uploaded_at DESC NULLS LAST
+    LIMIT 500
+  `;
+}
+
+function mapReceiptListRows(rows = []) {
+  return rows.map((row) => {
     const resolvedStoragePath = resolveReceiptFilePath(row.storage_path);
     return {
       id: row.id,
@@ -217,15 +252,51 @@ router.get("/", async (req, res) => {
       has_file_bytes: !!row.has_file_bytes,
       is_viewable: !!resolvedStoragePath || !!row.has_file_bytes
     };
-    });
+  });
+}
 
-    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
-    res.setHeader("Pragma", "no-cache");
-    res.setHeader("Expires", "0");
+function setNoStoreHeaders(res) {
+  res.setHeader("Cache-Control", "private, no-store, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+}
+
+/* =========================================================
+   GET /receipts — List Receipts (Newest First)
+   ========================================================= */
+
+router.get("/", async (req, res) => {
+  try {
+    const scope = await getBusinessScopeForUser(req.user, req.query?.scope);
+
+    if (!scope.businessIds.length) {
+      return res.status(400).json({
+        error: "Missing business context"
+      });
+    }
+
+    const sql = buildReceiptListSql();
+    let result;
+
+    try {
+      result = await pool.query(sql, [scope.businessIds]);
+    } catch (err) {
+      if (!isRecoverableReceiptSchemaError(err)) {
+        throw err;
+      }
+
+      logWarn("Receipts schema drift detected; applying safe receipt metadata guards before retry", getErrorDiagnostic(err));
+      await ensureReceiptListSchema();
+      result = await pool.query(sql, [scope.businessIds]);
+    }
+
+    const rows = mapReceiptListRows(result.rows || []);
+
+    setNoStoreHeaders(res);
 
     return res.status(200).json(rows);
   } catch (err) {
-    logError("Receipts load error:", err);
+    logError("Receipts load error:", getErrorDiagnostic(err));
     return res.status(500).json({
       error: "Failed to load receipts"
     });
