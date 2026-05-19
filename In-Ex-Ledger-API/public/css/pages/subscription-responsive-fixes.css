@@ -1,0 +1,188 @@
+/* Subscription responsive fixes: desktop, tablet, mobile, and iOS desktop-view widths. */
+html, body { max-width: 100%; overflow-x: hidden; }
+
+.subscription-dashboard-shell,
+.subscription-dashboard,
+.subscription-page-header,
+.subscription-panel,
+.subscription-plan-workbench,
+.subscription-plan-layout,
+.subscription-plan-stack,
+.subscription-plan-row,
+.subscription-capacity-board,
+.subscription-grid,
+.sub-plan-card,
+.sub-detail-card,
+.billing-history-list,
+#subPaymentMethodCard,
+#businessSlotsManager {
+  min-width: 0 !important;
+}
+
+.subscription-dashboard-shell { box-sizing: border-box; }
+.subscription-page-header,
+.subscription-panel,
+.subscription-board-card,
+.sub-price-summary,
+.sub-detail-card,
+.billing-history-list { overflow: hidden; }
+
+.subscription-page-header p,
+.subscription-section-title p,
+.subscription-stripe-panel p,
+.sub-plan-pitch,
+.sub-plan-addon-note,
+.sub-plan-checkout-note,
+.sub-detail-secondary,
+.sub-access-settings-note,
+.sub-access-upgrade-note,
+.sub-access-cancel-note { overflow-wrap: anywhere; }
+
+@media (min-width: 1500px) {
+  .subscription-dashboard-shell,
+  .sub-no-sidebar { width: min(94vw, 1640px) !important; }
+  .subscription-grid-top { grid-template-columns: minmax(0, 1.25fr) minmax(410px, 0.75fr) !important; }
+  .subscription-plan-layout { grid-template-columns: minmax(0, 1.3fr) minmax(400px, 0.7fr) !important; }
+  .subscription-plan-row,
+  .sub-plan-card { grid-template-columns: minmax(220px, 0.82fr) minmax(180px, 0.38fr) minmax(300px, 1fr) minmax(160px, 0.34fr) !important; }
+}
+
+@media (max-width: 1320px) {
+  .subscription-plan-layout { grid-template-columns: 1fr !important; }
+  .subscription-capacity-board { position: static !important; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .subscription-plan-row,
+  .sub-plan-card { grid-template-columns: minmax(0, 1fr) minmax(180px, 0.35fr) !important; }
+  .subscription-plan-row .sub-plan-features,
+  .sub-plan-card .sub-plan-features { grid-column: 1 / -1; }
+  .subscription-plan-row .sub-cta-primary,
+  .subscription-plan-row .sub-cta-outline,
+  .sub-plan-card .sub-cta-primary,
+  .sub-plan-card .sub-cta-outline { grid-column: 1 / -1; width: 100% !important; }
+}
+
+@media (max-width: 1180px) {
+  .subscription-dashboard-shell,
+  .sub-no-sidebar { width: min(100%, calc(100vw - 24px)) !important; padding: 22px 0 56px !important; }
+  .subscription-page-header { grid-template-columns: 1fr !important; align-items: start; }
+  .subscription-settings-link { width: fit-content; }
+  .subscription-grid-top,
+  .subscription-grid-bottom,
+  .subscription-plan-layout,
+  .sub-access-overview { grid-template-columns: 1fr !important; }
+  .subscription-capacity-board { grid-template-columns: 1fr !important; position: static !important; }
+  .subscription-mini-metrics,
+  .sub-status-stats,
+  .sub-command-stats { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+
+@media (max-width: 1024px), (hover: none) and (max-width: 1180px) {
+  .subscription-dashboard-shell,
+  .sub-no-sidebar { width: min(100%, calc(100vw - 18px)) !important; padding: 18px 0 48px !important; }
+  .subscription-dashboard,
+  .sub-no-sidebar .settings-main { gap: 16px !important; }
+  .subscription-page-header,
+  .subscription-panel,
+  .subscription-plan-workbench,
+  .subscription-board-card,
+  .sub-price-summary,
+  .sub-detail-card,
+  .billing-history-list { border-radius: 22px !important; }
+  .subscription-page-header,
+  .subscription-panel,
+  .subscription-plan-workbench { padding: 20px !important; }
+  .subscription-page-header h1 { font-size: clamp(42px, 9vw, 70px) !important; line-height: 0.9 !important; letter-spacing: -0.07em !important; }
+  .subscription-status-panel { background: linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.96)), radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.32), transparent 42%) !important; }
+  .subscription-plan-row,
+  .sub-plan-card { grid-template-columns: 1fr !important; gap: 14px !important; padding: 18px !important; }
+  .subscription-plan-row-price { padding: 14px; border-radius: 18px; background: rgba(248, 250, 252, 0.92); }
+  .subscription-plan-row.sub-plan-featured .subscription-plan-row-price,
+  .sub-plan-featured .subscription-plan-row-price { background: rgba(255, 255, 255, 0.78); }
+  .sub-plan-features { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .subscription-actions-row,
+  .sub-business-item-actions,
+  .modal-actions,
+  .business-modal-actions { justify-content: stretch !important; }
+  .subscription-actions-row > *,
+  .sub-business-item-actions > *,
+  .modal-actions > *,
+  .business-modal-actions > * { width: 100% !important; }
+  .sub-slots-panel-head,
+  .sub-slots-workbench,
+  .sub-slots-footer,
+  .sub-business-roster-head,
+  .sub-business-item { display: grid !important; grid-template-columns: 1fr !important; }
+}
+
+@media (max-width: 760px) {
+  .subscription-dashboard-shell,
+  .sub-no-sidebar { width: calc(100vw - 14px) !important; padding: 14px 0 42px !important; }
+  .subscription-dashboard,
+  .sub-no-sidebar .settings-main { gap: 14px !important; }
+  .subscription-page-header,
+  .subscription-panel,
+  .subscription-plan-workbench { padding: 18px !important; border-radius: 20px !important; }
+  .subscription-page-header h1 { font-size: clamp(40px, 14vw, 56px) !important; line-height: 0.92 !important; }
+  .subscription-page-header p,
+  .subscription-section-title p,
+  .subscription-stripe-panel p { font-size: 14px !important; line-height: 1.62 !important; }
+  .subscription-panel-head,
+  .sub-status-row,
+  .sub-status-spotlight-top { display: grid !important; grid-template-columns: 1fr !important; align-items: start !important; }
+  .subscription-chip,
+  .sub-status-badge,
+  .sub-status-plan-pill,
+  .subscription-plan-label,
+  .sub-featured-badge { width: fit-content !important; }
+  .sub-status-headline { font-size: clamp(32px, 12vw, 48px) !important; line-height: 0.95 !important; }
+  .sub-status-stats,
+  .sub-command-stats,
+  .subscription-mini-metrics,
+  .sub-access-overview,
+  .sub-plan-features { grid-template-columns: 1fr !important; }
+  .subscription-stripe-panel h2,
+  .subscription-section-title h2,
+  .subscription-board-card h3 { font-size: clamp(24px, 8vw, 34px) !important; }
+  .subscription-plan-row-price strong,
+  .sub-price-amount,
+  #planProPriceLabel { font-size: clamp(30px, 10vw, 40px) !important; }
+  .subscription-board-card,
+  .sub-price-summary,
+  .sub-detail-card,
+  .billing-history-list,
+  .sub-access-stat,
+  .sub-business-roster-card,
+  .sub-business-item,
+  .sub-slots-panel,
+  .sub-slots-stepper-card,
+  .sub-slots-summary-card { padding: 16px !important; border-radius: 20px !important; }
+  .sub-control-row,
+  .sub-price-row,
+  .sub-slots-summary-row { display: grid !important; grid-template-columns: 1fr !important; justify-items: stretch !important; }
+  .sub-toggle,
+  .sub-quantity-control,
+  .sub-quantity-control-slots { width: 100% !important; justify-content: space-between !important; }
+  .sub-toggle-btn { flex: 1 1 0; }
+  .sub-quantity-input { flex: 1 1 auto; min-width: 0; }
+  .sub-cta-primary,
+  .sub-cta-outline,
+  .settings-primary-btn,
+  .settings-secondary-btn,
+  .danger-outline-btn,
+  .sub-slots-save-btn { width: 100% !important; }
+  .business-modal,
+  .transaction-modal-content { width: min(100%, calc(100vw - 24px)) !important; padding: 22px !important; border-radius: 22px !important; }
+  .settings-toast { left: 12px !important; right: 12px !important; bottom: 12px !important; width: auto !important; text-align: center; }
+}
+
+@media (max-width: 420px) {
+  .subscription-dashboard-shell,
+  .sub-no-sidebar { width: calc(100vw - 10px) !important; }
+  .subscription-page-header,
+  .subscription-panel,
+  .subscription-plan-workbench { padding: 16px !important; }
+  .subscription-page-header h1 { font-size: clamp(36px, 16vw, 48px) !important; }
+  .subscription-eyebrow,
+  .sub-control-label,
+  .sub-slots-stepper-label,
+  .sub-access-stat-label { font-size: 10px !important; letter-spacing: 0.1em !important; }
+}
