@@ -46,6 +46,14 @@ const MAX_BUSINESS_ADDRESS_LENGTH = 500;
 const VALID_ACCOUNTING_METHODS = new Set(["cash", "accrual"]);
 const VALID_MATERIAL_PARTICIPATION = new Set(["yes", "no"]);
 
+function buildTrialSetupRedirect(nextPath = "/transactions") {
+  const normalized = String(nextPath || "/transactions").trim();
+  if (!normalized.startsWith("/") || normalized.startsWith("//") || /[\r\n]/.test(normalized)) {
+    return "/trial-setup";
+  }
+  return `/trial-setup?next=${encodeURIComponent(normalized)}`;
+}
+
 function normalizeOptionalTrimmedString(value) {
   if (typeof value !== "string") {
     return null;
@@ -422,7 +430,7 @@ router.put("/onboarding", async (req, res) => {
 
       return res.status(200).json({
         onboarding: normalizeOnboardingPayload(updated.rows[0]),
-        redirect_to: `/${normalizedStartFocus}`
+        redirect_to: buildTrialSetupRedirect(`/${normalizedStartFocus}`)
       });
     } catch (err) {
       await client.query("ROLLBACK");
@@ -475,7 +483,7 @@ router.post("/onboarding/guide", async (req, res) => {
       page || (GUIDED_SETUP_STEPS.includes(currentData.guided_setup_step) ? currentData.guided_setup_step : GUIDED_SETUP_STEPS[0]);
     const timestamp = new Date().toISOString();
 
-    let redirectTo = "/transactions";
+    let redirectTo = buildTrialSetupRedirect("/transactions");
     if (action === "skip") {
       GUIDED_SETUP_STEPS.forEach((step) => {
         currentTourSeen[step] = true;

@@ -195,6 +195,21 @@ function normalizeAdditionalBusinesses(input) {
   return value;
 }
 
+function normalizeInternalReturnPath(value, fallback = "/subscription") {
+  const next = String(value || "").trim();
+  if (!next.startsWith("/") || next.startsWith("//") || /[\r\n]/.test(next)) {
+    return fallback;
+  }
+  return next;
+}
+
+function buildCheckoutReturnPath(returnPath, checkoutState) {
+  const normalizedPath = normalizeInternalReturnPath(returnPath, "/subscription");
+  const parsed = new URL(normalizedPath, "https://app.inexledger.local");
+  parsed.searchParams.set("checkout", checkoutState);
+  return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+
 function isTrialReupgradeAttempt(subscription) {
   return Boolean(
     subscription?.isTrialing &&
@@ -813,14 +828,15 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
         error: "This account already has an active or overlapping Stripe subscription. Manage it from Subscription instead of starting another checkout."
       });
     }
+    const requestedReturnPath = normalizeInternalReturnPath(req.body?.returnPath, "/subscription");
     const sessionPayload = {
       mode: "subscription",
       customer: customerId,
       allow_promotion_codes: true,
       "line_items[0][price]": priceSelection.basePriceId,
       "line_items[0][quantity]": 1,
-      success_url: buildAppUrl("/subscription?checkout=success"),
-      cancel_url: buildAppUrl("/subscription?checkout=cancel"),
+      success_url: buildAppUrl(buildCheckoutReturnPath(requestedReturnPath, "success")),
+      cancel_url: buildAppUrl(buildCheckoutReturnPath(requestedReturnPath, "cancel")),
       "metadata[business_id]": billingBusinessId,
       "metadata[user_id]": req.user.id,
       "metadata[plan_code]": "v1",

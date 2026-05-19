@@ -103,7 +103,7 @@ function updateCtaLabels() {
 
   const buttonText = isAuthed
     ? "Upgrade to Pro now"
-    : "Start free 30-day trial";
+    : "Start 30-day Pro trial";
 
   primaryButtons.forEach((btn) => {
     btn.textContent = buttonText;
@@ -112,15 +112,15 @@ function updateCtaLabels() {
   const helper = document.getElementById("planHelperText");
   if (helper) {
     helper.textContent = isAuthed
-      ? "You’re signed in. This button launches secure checkout for your selected Pro setup."
-      : "Create your account to begin the free 30-day trial. You can upgrade to paid Pro from this page once you’re signed in.";
+      ? "You're signed in. This button launches secure checkout for your selected Pro setup."
+      : "Create your account first. After onboarding, Stripe checkout appears immediately so you can secure the Pro trial without having to remember later.";
   }
 
   const footnote = document.getElementById("heroFootnote");
   if (footnote) {
     footnote.textContent = isAuthed
       ? "Signed in already? Pick your billing setup below and launch checkout."
-      : "Start free first. Upgrade to Pro when you’re ready for the premium bookkeeping toolkit.";
+      : "Finish setup first. Billing confirmation happens right after onboarding, and no charge is due today.";
   }
 }
 
@@ -130,6 +130,7 @@ function renderPricing() {
   const addonUnitText = formatMoney(pricingState.currency, pricing.addon);
   const addonTotalText = formatMoney(pricingState.currency, getAddonTotal());
   const grandTotalText = formatMoney(pricingState.currency, getGrandTotal());
+  const addonCycleText = `${addonUnitText} / ${pricingState.interval === "yearly" ? "year" : "month"}`;
 
   const v1PriceDisplay = document.getElementById("v1PriceDisplay");
   const v1PriceSubcopy = document.getElementById("v1PriceSubcopy");
@@ -137,19 +138,23 @@ function renderPricing() {
   const addonAmount = document.getElementById("addonAmount");
   const grandTotalAmount = document.getElementById("grandTotalAmount");
   const totalFootnote = document.getElementById("totalFootnote");
+  const addonNote = document.querySelector(".pricing-addon-note");
 
   if (v1PriceDisplay) v1PriceDisplay.textContent = baseText;
   if (v1PriceSubcopy) v1PriceSubcopy.textContent = pricing.label;
   if (basePlanAmount) basePlanAmount.textContent = baseText;
   if (addonAmount) addonAmount.textContent = addonTotalText;
   if (grandTotalAmount) grandTotalAmount.textContent = grandTotalText;
+  if (addonNote) {
+    addonNote.textContent = `Add another business workspace only when you need it. Each additional business is billed at ${addonCycleText} on the same cycle you choose for Pro.`;
+  }
 
   if (totalFootnote) {
     const intervalLabel = pricingState.interval === "yearly" ? "yearly" : "monthly";
     totalFootnote.textContent =
       pricingState.additionalBusinesses > 0
         ? `Base Pro ${intervalLabel} pricing plus ${pricingState.additionalBusinesses} additional business ${pricingState.additionalBusinesses === 1 ? "slot" : "slots"} at ${addonUnitText} each. Final checkout pricing is verified by the server.`
-        : `Base Pro ${intervalLabel} pricing only. Start with a 30-day free trial by creating your account. Final checkout pricing is verified by the server.`;
+        : `Base Pro ${intervalLabel} pricing only. Finish onboarding first, then confirm billing in Stripe to secure the trial. Final checkout pricing is verified by the server.`;
   }
 
   setActiveToggle("[data-interval]", pricingState.interval, "data-interval");
@@ -187,7 +192,7 @@ async function launchCheckout() {
     await loadVerifiedPricingContext();
     if (button) {
       button.disabled = true;
-      button.textContent = "Launching secure checkout…";
+      button.textContent = "Launching secure checkout...";
     }
 
     const res = await apiFetch("/api/billing/checkout-session", {
@@ -278,4 +283,3 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadVerifiedPricing();
   renderPricing();
 });
-

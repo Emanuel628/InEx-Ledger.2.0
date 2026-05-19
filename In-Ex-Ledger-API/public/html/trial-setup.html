@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Start Pro Trial | InEx Ledger</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/css/app.css?v=20260510c" />
+  <link rel="stylesheet" href="/css/pages/trial-setup.css?v=20260519a" />
+</head>
+<body class="trial-setup-page">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <header class="trial-setup-topbar">
+    <a class="trial-setup-brand" href="/transactions" aria-label="InEx Ledger home">
+      <span class="trial-setup-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
+          <rect x="9" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+          <rect x="2" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".6"></rect>
+          <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".35"></rect>
+        </svg>
+      </span>
+      <span>InEx Ledger</span>
+    </a>
+  </header>
+
+  <main id="main-content" class="trial-setup-main">
+    <section class="trial-setup-hero">
+      <div>
+        <span class="trial-setup-eyebrow">One last step</span>
+        <h1>Secure your Pro trial before you enter the app.</h1>
+        <p id="trialSetupLead">
+          Add your payment method now. You will not be charged today. Billing begins when the trial ends unless you cancel first.
+        </p>
+        <div id="trialSetupStatus" class="trial-setup-status hidden" role="status" aria-live="polite"></div>
+      </div>
+      <a id="trialSetupContinueLink" class="trial-setup-link hidden" href="/transactions">Continue to app</a>
+    </section>
+
+    <section class="trial-setup-grid">
+      <article class="trial-setup-card trial-setup-card-primary">
+        <div class="trial-setup-card-head">
+          <span class="trial-setup-eyebrow">Recommended</span>
+          <h2>Set up Pro billing now.</h2>
+        </div>
+        <p>
+          This keeps the full workflow uninterrupted after the trial: receipts, mileage, analytics, exports, and additional businesses if you need them.
+        </p>
+
+        <div class="trial-setup-controls">
+          <div class="trial-setup-control">
+            <span class="trial-setup-label">Billing</span>
+            <div class="trial-setup-toggle" role="group" aria-label="Billing interval">
+              <button type="button" class="trial-setup-toggle-btn is-active" data-billing-interval="monthly" aria-pressed="true">Monthly</button>
+              <button type="button" class="trial-setup-toggle-btn" data-billing-interval="yearly" aria-pressed="false">Yearly</button>
+            </div>
+          </div>
+
+          <div class="trial-setup-control">
+            <label class="trial-setup-label" for="trialSetupAdditionalBusinesses">Additional businesses</label>
+            <div class="trial-setup-stepper">
+              <button type="button" id="trialSetupAdditionalBusinessesMinus" aria-label="Decrease additional businesses">-</button>
+              <input id="trialSetupAdditionalBusinesses" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" />
+              <button type="button" id="trialSetupAdditionalBusinessesPlus" aria-label="Increase additional businesses">+</button>
+            </div>
+            <p id="trialSetupAddonUnitNote" class="trial-setup-help">Each additional business uses the same billing cycle as Pro.</p>
+          </div>
+        </div>
+
+        <div class="trial-setup-summary">
+          <div class="trial-setup-summary-row">
+            <span>Base Pro</span>
+            <strong id="trialSetupBaseAmount">$12</strong>
+          </div>
+          <div class="trial-setup-summary-row">
+            <span>Add-on businesses</span>
+            <strong id="trialSetupAddonAmount">$0</strong>
+          </div>
+          <div class="trial-setup-summary-row trial-setup-summary-total">
+            <span>Total after trial</span>
+            <strong id="trialSetupTotalAmount">$12</strong>
+          </div>
+          <p id="trialSetupSummaryNote" class="trial-setup-help">Final pricing is verified by the server before Stripe checkout starts.</p>
+        </div>
+
+        <div class="trial-setup-actions">
+          <button type="button" id="trialSetupCheckoutBtn" class="trial-setup-primary-btn">Continue to secure checkout</button>
+          <p class="trial-setup-fineprint">You can cancel before the trial end date to avoid billing.</p>
+        </div>
+      </article>
+
+      <article class="trial-setup-card">
+        <div class="trial-setup-card-head">
+          <span class="trial-setup-eyebrow">Alternative</span>
+          <h2>Keep Basic after the trial.</h2>
+        </div>
+        <p>
+          If you do not want billing set up now, you can continue with the trial and let this workspace fall back to Basic when the trial ends.
+        </p>
+        <ul class="trial-setup-list">
+          <li>No charge today.</li>
+          <li>You can still change this later in Subscription.</li>
+          <li>Basic remains available for lighter ongoing use.</li>
+        </ul>
+        <div class="trial-setup-actions">
+          <button type="button" id="trialSetupBasicBtn" class="trial-setup-secondary-btn">Continue with Basic after trial</button>
+          <button type="button" id="trialSetupSkipBtn" class="trial-setup-link-btn">Decide later</button>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <script src="/js/escape-html.js?v=20260410a"></script>
+  <script src="/js/global.js?v=20260510c"></script>
+  <script src="/js/auth.js?v=20260518a"></script>
+  <script src="/js/billing-pricing.js?v=20260419a"></script>
+  <script src="/js/trial-setup.js?v=20260519a"></script>
+</body>
+</html>

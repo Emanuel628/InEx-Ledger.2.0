@@ -70,7 +70,7 @@ function applyLandingPolish(region) {
   setTextBySelector(".feature-card:nth-child(4) h3", isCA ? "Built for Canadian records" : "Built for U.S. records");
   setTextBySelector("#regions .section-heading h2", isCA ? "A Canadian bookkeeping workflow for solo businesses." : "A U.S. bookkeeping workflow for solo businesses.");
   setTextBySelector("#regions .section-subtitle", isCA ? "T2125 categories, T4A context, GST/HST category support, kilometres, receipts, and exports." : "Schedule C categories, 1099 income context, mileage, receipts, and exports.");
-  setTextBySelector("#pricing .section-subtitle", isCA ? "No credit card required for the trial. Pricing shown in CAD." : "No credit card required for the trial. Pricing shown in USD.");
+  setTextBySelector("#pricing .section-subtitle", isCA ? "Finish onboarding first, then secure the Pro trial in Stripe. Pricing shown in CAD." : "Finish onboarding first, then secure the Pro trial in Stripe. Pricing shown in USD.");
 
   document.querySelectorAll(".region-cards article").forEach((card, index) => {
     card.hidden = isCA ? index === 0 : index === 1;

@@ -23,7 +23,7 @@ const LANDING_REGION_COPY = {
     featureRegion: "Support for U.S. business categories, 1099 context, receipts, mileage, and export-ready records.",
     regionSectionTitle: "A U.S. bookkeeping workflow for solo businesses.",
     regionSectionSubtitle: "U.S. business categories, 1099 income context, mileage, receipts, and exports.",
-    pricingSubtitle: "No credit card required to create an account. Pricing shown in USD.",
+    pricingSubtitle: "Finish onboarding first, then secure the Pro trial in Stripe. Pricing shown in USD.",
     faqRegionQuestion: "What U.S. record context does InEx Ledger support?",
     faqRegionAnswer: "The U.S. workflow is built around U.S. business categories, 1099 income context, receipts, mileage, accounts, and export-ready records. It helps organize your books, but it does not replace professional guidance.",
     currency: "usd"
@@ -52,7 +52,7 @@ const LANDING_REGION_COPY = {
     featureRegion: "Support for Canadian business categories, T4A context, GST/HST category support, receipts, kilometres, and export-ready records.",
     regionSectionTitle: "A Canadian bookkeeping workflow for solo businesses.",
     regionSectionSubtitle: "Canadian business categories, T4A context, GST/HST category support, kilometres, receipts, and exports.",
-    pricingSubtitle: "No credit card required to create an account. Pricing shown in CAD.",
+    pricingSubtitle: "Finish onboarding first, then secure the Pro trial in Stripe. Pricing shown in CAD.",
     faqRegionQuestion: "What Canadian record context does InEx Ledger support?",
     faqRegionAnswer: "The Canadian workflow is built around Canadian business categories, T4A context, GST/HST category support, receipts, kilometres, accounts, and export-ready records. It helps organize your books, but it does not replace professional guidance.",
     currency: "cad"
