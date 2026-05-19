@@ -1,0 +1,47 @@
+# gitleaks configuration for InEx Ledger.
+#
+# The default ruleset is extended so we continue to inherit upstream
+# coverage as gitleaks adds detectors. The allowlists below cover
+# locations that intentionally contain placeholder-shaped strings —
+# .env.example files, test fixtures, documentation, and dependency
+# lockfiles — none of which contain real secrets.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Paths that hold placeholder credentials, test fixtures, or third-party content."
+paths = [
+  # Documented placeholder env files. Real .env files are gitignored.
+  '''(^|/)\.env\.example$''',
+  '''(^|/)\.env\.test\.example$''',
+
+  # Test source — fixtures, mocks, and dummy tokens such as
+  # "test-jwt-secret", "sk_test_123", "re_test_key" are not real secrets.
+  '''(^|/)In-Ex-Ledger-API/tests/.*''',
+
+  # Smoke-test scripts that exist solely to exercise dev endpoints.
+  '''(^|/)In-Ex-Ledger-API/scripts/test-.*\.mjs$''',
+
+  # Documentation: PRODUCTION-READINESS.md and others list env var names,
+  # not values. Allowlist by path to avoid noise on rule changes.
+  '''(^|/)Docs/.*\.md$''',
+  '''(^|/)Work-To-Do/.*\.md$''',
+  '''(^|/)Work-Review/.*\.md$''',
+  '''(^|/)Work-Completed/.*\.md$''',
+
+  # Lockfile is auto-generated and rule-noisy.
+  '''(^|/)In-Ex-Ledger-API/package-lock\.json$'''
+]
+
+# Placeholder patterns we deliberately keep in .env.example / docs.
+regexes = [
+  # "sk_test_xxxxxxxxxxxxxxxxxxxx" style fillers.
+  '''sk_test_x{6,}''',
+  '''whsec_x{6,}''',
+  '''price_x{6,}''',
+  '''re_x{6,}''',
+  # Generic "change-me" / "xxxxxxxxxxxxxxxxxxxx" hints.
+  '''change-me-to-a-long-random-string''',
+  '''xxxxxxxxxxxxxxxxxxxx'''
+]

@@ -203,7 +203,6 @@ function sendCanonicalPage(pageName, req, res) {
 const ALLOWED_ORIGINS = [
   'https://inexledger.com',
   'https://www.inexledger.com',
-  'https://inex-ledger20-production.up.railway.app',
   ...(process.env.NODE_ENV !== 'production'
     ? ['http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000']
     : [])

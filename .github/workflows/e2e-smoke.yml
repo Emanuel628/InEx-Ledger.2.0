@@ -1,0 +1,98 @@
+name: E2E smoke
+
+# Playwright E2E suite. Intentionally NOT a required PR check yet —
+# it is too slow to gate every push. Runs nightly and on demand so
+# regressions surface before launch without slowing the merge queue.
+#
+# To promote to a required check, add a `pull_request` trigger
+# limited to relevant paths and update branch protection.
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    # 08:00 UTC every day (≈ early morning Pacific). Cron is UTC.
+    - cron: "0 8 * * *"
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: inex_ledger_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/inex_ledger_test
+      JWT_SECRET: test-jwt-secret-e2e
+      CSRF_SECRET: test-csrf-secret-e2e
+      APP_BASE_URL: http://localhost:8080
+      RESEND_API_KEY: re_test_e2e
+      EXPORT_GRANT_SECRET: test-export-grant-secret-e2e
+      EXPORT_GRANT_TTL_MS: 60000
+      FIELD_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      RATE_LIMIT_ENABLED: "false"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: In-Ex-Ledger-API/package-lock.json
+
+      - name: Confirm Playwright config and tests are present
+        working-directory: In-Ex-Ledger-API
+        run: |
+          if [ ! -f playwright.config.js ]; then
+            echo "::error::playwright.config.js is missing — E2E suite cannot run."
+            exit 1
+          fi
+          if ! ls tests/e2e/*.spec.js >/dev/null 2>&1; then
+            echo "::error::No Playwright specs found under tests/e2e/*.spec.js — E2E suite cannot run."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        working-directory: In-Ex-Ledger-API
+        run: npm install
+
+      - name: Install Playwright browsers
+        working-directory: In-Ex-Ledger-API
+        run: npx playwright install --with-deps chromium
+
+      - name: Run database migrations
+        working-directory: In-Ex-Ledger-API
+        run: node -e "const { initDatabase } = require('./db.js'); initDatabase().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });"
+
+      - name: Run Playwright E2E
+        working-directory: In-Ex-Ledger-API
+        run: npx playwright test
+
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            In-Ex-Ledger-API/playwright-report
+            In-Ex-Ledger-API/test-results
+          if-no-files-found: ignore
+          retention-days: 7

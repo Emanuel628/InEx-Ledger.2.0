@@ -7,7 +7,7 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const CSRF_COOKIE_OPTIONS = {
   httpOnly: false,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
+  sameSite: "strict",
   path: "/"
 };
 
