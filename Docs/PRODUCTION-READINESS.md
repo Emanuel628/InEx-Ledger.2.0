@@ -149,6 +149,57 @@ npm run test:integration
   `accounts.bank_connection_id`/`source`; `transactions.external_id`,
   `posted_date`, `merchant_name`, `pending`).
 
+## End-to-end test workflow
+
+`.github/workflows/e2e-smoke.yml` runs the Playwright suite under
+`In-Ex-Ledger-API/tests/e2e/*.spec.js` against a Postgres 15 service.
+
+- Triggers: `workflow_dispatch` (manual) and a daily `cron` at 08:00 UTC.
+- Not yet wired as a required PR check — the workflow is intentionally
+  isolated so it does not slow the merge queue while the suite stabilizes.
+- The workflow installs Playwright browsers (`chromium`) before running.
+- Failure uploads `playwright-report` and `test-results` as a 7-day
+  artifact.
+- The workflow asserts that `playwright.config.js` and at least one
+  `tests/e2e/*.spec.js` exist before running. If either is missing, the
+  workflow fails with a clear `::error::` message rather than reporting
+  a no-op green run.
+
+Before promoting this workflow to a required PR check, address the
+known flake/runtime gaps in `Work-To-Do/E2E-FINDINGS-NEW-USER.md` and
+move it to a `pull_request` trigger on relevant paths.
+
+## Rate limiting degradation behavior
+
+The API has a layered rate-limiting contract that is enforced at startup
+and at request time:
+
+- Production requires `RATE_LIMIT_ENABLED=true`. When this is not set (or
+  is any value other than `"true"`) and `NODE_ENV=production`, every API
+  request returns `503 Service temporarily unavailable due to rate
+  limiting requirements.` until the configuration is corrected. The API
+  fails closed; no traffic is served without limiter enforcement.
+- When `RATE_LIMIT_ENABLED=true` and Redis is unreachable, the limiter
+  falls back to a per-process in-memory store and reports
+  `rateLimiting.mode = "degraded"` in `/health`. The API stays available,
+  but each Node.js process maintains its own counters. In a
+  multi-instance deployment (e.g. Railway with horizontal scaling), this
+  means rate limits are **not global** across instances; a determined
+  attacker can divide their request volume across instances to multiply
+  their effective allowance.
+- Redis should therefore be treated as **required** for production-grade,
+  multi-instance abuse protection. The in-memory fallback exists to keep
+  the API serving traffic during transient Redis outages, not as a
+  long-running production configuration.
+
+Operational checks:
+- `/health` returns `503` whenever the rate limiter is `degraded` and the
+  limiter is required (production with `RATE_LIMIT_ENABLED=true`).
+- `GET /api/system/diagnostics` (auth-required) exposes the limiter mode
+  for operators.
+- If Redis is unavailable for more than a brief outage, treat the
+  deployment as degraded and restore Redis before the next traffic peak.
+
 ## Rollback notes
 
 - Keep a production database backup before deploy. See `BACKUP-RESTORE.md`.

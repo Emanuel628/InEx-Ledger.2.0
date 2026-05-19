@@ -1,5 +1,29 @@
 "use strict";
 
+// The public /health endpoint is unauthenticated, so the response body
+// must never expose operational error strings, filesystem paths, backend
+// hints, or any other detail that could be useful to an attacker probing
+// for infrastructure. Sanitize at this boundary by whitelisting fields.
+
+function sanitizeRateLimiting(rateLimiting = {}) {
+  return {
+    available: rateLimiting.available === true,
+    enabled: rateLimiting.enabled === true,
+    mode: typeof rateLimiting.mode === "string" ? rateLimiting.mode : "unknown",
+    redisConfigured: rateLimiting.redisConfigured === true,
+    redisConnected: rateLimiting.redisConnected === true,
+    required: rateLimiting.required === true
+  };
+}
+
+function sanitizeReceiptStorage(receiptStorage = {}) {
+  return {
+    available: receiptStorage.available === true,
+    mode: typeof receiptStorage.mode === "string" ? receiptStorage.mode : "unknown",
+    configured: receiptStorage.persistentConfirmed === true
+  };
+}
+
 function buildHealthCheckResponse({
   dbState,
   rateLimiting = {},
@@ -32,8 +56,8 @@ function buildHealthCheckResponse({
       database: {
         state: dbState
       },
-      receiptStorage,
-      rateLimiting,
+      receiptStorage: sanitizeReceiptStorage(receiptStorage),
+      rateLimiting: sanitizeRateLimiting(rateLimiting),
       uptime: uptimeSeconds,
       timestamp: now
     }
@@ -41,5 +65,7 @@ function buildHealthCheckResponse({
 }
 
 module.exports = {
-  buildHealthCheckResponse
+  buildHealthCheckResponse,
+  sanitizeRateLimiting,
+  sanitizeReceiptStorage
 };

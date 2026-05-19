@@ -94,3 +94,10 @@ Landing page needs another content/UX pass before heavier promotion.
 
 #### Priority
 Medium. Important for conversion, but separate from critical backend/security fixes.
+
+---
+
+## Security hardening
+
+### Move access token toward memory-only storage
+Current browser-accessible token storage remains XSS-readable. Strict CSP reduces risk, but a future auth hardening pass should move toward a memory-only access token plus refresh-token cookie model. This is a larger auth architecture change and should not be rushed immediately before launch.
