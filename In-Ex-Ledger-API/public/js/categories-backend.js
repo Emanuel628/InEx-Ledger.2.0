@@ -96,6 +96,7 @@ let unattachedReceiptsCount = 0;
 let categoriesServerAvailable = true;
 let categoriesLoading = false;
 let categorySearchTerm = "";
+let editingCategoryId = null;
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
@@ -217,12 +218,45 @@ function updateRegionContext() {
     : "Mappings follow Schedule C and 1099 reporting context. Review categories before exporting.";
 }
 
-function openCategoryModal(type) {
+function openCategoryModal(type, categoryId = null) {
   const modal = document.getElementById("categoryModal");
+  const title = document.getElementById("categoryModalTitle");
+  const submitButton = document.querySelector("#categoryForm .modal-save");
+  const nameInput = document.getElementById("category-name");
   const typeSelect = document.getElementById("category-type");
-  if (typeSelect && type) typeSelect.value = type;
-  populateTaxLabelOptions(type || typeSelect?.value || "income");
+  const colorInput = document.getElementById("category-color");
+  const taxSelect = document.getElementById("category-tax-label");
+  const category = categoryId ? categoryRecords.find((item) => String(item.id) === String(categoryId)) : null;
+
+  editingCategoryId = category?.id || null;
+  const resolvedType = category?.type || type || typeSelect?.value || "income";
+
+  if (typeSelect) typeSelect.value = resolvedType;
+  populateTaxLabelOptions(resolvedType);
+
+  if (category) {
+    if (title) title.textContent = "Update tax mapping";
+    if (submitButton) submitButton.textContent = "Save mapping";
+    if (nameInput) nameInput.value = category.name || "";
+    if (colorInput) colorInput.value = category.color || defaultColorForType(resolvedType);
+    if (taxSelect) taxSelect.value = category.taxLabel || "";
+    syncColorSwatches(colorInput?.value || defaultColorForType(resolvedType));
+  } else {
+    if (title) title.textContent = "Add category";
+    if (submitButton) submitButton.textContent = "Add category";
+    syncColorSwatches(colorInput?.value || "blue");
+  }
+
   modal?.classList.remove("hidden");
+}
+
+function syncColorSwatches(color) {
+  const normalizedColor = normalizeCategoryColor(color, "expense");
+  document.querySelectorAll(".color-swatch").forEach((item) => {
+    const isActive = item.dataset.color === normalizedColor;
+    item.classList.toggle("is-active", isActive);
+    item.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
 }
 
 function wirePerListAddButtons() {
@@ -269,27 +303,29 @@ function wireCategoryModal() {
       return;
     }
 
-    const response = await apiFetch("/api/categories", {
-      method: "POST",
+    const payload = {
+      name,
+      kind: type,
+      color,
+      tax_map_us: currentRegion === "US" ? taxLabel || null : null,
+      tax_map_ca: currentRegion === "CA" ? taxLabel || null : null
+    };
+
+    const response = await apiFetch(editingCategoryId ? `/api/categories/${editingCategoryId}` : "/api/categories", {
+      method: editingCategoryId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        kind: type,
-        color,
-        tax_map_us: currentRegion === "US" ? taxLabel || null : null,
-        tax_map_ca: currentRegion === "CA" ? taxLabel || null : null
-      })
+      body: JSON.stringify(payload)
     });
 
     if (!response || !response.ok) {
       const errorPayload = response ? await response.json().catch(() => null) : null;
-      if (message) message.textContent = errorPayload?.error || tx("categories_error_add");
+      if (message) message.textContent = errorPayload?.error || (editingCategoryId ? "Failed to update category mapping." : tx("categories_error_add"));
       return;
     }
 
     closeCategoryModal();
     await loadCategories();
-    showCategoriesToast(tx("categories_added"));
+    showCategoriesToast(editingCategoryId ? "Category mapping updated" : tx("categories_added"));
   });
 }
 
@@ -297,21 +333,18 @@ function closeCategoryModal() {
   const modal = document.getElementById("categoryModal");
   const form = document.getElementById("categoryForm");
   const message = document.getElementById("categoryFormMessage");
+  const title = document.getElementById("categoryModalTitle");
+  const submitButton = document.querySelector("#categoryForm .modal-save");
+  editingCategoryId = null;
   modal?.classList.add("hidden");
   form?.reset();
   if (message) message.textContent = "";
+  if (title) title.textContent = "Add category";
+  if (submitButton) submitButton.textContent = "Add category";
   const colorInput = document.getElementById("category-color");
   if (colorInput) colorInput.value = "blue";
   populateTaxLabelOptions("income");
-  document.querySelectorAll(".color-swatch").forEach((item) => {
-    item.classList.remove("is-active");
-    item.setAttribute("aria-pressed", "false");
-  });
-  const blueBtn = document.querySelector('.color-swatch[data-color="blue"]');
-  if (blueBtn) {
-    blueBtn.classList.add("is-active");
-    blueBtn.setAttribute("aria-pressed", "true");
-  }
+  syncColorSwatches("blue");
 }
 
 function wireDefaultCategorySeed() {
@@ -414,6 +447,9 @@ function renderCategoryGroup(containerId, type, emptyText) {
   container.querySelectorAll("[data-category-delete]").forEach((button) => {
     button.addEventListener("click", async () => handleCategoryDelete(button.getAttribute("data-category-delete") || ""));
   });
+  container.querySelectorAll("[data-category-map]").forEach((button) => {
+    button.addEventListener("click", () => openCategoryModal(null, button.getAttribute("data-category-map") || ""));
+  });
 }
 
 function renderCategoryRow(category, type) {
@@ -443,7 +479,7 @@ function renderCategoryRow(category, type) {
       <div class="category-actions">
         <button type="button" class="category-row-menu" aria-label="Category actions">•••</button>
         <div class="category-action-menu">
-          <button type="button" disabled>Tax mapping</button>
+          <button type="button" data-category-map="${escapeHtml(category.id)}">Tax mapping</button>
           <button type="button" class="category-delete" data-category-delete="${escapeHtml(category.id)}">Delete category</button>
         </div>
       </div>
