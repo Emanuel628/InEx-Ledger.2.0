@@ -29,15 +29,23 @@ window.LANDING_POLISH_FAQS = {
   ]
 };
 
+window.__landingExpandedFaqRendering = false;
+
+function getLandingFaqRegion() {
+  return document.documentElement.dataset.region === "CA" ? "CA" : "US";
+}
+
 function renderExpandedLandingFaqs() {
   var list = document.querySelector("#faq .faq-list");
-  if (!list || !window.LANDING_POLISH_FAQS) return;
-  var region = document.documentElement.dataset.region === "CA" ? "CA" : "US";
+  if (!list || !window.LANDING_POLISH_FAQS || window.__landingExpandedFaqRendering) return;
+  var region = getLandingFaqRegion();
   var faqs = window.LANDING_POLISH_FAQS[region] || window.LANDING_POLISH_FAQS.US;
+  window.__landingExpandedFaqRendering = true;
   list.textContent = "";
   faqs.forEach(function(item, index) {
     var details = document.createElement("details");
     details.className = "faq-item";
+    details.setAttribute("data-expanded-faq", "true");
     if (index === 0) details.setAttribute("open", "");
     var summary = document.createElement("summary");
     summary.textContent = item.q;
@@ -47,13 +55,38 @@ function renderExpandedLandingFaqs() {
     details.appendChild(paragraph);
     list.appendChild(details);
   });
+  list.setAttribute("data-expanded-faq-region", region);
+  window.__landingExpandedFaqRendering = false;
+}
+
+function scheduleExpandedLandingFaqs() {
+  [0, 30, 120, 350, 800].forEach(function(delay) {
+    window.setTimeout(renderExpandedLandingFaqs, delay);
+  });
+}
+
+function installExpandedFaqObserver() {
+  var list = document.querySelector("#faq .faq-list");
+  if (!list || list.__expandedFaqObserverInstalled) return;
+  list.__expandedFaqObserverInstalled = true;
+  var observer = new MutationObserver(function() {
+    if (window.__landingExpandedFaqRendering) return;
+    var expectedRegion = getLandingFaqRegion();
+    var isExpanded = list.getAttribute("data-expanded-faq-region") === expectedRegion && list.querySelectorAll("[data-expanded-faq='true']").length >= 8;
+    if (!isExpanded) window.setTimeout(renderExpandedLandingFaqs, 0);
+  });
+  observer.observe(list, { childList: true, subtree: false });
 }
 
 document.addEventListener("DOMContentLoaded", function() {
-  window.setTimeout(renderExpandedLandingFaqs, 30);
+  installExpandedFaqObserver();
+  scheduleExpandedLandingFaqs();
   document.querySelectorAll("[data-region-toggle]").forEach(function(button) {
-    button.addEventListener("click", function() {
-      window.setTimeout(renderExpandedLandingFaqs, 30);
-    });
+    button.addEventListener("click", scheduleExpandedLandingFaqs);
   });
 });
+
+if (document.readyState !== "loading") {
+  installExpandedFaqObserver();
+  scheduleExpandedLandingFaqs();
+}
