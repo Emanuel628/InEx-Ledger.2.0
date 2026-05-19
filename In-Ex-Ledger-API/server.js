@@ -334,6 +334,7 @@ for (const pageName of htmlPageNames) {
   });
 }
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
+app.use('/api/email/inbound', express.raw({ type: '*/*', limit: '256kb' }));
 app.use('/html', express.static(htmlDir, {
   index: false,
   setHeaders: setStaticAssetCacheHeaders
