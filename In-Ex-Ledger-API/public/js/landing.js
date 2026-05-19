@@ -1,9 +1,10 @@
 const LANDING_REGION_COPY = {
   US: {
-    heroKicker: "For solo businesses 🇺🇸",
+    heroKicker: "For U.S. solo businesses 🇺🇸",
     heroLede: "Track income, expenses, receipts, mileage, categories, and exports in one clean ledger built for U.S. solo businesses.",
-    ctaNote: "U.S. support.",
-    taxContext: "Tax form context: U.S. Schedule C estimate",
+    ctaNote: "U.S. tax context.",
+    regionNavLink: "U.S. workflow",
+    taxContext: "Tax form context: Schedule C estimate",
     previewIncome: "$1,643.26",
     previewExpenses: "$4,199.01",
     previewProfit: "-$2,555.75",
@@ -13,15 +14,23 @@ const LANDING_REGION_COPY = {
     rowFuel: "-$65.00",
     fuelCategory: "Vehicle",
     mileageNav: "+ Mileage",
-    trustRegion: "Built for U.S. Schedule C / 1099 workflows.",
-    featureRegion: "Support for U.S. Schedule C and 1099 tax context.",
+    trustRegionTitle: "U.S. tax context",
+    trustRegion: "Built around Schedule C categories and 1099 income context.",
+    featureRegionTitle: "Built for U.S. records",
+    featureRegion: "Support for Schedule C categories, 1099 context, receipts, mileage, and export-ready records.",
+    regionSectionTitle: "A U.S. bookkeeping workflow for solo businesses.",
+    regionSectionSubtitle: "Preview the U.S. version: Schedule C categories, 1099 income context, mileage, receipts, and exports.",
+    pricingSubtitle: "No credit card required for the trial. Pricing shown in USD.",
+    faqRegionQuestion: "What U.S. tax context does InEx Ledger support?",
+    faqRegionAnswer: "The U.S. workflow is built around Schedule C-style categories, 1099 income context, receipts, mileage, accounts, and export-ready records. It helps organize your books, but it does not replace professional tax advice.",
     currency: "usd"
   },
   CA: {
-    heroKicker: "For solo businesses 🇨🇦",
-    heroLede: "Track income, expenses, receipts, kilometres, categories, and exports in one clean ledger built for Canadian solo businesses.",
-    ctaNote: "Canada support.",
-    taxContext: "Tax form context: Canada T2125 estimate",
+    heroKicker: "For Canadian solo businesses 🇨🇦",
+    heroLede: "Track income, expenses, receipts, kilometres, categories, GST/HST context, and exports in one clean ledger built for Canadian solo businesses.",
+    ctaNote: "Canadian tax context.",
+    regionNavLink: "Canada workflow",
+    taxContext: "Tax form context: T2125 estimate",
     previewIncome: "CA$1,643.26",
     previewExpenses: "CA$4,199.01",
     previewProfit: "-CA$2,555.75",
@@ -31,8 +40,15 @@ const LANDING_REGION_COPY = {
     rowFuel: "-CA$65.00",
     fuelCategory: "Motor Vehicle",
     mileageNav: "+ Kilometres",
-    trustRegion: "Built for Canadian T2125 / T4A workflows with GST/HST category support.",
-    featureRegion: "Support for Canadian T2125, T4A, and GST/HST tax context.",
+    trustRegionTitle: "Canadian tax context",
+    trustRegion: "Built around T2125 categories, T4A context, kilometres, and GST/HST category support.",
+    featureRegionTitle: "Built for Canadian records",
+    featureRegion: "Support for T2125 categories, T4A context, GST/HST category support, receipts, kilometres, and export-ready records.",
+    regionSectionTitle: "A Canadian bookkeeping workflow for solo businesses.",
+    regionSectionSubtitle: "Preview the Canada version: T2125 categories, T4A context, GST/HST category support, kilometres, receipts, and exports.",
+    pricingSubtitle: "No credit card required for the trial. Pricing shown in CAD.",
+    faqRegionQuestion: "What Canadian tax context does InEx Ledger support?",
+    faqRegionAnswer: "The Canadian workflow is built around T2125-style categories, T4A context, GST/HST category support, receipts, kilometres, accounts, and export-ready records. It helps organize your books, but it does not replace professional tax advice.",
     currency: "cad"
   }
 };
@@ -71,6 +87,9 @@ function applyLandingRegion(region) {
     const isActive = button.getAttribute("data-region-toggle") === normalized;
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-pressed", String(isActive));
+  });
+  document.querySelectorAll("[data-region-panel]").forEach((panel) => {
+    panel.hidden = panel.getAttribute("data-region-panel") !== normalized;
   });
   updateLandingPricing("monthly", normalized);
 }
