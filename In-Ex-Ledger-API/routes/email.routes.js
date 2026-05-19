@@ -12,13 +12,24 @@
  *   }
  *
  * We extract the reply token from any recipient that matches the
- * plus-addressing pattern, validate it against the optional HMAC secret,
+ * plus-addressing pattern, validate it against the HMAC secret,
  * load the invoice, and insert an 'invoice_reply' message owned by the
  * invoice's business owner (so it appears in their Messages page).
  *
- * The webhook is public (Resend webhooks have no per-call auth). Optional
- * defense in depth: if INBOUND_EMAIL_WEBHOOK_SECRET is set, the request
- * must include `X-Inbound-Secret: <value>` to be accepted.
+ * Signed-webhook contract (production-required):
+ *   - INBOUND_EMAIL_WEBHOOK_SECRET must be set; otherwise 503.
+ *   - The webhook source must send two headers:
+ *       x-inbound-timestamp : Unix seconds when the payload was signed.
+ *       x-inbound-signature : HMAC-SHA256 hex of `${timestamp}.${rawBodyUtf8}`
+ *                             using INBOUND_EMAIL_WEBHOOK_SECRET.
+ *   - Requests older than 5 minutes are rejected (clock skew tolerance).
+ *   - Each signature is single-use within a 5-minute window (replay cache).
+ *   - JSON parsing happens only after the signature check succeeds.
+ *
+ * For local development outside production, a legacy `X-Inbound-Secret`
+ * header is still honoured as a fallback so smoke tests against a
+ * local instance don't have to compute HMACs. This fallback is rejected
+ * when NODE_ENV === "production".
  */
 
 const express = require("express");
@@ -177,24 +188,136 @@ function cleanInboundReplyBody(rawBody) {
   return cleaned;
 }
 
+const INBOUND_TIMESTAMP_TOLERANCE_SECONDS = 5 * 60;
+const INBOUND_REPLAY_TTL_MS = 5 * 60 * 1000;
+const inboundReplayCache = new Map();
+
+function pruneReplayCache(nowMs) {
+  for (const [signature, recordedAt] of inboundReplayCache.entries()) {
+    if (nowMs - recordedAt > INBOUND_REPLAY_TTL_MS) {
+      inboundReplayCache.delete(signature);
+    }
+  }
+}
+
+function rememberSignature(signature, nowMs) {
+  inboundReplayCache.set(signature, nowMs);
+}
+
+function hasSeenSignature(signature) {
+  return inboundReplayCache.has(signature);
+}
+
+function computeInboundSignature(secret, timestampHeader, rawBody) {
+  return crypto
+    .createHmac("sha256", secret)
+    .update(`${timestampHeader}.${rawBody}`)
+    .digest("hex");
+}
+
+function timingSafeHexEqual(a, b) {
+  try {
+    const ab = Buffer.from(String(a || ""), "hex");
+    const bb = Buffer.from(String(b || ""), "hex");
+    if (ab.length === 0 || ab.length !== bb.length) return false;
+    return crypto.timingSafeEqual(ab, bb);
+  } catch (_) {
+    return false;
+  }
+}
+
+function rawBodyUtf8(req) {
+  if (Buffer.isBuffer(req.body)) {
+    return req.body.toString("utf8");
+  }
+  if (typeof req.body === "string") {
+    return req.body;
+  }
+  return "";
+}
+
+function verifyInboundEmailRequest(req, nowMs = Date.now()) {
+  const secret = String(process.env.INBOUND_EMAIL_WEBHOOK_SECRET || "").trim();
+  if (!secret) {
+    return { ok: false, status: 503, error: "Inbound email webhook is not configured." };
+  }
+
+  const rawBody = rawBodyUtf8(req);
+  const timestampHeader = String(req.get("x-inbound-timestamp") || "").trim();
+  const signatureHeader = String(req.get("x-inbound-signature") || "").trim();
+  const legacySecretHeader = req.get("x-inbound-secret") || req.get("x-webhook-secret") || "";
+  const allowLegacyFallback = process.env.NODE_ENV !== "production";
+
+  if (timestampHeader || signatureHeader) {
+    if (!timestampHeader || !signatureHeader) {
+      return { ok: false, status: 400, error: "Missing webhook signature headers." };
+    }
+
+    const timestampSeconds = Number.parseInt(timestampHeader, 10);
+    if (!Number.isFinite(timestampSeconds) || timestampSeconds <= 0) {
+      return { ok: false, status: 400, error: "Malformed webhook timestamp." };
+    }
+
+    const nowSeconds = Math.floor(nowMs / 1000);
+    if (Math.abs(nowSeconds - timestampSeconds) > INBOUND_TIMESTAMP_TOLERANCE_SECONDS) {
+      return { ok: false, status: 401, error: "Webhook timestamp outside tolerance window." };
+    }
+
+    const expectedSignature = computeInboundSignature(secret, timestampHeader, rawBody);
+    if (!timingSafeHexEqual(signatureHeader, expectedSignature)) {
+      return { ok: false, status: 401, error: "Invalid webhook signature." };
+    }
+
+    pruneReplayCache(nowMs);
+    if (hasSeenSignature(signatureHeader)) {
+      return { ok: false, status: 409, error: "Replayed webhook signature." };
+    }
+    rememberSignature(signatureHeader, nowMs);
+  } else if (allowLegacyFallback && legacySecretHeader) {
+    // Dev-only fallback: pre-signing clients (local scripts, manual smoke
+    // tests) may still send the static secret. Never accepted in production.
+    if (!timingSafeStringEqual(legacySecretHeader, secret)) {
+      return { ok: false, status: 401, error: "Invalid webhook secret." };
+    }
+  } else {
+    return { ok: false, status: 401, error: "Missing webhook signature." };
+  }
+
+  let payload = {};
+  if (rawBody) {
+    try {
+      payload = JSON.parse(rawBody);
+      if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+        return { ok: false, status: 400, error: "Webhook payload must be a JSON object." };
+      }
+    } catch (_) {
+      return { ok: false, status: 400, error: "Webhook payload is not valid JSON." };
+    }
+  }
+
+  return { ok: true, payload };
+}
+
 /**
  * POST /api/email/inbound
  * Public webhook entry point.
+ *
+ * Body is consumed as a raw Buffer via the path-specific `express.raw`
+ * middleware registered in server.js (mirroring the Stripe webhook).
+ * The standalone email-route tests build their own app and must
+ * register the same raw parser before any global JSON parser.
  */
-router.post("/inbound", express.json({ limit: "256kb" }), async (req, res) => {
-  const expected = String(process.env.INBOUND_EMAIL_WEBHOOK_SECRET || "").trim();
-  if (!expected) {
-    logError("inbound email webhook misconfigured: INBOUND_EMAIL_WEBHOOK_SECRET is required");
-    return res.status(503).json({ ok: false, error: "Inbound email webhook is not configured." });
+router.post("/inbound", async (req, res) => {
+  const verification = verifyInboundEmailRequest(req);
+  if (!verification.ok) {
+    logWarn("inbound email webhook rejected", {
+      status: verification.status,
+      reason: verification.error
+    });
+    return res.status(verification.status).json({ ok: false, error: verification.error });
   }
 
-  const provided = req.get("x-inbound-secret") || req.get("x-webhook-secret") || "";
-  if (!timingSafeStringEqual(provided, expected)) {
-    logWarn("inbound email webhook rejected: bad secret");
-    return res.status(401).json({ ok: false, error: "Invalid webhook secret." });
-  }
-
-  const payload = req.body || {};
+  const payload = verification.payload || {};
   const recipients = pickRecipientList(payload);
   if (!recipients.length) {
     logWarn("inbound email webhook: no recipients in payload");
