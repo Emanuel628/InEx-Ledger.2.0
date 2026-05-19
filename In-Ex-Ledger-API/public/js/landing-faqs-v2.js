@@ -20,3 +20,32 @@ window.LANDING_POLISH_FAQS = {
     { q: "Is this a full accounting suite?", a: "No. InEx Ledger is intentionally focused on solo-business bookkeeping: income, expenses, accounts, categories, receipts, kilometres, analytics, and exports." }
   ]
 };
+
+function renderExpandedLandingFaqs() {
+  var list = document.querySelector("#faq .faq-list");
+  if (!list || !window.LANDING_POLISH_FAQS) return;
+  var region = document.documentElement.dataset.region === "CA" ? "CA" : "US";
+  var faqs = window.LANDING_POLISH_FAQS[region] || window.LANDING_POLISH_FAQS.US;
+  list.textContent = "";
+  faqs.forEach(function(item, index) {
+    var details = document.createElement("details");
+    details.className = "faq-item";
+    if (index === 0) details.setAttribute("open", "");
+    var summary = document.createElement("summary");
+    summary.textContent = item.q;
+    var paragraph = document.createElement("p");
+    paragraph.textContent = item.a;
+    details.appendChild(summary);
+    details.appendChild(paragraph);
+    list.appendChild(details);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  window.setTimeout(renderExpandedLandingFaqs, 30);
+  document.querySelectorAll("[data-region-toggle]").forEach(function(button) {
+    button.addEventListener("click", function() {
+      window.setTimeout(renderExpandedLandingFaqs, 30);
+    });
+  });
+});
