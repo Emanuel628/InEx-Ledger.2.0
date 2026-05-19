@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="/css/app.css?v=20260510c" />
   <link rel="stylesheet" href="/css/pages/settings.css?v=20260516b" />
   <link rel="stylesheet" href="/css/pages/subscription.css?v=20260516a" />
+  <link rel="stylesheet" href="/css/pages/subscription-premium.css?v=20260519a" />
+  <link rel="stylesheet" href="/css/pages/subscription-premium-bridge.css?v=20260519a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -33,7 +35,7 @@
         <a href="mileage"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg></span><span data-i18n="nav_mileage">Mileage</span></a>
         <a href="exports"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg></span><span data-i18n="nav_exports">Exports</span></a>
         <a href="settings"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg></span><span data-i18n="nav_settings">Settings</span></a>
-              <a data-i18n="nav_invoices" href="invoices"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg></span><span>Invoices</span></a>
+        <a data-i18n="nav_invoices" href="invoices"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg></span><span>Invoices</span></a>
         <a data-i18n="nav_messages" href="messages"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M2.5 4.5 8 9l5.5-4.5"/><rect x="2" y="3" width="12" height="10" rx="1.5"/></svg></span><span>Messages</span></a>
       </nav>
     </div>
@@ -44,58 +46,56 @@
   </header>
 
   <div class="settings-shell sub-no-sidebar">
-
     <main id="main-content" class="settings-main">
-
-      <!-- -- Status & Plan --------------------------- -->
-      <section class="settings-card sub-hero-card" id="sub-status-section">
-        <div class="sub-hero-shell">
+      <section class="settings-card sub-hero-card sub-premium-hero" id="sub-status-section">
+        <div class="sub-hero-shell sub-premium-hero-grid">
           <div class="sub-hero-copy">
-            <span class="sub-hero-kicker">Billing center</span>
-            <h1 class="sub-hero-title">Plan state, payment details, invoices, and renewal actions in one flow.</h1>
-            <p class="sub-hero-sub">Use this page for billing only. Business switching, editing, and deletion belong in Settings.</p>
+            <span class="sub-hero-kicker sub-premium-kicker">Billing command center</span>
+            <h1 class="sub-hero-title sub-premium-title">Plan, payment, business capacity, and invoices in one place.</h1>
+            <p class="sub-hero-sub sub-premium-subtitle">Manage the billing side of InEx Ledger without mixing it up with operational settings. Stripe handles payment details and invoices; this page keeps your app access and business capacity clear.</p>
+            <div class="sub-premium-proof-grid" aria-label="Billing page highlights">
+              <div class="sub-proof-pill"><span>1</span><div><strong>Current plan first</strong><small>See plan state, renewal, trial, or payment status before choosing an action.</small></div></div>
+              <div class="sub-proof-pill"><span>2</span><div><strong>Stripe-managed billing</strong><small>Cards, invoices, portal actions, and checkout stay in Stripe.</small></div></div>
+              <div class="sub-proof-pill"><span>3</span><div><strong>Business capacity</strong><small>Track included and additional businesses without leaving billing.</small></div></div>
+              <div class="sub-proof-pill"><span>4</span><div><strong>One primary action</strong><small>The main button changes based on the live subscription state.</small></div></div>
+            </div>
           </div>
-          <div class="sub-status-block" id="subStatusBlock">
-            <div class="sub-status-loading" data-i18n="settings_loading">Loading...</div>
+          <div class="sub-premium-status-panel">
+            <div class="sub-status-block" id="subStatusBlock">
+              <div class="sub-status-loading" data-i18n="settings_loading">Loading...</div>
+            </div>
+            <div class="sub-stripe-note">
+              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" class="sub-stripe-icon">
+                <rect x="2" y="7" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.4"/>
+                <path d="M5 7V5a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+              <span>Payment details, invoices, and plan changes are managed in Stripe — not stored inside this app.</span>
+            </div>
+            <div class="settings-row sub-actions-row sub-command-actions">
+              <a href="settings" class="settings-secondary-btn">Back to settings</a>
+              <button type="button" id="subManageBillingBtn" class="settings-secondary-btn hidden" data-i18n="subscription_manage_billing">Manage billing</button>
+              <button type="button" id="subCancelBtn" class="danger-outline-btn hidden" data-i18n="settings_cancel_subscription_btn">Cancel subscription…</button>
+            </div>
           </div>
-        </div>
-
-        <div class="sub-stripe-note">
-          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" class="sub-stripe-icon">
-            <rect x="2" y="7" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.4"/>
-            <path d="M5 7V5a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          </svg>
-          <span>Payment details, invoices, and plan changes are managed in Stripe &mdash; not stored inside this app.</span>
-        </div>
-
-        <div class="settings-row sub-actions-row">
-          <a href="settings" class="settings-secondary-btn">Back to settings</a>
-          <button type="button" id="subManageBillingBtn" class="settings-secondary-btn hidden" data-i18n="subscription_manage_billing">Manage billing</button>
-          <button type="button" id="subCancelBtn" class="danger-outline-btn hidden" data-i18n="settings_cancel_subscription_btn">Cancel subscription&#x2026;</button>
         </div>
       </section>
 
-      <!-- -- Plans ----------------------------------- -->
       <section class="settings-card sub-plans-section" id="sub-plans-section">
-
-        <div class="sub-plans-head">
-          <span class="sub-plans-kicker">Plans &amp; Pricing</span>
-          <h2 class="sub-plans-title">A cleaner billing surface with one primary action per state.</h2>
-          <p class="sub-plans-sub">Compare only the plans and billed add-ons that matter right now. Primary actions should match the live state of the account.</p>
+        <div class="sub-plans-head sub-section-header">
+          <div>
+            <span class="sub-plans-kicker sub-section-kicker">Plans & pricing</span>
+            <h2 class="sub-plans-title sub-section-title">Choose the workflow that matches your business load.</h2>
+            <p class="sub-plans-sub sub-section-subtitle">Basic is for lighter activity. Pro unlocks the full working ledger, exports, receipt support, analytics, and additional business capacity.</p>
+          </div>
         </div>
 
         <div class="sub-plans-grid">
-
-          <!-- Basic -->
           <div class="sub-plan-card" id="planFree">
             <div class="sub-plan-badge-row" aria-hidden="true"></div>
             <div class="sub-plan-top">
               <h3 class="sub-plan-name" data-i18n="subscription_starter_title">Basic</h3>
-              <div class="sub-price-block">
-                <span class="sub-price-amount">$0</span>
-                <span class="sub-price-period">/ month</span>
-              </div>
-              <p class="sub-plan-pitch">Track income and expenses for lighter monthly activity. No commitment, no card required.</p>
+              <div class="sub-price-block"><span class="sub-price-amount">$0</span><span class="sub-price-period">/ month</span></div>
+              <p class="sub-plan-pitch">A simple starting point for lighter bookkeeping activity. No commitment, no card required.</p>
             </div>
             <ul class="sub-plan-features">
               <li>50 transactions per month</li>
@@ -108,52 +108,41 @@
             </div>
           </div>
 
-          <!-- Pro -->
           <div class="sub-plan-card sub-plan-featured" id="planPro">
-            <div class="sub-plan-badge-row">
-              <span class="sub-featured-badge" data-i18n="subscription_pro_badge">Most Popular</span>
-            </div>
+            <div class="sub-plan-badge-row"><span class="sub-featured-badge" data-i18n="subscription_pro_badge">Recommended</span></div>
             <div class="sub-plan-top">
               <h3 class="sub-plan-name" data-i18n="subscription_pro_title">Pro</h3>
-              <div class="sub-price-block">
-                <span class="sub-price-amount" id="planProPriceLabel">$12 / mo</span>
-              </div>
+              <div class="sub-price-block"><span class="sub-price-amount" id="planProPriceLabel">$12 / mo</span></div>
               <p class="sub-plan-addon-note" id="planProAddonPriceLabel">Additional businesses from $5&nbsp;/&nbsp;mo</p>
-              <p class="sub-plan-pitch">The complete working ledger&#x202F;&mdash; built for real, ongoing use without limits.</p>
+              <p class="sub-plan-pitch">The complete working ledger for ongoing solo-business bookkeeping.</p>
             </div>
 
-            <div class="sub-plan-controls" id="proCardAddonGroup">
-              <div class="sub-control-row">
-                <span class="sub-control-label" data-i18n="subscription_billing_interval_label">Billing</span>
-                <div class="sub-toggle" role="group" aria-label="Billing interval">
-                  <button type="button" class="sub-toggle-btn is-active" data-billing-interval="monthly" data-i18n="subscription_billing_monthly" aria-pressed="true">Monthly</button>
-                  <button type="button" class="sub-toggle-btn" data-billing-interval="yearly" data-i18n="subscription_billing_yearly" aria-pressed="false">Yearly</button>
+            <div class="sub-capacity-shell">
+              <div class="sub-plan-controls sub-capacity-card" id="proCardAddonGroup">
+                <span class="sub-mini-kicker">Business capacity</span>
+                <div class="sub-control-row">
+                  <span class="sub-control-label" data-i18n="subscription_billing_interval_label">Billing</span>
+                  <div class="sub-toggle" role="group" aria-label="Billing interval">
+                    <button type="button" class="sub-toggle-btn is-active" data-billing-interval="monthly" data-i18n="subscription_billing_monthly" aria-pressed="true">Monthly</button>
+                    <button type="button" class="sub-toggle-btn" data-billing-interval="yearly" data-i18n="subscription_billing_yearly" aria-pressed="false">Yearly</button>
+                  </div>
+                </div>
+                <div class="sub-control-row">
+                  <label class="sub-control-label" for="additionalBusinessesInput" data-i18n="subscription_additional_businesses_label">Extra businesses</label>
+                  <div class="sub-quantity-control">
+                    <button type="button" class="sub-quantity-btn" data-qty-action="decrease" aria-label="Decrease">−</button>
+                    <input id="additionalBusinessesInput" class="sub-quantity-input" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" />
+                    <button type="button" class="sub-quantity-btn" data-qty-action="increase" aria-label="Increase">+</button>
+                  </div>
                 </div>
               </div>
-              <div class="sub-control-row">
-                <label class="sub-control-label" for="additionalBusinessesInput" data-i18n="subscription_additional_businesses_label">Extra businesses</label>
-                <div class="sub-quantity-control">
-                  <button type="button" class="sub-quantity-btn" data-qty-action="decrease" aria-label="Decrease">&#x2212;</button>
-                  <input id="additionalBusinessesInput" class="sub-quantity-input" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" />
-                  <button type="button" class="sub-quantity-btn" data-qty-action="increase" aria-label="Increase">+</button>
-                </div>
-              </div>
-            </div>
 
-            <div class="sub-price-summary" id="subPriceSummary">
-              <div class="sub-price-row">
-                <span class="sub-price-label" data-i18n="subscription_price_summary_plan">Plan</span>
-                <span class="sub-price-value" id="subPricePlan">&#x2014;</span>
+              <div class="sub-price-summary" id="subPriceSummary">
+                <div class="sub-price-row"><span class="sub-price-label" data-i18n="subscription_price_summary_plan">Plan</span><span class="sub-price-value" id="subPricePlan">—</span></div>
+                <div class="sub-price-row"><span class="sub-price-label" data-i18n="subscription_price_summary_addon">Add-ons</span><span class="sub-price-value" id="subPriceAddon">$0</span></div>
+                <div class="sub-price-row sub-price-total"><span class="sub-price-label" data-i18n="subscription_price_summary_total">Estimated total</span><span class="sub-price-value" id="subPriceTotal">—</span></div>
+                <p class="sub-price-note" id="subPriceNote" data-i18n="subscription_price_summary_note">Final pricing confirmed at checkout.</p>
               </div>
-              <div class="sub-price-row">
-                <span class="sub-price-label" data-i18n="subscription_price_summary_addon">Add-ons</span>
-                <span class="sub-price-value" id="subPriceAddon">$0</span>
-              </div>
-              <div class="sub-price-row sub-price-total">
-                <span class="sub-price-label" data-i18n="subscription_price_summary_total">Estimated total</span>
-                <span class="sub-price-value" id="subPriceTotal">&#x2014;</span>
-              </div>
-              <p class="sub-price-note" id="subPriceNote" data-i18n="subscription_price_summary_note">Final pricing confirmed at checkout.</p>
             </div>
 
             <ul class="sub-plan-features">
@@ -163,7 +152,7 @@
               <li>Full analytics dashboard</li>
               <li data-i18n="subscription_pro_4">Multi-format exports</li>
               <li data-i18n="subscription_pro_3">Priority support</li>
-              <li>Multiple businesses (add-on)</li>
+              <li>Multiple businesses with add-ons</li>
             </ul>
 
             <div class="sub-plan-cta-area">
@@ -171,106 +160,66 @@
               <p class="sub-plan-checkout-note">Secure checkout opens in Stripe when a new subscription is needed.</p>
             </div>
           </div>
-
-        </div><!-- /.sub-plans-grid -->
-
+        </div>
       </section>
 
-      <!-- -- Billing Details -------------------------- -->
-      <section class="settings-card" id="sub-access-section">
-        <div class="card-head">
-          <h2 class="card-title">Billing details</h2>
-          <p class="card-desc">Payment method, invoice access, and billed business capacity belong here. Business ownership and deletion live in Settings.</p>
+      <section class="settings-card sub-billing-panel" id="sub-access-section">
+        <div class="card-head sub-section-header">
+          <div>
+            <span class="sub-section-kicker">Billing details</span>
+            <h2 class="card-title sub-section-title">Payment method and business capacity.</h2>
+            <p class="card-desc sub-section-subtitle">Payment method, invoice access, and billed business capacity belong here. Business ownership and deletion live in Settings.</p>
+          </div>
         </div>
         <div class="sub-billing-detail-grid">
-          <div id="subPaymentMethodCard" class="sub-detail-card">
-            <div class="sub-status-loading" data-i18n="settings_loading">Loading&#x2026;</div>
-          </div>
-          <div id="businessSlotsManager" class="sub-detail-card">
-            <div class="sub-status-loading" data-i18n="settings_loading">Loading&#x2026;</div>
-          </div>
+          <div id="subPaymentMethodCard" class="sub-detail-card"><div class="sub-status-loading" data-i18n="settings_loading">Loading…</div></div>
+          <div id="businessSlotsManager" class="sub-detail-card"><div class="sub-status-loading" data-i18n="settings_loading">Loading…</div></div>
         </div>
       </section>
 
-      <!-- -- Billing History -------------------------- -->
-      <section class="settings-card" id="sub-history-section">
-        <div class="card-head">
-          <h2 class="card-title" data-i18n="sub_mgmt_history_title">Billing history</h2>
-          <p class="card-desc">Past payments and invoices from Stripe.</p>
+      <section class="settings-card sub-history-panel" id="sub-history-section">
+        <div class="card-head sub-section-header">
+          <div>
+            <span class="sub-section-kicker">Billing history</span>
+            <h2 class="card-title sub-section-title" data-i18n="sub_mgmt_history_title">Invoices and payment history.</h2>
+            <p class="card-desc sub-section-subtitle">Past payments and invoices from Stripe.</p>
+          </div>
         </div>
-        <div id="billingHistoryList" class="billing-history-list">
-          <div class="sub-status-loading" data-i18n="settings_loading">Loading&#x2026;</div>
-        </div>
+        <div id="billingHistoryList" class="billing-history-list"><div class="sub-status-loading" data-i18n="settings_loading">Loading…</div></div>
       </section>
-
     </main>
   </div>
 
-  <!-- Cancel subscription modal -->
   <div id="subCancelModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="subCancelModalTitle" aria-describedby="subCancelModalBody">
     <div class="transaction-modal-content danger-modal">
-      <div class="danger-modal-icon" aria-hidden="true">
-        <svg viewBox="0 0 16 16" fill="none">
-          <path d="M8 3L14 13H2L8 3Z"></path>
-          <line x1="8" y1="7" x2="8" y2="10"></line>
-          <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
-        </svg>
-      </div>
+      <div class="danger-modal-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 3L14 13H2L8 3Z"></path><line x1="8" y1="7" x2="8" y2="10"></line><circle cx="8" cy="12" r=".5" fill="currentColor"></circle></svg></div>
       <h3 id="subCancelModalTitle" data-i18n="settings_cancel_sub_modal_title">Cancel subscription?</h3>
       <p id="subCancelModalBody" data-i18n="settings_cancel_sub_modal_body">Your subscription will remain active until the end of the current billing period.</p>
-      <div class="modal-actions danger-actions">
-        <button type="button" id="subCancelModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
-        <button type="button" id="subCancelModalConfirm" class="modal-delete" data-i18n="settings_cancel_sub_confirm_btn">Yes, cancel subscription</button>
-      </div>
+      <div class="modal-actions danger-actions"><button type="button" id="subCancelModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button><button type="button" id="subCancelModalConfirm" class="modal-delete" data-i18n="settings_cancel_sub_confirm_btn">Yes, cancel subscription</button></div>
     </div>
   </div>
 
-  <!-- Switch to Basic modal -->
   <div id="subFreeModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="subFreeModalTitle" aria-describedby="subFreeModalBody">
     <div class="transaction-modal-content danger-modal">
-      <div class="danger-modal-icon" aria-hidden="true">
-        <svg viewBox="0 0 16 16" fill="none">
-          <path d="M8 3L14 13H2L8 3Z"></path>
-          <line x1="8" y1="7" x2="8" y2="10"></line>
-          <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
-        </svg>
-      </div>
+      <div class="danger-modal-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 3L14 13H2L8 3Z"></path><line x1="8" y1="7" x2="8" y2="10"></line><circle cx="8" cy="12" r=".5" fill="currentColor"></circle></svg></div>
       <h3 id="subFreeModalTitle" data-i18n="subscription_free_confirm_title">Switch to Basic?</h3>
       <p id="subFreeModalBody" data-i18n="subscription_free_confirm_body_generic">This business will move to Basic.</p>
-      <div class="modal-actions danger-actions">
-        <button type="button" id="subFreeModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button>
-        <button type="button" id="subFreeModalConfirm" class="modal-delete" data-i18n="subscription_free_confirm_action">Confirm Basic</button>
-      </div>
+      <div class="modal-actions danger-actions"><button type="button" id="subFreeModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button><button type="button" id="subFreeModalConfirm" class="modal-delete" data-i18n="subscription_free_confirm_action">Confirm Basic</button></div>
     </div>
   </div>
 
   <div id="subBusinessDeleteModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="subBusinessDeleteTitle" aria-describedby="subBusinessDeleteBody">
     <div class="transaction-modal-content danger-modal">
-      <div class="danger-modal-icon" aria-hidden="true">
-        <svg viewBox="0 0 16 16" fill="none">
-          <path d="M8 3L14 13H2L8 3Z"></path>
-          <line x1="8" y1="7" x2="8" y2="10"></line>
-          <circle cx="8" cy="12" r=".5" fill="currentColor"></circle>
-        </svg>
-      </div>
+      <div class="danger-modal-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 3L14 13H2L8 3Z"></path><line x1="8" y1="7" x2="8" y2="10"></line><circle cx="8" cy="12" r=".5" fill="currentColor"></circle></svg></div>
       <h3 id="subBusinessDeleteTitle">Delete business?</h3>
       <p id="subBusinessDeleteBody">This action permanently deletes the selected business and its associated data.</p>
-      <div class="danger-confirm-wrap">
-        <label for="subBusinessDeletePassword">Enter your password to confirm</label>
-        <input type="password" id="subBusinessDeletePassword" autocomplete="current-password" />
-      </div>
+      <div class="danger-confirm-wrap"><label for="subBusinessDeletePassword">Enter your password to confirm</label><input type="password" id="subBusinessDeletePassword" autocomplete="current-password" /></div>
       <p id="subBusinessDeleteError" class="sub-inline-error hidden" role="alert" aria-live="assertive"></p>
-      <div class="modal-actions danger-actions">
-        <button type="button" id="subBusinessDeleteCancel" class="modal-cancel">Cancel</button>
-        <button type="button" id="subBusinessDeleteConfirm" class="modal-delete">Delete business</button>
-      </div>
+      <div class="modal-actions danger-actions"><button type="button" id="subBusinessDeleteCancel" class="modal-cancel">Cancel</button><button type="button" id="subBusinessDeleteConfirm" class="modal-delete">Delete business</button></div>
     </div>
   </div>
 
-  <!-- Toast -->
-  <div id="subToast" class="settings-toast hidden" role="status" aria-live="polite">
-    <span id="subToastMessage">Saved</span>
-  </div>
+  <div id="subToast" class="settings-toast hidden" role="status" aria-live="polite"><span id="subToastMessage">Saved</span></div>
 
   <script src="../js/escape-html.js?v=20260410a"></script>
   <script src="../js/global.js?v=20260510c"></script>
@@ -279,6 +228,6 @@
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
   <script src="../js/billing-pricing.js?v=20260419a"></script>
-  <script src="../js/subscription.js?v=20260516a"></script>
+  <script src="../js/subscription.js?v=20260519a"></script>
 </body>
 </html>
