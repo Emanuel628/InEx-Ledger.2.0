@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/css/app.css?v=20260510c" />
   <link rel="stylesheet" href="/css/pages/settings.css?v=20260516b" />
   <link rel="stylesheet" href="/css/pages/subscription.css?v=20260519c" />
+  <link rel="stylesheet" href="/css/pages/subscription-responsive-fixes.css?v=20260519a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -76,51 +77,23 @@
         <div class="subscription-plan-layout">
           <div class="subscription-plan-stack">
             <article class="sub-plan-card subscription-plan-row" id="planFree">
-              <div class="subscription-plan-row-main">
-                <span class="subscription-plan-label">Basic</span>
-                <h3 class="sub-plan-name" data-i18n="subscription_starter_title">Basic</h3>
-                <p class="sub-plan-pitch">A simple starting point for lighter bookkeeping activity. No commitment, no card required.</p>
-              </div>
+              <div class="subscription-plan-row-main"><span class="subscription-plan-label">Basic</span><h3 class="sub-plan-name" data-i18n="subscription_starter_title">Basic</h3><p class="sub-plan-pitch">A simple starting point for lighter bookkeeping activity. No commitment, no card required.</p></div>
               <div class="subscription-plan-row-price"><strong>$0</strong><span>/ month</span></div>
-              <ul class="sub-plan-features">
-                <li>50 transactions per month</li><li>Single business</li><li>Income &amp; expense ledger</li><li>CSV export</li>
-              </ul>
+              <ul class="sub-plan-features"><li>50 transactions per month</li><li>Single business</li><li>Income &amp; expense ledger</li><li>CSV export</li></ul>
               <button type="button" id="planFreeBtn" class="sub-cta-outline" data-i18n="subscription_starter_cta">Select Basic</button>
             </article>
 
             <article class="sub-plan-card sub-plan-featured subscription-plan-row" id="planPro">
-              <div class="subscription-plan-row-main">
-                <span class="subscription-plan-label subscription-plan-label-pro" data-i18n="subscription_pro_badge">Recommended</span>
-                <h3 class="sub-plan-name" data-i18n="subscription_pro_title">Pro</h3>
-                <p class="sub-plan-pitch">The complete working ledger for ongoing solo-business bookkeeping.</p>
-              </div>
+              <div class="subscription-plan-row-main"><span class="subscription-plan-label subscription-plan-label-pro" data-i18n="subscription_pro_badge">Recommended</span><h3 class="sub-plan-name" data-i18n="subscription_pro_title">Pro</h3><p class="sub-plan-pitch">The complete working ledger for ongoing solo-business bookkeeping.</p></div>
               <div class="subscription-plan-row-price"><strong id="planProPriceLabel">$12 / mo</strong><span id="planProAddonPriceLabel">Additional businesses from $5&nbsp;/&nbsp;mo</span></div>
-              <ul class="sub-plan-features">
-                <li data-i18n="subscription_pro_1">Unlimited transactions</li><li>Receipt uploads &amp; OCR scanning</li><li>Mileage tracking</li><li>Full analytics dashboard</li><li data-i18n="subscription_pro_4">Multi-format exports</li><li data-i18n="subscription_pro_3">Priority support</li><li>Multiple businesses with add-ons</li>
-              </ul>
+              <ul class="sub-plan-features"><li data-i18n="subscription_pro_1">Unlimited transactions</li><li>Receipt uploads &amp; OCR scanning</li><li>Mileage tracking</li><li>Full analytics dashboard</li><li data-i18n="subscription_pro_4">Multi-format exports</li><li data-i18n="subscription_pro_3">Priority support</li><li>Multiple businesses with add-ons</li></ul>
               <button type="button" id="planProBtn" class="sub-cta-primary" data-i18n="subscription_pro_cta">Upgrade to Pro</button>
             </article>
           </div>
 
           <aside class="subscription-capacity-board" aria-label="Pro billing estimate">
-            <div class="subscription-board-card" id="proCardAddonGroup">
-              <span class="subscription-eyebrow">Capacity calculator</span>
-              <h3>Estimate Pro before Stripe checkout.</h3>
-              <div class="sub-control-row">
-                <span class="sub-control-label" data-i18n="subscription_billing_interval_label">Billing</span>
-                <div class="sub-toggle" role="group" aria-label="Billing interval"><button type="button" class="sub-toggle-btn is-active" data-billing-interval="monthly" data-i18n="subscription_billing_monthly" aria-pressed="true">Monthly</button><button type="button" class="sub-toggle-btn" data-billing-interval="yearly" data-i18n="subscription_billing_yearly" aria-pressed="false">Yearly</button></div>
-              </div>
-              <div class="sub-control-row">
-                <label class="sub-control-label" for="additionalBusinessesInput" data-i18n="subscription_additional_businesses_label">Extra businesses</label>
-                <div class="sub-quantity-control"><button type="button" class="sub-quantity-btn" data-qty-action="decrease" aria-label="Decrease">−</button><input id="additionalBusinessesInput" class="sub-quantity-input" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" /><button type="button" class="sub-quantity-btn" data-qty-action="increase" aria-label="Increase">+</button></div>
-              </div>
-            </div>
-            <div class="sub-price-summary subscription-board-card" id="subPriceSummary">
-              <div class="sub-price-row"><span class="sub-price-label" data-i18n="subscription_price_summary_plan">Plan</span><span class="sub-price-value" id="subPricePlan">—</span></div>
-              <div class="sub-price-row"><span class="sub-price-label" data-i18n="subscription_price_summary_addon">Add-ons</span><span class="sub-price-value" id="subPriceAddon">$0</span></div>
-              <div class="sub-price-row sub-price-total"><span class="sub-price-label" data-i18n="subscription_price_summary_total">Estimated total</span><span class="sub-price-value" id="subPriceTotal">—</span></div>
-              <p class="sub-price-note" id="subPriceNote" data-i18n="subscription_price_summary_note">Final pricing confirmed at checkout.</p>
-            </div>
+            <div class="subscription-board-card" id="proCardAddonGroup"><span class="subscription-eyebrow">Capacity calculator</span><h3>Estimate Pro before Stripe checkout.</h3><div class="sub-control-row"><span class="sub-control-label" data-i18n="subscription_billing_interval_label">Billing</span><div class="sub-toggle" role="group" aria-label="Billing interval"><button type="button" class="sub-toggle-btn is-active" data-billing-interval="monthly" data-i18n="subscription_billing_monthly" aria-pressed="true">Monthly</button><button type="button" class="sub-toggle-btn" data-billing-interval="yearly" data-i18n="subscription_billing_yearly" aria-pressed="false">Yearly</button></div></div><div class="sub-control-row"><label class="sub-control-label" for="additionalBusinessesInput" data-i18n="subscription_additional_businesses_label">Extra businesses</label><div class="sub-quantity-control"><button type="button" class="sub-quantity-btn" data-qty-action="decrease" aria-label="Decrease">−</button><input id="additionalBusinessesInput" class="sub-quantity-input" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" /><button type="button" class="sub-quantity-btn" data-qty-action="increase" aria-label="Increase">+</button></div></div></div>
+            <div class="sub-price-summary subscription-board-card" id="subPriceSummary"><div class="sub-price-row"><span class="sub-price-label" data-i18n="subscription_price_summary_plan">Plan</span><span class="sub-price-value" id="subPricePlan">—</span></div><div class="sub-price-row"><span class="sub-price-label" data-i18n="subscription_price_summary_addon">Add-ons</span><span class="sub-price-value" id="subPriceAddon">$0</span></div><div class="sub-price-row sub-price-total"><span class="sub-price-label" data-i18n="subscription_price_summary_total">Estimated total</span><span class="sub-price-value" id="subPriceTotal">—</span></div><p class="sub-price-note" id="subPriceNote" data-i18n="subscription_price_summary_note">Final pricing confirmed at checkout.</p></div>
           </aside>
         </div>
       </section>
