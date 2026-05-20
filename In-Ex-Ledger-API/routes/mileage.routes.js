@@ -5,7 +5,25 @@ const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+
+/**
+ * Vehicle cost tracking (fuel / maintenance / insurance entries) is a Pro
+ * feature. Mileage and kilometre trip logging itself stays available on the
+ * Basic tier — only the heavier vehicle-expense module is gated here.
+ */
+async function assertVehicleCostProAccess(businessId) {
+  const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+  if ((subscription?.effectiveTier || "free") === "free") {
+    const error = new Error(
+      "Vehicle cost tracking is a Pro feature. Mileage and kilometre trip logging stays available on Basic — upgrade to Pro to track vehicle expenses."
+    );
+    error.status = 402;
+    error.code = "pro_feature_required";
+    throw error;
+  }
+}
 const {
   AccountingPeriodLockedError,
   loadAccountingLockState,
@@ -214,6 +232,7 @@ router.post("/costs", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    await assertVehicleCostProAccess(businessId);
     const lockState = await loadAccountingLockState(pool, businessId);
     assertDateUnlocked(lockState, normalized.value.entryDate.slice(0, 10));
     const result = await pool.query(
@@ -233,6 +252,9 @@ router.post("/costs", async (req, res) => {
     );
     return res.status(201).json(result.rows[0]);
   } catch (err) {
+    if (err?.status === 402 && err?.code === "pro_feature_required") {
+      return res.status(402).json({ error: err.message, code: err.code });
+    }
     if (err instanceof AccountingPeriodLockedError) {
       return res.status(err.status).json({
         error: err.message,
@@ -502,6 +524,7 @@ router.put("/costs/:id", async (req, res) => {
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
+    await assertVehicleCostProAccess(businessId);
 
     const existing = await pool.query(
       `SELECT id, entry_date
@@ -546,6 +569,9 @@ router.put("/costs/:id", async (req, res) => {
 
     return res.json(result.rows[0]);
   } catch (err) {
+    if (err?.status === 402 && err?.code === "pro_feature_required") {
+      return res.status(402).json({ error: err.message, code: err.code });
+    }
     if (err instanceof AccountingPeriodLockedError) {
       return res.status(err.status).json({
         error: err.message,

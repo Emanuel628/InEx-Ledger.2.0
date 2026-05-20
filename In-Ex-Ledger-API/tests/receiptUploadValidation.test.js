@@ -53,31 +53,49 @@ function loadReceiptsRouter(options = {}) {
       };
     }
     if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
+      const periodRow = () => ({ id: "period-test", receipts_used: options.receiptsUsed || 0 });
+      const outerQuery = async (sql, params) => {
+        state.queryCount += 1;
+        if (/business_usage_periods/i.test(sql)) {
+          return { rowCount: 1, rows: [periodRow()] };
+        }
+        if (/SELECT id, filename, mime_type, storage_path, file_bytes\s+FROM receipts/i.test(sql)) {
+          if (!state.receiptRow) {
+            return { rowCount: 0, rows: [] };
+          }
+          return { rowCount: 1, rows: [state.receiptRow] };
+        }
+        if (/FROM transactions/i.test(sql)) {
+          if (!state.transactionRow) {
+            return { rowCount: 0, rows: [] };
+          }
+          return { rowCount: 1, rows: [state.transactionRow] };
+        }
+        return { rowCount: 0, rows: [] };
+      };
+      const clientQuery = async (sql, params) => {
+        state.queryCount += 1;
+        const text = String(sql || "");
+        if (/business_usage_periods/i.test(text)) {
+          return { rowCount: 1, rows: [periodRow()] };
+        }
+        if (/INSERT INTO receipts/i.test(text)) {
+          state.insertParams = params;
+          return { rowCount: 1, rows: [] };
+        }
+        if (/COUNT\(\*\)[\s\S]*FROM receipts/i.test(text)) {
+          return { rowCount: 1, rows: [{ count: options.attachedReceiptCount || 0 }] };
+        }
+        return { rowCount: 0, rows: [] };
+      };
       return {
         pool: {
-          async query(sql, params) {
-            state.queryCount += 1;
-
-            if (/FROM transactions/i.test(sql)) {
-              if (!state.transactionRow) {
-                return { rowCount: 0, rows: [] };
-              }
-              return { rowCount: 1, rows: [state.transactionRow] };
-            }
-
-            if (/INSERT INTO receipts/i.test(sql)) {
-              state.insertParams = params;
-              return { rowCount: 1, rows: [] };
-            }
-
-            if (/SELECT id, filename, mime_type, storage_path, file_bytes\s+FROM receipts/i.test(sql)) {
-              if (!state.receiptRow) {
-                return { rowCount: 0, rows: [] };
-              }
-              return { rowCount: 1, rows: [state.receiptRow] };
-            }
-
-            throw new Error(`Unexpected query in test double: ${sql}`);
+          query: outerQuery,
+          async connect() {
+            return {
+              query: clientQuery,
+              release() {}
+            };
           }
         }
       };
@@ -284,6 +302,42 @@ test("receipt download forces attachment and octet-stream for unsafe stored mime
     assert.equal(response.headers["content-type"], "application/octet-stream");
     assert.match(String(response.headers["content-disposition"] || ""), /^attachment;/i);
     assert.equal(response.headers["x-content-type-options"], "nosniff");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("receipt upload is blocked once a transaction already has 10 receipt files", async () => {
+  const transactionId = "00000000-0000-4000-8000-000000000444";
+  const fixture = loadReceiptsRouter({
+    transactionRow: { id: transactionId, date: "2026-05-01" },
+    attachedReceiptCount: 10
+  });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await uploadReceipt(request(app), transactionId);
+
+    assert.equal(response.status, 409);
+    assert.equal(response.body.code, "transaction_receipt_limit_reached");
+    assert.equal(response.body.limit, 10);
+    assert.equal(fixture.state.insertParams, null);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("receipt upload succeeds when a transaction is below the 10-file limit", async () => {
+  const transactionId = "00000000-0000-4000-8000-000000000555";
+  const fixture = loadReceiptsRouter({
+    transactionRow: { id: transactionId, date: "2026-05-01" },
+    attachedReceiptCount: 4
+  });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await uploadReceipt(request(app), transactionId);
+
+    assert.equal(response.status, 201);
+    assert.ok(Array.isArray(fixture.state.insertParams));
   } finally {
     fixture.cleanup();
   }

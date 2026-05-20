@@ -143,12 +143,48 @@
         </div>
       </form>
     </section>
+
+    <section class="onboarding-shell onboarding-import-shell" id="onboardingImportStep" hidden>
+      <div class="onboarding-import-card">
+        <span class="onboarding-kicker">Optional step</span>
+        <h2 class="onboarding-import-title">Import transactions from your bank</h2>
+        <p class="onboarding-import-lede">
+          Save time by importing a CSV from your bank. You can also skip this step and add transactions manually.
+        </p>
+
+        <div class="onboarding-import-actions">
+          <label class="onboarding-import-upload">
+            <input type="file" id="onboardingCsvFile" accept=".csv,text/csv" />
+            <span class="auth-submit onboarding-import-upload-btn">Upload CSV</span>
+          </label>
+          <button
+            type="button"
+            id="onboardingCsvHelpToggle"
+            class="onboarding-help-icon"
+            aria-label="Need help finding your CSV?"
+            aria-expanded="false"
+            aria-controls="onboardingBankHelpPanel"
+            title="Need help finding your CSV?"
+          >i</button>
+          <button type="button" id="onboardingCsvSkip" class="onboarding-skip-btn">Skip for now</button>
+        </div>
+
+        <p id="onboardingCsvStatus" class="onboarding-import-status" role="status" aria-live="polite" hidden></p>
+
+        <div id="onboardingBankHelpPanel" class="bank-csv-help-panel" hidden></div>
+
+        <div class="onboarding-import-continue" id="onboardingImportContinueRow" hidden>
+          <button type="button" id="onboardingImportContinue" class="auth-submit">Continue to your workspace</button>
+        </div>
+      </div>
+    </section>
   </main>
   <script src="../js/escape-html.js?v=20260410a"></script>
   <script src="../js/global.js?v=20260510c"></script>
   <script src="../js/i18n.js?v=20260510c"></script>
   <script src="../js/auth.js?v=20260518a"></script>
-  <script src="../js/onboarding-page.js?v=20260518a"></script>
+  <script src="../js/bank-csv-help.js?v=20260520a"></script>
+  <script src="../js/onboarding-page.js?v=20260520a"></script>
 </body>
 </html>
 

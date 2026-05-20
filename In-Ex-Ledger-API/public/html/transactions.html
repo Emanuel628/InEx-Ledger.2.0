@@ -290,12 +290,13 @@
                   <p class="small-note">Use this once the transaction matches your bank or card statement.</p>
                 </div>
                 <div class="form-field form-field-full">
-                  <label for="transactionReceiptInput" class="form-label">Receipt attachment</label>
+                  <label for="transactionReceiptInput" class="form-label">Attach receipt files</label>
                   <div class="receipt-upload-inline">
-                    <button type="button" id="transactionReceiptButton" class="receipt-upload-button">Choose receipt</button>
-                    <span id="transactionReceiptName" class="receipt-upload-name">No file selected</span>
+                    <button type="button" id="transactionReceiptButton" class="receipt-upload-button">Choose receipts</button>
+                    <span id="transactionReceiptName" class="receipt-upload-name">No files selected</span>
                   </div>
-                  <input class="receipt-upload-input" type="file" id="transactionReceiptInput" accept="image/*,.pdf,application/pdf" />
+                  <input class="receipt-upload-input" type="file" id="transactionReceiptInput" accept="image/*,.pdf,application/pdf" multiple />
+                  <p class="small-note">You can upload up to 10 files for one transaction. Long receipt? Upload multiple photos for the same transaction.</p>
                 </div>
               </div>
 
@@ -653,7 +654,7 @@
 <script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/taxReminders.js?v=20260405c"></script>
 <script src="../js/onboarding.js?v=20260516a"></script>
-<script src="../js/transactions.js?v=20260510g"></script>
+<script src="../js/transactions.js?v=20260520a"></script>
 </body>
 </html>
 

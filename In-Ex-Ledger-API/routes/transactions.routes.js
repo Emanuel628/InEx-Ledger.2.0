@@ -24,8 +24,10 @@ const {
 } = require("../services/subscriptionService.js");
 const {
   BasicPlanLimitError,
-  assertCanCreateTransactions
+  assertCanCreateTransactions,
+  assertCanImportCsvRows
 } = require("../services/basicPlanUsageService.js");
+const { evaluateUsageLimitEmails } = require("../services/usageLimitEmailService.js");
 const {
   createImportBatch,
   finalizeImportBatch,
@@ -865,6 +867,9 @@ router.post("/", async (req, res) => {
     );
     await client.query("COMMIT");
 
+    // Best-effort: notify Basic businesses as they approach their monthly cap.
+    void evaluateUsageLimitEmails({ businessId, resources: ["transactions"], subscription });
+
     res.status(201).json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     if (client) await client.query("ROLLBACK").catch(() => {});
@@ -1703,10 +1708,9 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
+    // CSV import is available on every tier. Basic businesses are metered by
+    // the monthly import + transaction caps, enforced below before any insert.
     const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    if (!hasFeatureAccess(subscription, "advanced_exports")) {
-      return res.status(402).json({ error: "CSV import requires an active InEx Ledger Pro plan." });
-    }
 
     const accountId = String(req.body?.account_id || "").trim();
     if (!accountId || !UUID_REGEX.test(accountId)) {
@@ -1791,8 +1795,23 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       categoryCache.set(`${cat.kind}::${cat.name.toLowerCase()}`, cat.id);
     }
 
-    const allowance = await assertCanCreateTransactions(client, businessId, 0, { subscription });
-    let remainingBasicSlots = Number.isFinite(allowance.remaining) ? allowance.remaining : Number.POSITIVE_INFINITY;
+    // Count rows that would actually import (valid fields + within the date
+    // range) and block the whole import up-front if it would exceed the Basic
+    // monthly allowance. Imported rows consume transaction slots, so the import
+    // is never silently truncated — the user is asked to narrow the date range
+    // or upgrade. Splitting one CSV into several files cannot bypass the cap
+    // because the limit is a monthly usage cap, not a per-upload cap.
+    let csvValidRowCount = 0;
+    for (const previewRow of rowsToProcess) {
+      const preview = extractRowData(previewRow, cols);
+      if (!preview.date || !preview.amount || !preview.type || preview.amount <= 0 || !preview.description) {
+        continue;
+      }
+      if (filterStartDate && preview.date < filterStartDate) continue;
+      if (filterEndDate && preview.date > filterEndDate) continue;
+      csvValidRowCount += 1;
+    }
+    await assertCanImportCsvRows(client, businessId, csvValidRowCount, { subscription });
 
     const batch = await createImportBatch(client, {
       businessId,
@@ -1852,20 +1871,10 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         continue;
       }
 
-      if (remainingBasicSlots <= 0) {
-        results.errors.push({
-          row: i + 2,
-          reason: `Row ${i + 2}: Basic includes up to 50 transactions per month. Upgrade to Pro to import more this month.`
-        });
-        results.skipped++;
-        continue;
-      }
-
       const storedDescription = buildStoredDescriptionColumns(description);
       const taxTreatment = type === "income" ? "income" : "operating";
 
       try {
-        await assertCanCreateTransactions(client, businessId, 1, { subscription });
         await client.query(
           `INSERT INTO transactions
             (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted,
@@ -1887,18 +1896,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
           ]
         );
         results.imported++;
-        if (Number.isFinite(remainingBasicSlots)) {
-          remainingBasicSlots -= 1;
-        }
       } catch (insertErr) {
-        if (insertErr instanceof BasicPlanLimitError) {
-          results.errors.push({
-            row: i + 2,
-            reason: `Row ${i + 2}: ${insertErr.message}`
-          });
-          results.skipped++;
-          continue;
-        }
         results.errors.push({ row: i + 2, reason: `Row ${i + 2}: ${insertErr.message}` });
         results.skipped++;
       }
@@ -1917,6 +1915,15 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     });
     await client.query("COMMIT");
 
+    // Best-effort: notify Basic businesses as they approach their monthly caps.
+    if (results.imported > 0) {
+      void evaluateUsageLimitEmails({
+        businessId,
+        resources: ["transactions", "csvImportRows"],
+        subscription
+      });
+    }
+
     const rangePart = (filterStartDate || filterEndDate)
       ? `, ${results.out_of_range} outside date range`
       : "";
@@ -1929,6 +1936,13 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     });
   } catch (err) {
     if (client) await client.query("ROLLBACK").catch(() => {});
+    if (err instanceof BasicPlanLimitError) {
+      return res.status(err.statusCode).json({
+        error: err.message,
+        code: err.code,
+        ...err.details
+      });
+    }
     logError("POST /transactions/import/csv error:", err);
     res.status(500).json({ error: "CSV import failed." });
   } finally {

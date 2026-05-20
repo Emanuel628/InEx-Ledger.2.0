@@ -38,20 +38,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function wireUploadInput(inputEl) {
   inputEl?.addEventListener("change", async () => {
-    const file = inputEl.files?.[0];
-    if (!file) return;
-    try {
-      const uploaded = await uploadReceipt(file);
-      showReceiptsToast(tx("receipts_uploaded_success"));
-      inputEl.value = "";
-      if (uploaded?.id) {
-        prependUploadedReceipt(uploaded);
-      }
-      updateReceiptsDot();
-    } catch (error) {
-      console.error("Receipt upload failed:", error);
-      showReceiptsToast(error.message || tx("receipts_error_upload"));
-    }
+    const files = Array.from(inputEl.files || []);
+    inputEl.value = "";
+    if (!files.length) return;
+    await uploadReceiptsSequential(files);
   });
 }
 
@@ -62,11 +52,9 @@ function wireReceiptUpload() {
   const uploadInputBottom = document.getElementById("receiptUploadInputBottom");
 
   uploadButton?.addEventListener("click", () => {
-    if (!ensureV1Tier()) return;
     uploadInput?.click();
   });
   uploadButtonBottom?.addEventListener("click", () => {
-    if (!ensureV1Tier()) return;
     uploadInputBottom?.click();
   });
 
@@ -81,7 +69,6 @@ function wireReceiptDropZone() {
   if (!zone) return;
 
   browseBtn?.addEventListener("click", () => {
-    if (!ensureV1Tier()) return;
     uploadInput?.click();
   });
 
@@ -95,20 +82,57 @@ function wireReceiptDropZone() {
   zone.addEventListener("drop", async (e) => {
     e.preventDefault();
     zone.classList.remove("is-dragover");
-    if (!ensureV1Tier()) return;
-    const file = e.dataTransfer?.files?.[0];
-    if (!file) return;
-    try {
-      const uploaded = await uploadReceipt(file);
-      showReceiptsToast(tx("receipts_uploaded_success"));
-      if (uploaded?.id) {
-        prependUploadedReceipt(uploaded);
-      }
-      updateReceiptsDot();
-    } catch (error) {
-      showReceiptsToast(error.message || tx("receipts_error_upload"));
-    }
+    const files = Array.from(e.dataTransfer?.files || []);
+    if (!files.length) return;
+    await uploadReceiptsSequential(files);
   });
+}
+
+/**
+ * Uploads receipt files one at a time (one request per file). Stops early on
+ * the Basic monthly receipt cap, since the remaining files would fail the same
+ * way. Receipt-page uploads are unattached, so the per-transaction 10-file cap
+ * does not apply here.
+ */
+async function uploadReceiptsSequential(files) {
+  const list = Array.from(files || []);
+  if (!list.length) return;
+
+  let uploaded = 0;
+  let failed = 0;
+  let lastError = "";
+  const uploadedReceipts = [];
+
+  for (let i = 0; i < list.length; i++) {
+    showReceiptsToast(`Uploading ${i + 1} of ${list.length}...`);
+    try {
+      const receipt = await uploadReceipt(list[i]);
+      uploaded += 1;
+      if (receipt?.id) {
+        uploadedReceipts.push(receipt);
+      }
+    } catch (error) {
+      failed += 1;
+      lastError = error.message || tx("receipts_error_upload");
+      if (error.code === "basic_receipt_limit_reached") {
+        failed += list.length - 1 - i;
+        break;
+      }
+    }
+  }
+
+  uploadedReceipts.forEach((receipt) => prependUploadedReceipt(receipt));
+  updateReceiptsDot();
+
+  if (failed === 0) {
+    showReceiptsToast(
+      uploaded === 1 ? tx("receipts_uploaded_success") : `${uploaded} receipts uploaded.`
+    );
+  } else if (uploaded > 0) {
+    showReceiptsToast(lastError || `${uploaded} uploaded, ${failed} could not be uploaded.`);
+  } else {
+    showReceiptsToast(lastError || tx("receipts_error_upload"));
+  }
 }
 
 async function uploadReceipt(file) {
@@ -123,13 +147,12 @@ async function uploadReceipt(file) {
     throw new Error(tx("receipts_error_upload"));
   }
 
-  if (response.status === 402) {
-    throw new Error(tx("receipts_error_v1_required"));
-  }
-
   if (!response.ok) {
     const errorPayload = await response.json().catch(() => null);
-    throw new Error(errorPayload?.error || tx("receipts_error_upload"));
+    const uploadError = new Error(errorPayload?.error || tx("receipts_error_upload"));
+    uploadError.code = errorPayload?.code || "";
+    uploadError.status = response.status;
+    throw uploadError;
   }
 
   return response.json().catch(() => ({}));
@@ -601,14 +624,6 @@ async function openReceiptPreview(receiptId, filename) {
   const revoke = () => URL.revokeObjectURL(url);
   previewWindow.addEventListener("beforeunload", revoke, { once: true });
   window.addEventListener("pagehide", revoke, { once: true });
-}
-
-function ensureV1Tier() {
-  if (effectiveTier() === "v1") {
-    return true;
-  }
-  showReceiptsToast(tx("receipts_error_v1_required"));
-  return false;
 }
 
 function updateReceiptsDot() {

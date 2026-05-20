@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const arApService = require('../services/arApService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
-const { logWarn } = require('../utils/logger.js');
 const { resolveBusinessIdForUser } = require('../api/utils/resolveBusinessIdForUser.js');
 const { getSubscriptionSnapshotForBusiness, PLAN_PRO, PLAN_BUSINESS } = require('../services/subscriptionService.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled.js');
@@ -26,22 +25,10 @@ router.get('/arap-summary', ...businessTierOnly, async (req, res) => {
 
 // Optional paid-feature preload endpoints should not create noisy 402 console errors
 // when a page checks for data the current plan does not include.
-router.use('/recurring', requireAuth, async (req, res, next) => {
-  if (req.method !== 'GET' || (req.path !== '/' && req.path !== '')) {
-    return next();
-  }
-  try {
-    const tier = await getEffectiveTierForRequest(req);
-    if (tier !== PLAN_BUSINESS && tier !== PLAN_PRO) {
-      return res.json([]);
-    }
-    return next();
-  } catch (err) {
-    logWarn('Recurring preload failed:', err?.message || err);
-    return res.json([]);
-  }
-});
-
+// Recurring transactions are intentionally NOT soft-handled here: Basic access
+// is fully gated inside recurring.routes.js, which returns a 402
+// `recurring_requires_pro`. The Basic UI hides the recurring panel and never
+// calls these endpoints.
 router.get('/exports/history', requireAuth, async (req, res, next) => {
   try {
     const tier = await getEffectiveTierForRequest(req);

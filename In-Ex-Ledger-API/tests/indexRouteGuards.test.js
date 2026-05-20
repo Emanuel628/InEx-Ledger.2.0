@@ -126,17 +126,10 @@ test("index arap-summary resolves the business id instead of reading req.busines
   }
 });
 
-test("index recurring preload returns an empty list for non-paid tiers", async () => {
-  const fixture = loadIndexRouterFixture({ tier: "free" });
-
-  try {
-    const response = await request(fixture.app).get("/api/recurring");
-    assert.equal(response.status, 200);
-    assert.deepEqual(response.body, []);
-  } finally {
-    fixture.cleanup();
-  }
-});
+// The recurring "preload" soft-guard was removed: recurring transactions are
+// fully gated inside recurring.routes.js, which returns a 402
+// `recurring_requires_pro` for Basic. That behaviour is covered by
+// recurringRouteValidation.test.js.
 
 test("index exports/history fails closed when the tier lookup fails", async () => {
   const fixture = loadIndexRouterFixture({ throwSubscription: true });
