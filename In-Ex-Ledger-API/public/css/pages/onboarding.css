@@ -445,6 +445,21 @@
   line-height: 1.6;
 }
 
+.onboarding-import-help-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+  color: var(--text-muted, #6b7280);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.onboarding-import-help-copy {
+  display: inline-flex;
+  align-items: center;
+}
+
 .onboarding-import-actions {
   display: flex;
   flex-wrap: wrap;
@@ -473,19 +488,31 @@
 .onboarding-help-icon {
   width: 32px;
   height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
   border: 1px solid var(--border, #d1d5db);
   background: var(--surface, #fff);
   color: var(--text-muted, #6b7280);
-  font-style: italic;
+  font-style: normal;
   font-weight: 600;
   cursor: pointer;
   line-height: 1;
+  flex: 0 0 auto;
+  transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
 
 .onboarding-help-icon:hover {
   border-color: var(--accent, #2563eb);
   color: var(--accent, #2563eb);
+}
+
+.onboarding-help-icon:focus-visible {
+  outline: none;
+  border-color: var(--accent, #2563eb);
+  color: var(--accent, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 
 .onboarding-skip-btn {
@@ -513,7 +540,7 @@
 /* Region-aware bank CSV help panel */
 .bank-csv-help-panel {
   margin-top: 18px;
-  padding: 18px;
+  padding: 16px;
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 12px;
   background: var(--surface-muted, #f9fafb);
@@ -543,6 +570,7 @@
   flex-direction: column;
   gap: 6px;
   margin: 14px 0;
+  max-width: 360px;
 }
 
 .bank-help-label {
@@ -555,6 +583,12 @@
   border: 1px solid var(--border, #d1d5db);
   border-radius: 8px;
   background: var(--surface, #fff);
+}
+
+.bank-help-select:focus-visible {
+  outline: none;
+  border-color: var(--accent, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
 }
 
 .bank-help-instructions:empty {
@@ -583,4 +617,14 @@
 .bank-help-link {
   display: inline-flex;
   margin-top: 6px;
+}
+
+@media (max-width: 640px) {
+  .onboarding-import-help-inline {
+    align-items: flex-start;
+  }
+
+  .bank-csv-help-panel {
+    padding: 14px;
+  }
 }
