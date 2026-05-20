@@ -1995,6 +1995,46 @@ body {
   color: var(--text-secondary);
   margin: 0 0 20px;
 }
+.csv-import-help-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 18px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.csv-import-help-copy {
+  display: inline-flex;
+  align-items: center;
+}
+.csv-import-help-icon {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border, #d1d5db);
+  background: var(--surface, #fff);
+  color: var(--text-secondary);
+  font-style: normal;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+  flex: 0 0 auto;
+  transition: border-color 140ms ease, color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
+}
+.csv-import-help-icon:hover {
+  border-color: var(--accent2, #2c79c4);
+  color: var(--accent2, #2c79c4);
+}
+.csv-import-help-icon:focus-visible {
+  outline: none;
+  border-color: var(--accent2, #2c79c4);
+  color: var(--accent2, #2c79c4);
+  box-shadow: 0 0 0 3px rgba(44, 121, 196, 0.18);
+}
 .csv-import-success {
   display: flex;
   gap: 24px;
@@ -2054,7 +2094,81 @@ body {
   font-size: 13px;
   flex-shrink: 0;
 }
+.bank-csv-help-panel {
+  margin: 0 0 18px;
+  padding: 16px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  background: var(--surface2, #f9fafb);
+}
+.bank-help-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+.bank-help-intro,
+.bank-help-generic,
+.bank-help-warning,
+.bank-help-privacy {
+  margin: 8px 0;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  font-size: 13px;
+}
+.bank-help-warning {
+  color: var(--text, #1f2937);
+}
+.bank-help-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+  max-width: 360px;
+}
+.bank-help-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.bank-help-select {
+  padding: 8px 10px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+}
+.bank-help-select:focus-visible {
+  outline: none;
+  border-color: var(--accent2, #2c79c4);
+  box-shadow: 0 0 0 3px rgba(44, 121, 196, 0.16);
+}
+.bank-help-instructions:empty {
+  display: none;
+}
+.bank-help-bank-name {
+  margin: 14px 0 8px;
+  font-size: 15px;
+}
+.bank-help-steps {
+  margin: 0 0 10px;
+  padding-left: 20px;
+  line-height: 1.6;
+  font-size: 13px;
+}
+.bank-help-desktop-note,
+.bank-help-disclaimer {
+  margin: 6px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.bank-help-link {
+  display: inline-flex;
+  margin-top: 6px;
+}
 @media (max-width: 480px) {
+  .csv-import-help-inline {
+    align-items: flex-start;
+  }
+  .bank-csv-help-panel {
+    padding: 14px;
+  }
   .csv-import-daterange {
     flex-direction: column;
     align-items: stretch;

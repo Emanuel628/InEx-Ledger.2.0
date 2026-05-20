@@ -3758,8 +3758,30 @@ function initCsvImport() {
   const startBtn = document.getElementById("csvImportStart");
   const doneBtn = document.getElementById("csvImportDone");
   const accountSelect = document.getElementById("csvImportAccount");
+  const helpToggle = document.getElementById("csvImportHelpToggle");
+  const helpPanel = document.getElementById("csvImportBankHelpPanel");
 
   if (!importBtn || !modal) return;
+
+  let csvHelpRendered = false;
+
+  function currentBusinessRegion() {
+    const value = String(businessTaxProfile?.region || getResolvedRegion() || "").trim().toUpperCase();
+    return value === "US" || value === "CA" ? value : null;
+  }
+
+  helpToggle?.addEventListener("click", () => {
+    if (!helpPanel) {
+      return;
+    }
+    const willShow = helpPanel.hidden;
+    if (willShow && !csvHelpRendered && window.BankCsvHelp) {
+      window.BankCsvHelp.render(helpPanel, currentBusinessRegion());
+      csvHelpRendered = true;
+    }
+    helpPanel.hidden = !willShow;
+    helpToggle.setAttribute("aria-expanded", willShow ? "true" : "false");
+  });
 
   // Populate account dropdown from already-loaded ledger state
   function populateCsvAccounts() {
@@ -3809,6 +3831,12 @@ function initCsvImport() {
     document.getElementById("csvImportStep1").hidden = false;
     document.getElementById("csvImportStep2").hidden = true;
     document.getElementById("csvImportError").hidden = true;
+    if (helpPanel) {
+      helpPanel.hidden = true;
+    }
+    if (helpToggle) {
+      helpToggle.setAttribute("aria-expanded", "false");
+    }
     document.getElementById("csvImportFile").value = "";
     if (startDateInput) startDateInput.value = "";
     if (endDateInput) endDateInput.value = "";

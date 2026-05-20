@@ -596,6 +596,19 @@
     <p class="csv-import-subtitle">Upload a CSV export from your bank. Supports BMO, TD, RBC, Scotiabank, Chase, Bank of America, Capital One, Wells Fargo, and most standard formats.</p>
 
     <div id="csvImportStep1">
+      <div class="csv-import-help-inline">
+        <span class="csv-import-help-copy">Need help finding your bank CSV?</span>
+        <button
+          type="button"
+          id="csvImportHelpToggle"
+          class="csv-import-help-icon"
+          aria-label="Help finding your bank CSV"
+          aria-expanded="false"
+          aria-controls="csvImportBankHelpPanel"
+          title="Help finding your bank CSV"
+        >i</button>
+      </div>
+      <div id="csvImportBankHelpPanel" class="bank-csv-help-panel" hidden></div>
       <div class="form-field">
         <label for="csvImportAccount" class="form-label">Destination account</label>
         <select id="csvImportAccount" class="form-control">
@@ -653,6 +666,7 @@
 <script src="../js/auth.js?v=20260518a"></script>
 <script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/taxReminders.js?v=20260405c"></script>
+<script src="../js/bank-csv-help.js?v=20260520b"></script>
 <script src="../js/onboarding.js?v=20260516a"></script>
 <script src="../js/transactions.js?v=20260520a"></script>
 </body>
