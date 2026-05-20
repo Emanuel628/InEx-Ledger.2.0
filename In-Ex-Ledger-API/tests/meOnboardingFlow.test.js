@@ -8,7 +8,7 @@ const request = require("supertest");
 
 const ME_ROUTE_PATH = require.resolve("../routes/me.routes.js");
 
-function loadMeRouterFixture() {
+function loadMeRouterFixture(options = {}) {
   const originalLoad = Module._load.bind(Module);
 
   const state = {
@@ -46,13 +46,18 @@ function loadMeRouterFixture() {
               return {
                 rows: [{
                   onboarding_completed: true,
-                  onboarding_data: { guided_setup_active: true, guided_setup_step: "transactions" },
+                  onboarding_data: options.currentOnboardingData || { guided_setup_active: true, guided_setup_step: "transactions" },
                   onboarding_tour_seen: {}
                 }],
                 rowCount: 1
               };
             }
-            if (/UPDATE users\s+SET onboarding_data = \$1::jsonb/i.test(sql)) {
+            if (
+              /UPDATE users\s+SET onboarding_data = \$1::jsonb/i.test(sql) ||
+              (/UPDATE users/i.test(sql) &&
+               /onboarding_tour_seen\s*=\s*'\{\}'::jsonb/i.test(sql) &&
+               /onboarding_data = \$1::jsonb/i.test(sql))
+            ) {
               return {
                 rows: [{
                   onboarding_completed: true,
@@ -330,6 +335,30 @@ test("guided setup import step finishes onboarding", async () => {
     assert.equal(response.status, 200);
     assert.equal(response.body.onboarding.data.guided_setup_step, "complete");
     assert.equal(response.body.onboarding.data.guided_setup_active, false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("guided setup replay finish returns directly to transactions instead of trial setup", async () => {
+  const fixture = loadMeRouterFixture({
+    currentOnboardingData: {
+      guided_setup_active: true,
+      guided_setup_step: "import",
+      guided_setup_replay: true
+    }
+  });
+  try {
+    const app = buildApp(fixture.router);
+    const finishResponse = await request(app)
+      .post("/api/me/onboarding/guide")
+      .send({ action: "finish", page: "import" });
+
+    assert.equal(finishResponse.status, 200);
+    assert.equal(finishResponse.body.redirect_to, "/transactions");
+    assert.equal(finishResponse.body.onboarding.data.guided_setup_step, "complete");
+    assert.equal(finishResponse.body.onboarding.data.guided_setup_active, false);
+    assert.equal("guided_setup_replay" in finishResponse.body.onboarding.data, false);
   } finally {
     fixture.cleanup();
   }

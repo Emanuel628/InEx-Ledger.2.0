@@ -491,7 +491,8 @@ router.post("/onboarding/guide", async (req, res) => {
       page || (GUIDED_SETUP_STEPS.includes(currentData.guided_setup_step) ? currentData.guided_setup_step : GUIDED_SETUP_STEPS[0]);
     const timestamp = new Date().toISOString();
 
-    let redirectTo = buildTrialSetupRedirect("/transactions");
+    const isReplay = currentData.guided_setup_replay === true;
+    let redirectTo = isReplay ? "/transactions" : buildTrialSetupRedirect("/transactions");
     if (action === "skip") {
       GUIDED_SETUP_STEPS.forEach((step) => {
         currentTourSeen[step] = true;
@@ -500,11 +501,13 @@ router.post("/onboarding/guide", async (req, res) => {
       currentData.guided_setup_step = "skipped";
       currentData.guided_setup_completed_at = timestamp;
       currentData.guided_setup_skipped_at = timestamp;
+      delete currentData.guided_setup_replay;
     } else if (action === "finish") {
       currentTourSeen[effectivePage] = true;
       currentData.guided_setup_active = false;
       currentData.guided_setup_step = "complete";
       currentData.guided_setup_completed_at = timestamp;
+      delete currentData.guided_setup_replay;
     } else if (action === "back") {
       const previousStep = resolvePreviousGuidedSetupStep(effectivePage);
       currentData.guided_setup_active = true;
@@ -601,6 +604,7 @@ router.post("/onboarding/replay", async (req, res) => {
     delete nextData.guided_setup_skipped_at;
     nextData.guided_setup_active = true;
     nextData.guided_setup_step = GUIDED_SETUP_STEPS[0];
+    nextData.guided_setup_replay = true;
 
     await pool.query(
       "UPDATE users SET onboarding_tour_seen = '{}'::jsonb, onboarding_data = $1::jsonb WHERE id = $2",
