@@ -20,6 +20,10 @@ const {
 } = require("../services/subscriptionService.js");
 const { buildStripePriceEnvMap, buildStripePriceLookup } = require("../services/stripePriceConfig.js");
 const { decryptTaxId, encryptTaxId } = require("../services/taxIdService.js");
+const {
+  decryptGstHstNumber,
+  encryptGstHstNumber
+} = require("../services/gstHstNumberService.js");
 const { verifyPassword } = require("../utils/authUtils.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
 const {
@@ -402,7 +406,7 @@ function normalizeBusinessProfileRow(row) {
     accounting_method: row.accounting_method || null,
     material_participation: typeof row.material_participation === "boolean" ? row.material_participation : null,
     gst_hst_registered: row.gst_hst_registered === true,
-    gst_hst_number: row.gst_hst_number || null,
+    gst_hst_number: decryptGstHstNumber(row.gst_hst_number),
     gst_hst_method: row.gst_hst_method || null,
     locked_through_date: row.locked_through_date || null,
     locked_period_note: row.locked_period_note || null,
@@ -514,6 +518,9 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
   const normalizedTaxId = Object.prototype.hasOwnProperty.call(payload, "tax_id")
     ? normalizeOptionalTrimmedString(tax_id)
     : current.tax_id;
+  const normalizedGstHstNumber = Object.prototype.hasOwnProperty.call(payload, "gst_hst_number")
+    ? normalizeOptionalTrimmedString(gst_hst_number)
+    : current.gst_hst_number;
   const resolvedGstRegistered = Object.prototype.hasOwnProperty.call(payload, "gst_hst_registered")
     ? gst_hst_registered
     : current.gst_hst_registered;
@@ -566,7 +573,7 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
       resolvedMaterialParticipation,
       resolvedRegion === "CA" ? resolvedGstRegistered : false,
       resolvedRegion === "CA" && resolvedGstRegistered
-        ? normalizeOptionalTrimmedString(gst_hst_number)
+        ? (normalizedGstHstNumber ? encryptGstHstNumber(normalizedGstHstNumber) : null)
         : null,
       resolvedRegion === "CA" && resolvedGstRegistered
         ? normalizeOptionalTrimmedString(String(gst_hst_method || "").toLowerCase())

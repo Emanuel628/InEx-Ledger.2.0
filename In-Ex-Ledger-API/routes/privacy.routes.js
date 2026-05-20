@@ -11,6 +11,7 @@ const { verifyPassword } = require("../utils/authUtils.js");
 const { logError } = require("../utils/logger.js");
 const { decrypt } = require("../services/encryptionService.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
+const { neutralizeFormulaCell } = require("../services/csvExportService.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -69,7 +70,7 @@ async function logUserAction({ userId, action, format, ipAddress, userAgent, per
 function toCsv(rows) {
   if (!rows || !rows.length) return "";
   const escape = (v) => {
-    const s = v === null || v === undefined ? "" : String(v);
+    const s = neutralizeFormulaCell(v === null || v === undefined ? "" : String(v));
     return s.includes(",") || s.includes('"') || s.includes("\n") || s.includes("\r")
       ? `"${s.replace(/"/g, '""')}"`
       : s;

@@ -172,6 +172,9 @@ function loadExportsRouter(options = {}) {
     if (/taxIdService\.js$/.test(requestName)) {
       return { decryptTaxId: () => "12-3456789" };
     }
+    if (/gstHstNumberService\.js$/.test(requestName)) {
+      return { decryptGstHstNumber: (value) => value };
+    }
     if (/pdfGeneratorService\.js$/.test(requestName)) {
       return pdfService;
     }

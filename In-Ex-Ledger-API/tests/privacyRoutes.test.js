@@ -277,6 +277,54 @@ test("privacy export includes receipts, export history, bank connections, invoic
   }
 });
 
+test("privacy CSV export neutralizes spreadsheet formula cells", async () => {
+  const fixture = loadPrivacyRouter({
+    exportRows: {
+      user: [{ id: "00000000-0000-4000-8000-000000000111", email: "owner@example.com", full_name: "Owner", display_name: "Owner", created_at: "2026-05-01T00:00:00.000Z" }],
+      transactions: [{
+        transaction_id: "tx_formula",
+        account: "Checking",
+        category: "Sales",
+        amount: "12.50",
+        type: "income",
+        description: "=SUM(A1:A2)",
+        description_encrypted: null,
+        date: "2026-05-01",
+        note: "@cmd",
+        cleared: true,
+        business_id: "00000000-0000-4000-8000-000000000211",
+        created_at: "2026-05-01T00:00:00.000Z"
+      }],
+      adjustments: [],
+      accounts: [],
+      categories: [],
+      auditLog: [],
+      mileage: [],
+      vehicleCosts: [],
+      recurringTransactions: [],
+      receipts: [],
+      exportHistory: [],
+      bankConnections: [],
+      invoices: [],
+      privacySettings: [],
+      consentLog: []
+    }
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/privacy/export")
+      .send({ format: "csv" });
+
+    assert.equal(response.status, 200);
+    assert.match(response.text, /'=SUM\(A1:A2\)/);
+    assert.match(response.text, /'@cmd/);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("privacy delete removes invoices, bank connections, subscriptions, and cleans up managed files after commit", async () => {
   const fixture = loadPrivacyRouter();
   try {

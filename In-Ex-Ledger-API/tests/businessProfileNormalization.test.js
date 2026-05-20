@@ -62,6 +62,13 @@ function loadBusinessesRouterFixture() {
       };
     }
 
+    if (requestName === "../services/gstHstNumberService.js" || /gstHstNumberService\.js$/.test(requestName)) {
+      return {
+        decryptGstHstNumber: (value) => value,
+        encryptGstHstNumber: (value) => value
+      };
+    }
+
     if (requestName === "../utils/authUtils.js" || /authUtils\.js$/.test(requestName)) {
       return { verifyPassword: async () => ({ match: true }) };
     }

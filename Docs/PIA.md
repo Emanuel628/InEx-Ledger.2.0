@@ -1,166 +1,192 @@
-# Privacy Impact Assessment (PIA)
-## InEx Ledger 2.0 — Living Document
+# Privacy Impact Assessment
+## InEx Ledger 2.0
 
-**Prepared by:** InEx Ledger Engineering & Compliance  
-**Jurisdictions:** United States of America · Canada (PIPEDA) · Quebec (Law 25 / Bill 64)  
-**Document status:** Living — updated as features change  
-**Last reviewed:** 2026-04-07
-
----
+Prepared by: InEx Ledger Engineering
+Contact: privacy@inexledger.com
+Jurisdictions considered: United States, Canada, Quebec
+Document status: Living document
+Last reviewed: 2026-05-20
 
 ## 1. Purpose
 
-This Privacy Impact Assessment (PIA) documents the personal and financial data collected by **InEx Ledger 2.0**, explains how it is stored, transmitted, and protected, and identifies the risks and mitigations in place to comply with:
+This Privacy Impact Assessment documents the personal information and financial data handled by InEx Ledger, the systems that process it, the third parties involved in delivery, and the safeguards currently implemented in the repository.
 
-- **USA:** FTC Act (Section 5 unfair/deceptive practices), Gramm-Leach-Bliley Act (financial data), state privacy laws (e.g., CCPA/CPRA for California residents)
-- **Canada:** *Personal Information Protection and Electronic Documents Act* (PIPEDA)
-- **Quebec:** *Act respecting the protection of personal information in the private sector* (Law 25 / formerly Bill 64), which imposes stricter rules including Privacy by Default, mandatory breach notification within 72 hours, and a right to data portability
+This document is intended to reflect the current codebase. It should not describe aspirational controls as if they are already live.
 
----
+## 2. Scope of the System
 
-## 2. Data Collected
+InEx Ledger is a bookkeeping SaaS used to record and export transactions, receipts, mileage, invoices, subscriptions, privacy settings, and related business records.
 
-### 2.1 Personal Details
+The current repository includes:
 
-| Field | Purpose | Stored in |
-|---|---|---|
-| Email address | Account authentication, transactional emails | `users.email` |
-| Full name / Display name | User profile | `users.full_name`, `users.display_name` |
-| Country & Province | Data-residency tagging; jurisdictional privacy defaults | `users.country`, `users.province` |
-| Password hash (bcrypt, 12 rounds) | Authentication | `users.password_hash` |
-| MFA credentials (encrypted) | Two-factor authentication | `users.mfa_secret_encrypted` |
+- a Node.js / Express application in `In-Ex-Ledger-API/`
+- a static frontend served by that application
+- PostgreSQL-backed data storage
+- receipt storage on local disk / mounted volume
+- Stripe billing flows
+- Resend transactional email flows
+- Plaid bank-connection flows
+- optional Anthropic-powered receipt OCR when enabled
 
-### 2.2 Financial Data
+## 3. Personal Information and Business Data Handled
 
-| Field | Purpose | Stored in |
-|---|---|---|
-| Transaction amounts, types, dates | Bookkeeping | `transactions.*` |
-| Transaction descriptions (AES-256-GCM encrypted) | Audit trail | `transactions.description_encrypted` |
-| Account names & numbers (AES-256-GCM encrypted) | Banking reference | `accounts.account_number_encrypted` |
-| Tax ID (AES-256-GCM encrypted) | Tax reporting | `businesses.tax_id_encrypted` |
-| Receipt files | Expense documentation | Object storage (Railway) |
-| Mileage logs | Business travel deductions | `mileage.*` |
+### 3.1 Account and identity data
 
-### 2.3 Metadata & Logs
+- email address
+- password hash
+- display name / profile fields
+- country, province, and data-residency signals
+- session and authentication metadata
+- MFA-related secrets and trusted-device records
 
-| Field | Purpose | Stored in |
-|---|---|---|
-| Session tokens (hashed) | Authenticated sessions | `refresh_tokens`, `mfa_trusted_devices` |
-| CPA access grants | Professional access audit | `cpa_access_grants`, `cpa_audit_logs` |
-| Privacy consent log | Quebec Law 25 explicit opt-in tracking | `privacy_consent_log` |
-| IP address (consent events) | Consent attribution | `privacy_consent_log.ip_address` |
+### 3.2 Business and bookkeeping data
 
----
+- business name and business profile data
+- tax IDs
+- GST/HST registration information
+- account, category, transaction, invoice, mileage, and recurring-entry data
+- receipt files and receipt metadata
+- export history and redacted export artifacts
 
-## 3. Data Residency
+### 3.3 Security, governance, and support data
 
-| Environment | Infrastructure | Region |
-|---|---|---|
-| Production API | Railway.app | United States (US East) |
-| Database (PostgreSQL) | Railway.app managed PostgreSQL | United States (US East) |
-| File storage (receipts) | Railway.app object storage | United States (US East) |
+- privacy-consent records
+- cookie-consent records
+- audit and user-action logs
+- sign-in context such as IP-derived signals and user-agent strings
+- support and troubleshooting communications when provided by users
 
-> **Cross-border transfer note (Quebec):** Data from Quebec residents is stored in Railway's US data centers. Under Quebec Law 25, a Privacy Impact Assessment (this document) is required before transferring personal information outside Quebec. The following safeguards justify the transfer: AES-256-GCM at-rest encryption, TLS 1.3 in-transit encryption, mandatory MFA for professional (CPA) access, and contractual data processing terms with Railway.
+## 4. Data Locations and Cross-Border Processing
 
----
+The repository and current public product materials indicate that production infrastructure may process data in the United States.
 
-## 4. Safeguards
+Known or configured third-party processors visible from the codebase include:
 
-### 4.1 Encryption
+- Railway for hosting and infrastructure
+- Stripe for billing and payment processing
+- Resend for transactional email
+- Plaid for bank-linking features when enabled
+- Anthropic for receipt OCR when `ANTHROPIC_API_KEY` is configured
+- ipapi.co or the configured approved geolocation host for sign-in geolocation lookups
 
-- **At rest:** Sensitive database fields (`description_encrypted`, `account_number_encrypted`, `tax_id_encrypted`, `mfa_secret_encrypted`) are encrypted using **AES-256-GCM** before persistence. The encryption key is stored as a Railway Secret (`FIELD_ENCRYPTION_KEY`) and never committed to source code.
-- **In transit:** All API endpoints are served over **TLS 1.3** (enforced by Railway's edge).
-- **Passwords:** Stored as **bcrypt** hashes (cost factor 12), never in plain text.
+Cross-border assessment note:
 
-### 4.2 Authentication & Access Control
+- This system is not Railway-only from a privacy perspective.
+- Any production privacy posture for Quebec or other cross-border regimes must consider all enabled third-party processors, not only primary hosting.
 
-- **JWT access tokens** with 15-minute expiry; **rotating refresh tokens** (7-day, stored as SHA-256 hashes).
-- **Multi-Factor Authentication (MFA):** Email-based OTP, mandatory for all CPA (professional) accounts. Users without MFA enabled are blocked from accessing CPA portfolio routes (`/api/cpa-access/*`) until setup is complete.
-- **Role-based access:** Regular users (`role: user`) and CPA users (`role: cpa`) have distinct permission levels enforced in middleware.
+## 5. Current Safeguards Verified in the Repository
 
-### 4.3 Audit Trail (Append-Only Transactions)
+### 5.1 Encryption and credential protection
 
-Transaction edits do **not** overwrite existing records. Instead, each edit inserts a new **adjustment row** (`is_adjustment = true`) referencing the original transaction (`original_transaction_id`). This provides an immutable, tamper-evident ledger that satisfies CPA audit requirements under both GAAP and IFRS, and aligns with PIPEDA accountability obligations.
+Verified in code:
 
-### 4.4 Rate Limiting & Abuse Protection
+- passwords are stored as bcrypt hashes
+- refresh tokens are hashed at rest
+- MFA secrets are encrypted
+- transaction descriptions are encrypted with AES-256-GCM
+- tax IDs are encrypted with AES-256-GCM
+- Plaid access tokens are encrypted with AES-256-GCM
+- new GST/HST numbers are now written through the field-encryption path
 
-- Auth endpoints: 20 requests per 15-minute window per IP.
-- Data API endpoints: configurable via `createDataApiLimiter()` (default 100 req/min).
-- Helmet security headers (CSP, HSTS, X-Frame-Options) on all responses.
+Implementation note:
 
----
+- legacy plaintext GST/HST values can still be read through compatibility fallback until they are rewritten
 
-## 5. Privacy by Default (Quebec Law 25)
+### 5.2 Transport and browser security
 
-For users who register with `country = CA` and `province = QC`:
+Verified in code:
 
-1. **Data sharing defaults to OFF** — `user_privacy_settings.data_sharing_opt_out` is set to `true` at registration.
-2. **Consent tracking** — Every explicit change to data-sharing preferences by a Quebec resident is recorded in `privacy_consent_log` with a timestamp, action type (`opt_in` / `opt_out`), IP address, and user-agent string.
-3. **Right to data portability** — `POST /api/privacy/export` delivers a machine-readable JSON archive of all personal and financial data.
-4. **Right to erasure** — `POST /api/privacy/delete` scrubs all transactional and business data while retaining the audit-required minimum (user account ID for referential integrity).
+- Helmet headers are applied
+- HSTS is enabled in production
+- CSP is present and restrictive
+- CORS is allowlisted
+- auth cookies and CSRF cookies use `secure` in production
 
----
+### 5.3 Access control and abuse resistance
 
-## 6. Risk Assessment
+Verified in code:
 
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| Data breach (database exfiltration) | Medium | High | AES-256-GCM field encryption; row-level business scoping; no plaintext keys in code |
-| Unauthorized account access | Medium | High | bcrypt passwords; MFA enforcement; rotating refresh tokens |
-| CPA unauthorized client access | Low | High | requireMfa middleware on all CPA routes; explicit client grant workflow; full audit log |
-| Cross-border data transfer (Quebec) | Present | Medium | This PIA; contractual safeguards with Railway; AES-GCM encryption |
-| Privacy breach notification failure | Low | High | Automated monitoring (planned); 72-hour CAI notification SOP in Incident Response Plan |
-| Insider threat (employee) | Low | High | Railway Secrets for encryption keys; no production DB access in dev environments |
-| Injection / XSS attacks | Low | High | Parameterized queries only; Helmet CSP headers; `express-validator` on inputs |
+- JWT access tokens are short-lived
+- refresh-token backed sessions are used
+- CSRF validation is implemented and applied on many write routes
+- rate limiting exists for auth, billing, receipt, and data API paths
+- business-scoped data access is enforced across core ledger routes
 
----
+### 5.4 Privacy and accountability tooling
 
-## 7. User Rights
+Verified in code:
 
-| Right | Mechanism |
-|---|---|
-| Access | `GET /api/privacy/export` — full JSON export |
-| Portability | `GET /api/privacy/export` — machine-readable JSON |
-| Rectification | Update profile at `PUT /api/me`; update business at `PUT /api/business` |
-| Erasure | `POST /api/privacy/delete` (data scrub); `DELETE /api/me` (full account delete) |
-| Withdraw consent | `POST /api/privacy/settings` with `dataSharingOptOut: true` |
-| Complaint | Email: privacy@inexledger.com; CAI (Quebec): www.cai.gouv.qc.ca; OPC (Canada): www.priv.gc.ca |
+- privacy settings are stored server-side
+- Quebec consent changes are logged
+- cookie consent decisions are logged
+- user data export and erase flows exist
+- governance and audit records exist for sensitive user actions
 
----
+## 6. Current Verified Gaps
 
-## 8. Breach Notification Obligations
+### 6.1 Incomplete encryption coverage
 
-| Regulator | Threshold | Deadline | Contact |
-|---|---|---|---|
-| FTC (US) | Material breach | Prompt (no fixed deadline, good-faith standard) | ftc.gov/contact |
-| OPC (Canada / PIPEDA) | Real risk of significant harm | Promptly after discovery | priv.gc.ca |
-| CAI (Quebec / Law 25) | Confidentiality incident | **72 hours** after awareness | cai.gouv.qc.ca |
+The following areas are not fully encrypted at rest end-to-end in the current repository:
 
-Refer to the Incident Response Plan (`/docs/IncidentResponsePlan.md`) for step-by-step breach procedures.
+- transaction notes
+- receipt files stored on disk
+- receipt bytes stored in `receipts.file_bytes`
 
----
+### 6.2 Legacy or partial data states
 
-## 9. Retention & Deletion Schedule
+- GST/HST values written going forward are encrypted, but existing plaintext rows may remain until rewritten
 
-| Data type | Retention | Rationale |
-|---|---|---|
-| Transaction records | 7 years | CRA / IRS tax record retention requirement |
-| Audit adjustment rows | 7 years | Immutable by design; required for financial audits |
-| Session / refresh tokens | Revoked at logout; auto-expired | Minimization |
-| Privacy consent log | 5 years | Quebec Law 25 accountability |
-| CPA audit logs | 7 years | Professional accountability |
-| Receipt files | 7 years | Tax documentation |
-| Email verification tokens | 15 minutes | Minimization |
-| Password reset tokens | 20 minutes | Minimization |
+### 6.3 Documentation consistency risk
 
----
+Before this update, internal privacy/security docs overstated several controls. This PIA should now be treated as the authoritative repo-aligned version, and related docs should stay synchronized with it.
 
-## 10. Changes & Review History
+### 6.4 Operational and legal facts outside the repo
 
-| Date | Author | Summary |
-|---|---|---|
-| 2026-04-07 | InEx Ledger Engineering | Initial PIA — Phase 1 & 2 compliance implementation |
+This PIA cannot prove, from code alone:
 
----
+- which DPAs are executed
+- who the formally designated privacy officer is as an individual
+- whether OCR is enabled in production
+- the exact production vendor and data-flow configuration at any moment
 
-*This document is a living record. It must be updated whenever a new feature, data collection, or third-party integration is introduced that could affect privacy obligations.*
+## 7. Privacy by Default and Consent
+
+Verified in code:
+
+- Quebec users default to stronger privacy settings
+- analytics opt-in is off by default
+- explicit Quebec privacy preference changes are logged in `privacy_consent_log`
+- cookie consent is tracked independently in `cookie_consent_log`
+
+## 8. Retention
+
+The product currently exposes or documents these practical retention positions:
+
+- live user data persists until the user deletes it or the account is removed
+- certain security, consent, export, and audit records may persist longer for compliance and security purposes
+- redacted export history is retained as part of auditability and user history
+
+Policy requirement:
+
+- public-facing retention statements must remain aligned with actual operational retention and backup practices
+
+## 9. Incident Handling
+
+The repository includes an incident response runbook and now includes a standing incident-register artifact in `Docs/CONFIDENTIALITY_INCIDENT_REGISTER.md`.
+
+Quebec and Canadian incident handling should be based on:
+
+- prompt assessment and notice where legal thresholds are met
+- maintenance of an incident register
+- retention of incident records for the applicable statutory period
+
+## 10. Review and Update Trigger
+
+This PIA must be updated when any of the following change:
+
+- new third-party processors are introduced
+- a sensitive field is added or reclassified
+- receipt handling changes
+- OCR or analytics behavior changes
+- privacy rights flows change
+- data residency or production hosting changes

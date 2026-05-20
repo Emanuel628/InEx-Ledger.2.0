@@ -9,6 +9,10 @@ const {
   saveAccountingLockState
 } = require("../services/accountingLockService.js");
 const { encryptTaxId, decryptTaxId } = require("../services/taxIdService.js");
+const {
+  encryptGstHstNumber,
+  decryptGstHstNumber
+} = require("../services/gstHstNumberService.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 
 const router = express.Router();
@@ -56,7 +60,8 @@ function normalizeBusinessRow(row) {
     gst_hst_number: null,
     gst_hst_method: null,
     ...row,
-    tax_id: decryptTaxId(row.tax_id)
+    tax_id: decryptTaxId(row.tax_id),
+    gst_hst_number: decryptGstHstNumber(row.gst_hst_number)
   };
 }
 
@@ -85,6 +90,10 @@ async function updateBusinessRow(businessId, payload) {
   } = payload;
   const normalizedTaxId = normalizeOptionalTrimmedString(tax_id);
   const encryptedTaxId = normalizedTaxId ? encryptTaxId(normalizedTaxId) : null;
+  const normalizedGstHstNumber = normalizeOptionalTrimmedString(gst_hst_number);
+  const encryptedGstHstNumber = normalizedGstHstNumber
+    ? encryptGstHstNumber(normalizedGstHstNumber)
+    : null;
   const result = await pool.query(
     `UPDATE businesses
      SET name = COALESCE($1, name),
@@ -122,7 +131,7 @@ async function updateBusinessRow(businessId, payload) {
       accounting_method || null,
       typeof material_participation === "boolean" ? material_participation : null,
       typeof gst_hst_registered === "boolean" ? gst_hst_registered : false,
-      normalizeOptionalTrimmedString(gst_hst_number),
+      encryptedGstHstNumber,
       gst_hst_method || null,
       businessId
     ]

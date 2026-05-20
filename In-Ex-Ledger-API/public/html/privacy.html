@@ -88,6 +88,10 @@
         <strong>Contact:</strong>
         <a href="mailto:privacy@inexledger.com?subject=Privacy%20Request%20for%20InEx%20Ledger">privacy@inexledger.com</a>
       </p>
+      <p>
+        This contact point handles privacy requests and incident questions. A specific internal individual or
+        delegate may be assigned to that role operationally even when the public contact remains this mailbox.
+      </p>
     </section>
 
     <section>
@@ -130,6 +134,22 @@
     </section>
 
     <section>
+      <h2>Service providers and processors</h2>
+      <p>
+        We use third-party providers to operate the service. Depending on the features you use and the
+        deployment configuration, these providers may process personal information on our behalf.
+      </p>
+      <ul>
+        <li>Railway for application hosting, infrastructure, and storage.</li>
+        <li>Stripe for subscriptions, billing, and payment-related account metadata.</li>
+        <li>Resend for transactional email delivery.</li>
+        <li>Plaid for bank-linking features when enabled.</li>
+        <li>Anthropic for receipt OCR when that feature is enabled on the server.</li>
+        <li>Approved geolocation providers for limited sign-in security checks based on IP address.</li>
+      </ul>
+    </section>
+
+    <section>
       <h2>Cross-border processing</h2>
       <p>
         Information may be processed or stored in the United States and other jurisdictions where InEx Ledger
@@ -141,6 +161,10 @@
         Our production infrastructure and support tooling may process data in the United States. By using the
         service, you acknowledge that cross-border processing may occur subject to the safeguards described in
         this policy and our vendor controls.
+      </p>
+      <p>
+        Cross-border processing may occur through hosting, billing, email delivery, bank-linking, receipt OCR,
+        and security-support vendors depending on the features in use.
       </p>
     </section>
 
@@ -162,9 +186,11 @@
         and to enforce our agreements.
       </p>
       <ul>
-        <li>Live business records remain available until you delete them, close the account, or they are otherwise removed according to product controls.</li>
+        <li>Live business records generally remain available until you delete them, close the account, or they are otherwise removed through product controls.</li>
+        <li>Transaction, receipt, invoice, export-history, and related business records may be retained for up to 7 years where needed for bookkeeping, tax, audit, dispute, or compliance purposes.</li>
+        <li>Session, verification, and reset artifacts are retained only for their operational lifetime or related security needs.</li>
+        <li>Consent, security, and incident records may be retained longer where needed to document compliance, fraud prevention, chargeback defense, or incident handling.</li>
         <li>Backups and disaster-recovery copies may persist for a limited retention period before they are overwritten.</li>
-        <li>We may retain minimal records needed to document consent choices, legal compliance, fraud prevention, chargeback defense, or security incidents.</li>
       </ul>
     </section>
 
@@ -172,13 +198,18 @@
       <h2>Security</h2>
       <p>
         We use administrative, technical, and organizational safeguards designed for the sensitivity of the
-        information we handle, including authentication controls, least-privilege access, transport encryption,
-        logging, and vendor controls. No system is perfectly secure, and no method of transmission or storage
-        can be guaranteed to be completely secure.
+        information we handle, including authentication controls, session management, transport encryption,
+        field encryption for selected sensitive values, logging, rate limiting, and vendor controls. No system
+        is perfectly secure, and no method of transmission or storage can be guaranteed to be completely secure.
       </p>
       <p>
         If we identify a security or confidentiality incident that requires notice under applicable law, we
         will investigate, document, and provide notices as required.
+      </p>
+      <p>
+        Some fields and files may require additional protection or operational controls over time as the system
+        evolves. This policy does not claim that every field or every stored document is encrypted in every
+        context.
       </p>
     </section>
 

@@ -11,6 +11,7 @@ const { issueExportGrant, verifyExportGrant } = require("../services/exportGrant
 const { saveRedactedPdf, buildRedactedStream, deleteExportFile } = require("../services/exportStorage.js");
 const { decryptJwe } = require("../services/jweDecryptService.js");
 const { decryptTaxId } = require("../services/taxIdService.js");
+const { decryptGstHstNumber } = require("../services/gstHstNumberService.js");
 const { buildPdfExport, buildPdfExportDocument, __private: pdfPrivate } = require("../services/pdfGeneratorService.js");
 const { buildNormalizedExportDataset } = require("../services/exportDatasetService.js");
 const { decrypt: decryptField } = require("../services/encryptionService.js");
@@ -491,7 +492,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       accountingMethod: business.accounting_method || "",
       materialParticipation: business.material_participation,
       gstHstRegistered: business.gst_hst_registered === true,
-      gstHstNumber: business.gst_hst_number || "",
+      gstHstNumber: decryptGstHstNumber(business.gst_hst_number) || "",
       gstHstMethod: business.gst_hst_method || "",
       generatedAt,
       reportId,
@@ -827,7 +828,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       accountingMethod: business.accounting_method || "",
       materialParticipation: business.material_participation,
       gstHstRegistered: business.gst_hst_registered === true,
-      gstHstNumber: business.gst_hst_number || "",
+      gstHstNumber: decryptGstHstNumber(business.gst_hst_number) || "",
       gstHstMethod: business.gst_hst_method || "",
       generatedAt,
       reportId,

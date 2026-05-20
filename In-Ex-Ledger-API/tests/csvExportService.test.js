@@ -6,6 +6,7 @@ const assert = require("node:assert/strict");
 const { buildNormalizedExportDataset } = require("../services/exportDatasetService.js");
 const {
   escapeCsv,
+  neutralizeFormulaCell,
   buildBasicLedgerCsv,
   buildFullCpaCsv,
   buildExcludedItemsCsv,
@@ -49,6 +50,17 @@ test("escapeCsv escapes quotes", () => {
 
 test("escapeCsv escapes newlines", () => {
   assert.equal(escapeCsv("A\nB"), "\"A\nB\"");
+});
+
+test("neutralizeFormulaCell prefixes spreadsheet formula triggers", () => {
+  assert.equal(neutralizeFormulaCell("=SUM(A1:A2)"), "'=SUM(A1:A2)");
+  assert.equal(neutralizeFormulaCell("+cmd"), "'+cmd");
+  assert.equal(neutralizeFormulaCell("-10"), "'-10");
+  assert.equal(neutralizeFormulaCell("@user"), "'@user");
+});
+
+test("escapeCsv neutralizes spreadsheet formula triggers before serialization", () => {
+  assert.equal(escapeCsv("=SUM(A1:A2)"), "'=SUM(A1:A2)");
 });
 
 test("basic CSV begins with UTF-8 BOM and includes account/category/receipt/notes columns", () => {

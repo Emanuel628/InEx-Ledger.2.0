@@ -4,11 +4,16 @@ const BOM = "\uFEFF";
 const CRLF = "\r\n";
 
 function escapeCsv(value) {
-  const stringValue = `${value ?? ""}`;
+  const stringValue = neutralizeFormulaCell(`${value ?? ""}`);
   if (!/[",\r\n]/.test(stringValue)) {
     return stringValue;
   }
   return `"${stringValue.replace(/"/g, '""')}"`;
+}
+
+function neutralizeFormulaCell(value) {
+  const stringValue = `${value ?? ""}`;
+  return /^[=+\-@]/.test(stringValue) ? `'${stringValue}` : stringValue;
 }
 
 function yesNo(value) {
@@ -254,5 +259,6 @@ module.exports = {
   buildExcludedItemsCsv,
   buildCategorySummaryCsv,
   buildCsvBundle,
-  escapeCsv
+  escapeCsv,
+  neutralizeFormulaCell
 };
