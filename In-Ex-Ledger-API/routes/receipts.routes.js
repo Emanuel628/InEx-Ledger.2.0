@@ -15,9 +15,14 @@ const {
 const { pool } = require("../db.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
-  getSubscriptionSnapshotForBusiness,
-  hasFeatureAccess
+  getSubscriptionSnapshotForBusiness
 } = require("../services/subscriptionService.js");
+const {
+  BasicPlanLimitError,
+  assertCanUploadReceipts,
+  incrementReceiptUsage
+} = require("../services/basicPlanUsageService.js");
+const { evaluateUsageLimitEmails } = require("../services/usageLimitEmailService.js");
 const {
   getReceiptStorageDir,
   isManagedReceiptPath,
@@ -307,14 +312,14 @@ router.get("/", async (req, res) => {
    POST /receipts — Upload Receipt
    ========================================================= */
 
+// Resolves the business and subscription for a receipt upload. Receipt uploads
+// are available on every tier; Basic businesses are metered by the monthly
+// receipt cap, enforced inside the POST handler before any insert.
 async function checkReceiptPlanAccess(req, res, next) {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
-    if (!hasFeatureAccess(subscription, "receipts")) {
-      return res.status(402).json({ error: "Receipt uploads require an active InEx Ledger Pro plan." });
-    }
     req._receiptsBusinessId = businessId;
+    req._receiptsSubscription = await getSubscriptionSnapshotForBusiness(businessId);
     next();
   } catch (err) {
     logError("Receipt plan gate error:", err);
@@ -327,9 +332,14 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
     return res.status(400).json({ error: "Receipt file is required." });
   }
 
-  try {
-    const businessId = req._receiptsBusinessId || await resolveBusinessIdForUser(req.user);
+  const client = await pool.connect();
+  let storagePath = null;
+  let inTransaction = false;
+  let committed = false;
+  const businessId = req._receiptsBusinessId;
+  const subscription = req._receiptsSubscription || null;
 
+  try {
     let transactionId = req.body.transaction_id;
     if (typeof transactionId === "string") {
       transactionId = transactionId.trim();
@@ -367,13 +377,20 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
     const fileBytes = req.file.buffer;
     const fileHash = crypto.createHash("sha256").update(fileBytes).digest("hex");
     const normalizedMimeType = normalizeUploadedReceiptMimeType(req.file);
-    let storagePath = null;
 
     if (!normalizedMimeType) {
       return res.status(400).json({
         error: "Unsupported file type. Only receipt images or PDFs are allowed."
       });
     }
+
+    // Acquire a per-business advisory lock so the monthly-cap check, the insert,
+    // and the usage-counter increment are atomic. Two concurrent uploads at the
+    // Basic cap cannot both pass the check.
+    await client.query("BEGIN");
+    inTransaction = true;
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [businessId]);
+    await assertCanUploadReceipts(client, businessId, 1, { subscription });
 
     try {
       storagePath = await writeReceiptMirror(fileBytes, req.file.originalname);
@@ -387,7 +404,7 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
       });
     }
 
-    await pool.query(
+    await client.query(
       `INSERT INTO receipts
         (id, business_id, transaction_id, filename, mime_type, storage_path, file_hash, file_bytes)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
@@ -403,6 +420,15 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
       ]
     );
 
+    // Authoritative monthly receipt counter (never decremented on delete).
+    await incrementReceiptUsage(client, businessId, 1);
+
+    await client.query("COMMIT");
+    committed = true;
+
+    // Best-effort: notify Basic businesses as they approach their monthly cap.
+    void evaluateUsageLimitEmails({ businessId, resources: ["receipts"], subscription });
+
     return res.status(201).json({
       id: receiptId,
       filename: req.file.originalname,
@@ -413,8 +439,21 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
       url: `/api/receipts/${receiptId}`
     });
   } catch (err) {
+    if (inTransaction && !committed) {
+      await client.query("ROLLBACK").catch(() => {});
+    }
+    if (!committed && storagePath) {
+      await safeUnlink(storagePath);
+    }
+
+    if (err instanceof BasicPlanLimitError) {
+      return res.status(err.statusCode).json({
+        error: err.message,
+        code: err.code,
+        ...err.details
+      });
+    }
     if (err.name === "AccountingPeriodLockedError") {
-      await safeUnlink(req.file?.path);
       return res.status(409).json({
         error: err.message,
         code: err.code,
@@ -422,9 +461,9 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
       });
     }
     logError("POST /receipts error:", err);
-
-    // Orphan cleanup
     return res.status(500).json({ error: "Failed to save receipt." });
+  } finally {
+    client.release();
   }
 });
 
