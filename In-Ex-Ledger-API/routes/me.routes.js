@@ -29,7 +29,15 @@ const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const VALID_BUSINESS_TYPES = new Set(["sole_proprietor", "llc", "s_corp", "partnership", "corporation"]);
 const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
 const VALID_STARTER_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash", "loan"]);
-const GUIDED_SETUP_STEPS = ["categories", "accounts", "transactions"];
+const GUIDED_SETUP_STEPS = ["categories", "accounts", "transactions", "import"];
+// Each guided step maps to the route the user is sent to. The import step runs
+// on the transactions page because the CSV import modal lives there.
+const GUIDED_SETUP_ROUTES = {
+  categories: "/categories",
+  accounts: "/accounts",
+  transactions: "/transactions",
+  import: "/transactions"
+};
 const VALID_GUIDED_SETUP_ACTIONS = new Set(["next", "back", "skip", "finish"]);
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const REFRESH_TOKEN_COOKIE = "refresh_token";
@@ -501,14 +509,14 @@ router.post("/onboarding/guide", async (req, res) => {
       const previousStep = resolvePreviousGuidedSetupStep(effectivePage);
       currentData.guided_setup_active = true;
       currentData.guided_setup_step = previousStep || GUIDED_SETUP_STEPS[0];
-      redirectTo = `/${currentData.guided_setup_step}`;
+      redirectTo = GUIDED_SETUP_ROUTES[currentData.guided_setup_step] || `/${currentData.guided_setup_step}`;
     } else {
       currentTourSeen[effectivePage] = true;
       const nextStep = resolveNextGuidedSetupStep(effectivePage);
       if (nextStep) {
         currentData.guided_setup_active = true;
         currentData.guided_setup_step = nextStep;
-        redirectTo = `/${nextStep}`;
+        redirectTo = GUIDED_SETUP_ROUTES[nextStep] || `/${nextStep}`;
       } else {
         currentData.guided_setup_active = false;
         currentData.guided_setup_step = "complete";

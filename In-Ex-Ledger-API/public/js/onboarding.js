@@ -52,7 +52,7 @@ const ONBOARDING_TOURS = {
   }
 };
 
-const GUIDED_SETUP_ORDER = ["categories", "accounts", "transactions"];
+const GUIDED_SETUP_ORDER = ["categories", "accounts", "transactions", "import"];
 const GUIDED_SETUP_CONFIG = {
   categories: {
     stepNumber: 1,
@@ -93,6 +93,23 @@ const GUIDED_SETUP_CONFIG = {
     ],
     launchSelector: "#addTxTogglePage, #addTxToggle",
     launchLabelKey: "onboarding_guide_transactions_add",
+    nextAction: "next",
+    nextLabelKey: "onboarding_guide_next"
+  },
+  import: {
+    stepNumber: 4,
+    // The import step runs on the transactions page (the CSV import modal
+    // lives there); `page` decouples the step key from the route.
+    page: "transactions",
+    titleKey: "onboarding_guide_import_title",
+    bodyKey: "onboarding_guide_import_body",
+    helperKey: "onboarding_guide_import_helper",
+    points: [
+      "onboarding_guide_import_point_1",
+      "onboarding_guide_import_point_2"
+    ],
+    launchSelector: "#importCsvBtn",
+    launchLabelKey: "onboarding_guide_import_add",
     nextAction: "finish",
     nextLabelKey: "onboarding_guide_finish"
   }
@@ -207,8 +224,9 @@ function maybeShowOnboardingTour(page, profile) {
   const onboardingData = onboarding.data || {};
   const guidedStep = String(onboardingData.guided_setup_step || "").trim().toLowerCase();
   if (onboardingData.guided_setup_active) {
-    if (guidedStep === page && GUIDED_SETUP_CONFIG[page]) {
-      renderGuidedSetupCard(page);
+    const guidedConfig = GUIDED_SETUP_CONFIG[guidedStep];
+    if (guidedConfig && (guidedConfig.page || guidedStep) === page) {
+      renderGuidedSetupCard(guidedStep);
     }
     return;
   }
@@ -223,12 +241,12 @@ function maybeShowOnboardingTour(page, profile) {
   renderOnboardingTour(page);
 }
 
-function renderGuidedSetupCard(page) {
-  const config = GUIDED_SETUP_CONFIG[page];
+function renderGuidedSetupCard(stepKey) {
+  const config = GUIDED_SETUP_CONFIG[stepKey];
   if (!config) {
     return;
   }
-  const uiState = readGuidedCardUiState(page);
+  const uiState = readGuidedCardUiState(stepKey);
   if (uiState.closed) {
     return;
   }
@@ -284,7 +302,7 @@ function renderGuidedSetupCard(page) {
       minimizeButton.setAttribute("aria-label", minimized ? "Expand setup card" : "Minimize setup card");
       minimizeButton.setAttribute("title", minimized ? "Expand" : "Minimize");
     }
-    writeGuidedCardUiState(page, { minimized, closed: false });
+    writeGuidedCardUiState(stepKey, { minimized, closed: false });
   };
 
   card.querySelector(".onboarding-guide-launch")?.addEventListener("click", () => {
@@ -294,23 +312,23 @@ function renderGuidedSetupCard(page) {
     syncMinimizedState(!card.classList.contains("is-minimized"));
   });
   closeButton?.addEventListener("click", () => {
-    writeGuidedCardUiState(page, { minimized: false, closed: true });
+    writeGuidedCardUiState(stepKey, { minimized: false, closed: true });
     card.remove();
   });
   card.querySelector(".onboarding-guide-back")?.addEventListener("click", () => {
-    advanceGuidedSetup("back", page, card);
+    advanceGuidedSetup("back", stepKey, card);
   });
   card.querySelector(".onboarding-guide-next")?.addEventListener("click", () => {
-    advanceGuidedSetup(config.nextAction, page, card);
+    advanceGuidedSetup(config.nextAction, stepKey, card);
   });
   card.querySelector(".onboarding-guide-skip")?.addEventListener("click", () => {
-    advanceGuidedSetup("skip", page, card);
+    advanceGuidedSetup("skip", stepKey, card);
   });
 
   syncMinimizedState(uiState.minimized);
 }
 
-async function advanceGuidedSetup(action, page, card) {
+async function advanceGuidedSetup(action, stepKey, card) {
   const buttons = Array.from(card.querySelectorAll("button"));
   buttons.forEach((button) => button.setAttribute("disabled", "true"));
 
@@ -320,7 +338,7 @@ async function advanceGuidedSetup(action, page, card) {
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ action, page })
+      body: JSON.stringify({ action, page: stepKey })
     });
     const result = response ? await response.json().catch(() => null) : null;
 
@@ -332,7 +350,7 @@ async function advanceGuidedSetup(action, page, card) {
       window.__LUNA_ME__.onboarding = result?.onboarding || window.__LUNA_ME__.onboarding || null;
     }
     window.__LUNA_ONBOARDING__ = result?.onboarding || window.__LUNA_ONBOARDING__ || null;
-    clearGuidedCardUiState(page);
+    clearGuidedCardUiState(stepKey);
     window.location.href = result?.redirect_to || "/transactions";
   } catch (error) {
     console.error("Failed to update guided onboarding state", error);

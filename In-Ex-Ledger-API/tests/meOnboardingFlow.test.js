@@ -42,6 +42,27 @@ function loadMeRouterFixture() {
         pool: {
           async query(sql, params = []) {
             state.dbQueries.push({ sql, params });
+            if (/SELECT onboarding_completed, onboarding_data, onboarding_tour_seen/i.test(sql)) {
+              return {
+                rows: [{
+                  onboarding_completed: true,
+                  onboarding_data: { guided_setup_active: true, guided_setup_step: "transactions" },
+                  onboarding_tour_seen: {}
+                }],
+                rowCount: 1
+              };
+            }
+            if (/UPDATE users\s+SET onboarding_data = \$1::jsonb/i.test(sql)) {
+              return {
+                rows: [{
+                  onboarding_completed: true,
+                  onboarding_completed_at: new Date().toISOString(),
+                  onboarding_data: JSON.parse(params[0] || "{}"),
+                  onboarding_tour_seen: JSON.parse(params[1] || "{}")
+                }],
+                rowCount: 1
+              };
+            }
             if (/FROM users\s+WHERE id = \$1/i.test(sql)) {
               return { rows: [userRow], rowCount: 1 };
             }
@@ -276,6 +297,39 @@ test("PUT /api/me rejects oversized profile names before issuing the update", as
       /UPDATE users\s+SET full_name/i.test(entry.sql)
     );
     assert.equal(profileUpdateQuery, undefined);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("guided setup advances from transactions to a 4th import step", async () => {
+  const fixture = loadMeRouterFixture();
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/me/onboarding/guide")
+      .send({ action: "next", page: "transactions" });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.redirect_to, "/transactions");
+    assert.equal(response.body.onboarding.data.guided_setup_step, "import");
+    assert.equal(response.body.onboarding.data.guided_setup_active, true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("guided setup import step finishes onboarding", async () => {
+  const fixture = loadMeRouterFixture();
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/me/onboarding/guide")
+      .send({ action: "finish", page: "import" });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.onboarding.data.guided_setup_step, "complete");
+    assert.equal(response.body.onboarding.data.guided_setup_active, false);
   } finally {
     fixture.cleanup();
   }
