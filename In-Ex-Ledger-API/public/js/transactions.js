@@ -3865,7 +3865,7 @@ function initCsvImport() {
     if (endDateValue) formData.append("end_date", endDateValue);
 
     startBtn.disabled = true;
-    startBtn.textContent = "Importing…";
+    startBtn.textContent = "Importing...";
 
     try {
       const res = await apiFetch("/api/transactions/import/csv", {
@@ -3896,7 +3896,7 @@ function initCsvImport() {
         </div>
         ${truncNote}
         ${errRows.length ? `<ul class="csv-error-list">${errRows.map((e) => `<li>${escapeHtml(e.reason)}</li>`).join("")}</ul>` : ""}
-        <p class="csv-import-note">Imported transactions are flagged <strong>Needs Review</strong> — check the category assignments before reporting.</p>
+        <p class="csv-import-note">Imported transactions are flagged <strong>Needs Review</strong> - check the category assignments before reporting.</p>
       `;
       document.getElementById("csvImportStep1").hidden = true;
       document.getElementById("csvImportStep2").hidden = false;

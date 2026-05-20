@@ -270,7 +270,7 @@ function renderGuidedSetupCard(stepKey) {
         <div class="onboarding-tour-step">${escapeHtml(stepLabel)}</div>
       </div>
       <div class="onboarding-tour-controls">
-        <button type="button" class="onboarding-tour-control onboarding-tour-minimize" aria-label="Minimize setup card" title="Minimize">−</button>
+        <button type="button" class="onboarding-tour-control onboarding-tour-minimize" aria-label="Minimize setup card" title="Minimize">-</button>
         <button type="button" class="onboarding-tour-control onboarding-tour-close" aria-label="Close setup card" title="Close">&times;</button>
       </div>
     </div>
@@ -298,7 +298,7 @@ function renderGuidedSetupCard(stepKey) {
   const syncMinimizedState = (minimized) => {
     card.classList.toggle("is-minimized", minimized);
     if (minimizeButton) {
-      minimizeButton.textContent = minimized ? "+" : "−";
+      minimizeButton.textContent = minimized ? "+" : "-";
       minimizeButton.setAttribute("aria-label", minimized ? "Expand setup card" : "Minimize setup card");
       minimizeButton.setAttribute("title", minimized ? "Expand" : "Minimize");
     }

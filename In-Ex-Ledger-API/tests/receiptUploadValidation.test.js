@@ -18,6 +18,7 @@ function loadReceiptsRouter(options = {}) {
     businessId: options.businessId || "00000000-0000-4000-8000-0000000000b1",
     transactionRow: options.transactionRow,
     insertParams: null,
+    attachUpdateParams: null,
     lockCheckDate: null,
     queryCount: 0,
     receiptRow: options.receiptRow || null
@@ -79,12 +80,40 @@ function loadReceiptsRouter(options = {}) {
         if (/business_usage_periods/i.test(text)) {
           return { rowCount: 1, rows: [periodRow()] };
         }
+        if (/SELECT id, business_id\s+FROM receipts/i.test(text)) {
+          if (options.receiptExists === false) {
+            return { rowCount: 0, rows: [] };
+          }
+          return {
+            rowCount: 1,
+            rows: [{
+              id: options.receiptId || "00000000-0000-4000-8000-000000000901",
+              business_id: state.businessId
+            }]
+          };
+        }
+        if (/FROM transactions/i.test(text)) {
+          if (!state.transactionRow) {
+            return { rowCount: 0, rows: [] };
+          }
+          return { rowCount: 1, rows: [state.transactionRow] };
+        }
         if (/INSERT INTO receipts/i.test(text)) {
           state.insertParams = params;
           return { rowCount: 1, rows: [] };
         }
         if (/COUNT\(\*\)[\s\S]*FROM receipts/i.test(text)) {
           return { rowCount: 1, rows: [{ count: options.attachedReceiptCount || 0 }] };
+        }
+        if (/SELECT t\.date\s+FROM receipts r/i.test(text)) {
+          if (!options.currentLinkedDate) {
+            return { rowCount: 0, rows: [] };
+          }
+          return { rowCount: 1, rows: [{ date: options.currentLinkedDate }] };
+        }
+        if (/UPDATE receipts\s+SET transaction_id/i.test(text)) {
+          state.attachUpdateParams = params;
+          return { rowCount: 1, rows: [{ id: params[1], transaction_id: params[0] }] };
         }
         return { rowCount: 0, rows: [] };
       };
@@ -159,6 +188,7 @@ function loadReceiptsRouter(options = {}) {
 
 function buildApp(router) {
   const app = express();
+  app.use(express.json());
   app.use("/api/receipts", router);
   app.use((err, _req, res, _next) => {
     res.status(err.status || 500).json({ error: err.message });
@@ -338,6 +368,55 @@ test("receipt upload succeeds when a transaction is below the 10-file limit", as
 
     assert.equal(response.status, 201);
     assert.ok(Array.isArray(fixture.state.insertParams));
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("receipt attach is blocked once a transaction already has 10 receipt files", async () => {
+  const receiptId = "00000000-0000-4000-8000-000000000777";
+  const transactionId = "00000000-0000-4000-8000-000000000778";
+  const fixture = loadReceiptsRouter({
+    receiptId,
+    transactionRow: { id: transactionId, date: "2026-05-01" },
+    attachedReceiptCount: 10
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .patch(`/api/receipts/${receiptId}/attach`)
+      .send({ transaction_id: transactionId });
+
+    assert.equal(response.status, 409);
+    assert.equal(response.body.code, "transaction_receipt_limit_reached");
+    assert.equal(fixture.state.attachUpdateParams, null);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("receipt attach succeeds when a transaction is below the 10-file limit", async () => {
+  const receiptId = "00000000-0000-4000-8000-000000000779";
+  const transactionId = "00000000-0000-4000-8000-000000000780";
+  const fixture = loadReceiptsRouter({
+    receiptId,
+    transactionRow: { id: transactionId, date: "2026-05-01" },
+    attachedReceiptCount: 4
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .patch(`/api/receipts/${receiptId}/attach`)
+      .send({ transaction_id: transactionId });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(fixture.state.attachUpdateParams, [
+      transactionId,
+      receiptId,
+      fixture.state.businessId
+    ]);
   } finally {
     fixture.cleanup();
   }

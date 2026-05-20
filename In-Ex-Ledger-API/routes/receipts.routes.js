@@ -498,6 +498,9 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
    ========================================================= */
 
 router.patch("/:id/attach", async (req, res) => {
+  const client = await pool.connect();
+  let inTransaction = false;
+
   try {
     const scope = await getBusinessScopeForUser(req.user, "all");
     const receiptId = req.params.id;
@@ -522,25 +525,32 @@ router.patch("/:id/attach", async (req, res) => {
       }
     }
 
-    const receiptLookup = await pool.query(
+    await client.query("BEGIN");
+    inTransaction = true;
+
+    const receiptLookup = await client.query(
       `SELECT id, business_id
        FROM receipts
        WHERE id = $1
          AND business_id = ANY($2::uuid[])
+       FOR UPDATE
        LIMIT 1`,
       [receiptId, scope.businessIds]
     );
 
     if (!receiptLookup.rowCount) {
+      await client.query("ROLLBACK");
+      inTransaction = false;
       return res.status(404).json({ error: "Receipt not found." });
     }
 
     const receiptBusinessId = receiptLookup.rows[0].business_id;
-    const lockState = await loadAccountingLockState(pool, receiptBusinessId);
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [receiptBusinessId]);
+    const lockState = await loadAccountingLockState(client, receiptBusinessId);
 
     if (transactionId !== null) {
-      // Attaching to a transaction → verify ownership and lock state
-      const txCheck = await pool.query(
+      // Attaching to a transaction -> verify ownership and lock state.
+      const txCheck = await client.query(
         `SELECT id, date
          FROM transactions
          WHERE id = $1 AND business_id = $2
@@ -549,6 +559,8 @@ router.patch("/:id/attach", async (req, res) => {
       );
 
       if (!txCheck.rowCount) {
+        await client.query("ROLLBACK");
+        inTransaction = false;
         return res.status(404).json({
           error: "Transaction not found or does not belong to this business."
         });
@@ -556,17 +568,17 @@ router.patch("/:id/attach", async (req, res) => {
 
       assertDateUnlocked(lockState, txCheck.rows[0].date);
 
-      // Enforce the receipts-per-transaction cap so it cannot be bypassed by
-      // uploading unattached receipts first and then attaching them. The
-      // receipt being moved is excluded so re-attaching it to the same
-      // transaction is never counted against itself.
-      const attachedCount = await pool.query(
+      // Run the count and update under the same lock so concurrent attach
+      // requests cannot both slip past the 10-receipt cap.
+      const attachedCount = await client.query(
         `SELECT COUNT(*)::int AS count
            FROM receipts
           WHERE transaction_id = $1 AND business_id = $2 AND id <> $3`,
         [transactionId, receiptBusinessId, receiptId]
       );
       if (Number(attachedCount.rows[0]?.count || 0) >= MAX_RECEIPTS_PER_TRANSACTION) {
+        await client.query("ROLLBACK");
+        inTransaction = false;
         return res.status(409).json({
           error: `This transaction already has ${MAX_RECEIPTS_PER_TRANSACTION} receipt files. Remove one before attaching another.`,
           code: "transaction_receipt_limit_reached",
@@ -574,8 +586,9 @@ router.patch("/:id/attach", async (req, res) => {
         });
       }
     } else {
-      // Detaching (null) → check if the receipt is currently linked to a locked-period transaction
-      const currentLink = await pool.query(
+      // Detaching (null) -> check if the receipt is currently linked to a
+      // locked-period transaction.
+      const currentLink = await client.query(
         `SELECT t.date
          FROM receipts r
          JOIN transactions t ON t.id = r.transaction_id
@@ -591,7 +604,7 @@ router.patch("/:id/attach", async (req, res) => {
       }
     }
 
-    const result = await pool.query(
+    const result = await client.query(
       `UPDATE receipts
        SET transaction_id = $1
        WHERE id = $2 AND business_id = $3
@@ -600,11 +613,18 @@ router.patch("/:id/attach", async (req, res) => {
     );
 
     if (!result.rowCount) {
+      await client.query("ROLLBACK");
+      inTransaction = false;
       return res.status(404).json({ error: "Receipt not found." });
     }
 
+    await client.query("COMMIT");
+    inTransaction = false;
     return res.json(result.rows[0]);
   } catch (err) {
+    if (inTransaction) {
+      await client.query("ROLLBACK").catch(() => {});
+    }
     if (err.name === "AccountingPeriodLockedError") {
       return res.status(409).json({
         error: err.message,
@@ -616,6 +636,8 @@ router.patch("/:id/attach", async (req, res) => {
     return res.status(500).json({
       error: "Failed to update receipt attachment."
     });
+  } finally {
+    client.release();
   }
 });
 

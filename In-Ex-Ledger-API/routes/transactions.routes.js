@@ -1529,6 +1529,105 @@ function parseImportDateRange(body = {}) {
   return { startDate: start || null, endDate: end || null };
 }
 
+function isPlannedCsvDuplicate(plannedRows, candidate, dateWindowDays = 2) {
+  if (!candidate || !Array.isArray(plannedRows) || !plannedRows.length) {
+    return false;
+  }
+
+  const candidateTime = Date.parse(candidate.date);
+  if (Number.isNaN(candidateTime)) {
+    return false;
+  }
+
+  return plannedRows.some((row) => {
+    if (
+      row.accountId !== candidate.accountId ||
+      row.amount !== candidate.amount ||
+      row.type !== candidate.type ||
+      row.description !== candidate.description
+    ) {
+      return false;
+    }
+
+    const rowTime = Date.parse(row.date);
+    if (Number.isNaN(rowTime)) {
+      return false;
+    }
+
+    const diffDays = Math.abs(candidateTime - rowTime) / 86400000;
+    return diffDays <= dateWindowDays;
+  });
+}
+
+async function countImportableCsvRows(rows, cols, options = {}) {
+  const {
+    client,
+    businessId,
+    accountId,
+    filterStartDate = null,
+    filterEndDate = null,
+    skipDuplicates = true,
+    lockState = null,
+    findDuplicateCandidatesFn = findDuplicateCandidates,
+    assertDateUnlockedFn = assertDateUnlocked
+  } = options;
+
+  const plannedRows = [];
+  let importableRows = 0;
+
+  for (const row of rows) {
+    const preview = extractRowData(row, cols);
+    if (!preview.date || !preview.amount || !preview.type || preview.amount <= 0 || !preview.description) {
+      continue;
+    }
+    if (filterStartDate && preview.date < filterStartDate) {
+      continue;
+    }
+    if (filterEndDate && preview.date > filterEndDate) {
+      continue;
+    }
+
+    try {
+      if (lockState) {
+        assertDateUnlockedFn(lockState, preview.date);
+      }
+    } catch (_) {
+      continue;
+    }
+
+    if (skipDuplicates) {
+      if (isPlannedCsvDuplicate(plannedRows, { ...preview, accountId })) {
+        continue;
+      }
+
+      const candidates = await findDuplicateCandidatesFn(client, {
+        businessId,
+        accountId,
+        date: preview.date,
+        amount: preview.amount,
+        type: preview.type,
+        description: preview.description,
+        dateWindowDays: 2
+      });
+
+      if (Array.isArray(candidates) && candidates.length > 0) {
+        continue;
+      }
+    }
+
+    plannedRows.push({
+      accountId,
+      date: preview.date,
+      amount: preview.amount,
+      type: preview.type,
+      description: preview.description
+    });
+    importableRows += 1;
+  }
+
+  return importableRows;
+}
+
 // ─── Smart CSV Category Detection ────────────────────────────────────────────
 const CSV_CATEGORY_RULES = [
   // Expense rules — ordered most-specific first
@@ -1801,16 +1900,15 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     // is never silently truncated — the user is asked to narrow the date range
     // or upgrade. Splitting one CSV into several files cannot bypass the cap
     // because the limit is a monthly usage cap, not a per-upload cap.
-    let csvValidRowCount = 0;
-    for (const previewRow of rowsToProcess) {
-      const preview = extractRowData(previewRow, cols);
-      if (!preview.date || !preview.amount || !preview.type || preview.amount <= 0 || !preview.description) {
-        continue;
-      }
-      if (filterStartDate && preview.date < filterStartDate) continue;
-      if (filterEndDate && preview.date > filterEndDate) continue;
-      csvValidRowCount += 1;
-    }
+    const csvValidRowCount = await countImportableCsvRows(rowsToProcess, cols, {
+      client,
+      businessId,
+      accountId,
+      filterStartDate,
+      filterEndDate,
+      skipDuplicates,
+      lockState
+    });
     await assertCanImportCsvRows(client, businessId, csvValidRowCount, { subscription });
 
     const batch = await createImportBatch(client, {
@@ -2095,5 +2193,7 @@ module.exports.__private = {
   normalizeDate,
   detectColumns,
   extractRowData,
-  parseImportDateRange
+  parseImportDateRange,
+  isPlannedCsvDuplicate,
+  countImportableCsvRows
 };

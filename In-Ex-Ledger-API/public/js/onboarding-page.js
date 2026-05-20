@@ -4,7 +4,7 @@ let onboardingSubmitting = false;
 let onboardingAccountNameTouched = false;
 const ONBOARDING_REGION_KEY = "lb_region";
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
-const GUIDED_SETUP_STEPS = new Set(["categories", "accounts", "transactions"]);
+const GUIDED_SETUP_STEPS = new Set(["categories", "accounts", "transactions", "import"]);
 const STARTER_ACCOUNT_NAME_PRESETS = {
   checking: { US: "Primary Checking", CA: "Primary Chequing" },
   savings: { US: "Business Savings", CA: "Business Savings" },
@@ -285,7 +285,7 @@ function resolveOnboardingDestination(profile = {}) {
 
 /* =========================================================
    Optional onboarding step: import transactions from a bank CSV.
-   Uses the business region already chosen during onboarding — it never
+   Uses the business region already chosen during onboarding - it never
    asks the user to pick a region. The step is always skippable.
    ========================================================= */
 
@@ -390,7 +390,7 @@ async function handleOnboardingCsvUpload(file, accountId, statusEl, continueRow)
     return;
   }
 
-  setImportStatus(statusEl, "Importing your CSV…");
+  setImportStatus(statusEl, "Importing your CSV...");
 
   const formData = new FormData();
   formData.append("file", file);
