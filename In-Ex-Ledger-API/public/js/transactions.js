@@ -100,7 +100,7 @@ let transactionUndoKind = "transaction";
 let transactionFxReferenceState = null;
 let transactionFxReferenceDismissed = false;
 let transactionFxReferenceRequestId = 0;
-let pendingTransactionReceiptFile = null;
+let pendingTransactionReceiptFiles = [];
 let recurringDrawerElement = null;
 let recurringToggleElement = null;
 let editingRecurringTemplateId = null;
@@ -289,6 +289,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Recurring transactions are a Pro feature. Hide the panel entirely for
+  // Basic so the backend recurring routes are never called from this page.
+  const recurringPanelInit = document.querySelector(".recurring-panel");
+  if (recurringPanelInit && tier !== "v1") {
+    recurringPanelInit.hidden = true;
+  }
+
   if (upsell) {
     const shouldShowUpsell = tier === "free" && hasTransactions && !upsellDismissed;
     upsell.hidden = !shouldShowUpsell;
@@ -449,7 +456,7 @@ function syncTransactionScopeUi() {
   }
 
   if (recurringPanel) {
-    recurringPanel.hidden = isAllScope;
+    recurringPanel.hidden = isAllScope || effectiveTier() !== "v1";
   }
 
   if (taxContext && isAllScope && hasMixedCurrenciesInScope()) {
@@ -623,11 +630,11 @@ function wireTransactionForm() {
         renderTotals();
       }
 
-      if (savedTransaction?.id && pendingTransactionReceiptFile) {
-        const uploaded = await uploadReceipt(savedTransaction.id, pendingTransactionReceiptFile);
-        if (!uploaded) {
-          // Transaction was saved; only the receipt attachment failed.
-          // Close the drawer and surface a recoverable warning.
+      if (savedTransaction?.id && pendingTransactionReceiptFiles.length) {
+        const uploadSummary = await uploadReceiptFiles(savedTransaction.id, pendingTransactionReceiptFiles);
+        if (uploadSummary.failed > 0) {
+          // Transaction was saved; one or more receipt attachments failed.
+          // Close the drawer and surface a recoverable, specific warning.
           markAccountAsUsed(accountId);
           try {
             await loadTransactions();
@@ -636,7 +643,10 @@ function wireTransactionForm() {
           }
           form.reset();
           closeTransactionDrawer();
-          setTransactionFormMessage(txT("transactions_warning_receipt_upload", "Transaction saved, but the receipt could not be uploaded. You can attach it later."));
+          const fallbackMessage = uploadSummary.uploaded > 0
+            ? `Transaction saved. ${uploadSummary.uploaded} receipt file(s) attached; ${uploadSummary.failed} could not be uploaded.`
+            : txT("transactions_warning_receipt_upload", "Transaction saved, but the receipt could not be uploaded. You can attach it later.");
+          setTransactionFormMessage(uploadSummary.lastError || fallbackMessage);
           return;
         }
       }
@@ -896,17 +906,24 @@ async function loadTransactions(options = {}) {
     }
 
     const transactions = Array.isArray(payload?.transactions) ? payload.transactions : [];
-    let receiptSnapshot = { byTransactionId: {}, unattachedCount: 0 };
+    let receiptSnapshot = { byTransactionId: {}, countByTransactionId: {}, idsByTransactionId: {}, unattachedCount: 0 };
     try {
       receiptSnapshot = await fetchReceiptLinksSnapshot();
     } catch (receiptError) {
       console.warn("[Transactions] Receipt snapshot unavailable", receiptError);
     }
 
-    ledgerState.transactions = transactions.filter(Boolean).map((transaction) => ({
-      ...transaction,
-      receiptId: receiptSnapshot.byTransactionId[transaction.id] || transaction.receiptId || ""
-    }));
+    ledgerState.transactions = transactions.filter(Boolean).map((transaction) => {
+      const receiptIds = receiptSnapshot.idsByTransactionId[transaction.id] || [];
+      return {
+        ...transaction,
+        receiptId: receiptSnapshot.byTransactionId[transaction.id] || transaction.receiptId || "",
+        receiptIds,
+        receiptCount:
+          receiptSnapshot.countByTransactionId[transaction.id] ||
+          (transaction.receiptId ? 1 : 0)
+      };
+    });
     ledgerState.transactionMeta = {
       total: Number(payload?.meta?.total || 0),
       limit: Number(payload?.meta?.limit || PAGE_SIZE),
@@ -1292,6 +1309,11 @@ function resetRecurringForm() {
 }
 
 async function loadRecurringTemplates() {
+  // Recurring transactions are Pro-only. Basic never calls the recurring API.
+  if (effectiveTier() !== "v1") {
+    recurringState.templates = [];
+    return;
+  }
   const tbody = document.getElementById("recurringTableBody");
   if (tbody) {
     tbody.innerHTML = `<tr class="placeholder-row"><td colspan="6" class="placeholder placeholder-cell">${txT("transactions_recurring_loading", "Loading recurring templates...")}</td></tr>`;
@@ -1891,7 +1913,7 @@ function resetTransactionForm() {
   if (form) {
     form.reset();
   }
-  pendingTransactionReceiptFile = null;
+  pendingTransactionReceiptFiles = [];
   updateTransactionReceiptLabel();
   editingTransactionId = null;
   setEditingMode(false);
@@ -2175,8 +2197,12 @@ function renderTransactionList(filteredTransactions) {
       typeof t === "function" ? t(typeKey) : txn.type === "income" ? "Income" : "Expense";
     const receiptLabel = txT("transactions_receipt_attached", "Receipt attached");
     const noteLabel = txT("transactions_note_attached", "Note attached");
-    const receiptClip = txn.receiptId
-      ? `<span class="tx-clip" aria-hidden="true" title="${escapeHtml(receiptLabel)}">📎</span><span class="sr-only">${escapeHtml(receiptLabel)}</span>`
+    const clipReceiptCount = Number(txn.receiptCount || 0) || (txn.receiptId ? 1 : 0);
+    const clipReceiptLabel = clipReceiptCount === 1
+      ? receiptLabel
+      : `${clipReceiptCount} receipts attached`;
+    const receiptClip = clipReceiptCount > 0
+      ? `<span class="tx-clip" aria-hidden="true" title="${escapeHtml(clipReceiptLabel)}">📎${clipReceiptCount > 1 ? " " + clipReceiptCount : ""}</span><span class="sr-only">${escapeHtml(clipReceiptLabel)}</span>`
       : "";
     const noteIndicator = txn.note
       ? `<span class="tx-note-indicator" aria-hidden="true" title="${escapeHtml(noteLabel)}">📝</span><span class="sr-only">${escapeHtml(noteLabel)}</span>`
@@ -2304,7 +2330,7 @@ async function fetchReceiptLinksSnapshot() {
     const noCacheQuery = query ? `${query}&_ts=${Date.now()}` : `?_ts=${Date.now()}`;
     const response = await apiFetch(`/api/receipts${noCacheQuery}`);
     if (!response || !response.ok) {
-      return { byTransactionId: {}, unattachedCount: 0 };
+      return { byTransactionId: {}, countByTransactionId: {}, idsByTransactionId: {}, unattachedCount: 0 };
     }
 
     const payload = await response.json().catch(() => []);
@@ -2316,18 +2342,26 @@ async function fetchReceiptLinksSnapshot() {
 
     return receipts.reduce(
       (snapshot, receipt) => {
-        if (receipt?.transaction_id) {
-          snapshot.byTransactionId[receipt.transaction_id] = receipt.id;
+        const txId = receipt?.transaction_id;
+        if (txId) {
+          if (!snapshot.idsByTransactionId[txId]) {
+            snapshot.idsByTransactionId[txId] = [];
+          }
+          snapshot.idsByTransactionId[txId].push(receipt.id);
+          snapshot.countByTransactionId[txId] = snapshot.idsByTransactionId[txId].length;
+          if (!snapshot.byTransactionId[txId]) {
+            snapshot.byTransactionId[txId] = receipt.id;
+          }
         } else {
           snapshot.unattachedCount += 1;
         }
         return snapshot;
       },
-      { byTransactionId: {}, unattachedCount: 0 }
+      { byTransactionId: {}, countByTransactionId: {}, idsByTransactionId: {}, unattachedCount: 0 }
     );
   } catch (error) {
     console.warn("[Transactions] Unable to load receipt links", error);
-    return { byTransactionId: {}, unattachedCount: 0 };
+    return { byTransactionId: {}, countByTransactionId: {}, idsByTransactionId: {}, unattachedCount: 0 };
   }
 }
 
@@ -2350,6 +2384,8 @@ function normalizeTransaction(transaction) {
     type: transaction.type === "income" ? "income" : "expense",
     note: transaction.note || "",
     receiptId: transaction.receiptId || transaction.receipt_id || "",
+    receiptCount: Number(transaction.receiptCount ?? transaction.receipt_count ?? 0) || 0,
+    receiptIds: Array.isArray(transaction.receiptIds) ? transaction.receiptIds : [],
     createdAt: transaction.createdAt || transaction.created_at || "",
     cleared: transaction.cleared === true,
     currency: String(transaction.currency || "").toUpperCase() || getTransactionDefaultCurrency(),
@@ -2457,6 +2493,13 @@ function prefillRecurringForm(suggestion) {
 function renderGhostSuggestions() {
   const panel = document.getElementById("recurringGhostPanel");
   if (!panel) return;
+
+  // "Make recurring" suggestions only apply to Pro, where recurring exists.
+  if (effectiveTier() !== "v1") {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    return;
+  }
 
   const suggestions = detectRecurringSuggestions();
   if (!suggestions.length) {
@@ -2722,8 +2765,15 @@ function renderTransactionsTable(filteredTransactions) {
     const clearedMarkup = txn.cleared
       ? `<span class="status-badge status-cleared">${txT("transactions_status_cleared", "Cleared")}</span>`
       : `<span class="status-badge status-pending">${txT("transactions_status_pending", "Pending")}</span>`;
-    const receiptMarkup = txn.receiptId
-      ? `<span class="receipt-status attached"><span class="receipt-dot"></span><span>${txT("transactions_receipt_attached_short", "Attached")}</span></span>`
+    const rowReceiptCount = Number(txn.receiptCount || 0) || (txn.receiptId ? 1 : 0);
+    const rowReceiptLabel = rowReceiptCount === 1
+      ? txT("transactions_receipt_attached_short", "Attached")
+      : `${rowReceiptCount} receipts`;
+    const rowReceiptAriaLabel = rowReceiptCount === 1
+      ? "1 receipt attached"
+      : `${rowReceiptCount} receipts attached`;
+    const receiptMarkup = rowReceiptCount > 0
+      ? `<span class="receipt-status attached" title="${escapeHtml(rowReceiptAriaLabel)}"><span class="receipt-dot"></span><span>${escapeHtml(rowReceiptLabel)}</span></span>`
       : `<button type="button" class="receipt-attach-hover" data-action="upload-receipt" data-id="${txn.id}" title="Attach a receipt">+ attach</button>`;
 
     row.innerHTML = `
@@ -3449,7 +3499,7 @@ function initTransactionReceiptField() {
     button.dataset.wired = "true";
     button.addEventListener("click", () => input.click());
     input.addEventListener("change", () => {
-      pendingTransactionReceiptFile = input.files?.[0] || null;
+      pendingTransactionReceiptFiles = Array.from(input.files || []);
       updateTransactionReceiptLabel();
     });
   }
@@ -3463,9 +3513,16 @@ function updateTransactionReceiptLabel() {
   if (!nameNode) {
     return;
   }
-  nameNode.textContent = pendingTransactionReceiptFile?.name || "No file selected";
-  if (!pendingTransactionReceiptFile && input) {
-    input.value = "";
+  const count = pendingTransactionReceiptFiles.length;
+  if (count === 0) {
+    nameNode.textContent = "No files selected";
+    if (input) {
+      input.value = "";
+    }
+  } else if (count === 1) {
+    nameNode.textContent = pendingTransactionReceiptFiles[0].name;
+  } else {
+    nameNode.textContent = `${count} files selected`;
   }
 }
 
@@ -3477,12 +3534,14 @@ function initReceiptInput() {
   receiptInputElement = document.createElement("input");
   receiptInputElement.type = "file";
   receiptInputElement.accept = "image/*,application/pdf";
+  receiptInputElement.multiple = true;
   receiptInputElement.className = "receipt-upload-input";
   receiptInputElement.addEventListener("change", async () => {
     const transactionId = receiptInputElement.dataset.transactionId || "";
-    const file = receiptInputElement.files?.[0];
-    if (file && transactionId) {
-      await uploadReceipt(transactionId, file);
+    const files = Array.from(receiptInputElement.files || []);
+    if (files.length && transactionId) {
+      await uploadReceiptFiles(transactionId, files);
+      await loadTransactions();
     }
     receiptInputElement.value = "";
   });
@@ -3500,8 +3559,11 @@ function triggerReceiptUpload(transactionId) {
   receiptInputElement.click();
 }
 
-async function uploadReceipt(transactionId, file) {
-  setTransactionFormMessage("Uploading receipt...");
+/**
+ * Uploads a single receipt file. Returns a structured result instead of
+ * throwing so the caller can drive a sequential multi-file upload.
+ */
+async function uploadReceiptSingle(transactionId, file) {
   const formData = new FormData();
   formData.append("receipt", file);
   if (TRANSACTION_ID_REGEX.test(transactionId || "")) {
@@ -3520,19 +3582,63 @@ async function uploadReceipt(transactionId, file) {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => null);
-      setTransactionFormMessage(error?.error || "Receipt upload failed.");
-      return false;
+      const errorPayload = await response.json().catch(() => null);
+      return {
+        ok: false,
+        error: errorPayload?.error || "Receipt upload failed.",
+        code: errorPayload?.code || ""
+      };
     }
-
-    await loadTransactions();
-    setTransactionFormMessage("Receipt uploaded.");
-    return true;
+    return { ok: true };
   } catch (err) {
     console.error("Receipt upload error:", err);
-    setTransactionFormMessage("Receipt upload failed.");
-    return false;
+    return { ok: false, error: "Receipt upload failed.", code: "" };
   }
+}
+
+/**
+ * Uploads receipt files one at a time (one request per file). Stops the
+ * sequence early when the backend reports a hard cap — the per-transaction
+ * 10-file limit or the Basic monthly receipt cap — since every remaining file
+ * would fail the same way. Returns a summary the caller can surface.
+ */
+async function uploadReceiptFiles(transactionId, files) {
+  const list = Array.from(files || []);
+  const summary = { uploaded: 0, failed: 0, stopped: false, lastError: "" };
+  if (!list.length) {
+    return summary;
+  }
+
+  for (let i = 0; i < list.length; i++) {
+    setTransactionFormMessage(`Uploading receipt ${i + 1} of ${list.length}...`);
+    const result = await uploadReceiptSingle(transactionId, list[i]);
+    if (result.ok) {
+      summary.uploaded += 1;
+      continue;
+    }
+    summary.failed += 1;
+    summary.lastError = result.error;
+    if (result.code === "transaction_receipt_limit_reached" || result.code === "basic_receipt_limit_reached") {
+      // Hard cap reached — the remaining files cannot succeed either.
+      summary.failed += list.length - 1 - i;
+      summary.stopped = true;
+      break;
+    }
+  }
+
+  if (summary.failed === 0) {
+    setTransactionFormMessage(
+      summary.uploaded === 1 ? "Receipt uploaded." : `${summary.uploaded} receipt files uploaded.`
+    );
+  } else if (summary.uploaded > 0) {
+    setTransactionFormMessage(
+      summary.lastError || `${summary.uploaded} receipt file(s) uploaded; ${summary.failed} could not be uploaded.`
+    );
+  } else {
+    setTransactionFormMessage(summary.lastError || "Receipt upload failed.");
+  }
+
+  return summary;
 }
 
 function maybePlaySlotAnimation() {

@@ -67,7 +67,7 @@
           <h1 class="app-page-title" data-i18n="receipts_title">Receipts</h1>
           <p class="app-page-subtitle" data-i18n="receipts_page_subtitle">Upload source documents, keep them attached to the right transaction, and maintain a clean audit trail.</p>
         </div>
-        <input type="file" id="receiptUploadInput" class="hidden-upload-input" accept="image/*,.pdf" />
+        <input type="file" id="receiptUploadInput" class="hidden-upload-input" accept="image/*,.pdf" multiple />
       </section>
 
       <!-- N-03: Drag-and-drop upload zone -->
@@ -104,7 +104,7 @@
 
         <!-- M-15: Bottom upload button -->
         <div class="receipts-card-footer">
-          <input type="file" id="receiptUploadInputBottom" class="hidden-upload-input" accept="image/*,.pdf" />
+          <input type="file" id="receiptUploadInputBottom" class="hidden-upload-input" accept="image/*,.pdf" multiple />
           <button type="button" class="receipt-bottom-upload-btn" id="receiptUploadButtonBottom" data-i18n="receipts_button_upload">+ Upload receipt</button>
         </div>
       </section>
@@ -151,7 +151,7 @@
   <script src="../js/auth.js?v=20260518a"></script>
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
-  <script src="../js/receipts.js?v=20260514a"></script>
+  <script src="../js/receipts.js?v=20260520a"></script>
 </body>
 </html>
 

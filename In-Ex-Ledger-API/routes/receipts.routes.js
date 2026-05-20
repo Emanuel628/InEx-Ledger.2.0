@@ -74,6 +74,7 @@ const MIME_BY_EXTENSION = new Map([
 ]);
 
 const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
+const MAX_RECEIPTS_PER_TRANSACTION = 10;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /* =========================================================
@@ -392,6 +393,24 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [businessId]);
     await assertCanUploadReceipts(client, businessId, 1, { subscription });
 
+    // Cap the number of receipt files a single transaction can carry. The
+    // count runs under the advisory lock so concurrent uploads to the same
+    // transaction cannot both slip past the cap.
+    if (transactionId !== null) {
+      const countResult = await client.query(
+        "SELECT COUNT(*)::int AS count FROM receipts WHERE transaction_id = $1 AND business_id = $2",
+        [transactionId, businessId]
+      );
+      if (Number(countResult.rows[0]?.count || 0) >= MAX_RECEIPTS_PER_TRANSACTION) {
+        const limitError = new Error(
+          `This transaction already has ${MAX_RECEIPTS_PER_TRANSACTION} receipt files. Remove one before uploading another.`
+        );
+        limitError.status = 409;
+        limitError.code = "transaction_receipt_limit_reached";
+        throw limitError;
+      }
+    }
+
     try {
       storagePath = await writeReceiptMirror(fileBytes, req.file.originalname);
     } catch (mirrorErr) {
@@ -451,6 +470,13 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
         error: err.message,
         code: err.code,
         ...err.details
+      });
+    }
+    if (err.status === 409 && err.code === "transaction_receipt_limit_reached") {
+      return res.status(409).json({
+        error: err.message,
+        code: err.code,
+        limit: MAX_RECEIPTS_PER_TRANSACTION
       });
     }
     if (err.name === "AccountingPeriodLockedError") {
@@ -529,6 +555,24 @@ router.patch("/:id/attach", async (req, res) => {
       }
 
       assertDateUnlocked(lockState, txCheck.rows[0].date);
+
+      // Enforce the receipts-per-transaction cap so it cannot be bypassed by
+      // uploading unattached receipts first and then attaching them. The
+      // receipt being moved is excluded so re-attaching it to the same
+      // transaction is never counted against itself.
+      const attachedCount = await pool.query(
+        `SELECT COUNT(*)::int AS count
+           FROM receipts
+          WHERE transaction_id = $1 AND business_id = $2 AND id <> $3`,
+        [transactionId, receiptBusinessId, receiptId]
+      );
+      if (Number(attachedCount.rows[0]?.count || 0) >= MAX_RECEIPTS_PER_TRANSACTION) {
+        return res.status(409).json({
+          error: `This transaction already has ${MAX_RECEIPTS_PER_TRANSACTION} receipt files. Remove one before attaching another.`,
+          code: "transaction_receipt_limit_reached",
+          limit: MAX_RECEIPTS_PER_TRANSACTION
+        });
+      }
     } else {
       // Detaching (null) → check if the receipt is currently linked to a locked-period transaction
       const currentLink = await pool.query(

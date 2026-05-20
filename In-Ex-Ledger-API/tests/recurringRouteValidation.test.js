@@ -46,7 +46,7 @@ function loadRecurringRouter(options = {}) {
     if (requestName === "../services/subscriptionService.js" || /subscriptionService\.js$/.test(requestName)) {
       return {
         getSubscriptionSnapshotForBusiness: async () => ({ plan: "test" }),
-        hasFeatureAccess: () => true
+        hasFeatureAccess: options.hasFeatureAccess || (() => true)
       };
     }
     if (requestName === "../services/basicPlanUsageService.js" || /basicPlanUsageService\.js$/.test(requestName)) {
@@ -272,6 +272,20 @@ test("recurring undo-delete restores the latest deleted template", async () => {
     assert.equal(response.status, 200);
     assert.equal(response.body.message, "Recurring transaction restored.");
     assert.match(String(fixture.state.queries.find((sql) => /WITH latest_deleted/i.test(String(sql))) || ""), /UPDATE recurring_transactions/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("recurring routes are gated for Basic with a recurring_requires_pro response", async () => {
+  const fixture = loadRecurringRouter({ hasFeatureAccess: () => false });
+  try {
+    const response = await request(fixture.app).get("/api/recurring");
+
+    assert.equal(response.status, 402);
+    assert.equal(response.body.code, "recurring_requires_pro");
+    assert.match(response.body.error, /available on Pro/i);
+    assert.equal(fixture.state.dbTouched, false);
   } finally {
     fixture.cleanup();
   }
