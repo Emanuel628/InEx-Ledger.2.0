@@ -12,6 +12,7 @@ function loadAuthRouterFixture() {
   const originalLoad = Module._load.bind(Module);
   const previousEnv = {
     APP_BASE_URL: process.env.APP_BASE_URL,
+    JWT_SECRET: process.env.JWT_SECRET,
     NODE_ENV: process.env.NODE_ENV,
     RESEND_API_KEY: process.env.RESEND_API_KEY
   };
@@ -20,6 +21,7 @@ function loadAuthRouterFixture() {
   };
 
   process.env.APP_BASE_URL = "https://app.inexledger.test";
+  process.env.JWT_SECRET = process.env.JWT_SECRET || "test-forgot-password-jwt-secret";
   process.env.NODE_ENV = "test";
   process.env.RESEND_API_KEY = "resend_test_key";
 
@@ -142,6 +144,7 @@ function loadAuthRouterFixture() {
       delete require.cache[AUTH_ROUTE_PATH];
       Module._load = originalLoad;
       process.env.APP_BASE_URL = previousEnv.APP_BASE_URL;
+      process.env.JWT_SECRET = previousEnv.JWT_SECRET;
       process.env.NODE_ENV = previousEnv.NODE_ENV;
       process.env.RESEND_API_KEY = previousEnv.RESEND_API_KEY;
     }

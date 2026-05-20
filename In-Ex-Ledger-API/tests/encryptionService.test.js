@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 
 const ENCRYPTION_SERVICE_PATH = require.resolve("../services/encryptionService.js");
+const ORIGINAL_FIELD_ENCRYPTION_KEY = process.env.FIELD_ENCRYPTION_KEY;
 
 function loadEncryptionService() {
   delete require.cache[ENCRYPTION_SERVICE_PATH];
@@ -23,6 +24,11 @@ function decryptWithKey(ciphertext, rawKey) {
 
 test.afterEach(() => {
   delete require.cache[ENCRYPTION_SERVICE_PATH];
+  if (ORIGINAL_FIELD_ENCRYPTION_KEY === undefined) {
+    delete process.env.FIELD_ENCRYPTION_KEY;
+  } else {
+    process.env.FIELD_ENCRYPTION_KEY = ORIGINAL_FIELD_ENCRYPTION_KEY;
+  }
 });
 
 test("encryptionService picks up FIELD_ENCRYPTION_KEY changes without a process restart", () => {
@@ -32,10 +38,12 @@ test("encryptionService picks up FIELD_ENCRYPTION_KEY changes without a process 
   const { encrypt } = loadEncryptionService();
 
   const firstCiphertext = encrypt("first");
+  assert.match(firstCiphertext, /^enc:v1:[^:]+:[^:]+:[^:]+$/);
   assert.equal(decryptWithKey(firstCiphertext, firstKey), "first");
 
   process.env.FIELD_ENCRYPTION_KEY = secondKey;
   const secondCiphertext = encrypt("second");
+  assert.match(secondCiphertext, /^enc:v1:[^:]+:[^:]+:[^:]+$/);
   assert.equal(decryptWithKey(secondCiphertext, secondKey), "second");
   assert.throws(() => decryptWithKey(secondCiphertext, firstKey));
 });

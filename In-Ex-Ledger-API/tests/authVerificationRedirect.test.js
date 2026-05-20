@@ -36,7 +36,10 @@ function loadAuthRouter() {
       return {
         pool: {
           async query(sql, params = []) {
-            if (/DELETE FROM verification_tokens WHERE expires_at <= NOW\(\)/i.test(sql)) {
+            if (
+              /WITH expired AS\s*\(\s*SELECT token\s*FROM verification_tokens\s*WHERE expires_at <= NOW\(\)/i.test(sql)
+              || /DELETE FROM verification_tokens WHERE expires_at <= NOW\(\)/i.test(sql)
+            ) {
               return { rows: [], rowCount: 0 };
             }
 

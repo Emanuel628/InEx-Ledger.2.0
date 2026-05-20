@@ -23,6 +23,8 @@ const {
   __private: { clamp, normalizeProvider, normalizeStatus, normalizeSource }
 } = require("../services/bankConnectionService.js");
 
+Module._load = originalLoad;
+
 function makePool(rowsByCall = []) {
   let i = 0;
   return {
