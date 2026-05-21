@@ -1825,17 +1825,20 @@ body {
   }
 
   .stats-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
     margin-bottom: 16px;
   }
 
   .stat-card {
-    padding: 14px 16px;
+    padding: 12px 14px;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .stat-value {
-    font-size: 20px;
+    font-size: clamp(15px, 4vw, 20px);
+    letter-spacing: -0.05em;
   }
 
   .transactions-toolbar {
@@ -4004,11 +4007,11 @@ tr.tx-highlight {
 
 @media (max-width: 640px) {
   .stats-row {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
   .stat-card {
-    width: 100% !important;
+    min-width: 0 !important;
   }
 }
 
@@ -4046,7 +4049,7 @@ tr.tx-highlight {
   }
 
   .stats-row {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
   .transaction-form-grid,
@@ -4057,12 +4060,12 @@ tr.tx-highlight {
   .table-wrapper {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    padding-left: 12px !important;
-    padding-right: 12px !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
   }
 
   .transactions-table {
-    min-width: 860px !important;
+    min-width: 0 !important;
   }
 
   .scope-select-wrap,
@@ -4165,5 +4168,279 @@ tr.tx-highlight {
   #netProfitYTD {
     font-size: clamp(14px, 1.45vw, 18px);
     letter-spacing: -0.075em;
+  }
+}
+
+/* ── Responsive polish ────────────────────────────────────────
+   Covers desktop fine-tuning, tablet transitions, and mobile
+   card/column layouts not covered by earlier breakpoints.
+   ──────────────────────────────────────────────────────────── */
+
+/* Desktop: widen description column; let layout breathe */
+@media (min-width: 1025px) {
+  .app-content {
+    padding: 28px 32px 44px;
+  }
+
+  .transactions-table {
+    table-layout: auto;
+  }
+
+  .transactions-table .col-description {
+    width: auto;
+    min-width: 180px;
+  }
+
+  .transactions-table .col-date {
+    width: 88px;
+  }
+
+  .transactions-table .col-account {
+    width: 110px;
+  }
+
+  .transactions-table .col-category {
+    width: 120px;
+  }
+
+  .transactions-table .col-receipt {
+    width: 76px;
+  }
+
+  .transactions-table .col-status {
+    width: 94px;
+  }
+
+  .transactions-table .col-amount {
+    width: 110px;
+  }
+}
+
+/* Medium-wide desktop: compact page-header before tabs wrap */
+@media (max-width: 1280px) and (min-width: 1025px) {
+  .page-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .page-header-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* Tablet (641px–1024px): content padding + header wrap */
+@media (max-width: 1024px) and (min-width: 641px) {
+  .app-content {
+    padding: 20px 18px 32px;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .page-header-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* Mobile (≤ 640px): comprehensive layout fixes */
+@media (max-width: 640px) {
+  /* Tighter app-content padding */
+  .app-content {
+    padding: 14px 12px 24px;
+  }
+
+  /* Period picker: horizontal scroll, no wrapping */
+  .tx-period-picker {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    margin-bottom: -2px;
+  }
+  .tx-period-picker::-webkit-scrollbar {
+    display: none;
+  }
+  .tx-period-chip {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* Toolbar: full-width stacked layout */
+  .transactions-toolbar-tools {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+  }
+  .toolbar-search {
+    width: 100%;
+  }
+  .toolbar-search input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .transactions-toolbar-controls {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px;
+    width: 100%;
+  }
+  .transactions-toolbar-controls .toolbar-select {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto !important;
+    max-width: none !important;
+  }
+  .toolbar-import-button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    width: auto !important;
+    max-width: none !important;
+  }
+
+  /* Table: auto layout, no forced min-width, hide lower-priority columns */
+  .transactions-table {
+    display: table;
+    table-layout: auto;
+    min-width: 0 !important;
+    overflow-x: visible;
+    white-space: normal;
+  }
+  .table-wrapper {
+    overflow-x: visible !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Shrink the checkbox column — header checkbox is hidden, just needs tap space */
+  .transactions-table th.col-select,
+  .transactions-table td:nth-child(1) {
+    width: 36px !important;
+    padding-left: 8px;
+    padding-right: 4px;
+  }
+
+  /* Date column narrower */
+  .transactions-table th.col-date,
+  .transactions-table td:nth-child(2) {
+    width: 74px !important;
+  }
+
+  /* Description: allow wrapping */
+  .transactions-table .col-description,
+  .transactions-table td:nth-child(3) {
+    word-break: break-word;
+    white-space: normal;
+    min-width: 100px;
+  }
+
+  /* Amount column compact */
+  .transactions-table th.col-amount,
+  .transactions-table td:nth-child(8) {
+    width: 80px !important;
+  }
+
+  /* Hide Account (4th) and Receipt (6th) columns */
+  .transactions-table th.col-account,
+  .transactions-table td:nth-child(4),
+  .transactions-table th.col-receipt,
+  .transactions-table td:nth-child(6) {
+    display: none;
+  }
+
+  /* Stat card icon smaller on mobile */
+  .stat-card-icon {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+  }
+}
+
+/* Small mobile (≤ 480px): tightest layout */
+@media (max-width: 480px) {
+  .app-content {
+    padding: 12px 10px 20px;
+  }
+
+  /* Period chips: slightly smaller */
+  .tx-period-chip {
+    padding: 4px 9px;
+    font-size: 11px;
+  }
+
+  /* Also hide category column on very small screens */
+  .transactions-table th.col-category,
+  .transactions-table td:nth-child(5) {
+    display: none;
+  }
+
+  /* Status column: icon only */
+  .transactions-table th.col-status,
+  .transactions-table td:nth-child(7) {
+    width: 70px !important;
+  }
+
+  /* Tighter cell padding for remaining columns */
+  .transactions-table td {
+    padding: 10px 6px;
+  }
+  .transactions-table thead th {
+    padding: 8px 6px;
+    font-size: 10px;
+  }
+
+  /* Stat values: scale down for narrow screens */
+  .stat-value {
+    font-size: clamp(13px, 3.8vw, 17px);
+    letter-spacing: -0.06em;
+  }
+
+  /* Tax banner: compact */
+  .tax-banner {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .tax-banner-amount {
+    font-size: 17px;
+  }
+
+  /* Page title: slightly smaller */
+  .page-title {
+    font-size: 19px;
+  }
+
+  /* Stat cards side by side, tight */
+  .stat-card {
+    padding: 10px 12px;
+  }
+  .stat-label {
+    font-size: 10px;
+  }
+  .stat-delta {
+    font-size: 10px;
+  }
+
+  /* Scope select: compact */
+  .scope-select-wrap {
+    padding: 7px 10px;
+  }
+
+  /* Drawer title smaller on small mobile */
+  .drawer-title {
+    font-size: 15px;
+  }
+
+  /* Receipt upload: stack */
+  .receipt-upload-inline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
   }
 }
