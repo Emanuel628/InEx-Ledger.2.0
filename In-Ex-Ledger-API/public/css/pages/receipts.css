@@ -179,7 +179,7 @@
 
 .receipt-column-filename { width: 260px; }
 .receipt-column-uploaded { width: 150px; }
-.receipt-column-actions { width: 220px; }
+.receipt-column-actions { width: 300px; }
 
 .receipts-table td {
   padding: 14px 16px;
@@ -222,8 +222,17 @@
 .receipt-row-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.receipt-row-actions .receipt-link-btn,
+.receipt-row-actions .receipt-scan-btn,
+.receipt-row-actions .receipt-delete-btn {
+  flex: 0 0 auto;
+  min-width: 72px;
 }
 
 .receipts-empty-state {
@@ -462,17 +471,13 @@
 
   .receipts-page-header,
   .receipts-card-head,
-  .receipt-modal-actions,
-  .receipt-row-actions {
+  .receipt-modal-actions {
     flex-direction: column;
     align-items: stretch;
   }
 
   .receipt-secondary-btn,
   .receipt-primary-btn,
-  .receipt-link-btn,
-  .receipt-scan-btn,
-  .receipt-delete-btn,
   .receipt-file-button,
   .receipt-bottom-upload-btn,
   .receipt-refresh-btn {
@@ -507,11 +512,7 @@
   }
 
   .receipts-table {
-    min-width: 860px;
-  }
-
-  .receipt-row-actions {
-    flex-wrap: wrap;
+    min-width: 940px;
   }
 }
 
@@ -527,8 +528,7 @@
   .receipts-page-header,
   .receipts-card-head,
   .receipt-modal-actions,
-  .modal-actions,
-  .receipt-row-actions {
+  .modal-actions {
     flex-direction: column !important;
     align-items: stretch !important;
   }
@@ -546,14 +546,11 @@
   }
 
   .receipts-table {
-    min-width: 760px !important;
+    min-width: 940px !important;
   }
 
   .receipt-secondary-btn,
   .receipt-primary-btn,
-  .receipt-link-btn,
-  .receipt-scan-btn,
-  .receipt-delete-btn,
   .receipt-file-button,
   .receipt-bottom-upload-btn,
   .receipt-refresh-btn,
