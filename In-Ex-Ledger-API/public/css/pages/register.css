@@ -4,15 +4,12 @@
 
 @import url("/css/pages/login.css");
 
-/* ── Page shell ── */
-
 body {
   background:
     radial-gradient(circle at top left, rgba(36, 109, 187, 0.07), transparent 36%),
     linear-gradient(180deg, #fbfcfe 0%, #f2f5f9 100%);
 }
 
-/* Override login.css page-shell sizing */
 main {
   max-width: none;
   margin-top: 0;
@@ -25,21 +22,23 @@ main {
   padding: 40px 0 72px;
 }
 
-/* ── Two-column layout ── */
-
 .register-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1fr);
   gap: 0;
   min-height: 0;
   align-items: start;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 22px 52px rgba(15, 23, 42, 0.07);
+  overflow: hidden;
 }
 
-/* ── Form column ── */
-
 .register-form-col {
-  padding: 48px 0 56px 56px;
-  max-width: 520px;
+  padding: 48px 56px 56px 56px;
+  max-width: 560px;
+  min-width: 0;
 }
 
 .register-form-header {
@@ -62,12 +61,9 @@ main {
   line-height: 1.6;
 }
 
-/* Form gap override for register */
 .register-form {
   gap: 14px;
 }
-
-/* ── Password block ── */
 
 .password-block {
   display: flex;
@@ -113,8 +109,8 @@ main {
   background: var(--border2);
 }
 
-.meter-segment.is-weak   { background: var(--red); }
-.meter-segment.is-fair   { background: var(--amber); }
+.meter-segment.is-weak { background: var(--red); }
+.meter-segment.is-fair { background: var(--amber); }
 .meter-segment.is-strong { background: var(--green); }
 
 .password-strength-text {
@@ -123,9 +119,9 @@ main {
   margin: 0;
 }
 
-.password-strength-text.is-weak    { color: #b91c1c; }
-.password-strength-text.is-fair    { color: #92600a; }
-.password-strength-text.is-strong  { color: #1a7a4a; }
+.password-strength-text.is-weak { color: #b91c1c; }
+.password-strength-text.is-fair { color: #92600a; }
+.password-strength-text.is-strong { color: #1a7a4a; }
 
 .password-match-message {
   margin: 0;
@@ -134,7 +130,7 @@ main {
   line-height: 1.4;
 }
 
-.password-match-message.is-ok  { color: var(--green); }
+.password-match-message.is-ok { color: var(--green); }
 .password-match-message.is-bad { color: var(--red); }
 
 .password-requirements {
@@ -173,13 +169,9 @@ main {
   border-color: rgba(26, 122, 74, 0.38);
 }
 
-/* ── Language ── */
-
 .language-field {
   margin-top: 0;
 }
-
-/* ── Consent section ── */
 
 .consent-section {
   display: flex;
@@ -190,8 +182,8 @@ main {
 
 .consent-field {
   display: grid;
-  grid-template-columns: 16px 1fr;
-  gap: 8px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 9px;
   align-items: start;
   font-size: 13px;
   line-height: 1.4;
@@ -214,8 +206,8 @@ main {
 }
 
 .consent-checkbox {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   margin-top: 2px;
 }
 
@@ -232,8 +224,6 @@ main {
   color: var(--red);
 }
 
-/* ── CTA area ── */
-
 .register-cta-area {
   display: flex;
   flex-direction: column;
@@ -249,24 +239,22 @@ main {
   text-align: center;
 }
 
-/* ── Sign-in line ── */
-
 .register-signin-line {
   margin-top: 20px;
   font-size: 13px;
   color: var(--ink2);
+  text-align: center;
 }
 
 .register-signin-line a {
   color: var(--accent2);
 }
 
-/* ── Value column ── */
-
 .register-value-col {
   position: sticky;
   top: 80px;
-  padding: 48px 56px 56px 0;
+  padding: 48px 0 56px 56px;
+  min-width: 0;
 }
 
 .register-value-inner {
@@ -357,41 +345,89 @@ main {
   font-weight: 500;
 }
 
-/* ── Mobile: single column ── */
-
 @media (max-width: 860px) {
+  body {
+    background: #f6f8fb;
+  }
+
+  .auth-header {
+    padding: 14px 16px !important;
+  }
+
   .register-main {
-    padding: 24px 0 48px;
+    width: min(100%, 680px) !important;
+    max-width: 100% !important;
+    padding: 12px 12px 36px !important;
+    box-sizing: border-box !important;
   }
 
   .register-layout {
-    grid-template-columns: 1fr;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: visible !important;
   }
 
-  /* On mobile: value column is already first in DOM */
+  .register-form-col {
+    order: 1;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 18px !important;
+    border: 1px solid rgba(15, 25, 35, 0.08);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 16px 38px rgba(15, 23, 42, 0.07);
+    box-sizing: border-box !important;
+  }
+
   .register-value-col {
-    position: static;
-    padding: 0;
+    order: 2;
+    position: static !important;
+    width: 100% !important;
+    padding: 0 !important;
   }
 
   .register-value-inner {
-    border-radius: 14px;
-    padding: 20px 18px;
+    width: 100% !important;
+    padding: 18px !important;
+    border-radius: 22px !important;
+    box-sizing: border-box !important;
+  }
+
+  .register-form-header {
+    margin-bottom: 18px;
+  }
+
+  .register-headline {
+    font-size: clamp(30px, 9vw, 42px);
+    line-height: 0.98;
+  }
+
+  .register-intro {
+    font-size: 14px;
+  }
+
+  .password-block {
+    padding: 14px !important;
+  }
+
+  .password-requirements,
+  .register-trial-points {
+    grid-template-columns: 1fr !important;
   }
 
   .register-trial-points {
     display: grid;
-    grid-template-columns: 1fr 1fr;
     gap: 8px;
     margin-bottom: 12px;
   }
 
-  .register-trial-points li {
-    font-size: 12px;
-  }
-
   .register-value-headline {
-    font-size: 17px;
+    font-size: 18px;
   }
 
   .register-value-lede {
@@ -399,77 +435,32 @@ main {
     margin-bottom: 12px;
   }
 
-  .register-form-col {
-    padding: 24px 0 0;
-    max-width: 100%;
-  }
-
-  .register-headline {
-    font-size: 26px;
-  }
-
-  .password-requirements {
-    grid-template-columns: 1fr;
-  }
-
   .register-trust-bar {
-    gap: 4px 10px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .auth-submit,
+  .register-form input,
+  .register-form select {
+    width: 100% !important;
+  }
+
+  footer {
+    padding: 18px 0 28px !important;
   }
 }
 
 @media (max-width: 480px) {
-  .register-trial-points {
-    grid-template-columns: 1fr;
-  }
-
-  .register-value-inner {
-    padding: 16px 14px;
-  }
-}
-
-/* Desktop-on-mobile: preserve two-column registration layout at desktop-ish widths */
-@media (min-width: 1025px) {
-  .register-layout {
-    grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1fr);
-  }
-
-  .register-value-col,
-  .register-form-col {
-    min-width: 0;
-  }
-}
-
-/* Mobile view: final safety pass */
-@media (max-width: 560px) {
   .register-main {
-    width: calc(100vw - 16px) !important;
-    max-width: calc(100vw - 16px) !important;
-    padding: 18px 0 40px !important;
-    box-sizing: border-box !important;
-  }
-
-  .register-layout,
-  .register-trial-points,
-  .password-requirements {
-    grid-template-columns: 1fr !important;
+    padding: 10px 10px 30px !important;
   }
 
   .register-form-col,
-  .register-value-col,
-  .register-value-inner,
-  .password-block {
-    width: 100% !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  .register-form-col {
-    padding: 20px 0 0 !important;
-  }
-
-  .register-value-inner,
-  .password-block {
+  .register-value-inner {
     padding: 16px 14px !important;
+    border-radius: 20px !important;
   }
 
   .password-meter-row {
@@ -481,10 +472,8 @@ main {
     white-space: normal !important;
   }
 
-  .auth-submit,
-  .register-form input,
-  .register-form select {
-    width: 100% !important;
+  .consent-field {
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 10px;
   }
 }
-
