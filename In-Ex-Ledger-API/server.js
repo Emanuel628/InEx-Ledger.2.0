@@ -197,27 +197,6 @@ function sendCanonicalPage(pageName, req, res) {
   res.sendFile(filePath);
 }
 
-function wantsDesktopView(req) {
-  const view = String(req.query?.view || '').trim().toLowerCase();
-  const mobile = String(req.query?.mobile || '').trim().toLowerCase();
-  return view === 'desktop' || mobile === '0' || mobile === 'false';
-}
-
-function isLikelyMobileRequest(req) {
-  const ua = String(req.headers['user-agent'] || '').toLowerCase();
-  const secMobile = String(req.headers['sec-ch-ua-mobile'] || '').trim().toLowerCase();
-  if (secMobile === '?1') return true;
-  return /android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile/.test(ua);
-}
-
-function sendMobileAwareSettings(req, res) {
-  if (!wantsDesktopView(req) && isLikelyMobileRequest(req)) {
-    return res.redirect(302, `/settings-mobile${req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''}`);
-  }
-
-  return sendCanonicalPage('settings', req, res);
-}
-
 /* =========================================================
    CORS & SECURITY CONFIGURATION
    ========================================================= */
@@ -322,16 +301,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/settings', sendMobileAwareSettings);
-app.get('/settings.html', (req, res) => res.redirect(301, '/settings'));
-app.get('/html/settings', (req, res) => res.redirect(301, '/settings'));
-app.get('/html/settings.html', (req, res) => res.redirect(301, '/settings'));
-
 for (const pageName of htmlPageNames) {
   if (!ENABLE_V2_BUSINESS && V2_HTML_PAGES.has(pageName)) {
-    continue;
-  }
-  if (pageName === 'settings') {
     continue;
   }
   const canonicalPath = getCanonicalPagePath(pageName);
