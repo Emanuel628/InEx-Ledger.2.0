@@ -8,9 +8,56 @@
   line-height: 1.05;
 }
 
+/* Stronger stat-card override.
+   Some page CSS intentionally keeps .stat-value on one line. That breaks with
+   long CAD values such as CA$1,000,000.00 inside four-column KPI cards, so this
+   rule uses !important to protect every stat card loaded after app.css too. */
+.stats-row,
+.stat-card,
+.stat-card-copy {
+  min-width: 0 !important;
+}
+
+.stat-card {
+  overflow: hidden !important;
+}
+
+.stat-card .stat-value,
+.stats-row .stat-value {
+  display: block !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  line-height: 1.05 !important;
+  letter-spacing: -0.055em !important;
+  font-size: clamp(16px, 1.65vw, 22px) !important;
+}
+
+@media (max-width: 1100px) {
+  .stat-card .stat-value,
+  .stats-row .stat-value {
+    font-size: clamp(15px, 2.4vw, 20px) !important;
+  }
+}
+
 @media (max-width: 767px) {
   :is(.card, .settings-card, .billing-card, .subscription-card, .summary-card, .kpi-card, .stat-card, .analytics-card, .account-card, .balance-card) :is(.amount, .balance, .price, .money, .currency, .kpi-value, .stat-value, [data-price-amount], [data-currency-amount]) {
     font-size: clamp(1.5rem, 9vw, 2.5rem);
     letter-spacing: -0.045em;
+  }
+
+  .stat-card .stat-value,
+  .stats-row .stat-value {
+    font-size: clamp(16px, 4.2vw, 22px) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-card .stat-value,
+  .stats-row .stat-value {
+    font-size: clamp(14px, 4.4vw, 19px) !important;
+    letter-spacing: -0.045em !important;
   }
 }
