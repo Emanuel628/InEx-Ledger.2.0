@@ -446,7 +446,7 @@ main {
   }
 
   .auth-submit,
-  .register-form input,
+  .register-form input:not([type="checkbox"]),
   .register-form select {
     width: 100% !important;
   }
@@ -479,4 +479,18 @@ main {
   .consent-field {
     gap: 10px;
   }
+}
+
+/* Final checkbox override: mobile form rules make inputs full width, but consent
+   checkboxes must keep their natural size so text sits directly beside them. */
+.register-form .consent-field input[type="checkbox"].consent-checkbox,
+.register-form input[type="checkbox"].consent-checkbox {
+  flex: 0 0 16px !important;
+  width: 16px !important;
+  min-width: 16px !important;
+  max-width: 16px !important;
+  height: 16px !important;
+  min-height: 16px !important;
+  max-height: 16px !important;
+  margin: 2px 0 0 !important;
 }
