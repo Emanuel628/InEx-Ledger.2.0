@@ -189,7 +189,7 @@ test.describe('InEx Ledger full walkthrough', () => {
     await assertCtaVisible(page, 'button[type="submit"]', 'Onboarding submit');
 
     await page.fill('#onboardingBusinessName', 'Audit Test Co.');
-    await page.selectOption('#onboardingStarterAccountType', 'chequing');
+    await page.selectOption('#onboardingStarterAccountType', 'checking');
     await page.fill('#onboardingStarterAccountName', 'Main Chequing');
     await page.selectOption('#onboardingRegion', 'CA');
 
@@ -197,8 +197,24 @@ test.describe('InEx Ledger full walkthrough', () => {
     await expect(page.locator('#onboardingProvinceField')).toBeVisible({ timeout: 3000 });
     await page.selectOption('#onboardingProvince', 'ON');
 
+    // Required export/profile fields added after the original E2E was written.
+    await page.fill('#onboardingBusinessActivityCode', '541400');
+    await page.selectOption('#onboardingAccountingMethod', 'cash');
+    await page.selectOption('#onboardingMaterialParticipation', 'yes');
+    await page.fill(
+      '#onboardingBusinessAddress',
+      '123 Test Street, Toronto, ON M5V 2T6, Canada'
+    );
+
     await page.click('button[type="submit"]');
-    await page.waitForURL(/transactions|dashboard/i, { timeout: 10000 });
+
+    // Current onboarding shows an optional CSV import step before the workspace.
+    await expect(page.locator('#onboardingImportStep')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('#onboardingCsvHelpToggle')).toBeVisible({ timeout: 3000 });
+    await screenshot(page, '07-onboarding-import-step');
+
+    await page.click('#onboardingCsvSkip');
+    await page.waitForURL(/trial-setup|categories|transactions|dashboard/i, { timeout: 10000 });
     await screenshot(page, '07-onboarding-complete');
   });
 
