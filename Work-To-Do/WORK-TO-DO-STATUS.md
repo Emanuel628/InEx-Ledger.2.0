@@ -91,27 +91,21 @@ Legend:
 
 ---
 
-## `Work-To-Do/CODEBASE-AUDIT-HIGH.md`
+## `Work-Completed/CODEBASE-AUDIT-HIGH.md` — moved 2026-05-22
 
-Status: ✅ complete as written. All task rows are checked off `[x]`.
-
-No current action needed from this file unless a new audit reopens an item.
+Status: ✅ complete. All 32 task rows checked off `[x]`; the file header records the partials being verified and closed on 2026-05-15. Corresponding tests are in the green `test:all` suite. Moved to `Work-Completed/`.
 
 ---
 
-## `Work-To-Do/CODEBASE-AUDIT-MEDIUM.md`
+## `Work-Completed/CODEBASE-AUDIT-MEDIUM.md` — moved 2026-05-22
 
-Status: ✅ complete as written. All task rows are checked off `[x]`.
-
-No current action needed from this file unless a new audit reopens an item.
+Status: ✅ complete. All 42 task rows checked off `[x]`. Corresponding tests are in the green `test:all` suite. Moved to `Work-Completed/`.
 
 ---
 
-## `Work-To-Do/CODEBASE-AUDIT-LOW.md`
+## `Work-Completed/CODEBASE-AUDIT-LOW.md` — moved 2026-05-22
 
-Status: ✅ complete as written. All task rows are checked off `[x]`.
-
-No current action needed from this file unless a new audit reopens an item.
+Status: ✅ complete. All 28 task rows checked off `[x]`. Moved to `Work-Completed/`.
 
 ---
 
@@ -300,9 +294,9 @@ Current visible open items:
 
 ---
 
-## `Work-To-Do/SECURITY-LEGAL-READINESS-US-CANADA.md`
+## `Work-Completed/SECURITY-LEGAL-READINESS-US-CANADA.md` — moved 2026-05-22
 
-Status: ✅ complete. The verified gaps in this memo have been addressed; the file can be moved to `Work-Completed/`.
+Status: ✅ complete. The verified gaps in this memo have been addressed; moved to `Work-Completed/`.
 
 Resolved this pass (commit `Align security docs and harden privacy exports`):
 
