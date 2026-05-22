@@ -27,6 +27,7 @@
   </script>
   <link rel="stylesheet" href="/css/app.css?v=20260514c" />
   <link rel="stylesheet" href="/css/pages/landing.css?v=20260519e" />
+  <link rel="stylesheet" href="/css/pages/landing-rolodex.css?v=20260522a" />
   <link rel="stylesheet" href="/css/pages/landing-responsive-fixes.css?v=20260522b" />
 </head>
 <body>
@@ -75,52 +76,255 @@
         <div class="hero-cta-note"><span>Secure billing setup appears after onboarding.</span><span data-region-copy="ctaNote">US and Canada support.</span><span>No charge today.</span></div>
       </div>
 
-      <div class="hero-visual" aria-label="InEx Ledger transactions page preview with demo data">
-        <div class="app-preview-shell">
-          <header class="app-preview-topbar">
-            <div class="preview-brand"><span class="preview-brand-mark" aria-hidden="true"></span><strong>InEx Ledger</strong></div>
-            <label class="preview-search"><span aria-hidden="true">⌕</span><input aria-label="Search transactions" value="Search transactions..." readonly /></label>
-            <div class="preview-user-pill">DE</div>
-          </header>
-          <div class="app-preview-body">
-            <aside class="preview-sidebar">
-              <div class="preview-quick-header"><span>Quick Add</span><button type="button">+ Add</button></div>
-              <nav>
-                <span class="is-active">+ Transactions</span>
-                <span>+ Receipts</span>
-                <span data-region-copy="mileageNav">+ Mileage</span>
-                <span>+ Accounts</span>
-                <span>+ Categories</span>
-                <span>+ Invoices</span>
-              </nav>
-            </aside>
-            <section class="preview-content">
-              <div class="preview-page-header">
-                <div><h2>Transactions</h2><p>Demo business ledger · current reporting period</p><p class="preview-context" data-region-copy="taxContext">Record context: U.S. business categories</p></div>
-                <div class="preview-actions"><button type="button">This Month</button><button type="button">YTD</button><button type="button">+ Add transaction</button></div>
+      <div class="hero-visual" aria-label="InEx Ledger app previews with mock data">
+        <div class="hero-rolodex" data-rolodex>
+          <div class="hero-rolodex-header">
+            <div>
+              <span class="hero-rolodex-kicker">Inside the app</span>
+              <p class="hero-rolodex-title">Spin through a mirrored product tour with mock data.</p>
+            </div>
+            <div class="hero-rolodex-controls" aria-label="Preview navigation">
+              <button type="button" class="hero-rolodex-arrow hero-rolodex-arrow-left" data-rolodex-prev aria-label="Previous app screen"><span aria-hidden="true"></span></button>
+              <button type="button" class="hero-rolodex-arrow hero-rolodex-arrow-right" data-rolodex-next aria-label="Next app screen"><span aria-hidden="true"></span></button>
+            </div>
+          </div>
+
+          <div class="hero-rolodex-stage">
+            <article class="hero-rolodex-slide" data-rolodex-slide data-slide-name="Transactions" aria-label="Transactions preview">
+              <div class="app-preview-shell">
+                <header class="app-preview-topbar">
+                  <div class="preview-brand"><span class="preview-brand-mark" aria-hidden="true"></span><strong>InEx Ledger</strong></div>
+                  <label class="preview-search"><span aria-hidden="true">⌕</span><input aria-label="Search transactions" value="Search transactions..." readonly /></label>
+                  <div class="preview-user-pill">DE</div>
+                </header>
+                <div class="app-preview-body">
+                  <aside class="preview-sidebar">
+                    <div class="preview-quick-header"><span>Quick Add</span><button type="button">+ Add</button></div>
+                    <nav>
+                      <span class="is-active">+ Transactions</span>
+                      <span>+ Receipts</span>
+                      <span data-region-copy="mileageNav">+ Mileage</span>
+                      <span>+ Accounts</span>
+                      <span>+ Categories</span>
+                      <span>+ Exports</span>
+                    </nav>
+                  </aside>
+                  <section class="preview-content">
+                    <div class="preview-page-header">
+                      <div><h2>Transactions</h2><p>Demo business ledger · current reporting period</p><p class="preview-context" data-region-copy="taxContext">Record context: U.S. business categories</p></div>
+                      <div class="preview-actions"><button type="button">This Month</button><button type="button">YTD</button><button type="button">+ Add transaction</button></div>
+                    </div>
+                    <div class="preview-stats">
+                      <article><span>Total income</span><strong data-region-copy="previewIncome">$1,643.26</strong><small>Current period</small></article>
+                      <article><span>Total expenses</span><strong data-region-copy="previewExpenses">$4,199.01</strong><small>Current period</small></article>
+                      <article><span>Net profit</span><strong data-region-copy="previewProfit">-$2,555.75</strong><small>After expenses</small></article>
+                      <article><span>Transactions</span><strong>32</strong><small>32 this month</small></article>
+                    </div>
+                    <div class="preview-toolbar"><span>⌕ Search transactions...</span><button>All Accounts</button><button>All Categories</button><button>Filters</button><button>+ Add transaction</button></div>
+                    <div class="preview-table" role="table" aria-label="Demo transaction preview">
+                      <div class="preview-row preview-head" role="row"><span>Date</span><span>Description</span><span>Category</span><span>Account</span><span>Amount</span><span>Type</span></div>
+                      <div class="preview-row animate-row" role="row"><span>May 16, 2026</span><span>Demo Payout</span><span>Sales</span><span>Operating Account</span><span data-region-copy="rowIncome">$1,250.00</span><span class="income-pill">Income</span></div>
+                      <div class="preview-row" role="row"><span>May 16, 2026</span><span>Office Supplies</span><span>Office Supplies</span><span>Business Card</span><span data-region-copy="rowExpense">-$89.42</span><span class="expense-pill">Expense</span></div>
+                      <div class="preview-row" role="row"><span>May 17, 2026</span><span>Client Payment</span><span>Consulting</span><span>Operating Account</span><span data-region-copy="rowClient">$2,500.00</span><span class="income-pill">Income</span></div>
+                      <div class="preview-row" role="row"><span>May 18, 2026</span><span>Fuel</span><span data-region-copy="fuelCategory">Vehicle</span><span>Cash Account</span><span data-region-copy="rowFuel">-$65.00</span><span class="expense-pill">Expense</span></div>
+                    </div>
+                  </section>
+                </div>
               </div>
-              <div class="preview-stats">
-                <article><span>Total income</span><strong data-region-copy="previewIncome">$1,643.26</strong><small>Current period</small></article>
-                <article><span>Total expenses</span><strong data-region-copy="previewExpenses">$4,199.01</strong><small>Current period</small></article>
-                <article><span>Net profit</span><strong data-region-copy="previewProfit">-$2,555.75</strong><small>After expenses</small></article>
-                <article><span>Transactions</span><strong>32</strong><small>32 this month</small></article>
+            </article>
+
+            <article class="hero-rolodex-slide" data-rolodex-slide data-slide-name="Receipts" aria-label="Receipts preview">
+              <div class="app-preview-shell">
+                <header class="app-preview-topbar">
+                  <div class="preview-brand"><span class="preview-brand-mark" aria-hidden="true"></span><strong>InEx Ledger</strong></div>
+                  <label class="preview-search"><span aria-hidden="true">⌕</span><input aria-label="Search receipts" value="Search receipts..." readonly /></label>
+                  <div class="preview-user-pill">DE</div>
+                </header>
+                <div class="app-preview-body">
+                  <aside class="preview-sidebar">
+                    <div class="preview-quick-header"><span>Capture</span><button type="button">+ Scan</button></div>
+                    <nav>
+                      <span>+ Transactions</span>
+                      <span class="is-active">+ Receipts</span>
+                      <span data-region-copy="mileageNav">+ Mileage</span>
+                      <span>+ Accounts</span>
+                      <span>+ Categories</span>
+                      <span>+ Exports</span>
+                    </nav>
+                  </aside>
+                  <section class="preview-content preview-content-alt">
+                    <div class="preview-page-header">
+                      <div><h2>Receipts</h2><p>Inbox and attachments · mock OCR details</p><p class="preview-context">Keep proof tied to the right transaction.</p></div>
+                      <div class="preview-actions"><button type="button">Needs Review</button><button type="button">All Receipts</button><button type="button">+ Upload receipt</button></div>
+                    </div>
+                    <div class="preview-two-up">
+                      <div class="preview-receipt-card">
+                        <div class="preview-card-top"><span class="preview-card-label">Latest upload</span><span class="preview-status-pill preview-status-pill-ok">OCR ready</span></div>
+                        <div class="preview-receipt-paper">
+                          <div class="preview-receipt-paper-line short"></div>
+                          <div class="preview-receipt-paper-line"></div>
+                          <div class="preview-receipt-paper-line"></div>
+                          <div class="preview-receipt-paper-line short"></div>
+                        </div>
+                        <div class="preview-receipt-meta">
+                          <strong>Northwind Office Supply</strong>
+                          <span>May 18, 2026</span>
+                          <span data-region-copy="receiptAmount">$89.42 captured</span>
+                        </div>
+                      </div>
+                      <div class="preview-card-stack">
+                        <article class="preview-micro-card">
+                          <span class="preview-card-label">Linked transaction</span>
+                          <strong>Office Supplies</strong>
+                          <p>Business Card · pending review</p>
+                        </article>
+                        <article class="preview-micro-card">
+                          <span class="preview-card-label">Checklist</span>
+                          <ul class="preview-checklist">
+                            <li>Merchant found</li>
+                            <li>Date found</li>
+                            <li>Total verified</li>
+                            <li data-region-copy="receiptDistanceCheck">Mileage note optional</li>
+                          </ul>
+                        </article>
+                      </div>
+                    </div>
+                  </section>
+                </div>
               </div>
-              <div class="preview-toolbar"><span>⌕ Search transactions...</span><button>All Accounts</button><button>All Categories</button><button>Filters</button><button>+ Add transaction</button></div>
-              <div class="preview-table" role="table" aria-label="Demo transaction preview">
-                <div class="preview-row preview-head" role="row"><span>Date</span><span>Description</span><span>Category</span><span>Account</span><span>Amount</span><span>Type</span></div>
-                <div class="preview-row animate-row" role="row"><span>May 16, 2026</span><span>Demo Payout</span><span>Sales</span><span>Operating Account</span><span data-region-copy="rowIncome">$1,250.00</span><span class="income-pill">Income</span></div>
-                <div class="preview-row" role="row"><span>May 16, 2026</span><span>Office Supplies</span><span>Office Supplies</span><span>Business Card</span><span data-region-copy="rowExpense">-$89.42</span><span class="expense-pill">Expense</span></div>
-                <div class="preview-row" role="row"><span>May 17, 2026</span><span>Client Payment</span><span>Consulting</span><span>Operating Account</span><span data-region-copy="rowClient">$2,500.00</span><span class="income-pill">Income</span></div>
-                <div class="preview-row" role="row"><span>May 18, 2026</span><span>Fuel</span><span data-region-copy="fuelCategory">Vehicle</span><span>Cash Account</span><span data-region-copy="rowFuel">-$65.00</span><span class="expense-pill">Expense</span></div>
+            </article>
+
+            <article class="hero-rolodex-slide" data-rolodex-slide data-slide-name="Analytics" aria-label="Analytics preview">
+              <div class="app-preview-shell">
+                <header class="app-preview-topbar">
+                  <div class="preview-brand"><span class="preview-brand-mark" aria-hidden="true"></span><strong>InEx Ledger</strong></div>
+                  <label class="preview-search"><span aria-hidden="true">⌕</span><input aria-label="Search analytics" value="Search analytics..." readonly /></label>
+                  <div class="preview-user-pill">DE</div>
+                </header>
+                <div class="app-preview-body">
+                  <aside class="preview-sidebar">
+                    <div class="preview-quick-header"><span>Reporting</span><button type="button">Live</button></div>
+                    <nav>
+                      <span>+ Transactions</span>
+                      <span>+ Receipts</span>
+                      <span data-region-copy="mileageNav">+ Mileage</span>
+                      <span class="is-active">+ Analytics</span>
+                      <span>+ Categories</span>
+                      <span>+ Exports</span>
+                    </nav>
+                  </aside>
+                  <section class="preview-content preview-content-alt">
+                    <div class="preview-page-header">
+                      <div><h2>Analytics</h2><p>Monthly performance · mock dashboard</p><p class="preview-context">Know the trend before export time.</p></div>
+                      <div class="preview-actions"><button type="button">Dashboard</button><button type="button">Cash Flow</button><button type="button">What-If</button></div>
+                    </div>
+                    <div class="preview-stats preview-stats-analytics">
+                      <article><span>Avg monthly income</span><strong data-region-copy="analyticsIncome">$8,420</strong><small>Trailing 12 months</small></article>
+                      <article><span>Avg monthly expenses</span><strong data-region-copy="analyticsExpense">$3,180</strong><small>Trailing 12 months</small></article>
+                      <article><span>Projected net</span><strong data-region-copy="analyticsNet">$5,240</strong><small>Next month</small></article>
+                    </div>
+                    <div class="preview-chart-card">
+                      <div class="preview-chart-header"><strong>12-month trend</strong><span data-region-copy="analyticsRange">Jan to Dec</span></div>
+                      <div class="preview-chart">
+                        <span style="--bar:42%"></span>
+                        <span style="--bar:58%"></span>
+                        <span style="--bar:47%"></span>
+                        <span style="--bar:71%"></span>
+                        <span style="--bar:64%"></span>
+                        <span style="--bar:82%"></span>
+                        <span style="--bar:68%"></span>
+                        <span style="--bar:88%"></span>
+                      </div>
+                    </div>
+                    <div class="preview-mini-grid">
+                      <article class="preview-micro-card"><span class="preview-card-label">Top income</span><strong>Consulting</strong><p data-region-copy="analyticsTopIncome">$3,900 this month</p></article>
+                      <article class="preview-micro-card"><span class="preview-card-label">Top expense</span><strong>Contractors</strong><p data-region-copy="analyticsTopExpense">$1,180 this month</p></article>
+                    </div>
+                  </section>
+                </div>
               </div>
-            </section>
+            </article>
+
+            <article class="hero-rolodex-slide" data-rolodex-slide data-slide-name="Exports" aria-label="Exports preview">
+              <div class="app-preview-shell">
+                <header class="app-preview-topbar">
+                  <div class="preview-brand"><span class="preview-brand-mark" aria-hidden="true"></span><strong>InEx Ledger</strong></div>
+                  <label class="preview-search"><span aria-hidden="true">⌕</span><input aria-label="Search exports" value="Search exports..." readonly /></label>
+                  <div class="preview-user-pill">DE</div>
+                </header>
+                <div class="app-preview-body">
+                  <aside class="preview-sidebar">
+                    <div class="preview-quick-header"><span>Delivery</span><button type="button">PDF</button></div>
+                    <nav>
+                      <span>+ Transactions</span>
+                      <span>+ Receipts</span>
+                      <span data-region-copy="mileageNav">+ Mileage</span>
+                      <span>+ Analytics</span>
+                      <span class="is-active">+ Exports</span>
+                      <span>+ Archive</span>
+                    </nav>
+                  </aside>
+                  <section class="preview-content preview-content-alt">
+                    <div class="preview-page-header">
+                      <div><h2>Exports</h2><p>Clean handoff · mock PDF preview</p><p class="preview-context">Downloadable PDF and CSV exports from the same records.</p></div>
+                      <div class="preview-actions"><button type="button">2026 YTD</button><button type="button">CSV</button><button type="button">Export PDF</button></div>
+                    </div>
+                    <div class="preview-two-up">
+                      <div class="preview-export-panel">
+                        <article class="preview-micro-card preview-export-card">
+                          <span class="preview-card-label">Report settings</span>
+                          <strong data-region-copy="exportFormName">Schedule C review packet</strong>
+                          <p data-region-copy="exportRange">Jan 1, 2026 to May 20, 2026</p>
+                          <div class="preview-export-buttons">
+                            <button type="button">Export CSV</button>
+                            <button type="button" class="is-primary">Export PDF</button>
+                          </div>
+                        </article>
+                        <article class="preview-micro-card">
+                          <span class="preview-card-label">Export summary</span>
+                          <p data-region-copy="exportSummaryIncome">Income: $48,220.14</p>
+                          <p data-region-copy="exportSummaryExpense">Expenses: $18,094.32</p>
+                          <p data-region-copy="exportSummaryNet">Net: $30,125.82</p>
+                        </article>
+                      </div>
+                      <div class="preview-pdf-card" aria-label="Mock downloadable PDF export preview">
+                        <div class="preview-pdf-top">
+                          <span class="preview-status-pill preview-status-pill-pdf">PDF ready</span>
+                          <span class="preview-download-chip">↓ Download</span>
+                        </div>
+                        <div class="preview-pdf-page">
+                          <span class="preview-card-label" data-region-copy="exportPdfBadge">Prepared PDF export</span>
+                          <strong data-region-copy="exportPdfTitle">Schedule C review packet</strong>
+                          <div class="preview-pdf-lines">
+                            <span></span>
+                            <span></span>
+                            <span class="short"></span>
+                          </div>
+                          <div class="preview-pdf-grid">
+                            <div><small>Income</small><strong data-region-copy="exportPdfIncome">$48,220.14</strong></div>
+                            <div><small>Expenses</small><strong data-region-copy="exportPdfExpense">$18,094.32</strong></div>
+                            <div><small>Net</small><strong data-region-copy="exportPdfNet">$30,125.82</strong></div>
+                            <div><small>Export ID</small><strong>PDF-2048</strong></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="hero-rolodex-footer">
+            <div class="hero-rolodex-dots" aria-label="Preview screens"></div>
+            <p class="hero-rolodex-caption" data-rolodex-caption>Transactions · current reporting period</p>
           </div>
         </div>
       </div>
     </section>
 
     <section class="trust-strip" aria-label="Product capabilities">
-      <article><span aria-hidden="true">◎</span><strong>Region-aware records</strong><p data-region-copy="trustRegion">Built for U.S. and Canadian business record workflows.</p></article>
+      <article><span aria-hidden="true">◍</span><strong>Region-aware records</strong><p data-region-copy="trustRegion">Built for U.S. and Canadian business record workflows.</p></article>
       <article><span aria-hidden="true">▣</span><strong>Receipts and mileage</strong><p>Attach receipts and track mileage in one place.</p></article>
       <article><span aria-hidden="true">▤</span><strong>Categories and record mapping</strong><p>Organize records with region-aware category context.</p></article>
       <article><span aria-hidden="true">↓</span><strong>Exports for review</strong><p>Export clean records for review and filing prep.</p></article>
