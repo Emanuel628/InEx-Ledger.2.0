@@ -9,6 +9,7 @@ const cookieParser = require("cookie-parser");
 const request = require("supertest");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret-plaid-routes";
+process.env.CSRF_SECRET = process.env.CSRF_SECRET || "test-csrf-secret-plaid-routes";
 process.env.DATABASE_URL =
   process.env.DATABASE_URL || "postgresql://local:test@localhost:5432/inex_ledger_test";
 
