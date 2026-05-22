@@ -1,6 +1,6 @@
 # Work-To-Do Status Review
 
-Reviewed against current `main` on 2026-05-19.
+Reviewed against the current codebase on 2026-05-22 (branch `claude/update-work-to-do-status-Orqxm`).
 
 Legend:
 
@@ -16,121 +16,85 @@ Legend:
 ### Critical bugs
 
 - ✅ ~~Migrations cannot run on a fresh database~~
-  - Status: Complete. `007_add_marketing_email_opt_in.sql` is now an intentional no-op and the later privacy-settings migration owns the column.
+  - Status: Complete. `db/migrations/007_add_marketing_email_opt_in.sql` is an intentional `DO $$ ... $$` no-op; `026_create_user_privacy_settings.sql` creates the table and owns the `marketing_email_opt_in` column.
 
 - ✅ ~~CSV and PDF exports silently lose every transaction description~~
-  - Status: Complete. Export source rows now include `description_encrypted`, decrypt it, fall back to plaintext description, and strip ciphertext from the exported row.
+  - Status: Complete. `routes/exports.routes.js` `fetchExportSourceRows()` now selects `description_encrypted`, decrypts it via `decryptField()`, falls back to plaintext `description`, and strips the ciphertext column from the exported row.
 
 - ⏳ PARTIAL — `GET /api/receipts` returns 500 for every authenticated user
-  - Code status: Fixed in repo. The list query now uses `uploaded_at`, exposes `created_at` as an alias, and no longer sends raw `file_bytes`.
-  - Runtime status: Needs live production verification because `/api/receipts 500` was still seen after one deploy.
+  - Code status: Fixed and re-verified. The list query selects `r.uploaded_at`, exposes `r.uploaded_at AS created_at`, sends `(r.file_bytes IS NOT NULL) AS has_file_bytes` instead of raw bytes, and orders by `r.uploaded_at`.
+  - Runtime status: Still needs live production verification because `/api/receipts 500` was seen after one earlier deploy.
   - Required check: live `/api/receipts` must return `200` on production.
 
 - ✅ ~~CSV import silently drops historical rows because of a hidden default date filter~~
-  - Status: Complete by commit history. The CSV modal no longer defaults the start date to today.
+  - Status: Complete. `public/js/transactions.js` now sets `startDateInput.value = ""` when the CSV modal opens — no today-date pre-fill.
 
 - ✅ ~~Stripe price env-var names do not match `.env.example` / runtime config~~
-  - Status: Complete enough for launch. Production env validation now requires Stripe price env vars from `STRIPE_PRICE_ENTRIES`.
-  - Follow-up: yearly Additional Business UI wiring is tracked separately in `Docs/PRODUCT-BACKLOG.md`.
+  - Status: Complete. Both `.env.example` (root) and `In-Ex-Ledger-API/.env.example` now document `STRIPE_PRO_M_US`, `STRIPE_PRO_Y_US`, `STRIPE_ADDL_M_US`, … which exactly match the keys read by `services/stripePriceConfig.js`. Production env validation requires these via `STRIPE_PRICE_ENTRIES`.
+  - Follow-up: yearly Additional Business UI wiring is still tracked in `Docs/PRODUCT-BACKLOG.md`.
 
-- ❌ INCOMPLETE — `CSRF_SECRET` required at runtime but not required in dev validation
-  - Current code still throws from `csrf.middleware.js` when `CSRF_SECRET` is missing.
-  - `envValidationService.js` still only requires `CSRF_SECRET` in production.
-  - Fix: require `CSRF_SECRET` in all environments or provide a safe dev/test default path documented in `.env.example`.
+- ✅ ~~`CSRF_SECRET` required at runtime but not required in dev validation~~
+  - Status: Resolved for launch. `CSRF_SECRET` is set as a Railway environment variable on the API service, so production runtime has it.
+  - Note: `envValidationService.js` still only adds `CSRF_SECRET` to the required list when `NODE_ENV === "production"`, and `csrf.middleware.js` still throws if it is missing. This is purely a local dev-experience nicety now, not a launch blocker. Same minor gap applies to `INBOUND_EMAIL_WEBHOOK_SECRET` and `INVOICE_REPLY_HMAC_SECRET` if a future pass wants fail-fast dev startup.
 
 ### High-severity functional issues
 
 - ✅ ~~New users cannot export PDF until they hunt down hidden profile fields~~
-  - Status: Complete. Onboarding now validates and collects business activity code, accounting method, material participation, address, and CA province where needed.
+  - Status: Complete. `public/html/onboarding.html` now collects business activity code, accounting method, material participation ("Are you active in this business?"), and business address as required fields.
 
-- ❌ INCOMPLETE / VERIFY — Privacy-consent persistence fails right after registration
-  - Status: Not re-verified in this pass.
-  - Required check: register a fresh user and confirm privacy settings persist server-side without a 401.
+- ✅ ~~Privacy-consent persistence fails right after registration~~
+  - Status: Resolved. `routes/auth.routes.js` `POST /register` now writes `user_privacy_settings` (with `consent_given = true` and `marketing_email_opt_in`) inside the registration transaction, so consent is persisted server-side regardless of front-end timing.
+  - Cleanup note: `public/js/register.js` still fires a redundant `persistConsent()` → `POST /api/privacy/settings` after register that 401s (no token yet) but is caught and only `console.warn`s. It is now dead/no-op code and could be removed for cleanliness.
 
-- ❌ INCOMPLETE / VERIFY — Cookie-banner POST is CSRF-blocked
-  - Status: Not re-verified in this pass.
-  - Required check: unauthenticated cookie consent POST should either send CSRF correctly or use an intentional exempt/audited path.
+- ⏳ PARTIAL — Cookie-banner POST is CSRF-blocked
+  - Code status: Fixed. `public/js/global.js` `setConsentRecord()` now adds `csrfHeader('POST')` to the `POST /api/consent/cookie` request; the route keeps `requireCsrfProtection`.
+  - Required check: runtime verification that an unauthenticated visitor receives a CSRF cookie and the token roundtrip succeeds (HTTP 200/204, audit row written in `cookie_consent_log`).
 
-- ❌ INCOMPLETE / LOW RISK — V2 feature pages return raw `Not Found`
-  - Status: Still needs live/route UX verification if those links are public or indexed.
-  - Not a blocker if V2 pages are hidden and feature-gated.
+- ✅ ~~V2 feature pages return raw `Not Found`~~
+  - Status: Resolved. `server.js` `isBlockedV2PageRequest()` now `302`-redirects blocked V2 pages (`bills`, `billable-expenses`, `customers`, `vendors`, `projects`, `ar-ap`) to `/settings?feature=v2-business` instead of returning unstyled `Not Found`.
 
 - ✅ ~~`/upgrade` page exposes dev-only Activate Pro button publicly~~
-  - Status: Already covered by previous billing mock hardening work in audit docs.
+  - Status: Complete. `#mockUpgradeWrap` ships `hidden`; `public/js/upgrade.js` only reveals it after `GET /api/billing/mock-v1` succeeds, i.e. only when `ENABLE_MOCK_BILLING=true`.
 
-- ❌ INCOMPLETE / PRODUCT DECISION — Auth-page redirect relies on localStorage bearer token
-  - Status: Not resolved by recent work.
-  - Decision needed: keep bearer-token localStorage model or move toward cookie/session-authoritative auth.
+- ⏳ PARTIAL / PRODUCT DECISION — Auth-page redirect relies on localStorage bearer token
+  - Code status: Improved. `redirectIfAuthenticated()` in `public/js/auth.js` now performs a server `GET /api/me` check (with refresh-token retry) before redirecting, so the redirect itself is server-validated.
+  - Open decision: the bearer token in `localStorage` remains a valid credential, so clearing cookies alone does not log a user out. Keeping bearer-token auth vs. moving to cookie/session-authoritative auth is still a product decision.
 
 ### Medium UX / hygiene issues
 
 - ❌ INCOMPLETE — CSP `upgrade-insecure-requests` noisy in local HTTP dev
-- ❌ INCOMPLETE — Cookie banner overlaps content
-- ⏳ PARTIAL — Onboarding now asks more meaningful required fields, but UX copy/design still needs final pass
-- ❌ INCOMPLETE / VERIFY — Login readonly autofill suppression remains to be checked
+  - The `helmet()` config in `server.js` sets explicit `contentSecurityPolicy.directives` but does not pass `useDefaults: false` or `upgradeInsecureRequests: null`, so helmet still emits `upgrade-insecure-requests`.
+- ❌ INCOMPLETE / VERIFY — Cookie banner overlaps content
+- ⏳ PARTIAL — Onboarding now asks meaningful required fields, but UX copy/design still needs a final pass
+- ❌ INCOMPLETE — Login readonly autofill suppression: `login.html` `#email` and `#password` still ship with `readonly`
 - ❌ INCOMPLETE — Account-menu / sign-out discoverability still needs UX pass
 - ✅ ~~Pricing/Subscription empty Stripe price data from env mismatch~~
-  - Status: Startup validation now catches missing Stripe price env vars.
+  - Status: Resolved alongside the Stripe env-var name reconciliation above.
 - ❌ INCOMPLETE / LOW — Invoice starter line item UX polish
 - ❌ INCOMPLETE / LOW — Default income category ordering
 - ❌ INCOMPLETE / LOW — Mileage form visibility consistency
-- ⏳ PARTIAL — Material participation now required in onboarding, but explanatory copy still needs review
+- ⏳ PARTIAL — Material participation is required in onboarding, but explanatory copy still needs review
 - ❌ INCOMPLETE / LOW — Invoice form field-level server error display
 
 ### Suggested fix priority from original file
 
 - ✅ ~~Decrypt `description_encrypted` in exports~~
 - ✅ ~~Fix migration 007 ordering~~
-- ⏳ PARTIAL — Fix receipts endpoint, live production verification still required
+- ⏳ PARTIAL — Receipts endpoint fixed in code; live production verification still required
 - ✅ ~~Remove silent CSV import today-date default~~
 - ✅ ~~Reconcile Stripe env-var names / startup validation~~
-- ❌ INCOMPLETE — Dev env validation for `CSRF_SECRET` and related secrets
+- ✅ ~~`CSRF_SECRET` handled via Railway env variable~~ (optional dev fail-fast cleanup only)
 - ✅ ~~Add PDF-required business fields to onboarding~~
-- ❌ INCOMPLETE / VERIFY — Registration privacy persistence
-- ❌ INCOMPLETE / VERIFY — Cookie consent CSRF behavior
+- ✅ ~~Registration privacy persistence~~ (now server-side in the register transaction)
+- ⏳ PARTIAL — Cookie consent CSRF: client now sends the header; runtime verify pending
 - ✅ ~~Hide/mock-disable dev-only billing path~~
-- ❌ INCOMPLETE / LOW — Styled V2-gated 404
+- ✅ ~~V2-gated pages no longer return raw `Not Found`~~ (redirect to settings)
 
 ---
 
 ## `Work-To-Do/CODEBASE-AUDIT-HIGH.md`
 
-Status: ✅ complete as written.
-
-All task rows in this file are already checked off as `[x]`.
-
-- ✅ ~~Auth recovery endpoint ordering~~
-- ✅ ~~Sessions frontend response shape~~
-- ✅ ~~Landing pricing toggle selector mismatch~~
-- ✅ ~~Public billing mock exposure~~
-- ✅ ~~Recurring UUID validation~~
-- ✅ ~~V2 route auth/validation guards~~
-- ✅ ~~Inbound email webhook auth~~
-- ✅ ~~Plaid webhook signature verification~~
-- ✅ ~~Business creation crypto runtime bug~~
-- ✅ ~~Audit events cap~~
-- ✅ ~~Pricing/checkout trust boundary~~
-- ✅ ~~Email-change token hashing~~
-- ✅ ~~Live MFA state for destructive deletion~~
-- ✅ ~~Log sanitizer token redaction~~
-- ✅ ~~Receipt upload/preview XSS hardening~~
-- ✅ ~~Password confirmation for privacy erase~~
-- ✅ ~~Bulk-delete RBAC~~
-- ✅ ~~Accounting-lock guard on review status~~
-- ✅ ~~Inline handler/CSP rollout work~~
-- ✅ ~~URL token exposure cleanup~~
-- ✅ ~~Transaction description storage consistency~~
-- ✅ ~~Privacy service split-brain cleanup~~
-- ✅ ~~Recurring consistency path~~
-- ✅ ~~Core route gating fixes~~
-- ✅ ~~Server-authoritative trial enforcement~~
-- ✅ ~~Non-blocking receipt I/O~~
-- ✅ ~~JWE bootstrap concurrency/validation~~
-- ✅ ~~Mock billing safety~~
-- ✅ ~~Billing checkout idempotency/state guards~~
-- ✅ ~~Region detection trust model~~
-- ✅ ~~PDF tax estimate correction~~
-- ✅ ~~Real CSP rollout~~
+Status: ✅ complete as written. All task rows are checked off `[x]`.
 
 No current action needed from this file unless a new audit reopens an item.
 
@@ -138,9 +102,7 @@ No current action needed from this file unless a new audit reopens an item.
 
 ## `Work-To-Do/CODEBASE-AUDIT-MEDIUM.md`
 
-Status: ✅ complete as written.
-
-All task rows in this file are already checked off as `[x]`.
+Status: ✅ complete as written. All task rows are checked off `[x]`.
 
 No current action needed from this file unless a new audit reopens an item.
 
@@ -148,9 +110,7 @@ No current action needed from this file unless a new audit reopens an item.
 
 ## `Work-To-Do/CODEBASE-AUDIT-LOW.md`
 
-Status: ✅ complete as written.
-
-All task rows in this file are already checked off as `[x]`.
+Status: ✅ complete as written. All task rows are checked off `[x]`.
 
 No current action needed from this file unless a new audit reopens an item.
 
@@ -162,59 +122,56 @@ No current action needed from this file unless a new audit reopens an item.
 
 - ✅ ~~Delete old Quick Add sidecar files~~
 - ✅ ~~Remove stale backend `/api/entitlements/quick-add` endpoint~~
-- ❌ INCOMPLETE / VERIFY — Confirm `global.js` is the only owner of Quick Add visibility
-- ❌ INCOMPLETE / VERIFY — Confirm Basic/Free users do not see Quick Add sidebar
-- ❌ INCOMPLETE / VERIFY — Confirm Pro sees only Core Quick Add
-- ❌ INCOMPLETE / VERIFY — Confirm Business sees Core + Business Quick Add
-- ❌ INCOMPLETE / VERIFY — Confirm Analytics and Settings are not Quick Add options
-- ❌ INCOMPLETE / VERIFY — Confirm multi-select Quick Add behavior is owned by `global.js`
+- ✅ ~~Confirm `global.js` is the owner of Quick Add visibility~~ — the Quick Add action config and visibility logic live in `public/js/global.js`; `transactions.js` only consumes it.
+- ✅ ~~Confirm Analytics and Settings are not Quick Add options~~ — the action list in `global.js` is add transaction / upload receipt / add trip / add account / add category / create export / customers / new invoice / bills / vendors only.
+- ❌ INCOMPLETE / VERIFY (live) — Basic/Free users do not see the Quick Add sidebar
+- ❌ INCOMPLETE / VERIFY (live) — Pro sees only Core Quick Add
+- ❌ INCOMPLETE / VERIFY (live) — Business sees Core + Business Quick Add
+- ❌ INCOMPLETE / VERIFY (live) — Multi-select Quick Add behavior behaves as intended at runtime
 
 ### Phase 2 — Transactions Undo / Checkbox Action Cleanup
 
 - ✅ ~~Remove separate undo route mount from `routes/index.js`~~
-- ✅ ~~Delete `transactions-undo.routes.js`~~
-- ✅ ~~Delete disconnected transaction frontend sidecars if behavior was not wanted~~
-  - Current spot check: `transaction-undo-button.js` was not found on `main`.
+- ✅ ~~Delete `transactions-undo.routes.js`~~ — not present in `routes/`.
+- ✅ ~~Delete disconnected transaction frontend sidecars~~ — `transaction-undo-button.js` not found anywhere in the repo.
 - ❌ INCOMPLETE / PRODUCT DECISION — Decide whether Undo should exist at all
 - ❌ INCOMPLETE / PRODUCT DECISION — Decide whether checkbox row actions should exist at all
-- ❌ INCOMPLETE IF KEPT — Rebuild Undo directly in `transactions.routes.js`, `transactions.html`, `transactions.js`, and `transactions.css`
+- ❌ INCOMPLETE IF KEPT — Rebuild Undo directly in transaction owner files
 - ❌ INCOMPLETE IF KEPT — Rebuild checkbox actions directly in transaction owner files
 
 ### Phase 3 — Auth Bridge / MFA Trust Cleanup
 
 - ✅ ~~Remove login/MFA frontend bridge cookies and handoff terms~~
-- ❌ INCOMPLETE / VERIFY — Confirm `accountSwitchMfaTrust.js` is removed or no longer monkey-patches `res.json`
-- ❌ INCOMPLETE IF KEPT — Move trusted-browser account-switch behavior into explicit auth/MFA owner flow
+- ✅ ~~Confirm `accountSwitchMfaTrust.js` is removed~~ — file not found anywhere in the repo; no `res.json` monkey-patch remains.
 
 ### Phase 4 — Billing / Subscription Consolidation
 
-- ✅ ~~Remove or consolidate `billing-checkout-overrides.routes.js`~~
-  - Current spot check: file was not found on `main`.
-- ❌ INCOMPLETE / VERIFY — Confirm `billing-reactivation.routes.js` was consolidated or intentionally removed
-- ❌ INCOMPLETE / VERIFY — Confirm `subscription-reactivation.js` was consolidated or intentionally removed
-- ❌ INCOMPLETE / VERIFY — Confirm `subscriptionTrialCheckoutPatch.js` was consolidated into `subscriptionService.js` or removed
-- ❌ INCOMPLETE / VERIFY — Confirm no billing/subscription patch/override sidecars remain
+- ✅ ~~Remove or consolidate `billing-checkout-overrides.routes.js`~~ — not found.
+- ✅ ~~Confirm `billing-reactivation.routes.js` was consolidated/removed~~ — not found in `routes/`.
+- ✅ ~~Confirm `subscription-reactivation.js` was consolidated/removed~~ — no `*reactivation*` file found in `routes/`, `services/`, or `public/js/`.
+- ✅ ~~Confirm `subscriptionTrialCheckoutPatch.js` was consolidated/removed~~ — not found.
+- ✅ ~~Confirm no billing/subscription patch/override sidecars remain~~ — full filename search found only `public/css/pages/subscription-premium-bridge.css` (a stylesheet, naming coincidence) — not a route/service sidecar.
 
 ### Phase 5 — Theme / Dark Mode Drift Cleanup
 
-- ⏳ PARTIAL — Dark mode is intended to stay disabled
-- ❌ INCOMPLETE / VERIFY — Confirm dark mode cannot activate from localStorage
-- ❌ INCOMPLETE / VERIFY — Confirm dark mode cannot activate from OS/browser preference
-- ❌ INCOMPLETE / VERIFY — Confirm no visible dark-mode toggle activates dark mode
-- ❌ INCOMPLETE / VERIFY — Confirm `global.js` owns theme behavior or `theme-boot.js` is documented as permanent early light-mode lock
+- ✅ ~~Dark mode is intended to stay disabled~~ — `public/js/theme-boot.js` exists and its header documents it as a permanent early light-mode lock.
+- ✅ ~~Confirm dark mode cannot activate from localStorage~~ — `theme-boot.js` forces `data-theme=light` and overwrites `lb_theme` to `light` on every boot.
+- ✅ ~~Confirm dark mode cannot activate from OS/browser preference~~ — `theme-boot.js` hard-sets light regardless of `prefers-color-scheme`.
+- ✅ ~~Confirm theme ownership~~ — `theme-boot.js` is documented as the permanent early light-mode lock.
+- ⏳ PARTIAL — Optional: a runtime UI spot-check that no visible toggle re-enables dark mode.
 
 ### Phase 6 — Final Audit
 
 - ✅ ~~`transaction-undo-button.js` spot-check not found~~
 - ✅ ~~`billing-checkout-overrides.routes.js` spot-check not found~~
-- ❌ INCOMPLETE — Full local filename search still needed for all `patch`, `override`, `bridge`, `-v2`, and sidecar names
-- ❌ INCOMPLETE — Decide permanent owner/removal status for every remaining suspicious sidecar
+- ✅ ~~Full local filename search for `patch`, `override`, `bridge`, `-v2`, sidecar names~~ — only matches are `public/js/landing-faqs-v2.js` and `public/css/pages/subscription-premium-bridge.css`, both legitimate redesign assets.
+- ✅ ~~Owner/removal decision for remaining suspicious sidecars~~ — the two matches above are intentional UI files; no removal needed.
 
 ### Additional Cleanup Candidates
 
 - ✅ ~~Duplicate dark-mode CSS drift files consolidated/deleted~~
 - ❌ INCOMPLETE / VERIFY — Dated recovery artifact folder cleanup
-- ❌ INCOMPLETE / VERIFY — Checksum repair script consolidation/documentation
+- ❌ INCOMPLETE / VERIFY — Checksum repair script consolidation/documentation (`scripts/repair-migration-checksums.js` is wired into `prestart`)
 - ❌ INCOMPLETE / VERIFY — Test naming/audit drift cleanup
 - ❌ INCOMPLETE / VERIFY — Documentation drift cleanup between `Docs/`, root docs, and lowercase `docs/`
 - ❌ INCOMPLETE / VERIFY — Guardrail/utility script review
@@ -225,7 +182,7 @@ No current action needed from this file unless a new audit reopens an item.
 
 ### Phase 4 — Plan gating
 
-- ⏳ PARTIAL — Code-review pass marked PASS, but live verification is still required.
+- ⏳ PARTIAL — Code-review pass marked PASS; live verification still required.
 
 Required live checks still incomplete unless manually proven:
 
@@ -242,7 +199,7 @@ Required live checks still incomplete unless manually proven:
 
 ### Phase 7 — Data safety
 
-- ⏳ PARTIAL — Code-review pass marked PASS, but live multi-business verification is still required.
+- ⏳ PARTIAL — Code-review pass marked PASS; live multi-business verification still required.
 
 Required live checks still incomplete unless manually proven:
 
@@ -263,20 +220,19 @@ Required live checks still incomplete unless manually proven:
 
 - ✅ ~~Wire CSV Import End-to-End~~
 - ✅ ~~Make Onboarding Meaningful~~
-- ❌ INCOMPLETE — Add Public SEO in owner files
+- ⏳ PARTIAL — Add Public SEO in owner files
+  - `public/sitemap.xml` and `public/robots.txt` exist; `landing.html` and `pricing.html` carry meta description + Open Graph tags.
+  - Remaining: confirm SEO metadata coverage/copy across all public pages and fold it into the owner-file workflow.
 - ⏳ PARTIAL — Fix Stripe Webhook Host and Delivery Path
-  - Code route exists.
-  - Operational/live Stripe endpoint still needs verification and any failed event replay.
-- ✅ ~~Fold Residual Transactions Drift CSS into Owner Styles~~
-  - Spot check: `transactions-no-actions-column.css` was not found on `main`.
+  - Code route and `049_create_stripe_webhook_events.sql` migration exist.
+  - Operational/live Stripe endpoint still needs verification and any failed-event replay.
+- ✅ ~~Fold Residual Transactions Drift CSS into Owner Styles~~ — `transactions-no-actions-column.css` not found.
 
 ---
 
 ## `Work-To-Do/V2_BUILD_PLAN.md`
 
-Status: 📝 PLANNING / ROADMAP.
-
-This is not a completed task checklist. It is a canonical phased build plan for later V2/Business expansion.
+Status: 📝 PLANNING / ROADMAP. Not a completed task checklist — a canonical phased build plan for later V2/Business expansion.
 
 Current status by phase:
 
@@ -312,28 +268,13 @@ Immediate next actions from that file remain incomplete:
 
 Status: 📝 ROADMAP, partially implemented by later product work.
 
-- ⏳ PARTIAL — Language & UX reframe
-  - Some freelancer/solo-operator positioning exists, but broad terminology cleanup is not complete.
-
-- ⏳ PARTIAL — Onboarding simplification
-  - Onboarding became more meaningful, but not the exact 3-step freelancer fast-path described here.
-
-- ✅ ~~1099-NEC / T4A income tagging foundation~~
-  - `payer_name` and `tax_form_type` appear in export source rows and transaction/export logic.
-  - UI/report polish may still need review.
-
-- ⏳ PARTIAL — Self-employment tax estimate widget
-  - Tax context/estimated tax UI exists, but exact SE/CPP calculation behavior needs verification against this spec.
-
-- ⏳ PARTIAL — Quarterly estimated tax reminders
-  - There are reminder services/tests in the codebase, but current UX coverage needs verification.
-
-- ✅ ~~Schedule C / T2125 category mapping foundation~~
-  - Export and category mapping are clearly present in current PDF output.
-  - Categories page UX redesign is still open separately in `Docs/PRODUCT-BACKLOG.md`.
-
-- ❌ INCOMPLETE — Mileage rate auto-update
-  - No verified completion in this pass.
+- ⏳ PARTIAL — Language & UX reframe — some freelancer/solo-operator positioning exists; broad terminology cleanup is not complete.
+- ⏳ PARTIAL — Onboarding simplification — onboarding became more meaningful, but not the exact 3-step freelancer fast-path described here.
+- ✅ ~~1099-NEC / T4A income tagging foundation~~ — `payer_name` / `tax_form_type` appear in transaction and export logic (`046_add_1099_payer_fields_to_transactions.sql`). UI/report polish may still need review.
+- ⏳ PARTIAL — Self-employment tax estimate widget — tax context/estimated-tax UI exists; exact SE/CPP calculation behavior needs verification against this spec.
+- ⏳ PARTIAL — Quarterly estimated tax reminders — reminder service and tests exist (`quarterlyTaxReminderService`); UX coverage needs verification.
+- ✅ ~~Schedule C / T2125 category mapping foundation~~ — export and category mapping present in PDF output. Categories page UX redesign still open in `Docs/PRODUCT-BACKLOG.md`.
+- ❌ INCOMPLETE — Mileage rate auto-update — no verified completion.
 
 ---
 
@@ -344,16 +285,14 @@ Status: 📝 ROADMAP / design rollout plan.
 - ⏳ PARTIAL — Phase 0: Design baseline
 - ⏳ PARTIAL — Phase 1: Shared frontend foundation
 - ⏳ PARTIAL — Phase 2: App shell consistency
-- ⏳ PARTIAL — Phase 3: Core workflows
-  - Transactions improved.
-  - Categories still needs redesign and is explicitly tracked in `Docs/PRODUCT-BACKLOG.md`.
+- ⏳ PARTIAL — Phase 3: Core workflows — transactions improved; Categories still needs redesign (tracked in `Docs/PRODUCT-BACKLOG.md`).
 - ⏳ PARTIAL — Phase 4: Settings / Subscription / Help
 - ⏳ PARTIAL — Phase 5: Secondary / Edge Surfaces
 - ❌ INCOMPLETE — Phase 6: Copy pass
 - ❌ INCOMPLETE — Phase 7: Interaction polish
 - ❌ INCOMPLETE — Phase 8: QA and regression control
 
-Current visible open items from recent review:
+Current visible open items:
 
 - ❌ Categories page redesign
 - ❌ Landing page updates
@@ -362,27 +301,61 @@ Current visible open items from recent review:
 
 ---
 
+## `Work-To-Do/SECURITY-LEGAL-READINESS-US-CANADA.md`
+
+Status: ❌ INCOMPLETE — verified engineering/legal readiness memo (dated 2026-05-20). Stays in `Work-To-Do/` because multiple gaps remain open. Most gaps are documentation/legal-operational; a few are code-touching.
+
+Already in place (per the memo's verification): field encryption for transaction descriptions / tax IDs / Plaid tokens / MFA secrets, bcrypt password hashing, CSRF on sensitive routes, hashed refresh tokens, privacy/consent logging, privacy export/erase flows, security test coverage.
+
+Open documentation/operational gaps (not code work):
+
+- ❌ Rewrite `Docs/PIA.md` and `Docs/SECURITY_PLAN.md` to match actual code (remove planned/partial/unused control claims, drop `express-validator` reference).
+- ❌ Fix Quebec breach-notice language (drop fixed "72-hour" framing; add 5-year incident-register retention).
+- ❌ Add a state-by-state US breach matrix to `Docs/BREACH_NOTIFICATION_RUNBOOK.md`.
+- ❌ Document the named Privacy Officer / governance responsibilities.
+- ❌ Broaden cross-border processor coverage in privacy docs beyond Railway (Stripe, Resend, Plaid, Anthropic OCR, geolocation host); publish a sub-processor list if that is the policy.
+- ❌ Add concrete public retention periods to the public privacy policy.
+- ❌ Disclose Anthropic receipt-OCR third-party processing in privacy materials.
+- ❌ Create and maintain an operational incident register.
+
+Open code-touching gaps (not individually launch-blocking, but compliance-relevant):
+
+- ❌ CSV export formula-injection hardening — neutralize cells starting with `=`, `+`, `-`, `@` in `routes/privacy.routes.js` CSV serialization.
+- ❌ Encryption-coverage decision — `businesses.gst_hst_number`, `transactions.note`, and receipt files / `receipts.file_bytes` are still plaintext at rest; either extend encryption or narrow the docs' claims.
+- ❌ Receipt upload validation — extension/MIME pairs are enforced but there is no magic-byte/file-signature sniffing.
+- ⏳ Production rate limiting falls back to in-memory if Redis is unavailable — document Redis as an operational requirement for multi-instance production.
+
+---
+
 ## Final Active Work List
 
 Launch-relevant:
 
-1. ❌ Verify live `/api/receipts` returns `200`.
-2. ❌ Verify Stripe webhook endpoint host and replay missed failed events if needed.
-3. ❌ Finish full `npm run test:all` green.
+1. ❌ Verify live `/api/receipts` returns `200` (code fix re-verified; production check pending).
+2. ❌ Verify Stripe webhook endpoint host and replay any missed failed events.
+3. ❌ Run full `npm run test:all` green (could not be run in this review — no database available in the environment).
 4. ❌ Run `Docs/RELEASE-CHECKLIST.md` / real browser smoke pass.
-5. ❌ Fix or document dev `CSRF_SECRET` validation behavior.
+5. ❌ Runtime-verify cookie-consent CSRF roundtrip (client now sends the header; confirm 200/204 + audit row).
 
 Product/design backlog:
 
 1. ❌ Categories page redesign.
 2. ❌ Landing page updates.
 3. ❌ Yearly Additional Business UI/backend wiring check.
-4. ❌ Public SEO owner-file pass.
+4. ❌ Public SEO owner-file pass (sitemap/robots/meta already present — finish coverage + workflow).
 5. ❌ V2 planning documents if/when Business tier work resumes.
 
-Cleanup backlog:
+Cleanup backlog (mostly closed this pass):
 
-1. ❌ Full local sidecar/patch filename search.
-2. ❌ Documentation drift cleanup.
-3. ❌ Recovery/checksum artifact cleanup.
-4. ❌ Remaining theme/dark-mode ownership verification.
+1. ❌ Dated recovery artifact folder cleanup.
+2. ❌ Checksum repair script consolidation/documentation.
+3. ❌ Documentation drift cleanup between `Docs/`, root docs, and lowercase `docs/`.
+4. ❌ Test naming/audit drift cleanup; guardrail/utility script review.
+
+Security/legal-readiness backlog (from `SECURITY-LEGAL-READINESS-US-CANADA.md`):
+
+1. ❌ Rewrite `Docs/PIA.md` and `Docs/SECURITY_PLAN.md` to match code.
+2. ❌ Fix Quebec breach language + add 5-year incident-register retention; add US state breach matrix.
+3. ❌ CSV export formula-injection hardening in `routes/privacy.routes.js`.
+4. ❌ Decide encryption coverage for `gst_hst_number`, `transactions.note`, and receipt storage at rest.
+5. ❌ Create an operational incident register; broaden processor/OCR disclosures in public privacy materials.
