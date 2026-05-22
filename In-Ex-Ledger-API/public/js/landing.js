@@ -8,7 +8,7 @@ const LANDING_REGION_COPY = {
     taxContext: "Record context: U.S. business categories",
     previewIncome: "$1,643.26",
     previewExpenses: "$4,199.01",
-    previewProfit: "-$2,555.75",
+    previewProfit: "$2,555.75",
     rowIncome: "$1,250.00",
     rowExpense: "-$89.42",
     rowClient: "$2,500.00",
@@ -55,7 +55,7 @@ const LANDING_REGION_COPY = {
     taxContext: "Record context: Canadian business categories",
     previewIncome: "CA$1,643.26",
     previewExpenses: "CA$4,199.01",
-    previewProfit: "-CA$2,555.75",
+    previewProfit: "CA$2,555.75",
     rowIncome: "CA$1,250.00",
     rowExpense: "-CA$89.42",
     rowClient: "CA$2,500.00",
@@ -97,9 +97,9 @@ const LANDING_REGION_COPY = {
 
 const LANDING_ROLODEX_CAPTIONS = [
   "Transactions · current reporting period",
-  "Receipts · mock OCR and attachment review",
-  "Analytics · monthly trend and what-if view",
-  "Exports · downloadable PDF and CSV handoff"
+  "Receipts · reviewed and ready to organize",
+  "Analytics · monthly trends at a glance",
+  "Exports · PDF and CSV ready to download"
 ];
 
 function normalizeLandingRegion(value) {
