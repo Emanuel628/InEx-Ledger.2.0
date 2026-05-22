@@ -1,8 +1,8 @@
 const LANDING_POLISH_FAQS = {
   US: [
     {
-      q: "What U.S. tax context does InEx Ledger support?",
-      a: "The U.S. workflow is built around Schedule C-style categories, 1099 income context, receipts, mileage, accounts, and export-ready records. It helps organize your books, but it does not replace professional tax advice."
+      q: "What U.S. setup does InEx Ledger support?",
+      a: "The U.S. setup includes Schedule C-style categories, 1099 income, receipts, mileage, accounts, and exports. It helps you stay organized, but it does not replace professional tax advice."
     },
     {
       q: "Can I keep receipts and mileage with my transactions?",
@@ -10,7 +10,7 @@ const LANDING_POLISH_FAQS = {
     },
     {
       q: "Can I export my bookkeeping records?",
-      a: "Yes. The app includes export workflows so you can prepare cleaner records for tax season, review, or your own business archive."
+      a: "Yes. The app includes exports so you can hand over cleaner records at tax time, during a review, or for your own files."
     },
     {
       q: "Is InEx Ledger a full accounting suite?",
@@ -19,8 +19,8 @@ const LANDING_POLISH_FAQS = {
   ],
   CA: [
     {
-      q: "What Canadian tax context does InEx Ledger support?",
-      a: "The Canadian workflow is built around T2125-style categories, T4A context, GST/HST category support, receipts, kilometres, accounts, and export-ready records. It helps organize your books, but it does not replace professional tax advice."
+      q: "What Canadian setup does InEx Ledger support?",
+      a: "The Canadian setup includes T2125-style categories, T4A details, GST/HST support, receipts, kilometres, accounts, and exports. It helps you stay organized, but it does not replace professional tax advice."
     },
     {
       q: "Does the Canada version use Canadian wording?",
@@ -28,11 +28,11 @@ const LANDING_POLISH_FAQS = {
     },
     {
       q: "Can I organize GST/HST-related categories?",
-      a: "Yes. The category workflow includes GST/HST-related category support for Canadian bookkeeping context."
+      a: "Yes. The category setup includes GST/HST support for Canadian bookkeeping."
     },
     {
       q: "Can I export records for review?",
-      a: "Yes. InEx Ledger includes export workflows so you can prepare cleaner records for tax review, filing prep, or your own business archive."
+      a: "Yes. InEx Ledger includes exports so you can prepare cleaner records for tax review or your own files."
     }
   ]
 };
@@ -62,15 +62,15 @@ function applyLandingPolish(region) {
   const activeRegion = region === "CA" ? "CA" : "US";
   const isCA = activeRegion === "CA";
 
-  setTextBySelector(".marketing-nav-link[href='#regions']", isCA ? "Canada workflow" : "U.S. workflow");
+  setTextBySelector(".marketing-nav-link[href='#regions']", isCA ? "Canada" : "United States");
   setTextBySelector(".hero-proof-list li:nth-child(3)", isCA ? "Attach receipts and track kilometres" : "Attach receipts and track mileage");
-  setTextBySelector(".trust-strip article:first-child strong", isCA ? "Canadian tax context" : "U.S. tax context");
+  setTextBySelector(".trust-strip article:first-child strong", isCA ? "Built for Canada" : "Built for the U.S.");
   setTextBySelector(".trust-strip article:nth-child(2) strong", isCA ? "Receipts and kilometres" : "Receipts and mileage");
   setTextBySelector(".trust-strip article:nth-child(2) p", isCA ? "Attach receipts and track kilometres in one place." : "Attach receipts and track mileage in one place.");
-  setTextBySelector(".feature-card:nth-child(4) h3", isCA ? "Built for Canadian records" : "Built for U.S. records");
-  setTextBySelector("#regions .section-heading h2", isCA ? "A Canadian bookkeeping workflow for solo businesses." : "A U.S. bookkeeping workflow for solo businesses.");
-  setTextBySelector("#regions .section-subtitle", isCA ? "T2125 categories, T4A context, GST/HST category support, kilometres, receipts, and exports." : "Schedule C categories, 1099 income context, mileage, receipts, and exports.");
-  setTextBySelector("#pricing .section-subtitle", isCA ? "Finish onboarding first, then secure the Pro trial in Stripe. Pricing shown in CAD." : "Finish onboarding first, then secure the Pro trial in Stripe. Pricing shown in USD.");
+  setTextBySelector(".feature-card:nth-child(4) h3", isCA ? "Built for Canadian businesses" : "Built for U.S. businesses");
+  setTextBySelector("#regions .section-heading h2", isCA ? "Bookkeeping for Canadian solo businesses." : "Bookkeeping for U.S. solo businesses.");
+  setTextBySelector("#regions .section-subtitle", isCA ? "T2125 categories, T4A details, GST/HST support, kilometres, receipts, and exports." : "Schedule C categories, 1099 income, mileage, receipts, and exports.");
+  setTextBySelector("#pricing .section-subtitle", isCA ? "Finish onboarding first, then confirm your Pro trial in Stripe. Pricing shown in CAD." : "Finish onboarding first, then confirm your Pro trial in Stripe. Pricing shown in USD.");
 
   document.querySelectorAll(".region-cards article").forEach((card, index) => {
     card.hidden = isCA ? index === 0 : index === 1;

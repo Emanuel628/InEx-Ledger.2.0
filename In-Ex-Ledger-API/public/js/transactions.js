@@ -435,13 +435,13 @@ function syncTransactionScopeUi() {
   if (subtitle) {
     subtitle.textContent = isAllScope
       ? `${getBusinessesInScope().length || 0} ${txT("transactions_scope_businesses", "businesses")} · ${txT("transactions_scope_portfolio_view", "combined reporting view")}`
-      : txT("transactions_scope_active_subtitle", "Active business ledger · current reporting period");
+      : txT("transactions_scope_active_subtitle", "Active business ledger · this period");
   }
 
   if (subtitle) {
     subtitle.textContent = isAllScope
       ? `${getBusinessesInScope().length || 0} ${txT("transactions_scope_businesses", "businesses")} - ${txT("transactions_scope_portfolio_view", "combined reporting view")}`
-      : txT("transactions_scope_active_subtitle", "Active business ledger - current reporting period");
+      : txT("transactions_scope_active_subtitle", "Active business ledger - this period");
   }
 
   addButtons.filter(Boolean).forEach((button) => {

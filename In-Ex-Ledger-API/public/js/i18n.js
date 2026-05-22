@@ -786,7 +786,7 @@ const TRANSLATIONS = {
     transactions_undo_error: 'Unable to restore archived transaction.',
     transactions_scope_businesses: 'businesses',
     transactions_scope_portfolio_view: 'combined reporting view',
-    transactions_scope_active_subtitle: 'Active business ledger · current reporting period',
+    transactions_scope_active_subtitle: 'Active business ledger · this period',
     transactions_scope_switch_to_active: 'Switch to Active business to add or edit transactions.',
     transactions_tax_context_multi: 'Tax form context: Multi-business reporting view',
     transactions_vs_last_year: 'vs last year',
