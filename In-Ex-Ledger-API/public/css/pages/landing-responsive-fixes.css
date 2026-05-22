@@ -38,6 +38,26 @@ body {
   outline-offset: 2px;
 }
 
+/* "Coming soon" pill — the Business tier (invoices, customers, vendors,
+   projects, bills, AR/AP) is not available yet, so flag it on the pricing
+   tier card instead of implying it can be purchased today. */
+.coming-soon-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  margin-left: 8px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 /* Updated hero product preview: visually closer to the real Transactions page,
    clearly framed, and non-interactive so it does not compete with real CTAs. */
 .hero-visual {
