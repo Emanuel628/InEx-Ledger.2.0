@@ -13,6 +13,31 @@ body {
   min-width: 0;
 }
 
+/* Marketing header nav links. core/layout.css has a global `nav a` rule for
+   the dark app topbar (near-white text, white on hover). The marketing header
+   is light, so that rule makes Features / US + Canada / Pricing / FAQ and the
+   Sign in link unreadable. Pin them to dark text with a light-blue hover pill
+   that keeps the text black. Selectors are scoped to .marketing-nav so they
+   outrank the global `nav a` / `nav a:hover` / `nav a:focus-visible` rules. */
+.marketing-nav .marketing-nav-link,
+.marketing-nav .marketing-nav-link:link,
+.marketing-nav .marketing-nav-link:visited {
+  color: #0f172a;
+}
+
+.marketing-nav .marketing-nav-link:hover,
+.marketing-nav .marketing-nav-link:focus,
+.marketing-nav .marketing-nav-link:focus-visible,
+.marketing-nav .marketing-nav-link:active {
+  color: #0f172a;
+  background: #eaf3ff;
+}
+
+.marketing-nav .marketing-nav-link:focus-visible {
+  outline: 2px solid #0f5bd7;
+  outline-offset: 2px;
+}
+
 /* Updated hero product preview: visually closer to the real Transactions page,
    clearly framed, and non-interactive so it does not compete with real CTAs. */
 .hero-visual {
