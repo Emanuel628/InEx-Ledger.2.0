@@ -384,6 +384,15 @@
   background: linear-gradient(180deg, #fff, #f8fafc);
 }
 
+.preview-pdf-meta {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .preview-pdf-lines {
   display: grid;
   gap: 8px;
@@ -399,6 +408,64 @@
 
 .preview-pdf-lines .short {
   width: 46%;
+}
+
+.preview-pdf-summary {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.preview-pdf-summary-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.preview-pdf-summary-row span {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.preview-pdf-summary-row strong {
+  margin-top: 0;
+  font-size: 15px;
+}
+
+.preview-pdf-table {
+  margin-top: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.preview-pdf-table-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.preview-pdf-table-row:first-child {
+  border-top: 0;
+}
+
+.preview-pdf-table-head {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .preview-pdf-grid {

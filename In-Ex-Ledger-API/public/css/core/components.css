@@ -231,6 +231,18 @@ a.primary-cta:focus-visible {
   text-decoration: none;
 }
 
+a.button.button-secondary:hover,
+a.button.button-secondary:focus,
+a.button.button-secondary:focus-visible,
+a.button.btn-secondary:hover,
+a.button.btn-secondary:focus,
+a.button.btn-secondary:focus-visible,
+a.button.ghost-btn:hover,
+a.button.ghost-btn:focus,
+a.button.ghost-btn:focus-visible {
+  color: var(--ink, #0f172a);
+}
+
 button:active,
 .primary-btn:active,
 .btn-primary:active,

@@ -58,6 +58,46 @@ body {
   outline-offset: 2px;
 }
 
+.button.button-secondary,
+.button.button-secondary:link,
+.button.button-secondary:visited {
+  color: #0f172a;
+}
+
+.button.button-secondary:hover,
+.button.button-secondary:focus,
+.button.button-secondary:focus-visible,
+.button.button-secondary:active {
+  color: #0f172a;
+  background: #eef4fb;
+  border-color: rgba(15, 91, 215, 0.18);
+}
+
+.region-card-active h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.region-card-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5em;
+  min-width: 1.5em;
+  font-size: 0;
+  line-height: 1;
+}
+
+.region-card-flag::before {
+  content: "\1F1FA\1F1F8";
+  font-size: 1.15em;
+}
+
+html[data-region="CA"] .region-card-flag::before {
+  content: "\1F1E8\1F1E6";
+}
+
 /* "Coming soon" pill — the Business tier (invoices, customers, vendors,
    projects, bills, AR/AP) is not available yet, so flag it on the pricing
    tier card instead of implying it can be purchased today. */

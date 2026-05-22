@@ -44,6 +44,18 @@ const LANDING_REGION_COPY = {
     exportSummaryNet: "Net: $30,125.82",
     exportPdfBadge: "Prepared PDF export",
     exportPdfTitle: "Schedule C review packet",
+    exportPdfFilename: "inex-ledger-schedule-c-review-packet-2026-ytd.pdf",
+    exportPdfPrepared: "Generated May 22, 2026",
+    exportPdfSectionOne: "Income summary",
+    exportPdfSectionTwo: "Expense summary",
+    exportPdfSectionThree: "Net income",
+    exportPdfLineOne: "Sales income",
+    exportPdfLineOneAmount: "$34,800.00",
+    exportPdfLineTwo: "Contractor costs",
+    exportPdfLineTwoAmount: "$6,420.00",
+    exportPdfLineThree: "Office and software",
+    exportPdfLineThreeAmount: "$2,184.32",
+    exportPdfPreparedFor: "Demo advisory review",
     exportPdfIncome: "$48,220.14",
     exportPdfExpense: "$18,094.32",
     exportPdfNet: "$30,125.82",
@@ -94,6 +106,18 @@ const LANDING_REGION_COPY = {
     exportSummaryNet: "Net: CA$30,125.82",
     exportPdfBadge: "Prepared PDF export",
     exportPdfTitle: "T2125 review packet",
+    exportPdfFilename: "inex-ledger-t2125-review-packet-2026-ytd.pdf",
+    exportPdfPrepared: "Generated May 22, 2026",
+    exportPdfSectionOne: "Income summary",
+    exportPdfSectionTwo: "Expense summary",
+    exportPdfSectionThree: "Net income",
+    exportPdfLineOne: "Business income",
+    exportPdfLineOneAmount: "CA$34,800.00",
+    exportPdfLineTwo: "Subcontractor costs",
+    exportPdfLineTwoAmount: "CA$6,420.00",
+    exportPdfLineThree: "Office and software",
+    exportPdfLineThreeAmount: "CA$2,184.32",
+    exportPdfPreparedFor: "Demo accountant review",
     exportPdfIncome: "CA$48,220.14",
     exportPdfExpense: "CA$18,094.32",
     exportPdfNet: "CA$30,125.82",
@@ -171,6 +195,61 @@ function updateLandingPricing(billingMode, regionOverride) {
       ? `Billed annually at ${formatLandingPrice(yearlyTotalPrice, currency)}. Save 15%.`
       : `Billed monthly at ${formatLandingPrice(monthlyPrice, currency)}.`;
   });
+}
+
+function hydrateLandingStaticFixes() {
+  const regionFlag = document.querySelector(".region-card-flag");
+  if (regionFlag) {
+    regionFlag.textContent = "";
+  }
+
+  const pdfCard = document.querySelector(".preview-pdf-card .preview-pdf-page");
+  if (!pdfCard) return;
+
+  pdfCard.innerHTML = `
+    <span class="preview-card-label" data-region-copy="exportPdfBadge">Prepared PDF export</span>
+    <strong data-region-copy="exportPdfTitle">Schedule C review packet</strong>
+    <div class="preview-pdf-meta">
+      <span data-region-copy="exportPdfFilename">inex-ledger-schedule-c-review-packet-2026-ytd.pdf</span>
+      <span data-region-copy="exportPdfPrepared">Generated May 22, 2026</span>
+    </div>
+    <div class="preview-pdf-lines">
+      <span></span>
+      <span></span>
+      <span class="short"></span>
+    </div>
+    <div class="preview-pdf-summary">
+      <div class="preview-pdf-summary-row">
+        <span data-region-copy="exportPdfSectionOne">Income summary</span>
+        <strong data-region-copy="exportPdfIncome">$48,220.14</strong>
+      </div>
+      <div class="preview-pdf-summary-row">
+        <span data-region-copy="exportPdfSectionTwo">Expense summary</span>
+        <strong data-region-copy="exportPdfExpense">$18,094.32</strong>
+      </div>
+      <div class="preview-pdf-summary-row">
+        <span data-region-copy="exportPdfSectionThree">Net income</span>
+        <strong data-region-copy="exportPdfNet">$30,125.82</strong>
+      </div>
+    </div>
+    <div class="preview-pdf-table" role="presentation">
+      <div class="preview-pdf-table-row preview-pdf-table-head"><span>Section</span><span>Amount</span></div>
+      <div class="preview-pdf-table-row"><span data-region-copy="exportPdfLineOne">Sales income</span><span data-region-copy="exportPdfLineOneAmount">$34,800.00</span></div>
+      <div class="preview-pdf-table-row"><span data-region-copy="exportPdfLineTwo">Contractor costs</span><span data-region-copy="exportPdfLineTwoAmount">$6,420.00</span></div>
+      <div class="preview-pdf-table-row"><span data-region-copy="exportPdfLineThree">Office and software</span><span data-region-copy="exportPdfLineThreeAmount">$2,184.32</span></div>
+    </div>
+    <div class="preview-pdf-grid">
+      <div><small>Prepared for</small><strong data-region-copy="exportPdfPreparedFor">Demo advisory review</strong></div>
+      <div><small>File type</small><strong>PDF export</strong></div>
+      <div><small>Pages</small><strong>6 pages</strong></div>
+      <div><small>Export ID</small><strong>PDF-2048</strong></div>
+    </div>
+  `;
+
+  const downloadChip = document.querySelector(".preview-download-chip");
+  if (downloadChip) {
+    downloadChip.textContent = "Download PDF";
+  }
 }
 
 function initLandingRolodex() {
@@ -293,6 +372,7 @@ function initLandingRolodex() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  hydrateLandingStaticFixes();
   initLandingRolodex();
   const detectedRegion = await detectLandingRegion();
   applyLandingRegion(detectedRegion);
