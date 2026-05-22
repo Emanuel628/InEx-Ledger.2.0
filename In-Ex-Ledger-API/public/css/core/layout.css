@@ -358,6 +358,7 @@ body[data-theme="light"] .primary-btn:hover,
 body[data-theme="light"] .btn-primary:hover,
 body[data-theme="light"] button.primary:hover {
   box-shadow: var(--shadow-md);
+  color: #ffffff;
 }
 
 body[data-theme="light"] .secondary-btn,

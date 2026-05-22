@@ -203,23 +203,13 @@ function initLandingRolodex() {
         slide.style.transform = "translateX(0) rotateY(0deg) scale(1)";
         slide.style.opacity = "1";
         slide.style.filter = "blur(0)";
-      } else if (distance === 1 || distance === -(slides.length - 1)) {
-        slide.classList.add("is-next");
-        slide.style.transform = "translateX(16%) rotateY(-18deg) scale(0.92)";
-        slide.style.opacity = "0.52";
-        slide.style.filter = "blur(0.4px)";
-      } else if (distance === -1 || distance === slides.length - 1) {
-        slide.classList.add("is-prev");
-        slide.style.transform = "translateX(-16%) rotateY(18deg) scale(0.92)";
-        slide.style.opacity = "0.52";
-        slide.style.filter = "blur(0.4px)";
       } else {
         slide.classList.add("is-hidden");
         slide.style.transform = distance > 0
-          ? "translateX(28%) rotateY(-28deg) scale(0.84)"
-          : "translateX(-28%) rotateY(28deg) scale(0.84)";
+          ? "translateX(8%) scale(0.98)"
+          : "translateX(-8%) scale(0.98)";
         slide.style.opacity = "0";
-        slide.style.filter = "blur(1px)";
+        slide.style.filter = "blur(0.6px)";
       }
       slide.setAttribute("aria-hidden", distance === 0 ? "false" : "true");
     });

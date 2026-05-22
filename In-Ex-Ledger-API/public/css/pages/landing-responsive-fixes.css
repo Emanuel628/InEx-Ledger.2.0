@@ -25,6 +25,12 @@ body {
   color: #0f172a;
 }
 
+.marketing-nav .marketing-nav-cta,
+.marketing-nav .marketing-nav-cta:link,
+.marketing-nav .marketing-nav-cta:visited {
+  color: #ffffff;
+}
+
 .marketing-nav .marketing-nav-link:hover,
 .marketing-nav .marketing-nav-link:focus,
 .marketing-nav .marketing-nav-link:focus-visible,
@@ -34,6 +40,20 @@ body {
 }
 
 .marketing-nav .marketing-nav-link:focus-visible {
+  outline: 2px solid #0f5bd7;
+  outline-offset: 2px;
+}
+
+.marketing-nav .marketing-nav-cta:hover,
+.marketing-nav .marketing-nav-cta:focus,
+.marketing-nav .marketing-nav-cta:focus-visible,
+.marketing-nav .marketing-nav-cta:active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #0c4fbf, #216ad6);
+  text-decoration: none;
+}
+
+.marketing-nav .marketing-nav-cta:focus-visible {
   outline: 2px solid #0f5bd7;
   outline-offset: 2px;
 }

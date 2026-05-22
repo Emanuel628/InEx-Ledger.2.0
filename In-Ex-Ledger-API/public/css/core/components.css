@@ -212,6 +212,25 @@ button:hover,
   color: white;
 }
 
+a.button:hover,
+a.button:focus,
+a.button:focus-visible,
+a.pricing-cta-btn:hover,
+a.pricing-cta-btn:focus,
+a.pricing-cta-btn:focus-visible,
+a.primary-btn:hover,
+a.primary-btn:focus,
+a.primary-btn:focus-visible,
+a.btn-primary:hover,
+a.btn-primary:focus,
+a.btn-primary:focus-visible,
+a.primary-cta:hover,
+a.primary-cta:focus,
+a.primary-cta:focus-visible {
+  color: #ffffff;
+  text-decoration: none;
+}
+
 button:active,
 .primary-btn:active,
 .btn-primary:active,
