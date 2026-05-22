@@ -52,11 +52,14 @@
         <div class="onboarding-grid">
           <div class="form-field">
             <label for="onboardingBusinessName" data-i18n="onboarding_business_name">Your name or trade name</label>
+            <button type="button" class="onboarding-help-icon onboarding-field-help-toggle" data-help-key="businessName" aria-label="Help for your name or trade name" aria-expanded="false" aria-controls="onboardingHelpBusinessName">i</button>
             <input type="text" id="onboardingBusinessName" autocomplete="name" required data-i18n-placeholder="onboarding_business_name_placeholder" placeholder="e.g. Jane Smith or Jane's Design" />
+            <p id="onboardingHelpBusinessName" class="onboarding-field-help" hidden></p>
           </div>
           <input type="hidden" id="onboardingBusinessType" value="sole_proprietor" />
           <div class="form-field">
             <label for="onboardingStarterAccountType" data-i18n="onboarding_first_account_type">Primary account type</label>
+            <button type="button" class="onboarding-help-icon onboarding-field-help-toggle" data-help-key="accountType" aria-label="Help for primary account type" aria-expanded="false" aria-controls="onboardingHelpAccountType">i</button>
             <select id="onboardingStarterAccountType" required>
               <option value="checking">Checking</option>
               <option value="savings">Savings</option>
@@ -64,20 +67,26 @@
               <option value="cash">Cash</option>
               <option value="loan">Loan</option>
             </select>
+            <p id="onboardingHelpAccountType" class="onboarding-field-help" hidden></p>
           </div>
           <div class="form-field">
             <label for="onboardingStarterAccountName" data-i18n="onboarding_first_account_name">Account nickname</label>
+            <button type="button" class="onboarding-help-icon onboarding-field-help-toggle" data-help-key="accountName" aria-label="Help for account nickname" aria-expanded="false" aria-controls="onboardingHelpAccountName">i</button>
             <input type="text" id="onboardingStarterAccountName" autocomplete="off" placeholder="e.g. Primary Checking" />
+            <p id="onboardingHelpAccountName" class="onboarding-field-help" hidden></p>
           </div>
           <div class="form-field">
             <label for="onboardingRegion" data-i18n="onboarding_region">Where do you file taxes?</label>
+            <button type="button" class="onboarding-help-icon onboarding-field-help-toggle" data-help-key="region" aria-label="Help for tax filing region" aria-expanded="false" aria-controls="onboardingHelpRegion">i</button>
             <select id="onboardingRegion" required>
               <option value="US" data-i18n="region_us">United States</option>
               <option value="CA" data-i18n="region_ca">Canada</option>
             </select>
+            <p id="onboardingHelpRegion" class="onboarding-field-help" hidden></p>
           </div>
           <div class="form-field" id="onboardingProvinceField" hidden>
             <label for="onboardingProvince" data-i18n="onboarding_province">Province</label>
+            <button type="button" class="onboarding-help-icon onboarding-field-help-toggle" data-help-key="province" aria-label="Help for province" aria-expanded="false" aria-controls="onboardingHelpProvince">i</button>
             <select id="onboardingProvince">
               <option value="" data-i18n="onboarding_province_placeholder">Choose a province</option>
               <option value="AB">Alberta</option>
@@ -94,44 +103,55 @@
               <option value="SK">Saskatchewan</option>
               <option value="YT">Yukon</option>
             </select>
+            <p id="onboardingHelpProvince" class="onboarding-field-help" hidden></p>
           </div>
 
           <div class="form-field">
-            <label for="onboardingBusinessActivityCode">Business activity code</label>
+            <label for="onboardingBusinessActivityCode" data-i18n="onboarding_business_activity_code">Business activity code</label>
+            <button type="button" class="onboarding-help-icon onboarding-field-help-toggle" data-help-key="activityCode" aria-label="Help for business activity code" aria-expanded="false" aria-controls="onboardingHelpActivityCode">i</button>
             <input
               type="text"
               id="onboardingBusinessActivityCode"
               autocomplete="off"
+              data-i18n-placeholder="onboarding_business_activity_code_placeholder"
               placeholder="NAICS / business activity code"
               required
             />
+            <p id="onboardingHelpActivityCode" class="onboarding-field-help" hidden></p>
           </div>
 
           <div class="form-field">
-            <label for="onboardingAccountingMethod">Accounting method</label>
+            <label for="onboardingAccountingMethod" data-i18n="onboarding_accounting_method">Accounting method</label>
+            <button type="button" class="onboarding-help-icon onboarding-field-help-toggle" data-help-key="accountingMethod" aria-label="Help for accounting method" aria-expanded="false" aria-controls="onboardingHelpAccountingMethod">i</button>
             <select id="onboardingAccountingMethod" required>
-              <option value="cash">Cash</option>
-              <option value="accrual">Accrual</option>
+              <option value="cash" data-i18n="onboarding_accounting_method_cash">Cash</option>
+              <option value="accrual" data-i18n="onboarding_accounting_method_accrual">Accrual</option>
             </select>
+            <p id="onboardingHelpAccountingMethod" class="onboarding-field-help" hidden></p>
           </div>
 
           <div class="form-field">
-            <label for="onboardingMaterialParticipation">Are you active in this business?</label>
+            <label for="onboardingMaterialParticipation" data-i18n="onboarding_material_participation">Are you active in this business?</label>
+            <button type="button" class="onboarding-help-icon onboarding-field-help-toggle" data-help-key="materialParticipation" aria-label="Help for business activity status" aria-expanded="false" aria-controls="onboardingHelpMaterialParticipation">i</button>
             <select id="onboardingMaterialParticipation" required>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
+              <option value="yes" data-i18n="common_yes">Yes</option>
+              <option value="no" data-i18n="common_no">No</option>
             </select>
+            <p id="onboardingHelpMaterialParticipation" class="onboarding-field-help" hidden></p>
           </div>
 
           <div class="form-field form-field-full">
-            <label for="onboardingBusinessAddress">Business address</label>
+            <label for="onboardingBusinessAddress" data-i18n="settings_label_business_address">Business address</label>
+            <button type="button" class="onboarding-help-icon onboarding-field-help-toggle" data-help-key="businessAddress" aria-label="Help for business address" aria-expanded="false" aria-controls="onboardingHelpBusinessAddress">i</button>
             <textarea
               id="onboardingBusinessAddress"
               rows="3"
               autocomplete="street-address"
+              data-i18n-placeholder="onboarding_business_address_placeholder"
               placeholder="Street, city, state/province, ZIP/postal code, country"
               required
             ></textarea>
+            <p id="onboardingHelpBusinessAddress" class="onboarding-field-help" hidden></p>
           </div>
 
         </div>
@@ -143,50 +163,11 @@
         </div>
       </form>
     </section>
-
-    <section class="onboarding-shell onboarding-import-shell" id="onboardingImportStep" hidden>
-      <div class="onboarding-import-card">
-        <span class="onboarding-kicker">Optional step</span>
-        <h2 class="onboarding-import-title">Import transactions from your bank</h2>
-        <p class="onboarding-import-lede">
-          Save time by importing a CSV from your bank. You can also skip this step and add transactions manually.
-        </p>
-        <div class="onboarding-import-help-inline">
-          <span class="onboarding-import-help-copy">Need help finding your bank CSV?</span>
-          <button
-            type="button"
-            id="onboardingCsvHelpToggle"
-            class="onboarding-help-icon"
-            aria-label="Help finding your bank CSV"
-            aria-expanded="false"
-            aria-controls="onboardingBankHelpPanel"
-            title="Help finding your bank CSV"
-          >i</button>
-        </div>
-
-        <div class="onboarding-import-actions">
-          <label class="onboarding-import-upload">
-            <input type="file" id="onboardingCsvFile" accept=".csv,text/csv" />
-            <span class="auth-submit onboarding-import-upload-btn">Upload CSV</span>
-          </label>
-          <button type="button" id="onboardingCsvSkip" class="onboarding-skip-btn">Skip for now</button>
-        </div>
-
-        <p id="onboardingCsvStatus" class="onboarding-import-status" role="status" aria-live="polite" hidden></p>
-
-        <div id="onboardingBankHelpPanel" class="bank-csv-help-panel" hidden></div>
-
-        <div class="onboarding-import-continue" id="onboardingImportContinueRow" hidden>
-          <button type="button" id="onboardingImportContinue" class="auth-submit">Continue to your workspace</button>
-        </div>
-      </div>
-    </section>
   </main>
   <script src="../js/escape-html.js?v=20260410a"></script>
   <script src="../js/global.js?v=20260510c"></script>
   <script src="../js/i18n.js?v=20260510c"></script>
   <script src="../js/auth.js?v=20260518a"></script>
-  <script src="../js/bank-csv-help.js?v=20260520b"></script>
   <script src="../js/onboarding-page.js?v=20260520b"></script>
 </body>
 </html>

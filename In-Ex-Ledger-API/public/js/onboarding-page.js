@@ -5,6 +5,17 @@ let onboardingAccountNameTouched = false;
 const ONBOARDING_REGION_KEY = "lb_region";
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const GUIDED_SETUP_STEPS = new Set(["categories", "accounts", "transactions", "import"]);
+const ONBOARDING_FIELD_HELP_KEYS = {
+  businessName: "onboarding_help_business_name",
+  accountType: "onboarding_help_account_type",
+  accountName: "onboarding_help_account_name",
+  region: "onboarding_help_region",
+  province: "onboarding_help_province",
+  activityCode: "onboarding_help_activity_code",
+  accountingMethod: "onboarding_help_accounting_method",
+  materialParticipation: "onboarding_help_material_participation",
+  businessAddress: "onboarding_help_business_address"
+};
 const STARTER_ACCOUNT_NAME_PRESETS = {
   checking: { US: "Primary Checking", CA: "Primary Chequing" },
   savings: { US: "Business Savings", CA: "Business Savings" },
@@ -45,6 +56,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateOnboardingPlanPreview();
   });
   window.addEventListener("lunaLanguageChanged", applyOnboardingStaticCopy);
+  wireFieldHelpToggles();
   onboardingForm.addEventListener("submit", handleOnboardingSubmit);
 });
 
@@ -145,19 +157,19 @@ async function handleOnboardingSubmit(event) {
     return;
   }
   if (!payload.business_activity_code) {
-    setOnboardingMessage("Business activity code is required for PDF exports.");
+    setOnboardingMessage(tx("onboarding_error_activity_code"));
     return;
   }
   if (!payload.accounting_method) {
-    setOnboardingMessage("Accounting method is required for PDF exports.");
+    setOnboardingMessage(tx("onboarding_error_accounting_method"));
     return;
   }
   if (!payload.material_participation) {
-    setOnboardingMessage("Business activity status is required for PDF exports.");
+    setOnboardingMessage(tx("onboarding_error_material_participation"));
     return;
   }
   if (!payload.address) {
-    setOnboardingMessage("Business address is required for PDF exports.");
+    setOnboardingMessage(tx("onboarding_error_business_address"));
     return;
   }
 
@@ -185,11 +197,9 @@ async function handleOnboardingSubmit(event) {
     if (typeof setCurrentLanguage === "function") {
       setCurrentLanguage(payload.language);
     }
-    const destination =
+    window.location.href =
       result?.redirect_to ||
       resolveOnboardingDestination({ onboarding: result?.onboarding || null });
-    // Offer an optional bank-CSV import step before sending the user onward.
-    showOnboardingImportStep(payload.region, destination);
   } catch (error) {
     console.error("Onboarding save failed:", error);
     setOnboardingMessage(tx("onboarding_error_finish"));
@@ -272,159 +282,44 @@ function applyOnboardingStaticCopy() {
   intro?.querySelector("p")?.replaceChildren(tx("onboarding_intro_guided"));
   document.title = `InEx Ledger - ${tx("onboarding_page_title")}`;
   updateOnboardingPlanPreview();
+  renderFieldHelpCopy();
 }
 
 function resolveOnboardingDestination(profile = {}) {
   const onboardingData = profile?.onboarding?.data || {};
   const guidedSetupStep = String(onboardingData.guided_setup_step || "").trim().toLowerCase();
   if (onboardingData.guided_setup_active && GUIDED_SETUP_STEPS.has(guidedSetupStep)) {
-    return `/${guidedSetupStep}`;
+    return guidedSetupStep === "import" ? "/transactions" : `/${guidedSetupStep}`;
   }
   return "/categories";
 }
 
-/* =========================================================
-   Optional onboarding step: import transactions from a bank CSV.
-   Uses the business region already chosen during onboarding - it never
-   asks the user to pick a region. The step is always skippable.
-   ========================================================= */
-
-function showOnboardingImportStep(region, destination) {
-  const importStep = document.getElementById("onboardingImportStep");
-  const formShell = onboardingForm ? onboardingForm.closest(".onboarding-shell") : null;
-
-  // If the optional step markup is unavailable, continue without blocking.
-  if (!importStep) {
-    window.location.href = destination;
-    return;
-  }
-
-  if (formShell) {
-    formShell.hidden = true;
-  }
-  importStep.hidden = false;
-  window.scrollTo({ top: 0, behavior: "smooth" });
-  setupOnboardingImportStep(region, destination);
-}
-
-function setupOnboardingImportStep(region, destination) {
-  const fileInput = document.getElementById("onboardingCsvFile");
-  const helpToggle = document.getElementById("onboardingCsvHelpToggle");
-  const helpPanel = document.getElementById("onboardingBankHelpPanel");
-  const skipButton = document.getElementById("onboardingCsvSkip");
-  const continueButton = document.getElementById("onboardingImportContinue");
-  const continueRow = document.getElementById("onboardingImportContinueRow");
-  const statusEl = document.getElementById("onboardingCsvStatus");
-
-  const goToWorkspace = () => {
-    window.location.href = destination;
-  };
-
-  skipButton?.addEventListener("click", goToWorkspace);
-  continueButton?.addEventListener("click", goToWorkspace);
-
-  // Region-aware bank CSV help. The region is the business region from
-  // onboarding; the help panel never asks the user to choose a region.
-  let helpRendered = false;
-  helpToggle?.addEventListener("click", () => {
-    if (!helpPanel) {
+function wireFieldHelpToggles() {
+  document.querySelectorAll(".onboarding-field-help-toggle").forEach((button) => {
+    if (button.dataset.helpWired === "true") {
       return;
     }
-    const willShow = helpPanel.hidden;
-    if (willShow && !helpRendered && window.BankCsvHelp) {
-      window.BankCsvHelp.render(helpPanel, region);
-      helpRendered = true;
-    }
-    helpPanel.hidden = !willShow;
-    helpToggle.setAttribute("aria-expanded", willShow ? "true" : "false");
-  });
-
-  // Resolve the starter account created during onboarding as the import target.
-  let starterAccountId = null;
-  resolveStarterAccountId()
-    .then((accountId) => {
-      starterAccountId = accountId;
-    })
-    .catch(() => {
-      starterAccountId = null;
+    button.dataset.helpWired = "true";
+    button.addEventListener("click", () => {
+      const panelId = button.getAttribute("aria-controls");
+      const panel = panelId ? document.getElementById(panelId) : null;
+      if (!panel) {
+        return;
+      }
+      const willShow = panel.hidden;
+      panel.hidden = !willShow;
+      button.setAttribute("aria-expanded", willShow ? "true" : "false");
     });
-
-  fileInput?.addEventListener("change", async () => {
-    const file = fileInput.files && fileInput.files[0];
-    if (!file) {
-      return;
-    }
-    await handleOnboardingCsvUpload(file, starterAccountId, statusEl, continueRow);
-    fileInput.value = "";
   });
 }
 
-async function resolveStarterAccountId() {
-  try {
-    const response = await apiFetch("/api/accounts?scope=active");
-    if (!response || !response.ok) {
-      return null;
+function renderFieldHelpCopy() {
+  Object.entries(ONBOARDING_FIELD_HELP_KEYS).forEach(([fieldKey, translationKey]) => {
+    const button = document.querySelector(`.onboarding-field-help-toggle[data-help-key="${fieldKey}"]`);
+    const panelId = button?.getAttribute("aria-controls");
+    const panel = panelId ? document.getElementById(panelId) : null;
+    if (panel) {
+      panel.textContent = tx(translationKey);
     }
-    const payload = await response.json().catch(() => null);
-    const accounts = Array.isArray(payload) ? payload : (payload?.data || []);
-    return accounts.length ? accounts[0].id : null;
-  } catch (_) {
-    return null;
-  }
-}
-
-function setImportStatus(statusEl, message) {
-  if (!statusEl) {
-    return;
-  }
-  statusEl.textContent = message || "";
-  statusEl.hidden = !message;
-}
-
-async function handleOnboardingCsvUpload(file, accountId, statusEl, continueRow) {
-  if (!accountId) {
-    setImportStatus(
-      statusEl,
-      "We couldn't find your starter account yet. You can skip this step and import later from the Transactions page."
-    );
-    return;
-  }
-
-  setImportStatus(statusEl, "Importing your CSV...");
-
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("account_id", accountId);
-
-  try {
-    const response = await apiFetch("/api/transactions/import/csv", {
-      method: "POST",
-      body: formData
-    });
-    const data = response ? await response.json().catch(() => ({})) : {};
-
-    if (!response || !response.ok) {
-      setImportStatus(
-        statusEl,
-        data.error || "We couldn't import that file. You can skip this step and try again later from Transactions."
-      );
-      return;
-    }
-
-    const imported = Number(data.imported || 0);
-    const skipped = Number(data.skipped || 0);
-    const skippedNote = skipped > 0 ? `, ${skipped} skipped` : "";
-    setImportStatus(
-      statusEl,
-      `Import complete. ${imported} transaction${imported === 1 ? "" : "s"} added${skippedNote}.`
-    );
-    if (continueRow) {
-      continueRow.hidden = false;
-    }
-  } catch (_) {
-    setImportStatus(
-      statusEl,
-      "Something went wrong during import. You can skip this step and try again later from Transactions."
-    );
-  }
+  });
 }

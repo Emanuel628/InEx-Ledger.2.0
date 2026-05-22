@@ -19,6 +19,13 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
+function txf(key, values) {
+  if (typeof window.tFormat === "function") {
+    return window.tFormat(key, values);
+  }
+  return String(tx(key)).replace(/\{(\w+)\}/g, (_, token) => values?.[token] ?? "");
+}
+
 function extractAccountsPayload(payload) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.data)) return payload.data;
@@ -45,39 +52,39 @@ function enhanceAccountsShell() {
 
   const title = header.querySelector(".app-page-title");
   const subtitle = header.querySelector(".app-page-subtitle");
-  if (title) title.textContent = "Accounts";
-  if (subtitle) subtitle.textContent = "Manage the accounts, cards, and cash sources that transactions flow through.";
+  if (title) title.textContent = tx("accounts_title");
+  if (subtitle) subtitle.textContent = tx("accounts_shell_subtitle");
 
   const dashboard = document.createElement("section");
   dashboard.className = "accounts-dashboard";
-  dashboard.setAttribute("aria-label", "Account overview");
+  dashboard.setAttribute("aria-label", tx("accounts_overview_aria"));
   dashboard.innerHTML = `
-    <article class="account-stat-card"><span class="account-stat-icon total" aria-hidden="true">▣</span><div><span>Active accounts</span><strong id="accountTotalCount">0</strong><small>Ledger sources</small></div></article>
-    <article class="account-stat-card"><span class="account-stat-icon bank" aria-hidden="true">↗</span><div><span>Bank accounts</span><strong id="accountBankCount">0</strong><small>Checking / savings</small></div></article>
-    <article class="account-stat-card"><span class="account-stat-icon cash" aria-hidden="true">◈</span><div><span>Cards / cash</span><strong id="accountCashCardCount">0</strong><small>Manual sources</small></div></article>
-    <article class="account-stat-card"><span class="account-stat-icon currency" aria-hidden="true">$</span><div><span>Ledger currency</span><strong id="accountCurrencyLabel">USD</strong><small>Current business</small></div></article>
+    <article class="account-stat-card"><span class="account-stat-icon total" aria-hidden="true">A</span><div><span>${escapeHtml(tx("accounts_stat_active"))}</span><strong id="accountTotalCount">0</strong><small>${escapeHtml(tx("accounts_stat_active_hint"))}</small></div></article>
+    <article class="account-stat-card"><span class="account-stat-icon bank" aria-hidden="true">B</span><div><span>${escapeHtml(tx("accounts_stat_bank"))}</span><strong id="accountBankCount">0</strong><small>${escapeHtml(tx("accounts_stat_bank_hint"))}</small></div></article>
+    <article class="account-stat-card"><span class="account-stat-icon cash" aria-hidden="true">C</span><div><span>${escapeHtml(tx("accounts_stat_cash"))}</span><strong id="accountCashCardCount">0</strong><small>${escapeHtml(tx("accounts_stat_cash_hint"))}</small></div></article>
+    <article class="account-stat-card"><span class="account-stat-icon currency" aria-hidden="true">$</span><div><span>${escapeHtml(tx("accounts_stat_currency"))}</span><strong id="accountCurrencyLabel">USD</strong><small>${escapeHtml(tx("accounts_stat_currency_hint"))}</small></div></article>
   `;
   header.after(dashboard);
 
   const toolbar = document.createElement("section");
   toolbar.className = "accounts-toolbar";
-  toolbar.setAttribute("aria-label", "Account tools");
+  toolbar.setAttribute("aria-label", tx("accounts_tools_aria"));
   toolbar.innerHTML = `
-    <label class="account-search-wrap" for="accountSearchInput"><span aria-hidden="true">⌕</span><input id="accountSearchInput" type="search" placeholder="Search accounts" autocomplete="off" /></label>
+    <label class="account-search-wrap" for="accountSearchInput"><span aria-hidden="true">S</span><input id="accountSearchInput" type="search" placeholder="${escapeHtml(tx("accounts_search_placeholder"))}" autocomplete="off" /></label>
   `;
   dashboard.after(toolbar);
 
   const panel = document.createElement("section");
   panel.className = "account-sources-panel";
   panel.innerHTML = `
-    <div class="account-sources-head"><div><h2>Account sources</h2><p id="accountSourcesSummary">0 active · used for transaction tracking and reports</p></div></div>
+    <div class="account-sources-head"><div><h2>${escapeHtml(tx("accounts_sources_title"))}</h2><p id="accountSourcesSummary">${escapeHtml(txf("accounts_sources_summary", { count: 0 }))}</p></div></div>
   `;
   list.before(panel);
   panel.appendChild(list);
 
   const guidance = document.createElement("section");
   guidance.className = "accounts-guidance";
-  guidance.innerHTML = `<span aria-hidden="true">◈</span><p><strong>How accounts are used</strong><br>Accounts keep transactions tied to the right checking, cash, card, or manual source so reports and exports stay clean.</p>`;
+  guidance.innerHTML = `<span aria-hidden="true">i</span><p><strong>${escapeHtml(tx("accounts_guidance_title"))}</strong><br>${escapeHtml(tx("accounts_guidance_body"))}</p>`;
   panel.after(guidance);
 
   document.getElementById("accountSearchInput")?.addEventListener("input", (event) => {
@@ -147,11 +154,11 @@ function wireAccountForm() {
         body: JSON.stringify({ name, type })
       });
 
-      if (!response) throw new Error(editingAccountId ? "Failed to update account." : tx("accounts_error_save"));
-      if (!response.ok) throw new Error(await getApiErrorText(response, editingAccountId ? "Failed to update account." : tx("accounts_error_save")));
+      if (!response) throw new Error(editingAccountId ? tx("accounts_error_update") : tx("accounts_error_save"));
+      if (!response.ok) throw new Error(await getApiErrorText(response, editingAccountId ? tx("accounts_error_update") : tx("accounts_error_save")));
 
       closeAccountForm();
-      showAccountsToast(editingAccountId ? "Account updated" : tx("accounts_added"));
+      showAccountsToast(editingAccountId ? tx("accounts_updated") : tx("accounts_added"));
       await renderAccountList();
     } catch (error) {
       if (message) message.textContent = error.message || tx("accounts_error_save");
@@ -170,7 +177,7 @@ function openAccountForm(account = null) {
   editingAccountId = account?.id || null;
   if (nameInput) nameInput.value = account?.name || "";
   setActiveAccountType(account?.type || "checking");
-  if (submitButton) submitButton.textContent = editingAccountId ? "Save changes" : tx("accounts_button_save");
+  if (submitButton) submitButton.textContent = editingAccountId ? tx("accounts_button_save_changes") : tx("accounts_button_save");
   if (message) message.textContent = "";
   if (formContainer) formContainer.hidden = false;
   nameInput?.focus();
@@ -230,7 +237,7 @@ function renderAccountRows(accounts) {
   });
 
   if (!filtered.length) {
-    container.innerHTML = `<div class="accounts-empty">${escapeHtml(accountSearchTerm ? "No accounts match your search." : tx("accounts_no_accounts"))}</div>`;
+    container.innerHTML = `<div class="accounts-empty">${escapeHtml(accountSearchTerm ? tx("accounts_no_search_matches") : tx("accounts_no_accounts"))}</div>`;
     return;
   }
 
@@ -265,17 +272,17 @@ function renderAccountCard(account) {
       <div class="account-card-main">
         <div class="account-name">${escapeHtml(name)}</div>
         <div class="account-meta-row">
-          <span class="account-type">${escapeHtml(typeLabel)} account</span>
+          <span class="account-type">${escapeHtml(txf("accounts_type_account", { type: typeLabel }))}</span>
           <span class="account-meta-pill">${escapeHtml(currency)}</span>
-          <span class="account-meta-pill is-active">Active</span>
-          ${isDefault ? `<span class="account-meta-pill">Default</span>` : ""}
+          <span class="account-meta-pill is-active">${escapeHtml(tx("accounts_status_active"))}</span>
+          ${isDefault ? `<span class="account-meta-pill">${escapeHtml(tx("accounts_status_default"))}</span>` : ""}
         </div>
       </div>
       <div class="account-actions">
-        <button type="button" class="account-menu-btn" aria-label="Account actions">•••</button>
+        <button type="button" class="account-menu-btn" aria-label="${escapeHtml(tx("accounts_actions_aria"))}">...</button>
         <div class="account-action-menu">
-          <button type="button" data-account-edit="${escapeHtml(account.id || "")}">Edit</button>
-          <button type="button" class="account-delete-menu-btn" data-account-delete="${escapeHtml(account.id || "")}">Delete</button>
+          <button type="button" data-account-edit="${escapeHtml(account.id || "")}">${escapeHtml(tx("common_edit"))}</button>
+          <button type="button" class="account-delete-menu-btn" data-account-delete="${escapeHtml(account.id || "")}">${escapeHtml(tx("common_delete"))}</button>
         </div>
       </div>
     </article>
@@ -290,7 +297,7 @@ function updateAccountDashboard(accounts) {
   setText("accountBankCount", bank);
   setText("accountCashCardCount", cashCard);
   setText("accountCurrencyLabel", inferLedgerCurrency());
-  setText("accountSourcesSummary", `${total} active · used for transaction tracking and reports`);
+  setText("accountSourcesSummary", txf("accounts_sources_summary", { count: total }));
 }
 
 function setText(id, value) {
@@ -304,10 +311,10 @@ function inferLedgerCurrency() {
 }
 
 function getAccountIcon(type) {
-  if (type === "credit_card") return "▤";
+  if (type === "credit_card") return "C";
   if (type === "cash") return "$";
-  if (type === "loan") return "↔";
-  if (type === "savings") return "◇";
+  if (type === "loan") return "L";
+  if (type === "savings") return "S";
   return "B";
 }
 
@@ -326,11 +333,11 @@ function isLikelyDefaultAccount(account) {
 
 async function deleteAccount(accountId) {
   const account = accountRecordsCache.find((a) => a.id === accountId);
-  const name = account?.name || "this account";
+  const name = account?.name || tx("accounts_fallback_name").toLowerCase();
   const modal = document.getElementById("accountDeleteModal");
   const body = document.getElementById("accountDeleteModalBody");
   if (modal && body) {
-    body.textContent = `Delete "${name}"? This action cannot be undone.`;
+    body.textContent = txf("accounts_confirm_delete_named", { name });
     modal.classList.remove("hidden");
     pendingDeleteAccountId = accountId;
   } else {
@@ -454,16 +461,16 @@ function renderAccountGhosts(suggestions) {
     return;
   }
   panel.hidden = false;
-  panel.innerHTML = `<div class="acc-ghost-header"><span class="acc-ghost-badge">New account?</span><span class="acc-ghost-title">We spotted untracked accounts in your transactions</span></div>`;
+  panel.innerHTML = `<div class="acc-ghost-header"><span class="acc-ghost-badge">${escapeHtml(tx("accounts_ghost_badge"))}</span><span class="acc-ghost-title">${escapeHtml(tx("accounts_ghost_title"))}</span></div>`;
   for (const s of suggestions) {
     const card = document.createElement("article");
     card.className = "account-card acc-ghost-card";
     card.dataset.ghostLast4 = s.last4;
-    const txLabel = `${s.count} transaction${s.count === 1 ? "" : "s"}`;
+    const txLabel = txf(s.count === 1 ? "accounts_ghost_seen_count_one" : "accounts_ghost_seen_count_other", { count: s.count });
     const preview = escapeHtml(String(s.sample).slice(0, 45));
     card.innerHTML = `
-      <div><div class="account-name acc-ghost-name">${escapeHtml(s.display)}</div><div class="account-type acc-ghost-meta">Seen in ${txLabel} &mdash; e.g. &ldquo;${preview}&rdquo;</div></div>
-      <div class="acc-ghost-actions"><button type="button" class="acc-ghost-add-btn">Add account</button><button type="button" class="acc-ghost-dismiss-btn">Not now</button></div>
+      <div><div class="account-name acc-ghost-name">${escapeHtml(s.display)}</div><div class="account-type acc-ghost-meta">${escapeHtml(txf("accounts_ghost_seen_in", { count: txLabel, sample: String(s.sample).slice(0, 45) }))}</div></div>
+      <div class="acc-ghost-actions"><button type="button" class="acc-ghost-add-btn">${escapeHtml(tx("accounts_add"))}</button><button type="button" class="acc-ghost-dismiss-btn">${escapeHtml(tx("accounts_ghost_dismiss"))}</button></div>
     `;
     card.querySelector(".acc-ghost-add-btn").addEventListener("click", () => {
       openAccountForm({ name: s.display, type: "checking" });

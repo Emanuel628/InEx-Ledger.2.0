@@ -60,6 +60,17 @@ if (!window.__AUTH_GUARD_STATE__) {
 
 let pendingRefreshPromise = null;
 
+function authT(key) {
+  return typeof t === "function" ? t(key) : key;
+}
+
+function authTf(key, values) {
+  if (typeof window.tFormat === "function") {
+    return window.tFormat(key, values);
+  }
+  return String(authT(key)).replace(/\{(\w+)\}/g, (_, token) => values?.[token] ?? "");
+}
+
 function resolveStorageUserId(profile = window.__LUNA_ME__) {
   return profile?.id || profile?.user_id || profile?.userId || profile?.uid || "";
 }
@@ -269,12 +280,14 @@ function showAdditionalBusinessPaywall(profile = window.__LUNA_ME__) {
   const allowed = getMaxBusinessesAllowedFromSubscription(subscription);
   const hasProAccess = subscription?.effectiveTier === "v1";
   const message = hasProAccess
-    ? (allowed <= 1
-        ? "Your Pro plan currently includes 1 business. Add an additional business slot in Subscription to continue."
-        : `Your Pro plan currently allows up to ${allowed} businesses. Increase your additional business slots in Subscription to continue.`)
-    : (allowed <= 1
-        ? "Your current plan includes 1 business. Upgrade to Pro and add an additional business slot to continue."
-        : `Your current plan allows up to ${allowed} businesses. Upgrade your business access in Subscription to continue.`);
+    ? authTf(
+        allowed <= 1 ? "auth_business_limit_pro_single" : "auth_business_limit_pro_multi",
+        { allowed }
+      )
+    : authTf(
+        allowed <= 1 ? "auth_business_limit_basic_single" : "auth_business_limit_basic_multi",
+        { allowed }
+      );
 
   showAccountMenuNotice(message);
   window.setTimeout(() => {
@@ -290,10 +303,10 @@ function getUserDisplayName(profile = {}) {
 
   const email = String(profile.email || "").trim();
   if (!email) {
-    return "User";
+    return authT("common_user");
   }
 
-  return email.split("@")[0] || "User";
+  return email.split("@")[0] || authT("common_user");
 }
 
 function getUserInitials(profile = {}) {
@@ -337,7 +350,7 @@ function getPillBusinessName(profile = {}) {
     localStorage.getItem(ACTIVE_BUSINESS_NAME_KEY) ||
     "";
   const normalized = String(candidate || "").trim();
-  return normalized || "Business";
+  return normalized || authT("common_business");
 }
 
 /**
@@ -372,7 +385,7 @@ function persistBusinessContext(profile = {}) {
   }
 
   localStorage.setItem(ACTIVE_BUSINESS_ID_KEY, activeBusiness.id);
-  localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || "Business");
+  localStorage.setItem(ACTIVE_BUSINESS_NAME_KEY, activeBusiness.name || authT("common_business"));
 }
 
 function updateAuthenticatedChrome(profile = {}) {
@@ -408,7 +421,7 @@ function preloadAuthenticatedChrome() {
   try {
     const pillBusinessName = String(localStorage.getItem(ACTIVE_BUSINESS_NAME_KEY) || "").trim();
     const initials = String(localStorage.getItem(USER_INITIALS_KEY) || "").trim();
-    const displayName = String(localStorage.getItem(USER_DISPLAY_NAME_KEY) || "").trim() || "User";
+    const displayName = String(localStorage.getItem(USER_DISPLAY_NAME_KEY) || "").trim() || authT("common_user");
 
     if (!pillBusinessName && !initials) {
       return;
@@ -444,8 +457,8 @@ function shouldRedirectToOnboarding(profile = {}) {
 
 function getPlanDisplayNameFromCode(tier) {
   if (tier === "v1") return "Pro";
-  if (tier === "v2" || tier === "business") return "Business";
-  return "Basic";
+  if (tier === "v2" || tier === "business") return authT("common_business");
+  return authT("plan_basic");
 }
 
 function resolvePostOnboardingPath(profile = {}) {
@@ -501,7 +514,7 @@ function ensureLegacyUserPills() {
   pill.className = "user-pill legacy-user-pill";
   pill.innerHTML = `
     <span class="user-avatar">U</span>
-    <span class="user-name">User</span>
+    <span class="user-name">${authT("common_user")}</span>
     ${USER_PILL_CHEVRON_MARKUP}
   `;
 
@@ -908,12 +921,15 @@ function wireMenuTrigger(trigger, menu) {
   });
 }
 
-function initAccountMenus(displayName = "User", profile = {}) {
+function initAccountMenus(displayName = authT("common_user"), profile = {}) {
   ensureAccountMenuStyles();
   ensureBusinessCreationModal();
   const activeBusiness = getActiveBusiness(profile);
   const businesses = getBusinessCollection(profile);
-  const businessCountLabel = `${businesses.length} business${businesses.length === 1 ? "" : "es"}`;
+  const businessCountLabel = authTf(
+    businesses.length === 1 ? "auth_business_count_one" : "auth_business_count_other",
+    { count: businesses.length }
+  );
 
   document.querySelectorAll(".user-pill").forEach((pill, index) => {
     let menu = pill.querySelector(".account-menu");
@@ -941,12 +957,12 @@ function initAccountMenus(displayName = "User", profile = {}) {
 
     menu.innerHTML = `
       <div class="account-menu-section">
-        <div class="account-menu-caption">${typeof t === "function" ? t("auth_signed_in_as") : "Signed in as"}</div>
+        <div class="account-menu-caption">${authT("auth_signed_in_as")}</div>
         <div class="account-menu-current">${escapeHtml(displayName)}</div>
       </div>
       <div class="account-menu-section">
-        <div class="account-menu-caption">Active business</div>
-        <div class="account-menu-current">${escapeHtml(activeBusiness?.name || (typeof t === "function" ? t("common_business") : "Business"))}</div>
+        <div class="account-menu-caption">${authT("auth_active_business")}</div>
+        <div class="account-menu-current">${escapeHtml(activeBusiness?.name || authT("common_business"))}</div>
         <div class="account-menu-hint">${businessCountLabel}</div>
       </div>
       <div class="account-menu-section">
@@ -958,16 +974,16 @@ function initAccountMenus(displayName = "User", profile = {}) {
             role="menuitem"
           >
             <span class="business-menu-copy">
-              <span class="account-menu-label">${escapeHtml(business.name || "Business")}</span>
+              <span class="account-menu-label">${escapeHtml(business.name || authT("common_business"))}</span>
               <span class="account-menu-hint">${escapeHtml(business.region || "US")}</span>
             </span>
-            ${business.is_active ? '<span class="business-menu-state">Current</span>' : ""}
+            ${business.is_active ? `<span class="business-menu-state">${escapeHtml(authT("common_current"))}</span>` : ""}
           </button>
         `).join("")}
       </div>
       <button type="button" class="account-menu-item account-menu-secondary" data-account-menu-action="add-business" role="menuitem">
-        <span class="account-menu-label">${typeof t === "function" ? t("auth_add_another_business") : "Add another business"}</span>
-        <span class="account-menu-hint">${typeof t === "function" ? t("auth_create_and_switch") : "Create and switch instantly"}</span>
+        <span class="account-menu-label">${authT("auth_add_another_business")}</span>
+        <span class="account-menu-hint">${authT("auth_create_and_switch")}</span>
       </button>
       <button type="button" class="account-menu-item" data-account-menu-action="logout" role="menuitem">
         ${typeof t === "function" ? t("auth_sign_out") : "Sign out"}
@@ -1030,32 +1046,32 @@ function ensureBusinessCreationModal() {
   modal.hidden = true;
   modal.innerHTML = `
     <div class="business-modal" role="dialog" aria-modal="true" aria-labelledby="businessModalTitle">
-      <h3 id="businessModalTitle">Add another business</h3>
-      <p>Create a new business and make it the active scope across the app.</p>
+      <h3 id="businessModalTitle">${escapeHtml(authT("auth_add_another_business"))}</h3>
+      <p>${escapeHtml(authT("auth_add_business_body"))}</p>
       <form class="business-modal-form" id="businessCreationForm">
         <label>
-          Business name
-          <input type="text" id="businessNameInput" maxlength="120" placeholder="River Street Rentals LLC" required />
+          ${escapeHtml(authT("auth_business_name_label"))}
+          <input type="text" id="businessNameInput" maxlength="120" placeholder="${escapeHtml(authT("auth_business_name_placeholder"))}" required />
         </label>
         <label>
-          Region
+          ${escapeHtml(authT("auth_business_region_label"))}
           <select id="businessRegionInput">
-            <option value="US">United States</option>
-            <option value="CA">Canada</option>
+            <option value="US">${escapeHtml(authT("country_united_states"))}</option>
+            <option value="CA">${escapeHtml(authT("country_canada"))}</option>
           </select>
         </label>
         <label>
-          Language
+          ${escapeHtml(authT("auth_business_language_label"))}
           <select id="businessLanguageInput">
-            <option value="en">English</option>
-            <option value="es">Spanish</option>
-            <option value="fr">French</option>
+            <option value="en">${escapeHtml(authT("language_english"))}</option>
+            <option value="es">${escapeHtml(authT("language_spanish"))}</option>
+            <option value="fr">${escapeHtml(authT("language_french"))}</option>
           </select>
         </label>
         <div class="business-modal-error" id="businessModalError"></div>
         <div class="business-modal-actions">
-          <button type="button" data-business-cancel>Cancel</button>
-          <button type="submit" data-business-submit>Create business</button>
+          <button type="button" data-business-cancel>${escapeHtml(authT("common_cancel"))}</button>
+          <button type="submit" data-business-submit>${escapeHtml(authT("auth_create_business"))}</button>
         </div>
       </form>
     </div>
@@ -1137,7 +1153,7 @@ function applyActivatedBusinessContext(activeBusiness) {
   localStorage.setItem(ACTIVE_BUSINESS_ID_KEY, activeBusiness.id);
   localStorage.setItem(
     ACTIVE_BUSINESS_NAME_KEY,
-    activeBusiness.name || (typeof t === "function" ? t("common_business") : "Business")
+    activeBusiness.name || authT("common_business")
   );
   if (window.__LUNA_ME__ && typeof window.__LUNA_ME__ === "object") {
     window.__LUNA_ME__.active_business_id = activeBusiness.id;
@@ -1161,7 +1177,7 @@ async function submitBusinessCreation() {
 
   if (!name) {
     if (error) {
-      error.textContent = "Business name is required.";
+      error.textContent = authT("auth_business_name_required");
     }
     return;
   }
@@ -1186,7 +1202,7 @@ async function submitBusinessCreation() {
     if (!response || !response.ok) {
       const payload = response ? await response.json().catch(() => null) : null;
       if (error) {
-        error.textContent = payload?.error || (typeof t === "function" ? t("auth_error_create_business") : "Unable to create business.");
+        error.textContent = payload?.error || authT("auth_error_create_business");
       }
       if (payload?.code === "additional_business_payment_required") {
         window.setTimeout(() => {
