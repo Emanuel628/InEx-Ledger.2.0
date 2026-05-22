@@ -23,6 +23,9 @@ const LANDING_REGION_COPY = {
     featureRegion: "Support for U.S. business categories, 1099 context, receipts, mileage, and export-ready records.",
     regionSectionTitle: "A U.S. bookkeeping workflow for solo businesses.",
     regionSectionSubtitle: "U.S. business categories, 1099 income context, mileage, receipts, and exports.",
+    regionFlag: "🇺🇸",
+    regionCardTitle: "United States",
+    regionCardBody: "U.S. business categories, 1099 context, income and expense records, receipts, mileage, and exports.",
     pricingSubtitle: "Finish onboarding first, then secure the Pro trial in Stripe. Pricing shown in USD.",
     faqRegionQuestion: "What U.S. record context does InEx Ledger support?",
     faqRegionAnswer: "The U.S. workflow is built around U.S. business categories, 1099 income context, receipts, mileage, accounts, and export-ready records. It helps organize your books, but it does not replace professional guidance.",
@@ -70,6 +73,9 @@ const LANDING_REGION_COPY = {
     featureRegion: "Support for Canadian business categories, T4A context, GST/HST category support, receipts, kilometres, and export-ready records.",
     regionSectionTitle: "A Canadian bookkeeping workflow for solo businesses.",
     regionSectionSubtitle: "Canadian business categories, T4A context, GST/HST category support, kilometres, receipts, and exports.",
+    regionFlag: "🇨🇦",
+    regionCardTitle: "Canada",
+    regionCardBody: "Canadian business categories, T4A context, GST/HST category support, receipts, kilometres, and exports.",
     pricingSubtitle: "Finish onboarding first, then secure the Pro trial in Stripe. Pricing shown in CAD.",
     faqRegionQuestion: "What Canadian record context does InEx Ledger support?",
     faqRegionAnswer: "The Canadian workflow is built around Canadian business categories, T4A context, GST/HST category support, receipts, kilometres, accounts, and export-ready records. It helps organize your books, but it does not replace professional guidance.",
@@ -131,11 +137,6 @@ function applyLandingRegion(region) {
   document.querySelectorAll("[data-region-copy]").forEach((node) => {
     const key = node.getAttribute("data-region-copy");
     if (copy[key]) node.textContent = copy[key];
-  });
-  document.querySelectorAll("[data-region-toggle]").forEach((button) => {
-    const isActive = button.getAttribute("data-region-toggle") === normalized;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-pressed", String(isActive));
   });
   document.querySelectorAll("[data-region-panel]").forEach((panel) => {
     panel.hidden = panel.getAttribute("data-region-panel") !== normalized;
@@ -295,7 +296,4 @@ document.addEventListener("DOMContentLoaded", async () => {
   initLandingRolodex();
   const detectedRegion = await detectLandingRegion();
   applyLandingRegion(detectedRegion);
-  document.querySelectorAll("[data-region-toggle]").forEach((button) => {
-    button.addEventListener("click", () => applyLandingRegion(button.getAttribute("data-region-toggle") || "US"));
-  });
 });

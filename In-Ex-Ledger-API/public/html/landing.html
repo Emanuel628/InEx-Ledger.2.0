@@ -341,14 +341,12 @@
     </section>
 
     <section id="regions" class="region-section">
-      <div class="section-heading"><span class="section-eyebrow">Choose your record context</span><h2>One product, two region-aware workflows.</h2><p class="section-subtitle">Use the region switcher to preview how the product language changes for U.S. and Canadian businesses.</p></div>
-      <div class="region-switcher" role="group" aria-label="Landing page region preview">
-        <button type="button" class="region-toggle is-active" data-region-toggle="US" aria-pressed="true">🇺🇸 United States</button>
-        <button type="button" class="region-toggle" data-region-toggle="CA" aria-pressed="false">🇨🇦 Canada</button>
-      </div>
-      <div class="region-cards">
-        <article><h3>United States</h3><p>U.S. business categories, 1099 context, income and expense records, receipts, mileage, and exports.</p></article>
-        <article><h3>Canada</h3><p>Canadian business categories, T4A context, GST/HST category support, receipts, kilometres, and exports.</p></article>
+      <div class="section-heading"><span class="section-eyebrow">Choose your record context</span><h2 data-region-copy="regionSectionTitle">A U.S. bookkeeping workflow for solo businesses.</h2><p class="section-subtitle" data-region-copy="regionSectionSubtitle">U.S. business categories, 1099 income context, mileage, receipts, and exports.</p></div>
+      <div class="region-cards region-cards-single">
+        <article class="region-card-active">
+          <h3><span class="region-card-flag" data-region-copy="regionFlag" aria-hidden="true">🇺🇸</span><span data-region-copy="regionCardTitle">United States</span></h3>
+          <p data-region-copy="regionCardBody">U.S. business categories, 1099 context, income and expense records, receipts, mileage, and exports.</p>
+        </article>
       </div>
     </section>
 
