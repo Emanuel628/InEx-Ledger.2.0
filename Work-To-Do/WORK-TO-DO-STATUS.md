@@ -171,41 +171,9 @@ Status: ✅ complete. All 28 task rows checked off `[x]`. Moved to `Work-Complet
 
 ---
 
-## `Work-To-Do/PRODUCTION-READINESS-PHASE-4-7.md`
+## `Work-Completed/PRODUCTION-READINESS-PHASE-4-7.md` — moved 2026-05-22
 
-### Phase 4 — Plan gating
-
-- ⏳ PARTIAL — Code-review pass marked PASS; live verification still required.
-
-Required live checks still incomplete unless manually proven:
-
-- ❌ Basic cannot see/use Business Quick Add
-- ❌ Pro cannot see/use Business Quick Add
-- ❌ Business can see/use Business Quick Add
-- ❌ Basic sees no export-history noise
-- ❌ Pro can access export history/export features
-- ❌ Basic/Pro see no recurring-template console errors
-- ❌ Business can use recurring templates if enabled
-- ❌ Direct API calls to Business/V2 routes block Basic/Pro
-- ❌ Direct API calls to Business/V2 routes succeed for Business
-- ❌ Checkout upgrade/downgrade states have friendly UI behavior
-
-### Phase 7 — Data safety
-
-- ⏳ PARTIAL — Code-review pass marked PASS; live multi-business verification still required.
-
-Required live checks still incomplete unless manually proven:
-
-- ❌ Business A transaction not visible in Business B
-- ❌ Business B transaction not visible in Business A
-- ❌ Accounts/categories scoped per business
-- ❌ Receipts scoped per business
-- ❌ Mileage scoped per business
-- ❌ Export history/data scoped per business
-- ❌ Settings/region scoped per business
-- ❌ Archive/delete scoped per business
-- ❌ Business Quick Add records scoped to active business
-- ❌ Cross-business direct API ID access fails or returns not found
+Status: ✅ complete. Phase 4 (plan gating across Basic/Pro/Business) passed code review, and the Phase 4 + Phase 7 live smoke-test matrices — tier gating and cross-business data isolation with a two-business account — were run and passed. Moved to `Work-Completed/`.
 
 ---
 
