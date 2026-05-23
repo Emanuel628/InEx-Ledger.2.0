@@ -23,7 +23,7 @@ body.trial-setup-page {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 78px;
+  min-height: 64px;
   padding: 0 clamp(22px, 3vw, 48px);
   border-bottom: 1px solid var(--trial-setup-border);
   background: rgba(255, 255, 255, 0.94);
@@ -36,7 +36,7 @@ body.trial-setup-page {
   gap: 12px;
   color: var(--trial-setup-ink);
   text-decoration: none;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 950;
   letter-spacing: -0.05em;
 }
@@ -60,7 +60,7 @@ body.trial-setup-page {
 .trial-setup-main {
   width: min(1480px, calc(100vw - 28px));
   margin: 0 auto;
-  padding: 28px 0 64px;
+  padding: 16px 0 40px;
 }
 
 .trial-setup-hero,
@@ -74,9 +74,9 @@ body.trial-setup-page {
 .trial-setup-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 22px;
+  gap: 18px;
   align-items: end;
-  padding: clamp(26px, 3vw, 42px);
+  padding: clamp(18px, 2.2vw, 28px);
 }
 
 .trial-setup-eyebrow {
@@ -94,9 +94,9 @@ body.trial-setup-page {
 }
 
 .trial-setup-hero h1 {
-  margin: 16px 0 14px;
-  font-size: clamp(40px, 5vw, 82px);
-  line-height: 0.9;
+  margin: 12px 0 10px;
+  font-size: clamp(30px, 3.8vw, 56px);
+  line-height: 0.95;
   letter-spacing: -0.075em;
   font-weight: 1000;
 }
@@ -129,12 +129,12 @@ body.trial-setup-page {
 .trial-setup-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
-  gap: 22px;
-  margin-top: 22px;
+  gap: 18px;
+  margin-top: 18px;
 }
 
 .trial-setup-card {
-  padding: clamp(22px, 2.5vw, 34px);
+  padding: clamp(18px, 2vw, 28px);
 }
 
 .trial-setup-card-primary {
@@ -144,8 +144,8 @@ body.trial-setup-page {
 }
 
 .trial-setup-card-head h2 {
-  margin: 14px 0 0;
-  font-size: clamp(28px, 3vw, 48px);
+  margin: 10px 0 0;
+  font-size: clamp(24px, 2.4vw, 38px);
   line-height: 0.96;
   letter-spacing: -0.05em;
 }
@@ -153,7 +153,7 @@ body.trial-setup-page {
 .trial-setup-controls,
 .trial-setup-summary,
 .trial-setup-actions {
-  margin-top: 22px;
+  margin-top: 18px;
 }
 
 .trial-setup-control + .trial-setup-control {
@@ -210,25 +210,32 @@ body.trial-setup-page {
 }
 
 .trial-setup-stepper button {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 72px;
+  padding: 0;
+  border-radius: 28px;
   border-color: var(--trial-setup-border);
   background: #fff;
   color: var(--trial-setup-ink);
-  font-size: 18px;
+  font-size: 54px;
   font-weight: 900;
+  line-height: 1;
+  text-align: center;
 }
 
 .trial-setup-stepper input {
-  width: 96px;
-  min-height: 42px;
-  padding: 0 12px;
+  width: 292px;
+  min-height: 72px;
+  padding: 0 18px;
   border: 1px solid var(--trial-setup-border);
-  border-radius: 12px;
+  border-radius: 28px;
   text-align: center;
-  font-size: 16px;
+  font-size: 58px;
   font-weight: 800;
+  line-height: 1;
   color: var(--trial-setup-ink);
   background: #fff;
 }
@@ -273,6 +280,10 @@ body.trial-setup-page {
   border-radius: 16px;
   font-size: 16px;
   font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .trial-setup-primary-btn {
@@ -282,9 +293,18 @@ body.trial-setup-page {
 }
 
 .trial-setup-secondary-btn {
-  background: #fff;
-  border-color: var(--trial-setup-border);
-  color: var(--trial-setup-ink);
+  background: var(--trial-setup-blue);
+  border-color: var(--trial-setup-blue);
+  color: #fff;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.2);
+}
+
+.trial-setup-secondary-btn:hover,
+.trial-setup-secondary-btn:focus-visible,
+.trial-setup-secondary-btn:active {
+  background: var(--trial-setup-blue);
+  border-color: var(--trial-setup-blue);
+  color: #fff;
 }
 
 .trial-setup-primary-btn:hover,
@@ -346,17 +366,17 @@ body.trial-setup-page {
 @media (max-width: 760px) {
   .trial-setup-main {
     width: calc(100vw - 14px);
-    padding: 14px 0 40px;
+    padding: 12px 0 28px;
   }
 
   .trial-setup-hero,
   .trial-setup-card {
-    padding: 18px;
+    padding: 16px;
     border-radius: 22px;
   }
 
   .trial-setup-hero h1 {
-    font-size: clamp(36px, 13vw, 54px);
+    font-size: clamp(28px, 10vw, 42px);
   }
 
   .trial-setup-stepper,
@@ -366,10 +386,24 @@ body.trial-setup-page {
     width: 100%;
   }
 
+  .trial-setup-stepper button {
+    width: 74px;
+    height: 60px;
+    border-radius: 22px;
+    font-size: 42px;
+  }
+
   .trial-setup-stepper input,
   .trial-setup-primary-btn,
   .trial-setup-secondary-btn {
     flex: 1 1 auto;
+  }
+
+  .trial-setup-stepper input {
+    width: auto;
+    min-height: 60px;
+    border-radius: 22px;
+    font-size: 42px;
   }
 
   .trial-setup-summary-row {
