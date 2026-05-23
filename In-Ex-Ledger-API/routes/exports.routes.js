@@ -12,7 +12,8 @@ const { saveRedactedPdf, buildRedactedStream, deleteExportFile } = require("../s
 const { decryptJwe } = require("../services/jweDecryptService.js");
 const { decryptTaxId } = require("../services/taxIdService.js");
 const { decryptGstHstNumber } = require("../services/gstHstNumberService.js");
-const { buildPdfExport, buildPdfExportDocument, __private: pdfPrivate } = require("../services/pdfGeneratorService.js");
+const { __private: pdfPrivate } = require("../services/pdfGeneratorService.js");
+const { generatePdfExportPair } = require("../services/exportOrchestrationService.js");
 const { buildNormalizedExportDataset } = require("../services/exportDatasetService.js");
 const { decrypt: decryptField } = require("../services/encryptionService.js");
 const { buildCsvBundle } = require("../services/csvExportService.js");
@@ -534,6 +535,11 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       taxLabel: region === "ca" ? (c.tax_map_ca || "") : (c.tax_map_us || "")
     }));
 
+    const certifiedByUser = Boolean(req.body?.certifiedByUser);
+    if (includeTaxId && !certifiedByUser) {
+      return res.status(400).json({ error: "certifiedByUser must be acknowledged to include Tax ID in the export." });
+    }
+
     const taxId = resolveSecureExportTaxId(req.body, includeTaxId);
 
     const generatedAt = new Date().toISOString();
@@ -649,10 +655,8 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       return res.send(csvBuffer);
     }
 
-    const fullPdf = buildPdfExportDocument({ ...sharedOptions, taxId });
-    const redactedPdf = buildPdfExportDocument({ ...sharedOptions, taxId: "" });
-    const fullPdfBuffer = fullPdf.buffer;
-    const redactedBuffer = redactedPdf.buffer;
+    const { fullBuffer: fullPdfBuffer, redactedBuffer, pageCount: pdfPageCount } =
+      generatePdfExportPair({ sharedOptions, taxId });
 
     const jobId = crypto.randomUUID();
     const filename = `inex-ledger-export-${grantStartDate}_to_${grantEndDate}.pdf`;
@@ -669,7 +673,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       filePath,
       language: exportLang,
       currency,
-      pageCount: redactedPdf.pageCount,
+      pageCount: pdfPageCount,
       notes: "Generated via grant",
       fullVersionAvailable: false
     });
@@ -788,6 +792,9 @@ router.get("/history/:id/redacted", exportGrantLimiter, async (req, res) => {
     });
     buildRedactedStream(res, rows[0].file_path);
   } catch (err) {
+    if (err.message === "Redacted export not found." || err.message === "Invalid export path") {
+      return res.status(404).json({ error: "Export file is no longer available. Please regenerate the export." });
+    }
     logError("Redacted download error", { err: err.message });
     return res.status(500).json({ error: "Cannot download redacted export." });
   }
@@ -929,10 +936,8 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       province: business.province || ""
     };
 
-    const fullPdf = buildPdfExportDocument({ ...sharedOptions, taxId });
-    const redactedPdf = buildPdfExportDocument({ ...sharedOptions, taxId: "" });
-    const fullPdfBuffer = fullPdf.buffer;
-    const redactedBuffer = redactedPdf.buffer;
+    const { fullBuffer: fullPdfBuffer, redactedBuffer, pageCount: pdfPageCount } =
+      generatePdfExportPair({ sharedOptions, taxId });
 
     const jobId = crypto.randomUUID();
     const filename = `inex-ledger-export-${dateRange.startDate}_to_${dateRange.endDate}.pdf`;
@@ -949,7 +954,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       filePath,
       language: exportLang,
       currency,
-      pageCount: redactedPdf.pageCount,
+      pageCount: pdfPageCount,
       notes: "Generated via secure export",
       fullVersionAvailable: false
     });

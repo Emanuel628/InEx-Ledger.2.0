@@ -14,6 +14,7 @@ const PDF_LABELS = {
     secure_badge: "Secure Export",
     redacted_badge: "Redacted Export",
     draft_badge: "Draft - CPA Review Required",
+    workpaper_badge: "CPA Workpaper Ready",
     not_filed: "This export is a bookkeeping workpaper, not a filed return.",
     executive_summary: "Executive Summary",
     mapping_summary: "Tax Mapping Summary",
@@ -1255,7 +1256,7 @@ function buildIdentityPage(data) {
   const canvas = new PdfCanvas();
   const header = drawReportHeader(canvas, { title: regionCode === "CA" ? labels.ca_report_title : labels.us_report_title, subtitle: regionCode === "CA" ? "Prepared for T2125 bookkeeping review" : "Prepared for Schedule C bookkeeping review", badges: [
     { text: isSecure ? labels.secure_badge : labels.redacted_badge, variant: "neutral" },
-    { text: labels.draft_badge, variant: "warning" }
+    { text: labels.statusBadgeText, variant: labels.statusBadgeVariant }
   ] });
 
   canvas.text(PAGE.margin, header.contentStartY, labels.executive_summary, 13, "F2");
@@ -1362,7 +1363,7 @@ function buildCategoryPages(transactions, categories, receipts, currency, labels
   const chunks = chunkArray(rows, 18);
   return chunks.map((chunk, index) => {
     const canvas = new PdfCanvas();
-    const header = drawReportHeader(canvas, { title: labels.mapping_summary, subtitle: normalizeRegionCode(region) === "CA" ? "T2125 category and tax-line resolution" : "Schedule C category and tax-line resolution", badges: [{ text: labels.draft_badge, variant: "warning" }] });
+    const header = drawReportHeader(canvas, { title: labels.mapping_summary, subtitle: normalizeRegionCode(region) === "CA" ? "T2125 category and tax-line resolution" : "Schedule C category and tax-line resolution", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
     const metricTop = header.contentStartY - 8;
     canvas.drawMetricCard(40, metricTop, 126, 70, "Needs category", formatCurrencyForPdf(totals.needsCategory, currency), "Imported / uncategorized");
     canvas.drawMetricCard(178, metricTop, 126, 70, "Needs support", formatCurrencyForPdf(totals.mappedNeedsSupport, currency), "Mapped but incomplete");
@@ -1412,7 +1413,7 @@ function buildTaxPacketPages({ transactions, categories, receipts, currency, reg
   const lineSummary = computeTaxLineSummary(transactions, categories, region);
   const mappedSupportTransactions = transactions.filter((txn) => statusNeedsSupport(txn.__status));
   const canvas = new PdfCanvas();
-  const header = drawReportHeader(canvas, { title: normalizeRegionCode(region) === "CA" ? labels.tax_packet_title_ca : labels.tax_packet_title_us, subtitle: normalizeRegionCode(region) === "CA" ? "Payer/form review and T2125 line summary" : "Payer/form review and Schedule C line summary", badges: [{ text: labels.draft_badge, variant: "warning" }] });
+  const header = drawReportHeader(canvas, { title: normalizeRegionCode(region) === "CA" ? labels.tax_packet_title_ca : labels.tax_packet_title_us, subtitle: normalizeRegionCode(region) === "CA" ? "Payer/form review and T2125 line summary" : "Payer/form review and Schedule C line summary", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
   const cardTop = header.contentStartY - 8;
   canvas.drawCard(40, cardTop, 252, 96, "Receipt Review", [
     `Expense transactions: ${coverage.expense_count}`,
@@ -1500,7 +1501,7 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
   const sorted = [...(transactions || [])].sort((a, b) => normalizePdfDate(a.date).localeCompare(normalizePdfDate(b.date)));
   if (!sorted.length) {
     const canvas = new PdfCanvas();
-    drawReportHeader(canvas, { title: labels.ledger_title, subtitle: "No included transactions in this period", badges: [{ text: labels.draft_badge, variant: "warning" }] });
+    drawReportHeader(canvas, { title: labels.ledger_title, subtitle: "No included transactions in this period", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
     return [canvas];
   }
   const pages = [];
@@ -1508,7 +1509,7 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
   const state = { y: 0, firstPage: true };
   const startPage = () => {
     canvas = new PdfCanvas();
-    const header = drawReportHeader(canvas, { title: labels.ledger_title, subtitle: "Primary line: date, payee, tax line, amount, flags", badges: [{ text: labels.draft_badge, variant: "warning" }] });
+    const header = drawReportHeader(canvas, { title: labels.ledger_title, subtitle: "Primary line: date, payee, tax line, amount, flags", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
     canvas.drawSectionHeader(state.firstPage ? "Flag Legend" : "Flag legend shown on first ledger page", 40, header.contentStartY);
     if (state.firstPage) {
       let legendY = header.contentStartY - 24;
@@ -1579,7 +1580,7 @@ function buildExclusionPages(transactions, currency, labels) {
   let firstPage = true;
   while (index < rows.length || firstPage) {
     const canvas = new PdfCanvas();
-    const header = drawReportHeader(canvas, { title: firstPage ? labels.exclusions_title : `${labels.exclusions_title} - continued`, subtitle: "Short reason codes shown; full legend appears on the first excluded-items page", badges: [{ text: labels.draft_badge, variant: "warning" }] });
+    const header = drawReportHeader(canvas, { title: firstPage ? labels.exclusions_title : `${labels.exclusions_title} - continued`, subtitle: "Short reason codes shown; full legend appears on the first excluded-items page", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
     let y = header.contentStartY - 4;
     if (firstPage) {
       canvas.drawCard(40, y, 532, 118, "Exclusion Summary", summary.map((row) => `${row.label} - ${row.count} items - ${row.amount_display}`), { maxChars: 92 });
@@ -1619,7 +1620,7 @@ function buildCpaChecklistPage(opts) {
   const { labels, region, reviewInsights, currency } = opts;
   const isCA = normalizeRegionCode(region) === "CA";
   const canvas = new PdfCanvas();
-  const header = drawReportHeader(canvas, { title: labels.checklist_title, subtitle: isCA ? "T2125 bookkeeping workpaper checklist" : "Schedule C bookkeeping workpaper checklist", badges: [{ text: labels.draft_badge, variant: "warning" }] });
+  const header = drawReportHeader(canvas, { title: labels.checklist_title, subtitle: isCA ? "T2125 bookkeeping workpaper checklist" : "Schedule C bookkeeping workpaper checklist", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
   const items = [
     { badge: reviewInsights.missingReceiptCount > 0 ? "ACTION" : "OK", title: "Receipts", description: `${reviewInsights.receiptLinkedCount} of ${reviewInsights.expenseTransactionCount} expense transactions have attached receipts.` },
     { badge: reviewInsights.needsCategoryCount > 0 ? "ACTION" : "OK", title: "Category cleanup", description: `${reviewInsights.needsCategoryCount} imported or uncategorized transactions need real business categories before filing.` },
@@ -1673,7 +1674,7 @@ function summarizeVehicleCosts(vehicleCosts, currency) {
 
 function buildSupportPages(receipts, transactions, mileage, vehicleCosts, labels, currency, reviewInsights, region) {
   const canvas = new PdfCanvas();
-  const header = drawReportHeader(canvas, { title: labels.support_title, subtitle: normalizeRegionCode(region) === "CA" ? "Support dashboard and final CRA review notes" : "Support dashboard and final IRS review notes", badges: [{ text: labels.draft_badge, variant: "warning" }] });
+  const header = drawReportHeader(canvas, { title: labels.support_title, subtitle: normalizeRegionCode(region) === "CA" ? "Support dashboard and final CRA review notes" : "Support dashboard and final IRS review notes", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
   const vehicleSummary = summarizeVehicleCosts(vehicleCosts, currency);
   const top = header.contentStartY - 8;
   canvas.drawCard(40, top, 252, 126, "Vehicle Review", [
@@ -1727,7 +1728,7 @@ function buildVehicleAuditSchedule(vehicleClaims, currency, labels, region) {
   const header = drawReportHeader(canvas, {
     title: "Auto Audit Support Schedule",
     subtitle: isCA ? "CRA vehicle expense claim details (per-transaction)" : "IRS vehicle expense claim details (per-transaction)",
-    badges: [{ text: labels.draft_badge, variant: "warning" }]
+    badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }]
   });
 
   const cols = [
@@ -1797,7 +1798,7 @@ function buildCapitalAssetSchedule(capitalAssets, currency, labels, region) {
   const header = drawReportHeader(canvas, {
     title: isCA ? "CCA Schedule - Capital Cost Allowance" : "MACRS / Section 179 Depreciation Schedule",
     subtitle: isCA ? "T2125 Part 13 — CCA schedule (current tax year)" : "Schedule C Line 13 — Depreciation and Section 179",
-    badges: [{ text: labels.draft_badge, variant: "warning" }]
+    badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }]
   });
 
   const cols = [
@@ -1860,7 +1861,7 @@ function buildQuickMethodRemittancePage(qmSchedule, currency, labels) {
   const header = drawReportHeader(canvas, {
     title: "CRA Quick Method Remittance Schedule",
     subtitle: "ETA s. 227 — Simplified accounting for small businesses",
-    badges: [{ text: labels.draft_badge, variant: "warning" }, { text: "QUICK METHOD", variant: "neutral" }]
+    badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }, { text: "QUICK METHOD", variant: "neutral" }]
   });
 
   let y = header.contentStartY - 10;
@@ -1975,7 +1976,8 @@ function buildPdfExportDocument(options) {
     vehicleClaimMap = null,      // Map<transactionId, vehicle_expense_details row> — with transaction_date, description attached
     capitalAssets = null,         // Array of capital_assets rows for the tax year
     capitalAssetTxMap = null,     // Map<transactionId, capital_assets row>
-    quickMethodSchedule = null    // Output of buildQuickMethodSchedule, or null
+    quickMethodSchedule = null,   // Output of buildQuickMethodSchedule, or null
+    exportStatus: exportStatusOption = null  // "draft" | "workpaper" | null (null = auto-derive from reviewInsights)
   } = options || {};
 
   validateExportProfile({
@@ -2030,6 +2032,24 @@ function buildPdfExportDocument(options) {
     excluded: excludedTransactions,
     region: normalizedRegion
   });
+
+  // Determine compliance status. Caller may pass an explicit exportStatus (used by
+  // generatePdfExportPair to guarantee both PDF builds carry the same badge). When null,
+  // auto-derive: workpaper requires all category, vehicle, phone, and support flags cleared.
+  const resolvedExportStatus =
+    exportStatusOption === "workpaper" || exportStatusOption === "draft"
+      ? exportStatusOption
+      : (reviewInsights.needsCategoryCount === 0 &&
+         reviewInsights.vehicleCount === 0 &&
+         reviewInsights.phoneAllocationCount === 0 &&
+         reviewInsights.mappedNeedsSupportCount === 0
+           ? "workpaper"
+           : "draft");
+
+  labels.statusBadgeText =
+    resolvedExportStatus === "workpaper" ? labels.workpaper_badge : labels.draft_badge;
+  labels.statusBadgeVariant = resolvedExportStatus === "workpaper" ? "success" : "warning";
+
   const isSecure = Boolean(String(taxId || "").trim());
 
   // Build Phase 2 schedule pages from pre-fetched compliance data
@@ -2085,7 +2105,8 @@ function buildPdfExportDocument(options) {
   return {
     buffer: createPdfBytes(pageContents),
     pageCount,
-    reportId: effectiveReportId
+    reportId: effectiveReportId,
+    exportStatus: resolvedExportStatus
   };
 }
 
