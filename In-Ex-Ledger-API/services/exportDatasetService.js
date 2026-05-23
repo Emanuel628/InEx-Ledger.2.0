@@ -272,6 +272,8 @@ function buildNormalizedExportDataset(options = {}) {
   const classified = summarizeExportTransactions(transactions, categories, {
     region,
     receipts,
+    vehicleClaimMap: options.vehicleClaimMap,
+    capitalAssetTxMap: options.capitalAssetTxMap,
     gstHstRegistered: business.gst_hst_registered === true || options.gstHstRegistered === true,
     gstHstMethod: business.gst_hst_method || options.gstHstMethod || "regular"
   });
