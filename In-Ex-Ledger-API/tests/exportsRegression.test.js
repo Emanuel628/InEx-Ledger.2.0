@@ -107,6 +107,7 @@ function buildFixtureOptions(overrides = {}) {
     address: "123 Main St, New York, NY",
     accountingMethod: "cash",
     materialParticipation: true,
+    supportArtifactMap: null,
     ...overrides
   };
 }
@@ -378,6 +379,20 @@ test("attached income receipts are surfaced in the PDF even when expense receipt
   assert.match(pdf, /\(Transactions with receipts: 1\) Tj/);
   assert.match(pdf, /Receipts: invoice-proof-1\.pdf, invo/i);
   assert.match(pdf, /\(0 of 0 expense transactions have attached receipts\./i);
+});
+
+test("phase 3 PDF adds unresolved exceptions and evidence schedules", () => {
+  const pdf = buildPdfExport(buildFixtureOptions({
+    supportArtifactMap: new Map([
+      ["tx_meal", [{ artifact_type: "review_note", filename: "Review note", review_status: "accepted", notes: "Client lunch with prospect" }]],
+      ["tx_fuel", [{ artifact_type: "mileage_log", filename: "mileage.pdf", review_status: "accepted", notes: "" }]]
+    ])
+  })).toString("latin1");
+
+  assert.match(pdf, /Unresolved Exceptions Schedule/i);
+  assert.match(pdf, /Evidence Schedule/i);
+  assert.match(pdf, /Open blocker summary/i);
+  assert.match(pdf, /mileage\.pdf/i);
 });
 
 test("executive summary and mapping pages keep truly unmapped counts consistent", () => {

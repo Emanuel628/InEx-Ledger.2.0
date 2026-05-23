@@ -22,6 +22,8 @@ const PDF_LABELS = {
     tax_packet_title_ca: "T2125 Workpaper Review",
     ledger_title: "Detailed Transaction Ledger",
     exclusions_title: "Excluded Items Schedule",
+    unresolved_exceptions_title: "Unresolved Exceptions Schedule",
+    evidence_schedule_title: "Evidence Schedule",
     checklist_title: "CPA Workpaper Checklist",
     support_title: "Supporting Schedules and Final Disclosure",
     payer_review: "Payer/Form Review",
@@ -1710,6 +1712,177 @@ function buildExclusionPages(transactions, currency, labels) {
   return pages;
 }
 
+function buildUnresolvedExceptionPages(transactions, currency, labels, region) {
+  const flagged = [...(transactions || [])]
+    .filter((txn) => Array.isArray(txn?.__status?.flags) && txn.__status.flags.length)
+    .sort((a, b) => {
+      const severityWeight = (txn) => {
+        const flags = new Set(txn?.__status?.flags || []);
+        if (flags.has("NC") || flags.has("UM") || flags.has("RV")) return 0;
+        if (flags.has("RS") || flags.has("ML") || flags.has("BP") || flags.has("AL") || flags.has("HO") || flags.has("CA")) return 1;
+        return 2;
+      };
+      const bySeverity = severityWeight(a) - severityWeight(b);
+      if (bySeverity !== 0) return bySeverity;
+      const amountA = Number(a?.__businessAmounts?.deductibleAmount ?? a?.__businessAmounts?.netAmount ?? 0);
+      const amountB = Number(b?.__businessAmounts?.deductibleAmount ?? b?.__businessAmounts?.netAmount ?? 0);
+      return amountB - amountA;
+    });
+  if (!flagged.length) return [];
+
+  const chunks = chunkArray(flagged, 18);
+  return chunks.map((chunk, index) => {
+    const canvas = new PdfCanvas();
+    const header = drawReportHeader(canvas, {
+      title: index === 0 ? labels.unresolved_exceptions_title : `${labels.unresolved_exceptions_title} - continued`,
+      subtitle: normalizeRegionCode(region) === "CA"
+        ? "Transactions still blocking a finalized T2125-ready package"
+        : "Transactions still blocking a finalized Schedule C-ready package",
+      badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }]
+    });
+
+    let y = header.contentStartY - 8;
+    if (index === 0) {
+      const summaryLines = [
+        `${flagged.filter((txn) => txn.__status.flags.includes("NC")).length} transactions still need a real business category.`,
+        `${flagged.filter((txn) => txn.__status.flags.includes("RS")).length} transactions still need receipt or source support.`,
+        `${flagged.filter((txn) => txn.__status.flags.some((flag) => ["ML", "BP", "AL", "HO", "CA"].includes(flag))).length} transactions still need schedule-specific support.`,
+        `${flagged.filter((txn) => txn.__status.flags.includes("RV")).length} transactions still need CPA review before filing.`
+      ];
+      canvas.drawCard(40, y, 532, 96, "Open blocker summary", summaryLines, { maxChars: 90 });
+      y -= 114;
+    }
+
+    const cols = [
+      { key: "date", label: "Date", x: 40, width: 60 },
+      { key: "payee", label: "Transaction", x: 108, width: 184 },
+      { key: "taxLine", label: "Tax line", x: 300, width: 102 },
+      { key: "amount", label: "Amount", x: 410, width: 72, align: "right" },
+      { key: "flags", label: "Flags", x: 490, width: 82 }
+    ];
+    canvas.drawTableHeader(cols, y);
+    y -= 18;
+
+    chunk.forEach((txn, rowIndex) => {
+      const amount = String(txn?.type || "").toLowerCase() === "income"
+        ? Number(txn?.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn))
+        : Number(txn?.__businessAmounts?.deductibleAmount ?? normalizeMoneyAmount(txn));
+      const payee = truncateText(buildTransactionText(txn) || "(No description)", 30);
+      const taxLine = truncateText(shortenTaxLine(txn.__status.taxLineDisplay), 18);
+      const flags = txn.__status.flags.join(" ");
+      canvas.drawTableRow(cols, {
+        date: normalizePdfDate(txn.date),
+        payee,
+        taxLine,
+        amount: formatCurrencyForPdf(amount, currency),
+        flags
+      }, y, { fillGray: rowIndex % 2 === 0 ? 0.985 : null });
+      y -= 12;
+      canvas.text(108, y, truncateText(`Action: ${txn.__status.supportSummary || "Needs review"}`, 82), 7);
+      y -= 12;
+    });
+
+    return canvas;
+  });
+}
+
+function buildEvidenceSchedulePages(transactions, receipts, supportArtifactMap, labels, region) {
+  const supportMap = supportArtifactMap instanceof Map ? supportArtifactMap : new Map();
+  const txMap = new Map((transactions || []).map((txn) => [txn.id, txn]));
+  const evidenceRows = [];
+
+  if (supportMap.size > 0) {
+    for (const [transactionId, artifacts] of supportMap.entries()) {
+      const txn = txMap.get(transactionId);
+      if (!txn) continue;
+      for (const artifact of artifacts || []) {
+        const reviewStatus = String(artifact?.review_status || artifact?.reviewStatus || "").trim().toLowerCase();
+        const storageStatus = String(artifact?.storage_status || artifact?.storageStatus || "").trim().toLowerCase();
+        if (reviewStatus === "rejected" || storageStatus === "deleted") continue;
+        evidenceRows.push({
+          transactionId,
+          date: normalizePdfDate(txn.date),
+          payee: buildTransactionText(txn) || "(No description)",
+          artifactType: String(artifact?.artifact_type || artifact?.artifactType || "").trim() || "support",
+          artifactName: String(artifact?.filename || artifact?.name || "Support item").trim(),
+          artifactStatus: String(artifact?.review_status || artifact?.reviewStatus || "accepted").trim(),
+          notes: String(artifact?.notes || "").trim()
+        });
+      }
+    }
+  } else {
+    for (const receipt of receipts || []) {
+      const transactionId = receipt?.transaction_id || receipt?.transactionId;
+      const txn = txMap.get(transactionId);
+      if (!txn) continue;
+      evidenceRows.push({
+        transactionId,
+        date: normalizePdfDate(txn.date),
+        payee: buildTransactionText(txn) || "(No description)",
+        artifactType: "receipt",
+        artifactName: String(receipt?.filename || "Receipt").trim(),
+        artifactStatus: "accepted",
+        notes: ""
+      });
+    }
+  }
+
+  if (!evidenceRows.length) return [];
+
+  evidenceRows.sort((a, b) => {
+    const byDate = String(a.date || "").localeCompare(String(b.date || ""));
+    if (byDate !== 0) return byDate;
+    return String(a.payee || "").localeCompare(String(b.payee || ""));
+  });
+
+  const chunks = chunkArray(evidenceRows, 22);
+  return chunks.map((chunk, index) => {
+    const canvas = new PdfCanvas();
+    const header = drawReportHeader(canvas, {
+      title: index === 0 ? labels.evidence_schedule_title : `${labels.evidence_schedule_title} - continued`,
+      subtitle: normalizeRegionCode(region) === "CA"
+        ? "Support artifacts linked to exported transactions"
+        : "Support artifacts linked to exported transactions",
+      badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }]
+    });
+    let y = header.contentStartY - 8;
+    if (index === 0) {
+      canvas.drawCard(40, y, 532, 72, "Evidence mapping", [
+        `${evidenceRows.length} support artifacts are linked to transactions in this export.`,
+        `This schedule shows which transaction each artifact supports and whether the artifact was accepted into the workpaper.`
+      ], { maxChars: 90 });
+      y -= 90;
+    }
+
+    const cols = [
+      { key: "date", label: "Date", x: 40, width: 60 },
+      { key: "payee", label: "Transaction", x: 108, width: 172 },
+      { key: "artifactType", label: "Type", x: 288, width: 82 },
+      { key: "artifactName", label: "Artifact", x: 378, width: 124 },
+      { key: "artifactStatus", label: "Status", x: 510, width: 62 }
+    ];
+    canvas.drawTableHeader(cols, y);
+    y -= 18;
+
+    chunk.forEach((row, rowIndex) => {
+      canvas.drawTableRow(cols, {
+        date: row.date,
+        payee: truncateText(row.payee, 28),
+        artifactType: truncateText(row.artifactType.replace(/_/g, " "), 14),
+        artifactName: truncateText(row.artifactName, 18),
+        artifactStatus: truncateText(row.artifactStatus, 10)
+      }, y, { fillGray: rowIndex % 2 === 0 ? 0.985 : null });
+      y -= 12;
+      if (row.notes) {
+        canvas.text(108, y, truncateText(`Notes: ${row.notes}`, 84), 7);
+        y -= 12;
+      }
+    });
+
+    return canvas;
+  });
+}
+
 function buildCpaChecklistPage(opts) {
   const { labels, region, reviewInsights, currency } = opts;
   const isCA = normalizeRegionCode(region) === "CA";
@@ -2173,6 +2346,8 @@ function buildPdfExportDocument(options) {
   const vehicleSchedulePages = buildVehicleAuditSchedule(vehicleClaimRows, effectiveCurrency, labels, normalizedRegion);
   const capitalAssetPages = buildCapitalAssetSchedule(effectiveCapitalAssets, effectiveCurrency, labels, normalizedRegion);
   const quickMethodPages = buildQuickMethodRemittancePage(quickMethodSchedule, effectiveCurrency, labels);
+  const unresolvedExceptionPages = buildUnresolvedExceptionPages(includedTransactions, effectiveCurrency, labels, normalizedRegion);
+  const evidenceSchedulePages = buildEvidenceSchedulePages(includedTransactions, receipts, effectiveSupportArtifactMap, labels, normalizedRegion);
 
   const canvases = [
     buildIdentityPage({
@@ -2204,6 +2379,8 @@ function buildPdfExportDocument(options) {
     ...buildCategoryPages(includedTransactions, categories, receipts, effectiveCurrency, labels, 0, normalizedRegion),
     ...buildTaxPacketPages({ transactions: includedTransactions, categories, receipts, currency: effectiveCurrency, region: normalizedRegion, labels, taxYear }),
     ...buildTransactionPages(includedTransactions, accounts, categories, receipts, effectiveCurrency, labels, normalizedRegion),
+    ...unresolvedExceptionPages,
+    ...evidenceSchedulePages,
     ...buildExclusionPages(excludedTransactions, effectiveCurrency, labels),
     ...buildCpaChecklistPage({ labels, region: normalizedRegion, reviewInsights, currency: effectiveCurrency }),
     ...buildSupportPages(receipts, includedTransactions, mileage, vehicleCosts, labels, effectiveCurrency, reviewInsights, normalizedRegion),
