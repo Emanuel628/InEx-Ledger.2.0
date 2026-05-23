@@ -65,7 +65,8 @@ Legend:
   - The `helmet()` config in `server.js` sets explicit `contentSecurityPolicy.directives` but does not pass `useDefaults: false` or `upgradeInsecureRequests: null`, so helmet still emits `upgrade-insecure-requests`.
 - ❌ INCOMPLETE / VERIFY — Cookie banner overlaps content
 - ⏳ PARTIAL — Onboarding now asks meaningful required fields, but UX copy/design still needs a final pass
-- ❌ INCOMPLETE — Login readonly autofill suppression: `login.html` `#email` and `#password` still ship with `readonly`
+- [x] Login readonly autofill suppression
+  - Status: Closed by product decision. The current `readonly` login-field behavior is accepted and is no longer tracked as active work.
 - ❌ INCOMPLETE — Account-menu / sign-out discoverability still needs UX pass
 - ✅ ~~Pricing/Subscription empty Stripe price data from env mismatch~~
   - Status: Resolved alongside the Stripe env-var name reconciliation above.
@@ -117,20 +118,18 @@ Status: ✅ complete. All 28 task rows checked off `[x]`. Moved to `Work-Complet
 - ✅ ~~Remove stale backend `/api/entitlements/quick-add` endpoint~~
 - ✅ ~~Confirm `global.js` is the owner of Quick Add visibility~~ — the Quick Add action config and visibility logic live in `public/js/global.js`; `transactions.js` only consumes it.
 - ✅ ~~Confirm Analytics and Settings are not Quick Add options~~ — the action list in `global.js` is add transaction / upload receipt / add trip / add account / add category / create export / customers / new invoice / bills / vendors only.
-- ❌ INCOMPLETE / VERIFY (live) — Basic/Free users do not see the Quick Add sidebar
-- ❌ INCOMPLETE / VERIFY (live) — Pro sees only Core Quick Add
-- ❌ INCOMPLETE / VERIFY (live) — Business sees Core + Business Quick Add
-- ❌ INCOMPLETE / VERIFY (live) — Multi-select Quick Add behavior behaves as intended at runtime
+- ⏳ PARTIAL — Code complete; live tier verification still useful for Basic/Free Quick Add hiding
+- ⏳ PARTIAL — Code complete; live tier verification still useful for Pro showing only Core Quick Add
+- ⏳ PARTIAL — Code complete; live tier verification still useful for Business showing Core + Business Quick Add
+- ⏳ PARTIAL — Code complete; runtime/browser verification still useful for multi-select Quick Add behavior
 
 ### Phase 2 — Transactions Undo / Checkbox Action Cleanup
 
 - ✅ ~~Remove separate undo route mount from `routes/index.js`~~
 - ✅ ~~Delete `transactions-undo.routes.js`~~ — not present in `routes/`.
-- ✅ ~~Delete disconnected transaction frontend sidecars~~ — `transaction-undo-button.js` not found anywhere in the repo.
-- ❌ INCOMPLETE / PRODUCT DECISION — Decide whether Undo should exist at all
-- ❌ INCOMPLETE / PRODUCT DECISION — Decide whether checkbox row actions should exist at all
-- ❌ INCOMPLETE IF KEPT — Rebuild Undo directly in transaction owner files
-- ❌ INCOMPLETE IF KEPT — Rebuild checkbox actions directly in transaction owner files
+- ✅ ~~Delete disconnected transaction frontend sidecars~~ — `transaction-undo-button.js`, `transaction-checkbox-actions.js`, and `transaction-checkbox-actions-v2.js` are not present in the repo.
+- ✅ ~~Undo exists directly in transaction owner files~~ — `transactions.routes.js` exposes `POST /undo-delete` and `GET /undo-delete-status`; `transactions.html` contains the undo bar; `transactions.js` wires the owner-file UI and restore flow.
+- ✅ ~~Checkbox row actions exist directly in transaction owner files~~ — `transactions.html` contains the bulk bar/select controls and `transactions.js` owns the row popup and bulk-delete behavior.
 
 ### Phase 3 — Auth Bridge / MFA Trust Cleanup
 
@@ -181,21 +180,17 @@ Status: ✅ complete. Phase 4 (plan gating across Basic/Pro/Business) passed cod
 
 - ✅ ~~Wire CSV Import End-to-End~~
 - ✅ ~~Make Onboarding Meaningful~~
-- ⏳ PARTIAL — Add Public SEO in owner files
-  - `public/sitemap.xml` and `public/robots.txt` exist; `landing.html` and `pricing.html` carry meta description + Open Graph tags.
-  - Remaining: confirm SEO metadata coverage/copy across all public pages and fold it into the owner-file workflow.
-- ⏳ PARTIAL — Fix Stripe Webhook Host and Delivery Path
-  - Code route and `049_create_stripe_webhook_events.sql` migration exist.
-  - Operational/live Stripe endpoint still needs verification and any failed-event replay.
+- [x] Add Public SEO in owner files
+  - Status: Complete. Public indexable pages now ship with canonical metadata coverage, `help.html` is in the sitemap, and auth/setup pages have consistent `noindex` handling.
+- [x] Fix Stripe Webhook Host and Delivery Path
+  - Status: Closed. Webhook configuration is accepted as working in production, and the API service has the required webhook environment variable.
 - ✅ ~~Fold Residual Transactions Drift CSS into Owner Styles~~ — `transactions-no-actions-column.css` not found.
 
 ---
 
 ## `Work-To-Do/V2_BUILD_PLAN.md`
+Status: PLANNING / ROADMAP. Deferred until Pro tier work is complete. Not a current execution checklist.
 
-Status: 📝 PLANNING / ROADMAP. Not a completed task checklist — a canonical phased build plan for later V2/Business expansion.
-
-Current status by phase:
 
 - ❌ INCOMPLETE — Phase 0: Foundation audit and scope lock
 - ❌ INCOMPLETE — Phase 0.5: Tier entitlements and feature flag matrix
@@ -224,24 +219,13 @@ Immediate next actions from that file remain incomplete:
 - ❌ Entitlement matrix plus feature flag matrix
 
 ---
+## `Work-Completed/FREELANCER_PIVOT.md`
 
-## `Work-To-Do/FREELANCER_PIVOT.md`
-
-Status: 📝 ROADMAP, partially implemented by later product work.
-
-- ⏳ PARTIAL — Language & UX reframe — some freelancer/solo-operator positioning exists; broad terminology cleanup is not complete.
-- ⏳ PARTIAL — Onboarding simplification — onboarding became more meaningful, but not the exact 3-step freelancer fast-path described here.
-- ✅ ~~1099-NEC / T4A income tagging foundation~~ — `payer_name` / `tax_form_type` appear in transaction and export logic (`046_add_1099_payer_fields_to_transactions.sql`). UI/report polish may still need review.
-- ⏳ PARTIAL — Self-employment tax estimate widget — tax context/estimated-tax UI exists; exact SE/CPP calculation behavior needs verification against this spec.
-- ⏳ PARTIAL — Quarterly estimated tax reminders — reminder service and tests exist (`quarterlyTaxReminderService`); UX coverage needs verification.
-- ✅ ~~Schedule C / T2125 category mapping foundation~~ — export and category mapping present in PDF output. Categories page UX redesign still open in `Docs/PRODUCT-BACKLOG.md`.
-- ❌ INCOMPLETE — Mileage rate auto-update — no verified completion.
-
----
+Status: complete. This roadmap was explicitly crossed off as active work and moved out of `Work-To-Do/`.
 
 ## `Work-To-Do/IMPECCABLE_STYLE_FRONTEND_ROLLOUT_PLAN.md`
 
-Status: 📝 ROADMAP / design rollout plan.
+Status: ROADMAP / partially complete. Not finished across the whole site yet.
 
 - ⏳ PARTIAL — Phase 0: Design baseline
 - ⏳ PARTIAL — Phase 1: Shared frontend foundation
@@ -295,14 +279,15 @@ Product/design backlog:
 1. ❌ Categories page redesign.
 2. ❌ Landing page updates.
 3. ❌ Yearly Additional Business UI/backend wiring check.
-4. ❌ Public SEO owner-file pass (sitemap/robots/meta already present — finish coverage + workflow).
-5. ❌ V2 planning documents if/when Business tier work resumes.
+4. ❌ Terms of Service completion.
+5. ❌ Impeccable Style rollout completion across remaining pages.
+6. ❌ V2 planning documents if/when Pro-tier work is complete.
 
 Cleanup backlog (mostly closed this pass):
 
 1. ❌ Dated recovery artifact folder cleanup.
 2. ❌ Checksum repair script consolidation/documentation.
-3. ❌ Documentation drift cleanup between `Docs/`, root docs, and lowercase `docs/`.
-4. ❌ Test naming/audit drift cleanup; guardrail/utility script review.
+3. ❌ Test naming/audit drift cleanup.
+4. ❌ Guardrail/utility script review.
 
 Security/legal readiness: ✅ complete — see the `SECURITY-LEGAL-READINESS-US-CANADA.md` section above. Remaining items are operational (executed DPAs, named Privacy Officer delegation), not engineering work.

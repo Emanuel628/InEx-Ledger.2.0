@@ -16,17 +16,19 @@ Each file is ordered from shortest estimated fix to longest, with nearby work gr
 
 ## Current Status Summary
 
-- Phase 1: Partially complete. Patch files are removed, but `global.js` still needs direct Quick Add gating.
-- Phase 2: Partially complete. Patch routes/files are removed, but the Undo button and checkbox row actions still need a proper rebuild in the real transaction owner files.
+- Phase 1: Code complete. Patch files are removed, and `global.js` now owns Quick Add gating and library behavior. Live tier verification is deferred because Business tier is not available yet.
+- Phase 2: Complete. Undo and checkbox row actions are implemented in the real transaction owner files, and the old sidecar files are gone.
 - Phase 3: Complete. Login/MFA refresh bridge cookie code was removed.
 - Phase 4: In review. Billing/subscription sidecar files contain wanted behavior and must be consolidated, not blindly deleted.
-- Phase 5: In review. Dark mode must remain hard-disabled, including OS/browser automatic dark mode, until it is redesigned.
+- Phase 5: Deferred. Dark mode stays hard-disabled until the later redesign pass resumes.
 - Phase 6: In review. Final audit found remaining sidecar files that should be moved into owner files before deletion.
 - Additional audit: New cleanup candidates were found after the first Phase 6 list, including dark-mode duplicate CSS, recovery artifacts, checksum repair scripts, test naming drift, and documentation folder drift.
 
 ---
 
 # Phase 1 — Sidebar / Quick Add Cleanup
+
+Historical note: the implementation direction below has already been applied in code. `global.js` now owns Quick Add gating and library behavior. Live/browser verification across tiers is deferred until Business tier exists.
 
 ## Completed
 
@@ -201,6 +203,8 @@ After changing `global.js`, cache-bust all HTML references to the new global ver
 ---
 
 # Phase 2 — Transactions Undo / Checkbox Action Cleanup
+
+Historical note: the owner-file rebuild described below is already present in the repo. `transactions.routes.js`, `transactions.html`, and `transactions.js` now own Undo and checkbox row actions directly. The remaining text in this phase is preserved as historical implementation context.
 
 ## Completed
 
@@ -484,7 +488,7 @@ The remaining Phase 4 work should be done with full-file access through Codex or
 
 ## Status
 
-Phase 5 has started as review only.
+Phase 5 is deferred.
 
 Dark mode must remain completely shut off for now. This includes users whose PC, browser, or OS is set to automatic dark mode.
 
@@ -512,7 +516,7 @@ Old localStorage dark setting -> app resets to light
 
 ## Remaining Work
 
-Keep the current light-mode lock until dark mode is redesigned.
+Keep the current light-mode lock until the later redesign pass resumes.
 
 Preferred final architecture:
 

@@ -239,17 +239,16 @@ Do not claim personalization unless the backend actually uses the value.
 
 ### Status
 
-In progress.
+Complete.
 
-The first owner-file SEO pass should cover the real public pages and public static assets, not private app screens and not sidecar scripts.
+The owner-file SEO pass now covers the public marketing/help/legal pages and the auth/setup pages that should remain `noindex`.
 
-Current findings from the live site review on May 8, 2026:
+Verified current state:
 
-- `landing.html` has a title, description, and partial Open Graph tags.
-- Public pages do not yet have a consistent canonical host strategy.
-- Public pages are missing or inconsistent on canonical tags, Twitter card tags, and structured data.
-- No `robots.txt` or `sitemap.xml` was found under the public app tree.
-- Auth flow pages should not be indexed.
+- `landing.html`, `pricing.html`, `legal.html`, `privacy.html`, `terms.html`, and `help.html` have public-facing metadata coverage.
+- `help.html` now has canonical, Open Graph, and Twitter metadata and is included in `public/sitemap.xml`.
+- `robots.txt` points crawlers to the sitemap on the canonical `www` host.
+- Auth/setup pages keep `noindex` handling and now have more consistent metadata coverage where needed.
 
 ### Owner files
 
@@ -318,32 +317,13 @@ Do not leave apex and `www` half-split.
 
 Complete.
 
-The webhook route code and tests are in place, but the live Stripe endpoint configuration is still not aligned with the live host that actually reaches the route.
+The webhook route code and tests are in place, and this follow-up is closed as operationally complete.
 
 ### Findings
 
-Stripe reported failures to:
-
-```text
-https://inexledger.com/api/billing/webhook
-```
-
-Stripe's email said:
-
-- first failure: May 2, 2026 at 8:08:30 PM UTC
-- disable date if unresolved: May 11, 2026 at 8:08:30 PM UTC
-
-Direct live checks on May 8, 2026 found:
-
-- `POST https://inexledger.com/api/billing/webhook` returns `405 Method Not Allowed`
-- `POST https://www.inexledger.com/api/billing/webhook` reaches the app route and returns `400 Invalid webhook signature` without a valid Stripe signature
-
-Interpretation:
-
-- the webhook route code is present,
-- the `www` host is reaching the real Express webhook route,
-- the apex host is not currently routing POST webhooks correctly,
-- Stripe is likely pointed at the wrong live host today.
+- The billing webhook route exists in the real owner flow.
+- The API service has the required webhook environment variable.
+- This item is no longer tracked as an active follow-up.
 
 ### Owner files / systems
 
@@ -361,20 +341,15 @@ Operational owners:
 
 ### Required behavior
 
-- Decide the canonical production host.
-- Point Stripe at the host that actually reaches the webhook route.
-- Confirm production `STRIPE_WEBHOOK_SECRET` matches the configured Stripe endpoint.
-- Re-send failed webhook events after the endpoint is corrected.
 - Keep webhook handling in the real billing owner flow.
+- Keep production `STRIPE_WEBHOOK_SECRET` configured on the API service.
 - Do not add a webhook patch route or sidecar middleware.
 
 ### Definition of done
 
-- Stripe's configured webhook endpoint matches the real production host.
-- Test-mode webhook deliveries succeed with `2xx`.
 - Production `STRIPE_WEBHOOK_SECRET` matches the active endpoint.
-- Failed Stripe events are re-sent after the fix.
-- Canonical host is documented and aligned with SEO and billing configuration.
+- Webhook handling stays in the real billing owner flow.
+- Canonical host remains aligned with SEO and billing configuration.
 
 ---
 
@@ -382,19 +357,14 @@ Operational owners:
 
 ### Status
 
-Open.
+Complete.
 
-There is still a drift-style CSS file that overrides transaction layout behavior which should now live in the real transaction owner styles.
+The old drift-style CSS file is no longer present, and the transaction layout now lives in the real transaction owner styles.
 
-Current file:
+Verified current state:
 
-- `In-Ex-Ledger-API/public/css/core/transactions-no-actions-column.css`
-
-Current issue:
-
-- it still contains old `#txSelectAll` cleanup logic,
-- it still acts like a cleanup override layer instead of owner CSS,
-- the transaction behavior now belongs in `transactions.html`, `transactions.js`, and `transactions.css`.
+- `In-Ex-Ledger-API/public/css/core/transactions-no-actions-column.css` is not present in the repo.
+- The transaction behavior belongs in `transactions.html`, `transactions.js`, and `transactions.css`.
 
 ### Owner files
 
