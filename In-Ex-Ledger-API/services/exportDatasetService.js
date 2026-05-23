@@ -272,6 +272,7 @@ function buildNormalizedExportDataset(options = {}) {
   const classified = summarizeExportTransactions(transactions, categories, {
     region,
     receipts,
+    supportArtifactMap: options.supportArtifactMap,
     vehicleClaimMap: options.vehicleClaimMap,
     capitalAssetTxMap: options.capitalAssetTxMap,
     gstHstRegistered: business.gst_hst_registered === true || options.gstHstRegistered === true,
@@ -298,10 +299,11 @@ function buildNormalizedExportDataset(options = {}) {
     return String(left.id || "").localeCompare(String(right.id || ""));
   });
 
-  const receiptSummary = computeReceiptCoverage(classified.included, receipts);
+  const receiptSummary = computeReceiptCoverage(classified.included, receipts, options.supportArtifactMap);
   const mappingSummary = computeTaxLineSummary(classified.included, categories, region);
   const supportSummary = buildReviewInsights(classified.included, categories, receipts, {
-    excluded: classified.excluded
+    excluded: classified.excluded,
+    supportArtifactMap: options.supportArtifactMap
   });
   const profitTotals = calculateTotals(classified.included);
   const categorySummary = buildCategorySummary(rows);

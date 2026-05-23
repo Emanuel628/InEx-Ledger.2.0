@@ -34,6 +34,9 @@ function loadReviewRouterFixture(options = {}) {
             if (/FROM receipts r/i.test(sql)) {
               return { rows: [{ id: "r_1", transaction_id: "tx_1", filename: "meal.pdf" }], rowCount: 1 };
             }
+            if (/FROM support_artifacts/i.test(sql)) {
+              return { rows: [], rowCount: 0 };
+            }
             if (/FROM businesses/i.test(sql)) {
               return { rows: [{ id: "biz_1", name: "Biz", region: "US", currency: "USD" }], rowCount: 1 };
             }

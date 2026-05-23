@@ -57,6 +57,7 @@ router.use('/bank-connections', require('./bank-connections.routes.js'));
 router.use('/email', require('./email.routes.js'));
 router.use('/plaid', require('./plaid.routes.js'));
 router.use('/receipts', require('./receipts.routes.js'));
+router.use('/support-artifacts', require('./supportArtifacts.routes.js'));
 router.use('/categories', require('./categories.routes.js'));
 router.use('/exports', require('./exports.routes.js'));
 router.use('/business', require('./business.routes.js'));

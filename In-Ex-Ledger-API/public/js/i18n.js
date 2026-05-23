@@ -5083,7 +5083,28 @@ Object.assign(TRANSLATIONS.en, {
   review_issue_fallback: 'Needs review',
   review_support_receipt_attached: 'Receipt attached',
   review_support_no_receipt: 'No receipt linked',
-  review_no_insights: 'No open flags.'
+  review_no_insights: 'No open flags.',
+  review_add_support: 'Add support',
+  review_support_modal_title: 'Add support',
+  review_support_type_label: 'Support type',
+  review_support_type_note: 'Review note',
+  review_support_type_receipt: 'Receipt',
+  review_support_type_invoice: 'Invoice',
+  review_support_type_mileage: 'Mileage log',
+  review_support_type_allocation: 'Allocation worksheet',
+  review_support_type_home: 'Home office worksheet',
+  review_support_type_asset: 'Capital asset support',
+  review_support_notes_label: 'Notes',
+  review_support_notes_placeholder: 'Add the business purpose or support detail here.',
+  review_support_file_label: 'Support file',
+  review_support_submit: 'Save support',
+  review_support_saving: 'Saving...',
+  review_support_none: 'No support artifacts on this transaction yet.',
+  review_support_open: 'Open',
+  review_support_item: 'Support item',
+  review_support_load_error: 'Failed to load support artifacts.',
+  review_support_file_required: 'Choose a support file first.',
+  review_support_save_error: 'Failed to save support.'
 });
 
 Object.assign(TRANSLATIONS.es, {
@@ -5121,7 +5142,28 @@ Object.assign(TRANSLATIONS.es, {
   review_issue_fallback: 'Necesita revision',
   review_support_receipt_attached: 'Recibo adjunto',
   review_support_no_receipt: 'Sin recibo vinculado',
-  review_no_insights: 'Sin banderas abiertas.'
+  review_no_insights: 'Sin banderas abiertas.',
+  review_add_support: 'Agregar soporte',
+  review_support_modal_title: 'Agregar soporte',
+  review_support_type_label: 'Tipo de soporte',
+  review_support_type_note: 'Nota de revision',
+  review_support_type_receipt: 'Recibo',
+  review_support_type_invoice: 'Factura',
+  review_support_type_mileage: 'Registro de millaje',
+  review_support_type_allocation: 'Hoja de asignacion',
+  review_support_type_home: 'Hoja de oficina en casa',
+  review_support_type_asset: 'Soporte de activo',
+  review_support_notes_label: 'Notas',
+  review_support_notes_placeholder: 'Agrega aqui el proposito comercial o el detalle del soporte.',
+  review_support_file_label: 'Archivo de soporte',
+  review_support_submit: 'Guardar soporte',
+  review_support_saving: 'Guardando...',
+  review_support_none: 'Todavia no hay soportes en esta transaccion.',
+  review_support_open: 'Abrir',
+  review_support_item: 'Elemento de soporte',
+  review_support_load_error: 'No se pudieron cargar los soportes.',
+  review_support_file_required: 'Primero elige un archivo de soporte.',
+  review_support_save_error: 'No se pudo guardar el soporte.'
 });
 
 Object.assign(TRANSLATIONS.fr, {
@@ -5159,7 +5201,28 @@ Object.assign(TRANSLATIONS.fr, {
   review_issue_fallback: 'Revision requise',
   review_support_receipt_attached: 'Recu lie',
   review_support_no_receipt: 'Aucun recu lie',
-  review_no_insights: 'Aucun drapeau ouvert.'
+  review_no_insights: 'Aucun drapeau ouvert.',
+  review_add_support: 'Ajouter un support',
+  review_support_modal_title: 'Ajouter un support',
+  review_support_type_label: 'Type de support',
+  review_support_type_note: 'Note de revision',
+  review_support_type_receipt: 'Recu',
+  review_support_type_invoice: 'Facture',
+  review_support_type_mileage: 'Journal de kilometrage',
+  review_support_type_allocation: 'Feuille de repartition',
+  review_support_type_home: 'Feuille bureau a domicile',
+  review_support_type_asset: 'Support d actif',
+  review_support_notes_label: 'Notes',
+  review_support_notes_placeholder: 'Ajoutez ici le motif professionnel ou le detail du support.',
+  review_support_file_label: 'Fichier de support',
+  review_support_submit: 'Enregistrer le support',
+  review_support_saving: 'Enregistrement...',
+  review_support_none: 'Aucun support sur cette transaction pour le moment.',
+  review_support_open: 'Ouvrir',
+  review_support_item: 'Element de support',
+  review_support_load_error: 'Impossible de charger les supports.',
+  review_support_file_required: 'Choisissez d abord un fichier de support.',
+  review_support_save_error: 'Impossible d enregistrer le support.'
 });
 
 

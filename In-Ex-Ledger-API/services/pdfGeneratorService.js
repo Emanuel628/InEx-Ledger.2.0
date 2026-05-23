@@ -699,6 +699,14 @@ function buildTransactionStatus(txn, category, context = {}) {
   const duplicate = context.duplicateKeys?.get(normalizeDuplicateKey(txn)) > 1;
   const personalUsePct = Number(txn?.personal_use_pct ?? txn?.personalUsePct) || 0;
   const currencyCode = String(txn?.currency || "").toUpperCase();
+  const supportArtifacts = Array.isArray(context.supportArtifacts) ? context.supportArtifacts : [];
+  const supportArtifactTypes = new Set(
+    supportArtifacts
+      .filter((artifact) => String(artifact?.review_status || artifact?.reviewStatus || "pending").trim().toLowerCase() !== "rejected")
+      .filter((artifact) => String(artifact?.storage_status || artifact?.storageStatus || "present").trim().toLowerCase() !== "deleted")
+      .map((artifact) => String(artifact?.artifact_type || artifact?.artifactType || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
 
   let categoryStatus = "mapped";
   let taxMapStatus = taxLineDisplay ? "mapped" : "unmapped";
@@ -719,12 +727,18 @@ function buildTransactionStatus(txn, category, context = {}) {
 
   const mappedReviewCategory = ["vehicle_fuel", "vehicle_maintenance", "vehicle_parking_tolls", "meals", "phone_internet", "insurance_vehicle", "home_office", "equipment_capital_asset", "travel"].includes(categorySlug);
   const needsFinalConfirmation = mappedReviewCategory;
-  const needsMileageLog = ["vehicle_fuel", "vehicle_maintenance", "vehicle_parking_tolls", "insurance_vehicle"].includes(categorySlug);
-  const needsBusinessPurpose = ["meals", "travel"].includes(categorySlug);
-  const needsAllocation = ["phone_internet", "insurance_vehicle", "vehicle_fuel", "vehicle_maintenance", "home_office"].includes(categorySlug);
-  const needsHomeOfficeSupport = categorySlug === "home_office";
-  const needsCapitalAssetReview = categorySlug === "equipment_capital_asset";
-  const needsReceipt = isExpense && !hasReceipt && !["needs_category"].includes(categorySlug);
+  const hasSupportReceipt = supportArtifactTypes.has("receipt") || supportArtifactTypes.has("invoice");
+  const hasReviewNote = supportArtifactTypes.has("review_note");
+  const hasMileageLog = supportArtifactTypes.has("mileage_log");
+  const hasAllocationWorksheet = supportArtifactTypes.has("allocation_worksheet");
+  const hasHomeOfficeWorksheet = supportArtifactTypes.has("home_office_worksheet");
+  const hasCapitalAssetSupport = supportArtifactTypes.has("capital_asset_support");
+  const needsMileageLog = ["vehicle_fuel", "vehicle_maintenance", "vehicle_parking_tolls", "insurance_vehicle"].includes(categorySlug) && !hasMileageLog;
+  const needsBusinessPurpose = ["meals", "travel"].includes(categorySlug) && !hasReviewNote;
+  const needsAllocation = ["phone_internet", "insurance_vehicle", "vehicle_fuel", "vehicle_maintenance", "home_office"].includes(categorySlug) && !(hasAllocationWorksheet || hasHomeOfficeWorksheet);
+  const needsHomeOfficeSupport = categorySlug === "home_office" && !hasHomeOfficeWorksheet;
+  const needsCapitalAssetReview = categorySlug === "equipment_capital_asset" && !hasCapitalAssetSupport;
+  const needsReceipt = isExpense && !hasReceipt && !hasSupportReceipt && !["needs_category"].includes(categorySlug);
   const incomeNeedsReview = isIncome && (importedIncome || nature === "unknown_needs_review");
 
   if (nature === "refund_or_reversal" || nature === "cashback_or_reward") flags.push("RR");
@@ -740,7 +754,7 @@ function buildTransactionStatus(txn, category, context = {}) {
     flags.push("UM");
   }
 
-  if (needsFinalConfirmation) flags.push("FC");
+  if (needsFinalConfirmation && !hasReviewNote && !hasAllocationWorksheet && !hasMileageLog) flags.push("FC");
   if (needsReceipt) flags.push("RS");
   if (needsBusinessPurpose) flags.push("BP");
   if (needsAllocation) flags.push("AL");
@@ -815,6 +829,7 @@ function normalizeDuplicateKey(txn) {
 function summarizeExportTransactions(transactions, categories, options = {}) {
   const categoryMap = mapByKey(categories || [], "id");
   const receiptTxIds = new Set((options.receipts || []).map((receipt) => receipt?.transaction_id || receipt?.transactionId));
+  const supportArtifactMap = options.supportArtifactMap instanceof Map ? options.supportArtifactMap : new Map();
   const duplicateKeys = new Map();
   for (const txn of transactions || []) {
     const key = normalizeDuplicateKey(txn);
@@ -835,13 +850,15 @@ function summarizeExportTransactions(transactions, categories, options = {}) {
     const exclusionReason = classifyExcludedTransaction(txn, category, options.region);
     const vehicleClaim = vehicleClaimMap.get(txn.id) || null;
     const capitalAsset = capitalAssetTxMap.get(txn.id) || null;
+    const supportArtifacts = supportArtifactMap.get(txn.id) || [];
     const businessAmounts = deriveBusinessAmounts(txn, category, { ...options, vehicleClaim });
     const status = buildTransactionStatus(txn, category, {
       region: options.region,
       receiptTxIds,
       duplicateKeys,
       vehicleClaim,
-      capitalAsset
+      capitalAsset,
+      supportArtifacts
     });
     const enriched = {
       ...txn,
@@ -850,7 +867,8 @@ function summarizeExportTransactions(transactions, categories, options = {}) {
       __status: status,
       __exclusionReason: exclusionReason,
       __vehicleClaim: vehicleClaim,
-      __capitalAsset: capitalAsset
+      __capitalAsset: capitalAsset,
+      __supportArtifacts: supportArtifacts
     };
     if (exclusionReason) excluded.push(enriched);
     else included.push(enriched);
@@ -880,12 +898,30 @@ function calculateTotals(transactions, options = {}) {
   };
 }
 
-function computeReceiptCoverage(transactions, receipts) {
+function transactionHasReceiptSupport(txn, supportArtifactMap) {
+  const supportArtifacts = supportArtifactMap instanceof Map ? (supportArtifactMap.get(txn?.id) || []) : [];
+  return supportArtifacts.some((artifact) => {
+    const reviewStatus = String(artifact?.review_status || artifact?.reviewStatus || "pending").trim().toLowerCase();
+    const storageStatus = String(artifact?.storage_status || artifact?.storageStatus || "present").trim().toLowerCase();
+    const type = String(artifact?.artifact_type || artifact?.artifactType || "").trim().toLowerCase();
+    return reviewStatus !== "rejected" &&
+      storageStatus !== "deleted" &&
+      (type === "receipt" || type === "invoice");
+  });
+}
+
+function computeReceiptCoverage(transactions, receipts, supportArtifactMap) {
   const expenseTxIds = new Set((transactions || []).filter((t) => String(t.type || "").toLowerCase() === "expense").map((t) => t.id));
   const withReceipt = new Set();
   for (const receipt of receipts || []) {
     const txId = receipt?.transaction_id || receipt?.transactionId;
     if (expenseTxIds.has(txId)) withReceipt.add(txId);
+  }
+  for (const txn of transactions || []) {
+    if (!expenseTxIds.has(txn?.id)) continue;
+    if (transactionHasReceiptSupport(txn, supportArtifactMap)) {
+      withReceipt.add(txn.id);
+    }
   }
   const expenseCount = expenseTxIds.size;
   const coveragePct = expenseCount === 0 ? null : Number(((withReceipt.size / expenseCount) * 100).toFixed(1));
@@ -897,7 +933,7 @@ function computeReceiptCoverage(transactions, receipts) {
   };
 }
 
-function computeAttachedReceiptSummary(transactions, receipts) {
+function computeAttachedReceiptSummary(transactions, receipts, supportArtifactMap) {
   const includedTxIds = new Set((transactions || []).map((txn) => txn?.id).filter(Boolean));
   const txWithReceipts = new Set();
   let attachedFileCount = 0;
@@ -906,6 +942,22 @@ function computeAttachedReceiptSummary(transactions, receipts) {
     if (!includedTxIds.has(txId)) continue;
     txWithReceipts.add(txId);
     attachedFileCount += 1;
+  }
+  if (supportArtifactMap instanceof Map) {
+    for (const [txId, artifacts] of supportArtifactMap.entries()) {
+      if (!includedTxIds.has(txId)) continue;
+      const receiptArtifacts = (artifacts || []).filter((artifact) => {
+        const reviewStatus = String(artifact?.review_status || artifact?.reviewStatus || "pending").trim().toLowerCase();
+        const storageStatus = String(artifact?.storage_status || artifact?.storageStatus || "present").trim().toLowerCase();
+        const type = String(artifact?.artifact_type || artifact?.artifactType || "").trim().toLowerCase();
+        return reviewStatus !== "rejected" &&
+          storageStatus !== "deleted" &&
+          (type === "receipt" || type === "invoice");
+      });
+      if (!receiptArtifacts.length) continue;
+      txWithReceipts.add(txId);
+      attachedFileCount += receiptArtifacts.length;
+    }
   }
   return {
     transaction_count: txWithReceipts.size,
@@ -1019,8 +1071,9 @@ function computeTaxLineSummary(transactions, categories, region) {
 }
 
 function buildReviewInsights(transactions, categories, receipts, meta = {}) {
-  const coverage = computeReceiptCoverage(transactions, receipts);
-  const attachmentSummary = computeAttachedReceiptSummary(transactions, receipts);
+  const supportArtifactMap = meta.supportArtifactMap instanceof Map ? meta.supportArtifactMap : new Map();
+  const coverage = computeReceiptCoverage(transactions, receipts, supportArtifactMap);
+  const attachmentSummary = computeAttachedReceiptSummary(transactions, receipts, supportArtifactMap);
   const excluded = Array.isArray(meta.excluded) ? meta.excluded : [];
   const byExclusionCode = {};
   let needsCategoryCount = 0;
@@ -2015,6 +2068,7 @@ function buildPdfExportDocument(options) {
     gstHstRegistered = false,
     gstHstNumber = "",
     gstHstMethod = "",
+    supportArtifactMap = null,
     // Phase 2 compliance data (pre-fetched by the exports route)
     vehicleClaimMap = null,      // Map<transactionId, vehicle_expense_details row> — with transaction_date, description attached
     capitalAssets = null,         // Array of capital_assets rows for the tax year
@@ -2024,6 +2078,7 @@ function buildPdfExportDocument(options) {
   } = options || {};
 
   // --- PDF Builder Audit ---
+  console.log("[PDF Builder] supportArtifactMap received:", supportArtifactMap instanceof Map ? `Map(${supportArtifactMap.size})` : `NOT a Map - type=${typeof supportArtifactMap}, value=${supportArtifactMap}`);
   console.log("[PDF Builder] vehicleClaimMap received:", vehicleClaimMap instanceof Map ? `Map(${vehicleClaimMap.size})` : `NOT a Map — type=${typeof vehicleClaimMap}, value=${vehicleClaimMap}`);
   console.log("[PDF Builder] capitalAssets received:", Array.isArray(capitalAssets) ? `Array(${capitalAssets.length})` : `NOT an array — type=${typeof capitalAssets}, value=${capitalAssets}`);
   console.log("[PDF Builder] capitalAssetTxMap received:", capitalAssetTxMap instanceof Map ? `Map(${capitalAssetTxMap.size})` : `NOT a Map — type=${typeof capitalAssetTxMap}, value=${capitalAssetTxMap}`);
@@ -2061,6 +2116,9 @@ function buildPdfExportDocument(options) {
     ? capitalAssetTxMap
     : new Map((capitalAssetTxMap ? Array.from(capitalAssetTxMap.entries()) : []));
   const effectiveCapitalAssets = Array.isArray(capitalAssets) ? capitalAssets : [];
+  const effectiveSupportArtifactMap = supportArtifactMap instanceof Map
+    ? supportArtifactMap
+    : new Map((supportArtifactMap ? Array.from(supportArtifactMap.entries()) : []));
 
   // --- PDF Builder Normalization Audit ---
   console.log("[PDF Builder] effectiveVehicleClaimMap after normalization:", `Map(${effectiveVehicleClaimMap.size})`);
@@ -2073,6 +2131,7 @@ function buildPdfExportDocument(options) {
     gstHstRegistered,
     gstHstMethod,
     receipts,
+    supportArtifactMap: effectiveSupportArtifactMap,
     vehicleClaimMap: effectiveVehicleClaimMap,
     capitalAssetTxMap: effectiveCapitalAssetTxMap
   });
@@ -2086,7 +2145,8 @@ function buildPdfExportDocument(options) {
   const totals = calculateTotals(includedTransactions, { capitalDepreciation });
   const reviewInsights = buildReviewInsights(includedTransactions, categories, receipts, {
     excluded: excludedTransactions,
-    region: normalizedRegion
+    region: normalizedRegion,
+    supportArtifactMap: effectiveSupportArtifactMap
   });
 
   // Determine compliance status. Caller may pass an explicit exportStatus (used by

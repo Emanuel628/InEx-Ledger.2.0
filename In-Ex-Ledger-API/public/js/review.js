@@ -1,6 +1,7 @@
 "use strict";
 
 let reviewQueue = [];
+let activeSupportTransaction = null;
 
 function tx(key, fallback) {
   if (typeof window.t === "function") {
@@ -128,11 +129,160 @@ function renderQueue() {
           </div>
         </td>
         <td>
-          <a class="review-row-action" href="${escapeText(actionHref)}">${escapeText(actionLabel)}</a>
+          <div class="review-row-actions">
+            <a class="review-row-action" href="${escapeText(actionHref)}">${escapeText(actionLabel)}</a>
+            <button type="button" class="review-row-support-btn" data-support-transaction="${escapeText(item.id)}">${escapeText(tx("review_add_support", "Add support"))}</button>
+          </div>
         </td>
       </tr>
     `;
   }).join("");
+
+  tbody.querySelectorAll("[data-support-transaction]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const transactionId = button.getAttribute("data-support-transaction");
+      const item = reviewQueue.find((entry) => entry.id === transactionId);
+      if (item) {
+        void openSupportModal(item);
+      }
+    });
+  });
+}
+
+function renderExistingArtifacts(artifacts) {
+  const container = document.getElementById("supportArtifactExisting");
+  if (!container) return;
+  if (!Array.isArray(artifacts) || !artifacts.length) {
+    container.innerHTML = `
+      <div class="review-existing-empty">${escapeText(tx("review_support_none", "No support artifacts on this transaction yet."))}</div>
+    `;
+    return;
+  }
+
+  container.innerHTML = artifacts.map((artifact) => {
+    const filename = artifact.filename || artifact.artifact_type || tx("review_support_item", "Support item");
+    const detail = [artifact.artifact_type, artifact.review_status].filter(Boolean).join(" · ");
+    const hasFile = Boolean(artifact.mime_type);
+    return `
+      <div class="review-existing-item">
+        <div>
+          <strong>${escapeText(filename)}</strong>
+          <div class="review-support-subtle">${escapeText(detail)}</div>
+          ${artifact.notes ? `<div class="review-support-subtle">${escapeText(artifact.notes)}</div>` : ""}
+        </div>
+        ${hasFile ? `<a class="review-row-action" href="/api/support-artifacts/${escapeText(artifact.id)}" target="_blank" rel="noreferrer">${escapeText(tx("review_support_open", "Open"))}</a>` : ""}
+      </div>
+    `;
+  }).join("");
+}
+
+function syncSupportModalType() {
+  const type = document.getElementById("supportArtifactType")?.value || "review_note";
+  const fileField = document.getElementById("supportArtifactFileField");
+  const fileInput = document.getElementById("supportArtifactFile");
+  const fileRequired = type !== "review_note";
+  if (fileField) {
+    fileField.hidden = !fileRequired;
+  }
+  if (fileInput) {
+    fileInput.required = fileRequired;
+    if (!fileRequired) {
+      fileInput.value = "";
+    }
+  }
+}
+
+function closeSupportModal() {
+  activeSupportTransaction = null;
+  const modal = document.getElementById("supportArtifactModal");
+  if (modal) {
+    modal.classList.add("hidden");
+  }
+  const form = document.getElementById("supportArtifactForm");
+  form?.reset();
+  syncSupportModalType();
+}
+
+async function openSupportModal(item) {
+  activeSupportTransaction = item;
+  const modal = document.getElementById("supportArtifactModal");
+  const context = document.getElementById("supportArtifactContext");
+  const transactionIdInput = document.getElementById("supportArtifactTransactionId");
+  if (!modal || !context || !transactionIdInput) return;
+
+  context.textContent = `${item.description || "(No description)"} · ${item.date || ""}`;
+  transactionIdInput.value = item.id;
+  modal.classList.remove("hidden");
+  syncSupportModalType();
+
+  try {
+    const response = await apiFetch(`/api/support-artifacts?transaction_id=${encodeURIComponent(item.id)}`);
+    if (!response || !response.ok) {
+      throw new Error(tx("review_support_load_error", "Failed to load support artifacts."));
+    }
+    const artifacts = await response.json().catch(() => []);
+    renderExistingArtifacts(artifacts);
+  } catch (error) {
+    console.error("Failed to load support artifacts:", error);
+    renderExistingArtifacts([]);
+  }
+}
+
+async function saveSupportArtifact(event) {
+  event.preventDefault();
+
+  const transactionId = document.getElementById("supportArtifactTransactionId")?.value || "";
+  const artifactType = document.getElementById("supportArtifactType")?.value || "review_note";
+  const notes = document.getElementById("supportArtifactNotes")?.value.trim() || "";
+  const fileInput = document.getElementById("supportArtifactFile");
+  const submitButton = document.getElementById("supportArtifactSubmit");
+
+  if (!transactionId) return;
+
+  submitButton.disabled = true;
+  submitButton.textContent = tx("review_support_saving", "Saving...");
+
+  try {
+    let response;
+    if (artifactType === "review_note") {
+      response = await apiFetch("/api/support-artifacts/review-note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transaction_id: transactionId, notes })
+      });
+    } else {
+      const file = fileInput?.files?.[0] || null;
+      if (!file) {
+        throw new Error(tx("review_support_file_required", "Choose a support file first."));
+      }
+      const formData = new FormData();
+      formData.append("transaction_id", transactionId);
+      formData.append("artifact_type", artifactType);
+      formData.append("notes", notes);
+      formData.append("artifact", file);
+      response = await apiFetch("/api/support-artifacts/upload", {
+        method: "POST",
+        body: formData
+      });
+    }
+
+    if (!response || !response.ok) {
+      const payload = await response?.json().catch(() => null);
+      throw new Error(payload?.error || tx("review_support_save_error", "Failed to save support."));
+    }
+
+    await loadReviewQueue();
+    if (activeSupportTransaction) {
+      const refreshedItem = reviewQueue.find((entry) => entry.id === activeSupportTransaction.id) || activeSupportTransaction;
+      await openSupportModal(refreshedItem);
+    }
+  } catch (error) {
+    console.error("Failed to save support artifact:", error);
+    window.alert(error.message || tx("review_support_save_error", "Failed to save support."));
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = tx("review_support_submit", "Save support");
+  }
 }
 
 async function loadReviewQueue() {
@@ -173,6 +323,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     void loadReviewQueue();
   });
   document.getElementById("reviewStatusFilter")?.addEventListener("change", renderQueue);
+  document.getElementById("supportArtifactType")?.addEventListener("change", syncSupportModalType);
+  document.getElementById("supportArtifactForm")?.addEventListener("submit", saveSupportArtifact);
+  document.querySelectorAll("[data-support-modal-close]").forEach((node) => {
+    node.addEventListener("click", closeSupportModal);
+  });
 
   await loadReviewQueue();
 });

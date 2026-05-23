@@ -141,7 +141,7 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
   const taxYear = Number(String(endDate || "").slice(0, 4)) || new Date().getFullYear();
   console.log("[fetchExportSourceRows] businessId:", businessId, "| startDate:", startDate, "| endDate:", endDate, "| taxYear:", taxYear);
 
-  const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult, vehicleClaimResult, capitalAssetResult] =
+  const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult, vehicleClaimResult, capitalAssetResult, supportArtifactResult] =
     await Promise.all([
       pool.query(
         `SELECT id, account_id, category_id, amount, type, description, description_encrypted, date, note,
@@ -203,6 +203,13 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
          WHERE business_id = $1 AND tax_year = $2 AND is_disposed = FALSE
          ORDER BY purchase_date ASC, name ASC`,
         [businessId, taxYear]
+      ),
+      pool.query(
+        `SELECT id, transaction_id, artifact_type, filename, mime_type, storage_path, review_status, notes, uploaded_at
+           FROM support_artifacts
+          WHERE business_id = $1
+            AND transaction_id IS NOT NULL`,
+        [businessId]
       )
     ]);
 
@@ -241,6 +248,13 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
       .filter((row) => row.transaction_id)
       .map((row) => [row.transaction_id, row])
   );
+  const supportArtifactMap = new Map();
+  for (const row of supportArtifactResult.rows) {
+    if (!row.transaction_id) continue;
+    const current = supportArtifactMap.get(row.transaction_id) || [];
+    current.push(row);
+    supportArtifactMap.set(row.transaction_id, current);
+  }
 
   return {
     transactions,
@@ -251,6 +265,7 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
     vehicleCosts: vehicleCostResult.rows,
     business: bizResult.rows[0] || {},
     vehicleClaimMap,
+    supportArtifactMap,
     capitalAssets: capitalAssetResult.rows,
     capitalAssetTxMap,
     taxYear
@@ -430,6 +445,7 @@ router.get("/dataset", exportGrantLimiter, async (req, res) => {
       accounts: sourceRows.accounts,
       categories,
       receipts: sourceRows.receipts,
+      supportArtifactMap: sourceRows.supportArtifactMap,
       business,
       region,
       province: business.province || "",
@@ -579,6 +595,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       accounts: sourceRows.accounts,
       categories,
       receipts: sourceRows.receipts,
+      supportArtifactMap: sourceRows.supportArtifactMap,
       mileage: sourceRows.mileage,
       vehicleCosts: sourceRows.vehicleCosts,
       startDate: grantStartDate,
@@ -604,6 +621,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       province: business.province || "",
       // Phase 2 compliance data
       vehicleClaimMap: sourceRows.vehicleClaimMap,
+      supportArtifactMap: sourceRows.supportArtifactMap,
       capitalAssets: sourceRows.capitalAssets,
       capitalAssetTxMap: sourceRows.capitalAssetTxMap,
       quickMethodSchedule
@@ -619,6 +637,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
         accounts: sourceRows.accounts,
         categories,
         receipts: sourceRows.receipts,
+        supportArtifactMap: sourceRows.supportArtifactMap,
         mileage: sourceRows.mileage,
         vehicleCosts: sourceRows.vehicleCosts,
         business,
@@ -839,7 +858,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     const currency = req.body?.currency || "USD";
     const templateVersion = req.body?.templateVersion || "v1";
 
-    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult] =
+    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult, supportArtifactResult] =
       await Promise.all([
         pool.query(
           `SELECT id, account_id, category_id, amount, type, description, date, note,
@@ -887,6 +906,13 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
                   business_type
              FROM businesses WHERE id = $1`,
           [businessId]
+        ),
+        pool.query(
+          `SELECT id, transaction_id, artifact_type, filename, mime_type, storage_path, review_status, notes, uploaded_at
+             FROM support_artifacts
+            WHERE business_id = $1
+              AND transaction_id IS NOT NULL`,
+          [businessId]
         )
       ]);
 
@@ -915,12 +941,20 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
 
     const generatedAt = new Date().toISOString();
     const reportId = createPdfReportId(generatedAt);
+    const supportArtifactMap = new Map();
+    for (const row of supportArtifactResult.rows) {
+      if (!row.transaction_id) continue;
+      const current = supportArtifactMap.get(row.transaction_id) || [];
+      current.push(row);
+      supportArtifactMap.set(row.transaction_id, current);
+    }
 
     const sharedOptions = {
       transactions: txResult.rows,
       accounts: accountResult.rows,
       categories,
       receipts: receiptResult.rows,
+      supportArtifactMap,
       mileage: mileageResult.rows,
       vehicleCosts: vehicleCostResult.rows,
       startDate: dateRange.startDate,

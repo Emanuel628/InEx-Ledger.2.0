@@ -120,3 +120,21 @@ test("dataset totals and summaries stay internally consistent", () => {
   assert.equal(dataset.totals.trulyUnmappedCount, dataset.mappingSummary.unmapped_count);
   assert.equal(dataset.totals.missingReceiptCount, dataset.receiptSummary.missing);
 });
+
+test("support artifacts clear matching review flags and receipt gaps", () => {
+  const supportArtifactMap = new Map([
+    ["fuel1", [{ artifact_type: "mileage_log", review_status: "accepted" }, { artifact_type: "receipt", review_status: "accepted" }]],
+    ["meal1", [{ artifact_type: "review_note", review_status: "accepted", notes: "Client meal" }]],
+    ["phone1", [{ artifact_type: "allocation_worksheet", review_status: "accepted" }]]
+  ]);
+  const dataset = buildNormalizedExportDataset(buildFixture({ supportArtifactMap }));
+  const fuel = dataset.includedRows.find((row) => row.id === "fuel1");
+  const meals = dataset.includedRows.find((row) => row.id === "meal1");
+  const phone = dataset.includedRows.find((row) => row.id === "phone1");
+
+  assert.ok(!fuel.reviewFlags.includes("ML"));
+  assert.ok(!fuel.reviewFlags.includes("RS"));
+  assert.ok(!meals.reviewFlags.includes("BP"));
+  assert.ok(!phone.reviewFlags.includes("AL"));
+  assert.ok(dataset.totals.missingReceiptCount < buildNormalizedExportDataset(buildFixture()).totals.missingReceiptCount);
+});

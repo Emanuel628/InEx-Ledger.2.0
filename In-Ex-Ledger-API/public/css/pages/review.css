@@ -54,6 +54,21 @@
   color: #fff;
 }
 
+.review-row-support-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: #fff;
+  color: #0f172a;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
 .review-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -198,6 +213,109 @@
   color: #233046;
 }
 
+.review-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.review-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.review-modal.hidden {
+  display: none;
+}
+
+.review-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.44);
+}
+
+.review-modal-card {
+  position: relative;
+  width: min(720px, 100%);
+  max-height: min(90vh, 860px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.22);
+}
+
+.review-modal-head,
+.review-existing-item,
+.review-modal-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.review-modal-subtitle {
+  margin-top: 6px;
+  color: #66748a;
+}
+
+.review-modal-close {
+  border: 0;
+  background: transparent;
+  color: #52607a;
+  font-size: 1.8rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.review-existing-artifacts {
+  margin-top: 18px;
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.review-existing-item,
+.review-existing-empty {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #f7f9fc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.review-support-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.review-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #233046;
+  font-weight: 600;
+}
+
+.review-form-field textarea,
+.review-form-field input[type="file"] {
+  font: inherit;
+}
+
+.review-form-field textarea {
+  min-height: 132px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  resize: vertical;
+}
+
 .review-status-badge {
   display: inline-flex;
   align-items: center;
@@ -256,5 +374,15 @@
   .review-secondary-btn,
   .review-primary-link {
     width: 100%;
+  }
+
+  .review-modal-card {
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .review-modal-actions,
+  .review-existing-item {
+    flex-direction: column;
   }
 }

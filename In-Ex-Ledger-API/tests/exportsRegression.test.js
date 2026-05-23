@@ -186,6 +186,7 @@ function loadExportsRouter(options = {}) {
             if (/FROM accounts/i.test(sql)) return { rows: fixture.accounts };
             if (/FROM categories/i.test(sql)) return { rows: fixture.categories };
             if (/FROM receipts/i.test(sql)) return { rows: fixture.receipts };
+            if (/FROM support_artifacts/i.test(sql)) return { rows: [] };
             if (/FROM mileage/i.test(sql)) return { rows: fixture.mileage };
             if (/FROM vehicle_expense_details/i.test(sql)) { state.vehicleCostQueryCount += 1; return { rows: [] }; }
             if (/FROM vehicle_costs/i.test(sql)) { state.vehicleCostQueryCount += 1; return { rows: fixture.vehicleCosts }; }

@@ -160,6 +160,7 @@ router.get("/queue", async (req, res) => {
       accountResult,
       categoryResult,
       receiptResult,
+      supportArtifactResult,
       businessResult,
       vehicleClaimResult,
       capitalAssetResult
@@ -191,6 +192,13 @@ router.get("/queue", async (req, res) => {
         receiptParams
       ),
       pool.query(
+        `SELECT id, transaction_id, artifact_type, filename, mime_type, storage_path, storage_status, review_status, notes, uploaded_at
+           FROM support_artifacts
+          WHERE business_id = $1
+            AND transaction_id IS NOT NULL`,
+        [businessId]
+      ),
+      pool.query(
         `SELECT id, name, region, province, currency, gst_hst_registered, gst_hst_method
            FROM businesses
           WHERE id = $1
@@ -215,6 +223,13 @@ router.get("/queue", async (req, res) => {
       )
     ]);
 
+    const supportArtifactMap = new Map();
+    for (const row of supportArtifactResult.rows) {
+      if (!row.transaction_id) continue;
+      const current = supportArtifactMap.get(row.transaction_id) || [];
+      current.push(row);
+      supportArtifactMap.set(row.transaction_id, current);
+    }
     const vehicleClaimMap = new Map(
       vehicleClaimResult.rows
         .filter((row) => row.transaction_id)
@@ -231,6 +246,7 @@ router.get("/queue", async (req, res) => {
       accounts: accountResult.rows,
       categories: categoryResult.rows,
       receipts: receiptResult.rows,
+      supportArtifactMap,
       business: businessResult.rows[0] || {},
       vehicleClaimMap,
       capitalAssetTxMap,

@@ -136,6 +136,52 @@
     </div>
   </main>
 
+  <div id="supportArtifactModal" class="review-modal hidden" role="dialog" aria-modal="true" aria-labelledby="supportArtifactTitle">
+    <div class="review-modal-backdrop" data-support-modal-close></div>
+    <div class="review-modal-card">
+      <div class="review-modal-head">
+        <div>
+          <h3 id="supportArtifactTitle" data-i18n="review_support_modal_title">Add support</h3>
+          <p id="supportArtifactContext" class="review-modal-subtitle"></p>
+        </div>
+        <button type="button" class="review-modal-close" data-support-modal-close aria-label="Close">&times;</button>
+      </div>
+
+      <div id="supportArtifactExisting" class="review-existing-artifacts"></div>
+
+      <form id="supportArtifactForm" class="review-support-form">
+        <input type="hidden" id="supportArtifactTransactionId" />
+        <label class="review-form-field">
+          <span data-i18n="review_support_type_label">Support type</span>
+          <select id="supportArtifactType" class="review-filter-select">
+            <option value="review_note" data-i18n="review_support_type_note">Review note</option>
+            <option value="receipt" data-i18n="review_support_type_receipt">Receipt</option>
+            <option value="invoice" data-i18n="review_support_type_invoice">Invoice</option>
+            <option value="mileage_log" data-i18n="review_support_type_mileage">Mileage log</option>
+            <option value="allocation_worksheet" data-i18n="review_support_type_allocation">Allocation worksheet</option>
+            <option value="home_office_worksheet" data-i18n="review_support_type_home">Home office worksheet</option>
+            <option value="capital_asset_support" data-i18n="review_support_type_asset">Capital asset support</option>
+          </select>
+        </label>
+
+        <label class="review-form-field">
+          <span data-i18n="review_support_notes_label">Notes</span>
+          <textarea id="supportArtifactNotes" rows="5" data-i18n-placeholder="review_support_notes_placeholder" placeholder="Add the business purpose or support detail here."></textarea>
+        </label>
+
+        <label id="supportArtifactFileField" class="review-form-field">
+          <span data-i18n="review_support_file_label">Support file</span>
+          <input id="supportArtifactFile" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.xls,.xlsx" />
+        </label>
+
+        <div class="review-modal-actions">
+          <button type="button" id="supportArtifactCancel" class="review-secondary-btn" data-support-modal-close data-i18n="common_cancel">Cancel</button>
+          <button type="submit" id="supportArtifactSubmit" class="review-primary-link" data-i18n="review_support_submit">Save support</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="../js/escape-html.js?v=20260410a"></script>
   <script src="../js/global.js?v=20260510c"></script>
   <script src="../js/i18n.js?v=20260523f"></script>
