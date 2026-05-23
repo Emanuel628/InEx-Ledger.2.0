@@ -164,6 +164,14 @@ function clearGuidedCardUiState(page) {
   }
 }
 
+function normalizePathname(value) {
+  const path = String(value || "").trim();
+  if (!path) {
+    return "/";
+  }
+  return path.replace(/\/+$/, "") || "/";
+}
+
 function removeGuidedHighlight() {
   clearGuidedHighlight();
   clearGuidedHighlight = () => {};
@@ -381,7 +389,25 @@ async function advanceGuidedSetup(action, stepKey, card, config) {
     }
     window.__LUNA_ONBOARDING__ = result?.onboarding || window.__LUNA_ONBOARDING__ || null;
     clearGuidedCardUiState(stepKey);
-    window.location.href = result?.redirect_to || "/transactions";
+    const redirectTo = result?.redirect_to || "/transactions";
+    const nextGuidedStep = String(result?.onboarding?.data?.guided_setup_step || "").trim().toLowerCase();
+    const nextConfig = GUIDED_SETUP_CONFIG[nextGuidedStep];
+    const targetPath = normalizePathname(new URL(redirectTo, window.location.origin).pathname);
+    const currentPath = normalizePathname(window.location.pathname);
+    const nextPage = normalizePathname(nextConfig?.page ? `/${nextConfig.page}` : `/${nextGuidedStep}`);
+
+    if (
+      nextConfig &&
+      result?.onboarding?.data?.guided_setup_active &&
+      targetPath === currentPath &&
+      nextPage === currentPath
+    ) {
+      card.remove();
+      renderGuidedSetupCard(nextGuidedStep);
+      return;
+    }
+
+    window.location.href = redirectTo;
   } catch (error) {
     console.error("Failed to update guided onboarding state", error);
     applyGuidedHighlight(config);

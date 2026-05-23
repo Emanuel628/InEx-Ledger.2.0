@@ -2754,7 +2754,21 @@ body {
 
 .toolbar-import-button.onboarding-tour-target-active {
   position: relative;
+  isolation: isolate;
   animation: csvImportTourPulse 2.8s ease-in-out infinite;
+}
+
+.toolbar-import-button.onboarding-tour-target-active::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 18px;
+  border: 2px solid rgba(94, 234, 212, 0.72);
+  box-shadow:
+    0 0 0 4px rgba(94, 234, 212, 0.14),
+    0 10px 28px rgba(13, 148, 136, 0.18);
+  pointer-events: none;
+  animation: csvImportTourRing 2.8s ease-in-out infinite;
 }
 
 @keyframes csvImportTourPulse {
@@ -2768,6 +2782,18 @@ body {
     box-shadow:
       0 20px 38px rgba(8, 83, 73, 0.3),
       0 0 0 10px rgba(94, 234, 212, 0.1);
+  }
+}
+
+@keyframes csvImportTourRing {
+  0%,
+  100% {
+    opacity: 0.9;
+    transform: scale(0.985);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(1.04);
   }
 }
 
