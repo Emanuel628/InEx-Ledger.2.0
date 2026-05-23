@@ -13,7 +13,7 @@ const {
   encryptGstHstNumber,
   decryptGstHstNumber
 } = require("../services/gstHstNumberService.js");
-const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { logError } = require("../utils/logger.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -22,30 +22,30 @@ router.use(requireCsrfProtection);
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
 const CA_PROVINCES = new Set(["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"]);
-const FISCAL_YEAR_START_RE = /^((0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])|\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))$/;
 const VALID_ACCOUNTING_METHODS = new Set(["cash", "accrual"]);
 const VALID_GST_HST_METHODS = new Set(["regular", "quick"]);
+const VALID_ENTITY_TYPES = new Set([
+  "sole_proprietorship",
+  "single_member_llc",
+  "limited_liability_company",
+  "corporation",
+  "partnership"
+]);
+
 const BUSINESS_SELECT = `SELECT id, name, region, language, fiscal_year_start, province,
                                 business_type, tax_id, address, operating_name,
                                 business_activity_code, accounting_method,
                                 material_participation, gst_hst_registered,
                                 gst_hst_number, gst_hst_method, created_at
-                         FROM businesses
-                         WHERE id = $1`;
+                         FROM businesses WHERE id = $1`;
 
 function normalizeOptionalTrimmedString(value) {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed || null;
+  if (typeof value !== "string") return null;
+  return value.trim() || null;
 }
 
 function normalizeBusinessRow(row) {
-  if (!row) {
-    return row;
-  }
-
+  if (!row) return row;
   return {
     fiscal_year_start: "01-01",
     province: null,
@@ -71,29 +71,9 @@ async function fetchBusinessRow(businessId) {
 }
 
 async function updateBusinessRow(businessId, payload) {
-  const {
-    name,
-    region,
-    language,
-    fiscal_year_start,
-    province,
-    business_type,
-    tax_id,
-    address,
-    operating_name,
-    business_activity_code,
-    accounting_method,
-    material_participation,
-    gst_hst_registered,
-    gst_hst_number,
-    gst_hst_method
-  } = payload;
-  const normalizedTaxId = normalizeOptionalTrimmedString(tax_id);
-  const encryptedTaxId = normalizedTaxId ? encryptTaxId(normalizedTaxId) : null;
-  const normalizedGstHstNumber = normalizeOptionalTrimmedString(gst_hst_number);
-  const encryptedGstHstNumber = normalizedGstHstNumber
-    ? encryptGstHstNumber(normalizedGstHstNumber)
-    : null;
+  const encryptedTaxId = payload.tax_id ? encryptTaxId(payload.tax_id) : null;
+  const encryptedGstHstNumber = payload.gst_hst_number ? encryptGstHstNumber(payload.gst_hst_number) : null;
+
   const result = await pool.query(
     `UPDATE businesses
      SET name = COALESCE($1, name),
@@ -118,25 +98,24 @@ async function updateBusinessRow(businessId, payload) {
                material_participation, gst_hst_registered,
                gst_hst_number, gst_hst_method, created_at`,
     [
-      normalizeOptionalTrimmedString(name),
-      region || null,
-      language || null,
-      fiscal_year_start || null,
-      province,
-      business_type,
+      payload.name,
+      payload.region,
+      payload.language,
+      payload.fiscal_year_start,
+      payload.province,
+      payload.business_type,
       encryptedTaxId,
-      address,
-      normalizeOptionalTrimmedString(operating_name),
-      normalizeOptionalTrimmedString(business_activity_code),
-      accounting_method || null,
-      typeof material_participation === "boolean" ? material_participation : null,
-      typeof gst_hst_registered === "boolean" ? gst_hst_registered : false,
+      payload.address,
+      payload.operating_name,
+      payload.business_activity_code,
+      payload.accounting_method,
+      payload.material_participation,
+      payload.gst_hst_registered,
       encryptedGstHstNumber,
-      gst_hst_method || null,
+      payload.gst_hst_method,
       businessId
     ]
   );
-
   return normalizeBusinessRow(result.rows[0] || null);
 }
 
@@ -149,7 +128,7 @@ router.get("/", async (req, res) => {
     res.json(await fetchBusinessRow(businessId));
   } catch (err) {
     logError("GET /business error:", err.stack || err);
-    res.status(500).json({ error: "A server error occurred while loading the business profile. Please try again or contact support if the problem persists." });
+    res.status(500).json({ error: "Server error loading business profile." });
   }
 });
 
@@ -157,137 +136,124 @@ router.get("/", async (req, res) => {
  * PUT /api/business
  */
 router.put("/", async (req, res) => {
-  const {
-    name,
-    region,
-    language,
-    fiscal_year_start,
-    province,
-    business_type,
-    tax_id,
-    address,
-    operating_name,
-    business_activity_code,
-    accounting_method,
-    material_participation,
-    gst_hst_registered,
-    gst_hst_number,
-    gst_hst_method
-  } = req.body ?? {};
+  const body = req.body ?? {};
 
-  if (region && !VALID_REGIONS.has(region)) {
-    return res.status(400).json({ error: "region must be 'US' or 'CA'" });
+  // --- Input validation ---
+  if (body.region && !VALID_REGIONS.has(body.region)) {
+    return res.status(400).json({ error: "Invalid region. Must be 'US' or 'CA'." });
   }
-  if (language && !VALID_LANGUAGES.has(language)) {
-    return res.status(400).json({ error: "language must be 'en', 'es', or 'fr'" });
+  if (body.language && !VALID_LANGUAGES.has(body.language)) {
+    return res.status(400).json({ error: "language must be 'en', 'es', or 'fr'." });
   }
-  if (fiscal_year_start != null && fiscal_year_start !== "" && !FISCAL_YEAR_START_RE.test(String(fiscal_year_start))) {
-    return res.status(400).json({ error: "fiscal_year_start must be in MM-DD format with valid month (01-12) and day (01-31)." });
+  if (body.accounting_method && !VALID_ACCOUNTING_METHODS.has(body.accounting_method.toLowerCase())) {
+    return res.status(400).json({ error: "Invalid accounting method. Must be 'cash' or 'accrual'." });
   }
-  if (accounting_method != null && accounting_method !== "" && !VALID_ACCOUNTING_METHODS.has(String(accounting_method).toLowerCase())) {
-    return res.status(400).json({ error: "accounting_method must be 'cash' or 'accrual'" });
+  if (body.business_activity_code && !/^[0-9]{6}$/.test(body.business_activity_code)) {
+    return res.status(400).json({ error: "Business Activity Code must be a 6-digit NAICS code." });
   }
-  if (gst_hst_method != null && gst_hst_method !== "" && !VALID_GST_HST_METHODS.has(String(gst_hst_method).toLowerCase())) {
-    return res.status(400).json({ error: "gst_hst_method must be 'regular' or 'quick'" });
+  if (body.business_type && !VALID_ENTITY_TYPES.has(body.business_type)) {
+    return res.status(400).json({ error: "Invalid legal entity structure." });
   }
-  if (material_participation != null && typeof material_participation !== "boolean") {
+  if (body.gst_hst_method && !VALID_GST_HST_METHODS.has(body.gst_hst_method.toLowerCase())) {
+    return res.status(400).json({ error: "gst_hst_method must be 'regular' or 'quick'." });
+  }
+  if (body.material_participation != null && typeof body.material_participation !== "boolean") {
     return res.status(400).json({ error: "material_participation must be a boolean value." });
   }
-  if (gst_hst_registered != null && typeof gst_hst_registered !== "boolean") {
+  if (body.gst_hst_registered != null && typeof body.gst_hst_registered !== "boolean") {
     return res.status(400).json({ error: "gst_hst_registered must be a boolean value." });
   }
 
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
     const current = await fetchBusinessRow(businessId);
-    if (!current) {
-      return res.status(404).json({ error: "Business not found." });
+    if (!current) return res.status(404).json({ error: "Business not found." });
+
+    const region = (body.region || current.region || "US").toUpperCase();
+    const businessType = body.business_type || current.business_type;
+
+    // Geographic structural compliance: Single-Member LLC is a US-only classification
+    if (region === "CA" && businessType === "single_member_llc") {
+      return res.status(400).json({ error: "Single-Member LLC is not a valid CRA tax classification for Canada." });
     }
 
-    const resolvedRegion = String(region || current.region || "US").toUpperCase();
-    const resolvedProvince = resolvedRegion === "CA"
-      ? String(province || current.province || "").toUpperCase() || null
+    // CA requires a valid province code
+    const province = region === "CA"
+      ? String(body.province || current.province || "").toUpperCase() || null
       : null;
-
-    if (resolvedProvince && !CA_PROVINCES.has(resolvedProvince)) {
-      return res.status(400).json({ error: "Invalid Canadian province code" });
-    }
-    if (resolvedRegion === "CA" && !resolvedProvince) {
+    if (region === "CA" && !province) {
       return res.status(400).json({ error: "Province is required for Canadian businesses." });
     }
-    
-    const body = req.body ?? {};
-    
-    const resolvedFiscalYearStart = 'fiscal_year_start' in body
-    ? normalizeOptionalTrimmedString(fiscal_year_start)
-    : current.fiscal_year_start;
-    
-    
-    if (resolvedRegion === "CA" && !resolvedFiscalYearStart) {
+    if (province && !CA_PROVINCES.has(province)) {
+      return res.status(400).json({ error: "Invalid Canadian province code." });
+    }
+
+    // Sole proprietorships must use the standard calendar fiscal year (Jan 1 start)
+    // This applies in both the US (Schedule C requires calendar year for most filers)
+    // and Canada (T2125 sole props use Dec 31 year-end = Jan 1 start).
+    let fiscalYearStart = ('fiscal_year_start' in body)
+      ? normalizeOptionalTrimmedString(body.fiscal_year_start)
+      : current.fiscal_year_start;
+    if (businessType === "sole_proprietorship" && fiscalYearStart !== "01-01") {
+      fiscalYearStart = "01-01";
+    }
+
+    if (region === "CA" && !fiscalYearStart) {
       return res.status(400).json({ error: "fiscal_year_start is required for Canadian businesses." });
     }
 
-    const resolvedBusinessType = 'business_type' in body
-      ? normalizeOptionalTrimmedString(business_type)
-      : current.business_type;
-    const resolvedTaxId = 'tax_id' in body ? (tax_id || null) : current.tax_id;
-    const resolvedAddress = 'address' in body ? normalizeOptionalTrimmedString(address) : current.address;
-    const resolvedOperatingName = 'operating_name' in body
-      ? normalizeOptionalTrimmedString(operating_name)
-      : current.operating_name;
-    const resolvedBusinessActivityCode = 'business_activity_code' in body
-      ? normalizeOptionalTrimmedString(business_activity_code)
-      : current.business_activity_code;
-    const resolvedAccountingMethod = 'accounting_method' in body
-    ? normalizeOptionalTrimmedString(String(accounting_method || "").toLowerCase())
-    : current.accounting_method;
-
-    const resolvedMaterialParticipation = 'material_participation' in body
-     ? material_participation
-     : current.material_participation;
-    
+    const resolvedAccountingMethod = ('accounting_method' in body)
+      ? String(body.accounting_method || "").toLowerCase()
+      : current.accounting_method;
     if (!resolvedAccountingMethod) {
-      return res.status(400).json({ error: "accounting_method is required." })
+      return res.status(400).json({ error: "accounting_method is required." });
     }
-    
-    if (!VALID_ACCOUNTING_METHODS.has(resolvedAccountingMethod)) {
-       return res.status(400).json({ error: "accounting_method must be 'cash' or 'accrual'" })
-    }
-    
-    if (resolvedRegion === "US" && typeof resolvedMaterialParticipation !== "boolean") {
+
+    const resolvedMaterialParticipation = ('material_participation' in body)
+      ? body.material_participation
+      : current.material_participation;
+    if (region === "US" && typeof resolvedMaterialParticipation !== "boolean") {
       return res.status(400).json({ error: "material_participation is required for US businesses." });
     }
-    const resolvedGstHstRegistered = 'gst_hst_registered' in body
-      ? gst_hst_registered
-      : Boolean(current.gst_hst_registered);
-    const resolvedGstHstNumber = 'gst_hst_number' in body
-      ? normalizeOptionalTrimmedString(gst_hst_number)
-      : current.gst_hst_number;
-    const resolvedGstHstMethod = 'gst_hst_method' in body
-      ? normalizeOptionalTrimmedString(gst_hst_method)
-      : current.gst_hst_method;
 
-    const updated = await updateBusinessRow(businessId, {
-      name,
-      region: resolvedRegion,
-      language,
-      fiscal_year_start: resolvedFiscalYearStart,
-      province: resolvedProvince,
-      business_type: resolvedBusinessType,
-      tax_id: resolvedTaxId,
-      address: resolvedAddress,
-      operating_name: resolvedOperatingName,
-      business_activity_code: resolvedBusinessActivityCode,
+    // Resolve GST/HST fields using the final registered state, not the raw body value,
+    // so that a partial profile update does not wipe existing registration details.
+    const resolvedGstHstRegistered = typeof body.gst_hst_registered === "boolean"
+      ? body.gst_hst_registered
+      : Boolean(current.gst_hst_registered);
+    const resolvedGstHstNumber = resolvedGstHstRegistered
+      ? ('gst_hst_number' in body ? normalizeOptionalTrimmedString(body.gst_hst_number) : current.gst_hst_number)
+      : null;
+    const resolvedGstHstMethod = resolvedGstHstRegistered
+      ? ('gst_hst_method' in body ? normalizeOptionalTrimmedString(body.gst_hst_method) : current.gst_hst_method)
+      : null;
+
+    const payload = {
+      name: normalizeOptionalTrimmedString(body.name) || current.name,
+      region,
+      language: body.language || current.language,
+      fiscal_year_start: fiscalYearStart,
+      province,
+      business_type: businessType,
+      tax_id: 'tax_id' in body ? normalizeOptionalTrimmedString(body.tax_id) : current.tax_id,
+      address: 'address' in body ? normalizeOptionalTrimmedString(body.address) : current.address,
+      operating_name: 'operating_name' in body
+        ? normalizeOptionalTrimmedString(body.operating_name)
+        : current.operating_name,
+      business_activity_code: 'business_activity_code' in body
+        ? normalizeOptionalTrimmedString(body.business_activity_code)
+        : current.business_activity_code,
       accounting_method: resolvedAccountingMethod,
       material_participation: resolvedMaterialParticipation,
       gst_hst_registered: resolvedGstHstRegistered,
-      gst_hst_number: resolvedRegion === "CA" && resolvedGstHstRegistered ? resolvedGstHstNumber : null,
-      gst_hst_method: resolvedRegion === "CA" && resolvedGstHstRegistered ? resolvedGstHstMethod : null
-    });
-    res.json(updated);
+      gst_hst_number: region === "CA" ? resolvedGstHstNumber : null,
+      gst_hst_method: region === "CA" ? resolvedGstHstMethod : null
+    };
+
+    res.json(await updateBusinessRow(businessId, payload));
   } catch (err) {
     logError("PUT /business error:", err.stack || err);
-    res.status(500).json({ error: "A server error occurred while updating the business profile. Please try again or contact support if the problem persists." });
+    res.status(500).json({ error: "Server error updating profile." });
   }
 });
 
@@ -298,13 +264,12 @@ router.get("/accounting-lock", async (req, res) => {
     res.json({ lock });
   } catch (err) {
     logError("GET /business/accounting-lock error:", err.stack || err);
-    res.status(500).json({ error: "A server error occurred while loading the accounting lock. Please try again or contact support if the problem persists." });
+    res.status(500).json({ error: "A server error occurred while loading the accounting lock." });
   }
 });
 
 router.put("/accounting-lock", async (req, res) => {
   const { locked_through_date, note } = req.body ?? {};
-
   try {
     const normalizedLockDate = normalizeDateOnly(locked_through_date);
     const businessId = await resolveBusinessIdForUser(req.user);
@@ -318,7 +283,7 @@ router.put("/accounting-lock", async (req, res) => {
       return res.status(400).json({ error: "locked_through_date must be a valid date." });
     }
     logError("PUT /business/accounting-lock error:", err.stack || err);
-    res.status(500).json({ error: "A server error occurred while updating the accounting lock. Please try again or contact support if the problem persists." });
+    res.status(500).json({ error: "A server error occurred while updating the accounting lock." });
   }
 });
 

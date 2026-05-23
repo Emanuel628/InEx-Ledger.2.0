@@ -272,7 +272,8 @@ function buildNormalizedExportDataset(options = {}) {
   const classified = summarizeExportTransactions(transactions, categories, {
     region,
     receipts,
-    gstHstRegistered: business.gst_hst_registered === true || options.gstHstRegistered === true
+    gstHstRegistered: business.gst_hst_registered === true || options.gstHstRegistered === true,
+    gstHstMethod: business.gst_hst_method || options.gstHstMethod || "regular"
   });
 
   const receiptsByTxId = buildReceiptMap(receipts);

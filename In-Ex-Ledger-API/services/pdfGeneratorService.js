@@ -635,18 +635,35 @@ function deriveBusinessAmounts(txn, category, options = {}) {
   const amount = normalizeMoneyAmount(txn);
   const region = normalizeRegionCode(options.region);
   const gstHstRegistered = coerceBoolean(options.gstHstRegistered);
+  const gstHstMethod = String(options.gstHstMethod || "regular").toLowerCase();
   const taxAmount = resolveIndirectTaxAmount(txn);
   const categorySlug = inferCategorySlug(txn, category, classifyTransactionNature(txn, category));
+
   let netAmount = amount;
-  if (region === "CA" && gstHstRegistered && taxAmount > 0) {
+
+  // CA GST/HST: strip indirect tax from the expense base ONLY under the Regular Method.
+  // Under the Quick Method the registrant does not claim ITCs, so the full amount
+  // (including GST/HST paid) remains a deductible business expense (ITA s. 20(1)(c) / ETA).
+  if (region === "CA" && gstHstRegistered && gstHstMethod === "regular" && taxAmount > 0) {
     netAmount = Math.max(0, amount - taxAmount);
   }
+
   let deductibleAmount = netAmount;
   let nonDeductibleAmount = 0;
+
+  // Statutory 50% meals limitation: IRC s. 274(n) (US) / ITA s. 67.1 (CA).
   if (categorySlug === "meals") {
-    deductibleAmount = Number((netAmount * 0.5).toFixed(2));
+    deductibleAmount = Number((netAmount * 0.50).toFixed(2));
     nonDeductibleAmount = Number((netAmount - deductibleAmount).toFixed(2));
   }
+
+  // Capital assets bypass the current-year deduction entirely; they enter a
+  // depreciation / CCA schedule (Schedule C line 13 / T2125 line 9936).
+  if (categorySlug === "equipment_capital_asset") {
+    deductibleAmount = 0;
+    nonDeductibleAmount = netAmount;
+  }
+
   return {
     grossAmount: Number(amount.toFixed(2)),
     taxAmount: Number(taxAmount.toFixed(2)),
@@ -1765,6 +1782,7 @@ function buildPdfExportDocument(options) {
   const transactionSummary = summarizeExportTransactions(transactions, categories, {
     region: normalizedRegion,
     gstHstRegistered,
+    gstHstMethod,
     receipts
   });
   const includedTransactions = transactionSummary.included;

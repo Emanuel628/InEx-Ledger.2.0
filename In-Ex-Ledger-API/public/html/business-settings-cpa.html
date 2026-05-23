@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tax & Entity Profile</title>
+  <style>
+    :root {
+      --bg-base: #0A0A0B;
+      --bg-surface: #141416;
+      --bg-input: #1D1D20;
+      --border-subtle: #27272A;
+      --text-primary: #EDEDED;
+      --text-secondary: #A1A1AA;
+      --text-muted: #52525B;
+      --accent-blue: #3B82F6;
+      --accent-blue-hover: #2563EB;
+      --status-ok: #22C55E;
+      --status-warn: #F59E0B;
+      --status-error: #EF4444;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .settings-container {
+      background-color: var(--bg-base);
+      padding: 40px;
+      max-width: 800px;
+      margin: 0 auto;
+      border-radius: 8px;
+    }
+
+    .settings-header {
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+
+    .settings-header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .settings-header p {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      margin-top: 32px;
+    }
+
+    .form-group {
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .form-label {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tax-box-tag {
+      color: var(--text-muted);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .form-input,
+    .form-select {
+      background-color: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+      width: 100%;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .form-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .form-input:focus,
+    .form-select:focus {
+      border-color: var(--accent-blue);
+    }
+
+    .form-input:disabled,
+    .form-select:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .form-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .form-hint.warn {
+      color: var(--status-warn);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .toggle-row-label {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .toggle-row-label span:first-child {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .toggle-row-label span:last-child {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--border-subtle);
+      border-radius: 11px;
+      transition: background 0.2s;
+    }
+
+    .toggle input:checked + .toggle-track {
+      background: var(--accent-blue);
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      background: var(--text-primary);
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+
+    .toggle input:checked ~ .toggle-thumb {
+      transform: translateX(18px);
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border-subtle);
+      margin: 28px 0;
+    }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .alert.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #FCA5A5;
+    }
+
+    .alert.success {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #86EFAC;
+    }
+
+    .form-footer {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .btn-primary {
+      background-color: var(--accent-blue);
+      color: #FFF;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--accent-blue-hover);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .save-status {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .save-status.ok {
+      color: var(--status-ok);
+    }
+
+    .save-status.err {
+      color: var(--status-error);
+    }
+
+    #gst-panel {
+      margin-top: 16px;
+      display: none;
+    }
+
+    @media (max-width: 600px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+      .settings-container {
+        padding: 24px 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="settings-container" id="business-settings">
+
+    <div class="settings-header">
+      <h1>Tax &amp; Entity Profile</h1>
+      <p>Configure your structural tax data for automated CPA compliance exports.</p>
+    </div>
+
+    <div id="form-alert" class="alert" role="alert"></div>
+
+    <form id="profile-form" novalidate>
+
+      <!-- Identity -->
+      <p class="section-title">Business Identity</p>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="name">
+            Legal Business Name
+            <span class="tax-box-tag">Schedule C Line 1 / T2125 Box A</span>
+          </label>
+          <input type="text" class="form-input" id="name" name="name"
+                 placeholder="e.g. Milo and Leo's Bake Shop" autocomplete="organization" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="operating_name">
+            Operating Name (DBA)
+          </label>
+          <input type="text" class="form-input" id="operating_name" name="operating_name"
+                 placeholder="Optional trade name">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="address">
+          Business Address
+          <span class="tax-box-tag">Required for export</span>
+        </label>
+        <input type="text" class="form-input" id="address" name="address"
+               placeholder="Street, City, State/Province, ZIP/Postal Code">
+      </div>
+
+      <!-- Classification -->
+      <div class="divider"></div>
+      <p class="section-title">Tax Classification</p>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="region">Tax Jurisdiction</label>
+          <select class="form-select" id="region" name="region">
+            <option value="US">United States (IRS)</option>
+            <option value="CA">Canada (CRA)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="province">Province (Canada only)</label>
+          <select class="form-select" id="province" name="province" disabled>
+            <option value="">Select province</option>
+            <option value="AB">Alberta</option>
+            <option value="BC">British Columbia</option>
+            <option value="MB">Manitoba</option>
+            <option value="NB">New Brunswick</option>
+            <option value="NL">Newfoundland and Labrador</option>
+            <option value="NS">Nova Scotia</option>
+            <option value="NT">Northwest Territories</option>
+            <option value="NU">Nunavut</option>
+            <option value="ON">Ontario</option>
+            <option value="PE">Prince Edward Island</option>
+            <option value="QC">Quebec</option>
+            <option value="SK">Saskatchewan</option>
+            <option value="YT">Yukon</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="business_type">Legal Entity Structure</label>
+          <select class="form-select" id="business_type" name="business_type">
+            <option value="sole_proprietorship">Sole Proprietorship</option>
+            <option value="single_member_llc">Single-Member LLC (US only)</option>
+            <option value="limited_liability_company">Limited Liability Company</option>
+            <option value="corporation">Corporation</option>
+            <option value="partnership">Partnership</option>
+          </select>
+          <span class="form-hint" id="entity-hint"></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="business_activity_code">
+            NAICS / Industry Code
+            <span class="tax-box-tag">Box B / Schedule C</span>
+          </label>
+          <input type="text" class="form-input" id="business_activity_code" name="business_activity_code"
+                 placeholder="e.g. 311811" pattern="[0-9]{6}" maxlength="6" inputmode="numeric">
+          <span class="form-hint">Must be exactly 6 digits (NAICS standard).</span>
+        </div>
+      </div>
+
+      <!-- Accounting -->
+      <div class="divider"></div>
+      <p class="section-title">Accounting Configuration</p>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="accounting_method">
+            Accounting Method
+            <span class="tax-box-tag">Box F</span>
+          </label>
+          <select class="form-select" id="accounting_method" name="accounting_method">
+            <option value="cash">Cash Basis</option>
+            <option value="accrual">Accrual Basis</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="fiscal_year_start">
+            Fiscal Year Start
+            <span class="tax-box-tag">MM-DD</span>
+          </label>
+          <input type="text" class="form-input" id="fiscal_year_start" name="fiscal_year_start"
+                 placeholder="01-01" maxlength="5" pattern="(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])">
+          <span class="form-hint" id="fy-hint">Sole proprietorships are locked to 01-01 (calendar year).</span>
+        </div>
+      </div>
+
+      <!-- US: Material Participation -->
+      <div id="us-panel">
+        <div class="divider"></div>
+        <p class="section-title">US Schedule C — Material Participation</p>
+        <label class="toggle-row" for="material_participation_toggle">
+          <div class="toggle-row-label">
+            <span>Material Participation</span>
+            <span>I materially participated in the business activity this tax year (IRC s. 469).</span>
+          </div>
+          <div class="toggle">
+            <input type="checkbox" id="material_participation_toggle" name="material_participation">
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </div>
+        </label>
+      </div>
+
+      <!-- CA: GST/HST -->
+      <div id="ca-panel" style="display: none;">
+        <div class="divider"></div>
+        <p class="section-title">Canada — GST/HST Registration</p>
+
+        <label class="toggle-row" for="gst_hst_registered_toggle">
+          <div class="toggle-row-label">
+            <span>GST/HST Registrant</span>
+            <span>This business is registered for GST/HST with the CRA.</span>
+          </div>
+          <div class="toggle">
+            <input type="checkbox" id="gst_hst_registered_toggle" name="gst_hst_registered">
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </div>
+        </label>
+
+        <div id="gst-panel">
+          <div class="form-row" style="margin-top: 16px;">
+            <div class="form-group">
+              <label class="form-label" for="gst_hst_number">
+                GST/HST Registration Number
+                <span class="tax-box-tag">9-digit BN + RT0001</span>
+              </label>
+              <input type="text" class="form-input" id="gst_hst_number" name="gst_hst_number"
+                     placeholder="e.g. 123456789RT0001" maxlength="15">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="gst_hst_method">
+                GST/HST Accounting Method
+              </label>
+              <select class="form-select" id="gst_hst_method" name="gst_hst_method">
+                <option value="regular">Regular Method (claim ITCs)</option>
+                <option value="quick">Quick Method (remit flat rate)</option>
+              </select>
+              <span class="form-hint warn" id="quick-method-hint" style="display: none;">
+                Quick Method: GST/HST paid on expenses remains fully deductible (no ITC claims).
+                Confirm with your preparer.
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="form-footer">
+        <button type="submit" class="btn-primary" id="save-btn">Save Profile Configuration</button>
+        <span class="save-status" id="save-status"></span>
+      </div>
+
+    </form>
+  </div>
+
+  <script>
+    (function () {
+      const regionSelect = document.getElementById("region");
+      const provinceSelect = document.getElementById("province");
+      const entitySelect = document.getElementById("business_type");
+      const entityHint = document.getElementById("entity-hint");
+      const fyInput = document.getElementById("fiscal_year_start");
+      const fyHint = document.getElementById("fy-hint");
+      const usPanel = document.getElementById("us-panel");
+      const caPanel = document.getElementById("ca-panel");
+      const gstToggle = document.getElementById("gst_hst_registered_toggle");
+      const gstPanel = document.getElementById("gst-panel");
+      const gstMethodSelect = document.getElementById("gst_hst_method");
+      const quickMethodHint = document.getElementById("quick-method-hint");
+      const alertBox = document.getElementById("form-alert");
+      const saveStatus = document.getElementById("save-status");
+      const saveBtn = document.getElementById("save-btn");
+
+      function isCanada() {
+        return regionSelect.value === "CA";
+      }
+
+      function isSoleProp() {
+        return entitySelect.value === "sole_proprietorship";
+      }
+
+      function showAlert(message, type) {
+        alertBox.textContent = message;
+        alertBox.className = "alert " + type;
+        alertBox.style.display = "block";
+        alertBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function hideAlert() {
+        alertBox.style.display = "none";
+      }
+
+      function applyRegionRules() {
+        const ca = isCanada();
+
+        // Province selector
+        provinceSelect.disabled = !ca;
+        if (!ca) provinceSelect.value = "";
+
+        // Show/hide jurisdiction panels
+        usPanel.style.display = ca ? "none" : "block";
+        caPanel.style.display = ca ? "block" : "none";
+
+        // Disable Single-Member LLC option for Canada
+        Array.from(entitySelect.options).forEach(function (opt) {
+          if (opt.value === "single_member_llc") {
+            opt.disabled = ca;
+            if (ca && entitySelect.value === "single_member_llc") {
+              entitySelect.value = "sole_proprietorship";
+            }
+          }
+        });
+
+        applyEntityRules();
+      }
+
+      function applyEntityRules() {
+        if (isSoleProp()) {
+          fyInput.value = "01-01";
+          fyInput.disabled = true;
+          fyHint.textContent = "Sole proprietorships are locked to 01-01 (calendar year).";
+          fyHint.className = "form-hint warn";
+        } else {
+          fyInput.disabled = false;
+          fyHint.textContent = "";
+          fyHint.className = "form-hint";
+        }
+
+        if (isCanada() && entitySelect.value === "corporation") {
+          entityHint.textContent = "Corporations file T2 (not T2125). This export targets T2125 workflows.";
+          entityHint.className = "form-hint warn";
+        } else {
+          entityHint.textContent = "";
+          entityHint.className = "form-hint";
+        }
+      }
+
+      function applyGstRules() {
+        const registered = gstToggle.checked;
+        gstPanel.style.display = registered ? "block" : "none";
+      }
+
+      function applyQuickMethodHint() {
+        quickMethodHint.style.display = gstMethodSelect.value === "quick" ? "block" : "none";
+      }
+
+      regionSelect.addEventListener("change", applyRegionRules);
+      entitySelect.addEventListener("change", applyEntityRules);
+      gstToggle.addEventListener("change", applyGstRules);
+      gstMethodSelect.addEventListener("change", applyQuickMethodHint);
+
+      // Load current profile on page initialisation
+      async function loadProfile() {
+        try {
+          const res = await fetch("/api/business", { credentials: "include" });
+          if (!res.ok) return;
+          const data = await res.json();
+
+          if (data.name) document.getElementById("name").value = data.name;
+          if (data.operating_name) document.getElementById("operating_name").value = data.operating_name;
+          if (data.address) document.getElementById("address").value = data.address;
+          if (data.region) regionSelect.value = data.region;
+          if (data.province) provinceSelect.value = data.province;
+          if (data.business_type) entitySelect.value = data.business_type;
+          if (data.business_activity_code) document.getElementById("business_activity_code").value = data.business_activity_code;
+          if (data.accounting_method) document.getElementById("accounting_method").value = data.accounting_method;
+          if (data.fiscal_year_start) fyInput.value = data.fiscal_year_start;
+          if (typeof data.material_participation === "boolean") {
+            document.getElementById("material_participation_toggle").checked = data.material_participation;
+          }
+          if (typeof data.gst_hst_registered === "boolean") {
+            gstToggle.checked = data.gst_hst_registered;
+          }
+          if (data.gst_hst_number) document.getElementById("gst_hst_number").value = data.gst_hst_number;
+          if (data.gst_hst_method) gstMethodSelect.value = data.gst_hst_method;
+
+          applyRegionRules();
+          applyGstRules();
+          applyQuickMethodHint();
+        } catch (err) {
+          // Non-fatal: user can still edit manually
+        }
+      }
+
+      document.getElementById("profile-form").addEventListener("submit", async function (e) {
+        e.preventDefault();
+        hideAlert();
+        saveStatus.textContent = "";
+        saveStatus.className = "save-status";
+
+        const naics = document.getElementById("business_activity_code").value.trim();
+        if (naics && !/^[0-9]{6}$/.test(naics)) {
+          showAlert("Business Activity Code must be exactly 6 digits.", "error");
+          return;
+        }
+
+        const region = regionSelect.value;
+        const businessType = entitySelect.value;
+        if (region === "CA" && businessType === "single_member_llc") {
+          showAlert("Single-Member LLC is not a valid CRA tax classification for Canada.", "error");
+          return;
+        }
+
+        saveBtn.disabled = true;
+        saveStatus.textContent = "Saving...";
+
+        const payload = {
+          name: document.getElementById("name").value.trim(),
+          operating_name: document.getElementById("operating_name").value.trim() || null,
+          address: document.getElementById("address").value.trim() || null,
+          region,
+          province: region === "CA" ? provinceSelect.value : null,
+          business_type: businessType,
+          business_activity_code: naics || null,
+          accounting_method: document.getElementById("accounting_method").value,
+          fiscal_year_start: fyInput.value.trim() || null,
+          material_participation: region === "US"
+            ? document.getElementById("material_participation_toggle").checked
+            : null,
+          gst_hst_registered: region === "CA" ? gstToggle.checked : false,
+          gst_hst_number: (region === "CA" && gstToggle.checked)
+            ? document.getElementById("gst_hst_number").value.trim() || null
+            : null,
+          gst_hst_method: (region === "CA" && gstToggle.checked)
+            ? gstMethodSelect.value
+            : null
+        };
+
+        // Remove null province/material_participation from payload to avoid
+        // overwriting with null when those fields are not relevant to the region.
+        if (payload.province === null) delete payload.province;
+        if (payload.material_participation === null) delete payload.material_participation;
+
+        try {
+          const res = await fetch("/api/business", {
+            method: "PUT",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          const body = await res.json();
+
+          if (!res.ok) {
+            showAlert(body.error || "Validation failed. Please review your inputs.", "error");
+            saveStatus.textContent = "Not saved.";
+            saveStatus.className = "save-status err";
+          } else {
+            saveStatus.textContent = "Profile saved.";
+            saveStatus.className = "save-status ok";
+          }
+        } catch (err) {
+          showAlert("Network error. Please try again.", "error");
+          saveStatus.textContent = "Not saved.";
+          saveStatus.className = "save-status err";
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+
+      // Initialise
+      loadProfile();
+    })();
+  </script>
+</body>
+</html>
