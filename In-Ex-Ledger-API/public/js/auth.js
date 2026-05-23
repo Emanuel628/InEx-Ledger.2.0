@@ -817,6 +817,20 @@ async function apiFetch(url, options = {}) {
     headers: buildHeaders()
   });
 
+  // Auto-recover from a stale CSRF token. The 403 response already carries a
+  // fresh csrf_token cookie via ensureCsrfCookie; one retry picks it up.
+  if (response.status === 403) {
+    const cloned = response.clone();
+    const payload = await cloned.json().catch(() => null);
+    if (payload?.error === "CSRF token missing or invalid.") {
+      response = await fetch(apiUrl, {
+        ...fetchOptions,
+        credentials: "include",
+        headers: buildHeaders()
+      });
+    }
+  }
+
   if (response.status === 401) {
     const refreshed = await refreshAccessToken();
     if (refreshed) {
