@@ -321,11 +321,12 @@ function formatFiscalYearSummary(value) {
 function fiscalYearStorageToInput(value) {
   const normalized = String(value || "").trim();
   if (!normalized) return "";
+  const year = new Date().getFullYear();
   if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-    return normalized;
+    return `${year}-${normalized.slice(5)}`;
   }
   if (/^\d{2}-\d{2}$/.test(normalized)) {
-    return `2000-${normalized}`;
+    return `${year}-${normalized}`;
   }
   return "";
 }
