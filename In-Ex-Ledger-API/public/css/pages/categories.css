@@ -249,6 +249,10 @@
 .category-item:hover { border-color: rgba(37, 99, 235, 0.18); box-shadow: 0 12px 26px rgba(15, 23, 42, 0.07); }
 
 .category-row-icon { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 10px; background: var(--row-icon-bg, #eff6ff); color: var(--row-accent, #2563eb); font-size: 15px; font-weight: 900; }
+.category-item-accent-income { --row-accent: #10b981; --row-icon-bg: #ecfdf5; }
+.category-item-accent-expense { --row-accent: #3b82f6; --row-icon-bg: #eff6ff; }
+.category-item-accent-tax { --row-accent: #2563eb; --row-icon-bg: #eff6ff; }
+.category-item-accent-review { --row-accent: #f59e0b; --row-icon-bg: #fffbeb; }
 .category-row-main { min-width: 0; }
 .category-row-title { display: block; color: var(--cat-ink); font-size: 13px; font-weight: 850; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .category-row-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 7px; }

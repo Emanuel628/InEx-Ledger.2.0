@@ -159,6 +159,11 @@ fieldset.form-field { min-inline-size: 0; margin: 0; padding: 0; border: 0; }
 }
 .accounts-list .account-card:hover { transform: translateY(-1px); border-color: rgba(37, 99, 235, 0.18); box-shadow: 0 12px 26px rgba(15, 23, 42, 0.07); }
 .account-card-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 12px; background: var(--account-icon-bg, #eff6ff); color: var(--account-accent, #246dba); font-size: 14px; font-weight: 900; }
+.account-card-accent-default { --account-accent: #246dba; --account-icon-bg: #eff6ff; }
+.account-card-accent-savings { --account-accent: #2563eb; --account-icon-bg: #eff6ff; }
+.account-card-accent-cash { --account-accent: #059669; --account-icon-bg: #ecfdf5; }
+.account-card-accent-credit { --account-accent: #7c3aed; --account-icon-bg: #f3e8ff; }
+.account-card-accent-loan { --account-accent: #d97706; --account-icon-bg: #fffbeb; }
 .account-card-main { min-width: 0; }
 .account-name { display: block; color: var(--acct-ink); font-size: 15px; font-weight: 850; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .account-meta-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 8px; }

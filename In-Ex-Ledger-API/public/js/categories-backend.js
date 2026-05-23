@@ -457,7 +457,7 @@ function renderCategoryRow(category, type) {
   const isMapped = !!taxInfo;
   const isTax = isTaxCategory(category, taxInfo);
   const isDefault = isLikelyDefaultCategory(category);
-  const accent = rowAccent(category, type, isTax, !isMapped);
+  const accentClass = rowAccentClass(type, isTax, !isMapped);
   const icon = rowIcon(category, type, isTax);
   const taxChipHtml = taxInfo ? `<span class="category-tax-pill" title="${escapeHtml(taxInfo.label)}">${escapeHtml(taxInfo.line || taxInfo.label)}</span>` : "";
   const statusHtml = isMapped
@@ -466,7 +466,7 @@ function renderCategoryRow(category, type) {
   const taxStatusHtml = isTax ? `<span class="category-status-pill status-tax">${currentRegion === "CA" ? "GST/HST" : "1099"}</span>` : "";
   const defaultHtml = isDefault ? `<span class="category-status-pill status-default">Default</span>` : "";
   return `
-    <div class="category-item" style="--row-accent:${accent.color};--row-icon-bg:${accent.bg};">
+    <div class="category-item ${accentClass}">
       <span class="category-row-icon" aria-hidden="true">${escapeHtml(icon)}</span>
       <div class="category-row-main">
         <span class="category-row-title">${escapeHtml(category.name || tx("categories_fallback_name"))}</span>
@@ -526,6 +526,13 @@ function rowAccent(category, type, isTax, needsReview) {
   if (isTax) return { color: "#2563eb", bg: "#eff6ff" };
   if (type === "income") return { color: "#10b981", bg: "#ecfdf5" };
   return { color: "#3b82f6", bg: "#eff6ff" };
+}
+
+function rowAccentClass(type, isTax, needsReview) {
+  if (needsReview) return "category-item-accent-review";
+  if (isTax) return "category-item-accent-tax";
+  if (type === "income") return "category-item-accent-income";
+  return "category-item-accent-expense";
 }
 
 function rowIcon(category, type, isTax) {

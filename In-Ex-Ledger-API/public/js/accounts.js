@@ -264,10 +264,10 @@ function renderAccountCard(account) {
   const typeLabel = formatAccountType(type);
   const currency = String(account.currency || inferLedgerCurrency()).toUpperCase();
   const icon = getAccountIcon(type);
-  const accent = getAccountAccent(type);
+  const accentClass = getAccountAccentClass(type);
   const isDefault = isLikelyDefaultAccount(account);
   return `
-    <article class="account-card premium-account-card" style="--account-accent:${accent.color};--account-icon-bg:${accent.bg};">
+    <article class="account-card premium-account-card ${accentClass}">
       <span class="account-card-icon" aria-hidden="true">${escapeHtml(icon)}</span>
       <div class="account-card-main">
         <div class="account-name">${escapeHtml(name)}</div>
@@ -324,6 +324,14 @@ function getAccountAccent(type) {
   if (type === "loan") return { color: "#d97706", bg: "#fffbeb" };
   if (type === "savings") return { color: "#2563eb", bg: "#eff6ff" };
   return { color: "#246dba", bg: "#eff6ff" };
+}
+
+function getAccountAccentClass(type) {
+  if (type === "cash") return "account-card-accent-cash";
+  if (type === "credit_card") return "account-card-accent-credit";
+  if (type === "loan") return "account-card-accent-loan";
+  if (type === "savings") return "account-card-accent-savings";
+  return "account-card-accent-default";
 }
 
 function isLikelyDefaultAccount(account) {
