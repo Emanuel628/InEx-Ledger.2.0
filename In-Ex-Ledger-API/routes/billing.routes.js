@@ -285,6 +285,26 @@ function resolveStripePriceSelection({ billingInterval, currency, additionalBusi
   };
 }
 
+const FALLBACK_PRICING_TABLE = Object.freeze({
+  usd: Object.freeze({
+    monthly: Object.freeze({ base: 12, addon: 5, labelKey: "subscription_billing_monthly" }),
+    yearly: Object.freeze({ base: 122.4, addon: 51, labelKey: "subscription_billing_yearly" })
+  }),
+  cad: Object.freeze({
+    monthly: Object.freeze({ base: 17, addon: 7, labelKey: "subscription_billing_monthly" }),
+    yearly: Object.freeze({ base: 175, addon: 72, labelKey: "subscription_billing_yearly" })
+  })
+});
+
+function buildFallbackPricingTable(currency) {
+  const normalizedCurrency = normalizeCurrency(currency);
+  const pricing = FALLBACK_PRICING_TABLE[normalizedCurrency];
+  return {
+    monthly: { ...pricing.monthly },
+    yearly: { ...pricing.yearly }
+  };
+}
+
 function parseStripeUnitAmount(price) {
   const raw = price?.unit_amount_decimal ?? price?.unit_amount;
   const numeric = Number(raw);
@@ -682,11 +702,20 @@ router.get("/pricing-context", billingReadLimiter, async (req, res) => {
 router.get("/pricing", billingReadLimiter, async (req, res) => {
   try {
     const context = await resolveBillingContext(req);
-    const pricing = await buildVerifiedPricingTable(context.currency);
+    let pricing;
+    let verified = true;
+    try {
+      pricing = await buildVerifiedPricingTable(context.currency);
+    } catch (err) {
+      verified = false;
+      pricing = buildFallbackPricingTable(context.currency);
+      logWarn("GET /api/billing/pricing falling back to static pricing:", err.message);
+    }
     res.json({
       currency: context.currency,
       country_code: context.countryCode,
       source: context.source,
+      verified,
       pricing
     });
   } catch (err) {

@@ -1,4 +1,4 @@
-@import url("/css/pages/login.css");
+@import url("/css/pages/login.css?v=20260523b");
 
 .onboarding-main {
   max-width: 1180px;
@@ -310,7 +310,8 @@
 .onboarding-card .auth-submit {
   min-height: 48px;
   border-radius: 14px;
-  background: var(--cta-gradient);
+  background-color: #246dbb;
+  background-image: var(--cta-gradient);
   box-shadow: var(--shadow-cta);
   font-size: 14px;
   font-weight: 700;

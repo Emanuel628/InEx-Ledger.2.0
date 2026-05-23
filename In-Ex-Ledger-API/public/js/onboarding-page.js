@@ -29,13 +29,15 @@ function tx(key) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  onboardingForm = document.getElementById("onboardingForm");
+  onboardingMessage = document.getElementById("onboardingMessage");
+  wireOnboardingSubmitHandler();
+  wireOnboardingLiveFields();
   const valid = await requireValidSessionOrRedirect();
   if (valid === false || !getToken()) {
     return;
   }
 
-  onboardingForm = document.getElementById("onboardingForm");
-  onboardingMessage = document.getElementById("onboardingMessage");
   if (!onboardingForm) {
     return;
   }
@@ -49,16 +51,41 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   hydrateOnboardingDefaults(profile);
-  document.getElementById("onboardingRegion")?.addEventListener("change", syncOnboardingPreview);
-  document.getElementById("onboardingStarterAccountType")?.addEventListener("change", syncStarterAccountName);
-  document.getElementById("onboardingStarterAccountName")?.addEventListener("input", () => {
-    onboardingAccountNameTouched = true;
-    updateOnboardingPlanPreview();
-  });
   window.addEventListener("lunaLanguageChanged", applyOnboardingStaticCopy);
   wireFieldHelpToggles();
-  onboardingForm.addEventListener("submit", handleOnboardingSubmit);
 });
+
+function wireOnboardingSubmitHandler() {
+  if (!onboardingForm || onboardingForm.dataset.submitWired === "true") {
+    return;
+  }
+  onboardingForm.dataset.submitWired = "true";
+  onboardingForm.addEventListener("submit", handleOnboardingSubmit);
+}
+
+function wireOnboardingLiveFields() {
+  const regionSelect = document.getElementById("onboardingRegion");
+  if (regionSelect && regionSelect.dataset.liveWired !== "true") {
+    regionSelect.dataset.liveWired = "true";
+    regionSelect.addEventListener("change", syncOnboardingPreview);
+    regionSelect.addEventListener("input", syncOnboardingPreview);
+  }
+
+  const accountTypeSelect = document.getElementById("onboardingStarterAccountType");
+  if (accountTypeSelect && accountTypeSelect.dataset.liveWired !== "true") {
+    accountTypeSelect.dataset.liveWired = "true";
+    accountTypeSelect.addEventListener("change", syncStarterAccountName);
+  }
+
+  const accountNameInput = document.getElementById("onboardingStarterAccountName");
+  if (accountNameInput && accountNameInput.dataset.liveWired !== "true") {
+    accountNameInput.dataset.liveWired = "true";
+    accountNameInput.addEventListener("input", () => {
+      onboardingAccountNameTouched = true;
+      updateOnboardingPlanPreview();
+    });
+  }
+}
 
 function hydrateOnboardingDefaults(profile = {}) {
   const business = profile?.active_business || {};

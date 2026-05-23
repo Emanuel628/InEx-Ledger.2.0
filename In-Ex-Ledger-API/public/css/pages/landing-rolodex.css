@@ -326,6 +326,15 @@
   background: linear-gradient(180deg, #93c5fd, #2563eb);
 }
 
+.preview-chart-bar.bar-42 { --bar: 42%; }
+.preview-chart-bar.bar-58 { --bar: 58%; }
+.preview-chart-bar.bar-47 { --bar: 47%; }
+.preview-chart-bar.bar-71 { --bar: 71%; }
+.preview-chart-bar.bar-64 { --bar: 64%; }
+.preview-chart-bar.bar-82 { --bar: 82%; }
+.preview-chart-bar.bar-68 { --bar: 68%; }
+.preview-chart-bar.bar-88 { --bar: 88%; }
+
 .preview-export-card strong {
   display: block;
   margin-top: 10px;

@@ -651,15 +651,15 @@ function wireTransactionForm() {
         }
       }
 
+      // Close immediately once the transaction is saved so repeat entry feels
+      // responsive and the add button always reopens the drawer on the next click.
+      closeTransactionDrawer();
       markAccountAsUsed(accountId);
       try {
         await loadTransactions();
       } catch (reloadError) {
         console.warn("[Transactions] Save succeeded but refresh failed", reloadError);
       }
-
-      form.reset();
-      closeTransactionDrawer();
     } catch (error) {
       console.error("Transaction save failed:", error);
       setTransactionFormMessage(txT("transactions_error_save", "Unable to save transaction."));
@@ -680,18 +680,28 @@ function setupTransactionDrawer() {
     return;
   }
 
-  [transactionToggleElement, transactionPageToggleElement].filter(Boolean).forEach((button) => {
-    button.addEventListener("click", async () => {
-      const canOpen = await switchToActiveScopeIfNeeded();
-      if (!canOpen) {
-        return;
-      }
-      if (transactionDrawerElement.hasAttribute("hidden")) {
-        openTransactionDrawer();
-      } else {
-        closeTransactionDrawer();
-      }
-    });
+  transactionToggleElement?.addEventListener("click", async () => {
+    const canOpen = await switchToActiveScopeIfNeeded();
+    if (!canOpen) {
+      return;
+    }
+    if (transactionDrawerElement.hasAttribute("hidden")) {
+      openTransactionDrawer();
+    } else {
+      closeTransactionDrawer();
+    }
+  });
+
+  transactionPageToggleElement?.addEventListener("click", async () => {
+    const canOpen = await switchToActiveScopeIfNeeded();
+    if (!canOpen) {
+      return;
+    }
+    if (transactionDrawerElement.hasAttribute("hidden")) {
+      openTransactionDrawer();
+      return;
+    }
+    document.getElementById("txType")?.focus();
   });
 
   closeTransactionDrawer();
@@ -788,7 +798,7 @@ function openTransactionDrawer() {
     transactionToggleElement.setAttribute("aria-expanded", "true");
   }
   if (transactionPageToggleElement) {
-    transactionPageToggleElement.textContent = txT("common_close", "Close");
+    transactionPageToggleElement.setAttribute("aria-expanded", "true");
   }
   setTimeout(() => {
     document.getElementById("txType")?.focus();
@@ -807,6 +817,7 @@ function closeTransactionDrawer() {
   }
   if (transactionPageToggleElement) {
     transactionPageToggleElement.textContent = txT("transactions_add_button", "+ Add transaction");
+    transactionPageToggleElement.setAttribute("aria-expanded", "false");
   }
   resetTransactionForm();
 }
