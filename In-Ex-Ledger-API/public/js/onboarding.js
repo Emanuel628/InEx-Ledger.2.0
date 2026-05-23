@@ -63,6 +63,7 @@ const GUIDED_SETUP_CONFIG = {
       "onboarding_guide_categories_point_1",
       "onboarding_guide_categories_point_2"
     ],
+    highlightSelector: "#seedDefaultCategoriesBtn, #addIncomeCategoryBtn, #addExpenseCategoryBtn",
     launchSelector: "#addExpenseCategoryBtn, #addIncomeCategoryBtn",
     launchLabelKey: "onboarding_guide_categories_add",
     nextAction: "next",
@@ -91,6 +92,7 @@ const GUIDED_SETUP_CONFIG = {
       "onboarding_guide_transactions_point_1",
       "onboarding_guide_transactions_point_2"
     ],
+    highlightSelector: "#addTxTogglePage, #addTxToggle",
     launchSelector: "#addTxTogglePage, #addTxToggle",
     launchLabelKey: "onboarding_guide_transactions_add",
     nextAction: "next",
@@ -111,6 +113,8 @@ const GUIDED_SETUP_CONFIG = {
     highlightSelector: "#importCsvBtn",
     launchSelector: "#importCsvBtn",
     launchLabelKey: "onboarding_guide_import_add",
+    autoScroll: true,
+    focusTarget: true,
     nextAction: "finish",
     nextLabelKey: "onboarding_guide_finish"
   }
@@ -175,22 +179,55 @@ function removeGuidedHighlight() {
   clearGuidedHighlight = () => {};
 }
 
+function getGuidedTargets(selector) {
+  if (!selector) {
+    return [];
+  }
+  return Array.from(document.querySelectorAll(selector)).filter(Boolean);
+}
+
+function getFirstGuidedTarget(selector) {
+  return getGuidedTargets(selector)[0] || null;
+}
+
 function applyGuidedHighlight(config) {
   removeGuidedHighlight();
   const selector = config?.highlightSelector || config?.launchSelector;
   if (!selector) {
     return;
   }
-  const target = document.querySelector(selector);
-  if (!target) {
+  const targets = getGuidedTargets(selector);
+  if (!targets.length) {
     return;
   }
 
-  target.classList.add("onboarding-tour-target-active");
-  target.setAttribute("data-onboarding-highlight", "true");
+  targets.forEach((target) => {
+    target.classList.add("onboarding-tour-target-active");
+    target.setAttribute("data-onboarding-highlight", "true");
+  });
+
+  const primaryTarget = targets[0];
+  if (primaryTarget && config?.autoScroll) {
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    window.requestAnimationFrame(() => {
+      primaryTarget.scrollIntoView({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "center",
+        inline: "nearest"
+      });
+      if (config?.focusTarget && typeof primaryTarget.focus === "function") {
+        window.setTimeout(() => {
+          primaryTarget.focus({ preventScroll: true });
+        }, prefersReducedMotion ? 0 : 360);
+      }
+    });
+  }
+
   clearGuidedHighlight = () => {
-    target.classList.remove("onboarding-tour-target-active");
-    target.removeAttribute("data-onboarding-highlight");
+    targets.forEach((target) => {
+      target.classList.remove("onboarding-tour-target-active");
+      target.removeAttribute("data-onboarding-highlight");
+    });
   };
 }
 
@@ -289,7 +326,7 @@ function renderGuidedSetupCard(stepKey) {
   }
   const stepLabel = `${tx("onboarding_guide_step_prefix")} ${config.stepNumber} ${tx("onboarding_guide_step_of")} ${GUIDED_SETUP_ORDER.length}`;
   const canGoBack = config.stepNumber > 1;
-  const launchButton = document.querySelector(config.launchSelector)
+  const launchButton = getFirstGuidedTarget(config.launchSelector)
     ? `<button type="button" class="onboarding-tour-secondary onboarding-guide-launch">${escapeHtml(tx(config.launchLabelKey))}</button>`
     : "";
 
@@ -337,7 +374,7 @@ function renderGuidedSetupCard(stepKey) {
   };
 
   card.querySelector(".onboarding-guide-launch")?.addEventListener("click", () => {
-    document.querySelector(config.launchSelector)?.click();
+    getFirstGuidedTarget(config.launchSelector)?.click();
   });
   minimizeButton?.addEventListener("click", () => {
     syncMinimizedState(!card.classList.contains("is-minimized"));

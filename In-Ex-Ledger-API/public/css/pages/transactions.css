@@ -2540,6 +2540,29 @@ body {
   box-shadow: 0 16px 28px rgba(36, 109, 187, 0.22);
 }
 
+.page-add-button.onboarding-tour-target-active,
+.toolbar-import-button.onboarding-tour-target-active {
+  position: relative;
+  isolation: isolate;
+  z-index: 1;
+  animation: csvImportTourPulse 2.05s ease-in-out infinite;
+}
+
+.page-add-button.onboarding-tour-target-active::after,
+.toolbar-import-button.onboarding-tour-target-active::after {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: 18px;
+  border: 2px solid rgba(230, 179, 40, 0.92);
+  box-shadow:
+    0 0 0 6px rgba(245, 204, 93, 0.24),
+    0 0 28px rgba(230, 179, 40, 0.46),
+    0 18px 40px rgba(179, 119, 21, 0.22);
+  pointer-events: none;
+  animation: csvImportTourRing 2.05s ease-in-out infinite;
+}
+
 .stats-row {
   gap: 14px;
   margin-bottom: 24px;
@@ -2739,10 +2762,10 @@ body {
 
 .toolbar-import-button:hover {
   transform: translateY(-1px);
-  background: linear-gradient(135deg, #14897f 0%, #0c7566 52%, #0a6790 100%);
+  background: linear-gradient(135deg, #3478c0 0%, #2b6cb0 52%, #245d99 100%);
   color: #ffffff;
-  border-color: rgba(10, 107, 92, 0.28);
-  box-shadow: 0 18px 34px rgba(8, 83, 73, 0.24);
+  border-color: rgba(43, 108, 176, 0.28);
+  box-shadow: 0 18px 34px rgba(27, 79, 145, 0.24);
   filter: saturate(1.05);
 }
 
@@ -2751,27 +2774,6 @@ body {
   box-shadow:
     0 0 0 4px rgba(245, 204, 93, 0.24),
     0 18px 34px rgba(27, 79, 145, 0.24);
-}
-
-.toolbar-import-button.onboarding-tour-target-active {
-  position: relative;
-  isolation: isolate;
-  z-index: 1;
-  animation: csvImportTourPulse 2.05s ease-in-out infinite;
-}
-
-.toolbar-import-button.onboarding-tour-target-active::after {
-  content: "";
-  position: absolute;
-  inset: -10px;
-  border-radius: 18px;
-  border: 2px solid rgba(230, 179, 40, 0.92);
-  box-shadow:
-    0 0 0 6px rgba(245, 204, 93, 0.24),
-    0 0 28px rgba(230, 179, 40, 0.46),
-    0 18px 40px rgba(179, 119, 21, 0.22);
-  pointer-events: none;
-  animation: csvImportTourRing 2.05s ease-in-out infinite;
 }
 
 @keyframes csvImportTourPulse {
