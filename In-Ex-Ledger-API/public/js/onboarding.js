@@ -108,12 +108,15 @@ const GUIDED_SETUP_CONFIG = {
       "onboarding_guide_import_point_1",
       "onboarding_guide_import_point_2"
     ],
+    highlightSelector: "#importCsvBtn",
     launchSelector: "#importCsvBtn",
     launchLabelKey: "onboarding_guide_import_add",
     nextAction: "finish",
     nextLabelKey: "onboarding_guide_finish"
   }
 };
+
+let clearGuidedHighlight = () => {};
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
@@ -159,6 +162,30 @@ function clearGuidedCardUiState(page) {
   } catch (_) {
     // Ignore session storage failures for optional UI state.
   }
+}
+
+function removeGuidedHighlight() {
+  clearGuidedHighlight();
+  clearGuidedHighlight = () => {};
+}
+
+function applyGuidedHighlight(config) {
+  removeGuidedHighlight();
+  const selector = config?.highlightSelector || config?.launchSelector;
+  if (!selector) {
+    return;
+  }
+  const target = document.querySelector(selector);
+  if (!target) {
+    return;
+  }
+
+  target.classList.add("onboarding-tour-target-active");
+  target.setAttribute("data-onboarding-highlight", "true");
+  clearGuidedHighlight = () => {
+    target.classList.remove("onboarding-tour-target-active");
+    target.removeAttribute("data-onboarding-highlight");
+  };
 }
 
 function initOnboardingTours() {
@@ -291,6 +318,7 @@ function renderGuidedSetupCard(stepKey) {
   `;
 
   document.body.appendChild(card);
+  applyGuidedHighlight(config);
 
   const minimizeButton = card.querySelector(".onboarding-tour-minimize");
   const closeButton = card.querySelector(".onboarding-tour-close");
@@ -312,25 +340,27 @@ function renderGuidedSetupCard(stepKey) {
     syncMinimizedState(!card.classList.contains("is-minimized"));
   });
   closeButton?.addEventListener("click", () => {
+    removeGuidedHighlight();
     writeGuidedCardUiState(stepKey, { minimized: false, closed: true });
     card.remove();
   });
   card.querySelector(".onboarding-guide-back")?.addEventListener("click", () => {
-    advanceGuidedSetup("back", stepKey, card);
+    advanceGuidedSetup("back", stepKey, card, config);
   });
   card.querySelector(".onboarding-guide-next")?.addEventListener("click", () => {
-    advanceGuidedSetup(config.nextAction, stepKey, card);
+    advanceGuidedSetup(config.nextAction, stepKey, card, config);
   });
   card.querySelector(".onboarding-guide-skip")?.addEventListener("click", () => {
-    advanceGuidedSetup("skip", stepKey, card);
+    advanceGuidedSetup("skip", stepKey, card, config);
   });
 
   syncMinimizedState(uiState.minimized);
 }
 
-async function advanceGuidedSetup(action, stepKey, card) {
+async function advanceGuidedSetup(action, stepKey, card, config) {
   const buttons = Array.from(card.querySelectorAll("button"));
   buttons.forEach((button) => button.setAttribute("disabled", "true"));
+  removeGuidedHighlight();
 
   try {
     const response = await apiFetch("/api/me/onboarding/guide", {
@@ -354,6 +384,7 @@ async function advanceGuidedSetup(action, stepKey, card) {
     window.location.href = result?.redirect_to || "/transactions";
   } catch (error) {
     console.error("Failed to update guided onboarding state", error);
+    applyGuidedHighlight(config);
     buttons.forEach((button) => button.removeAttribute("disabled"));
   }
 }

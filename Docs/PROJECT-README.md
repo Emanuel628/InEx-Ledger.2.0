@@ -10,22 +10,38 @@ https://inexledger.com
 
 ## Current Status
 
-InEx Ledger is in final production stabilization.
+As of 2026-05-19, InEx Ledger is in late production stabilization with a mostly complete product surface and a smaller set of remaining release blockers.
 
-The core product is implemented and the repo is now focused on launch polish, smoke testing, and production verification rather than major new feature development.
+The core product is implemented. Current repo work is focused on launch hardening, end-to-end verification, and cleanup follow-through rather than major new feature development.
+
+Most of the recent critical E2E findings have already been fixed in `main`, including:
+
+- fresh-database migration boot
+- export description preservation
+- CSV import date-default behavior
+- Stripe price env validation alignment
+- onboarding collection of PDF-required business fields
+
+The main items still needing resolution or live verification are:
+
+- production verification that `/api/receipts` no longer 500s
+- dev/runtime validation gap for `CSRF_SECRET`
+- privacy-consent persistence right after registration
+- unauthenticated cookie-consent CSRF behavior
+- remaining cleanup and launch-verification items tracked under `Work-To-Do/`
 
 Current readiness estimate:
 
-- Product completeness: 89-93%
-- Technical foundation: 90-93%
+- Product completeness: 91-94%
+- Technical foundation: 91-94%
 - Security/auth structure: 88-91%
-- Frontend polish: 84-88%
-- Production readiness: 82-87%
+- Frontend polish: 86-90%
+- Production readiness: 84-89%
 
 Recommended launch posture:
 
-- Soft launch: ready after smoke testing
-- Paid/public launch: ready after live billing, receipt upload, export, auth, and mobile flows are verified end-to-end
+- Soft launch: close, but hold until the remaining verification blockers above are cleared
+- Paid/public launch: ready after live billing, receipts, auth/privacy, and mobile flows are verified end-to-end
 
 ## Product Scope
 
