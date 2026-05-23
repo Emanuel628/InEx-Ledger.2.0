@@ -967,6 +967,53 @@ function computeAttachedReceiptSummary(transactions, receipts, supportArtifactMa
   };
 }
 
+function summarizeSupportArtifacts(transactions, supportArtifactMap) {
+  const txIds = new Set((transactions || []).map((txn) => txn?.id).filter(Boolean));
+  const summary = {
+    totalCount: 0,
+    transactionCount: 0,
+    acceptedCount: 0,
+    pendingCount: 0,
+    reviewNoteCount: 0,
+    mileageLogCount: 0,
+    allocationWorksheetCount: 0,
+    homeOfficeWorksheetCount: 0,
+    capitalAssetSupportCount: 0,
+    receiptLikeCount: 0
+  };
+
+  if (!(supportArtifactMap instanceof Map)) {
+    return summary;
+  }
+
+  for (const [transactionId, artifacts] of supportArtifactMap.entries()) {
+    if (!txIds.has(transactionId)) continue;
+    const eligible = (artifacts || []).filter((artifact) => {
+      const storageStatus = String(artifact?.storage_status || artifact?.storageStatus || "present").trim().toLowerCase();
+      return storageStatus !== "deleted";
+    });
+    if (!eligible.length) continue;
+
+    summary.transactionCount += 1;
+    for (const artifact of eligible) {
+      const type = String(artifact?.artifact_type || artifact?.artifactType || "").trim().toLowerCase();
+      const reviewStatus = String(artifact?.review_status || artifact?.reviewStatus || "pending").trim().toLowerCase();
+      summary.totalCount += 1;
+      if (reviewStatus === "accepted") summary.acceptedCount += 1;
+      else summary.pendingCount += 1;
+
+      if (type === "review_note") summary.reviewNoteCount += 1;
+      else if (type === "mileage_log") summary.mileageLogCount += 1;
+      else if (type === "allocation_worksheet") summary.allocationWorksheetCount += 1;
+      else if (type === "home_office_worksheet") summary.homeOfficeWorksheetCount += 1;
+      else if (type === "capital_asset_support") summary.capitalAssetSupportCount += 1;
+      else if (type === "receipt" || type === "invoice") summary.receiptLikeCount += 1;
+    }
+  }
+
+  return summary;
+}
+
 function buildReceiptFilenameMap(receipts) {
   const map = new Map();
   for (const receipt of receipts || []) {
@@ -1939,10 +1986,11 @@ function summarizeVehicleCosts(vehicleCosts, currency) {
   };
 }
 
-function buildSupportPages(receipts, transactions, mileage, vehicleCosts, labels, currency, reviewInsights, region) {
+function buildSupportPages(receipts, transactions, mileage, vehicleCosts, supportArtifactMap, labels, currency, reviewInsights, region) {
   const canvas = new PdfCanvas();
   const header = drawReportHeader(canvas, { title: labels.support_title, subtitle: normalizeRegionCode(region) === "CA" ? "Support dashboard and final CRA review notes" : "Support dashboard and final IRS review notes", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
   const vehicleSummary = summarizeVehicleCosts(vehicleCosts, currency);
+  const artifactSummary = summarizeSupportArtifacts(transactions, supportArtifactMap);
   const top = header.contentStartY - 8;
   canvas.drawCard(40, top, 252, 126, "Vehicle Review", [
     `Transactions: ${reviewInsights.vehicleCount}`,
@@ -1969,8 +2017,14 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, labels
     `Missing receipt: ${reviewInsights.missingReceiptCount}`,
     `Coverage: ${reviewInsights.expenseTransactionCount ? `${((reviewInsights.receiptLinkedCount / reviewInsights.expenseTransactionCount) * 100).toFixed(1)}%` : "-"}`
   ], { maxChars: 34 });
+  canvas.drawCard(40, top - 256, 252, 98, "Support Artifact Summary", [
+    `Artifacts linked: ${artifactSummary.totalCount} across ${artifactSummary.transactionCount} transactions`,
+    `Accepted: ${artifactSummary.acceptedCount} | Pending: ${artifactSummary.pendingCount}`,
+    `Review notes: ${artifactSummary.reviewNoteCount} | Mileage logs: ${artifactSummary.mileageLogCount}`,
+    `Allocation worksheets: ${artifactSummary.allocationWorksheetCount} | Receipt-like files: ${artifactSummary.receiptLikeCount}`
+  ], { maxChars: 34 });
   if (reviewInsights.homeOfficeCount > 0) {
-    canvas.drawCard(40, top - 256, 252, 74, "Home Office Review", [
+    canvas.drawCard(320, top - 256, 252, 74, "Home Office Review", [
       `Total amount: ${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)}`,
       `Square-foot allocation and support needed`
     ], { maxChars: 34 });
@@ -1980,10 +2034,11 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, labels
     .sort((a, b) => Number(b.__businessAmounts?.deductibleAmount ?? b.__businessAmounts?.netAmount ?? 0) - Number(a.__businessAmounts?.deductibleAmount ?? a.__businessAmounts?.netAmount ?? 0))
     .slice(0, 5)
     .map((txn) => `${truncateText(buildTransactionText(txn) || "(No description)", 34)} - ${formatCurrencyForPdf(Number(txn.__businessAmounts?.deductibleAmount ?? txn.__businessAmounts?.netAmount ?? 0), currency)} - ${txn.__status.flags.join(" ")}`);
-  canvas.drawCard(320, top - 256, 252, 132, "Top Exceptions", topExceptions.length ? topExceptions : ["No large flagged exceptions detected."], { maxChars: 34 });
-  canvas.drawCard(40, top - 444, 532, 78, "Final Disclosure", [
+  canvas.drawCard(40, top - 372, 532, 132, "Top Exceptions", topExceptions.length ? topExceptions : ["No large flagged exceptions detected."], { maxChars: 90 });
+  canvas.drawCard(40, top - 520, 532, 92, "Final Disclosure", [
     "Potential deductible amounts shown here are bookkeeping workpaper estimates only.",
-    "Draft - CPA review required. Not a filed tax return."
+    "Draft - CPA review required. Not a filed tax return.",
+    `Support artifact package currently includes ${artifactSummary.totalCount} linked items across ${artifactSummary.transactionCount} transactions.`
   ], { maxChars: 90 });
   return [canvas];
 }
@@ -2383,7 +2438,7 @@ function buildPdfExportDocument(options) {
     ...evidenceSchedulePages,
     ...buildExclusionPages(excludedTransactions, effectiveCurrency, labels),
     ...buildCpaChecklistPage({ labels, region: normalizedRegion, reviewInsights, currency: effectiveCurrency }),
-    ...buildSupportPages(receipts, includedTransactions, mileage, vehicleCosts, labels, effectiveCurrency, reviewInsights, normalizedRegion),
+    ...buildSupportPages(receipts, includedTransactions, mileage, vehicleCosts, effectiveSupportArtifactMap, labels, effectiveCurrency, reviewInsights, normalizedRegion),
     // Phase 2 supporting schedules — only included when data exists
     ...vehicleSchedulePages,
     ...capitalAssetPages,

@@ -393,6 +393,8 @@ test("phase 3 PDF adds unresolved exceptions and evidence schedules", () => {
   assert.match(pdf, /Evidence Schedule/i);
   assert.match(pdf, /Open blocker summary/i);
   assert.match(pdf, /mileage\.pdf/i);
+  assert.match(pdf, /Support Artifact Summary/i);
+  assert.match(pdf, /Review notes: 1 \| Mileage logs: 1/i);
 });
 
 test("executive summary and mapping pages keep truly unmapped counts consistent", () => {
