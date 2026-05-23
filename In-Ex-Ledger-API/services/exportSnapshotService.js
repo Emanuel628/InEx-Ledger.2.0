@@ -217,7 +217,7 @@ async function createExportSnapshot({
      ) VALUES (
        $1, $2, $3, $4, $5, $6,
        $7, $8, $9, $10, $11,
-       $12, 'snapshotted', $13, CASE WHEN $13 THEN NOW() ELSE NULL END, CASE WHEN $13 THEN $4 ELSE NULL END
+       $12, 'snapshotted', $13, CASE WHEN $13::boolean THEN NOW() ELSE NULL END, CASE WHEN $13::boolean THEN $4::uuid ELSE NULL END
      )`,
     [
       snapshotId,
