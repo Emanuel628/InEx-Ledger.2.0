@@ -340,6 +340,33 @@ test("guided setup import step finishes onboarding", async () => {
   }
 });
 
+test("PUT /api/me/onboarding rejects non-numeric activity codes before opening a transaction", async () => {
+  const fixture = loadMeRouterFixture();
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .put("/api/me/onboarding")
+      .send({
+        business_name: "My Business",
+        business_type: "sole_proprietor",
+        region: "US",
+        language: "en",
+        starter_account_type: "checking",
+        starter_account_name: "Primary Checking",
+        business_activity_code: "ABC123",
+        accounting_method: "cash",
+        material_participation: "yes",
+        address: "123 Main St, Miami, FL 33101, USA"
+      });
+
+    assert.equal(response.status, 400);
+    assert.match(String(response.body?.error || ""), /6 digits/i);
+    assert.equal(fixture.state.txQueries.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("guided setup replay finish returns directly to transactions instead of trial setup", async () => {
   const fixture = loadMeRouterFixture({
     currentOnboardingData: {

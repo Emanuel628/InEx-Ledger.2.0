@@ -53,6 +53,7 @@ const MAX_BUSINESS_ACTIVITY_CODE_LENGTH = 50;
 const MAX_BUSINESS_ADDRESS_LENGTH = 500;
 const VALID_ACCOUNTING_METHODS = new Set(["cash", "accrual"]);
 const VALID_MATERIAL_PARTICIPATION = new Set(["yes", "no"]);
+const BUSINESS_ACTIVITY_CODE_PATTERN = /^\d{6}$/;
 
 function buildTrialSetupRedirect(nextPath = "/transactions") {
   const normalized = String(nextPath || "/transactions").trim();
@@ -319,6 +320,9 @@ router.put("/onboarding", async (req, res) => {
   }
   if (!businessActivityCode) {
     return res.status(400).json({ error: "Business activity code is required for PDF exports." });
+  }
+  if (!BUSINESS_ACTIVITY_CODE_PATTERN.test(businessActivityCode)) {
+    return res.status(400).json({ error: "Business activity code must be exactly 6 digits." });
   }
   if (businessActivityCode.length > MAX_BUSINESS_ACTIVITY_CODE_LENGTH) {
     return res.status(400).json({ error: `Business activity code must be ${MAX_BUSINESS_ACTIVITY_CODE_LENGTH} characters or fewer.` });

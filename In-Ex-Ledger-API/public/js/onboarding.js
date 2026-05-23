@@ -130,15 +130,14 @@ function readGuidedCardUiState(page) {
   try {
     const raw = window.sessionStorage?.getItem(getGuidedCardUiStateKey(page));
     if (!raw) {
-      return { minimized: false, closed: false };
+      return { minimized: false };
     }
     const parsed = JSON.parse(raw);
     return {
-      minimized: !!parsed?.minimized,
-      closed: !!parsed?.closed
+      minimized: !!parsed?.minimized
     };
   } catch (_) {
-    return { minimized: false, closed: false };
+    return { minimized: false };
   }
 }
 
@@ -147,8 +146,7 @@ function writeGuidedCardUiState(page, state = {}) {
     window.sessionStorage?.setItem(
       getGuidedCardUiStateKey(page),
       JSON.stringify({
-        minimized: !!state.minimized,
-        closed: !!state.closed
+        minimized: !!state.minimized
       })
     );
   } catch (_) {
@@ -282,9 +280,6 @@ function renderGuidedSetupCard(stepKey) {
     return;
   }
   const uiState = readGuidedCardUiState(stepKey);
-  if (uiState.closed) {
-    return;
-  }
 
   const card = document.createElement("div");
   card.id = "onboardingTourCard";
@@ -338,7 +333,7 @@ function renderGuidedSetupCard(stepKey) {
       minimizeButton.setAttribute("aria-label", minimized ? "Expand setup card" : "Minimize setup card");
       minimizeButton.setAttribute("title", minimized ? "Expand" : "Minimize");
     }
-    writeGuidedCardUiState(stepKey, { minimized, closed: false });
+    writeGuidedCardUiState(stepKey, { minimized });
   };
 
   card.querySelector(".onboarding-guide-launch")?.addEventListener("click", () => {
@@ -349,7 +344,6 @@ function renderGuidedSetupCard(stepKey) {
   });
   closeButton?.addEventListener("click", () => {
     removeGuidedHighlight();
-    writeGuidedCardUiState(stepKey, { minimized: false, closed: true });
     card.remove();
   });
   card.querySelector(".onboarding-guide-back")?.addEventListener("click", () => {

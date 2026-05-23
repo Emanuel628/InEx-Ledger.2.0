@@ -5,6 +5,7 @@ let onboardingAccountNameTouched = false;
 const ONBOARDING_REGION_KEY = "lb_region";
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const GUIDED_SETUP_STEPS = new Set(["categories", "accounts", "transactions", "import"]);
+const BUSINESS_ACTIVITY_CODE_PATTERN = /^\d{6}$/;
 const ONBOARDING_FIELD_HELP_KEYS = {
   businessName: "onboarding_help_business_name",
   accountType: "onboarding_help_account_type",
@@ -185,6 +186,10 @@ async function handleOnboardingSubmit(event) {
   }
   if (!payload.business_activity_code) {
     setOnboardingMessage(tx("onboarding_error_activity_code"));
+    return;
+  }
+  if (!BUSINESS_ACTIVITY_CODE_PATTERN.test(payload.business_activity_code)) {
+    setOnboardingMessage(tx("onboarding_error_activity_code_format"));
     return;
   }
   if (!payload.accounting_method) {

@@ -468,6 +468,34 @@ test("onboarding: PUT CA region without province returns 400", async () => {
   assert.match(res.body.error, /[Pp]rovince/);
 });
 
+test("onboarding: PUT with non-numeric activity code returns 400", async () => {
+  const router = require("../routes/me.routes.js");
+  const app = buildApp(router, "/api/me");
+  const token = makeToken();
+  const csrf = generateCsrfToken();
+
+  const res = await request(app)
+    .put("/api/me/onboarding")
+    .set("Authorization", `Bearer ${token}`)
+    .set(CSRF_HEADER_NAME, csrf)
+    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
+    .send({
+      business_name: "Test Co",
+      business_type: "sole_proprietor",
+      region: "US",
+      language: "en",
+      starter_account_type: "checking",
+      starter_account_name: "Checking",
+      business_activity_code: "12A456",
+      accounting_method: "cash",
+      material_participation: "yes",
+      address: "123 Main St, Miami, FL 33101, USA"
+    });
+
+  assert.equal(res.status, 400);
+  assert.match(res.body.error, /6 digits/i);
+});
+
 test("onboarding: PUT with invalid business type returns 400", async () => {
   const router = require("../routes/me.routes.js");
   const app = buildApp(router, "/api/me");
