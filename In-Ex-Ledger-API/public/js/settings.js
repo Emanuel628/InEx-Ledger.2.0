@@ -66,9 +66,9 @@ const CA_PROVINCE_NAMES = {
   YT: "Yukon"
 };
 const SETTINGS_BUSINESS_TYPE_KEYS = {
-  sole_proprietor: "settings_business_type_sole_prop",
-  llc: "settings_business_type_llc",
-  s_corp: "settings_business_type_scorp",
+  sole_proprietorship: "settings_business_type_sole_prop",
+  single_member_llc: "settings_business_type_single_member_llc",
+  limited_liability_company: "settings_business_type_llc",
   partnership: "settings_business_type_partnership",
   corporation: "settings_business_type_corporation"
 };
@@ -657,7 +657,7 @@ async function initBusinessProfileForm() {
 
 function applyBusinessProfileForm(profile) {
   document.getElementById("business-name").value = profile.name || "";
-  document.getElementById("business-type-select").value = profile.type || "sole_proprietor";
+  document.getElementById("business-type-select").value = profile.type || "";
   document.getElementById("fiscal-year").value = fiscalYearStorageToInput(profile.fiscalYearStart);
   document.getElementById("operating-name").value = profile.operatingName || "";
   document.getElementById("business-activity-code").value = profile.businessActivityCode || "";
@@ -674,6 +674,10 @@ function applyBusinessProfileForm(profile) {
   document.getElementById("address-state").value = addrParts[3] || "";
   document.getElementById("address-postal").value = addrParts[4] || "";
   document.getElementById("address-country").value = addrParts[5] || "";
+
+  const region = businessSettingsState?.region || "us";
+  syncBusinessTypeOptions(region);
+  syncBusinessFormRegionFields(region);
 }
 
 async function renderBusinessList() {
@@ -886,7 +890,7 @@ async function openBusinessEditModal(businessId) {
 
   document.getElementById("businessEditId").value = businessId;
   document.getElementById("businessEditName").value = payload.name || "";
-  document.getElementById("businessEditType").value = payload.business_type || "sole_proprietor";
+  document.getElementById("businessEditType").value = payload.business_type || "";
   document.getElementById("businessEditFiscalYear").value = fiscalYearStorageToInput(payload.fiscal_year_start);
   document.getElementById("businessEditOperatingName").value = payload.operating_name || "";
   document.getElementById("businessEditActivityCode").value = payload.business_activity_code || "";
@@ -1242,22 +1246,35 @@ async function saveBusinessProfileToApi(profile) {
 }
 
 function syncBusinessTypeOptions(region) {
-  const businessTypeSelect = document.getElementById("business-type-select");
-  if (!businessTypeSelect) return;
   const isCA = normalizeSettingsRegion(region) === "ca";
   const isUS = !isCA;
-  Array.from(businessTypeSelect.options).forEach((opt) => {
-    const showFor = opt.getAttribute("data-region-show");
-    if (!showFor) return;
-    const shouldShow = (showFor === "us" && isUS) || (showFor === "ca" && isCA);
-    opt.hidden = !shouldShow;
-    opt.disabled = !shouldShow;
+  [
+    document.getElementById("business-type-select"),
+    document.getElementById("businessEditType")
+  ].forEach((sel) => {
+    if (!sel) return;
+    Array.from(sel.options).forEach((opt) => {
+      const showFor = opt.getAttribute("data-region-show");
+      if (!showFor) return;
+      const shouldShow = (showFor === "us" && isUS) || (showFor === "ca" && isCA);
+      opt.hidden = !shouldShow;
+      opt.disabled = !shouldShow;
+    });
+    const selected = sel.options[sel.selectedIndex];
+    if (selected && selected.hidden) {
+      sel.value = "";
+    }
   });
-  // If the currently selected option is now hidden, fall back to sole_proprietor
-  const selected = businessTypeSelect.options[businessTypeSelect.selectedIndex];
-  if (selected && selected.hidden) {
-    businessTypeSelect.value = "sole_proprietor";
-  }
+}
+
+function syncBusinessFormRegionFields(region) {
+  const isCA = normalizeSettingsRegion(region) === "ca";
+  const isUS = !isCA;
+  document.querySelectorAll("#businessProfileForm [data-region-show]").forEach((el) => {
+    const showFor = el.getAttribute("data-region-show");
+    const visible = (showFor === "us" && isUS) || (showFor === "ca" && isCA);
+    el.hidden = !visible;
+  });
 }
 
 async function initPreferences() {
@@ -1316,6 +1333,7 @@ async function initPreferences() {
       applyRegionHardening(region, province || "");
     }
     syncBusinessTypeOptions(region);
+    syncBusinessFormRegionFields(region);
   };
 
   const syncPreferenceControls = (state) => {
@@ -1982,6 +2000,7 @@ function refreshSettingsLocalizedState() {
     applyRegionHardening(currentRegion, currentProvince);
   }
   syncBusinessTypeOptions(currentRegion);
+  syncBusinessFormRegionFields(currentRegion);
   syncSettingsOverviewSummaries();
 }
 
