@@ -510,9 +510,24 @@ function syncSettingsOverviewSummaries() {
   syncSettingsHeroState();
 }
 
+function wireActivityCodeInput(inputId) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  el.addEventListener("keydown", (e) => {
+    const allow = e.key === "Backspace" || e.key === "Delete" || e.key === "Tab" ||
+      e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Home" || e.key === "End" ||
+      (e.key >= "0" && e.key <= "9");
+    if (!allow) e.preventDefault();
+  });
+  el.addEventListener("input", () => {
+    el.value = el.value.replace(/\D/g, "").slice(0, 6);
+  });
+}
+
 async function initBusinessProfileForm() {
   const form = document.getElementById("businessProfileForm");
   if (!form) return;
+  wireActivityCodeInput("business-activity-code");
 
   const profile = await loadBusinessProfile();
   applyBusinessProfileForm(profile);
@@ -903,6 +918,7 @@ function closeBusinessEditModal() {
 }
 
 function wireBusinessEditModal() {
+  wireActivityCodeInput("businessEditActivityCode");
   const modal = document.getElementById("businessEditModal");
   const form = document.getElementById("businessEditForm");
   const cancelButton = document.getElementById("businessEditCancel");

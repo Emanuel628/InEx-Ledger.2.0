@@ -228,7 +228,7 @@
             </div>
             <div class="form-field">
               <label for="business-activity-code">Business activity code</label>
-              <input type="text" id="business-activity-code" name="business_activity_code" placeholder="NAICS / business activity code" />
+              <input type="text" id="business-activity-code" name="business_activity_code" placeholder="6-digit NAICS code" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" />
             </div>
             <div class="form-field">
               <label for="accounting-method">Accounting method</label>
@@ -771,7 +771,7 @@
           </div>
           <div class="form-field">
             <label for="businessEditActivityCode">Business activity code</label>
-            <input type="text" id="businessEditActivityCode" />
+            <input type="text" id="businessEditActivityCode" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="6-digit NAICS code" />
           </div>
         </div>
         <div class="modal-actions">
