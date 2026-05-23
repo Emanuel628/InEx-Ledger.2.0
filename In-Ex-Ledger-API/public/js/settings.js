@@ -962,10 +962,10 @@ function wireBusinessEditModal() {
       const activeBusinessId = window.__LUNA_ME__?.active_business_id || window.__LUNA_ME__?.active_business?.id || "";
       if (businessId === activeBusinessId) {
         const currentProfile = getBusinessProfile();
-        const updatedProfile = {
+      const updatedProfile = {
           ...currentProfile,
           name: payload?.name || currentProfile.name || "",
-          type: payload?.business_type || currentProfile.type || "sole_proprietor",
+          type: payload?.business_type || currentProfile.type || "",
           fiscalYearStart: payload?.fiscal_year_start || currentProfile.fiscalYearStart || "",
           address: payload?.address || currentProfile.address || "",
           operatingName: payload?.operating_name || currentProfile.operatingName || "",
@@ -1180,7 +1180,7 @@ async function initAccountingLockPanel() {
 async function loadBusinessProfile() {
   const emptyProfile = {
     name: "",
-    type: "sole_proprietor",
+    type: "",
     fiscalYearStart: "",
     address: "",
     operatingName: "",
@@ -1201,7 +1201,7 @@ async function loadBusinessProfile() {
     const business = await response.json().catch(() => null);
     const profile = {
       name: business?.name || "",
-      type: business?.business_type || "sole_proprietor",
+      type: business?.business_type || "",
       fiscalYearStart: business?.fiscal_year_start || "",
       address: serializeBusinessAddress(parseBusinessAddress(business?.address || "")),
       operatingName: business?.operating_name || "",

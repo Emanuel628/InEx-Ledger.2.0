@@ -14,8 +14,7 @@ const ONBOARDING_FIELD_HELP_KEYS = {
   province: "onboarding_help_province",
   activityCode: "onboarding_help_activity_code",
   accountingMethod: "onboarding_help_accounting_method",
-  materialParticipation: "onboarding_help_material_participation",
-  businessAddress: "onboarding_help_business_address"
+  materialParticipation: "onboarding_help_material_participation"
 };
 const STARTER_ACCOUNT_NAME_PRESETS = {
   checking: { US: "Primary Checking", CA: "Primary Chequing" },
@@ -132,14 +131,6 @@ function hydrateOnboardingDefaults(profile = {}) {
       (business.material_participation === false ? "no" : "yes");
   }
 
-  const elBusinessAddress = document.getElementById("onboardingBusinessAddress");
-  if (elBusinessAddress) {
-    elBusinessAddress.value =
-      onboardingData.address ||
-      business.address ||
-      "";
-  }
-
   syncStarterAccountName();
   updateOnboardingPlanPreview();
 
@@ -158,9 +149,8 @@ async function handleOnboardingSubmit(event) {
     localStorage.getItem("lb_language") ||
     "en";
 
-    const payload = {
+  const payload = {
     business_name: document.getElementById("onboardingBusinessName")?.value.trim() || "",
-    business_type: resolveOnboardingBusinessType(),
     starter_account_type: document.getElementById("onboardingStarterAccountType")?.value || "checking",
     starter_account_name: document.getElementById("onboardingStarterAccountName")?.value.trim() || "",
     region: document.getElementById("onboardingRegion")?.value || "US",
@@ -168,7 +158,6 @@ async function handleOnboardingSubmit(event) {
     business_activity_code: document.getElementById("onboardingBusinessActivityCode")?.value.trim() || "",
     accounting_method: document.getElementById("onboardingAccountingMethod")?.value || "cash",
     material_participation: document.getElementById("onboardingMaterialParticipation")?.value || "yes",
-    address: document.getElementById("onboardingBusinessAddress")?.value.trim() || "",
     language: savedLanguage
   };
 
@@ -200,11 +189,6 @@ async function handleOnboardingSubmit(event) {
     setOnboardingMessage(tx("onboarding_error_material_participation"));
     return;
   }
-  if (!payload.address) {
-    setOnboardingMessage(tx("onboarding_error_business_address"));
-    return;
-  }
-
   setOnboardingMessage("");
   onboardingSubmitting = true;
   submitButton?.setAttribute("disabled", "true");
@@ -239,11 +223,6 @@ async function handleOnboardingSubmit(event) {
     submitButton?.removeAttribute("disabled");
     onboardingSubmitting = false;
   }
-}
-
-function resolveOnboardingBusinessType() {
-  const value = document.getElementById("onboardingBusinessType")?.value;
-  return String(value || "sole_proprietorship").trim() || "sole_proprietorship";
 }
 
 function syncStarterAccountName() {

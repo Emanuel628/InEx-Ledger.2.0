@@ -236,7 +236,6 @@ test("PUT /api/me/onboarding creates a starter account when the business has non
       .put("/api/me/onboarding")
       .send({
         business_name: "My Business",
-        business_type: "sole_proprietor",
         region: "US",
         language: "en",
         starter_account_type: "checking",
@@ -244,8 +243,7 @@ test("PUT /api/me/onboarding creates a starter account when the business has non
         start_focus: "transactions",
         business_activity_code: "541611",
         accounting_method: "cash",
-        material_participation: "yes",
-        address: "123 Main St, Miami, FL 33101, USA"
+        material_participation: "yes"
       });
 
     assert.equal(response.status, 200);
@@ -260,7 +258,7 @@ test("PUT /api/me/onboarding creates a starter account when the business has non
     assert.ok(insertIdx !== -1, "onboarding should insert starter account");
     assert.ok(existingIdx < insertIdx, "account existence check should happen before starter insert");
     const businessUpdate = fixture.state.txQueries.find((entry) => /UPDATE businesses/i.test(entry.sql));
-    assert.equal(businessUpdate?.params?.[1], "sole_proprietorship");
+    assert.equal(businessUpdate?.params?.[1], "US");
     assert.equal(fixture.state.clientReleased, true);
   } finally {
     fixture.cleanup();
@@ -275,7 +273,6 @@ test("PUT /api/me/onboarding rejects oversized business names before opening a t
       .put("/api/me/onboarding")
       .send({
         business_name: "B".repeat(201),
-        business_type: "sole_proprietor",
         region: "US",
         language: "en"
       });
@@ -350,15 +347,13 @@ test("PUT /api/me/onboarding rejects non-numeric activity codes before opening a
       .put("/api/me/onboarding")
       .send({
         business_name: "My Business",
-        business_type: "sole_proprietor",
         region: "US",
         language: "en",
         starter_account_type: "checking",
         starter_account_name: "Primary Checking",
         business_activity_code: "ABC123",
         accounting_method: "cash",
-        material_participation: "yes",
-        address: "123 Main St, Miami, FL 33101, USA"
+        material_participation: "yes"
       });
 
     assert.equal(response.status, 400);

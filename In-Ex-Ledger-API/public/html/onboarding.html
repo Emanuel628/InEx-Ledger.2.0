@@ -62,7 +62,6 @@
             <input type="text" id="onboardingBusinessName" autocomplete="name" required data-i18n-placeholder="onboarding_business_name_placeholder" placeholder="e.g. Jane Smith or Jane's Design" />
             <p id="onboardingHelpBusinessName" class="onboarding-field-help" hidden></p>
           </div>
-          <input type="hidden" id="onboardingBusinessType" value="sole_proprietorship" />
           <div class="form-field">
             <label for="onboardingStarterAccountType" data-i18n="onboarding_first_account_type">Primary account type</label>
             <button type="button" class="onboarding-help-icon onboarding-field-help-toggle" data-help-key="accountType" aria-label="Help for primary account type" aria-expanded="false" aria-controls="onboardingHelpAccountType">i</button>
@@ -147,20 +146,6 @@
               <option value="no" data-i18n="common_no">No</option>
             </select>
             <p id="onboardingHelpMaterialParticipation" class="onboarding-field-help" hidden></p>
-          </div>
-
-          <div class="form-field form-field-full">
-            <label for="onboardingBusinessAddress" data-i18n="settings_label_business_address">Business address</label>
-            <button type="button" class="onboarding-help-icon onboarding-field-help-toggle" data-help-key="businessAddress" aria-label="Help for business address" aria-expanded="false" aria-controls="onboardingHelpBusinessAddress">i</button>
-            <textarea
-              id="onboardingBusinessAddress"
-              rows="3"
-              autocomplete="street-address"
-              data-i18n-placeholder="onboarding_business_address_placeholder"
-              placeholder="Street, city, state/province, ZIP/postal code, country"
-              required
-            ></textarea>
-            <p id="onboardingHelpBusinessAddress" class="onboarding-field-help" hidden></p>
           </div>
 
         </div>

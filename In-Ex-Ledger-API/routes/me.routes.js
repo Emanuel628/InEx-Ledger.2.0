@@ -26,17 +26,6 @@ const accountDeleteLimiter = rateLimit({
 
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
-const BUSINESS_TYPE_ALIASES = new Map([
-  ["sole_proprietor", "sole_proprietorship"],
-  ["sole_proprietorship", "sole_proprietorship"],
-  ["llc", "limited_liability_company"],
-  ["single_member_llc", "single_member_llc"],
-  ["limited_liability_company", "limited_liability_company"],
-  ["s_corp", "corporation"],
-  ["corporation", "corporation"],
-  ["partnership", "partnership"]
-]);
-const VALID_BUSINESS_TYPES = new Set(BUSINESS_TYPE_ALIASES.keys());
 const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
 const VALID_STARTER_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash", "loan"]);
 const GUIDED_SETUP_STEPS = ["categories", "accounts", "transactions", "import"];
@@ -60,7 +49,6 @@ const MAX_BUSINESS_NAME_LENGTH = 200;
 const MAX_STARTER_ACCOUNT_NAME_LENGTH = 120;
 const MAX_PROFILE_NAME_LENGTH = 120;
 const MAX_BUSINESS_ACTIVITY_CODE_LENGTH = 50;
-const MAX_BUSINESS_ADDRESS_LENGTH = 500;
 const VALID_ACCOUNTING_METHODS = new Set(["cash", "accrual"]);
 const VALID_MATERIAL_PARTICIPATION = new Set(["yes", "no"]);
 const BUSINESS_ACTIVITY_CODE_PATTERN = /^\d{6}$/;
@@ -90,11 +78,6 @@ function normalizeOptionalTrimmedStringWithLimit(value, maxLength) {
     return { error: `Must be ${maxLength} characters or fewer.` };
   }
   return normalized;
-}
-
-function normalizeBusinessType(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  return BUSINESS_TYPE_ALIASES.get(normalized) || "";
 }
 
 function normalizeUiPreferences(input) {
@@ -294,8 +277,6 @@ router.get("/onboarding", async (req, res) => {
 
 router.put("/onboarding", async (req, res) => {
   const businessName = String(req.body?.business_name || "").trim();
-  const businessType = String(req.body?.business_type || "").trim();
-  const normalizedBusinessType = normalizeBusinessType(businessType);
   const starterAccountType = String(req.body?.starter_account_type || "").trim().toLowerCase();
   const starterAccountName = normalizeOptionalTrimmedStringWithLimit(
     req.body?.starter_account_name,
@@ -307,7 +288,6 @@ router.put("/onboarding", async (req, res) => {
   const businessActivityCode = String(req.body?.business_activity_code || "").trim();
   const accountingMethod = String(req.body?.accounting_method || "").trim().toLowerCase();
   const materialParticipation = String(req.body?.material_participation || "").trim().toLowerCase();
-  const businessAddress = String(req.body?.address || "").trim();
   const language = String(req.body?.language || "").trim();
 
   if (!businessName) {
@@ -315,9 +295,6 @@ router.put("/onboarding", async (req, res) => {
   }
   if (businessName.length > MAX_BUSINESS_NAME_LENGTH) {
     return res.status(400).json({ error: `Business name must be ${MAX_BUSINESS_NAME_LENGTH} characters or fewer.` });
-  }
-  if (!VALID_BUSINESS_TYPES.has(businessType) || !normalizedBusinessType) {
-    return res.status(400).json({ error: "Choose a valid business type." });
   }
   if (!VALID_REGIONS.has(region)) {
     return res.status(400).json({ error: "Choose a valid region." });
@@ -349,12 +326,6 @@ router.put("/onboarding", async (req, res) => {
   if (!VALID_MATERIAL_PARTICIPATION.has(materialParticipation)) {
     return res.status(400).json({ error: "Choose whether you are active in this business." });
   }
-  if (!businessAddress) {
-    return res.status(400).json({ error: "Business address is required for PDF exports." });
-  }
-  if (businessAddress.length > MAX_BUSINESS_ADDRESS_LENGTH) {
-    return res.status(400).json({ error: `Business address must be ${MAX_BUSINESS_ADDRESS_LENGTH} characters or fewer.` });
-  }
   if (starterAccountName?.error) {
     return res.status(400).json({ error: `Starter account name ${starterAccountName.error}` });
   }
@@ -384,28 +355,24 @@ router.put("/onboarding", async (req, res) => {
       await client.query(
         `UPDATE businesses
             SET name = $1,
-                business_type = $2,
-                region = $3,
-                language = $4,
+                region = $2,
+                language = $3,
                 province = CASE
-                  WHEN $3 = 'CA' THEN $5
+                  WHEN $2 = 'CA' THEN $4
                   ELSE NULL
                 END,
-                business_activity_code = $6,
-                accounting_method = $7,
-                material_participation = $8,
-                address = $9
-          WHERE id = $10`,
+                business_activity_code = $5,
+                accounting_method = $6,
+                material_participation = $7
+          WHERE id = $8`,
         [
           businessName,
-          normalizedBusinessType,
           region,
           language,
           province || null,
           businessActivityCode,
           accountingMethod,
           materialParticipation === "yes",
-          businessAddress,
           businessId
         ]
       );
@@ -427,7 +394,6 @@ router.put("/onboarding", async (req, res) => {
 
       const onboardingData = {
         business_name: businessName,
-        business_type: normalizedBusinessType,
         starter_account_type: normalizedStarterAccountType,
         starter_account_name: starterName,
         start_focus: normalizedStartFocus,
@@ -436,7 +402,6 @@ router.put("/onboarding", async (req, res) => {
         business_activity_code: businessActivityCode,
         accounting_method: accountingMethod,
         material_participation: materialParticipation,
-        address: businessAddress,
         language,
         recommended_categories: onboardingRecommendations.recommended_categories,
         setup_notes: onboardingRecommendations.setup_notes,
