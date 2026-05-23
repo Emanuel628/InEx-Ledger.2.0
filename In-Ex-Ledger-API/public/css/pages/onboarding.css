@@ -161,7 +161,7 @@
 
 .onboarding-tour-card {
   position: fixed;
-  right: 20px;
+  left: 20px;
   bottom: 20px;
   z-index: 90;
   width: min(360px, calc(100vw - 32px));
