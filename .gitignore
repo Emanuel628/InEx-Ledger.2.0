@@ -10,3 +10,7 @@ npm-debug.log*
 tmp-chrome/
 tmp-edge/
 tmp-*.txt
+.claude/
+In-Ex-Ledger-API/storage/
+In-Ex-Ledger-API/test-results/
+insert-i18n.js
