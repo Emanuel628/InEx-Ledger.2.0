@@ -97,16 +97,6 @@ function buildExportComplianceStatus(reviewInsights, vehicleClaimMap, capitalAss
 //   const vehicleClaim = vehicleClaimMap.get(txn.id) || null;
 //   const deduction = vehicleClaim ? vehicleClaim.calculated_deduction : 0;
 function generatePdfExportPair({ sharedOptions, taxId }) {
-  // --- Orchestration Audit ---
-  const _vcm = sharedOptions?.vehicleClaimMap;
-  const _ca = sharedOptions?.capitalAssets;
-  const _catm = sharedOptions?.capitalAssetTxMap;
-  console.log("[Orchestration Audit] vehicleClaimMap:", _vcm instanceof Map ? `Map(${_vcm.size})` : `NOT a Map — type=${typeof _vcm}, value=${_vcm}`);
-  console.log("[Orchestration Audit] capitalAssets:", Array.isArray(_ca) ? `Array(${_ca.length})` : `NOT an array — type=${typeof _ca}, value=${_ca}`);
-  console.log("[Orchestration Audit] capitalAssetTxMap:", _catm instanceof Map ? `Map(${_catm.size})` : `NOT a Map — type=${typeof _catm}, value=${_catm}`);
-  console.log("[Orchestration Audit] quickMethodSchedule:", sharedOptions?.quickMethodSchedule ? "present" : "null/undefined");
-  // --- End Audit ---
-
   const fullPdf = buildPdfExportDocument({ ...sharedOptions, taxId });
   const redactedPdf = buildPdfExportDocument({
     ...sharedOptions,
