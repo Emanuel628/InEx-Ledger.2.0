@@ -187,7 +187,9 @@ function loadExportsRouter(options = {}) {
             if (/FROM categories/i.test(sql)) return { rows: fixture.categories };
             if (/FROM receipts/i.test(sql)) return { rows: fixture.receipts };
             if (/FROM mileage/i.test(sql)) return { rows: fixture.mileage };
+            if (/FROM vehicle_expense_details/i.test(sql)) { state.vehicleCostQueryCount += 1; return { rows: [] }; }
             if (/FROM vehicle_costs/i.test(sql)) { state.vehicleCostQueryCount += 1; return { rows: fixture.vehicleCosts }; }
+            if (/FROM capital_assets/i.test(sql)) return { rows: [] };
             if (/FROM businesses/i.test(sql)) {
               return { rows: [{ name: fixture.businessName, region: "us", province: "", operating_name: fixture.operatingName, business_activity_code: fixture.naics, fiscal_year_start: "01-01", address: fixture.address, tax_id: fixture.taxId, accounting_method: fixture.accountingMethod, material_participation: true, gst_hst_registered: false, gst_hst_number: "", gst_hst_method: "", business_type: "sole_prop" }] };
             }
@@ -346,6 +348,37 @@ test("receipt and support metrics use distinct wording", () => {
   assert.match(pdf, /Expense transactions without receipt attachment: 3/i);
 });
 
+test("attached income receipts are surfaced in the PDF even when expense receipt coverage is zero", () => {
+  const pdf = buildPdfExport(buildFixtureOptions({
+    transactions: [
+      {
+        id: "tx_income_only",
+        type: "income",
+        amount: "1200.00",
+        categoryId: "cat_income",
+        accountId: "acc_main",
+        date: "2026-04-01",
+        description: "Client A invoice",
+        payer_name: "Acme Platform",
+        tax_form_type: "1099-K"
+      }
+    ],
+    receipts: [
+      { id: "r_income_1", transaction_id: "tx_income_only", filename: "invoice-proof-1.pdf" },
+      { id: "r_income_2", transaction_id: "tx_income_only", filename: "invoice-proof-2.pdf" },
+      { id: "r_income_3", transaction_id: "tx_income_only", filename: "invoice-proof-3.pdf" }
+    ],
+    mileage: [],
+    vehicleCosts: []
+  })).toString("latin1");
+
+  assert.match(pdf, /3 receipt files are attached across 1 transactions in this export\./i);
+  assert.match(pdf, /\(Attached receipt files: 3\) Tj/);
+  assert.match(pdf, /\(Transactions with receipts: 1\) Tj/);
+  assert.match(pdf, /Receipts: invoice-proof-1\.pdf, invo/i);
+  assert.match(pdf, /\(0 of 0 expense transactions have attached receipts\./i);
+});
+
 test("executive summary and mapping pages keep truly unmapped counts consistent", () => {
   const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
   assert.match(pdf, /1 imported \/ uncategorized transactions need real category assignment\./i);
@@ -455,7 +488,7 @@ test("route generate stores nonzero page count metadata and saves only the redac
       .post("/api/exports/generate")
       .buffer(true)
       .parse(parseBinaryResponse)
-      .send({ grantToken: "grant_token_123", taxId_jwe: "encrypted_tax_id" });
+      .send({ grantToken: "grant_token_123", taxId_jwe: "encrypted_tax_id", certifiedByUser: true });
 
     assert.equal(response.status, 200);
     assert.equal(response.headers["content-type"], "application/pdf");

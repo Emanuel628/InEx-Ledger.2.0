@@ -9,6 +9,7 @@ const {
     buildExclusionSummary,
     classifyExcludedTransaction,
     computeReceiptCoverage,
+    computeAttachedReceiptSummary,
     computePayerSummary,
     computeTaxLineSummary,
     expectedTaxFormForPayer,
@@ -34,6 +35,24 @@ test("computeReceiptCoverage counts only receipts attached to expense transactio
   assert.equal(cov.with_receipt, 1);
   assert.equal(cov.missing, 2);
   assert.equal(cov.coverage_pct, 33.3);
+});
+
+test("computeAttachedReceiptSummary counts receipt files on any included transaction type", () => {
+  const summary = computeAttachedReceiptSummary(
+    [
+      { id: "t1", type: "income" },
+      { id: "t2", type: "expense" },
+      { id: "t3", type: "income" }
+    ],
+    [
+      { transaction_id: "t1", filename: "income-1.pdf" },
+      { transaction_id: "t1", filename: "income-2.pdf" },
+      { transaction_id: "t2", filename: "expense-1.pdf" },
+      { transaction_id: "missing", filename: "ignored.pdf" }
+    ]
+  );
+  assert.equal(summary.transaction_count, 2);
+  assert.equal(summary.file_count, 3);
 });
 
 test("expectedTaxFormForPayer applies US and Canada thresholds", () => {

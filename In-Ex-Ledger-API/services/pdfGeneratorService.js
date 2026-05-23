@@ -897,6 +897,36 @@ function computeReceiptCoverage(transactions, receipts) {
   };
 }
 
+function computeAttachedReceiptSummary(transactions, receipts) {
+  const includedTxIds = new Set((transactions || []).map((txn) => txn?.id).filter(Boolean));
+  const txWithReceipts = new Set();
+  let attachedFileCount = 0;
+  for (const receipt of receipts || []) {
+    const txId = receipt?.transaction_id || receipt?.transactionId;
+    if (!includedTxIds.has(txId)) continue;
+    txWithReceipts.add(txId);
+    attachedFileCount += 1;
+  }
+  return {
+    transaction_count: txWithReceipts.size,
+    file_count: attachedFileCount
+  };
+}
+
+function buildReceiptFilenameMap(receipts) {
+  const map = new Map();
+  for (const receipt of receipts || []) {
+    const txId = receipt?.transaction_id || receipt?.transactionId;
+    if (!txId) continue;
+    const filename = String(receipt?.filename || "").trim();
+    if (!filename) continue;
+    const current = map.get(txId) || [];
+    current.push(filename);
+    map.set(txId, current);
+  }
+  return map;
+}
+
 function expectedTaxFormForPayer({ region, total, transactionCount, taxYear }) {
   const normalizedRegion = normalizeRegionCode(region);
   if (normalizedRegion === "CA") return total >= 500 ? "T4A" : null;
@@ -990,6 +1020,7 @@ function computeTaxLineSummary(transactions, categories, region) {
 
 function buildReviewInsights(transactions, categories, receipts, meta = {}) {
   const coverage = computeReceiptCoverage(transactions, receipts);
+  const attachmentSummary = computeAttachedReceiptSummary(transactions, receipts);
   const excluded = Array.isArray(meta.excluded) ? meta.excluded : [];
   const byExclusionCode = {};
   let needsCategoryCount = 0;
@@ -1064,6 +1095,8 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
     transactionCount: (transactions || []).length,
     expenseTransactionCount: coverage.expense_count,
     receiptLinkedCount: coverage.with_receipt,
+    transactionWithReceiptCount: attachmentSummary.transaction_count,
+    attachedReceiptFileCount: attachmentSummary.file_count,
     expenseWithoutReceiptAttachmentCount: coverage.missing,
     receiptCoverageText: `${coverage.with_receipt} of ${coverage.expense_count}`,
     missingReceiptCount,
@@ -1297,6 +1330,7 @@ function buildIdentityPage(data) {
     `${reviewInsights.needsCategoryCount} imported / uncategorized transactions need real category assignment.`,
     `${reviewInsights.unmappedTaxCount} categorized transactions remain truly unmapped after category review.`,
     `${reviewInsights.mappedNeedsSupportCount} mapped transactions still need support or final confirmation.`,
+    `${reviewInsights.attachedReceiptFileCount} receipt files are attached across ${reviewInsights.transactionWithReceiptCount} transactions in this export.`,
     `${reviewInsights.expenseWithoutReceiptAttachmentCount} expense transactions do not have receipt attachments.`,
     `${reviewInsights.vehicleCount} vehicle items require mileage or actual-expense support.`,
     `${reviewInsights.mealsCount} meal items require business-purpose support.`,
@@ -1496,8 +1530,9 @@ function buildTaxPacketPages({ transactions, categories, receipts, currency, reg
   return [canvas];
 }
 
-function buildTransactionPages(transactions, accounts, categories, currency, labels, region) {
+function buildTransactionPages(transactions, accounts, categories, receipts, currency, labels, region) {
   const accountMap = mapByKey(accounts || [], "id");
+  const receiptFilenameMap = buildReceiptFilenameMap(receipts);
   const sorted = [...(transactions || [])].sort((a, b) => normalizePdfDate(a.date).localeCompare(normalizePdfDate(b.date)));
   if (!sorted.length) {
     const canvas = new PdfCanvas();
@@ -1541,9 +1576,11 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
     }
     const status = txn.__status;
     const account = accountMap[txn?.account_id || txn?.accountId] || null;
+    const receiptFilenames = receiptFilenameMap.get(txn.id) || [];
     const primaryHeight = buildTransactionText(txn).length > 56 ? 28 : 14;
-    const secondaryNeeded = status.supportSummary ? 14 : 0;
-    ensureSpace(state, 22 + primaryHeight + secondaryNeeded, () => { pages.push(canvas); startPage(); });
+    const secondaryNeeded = 14;
+    const tertiaryNeeded = receiptFilenames.length ? 14 : 0;
+    ensureSpace(state, 22 + primaryHeight + secondaryNeeded + tertiaryNeeded, () => { pages.push(canvas); startPage(); });
     const amountValue = String(txn.type || "").toLowerCase() === "income"
       ? Number(txn.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn))
       : Number(txn.__businessAmounts?.deductibleAmount ?? normalizeMoneyAmount(txn));
@@ -1564,6 +1601,10 @@ function buildTransactionPages(transactions, accounts, categories, currency, lab
       : `Acct: ${safeValue(account?.name, "-")} | Cat: ${categoryName} | Support: ${status.supportSummary}`;
     canvas.text(104, state.y, truncateText(detail, 90), 7);
     state.y -= 14;
+    if (receiptFilenames.length) {
+      canvas.text(104, state.y, truncateText(`Receipts: ${receiptFilenames.join(", ")}`, 90), 7);
+      state.y -= 14;
+    }
     canvas.drawDivider(state.y + 4);
     state.y -= 6;
   }
@@ -1622,7 +1663,7 @@ function buildCpaChecklistPage(opts) {
   const canvas = new PdfCanvas();
   const header = drawReportHeader(canvas, { title: labels.checklist_title, subtitle: isCA ? "T2125 bookkeeping workpaper checklist" : "Schedule C bookkeeping workpaper checklist", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
   const items = [
-    { badge: reviewInsights.missingReceiptCount > 0 ? "ACTION" : "OK", title: "Receipts", description: `${reviewInsights.receiptLinkedCount} of ${reviewInsights.expenseTransactionCount} expense transactions have attached receipts.` },
+    { badge: reviewInsights.missingReceiptCount > 0 ? "ACTION" : "OK", title: "Receipts", description: `${reviewInsights.receiptLinkedCount} of ${reviewInsights.expenseTransactionCount} expense transactions have attached receipts. ${reviewInsights.attachedReceiptFileCount} receipt files are attached across ${reviewInsights.transactionWithReceiptCount} transactions in this export.` },
     { badge: reviewInsights.needsCategoryCount > 0 ? "ACTION" : "OK", title: "Category cleanup", description: `${reviewInsights.needsCategoryCount} imported or uncategorized transactions need real business categories before filing.` },
     { badge: reviewInsights.vehicleCount > 0 ? "ACTION" : "OK", title: "Vehicle support", description: `${reviewInsights.vehicleCount} vehicle/fuel transactions totaling ${formatCurrencyForPdf(reviewInsights.vehicleTotal, currency)} need mileage or actual-expense support.` },
     { badge: reviewInsights.mealsCount > 0 ? "REVIEW" : "OK", title: "Meals", description: `${reviewInsights.mealsCount} meal transactions totaling ${formatCurrencyForPdf(reviewInsights.mealsTotal, currency)} require business purpose documentation. Potential 50% limit applies.` },
@@ -1696,6 +1737,8 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, labels
     `Business-use percentage needed before final deduction`
   ], { maxChars: 34 });
   canvas.drawCard(320, top - 146, 252, 96, "Receipt Review", [
+    `Attached receipt files: ${reviewInsights.attachedReceiptFileCount}`,
+    `Transactions with receipts: ${reviewInsights.transactionWithReceiptCount}`,
     `With receipt: ${reviewInsights.receiptLinkedCount}`,
     `Missing receipt: ${reviewInsights.missingReceiptCount}`,
     `Coverage: ${reviewInsights.expenseTransactionCount ? `${((reviewInsights.receiptLinkedCount / reviewInsights.expenseTransactionCount) * 100).toFixed(1)}%` : "-"}`
@@ -2100,7 +2143,7 @@ function buildPdfExportDocument(options) {
     }),
     ...buildCategoryPages(includedTransactions, categories, receipts, effectiveCurrency, labels, 0, normalizedRegion),
     ...buildTaxPacketPages({ transactions: includedTransactions, categories, receipts, currency: effectiveCurrency, region: normalizedRegion, labels, taxYear }),
-    ...buildTransactionPages(includedTransactions, accounts, categories, effectiveCurrency, labels, normalizedRegion),
+    ...buildTransactionPages(includedTransactions, accounts, categories, receipts, effectiveCurrency, labels, normalizedRegion),
     ...buildExclusionPages(excludedTransactions, effectiveCurrency, labels),
     ...buildCpaChecklistPage({ labels, region: normalizedRegion, reviewInsights, currency: effectiveCurrency }),
     ...buildSupportPages(receipts, includedTransactions, mileage, vehicleCosts, labels, effectiveCurrency, reviewInsights, normalizedRegion),
@@ -2132,6 +2175,7 @@ module.exports = {
   buildPdfExportDocument,
   __private: {
     calculateTotals,
+    computeAttachedReceiptSummary,
     computeReceiptCoverage,
     computePayerSummary,
     computeTaxLineSummary,
