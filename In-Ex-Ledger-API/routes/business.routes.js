@@ -252,6 +252,16 @@ router.put("/", async (req, res) => {
 
     res.json(await updateBusinessRow(businessId, payload));
   } catch (err) {
+    const constraint = err.constraint || "";
+    if (constraint === "chk_business_activity_code") {
+      return res.status(400).json({ error: "Business Activity Code must be exactly 6 digits (e.g. 541511)." });
+    }
+    if (constraint === "chk_business_type") {
+      return res.status(400).json({ error: "The selected entity type is not valid for this region." });
+    }
+    if (constraint === "chk_ca_entity_match") {
+      return res.status(400).json({ error: "Single-member LLC is not a recognized entity type in Canada. Use Sole Proprietorship or another supported type." });
+    }
     logError("PUT /business error:", err.stack || err);
     res.status(500).json({ error: "Server error updating profile." });
   }

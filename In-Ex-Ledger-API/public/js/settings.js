@@ -543,7 +543,13 @@ async function initBusinessProfileForm() {
       gstHstMethod: document.getElementById("gst-hst-method").value
     };
 
-    const savedBusiness = await saveBusinessProfileToApi(nextProfile);
+    let savedBusiness;
+    try {
+      savedBusiness = await saveBusinessProfileToApi(nextProfile);
+    } catch (saveErr) {
+      showSettingsToast(saveErr?.message || t("settings_business_profile_save_error"));
+      return;
+    }
     if (!savedBusiness) {
       showSettingsToast(t("settings_business_profile_save_error"));
       return;
@@ -1197,40 +1203,42 @@ async function loadBusinessProfile() {
 }
 
 async function saveBusinessProfileToApi(profile) {
-  try {
-    const response = await apiFetch("/api/business", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        name: profile.name,
-        fiscal_year_start: profile.fiscalYearStart || null,
-        business_type: profile.type || null,
-        address: profile.address || null,
-        operating_name: profile.operatingName || null,
-        business_activity_code: profile.businessActivityCode || null,
-        accounting_method: profile.accountingMethod || null,
-        material_participation:
-          profile.materialParticipation === "yes"
-            ? true
-            : profile.materialParticipation === "no"
-              ? false
-              : null,
-        gst_hst_registered: Boolean(profile.gstHstRegistered),
-        gst_hst_number: profile.gstHstNumber || null,
-        gst_hst_method: profile.gstHstMethod || null
-      })
-    });
+  const response = await apiFetch("/api/business", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      name: profile.name,
+      fiscal_year_start: profile.fiscalYearStart || null,
+      business_type: profile.type || null,
+      address: profile.address || null,
+      operating_name: profile.operatingName || null,
+      business_activity_code: profile.businessActivityCode || null,
+      accounting_method: profile.accountingMethod || null,
+      material_participation:
+        profile.materialParticipation === "yes"
+          ? true
+          : profile.materialParticipation === "no"
+            ? false
+            : null,
+      gst_hst_registered: Boolean(profile.gstHstRegistered),
+      gst_hst_number: profile.gstHstNumber || null,
+      gst_hst_method: profile.gstHstMethod || null
+    })
+  });
 
-    if (!response || !response.ok) {
-      return null;
-    }
-    return await response.json().catch(() => null);
-  } catch (error) {
-    console.error("Failed to save business profile", error);
-    return null;
+  if (!response || !response.ok) {
+    let message = t("settings_business_profile_save_error");
+    try {
+      const payload = await response.json();
+      if (payload?.error && typeof payload.error === "string") {
+        message = payload.error;
+      }
+    } catch {}
+    throw new Error(message);
   }
+  return await response.json().catch(() => null);
 }
 
 function syncBusinessTypeOptions(region) {
