@@ -284,20 +284,30 @@
 .onboarding-card .form-field label {
   display: inline-block;
   width: auto;
-  padding-right: 42px;
+  padding-right: 0;
 }
 
-.onboarding-card .onboarding-field-help-toggle {
-  position: absolute;
-  top: 0;
-  right: 0;
+.onboarding-help-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.onboarding-help-label {
+  font-size: 13px;
+  color: var(--ink3);
+}
+
+.onboarding-help-toggle {
   width: 28px;
   height: 28px;
   font-size: 13px;
 }
 
-.onboarding-field-help {
-  margin: 8px 0 0;
+.onboarding-help-panel {
+  margin: 0 0 18px;
   padding: 10px 12px;
   border: 1px solid rgba(37, 99, 235, 0.14);
   border-radius: 12px;
@@ -305,6 +315,16 @@
   color: var(--ink2);
   font-size: 13px;
   line-height: 1.55;
+}
+
+.onboarding-help-panel p {
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+
+.onboarding-help-list {
+  margin: 0;
+  padding-left: 18px;
 }
 
 .onboarding-card .auth-submit {

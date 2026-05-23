@@ -6,16 +6,6 @@ const ONBOARDING_REGION_KEY = "lb_region";
 const CA_PROVINCES = new Set(["AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"]);
 const GUIDED_SETUP_STEPS = new Set(["categories", "accounts", "transactions", "import"]);
 const BUSINESS_ACTIVITY_CODE_PATTERN = /^\d{6}$/;
-const ONBOARDING_FIELD_HELP_KEYS = {
-  businessName: "onboarding_help_business_name",
-  accountType: "onboarding_help_account_type",
-  accountName: "onboarding_help_account_name",
-  region: "onboarding_help_region",
-  province: "onboarding_help_province",
-  activityCode: "onboarding_help_activity_code",
-  accountingMethod: "onboarding_help_accounting_method",
-  materialParticipation: "onboarding_help_material_participation"
-};
 const STARTER_ACCOUNT_NAME_PRESETS = {
   checking: { US: "Primary Checking", CA: "Primary Chequing" },
   savings: { US: "Business Savings", CA: "Business Savings" },
@@ -52,7 +42,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   hydrateOnboardingDefaults(profile);
   window.addEventListener("lunaLanguageChanged", applyOnboardingStaticCopy);
-  wireFieldHelpToggles();
+  wireOnboardingHelpToggle();
 });
 
 function wireOnboardingSubmitHandler() {
@@ -293,7 +283,6 @@ function applyOnboardingStaticCopy() {
   intro?.querySelector("p")?.replaceChildren(tx("onboarding_intro_guided"));
   document.title = `InEx Ledger - ${tx("onboarding_page_title")}`;
   updateOnboardingPlanPreview();
-  renderFieldHelpCopy();
 }
 
 function resolveOnboardingDestination(profile = {}) {
@@ -305,32 +294,16 @@ function resolveOnboardingDestination(profile = {}) {
   return "/categories";
 }
 
-function wireFieldHelpToggles() {
-  document.querySelectorAll(".onboarding-field-help-toggle").forEach((button) => {
-    if (button.dataset.helpWired === "true") {
-      return;
-    }
-    button.dataset.helpWired = "true";
-    button.addEventListener("click", () => {
-      const panelId = button.getAttribute("aria-controls");
-      const panel = panelId ? document.getElementById(panelId) : null;
-      if (!panel) {
-        return;
-      }
-      const willShow = panel.hidden;
-      panel.hidden = !willShow;
-      button.setAttribute("aria-expanded", willShow ? "true" : "false");
-    });
-  });
-}
-
-function renderFieldHelpCopy() {
-  Object.entries(ONBOARDING_FIELD_HELP_KEYS).forEach(([fieldKey, translationKey]) => {
-    const button = document.querySelector(`.onboarding-field-help-toggle[data-help-key="${fieldKey}"]`);
-    const panelId = button?.getAttribute("aria-controls");
-    const panel = panelId ? document.getElementById(panelId) : null;
-    if (panel) {
-      panel.textContent = tx(translationKey);
-    }
+function wireOnboardingHelpToggle() {
+  const button = document.getElementById("onboardingHelpToggle");
+  const panel = document.getElementById("onboardingHelpPanel");
+  if (!button || !panel || button.dataset.helpWired === "true") {
+    return;
+  }
+  button.dataset.helpWired = "true";
+  button.addEventListener("click", () => {
+    const willShow = panel.hidden;
+    panel.hidden = !willShow;
+    button.setAttribute("aria-expanded", willShow ? "true" : "false");
   });
 }
