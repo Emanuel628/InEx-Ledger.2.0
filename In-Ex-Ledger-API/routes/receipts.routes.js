@@ -33,6 +33,7 @@ const {
   loadAccountingLockState,
   assertDateUnlocked
 } = require("../services/accountingLockService.js");
+const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 
 const router = express.Router();
 const storageDir = getReceiptStorageDir();
@@ -444,6 +445,10 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
 
     await client.query("COMMIT");
     committed = true;
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Receipt evidence changed after export."
+    }).catch((error) => logWarn("Receipt snapshot invalidation failed", { businessId, err: error.message }));
 
     // Best-effort: notify Basic businesses as they approach their monthly cap.
     void evaluateUsageLimitEmails({ businessId, resources: ["receipts"], subscription });
@@ -620,6 +625,13 @@ router.patch("/:id/attach", async (req, res) => {
 
     await client.query("COMMIT");
     inTransaction = false;
+    void invalidateSnapshotsForBusiness({
+      businessId: receiptBusinessId,
+      reason: "Receipt evidence changed after export."
+    }).catch((error) => logWarn("Receipt snapshot invalidation failed", {
+      businessId: receiptBusinessId,
+      err: error.message
+    }));
     return res.json(result.rows[0]);
   } catch (err) {
     if (inTransaction) {
@@ -786,6 +798,13 @@ router.delete("/:id", async (req, res) => {
     );
 
     await client.query("COMMIT");
+    void invalidateSnapshotsForBusiness({
+      businessId: receiptBusinessId,
+      reason: "Receipt evidence changed after export."
+    }).catch((error) => logWarn("Receipt snapshot invalidation failed", {
+      businessId: receiptBusinessId,
+      err: error.message
+    }));
 
     if (movedToPending) {
       await safeUnlink(pendingDeletePath);

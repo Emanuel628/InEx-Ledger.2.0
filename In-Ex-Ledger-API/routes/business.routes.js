@@ -14,6 +14,7 @@ const {
   decryptGstHstNumber
 } = require("../services/gstHstNumberService.js");
 const { logError } = require("../utils/logger.js");
+const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -250,7 +251,12 @@ router.put("/", async (req, res) => {
       gst_hst_method: region === "CA" ? resolvedGstHstMethod : null
     };
 
-    res.json(await updateBusinessRow(businessId, payload));
+    const updated = await updateBusinessRow(businessId, payload);
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Business filing profile changed after export."
+    }).catch((error) => logError("Business snapshot invalidation failed:", error));
+    res.json(updated);
   } catch (err) {
     const constraint = err.constraint || "";
     if (constraint === "chk_business_activity_code") {

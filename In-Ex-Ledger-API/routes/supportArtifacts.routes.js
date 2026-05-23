@@ -11,6 +11,7 @@ const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError } = require("../utils/logger.js");
+const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 const {
   ensureSupportArtifactStorageDir,
   resolveSupportArtifactFilePath
@@ -135,6 +136,10 @@ router.post("/review-note", async (req, res) => {
        RETURNING id, transaction_id, artifact_type, filename, mime_type, review_status, notes, uploaded_at`,
       [artifactId, businessId, transactionId, "Review note", notes, req.user.id]
     );
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Support artifacts changed after export."
+    }).catch((error) => logError("Support artifact snapshot invalidation failed:", error));
 
     return res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -191,6 +196,10 @@ router.post("/upload", upload.single("artifact"), async (req, res) => {
         req.user.id
       ]
     );
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Support artifacts changed after export."
+    }).catch((error) => logError("Support artifact snapshot invalidation failed:", error));
 
     return res.status(201).json(result.rows[0]);
   } catch (err) {

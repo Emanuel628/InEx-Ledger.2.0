@@ -7,6 +7,7 @@ const express = require("express");
 const request = require("supertest");
 
 const EXPORTS_ROUTE_PATH = require.resolve("../routes/exports.routes.js");
+const EXPORT_SNAPSHOT_SERVICE_PATH = require.resolve("../services/exportSnapshotService.js");
 const pdfService = require("../services/pdfGeneratorService.js");
 const { buildPdfExport, buildPdfExportDocument } = pdfService;
 
@@ -114,7 +115,15 @@ function buildFixtureOptions(overrides = {}) {
 
 function loadExportsRouter(options = {}) {
   const originalLoad = Module._load.bind(Module);
-  const state = { insertedMetadata: null, insertedExport: null, released: false, savedRedacted: null, vehicleCostQueryCount: 0 };
+  const state = {
+    insertedMetadata: null,
+    insertedExport: null,
+    insertedSnapshot: null,
+    insertedSnapshotItems: null,
+    released: false,
+    savedRedacted: null,
+    vehicleCostQueryCount: 0
+  };
   const grantPayload = options.grantPayload || {
     action: "generate_pdf",
     businessId: "biz_test",
@@ -182,7 +191,7 @@ function loadExportsRouter(options = {}) {
     if (/db\.js$/.test(requestName)) {
       return {
         pool: {
-          async query(sql) {
+          async query(sql, params) {
             if (/FROM transactions/i.test(sql)) return { rows: fixture.transactions.map((row) => ({ ...row, account_id: row.accountId, category_id: row.categoryId })) };
             if (/FROM accounts/i.test(sql)) return { rows: fixture.accounts };
             if (/FROM categories/i.test(sql)) return { rows: fixture.categories };
@@ -195,6 +204,14 @@ function loadExportsRouter(options = {}) {
             if (/FROM businesses/i.test(sql)) {
               return { rows: [{ name: fixture.businessName, region: "us", province: "", operating_name: fixture.operatingName, business_activity_code: fixture.naics, fiscal_year_start: "01-01", address: fixture.address, tax_id: fixture.taxId, accounting_method: fixture.accountingMethod, material_participation: true, gst_hst_registered: false, gst_hst_number: "", gst_hst_method: "", business_type: "sole_prop" }] };
             }
+            if (/INSERT INTO export_snapshots/i.test(sql)) {
+              state.insertedSnapshot = params;
+              return { rowCount: 1, rows: [] };
+            }
+            if (/INSERT INTO export_snapshot_items/i.test(sql)) {
+              state.insertedSnapshotItems = params;
+              return { rowCount: 1, rows: [] };
+            }
             throw new Error(`Unhandled pool SQL: ${sql}`);
           },
           async connect() {
@@ -202,6 +219,8 @@ function loadExportsRouter(options = {}) {
               async query(sql, params) {
                 if (/INSERT INTO export_metadata/i.test(sql)) state.insertedMetadata = params;
                 if (/INSERT INTO exports/i.test(sql)) state.insertedExport = params;
+                if (/INSERT INTO export_snapshots/i.test(sql)) state.insertedSnapshot = params;
+                if (/INSERT INTO export_snapshot_items/i.test(sql)) state.insertedSnapshotItems = params;
                 return { rowCount: 1, rows: [] };
               },
               release() { state.released = true; }
@@ -223,11 +242,16 @@ function loadExportsRouter(options = {}) {
   };
 
   delete require.cache[EXPORTS_ROUTE_PATH];
+  delete require.cache[EXPORT_SNAPSHOT_SERVICE_PATH];
   try {
     return {
       router: require("../routes/exports.routes.js"),
       state,
-      cleanup() { delete require.cache[EXPORTS_ROUTE_PATH]; Module._load = originalLoad; }
+      cleanup() {
+        delete require.cache[EXPORTS_ROUTE_PATH];
+        delete require.cache[EXPORT_SNAPSHOT_SERVICE_PATH];
+        Module._load = originalLoad;
+      }
     };
   } catch (error) {
     Module._load = originalLoad;
@@ -518,6 +542,10 @@ test("route generate stores nonzero page count metadata and saves only the redac
     assert.equal(Number(fixture.state.insertedMetadata[pageCountIndex + 1]) > 0, true);
     assert.ok(Buffer.isBuffer(fixture.state.savedRedacted.buffer));
     assert.doesNotMatch(fixture.state.savedRedacted.buffer.toString("latin1"), /\(Tax ID: 12-3456789\) Tj/);
+    assert.ok(Array.isArray(fixture.state.insertedSnapshot));
+    assert.equal(fixture.state.insertedSnapshot[4], "workpaper");
+    assert.equal(fixture.state.insertedSnapshot[5], "pdf");
+    assert.ok(Array.isArray(fixture.state.insertedSnapshotItems));
     assert.equal(fixture.state.released, true);
   } finally {
     fixture.cleanup();
@@ -609,6 +637,37 @@ test("CSV generate route returns backend-authoritative CSV and records export hi
     const filenameIndex = fixture.state.insertedMetadata.indexOf("filename");
     assert.equal(filenameIndex >= 0, true);
     assert.match(String(fixture.state.insertedMetadata[filenameIndex + 1]), /cpa-workpaper/i);
+    assert.ok(Array.isArray(fixture.state.insertedSnapshot));
+    assert.equal(fixture.state.insertedSnapshot[4], "draft");
+    assert.equal(fixture.state.insertedSnapshot[5], "csv");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("finalized export mode is blocked when the dataset still has hard blockers", async () => {
+  const fixture = loadExportsRouter({
+    grantPayload: {
+      action: "generate_pdf",
+      businessId: "biz_test",
+      userId: "user_test",
+      exportType: "pdf",
+      includeTaxId: false,
+      jti: "grant_jti_finalized",
+      dateRange: { startDate: "2026-04-01", endDate: "2026-04-30" },
+      metadata: { language: "en", currency: "USD" }
+    }
+  });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/exports/generate")
+      .send({ grantToken: "grant_token_123", exportMode: "finalized", certifiedByUser: true });
+
+    assert.equal(response.status, 409);
+    assert.match(String(response.body?.error || ""), /not eligible/i);
+    assert.equal(response.body?.finalization?.eligibleForFinalization, false);
+    assert.equal(Array.isArray(response.body?.finalization?.hardBlockers), true);
   } finally {
     fixture.cleanup();
   }

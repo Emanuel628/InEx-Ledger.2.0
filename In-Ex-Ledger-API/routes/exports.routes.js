@@ -15,6 +15,12 @@ const { decryptGstHstNumber } = require("../services/gstHstNumberService.js");
 const { __private: pdfPrivate } = require("../services/pdfGeneratorService.js");
 const { generatePdfExportPair } = require("../services/exportOrchestrationService.js");
 const { buildNormalizedExportDataset } = require("../services/exportDatasetService.js");
+const {
+  hashValue,
+  normalizeExportMode,
+  deriveFinalizationDecision,
+  createExportSnapshot
+} = require("../services/exportSnapshotService.js");
 const { decrypt: decryptField } = require("../services/encryptionService.js");
 const { buildCsvBundle } = require("../services/csvExportService.js");
 const { buildQuickMethodSchedule } = require("../services/quickMethodService.js");
@@ -135,6 +141,22 @@ function buildCsvFilename(exportType, startDate, endDate) {
   };
   const suffix = suffixMap[exportType] || "export";
   return `inex-ledger-${suffix}-${startDate}_to_${endDate}.csv`;
+}
+
+function collectExportArtifactIds(sourceRows = {}) {
+  const artifactIds = [];
+  for (const receipt of sourceRows.receipts || []) {
+    if (receipt?.id) artifactIds.push(receipt.id);
+  }
+  const supportArtifactMap = sourceRows.supportArtifactMap;
+  if (supportArtifactMap instanceof Map) {
+    for (const artifacts of supportArtifactMap.values()) {
+      for (const artifact of artifacts || []) {
+        if (artifact?.id) artifactIds.push(artifact.id);
+      }
+    }
+  }
+  return Array.from(new Set(artifactIds));
 }
 
 async function fetchExportSourceRows(businessId, startDate, endDate) {
@@ -340,6 +362,14 @@ async function storeCompletedExport({
   }
 }
 
+async function persistSnapshotBestEffort(snapshotInput) {
+  try {
+    await createExportSnapshot(snapshotInput);
+  } catch (error) {
+    logError("Export snapshot persistence skipped", { err: error.message, exportId: snapshotInput?.exportId || null });
+  }
+}
+
 function normalizeExportHistoryEntry(entry) {
   return {
     id: entry.id,
@@ -355,7 +385,11 @@ function normalizeExportHistoryEntry(entry) {
     scope: entry.scope || "active",
     filename: entry.filename || null,
     storage_type: "redacted-only",
-    full_version_available: String(entry.full_version_available || "true").toLowerCase() !== "false"
+    full_version_available: String(entry.full_version_available || "true").toLowerCase() !== "false",
+    export_mode: entry.export_mode || "workpaper",
+    snapshot_status: entry.snapshot_status || null,
+    invalidated_at: entry.invalidated_at || null,
+    invalidation_reason: entry.invalidation_reason || null
   };
 }
 
@@ -552,10 +586,15 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     const exportLang = grantPayload.metadata?.language || "en";
     const currency = grantPayload.metadata?.currency || "USD";
     const includeTaxId = grantPayload.includeTaxId;
+    const requestedMode = normalizeExportMode(
+      req.body?.exportMode,
+      exportType === "pdf" ? "workpaper" : "draft"
+    );
 
     const sourceRows = await fetchExportSourceRows(businessId, grantStartDate, grantEndDate);
     const business = sourceRows.business || {};
     const region = String(business.region || "us").toLowerCase();
+    const jurisdiction = region === "ca" ? "CA" : "US";
     const categories = sourceRows.categories.map((c) => ({
       ...c,
       taxLabel: region === "ca" ? (c.tax_map_ca || "") : (c.tax_map_us || "")
@@ -565,6 +604,50 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     if (includeTaxId && !certifiedByUser) {
       return res.status(400).json({ error: "certifiedByUser must be acknowledged to include Tax ID in the export." });
     }
+
+    const dataset = buildNormalizedExportDataset({
+      transactions: sourceRows.transactions,
+      accounts: sourceRows.accounts,
+      categories,
+      receipts: sourceRows.receipts,
+      supportArtifactMap: sourceRows.supportArtifactMap,
+      mileage: sourceRows.mileage,
+      vehicleCosts: sourceRows.vehicleCosts,
+      business,
+      region,
+      province: business.province || "",
+      startDate: grantStartDate,
+      endDate: grantEndDate,
+      currency
+    });
+    const finalization = deriveFinalizationDecision({
+      dataset,
+      business,
+      requestedMode,
+      exportFormat: exportType === "pdf" ? "pdf" : "csv",
+      jurisdiction,
+      certifiedByUser,
+      includeTaxId
+    });
+    if (requestedMode === "finalized" && !finalization.eligibleForFinalization) {
+      return res.status(409).json({
+        error: "This export is not eligible for finalized CPA package status yet.",
+        finalization
+      });
+    }
+    const datasetHash = hashValue({
+      dataset,
+      finalization,
+      exportContext: {
+        businessId,
+        exportType,
+        jurisdiction,
+        startDate: grantStartDate,
+        endDate: grantEndDate,
+        language: exportLang,
+        currency
+      }
+    });
 
     const taxId = resolveSecureExportTaxId(req.body, includeTaxId);
 
@@ -632,28 +715,13 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
         return res.status(400).json({ error: "Tax ID may not be requested for CSV exports." });
       }
 
-      const dataset = buildNormalizedExportDataset({
-        transactions: sourceRows.transactions,
-        accounts: sourceRows.accounts,
-        categories,
-        receipts: sourceRows.receipts,
-        supportArtifactMap: sourceRows.supportArtifactMap,
-        mileage: sourceRows.mileage,
-        vehicleCosts: sourceRows.vehicleCosts,
-        business,
-        region,
-        province: business.province || "",
-        startDate: grantStartDate,
-        endDate: grantEndDate,
-        currency
-      });
       const csvBuffer = buildCsvBundle(dataset, {
         exportType,
         includeBusiness: exportType !== "csv_basic"
       });
       const contentHash = crypto.createHash("sha256").update(csvBuffer).digest("hex");
       const filename = buildCsvFilename(exportType, grantStartDate, grantEndDate);
-      await storeCompletedExport({
+      const exportId = await storeCompletedExport({
         businessId,
         userId: user.id,
         exportType,
@@ -670,6 +738,20 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
         filename,
         notes: "CSV generated via grant",
         fullVersionAvailable: false
+      });
+      await persistSnapshotBestEffort({
+        exportId,
+        businessId,
+        userId: user.id,
+        exportMode: finalization.resolvedMode,
+        exportFormat: "csv",
+        jurisdiction,
+        startDate: grantStartDate,
+        endDate: grantEndDate,
+        datasetHash,
+        certifiedByUser,
+        includedTransactionIds: dataset.rows.map((row) => row.id),
+        includedArtifactIds: collectExportArtifactIds(sourceRows)
       });
       logInfo("CSV export generated via grant", {
         userId: user.id,
@@ -690,7 +772,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     const jobId = crypto.randomUUID();
     const filename = `inex-ledger-export-${grantStartDate}_to_${grantEndDate}.pdf`;
     const { filePath, hash } = await saveRedactedPdf(jobId, redactedBuffer);
-    await storeCompletedExport({
+    const exportId = await storeCompletedExport({
       businessId,
       userId: user.id,
       exportType: "pdf",
@@ -705,6 +787,20 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       pageCount: pdfPageCount,
       notes: "Generated via grant",
       fullVersionAvailable: false
+    });
+    await persistSnapshotBestEffort({
+      exportId,
+      businessId,
+      userId: user.id,
+      exportMode: finalization.resolvedMode,
+      exportFormat: "pdf",
+      jurisdiction,
+      startDate: grantStartDate,
+      endDate: grantEndDate,
+      datasetHash,
+      certifiedByUser,
+      includedTransactionIds: dataset.rows.map((row) => row.id),
+      includedArtifactIds: collectExportArtifactIds(sourceRows)
     });
     logInfo("Secure export PDF generated via grant", {
       userId: user.id,
@@ -754,7 +850,11 @@ router.get("/history", exportGrantLimiter, async (req, res) => {
               m.page_count,
               m.scope,
               m.filename,
-              m.full_version_available
+              m.full_version_available,
+              s.export_mode,
+              s.status AS snapshot_status,
+              s.invalidated_at,
+              s.invalidation_reason
          FROM exports e
          JOIN businesses b ON b.id = e.business_id
          LEFT JOIN LATERAL (
@@ -771,6 +871,13 @@ router.get("/history", exportGrantLimiter, async (req, res) => {
              FROM export_metadata
             WHERE export_id = e.id
          ) m ON TRUE
+         LEFT JOIN LATERAL (
+           SELECT export_mode, status, invalidated_at, invalidation_reason
+             FROM export_snapshots
+            WHERE export_id = e.id
+            ORDER BY created_at DESC
+            LIMIT 1
+         ) s ON TRUE
         WHERE e.business_id = $1
         ORDER BY e.created_at DESC
         LIMIT 50`,
@@ -856,7 +963,11 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
 
     const exportLang = req.body?.language || "en";
     const currency = req.body?.currency || "USD";
-    const templateVersion = req.body?.templateVersion || "v1";
+    const requestedMode = normalizeExportMode(req.body?.exportMode, "workpaper");
+    const certifiedByUser = Boolean(req.body?.certifiedByUser);
+    if (includeTaxId && !certifiedByUser) {
+      return res.status(400).json({ error: "certifiedByUser must be acknowledged to include Tax ID in the export." });
+    }
 
     const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult, supportArtifactResult] =
       await Promise.all([
@@ -932,15 +1043,11 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
 
     const business = bizResult.rows[0] || {};
     const region = String(business.region || "us").toLowerCase();
+    const jurisdiction = region === "ca" ? "CA" : "US";
     const categories = categoryResult.rows.map((c) => ({
       ...c,
       taxLabel: region === "ca" ? (c.tax_map_ca || "") : (c.tax_map_us || "")
     }));
-
-    const taxId = resolveSecureExportTaxId(req.body, includeTaxId);
-
-    const generatedAt = new Date().toISOString();
-    const reportId = createPdfReportId(generatedAt);
     const supportArtifactMap = new Map();
     for (const row of supportArtifactResult.rows) {
       if (!row.transaction_id) continue;
@@ -948,6 +1055,54 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       current.push(row);
       supportArtifactMap.set(row.transaction_id, current);
     }
+    const dataset = buildNormalizedExportDataset({
+      transactions: txResult.rows,
+      accounts: accountResult.rows,
+      categories,
+      receipts: receiptResult.rows,
+      supportArtifactMap,
+      mileage: mileageResult.rows,
+      vehicleCosts: vehicleCostResult.rows,
+      business,
+      region,
+      province: business.province || "",
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+      currency
+    });
+    const finalization = deriveFinalizationDecision({
+      dataset,
+      business,
+      requestedMode,
+      exportFormat: "pdf",
+      jurisdiction,
+      certifiedByUser,
+      includeTaxId
+    });
+    if (requestedMode === "finalized" && !finalization.eligibleForFinalization) {
+      return res.status(409).json({
+        error: "This export is not eligible for finalized CPA package status yet.",
+        finalization
+      });
+    }
+    const datasetHash = hashValue({
+      dataset,
+      finalization,
+      exportContext: {
+        businessId,
+        exportType: "pdf",
+        jurisdiction,
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
+        language: exportLang,
+        currency
+      }
+    });
+
+    const taxId = resolveSecureExportTaxId(req.body, includeTaxId);
+
+    const generatedAt = new Date().toISOString();
+    const reportId = createPdfReportId(generatedAt);
 
     const sharedOptions = {
       transactions: txResult.rows,
@@ -986,7 +1141,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     const jobId = crypto.randomUUID();
     const filename = `inex-ledger-export-${dateRange.startDate}_to_${dateRange.endDate}.pdf`;
     const { filePath, hash } = await saveRedactedPdf(jobId, redactedBuffer);
-    await storeCompletedExport({
+    const exportId = await storeCompletedExport({
       businessId,
       userId: user.id,
       exportType: "pdf",
@@ -1001,6 +1156,23 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       pageCount: pdfPageCount,
       notes: "Generated via secure export",
       fullVersionAvailable: false
+    });
+    await persistSnapshotBestEffort({
+      exportId,
+      businessId,
+      userId: user.id,
+      exportMode: finalization.resolvedMode,
+      exportFormat: "pdf",
+      jurisdiction,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+      datasetHash,
+      certifiedByUser,
+      includedTransactionIds: dataset.rows.map((row) => row.id),
+      includedArtifactIds: [
+        ...receiptResult.rows.map((row) => row.id).filter(Boolean),
+        ...supportArtifactResult.rows.map((row) => row.id).filter(Boolean)
+      ]
     });
     logInfo("Secure export PDF generated", {
       userId: user.id,

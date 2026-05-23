@@ -42,6 +42,7 @@ const {
 } = require("../services/taxSummaryService.js");
 const { getQuarterlyReminders } = require("../services/quarterlyTaxReminderService.js");
 const { getTaxDashboard } = require("../services/taxDashboardService.js");
+const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -866,6 +867,10 @@ router.post("/", async (req, res) => {
       ]
     );
     await client.query("COMMIT");
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Transactions changed after export."
+    }).catch((error) => logWarn("Transaction snapshot invalidation failed", { businessId, err: error.message }));
 
     // Best-effort: notify Basic businesses as they approach their monthly cap.
     void evaluateUsageLimitEmails({ businessId, resources: ["transactions"], subscription });
@@ -989,6 +994,10 @@ router.put("/:id", async (req, res) => {
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Transaction not found." });
     }
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Transactions changed after export."
+    }).catch((error) => logWarn("Transaction snapshot invalidation failed", { businessId, err: error.message }));
 
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
@@ -1037,6 +1046,10 @@ router.delete("/bulk-delete-all", async (req, res) => {
           AND deleted_at IS NULL`,
       [businessId]
     );
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Transactions changed after export."
+    }).catch((error) => logWarn("Transaction snapshot invalidation failed", { businessId, err: error.message }));
     res.json({ message: `Deleted ${result.rowCount} transaction(s).`, count: result.rowCount });
   } catch (err) {
     logError("DELETE /transactions/bulk-delete-all error:", err);
@@ -1071,6 +1084,10 @@ router.delete("/:id", async (req, res) => {
     if (!archived) {
       return res.status(404).json({ error: "Transaction not found." });
     }
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Transactions changed after export."
+    }).catch((error) => logWarn("Transaction snapshot invalidation failed", { businessId, err: error.message }));
 
     res.json({ message: "Transaction deleted." });
   } catch (err) {
@@ -1123,6 +1140,10 @@ router.post("/undo-delete", async (req, res) => {
       remaining_undo_count: remainingUndoCount,
       undo_stack_limit: TRANSACTION_UNDO_STACK_LIMIT
     });
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Transactions changed after export."
+    }).catch((error) => logWarn("Transaction snapshot invalidation failed", { businessId, err: error.message }));
   } catch (err) {
     logError("POST /transactions/undo-delete error:", err);
     return handleTransactionMutationError(res, err, "Failed to restore transaction.");
@@ -1266,6 +1287,10 @@ router.patch("/:id/review-status", async (req, res) => {
        RETURNING *`,
       [status, req.params.id, businessId]
     );
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Transactions changed after export."
+    }).catch((error) => logWarn("Transaction snapshot invalidation failed", { businessId, err: error.message }));
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
     logError("PATCH /transactions/:id/review-status error:", err);
@@ -1308,6 +1333,10 @@ router.patch("/:id/cleared", async (req, res) => {
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Transaction not found." });
     }
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Transactions changed after export."
+    }).catch((error) => logWarn("Transaction snapshot invalidation failed", { businessId, err: error.message }));
 
     res.json(decryptTransactionRow(result.rows[0]));
   } catch (err) {
