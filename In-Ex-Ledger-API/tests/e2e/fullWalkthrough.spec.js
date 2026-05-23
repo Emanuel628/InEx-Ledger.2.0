@@ -185,12 +185,16 @@ test.describe('InEx Ledger full walkthrough', () => {
     await page.fill('#onboardingBusinessAddress', '123 Test Street, Toronto, ON M5V 2T6, Canada');
 
     await page.click('button[type="submit"]');
-    await expect(page.locator('#onboardingImportStep')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('#onboardingCsvHelpToggle')).toBeVisible({ timeout: 3000 });
-    await screenshot(page, '07-onboarding-import-step');
-
-    await page.click('#onboardingCsvSkip');
     await page.waitForURL(/trial-setup|categories|transactions|dashboard/i, { timeout: 10000 });
+
+    if (page.url().includes('/trial-setup')) {
+      await screenshot(page, '07-trial-setup');
+      const skipBtn = page.locator('#trialSetupSkipBtn').first();
+      await expect(skipBtn).toBeVisible({ timeout: 5000 });
+      await skipBtn.click();
+      await page.waitForURL(/categories|transactions|dashboard/i, { timeout: 10000 });
+    }
+
     await screenshot(page, '07-onboarding-complete');
   });
 
