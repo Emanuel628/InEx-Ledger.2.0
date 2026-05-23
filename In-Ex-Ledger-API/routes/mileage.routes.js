@@ -7,6 +7,7 @@ const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForBusiness } = require("../services/subscriptionService.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 
 /**
  * Vehicle cost tracking (fuel / maintenance / insurance entries) is a Pro
@@ -44,6 +45,13 @@ let cachedMileageColumnModePromise = null;
 router.use(requireAuth);
 router.use(requireCsrfProtection);
 router.use(createDataApiLimiter());
+
+function invalidateMileageSnapshots(businessId, reason = "Mileage or vehicle support changed after export.") {
+  void invalidateSnapshotsForBusiness({
+    businessId,
+    reason
+  }).catch((error) => logError("Mileage snapshot invalidation failed:", error));
+}
 
 function parseOptionalNumber(value, field, max) {
   if (value === undefined || value === null || value === "") {
@@ -250,6 +258,7 @@ router.post("/costs", async (req, res) => {
         normalized.value.notes
       ]
     );
+    invalidateMileageSnapshots(businessId);
     return res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err?.status === 402 && err?.code === "pro_feature_required") {
@@ -357,6 +366,7 @@ router.post("/", async (req, res) => {
       insertSql,
       insertValues
     );
+    invalidateMileageSnapshots(businessId);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (err instanceof AccountingPeriodLockedError) {
@@ -567,6 +577,7 @@ router.put("/costs/:id", async (req, res) => {
       ]
     );
 
+    invalidateMileageSnapshots(businessId);
     return res.json(result.rows[0]);
   } catch (err) {
     if (err?.status === 402 && err?.code === "pro_feature_required") {
@@ -612,6 +623,7 @@ router.delete("/costs/:id", async (req, res) => {
       "DELETE FROM vehicle_costs WHERE id = $1 AND business_id = $2",
       [req.params.id, businessId]
     );
+    invalidateMileageSnapshots(businessId);
     return res.json({ message: "Vehicle cost deleted." });
   } catch (err) {
     if (err instanceof AccountingPeriodLockedError) {
@@ -785,6 +797,7 @@ router.put("/:id", async (req, res) => {
     const row = result.rows[0];
     // Normalize the trip_date field in the response
     row.trip_date = row.trip_date ?? row.date ?? null;
+    invalidateMileageSnapshots(businessId);
     res.json(row);
   } catch (err) {
     if (err instanceof AccountingPeriodLockedError) {
@@ -828,6 +841,7 @@ router.delete("/:id", async (req, res) => {
       "DELETE FROM mileage WHERE id = $1 AND business_id = $2",
       [req.params.id, businessId]
     );
+    invalidateMileageSnapshots(businessId);
     res.json({ message: "Mileage record deleted." });
   } catch (err) {
     if (err instanceof AccountingPeriodLockedError) {

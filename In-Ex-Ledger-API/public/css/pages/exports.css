@@ -530,6 +530,27 @@
   color: #657284;
 }
 
+.history-badge.mode {
+  background: rgba(194, 149, 26, 0.12);
+  color: #8a6912;
+}
+
+.history-badge.current {
+  background: rgba(24, 108, 65, 0.12);
+  color: #246b45;
+}
+
+.history-badge.stale {
+  background: rgba(169, 96, 20, 0.14);
+  color: #9b5a13;
+}
+
+.history-submeta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #8a5663;
+}
+
 .history-download-cell {
   display: flex;
   justify-content: flex-end;

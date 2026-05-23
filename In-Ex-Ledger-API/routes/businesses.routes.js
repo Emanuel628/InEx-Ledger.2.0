@@ -33,6 +33,7 @@ const {
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const { stripeRequest, stripeGet } = require("../services/stripeClient.js");
 const { normalizeFiscalYearStart } = require("../utils/fiscalYear.js");
+const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -639,6 +640,10 @@ router.put("/:id/profile", async (req, res) => {
     if (result.error) {
       return res.status(400).json({ error: result.error });
     }
+    void invalidateSnapshotsForBusiness({
+      businessId: req.params.id,
+      reason: "Business filing profile changed after export."
+    }).catch((error) => logError("Business profile snapshot invalidation failed:", error));
     res.json(result.business);
   } catch (err) {
     logError("PUT /businesses/:id/profile error:", err.message);

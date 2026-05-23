@@ -17,6 +17,7 @@ const {
 const { seedDefaultCategoriesForBusiness } = require("../api/utils/seedDefaultsForBusiness.js");
 const { getUnmappedCategories } = require("../services/taxSummaryService.js");
 const { normalizeCategoryTaxMap } = require("../utils/taxMappings.js");
+const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -62,6 +63,16 @@ function isCategoryNameConflict(err) {
     typeof err?.constraint === "string" &&
     CATEGORY_NAME_UNIQUE_CONSTRAINTS.has(err.constraint)
   );
+}
+
+function invalidateCategorySnapshots(businessId) {
+  void invalidateSnapshotsForBusiness({
+    businessId,
+    reason: "Category mappings changed after export."
+  }).catch((error) => logWarn("Category snapshot invalidation failed", {
+    businessId,
+    err: error.message
+  }));
 }
 
 function normalizeBusinessRegion(region) {
@@ -219,6 +230,7 @@ router.post("/", async (req, res) => {
         scopedTaxMaps.taxMapCa
       ]
     );
+    invalidateCategorySnapshots(businessId);
     res.status(201).json(result.rows[0]);
   } catch (err) {
     if (isCategoryNameConflict(err)) {
@@ -256,6 +268,7 @@ router.post("/defaults", async (req, res) => {
     const businessRegion = await loadBusinessRegion(businessId);
     await deactivateRegionIncompatibleDefaultCategories(pool, businessId, businessRegion);
     const inserted = await seedDefaultCategoriesForBusiness(pool, businessId);
+    invalidateCategorySnapshots(businessId);
     return res.status(200).json({
       inserted_count: inserted.length,
       categories: inserted
@@ -341,6 +354,7 @@ router.put("/:id", async (req, res) => {
        RETURNING id, name, kind, color, tax_map_us, tax_map_ca, is_default, is_active, created_at`,
       [newName, newKind, newColor, newTaxMapUs, newTaxMapCa, newIsActive, req.params.id, businessId]
     );
+    invalidateCategorySnapshots(businessId);
     res.json(result.rows[0]);
   } catch (err) {
     if (isCategoryNameConflict(err)) {
@@ -402,6 +416,7 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ error: "Category not found." });
     }
 
+    invalidateCategorySnapshots(businessId);
     res.json({ message: "Category deleted." });
   } catch (err) {
     logError("DELETE /categories/:id error:", err.stack || err);
@@ -474,6 +489,7 @@ router.post("/:id/merge", async (req, res) => {
     );
 
     await client.query("COMMIT");
+    invalidateCategorySnapshots(businessId);
     res.json({
       message: "Categories merged.",
       moved_transactions: txResult.rowCount,

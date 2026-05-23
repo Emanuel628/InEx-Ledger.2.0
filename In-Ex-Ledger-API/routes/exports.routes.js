@@ -470,6 +470,7 @@ router.get("/dataset", exportGrantLimiter, async (req, res) => {
     const sourceRows = await fetchExportSourceRows(businessId, dateRange.startDate, dateRange.endDate);
     const business = sourceRows.business || {};
     const region = String(business.region || "us").toLowerCase();
+    const jurisdiction = region === "ca" ? "CA" : "US";
     const categories = sourceRows.categories.map((c) => ({
       ...c,
       taxLabel: region === "ca" ? (c.tax_map_ca || "") : (c.tax_map_us || "")
@@ -486,7 +487,21 @@ router.get("/dataset", exportGrantLimiter, async (req, res) => {
       startDate: dateRange.startDate,
       endDate: dateRange.endDate
     });
-    res.json({ rows: dataset.rows, totals: dataset.totals, metadata: dataset.metadata });
+    const finalization = deriveFinalizationDecision({
+      dataset,
+      business,
+      requestedMode: "workpaper",
+      exportFormat: "pdf",
+      jurisdiction,
+      certifiedByUser: false,
+      includeTaxId: false
+    });
+    res.json({
+      rows: dataset.rows,
+      totals: dataset.totals,
+      metadata: dataset.metadata,
+      finalization
+    });
   } catch (err) {
     logError("GET /exports/dataset error", { err: err.message });
     res.status(500).json({ error: "Failed to load compliance dataset." });

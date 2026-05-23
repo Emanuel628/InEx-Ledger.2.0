@@ -10,6 +10,7 @@ const {
   upsertVehicleClaimDetail
 } = require("../services/vehicleClaimService.js");
 const { logError } = require("../utils/logger.js");
+const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -93,6 +94,10 @@ router.put("/:transactionId", async (req, res) => {
       region
     });
 
+    void invalidateSnapshotsForBusiness({
+      businessId,
+      reason: "Vehicle claim details changed after export."
+    }).catch((error) => logError("Vehicle claim snapshot invalidation failed:", error));
     res.json(detail);
   } catch (err) {
     logError("PUT /vehicle-claims/:transactionId error:", err.stack || err);

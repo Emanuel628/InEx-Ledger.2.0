@@ -153,6 +153,16 @@
             <p class="helper-text" data-i18n="exports_language_help">Affects PDF wording only - numbers and dates are universal.</p>
           </div>
 
+          <div class="form-field">
+            <label class="field-label" for="exportPackageMode" data-i18n="exports_package_mode_label">Package mode</label>
+            <select id="exportPackageMode">
+              <option value="draft" data-i18n="exports_package_mode_draft">Draft</option>
+              <option value="workpaper" selected data-i18n="exports_package_mode_workpaper">CPA workpaper</option>
+              <option value="finalized" data-i18n="exports_package_mode_finalized">Finalized CPA package</option>
+            </select>
+            <p class="helper-text" data-i18n="exports_package_mode_help">Use draft while sorting records, workpaper for accountant review, and finalized only when support and filing details are complete.</p>
+          </div>
+
           <label class="checkbox-row" for="exportIncludeTaxId">
             <input type="checkbox" id="exportIncludeTaxId" />
             <span data-i18n="exports_include_tax_id">Include tax ID on exported document</span>

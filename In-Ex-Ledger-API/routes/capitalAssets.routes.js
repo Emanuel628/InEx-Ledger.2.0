@@ -14,6 +14,7 @@ const {
   getTotalDepreciationForYear
 } = require("../services/capitalAssetService.js");
 const { logError } = require("../utils/logger.js");
+const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -26,6 +27,13 @@ const VALID_ASSET_CATEGORIES = new Set(["equipment", "vehicle", "computer", "sof
 async function resolveBusinessRegion(businessId) {
   const result = await pool.query(`SELECT region FROM businesses WHERE id = $1`, [businessId]);
   return result.rows[0]?.region || "US";
+}
+
+function invalidateCapitalAssetSnapshots(businessId) {
+  void invalidateSnapshotsForBusiness({
+    businessId,
+    reason: "Capital asset schedules changed after export."
+  }).catch((error) => logError("Capital asset snapshot invalidation failed:", error));
 }
 
 // GET /api/capital-assets?tax_year=2024
@@ -99,6 +107,7 @@ router.post("/", async (req, res) => {
       taxYear: Number(tax_year)
     }, region);
 
+    invalidateCapitalAssetSnapshots(businessId);
     res.status(201).json(asset);
   } catch (err) {
     logError("POST /capital-assets error:", err.stack || err);
@@ -140,6 +149,7 @@ router.put("/:assetId", async (req, res) => {
     }, region);
 
     if (!asset) return res.status(404).json({ error: "Capital asset not found." });
+    invalidateCapitalAssetSnapshots(businessId);
     res.json(asset);
   } catch (err) {
     logError("PUT /capital-assets/:assetId error:", err.stack || err);
@@ -157,6 +167,7 @@ router.post("/:assetId/dispose", async (req, res) => {
     const businessId = await resolveBusinessIdForUser(req.user);
     const asset = await disposeCapitalAsset(req.params.assetId, businessId, disposed_date);
     if (!asset) return res.status(404).json({ error: "Capital asset not found." });
+    invalidateCapitalAssetSnapshots(businessId);
     res.json(asset);
   } catch (err) {
     logError("POST /capital-assets/:assetId/dispose error:", err.stack || err);

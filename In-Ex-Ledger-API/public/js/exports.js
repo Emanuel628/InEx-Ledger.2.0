@@ -107,6 +107,20 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
+function getSelectedExportMode() {
+  return String(document.getElementById("exportPackageMode")?.value || "workpaper").trim().toLowerCase();
+}
+
+function confirmFinalizedExportIfNeeded() {
+  if (getSelectedExportMode() !== "finalized") {
+    return true;
+  }
+  return window.confirm(
+    tx("exports_finalize_confirm")
+    || "Finalize this CPA package? Only continue if categories, support, and filing profile details are complete."
+  );
+}
+
 function resolveExportBusinessId() {
   return exportContext.activeBusinessId || localStorage.getItem("lb_active_business_id") || "";
 }
@@ -570,7 +584,7 @@ function setupExportForm() {
   applyDatePreset(defaultPreset);
   updatePresetChipState(defaultPreset);
 
-  ["period-start", "period-end", "exportAccountFilter", "exportCategoryFilter", "exportLanguage", "exportIncludeTaxId", "exportScope"].forEach((id) => {
+  ["period-start", "period-end", "exportAccountFilter", "exportCategoryFilter", "exportLanguage", "exportIncludeTaxId", "exportScope", "exportPackageMode"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", () => {
       if (id === "period-start" || id === "period-end") {
         clearCustomPresetState();
@@ -974,6 +988,9 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
   }
 
   if (scope !== "all") {
+    if (!confirmFinalizedExportIfNeeded()) {
+      return;
+    }
     const filename = explicitFilename && batches.length === 1
       ? explicitFilename
       : makePdfFilename(startDate, endDate, batches[0]);
@@ -983,6 +1000,8 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
         startDate,
         endDate,
         includeTaxId,
+        exportMode: getSelectedExportMode(),
+        certifiedByUser: includeTaxId || getSelectedExportMode() === "finalized",
         exportLang,
         currency: getCurrencyForRegion(String(batches[0]?.region || getRegion()).toLowerCase()),
         filename
@@ -1069,7 +1088,7 @@ async function encryptExportTaxIdIfNeeded(includeTaxId) {
   return window.exportCrypto.encryptTaxId(taxId);
 }
 
-async function submitBackendPdfExport({ startDate, endDate, includeTaxId, exportLang, currency, filename }) {
+async function submitBackendPdfExport({ startDate, endDate, includeTaxId, exportMode, certifiedByUser, exportLang, currency, filename }) {
   const grant = await requestPdfGrant({ startDate, endDate, includeTaxId, exportLang, currency });
   const taxId_jwe = await encryptExportTaxIdIfNeeded(includeTaxId);
   const response = await apiFetch("/api/exports/generate", {
@@ -1077,7 +1096,9 @@ async function submitBackendPdfExport({ startDate, endDate, includeTaxId, export
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       grantToken: grant?.grantToken,
-      ...(taxId_jwe ? { taxId_jwe, certifiedByUser: true } : {})
+      exportMode: exportMode || "workpaper",
+      ...(taxId_jwe ? { taxId_jwe } : {}),
+      ...(certifiedByUser ? { certifiedByUser: true } : {})
     })
   });
 
@@ -1091,6 +1112,9 @@ async function submitBackendPdfExport({ startDate, endDate, includeTaxId, export
       }
       if (Array.isArray(payload?.missingFieldKeys)) {
         missingFieldKeys = normalizeMissingFieldKeys(payload.missingFieldKeys);
+      }
+      if (payload?.finalization?.requestedMode === "finalized" && Array.isArray(payload?.finalization?.hardBlockers)) {
+        errorMessage = payload.error || errorMessage;
       }
     } catch {}
     const error = new Error(errorMessage);
@@ -1346,6 +1370,10 @@ async function fetchBackendExportHistory() {
       exportLang: row.language || "en",
       scope: row.scope || "active",
       contentHash: row.content_hash || "",
+      exportMode: row.export_mode || "workpaper",
+      snapshotStatus: row.snapshot_status || "",
+      invalidatedAt: row.invalidated_at || "",
+      invalidationReason: row.invalidation_reason || "",
       source: "backend"
     }));
   } catch {
@@ -1371,6 +1399,10 @@ async function renderExportHistory() {
   historyRows.innerHTML = merged.map((entry) => {
     const descriptor = describeHistoryEntry(entry);
     const formatClass = descriptor.formatLabel === "PDF" ? "pdf" : "csv";
+    const modeLabel = tx(`exports_history_mode_${entry.exportMode || "workpaper"}`);
+    const statusLabel = entry.snapshotStatus === "invalidated"
+      ? tx("exports_history_status_stale")
+      : tx("exports_history_status_current");
     const hasStoredRedactedPdf = entry.format === PDF_FORMAT && !!entry.contentHash;
     const actionLabel = hasStoredRedactedPdf
     ? escapeHtml(tx("exports_history_download_redacted") || "Download")
@@ -1381,10 +1413,12 @@ async function renderExportHistory() {
       <div class="history-item">
         <div class="history-file">
           <span class="history-badge ${formatClass}">${descriptor.formatLabel}</span>
+          <span class="history-badge mode">${escapeHtml(modeLabel || (entry.exportMode || "workpaper"))}</span>
+          <span class="history-badge ${entry.snapshotStatus === "invalidated" ? "stale" : "current"}">${escapeHtml(statusLabel || "Current")}</span>
           <span class="history-file-name">${escapeHtml(entry.filename || descriptor.formatLabel)}</span>
         </div>
         <div class="history-period">${escapeHtml(`${entry.startDate || "-"} to ${entry.endDate || "-"}`)}</div>
-        <div class="history-meta">${escapeHtml(formatHistoryDate(entry.exportedAt))}</div>
+        <div class="history-meta">${escapeHtml(formatHistoryDate(entry.exportedAt))}${entry.invalidatedAt ? `<div class="history-submeta">${escapeHtml(entry.invalidationReason || tx("exports_history_stale_reason") || "Source data changed after export.")}</div>` : ""}</div>
         <div class="history-size">${escapeHtml(formatHistorySize(entry.format))}</div>
         <div class="history-download-cell">
           <div class="history-actions">
@@ -1904,6 +1938,10 @@ async function submitSecureExport(taxId, startDate, endDate) {
   const exportLang = clampExportLang(getCurrentExportLanguage());
   const region = getRegion();
   const currency = getCurrencyForRegion(region);
+  const exportMode = getSelectedExportMode();
+  if (exportMode === "finalized" && !confirmFinalizedExportIfNeeded()) {
+    return;
+  }
 
   const response = await apiFetch("/api/exports/secure-export", {
     method: "POST",
@@ -1912,6 +1950,7 @@ async function submitSecureExport(taxId, startDate, endDate) {
       dateRange: { startDate, endDate },
       includeTaxId: true,
       certifiedByUser: true,
+      exportMode,
       taxId_jwe,
       language: exportLang,
       currency,
