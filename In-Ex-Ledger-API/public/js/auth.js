@@ -20,6 +20,7 @@ const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
 const LOGIN_RESET_KEY = "lb_login_reset";
 const ONBOARDING_PAGE = "/onboarding";
+const TRIAL_SETUP_PAGE = "/trial-setup";
 const GUIDED_ONBOARDING_STEPS = new Set(["categories", "accounts", "transactions"]);
 const LOGIN_PAGE = "/login";
 const ONBOARDING_RUNTIME_PAGES = new Set([
@@ -451,8 +452,37 @@ function isOnboardingRoute(pathname = getNormalizedPathname()) {
   return pathname === ONBOARDING_PAGE;
 }
 
+function isTrialSetupRoute(pathname = getNormalizedPathname()) {
+  return pathname === TRIAL_SETUP_PAGE;
+}
+
 function shouldRedirectToOnboarding(profile = {}) {
   return !profile?.onboarding?.completed && !isOnboardingRoute();
+}
+
+function shouldRedirectToTrialSetup(profile = {}, pathname = getNormalizedPathname()) {
+  if (isTrialSetupRoute(pathname) || !profile?.onboarding?.completed) {
+    return false;
+  }
+
+  const subscription = profile?.subscription;
+  if (!subscription || subscription.effectiveStatus !== "trialing") {
+    return false;
+  }
+
+  if (subscription.stripeSubscriptionId || subscription.isTrialDowngradedToFree) {
+    return false;
+  }
+
+  return true;
+}
+
+function buildTrialSetupPath(nextPath = "/transactions") {
+  const normalized = String(nextPath || "/transactions").trim();
+  if (!normalized.startsWith("/") || normalized.startsWith("//") || /[\r\n]/.test(normalized)) {
+    return TRIAL_SETUP_PAGE;
+  }
+  return `${TRIAL_SETUP_PAGE}?next=${encodeURIComponent(normalized)}`;
 }
 
 function getPlanDisplayNameFromCode(tier) {
@@ -732,6 +762,11 @@ async function requireValidSessionOrRedirect() {
         window.location.href = ONBOARDING_PAGE;
         return;
       }
+      if (shouldRedirectToTrialSetup(payload)) {
+        window.__AUTH_GUARD_STATE__.running = false;
+        window.location.href = buildTrialSetupPath(getNormalizedPathname());
+        return;
+      }
       maybeLoadOnboardingRuntime(payload);
       if (typeof window !== "undefined" && typeof CustomEvent === "function") {
         window.dispatchEvent(new CustomEvent("lunaProfileReady", { detail: payload }));
@@ -793,7 +828,14 @@ async function redirectIfAuthenticated() {
         updateAuthenticatedChrome(payload);
       }
       syncRegionFromProfile(payload);
-      window.location.href = payload?.onboarding?.completed ? resolvePostOnboardingPath(payload) : ONBOARDING_PAGE;
+      if (!payload?.onboarding?.completed) {
+        window.location.href = ONBOARDING_PAGE;
+        return;
+      }
+      const nextPath = resolvePostOnboardingPath(payload);
+      window.location.href = shouldRedirectToTrialSetup(payload, nextPath)
+        ? buildTrialSetupPath(nextPath)
+        : nextPath;
     }
   } catch (err) {
     if (localStorage.getItem("debug") === "true") { console.error("[AUTH] redirectIfAuthenticated failed:", err); }

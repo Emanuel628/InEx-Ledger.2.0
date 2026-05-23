@@ -23,7 +23,7 @@ body.trial-setup-page {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 64px;
+  min-height: 58px;
   padding: 0 clamp(22px, 3vw, 48px);
   border-bottom: 1px solid var(--trial-setup-border);
   background: rgba(255, 255, 255, 0.94);
@@ -36,7 +36,7 @@ body.trial-setup-page {
   gap: 12px;
   color: var(--trial-setup-ink);
   text-decoration: none;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 950;
   letter-spacing: -0.05em;
 }
@@ -60,7 +60,7 @@ body.trial-setup-page {
 .trial-setup-main {
   width: min(1480px, calc(100vw - 28px));
   margin: 0 auto;
-  padding: 16px 0 40px;
+  padding: 10px 0 24px;
 }
 
 .trial-setup-hero,
@@ -74,29 +74,29 @@ body.trial-setup-page {
 .trial-setup-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
+  gap: 14px;
   align-items: end;
-  padding: clamp(18px, 2.2vw, 28px);
+  padding: clamp(14px, 1.8vw, 22px);
 }
 
 .trial-setup-eyebrow {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
-  padding: 0 12px;
+  min-height: 24px;
+  padding: 0 10px;
   border-radius: 999px;
   background: #eaf2ff;
   color: #1d4ed8;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 950;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .trial-setup-hero h1 {
-  margin: 12px 0 10px;
-  font-size: clamp(30px, 3.8vw, 56px);
-  line-height: 0.95;
+  margin: 8px 0 8px;
+  font-size: clamp(24px, 2.8vw, 40px);
+  line-height: 1;
   letter-spacing: -0.075em;
   font-weight: 1000;
 }
@@ -107,8 +107,8 @@ body.trial-setup-page {
 .trial-setup-list li,
 .trial-setup-fineprint {
   color: var(--trial-setup-muted);
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 .trial-setup-link,
@@ -129,12 +129,12 @@ body.trial-setup-page {
 .trial-setup-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
-  gap: 18px;
-  margin-top: 18px;
+  gap: 14px;
+  margin-top: 14px;
 }
 
 .trial-setup-card {
-  padding: clamp(18px, 2vw, 28px);
+  padding: clamp(16px, 1.6vw, 22px);
 }
 
 .trial-setup-card-primary {
@@ -144,8 +144,8 @@ body.trial-setup-page {
 }
 
 .trial-setup-card-head h2 {
-  margin: 10px 0 0;
-  font-size: clamp(24px, 2.4vw, 38px);
+  margin: 8px 0 0;
+  font-size: clamp(21px, 1.9vw, 30px);
   line-height: 0.96;
   letter-spacing: -0.05em;
 }
@@ -153,16 +153,16 @@ body.trial-setup-page {
 .trial-setup-controls,
 .trial-setup-summary,
 .trial-setup-actions {
-  margin-top: 18px;
+  margin-top: 14px;
 }
 
 .trial-setup-control + .trial-setup-control {
-  margin-top: 18px;
+  margin-top: 14px;
 }
 
 .trial-setup-label {
   display: block;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   color: #475569;
   font-size: 11px;
   font-weight: 900;
@@ -206,34 +206,34 @@ body.trial-setup-page {
 .trial-setup-stepper {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .trial-setup-stepper button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 96px;
-  height: 72px;
-  padding: 0;
-  border-radius: 28px;
+  min-width: 88px;
+  height: 48px;
+  padding: 0 16px;
+  border-radius: 16px;
   border-color: var(--trial-setup-border);
   background: #fff;
   color: var(--trial-setup-ink);
-  font-size: 54px;
+  font-size: 14px;
   font-weight: 900;
   line-height: 1;
   text-align: center;
 }
 
 .trial-setup-stepper input {
-  width: 292px;
-  min-height: 72px;
-  padding: 0 18px;
+  width: 140px;
+  min-height: 48px;
+  padding: 0 14px;
   border: 1px solid var(--trial-setup-border);
-  border-radius: 28px;
+  border-radius: 16px;
   text-align: center;
-  font-size: 58px;
+  font-size: 30px;
   font-weight: 800;
   line-height: 1;
   color: var(--trial-setup-ink);
@@ -241,7 +241,7 @@ body.trial-setup-page {
 }
 
 .trial-setup-summary {
-  padding: 18px;
+  padding: 14px;
   border: 1px solid var(--trial-setup-border);
   border-radius: 22px;
   background: #fbfdff;
@@ -259,7 +259,7 @@ body.trial-setup-page {
 }
 
 .trial-setup-summary-row strong {
-  font-size: 18px;
+  font-size: 16px;
   letter-spacing: -0.03em;
 }
 
@@ -270,15 +270,15 @@ body.trial-setup-page {
 }
 
 .trial-setup-summary-total strong {
-  font-size: 26px;
+  font-size: 22px;
 }
 
 .trial-setup-primary-btn,
 .trial-setup-secondary-btn {
-  min-height: 54px;
-  padding: 0 22px;
-  border-radius: 16px;
-  font-size: 16px;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 14px;
+  font-size: 15px;
   font-weight: 900;
   display: inline-flex;
   align-items: center;
@@ -366,17 +366,17 @@ body.trial-setup-page {
 @media (max-width: 760px) {
   .trial-setup-main {
     width: calc(100vw - 14px);
-    padding: 12px 0 28px;
+    padding: 8px 0 20px;
   }
 
   .trial-setup-hero,
   .trial-setup-card {
-    padding: 16px;
-    border-radius: 22px;
+    padding: 14px;
+    border-radius: 18px;
   }
 
   .trial-setup-hero h1 {
-    font-size: clamp(28px, 10vw, 42px);
+    font-size: clamp(22px, 8vw, 32px);
   }
 
   .trial-setup-stepper,
@@ -387,10 +387,10 @@ body.trial-setup-page {
   }
 
   .trial-setup-stepper button {
-    width: 74px;
-    height: 60px;
-    border-radius: 22px;
-    font-size: 42px;
+    min-width: 72px;
+    height: 44px;
+    border-radius: 14px;
+    font-size: 13px;
   }
 
   .trial-setup-stepper input,
@@ -401,9 +401,9 @@ body.trial-setup-page {
 
   .trial-setup-stepper input {
     width: auto;
-    min-height: 60px;
-    border-radius: 22px;
-    font-size: 42px;
+    min-height: 44px;
+    border-radius: 14px;
+    font-size: 24px;
   }
 
   .trial-setup-summary-row {
