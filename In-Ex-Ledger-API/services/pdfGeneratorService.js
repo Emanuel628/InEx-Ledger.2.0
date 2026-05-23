@@ -664,6 +664,15 @@ function deriveBusinessAmounts(txn, category, options = {}) {
     nonDeductibleAmount = netAmount;
   }
 
+  // Vehicle claim override: if this transaction has a registered claim detail
+  // (mileage or actual expense), replace the deductible amount with the auditor-computed value.
+  // This resolves the ML/AL flags and corrects net profit to use audited figures.
+  const vehicleClaim = options.vehicleClaim;
+  if (vehicleClaim && vehicleClaim.calculated_deduction != null) {
+    deductibleAmount = Number(Number(vehicleClaim.calculated_deduction).toFixed(2));
+    nonDeductibleAmount = Number(Math.max(0, netAmount - deductibleAmount).toFixed(2));
+  }
+
   return {
     grossAmount: Number(amount.toFixed(2)),
     taxAmount: Number(taxAmount.toFixed(2)),
@@ -738,12 +747,23 @@ function buildTransactionStatus(txn, category, context = {}) {
   if (needsHomeOfficeSupport) flags.push("HO");
   if (needsCapitalAssetReview) flags.push("CA");
 
+  // If a Phase 2 vehicle claim has been registered, the mileage/allocation requirement is satisfied.
+  if (context.vehicleClaim) {
+    const idx = (f) => flags.indexOf(f);
+    ["ML", "AL", "FC"].forEach((f) => { if (idx(f) !== -1) flags.splice(idx(f), 1); });
+  }
+  // If a capital asset record exists for this transaction, the CA review flag is satisfied.
+  if (context.capitalAsset) {
+    const caIdx = flags.indexOf("CA");
+    if (caIdx !== -1) flags.splice(caIdx, 1);
+  }
+
   if (categoryStatus === "needs_category") supportStatus = "category_required";
   else if (needsHomeOfficeSupport) supportStatus = "home_office_support_needed";
-  else if (needsCapitalAssetReview) supportStatus = "capital_asset_review_needed";
-  else if (needsMileageLog) supportStatus = "mileage_log_needed";
+  else if (needsCapitalAssetReview && !context.capitalAsset) supportStatus = "capital_asset_review_needed";
+  else if (needsMileageLog && !context.vehicleClaim) supportStatus = "mileage_log_needed";
   else if (needsBusinessPurpose) supportStatus = "business_purpose_needed";
-  else if (needsAllocation) supportStatus = "allocation_needed";
+  else if (needsAllocation && !context.vehicleClaim) supportStatus = "allocation_needed";
   else if (needsReceipt) supportStatus = "receipt_missing";
   else if (nature === "refund_or_reversal" || nature === "cashback_or_reward") supportStatus = "refund_reversal_match_needed";
   else if (flags.includes("RV")) supportStatus = "cpa_review";
@@ -800,24 +820,36 @@ function summarizeExportTransactions(transactions, categories, options = {}) {
     duplicateKeys.set(key, (duplicateKeys.get(key) || 0) + 1);
   }
 
+  // Phase 2 compliance maps: keyed by transaction ID.
+  // vehicleClaimMap: Map<txId, vehicle_expense_details row> — overrides deductible amount
+  // capitalAssetTxMap: Map<txId, capital_assets row> — resolves CA flag
+  const vehicleClaimMap = options.vehicleClaimMap instanceof Map ? options.vehicleClaimMap : new Map();
+  const capitalAssetTxMap = options.capitalAssetTxMap instanceof Map ? options.capitalAssetTxMap : new Map();
+
   const included = [];
   const excluded = [];
 
   for (const txn of transactions || []) {
     const category = categoryMap[txn?.category_id || txn?.categoryId] || txn?.__category || null;
     const exclusionReason = classifyExcludedTransaction(txn, category, options.region);
-    const businessAmounts = deriveBusinessAmounts(txn, category, options);
+    const vehicleClaim = vehicleClaimMap.get(txn.id) || null;
+    const capitalAsset = capitalAssetTxMap.get(txn.id) || null;
+    const businessAmounts = deriveBusinessAmounts(txn, category, { ...options, vehicleClaim });
     const status = buildTransactionStatus(txn, category, {
       region: options.region,
       receiptTxIds,
-      duplicateKeys
+      duplicateKeys,
+      vehicleClaim,
+      capitalAsset
     });
     const enriched = {
       ...txn,
       __category: category,
       __businessAmounts: businessAmounts,
       __status: status,
-      __exclusionReason: exclusionReason
+      __exclusionReason: exclusionReason,
+      __vehicleClaim: vehicleClaim,
+      __capitalAsset: capitalAsset
     };
     if (exclusionReason) excluded.push(enriched);
     else included.push(enriched);
@@ -826,7 +858,7 @@ function summarizeExportTransactions(transactions, categories, options = {}) {
   return { included, excluded };
 }
 
-function calculateTotals(transactions) {
+function calculateTotals(transactions, options = {}) {
   let income = 0;
   let expenses = 0;
   for (const txn of transactions || []) {
@@ -834,10 +866,15 @@ function calculateTotals(transactions) {
     if (type === "income") income += Number(txn?.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn));
     else if (type === "expense") expenses += Number(txn?.__businessAmounts?.deductibleAmount ?? normalizeMoneyAmount(txn));
   }
+  // Capital asset depreciation is added to expenses separately; the underlying transactions
+  // have deductibleAmount = 0 until their CCA/MACRS schedule is worked out.
+  const capitalDepreciation = Number(options.capitalDepreciation || 0);
+  const totalExpenses = expenses + capitalDepreciation;
   return {
     income: Number(income.toFixed(2)),
-    expenses: Number(expenses.toFixed(2)),
-    netProfit: Number((income - expenses).toFixed(2)),
+    expenses: Number(totalExpenses.toFixed(2)),
+    capitalDepreciation: Number(capitalDepreciation.toFixed(2)),
+    netProfit: Number((income - totalExpenses).toFixed(2)),
     estimatedTax: null
   };
 }
@@ -1681,6 +1718,185 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, labels
   return [canvas];
 }
 
+// ─── PHASE 2 SCHEDULE PAGES ───────────────────────────────────────────────────
+
+function buildVehicleAuditSchedule(vehicleClaims, currency, labels, region) {
+  if (!vehicleClaims || vehicleClaims.length === 0) return [];
+  const isCA = normalizeRegionCode(region) === "CA";
+  const canvas = new PdfCanvas();
+  const header = drawReportHeader(canvas, {
+    title: "Auto Audit Support Schedule",
+    subtitle: isCA ? "CRA vehicle expense claim details (per-transaction)" : "IRS vehicle expense claim details (per-transaction)",
+    badges: [{ text: labels.draft_badge, variant: "warning" }]
+  });
+
+  const cols = [
+    { key: "date", label: "Date", x: 40, width: 68 },
+    { key: "description", label: "Description", x: 116, width: 174 },
+    { key: "method", label: "Method", x: 298, width: 62 },
+    { key: "detail", label: "Distance / Pct", x: 368, width: 90 },
+    { key: "rate", label: "Rate", x: 466, width: 48 },
+    { key: "deduction", label: "Deduction", x: 522, width: 50, align: "right" }
+  ];
+
+  let y = header.contentStartY - 10;
+  canvas.drawSectionHeader("Vehicle Claim Detail", 40, y);
+  y -= 24;
+  canvas.drawTableHeader(cols, y);
+  y -= 18;
+
+  let totalDeduction = 0;
+  vehicleClaims.forEach((claim, index) => {
+    const isMileage = claim.claim_method === "mileage";
+    const detail = isMileage
+      ? `${Number(claim.distance || 0).toFixed(1)} ${claim.distance_unit || "mi"}`
+      : `${Number(claim.business_use_pct || 0).toFixed(1)}%`;
+    const rate = isMileage && claim.tax_year_rate
+      ? `$${Number(claim.tax_year_rate).toFixed(4)}`
+      : "-";
+    const deductionAmt = Number(claim.calculated_deduction || 0);
+    totalDeduction += deductionAmt;
+
+    if (y < PAGE.bottom + 24) {
+      canvas.addFooter(1, 1, "Auto Audit Support Schedule continued");
+      // For simplicity, truncate at page bottom; full multi-page is future work
+      return;
+    }
+
+    canvas.drawTableRow(cols, {
+      date: normalizePdfDate(claim.transaction_date || ""),
+      description: truncateText(claim.description || "(No description)", 28),
+      method: isMileage ? "Mileage" : "Actual %",
+      detail,
+      rate,
+      deduction: formatCurrencyForPdf(deductionAmt, currency)
+    }, y, { fillGray: index % 2 === 0 ? 0.985 : null });
+    y -= 13;
+  });
+
+  y -= 10;
+  canvas.setStrokeGray(COLORS.mid);
+  canvas.drawLine(40, y + 6, 572, y + 6);
+  canvas.setStrokeGray(COLORS.black);
+  canvas.text(40, y - 4, `Total audited vehicle deduction: ${formatCurrencyForPdf(totalDeduction, currency)}`, 9, "F2");
+  y -= 24;
+  canvas.drawCard(40, y, 532, 68, "Method Reference", [
+    isCA
+      ? "Mileage: CRA per-km rate applied (tiered: first 5,000 km / remainder). Actual: gross amount × business-use %. CRA Form T777 or T2200 required."
+      : "Mileage: IRS standard mileage rate applied. Actual: gross amount × business-use %. IRS Form 4562 may be required for first-year vehicles.",
+    "Rates stored per tax year. Run VALIDATE CONSTRAINT after data cleanup to enable query-planner optimization."
+  ], { maxChars: 90 });
+
+  return [canvas];
+}
+
+function buildCapitalAssetSchedule(capitalAssets, currency, labels, region) {
+  if (!capitalAssets || capitalAssets.length === 0) return [];
+  const isCA = normalizeRegionCode(region) === "CA";
+  const canvas = new PdfCanvas();
+  const header = drawReportHeader(canvas, {
+    title: isCA ? "CCA Schedule - Capital Cost Allowance" : "MACRS / Section 179 Depreciation Schedule",
+    subtitle: isCA ? "T2125 Part 13 — CCA schedule (current tax year)" : "Schedule C Line 13 — Depreciation and Section 179",
+    badges: [{ text: labels.draft_badge, variant: "warning" }]
+  });
+
+  const cols = [
+    { key: "name", label: "Asset", x: 40, width: 154 },
+    { key: "class", label: "Class", x: 202, width: 70 },
+    { key: "cost", label: "Original Cost", x: 280, width: 80, align: "right" },
+    { key: "prior", label: "Prior Depr.", x: 368, width: 72, align: "right" },
+    { key: "current", label: "Current Year", x: 448, width: 72, align: "right" },
+    { key: "remaining", label: "UCC / Basis", x: 528, width: 44, align: "right" }
+  ];
+
+  let y = header.contentStartY - 10;
+  canvas.drawSectionHeader("Asset Register", 40, y);
+  y -= 24;
+  canvas.drawTableHeader(cols, y);
+  y -= 18;
+
+  let totalCurrentDepreciation = 0;
+  let totalRemainingBasis = 0;
+
+  capitalAssets.forEach((asset, index) => {
+    const currentDepr = Number(asset.current_year_depreciation || 0);
+    const remaining = Number(asset.remaining_basis || 0);
+    totalCurrentDepreciation += currentDepr;
+    totalRemainingBasis += remaining;
+
+    if (y < PAGE.bottom + 24) return; // truncate at page bottom
+
+    canvas.drawTableRow(cols, {
+      name: truncateText(asset.name || "", 26),
+      class: asset.cca_class || asset.macrs_class || "-",
+      cost: formatCurrencyForPdf(asset.original_cost, currency),
+      prior: formatCurrencyForPdf(asset.prior_depreciation, currency),
+      current: formatCurrencyForPdf(currentDepr, currency),
+      remaining: formatCurrencyForPdf(remaining, currency)
+    }, y, { fillGray: index % 2 === 0 ? 0.985 : null });
+    y -= 13;
+  });
+
+  y -= 10;
+  canvas.setStrokeGray(COLORS.mid);
+  canvas.drawLine(40, y + 6, 572, y + 6);
+  canvas.setStrokeGray(COLORS.black);
+  canvas.text(40, y - 4, `Total current-year depreciation: ${formatCurrencyForPdf(totalCurrentDepreciation, currency)}   Remaining UCC / basis: ${formatCurrencyForPdf(totalRemainingBasis, currency)}`, 9, "F2");
+  y -= 28;
+
+  canvas.drawCard(40, y, 532, 78, "Depreciation Notes", [
+    isCA
+      ? "CCA uses declining-balance rates with a mandatory 50% first-year rule (CCRA IT-285R2). Assets in Class 12 (100%) and Class 14.1 (5%) use straight-line. Total added to T2125 line 9936."
+      : "MACRS uses IRS Rev. Proc. 87-57 tables with half-year convention. Section 179 deduction taken in full in the election year. Total carried to Schedule C line 13.",
+    "Equipment transactions categorized as 'equipment_capital_asset' have deductibleAmount = 0 in the ledger; this schedule supplies the actual deduction."
+  ], { maxChars: 92 });
+
+  return [canvas];
+}
+
+function buildQuickMethodRemittancePage(qmSchedule, currency, labels) {
+  if (!qmSchedule) return [];
+  const canvas = new PdfCanvas();
+  const header = drawReportHeader(canvas, {
+    title: "CRA Quick Method Remittance Schedule",
+    subtitle: "ETA s. 227 — Simplified accounting for small businesses",
+    badges: [{ text: labels.draft_badge, variant: "warning" }, { text: "QUICK METHOD", variant: "neutral" }]
+  });
+
+  let y = header.contentStartY - 10;
+  canvas.drawCard(40, y, 252, 118, "Remittance Calculation", [
+    `Gross revenues (incl. HST/GST): ${formatCurrencyForPdf(qmSchedule.grossSalesInclTax, currency)}`,
+    `Remittance rate (${String(qmSchedule.provinceGroup || "").replace(/_/g, "/")} ${qmSchedule.supplyType}): ${(Number(qmSchedule.remittanceRate) * 100).toFixed(1)}%`,
+    `Net tax to remit: ${formatCurrencyForPdf(qmSchedule.netTaxToRemit, currency)}`,
+    `Tax collected from customers: ${formatCurrencyForPdf(qmSchedule.taxCollected, currency)}`
+  ], { maxChars: 34 });
+
+  canvas.drawCard(320, y, 252, 118, "Method Parameters", [
+    `Province / group: ${qmSchedule.province || "-"}`,
+    `Supply type: ${qmSchedule.supplyType || "-"}`,
+    `Tax year: ${qmSchedule.taxYear || "-"}`,
+    `HST/GST rate: ${(Number(qmSchedule.hstRate) * 100).toFixed(0)}%`
+  ], { maxChars: 34 });
+
+  y -= 138;
+  canvas.drawCard(40, y, 532, 110, "Quick Method — ITC Treatment", [
+    "Under the Quick Method, ITCs on business expenses (other than capital property) are NOT claimed.",
+    "The expense amounts in the transaction ledger represent the full cost including GST/HST paid — this is correct under ETA s. 227.",
+    "The 1% credit on the first $30,000 of eligible supplies (ETA s. 227(6)) is applied separately by CRA.",
+    qmSchedule.note || ""
+  ], { maxChars: 90 });
+
+  y -= 130;
+  canvas.drawCard(40, y, 532, 68, "Comparison", [
+    `Tax collected: ${formatCurrencyForPdf(qmSchedule.taxCollected, currency)}  |  Remittance: ${formatCurrencyForPdf(qmSchedule.netTaxToRemit, currency)}  |  Net benefit: ${formatCurrencyForPdf(qmSchedule.taxCollected - qmSchedule.netTaxToRemit, currency)}`,
+    "Confirm with preparer that the Quick Method election is current and that annual revenues are under the $400,000 threshold."
+  ], { maxChars: 92 });
+
+  return [canvas];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function buildFooterText(labels, reportId, generatedAt, isSecure, pageNumber, totalPages, legalName, taxId) {
   return truncateText(`${safeValue(legalName, labels.footer_brand)} | ${maskTaxId(taxId)} | ${reportId} | ${formatReportTimestamp(generatedAt)} | ${isSecure ? labels.secure_badge : labels.redacted_badge} | Page ${pageNumber}/${totalPages}`, 110);
 }
@@ -1754,7 +1970,12 @@ function buildPdfExportDocument(options) {
     materialParticipation = null,
     gstHstRegistered = false,
     gstHstNumber = "",
-    gstHstMethod = ""
+    gstHstMethod = "",
+    // Phase 2 compliance data (pre-fetched by the exports route)
+    vehicleClaimMap = null,      // Map<transactionId, vehicle_expense_details row> — with transaction_date, description attached
+    capitalAssets = null,         // Array of capital_assets rows for the tax year
+    capitalAssetTxMap = null,     // Map<transactionId, capital_assets row>
+    quickMethodSchedule = null    // Output of buildQuickMethodSchedule, or null
   } = options || {};
 
   validateExportProfile({
@@ -1779,20 +2000,43 @@ function buildPdfExportDocument(options) {
   const effectiveCurrency = resolveBusinessCurrency(normalizedRegion, currency);
   const resolvedTaxId = String(taxId || storedTaxId || "");
   const taxYear = Number(String(endDate || "").slice(0, 4)) || new Date().getFullYear();
+
+  // Build effective compliance maps (normalize from arrays if needed)
+  const effectiveVehicleClaimMap = vehicleClaimMap instanceof Map
+    ? vehicleClaimMap
+    : new Map((vehicleClaimMap ? Array.from(vehicleClaimMap.entries()) : []));
+  const effectiveCapitalAssetTxMap = capitalAssetTxMap instanceof Map
+    ? capitalAssetTxMap
+    : new Map((capitalAssetTxMap ? Array.from(capitalAssetTxMap.entries()) : []));
+  const effectiveCapitalAssets = Array.isArray(capitalAssets) ? capitalAssets : [];
+
   const transactionSummary = summarizeExportTransactions(transactions, categories, {
     region: normalizedRegion,
     gstHstRegistered,
     gstHstMethod,
-    receipts
+    receipts,
+    vehicleClaimMap: effectiveVehicleClaimMap,
+    capitalAssetTxMap: effectiveCapitalAssetTxMap
   });
   const includedTransactions = transactionSummary.included;
   const excludedTransactions = transactionSummary.excluded;
-  const totals = calculateTotals(includedTransactions);
+
+  // Sum current-year CCA/MACRS depreciation from registered capital assets to fix net profit
+  const capitalDepreciation = effectiveCapitalAssets.reduce(
+    (sum, asset) => sum + Number(asset.current_year_depreciation || 0), 0
+  );
+  const totals = calculateTotals(includedTransactions, { capitalDepreciation });
   const reviewInsights = buildReviewInsights(includedTransactions, categories, receipts, {
     excluded: excludedTransactions,
     region: normalizedRegion
   });
   const isSecure = Boolean(String(taxId || "").trim());
+
+  // Build Phase 2 schedule pages from pre-fetched compliance data
+  const vehicleClaimRows = Array.from(effectiveVehicleClaimMap.values());
+  const vehicleSchedulePages = buildVehicleAuditSchedule(vehicleClaimRows, effectiveCurrency, labels, normalizedRegion);
+  const capitalAssetPages = buildCapitalAssetSchedule(effectiveCapitalAssets, effectiveCurrency, labels, normalizedRegion);
+  const quickMethodPages = buildQuickMethodRemittancePage(quickMethodSchedule, effectiveCurrency, labels);
 
   const canvases = [
     buildIdentityPage({
@@ -1826,7 +2070,11 @@ function buildPdfExportDocument(options) {
     ...buildTransactionPages(includedTransactions, accounts, categories, effectiveCurrency, labels, normalizedRegion),
     ...buildExclusionPages(excludedTransactions, effectiveCurrency, labels),
     ...buildCpaChecklistPage({ labels, region: normalizedRegion, reviewInsights, currency: effectiveCurrency }),
-    ...buildSupportPages(receipts, includedTransactions, mileage, vehicleCosts, labels, effectiveCurrency, reviewInsights, normalizedRegion)
+    ...buildSupportPages(receipts, includedTransactions, mileage, vehicleCosts, labels, effectiveCurrency, reviewInsights, normalizedRegion),
+    // Phase 2 supporting schedules — only included when data exists
+    ...vehicleSchedulePages,
+    ...capitalAssetPages,
+    ...quickMethodPages
   ];
 
   const pageCount = canvases.length;

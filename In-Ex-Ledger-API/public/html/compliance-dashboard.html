@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compliance Dashboard — InEx Ledger</title>
+  <style>
+    :root {
+      --bg-base: #0A0A0B;
+      --bg-card: #111113;
+      --bg-input: #1D1D20;
+      --bg-row: #16161A;
+      --border: #2A2A30;
+      --text-primary: #E8E8EC;
+      --text-secondary: #8A8A96;
+      --text-muted: #5A5A64;
+      --accent-blue: #3B82F6;
+      --accent-yellow: #F59E0B;
+      --accent-green: #10B981;
+      --accent-red: #EF4444;
+      --accent-purple: #8B5CF6;
+      --badge-action: #7C2D12;
+      --badge-review: #78350F;
+      --badge-ok: #14532D;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header h1 { font-size: 18px; font-weight: 600; }
+    header .subtitle { color: var(--text-secondary); font-size: 13px; }
+
+    .toolbar {
+      padding: 12px 24px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .filter-tabs { display: flex; gap: 4px; }
+    .tab {
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+    .tab.active { background: var(--accent-blue); border-color: var(--accent-blue); color: #fff; }
+    .tab:hover:not(.active) { border-color: var(--accent-blue); color: var(--text-primary); }
+
+    .spacer { flex: 1; }
+
+    .btn {
+      padding: 7px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent-blue); color: #fff; }
+    .btn-secondary { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); }
+    .btn-danger { background: var(--accent-red); color: #fff; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+    .summary-bar {
+      padding: 14px 24px;
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+    }
+    .metric {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      min-width: 120px;
+    }
+    .metric .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .metric .value { font-size: 22px; font-weight: 700; margin-top: 2px; }
+    .metric .value.action { color: var(--accent-yellow); }
+    .metric .value.ok { color: var(--accent-green); }
+
+    .main { padding: 16px 24px; }
+
+    /* Bulk action panel */
+    .bulk-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--accent-blue);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 16px;
+      display: none;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .bulk-panel.visible { display: flex; }
+    .bulk-panel .sel-count { font-weight: 600; color: var(--accent-blue); }
+
+    .bulk-actions-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    select.bulk-select {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+
+    /* Transaction table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: var(--bg-card);
+      padding: 8px 12px;
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+      user-select: none;
+    }
+    thead th.check-col { width: 36px; }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    tbody tr:hover { background: var(--bg-row); }
+    tbody tr.selected { background: rgba(59, 130, 246, 0.08); }
+    tbody td { padding: 8px 12px; vertical-align: top; }
+
+    .date-cell { white-space: nowrap; color: var(--text-secondary); font-size: 12px; }
+    .desc-cell { max-width: 240px; }
+    .desc-cell .primary { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .desc-cell .secondary { font-size: 12px; color: var(--text-muted); }
+    .amount-cell { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .amount-cell.income { color: var(--accent-green); }
+    .amount-cell.expense { color: var(--text-primary); }
+    .flags-cell { white-space: nowrap; }
+
+    .flag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 4px;
+      margin-right: 3px;
+      margin-bottom: 2px;
+    }
+    .flag-NC, .flag-UM { background: var(--badge-action); color: #FCA5A5; }
+    .flag-RS, .flag-CA, .flag-ML { background: var(--badge-review); color: #FCD34D; }
+    .flag-FC, .flag-BP, .flag-AL { background: #1E3A5F; color: #93C5FD; }
+    .flag-HO { background: #3B1F6E; color: #C4B5FD; }
+    .flag-RV { background: #3F1D1D; color: #FCA5A5; }
+
+    .support-cell { font-size: 12px; color: var(--text-secondary); max-width: 180px; }
+
+    .action-cell { white-space: nowrap; }
+
+    /* Inline claim form */
+    .claim-form {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      margin-top: 8px;
+    }
+    .claim-form label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+    .claim-form input, .claim-form select {
+      width: 100%;
+      background: var(--bg-base);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-radius: 5px;
+      padding: 6px 9px;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .claim-row { display: flex; gap: 8px; }
+    .claim-row > div { flex: 1; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 18px;
+      font-size: 13px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      z-index: 999;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all 0.25s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: none; }
+    .toast.success { border-color: var(--accent-green); }
+    .toast.error { border-color: var(--accent-red); }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 0;
+      color: var(--text-muted);
+    }
+    .empty-state p { margin-top: 8px; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Compliance Dashboard</h1>
+    <div class="subtitle">Resolve missing support before generating your CPA workpaper</div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="filter-tabs">
+    <button class="tab active" data-filter="all">All</button>
+    <button class="tab" data-filter="ML">Mileage</button>
+    <button class="tab" data-filter="CA">Capital Asset</button>
+    <button class="tab" data-filter="RS">Missing Receipt</button>
+    <button class="tab" data-filter="BP">Business Purpose</button>
+    <button class="tab" data-filter="AL">Allocation</button>
+    <button class="tab" data-filter="NC">Needs Category</button>
+    <button class="tab" data-filter="RV">CPA Review</button>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn btn-secondary btn-sm" id="btn-select-all">Select all</button>
+  <button class="btn btn-secondary btn-sm" id="btn-deselect-all">Deselect</button>
+</div>
+
+<div class="summary-bar" id="summary-bar">
+  <div class="metric"><div class="label">Needs Action</div><div class="value action" id="count-action">—</div></div>
+  <div class="metric"><div class="label">Mileage</div><div class="value" id="count-ml">—</div></div>
+  <div class="metric"><div class="label">Capital Assets</div><div class="value" id="count-ca">—</div></div>
+  <div class="metric"><div class="label">Missing Receipt</div><div class="value" id="count-rs">—</div></div>
+  <div class="metric"><div class="label">Mapped + Ready</div><div class="value ok" id="count-ok">—</div></div>
+</div>
+
+<div class="main">
+  <div class="bulk-panel" id="bulk-panel">
+    <span class="sel-count" id="sel-count-label">0 selected</span>
+    <div class="bulk-actions-row">
+      <select class="bulk-select" id="bulk-vehicle-method">
+        <option value="">— Apply vehicle method —</option>
+        <option value="mileage">Mileage method</option>
+        <option value="actual">Actual expense method</option>
+      </select>
+      <input type="number" id="bulk-business-pct" min="0" max="100" step="1" placeholder="Business use %" style="width:140px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:6px 9px;font-size:13px;" />
+      <input type="number" id="bulk-distance" min="0" placeholder="Total km/mi" style="width:120px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);border-radius:6px;padding:6px 9px;font-size:13px;" />
+      <button class="btn btn-primary btn-sm" id="btn-bulk-apply">Bulk Apply</button>
+    </div>
+    <button class="btn btn-secondary btn-sm" id="btn-bulk-cancel">Cancel</button>
+  </div>
+
+  <div class="table-wrap">
+    <table id="tx-table">
+      <thead>
+        <tr>
+          <th class="check-col"><input type="checkbox" id="chk-all" /></th>
+          <th>Date</th>
+          <th>Description</th>
+          <th>Category</th>
+          <th>Tax Line</th>
+          <th style="text-align:right">Amount</th>
+          <th>Flags</th>
+          <th>Support Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tx-body">
+        <tr><td colspan="9"><div class="empty-state">Loading...</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+const TAX_YEAR = new Date().getFullYear();
+let allRows = [];
+let filteredRows = [];
+let selectedIds = new Set();
+let activeFilter = "all";
+let expandedId = null;
+
+// ── API helpers ────────────────────────────────────────────────────────────────
+
+async function apiFetch(url, opts = {}) {
+  const res = await fetch(url, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest", ...(opts.headers || {}) },
+    ...opts
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+function getCsrf() {
+  return document.cookie.split("; ").find((c) => c.startsWith("csrf_token="))?.split("=")[1] || "";
+}
+
+// ── Data loading ───────────────────────────────────────────────────────────────
+
+async function loadTransactions() {
+  const today = new Date();
+  const startDate = `${today.getFullYear()}-01-01`;
+  const endDate = `${today.getFullYear()}-12-31`;
+
+  const [txData, businessData] = await Promise.all([
+    apiFetch(`/api/exports/dataset?startDate=${startDate}&endDate=${endDate}`).catch(() => null),
+    apiFetch("/api/business")
+  ]);
+
+  if (!txData || !txData.rows) {
+    return [];
+  }
+  return txData.rows;
+}
+
+// ── Rendering ──────────────────────────────────────────────────────────────────
+
+function buildFlagBadges(flags) {
+  return (flags || []).map((f) => `<span class="flag flag-${f}">${f}</span>`).join("");
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(Number(value) || 0);
+}
+
+function applyFilter(rows, filter) {
+  if (filter === "all") return rows.filter((r) => r.mappingStatus !== "Excluded" && (r.reviewFlags || []).length > 0 || r.needsCategory);
+  return rows.filter((r) => (r.reviewFlags || []).includes(filter));
+}
+
+function updateSummary(rows) {
+  document.getElementById("count-action").textContent = rows.filter((r) => (r.reviewFlags || []).length > 0 || r.needsCategory).length;
+  document.getElementById("count-ml").textContent = rows.filter((r) => (r.reviewFlags || []).includes("ML")).length;
+  document.getElementById("count-ca").textContent = rows.filter((r) => (r.reviewFlags || []).includes("CA")).length;
+  document.getElementById("count-rs").textContent = rows.filter((r) => (r.reviewFlags || []).includes("RS")).length;
+  document.getElementById("count-ok").textContent = rows.filter((r) => r.mappingStatus === "Mapped").length;
+}
+
+function renderTable() {
+  const tbody = document.getElementById("tx-body");
+  if (!filteredRows.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><strong>Nothing to action</strong><p>All transactions in this view are compliant.</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filteredRows.map((row) => {
+    const isSelected = selectedIds.has(row.id);
+    const isExpanded = expandedId === row.id;
+    const isVehicle = (row.reviewFlags || []).includes("ML") || (row.reviewFlags || []).includes("AL");
+    const isCapital = (row.reviewFlags || []).includes("CA");
+
+    const claimFormHtml = isExpanded && isVehicle ? buildVehicleClaimForm(row) : "";
+
+    return `
+      <tr class="${isSelected ? "selected" : ""}" data-id="${row.id}">
+        <td><input type="checkbox" class="row-chk" data-id="${row.id}" ${isSelected ? "checked" : ""} /></td>
+        <td class="date-cell">${row.date || ""}</td>
+        <td class="desc-cell">
+          <div class="primary" title="${(row.description || "").replace(/"/g, "&quot;")}">${row.description || "(No description)"}</div>
+          <div class="secondary">${row.accountName || ""}</div>
+          ${claimFormHtml}
+        </td>
+        <td>${row.categoryName || ""}</td>
+        <td style="font-size:12px;color:var(--text-secondary)">${(row.taxLineLabel || "").slice(0, 28) || "—"}</td>
+        <td class="amount-cell ${row.rawType}">${formatCurrency(row.rawType === "income" ? row.amount : row.potentialDeductibleAmount)}</td>
+        <td class="flags-cell">${buildFlagBadges(row.reviewFlags)}</td>
+        <td class="support-cell">${row.supportStatus || row.mappingStatus || ""}</td>
+        <td class="action-cell">
+          ${isVehicle ? `<button class="btn btn-secondary btn-sm btn-claim" data-id="${row.id}">${isExpanded ? "Close" : "Log Claim"}</button>` : ""}
+          ${isCapital ? `<button class="btn btn-secondary btn-sm btn-asset" data-id="${row.id}">Register Asset</button>` : ""}
+        </td>
+      </tr>`;
+  }).join("");
+
+  // Row click for selection (avoid firing on button/checkbox clicks)
+  tbody.querySelectorAll("tr[data-id]").forEach((tr) => {
+    tr.addEventListener("click", (e) => {
+      if (e.target.closest("button, input, select")) return;
+      const id = tr.dataset.id;
+      toggleSelect(id);
+      render();
+    });
+  });
+
+  tbody.querySelectorAll(".row-chk").forEach((chk) => {
+    chk.addEventListener("change", () => {
+      if (chk.checked) selectedIds.add(chk.dataset.id);
+      else selectedIds.delete(chk.dataset.id);
+      updateBulkPanel();
+    });
+  });
+
+  tbody.querySelectorAll(".btn-claim").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      expandedId = expandedId === btn.dataset.id ? null : btn.dataset.id;
+      renderTable();
+    });
+  });
+
+  tbody.querySelectorAll(".btn-asset").forEach((btn) => {
+    btn.addEventListener("click", () => openAssetForm(btn.dataset.id));
+  });
+
+  // Inline claim form handlers
+  tbody.querySelectorAll(".btn-save-claim").forEach((btn) => {
+    btn.addEventListener("click", () => saveVehicleClaim(btn.dataset.id));
+  });
+  tbody.querySelectorAll(".claim-method-sel").forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const txId = sel.dataset.id;
+      const isMileage = sel.value === "mileage";
+      document.querySelectorAll(`.mileage-fields[data-id="${txId}"]`).forEach((el) => {
+        el.style.display = isMileage ? "block" : "none";
+      });
+      document.querySelectorAll(`.actual-fields[data-id="${txId}"]`).forEach((el) => {
+        el.style.display = isMileage ? "none" : "block";
+      });
+    });
+  });
+}
+
+function buildVehicleClaimForm(row) {
+  return `
+    <div class="claim-form" onclick="event.stopPropagation()">
+      <div class="claim-row">
+        <div>
+          <label>Claim method</label>
+          <select class="claim-method-sel" data-id="${row.id}">
+            <option value="mileage">Standard mileage rate</option>
+            <option value="actual">Actual expense %</option>
+          </select>
+        </div>
+        <div>
+          <label>Tax year</label>
+          <input type="number" class="claim-year" data-id="${row.id}" value="${TAX_YEAR}" min="2020" max="2030" />
+        </div>
+      </div>
+      <div class="mileage-fields" data-id="${row.id}">
+        <div class="claim-row">
+          <div><label>Distance</label><input type="number" class="claim-distance" data-id="${row.id}" placeholder="0.0" min="0" step="0.1" /></div>
+          <div>
+            <label>Unit</label>
+            <select class="claim-unit" data-id="${row.id}">
+              <option value="mi">Miles</option>
+              <option value="km">Kilometres</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="actual-fields" data-id="${row.id}" style="display:none">
+        <label>Business use %</label>
+        <input type="number" class="claim-pct" data-id="${row.id}" placeholder="0–100" min="0" max="100" step="1" />
+      </div>
+      <button class="btn btn-primary btn-sm btn-save-claim" data-id="${row.id}">Save Claim</button>
+    </div>`;
+}
+
+// ── Claim / Asset save ─────────────────────────────────────────────────────────
+
+async function saveVehicleClaim(txId) {
+  const method = document.querySelector(`.claim-method-sel[data-id="${txId}"]`)?.value;
+  const year = document.querySelector(`.claim-year[data-id="${txId}"]`)?.value;
+  const distance = document.querySelector(`.claim-distance[data-id="${txId}"]`)?.value;
+  const unit = document.querySelector(`.claim-unit[data-id="${txId}"]`)?.value;
+  const pct = document.querySelector(`.claim-pct[data-id="${txId}"]`)?.value;
+
+  try {
+    await apiFetch(`/api/vehicle-claims/${txId}`, {
+      method: "PUT",
+      headers: { "X-CSRF-Token": getCsrf() },
+      body: JSON.stringify({
+        claim_method: method,
+        tax_year: Number(year),
+        distance: distance ? Number(distance) : undefined,
+        distance_unit: unit,
+        business_use_pct: pct ? Number(pct) : undefined
+      })
+    });
+    showToast("Vehicle claim saved", "success");
+    expandedId = null;
+    await refreshData();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function openAssetForm(txId) {
+  const name = prompt("Asset name (e.g. MacBook Pro 14\"):");
+  if (!name) return;
+  const cost = prompt("Original cost (e.g. 2499.00):");
+  if (!cost) return;
+  const purchaseDate = prompt("Purchase date (YYYY-MM-DD):");
+  if (!purchaseDate) return;
+  const region = (await apiFetch("/api/business").catch(() => ({ region: "US" }))).region || "US";
+  const isCA = String(region).toUpperCase() === "CA";
+  const classHint = isCA
+    ? prompt("CCA class (Class 8 / Class 10 / Class 12 / Class 50 / Class 14.1):", "Class 50")
+    : prompt("MACRS class (5-year / 7-year):", "5-year");
+
+  try {
+    await apiFetch("/api/capital-assets", {
+      method: "POST",
+      headers: { "X-CSRF-Token": getCsrf() },
+      body: JSON.stringify({
+        name,
+        original_cost: Number(cost),
+        purchase_date: purchaseDate,
+        asset_category: "equipment",
+        tax_year: TAX_YEAR,
+        transaction_id: txId,
+        ...(isCA ? { cca_class: classHint } : { macrs_class: classHint })
+      })
+    });
+    showToast("Capital asset registered", "success");
+    await refreshData();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+// ── Bulk apply ─────────────────────────────────────────────────────────────────
+
+document.getElementById("btn-bulk-apply").addEventListener("click", async () => {
+  if (!selectedIds.size) return;
+  const method = document.getElementById("bulk-vehicle-method").value;
+  if (!method) { showToast("Select a vehicle method first", "error"); return; }
+
+  const pct = Number(document.getElementById("bulk-business-pct").value);
+  const distance = Number(document.getElementById("bulk-distance").value);
+
+  const ids = Array.from(selectedIds);
+  let successCount = 0;
+  for (const txId of ids) {
+    try {
+      await apiFetch(`/api/vehicle-claims/${txId}`, {
+        method: "PUT",
+        headers: { "X-CSRF-Token": getCsrf() },
+        body: JSON.stringify({
+          claim_method: method,
+          tax_year: TAX_YEAR,
+          distance: method === "mileage" && distance ? distance : undefined,
+          distance_unit: "mi",
+          business_use_pct: method === "actual" && pct ? pct : undefined
+        })
+      });
+      successCount++;
+    } catch (e) {
+      // continue with remaining
+    }
+  }
+  showToast(`Applied to ${successCount} of ${ids.length} transactions`, "success");
+  selectedIds.clear();
+  await refreshData();
+});
+
+// ── Selection helpers ──────────────────────────────────────────────────────────
+
+function toggleSelect(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  updateBulkPanel();
+}
+
+function updateBulkPanel() {
+  const panel = document.getElementById("bulk-panel");
+  document.getElementById("sel-count-label").textContent = `${selectedIds.size} selected`;
+  if (selectedIds.size > 0) panel.classList.add("visible");
+  else panel.classList.remove("visible");
+}
+
+document.getElementById("btn-select-all").addEventListener("click", () => {
+  filteredRows.forEach((r) => selectedIds.add(r.id));
+  render();
+});
+document.getElementById("btn-deselect-all").addEventListener("click", () => {
+  selectedIds.clear();
+  render();
+});
+document.getElementById("btn-bulk-cancel").addEventListener("click", () => {
+  selectedIds.clear();
+  render();
+});
+document.getElementById("chk-all").addEventListener("change", (e) => {
+  if (e.target.checked) filteredRows.forEach((r) => selectedIds.add(r.id));
+  else selectedIds.clear();
+  render();
+});
+
+// ── Filter tabs ────────────────────────────────────────────────────────────────
+
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+    tab.classList.add("active");
+    activeFilter = tab.dataset.filter;
+    selectedIds.clear();
+    render();
+  });
+});
+
+// ── Toast ──────────────────────────────────────────────────────────────────────
+
+function showToast(msg, type = "neutral") {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  setTimeout(() => el.classList.remove("show"), 3200);
+}
+
+// ── Render orchestration ───────────────────────────────────────────────────────
+
+function render() {
+  filteredRows = applyFilter(allRows, activeFilter);
+  updateBulkPanel();
+  renderTable();
+  updateSummary(allRows);
+}
+
+async function refreshData() {
+  try {
+    allRows = await loadTransactions();
+  } catch (err) {
+    showToast("Failed to load transactions: " + err.message, "error");
+    allRows = [];
+  }
+  render();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+
+(async () => {
+  await refreshData();
+})();
+</script>
+</body>
+</html>

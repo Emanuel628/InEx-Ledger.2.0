@@ -16,6 +16,7 @@ const { buildPdfExport, buildPdfExportDocument, __private: pdfPrivate } = requir
 const { buildNormalizedExportDataset } = require("../services/exportDatasetService.js");
 const { decrypt: decryptField } = require("../services/encryptionService.js");
 const { buildCsvBundle } = require("../services/csvExportService.js");
+const { buildQuickMethodSchedule } = require("../services/quickMethodService.js");
 const { pool } = require("../db.js");
 const { logError, logInfo } = require("../utils/logger.js");
 const { sanitizePayload } = require("../utils/logSanitizer.js");
@@ -136,7 +137,9 @@ function buildCsvFilename(exportType, startDate, endDate) {
 }
 
 async function fetchExportSourceRows(businessId, startDate, endDate) {
-  const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult] =
+  const taxYear = Number(String(endDate || "").slice(0, 4)) || new Date().getFullYear();
+
+  const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult, vehicleClaimResult, capitalAssetResult] =
     await Promise.all([
       pool.query(
         `SELECT id, account_id, category_id, amount, type, description, description_encrypted, date, note,
@@ -181,33 +184,65 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
                 business_type
            FROM businesses WHERE id = $1`,
         [businessId]
+      ),
+      // Phase 2: vehicle claim details — join transactions to attach date + description for PDF rendering
+      pool.query(
+        `SELECT ved.*, t.date AS transaction_date, t.description AS description
+         FROM vehicle_expense_details ved
+         JOIN transactions t ON t.id = ved.transaction_id
+         WHERE ved.business_id = $1
+           AND t.date >= $2 AND t.date <= $3
+           AND t.deleted_at IS NULL`,
+        [businessId, startDate, endDate]
+      ),
+      // Phase 2: capital assets for the tax year derived from endDate
+      pool.query(
+        `SELECT * FROM capital_assets
+         WHERE business_id = $1 AND tax_year = $2 AND is_disposed = FALSE
+         ORDER BY purchase_date ASC, name ASC`,
+        [businessId, taxYear]
       )
     ]);
 
-  return {
-    transactions: txResult.rows.map((row) => {
-      let resolvedDescription = row.description;
-      if (row.description_encrypted) {
-        try {
-          resolvedDescription = decryptField(row.description_encrypted);
-        } catch (decryptErr) {
-          logError("Export: failed to decrypt description_encrypted for transaction", {
-            transactionId: row.id,
-            err: decryptErr.message
-          });
-          // Fall back to plaintext description (may be null)
-          resolvedDescription = row.description;
-        }
+  const transactions = txResult.rows.map((row) => {
+    let resolvedDescription = row.description;
+    if (row.description_encrypted) {
+      try {
+        resolvedDescription = decryptField(row.description_encrypted);
+      } catch (decryptErr) {
+        logError("Export: failed to decrypt description_encrypted for transaction", {
+          transactionId: row.id,
+          err: decryptErr.message
+        });
+        resolvedDescription = row.description;
       }
-      const { description_encrypted, ...rest } = row;
-      return { ...rest, description: resolvedDescription };
-    }),
+    }
+    const { description_encrypted, ...rest } = row;
+    return { ...rest, description: resolvedDescription };
+  });
+
+  // Build compliance maps keyed by transaction_id for O(1) lookup in the PDF engine
+  const vehicleClaimMap = new Map(
+    vehicleClaimResult.rows.map((row) => [row.transaction_id, row])
+  );
+  const capitalAssetTxMap = new Map(
+    capitalAssetResult.rows
+      .filter((row) => row.transaction_id)
+      .map((row) => [row.transaction_id, row])
+  );
+
+  return {
+    transactions,
     accounts: accountResult.rows,
     categories: categoryResult.rows,
     receipts: receiptResult.rows,
     mileage: mileageResult.rows,
     vehicleCosts: vehicleCostResult.rows,
-    business: bizResult.rows[0] || {}
+    business: bizResult.rows[0] || {},
+    vehicleClaimMap,
+    capitalAssets: capitalAssetResult.rows,
+    capitalAssetTxMap,
+    taxYear
   };
 }
 
@@ -363,6 +398,40 @@ router.get("/tax-mapping-rules", exportGrantLimiter, async (_req, res) => {
   });
 });
 
+// Lightweight dataset endpoint for the Compliance Dashboard UI.
+// Returns normalized transaction rows with status flags without requiring a grant token.
+router.get("/dataset", exportGrantLimiter, async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const dateRange = validateDateRange({ startDate: req.query.startDate, endDate: req.query.endDate });
+    if (!dateRange) {
+      return res.status(400).json({ error: "startDate and endDate query parameters are required (YYYY-MM-DD)." });
+    }
+    const sourceRows = await fetchExportSourceRows(businessId, dateRange.startDate, dateRange.endDate);
+    const business = sourceRows.business || {};
+    const region = String(business.region || "us").toLowerCase();
+    const categories = sourceRows.categories.map((c) => ({
+      ...c,
+      taxLabel: region === "ca" ? (c.tax_map_ca || "") : (c.tax_map_us || "")
+    }));
+    const dataset = buildNormalizedExportDataset({
+      transactions: sourceRows.transactions,
+      accounts: sourceRows.accounts,
+      categories,
+      receipts: sourceRows.receipts,
+      business,
+      region,
+      province: business.province || "",
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate
+    });
+    res.json({ rows: dataset.rows, totals: dataset.totals, metadata: dataset.metadata });
+  } catch (err) {
+    logError("GET /exports/dataset error", { err: err.message });
+    res.status(500).json({ error: "Failed to load compliance dataset." });
+  }
+});
+
 router.post("/request-grant", exportGrantLimiter, async (req, res) => {
   const sanitizedBody = sanitizePayload(req.body);
   try {
@@ -470,6 +539,25 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     const generatedAt = new Date().toISOString();
     const reportId = createPdfReportId(generatedAt);
 
+    // Phase 2: compute Quick Method remittance schedule if applicable
+    let quickMethodSchedule = null;
+    if (region === "ca" && business.gst_hst_registered === true && business.gst_hst_method === "quick") {
+      try {
+        const grossSalesInclTax = sourceRows.transactions
+          .filter((t) => String(t.type || "").toLowerCase() === "income")
+          .reduce((sum, t) => sum + Math.abs(Number(t.amount || 0)), 0);
+        quickMethodSchedule = await buildQuickMethodSchedule({
+          businessId,
+          province: business.province || "ON",
+          supplyType: "services",
+          taxYear: sourceRows.taxYear,
+          grossSalesInclTax
+        });
+      } catch (qmErr) {
+        logError("Quick Method schedule computation failed (non-fatal)", { err: qmErr.message });
+      }
+    }
+
     const sharedOptions = {
       transactions: sourceRows.transactions,
       accounts: sourceRows.accounts,
@@ -497,7 +585,12 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       generatedAt,
       reportId,
       region,
-      province: business.province || ""
+      province: business.province || "",
+      // Phase 2 compliance data
+      vehicleClaimMap: sourceRows.vehicleClaimMap,
+      capitalAssets: sourceRows.capitalAssets,
+      capitalAssetTxMap: sourceRows.capitalAssetTxMap,
+      quickMethodSchedule
     };
 
     if (exportType !== "pdf") {
