@@ -1980,6 +1980,13 @@ function buildPdfExportDocument(options) {
     exportStatus: exportStatusOption = null  // "draft" | "workpaper" | null (null = auto-derive from reviewInsights)
   } = options || {};
 
+  // --- PDF Builder Audit ---
+  console.log("[PDF Builder] vehicleClaimMap received:", vehicleClaimMap instanceof Map ? `Map(${vehicleClaimMap.size})` : `NOT a Map — type=${typeof vehicleClaimMap}, value=${vehicleClaimMap}`);
+  console.log("[PDF Builder] capitalAssets received:", Array.isArray(capitalAssets) ? `Array(${capitalAssets.length})` : `NOT an array — type=${typeof capitalAssets}, value=${capitalAssets}`);
+  console.log("[PDF Builder] capitalAssetTxMap received:", capitalAssetTxMap instanceof Map ? `Map(${capitalAssetTxMap.size})` : `NOT a Map — type=${typeof capitalAssetTxMap}, value=${capitalAssetTxMap}`);
+  console.log("[PDF Builder] quickMethodSchedule received:", quickMethodSchedule ? "present" : "null/undefined");
+  // --- End Audit ---
+
   validateExportProfile({
     legalName: legalName || businessName,
     businessName,
@@ -2011,6 +2018,12 @@ function buildPdfExportDocument(options) {
     ? capitalAssetTxMap
     : new Map((capitalAssetTxMap ? Array.from(capitalAssetTxMap.entries()) : []));
   const effectiveCapitalAssets = Array.isArray(capitalAssets) ? capitalAssets : [];
+
+  // --- PDF Builder Normalization Audit ---
+  console.log("[PDF Builder] effectiveVehicleClaimMap after normalization:", `Map(${effectiveVehicleClaimMap.size})`);
+  console.log("[PDF Builder] effectiveCapitalAssetTxMap after normalization:", `Map(${effectiveCapitalAssetTxMap.size})`);
+  console.log("[PDF Builder] effectiveCapitalAssets after normalization:", `Array(${effectiveCapitalAssets.length})`);
+  // --- End Normalization Audit ---
 
   const transactionSummary = summarizeExportTransactions(transactions, categories, {
     region: normalizedRegion,
