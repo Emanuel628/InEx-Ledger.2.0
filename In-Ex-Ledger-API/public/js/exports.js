@@ -1054,7 +1054,7 @@ async function submitBackendPdfExport({ startDate, endDate, includeTaxId, export
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       grantToken: grant?.grantToken,
-      ...(taxId_jwe ? { taxId_jwe } : {})
+      ...(taxId_jwe ? { taxId_jwe, certifiedByUser: true } : {})
     })
   });
 
@@ -1888,6 +1888,7 @@ async function submitSecureExport(taxId, startDate, endDate) {
     body: JSON.stringify({
       dateRange: { startDate, endDate },
       includeTaxId: true,
+      certifiedByUser: true,
       taxId_jwe,
       language: exportLang,
       currency,
