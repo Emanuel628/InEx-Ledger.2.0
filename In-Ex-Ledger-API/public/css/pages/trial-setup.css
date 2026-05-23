@@ -122,8 +122,11 @@ body.trial-setup-page {
 }
 
 .trial-setup-link-btn {
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
   padding: 0;
-  text-align: left;
+  text-align: center;
 }
 
 .trial-setup-grid {
@@ -154,6 +157,10 @@ body.trial-setup-page {
 .trial-setup-summary,
 .trial-setup-actions {
   margin-top: 14px;
+}
+
+.trial-setup-actions-secondary {
+  margin-top: 8px;
 }
 
 .trial-setup-control + .trial-setup-control {
@@ -213,7 +220,7 @@ body.trial-setup-page {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 88px;
+  width: 96px;
   height: 48px;
   padding: 0 16px;
   border-radius: 16px;
@@ -387,7 +394,7 @@ body.trial-setup-page {
   }
 
   .trial-setup-stepper button {
-    min-width: 72px;
+    width: 84px;
     height: 44px;
     border-radius: 14px;
     font-size: 13px;
