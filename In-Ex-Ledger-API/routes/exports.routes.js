@@ -139,6 +139,7 @@ function buildCsvFilename(exportType, startDate, endDate) {
 
 async function fetchExportSourceRows(businessId, startDate, endDate) {
   const taxYear = Number(String(endDate || "").slice(0, 4)) || new Date().getFullYear();
+  console.log("[fetchExportSourceRows] businessId:", businessId, "| startDate:", startDate, "| endDate:", endDate, "| taxYear:", taxYear);
 
   const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult, vehicleClaimResult, capitalAssetResult] =
     await Promise.all([
@@ -223,6 +224,15 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
   });
 
   // Build compliance maps keyed by transaction_id for O(1) lookup in the PDF engine
+  console.log("[fetchExportSourceRows] vehicleClaimResult.rows.length:", vehicleClaimResult.rows.length);
+  console.log("[fetchExportSourceRows] capitalAssetResult.rows.length:", capitalAssetResult.rows.length);
+  if (vehicleClaimResult.rows.length > 0) {
+    console.log("[fetchExportSourceRows] sample vehicleClaim row keys:", Object.keys(vehicleClaimResult.rows[0]));
+  }
+  if (capitalAssetResult.rows.length > 0) {
+    console.log("[fetchExportSourceRows] sample capitalAsset row:", JSON.stringify(capitalAssetResult.rows[0]).slice(0, 200));
+  }
+
   const vehicleClaimMap = new Map(
     vehicleClaimResult.rows.map((row) => [row.transaction_id, row])
   );
