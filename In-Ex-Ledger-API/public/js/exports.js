@@ -65,6 +65,23 @@ function hideExportProfileGuide() {
   }
 }
 
+function showExportGeneralError(message, missingFieldKeys = []) {
+  const errorEl = document.getElementById("exportGeneralError");
+  if (errorEl) {
+    errorEl.textContent = String(message || "");
+    errorEl.classList.toggle("hidden", !message);
+  }
+  const keys = normalizeMissingFieldKeys(missingFieldKeys);
+  const guide = document.getElementById("exportGeneralGuide");
+  const button = document.getElementById("exportGeneralShowMeBtn");
+  if (!guide || !button || !keys.length) {
+    if (guide) guide.classList.add("hidden");
+    return;
+  }
+  button.onclick = () => { window.location.href = buildExportProfileGuideUrl(keys); };
+  guide.classList.remove("hidden");
+}
+
 function showSecureExportInlineError(message, missingFieldKeys = []) {
   const errorEl = document.getElementById("exportInlineTaxIdError");
   if (errorEl) {
@@ -960,6 +977,7 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
     const filename = explicitFilename && batches.length === 1
       ? explicitFilename
       : makePdfFilename(startDate, endDate, batches[0]);
+    showExportGeneralError("");
     try {
       await submitBackendPdfExport({
         startDate,
@@ -975,7 +993,12 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
       }
     } catch (pdfErr) {
       console.error("[Exports] Backend PDF generation failed:", pdfErr);
-      showExportToast(pdfErr?.message || tx("exports_error_generic") || "PDF export failed. Please try again.");
+      const keys = pdfErr?.missingFieldKeys || [];
+      if (keys.length) {
+        showExportGeneralError(pdfErr.message, keys);
+      } else {
+        showExportToast(pdfErr?.message || tx("exports_error_generic") || "PDF export failed. Please try again.");
+      }
     }
     return;
   }
