@@ -259,6 +259,8 @@ test("PUT /api/me/onboarding creates a starter account when the business has non
     assert.ok(existingIdx !== -1, "onboarding should check for an existing starter account before inserting");
     assert.ok(insertIdx !== -1, "onboarding should insert starter account");
     assert.ok(existingIdx < insertIdx, "account existence check should happen before starter insert");
+    const businessUpdate = fixture.state.txQueries.find((entry) => /UPDATE businesses/i.test(entry.sql));
+    assert.equal(businessUpdate?.params?.[1], "sole_proprietorship");
     assert.equal(fixture.state.clientReleased, true);
   } finally {
     fixture.cleanup();

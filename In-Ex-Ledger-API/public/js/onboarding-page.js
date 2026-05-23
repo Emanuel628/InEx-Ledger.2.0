@@ -243,7 +243,7 @@ async function handleOnboardingSubmit(event) {
 
 function resolveOnboardingBusinessType() {
   const value = document.getElementById("onboardingBusinessType")?.value;
-  return String(value || "sole_proprietor").trim() || "sole_proprietor";
+  return String(value || "sole_proprietorship").trim() || "sole_proprietorship";
 }
 
 function syncStarterAccountName() {

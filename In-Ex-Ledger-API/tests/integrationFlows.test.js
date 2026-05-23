@@ -520,6 +520,33 @@ test("onboarding: PUT with invalid business type returns 400", async () => {
   assert.equal(res.status, 400);
 });
 
+test("onboarding: PUT accepts legacy sole_proprietor alias", async () => {
+  const router = require("../routes/me.routes.js");
+  const app = buildApp(router, "/api/me");
+  const token = makeToken();
+  const csrf = generateCsrfToken();
+
+  const res = await request(app)
+    .put("/api/me/onboarding")
+    .set("Authorization", `Bearer ${token}`)
+    .set(CSRF_HEADER_NAME, csrf)
+    .set("Cookie", `${CSRF_COOKIE_NAME}=${csrf}`)
+    .send({
+      business_name: "Test Co",
+      business_type: "sole_proprietor",
+      region: "US",
+      language: "en",
+      starter_account_type: "checking",
+      starter_account_name: "Checking",
+      business_activity_code: "123456",
+      accounting_method: "cash",
+      material_participation: "yes",
+      address: "123 Main St, Miami, FL 33101, USA"
+    });
+
+  assert.notEqual(res.status, 400);
+});
+
 // ---------------------------------------------------------------------------
 // 6. Category validation (400 before DB hit)
 // ---------------------------------------------------------------------------

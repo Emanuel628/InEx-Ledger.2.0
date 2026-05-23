@@ -26,7 +26,17 @@ const accountDeleteLimiter = rateLimit({
 
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
-const VALID_BUSINESS_TYPES = new Set(["sole_proprietor", "llc", "s_corp", "partnership", "corporation"]);
+const BUSINESS_TYPE_ALIASES = new Map([
+  ["sole_proprietor", "sole_proprietorship"],
+  ["sole_proprietorship", "sole_proprietorship"],
+  ["llc", "limited_liability_company"],
+  ["single_member_llc", "single_member_llc"],
+  ["limited_liability_company", "limited_liability_company"],
+  ["s_corp", "corporation"],
+  ["corporation", "corporation"],
+  ["partnership", "partnership"]
+]);
+const VALID_BUSINESS_TYPES = new Set(BUSINESS_TYPE_ALIASES.keys());
 const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
 const VALID_STARTER_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash", "loan"]);
 const GUIDED_SETUP_STEPS = ["categories", "accounts", "transactions", "import"];
@@ -80,6 +90,11 @@ function normalizeOptionalTrimmedStringWithLimit(value, maxLength) {
     return { error: `Must be ${maxLength} characters or fewer.` };
   }
   return normalized;
+}
+
+function normalizeBusinessType(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return BUSINESS_TYPE_ALIASES.get(normalized) || "";
 }
 
 function normalizeUiPreferences(input) {
@@ -280,6 +295,7 @@ router.get("/onboarding", async (req, res) => {
 router.put("/onboarding", async (req, res) => {
   const businessName = String(req.body?.business_name || "").trim();
   const businessType = String(req.body?.business_type || "").trim();
+  const normalizedBusinessType = normalizeBusinessType(businessType);
   const starterAccountType = String(req.body?.starter_account_type || "").trim().toLowerCase();
   const starterAccountName = normalizeOptionalTrimmedStringWithLimit(
     req.body?.starter_account_name,
@@ -300,7 +316,7 @@ router.put("/onboarding", async (req, res) => {
   if (businessName.length > MAX_BUSINESS_NAME_LENGTH) {
     return res.status(400).json({ error: `Business name must be ${MAX_BUSINESS_NAME_LENGTH} characters or fewer.` });
   }
-  if (!VALID_BUSINESS_TYPES.has(businessType)) {
+  if (!VALID_BUSINESS_TYPES.has(businessType) || !normalizedBusinessType) {
     return res.status(400).json({ error: "Choose a valid business type." });
   }
   if (!VALID_REGIONS.has(region)) {
@@ -382,7 +398,7 @@ router.put("/onboarding", async (req, res) => {
           WHERE id = $10`,
         [
           businessName,
-          businessType,
+          normalizedBusinessType,
           region,
           language,
           province || null,
@@ -411,7 +427,7 @@ router.put("/onboarding", async (req, res) => {
 
       const onboardingData = {
         business_name: businessName,
-        business_type: businessType,
+        business_type: normalizedBusinessType,
         starter_account_type: normalizedStarterAccountType,
         starter_account_name: starterName,
         start_focus: normalizedStartFocus,
