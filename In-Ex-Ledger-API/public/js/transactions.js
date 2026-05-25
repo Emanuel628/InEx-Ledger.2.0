@@ -967,6 +967,7 @@ function wireTransactionForm() {
   wireEdgeCaseFields();
   categorySelect?.addEventListener("change", () => {
     syncCustomCategoryField("category", "customCategoryName");
+    syncEdgeCaseUi();
   });
   typeSelect?.addEventListener("change", () => {
     if (!taxTreatmentSelect) {
@@ -1061,7 +1062,14 @@ function wireTransactionForm() {
         tax_treatment: taxTreatmentSelect?.value || "",
         indirect_tax_amount: normalizeNumberOrEmpty(indirectTaxAmountInput?.value),
         indirect_tax_recoverable: !!indirectTaxRecoverableInput?.checked,
-        personal_use_pct: normalizeNumberOrEmpty(personalUseInput?.value),
+        personal_use_pct: (() => {
+          const busRaw = String(document.getElementById("txBusinessUsePct")?.value ?? "").trim();
+          if (busRaw !== "" && Number.isFinite(Number(busRaw))) {
+            const clamped = Math.min(100, Math.max(0, Number(busRaw)));
+            return clamped >= 100 ? null : 100 - clamped;
+          }
+          return normalizeNumberOrEmpty(personalUseInput?.value);
+        })(),
         review_status: reviewStatusSelect?.value || "",
         review_notes: reviewNotesInput?.value.trim() || "",
         payer_name: type === "income" ? (document.getElementById("payerName")?.value.trim() || "") : "",
@@ -2404,6 +2412,12 @@ function prefillTransactionForm(transaction) {
   }
   if (personalUseInput) {
     personalUseInput.value = transaction.personalUsePct ?? transaction.personal_use_pct ?? "";
+  }
+  const businessUsePctInput = document.getElementById("txBusinessUsePct");
+  if (businessUsePctInput) {
+    const rawPct = transaction.personalUsePct ?? transaction.personal_use_pct;
+    const numPct = Number(rawPct);
+    businessUsePctInput.value = (rawPct != null && numPct > 0 && numPct < 100) ? String(100 - numPct) : "";
   }
   if (indirectTaxAmountInput) {
     indirectTaxAmountInput.value = transaction.indirectTaxAmount ?? transaction.indirect_tax_amount ?? "";
@@ -3944,9 +3958,27 @@ function wireEdgeCaseFields() {
 
 function syncEdgeCaseUi() {
   syncPersonalUsePctVisibility();
+  syncAllocationField();
   updateDeductiblePreview();
   syncReviewStatusWarning();
   syncRegionNotes();
+}
+
+function syncAllocationField() {
+  const categorySelect = document.getElementById("category");
+  const allocationField = document.getElementById("txAllocationField");
+  if (!allocationField) {
+    return;
+  }
+  const catText = (categorySelect?.options[categorySelect?.selectedIndex]?.text || "").toLowerCase();
+  const isPhoneInternet = /\bphone\b|\binternet\b/.test(catText);
+  allocationField.hidden = !isPhoneInternet;
+  if (!isPhoneInternet) {
+    const input = document.getElementById("txBusinessUsePct");
+    if (input) {
+      input.value = "";
+    }
+  }
 }
 
 function updateConvertedAmountPreview() {

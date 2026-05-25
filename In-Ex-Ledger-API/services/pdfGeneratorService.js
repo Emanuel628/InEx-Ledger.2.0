@@ -734,6 +734,13 @@ function deriveBusinessAmounts(txn, category, options = {}) {
     nonDeductibleAmount = Number(Math.max(0, netAmount - deductibleAmount).toFixed(2));
   }
 
+  // Phone/internet split-use: apply the stored personal-use percentage.
+  const txPersonalUsePct = Number(txn?.personal_use_pct ?? txn?.personalUsePct) || 0;
+  if (txPersonalUsePct > 0 && categorySlug === "phone_internet" && !vehicleClaim) {
+    deductibleAmount = Number((netAmount * (1 - txPersonalUsePct / 100)).toFixed(2));
+    nonDeductibleAmount = Number((netAmount - deductibleAmount).toFixed(2));
+  }
+
   return {
     grossAmount: Number(amount.toFixed(2)),
     taxAmount: Number(taxAmount.toFixed(2)),
@@ -795,7 +802,9 @@ function buildTransactionStatus(txn, category, context = {}) {
   const hasCapitalAssetSupport = supportArtifactTypes.has("capital_asset_support");
   const needsMileageLog = ["vehicle_fuel", "vehicle_maintenance", "vehicle_parking_tolls", "insurance_vehicle"].includes(categorySlug) && !hasMileageLog;
   const needsBusinessPurpose = ["meals", "travel"].includes(categorySlug) && !hasReviewNote;
-  const needsAllocation = ["phone_internet", "insurance_vehicle", "vehicle_fuel", "vehicle_maintenance", "home_office"].includes(categorySlug) && !(hasAllocationWorksheet || hasHomeOfficeWorksheet);
+  const needsAllocation = ["phone_internet", "insurance_vehicle", "vehicle_fuel", "vehicle_maintenance", "home_office"].includes(categorySlug)
+    && !(hasAllocationWorksheet || hasHomeOfficeWorksheet)
+    && !(categorySlug === "phone_internet" && personalUsePct > 0);
   const needsHomeOfficeSupport = categorySlug === "home_office" && !hasHomeOfficeWorksheet;
   const needsCapitalAssetReview = categorySlug === "equipment_capital_asset" && !hasCapitalAssetSupport;
   const needsReceipt = isExpense && !hasReceipt && !hasSupportReceipt && !["needs_category"].includes(categorySlug);

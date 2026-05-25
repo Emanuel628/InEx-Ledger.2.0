@@ -290,6 +290,11 @@
                   <label for="amount" class="form-label" data-i18n="transaction_label_amount">Amount</label>
                   <input class="form-control" type="number" id="amount" name="amount" step="0.01" required />
                 </div>
+                <div class="form-field form-field-full" id="txAllocationField" hidden>
+                  <label for="txBusinessUsePct" class="form-label">Business-use %</label>
+                  <input class="form-control" type="number" id="txBusinessUsePct" min="1" max="100" step="1" placeholder="e.g. 60" />
+                  <p class="small-note">Enter the percentage of this expense used for business. The deductible amount is calculated automatically.</p>
+                </div>
                 <!-- Payer / 1099 fields - shown only for income transactions -->
                 <div class="form-field income-only-field" id="payerNameField">
                   <label for="payerName" class="form-label" data-i18n="transaction_payer_label">Payer / Platform</label>
@@ -699,7 +704,7 @@
 <script src="../js/taxReminders.js?v=20260405c"></script>
 <script src="../js/bank-csv-help.js?v=20260520b"></script>
 <script src="../js/onboarding.js?v=20260523c"></script>
-<script src="../js/transactions.js?v=20260525g"></script>
+<script src="../js/transactions.js?v=20260525h"></script>
 </body>
 </html>
 
