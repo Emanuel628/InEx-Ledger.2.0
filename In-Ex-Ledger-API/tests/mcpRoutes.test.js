@@ -93,6 +93,25 @@ test("GET /mcp returns connector metadata", async () => {
   assert.equal(response.body.scope, "read:businesses read:exports");
 });
 
+test("GET /mcp/oauth/authorize renders a CSP-safe consent page", async () => {
+  const { app } = loadMcpRouterFixture();
+
+  const response = await request(app).get("/mcp/oauth/authorize")
+    .query({
+      response_type: "code",
+      client_id: "chatgpt-client",
+      redirect_uri: "https://chat.openai.com/aip/oauth/callback",
+      scope: "read:businesses read:exports",
+      code_challenge: "challenge",
+      code_challenge_method: "S256",
+      state: "state_1"
+    });
+
+  assert.equal(response.status, 200);
+  assert.match(response.text, /<form method="post" action="\/mcp\/oauth\/authorize">/);
+  assert.doesNotMatch(response.text, /<style>/);
+});
+
 test("POST /mcp/oauth/token exchanges an auth code", async () => {
   const { app } = loadMcpRouterFixture();
 

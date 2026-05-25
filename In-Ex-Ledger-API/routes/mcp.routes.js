@@ -31,45 +31,32 @@ function buildAuthorizeHtml(req, {
   codeChallenge,
   codeChallengeMethod
 }) {
-  const appOrigin = buildAppOrigin(req);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Connect ChatGPT | InEx Ledger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <style>
-    body { margin: 0; font-family: ui-sans-serif, system-ui, sans-serif; background: #f5f8fc; color: #0f172a; }
-    main { width: min(100% - 32px, 680px); margin: 56px auto; padding: 28px; border: 1px solid rgba(15,23,42,.08); border-radius: 24px; background: #fff; box-shadow: 0 16px 40px rgba(15,23,42,.08); }
-    .eyebrow { display: inline-flex; min-height: 28px; align-items: center; padding: 0 12px; border-radius: 999px; background: #eaf3ff; color: #0f5bd7; font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
-    h1 { margin: 18px 0 10px; font-size: 38px; line-height: 1.05; letter-spacing: -.05em; }
-    p { color: #475569; line-height: 1.65; }
-    ul { padding-left: 18px; color: #334155; }
-    form { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
-    button { min-height: 48px; padding: 0 18px; border-radius: 14px; border: 1px solid rgba(15,23,42,.1); background: #fff; color: #0f172a; font: inherit; font-weight: 800; cursor: pointer; }
-    .primary { background: linear-gradient(135deg, #0f5bd7, #2677e8); color: #fff; border-color: #0f5bd7; }
-    code { background: #f8fafc; padding: 2px 6px; border-radius: 8px; }
-  </style>
 </head>
 <body>
   <main>
-    <span class="eyebrow">ChatGPT connector</span>
+    <p><strong>ChatGPT connector</strong></p>
     <h1>Connect ChatGPT to InEx Ledger</h1>
     <p>Signed in as <strong>${escapeHtml(user.email)}</strong>. This grants read-only access to your active business ledger through the MCP endpoint.</p>
     <ul>
       <li>Client: <code>${escapeHtml(clientId)}</code></li>
       <li>Scope: <code>${escapeHtml(scope)}</code></li>
-      <li>MCP endpoint: <code>${escapeHtml(appOrigin)}/mcp</code></li>
+      <li>MCP endpoint: <code>${escapeHtml(buildAppOrigin(req))}/mcp</code></li>
     </ul>
     <p>ChatGPT will be able to read bookkeeping summaries, transactions, receipt coverage, export readiness, invoice activity, and tax reminders. It will not be able to write changes in this phase.</p>
-    <form method="post" action="${escapeHtml(appOrigin)}/mcp/oauth/authorize">
+    <form method="post" action="/mcp/oauth/authorize">
       <input type="hidden" name="client_id" value="${escapeHtml(clientId)}" />
       <input type="hidden" name="redirect_uri" value="${escapeHtml(redirectUri)}" />
       <input type="hidden" name="scope" value="${escapeHtml(scope)}" />
       <input type="hidden" name="state" value="${escapeHtml(state || "")}" />
       <input type="hidden" name="code_challenge" value="${escapeHtml(codeChallenge)}" />
       <input type="hidden" name="code_challenge_method" value="${escapeHtml(codeChallengeMethod)}" />
-      <button class="primary" type="submit" name="decision" value="approve">Allow read-only access</button>
+      <button type="submit" name="decision" value="approve">Allow read-only access</button>
       <button type="submit" name="decision" value="deny">Cancel</button>
     </form>
   </main>
