@@ -61,7 +61,21 @@ const LEGACY_HTML_REDIRECTS = new Map([
   ['/html/mfa.html', '/settings#settings-security'],
   ['/mfa.html', '/settings#settings-security']
 ]);
-const INDEXABLE_PUBLIC_PAGES = new Set(["landing", "pricing", "legal", "privacy", "terms"]);
+const INDEXABLE_PUBLIC_PAGES = new Set([
+  "landing",
+  "pricing",
+  "legal",
+  "privacy",
+  "terms",
+  "schedule-c-bookkeeping",
+  "t2125-bookkeeping-canada",
+  "quickbooks-alternative-for-solo-operators",
+  "spreadsheet-alternative-bookkeeping",
+  "cpa-ready-export",
+  "redacted-export-history",
+  "invoice-replies-bookkeeping",
+  "estimated-tax-reminders"
+]);
 const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const ORIGINLESS_API_WRITE_ALLOWLIST = new Set([
   "/api/billing/webhook",
