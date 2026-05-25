@@ -37,7 +37,6 @@ const ISSUE_CODE_TO_FLAG = Object.fromEntries(
 const HARD_REVIEW_ISSUE_CODES = new Set([
   "needs_category",
   "needs_tax_mapping",
-  "final_confirmation_needed",
   "needs_receipt_support",
   "needs_business_purpose",
   "needs_allocation",

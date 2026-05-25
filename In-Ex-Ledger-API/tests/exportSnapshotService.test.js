@@ -133,6 +133,31 @@ test("resolved reviewer issues no longer block finalization", () => {
   assert.equal(decision.hardBlockers.length, 0);
 });
 
+test("final confirmation warning alone does not block finalized export", () => {
+  const decision = deriveFinalizationDecision({
+    dataset: buildDataset({
+      includedRows: [{
+        id: "tx_1",
+        rawType: "expense",
+        description: "Home office utilities",
+        payerName: "",
+        reviewFlags: ["FC"],
+        reviewIssueEntries: [{ issueCode: "final_confirmation_needed", severity: "warning", status: "open" }]
+      }]
+    }),
+    business: buildBusiness(),
+    requestedMode: "finalized",
+    exportFormat: "pdf",
+    jurisdiction: "US",
+    certifiedByUser: true,
+    includeTaxId: false
+  });
+
+  assert.equal(decision.eligibleForFinalization, true);
+  assert.equal(decision.hardBlockers.length, 0);
+  assert.ok(decision.warnings.some((issue) => issue.code === "final_confirmation_needed"));
+});
+
 test("summarizeInvalidationReason classifies known stale causes", () => {
   const summary = summarizeInvalidationReason("Receipt evidence changed after export.");
   assert.equal(summary.code, "receipts");

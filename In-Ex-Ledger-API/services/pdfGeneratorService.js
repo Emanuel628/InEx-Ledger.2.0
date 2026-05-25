@@ -809,6 +809,25 @@ function buildTransactionStatus(txn, category, context = {}) {
   const needsCapitalAssetReview = categorySlug === "equipment_capital_asset" && !hasCapitalAssetSupport;
   const needsReceipt = isExpense && !hasReceipt && !hasSupportReceipt && !["needs_category"].includes(categorySlug);
   const incomeNeedsReview = isIncome && (importedIncome || nature === "unknown_needs_review");
+  const hasFinalConfirmationSupport = (() => {
+    if (context.vehicleClaim) return true;
+    if (["vehicle_fuel", "vehicle_maintenance", "vehicle_parking_tolls", "insurance_vehicle"].includes(categorySlug)) {
+      return hasMileageLog || hasAllocationWorksheet;
+    }
+    if (["meals", "travel"].includes(categorySlug)) {
+      return hasReviewNote;
+    }
+    if (categorySlug === "phone_internet") {
+      return hasAllocationWorksheet || personalUsePct > 0;
+    }
+    if (categorySlug === "home_office") {
+      return hasHomeOfficeWorksheet || hasAllocationWorksheet;
+    }
+    if (categorySlug === "equipment_capital_asset") {
+      return hasCapitalAssetSupport || !!context.capitalAsset;
+    }
+    return false;
+  })();
 
   if (nature === "refund_or_reversal" || nature === "cashback_or_reward") flags.push("RR");
   if (nature === "transfer" || nature === "credit_card_payment") flags.push("TR");
@@ -823,7 +842,7 @@ function buildTransactionStatus(txn, category, context = {}) {
     flags.push("UM");
   }
 
-  if (needsFinalConfirmation && !hasReviewNote && !hasAllocationWorksheet && !hasMileageLog) flags.push("FC");
+  if (needsFinalConfirmation && !hasFinalConfirmationSupport) flags.push("FC");
   if (needsReceipt) flags.push("RS");
   if (needsBusinessPurpose) flags.push("BP");
   if (needsAllocation) flags.push("AL");
@@ -840,6 +859,8 @@ function buildTransactionStatus(txn, category, context = {}) {
   if (context.capitalAsset) {
     const caIdx = flags.indexOf("CA");
     if (caIdx !== -1) flags.splice(caIdx, 1);
+    const fcIdx = flags.indexOf("FC");
+    if (fcIdx !== -1) flags.splice(fcIdx, 1);
   }
 
   if (categoryStatus === "needs_category") supportStatus = "category_required";

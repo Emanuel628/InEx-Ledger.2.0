@@ -80,6 +80,12 @@ function showFinalizationError(blockers) {
   const list = Array.isArray(blockers) ? blockers : [];
   const items = list.map((b) => {
     const n = Number(b.count) || 0;
+    if (b.code === "needs_tax_mapping") {
+      return `<li>${escapeHtml(b.message || "Some transactions still need tax-line mapping")} - <a href="categories">Fix in Categories</a></li>`;
+    }
+    if (["needs_receipt_support", "needs_business_purpose", "needs_allocation", "needs_mileage_log", "needs_home_office_support", "needs_capital_asset_review", "missing_description", "cpa_review_required", "final_confirmation_needed"].includes(b.code)) {
+      return `<li>${escapeHtml(b.message || b.code)} - <a href="review">Fix in Review Queue</a></li>`;
+    }
     if (b.code === "needs_category") {
       const label = n === 1 ? "1 transaction needs a category" : `${n} transactions need a category`;
       return `<li>${escapeHtml(label)} — <a href="transactions?filter=uncategorized">Fix in Transactions →</a></li>`;

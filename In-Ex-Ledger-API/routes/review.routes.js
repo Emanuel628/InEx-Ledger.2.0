@@ -106,7 +106,7 @@ function buildDerivedIssueEntries(row) {
     derived.push({
       issue_code: issueCode,
       label,
-      issue_severity: ["NC", "UM", "RS", "BP", "AL", "ML", "HO", "CA", "MD", "RV", "FC"].includes(flag) ? "hard" : "warning",
+      issue_severity: ["NC", "UM", "RS", "BP", "AL", "ML", "HO", "CA", "MD", "RV"].includes(flag) ? "hard" : "warning",
       source: "derived"
     });
   }

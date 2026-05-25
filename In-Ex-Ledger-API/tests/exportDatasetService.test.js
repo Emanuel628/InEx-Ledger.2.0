@@ -12,6 +12,8 @@ function buildFixture(overrides = {}) {
       { id: "fuel1", type: "expense", amount: 45, category_id: "fuel", account_id: "bank", date: "2026-04-02", description: "Shell fuel" },
       { id: "meal1", type: "expense", amount: 24, category_id: "meals", account_id: "bank", date: "2026-04-03", description: "Client lunch" },
       { id: "phone1", type: "expense", amount: 80, category_id: "phone", account_id: "bank", date: "2026-04-04", description: "Phone service" },
+      { id: "home1", type: "expense", amount: 220, category_id: "home_office", account_id: "bank", date: "2026-04-04", description: "Home office internet and utilities" },
+      { id: "asset1", type: "expense", amount: 2400, category_id: "equipment", account_id: "bank", date: "2026-04-04", description: "Laptop for business" },
       { id: "imported1", type: "expense", amount: 18, category_id: "imported_expense", account_id: "bank", date: "2026-04-05", description: "Imported row" },
       { id: "transfer1", type: "expense", amount: 300, category_id: "imported_expense", account_id: "bank", date: "2026-04-06", description: "TRANSFER TO SAV XXXXX7188" },
       { id: "cc1", type: "expense", amount: 250, category_id: "imported_expense", account_id: "bank", date: "2026-04-07", description: "CITI CARD ONLINE PAYMENT" },
@@ -28,6 +30,8 @@ function buildFixture(overrides = {}) {
       { id: "fuel", name: "Fuel & Gas", kind: "expense", tax_map_us: "", tax_map_ca: "" },
       { id: "meals", name: "Food & Dining", kind: "expense", tax_map_us: "", tax_map_ca: "" },
       { id: "phone", name: "Phone & Internet", kind: "expense", tax_map_us: "", tax_map_ca: "" },
+      { id: "home_office", name: "Home Office", kind: "expense", tax_map_us: "", tax_map_ca: "" },
+      { id: "equipment", name: "Equipment & Machinery", kind: "expense", tax_map_us: "", tax_map_ca: "" },
       { id: "imported_expense", name: "Imported Expense", kind: "expense", tax_map_us: "", tax_map_ca: "" },
       { id: "imported_income", name: "Imported Income", kind: "income", tax_map_us: "", tax_map_ca: "" }
     ],
@@ -51,10 +55,10 @@ function buildFixture(overrides = {}) {
 
 test("dataset excludes transfers, card payments, payroll, tax refunds, cashback, reversal, and debt payments from P&L", () => {
   const dataset = buildNormalizedExportDataset(buildFixture());
-  assert.equal(dataset.includedRows.length, 6);
+  assert.equal(dataset.includedRows.length, 8);
   assert.equal(dataset.excludedRows.length, 7);
   assert.equal(dataset.totals.grossIncome, 1260);
-  assert.equal(dataset.totals.totalExpenses, 155);
+  assert.equal(dataset.totals.totalExpenses, 375);
   assert.deepEqual(dataset.excludedRows.map((row) => row.exclusionCode).sort(), [
     "CC PAY",
     "CASHBACK",
@@ -125,17 +129,25 @@ test("support artifacts clear matching review flags and receipt gaps", () => {
   const supportArtifactMap = new Map([
     ["fuel1", [{ artifact_type: "mileage_log", review_status: "accepted" }, { artifact_type: "receipt", review_status: "accepted" }]],
     ["meal1", [{ artifact_type: "review_note", review_status: "accepted", notes: "Client meal" }]],
-    ["phone1", [{ artifact_type: "allocation_worksheet", review_status: "accepted" }]]
+    ["phone1", [{ artifact_type: "allocation_worksheet", review_status: "accepted" }]],
+    ["home1", [{ artifact_type: "home_office_worksheet", review_status: "accepted" }]],
+    ["asset1", [{ artifact_type: "capital_asset_support", review_status: "accepted" }]]
   ]);
   const dataset = buildNormalizedExportDataset(buildFixture({ supportArtifactMap }));
   const fuel = dataset.includedRows.find((row) => row.id === "fuel1");
   const meals = dataset.includedRows.find((row) => row.id === "meal1");
   const phone = dataset.includedRows.find((row) => row.id === "phone1");
+  const homeOffice = dataset.includedRows.find((row) => row.id === "home1");
+  const capitalAsset = dataset.includedRows.find((row) => row.id === "asset1");
 
   assert.ok(!fuel.reviewFlags.includes("ML"));
   assert.ok(!fuel.reviewFlags.includes("RS"));
   assert.ok(!meals.reviewFlags.includes("BP"));
   assert.ok(!phone.reviewFlags.includes("AL"));
+  assert.ok(!homeOffice.reviewFlags.includes("HO"));
+  assert.ok(!homeOffice.reviewFlags.includes("FC"));
+  assert.ok(!capitalAsset.reviewFlags.includes("CA"));
+  assert.ok(!capitalAsset.reviewFlags.includes("FC"));
   assert.ok(dataset.totals.missingReceiptCount < buildNormalizedExportDataset(buildFixture()).totals.missingReceiptCount);
 });
 
