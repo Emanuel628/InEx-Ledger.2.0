@@ -1,0 +1,291 @@
+/* ================================================================
+   PRINT STYLESHEET — InEx Ledger
+   Financial-grade print rules: ledger tables, invoices, exports.
+   ================================================================ */
+
+@media print {
+
+  /* ── 1. Hide all screen chrome ─────────────────────────────── */
+  .app-topbar,
+  .settings-topbar,
+  .accounts-topbar,
+  .exports-topbar,
+  .receipts-topbar,
+  .categories-topbar,
+  .mileage-topbar,
+  .messages-topbar,
+  .analytics-topbar,
+  .help-topbar,
+  header,
+  .app-sidebar,
+  .app-sidebar.app-sidebar--dynamic,
+  .mobile-nav-drawer,
+  .mobile-nav-overlay,
+  .mobile-nav-overlay.is-open,
+  .topbar-hamburger,
+  .trial-banner,
+  .offline-banner,
+  .account-menu,
+  .dynamic-sidebar-quick-panel,
+  .dynamic-sidebar-backdrop,
+  .mobile-desktop-link,
+  .mobile-view-link,
+  .skip-link,
+  [data-print-hide],
+  .no-print {
+    display: none !important;
+  }
+
+  /* ── 2. Page setup ──────────────────────────────────────────── */
+  @page {
+    size: letter portrait;
+    margin: 15mm 12mm 20mm 12mm;
+  }
+
+  /* Extra top margin on first page for business header */
+  @page :first {
+    margin-top: 22mm;
+  }
+
+  /* ── 3. Base typography ─────────────────────────────────────── */
+  /* Use pt in print — px values are device-dependent.           */
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+    font-size: 10pt !important;
+    line-height: 1.45 !important;
+    color: #000 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  h1 { font-size: 18pt; margin-bottom: 6pt; page-break-after: avoid; }
+  h2 { font-size: 14pt; margin-bottom: 4pt; page-break-after: avoid; }
+  h3 { font-size: 12pt; margin-bottom: 3pt; page-break-after: avoid; }
+  h4 { font-size: 11pt; margin-bottom: 3pt; page-break-after: avoid; }
+  p  { font-size: 10pt; margin-bottom: 6pt; }
+
+  /* ── 4. Layout — collapse to single column ─────────────────── */
+  main.app-shell {
+    display: block !important;
+    min-height: auto !important;
+    background: none !important;
+    max-width: none !important;
+  }
+
+  .app-page,
+  .app-content,
+  .receipts-content,
+  .accounts-content,
+  .settings-content,
+  .exports-content,
+  .categories-content,
+  .mileage-content,
+  .messages-content,
+  .analytics-content,
+  .help-content {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    float: none !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ── 5. Cards and sections ──────────────────────────────────── */
+  section,
+  .card,
+  .panel,
+  .tx-card,
+  .settings-section,
+  .history-card,
+  .billing-card,
+  .analytics-card,
+  .exports-card {
+    border: 0.5pt solid #ccc !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    padding: 10pt !important;
+    page-break-inside: avoid;
+    margin-bottom: 10pt;
+  }
+
+  /* ── 6. Financial tables ────────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+    page-break-inside: auto;
+  }
+
+  /* thead repeats on every printed page */
+  thead {
+    display: table-header-group;
+  }
+
+  /* tfoot with totals appears at the bottom of each page */
+  tfoot {
+    display: table-footer-group;
+  }
+
+  /* Never split a data row across pages */
+  tr {
+    page-break-inside: avoid;
+  }
+
+  th, td {
+    border: 0.5pt solid #bbb;
+    padding: 4pt 6pt;
+    text-align: left;
+    vertical-align: top;
+    font-size: 9pt;
+  }
+
+  th {
+    background: #f2f2f2 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-weight: 600;
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* Zebra rows — force background color through print engine */
+  tr:nth-child(even) td {
+    background: #fafafa !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Table wrappers: remove overflow clipping for print */
+  .table-wrapper,
+  .transactions-table-wrapper,
+  .accounts-table-wrapper,
+  .categories-table-wrapper,
+  .mileage-table-wrapper,
+  .exports-table-wrapper,
+  .receipts-card,
+  .invoice-table-wrapper {
+    overflow: visible !important;
+  }
+
+  /* ── 7. Financial-specific alignment ───────────────────────── */
+  .amount,
+  .currency,
+  td.number,
+  td.amount,
+  [data-amount],
+  [data-currency] {
+    text-align: right !important;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    font-weight: 500;
+  }
+
+  /* Income green / expense red preserved in print */
+  .income,
+  .positive,
+  [data-type="income"] {
+    color: #166534 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .expense,
+  .negative,
+  [data-type="expense"] {
+    color: #991b1b !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ── 8. Page break utilities ────────────────────────────────── */
+  .financial-summary,
+  .invoice-totals,
+  .export-totals,
+  .ledger-summary,
+  .period-summary {
+    page-break-inside: avoid;
+  }
+
+  /* Force a new page before this element */
+  .print-page-break {
+    break-before: page;
+  }
+
+  /* Keep section heading with its first content block */
+  .print-keep-together {
+    page-break-inside: avoid;
+  }
+
+  /* ── 9. Print-only header (hidden on screen) ────────────────── */
+  /* Add class="print-header" to a div in your HTML templates.   */
+  .print-header {
+    display: block !important;
+    margin-bottom: 12pt;
+    padding-bottom: 8pt;
+    border-bottom: 1pt solid #000;
+    font-size: 10pt;
+  }
+
+  .print-header-logo {
+    font-size: 16pt;
+    font-weight: 700;
+    margin-bottom: 4pt;
+  }
+
+  .print-header-meta {
+    font-size: 8pt;
+    color: #555;
+  }
+
+  /* ── 10. Links — suppress noisy URL output ─────────────────── */
+  /* Suppress URLs for nav links, anchor links, and UI controls  */
+  a[href^="#"]::after,
+  a[href^="javascript"]::after,
+  a[href^="/"]::after,
+  nav a::after,
+  button::after,
+  .no-print-url::after {
+    content: none !important;
+  }
+
+  /* Show full URL only for external references */
+  a[href^="http"]::after,
+  a[href^="https"]::after {
+    content: " (" attr(href) ")";
+    font-size: 8pt;
+    color: #666;
+  }
+
+  /* ── 11. KPI/stat cards in print ───────────────────────────── */
+  .stats-row,
+  .kpi-row,
+  .summary-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8pt !important;
+    page-break-inside: avoid;
+  }
+
+  .stat-card,
+  .kpi-card,
+  .summary-card {
+    border: 0.5pt solid #ccc !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 8pt !important;
+    break-inside: avoid;
+  }
+
+  /* ── 12. Page counter ───────────────────────────────────────── */
+  /* Uncomment if you add a .print-page-number element to templates */
+  /*
+  .print-page-number::after {
+    content: "Page " counter(page) " of " counter(pages);
+  }
+  */
+
+} /* end @media print */

@@ -68,6 +68,32 @@
 
   /* Form field gap between label and input */
   --field-label-gap: 6px;
+
+  /* ── Breakpoint reference (for JS — not usable in @media directly) ── */
+  --bp-xs:  480px;   /* large phones */
+  --bp-sm:  640px;   /* tablet portrait / phone landscape */
+  --bp-md:  768px;   /* tablet landscape / sidebar rail */
+  --bp-lg:  1024px;  /* desktop — sidebar expanded */
+  --bp-xl:  1280px;  /* standard desktop */
+  --bp-2xl: 1536px;  /* wide desktop */
+  --bp-tv:  1920px;  /* TV / ultra-wide */
+
+  /* ── Sidebar widths ── */
+  --sidebar-rail:     56px;
+  --sidebar-expanded: 240px;
+  --sidebar-wide:     260px;
+  --sidebar-tv:       300px;
+
+  /* ── Fluid type scale (min 360px → max 1280px viewport) ── */
+  /* Use these on any element; base body uses --text-base.   */
+  --text-xs:   clamp(0.75rem,  0.69rem + 0.27vw, 0.875rem); /* 12→14px */
+  --text-sm:   clamp(0.875rem, 0.83rem + 0.22vw, 1rem);     /* 14→16px */
+  --text-base: clamp(0.875rem, 0.84rem + 0.18vw, 0.9375rem);/* 14→15px */
+  --text-md:   clamp(1rem,     0.95rem + 0.27vw, 1.125rem); /* 16→18px */
+  --text-lg:   clamp(1.125rem, 1.03rem + 0.49vw, 1.375rem); /* 18→22px */
+  --text-xl:   clamp(1.375rem, 1.2rem  + 0.87vw, 1.75rem);  /* 22→28px */
+  --text-2xl:  clamp(1.625rem, 1.36rem + 1.36vw, 2.25rem);  /* 26→36px */
+  --text-3xl:  clamp(1.875rem, 1.47rem + 2.18vw, 2.875rem); /* 30→46px */
 }
 
 [data-theme="dark"] {
