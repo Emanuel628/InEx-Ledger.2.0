@@ -5224,7 +5224,18 @@ Object.assign(TRANSLATIONS.en, {
   review_support_item: 'Support item',
   review_support_load_error: 'Failed to load support artifacts.',
   review_support_file_required: 'Choose a support file first.',
-  review_support_save_error: 'Failed to save support.'
+  review_support_save_error: 'Failed to save support.',
+  common_refresh: 'Refresh',
+  review_action_open: 'Open',
+  review_issue_load_error: 'Failed to load reviewer issue state.',
+  review_issue_none: 'No saved reviewer decisions on this transaction yet.',
+  review_issue_reopen: 'Reopen',
+  review_issue_resolve: 'Resolve',
+  review_issue_save_error: 'Failed to save review issue.',
+  review_issue_saving: 'Saving...',
+  review_issue_submit: 'Save issue',
+  review_issue_waive: 'Waive',
+  review_manage_issue: 'Manage issue'
 });
 
 Object.assign(TRANSLATIONS.es, {
@@ -5283,7 +5294,18 @@ Object.assign(TRANSLATIONS.es, {
   review_support_item: 'Elemento de soporte',
   review_support_load_error: 'No se pudieron cargar los soportes.',
   review_support_file_required: 'Primero elige un archivo de soporte.',
-  review_support_save_error: 'No se pudo guardar el soporte.'
+  review_support_save_error: 'No se pudo guardar el soporte.',
+  common_refresh: 'Actualizar',
+  review_action_open: 'Abrir',
+  review_issue_load_error: 'No se pudo cargar el estado del problema del revisor.',
+  review_issue_none: 'Aun no hay decisiones guardadas del revisor en esta transaccion.',
+  review_issue_reopen: 'Reabrir',
+  review_issue_resolve: 'Resolver',
+  review_issue_save_error: 'No se pudo guardar el problema de revision.',
+  review_issue_saving: 'Guardando...',
+  review_issue_submit: 'Guardar problema',
+  review_issue_waive: 'Dispensar',
+  review_manage_issue: 'Gestionar problema'
 });
 
 Object.assign(TRANSLATIONS.fr, {
@@ -5342,7 +5364,18 @@ Object.assign(TRANSLATIONS.fr, {
   review_support_item: 'Element de support',
   review_support_load_error: 'Impossible de charger les supports.',
   review_support_file_required: 'Choisissez d abord un fichier de support.',
-  review_support_save_error: 'Impossible d enregistrer le support.'
+  review_support_save_error: 'Impossible d enregistrer le support.',
+  common_refresh: 'Actualiser',
+  review_action_open: 'Ouvrir',
+  review_issue_load_error: 'Impossible de charger l etat du probleme du reviseur.',
+  review_issue_none: 'Aucune decision du reviseur enregistree sur cette transaction.',
+  review_issue_reopen: 'Rouvrir',
+  review_issue_resolve: 'Resoudre',
+  review_issue_save_error: 'Impossible d enregistrer le probleme de revision.',
+  review_issue_saving: 'Enregistrement...',
+  review_issue_submit: 'Enregistrer le probleme',
+  review_issue_waive: 'Dispenser',
+  review_manage_issue: 'Gerer le probleme'
 });
 
 
