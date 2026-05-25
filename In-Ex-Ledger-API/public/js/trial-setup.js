@@ -1,7 +1,6 @@
 (function () {
   const billingPricingUtils = window.billingPricing || {};
   const BILLING_INTERVALS = billingPricingUtils.BILLING_INTERVALS || ["monthly", "yearly"];
-  const MAX_ADDITIONAL_BUSINESSES = 100;
   const PENDING_CHOICE_KEY = "lb_pending_pricing_choice";
   const SUCCESS_POLL_WINDOW_MS = 15000;
   const SUCCESS_POLL_INTERVAL_MS = 1500;
@@ -9,7 +8,6 @@
   const state = {
     billingInterval: "monthly",
     currency: "usd",
-    additionalBusinesses: 0,
     subscription: null,
     isCheckoutLoading: false,
     isBasicSelectionLoading: false,
@@ -51,9 +49,7 @@
   function clearPendingChoice() {
     try {
       sessionStorage.removeItem(PENDING_CHOICE_KEY);
-    } catch (_) {
-      // Ignore storage cleanup failures.
-    }
+    } catch (_) {}
   }
 
   function consumePendingChoice() {
@@ -66,13 +62,7 @@
       if (parsed?.billingInterval && BILLING_INTERVALS.includes(parsed.billingInterval)) {
         state.billingInterval = parsed.billingInterval;
       }
-      const additional = Number(parsed?.additionalBusinesses);
-      if (Number.isSafeInteger(additional) && additional >= 0) {
-        state.additionalBusinesses = Math.min(additional, MAX_ADDITIONAL_BUSINESSES);
-      }
-    } catch (_) {
-      // Ignore storage parse failures.
-    }
+    } catch (_) {}
   }
 
   function formatMoney(currency, amount) {
@@ -95,29 +85,6 @@
     return { base: 0, addon: 0 };
   }
 
-  function getAddonTotal() {
-    if (typeof billingPricingUtils.getAddonTotal === "function") {
-      return billingPricingUtils.getAddonTotal(state.currency, state.billingInterval, state.additionalBusinesses);
-    }
-    const pricing = getPricingDetails();
-    return pricing.addon * state.additionalBusinesses;
-  }
-
-  function getGrandTotal() {
-    if (typeof billingPricingUtils.getGrandTotal === "function") {
-      return billingPricingUtils.getGrandTotal(state.currency, state.billingInterval, state.additionalBusinesses);
-    }
-    const pricing = getPricingDetails();
-    return pricing.base + getAddonTotal();
-  }
-
-  function clampAdditionalBusinesses(value) {
-    if (!Number.isFinite(value)) {
-      return 0;
-    }
-    return Math.min(Math.max(Math.trunc(value), 0), MAX_ADDITIONAL_BUSINESSES);
-  }
-
   async function loadVerifiedPricing() {
     try {
       const res = await fetch("/api/billing/pricing", {
@@ -136,9 +103,7 @@
       if (payload?.pricing?.monthly && payload?.pricing?.yearly) {
         state.verifiedPricing = payload.pricing;
       }
-    } catch (_) {
-      // Ignore pricing preload failures and fall back to static values.
-    }
+    } catch (_) {}
   }
 
   async function loadSubscription() {
@@ -177,28 +142,23 @@
       year: "numeric"
     });
     if (sub.stripeSubscriptionId) {
-      lead.textContent = `Your Pro billing is already set up. Trial access stays active now, and the first Stripe charge is scheduled for ${ends} unless you cancel first.`;
+      lead.textContent = `Your Pro billing is already set up. Trial access stays active now, and the first charge is scheduled for ${ends} unless you cancel first.`;
       return;
     }
     if (sub.isTrialDowngradedToFree) {
-      lead.textContent = `Your workspace is currently set to fall back to Basic on ${ends}. You can still secure Pro billing now if you want uninterrupted paid access after the trial.`;
+      lead.textContent = `Your workspace is set to fall back to Basic on ${ends}. You can still secure Pro billing now if you want uninterrupted access after the trial.`;
       return;
     }
-    lead.textContent = `Add your payment method now. You will not be charged today. Billing begins on ${ends} unless you cancel before then.`;
+    lead.textContent = `Add your payment method now — you won't be charged until ${ends}. Cancel anytime before then and you owe nothing.`;
   }
 
   function updateUi() {
     const pricing = getPricingDetails();
-    const baseAmount = document.getElementById("trialSetupBaseAmount");
-    const addonAmount = document.getElementById("trialSetupAddonAmount");
     const totalAmount = document.getElementById("trialSetupTotalAmount");
-    const addonUnitNote = document.getElementById("trialSetupAddonUnitNote");
     const summaryNote = document.getElementById("trialSetupSummaryNote");
     const checkoutBtn = document.getElementById("trialSetupCheckoutBtn");
     const basicBtn = document.getElementById("trialSetupBasicBtn");
-    const skipBtn = document.getElementById("trialSetupSkipBtn");
     const continueLink = document.getElementById("trialSetupContinueLink");
-    const addonUnitText = formatMoney(state.currency, pricing.addon);
     const intervalLabel = state.billingInterval === "yearly" ? "year" : "month";
 
     document.querySelectorAll("[data-billing-interval]").forEach((btn) => {
@@ -207,23 +167,8 @@
       btn.setAttribute("aria-pressed", isActive ? "true" : "false");
     });
 
-    const addInput = document.getElementById("trialSetupAdditionalBusinesses");
-    if (addInput) {
-      addInput.value = String(state.additionalBusinesses);
-    }
-    const minusBtn = document.getElementById("trialSetupAdditionalBusinessesMinus");
-    const plusBtn = document.getElementById("trialSetupAdditionalBusinessesPlus");
-    if (minusBtn) minusBtn.disabled = state.additionalBusinesses <= 0 || state.isCheckoutLoading;
-    if (plusBtn) plusBtn.disabled = state.additionalBusinesses >= MAX_ADDITIONAL_BUSINESSES || state.isCheckoutLoading;
-    if (baseAmount) baseAmount.textContent = formatMoney(state.currency, pricing.base);
-    if (addonAmount) {
-      addonAmount.textContent = state.additionalBusinesses > 0
-        ? `${state.additionalBusinesses} x ${addonUnitText}`
-        : formatMoney(state.currency, 0);
-    }
-    if (totalAmount) totalAmount.textContent = formatMoney(state.currency, getGrandTotal());
-    if (addonUnitNote) addonUnitNote.textContent = `Each additional business is billed at ${addonUnitText} per ${intervalLabel} on the same cycle as Pro.`;
-    if (summaryNote) summaryNote.textContent = `Final pricing is verified by the server before Stripe checkout starts. ${state.billingInterval === "yearly" ? "Yearly pricing applies to both Pro and any additional business slots." : "You can switch to yearly before checkout if that fits better."}`;
+    if (totalAmount) totalAmount.textContent = formatMoney(state.currency, pricing.base);
+    if (summaryNote) summaryNote.textContent = `Billed per ${intervalLabel} after the trial. Final pricing is verified by the server before Stripe checkout starts.`;
 
     const hasStripeSetup = Boolean(state.subscription?.stripeSubscriptionId);
     if (checkoutBtn) {
@@ -237,14 +182,10 @@
     if (basicBtn) {
       basicBtn.disabled = state.isBasicSelectionLoading;
       basicBtn.textContent = state.isBasicSelectionLoading
-        ? "Saving Basic selection..."
+        ? "Saving selection..."
         : state.subscription?.isTrialDowngradedToFree
           ? "Basic is already selected after trial"
           : "Continue with Basic after trial";
-    }
-    if (skipBtn) {
-      skipBtn.disabled = false;
-      skipBtn.textContent = hasStripeSetup ? "Continue to app" : "Decide later";
     }
     if (continueLink) {
       continueLink.classList.toggle("hidden", !hasStripeSetup);
@@ -278,7 +219,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           billingInterval: state.billingInterval,
-          additionalBusinesses: state.additionalBusinesses,
+          additionalBusinesses: 0,
           returnPath: buildReturnPath()
         })
       });
@@ -339,27 +280,8 @@
       });
     });
 
-    const addInput = document.getElementById("trialSetupAdditionalBusinesses");
-    addInput?.addEventListener("input", () => {
-      state.additionalBusinesses = clampAdditionalBusinesses(Number(addInput.value));
-      updateUi();
-    });
-
-    document.getElementById("trialSetupAdditionalBusinessesMinus")?.addEventListener("click", () => {
-      state.additionalBusinesses = clampAdditionalBusinesses(state.additionalBusinesses - 1);
-      updateUi();
-    });
-
-    document.getElementById("trialSetupAdditionalBusinessesPlus")?.addEventListener("click", () => {
-      state.additionalBusinesses = clampAdditionalBusinesses(state.additionalBusinesses + 1);
-      updateUi();
-    });
-
     document.getElementById("trialSetupCheckoutBtn")?.addEventListener("click", startCheckout);
     document.getElementById("trialSetupBasicBtn")?.addEventListener("click", continueWithBasic);
-    document.getElementById("trialSetupSkipBtn")?.addEventListener("click", () => {
-      window.location.href = resolveNextPath();
-    });
   }
 
   async function handleCheckoutReturn() {

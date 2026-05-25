@@ -12,7 +12,7 @@
   <link rel="canonical" href="https://www.inexledger.com/trial-setup" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/css/app.css?v=20260525b" />
-  <link rel="stylesheet" href="/css/pages/trial-setup.css?v=20260525c" />
+  <link rel="stylesheet" href="/css/pages/trial-setup.css?v=20260525d" />
 </head>
 <body class="trial-setup-page">
   <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -35,9 +35,9 @@
     <section class="trial-setup-hero">
       <div>
         <span class="trial-setup-eyebrow">One last step</span>
-        <h1>Secure your Pro trial before you enter the app.</h1>
+        <h1>No charge today. Keep Pro after trial.</h1>
         <p id="trialSetupLead">
-          Add your payment method now. You will not be charged today. Billing begins when the trial ends unless you cancel first.
+          Add your payment method now — you won't be charged until the trial ends. Cancel anytime before then and you owe nothing.
         </p>
         <div id="trialSetupStatus" class="trial-setup-status hidden" role="status" aria-live="polite"></div>
       </div>
@@ -51,40 +51,22 @@
           <h2>Set up Pro billing now.</h2>
         </div>
         <p>
-          This keeps the full workflow uninterrupted after the trial: receipts, mileage, analytics, exports, and additional businesses if you need them.
+          Receipts, mileage, analytics, exports — the full workflow stays uninterrupted after the trial. You can add extra businesses from your subscription settings anytime.
         </p>
 
         <div class="trial-setup-controls">
           <div class="trial-setup-control">
-            <span class="trial-setup-label">Billing</span>
+            <span class="trial-setup-label">Billing cycle</span>
             <div class="trial-setup-toggle" role="group" aria-label="Billing interval">
               <button type="button" class="trial-setup-toggle-btn is-active" data-billing-interval="monthly" aria-pressed="true">Monthly</button>
               <button type="button" class="trial-setup-toggle-btn" data-billing-interval="yearly" aria-pressed="false">Yearly</button>
             </div>
           </div>
-
-          <div class="trial-setup-control">
-            <label class="trial-setup-label" for="trialSetupAdditionalBusinesses">Additional businesses</label>
-            <div class="trial-setup-stepper">
-              <button type="button" id="trialSetupAdditionalBusinessesMinus" aria-label="Remove one additional business"><span class="trial-setup-stepper-icon trial-setup-stepper-icon-minus" aria-hidden="true"></span></button>
-              <input id="trialSetupAdditionalBusinesses" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" />
-              <button type="button" id="trialSetupAdditionalBusinessesPlus" aria-label="Add one additional business"><span class="trial-setup-stepper-icon trial-setup-stepper-icon-plus" aria-hidden="true"></span></button>
-            </div>
-            <p id="trialSetupAddonUnitNote" class="trial-setup-help">Each additional business uses the same billing cycle as Pro.</p>
-          </div>
         </div>
 
         <div class="trial-setup-summary">
-          <div class="trial-setup-summary-row">
-            <span>Base Pro</span>
-            <strong id="trialSetupBaseAmount">$12</strong>
-          </div>
-          <div class="trial-setup-summary-row">
-            <span>Add-on businesses</span>
-            <strong id="trialSetupAddonAmount">$0</strong>
-          </div>
           <div class="trial-setup-summary-row trial-setup-summary-total">
-            <span>Total after trial</span>
+            <span>Due after trial</span>
             <strong id="trialSetupTotalAmount">$12</strong>
           </div>
           <p id="trialSetupSummaryNote" class="trial-setup-help">Final pricing is verified by the server before Stripe checkout starts.</p>
@@ -92,7 +74,7 @@
 
         <div class="trial-setup-actions">
           <button type="button" id="trialSetupCheckoutBtn" class="trial-setup-primary-btn">Continue to secure checkout</button>
-          <p class="trial-setup-fineprint">You can cancel before the trial end date to avoid billing.</p>
+          <p class="trial-setup-fineprint">No charge today. Cancel before the trial ends and you owe nothing.</p>
         </div>
       </article>
 
@@ -122,6 +104,6 @@
   <script src="/js/i18n.js?v=20260510c"></script>
   <script src="/js/auth.js?v=20260518a"></script>
   <script src="/js/billing-pricing.js?v=20260419a"></script>
-  <script src="/js/trial-setup.js?v=20260525a"></script>
+  <script src="/js/trial-setup.js?v=20260525b"></script>
 </body>
 </html>
