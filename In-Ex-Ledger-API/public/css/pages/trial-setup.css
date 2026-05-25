@@ -212,8 +212,9 @@ body.trial-setup-page {
 
 .trial-setup-stepper {
   display: inline-flex;
-  align-items: center;
+  align-items: stretch;
   gap: 0;
+  min-height: 52px;
   border: 1px solid var(--trial-setup-border);
   border-radius: 16px;
   background: #fff;
@@ -224,8 +225,8 @@ body.trial-setup-page {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: auto;
   padding: 0;
   border: none;
   border-radius: 0;
@@ -238,7 +239,8 @@ body.trial-setup-page {
 
 .trial-setup-stepper input {
   width: 80px;
-  min-height: 48px;
+  height: auto;
+  min-height: 0;
   padding: 0;
   border: none;
   border-left: 1px solid var(--trial-setup-border);
