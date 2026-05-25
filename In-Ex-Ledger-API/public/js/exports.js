@@ -71,6 +71,34 @@ function hideExportProfileGuide() {
   }
 }
 
+function showFinalizationError(blockers) {
+  const errorEl = document.getElementById("exportGeneralError");
+  const guide = document.getElementById("exportGeneralGuide");
+  if (!errorEl) return;
+  if (guide) guide.classList.add("hidden");
+
+  const list = Array.isArray(blockers) ? blockers : [];
+  const items = list.map((b) => {
+    const n = Number(b.count) || 0;
+    if (b.code === "needs_category") {
+      const label = n === 1 ? "1 transaction needs a category" : `${n} transactions need a category`;
+      return `<li>${escapeHtml(label)} — <a href="transactions?filter=uncategorized">Fix in Transactions →</a></li>`;
+    }
+    if (b.code === "business_profile_incomplete") {
+      return `<li>${escapeHtml(b.message || "Business profile is incomplete")} — <a href="settings">Fix in Settings →</a></li>`;
+    }
+    if (b.code === "finalization_certification_required") {
+      return `<li>${escapeHtml("Certification is required — check the box above.")}</li>`;
+    }
+    const label = n > 0 ? `${n} — ${b.message || b.code}` : (b.message || b.code);
+    return `<li>${escapeHtml(label)}</li>`;
+  }).join("");
+
+  const heading = list.length === 1 ? "1 issue blocking finalization:" : `${list.length} issues blocking finalization:`;
+  errorEl.innerHTML = `<strong>${escapeHtml("Can't finalize yet")} — ${escapeHtml(heading)}</strong><ul class="export-blocker-list">${items}</ul>`;
+  errorEl.classList.remove("hidden");
+}
+
 function showExportGeneralError(message, missingFieldKeys = []) {
   const errorEl = document.getElementById("exportGeneralError");
   if (errorEl) {
@@ -1195,7 +1223,9 @@ async function exportPdf(startDate, endDate, recordHistory = true, explicitFilen
     } catch (pdfErr) {
       console.error("[Exports] Backend PDF generation failed:", pdfErr);
       const keys = pdfErr?.missingFieldKeys || [];
-      if (keys.length) {
+      if (pdfErr?.finalizationBlockers?.length) {
+        showFinalizationError(pdfErr.finalizationBlockers);
+      } else if (keys.length) {
         showExportGeneralError(pdfErr.message, keys);
       } else {
         showExportToast(pdfErr?.message || tx("exports_error_generic") || "PDF export failed. Please try again.");
@@ -1287,6 +1317,7 @@ async function submitBackendPdfExport({ startDate, endDate, includeTaxId, export
   if (!response || !response.ok) {
     let errorMessage = tx("exports_error_generic") || "PDF export failed. Please try again.";
     let missingFieldKeys = [];
+    let finalizationBlockers = null;
     try {
       const payload = await response.json();
       if (payload?.error && typeof payload.error === "string") {
@@ -1295,12 +1326,13 @@ async function submitBackendPdfExport({ startDate, endDate, includeTaxId, export
       if (Array.isArray(payload?.missingFieldKeys)) {
         missingFieldKeys = normalizeMissingFieldKeys(payload.missingFieldKeys);
       }
-      if (payload?.finalization?.requestedMode === "finalized" && Array.isArray(payload?.finalization?.hardBlockers)) {
-        errorMessage = payload.error || errorMessage;
+      if (response.status === 409 && Array.isArray(payload?.finalization?.hardBlockers) && payload.finalization.hardBlockers.length > 0) {
+        finalizationBlockers = payload.finalization.hardBlockers;
       }
     } catch {}
     const error = new Error(errorMessage);
     error.missingFieldKeys = missingFieldKeys;
+    if (finalizationBlockers) error.finalizationBlockers = finalizationBlockers;
     throw error;
   }
 

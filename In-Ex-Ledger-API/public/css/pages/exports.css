@@ -380,6 +380,21 @@
   font-size: 12px;
 }
 
+.export-blocker-list {
+  margin: 5px 0 0 14px;
+  padding: 0;
+  list-style: disc;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.export-blocker-list a {
+  color: var(--red);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 .secure-export-guide {
   display: inline-flex;
   align-items: center;
