@@ -197,6 +197,7 @@ function loadExportsRouter(options = {}) {
             if (/FROM categories/i.test(sql)) return { rows: fixture.categories };
             if (/FROM receipts/i.test(sql)) return { rows: fixture.receipts };
             if (/FROM support_artifacts/i.test(sql)) return { rows: [] };
+            if (/FROM transaction_review_states/i.test(sql)) return { rows: fixture.reviewStateRows || [] };
             if (/FROM mileage/i.test(sql)) return { rows: fixture.mileage };
             if (/FROM vehicle_expense_details/i.test(sql)) { state.vehicleCostQueryCount += 1; return { rows: [] }; }
             if (/FROM vehicle_costs/i.test(sql)) { state.vehicleCostQueryCount += 1; return { rows: fixture.vehicleCosts }; }
@@ -419,6 +420,30 @@ test("phase 3 PDF adds unresolved exceptions and evidence schedules", () => {
   assert.match(pdf, /mileage\.pdf/i);
   assert.match(pdf, /Support Artifact Summary/i);
   assert.match(pdf, /Review notes: 1 \| Mileage logs: 1/i);
+});
+
+test("PDF includes reviewer decision schedule when persisted review states exist", () => {
+  const pdf = buildPdfExport(buildFixtureOptions({
+    reviewStateRows: [
+      {
+        transaction_id: "tx_meal",
+        issue_code: "needs_business_purpose",
+        issue_severity: "hard",
+        issue_status: "open",
+        review_notes: "Document client context"
+      },
+      {
+        transaction_id: "tx_phone",
+        issue_code: "reviewer_note",
+        issue_severity: "warning",
+        issue_status: "waived",
+        review_notes: "Immaterial"
+      }
+    ]
+  })).toString("latin1");
+
+  assert.match(pdf, /Reviewer Decisions Schedule/i);
+  assert.match(pdf, /Document client context/i);
 });
 
 test("executive summary and mapping pages keep truly unmapped counts consistent", () => {

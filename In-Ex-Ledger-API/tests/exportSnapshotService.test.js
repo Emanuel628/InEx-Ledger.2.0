@@ -17,7 +17,8 @@ function buildDataset(overrides = {}) {
         rawType: "expense",
         description: "Shell fuel",
         payerName: "",
-        reviewFlags: []
+        reviewFlags: [],
+        reviewIssueEntries: []
       }
     ],
     totals: {
@@ -81,7 +82,8 @@ test("deriveFinalizationDecision blocks finalized exports with missing profile o
         rawType: "expense",
         description: "",
         payerName: "",
-        reviewFlags: ["RS"]
+        reviewFlags: ["RS"],
+        reviewIssueEntries: [{ issueCode: "needs_receipt_support", severity: "hard", status: "open" }]
       }],
       totals: {
         needsCategoryCount: 1,
@@ -102,7 +104,30 @@ test("deriveFinalizationDecision blocks finalized exports with missing profile o
   assert.equal(decision.eligibleForFinalization, false);
   assert.equal(decision.resolvedMode, "workpaper");
   assert.ok(decision.hardBlockers.some((issue) => issue.code === "business_profile_incomplete"));
-  assert.ok(decision.hardBlockers.some((issue) => issue.code === "needs_category"));
-  assert.ok(decision.hardBlockers.some((issue) => issue.code === "support_follow_up_required"));
+  assert.ok(decision.hardBlockers.some((issue) => issue.code === "needs_receipt_support"));
   assert.ok(decision.hardBlockers.some((issue) => issue.code === "tax_id_certification_required"));
+});
+
+test("resolved reviewer issues no longer block finalization", () => {
+  const decision = deriveFinalizationDecision({
+    dataset: buildDataset({
+      includedRows: [{
+        id: "tx_1",
+        rawType: "expense",
+        description: "Shell fuel",
+        payerName: "",
+        reviewFlags: [],
+        reviewIssueEntries: []
+      }]
+    }),
+    business: buildBusiness(),
+    requestedMode: "finalized",
+    exportFormat: "pdf",
+    jurisdiction: "US",
+    certifiedByUser: true,
+    includeTaxId: false
+  });
+
+  assert.equal(decision.eligibleForFinalization, true);
+  assert.equal(decision.hardBlockers.length, 0);
 });

@@ -162,7 +162,7 @@ function collectExportArtifactIds(sourceRows = {}) {
 async function fetchExportSourceRows(businessId, startDate, endDate) {
   const taxYear = Number(String(endDate || "").slice(0, 4)) || new Date().getFullYear();
 
-  const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult, vehicleClaimResult, capitalAssetResult, supportArtifactResult] =
+  const [txResult, accountResult, categoryResult, receiptResult, mileageResult, vehicleCostResult, bizResult, vehicleClaimResult, capitalAssetResult, supportArtifactResult, reviewStateResult] =
     await Promise.all([
       pool.query(
         `SELECT id, account_id, category_id, amount, type, description, description_encrypted, date, note,
@@ -231,6 +231,12 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
           WHERE business_id = $1
             AND transaction_id IS NOT NULL`,
         [businessId]
+      ),
+      pool.query(
+        `SELECT id, transaction_id, issue_code, issue_severity, issue_status, review_notes, resolved_at, updated_at
+           FROM transaction_review_states
+          WHERE business_id = $1`,
+        [businessId]
       )
     ]);
 
@@ -278,6 +284,7 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
     business: bizResult.rows[0] || {},
     vehicleClaimMap,
     supportArtifactMap,
+    reviewStateRows: reviewStateResult.rows,
     capitalAssets: capitalAssetResult.rows,
     capitalAssetTxMap,
     taxYear
@@ -471,6 +478,7 @@ router.get("/dataset", exportGrantLimiter, async (req, res) => {
       categories,
       receipts: sourceRows.receipts,
       supportArtifactMap: sourceRows.supportArtifactMap,
+      reviewStateRows: sourceRows.reviewStateRows,
       business,
       region,
       province: business.province || "",
@@ -616,6 +624,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       categories,
       receipts: sourceRows.receipts,
       supportArtifactMap: sourceRows.supportArtifactMap,
+      reviewStateRows: sourceRows.reviewStateRows,
       mileage: sourceRows.mileage,
       vehicleCosts: sourceRows.vehicleCosts,
       business,
@@ -710,6 +719,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       // Phase 2 compliance data
       vehicleClaimMap: sourceRows.vehicleClaimMap,
       supportArtifactMap: sourceRows.supportArtifactMap,
+      reviewStateRows: sourceRows.reviewStateRows,
       capitalAssets: sourceRows.capitalAssets,
       capitalAssetTxMap: sourceRows.capitalAssetTxMap,
       quickMethodSchedule
@@ -974,7 +984,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       return res.status(400).json({ error: "certifiedByUser must be acknowledged to include Tax ID in the export." });
     }
 
-    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult, supportArtifactResult] =
+    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult, supportArtifactResult, reviewStateResult] =
       await Promise.all([
         pool.query(
           `SELECT id, account_id, category_id, amount, type, description, date, note,
@@ -1029,6 +1039,12 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
             WHERE business_id = $1
               AND transaction_id IS NOT NULL`,
           [businessId]
+        ),
+        pool.query(
+          `SELECT id, transaction_id, issue_code, issue_severity, issue_status, review_notes, resolved_at, updated_at
+             FROM transaction_review_states
+            WHERE business_id = $1`,
+          [businessId]
         )
       ]);
 
@@ -1066,6 +1082,7 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       categories,
       receipts: receiptResult.rows,
       supportArtifactMap,
+      reviewStateRows: reviewStateResult.rows,
       mileage: mileageResult.rows,
       vehicleCosts: vehicleCostResult.rows,
       business,
@@ -1138,6 +1155,8 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       reportId,
       region,
       province: business.province || ""
+      ,
+      reviewStateRows: reviewStateResult.rows
     };
 
     const { fullBuffer: fullPdfBuffer, redactedBuffer, pageCount: pdfPageCount } =

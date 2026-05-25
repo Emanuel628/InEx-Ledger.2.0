@@ -17,6 +17,37 @@ function mapById(rows) {
   return Object.fromEntries((rows || []).map((row) => [row?.id, row]));
 }
 
+const FLAG_TO_ISSUE_CODE = {
+  NC: "needs_category",
+  UM: "needs_tax_mapping",
+  FC: "final_confirmation_needed",
+  RS: "needs_receipt_support",
+  BP: "needs_business_purpose",
+  AL: "needs_allocation",
+  ML: "needs_mileage_log",
+  HO: "needs_home_office_support",
+  CA: "needs_capital_asset_review",
+  RV: "cpa_review_required"
+};
+
+const ISSUE_CODE_TO_FLAG = Object.fromEntries(
+  Object.entries(FLAG_TO_ISSUE_CODE).map(([flag, issueCode]) => [issueCode, flag])
+);
+
+const HARD_REVIEW_ISSUE_CODES = new Set([
+  "needs_category",
+  "needs_tax_mapping",
+  "final_confirmation_needed",
+  "needs_receipt_support",
+  "needs_business_purpose",
+  "needs_allocation",
+  "needs_mileage_log",
+  "needs_home_office_support",
+  "needs_capital_asset_review",
+  "missing_description",
+  "cpa_review_required"
+]);
+
 function normalizeAmount(value) {
   const num = Number(value);
   return Number.isFinite(num) ? Number(num.toFixed(2)) : 0;
@@ -165,6 +196,82 @@ function buildCategorySummary(rows) {
   })).sort((left, right) => right.amount - left.amount);
 }
 
+function normalizeIssueCode(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized && /^[a-z_]+$/.test(normalized) ? normalized : "";
+}
+
+function buildReviewStateMap(reviewStateRows) {
+  const map = new Map();
+  for (const row of reviewStateRows || []) {
+    const txId = row?.transaction_id || row?.transactionId;
+    if (!txId) continue;
+    const current = map.get(txId) || [];
+    current.push(row);
+    map.set(txId, current);
+  }
+  return map;
+}
+
+function applyReviewStateToRow(row, reviewStateRows) {
+  const stateRows = Array.isArray(reviewStateRows) ? reviewStateRows : [];
+  const suppressedIssueCodes = new Set(
+    stateRows
+      .filter((entry) => ["resolved", "waived"].includes(String(entry?.issue_status || "").trim().toLowerCase()))
+      .map((entry) => normalizeIssueCode(entry?.issue_code))
+      .filter(Boolean)
+  );
+
+  const effectiveReviewFlags = (row.reviewFlags || []).filter((flag) => {
+    const issueCode = FLAG_TO_ISSUE_CODE[flag];
+    return !issueCode || !suppressedIssueCodes.has(issueCode);
+  });
+
+  const issueEntries = effectiveReviewFlags.map((flag) => ({
+    issueCode: FLAG_TO_ISSUE_CODE[flag] || flag.toLowerCase(),
+    severity: HARD_REVIEW_ISSUE_CODES.has(FLAG_TO_ISSUE_CODE[flag]) ? "hard" : "warning",
+    status: "open",
+    source: "derived",
+    reviewNotes: ""
+  }));
+
+  for (const stateRow of stateRows) {
+    const issueCode = normalizeIssueCode(stateRow?.issue_code);
+    const issueStatus = String(stateRow?.issue_status || "").trim().toLowerCase();
+    if (!issueCode || issueStatus !== "open") continue;
+    if (issueEntries.some((entry) => entry.issueCode === issueCode)) continue;
+    issueEntries.push({
+      issueCode,
+      severity: String(stateRow?.issue_severity || "warning").trim().toLowerCase() === "hard" ? "hard" : "warning",
+      status: "open",
+      source: "reviewer",
+      reviewNotes: String(stateRow?.review_notes || "").trim()
+    });
+    const flag = ISSUE_CODE_TO_FLAG[issueCode];
+    if (flag && !effectiveReviewFlags.includes(flag)) {
+      effectiveReviewFlags.push(flag);
+    }
+  }
+
+  const hasOpenIssues = issueEntries.length > 0;
+  const reviewStatus = row.includedInPnl
+    ? (hasOpenIssues ? (row.mappingStatus === "Needs category" || row.mappingStatus === "Unmapped" ? "Action needed" : "Needs review") : "Mapped")
+    : (hasOpenIssues ? "Excluded - review schedule" : "Excluded");
+  const supportStatus = hasOpenIssues ? row.supportStatus : (row.includedInPnl ? "Mapped" : "Excluded");
+  const mappingStatus = hasOpenIssues ? row.mappingStatus : (row.includedInPnl ? "Mapped" : "Excluded");
+
+  return {
+    ...row,
+    reviewFlags: effectiveReviewFlags,
+    reviewIssueEntries: issueEntries,
+    openHardReviewerIssueCount: issueEntries.filter((entry) => entry.severity === "hard").length,
+    openWarningReviewerIssueCount: issueEntries.filter((entry) => entry.severity !== "hard").length,
+    reviewStatus,
+    supportStatus,
+    mappingStatus
+  };
+}
+
 function buildNormalizedRow(enrichedTxn, context) {
   const {
     accountsById,
@@ -307,15 +414,19 @@ function buildNormalizedExportDataset(options = {}) {
   });
   const profitTotals = calculateTotals(classified.included);
   const categorySummary = buildCategorySummary(rows);
+  const reviewStateMap = buildReviewStateMap(options.reviewStateRows);
+  const rowsWithReviewState = rows.map((row) => applyReviewStateToRow(row, reviewStateMap.get(row.id) || []));
 
-  const needsCategoryAmount = includedRows
+  const needsCategoryAmount = rowsWithReviewState
     .filter((row) => row.mappingStatus === "Needs category")
     .reduce((sum, row) => sum + (row.rawType === "income" ? row.amount : row.potentialDeductibleAmount), 0);
+  const openHardReviewerIssueCount = rowsWithReviewState.reduce((sum, row) => sum + Number(row.openHardReviewerIssueCount || 0), 0);
+  const openWarningReviewerIssueCount = rowsWithReviewState.reduce((sum, row) => sum + Number(row.openWarningReviewerIssueCount || 0), 0);
 
   return {
-    rows,
-    includedRows,
-    excludedRows,
+    rows: rowsWithReviewState,
+    includedRows: rowsWithReviewState.filter((row) => row.includedInPnl),
+    excludedRows: rowsWithReviewState.filter((row) => !row.includedInPnl),
     categorySummary,
     receiptSummary,
     mappingSummary,
@@ -324,18 +435,20 @@ function buildNormalizedExportDataset(options = {}) {
       grossIncome: profitTotals.income,
       totalExpenses: profitTotals.expenses,
       netProfit: profitTotals.netProfit,
-      includedCount: includedRows.length,
-      excludedCount: excludedRows.length,
-      needsCategoryCount: supportSummary.needsCategoryCount,
+      includedCount: rowsWithReviewState.filter((row) => row.includedInPnl).length,
+      excludedCount: rowsWithReviewState.filter((row) => !row.includedInPnl).length,
+      needsCategoryCount: rowsWithReviewState.filter((row) => row.mappingStatus === "Needs category").length,
       needsCategoryAmount: Number(needsCategoryAmount.toFixed(2)),
-      mappedSupportCount: mappingSummary.mapped_review_count,
+      mappedSupportCount: rowsWithReviewState.filter((row) => row.reviewStatus === "Needs review").length,
       mappedSupportAmount: mappingSummary.mapped_review_total,
-      trulyUnmappedCount: mappingSummary.unmapped_count,
+      trulyUnmappedCount: rowsWithReviewState.filter((row) => row.mappingStatus === "Unmapped").length,
       trulyUnmappedAmount: mappingSummary.unmapped_total,
       missingReceiptCount: receiptSummary.missing,
       vehicleItemCount: supportSummary.vehicleCount,
       mealItemCount: supportSummary.mealsCount,
-      phoneAllocationCount: supportSummary.phoneAllocationCount
+      phoneAllocationCount: supportSummary.phoneAllocationCount,
+      openHardReviewerIssueCount,
+      openWarningReviewerIssueCount
     },
     metadata: {
       businessId: business.id || options.businessId || "",

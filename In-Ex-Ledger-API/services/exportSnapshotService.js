@@ -6,6 +6,20 @@ const { pool } = require("../db.js");
 const DATASET_SCHEMA_VERSION = "cpa-export-dataset/v1";
 const RULE_VERSION = "2026-05-23";
 const VALID_EXPORT_MODES = new Set(["draft", "workpaper", "finalized"]);
+const ISSUE_LABELS = {
+  needs_category: "Some transactions still need a real category assignment.",
+  needs_tax_mapping: "Some transactions still remain unmapped to a filing line.",
+  final_confirmation_needed: "Some transactions still need final reviewer confirmation.",
+  needs_receipt_support: "Some transactions still need receipt or source support.",
+  needs_business_purpose: "Some transactions still need documented business purpose.",
+  needs_allocation: "Some transactions still need business-use allocation support.",
+  needs_mileage_log: "Some transactions still need mileage log support.",
+  needs_home_office_support: "Some transactions still need home-office support.",
+  needs_capital_asset_review: "Some transactions still need capital asset review.",
+  missing_description: "Some transactions are missing usable description detail.",
+  cpa_review_required: "Some transactions still require CPA review.",
+  reviewer_note: "Open reviewer notes remain on the package."
+};
 
 function normalizeExportMode(value, fallback = "workpaper") {
   const normalized = String(value || "").trim().toLowerCase();
@@ -75,7 +89,6 @@ function deriveFinalizationDecision({
   const warnings = [];
   const rows = Array.isArray(dataset?.includedRows) ? dataset.includedRows : [];
   const totals = dataset?.totals || {};
-  const supportSummary = dataset?.supportSummary || {};
   const profile = buildBusinessProfileSummary(business, jurisdiction);
 
   if (!profile.exportIdentityComplete) {
@@ -87,54 +100,53 @@ function deriveFinalizationDecision({
     });
   }
 
-  if (Number(totals.needsCategoryCount || 0) > 0) {
-    pushIssue(hardBlockers, {
-      code: "needs_category",
-      severity: "hard",
-      message: "Some transactions still need a real category assignment.",
-      count: totals.needsCategoryCount
+  const openIssuesByCode = new Map();
+  for (const row of rows) {
+    for (const issue of row.reviewIssueEntries || []) {
+      if (String(issue?.status || "open").trim().toLowerCase() !== "open") continue;
+      const code = String(issue.issueCode || "").trim();
+      if (!code) continue;
+      const current = openIssuesByCode.get(code) || { count: 0, severity: issue.severity === "hard" ? "hard" : "warning" };
+      current.count += 1;
+      if (issue.severity === "hard") current.severity = "hard";
+      openIssuesByCode.set(code, current);
+    }
+  }
+
+  for (const [code, issue] of openIssuesByCode.entries()) {
+    const target = issue.severity === "hard" ? hardBlockers : warnings;
+    pushIssue(target, {
+      code,
+      severity: issue.severity,
+      message: ISSUE_LABELS[code] || code.replace(/_/g, " "),
+      count: issue.count
     });
   }
 
-  if (Number(totals.trulyUnmappedCount || 0) > 0) {
-    pushIssue(hardBlockers, {
-      code: "truly_unmapped_transactions",
-      severity: "hard",
-      message: "Some categorized transactions still remain truly unmapped for filing.",
-      count: totals.trulyUnmappedCount
-    });
-  }
-
-  const missingDescriptionCount = rows.filter((row) => !String(row.description || "").trim()).length;
-  if (missingDescriptionCount > 0) {
-    pushIssue(hardBlockers, {
-      code: "missing_description",
-      severity: "hard",
-      message: "Some included transactions are missing a usable description or payee narrative.",
-      count: missingDescriptionCount
-    });
-  }
-
-  const supportRiskCount = rows.filter((row) => Array.isArray(row.reviewFlags) && row.reviewFlags.some((flag) => (
-    ["RS", "BP", "AL", "ML", "HO", "CA", "FC", "RV"].includes(flag)
-  ))).length;
-  if (supportRiskCount > 0) {
-    pushIssue(hardBlockers, {
-      code: "support_follow_up_required",
-      severity: "hard",
-      message: "Some included transactions still require support, allocation, or final reviewer confirmation.",
-      count: supportRiskCount
-    });
+  if (!openIssuesByCode.size) {
+    const missingDescriptionCount = rows.filter((row) => !String(row.description || "").trim()).length;
+    if (missingDescriptionCount > 0) {
+      pushIssue(hardBlockers, {
+        code: "missing_description",
+        severity: "hard",
+        message: ISSUE_LABELS.missing_description,
+        count: missingDescriptionCount
+      });
+    }
   }
 
   const missingPayerCount = rows.filter((row) => row.rawType === "income" && !String(row.payerName || "").trim()).length;
-  if (missingPayerCount > 0) {
+  if (missingPayerCount > 0 && !openIssuesByCode.has("missing_payer_name")) {
     pushIssue(warnings, {
       code: "missing_payer_name",
       severity: "warning",
       message: "Some income transactions do not include a payer name.",
       count: missingPayerCount
     });
+  }
+
+  if (Number(totals.openHardReviewerIssueCount || 0) > 0 || Number(totals.openWarningReviewerIssueCount || 0) > 0) {
+    // counts already represented via issueEntries above; this branch only preserves summary policy fields
   }
 
   if (includeTaxId && !certifiedByUser) {
@@ -155,7 +167,9 @@ function deriveFinalizationDecision({
     });
   }
 
-  const eligibleForFinalization = hardBlockers.length === 0;
+  const dedupedHardBlockers = Array.from(new Map(hardBlockers.map((issue) => [issue.code, issue])).values());
+  const dedupedWarnings = Array.from(new Map(warnings.map((issue) => [issue.code, issue])).values());
+  const eligibleForFinalization = dedupedHardBlockers.length === 0;
 
   return {
     requestedMode,
@@ -163,12 +177,12 @@ function deriveFinalizationDecision({
     exportFormat,
     jurisdiction,
     eligibleForFinalization,
-    hardBlockers,
-    warnings,
+    hardBlockers: dedupedHardBlockers,
+    warnings: dedupedWarnings,
     materialityPolicy: {
-      missingDescriptionsAreHardBlockers: true,
-      supportRiskTransactions: Number(supportSummary.mappedReviewCount || 0),
-      warningCount: warnings.length
+      openHardReviewerIssueCount: Number(totals.openHardReviewerIssueCount || 0),
+      openWarningReviewerIssueCount: Number(totals.openWarningReviewerIssueCount || 0),
+      warningCount: dedupedWarnings.length
     },
     certification: {
       required: requestedMode === "finalized" || includeTaxId,

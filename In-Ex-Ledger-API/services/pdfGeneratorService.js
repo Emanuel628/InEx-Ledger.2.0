@@ -1930,8 +1930,86 @@ function buildEvidenceSchedulePages(transactions, receipts, supportArtifactMap, 
   });
 }
 
+function rowsCount(rows, predicate) {
+  return (rows || []).reduce((sum, row) => sum + (predicate(row) ? 1 : 0), 0);
+}
+
+function buildReviewerDecisionPages(reviewStateRows, transactions, labels, region) {
+  const rows = Array.isArray(reviewStateRows) ? reviewStateRows : [];
+  if (!rows.length) return [];
+  const txMap = new Map((transactions || []).map((txn) => [txn.id, txn]));
+  const scheduleRows = rows
+    .map((row) => {
+      const txn = txMap.get(row.transaction_id);
+      if (!txn) return null;
+      return {
+        date: normalizePdfDate(txn.date),
+        payee: buildTransactionText(txn) || "(No description)",
+        issueCode: String(row.issue_code || "").trim() || "reviewer_note",
+        severity: String(row.issue_severity || "warning").trim(),
+        status: String(row.issue_status || "open").trim(),
+        notes: String(row.review_notes || "").trim()
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const statusWeight = (value) => value === "open" ? 0 : value === "waived" ? 1 : 2;
+      const byStatus = statusWeight(a.status) - statusWeight(b.status);
+      if (byStatus !== 0) return byStatus;
+      return String(a.date || "").localeCompare(String(b.date || ""));
+    });
+
+  if (!scheduleRows.length) return [];
+  const chunks = chunkArray(scheduleRows, 20);
+  return chunks.map((chunk, index) => {
+    const canvas = new PdfCanvas();
+    const header = drawReportHeader(canvas, {
+      title: index === 0 ? "Reviewer Decisions Schedule" : "Reviewer Decisions Schedule - continued",
+      subtitle: normalizeRegionCode(region) === "CA"
+        ? "Persisted reviewer decisions applied to this T2125 package"
+        : "Persisted reviewer decisions applied to this Schedule C package",
+      badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }]
+    });
+    let y = header.contentStartY - 8;
+    if (index === 0) {
+      const openCount = scheduleRows.filter((row) => row.status === "open").length;
+      const waivedCount = scheduleRows.filter((row) => row.status === "waived").length;
+      const resolvedCount = scheduleRows.filter((row) => row.status === "resolved").length;
+      canvas.drawCard(40, y, 532, 84, "Reviewer state", [
+        `${openCount} reviewer issues remain open in this package.`,
+        `${waivedCount} issues were waived and ${resolvedCount} issues were marked resolved before export.`
+      ], { maxChars: 90 });
+      y -= 102;
+    }
+    const cols = [
+      { key: "date", label: "Date", x: 40, width: 60 },
+      { key: "payee", label: "Transaction", x: 108, width: 182 },
+      { key: "issueCode", label: "Issue", x: 298, width: 108 },
+      { key: "severity", label: "Severity", x: 414, width: 66 },
+      { key: "status", label: "Status", x: 488, width: 84 }
+    ];
+    canvas.drawTableHeader(cols, y);
+    y -= 18;
+    chunk.forEach((row, rowIndex) => {
+      canvas.drawTableRow(cols, {
+        date: row.date,
+        payee: truncateText(row.payee, 30),
+        issueCode: truncateText(row.issueCode.replace(/_/g, " "), 18),
+        severity: truncateText(row.severity, 10),
+        status: truncateText(row.status, 10)
+      }, y, { fillGray: rowIndex % 2 === 0 ? 0.985 : null });
+      y -= 12;
+      if (row.notes) {
+        canvas.text(108, y, truncateText(`Reviewer note: ${row.notes}`, 82), 7);
+        y -= 12;
+      }
+    });
+    return canvas;
+  });
+}
+
 function buildCpaChecklistPage(opts) {
-  const { labels, region, reviewInsights, currency } = opts;
+  const { labels, region, reviewInsights, currency, reviewDecisionSummary = {} } = opts;
   const isCA = normalizeRegionCode(region) === "CA";
   const canvas = new PdfCanvas();
   const header = drawReportHeader(canvas, { title: labels.checklist_title, subtitle: isCA ? "T2125 bookkeeping workpaper checklist" : "Schedule C bookkeeping workpaper checklist", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
@@ -1941,7 +2019,8 @@ function buildCpaChecklistPage(opts) {
     { badge: reviewInsights.vehicleCount > 0 ? "ACTION" : "OK", title: "Vehicle support", description: `${reviewInsights.vehicleCount} vehicle/fuel transactions totaling ${formatCurrencyForPdf(reviewInsights.vehicleTotal, currency)} need mileage or actual-expense support.` },
     { badge: reviewInsights.mealsCount > 0 ? "REVIEW" : "OK", title: "Meals", description: `${reviewInsights.mealsCount} meal transactions totaling ${formatCurrencyForPdf(reviewInsights.mealsTotal, currency)} require business purpose documentation. Potential 50% limit applies.` },
     { badge: reviewInsights.phoneAllocationCount > 0 ? "ACTION" : "OK", title: "Phone / Internet allocation", description: `${reviewInsights.phoneAllocationCount} phone/internet transactions totaling ${formatCurrencyForPdf(reviewInsights.phoneAllocationTotal, currency)} require business-use allocation.` },
-    { badge: reviewInsights.excludedCount > 0 ? "OK" : "REVIEW", title: "Excluded non-business items", description: `${reviewInsights.excludedCount} non-business items were excluded from P&L and listed in a separate schedule.` }
+    { badge: reviewInsights.excludedCount > 0 ? "OK" : "REVIEW", title: "Excluded non-business items", description: `${reviewInsights.excludedCount} non-business items were excluded from P&L and listed in a separate schedule.` },
+    { badge: Number(reviewDecisionSummary.openHard || 0) > 0 ? "ACTION" : Number(reviewDecisionSummary.openWarning || 0) > 0 ? "REVIEW" : "OK", title: "Reviewer decisions", description: `${Number(reviewDecisionSummary.openHard || 0)} hard reviewer issues and ${Number(reviewDecisionSummary.openWarning || 0)} warning reviewer issues remain open. ${Number(reviewDecisionSummary.waived || 0)} issues were waived and ${Number(reviewDecisionSummary.resolved || 0)} were resolved before export.` }
   ];
   let y = header.contentStartY - 4;
   items.forEach((item) => {
@@ -2302,6 +2381,7 @@ function buildPdfExportDocument(options) {
     capitalAssets = null,         // Array of capital_assets rows for the tax year
     capitalAssetTxMap = null,     // Map<transactionId, capital_assets row>
     quickMethodSchedule = null,   // Output of buildQuickMethodSchedule, or null
+    reviewStateRows = [],
     exportStatus: exportStatusOption = null  // "draft" | "workpaper" | null (null = auto-derive from reviewInsights)
   } = options || {};
 
@@ -2389,6 +2469,13 @@ function buildPdfExportDocument(options) {
   const quickMethodPages = buildQuickMethodRemittancePage(quickMethodSchedule, effectiveCurrency, labels);
   const unresolvedExceptionPages = buildUnresolvedExceptionPages(includedTransactions, effectiveCurrency, labels, normalizedRegion);
   const evidenceSchedulePages = buildEvidenceSchedulePages(includedTransactions, receipts, effectiveSupportArtifactMap, labels, normalizedRegion);
+  const reviewerDecisionPages = buildReviewerDecisionPages(reviewStateRows, transactions, labels, normalizedRegion);
+  const reviewDecisionSummary = {
+    openHard: rowsCount(reviewStateRows, (row) => row.issue_status === "open" && row.issue_severity === "hard"),
+    openWarning: rowsCount(reviewStateRows, (row) => row.issue_status === "open" && row.issue_severity !== "hard"),
+    resolved: rowsCount(reviewStateRows, (row) => row.issue_status === "resolved"),
+    waived: rowsCount(reviewStateRows, (row) => row.issue_status === "waived")
+  };
 
   const canvases = [
     buildIdentityPage({
@@ -2422,8 +2509,9 @@ function buildPdfExportDocument(options) {
     ...buildTransactionPages(includedTransactions, accounts, categories, receipts, effectiveCurrency, labels, normalizedRegion),
     ...unresolvedExceptionPages,
     ...evidenceSchedulePages,
+    ...reviewerDecisionPages,
     ...buildExclusionPages(excludedTransactions, effectiveCurrency, labels),
-    ...buildCpaChecklistPage({ labels, region: normalizedRegion, reviewInsights, currency: effectiveCurrency }),
+    ...buildCpaChecklistPage({ labels, region: normalizedRegion, reviewInsights, currency: effectiveCurrency, reviewDecisionSummary }),
     ...buildSupportPages(receipts, includedTransactions, mileage, vehicleCosts, effectiveSupportArtifactMap, labels, effectiveCurrency, reviewInsights, normalizedRegion),
     // Phase 2 supporting schedules — only included when data exists
     ...vehicleSchedulePages,

@@ -138,3 +138,45 @@ test("support artifacts clear matching review flags and receipt gaps", () => {
   assert.ok(!phone.reviewFlags.includes("AL"));
   assert.ok(dataset.totals.missingReceiptCount < buildNormalizedExportDataset(buildFixture()).totals.missingReceiptCount);
 });
+
+test("resolved reviewer issues suppress open blockers in the normalized dataset", () => {
+  const dataset = buildNormalizedExportDataset(buildFixture({
+    reviewStateRows: [
+      {
+        transaction_id: "meal1",
+        issue_code: "needs_business_purpose",
+        issue_severity: "hard",
+        issue_status: "resolved",
+        review_notes: "Handled by reviewer"
+      },
+      {
+        transaction_id: "meal1",
+        issue_code: "final_confirmation_needed",
+        issue_severity: "hard",
+        issue_status: "resolved",
+        review_notes: "Handled by reviewer"
+      }
+    ]
+  }));
+  const meals = dataset.includedRows.find((row) => row.id === "meal1");
+  assert.ok(!meals.reviewFlags.includes("BP"));
+  assert.equal(meals.reviewStatus, "Mapped");
+  assert.equal(meals.openHardReviewerIssueCount, 0);
+});
+
+test("open reviewer-only issues are carried into export rows and totals", () => {
+  const dataset = buildNormalizedExportDataset(buildFixture({
+    reviewStateRows: [
+      {
+        transaction_id: "fuel1",
+        issue_code: "reviewer_note",
+        issue_severity: "warning",
+        issue_status: "open",
+        review_notes: "Double-check source memo"
+      }
+    ]
+  }));
+  const fuel = dataset.includedRows.find((row) => row.id === "fuel1");
+  assert.equal(fuel.reviewIssueEntries.some((entry) => entry.issueCode === "reviewer_note"), true);
+  assert.equal(dataset.totals.openWarningReviewerIssueCount > 0, true);
+});
