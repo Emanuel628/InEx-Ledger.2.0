@@ -286,8 +286,10 @@ router.put("/onboarding", async (req, res) => {
   const region = String(req.body?.region || "").trim().toUpperCase();
   const province = String(req.body?.province || "").trim().toUpperCase();
   const businessActivityCode = String(req.body?.business_activity_code || "").trim();
-  const accountingMethod = String(req.body?.accounting_method || "").trim().toLowerCase();
-  const materialParticipation = String(req.body?.material_participation || "").trim().toLowerCase();
+  const rawAccountingMethod = String(req.body?.accounting_method || "").trim().toLowerCase();
+  const accountingMethod = VALID_ACCOUNTING_METHODS.has(rawAccountingMethod) ? rawAccountingMethod : "cash";
+  const rawMaterialParticipation = String(req.body?.material_participation || "").trim().toLowerCase();
+  const materialParticipation = VALID_MATERIAL_PARTICIPATION.has(rawMaterialParticipation) ? rawMaterialParticipation : "yes";
   const language = String(req.body?.language || "").trim();
 
   if (!businessName) {
@@ -311,20 +313,8 @@ router.put("/onboarding", async (req, res) => {
     if (region === "CA" && !CA_PROVINCES.has(province)) {
     return res.status(400).json({ error: "Choose a valid province." });
   }
-  if (!businessActivityCode) {
-    return res.status(400).json({ error: "Business activity code is required for PDF exports." });
-  }
-  if (!BUSINESS_ACTIVITY_CODE_PATTERN.test(businessActivityCode)) {
+  if (businessActivityCode && !BUSINESS_ACTIVITY_CODE_PATTERN.test(businessActivityCode)) {
     return res.status(400).json({ error: "Business activity code must be exactly 6 digits." });
-  }
-  if (businessActivityCode.length > MAX_BUSINESS_ACTIVITY_CODE_LENGTH) {
-    return res.status(400).json({ error: `Business activity code must be ${MAX_BUSINESS_ACTIVITY_CODE_LENGTH} characters or fewer.` });
-  }
-  if (!VALID_ACCOUNTING_METHODS.has(accountingMethod)) {
-    return res.status(400).json({ error: "Choose a valid accounting method." });
-  }
-  if (!VALID_MATERIAL_PARTICIPATION.has(materialParticipation)) {
-    return res.status(400).json({ error: "Choose whether you are active in this business." });
   }
   if (starterAccountName?.error) {
     return res.status(400).json({ error: `Starter account name ${starterAccountName.error}` });
@@ -423,7 +413,7 @@ router.put("/onboarding", async (req, res) => {
 
       return res.status(200).json({
         onboarding: normalizeOnboardingPayload(updated.rows[0]),
-        redirect_to: buildTrialSetupRedirect(`/${normalizedStartFocus}`)
+        redirect_to: `/${normalizedStartFocus}`
       });
     } catch (err) {
       await client.query("ROLLBACK");

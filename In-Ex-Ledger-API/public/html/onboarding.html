@@ -1,18 +1,15 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>InEx Ledger - Getting Started</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta
-    name="description"
-    content="Finish the guided onboarding flow for your InEx Ledger workspace."
-  />
+  <meta name="description" content="Finish the guided onboarding flow for your InEx Ledger workspace." />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="canonical" href="https://www.inexledger.com/onboarding" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/css/app.css?v=20260525b" />
-  <link rel="stylesheet" href="/css/pages/onboarding.css?v=20260523a" />
+  <link rel="stylesheet" href="/css/pages/onboarding.css?v=20260525a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -31,143 +28,143 @@
   </header>
 
   <main id="main-content" class="onboarding-main">
-    <section class="onboarding-shell">
-      <div class="onboarding-intro">
-        <span class="onboarding-kicker" data-i18n="onboarding_kicker">Get set up</span>
-        <h1>Let's make your workspace usable in one pass.</h1>
-        <p>Tell us the business basics that actually matter, we'll save the right defaults, create your first real account, and walk you through the setup step by step.</p>
-        <ol class="onboarding-steps">
-          <li data-i18n="onboarding_step_1">Business basics</li>
-          <li data-i18n="onboarding_step_2">Regional defaults</li>
-          <li data-i18n="onboarding_step_3">First account</li>
-          <li data-i18n="onboarding_step_4">Guided setup</li>
-        </ol>
-        <div class="onboarding-preview-card" id="onboardingPlanPreview" aria-live="polite">
-          <div class="onboarding-preview-kicker">Your setup plan</div>
-          <h2 id="onboardingPlanTitle">Built to start real bookkeeping right away.</h2>
-          <p id="onboardingPlanBody">We'll save your business basics, create your first account, and guide you through categories, accounts, and transactions in order.</p>
-          <ul id="onboardingPlanBullets" class="onboarding-preview-list">
-            <li>Save the business name and filing region you actually use.</li>
-            <li>Create a starter account so the ledger is usable immediately.</li>
-            <li>Walk through the guided setup so the workspace is ready for real bookkeeping.</li>
-          </ul>
-        </div>
+
+    <div class="onboarding-progress" aria-hidden="true">
+      <span class="onboarding-pip is-active" id="onboardingPip1"></span>
+      <span class="onboarding-pip-line"></span>
+      <span class="onboarding-pip" id="onboardingPip2"></span>
+    </div>
+
+    <!-- Screen 1: Workspace basics -->
+    <section id="onboardingScreen1" class="onboarding-card">
+      <p class="onboarding-step-label">Step 1 of 2</p>
+      <h1 class="onboarding-screen-title" data-i18n="onboarding_screen1_title">Set up your workspace</h1>
+      <p class="onboarding-screen-sub" data-i18n="onboarding_screen1_sub">Just the essentials — tax details can wait until your first export.</p>
+
+      <div class="form-field">
+        <label for="onboardingBusinessName" data-i18n="onboarding_business_name">Your name or trade name</label>
+        <input
+          type="text"
+          id="onboardingBusinessName"
+          autocomplete="name"
+          required
+          data-i18n-placeholder="onboarding_business_name_placeholder"
+          placeholder="e.g. Jane Smith or Jane's Design"
+        />
       </div>
 
-      <form id="onboardingForm" class="onboarding-card">
-        <div class="onboarding-help-bar">
-          <span class="onboarding-help-label" data-i18n="onboarding_help_label">Need help?</span>
-          <button
-            type="button"
-            id="onboardingHelpToggle"
-            class="onboarding-help-icon onboarding-help-toggle"
-            aria-label="Help for this setup form"
-            aria-expanded="false"
-            aria-controls="onboardingHelpPanel"
-          >i</button>
-        </div>
-        <div id="onboardingHelpPanel" class="onboarding-help-panel" hidden>
-          <p data-i18n="onboarding_help_intro">Keep it simple:</p>
-          <ul class="onboarding-help-list">
-            <li data-i18n="onboarding_help_line_1">Use the name you want to see in the app right now.</li>
-            <li data-i18n="onboarding_help_line_2">Pick the main account where most money moves.</li>
-            <li data-i18n="onboarding_help_line_3">Choose the country where you file taxes.</li>
-            <li data-i18n="onboarding_help_line_4">Enter your 6-digit business activity code.</li>
-            <li data-i18n="onboarding_help_line_5">Choose cash unless you already use accrual accounting.</li>
-          </ul>
-        </div>
-        <div class="onboarding-grid">
-          <div class="form-field">
-            <label for="onboardingBusinessName" data-i18n="onboarding_business_name">Your name or trade name</label>
-            <input type="text" id="onboardingBusinessName" autocomplete="name" required data-i18n-placeholder="onboarding_business_name_placeholder" placeholder="e.g. Jane Smith or Jane's Design" />
-          </div>
-          <div class="form-field">
-            <label for="onboardingStarterAccountType" data-i18n="onboarding_first_account_type">Primary account type</label>
-            <select id="onboardingStarterAccountType" required>
-              <option value="checking">Checking</option>
-              <option value="savings">Savings</option>
-              <option value="credit_card">Credit card</option>
-              <option value="cash">Cash</option>
-              <option value="loan">Loan</option>
-            </select>
-          </div>
-          <div class="form-field">
-            <label for="onboardingStarterAccountName" data-i18n="onboarding_first_account_name">Account nickname</label>
-            <input type="text" id="onboardingStarterAccountName" autocomplete="off" placeholder="e.g. Primary Checking" />
-          </div>
-          <div class="form-field">
-            <label for="onboardingRegion" data-i18n="onboarding_region">Where do you file taxes?</label>
-            <select id="onboardingRegion" required>
-              <option value="US" data-i18n="region_us">United States</option>
-              <option value="CA" data-i18n="region_ca">Canada</option>
-            </select>
-          </div>
-          <div class="form-field" id="onboardingProvinceField" hidden>
-            <label for="onboardingProvince" data-i18n="onboarding_province">Province</label>
-            <select id="onboardingProvince">
-              <option value="" data-i18n="onboarding_province_placeholder">Choose a province</option>
-              <option value="AB">Alberta</option>
-              <option value="BC">British Columbia</option>
-              <option value="MB">Manitoba</option>
-              <option value="NB">New Brunswick</option>
-              <option value="NL">Newfoundland and Labrador</option>
-              <option value="NS">Nova Scotia</option>
-              <option value="NT">Northwest Territories</option>
-              <option value="NU">Nunavut</option>
-              <option value="ON">Ontario</option>
-              <option value="PE">Prince Edward Island</option>
-              <option value="QC">Quebec</option>
-              <option value="SK">Saskatchewan</option>
-              <option value="YT">Yukon</option>
-            </select>
-          </div>
+      <div class="form-field">
+        <label for="onboardingRegion" data-i18n="onboarding_region">Where do you file taxes?</label>
+        <select id="onboardingRegion" required>
+          <option value="US" data-i18n="region_us">United States</option>
+          <option value="CA" data-i18n="region_ca">Canada</option>
+        </select>
+      </div>
 
-          <div class="form-field">
-            <label for="onboardingBusinessActivityCode" data-i18n="onboarding_business_activity_code">Business activity code</label>
-            <input
-              type="text"
-              id="onboardingBusinessActivityCode"
-              autocomplete="off"
-              inputmode="numeric"
-              maxlength="6"
-              pattern="[0-9]{6}"
-              data-i18n-placeholder="onboarding_business_activity_code_placeholder"
-              placeholder="NAICS / business activity code"
-              required
-            />
-          </div>
+      <div class="form-field" id="onboardingProvinceField" hidden>
+        <label for="onboardingProvince" data-i18n="onboarding_province">Province</label>
+        <select id="onboardingProvince">
+          <option value="" data-i18n="onboarding_province_placeholder">Choose a province</option>
+          <option value="AB">Alberta</option>
+          <option value="BC">British Columbia</option>
+          <option value="MB">Manitoba</option>
+          <option value="NB">New Brunswick</option>
+          <option value="NL">Newfoundland and Labrador</option>
+          <option value="NS">Nova Scotia</option>
+          <option value="NT">Northwest Territories</option>
+          <option value="NU">Nunavut</option>
+          <option value="ON">Ontario</option>
+          <option value="PE">Prince Edward Island</option>
+          <option value="QC">Quebec</option>
+          <option value="SK">Saskatchewan</option>
+          <option value="YT">Yukon</option>
+        </select>
+      </div>
 
-          <div class="form-field">
-            <label for="onboardingAccountingMethod" data-i18n="onboarding_accounting_method">Accounting method</label>
-            <select id="onboardingAccountingMethod" required>
-              <option value="cash" data-i18n="onboarding_accounting_method_cash">Cash</option>
-              <option value="accrual" data-i18n="onboarding_accounting_method_accrual">Accrual</option>
-            </select>
-          </div>
+      <p id="onboardingScreen1Message" class="auth-error" role="alert" aria-live="polite" hidden></p>
 
-          <div class="form-field">
-            <label for="onboardingMaterialParticipation" data-i18n="onboarding_material_participation">Are you active in this business?</label>
-            <select id="onboardingMaterialParticipation" required>
-              <option value="yes" data-i18n="common_yes">Yes</option>
-              <option value="no" data-i18n="common_no">No</option>
-            </select>
-          </div>
-
-        </div>
-
-        <p id="onboardingMessage" class="auth-error" role="alert" aria-live="polite" hidden></p>
-
-        <div class="onboarding-actions">
-          <button type="submit" class="auth-submit" data-i18n="onboarding_submit">Save and continue</button>
-        </div>
-      </form>
+      <div class="onboarding-actions">
+        <button type="button" id="onboardingNextBtn" class="auth-submit" data-i18n="onboarding_continue">Continue</button>
+      </div>
     </section>
+
+    <!-- Screen 2: Goal selection -->
+    <section id="onboardingScreen2" class="onboarding-card" hidden>
+      <p class="onboarding-step-label">Step 2 of 2</p>
+      <h1 class="onboarding-screen-title" data-i18n="onboarding_screen2_title">What do you want to do first?</h1>
+      <p class="onboarding-screen-sub" data-i18n="onboarding_screen2_sub">We'll open the right page and you can start immediately.</p>
+
+      <div class="goal-grid" id="goalGrid" role="group" aria-label="Choose your first action">
+
+        <button type="button" class="goal-card" data-goal="transactions" aria-pressed="false">
+          <span class="goal-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none">
+              <rect x="2" y="3" width="16" height="14" rx="2.5" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="6" y1="8" x2="14" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="6" y1="12" x2="11" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="goal-card-label" data-i18n="onboarding_goal_transactions">Log income &amp; expenses</span>
+        </button>
+
+        <button type="button" class="goal-card" data-goal="categories" aria-pressed="false">
+          <span class="goal-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M10 6.5v3.5l2.5 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="goal-card-label" data-i18n="onboarding_goal_categories">Set up categories</span>
+        </button>
+
+        <button type="button" class="goal-card" data-goal="receipts" aria-pressed="false">
+          <span class="goal-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none">
+              <rect x="4" y="2" width="12" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/>
+              <line x1="7" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="7" y1="10" x2="13" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="7" y1="13" x2="10" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="goal-card-label" data-i18n="onboarding_goal_receipts">Capture a receipt</span>
+        </button>
+
+        <button type="button" class="goal-card" data-goal="mileage" aria-pressed="false">
+          <span class="goal-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M10 3v2M10 15v2M3 10h2M15 10h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="goal-card-label" data-i18n="onboarding_goal_mileage">Log a mileage trip</span>
+        </button>
+
+        <button type="button" class="goal-card" data-goal="exports" aria-pressed="false">
+          <span class="goal-card-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none">
+              <rect x="2" y="2" width="16" height="16" rx="2.5" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M5 13l4-5 3 3 4-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="goal-card-label" data-i18n="onboarding_goal_exports">Export my books</span>
+        </button>
+
+      </div>
+
+      <p id="onboardingScreen2Message" class="auth-error" role="alert" aria-live="polite" hidden></p>
+
+      <div class="onboarding-actions onboarding-actions-row">
+        <button type="button" id="onboardingBackBtn" class="ghost-btn" data-i18n="onboarding_back">← Back</button>
+        <button type="button" id="onboardingSubmitBtn" class="auth-submit" disabled data-i18n="onboarding_open_workspace">Open my workspace</button>
+      </div>
+    </section>
+
   </main>
+
   <script src="../js/escape-html.js?v=20260410a"></script>
   <script src="../js/global.js?v=20260510c"></script>
   <script src="../js/i18n.js?v=20260510c"></script>
   <script src="../js/auth.js?v=20260518a"></script>
-  <script src="../js/onboarding-page.js?v=20260523b"></script>
+  <script src="../js/onboarding-page.js?v=20260525a"></script>
 </body>
 </html>
-
