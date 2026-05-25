@@ -1492,7 +1492,7 @@ function buildIdentityPage(data) {
   const actionLines = [
     `${reviewInsights.needsCategoryCount} imported / uncategorized transactions need real category assignment.`,
     `${reviewInsights.unmappedTaxCount} categorized transactions remain truly unmapped after category review.`,
-    `${reviewInsights.mappedNeedsSupportCount} mapped transactions still need support or final confirmation.`,
+    `${reviewInsights.mappedReceiptSupportCount} mapped expense rows still missing receipt or support document.`,
     `${reviewInsights.attachedReceiptFileCount} receipt file${reviewInsights.attachedReceiptFileCount !== 1 ? "s" : ""} linked total - ${reviewInsights.receiptLinkedCount} to expense rows, ${Math.max(0, reviewInsights.transactionWithReceiptCount - reviewInsights.receiptLinkedCount)} to non-expense rows.`,
     `${reviewInsights.expenseWithoutReceiptAttachmentCount} expense transactions do not have receipt attachments.`,
     `${reviewInsights.vehicleCount} vehicle items require mileage or actual-expense support.`,
@@ -1593,11 +1593,11 @@ function buildCategoryPages(transactions, categories, receipts, currency, labels
       const mappedSupportTransactions = transactions.filter((txn) => statusNeedsSupport(txn.__status));
       const riskCardTop = Math.max(y - 10, 210);
       canvas.drawCard(40, riskCardTop, 532, 76, "Support Risk Summary", [
-        `Support-risk categories: ${rows.filter((row) => row.mappingStatus === "Needs support").length} | Mapped transactions requiring support/final confirmation: ${mappedSupportTransactions.length}`,
-        `Expense transactions without receipt attachment: ${coverage.missing} | Vehicle/logbook categories: ${rows.filter((row) => /mileage/i.test(row.supportStatus)).length} | Meals/business-purpose categories: ${rows.filter((row) => /business purpose/i.test(row.supportStatus)).length} | Phone/internet allocation categories: ${rows.filter((row) => /allocation/i.test(row.supportStatus)).length}`
+        `Mapped needing support: ${mappedSupportTransactions.length} | Needs category: ${rows.filter((row) => row.categoryStatus === "needs_category").length} | Missing receipts/support: ${coverage.missing}`,
+        `Vehicle/mileage log categories: ${rows.filter((row) => /mileage/i.test(row.supportStatus)).length} | Meals/business-purpose categories: ${rows.filter((row) => /business purpose/i.test(row.supportStatus)).length} | Phone/internet allocation categories: ${rows.filter((row) => /allocation/i.test(row.supportStatus)).length}`
       ], { maxChars: 92 });
       canvas.drawCard(40, riskCardTop - 88, 532, 54, "Summary note", [
-        `Amount needing real category: ${formatCurrencyForPdf(totals.needsCategory, currency)} | Mapped but requiring support: ${formatCurrencyForPdf(totals.mappedNeedsSupport, currency)} | Mapped and support-ready: ${formatCurrencyForPdf(totals.mappedReady, currency)}`
+        `Needing category: ${formatCurrencyForPdf(totals.needsCategory, currency)} | Mapped needing support: ${formatCurrencyForPdf(totals.mappedNeedsSupport, currency)} | Mapped and support-ready: ${formatCurrencyForPdf(totals.mappedReady, currency)}`
       ], { maxChars: 92 });
     }
     return canvas;
@@ -1616,7 +1616,7 @@ function buildTaxPacketPages({ transactions, categories, receipts, currency, reg
     `Expense transactions: ${coverage.expense_count}`,
     `With receipt attachment: ${coverage.with_receipt}`,
     `Without receipt attachment: ${coverage.missing}`,
-    `Mapped transactions requiring support/final confirmation: ${mappedSupportTransactions.length}`
+    `Mapped expenses still needing support: ${mappedSupportTransactions.length}`
   ]);
   canvas.drawCard(320, cardTop, 252, 96, labels.payer_review, [
     `Payers detected: ${payerSummary.payer_count}`,

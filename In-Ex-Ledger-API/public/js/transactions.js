@@ -25,6 +25,7 @@ const transactionFilters = {
   search: "",
   category: "",
   account: "",
+  review: "",
   period: localStorage.getItem("lb_tx_period") || "this-month"
 };
 
@@ -89,6 +90,32 @@ const TRANSACTION_REVIEW_LABELS = {
   ready: "Ready",
   matched: "Matched",
   locked: "Locked"
+};
+
+const TX_FLAG_PRIORITY = ["NC", "UM", "ML", "AL", "BP", "RS", "RV", "IS"];
+
+const TX_FLAG_LABELS = {
+  NC: "Needs Category",
+  UM: "Needs Tax Mapping",
+  RS: "Needs Receipt",
+  IS: "Income Source Review",
+  ML: "Needs Mileage Log",
+  AL: "Needs Allocation",
+  BP: "Needs Business Purpose",
+  RV: "CPA Review",
+  DUP: "Duplicate Review"
+};
+
+const TX_FLAG_BADGE_CSS = {
+  NC: "flag-action",
+  UM: "flag-action",
+  ML: "flag-missing",
+  AL: "flag-missing",
+  BP: "flag-missing",
+  RS: "flag-missing",
+  RV: "flag-cpa",
+  IS: "flag-warning",
+  DUP: "flag-warning"
 };
 let unattachedReceiptsCount = 0;
 const selectedTransactionIds = new Set();
@@ -228,6 +255,265 @@ function getReviewStatusLabel(value) {
   return TRANSACTION_REVIEW_LABELS[value] || value || "";
 }
 
+function computeTxnFlags(txn) {
+  const categoriesById = mapById(getCategories());
+  const category = categoriesById[txn.categoryId] || null;
+  const flags = [];
+  const isExpense = txn.type !== "income";
+  const isIncome = txn.type === "income";
+  const catName = String(txn.categoryName || category?.name || "").toLowerCase();
+  const isUncategorized = !txn.categoryId || /imported|needs[._-]?category|uncategorized/i.test(catName);
+
+  if (isUncategorized) {
+    flags.push("NC");
+  } else {
+    if (!category?.taxLabel) flags.push("UM");
+    if (/\bvehicle\b|\bfuel\b|\bmileage\b|auto insurance/i.test(catName) || txn.taxTreatment === "vehicle") {
+      flags.push("ML");
+    }
+    if (/\bphone\b|\binternet\b|home.?office/i.test(catName) || txn.taxTreatment === "split_use" || (txn.personalUsePct != null && Number(txn.personalUsePct) > 0)) {
+      flags.push("AL");
+    }
+    if (isExpense && /\bmeal|\bfood\b|\bdining\b|\brestaurant\b|\btravel\b|\bairfare\b|\bhotel\b|\bentertainment\b/i.test(catName)) {
+      flags.push("BP");
+    }
+    if (isExpense && txn.receiptCount === 0) {
+      flags.push("RS");
+    }
+    if (isIncome && txn.receiptCount === 0) {
+      flags.push("IS");
+    }
+  }
+
+  if (txn.reviewStatus === "needs_review" && !flags.some(f => ["NC","UM","RS","ML","AL","BP"].includes(f))) {
+    flags.push("RV");
+  }
+
+  return flags;
+}
+
+function getTxnTopFlag(flags) {
+  for (const f of TX_FLAG_PRIORITY) {
+    if (flags.includes(f)) return f;
+  }
+  return null;
+}
+
+function getTxnFlagBadgeLabel(flags) {
+  const top = getTxnTopFlag(flags);
+  if (!top) return null;
+  const label = TX_FLAG_LABELS[top] || top;
+  const extra = flags.length - 1;
+  return extra > 0 ? `${label} +${extra}` : label;
+}
+
+function getTxnFlagBadgeCss(flags) {
+  const top = getTxnTopFlag(flags);
+  return top ? (TX_FLAG_BADGE_CSS[top] || "flag-missing") : "flag-ready";
+}
+
+function matchesTxReviewFilter(txn, flags, filterValue) {
+  if (!filterValue) return true;
+  switch (filterValue) {
+    case "any": return flags.length > 0 || (txn.reviewStatus && txn.reviewStatus !== "ready" && txn.reviewStatus !== "matched");
+    case "nc": return flags.includes("NC");
+    case "rs": return flags.includes("RS");
+    case "al": return flags.includes("AL");
+    case "ml": return flags.includes("ML");
+    case "bp": return flags.includes("BP");
+    case "is": return flags.includes("IS");
+    case "rv": return flags.includes("RV");
+    case "ready": return flags.length === 0 && (!txn.reviewStatus || txn.reviewStatus === "ready" || txn.reviewStatus === "matched");
+    default: return true;
+  }
+}
+
+function buildTxnChecklistHtml(txn, flags) {
+  const categoriesById = mapById(getCategories());
+  const category = categoriesById[txn.categoryId] || null;
+  const catName = String(txn.categoryName || category?.name || "");
+  const catNameLower = catName.toLowerCase();
+  const isExpense = txn.type !== "income";
+  const isIncome = txn.type === "income";
+  const items = [];
+
+  const ok = (text) => ({ s: "ok", text });
+  const fail = (text) => ({ s: "fail", text });
+  const warn = (text) => ({ s: "warn", text });
+
+  if (flags.includes("NC")) {
+    items.push(fail("<strong>Category:</strong> Not assigned"));
+    items.push(fail("<strong>Tax line:</strong> Awaiting category assignment"));
+  } else {
+    items.push(ok(`<strong>Category:</strong> ${escapeHtml(catName || "Assigned")}`));
+    if (flags.includes("UM")) {
+      items.push(fail("<strong>Tax line:</strong> Not mapped - reassign category or set tax label"));
+    } else {
+      items.push(ok(`<strong>Tax line:</strong> ${escapeHtml(category?.taxLabel || "Mapped")}`));
+    }
+  }
+
+  if (isExpense && !flags.includes("NC")) {
+    if (flags.includes("RS")) {
+      items.push(fail("<strong>Receipt/support:</strong> Missing - attach receipt or support file"));
+    } else {
+      items.push(ok(`<strong>Receipt/support:</strong> ${txn.receiptCount || 0} attached`));
+    }
+
+    if (/\bmeal|\bfood\b|\bdining\b|\brestaurant\b|\btravel\b|\bairfare\b|\bhotel\b|\bentertainment\b/i.test(catNameLower)) {
+      if (flags.includes("BP")) {
+        items.push(fail("<strong>Business purpose:</strong> Document needed (50% limit applies)"));
+      } else {
+        items.push(ok("<strong>Business purpose:</strong> Documented"));
+      }
+    }
+
+    if (/\bphone\b|\binternet\b|home.?office/i.test(catNameLower) || txn.taxTreatment === "split_use") {
+      if (flags.includes("AL")) {
+        const pct = txn.personalUsePct != null ? Number(txn.personalUsePct) : null;
+        items.push(fail(pct != null && pct > 0
+          ? `<strong>Allocation:</strong> ${(100 - pct).toFixed(0)}% business set - verify or add worksheet`
+          : "<strong>Allocation:</strong> Business-use percentage not set"));
+      } else {
+        const pct = txn.personalUsePct != null ? Number(txn.personalUsePct) : null;
+        items.push(ok(`<strong>Allocation:</strong> ${pct != null ? `${(100 - pct).toFixed(0)}% business use` : "Set"}`));
+      }
+    }
+
+    if (/\bvehicle\b|\bfuel\b|\bmileage\b|auto insurance/i.test(catNameLower) || txn.taxTreatment === "vehicle") {
+      if (flags.includes("ML")) {
+        items.push(fail("<strong>Mileage log:</strong> Mileage log or actual-expense support missing"));
+      } else {
+        items.push(ok("<strong>Mileage log:</strong> On file"));
+      }
+    }
+  }
+
+  if (isIncome && !flags.includes("NC")) {
+    if (flags.includes("IS")) {
+      items.push(warn("<strong>Income source support:</strong> Optional - source document not attached"));
+    } else {
+      items.push(ok(`<strong>Income source support:</strong> ${txn.receiptCount || 0} attached`));
+    }
+  }
+
+  if (flags.includes("RV")) {
+    items.push(fail("<strong>CPA review:</strong> Flagged for review - edit to resolve or mark ready"));
+  }
+
+  if (items.length === 0) {
+    items.push(ok("<strong>All checks passed</strong> - this transaction is ready"));
+  }
+
+  const iconMap = { ok: "✅", warn: "⚠️", fail: "❌" };
+
+  return `<ul class="tx-review-checklist">${items.map(item =>
+    `<li class="tx-review-checklist-item ${item.s}">
+      <span class="tx-review-checklist-icon" aria-hidden="true">${iconMap[item.s] || ""}</span>
+      <span class="tx-review-checklist-label">${item.text}</span>
+    </li>`
+  ).join("")}</ul>`;
+}
+
+let _reviewPopoverTxnId = null;
+
+function openTxReviewPopover(txnId, anchorEl) {
+  const popover = document.getElementById("txReviewPopover");
+  if (!popover) return;
+  const txn = (ledgerState.transactions || []).find(t => String(t.id) === String(txnId));
+  if (!txn) return;
+
+  _reviewPopoverTxnId = txnId;
+  const flags = computeTxnFlags(txn);
+  const isExpense = txn.type !== "income";
+  const title = isExpense ? "Expense Review Checklist" : "Income Review Checklist";
+  const typeLabel = isExpense ? "Expense" : "Income";
+  const typeCss = isExpense ? "expense" : "income";
+
+  const actions = [];
+  if (flags.includes("NC") || flags.includes("UM")) {
+    actions.push({ label: "Edit transaction", fix: "edit" });
+  }
+  if (flags.includes("RS")) {
+    actions.push({ label: "Attach receipt", fix: "receipt", primary: true });
+  }
+  if (flags.includes("ML") || flags.includes("AL") || flags.includes("BP")) {
+    actions.push({ label: "Add note / support", fix: "edit" });
+  }
+  if (flags.includes("RV")) {
+    actions.push({ label: "Edit & resolve", fix: "edit" });
+  }
+  if (flags.includes("IS")) {
+    actions.push({ label: "Attach source document", fix: "receipt" });
+  }
+  if (flags.length === 0) {
+    actions.push({ label: null, fix: "none" });
+  }
+
+  const actionsHtml = actions.map(a => {
+    if (a.fix === "none") return `<span class="tx-review-all-clear">✅ All checks passed</span>`;
+    return `<button type="button" class="tx-review-fix-btn${a.primary ? " primary" : ""}" data-fix="${a.fix}" data-txn-id="${escapeHtml(String(txnId))}">${escapeHtml(a.label)}</button>`;
+  }).join("");
+
+  popover.innerHTML = `
+    <div class="tx-review-popover-header">
+      <span class="tx-review-popover-title">${escapeHtml(title)}</span>
+      <button type="button" class="tx-review-popover-close" id="txReviewPopoverClose" aria-label="Close">&times;</button>
+    </div>
+    <span class="tx-review-popover-type-label ${typeCss}">${escapeHtml(typeLabel)}</span>
+    ${buildTxnChecklistHtml(txn, flags)}
+    <div class="tx-review-checklist-actions">${actionsHtml}</div>
+  `;
+
+  popover.removeAttribute("hidden");
+  positionReviewPopover(popover, anchorEl);
+
+  popover.querySelector("#txReviewPopoverClose")?.addEventListener("click", closeTxReviewPopover);
+  popover.querySelectorAll(".tx-review-fix-btn[data-fix]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const fix = btn.dataset.fix;
+      const id = btn.dataset.txnId;
+      closeTxReviewPopover();
+      if (fix === "receipt") {
+        triggerReceiptUpload(id);
+      } else if (fix === "edit") {
+        handleEditEntry(id);
+      }
+    });
+  });
+}
+
+function closeTxReviewPopover() {
+  const popover = document.getElementById("txReviewPopover");
+  if (popover) popover.setAttribute("hidden", "");
+  _reviewPopoverTxnId = null;
+}
+
+function positionReviewPopover(popover, anchorEl) {
+  if (!popover || !anchorEl) return;
+  const rect = anchorEl.getBoundingClientRect();
+  const gap = 6;
+  const vPad = 8;
+  const hPad = 8;
+  const popW = 340;
+
+  let top = rect.bottom + gap;
+  const popH = popover.offsetHeight || 260;
+  if (top + popH > window.innerHeight - vPad) {
+    top = rect.top - popH - gap;
+  }
+  top = Math.max(vPad, top);
+
+  let left = rect.left;
+  if (left + popW > window.innerWidth - hPad) {
+    left = window.innerWidth - popW - hPad;
+  }
+  left = Math.max(hPad, left);
+
+  popover.style.top = `${Math.round(top)}px`;
+  popover.style.left = `${Math.round(left)}px`;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
 
@@ -263,6 +549,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireTransactionSearch();
   wireTransactionCategoryFilter();
   wireTransactionAccountFilter();
+  wireTransactionReviewFilter();
   wirePagination();
   wireTransactionSelectionHeader();
   wireTransactionModal();
@@ -1015,6 +1302,37 @@ function wireTransactionAccountFilter() {
   filter.addEventListener("change", () => {
     transactionFilters.account = filter.value;
     void loadTransactions({ resetPage: true });
+  });
+}
+
+function wireTransactionReviewFilter() {
+  const filter = document.getElementById("transactionReviewFilter");
+  if (!filter) return;
+  filter.addEventListener("change", () => {
+    transactionFilters.review = filter.value;
+    applyFilters();
+  });
+
+  document.addEventListener("click", (e) => {
+    const badge = e.target.closest("[data-review-txn-id]");
+    const popover = document.getElementById("txReviewPopover");
+    if (badge) {
+      e.stopPropagation();
+      const txnId = badge.dataset.reviewTxnId;
+      if (_reviewPopoverTxnId === txnId) {
+        closeTxReviewPopover();
+      } else {
+        openTxReviewPopover(txnId, badge);
+      }
+      return;
+    }
+    if (popover && !popover.hidden && !popover.contains(e.target)) {
+      closeTxReviewPopover();
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeTxReviewPopover();
   });
 }
 
@@ -2716,10 +3034,23 @@ function renderTransactionsTable(filteredTransactions) {
   const categoriesById = mapById(getCategories());
   const isAllScope = getTransactionScope() === "all";
   const canUseEdgeCaseTools = effectiveTier() === "v1";
+
+  const reviewFilterValue = transactionFilters.review || "";
+  const displayTransactions = reviewFilterValue
+    ? transactions.filter(txn => matchesTxReviewFilter(txn, computeTxnFlags(txn), reviewFilterValue))
+    : transactions;
+
   tbody.innerHTML = "";
   renderPagination(totalTransactions);
 
-  transactions.forEach((txn) => {
+  if (displayTransactions.length === 0 && transactions.length > 0 && reviewFilterValue) {
+    tbody.innerHTML = `<tr class="placeholder-row"><td colspan="8" class="placeholder placeholder-cell">No transactions match the selected review filter on this page. Try a different page or filter.</td></tr>`;
+    syncBulkBar();
+    updateTransactionSelectionHeader();
+    return;
+  }
+
+  displayTransactions.forEach((txn) => {
     const row = document.createElement("tr");
     row.id = `txn-${txn.id}`;
     const txnId = String(txn.id);
@@ -2761,8 +3092,16 @@ function renderTransactionsTable(filteredTransactions) {
     if (canUseEdgeCaseTools && txn.indirectTaxAmount !== null && txn.indirectTaxAmount !== undefined && Number(txn.indirectTaxAmount) > 0) {
       metadataBadges.push(formatTransactionMetaBadge(`${getIndirectTaxLabel(rowRegion)} ${formatCurrency(Number(txn.indirectTaxAmount) || 0, rowRegion)}`, "tax"));
     }
-    if (canUseEdgeCaseTools && txn.reviewStatus && txn.reviewStatus !== "ready") {
-      metadataBadges.push(formatTransactionMetaBadge(getReviewStatusLabel(txn.reviewStatus), txn.reviewStatus));
+    if (canUseEdgeCaseTools) {
+      const txnFlags = computeTxnFlags(txn);
+      const hasFlags = txnFlags.length > 0;
+      const hasManualReview = txn.reviewStatus && txn.reviewStatus !== "ready" && txn.reviewStatus !== "matched";
+      if (hasFlags || hasManualReview) {
+        const badgeLabel = getTxnFlagBadgeLabel(txnFlags) || getReviewStatusLabel(txn.reviewStatus);
+        const badgeCss = hasFlags ? getTxnFlagBadgeCss(txnFlags) : txn.reviewStatus;
+        const tooltip = hasFlags ? txnFlags.map(f => TX_FLAG_LABELS[f] || f).join(" | ") : getReviewStatusLabel(txn.reviewStatus);
+        metadataBadges.push(`<button type="button" class="tx-meta-badge tx-flag-badge ${escapeHtml(badgeCss)}" data-review-txn-id="${escapeHtml(String(txn.id))}" title="${escapeHtml(tooltip)}" aria-label="Review checklist: ${escapeHtml(badgeLabel)}">${escapeHtml(badgeLabel)}</button>`);
+      }
     }
     if (txn.type === "income" && txn.payerName) {
       metadataBadges.push(formatTransactionMetaBadge(`Payer: ${txn.payerName}`, "income-payer"));
@@ -2836,12 +3175,12 @@ function renderTransactionsTable(filteredTransactions) {
       }
       row.classList.toggle("is-selected", isChecked);
       syncBulkBar();
-      updateTransactionSelectionHeader(transactions);
+      updateTransactionSelectionHeader(displayTransactions);
     });
   });
 
   syncBulkBar();
-  updateTransactionSelectionHeader(transactions);
+  updateTransactionSelectionHeader(displayTransactions);
 
   maybeScrollToHighlightedTransaction();
 }

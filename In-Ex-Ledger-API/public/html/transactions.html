@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260525b">
-  <link rel="stylesheet" href="/css/pages/transactions.css?v=20260523f">
+  <link rel="stylesheet" href="/css/pages/transactions.css?v=20260525d">
 </head>
 
 <body>
@@ -202,6 +202,18 @@
               </select>
               <select id="transactionAccountFilter" class="toolbar-select" aria-label="Filter by account">
                 <option value="" data-i18n="transactions_filter_all_accounts">All accounts</option>
+              </select>
+              <select id="transactionReviewFilter" class="toolbar-select" aria-label="Filter by review status">
+                <option value="">All statuses</option>
+                <option value="any">Any needs review</option>
+                <option value="nc">Needs Category</option>
+                <option value="rs">Missing Receipt</option>
+                <option value="al">Needs Allocation</option>
+                <option value="ml">Needs Mileage Log</option>
+                <option value="bp">Needs Business Purpose</option>
+                <option value="is">Income Source Review</option>
+                <option value="rv">CPA Review</option>
+                <option value="ready">Ready (no flags)</option>
               </select>
               <button
                 id="importCsvBtn"
@@ -566,6 +578,9 @@
     <button type="button" id="txBulkCancelBtn" class="tx-bulk-cancel-btn">Cancel</button>
   </div>
 
+  <!-- Review checklist popover -->
+  <div id="txReviewPopover" class="tx-review-popover" hidden role="dialog" aria-label="Review checklist"></div>
+
   <!-- Row action popup -->
   <div id="txRowPopup" class="tx-row-popup" hidden>
     <button type="button" id="txPopupEdit" class="tx-popup-btn">Edit</button>
@@ -669,7 +684,7 @@
 <script src="../js/taxReminders.js?v=20260405c"></script>
 <script src="../js/bank-csv-help.js?v=20260520b"></script>
 <script src="../js/onboarding.js?v=20260523c"></script>
-<script src="../js/transactions.js?v=20260523a"></script>
+<script src="../js/transactions.js?v=20260525d"></script>
 </body>
 </html>
 

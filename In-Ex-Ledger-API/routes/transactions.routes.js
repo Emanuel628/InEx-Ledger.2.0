@@ -556,6 +556,11 @@ function buildTransactionListFilters(query, now = new Date()) {
     return { valid: false, error: "Invalid period filter." };
   }
 
+  const reviewStatus = String(query.review_status || "").trim().toLowerCase();
+  if (reviewStatus && !VALID_REVIEW_STATUSES.has(reviewStatus)) {
+    return { valid: false, error: "Invalid review_status filter." };
+  }
+
   return {
     valid: true,
     wantsAll,
@@ -566,7 +571,8 @@ function buildTransactionListFilters(query, now = new Date()) {
     type: type || "",
     search: String(query.search || "").trim(),
     period,
-    periodBounds: getTransactionPeriodBounds(period, now)
+    periodBounds: getTransactionPeriodBounds(period, now),
+    reviewStatus: reviewStatus || ""
   };
 }
 
@@ -599,6 +605,11 @@ function buildTransactionListWhereClause(scopeBusinessIds, filters) {
     clauses.push(`t.date >= $${params.length}`);
     params.push(filters.periodBounds.end);
     clauses.push(`t.date < $${params.length}`);
+  }
+
+  if (filters.reviewStatus) {
+    params.push(filters.reviewStatus);
+    clauses.push(`t.review_status = $${params.length}`);
   }
 
   if (filters.search) {

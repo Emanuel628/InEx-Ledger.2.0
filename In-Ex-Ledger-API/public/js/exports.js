@@ -1128,6 +1128,71 @@ function updateExportSummary() {
   summaryIncome.textContent = formatMoney(income, currencyRegion);
   summaryExpenses.textContent = formatMoney(expenses, currencyRegion);
   summaryNet.textContent = formatMoney(net, currencyRegion);
+
+  updateExportReadiness(transactions);
+}
+
+function updateExportReadiness(transactions) {
+  const section = document.getElementById("exportReadinessSection");
+  const itemsEl = document.getElementById("exportReadinessItems");
+  if (!section || !itemsEl || !transactions || transactions.length === 0) {
+    if (section) section.hidden = true;
+    return;
+  }
+
+  const categories = getCategories();
+  const catById = {};
+  categories.forEach(c => { catById[c.id] = c; });
+
+  let needsCategory = 0;
+  let needsTaxMapping = 0;
+  let missingReceipt = 0;
+  let needsMileage = 0;
+  let needsAllocation = 0;
+  let needsBusinessPurpose = 0;
+  let incomeReview = 0;
+
+  for (const txn of transactions) {
+    const cat = catById[txn.categoryId];
+    const catName = String(cat?.name || txn.categoryName || "").toLowerCase();
+    const isExpense = txn.type !== "income";
+    const isIncome = txn.type === "income";
+    const isUncategorized = !txn.categoryId || /imported|needs[._-]?category|uncategorized/i.test(catName);
+
+    if (isUncategorized) {
+      needsCategory++;
+      continue;
+    }
+    if (!cat?.taxLabel) needsTaxMapping++;
+    if (isExpense && !txn.receiptId) missingReceipt++;
+    if (isExpense && /\bvehicle\b|\bfuel\b|\bmileage\b|auto insurance/i.test(catName)) needsMileage++;
+    if (/\bphone\b|\binternet\b|home.?office/i.test(catName)) needsAllocation++;
+    if (isExpense && /\bmeal|\bfood\b|\bdining\b|\brestaurant\b|\btravel\b|\bentertainment\b/i.test(catName)) needsBusinessPurpose++;
+    if (isIncome && txn.reviewStatus === "needs_review") incomeReview++;
+  }
+
+  const readinessRows = [
+    { label: "Need category assignment", count: needsCategory, key: "nc" },
+    { label: "Expenses missing receipts/support", count: missingReceipt, key: "rs" },
+    { label: "Need tax line mapping", count: needsTaxMapping, key: "um" },
+    { label: "Need mileage log", count: needsMileage, key: "ml" },
+    { label: "Need business-use allocation", count: needsAllocation, key: "al" },
+    { label: "Need business purpose note", count: needsBusinessPurpose, key: "bp" },
+    { label: "Income rows flagged for review", count: incomeReview, key: "ir" }
+  ].filter(r => r.count > 0);
+
+  if (readinessRows.length === 0) {
+    itemsEl.innerHTML = `<span class="export-readiness-all-clear">✅ All transactions are ready for export</span>`;
+  } else {
+    itemsEl.innerHTML = readinessRows.map(r =>
+      `<div class="export-readiness-item">
+        <span class="export-readiness-label">${escapeHtml(r.label)}</span>
+        <span class="export-readiness-count warn">${r.count}</span>
+      </div>`
+    ).join("");
+  }
+
+  section.hidden = false;
 }
 
 async function exportCsv(startDate, endDate, recordHistory = true, explicitFilename, tierOverride, exportLangOverride, formatOverride) {
