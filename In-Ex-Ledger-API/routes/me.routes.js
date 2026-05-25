@@ -360,7 +360,7 @@ router.put("/onboarding", async (req, res) => {
           region,
           language,
           province || null,
-          businessActivityCode,
+          businessActivityCode || null,
           accountingMethod,
           materialParticipation === "yes",
           businessId
