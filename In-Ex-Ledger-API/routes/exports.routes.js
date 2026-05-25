@@ -144,6 +144,18 @@ function buildCsvFilename(exportType, startDate, endDate) {
   return `inex-ledger-${suffix}-${startDate}_to_${endDate}.csv`;
 }
 
+async function fetchUserDisplayName(userId) {
+  if (!userId) return "";
+  const result = await pool.query(
+    `SELECT COALESCE(display_name, full_name, email) AS name
+       FROM users
+      WHERE id = $1
+      LIMIT 1`,
+    [userId]
+  );
+  return String(result.rows[0]?.name || "").trim();
+}
+
 function collectExportArtifactIds(sourceRows = {}) {
   const artifactIds = [];
   for (const receipt of sourceRows.receipts || []) {
@@ -234,9 +246,14 @@ async function fetchExportSourceRows(businessId, startDate, endDate) {
         [businessId]
       ),
       pool.query(
-        `SELECT id, transaction_id, issue_code, issue_severity, issue_status, review_notes, resolved_at, updated_at
-           FROM transaction_review_states
-          WHERE business_id = $1`,
+        `SELECT trs.id, trs.transaction_id, trs.issue_code, trs.issue_severity, trs.issue_status,
+                trs.review_notes, trs.resolved_at, trs.updated_at, trs.created_at,
+                COALESCE(creator.display_name, creator.full_name, creator.email) AS created_by_name,
+                COALESCE(resolver.display_name, resolver.full_name, resolver.email) AS resolved_by_name
+           FROM transaction_review_states trs
+           LEFT JOIN users creator ON creator.id = trs.created_by_user_id
+           LEFT JOIN users resolver ON resolver.id = trs.resolved_by_user_id
+          WHERE trs.business_id = $1`,
         [businessId]
       )
     ]);
@@ -668,6 +685,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
 
     const generatedAt = new Date().toISOString();
     const reportId = createPdfReportId(generatedAt);
+    const actorDisplayName = await fetchUserDisplayName(user.id);
 
     // Phase 2: compute Quick Method remittance schedule if applicable
     let quickMethodSchedule = null;
@@ -723,7 +741,13 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       reviewStateRows: sourceRows.reviewStateRows,
       capitalAssets: sourceRows.capitalAssets,
       capitalAssetTxMap: sourceRows.capitalAssetTxMap,
-      quickMethodSchedule
+      quickMethodSchedule,
+      packageAttribution: {
+        generatedByName: actorDisplayName,
+        generatedAt,
+        certifiedByName: certifiedByUser ? actorDisplayName : "",
+        certifiedAt: certifiedByUser ? generatedAt : ""
+      }
     };
 
     if (exportType !== "pdf") {
@@ -938,8 +962,11 @@ router.get("/history/:id/diagnostics", exportGrantLimiter, async (req, res) => {
               s.invalidated_at,
               s.invalidation_reason,
               s.created_at AS snapshot_created_at,
+              s.certified_at,
               s.dataset_schema_version,
               s.rule_version,
+              COALESCE(generator.display_name, generator.full_name, generator.email) AS generated_by_name,
+              COALESCE(certifier.display_name, certifier.full_name, certifier.email) AS certified_by_name,
               COALESCE(si.transaction_count, 0) AS transaction_count,
               COALESCE(si.artifact_count, 0) AS artifact_count
          FROM exports e
@@ -956,12 +983,15 @@ router.get("/history/:id/diagnostics", exportGrantLimiter, async (req, res) => {
          ) m ON TRUE
          LEFT JOIN LATERAL (
            SELECT id, export_mode, export_format, jurisdiction, start_date, end_date, status,
-                  invalidated_at, invalidation_reason, created_at, dataset_schema_version, rule_version
+                  invalidated_at, invalidation_reason, created_at, dataset_schema_version, rule_version,
+                  generated_by_user_id, certified_at, certified_by_user_id
              FROM export_snapshots
             WHERE export_id = e.id
             ORDER BY created_at DESC
             LIMIT 1
          ) s ON TRUE
+         LEFT JOIN users generator ON generator.id = s.generated_by_user_id
+         LEFT JOIN users certifier ON certifier.id = s.certified_by_user_id
          LEFT JOIN LATERAL (
            SELECT COUNT(*) FILTER (WHERE item_type = 'transaction') AS transaction_count,
                   COUNT(*) FILTER (WHERE item_type = 'artifact') AS artifact_count
@@ -1000,6 +1030,9 @@ router.get("/history/:id/diagnostics", exportGrantLimiter, async (req, res) => {
         id: row.snapshot_id || null,
         datasetSchemaVersion: row.dataset_schema_version || null,
         ruleVersion: row.rule_version || null,
+        generatedBy: row.generated_by_name || null,
+        certifiedBy: row.certified_by_name || null,
+        certifiedAt: row.certified_at || null,
         itemCounts: {
           transactions: Number(row.transaction_count) || 0,
           artifacts: Number(row.artifact_count) || 0

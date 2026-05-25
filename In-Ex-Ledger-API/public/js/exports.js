@@ -1640,6 +1640,8 @@ async function fetchHistoryDiagnostics(exportId) {
 function buildHistoryDiagnosticsMarkup(diagnostics) {
   const invalidation = diagnostics?.invalidation || {};
   const itemCounts = diagnostics?.snapshot?.itemCounts || {};
+  const generatedBy = String(diagnostics?.snapshot?.generatedBy || "").trim();
+  const certifiedBy = String(diagnostics?.snapshot?.certifiedBy || "").trim();
   return `
     <div class="history-diagnostics-card">
       <div class="history-diagnostics-grid">
@@ -1658,6 +1660,14 @@ function buildHistoryDiagnosticsMarkup(diagnostics) {
         <div>
           <span class="history-diagnostics-label">${escapeHtml(tx("exports_history_diag_artifacts"))}</span>
           <strong>${escapeHtml(String(Number(itemCounts.artifacts) || 0))}</strong>
+        </div>
+        <div>
+          <span class="history-diagnostics-label">${escapeHtml(tx("exports_history_diag_generated_by"))}</span>
+          <strong>${escapeHtml(generatedBy || tx("exports_history_diag_unknown"))}</strong>
+        </div>
+        <div>
+          <span class="history-diagnostics-label">${escapeHtml(tx("exports_history_diag_finalized_by"))}</span>
+          <strong>${escapeHtml(certifiedBy || tx("exports_history_diag_unknown"))}</strong>
         </div>
       </div>
       <p class="history-diagnostics-reason">${escapeHtml(invalidation.reason || tx("exports_history_stale_reason"))}</p>

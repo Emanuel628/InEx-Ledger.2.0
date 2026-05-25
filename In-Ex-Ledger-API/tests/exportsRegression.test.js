@@ -196,6 +196,7 @@ function loadExportsRouter(options = {}) {
             if (/FROM accounts/i.test(sql)) return { rows: fixture.accounts };
             if (/FROM categories/i.test(sql)) return { rows: fixture.categories };
             if (/FROM receipts/i.test(sql)) return { rows: fixture.receipts };
+            if (/FROM users/i.test(sql)) return { rows: [{ name: "Owner Example" }] };
             if (/FROM support_artifacts/i.test(sql)) return { rows: [] };
             if (/FROM transaction_review_states/i.test(sql)) return { rows: fixture.reviewStateRows || [] };
             if (/FROM mileage/i.test(sql)) return { rows: fixture.mileage };
@@ -224,8 +225,11 @@ function loadExportsRouter(options = {}) {
                   invalidated_at: "2026-05-25T12:30:00.000Z",
                   invalidation_reason: "Receipt evidence changed after export.",
                   snapshot_created_at: "2026-05-25T12:00:00.000Z",
+                  certified_at: "2026-05-25T12:00:00.000Z",
                   dataset_schema_version: "cpa-export-dataset/v1",
                   rule_version: "2026-05-23",
+                  generated_by_name: "Owner Example",
+                  certified_by_name: "Owner Example",
                   transaction_count: "7",
                   artifact_count: "3"
                 }]
@@ -589,6 +593,7 @@ test("route generate stores nonzero page count metadata and saves only the redac
     assert.equal(response.status, 200);
     assert.equal(response.headers["content-type"], "application/pdf");
     assert.match(response.body.toString("latin1"), /^%PDF-/);
+    assert.match(response.body.toString("latin1"), /Owner Example/);
     assert.equal(fixture.state.vehicleCostQueryCount > 0, true);
     assert.ok(Array.isArray(fixture.state.insertedMetadata));
     const pageCountIndex = fixture.state.insertedMetadata.indexOf("page_count");
@@ -709,6 +714,8 @@ test("export history diagnostics returns stale reason details and snapshot count
     assert.equal(response.body.exportId, "export_001");
     assert.equal(response.body.status, "invalidated");
     assert.equal(response.body.invalidation.code, "receipts");
+    assert.equal(response.body.snapshot.generatedBy, "Owner Example");
+    assert.equal(response.body.snapshot.certifiedBy, "Owner Example");
     assert.equal(response.body.snapshot.itemCounts.transactions, 7);
     assert.equal(response.body.snapshot.itemCounts.artifacts, 3);
   } finally {

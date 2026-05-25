@@ -79,6 +79,7 @@ const ISSUE_CODE_LABELS = {
 
 const VALID_ISSUE_SEVERITIES = new Set(["warning", "hard"]);
 const VALID_ISSUE_STATUSES = new Set(["open", "resolved", "waived"]);
+const USER_NAME_SQL = "COALESCE(u.display_name, u.full_name, u.email)";
 
 function parseDateFilter(value) {
   const raw = String(value || "").trim();
@@ -404,11 +405,16 @@ router.get("/issues/:transactionId", async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT id, transaction_id, issue_code, issue_severity, issue_status, review_notes, resolved_at, updated_at
-         FROM transaction_review_states
-        WHERE business_id = $1
-          AND transaction_id = $2
-        ORDER BY updated_at DESC, created_at DESC`,
+      `SELECT trs.id, trs.transaction_id, trs.issue_code, trs.issue_severity, trs.issue_status,
+              trs.review_notes, trs.resolved_at, trs.updated_at, trs.created_at,
+              ${USER_NAME_SQL.replaceAll("u.", "creator.")} AS created_by_name,
+              ${USER_NAME_SQL.replaceAll("u.", "resolver.")} AS resolved_by_name
+         FROM transaction_review_states trs
+         LEFT JOIN users creator ON creator.id = trs.created_by_user_id
+         LEFT JOIN users resolver ON resolver.id = trs.resolved_by_user_id
+        WHERE trs.business_id = $1
+          AND trs.transaction_id = $2
+        ORDER BY trs.updated_at DESC, trs.created_at DESC`,
       [businessId, transactionId]
     );
     return res.json(result.rows);
@@ -457,10 +463,16 @@ router.post("/issues", async (req, res) => {
          $6, $7, CASE WHEN $5 IN ('resolved', 'waived') THEN $7 ELSE NULL END,
          CASE WHEN $5 IN ('resolved', 'waived') THEN NOW() ELSE NULL END
        )
-       RETURNING id, transaction_id, issue_code, issue_severity, issue_status, review_notes, resolved_at, updated_at`,
+       RETURNING id, transaction_id, issue_code, issue_severity, issue_status, review_notes, resolved_at, updated_at, created_at`,
       [transactionId, businessId, issueCode, issueSeverity, issueStatus, reviewNotes, req.user.id]
     );
-    return res.status(201).json(result.rows[0]);
+    return res.status(201).json({
+      ...result.rows[0],
+      created_by_name: req.user.display_name || req.user.full_name || req.user.email || "",
+      resolved_by_name: issueStatus === "resolved" || issueStatus === "waived"
+        ? (req.user.display_name || req.user.full_name || req.user.email || "")
+        : ""
+    });
   } catch (err) {
     logError("POST /review/issues error:", err);
     return res.status(500).json({ error: "Failed to save review issue." });
@@ -500,13 +512,19 @@ router.patch("/issues/:id", async (req, res) => {
               updated_at = NOW()
         WHERE id = $4
           AND business_id = $5
-        RETURNING id, transaction_id, issue_code, issue_severity, issue_status, review_notes, resolved_at, updated_at`,
+        RETURNING id, transaction_id, issue_code, issue_severity, issue_status, review_notes, resolved_at, updated_at, created_at`,
       [issueStatus, reviewNotes || null, req.user.id, issueId, businessId]
     );
     if (!result.rowCount) {
       return res.status(404).json({ error: "Review issue not found." });
     }
-    return res.json(result.rows[0]);
+    return res.json({
+      ...result.rows[0],
+      created_by_name: "",
+      resolved_by_name: result.rows[0].issue_status === "resolved" || result.rows[0].issue_status === "waived"
+        ? (req.user.display_name || req.user.full_name || req.user.email || "")
+        : ""
+    });
   } catch (err) {
     logError("PATCH /review/issues/:id error:", err);
     return res.status(500).json({ error: "Failed to update review issue." });
