@@ -624,6 +624,51 @@
   gap: 14px;
 }
 
+.sub-slots-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.sub-slots-arrow-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 132px;
+  height: 132px;
+  border: 2px solid rgba(15, 23, 42, 0.08);
+  border-radius: 34px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+  box-shadow: 0 14px 34px rgba(148, 163, 184, 0.18);
+  color: #0f172a;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.sub-slots-arrow-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(36, 109, 187, 0.16);
+  box-shadow: 0 18px 38px rgba(148, 163, 184, 0.22);
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.sub-slots-arrow-btn:focus-visible {
+  outline: 3px solid rgba(36, 109, 187, 0.22);
+  outline-offset: 3px;
+}
+
+.sub-slots-arrow-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.sub-slots-arrow-btn svg {
+  width: 44px;
+  height: 44px;
+  fill: currentColor;
+}
+
 .sub-business-item-actions {
   display: flex;
   gap: 10px;
@@ -708,6 +753,21 @@
 
   .subscription-page-header {
     grid-template-columns: 1fr;
+  }
+
+  .sub-slots-btn-row {
+    gap: 12px;
+  }
+
+  .sub-slots-arrow-btn {
+    width: 104px;
+    height: 104px;
+    border-radius: 28px;
+  }
+
+  .sub-slots-arrow-btn svg {
+    width: 36px;
+    height: 36px;
   }
 
   .subscription-page-header h1 {

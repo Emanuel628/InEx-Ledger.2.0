@@ -935,8 +935,12 @@ function renderBusinessAccessSection(sub) {
       <div class="sub-slots-actions">
         <p class="sub-slots-state-label" id="slotsStateLabel">${escapeHtml(stateMsg)}</p>
         <div class="sub-slots-btn-row">
-          <button type="button" id="removeSlotBtn" class="sub-slots-remove-btn"${extra <= 0 ? " disabled" : ""}>Remove a business</button>
-          <button type="button" id="addSlotBtn" class="sub-slots-add-btn">Add a business</button>
+          <button type="button" id="removeSlotBtn" class="sub-slots-arrow-btn sub-slots-arrow-btn-prev" aria-label="Remove a business"${extra <= 0 ? " disabled" : ""}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 6 7 12l8 6Z"></path></svg>
+          </button>
+          <button type="button" id="addSlotBtn" class="sub-slots-arrow-btn sub-slots-arrow-btn-next" aria-label="Add a business">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 6 8 6-8 6Z"></path></svg>
+          </button>
         </div>
         <p class="sub-access-settings-note">Need to switch, rename, or delete a specific business? Go to Settings.</p>
         <div id="removeSlotConfirm" class="sub-slots-remove-confirm hidden">
