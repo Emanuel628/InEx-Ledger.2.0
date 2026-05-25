@@ -18,6 +18,7 @@ const { buildNormalizedExportDataset } = require("../services/exportDatasetServi
 const {
   hashValue,
   normalizeExportMode,
+  summarizeInvalidationReason,
   deriveFinalizationDecision,
   createExportSnapshot
 } = require("../services/exportSnapshotService.js");
@@ -903,6 +904,117 @@ router.get("/history", exportGrantLimiter, async (req, res) => {
   } catch (err) {
     logError("Export history error", { err: err.message });
     return res.status(500).json({ error: "Unable to load export history." });
+  }
+});
+
+router.get("/history/:id/diagnostics", exportGrantLimiter, async (req, res) => {
+  try {
+    const user = req.user;
+    user.business_id = await resolveBusinessIdForUser(user);
+    const businessId = user.business_id;
+    const subscription = await getSubscriptionSnapshotForBusiness(businessId);
+    if (!hasFeatureAccess(subscription, "pdf_exports")) {
+      return res.status(402).json({ error: "Export history requires an active InEx Ledger Pro plan." });
+    }
+
+    const { id } = req.params;
+    const { rows } = await pool.query(
+      `SELECT e.id,
+              e.created_at,
+              e.export_type,
+              m.start_date,
+              m.end_date,
+              m.filename,
+              m.language,
+              COALESCE(m.currency, CASE WHEN b.region = 'CA' THEN 'CAD' ELSE 'USD' END) AS currency,
+              m.page_count,
+              s.id AS snapshot_id,
+              s.export_mode,
+              s.export_format,
+              s.jurisdiction,
+              s.start_date AS snapshot_start_date,
+              s.end_date AS snapshot_end_date,
+              s.status AS snapshot_status,
+              s.invalidated_at,
+              s.invalidation_reason,
+              s.created_at AS snapshot_created_at,
+              s.dataset_schema_version,
+              s.rule_version,
+              COALESCE(si.transaction_count, 0) AS transaction_count,
+              COALESCE(si.artifact_count, 0) AS artifact_count
+         FROM exports e
+         JOIN businesses b ON b.id = e.business_id
+         LEFT JOIN LATERAL (
+           SELECT MAX(CASE WHEN key = 'start_date' THEN value END) AS start_date,
+                  MAX(CASE WHEN key = 'end_date' THEN value END) AS end_date,
+                  MAX(CASE WHEN key = 'filename' THEN value END) AS filename,
+                  MAX(CASE WHEN key = 'language' THEN value END) AS language,
+                  MAX(CASE WHEN key = 'currency' THEN value END) AS currency,
+                  MAX(CASE WHEN key = 'page_count' THEN value END) AS page_count
+             FROM export_metadata
+            WHERE export_id = e.id
+         ) m ON TRUE
+         LEFT JOIN LATERAL (
+           SELECT id, export_mode, export_format, jurisdiction, start_date, end_date, status,
+                  invalidated_at, invalidation_reason, created_at, dataset_schema_version, rule_version
+             FROM export_snapshots
+            WHERE export_id = e.id
+            ORDER BY created_at DESC
+            LIMIT 1
+         ) s ON TRUE
+         LEFT JOIN LATERAL (
+           SELECT COUNT(*) FILTER (WHERE item_type = 'transaction') AS transaction_count,
+                  COUNT(*) FILTER (WHERE item_type = 'artifact') AS artifact_count
+             FROM export_snapshot_items
+            WHERE snapshot_id = s.id
+         ) si ON TRUE
+        WHERE e.id = $1
+          AND e.business_id = $2
+        LIMIT 1`,
+      [id, businessId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "Export not found." });
+    }
+
+    const row = rows[0];
+    const invalidation = summarizeInvalidationReason(row.invalidation_reason || "");
+    return res.json({
+      exportId: row.id,
+      filename: row.filename || null,
+      exportType: row.export_type || "pdf",
+      exportMode: row.export_mode || "workpaper",
+      status: row.snapshot_status || "current",
+      generatedAt: row.created_at || row.snapshot_created_at || null,
+      invalidatedAt: row.invalidated_at || null,
+      dateRange: {
+        startDate: row.start_date || row.snapshot_start_date || null,
+        endDate: row.end_date || row.snapshot_end_date || null
+      },
+      jurisdiction: row.jurisdiction || null,
+      language: row.language || "en",
+      currency: row.currency || "USD",
+      pageCount: Number(row.page_count) || 0,
+      snapshot: {
+        id: row.snapshot_id || null,
+        datasetSchemaVersion: row.dataset_schema_version || null,
+        ruleVersion: row.rule_version || null,
+        itemCounts: {
+          transactions: Number(row.transaction_count) || 0,
+          artifacts: Number(row.artifact_count) || 0
+        }
+      },
+      invalidation: {
+        code: invalidation.code,
+        label: invalidation.label,
+        reason: invalidation.reason,
+        nextStep: invalidation.nextStep
+      }
+    });
+  } catch (err) {
+    logError("Export history diagnostics error", { err: err.message });
+    return res.status(500).json({ error: "Unable to load export diagnostics." });
   }
 });
 

@@ -202,6 +202,35 @@ function loadExportsRouter(options = {}) {
             if (/FROM vehicle_expense_details/i.test(sql)) { state.vehicleCostQueryCount += 1; return { rows: [] }; }
             if (/FROM vehicle_costs/i.test(sql)) { state.vehicleCostQueryCount += 1; return { rows: fixture.vehicleCosts }; }
             if (/FROM capital_assets/i.test(sql)) return { rows: [] };
+            if (/FROM exports e/i.test(sql) && /snapshot_id/i.test(sql)) {
+              return {
+                rows: [{
+                  id: "export_001",
+                  created_at: "2026-05-25T12:00:00.000Z",
+                  export_type: "pdf",
+                  start_date: "2026-04-01",
+                  end_date: "2026-04-30",
+                  filename: "inex-ledger-secure-export.pdf",
+                  language: "en",
+                  currency: "USD",
+                  page_count: "12",
+                  snapshot_id: "snapshot_001",
+                  export_mode: "finalized",
+                  export_format: "pdf",
+                  jurisdiction: "US",
+                  snapshot_start_date: "2026-04-01",
+                  snapshot_end_date: "2026-04-30",
+                  snapshot_status: "invalidated",
+                  invalidated_at: "2026-05-25T12:30:00.000Z",
+                  invalidation_reason: "Receipt evidence changed after export.",
+                  snapshot_created_at: "2026-05-25T12:00:00.000Z",
+                  dataset_schema_version: "cpa-export-dataset/v1",
+                  rule_version: "2026-05-23",
+                  transaction_count: "7",
+                  artifact_count: "3"
+                }]
+              };
+            }
             if (/FROM businesses/i.test(sql)) {
               return { rows: [{ name: fixture.businessName, region: "us", province: "", operating_name: fixture.operatingName, business_activity_code: fixture.naics, fiscal_year_start: "01-01", address: fixture.address, tax_id: fixture.taxId, accounting_method: fixture.accountingMethod, material_participation: true, gst_hst_registered: false, gst_hst_number: "", gst_hst_method: "", business_type: "sole_prop" }] };
             }
@@ -665,6 +694,23 @@ test("CSV generate route returns backend-authoritative CSV and records export hi
     assert.ok(Array.isArray(fixture.state.insertedSnapshot));
     assert.equal(fixture.state.insertedSnapshot[4], "draft");
     assert.equal(fixture.state.insertedSnapshot[5], "csv");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("export history diagnostics returns stale reason details and snapshot counts", async () => {
+  const fixture = loadExportsRouter();
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app).get("/api/exports/history/export_001/diagnostics");
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.exportId, "export_001");
+    assert.equal(response.body.status, "invalidated");
+    assert.equal(response.body.invalidation.code, "receipts");
+    assert.equal(response.body.snapshot.itemCounts.transactions, 7);
+    assert.equal(response.body.snapshot.itemCounts.artifacts, 3);
   } finally {
     fixture.cleanup();
   }

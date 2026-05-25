@@ -20,6 +20,56 @@ const ISSUE_LABELS = {
   cpa_review_required: "Some transactions still require CPA review.",
   reviewer_note: "Open reviewer notes remain on the package."
 };
+const INVALIDATION_REASON_MAP = [
+  {
+    match: /transactions changed after export/i,
+    code: "transactions",
+    label: "Transactions",
+    nextStep: "Review edited, deleted, or newly imported transactions and regenerate the package."
+  },
+  {
+    match: /receipt evidence changed after export/i,
+    code: "receipts",
+    label: "Receipt evidence",
+    nextStep: "Review receipt attachments on included transactions and regenerate the package."
+  },
+  {
+    match: /support artifacts changed after export/i,
+    code: "support_artifacts",
+    label: "Support artifacts",
+    nextStep: "Review linked support files or notes and regenerate the package."
+  },
+  {
+    match: /category mappings changed after export/i,
+    code: "categories",
+    label: "Category mappings",
+    nextStep: "Review category assignments or tax mappings and regenerate the package."
+  },
+  {
+    match: /capital asset schedules changed after export/i,
+    code: "capital_assets",
+    label: "Capital assets",
+    nextStep: "Review capital asset schedules and regenerate the package."
+  },
+  {
+    match: /business filing profile changed after export/i,
+    code: "business_profile",
+    label: "Business filing profile",
+    nextStep: "Review filing profile details in Settings and regenerate the package."
+  },
+  {
+    match: /mileage or vehicle support changed after export/i,
+    code: "mileage",
+    label: "Mileage and vehicle support",
+    nextStep: "Review mileage or vehicle support entries and regenerate the package."
+  },
+  {
+    match: /vehicle claim details changed after export/i,
+    code: "vehicle_claims",
+    label: "Vehicle claim details",
+    nextStep: "Review vehicle claim details and regenerate the package."
+  }
+];
 
 function normalizeExportMode(value, fallback = "workpaper") {
   const normalized = String(value || "").trim().toLowerCase();
@@ -51,6 +101,26 @@ function pushIssue(target, issue) {
     message: issue.message,
     count: Number(issue.count) || 0
   });
+}
+
+function summarizeInvalidationReason(reason) {
+  const text = String(reason || "").trim()
+    || "Underlying source data changed after export.";
+  const match = INVALIDATION_REASON_MAP.find((entry) => entry.match.test(text));
+  if (match) {
+    return {
+      code: match.code,
+      label: match.label,
+      reason: text,
+      nextStep: match.nextStep
+    };
+  }
+  return {
+    code: "generic",
+    label: "Source data",
+    reason: text,
+    nextStep: "Review the underlying source data changes and regenerate the package."
+  };
 }
 
 function buildBusinessProfileSummary(business = {}, jurisdiction = "US") {
@@ -292,6 +362,7 @@ module.exports = {
   RULE_VERSION,
   hashValue,
   normalizeExportMode,
+  summarizeInvalidationReason,
   deriveFinalizationDecision,
   createExportSnapshot,
   invalidateSnapshotsForBusiness

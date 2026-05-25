@@ -19,6 +19,8 @@ let exportToastTimer = null;
 let resetInlineTaxIdState = () => {};
 let unattachedReceiptsCount = 0;
 let transactionsCacheFresh = false;
+let openHistoryDiagnosticsId = "";
+const exportHistoryDiagnosticsCache = new Map();
 let exportPreflightState = {
   loading: false,
   finalization: null
@@ -621,20 +623,25 @@ function setupExportForm() {
     if (deleteBtn) {
       const backendId = deleteBtn.dataset.deleteBackendId;
       if (backendId) {
-        deleteBackendExport(backendId, deleteBtn.closest(".history-item"));
+        deleteBackendExport(backendId, deleteBtn.closest(".history-entry"));
       }
       return;
     }
 
     const downloadBtn = event.target.closest(".history-download");
-    if (!downloadBtn) return;
-    if (downloadBtn.dataset.historyId) {
-  if (downloadBtn.dataset.historyMode === "redacted") {
-    downloadBackendExport(downloadBtn.dataset.historyId);
-  } else {
-    replayHistoryEntry(downloadBtn.dataset.historyId);
-  }
-}
+    if (downloadBtn?.dataset.historyId) {
+      if (downloadBtn.dataset.historyMode === "redacted") {
+        downloadBackendExport(downloadBtn.dataset.historyId);
+      } else {
+        replayHistoryEntry(downloadBtn.dataset.historyId);
+      }
+      return;
+    }
+
+    const diagnosticsBtn = event.target.closest(".history-diagnostics-toggle");
+    if (diagnosticsBtn?.dataset.historyDiagnosticsId) {
+      void toggleHistoryDiagnostics(diagnosticsBtn.dataset.historyDiagnosticsId);
+    }
   });
 }
 
@@ -1579,36 +1586,125 @@ async function renderExportHistory() {
       ? tx("exports_history_status_stale")
       : tx("exports_history_status_current");
     const hasStoredRedactedPdf = entry.format === PDF_FORMAT && !!entry.contentHash;
+    const isStale = entry.snapshotStatus === "invalidated";
     const actionLabel = hasStoredRedactedPdf
-    ? escapeHtml(tx("exports_history_download_redacted") || "Download")
-    : escapeHtml(tx("exports_history_download_label") || "Download");
+      ? escapeHtml(tx("exports_history_download_redacted") || "Download")
+      : escapeHtml(tx("exports_history_download_label") || "Download");
     
     const dataAttr = `data-history-id="${escapeHtml(entry.id || "")}" data-history-format="${escapeHtml(entry.format || PDF_FORMAT)}" data-history-mode="${hasStoredRedactedPdf ? "redacted" : "replay"}"`;
     return `
-      <div class="history-item">
-        <div class="history-file">
-          <span class="history-badge ${formatClass}">${descriptor.formatLabel}</span>
-          <span class="history-badge mode">${escapeHtml(modeLabel || (entry.exportMode || "workpaper"))}</span>
-          <span class="history-badge ${entry.snapshotStatus === "invalidated" ? "stale" : "current"}">${escapeHtml(statusLabel || "Current")}</span>
-          <span class="history-file-name">${escapeHtml(entry.filename || descriptor.formatLabel)}</span>
-        </div>
-        <div class="history-period">${escapeHtml(`${entry.startDate || "-"} to ${entry.endDate || "-"}`)}</div>
-        <div class="history-meta">${escapeHtml(formatHistoryDate(entry.exportedAt))}${entry.invalidatedAt ? `<div class="history-submeta">${escapeHtml(entry.invalidationReason || tx("exports_history_stale_reason") || "Source data changed after export.")}</div>` : ""}</div>
-        <div class="history-size">${escapeHtml(formatHistorySize(entry.format))}</div>
-        <div class="history-download-cell">
-          <div class="history-actions">
-            <button type="button" class="history-download" ${dataAttr}>
-              <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v7M5 7l3 3 3-3"></path><line x1="3" y1="13" x2="13" y2="13"></line></svg>
-              <span>${actionLabel}</span>
-            </button>
-            <button type="button" class="history-delete" data-delete-backend-id="${escapeHtml(entry.id || "")}" aria-label="Delete export">
-              <svg viewBox="0 0 16 16" fill="none"><polyline points="2 4 14 4"></polyline><path d="M5 4V2h6v2M6 7v5M10 7v5"></path><path d="M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"></path></svg>
-            </button>
+      <div class="history-entry" data-history-entry-id="${escapeHtml(entry.id || "")}">
+        <div class="history-item">
+          <div class="history-file">
+            <span class="history-badge ${formatClass}">${descriptor.formatLabel}</span>
+            <span class="history-badge mode">${escapeHtml(modeLabel || (entry.exportMode || "workpaper"))}</span>
+            <span class="history-badge ${isStale ? "stale" : "current"}">${escapeHtml(statusLabel || "Current")}</span>
+            <span class="history-file-name">${escapeHtml(entry.filename || descriptor.formatLabel)}</span>
+          </div>
+          <div class="history-period">${escapeHtml(`${entry.startDate || "-"} to ${entry.endDate || "-"}`)}</div>
+          <div class="history-meta">${escapeHtml(formatHistoryDate(entry.exportedAt))}${entry.invalidatedAt ? `<div class="history-submeta">${escapeHtml(entry.invalidationReason || tx("exports_history_stale_reason") || "Source data changed after export.")}</div>` : ""}</div>
+          <div class="history-size">${escapeHtml(formatHistorySize(entry.format))}</div>
+          <div class="history-download-cell">
+            <div class="history-actions">
+              ${isStale ? `<button type="button" class="history-diagnostics-toggle" data-history-diagnostics-id="${escapeHtml(entry.id || "")}">${escapeHtml(tx("exports_history_stale_details") || "Why stale?")}</button>` : ""}
+              <button type="button" class="history-download" ${dataAttr}>
+                <svg viewBox="0 0 16 16" fill="none"><path d="M8 3v7M5 7l3 3 3-3"></path><line x1="3" y1="13" x2="13" y2="13"></line></svg>
+                <span>${actionLabel}</span>
+              </button>
+              <button type="button" class="history-delete" data-delete-backend-id="${escapeHtml(entry.id || "")}" aria-label="Delete export">
+                <svg viewBox="0 0 16 16" fill="none"><polyline points="2 4 14 4"></polyline><path d="M5 4V2h6v2M6 7v5M10 7v5"></path><path d="M3 4l1 9a1 1 0 001 1h6a1 1 0 001-1l1-9"></path></svg>
+              </button>
+            </div>
           </div>
         </div>
+        <div class="history-diagnostics-panel hidden" data-history-diagnostics-panel="${escapeHtml(entry.id || "")}"></div>
       </div>
     `;
   }).join("");
+}
+
+async function fetchHistoryDiagnostics(exportId) {
+  const cached = exportHistoryDiagnosticsCache.get(exportId);
+  if (cached) {
+    return cached;
+  }
+  const response = await apiFetch(`/api/exports/history/${encodeURIComponent(exportId)}/diagnostics`);
+  if (!response || !response.ok) {
+    throw new Error("diagnostics_failed");
+  }
+  const payload = await response.json().catch(() => null);
+  exportHistoryDiagnosticsCache.set(exportId, payload || null);
+  return payload || null;
+}
+
+function buildHistoryDiagnosticsMarkup(diagnostics) {
+  const invalidation = diagnostics?.invalidation || {};
+  const itemCounts = diagnostics?.snapshot?.itemCounts || {};
+  return `
+    <div class="history-diagnostics-card">
+      <div class="history-diagnostics-grid">
+        <div>
+          <span class="history-diagnostics-label">${escapeHtml(tx("exports_history_diag_area"))}</span>
+          <strong>${escapeHtml(invalidation.label || tx("exports_history_diag_unknown"))}</strong>
+        </div>
+        <div>
+          <span class="history-diagnostics-label">${escapeHtml(tx("exports_history_diag_invalidated"))}</span>
+          <strong>${escapeHtml(formatHistoryDate(diagnostics?.invalidatedAt || diagnostics?.generatedAt || ""))}</strong>
+        </div>
+        <div>
+          <span class="history-diagnostics-label">${escapeHtml(tx("exports_history_diag_transactions"))}</span>
+          <strong>${escapeHtml(String(Number(itemCounts.transactions) || 0))}</strong>
+        </div>
+        <div>
+          <span class="history-diagnostics-label">${escapeHtml(tx("exports_history_diag_artifacts"))}</span>
+          <strong>${escapeHtml(String(Number(itemCounts.artifacts) || 0))}</strong>
+        </div>
+      </div>
+      <p class="history-diagnostics-reason">${escapeHtml(invalidation.reason || tx("exports_history_stale_reason"))}</p>
+      <p class="history-diagnostics-next">${escapeHtml(invalidation.nextStep || tx("exports_history_diag_next_default"))}</p>
+    </div>
+  `;
+}
+
+async function toggleHistoryDiagnostics(exportId) {
+  const panel = document.querySelector(`[data-history-diagnostics-panel="${CSS.escape(exportId)}"]`);
+  const button = document.querySelector(`[data-history-diagnostics-id="${CSS.escape(exportId)}"]`);
+  if (!panel || !button) {
+    return;
+  }
+
+  if (openHistoryDiagnosticsId && openHistoryDiagnosticsId !== exportId) {
+    const openPanel = document.querySelector(`[data-history-diagnostics-panel="${CSS.escape(openHistoryDiagnosticsId)}"]`);
+    const openButton = document.querySelector(`[data-history-diagnostics-id="${CSS.escape(openHistoryDiagnosticsId)}"]`);
+    openPanel?.classList.add("hidden");
+    if (openButton) {
+      openButton.textContent = tx("exports_history_stale_details") || "Why stale?";
+    }
+  }
+
+  if (!panel.classList.contains("hidden") && openHistoryDiagnosticsId === exportId) {
+    panel.classList.add("hidden");
+    button.textContent = tx("exports_history_stale_details") || "Why stale?";
+    openHistoryDiagnosticsId = "";
+    return;
+  }
+
+  button.disabled = true;
+  panel.classList.remove("hidden");
+  panel.innerHTML = `<div class="history-empty">${escapeHtml(tx("exports_history_diag_loading") || "Loading stale details...")}</div>`;
+  try {
+    const diagnostics = await fetchHistoryDiagnostics(exportId);
+    panel.innerHTML = buildHistoryDiagnosticsMarkup(diagnostics);
+    button.textContent = tx("exports_history_stale_hide") || "Hide details";
+    openHistoryDiagnosticsId = exportId;
+  } catch (error) {
+    console.error("[Exports] Unable to load history diagnostics", error);
+    panel.innerHTML = `<div class="history-empty">${escapeHtml(tx("exports_history_diag_error") || "Unable to load stale details.")}</div>`;
+    button.textContent = tx("exports_history_stale_details") || "Why stale?";
+    openHistoryDiagnosticsId = "";
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function downloadBackendExport(exportId) {

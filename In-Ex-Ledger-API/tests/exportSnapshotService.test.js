@@ -6,6 +6,7 @@ const assert = require("node:assert/strict");
 const {
   hashValue,
   normalizeExportMode,
+  summarizeInvalidationReason,
   deriveFinalizationDecision
 } = require("../services/exportSnapshotService.js");
 
@@ -130,4 +131,17 @@ test("resolved reviewer issues no longer block finalization", () => {
 
   assert.equal(decision.eligibleForFinalization, true);
   assert.equal(decision.hardBlockers.length, 0);
+});
+
+test("summarizeInvalidationReason classifies known stale causes", () => {
+  const summary = summarizeInvalidationReason("Receipt evidence changed after export.");
+  assert.equal(summary.code, "receipts");
+  assert.equal(summary.label, "Receipt evidence");
+  assert.match(summary.nextStep, /receipt/i);
+});
+
+test("summarizeInvalidationReason falls back safely for unknown causes", () => {
+  const summary = summarizeInvalidationReason("Something unusual changed after export.");
+  assert.equal(summary.code, "generic");
+  assert.equal(summary.label, "Source data");
 });
