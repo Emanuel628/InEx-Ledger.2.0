@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260525b">
-  <link rel="stylesheet" href="/css/pages/transactions.css?v=20260525d">
+  <link rel="stylesheet" href="/css/pages/transactions.css?v=20260525e">
 </head>
 
 <body>
@@ -207,6 +207,7 @@
                 <option value="">All statuses</option>
                 <option value="any">Any needs review</option>
                 <option value="nc">Needs Category</option>
+                <option value="um">Needs Tax Mapping</option>
                 <option value="rs">Missing Receipt</option>
                 <option value="al">Needs Allocation</option>
                 <option value="ml">Needs Mileage Log</option>
@@ -225,6 +226,19 @@
               </button>
             </div>
           </div>
+        </div>
+
+        <div id="transactionReviewSummary" class="transaction-review-summary" hidden>
+          <div class="transaction-review-summary-copy">
+            <span class="transaction-review-summary-kicker">Cleanup status</span>
+            <h3 id="transactionReviewSummaryTitle" class="transaction-review-summary-title">Everything on this page is ready.</h3>
+            <p id="transactionReviewSummaryBody" class="transaction-review-summary-body">No missing categories, receipts, or support items in the current view.</p>
+          </div>
+          <div class="transaction-review-summary-actions">
+            <button type="button" id="transactionFixNextBtn" class="transaction-fix-next-btn">Fix next</button>
+          </div>
+          <div id="transactionReviewSummaryStats" class="transaction-review-summary-stats"></div>
+          <div id="transactionReviewSummaryChips" class="transaction-review-summary-chips"></div>
         </div>
 
         <div id="txUndoBar" class="bulk-action-bar" hidden>
@@ -684,7 +698,7 @@
 <script src="../js/taxReminders.js?v=20260405c"></script>
 <script src="../js/bank-csv-help.js?v=20260520b"></script>
 <script src="../js/onboarding.js?v=20260523c"></script>
-<script src="../js/transactions.js?v=20260525d"></script>
+<script src="../js/transactions.js?v=20260525e"></script>
 </body>
 </html>
 

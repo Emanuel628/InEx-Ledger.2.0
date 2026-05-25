@@ -117,6 +117,16 @@ const TX_FLAG_BADGE_CSS = {
   IS: "flag-warning",
   DUP: "flag-warning"
 };
+const TRANSACTION_REVIEW_FILTER_OPTIONS = Object.freeze([
+  { key: "nc", label: "Needs category", codes: ["NC"], tone: "hard" },
+  { key: "rs", label: "Missing receipt", codes: ["RS"], tone: "hard" },
+  { key: "um", label: "Tax mapping", codes: ["UM"], tone: "hard" },
+  { key: "ml", label: "Mileage support", codes: ["ML"], tone: "hard" },
+  { key: "al", label: "Allocation", codes: ["AL"], tone: "hard" },
+  { key: "bp", label: "Business purpose", codes: ["BP"], tone: "hard" },
+  { key: "rv", label: "CPA review", codes: ["RV"], tone: "warning" },
+  { key: "is", label: "Income review", codes: ["IS"], tone: "warning" }
+]);
 let unattachedReceiptsCount = 0;
 const selectedTransactionIds = new Set();
 const selectedRecurringTemplateIds = new Set();
@@ -312,11 +322,16 @@ function getTxnFlagBadgeCss(flags) {
   return top ? (TX_FLAG_BADGE_CSS[top] || "flag-missing") : "flag-ready";
 }
 
+function hasManualReviewState(txn) {
+  return !!(txn?.reviewStatus && txn.reviewStatus !== "ready" && txn.reviewStatus !== "matched");
+}
+
 function matchesTxReviewFilter(txn, flags, filterValue) {
   if (!filterValue) return true;
   switch (filterValue) {
     case "any": return flags.length > 0 || (txn.reviewStatus && txn.reviewStatus !== "ready" && txn.reviewStatus !== "matched");
     case "nc": return flags.includes("NC");
+    case "um": return flags.includes("UM");
     case "rs": return flags.includes("RS");
     case "al": return flags.includes("AL");
     case "ml": return flags.includes("ML");
@@ -326,6 +341,180 @@ function matchesTxReviewFilter(txn, flags, filterValue) {
     case "ready": return flags.length === 0 && (!txn.reviewStatus || txn.reviewStatus === "ready" || txn.reviewStatus === "matched");
     default: return true;
   }
+}
+
+function getTransactionReviewSnapshot(transactions = ledgerState.transactions || []) {
+  const snapshot = {
+    total: transactions.length,
+    unresolvedCount: 0,
+    readyCount: 0,
+    manualReviewCount: 0,
+    hardCount: 0,
+    warningCount: 0,
+    filterCounts: {},
+    firstIssue: null
+  };
+
+  for (const option of TRANSACTION_REVIEW_FILTER_OPTIONS) {
+    snapshot.filterCounts[option.key] = 0;
+  }
+
+  for (const txn of transactions) {
+    const flags = computeTxnFlags(txn);
+    const unresolved = flags.length > 0 || hasManualReviewState(txn);
+    if (unresolved) {
+      snapshot.unresolvedCount += 1;
+      if (!snapshot.firstIssue) {
+        snapshot.firstIssue = { txn, flags };
+      }
+    } else {
+      snapshot.readyCount += 1;
+    }
+
+    if (hasManualReviewState(txn)) {
+      snapshot.manualReviewCount += 1;
+    }
+
+    for (const option of TRANSACTION_REVIEW_FILTER_OPTIONS) {
+      if (option.codes.some((code) => flags.includes(code))) {
+        snapshot.filterCounts[option.key] += 1;
+        if (option.tone === "hard") snapshot.hardCount += 1;
+        else snapshot.warningCount += 1;
+      }
+    }
+  }
+
+  return snapshot;
+}
+
+function getTransactionReviewSummaryCopy(snapshot, totalTransactions) {
+  if (!totalTransactions) {
+    return {
+      title: "No transactions in this view yet.",
+      body: "Add or import transactions first. Review flags will show up here as soon as something needs cleanup."
+    };
+  }
+
+  if (!snapshot.unresolvedCount) {
+    return {
+      title: "Everything on this page is ready.",
+      body: "No missing categories, receipts, or support items in the current view."
+    };
+  }
+
+  const itemLabel = snapshot.unresolvedCount === 1 ? "transaction needs attention" : "transactions need attention";
+  if (snapshot.hardCount > 0) {
+    return {
+      title: `${snapshot.unresolvedCount} ${itemLabel}.`,
+      body: "Start with the hard blockers first. Those are the items most likely to hold up export cleanup."
+    };
+  }
+
+  return {
+    title: `${snapshot.unresolvedCount} ${itemLabel}.`,
+    body: "These are softer review items, but they still deserve cleanup before final export."
+  };
+}
+
+function focusTransactionForReview(txnId) {
+  const row = document.getElementById(`txn-${txnId}`);
+  if (!row) {
+    return false;
+  }
+
+  const reviewBadge = row.querySelector("[data-review-txn-id]");
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+  row.classList.add("tx-highlight");
+  window.setTimeout(() => row.classList.remove("tx-highlight"), 2200);
+  if (reviewBadge) {
+    window.setTimeout(() => {
+      openTxReviewPopover(txnId, reviewBadge);
+    }, 180);
+  }
+  return true;
+}
+
+function renderTransactionReviewSummary(transactions = ledgerState.transactions || []) {
+  const summaryCard = document.getElementById("transactionReviewSummary");
+  const titleNode = document.getElementById("transactionReviewSummaryTitle");
+  const bodyNode = document.getElementById("transactionReviewSummaryBody");
+  const statsNode = document.getElementById("transactionReviewSummaryStats");
+  const chipsNode = document.getElementById("transactionReviewSummaryChips");
+  const fixNextButton = document.getElementById("transactionFixNextBtn");
+
+  if (!summaryCard || !titleNode || !bodyNode || !statsNode || !chipsNode || !fixNextButton) {
+    return;
+  }
+
+  const snapshot = getTransactionReviewSnapshot(transactions);
+  const copy = getTransactionReviewSummaryCopy(snapshot, transactions.length);
+  titleNode.textContent = copy.title;
+  bodyNode.textContent = copy.body;
+
+  const activeFilter = transactionFilters.review || "";
+  const summaryStats = [
+    { label: "Needs attention", value: snapshot.unresolvedCount, tone: snapshot.unresolvedCount ? "warn" : "ok" },
+    { label: "Ready", value: snapshot.readyCount, tone: snapshot.readyCount ? "ok" : "quiet" },
+    { label: "Manual review", value: snapshot.manualReviewCount, tone: snapshot.manualReviewCount ? "warn" : "quiet" }
+  ];
+  statsNode.innerHTML = summaryStats.map((item) => `
+    <div class="transaction-review-stat">
+      <span class="transaction-review-stat-label">${escapeHtml(item.label)}</span>
+      <span class="transaction-review-stat-value ${escapeHtml(item.tone)}">${escapeHtml(String(item.value))}</span>
+    </div>
+  `).join("");
+
+  chipsNode.innerHTML = TRANSACTION_REVIEW_FILTER_OPTIONS.map((option) => {
+    const count = snapshot.filterCounts[option.key] || 0;
+    const isActive = activeFilter === option.key;
+    const isDisabled = count === 0;
+    return `
+      <button
+        type="button"
+        class="transaction-review-chip${isActive ? " is-active" : ""}${option.tone === "hard" ? " is-hard" : ""}"
+        data-review-summary-filter="${escapeHtml(option.key)}"
+        ${isDisabled ? "disabled" : ""}
+      >
+        <span>${escapeHtml(option.label)}</span>
+        <strong>${escapeHtml(String(count))}</strong>
+      </button>
+    `;
+  }).join("");
+
+  summaryCard.hidden = false;
+  fixNextButton.disabled = !snapshot.firstIssue;
+  fixNextButton.textContent = snapshot.firstIssue ? "Fix next" : "Nothing to fix";
+  fixNextButton.onclick = () => {
+    if (!snapshot.firstIssue) {
+      return;
+    }
+    const firstFlag = getTxnTopFlag(snapshot.firstIssue.flags);
+    if (firstFlag) {
+      const filterOption = TRANSACTION_REVIEW_FILTER_OPTIONS.find((option) => option.codes.includes(firstFlag));
+      if (filterOption && transactionFilters.review !== filterOption.key) {
+        const reviewFilterSelect = document.getElementById("transactionReviewFilter");
+        transactionFilters.review = filterOption.key;
+        if (reviewFilterSelect) {
+          reviewFilterSelect.value = filterOption.key;
+        }
+        applyFilters();
+      }
+    }
+    focusTransactionForReview(snapshot.firstIssue.txn.id);
+  };
+
+  chipsNode.querySelectorAll("[data-review-summary-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextFilter = String(button.getAttribute("data-review-summary-filter") || "");
+      const resolvedFilter = transactionFilters.review === nextFilter ? "" : nextFilter;
+      transactionFilters.review = resolvedFilter;
+      const reviewFilterSelect = document.getElementById("transactionReviewFilter");
+      if (reviewFilterSelect) {
+        reviewFilterSelect.value = resolvedFilter;
+      }
+      applyFilters(true);
+    });
+  });
 }
 
 function buildTxnChecklistHtml(txn, flags) {
@@ -2298,6 +2487,7 @@ function setEditingMode(enabled) {
 
 function applyFilters(resetPage = false) {
   if (resetPage) currentPage = 0;
+  renderTransactionReviewSummary(getFilteredTransactions());
   renderTransactionsTable();
   renderTotals();
 }
