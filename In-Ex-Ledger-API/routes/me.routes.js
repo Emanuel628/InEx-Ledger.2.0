@@ -799,6 +799,13 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
         "DELETE FROM recurring_transactions WHERE business_id = ANY($1::uuid[])",
         [businessIds]
       );
+      // support_artifacts.transaction_id is ON DELETE SET NULL, but
+      // chk_support_artifacts_scope_link forbids NULL when scope_type='transaction'.
+      // Delete artifacts before transactions so the FK action never fires.
+      await client.query(
+        "DELETE FROM support_artifacts WHERE business_id = ANY($1::uuid[])",
+        [businessIds]
+      );
       await client.query(
         "DELETE FROM transactions WHERE business_id = ANY($1::uuid[])",
         [businessIds]
