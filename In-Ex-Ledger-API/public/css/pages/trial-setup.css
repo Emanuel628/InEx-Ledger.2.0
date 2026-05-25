@@ -220,15 +220,15 @@ body.trial-setup-page {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 96px;
+  width: 48px;
   height: 48px;
-  padding: 0 16px;
+  padding: 0;
   border-radius: 16px;
   border-color: var(--trial-setup-border);
   background: #fff;
   color: var(--trial-setup-ink);
-  font-size: 14px;
-  font-weight: 900;
+  font-size: 22px;
+  font-weight: 400;
   line-height: 1;
   text-align: center;
 }
@@ -394,10 +394,10 @@ body.trial-setup-page {
   }
 
   .trial-setup-stepper button {
-    width: 84px;
+    width: 44px;
     height: 44px;
     border-radius: 14px;
-    font-size: 13px;
+    font-size: 20px;
   }
 
   .trial-setup-stepper input,
