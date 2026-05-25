@@ -215,13 +215,6 @@
     const plusBtn = document.getElementById("trialSetupAdditionalBusinessesPlus");
     if (minusBtn) minusBtn.disabled = state.additionalBusinesses <= 0 || state.isCheckoutLoading;
     if (plusBtn) plusBtn.disabled = state.additionalBusinesses >= MAX_ADDITIONAL_BUSINESSES || state.isCheckoutLoading;
-    if (minusBtn) {
-      minusBtn.textContent = state.additionalBusinesses <= 0 ? "Remove" : "Remove 1";
-    }
-    if (plusBtn) {
-      plusBtn.textContent = "Add 1";
-    }
-
     if (baseAmount) baseAmount.textContent = formatMoney(state.currency, pricing.base);
     if (addonAmount) {
       addonAmount.textContent = state.additionalBusinesses > 0
