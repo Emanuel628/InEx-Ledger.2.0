@@ -9,6 +9,7 @@ let receiptsLoadFailed = false;
 let lastReceiptLinkTrigger = null;
 let lastReceiptDeleteTrigger = null;
 let activeReceiptDeleteId = null;
+let currentReceiptFilter = "all";
 
 function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
@@ -31,10 +32,32 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireReceiptDropZone();
   wireReceiptLinkModal();
   wireReceiptDeleteModal();
+  wireReceiptFilters();
+  wireReceiptReviewActions();
   await loadTransactionMap();
   await loadReceipts();
   updateReceiptsDot();
 });
+
+function wireReceiptFilters() {
+  document.querySelectorAll("[data-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      currentReceiptFilter = button.getAttribute("data-filter") || "all";
+      renderReceipts(receiptRecords);
+    });
+  });
+}
+
+function wireReceiptReviewActions() {
+  document.getElementById("receiptRefreshButton")?.addEventListener("click", async () => {
+    await loadTransactionMap();
+    await loadReceipts();
+  });
+
+  document.getElementById("receiptFixNextButton")?.addEventListener("click", () => {
+    openNextReceiptForReview();
+  });
+}
 
 function wireUploadInput(inputEl) {
   inputEl?.addEventListener("change", async () => {
@@ -257,12 +280,17 @@ function setReceiptRefreshBusy(isBusy) {
     return;
   }
   refreshButton.disabled = !!isBusy;
-  refreshButton.textContent = isBusy ? "Refreshing..." : "Refresh";
+  refreshButton.textContent = isBusy ? `${tx("common_refresh")}...` : tx("common_refresh");
 }
 
 function renderReceipts(receipts) {
   const tableBody = document.getElementById("receiptsTableBody");
   const emptyState = document.getElementById("receiptsEmptyState");
+  const filteredReceipts = filterReceipts(receipts, currentReceiptFilter);
+
+  updateReceiptSummary(receipts);
+  updateReceiptFocus(receipts);
+  updateReceiptFilterUi(filteredReceipts.length, receipts.length);
 
   if (!tableBody) {
     return;
@@ -311,7 +339,20 @@ function renderReceipts(receipts) {
     emptyState.hidden = true;
   }
 
-  tableBody.innerHTML = receipts.map((receipt) => {
+  if (!filteredReceipts.length) {
+    tableBody.innerHTML = "";
+    if (emptyState) {
+      emptyState.hidden = false;
+      updateReceiptsEmptyState(
+        emptyState,
+        tx("receipts_empty_filtered_title"),
+        tx("receipts_empty_filtered_body")
+      );
+    }
+    return;
+  }
+
+  tableBody.innerHTML = filteredReceipts.map((receipt) => {
     const transactionCell = renderTransactionCell(receipt.transaction_id, receipt.id);
     const canViewReceipt = receipt?.is_viewable !== false;
     return `
@@ -406,17 +447,33 @@ function updateReceiptsEmptyState(node, title, body) {
 }
 
 function renderTransactionCell(transactionId, receiptId) {
+  const receipt = receiptRecords.find((record) => record.id === receiptId);
+  const reviewLabel = escapeHtml(tx("receipts_status_needs_review"));
   if (!transactionId) {
-    return "&mdash;";
+    return `
+      <div class="receipt-status-stack">
+        <span class="receipt-status-badge receipt-status-badge--review">${reviewLabel}</span>
+        <div class="receipt-transaction-meta">${escapeHtml(tx("receipts_status_unlinked_note"))}</div>
+      </div>
+    `;
   }
 
   const transaction = transactionMap[transactionId];
-  const label = transaction?.description || transactionId;
-  const receipt = receiptRecords.find((record) => record.id === receiptId);
+  const label = buildTransactionLabel(transaction, transactionId);
   if (receipt?.is_viewable === false) {
-    return `<button type="button" class="receipt-transaction-link receipt-transaction-link--missing" data-receipt-missing="${escapeHtml(receiptId || "")}">${escapeHtml(label)}</button>`;
+    return `
+      <div class="receipt-status-stack">
+        <span class="receipt-status-badge receipt-status-badge--review">${reviewLabel}</span>
+        <button type="button" class="receipt-transaction-link receipt-transaction-link--missing" data-receipt-missing="${escapeHtml(receiptId || "")}">${escapeHtml(label)}</button>
+      </div>
+    `;
   }
-  return `<button type="button" class="receipt-transaction-link" data-receipt-view="${escapeHtml(receiptId || "")}">${escapeHtml(label)}</button>`;
+  return `
+    <div class="receipt-status-stack">
+      <span class="receipt-status-badge receipt-status-badge--linked">${escapeHtml(tx("receipts_status_linked"))}</span>
+      <button type="button" class="receipt-transaction-link" data-receipt-view="${escapeHtml(receiptId || "")}">${escapeHtml(label)}</button>
+    </div>
+  `;
 }
 
 function wireReceiptLinkModal() {
@@ -449,8 +506,14 @@ function openReceiptLinkModal(receiptId) {
 
   activeReceiptLinkId = receiptId;
   lastReceiptLinkTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  const transactions = Object.values(transactionMap)
-    .sort((left, right) => String(right.date || "").localeCompare(String(left.date || "")));
+  const hint = document.getElementById("receiptLinkHint");
+  const suggestedTransactions = getSuggestedTransactionsForReceipt(receipt);
+  const transactions = suggestedTransactions
+    .concat(
+      Object.values(transactionMap).filter(
+        (transaction) => !suggestedTransactions.some((suggested) => suggested.id === transaction.id)
+      )
+    );
   select.innerHTML = `<option value="">${escapeHtml(tx("receipts_not_attached"))}</option>`;
   transactions.forEach((transaction) => {
     if (!transaction?.id) {
@@ -458,9 +521,12 @@ function openReceiptLinkModal(receiptId) {
     }
     const option = document.createElement("option");
     option.value = transaction.id;
-    option.textContent = `${transaction.date || ""} - ${transaction.description || transaction.id}`;
+    option.textContent = buildTransactionLabel(transaction, transaction.id);
     select.appendChild(option);
   });
+  if (hint) {
+    hint.textContent = `${receipt.filename || tx("receipts_this_receipt")}: ${tx("receipts_link_hint")}`;
+  }
   select.value = receipt.transaction_id || "";
   modal.classList.remove("hidden");
   select.focus();
@@ -631,7 +697,184 @@ function updateReceiptsDot() {
   if (!dot) {
     return;
   }
-  dot.hidden = !receiptRecords.some((receipt) => !receipt.transaction_id);
+  dot.hidden = !receiptRecords.some((receipt) => getReceiptState(receipt).needsReview);
+}
+
+function getReceiptState(receipt) {
+  const linked = !!receipt?.transaction_id;
+  const recent = isRecentReceipt(receipt?.created_at);
+  const needsReview = !linked || receipt?.is_viewable === false;
+  return {
+    linked,
+    recent,
+    needsReview
+  };
+}
+
+function isRecentReceipt(value) {
+  if (!value) return false;
+  const createdAt = new Date(value);
+  if (Number.isNaN(createdAt.getTime())) return false;
+  return Date.now() - createdAt.getTime() <= 7 * 24 * 60 * 60 * 1000;
+}
+
+function filterReceipts(receipts, filter) {
+  return receipts.filter((receipt) => {
+    const state = getReceiptState(receipt);
+    switch (filter) {
+      case "unlinked":
+        return !state.linked;
+      case "linked":
+        return state.linked;
+      case "review":
+        return state.needsReview;
+      case "recent":
+        return state.recent;
+      default:
+        return true;
+    }
+  });
+}
+
+function updateReceiptSummary(receipts) {
+  const total = receipts.length;
+  const linked = receipts.filter((receipt) => getReceiptState(receipt).linked).length;
+  const review = receipts.filter((receipt) => getReceiptState(receipt).needsReview).length;
+  const recent = receipts.filter((receipt) => getReceiptState(receipt).recent).length;
+
+  setCountText("receiptsSummaryTotal", total);
+  setCountText("receiptsSummaryLinked", linked);
+  setCountText("receiptsSummaryReview", review);
+  setCountText("receiptsSummaryRecent", recent);
+}
+
+function updateReceiptFocus(receipts) {
+  const titleNode = document.getElementById("receiptFocusTitle");
+  const bodyNode = document.getElementById("receiptFocusBody");
+  const button = document.getElementById("receiptFixNextButton");
+  const nextReceipt = getNextReceiptForReview(receipts);
+
+  if (!titleNode || !bodyNode || !button) {
+    return;
+  }
+
+  if (!nextReceipt) {
+    titleNode.textContent = tx("receipts_focus_title");
+    bodyNode.textContent = tx("receipts_focus_body");
+    button.disabled = true;
+    return;
+  }
+
+  const state = getReceiptState(nextReceipt);
+  titleNode.textContent = tx("receipts_focus_ready_title");
+  bodyNode.textContent = state.linked
+    ? `${nextReceipt.filename || tx("receipts_this_receipt")} ${tx("receipts_focus_followup_body")}`
+    : `${nextReceipt.filename || tx("receipts_this_receipt")} ${tx("receipts_focus_link_body")}`;
+  button.disabled = false;
+}
+
+function updateReceiptFilterUi(filteredCount, totalCount) {
+  document.querySelectorAll("[data-filter]").forEach((button) => {
+    const isActive = (button.getAttribute("data-filter") || "all") === currentReceiptFilter;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+
+  const title = document.querySelector(".receipts-card-head h2");
+  if (title) {
+    title.textContent = filteredCount === totalCount
+      ? tx("receipts_uploaded_title")
+      : `${tx("receipts_uploaded_title")} (${filteredCount})`;
+  }
+}
+
+function getNextReceiptForReview(receipts) {
+  return receipts
+    .filter((receipt) => getReceiptState(receipt).needsReview)
+    .sort((left, right) => String(left.created_at || "").localeCompare(String(right.created_at || "")))[0] || null;
+}
+
+function openNextReceiptForReview() {
+  const nextReceipt = getNextReceiptForReview(receiptRecords);
+  if (!nextReceipt) {
+    showReceiptsToast(tx("receipts_focus_none_left"));
+    return;
+  }
+  currentReceiptFilter = "review";
+  renderReceipts(receiptRecords);
+  openReceiptLinkModal(nextReceipt.id);
+}
+
+function getSuggestedTransactionsForReceipt(receipt) {
+  const receiptDate = receipt?.created_at ? new Date(receipt.created_at) : null;
+  return Object.values(transactionMap)
+    .filter((transaction) => transaction?.id)
+    .sort((left, right) => scoreTransactionMatch(right, receiptDate) - scoreTransactionMatch(left, receiptDate))
+    .slice(0, 10);
+}
+
+function scoreTransactionMatch(transaction, receiptDate) {
+  let score = 0;
+  if (transaction?.type === "expense") score += 4;
+  if (transaction?.kind === "expense") score += 4;
+  if (transaction?.category && String(transaction.category).toLowerCase() !== "needs category") score += 2;
+  const transactionDate = transaction?.date ? new Date(transaction.date) : null;
+  if (receiptDate && transactionDate && !Number.isNaN(receiptDate.getTime()) && !Number.isNaN(transactionDate.getTime())) {
+    const daysApart = Math.abs(receiptDate.getTime() - transactionDate.getTime()) / (24 * 60 * 60 * 1000);
+    score += Math.max(0, 5 - Math.floor(daysApart));
+  }
+  return score;
+}
+
+function buildTransactionLabel(transaction, fallbackId) {
+  if (!transaction) {
+    return tx("receipts_transaction_fallback");
+  }
+
+  const parts = [];
+  if (transaction.date) {
+    parts.push(formatReceiptDate(transaction.date));
+  }
+
+  const description = String(transaction.description || "").trim();
+  if (description) {
+    parts.push(description);
+  } else if (transaction.payee) {
+    parts.push(String(transaction.payee));
+  } else {
+    parts.push(tx("receipts_transaction_untitled"));
+  }
+
+  if (transaction.amount !== undefined && transaction.amount !== null && transaction.amount !== "") {
+    parts.push(formatCurrency(transaction.amount, transaction.currency || "USD"));
+  } else if (fallbackId && !description) {
+    parts.push(tx("receipts_transaction_fallback"));
+  }
+
+  return parts.join(" - ");
+}
+
+function formatCurrency(amount, currency) {
+  const numeric = Number(amount);
+  if (!Number.isFinite(numeric)) {
+    return String(amount);
+  }
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currency || "USD",
+      maximumFractionDigits: 2
+    }).format(numeric);
+  } catch (_error) {
+    return numeric.toFixed(2);
+  }
+}
+
+function setCountText(id, value) {
+  const node = document.getElementById(id);
+  if (node) {
+    node.textContent = String(value);
+  }
 }
 
 function formatReceiptDate(value) {

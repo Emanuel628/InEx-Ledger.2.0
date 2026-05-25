@@ -12,6 +12,92 @@
   margin-bottom: 24px;
 }
 
+.receipts-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.receipts-summary-card,
+.receipts-focus-card {
+  background: var(--panel-bg);
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-card-lg);
+}
+
+.receipts-summary-card {
+  padding: 18px 18px 16px;
+  background:
+    radial-gradient(circle at top right, rgba(36, 109, 187, 0.08), transparent 34%),
+    var(--panel-bg);
+}
+
+.receipts-summary-card--attention {
+  border-color: rgba(200, 128, 32, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(200, 128, 32, 0.14), transparent 38%),
+    var(--panel-bg);
+}
+
+.receipts-summary-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #6d7986;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.receipts-summary-value {
+  display: block;
+  color: #102236;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.receipts-summary-note {
+  margin: 10px 0 0;
+  color: #5c6977;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.receipts-focus-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+  padding: 20px 22px;
+  background:
+    radial-gradient(circle at top right, rgba(36, 109, 187, 0.08), transparent 30%),
+    var(--panel-bg);
+}
+
+.receipts-focus-card h2 {
+  margin: 6px 0 0;
+  color: #102236;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.receipts-focus-card p {
+  margin: 10px 0 0;
+  color: #5c6977;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.receipts-focus-actions {
+  flex: 0 0 auto;
+}
+
 .hidden-upload-input {
   display: none;
 }
@@ -108,6 +194,11 @@
   color: var(--accent2);
 }
 
+.receipt-refresh-btn[disabled] {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 .receipt-delete-btn {
   min-height: 40px;
   padding: 0 14px;
@@ -154,6 +245,41 @@
   color: #5c6977;
   font-size: 14px;
   line-height: 1.6;
+}
+
+.receipts-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.receipts-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.receipts-filter-chip {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 25, 35, 0.12);
+  background: #fff;
+  color: #425164;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.receipts-filter-chip.is-active {
+  border-color: rgba(36, 109, 187, 0.28);
+  background: rgba(36, 109, 187, 0.08);
+  color: var(--accent2);
+  box-shadow: inset 0 0 0 1px rgba(36, 109, 187, 0.12);
 }
 
 .receipts-table {
@@ -241,6 +367,39 @@
   gap: 8px;
   flex-wrap: nowrap;
   white-space: nowrap;
+}
+
+.receipt-status-stack {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+}
+
+.receipt-status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.receipt-status-badge--linked {
+  background: rgba(42, 124, 79, 0.12);
+  color: #216441;
+}
+
+.receipt-status-badge--review {
+  background: rgba(200, 128, 32, 0.12);
+  color: #9a620f;
+}
+
+.receipt-transaction-meta {
+  color: #6d7986;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .receipt-row-actions .receipt-link-btn,
@@ -371,6 +530,12 @@
   font-size: 14px;
 }
 
+.receipt-link-hint {
+  margin-top: 10px;
+  color: #6d7986;
+  font-size: 13px;
+}
+
 .receipt-modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -484,6 +649,11 @@
     padding: 24px 20px 28px;
   }
 
+  .receipts-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .receipts-focus-card,
   .receipts-page-header,
   .receipts-card-head,
   .receipt-modal-actions {
@@ -503,6 +673,10 @@
 @media (max-width: 640px) {
   .receipts-content {
     padding: 18px 14px 24px;
+  }
+
+  .receipts-summary-grid {
+    grid-template-columns: 1fr;
   }
 
   .receipts-card,
@@ -549,7 +723,9 @@
   }
 
   .receipt-drop-zone,
-  .receipts-card {
+  .receipts-card,
+  .receipts-summary-card,
+  .receipts-focus-card {
     width: 100% !important;
     max-width: 100% !important;
     box-sizing: border-box !important;
