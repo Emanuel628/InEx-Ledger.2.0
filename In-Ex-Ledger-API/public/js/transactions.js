@@ -957,7 +957,7 @@ async function loadTransactions(options = {}) {
     applyFilters();
     renderGhostSuggestions();
     syncTransactionUndoBar();
-    void syncTransactionUndoAvailability({ preserveMessage: !!transactionUndoMessage });
+    void syncTransactionUndoAvailability({ preserveMessage: true });
   }
 }
 

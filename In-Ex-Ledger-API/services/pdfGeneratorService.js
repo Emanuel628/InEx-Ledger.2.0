@@ -28,6 +28,48 @@ const PDF_LABELS = {
     support_title: "Supporting Schedules and Final Disclosure",
     payer_review: "Payer/Form Review",
     footer_brand: "InEx Ledger"
+  },
+  fr: {
+    us_report_title: "Export de dossier CPA - Etats-Unis",
+    ca_report_title: "Export de dossier CPA - Canada",
+    secure_badge: "Export securise",
+    redacted_badge: "Export expurge",
+    draft_badge: "Brouillon - Revision CPA requise",
+    workpaper_badge: "Dossier CPA pret",
+    not_filed: "Cet export est un document comptable de travail, non une declaration fiscale deposee.",
+    executive_summary: "Resume executif",
+    mapping_summary: "Sommaire du mappage fiscal",
+    tax_packet_title_us: "Revision du dossier Schedule C",
+    tax_packet_title_ca: "Revision du dossier T2125",
+    ledger_title: "Grand livre detaille des transactions",
+    exclusions_title: "Calendrier des elements exclus",
+    unresolved_exceptions_title: "Calendrier des exceptions non resolues",
+    evidence_schedule_title: "Calendrier des pieces justificatives",
+    checklist_title: "Liste de verification CPA",
+    support_title: "Annexes de soutien et divulgation finale",
+    payer_review: "Revision payeur/formulaire",
+    footer_brand: "InEx Ledger"
+  },
+  es: {
+    us_report_title: "Exportacion de expediente CPA - EE.UU.",
+    ca_report_title: "Exportacion de expediente CPA - Canada",
+    secure_badge: "Exportacion segura",
+    redacted_badge: "Exportacion redactada",
+    draft_badge: "Borrador - Revision CPA requerida",
+    workpaper_badge: "Expediente CPA listo",
+    not_filed: "Esta exportacion es un documento contable de trabajo, no una declaracion de impuestos presentada.",
+    executive_summary: "Resumen ejecutivo",
+    mapping_summary: "Resumen de mapeo fiscal",
+    tax_packet_title_us: "Revision del expediente Schedule C",
+    tax_packet_title_ca: "Revision del expediente T2125",
+    ledger_title: "Libro mayor detallado de transacciones",
+    exclusions_title: "Calendario de elementos excluidos",
+    unresolved_exceptions_title: "Calendario de excepciones no resueltas",
+    evidence_schedule_title: "Calendario de evidencias",
+    checklist_title: "Lista de verificacion CPA",
+    support_title: "Anexos de soporte y divulgacion final",
+    payer_review: "Revision de pagador/formulario",
+    footer_brand: "InEx Ledger"
   }
 };
 
