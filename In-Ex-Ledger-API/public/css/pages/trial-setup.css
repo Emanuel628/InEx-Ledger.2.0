@@ -211,9 +211,11 @@ body.trial-setup-page {
 }
 
 .trial-setup-stepper {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 52px 80px 52px;
   align-items: stretch;
   gap: 0;
+  width: max-content;
   min-height: 52px;
   border: 1px solid var(--trial-setup-border);
   border-radius: 16px;
@@ -409,6 +411,10 @@ body.trial-setup-page {
   .trial-setup-primary-btn,
   .trial-setup-secondary-btn {
     width: 100%;
+  }
+
+  .trial-setup-stepper {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
   }
 
   .trial-setup-stepper button {
