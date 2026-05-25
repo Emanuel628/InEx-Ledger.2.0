@@ -36,11 +36,6 @@ nav a {
   transition: color 140ms ease, background 140ms ease;
 }
 
-nav a:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
-  text-decoration: none;
-}
 
 nav a.nav-link-active {
   font-weight: 500;
