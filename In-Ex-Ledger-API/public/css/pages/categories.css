@@ -228,14 +228,13 @@
 
 .category-card {
   overflow: visible;
+  margin: 0;
   align-self: start;
   background: var(--cat-panel);
   border: 1px solid var(--cat-line);
   border-radius: 22px;
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.07);
 }
-
-.category-card + .category-card { margin-top: 0; }
 
 .category-card-head {
   display: flex;
