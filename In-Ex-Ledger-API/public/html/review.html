@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260525b" />
-  <link rel="stylesheet" href="/css/pages/review.css?v=20260525a" />
+  <link rel="stylesheet" href="/css/pages/review.css?v=20260525b" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -83,6 +83,14 @@
           <span class="review-summary-label" data-i18n="review_summary_receipts">Missing receipts</span>
           <strong id="reviewReceiptCount" class="review-summary-value">0</strong>
         </article>
+        <article class="review-summary-card review-summary-card--hard">
+          <span class="review-summary-label">Hard blockers</span>
+          <strong id="reviewHardCount" class="review-summary-value">0</strong>
+        </article>
+        <article class="review-summary-card review-summary-card--warning">
+          <span class="review-summary-label">Warnings</span>
+          <strong id="reviewWarningCount" class="review-summary-value">0</strong>
+        </article>
       </section>
 
       <section class="review-insights-card">
@@ -91,8 +99,10 @@
             <h2 data-i18n="review_focus_title">What to clear first</h2>
             <p data-i18n="review_focus_subtitle">The queue is ordered so category blockers and real support gaps rise to the top.</p>
           </div>
+          <button type="button" id="reviewFixNextButton" class="review-primary-link">Fix next</button>
         </div>
         <div id="reviewInsightPills" class="review-insight-pills"></div>
+        <div id="reviewFocusCard" class="review-focus-card" hidden></div>
       </section>
 
       <section class="review-queue-card">
@@ -111,6 +121,8 @@
             </select>
           </div>
         </div>
+
+        <div id="reviewQuickFilters" class="review-quick-filters"></div>
 
         <div id="reviewQueueLoading" class="review-empty-state" data-i18n="common_loading">Loading...</div>
         <div id="reviewQueueEmpty" class="review-empty-state" hidden>
@@ -239,6 +251,6 @@
   <script src="../js/auth.js?v=20260518a"></script>
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
-  <script src="../js/review.js?v=20260525a"></script>
+  <script src="../js/review.js?v=20260525b"></script>
 </body>
 </html>

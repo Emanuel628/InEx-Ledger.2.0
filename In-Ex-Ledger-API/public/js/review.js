@@ -3,6 +3,15 @@
 let reviewQueue = [];
 let activeSupportTransaction = null;
 let activeIssueTransaction = null;
+let reviewQuickFilter = "all";
+const REVIEW_FILTER_PRESETS = Object.freeze([
+  { key: "hard", label: "Hard blockers" },
+  { key: "warning", label: "Warnings" },
+  { key: "needs_category", label: "Needs category" },
+  { key: "needs_receipt_support", label: "Missing receipt" },
+  { key: "needs_mileage_log", label: "Mileage support" },
+  { key: "needs_business_purpose", label: "Business purpose" }
+]);
 
 function tx(key, fallback) {
   if (typeof window.t === "function") {
@@ -44,11 +53,32 @@ function summarizeTopFlags(summary) {
     .slice(0, 5);
 }
 
+function summarizeIssues(queue = []) {
+  const stats = {
+    hard: 0,
+    warning: 0,
+    byCode: {}
+  };
+
+  queue.forEach((item) => {
+    (item.issueEntries || []).forEach((entry) => {
+      if (entry.severity === "hard") stats.hard += 1;
+      else stats.warning += 1;
+      stats.byCode[entry.issueCode] = (stats.byCode[entry.issueCode] || 0) + 1;
+    });
+  });
+
+  return stats;
+}
+
 function renderSummary(summary = {}) {
   document.getElementById("reviewTotalCount").textContent = String(summary.total || 0);
   document.getElementById("reviewActionCount").textContent = String(summary.actionNeededCount || 0);
   document.getElementById("reviewSupportCount").textContent = String(summary.needsReviewCount || 0);
   document.getElementById("reviewReceiptCount").textContent = String(summary.missingReceiptCount || 0);
+  const issueSummary = summarizeIssues(reviewQueue);
+  document.getElementById("reviewHardCount").textContent = String(issueSummary.hard || 0);
+  document.getElementById("reviewWarningCount").textContent = String(issueSummary.warning || 0);
 
   const pills = summarizeTopFlags(summary).map(([flag, count]) => `
     <span class="review-insight-pill">
@@ -60,6 +90,9 @@ function renderSummary(summary = {}) {
   document.getElementById("reviewInsightPills").innerHTML = pills || `
     <span class="review-insight-pill review-insight-pill--muted">${escapeText(tx("review_no_insights", "No open flags."))}</span>
   `;
+
+  renderReviewFocusCard();
+  renderQuickFilters(issueSummary);
 }
 
 function mapFilterStatus(item) {
@@ -69,6 +102,94 @@ function mapFilterStatus(item) {
   return "all";
 }
 
+function matchesQuickFilter(item, filter) {
+  if (filter === "all") return true;
+  const entries = item.issueEntries || [];
+  if (filter === "hard") return entries.some((entry) => entry.severity === "hard");
+  if (filter === "warning") return entries.some((entry) => entry.severity !== "hard");
+  return entries.some((entry) => entry.issueCode === filter);
+}
+
+function getReviewFocusItem() {
+  return reviewQueue.find((item) => (item.issueEntries || []).some((entry) => entry.severity === "hard"))
+    || reviewQueue[0]
+    || null;
+}
+
+function openQueueTarget(item) {
+  if (!item) return;
+  const href = item.actionTarget?.href || "/transactions";
+  if (href === "/transactions") {
+    window.location.href = `${href}?highlight=${encodeURIComponent(item.id)}`;
+    return;
+  }
+  window.location.href = href;
+}
+
+function renderReviewFocusCard() {
+  const card = document.getElementById("reviewFocusCard");
+  const button = document.getElementById("reviewFixNextButton");
+  if (!card || !button) return;
+
+  const item = getReviewFocusItem();
+  if (!item) {
+    card.hidden = true;
+    button.disabled = true;
+    return;
+  }
+
+  const topIssue = (item.issueEntries || [])[0] || null;
+  const severity = topIssue?.severity === "hard" ? "Hard blocker" : "Warning";
+  card.hidden = false;
+  card.innerHTML = `
+    <div class="review-focus-card-copy">
+      <span class="review-focus-badge ${topIssue?.severity === "hard" ? "is-hard" : "is-warning"}">${escapeText(severity)}</span>
+      <h3>${escapeText(item.description || "(No description)")}</h3>
+      <p>${escapeText(item.date || "")} · ${escapeText(item.categoryName || "Uncategorized")} · ${escapeText(formatMoney(item.amount, item.currency))}</p>
+      <p class="review-focus-note">${escapeText(topIssue?.label || item.supportSummary || "Needs cleanup")}</p>
+    </div>
+    <div class="review-focus-card-actions">
+      <button type="button" class="review-secondary-btn" data-review-focus-open>Open item</button>
+    </div>
+  `;
+  card.querySelector("[data-review-focus-open]")?.addEventListener("click", () => openQueueTarget(item));
+  button.disabled = false;
+  button.onclick = () => openQueueTarget(item);
+}
+
+function renderQuickFilters(issueSummary) {
+  const container = document.getElementById("reviewQuickFilters");
+  if (!container) return;
+
+  container.innerHTML = REVIEW_FILTER_PRESETS.map((preset) => {
+    const count = preset.key === "hard"
+      ? issueSummary.hard || 0
+      : preset.key === "warning"
+        ? issueSummary.warning || 0
+        : (issueSummary.byCode?.[preset.key] || 0);
+    return `
+      <button
+        type="button"
+        class="review-quick-filter${reviewQuickFilter === preset.key ? " is-active" : ""}${preset.key === "hard" ? " is-hard" : ""}"
+        data-review-quick-filter="${escapeText(preset.key)}"
+        ${count === 0 ? "disabled" : ""}
+      >
+        <span>${escapeText(preset.label)}</span>
+        <strong>${escapeText(String(count))}</strong>
+      </button>
+    `;
+  }).join("");
+
+  container.querySelectorAll("[data-review-quick-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const next = button.getAttribute("data-review-quick-filter") || "all";
+      reviewQuickFilter = reviewQuickFilter === next ? "all" : next;
+      renderQueue();
+      renderQuickFilters(issueSummary);
+    });
+  });
+}
+
 function renderQueue() {
   const filter = document.getElementById("reviewStatusFilter")?.value || "all";
   const tbody = document.getElementById("reviewQueueBody");
@@ -76,7 +197,12 @@ function renderQueue() {
   const empty = document.getElementById("reviewQueueEmpty");
   const tableWrap = document.getElementById("reviewTableWrap");
 
-  const filtered = reviewQueue.filter((item) => filter === "all" || mapFilterStatus(item) === filter);
+  const filtered = reviewQueue.filter((item) => {
+    if (filter !== "all" && mapFilterStatus(item) !== filter) {
+      return false;
+    }
+    return matchesQuickFilter(item, reviewQuickFilter);
+  });
 
   loading.hidden = true;
   empty.hidden = filtered.length > 0;
@@ -120,7 +246,9 @@ function renderQueue() {
         </td>
         <td>
           <div class="review-issue-list">
-            ${issues.map((issue) => `<span class="review-issue-chip">${escapeText(issue)}</span>`).join("")}
+            ${((item.issueEntries || []).length
+              ? item.issueEntries.map((issue) => `<span class="review-issue-chip ${issue.severity === "hard" ? "is-hard" : "is-warning"}">${escapeText(issue.label)}</span>`).join("")
+              : issues.map((issue) => `<span class="review-issue-chip">${escapeText(issue)}</span>`).join(""))}
           </div>
         </td>
         <td>
@@ -433,6 +561,7 @@ async function loadReviewQueue() {
   } catch (error) {
     console.error("Failed to load review queue:", error);
     reviewQueue = [];
+    reviewQuickFilter = "all";
     renderSummary({});
     loading.hidden = false;
     loading.textContent = tx("review_load_error", "Failed to load review queue.");
