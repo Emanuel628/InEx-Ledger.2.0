@@ -228,6 +228,7 @@
 
 .category-card {
   overflow: visible;
+  align-self: start;
   background: var(--cat-panel);
   border: 1px solid var(--cat-line);
   border-radius: 22px;
