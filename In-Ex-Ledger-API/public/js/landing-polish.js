@@ -67,7 +67,7 @@ function applyLandingPolish(region) {
   setTextBySelector(".trust-strip article:first-child strong", isCA ? "Built for Canada" : "Built for the U.S.");
   setTextBySelector(".trust-strip article:nth-child(2) strong", isCA ? "Receipts and kilometres" : "Receipts and mileage");
   setTextBySelector(".trust-strip article:nth-child(2) p", isCA ? "Attach receipts and track kilometres in one place." : "Attach receipts and track mileage in one place.");
-  setTextBySelector(".feature-card:nth-child(4) h3", isCA ? "Built for Canadian businesses" : "Built for U.S. businesses");
+  setTextBySelector(".feature-card:nth-child(4) h3", "Built for U.S. and Canadian businesses");
   setTextBySelector("#regions .section-heading h2", isCA ? "Bookkeeping for Canadian solo businesses." : "Bookkeeping for U.S. solo businesses.");
   setTextBySelector("#regions .section-subtitle", isCA ? "T2125 categories, T4A details, GST/HST support, kilometres, receipts, and exports." : "Schedule C categories, 1099 income, mileage, receipts, and exports.");
   setTextBySelector("#pricing .section-subtitle", isCA ? "Finish onboarding first, then confirm your Pro trial in Stripe. Pricing shown in CAD." : "Finish onboarding first, then confirm your Pro trial in Stripe. Pricing shown in USD.");
