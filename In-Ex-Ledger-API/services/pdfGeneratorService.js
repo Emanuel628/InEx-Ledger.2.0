@@ -1451,7 +1451,7 @@ function buildIdentityPage(data) {
     `${reviewInsights.needsCategoryCount} imported / uncategorized transactions need real category assignment.`,
     `${reviewInsights.unmappedTaxCount} categorized transactions remain truly unmapped after category review.`,
     `${reviewInsights.mappedNeedsSupportCount} mapped transactions still need support or final confirmation.`,
-    `${reviewInsights.attachedReceiptFileCount} receipt files are attached across ${reviewInsights.transactionWithReceiptCount} transactions in this export.`,
+    `${reviewInsights.attachedReceiptFileCount} receipt file${reviewInsights.attachedReceiptFileCount !== 1 ? "s" : ""} linked total - ${reviewInsights.receiptLinkedCount} to expense rows, ${Math.max(0, reviewInsights.transactionWithReceiptCount - reviewInsights.receiptLinkedCount)} to non-expense rows.`,
     `${reviewInsights.expenseWithoutReceiptAttachmentCount} expense transactions do not have receipt attachments.`,
     `${reviewInsights.vehicleCount} vehicle items require mileage or actual-expense support.`,
     `${reviewInsights.mealsCount} meal items require business-purpose support.`,
@@ -2063,8 +2063,10 @@ function buildReviewerDecisionPages(reviewStateRows, transactions, labels, regio
 function buildCpaChecklistPage(opts) {
   const { labels, region, reviewInsights, currency, reviewDecisionSummary = {}, packageAttribution = {}, isSecure = true } = opts;
   const isCA = normalizeRegionCode(region) === "CA";
+  const nonExpenseWithReceipt = Math.max(0, reviewInsights.transactionWithReceiptCount - reviewInsights.receiptLinkedCount);
+  const receiptNonExpenseNote = nonExpenseWithReceipt > 0 ? ` ${nonExpenseWithReceipt} linked to non-expense rows.` : "";
   const items = [
-    { badge: reviewInsights.missingReceiptCount > 0 ? "ACTION" : "OK", title: "Receipts", description: `${reviewInsights.receiptLinkedCount} of ${reviewInsights.expenseTransactionCount} expense transactions have attached receipts. ${reviewInsights.attachedReceiptFileCount} receipt files are attached across ${reviewInsights.transactionWithReceiptCount} transactions in this export.` },
+    { badge: reviewInsights.missingReceiptCount > 0 ? "ACTION" : "OK", title: "Receipts", description: `${reviewInsights.attachedReceiptFileCount} receipt file${reviewInsights.attachedReceiptFileCount !== 1 ? "s" : ""} linked total. ${reviewInsights.receiptLinkedCount} are linked to expense rows and count toward receipt coverage.${receiptNonExpenseNote}` },
     { badge: reviewInsights.needsCategoryCount > 0 ? "ACTION" : "OK", title: "Category cleanup", description: `${reviewInsights.needsCategoryCount} imported or uncategorized transactions need real business categories before filing.` },
     { badge: reviewInsights.vehicleCount > 0 ? "ACTION" : "OK", title: "Vehicle support", description: `${reviewInsights.vehicleCount} vehicle/fuel transactions totaling ${formatCurrencyForPdf(reviewInsights.vehicleTotal, currency)} need mileage or actual-expense support.` },
     { badge: reviewInsights.mealsCount > 0 ? "REVIEW" : "OK", title: "Meals", description: `${reviewInsights.mealsCount} meal transactions totaling ${formatCurrencyForPdf(reviewInsights.mealsTotal, currency)} require business purpose documentation. Potential 50% limit applies.` },
@@ -2080,6 +2082,21 @@ function buildCpaChecklistPage(opts) {
   const colWidth = 252;
   const colX = [40, 320];
   const rowGap = 12;
+
+  const rawPriorities = [];
+  if (reviewInsights.needsCategoryCount > 0) rawPriorities.push(`Categorize ${reviewInsights.needsCategoryCount} imported or uncategorized transaction${reviewInsights.needsCategoryCount !== 1 ? "s" : ""}.`);
+  if (reviewInsights.unmappedTaxCount > 0) rawPriorities.push(`Map ${reviewInsights.unmappedTaxCount} categorized expense transaction${reviewInsights.unmappedTaxCount !== 1 ? "s" : ""} to a tax line.`);
+  if (reviewInsights.expenseWithoutReceiptAttachmentCount > 0) rawPriorities.push(`Add receipts or support for ${reviewInsights.expenseWithoutReceiptAttachmentCount} expense row${reviewInsights.expenseWithoutReceiptAttachmentCount !== 1 ? "s" : ""}.`);
+  if (reviewInsights.vehicleCount > 0) rawPriorities.push(`Link mileage or actual-expense support for ${reviewInsights.vehicleCount} vehicle item${reviewInsights.vehicleCount !== 1 ? "s" : ""}.`);
+  if (reviewInsights.mealsCount > 0) rawPriorities.push(`Document business purpose for ${reviewInsights.mealsCount} meal item${reviewInsights.mealsCount !== 1 ? "s" : ""} (50% limit applies).`);
+  if (reviewInsights.phoneAllocationCount > 0) rawPriorities.push(`Set business-use percentage for ${reviewInsights.phoneAllocationCount} phone/internet item${reviewInsights.phoneAllocationCount !== 1 ? "s" : ""}.`);
+  if (reviewInsights.duplicateCount > 0) rawPriorities.push(`Review ${reviewInsights.duplicateCount} potential duplicate transaction${reviewInsights.duplicateCount !== 1 ? "s" : ""} flagged in the ledger.`);
+  const topPriorities = rawPriorities.slice(0, 4).map((line, idx) => `${idx + 1}. ${line}`);
+  const priorityCardLines = topPriorities.length ? topPriorities : ["No critical cleanup items detected. Review the checklist below for any remaining action items."];
+  const priorityCardHeight = estimateCardHeight(532, priorityCardLines, { maxChars: 88, minHeight: 68 });
+  canvas.drawCard(40, y, 532, priorityCardHeight, "Top Cleanup Priorities", priorityCardLines, { maxChars: 88 });
+  y -= priorityCardHeight + rowGap;
+
   const itemRows = chunkArray(items, 2);
 
   const startNewPage = () => {
@@ -2167,11 +2184,11 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, suppor
     `Expense rows missing receipt: ${reviewInsights.expenseWithoutReceiptAttachmentCount}`,
     `Coverage: ${reviewInsights.expenseTransactionCount ? `${((reviewInsights.receiptLinkedCount / reviewInsights.expenseTransactionCount) * 100).toFixed(1)}%` : "-"}`
   ], { maxChars: 34 });
-  canvas.drawCard(40, top - 256, 252, 98, "Support Artifact Summary", [
-    `Artifacts linked: ${artifactSummary.totalCount} across ${artifactSummary.transactionCount} transactions`,
+  canvas.drawCard(40, top - 256, 252, 98, "Additional Support Artifacts", [
+    `Linked: ${artifactSummary.totalCount} across ${artifactSummary.transactionCount} transactions`,
     `Accepted: ${artifactSummary.acceptedCount} | Pending: ${artifactSummary.pendingCount}`,
     `Review notes: ${artifactSummary.reviewNoteCount} | Mileage logs: ${artifactSummary.mileageLogCount}`,
-    `Allocation worksheets: ${artifactSummary.allocationWorksheetCount} | Receipt-like files: ${artifactSummary.receiptLikeCount}`
+    `Allocation worksheets: ${artifactSummary.allocationWorksheetCount}`
   ], { maxChars: 34 });
   if (reviewInsights.homeOfficeCount > 0) {
     canvas.drawCard(320, top - 256, 252, 74, "Home Office Review", [
@@ -2181,9 +2198,9 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, suppor
   } else {
     canvas.drawCard(320, top - 256, 252, 98, "Receipt Scope", [
       `Expense rows in export: ${reviewInsights.expenseTransactionCount}`,
+      `Expense rows with receipt: ${reviewInsights.receiptLinkedCount}`,
       `Expense rows missing receipt: ${reviewInsights.expenseWithoutReceiptAttachmentCount}`,
-      `Mapped expense rows still missing receipt/support: ${reviewInsights.mappedReceiptSupportCount}`,
-      `Receipt counts use expense rows; attachment counts use all included transactions.`
+      `Receipts on non-expense rows: ${Math.max(0, reviewInsights.transactionWithReceiptCount - reviewInsights.receiptLinkedCount)}`
     ], { maxChars: 34 });
   }
   const topExceptions = [...(transactions || [])]
@@ -2195,7 +2212,7 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, suppor
   canvas.drawCard(40, top - 520, 532, 92, "Final Disclosure", [
     "Potential deductible amounts shown here are bookkeeping workpaper estimates only.",
     "Draft - CPA review required. Not a filed tax return.",
-    `Support artifact package currently includes ${artifactSummary.totalCount} linked items across ${artifactSummary.transactionCount} transactions.`
+    `${reviewInsights.attachedReceiptFileCount} receipt file${reviewInsights.attachedReceiptFileCount !== 1 ? "s" : ""} linked; ${artifactSummary.totalCount} additional support artifact${artifactSummary.totalCount !== 1 ? "s" : ""} linked across ${artifactSummary.transactionCount} transaction${artifactSummary.transactionCount !== 1 ? "s" : ""}.`
   ], { maxChars: 90 });
   return [canvas];
 }

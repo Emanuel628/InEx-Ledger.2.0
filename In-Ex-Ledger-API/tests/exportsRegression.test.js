@@ -432,7 +432,7 @@ test("attached income receipts are surfaced in the PDF even when expense receipt
     vehicleCosts: []
   })).toString("latin1");
 
-  assert.match(pdf, /3 receipt files are attached across 1 transactions in this export\./i);
+  assert.match(pdf, /3 receipt files linked total - 0 to expense rows, 1 to non-expense rows\./i);
   assert.match(pdf, /\(Attached receipt files: 3\) Tj/);
   assert.match(pdf, /\(Transactions with any receipt\) Tj[\s\S]{0,80}\(file: 1\) Tj/);
   assert.match(pdf, /\(Expense rows with receipt: 0\) Tj/);
@@ -453,7 +453,7 @@ test("phase 3 PDF adds unresolved exceptions and evidence schedules", () => {
   assert.match(pdf, /Evidence Schedule/i);
   assert.match(pdf, /Open blocker summary/i);
   assert.match(pdf, /mileage\.pdf/i);
-  assert.match(pdf, /Support Artifact Summary/i);
+  assert.match(pdf, /Additional Support Artifacts/i);
   assert.match(pdf, /Review notes: 1 \| Mileage logs: 1/i);
 });
 
@@ -506,8 +506,8 @@ test("support page distinguishes expense receipt coverage from mapped receipt su
 
   assert.match(pdf, /\(Expense rows with receipt: 1\) Tj/);
   assert.match(pdf, /\(Expense rows missing receipt: 3\) Tj/);
-  assert.match(pdf, /\(Mapped expense rows still missing\) Tj[\s\S]{0,80}\(receipt\/support: 2\) Tj/);
-  assert.match(pdf, /\(Receipt counts use expense rows;\) Tj[\s\S]{0,80}\(attachment counts use all included\) Tj[\s\S]{0,80}\(transactions\.\) Tj/i);
+  assert.match(pdf, /\(Receipts on non-expense rows: 0\) Tj/);
+  assert.match(pdf, /\(Expense rows in export: 4\) Tj/);
 });
 
 test("executive summary and mapping pages keep truly unmapped counts consistent", () => {
