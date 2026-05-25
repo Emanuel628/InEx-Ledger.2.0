@@ -19,6 +19,10 @@ let exportToastTimer = null;
 let resetInlineTaxIdState = () => {};
 let unattachedReceiptsCount = 0;
 let transactionsCacheFresh = false;
+let exportPreflightState = {
+  loading: false,
+  finalization: null
+};
 let exportContext = {
   activeBusinessId: "",
   businesses: []
@@ -157,6 +161,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireInlineTaxId();
   await refreshReceiptsDot();
   updateExportSummary();
+  await refreshExportPreflight();
   renderExportHistory();
 });
 
@@ -263,6 +268,7 @@ function initExportScopeSelect() {
     await refreshReceiptsDot();
     syncExportScopeUi();
     updateExportSummary();
+    await refreshExportPreflight();
     renderExportHistory();
   });
 }
@@ -578,6 +584,7 @@ async function hydrateBusinessProfileCache() {
 function setupExportForm() {
   const form = document.getElementById("exportForm");
   const historyRows = document.getElementById("exportHistoryRows");
+  const preflightRefreshButton = document.getElementById("exportPreflightRefreshBtn");
   const ytdYear = new Date().getUTCFullYear();
   const defaultPreset = `${ytdYear}-ytd`;
 
@@ -585,12 +592,17 @@ function setupExportForm() {
   updatePresetChipState(defaultPreset);
 
   ["period-start", "period-end", "exportAccountFilter", "exportCategoryFilter", "exportLanguage", "exportIncludeTaxId", "exportScope", "exportPackageMode"].forEach((id) => {
-    document.getElementById(id)?.addEventListener("change", () => {
+    document.getElementById(id)?.addEventListener("change", async () => {
       if (id === "period-start" || id === "period-end") {
         clearCustomPresetState();
       }
       updateExportSummary();
+      await refreshExportPreflight();
     });
+  });
+
+  preflightRefreshButton?.addEventListener("click", async () => {
+    await refreshExportPreflight(true);
   });
 
   form?.addEventListener("submit", async (event) => {
@@ -635,11 +647,18 @@ function setupPdfButton() {
 
   const syncPdfState = () => {
     const isV1 = (typeof effectiveTier === "function" ? effectiveTier() : "free") === "v1";
-    button.disabled = !isV1;
+    const finalization = exportPreflightState.finalization;
+    const finalizedBlocked =
+      getSelectedExportMode() === "finalized"
+      && getExportScope() !== "all"
+      && Array.isArray(finalization?.hardBlockers)
+      && finalization.hardBlockers.length > 0;
+    button.disabled = !isV1 || finalizedBlocked;
+    button.title = finalizedBlocked ? tx("exports_preflight_note_finalized_blocked") : "";
     if (note) {
       note.hidden = isV1;
     }
-    return isV1;
+    return isV1 && !finalizedBlocked;
   };
 
   syncPdfState();
@@ -698,13 +717,169 @@ function setupPdfButton() {
 
 function initPresetChips() {
   document.querySelectorAll("[data-range-preset]").forEach((button) => {
-    button.addEventListener("click", () => {
+    button.addEventListener("click", async () => {
       const preset = button.dataset.rangePreset || "custom";
       applyDatePreset(preset);
       updatePresetChipState(preset);
       updateExportSummary();
+      await refreshExportPreflight();
     });
   });
+}
+
+function renderExportPreflightEmpty(message) {
+  const stateNode = document.getElementById("exportPreflightState");
+  if (!stateNode) {
+    return;
+  }
+  stateNode.innerHTML = `<div class="history-empty">${escapeHtml(message || tx("exports_preflight_empty"))}</div>`;
+}
+
+function renderExportPreflight(finalization) {
+  const stateNode = document.getElementById("exportPreflightState");
+  if (!stateNode) {
+    return;
+  }
+
+  const hardBlockers = Array.isArray(finalization?.hardBlockers) ? finalization.hardBlockers : [];
+  const warnings = Array.isArray(finalization?.warnings) ? finalization.warnings : [];
+  const reviewerCount =
+    Number(finalization?.materialityPolicy?.openHardReviewerIssueCount || 0)
+    + Number(finalization?.materialityPolicy?.openWarningReviewerIssueCount || 0);
+  const missingFields = Array.isArray(finalization?.businessProfile?.missingFieldKeys)
+    ? finalization.businessProfile.missingFieldKeys
+    : [];
+
+  let statusClass = "ready";
+  let statusLabel = tx("exports_preflight_status_ready");
+  if (hardBlockers.length > 0) {
+    statusClass = "blocked";
+    statusLabel = tx("exports_preflight_status_blocked");
+  } else if (warnings.length > 0 || reviewerCount > 0) {
+    statusClass = "warning";
+    statusLabel = tx("exports_preflight_status_warning");
+  }
+
+  const renderIssueList = (items) => {
+    if (!items.length) {
+      return `<li>${escapeHtml(tx("exports_preflight_none"))}</li>`;
+    }
+    return items.map((item) => {
+      const count = Number(item?.count || 0);
+      const suffix = count > 0 ? ` (${count})` : "";
+      return `<li>${escapeHtml(String(item?.message || item?.code || ""))}${escapeHtml(suffix)}</li>`;
+    }).join("");
+  };
+
+  const profileNote = missingFields.length
+    ? `<p class="export-preflight-note">${escapeHtml(tx("exports_preflight_profile_missing"))}: ${escapeHtml(missingFields.join(", "))}</p>`
+    : "";
+  const blockedNote = hardBlockers.length > 0 && getSelectedExportMode() === "finalized"
+    ? `<p class="export-preflight-note">${escapeHtml(tx("exports_preflight_note_finalized_blocked"))}</p>`
+    : "";
+
+  stateNode.innerHTML = `
+    <div class="export-preflight-grid">
+      <article class="export-preflight-metric">
+        <span class="meta-label">${escapeHtml(tx("exports_preflight_metric_blockers"))}</span>
+        <strong>${hardBlockers.length}</strong>
+      </article>
+      <article class="export-preflight-metric">
+        <span class="meta-label">${escapeHtml(tx("exports_preflight_metric_warnings"))}</span>
+        <strong>${warnings.length}</strong>
+      </article>
+      <article class="export-preflight-metric">
+        <span class="meta-label">${escapeHtml(tx("exports_preflight_metric_reviewer"))}</span>
+        <strong>${reviewerCount}</strong>
+      </article>
+    </div>
+    <div class="export-preflight-status-row">
+      <span class="export-preflight-status-badge ${statusClass}">${escapeHtml(statusLabel)}</span>
+    </div>
+    <div class="export-preflight-columns">
+      <section>
+        <h3>${escapeHtml(tx("exports_preflight_blockers_title"))}</h3>
+        <ul class="export-preflight-list">${renderIssueList(hardBlockers)}</ul>
+      </section>
+      <section>
+        <h3>${escapeHtml(tx("exports_preflight_warnings_title"))}</h3>
+        <ul class="export-preflight-list">${renderIssueList(warnings)}</ul>
+      </section>
+    </div>
+    ${profileNote}
+    ${blockedNote}
+  `;
+}
+
+async function refreshExportPreflight(force = false) {
+  const refreshButton = document.getElementById("exportPreflightRefreshBtn");
+  const button = document.getElementById("exportPdfBtn");
+  const range = getValidatedExportRange();
+
+  if (getExportScope() === "all") {
+    exportPreflightState = { loading: false, finalization: null };
+    renderExportPreflightEmpty(tx("exports_preflight_scope_all"));
+    if (button) {
+      button.title = "";
+      button.disabled = (typeof effectiveTier === "function" ? effectiveTier() : "free") !== "v1";
+    }
+    return;
+  }
+
+  if (!range) {
+    exportPreflightState = { loading: false, finalization: null };
+    renderExportPreflightEmpty(tx("exports_preflight_empty"));
+    if (button) {
+      button.title = "";
+      button.disabled = (typeof effectiveTier === "function" ? effectiveTier() : "free") !== "v1";
+    }
+    return;
+  }
+
+  if (!force && exportPreflightState.loading) {
+    return;
+  }
+
+  exportPreflightState = { ...exportPreflightState, loading: true };
+  if (refreshButton) {
+    refreshButton.disabled = true;
+  }
+  renderExportPreflightEmpty(tx("exports_preflight_loading"));
+
+  try {
+    const params = new URLSearchParams({
+      startDate: range.startDate,
+      endDate: range.endDate
+    });
+    const response = await apiFetch(`/api/exports/dataset?${params.toString()}`);
+    if (!response || !response.ok) {
+      throw new Error("dataset_failed");
+    }
+    const payload = await response.json().catch(() => null);
+    exportPreflightState = {
+      loading: false,
+      finalization: payload?.finalization || null
+    };
+    renderExportPreflight(exportPreflightState.finalization || {});
+  } catch (error) {
+    console.warn("[Exports] Unable to load export preflight", error);
+    exportPreflightState = { loading: false, finalization: null };
+    renderExportPreflightEmpty(tx("exports_error_generic") || "Unable to load export review.");
+  } finally {
+    if (refreshButton) {
+      refreshButton.disabled = false;
+    }
+    if (button) {
+      const finalization = exportPreflightState.finalization;
+      const finalizedBlocked =
+        getSelectedExportMode() === "finalized"
+        && Array.isArray(finalization?.hardBlockers)
+        && finalization.hardBlockers.length > 0;
+      const isV1 = (typeof effectiveTier === "function" ? effectiveTier() : "free") === "v1";
+      button.disabled = !isV1 || finalizedBlocked;
+      button.title = finalizedBlocked ? tx("exports_preflight_note_finalized_blocked") : "";
+    }
+  }
 }
 
 function applyDatePreset(preset) {

@@ -444,6 +444,128 @@
   font-size: 14px;
 }
 
+.export-preflight-card {
+  padding-bottom: 20px;
+}
+
+.export-preflight-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.export-preflight-refresh {
+  min-height: 38px;
+}
+
+.export-preflight-state {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.export-preflight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.export-preflight-metric {
+  padding: 16px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.export-preflight-metric span {
+  display: block;
+  color: #657284;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.export-preflight-metric strong {
+  display: block;
+  margin-top: 8px;
+  color: #102236;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.export-preflight-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.export-preflight-status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.export-preflight-status-badge.ready {
+  background: rgba(24, 108, 65, 0.12);
+  color: #246b45;
+}
+
+.export-preflight-status-badge.blocked {
+  background: rgba(169, 96, 20, 0.14);
+  color: #9b5a13;
+}
+
+.export-preflight-status-badge.warning {
+  background: rgba(194, 149, 26, 0.12);
+  color: #8a6912;
+}
+
+.export-preflight-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.export-preflight-list {
+  min-height: 100%;
+  padding: 16px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.export-preflight-list h3 {
+  margin: 0 0 10px;
+  color: #102236;
+  font-size: 15px;
+}
+
+.export-preflight-list ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #354255;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.export-preflight-list li + li {
+  margin-top: 6px;
+}
+
+.export-preflight-note {
+  color: #657284;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .history-columns {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr .8fr auto;
