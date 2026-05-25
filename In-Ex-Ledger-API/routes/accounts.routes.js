@@ -194,6 +194,7 @@ router.delete("/:id", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
+    // Block on active (non-deleted) transactions
     const usage = await pool.query(
       "SELECT COUNT(*) FROM transactions WHERE account_id = $1 AND business_id = $2 AND deleted_at IS NULL",
       [req.params.id, businessId]
@@ -204,8 +205,9 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
+    // Block on active (non-deleted) recurring transactions
     const recurringUsage = await pool.query(
-      "SELECT COUNT(*) FROM recurring_transactions WHERE account_id = $1 AND business_id = $2",
+      "SELECT COUNT(*) FROM recurring_transactions WHERE account_id = $1 AND business_id = $2 AND deleted_at IS NULL",
       [req.params.id, businessId]
     );
     if (parseInt(recurringUsage.rows[0]?.count || "0", 10) > 0) {
@@ -214,16 +216,42 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
-    const result = await pool.query(
-      "DELETE FROM accounts WHERE id = $1 AND business_id = $2",
-      [req.params.id, businessId]
-    );
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
 
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "Account not found or access denied." });
+      // Soft-deleted transactions still hold the FK (ON DELETE RESTRICT).
+      // Null out their account reference so the account row can be removed.
+      await client.query(
+        "UPDATE transactions SET account_id = NULL WHERE account_id = $1 AND business_id = $2 AND deleted_at IS NOT NULL",
+        [req.params.id, businessId]
+      );
+
+      // Soft-deleted recurring_transactions have account_id NOT NULL, so we
+      // can't null it. Hard-delete them — they're already logically gone.
+      await client.query(
+        "DELETE FROM recurring_transactions WHERE account_id = $1 AND business_id = $2 AND deleted_at IS NOT NULL",
+        [req.params.id, businessId]
+      );
+
+      const result = await client.query(
+        "DELETE FROM accounts WHERE id = $1 AND business_id = $2",
+        [req.params.id, businessId]
+      );
+
+      await client.query("COMMIT");
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: "Account not found or access denied." });
+      }
+
+      res.json({ message: "Account deleted successfully." });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
     }
-
-    res.json({ message: "Account deleted successfully." });
   } catch (err) {
     logError("DELETE account error:", err.stack || err);
     res.status(500).json({ error: "Delete failed." });
