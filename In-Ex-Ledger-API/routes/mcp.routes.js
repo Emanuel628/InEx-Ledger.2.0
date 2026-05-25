@@ -31,6 +31,24 @@ function buildAuthorizeHtml(req, {
   codeChallenge,
   codeChallengeMethod
 }) {
+  const approveHref = buildDecisionHref(req, {
+    decision: "approve",
+    clientId,
+    redirectUri,
+    scope,
+    state,
+    codeChallenge,
+    codeChallengeMethod
+  });
+  const denyHref = buildDecisionHref(req, {
+    decision: "deny",
+    clientId,
+    redirectUri,
+    scope,
+    state,
+    codeChallenge,
+    codeChallengeMethod
+  });
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,28 +56,39 @@ function buildAuthorizeHtml(req, {
   <title>Connect ChatGPT | InEx Ledger</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 </head>
-<body>
-  <main>
-    <p><strong>ChatGPT connector</strong></p>
-    <h1>Connect ChatGPT to InEx Ledger</h1>
-    <p>Signed in as <strong>${escapeHtml(user.email)}</strong>. This grants read-only access to your active business ledger through the MCP endpoint.</p>
-    <ul>
-      <li>Client: <code>${escapeHtml(clientId)}</code></li>
-      <li>Scope: <code>${escapeHtml(scope)}</code></li>
-      <li>MCP endpoint: <code>${escapeHtml(buildAppOrigin(req))}/mcp</code></li>
-    </ul>
-    <p>ChatGPT will be able to read bookkeeping summaries, transactions, receipt coverage, export readiness, invoice activity, and tax reminders. It will not be able to write changes in this phase.</p>
-    <form method="post" action="/mcp/oauth/authorize">
-      <input type="hidden" name="client_id" value="${escapeHtml(clientId)}" />
-      <input type="hidden" name="redirect_uri" value="${escapeHtml(redirectUri)}" />
-      <input type="hidden" name="scope" value="${escapeHtml(scope)}" />
-      <input type="hidden" name="state" value="${escapeHtml(state || "")}" />
-      <input type="hidden" name="code_challenge" value="${escapeHtml(codeChallenge)}" />
-      <input type="hidden" name="code_challenge_method" value="${escapeHtml(codeChallengeMethod)}" />
-      <button type="submit" name="decision" value="approve">Allow read-only access</button>
-      <button type="submit" name="decision" value="deny">Cancel</button>
-    </form>
-  </main>
+<body bgcolor="#f5f8fc" text="#0f172a">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f5f8fc">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="680" cellpadding="32" cellspacing="0" border="1" bgcolor="#ffffff">
+          <tr>
+            <td>
+              <font face="Arial, Helvetica, sans-serif" color="#0f172a">
+                <p><b>ChatGPT connector</b></p>
+                <h1>Connect ChatGPT to InEx Ledger</h1>
+                <p>Signed in as <b>${escapeHtml(user.email)}</b>. This grants read-only access to your active business ledger through the MCP endpoint.</p>
+                <p><b>Client:</b> <code>${escapeHtml(clientId)}</code></p>
+                <p><b>Scope:</b> <code>${escapeHtml(scope)}</code></p>
+                <p><b>MCP endpoint:</b> <code>${escapeHtml(buildAppOrigin(req))}/mcp</code></p>
+                <p>ChatGPT will be able to read bookkeeping summaries, transactions, receipt coverage, export readiness, invoice activity, and tax reminders. It will not be able to write changes in this phase.</p>
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td>
+                      <a href="${escapeHtml(approveHref)}">Allow read-only access</a>
+                    </td>
+                    <td width="20"></td>
+                    <td>
+                      <a href="${escapeHtml(denyHref)}">Cancel</a>
+                    </td>
+                  </tr>
+                </table>
+              </font>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 }
@@ -71,6 +100,30 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function buildDecisionHref(req, {
+  decision,
+  clientId,
+  redirectUri,
+  scope,
+  state,
+  codeChallenge,
+  codeChallengeMethod
+}) {
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope,
+    code_challenge: codeChallenge,
+    code_challenge_method: codeChallengeMethod,
+    decision
+  });
+  if (state) {
+    params.set("state", state);
+  }
+  return `${buildAppOrigin(req)}/mcp/oauth/authorize?${params.toString()}`;
 }
 
 function resolveAuthorizationInput(req) {
@@ -127,6 +180,10 @@ router.get("/oauth/authorize", async (req, res) => {
     if (!user) {
       return res.redirect(302, buildLoginRedirect(req));
     }
+    const decision = String(req.query?.decision || "").trim().toLowerCase();
+    if (decision === "approve" || decision === "deny") {
+      return finishAuthorization(req, res, { params, user, decision });
+    }
     res.setHeader("Cache-Control", "private, no-store, max-age=0, must-revalidate");
     res.send(buildAuthorizeHtml(req, { user, ...params }));
   } catch (error) {
@@ -134,15 +191,9 @@ router.get("/oauth/authorize", async (req, res) => {
   }
 });
 
-router.post("/oauth/authorize", express.urlencoded({ extended: false }), async (req, res) => {
+async function finishAuthorization(req, res, { params, user, decision }) {
   try {
-    const params = resolveAuthorizationInput(req);
-    validateOauthClient(params.clientId, params.redirectUri);
-    const user = await getAuthorizedUserFromRefreshCookie(req);
-    if (!user) {
-      return res.redirect(302, buildLoginRedirect(req));
-    }
-    if (String(req.body?.decision || "") === "deny") {
+    if (decision === "deny") {
       const denied = new URL(params.redirectUri);
       denied.searchParams.set("error", "access_denied");
       if (params.state) denied.searchParams.set("state", params.state);
@@ -176,6 +227,24 @@ router.post("/oauth/authorize", express.urlencoded({ extended: false }), async (
     redirect.searchParams.set("code", code.code);
     if (params.state) redirect.searchParams.set("state", params.state);
     return res.redirect(302, redirect.toString());
+  } catch (error) {
+    res.status(error.status || 500).send(error.message || "Unable to finish authorization.");
+  }
+}
+
+router.post("/oauth/authorize", express.urlencoded({ extended: false }), async (req, res) => {
+  try {
+    const params = resolveAuthorizationInput(req);
+    validateOauthClient(params.clientId, params.redirectUri);
+    const user = await getAuthorizedUserFromRefreshCookie(req);
+    if (!user) {
+      return res.redirect(302, buildLoginRedirect(req));
+    }
+    return finishAuthorization(req, res, {
+      params,
+      user,
+      decision: String(req.body?.decision || "").trim().toLowerCase()
+    });
   } catch (error) {
     res.status(error.status || 500).send(error.message || "Unable to finish authorization.");
   }

@@ -108,8 +108,10 @@ test("GET /mcp/oauth/authorize renders a CSP-safe consent page", async () => {
     });
 
   assert.equal(response.status, 200);
-  assert.match(response.text, /<form method="post" action="\/mcp\/oauth\/authorize">/);
+  assert.match(response.text, /Allow read-only access/);
+  assert.match(response.text, /decision=approve/);
   assert.doesNotMatch(response.text, /<style>/);
+  assert.doesNotMatch(response.text, /\sstyle=/);
 });
 
 test("POST /mcp/oauth/token exchanges an auth code", async () => {
