@@ -26,7 +26,7 @@ const accountDeleteLimiter = rateLimit({
 
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
-const VALID_START_FOCUS = new Set(["transactions", "receipts", "mileage", "exports"]);
+const VALID_START_FOCUS = new Set(["transactions", "categories", "receipts", "mileage", "exports"]);
 const VALID_STARTER_ACCOUNT_TYPES = new Set(["checking", "savings", "credit_card", "cash", "loan"]);
 const GUIDED_SETUP_STEPS = ["categories", "accounts", "transactions", "import"];
 // Each guided step maps to the route the user is sent to. The import step runs
