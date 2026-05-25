@@ -237,6 +237,17 @@ body.trial-setup-page {
   line-height: 1;
 }
 
+.trial-setup-stepper button svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+#trialSetupAdditionalBusinessesMinus svg {
+  height: 2px;
+}
+
 .trial-setup-stepper input {
   width: 80px;
   height: auto;
