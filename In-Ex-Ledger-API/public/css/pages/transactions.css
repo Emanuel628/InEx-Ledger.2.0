@@ -2364,11 +2364,8 @@ body {
   color: var(--ink);
 }
 
-/* ── M-06: Sticky Add transaction button ─────────────────── */
 .tx-sticky-add {
-  position: sticky;
-  top: 68px;
-  z-index: 8;
+  position: static;
 }
 
 /* ── M-08: Period picker chips ───────────────────────────── */
