@@ -437,32 +437,25 @@ function focusTransactionForReview(txnId) {
 function renderTransactionReviewSummary(transactions = ledgerState.transactions || []) {
   const summaryCard = document.getElementById("transactionReviewSummary");
   const titleNode = document.getElementById("transactionReviewSummaryTitle");
-  const bodyNode = document.getElementById("transactionReviewSummaryBody");
-  const statsNode = document.getElementById("transactionReviewSummaryStats");
+  const iconNode = document.getElementById("transactionReviewPanelIcon");
   const chipsNode = document.getElementById("transactionReviewSummaryChips");
   const fixNextButton = document.getElementById("transactionFixNextBtn");
 
-  if (!summaryCard || !titleNode || !bodyNode || !statsNode || !chipsNode || !fixNextButton) {
+  if (!summaryCard || !titleNode || !chipsNode || !fixNextButton) {
     return;
   }
 
   const snapshot = getTransactionReviewSnapshot(transactions);
   const copy = getTransactionReviewSummaryCopy(snapshot, transactions.length);
   titleNode.textContent = copy.title;
-  bodyNode.textContent = copy.body;
+
+  if (iconNode) {
+    const allClear = snapshot.unresolvedCount === 0 && transactions.length > 0;
+    iconNode.textContent = allClear ? "✓" : "⚠";
+    iconNode.className = "tx-review-panel-icon" + (allClear ? " is-ok" : "");
+  }
 
   const activeFilter = transactionFilters.review || "";
-  const summaryStats = [
-    { label: "Needs attention", value: snapshot.unresolvedCount, tone: snapshot.unresolvedCount ? "warn" : "ok" },
-    { label: "Ready", value: snapshot.readyCount, tone: snapshot.readyCount ? "ok" : "quiet" },
-    { label: "Manual review", value: snapshot.manualReviewCount, tone: snapshot.manualReviewCount ? "warn" : "quiet" }
-  ];
-  statsNode.innerHTML = summaryStats.map((item) => `
-    <div class="transaction-review-stat">
-      <span class="transaction-review-stat-label">${escapeHtml(item.label)}</span>
-      <span class="transaction-review-stat-value ${escapeHtml(item.tone)}">${escapeHtml(String(item.value))}</span>
-    </div>
-  `).join("");
 
   chipsNode.innerHTML = TRANSACTION_REVIEW_FILTER_OPTIONS.map((option) => {
     const count = snapshot.filterCounts[option.key] || 0;
@@ -1496,11 +1489,22 @@ function wireTransactionAccountFilter() {
 
 function wireTransactionReviewFilter() {
   const filter = document.getElementById("transactionReviewFilter");
-  if (!filter) return;
-  filter.addEventListener("change", () => {
-    transactionFilters.review = filter.value;
-    applyFilters();
-  });
+  if (filter) {
+    filter.addEventListener("change", () => {
+      transactionFilters.review = filter.value;
+      applyFilters();
+    });
+  }
+
+  const toggleBtn = document.getElementById("transactionReviewToggle");
+  const panelBody = document.getElementById("transactionReviewPanelBody");
+  if (toggleBtn && panelBody) {
+    toggleBtn.addEventListener("click", () => {
+      const expanded = toggleBtn.getAttribute("aria-expanded") === "true";
+      toggleBtn.setAttribute("aria-expanded", expanded ? "false" : "true");
+      panelBody.hidden = expanded;
+    });
+  }
 
   document.addEventListener("click", (e) => {
     const badge = e.target.closest("[data-review-txn-id]");
