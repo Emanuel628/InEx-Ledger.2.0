@@ -222,25 +222,24 @@ body.trial-setup-page {
 }
 
 .trial-setup-stepper button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   width: 52px;
-  height: auto;
+  height: 52px;
+  min-height: 52px;
   padding: 0;
   border: none;
   border-radius: 0;
   background: transparent;
   color: var(--trial-setup-ink);
-  font-size: 22px;
-  font-weight: 400;
-  line-height: 1;
+  line-height: 0;
 }
 
 .trial-setup-stepper button svg {
   display: block;
   width: 14px;
   height: 14px;
+  margin: auto;
   flex: 0 0 auto;
 }
 
@@ -250,8 +249,8 @@ body.trial-setup-page {
 
 .trial-setup-stepper input {
   width: 80px;
-  height: auto;
-  min-height: 0;
+  height: 52px;
+  min-height: 52px;
   padding: 0;
   border: none;
   border-left: 1px solid var(--trial-setup-border);
@@ -260,7 +259,7 @@ body.trial-setup-page {
   text-align: center;
   font-size: 28px;
   font-weight: 800;
-  line-height: 1;
+  line-height: 52px;
   color: var(--trial-setup-ink);
   background: #fff;
   box-shadow: none;
@@ -415,7 +414,7 @@ body.trial-setup-page {
   .trial-setup-stepper button {
     width: 44px;
     height: 44px;
-    font-size: 20px;
+    min-height: 44px;
   }
 
   .trial-setup-stepper input,
@@ -426,9 +425,11 @@ body.trial-setup-page {
 
   .trial-setup-stepper input {
     width: auto;
+    height: 44px;
     min-height: 44px;
     border-radius: 14px;
     font-size: 24px;
+    line-height: 44px;
   }
 
   .trial-setup-summary-row {
