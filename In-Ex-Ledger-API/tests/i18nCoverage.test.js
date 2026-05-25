@@ -74,6 +74,24 @@ function extractUsedKeys() {
   return [...used].sort();
 }
 
+function findMojibakeMatches(filePath) {
+  const source = fs.readFileSync(filePath, "utf8");
+  const suspicious = [
+    "Ã",
+    "Â",
+    "â€™",
+    "â€œ",
+    "â€",
+    "â€¦",
+    "â€”",
+    "â€“",
+    "â€¢",
+    "ðŸ"
+  ];
+
+  return suspicious.filter((token) => source.includes(token));
+}
+
 test("frontend i18n keys referenced by public files exist in every shipped language", () => {
   const defined = extractDefinedKeys();
   const used = extractUsedKeys();
@@ -82,4 +100,18 @@ test("frontend i18n keys referenced by public files exist in every shipped langu
     const missing = used.filter((key) => !defined[lang].has(key));
     assert.deepEqual(missing, [], `missing ${lang} translation keys:\n${missing.join("\n")}`);
   }
+});
+
+test("public i18n assets do not contain mojibake markers", () => {
+  const files = [I18N_PATH, ...walkFiles(PUBLIC_DIR)];
+  const offenders = [];
+
+  for (const file of files) {
+    const matches = findMojibakeMatches(file);
+    if (matches.length) {
+      offenders.push(`${path.relative(ROOT, file)} -> ${matches.join(", ")}`);
+    }
+  }
+
+  assert.deepEqual(offenders, [], `found mojibake markers:\n${offenders.join("\n")}`);
 });
