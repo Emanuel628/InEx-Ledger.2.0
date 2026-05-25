@@ -477,6 +477,15 @@ function chunkArray(items, size) {
   return chunks;
 }
 
+function estimateCardHeight(width, lines, options = {}) {
+  const maxChars = options.maxChars || Math.max(18, Math.floor((width - 18) / 5.6));
+  const lineHeight = options.lineHeight || 11;
+  const headerHeight = options.headerHeight || 34;
+  const footerPadding = options.footerPadding || 12;
+  const totalLineCount = (lines || []).reduce((sum, line) => sum + wrapText(line, maxChars).length, 0);
+  return Math.max(options.minHeight || 68, headerHeight + (totalLineCount * lineHeight) + footerPadding);
+}
+
 function buildTransactionText(txn) {
   return [
     txn?.description,
@@ -498,6 +507,13 @@ function maskTaxId(value) {
   if (!text) return "Withheld";
   if (text.length <= 4) return text;
   return `${text.slice(0, Math.min(5, text.length - 2))}***`;
+}
+
+function sanitizePackageActor(value, fallbackLabel, isSecure) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (isSecure) return text;
+  return fallbackLabel;
 }
 
 function normalizeExportCategoryName(category) {
@@ -1131,6 +1147,7 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
   let missingDescriptionCount = 0;
   let duplicateCount = 0;
   let missingReceiptCount = 0;
+  let mappedReceiptSupportCount = 0;
   let vehicleCount = 0;
   let vehicleTotal = 0;
   let mealsCount = 0;
@@ -1148,10 +1165,11 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
     const amount = Number(txn?.__businessAmounts?.deductibleAmount ?? txn?.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn));
     if (status.needsCategory) needsCategoryCount += 1;
     if (!status.needsCategory && !status.isMapped && String(txn?.type || "").toLowerCase() === "expense") unmappedTaxCount += 1;
-    if (status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag))) mappedNeedsSupportCount += 1;
+    if (statusNeedsSupport(status)) mappedNeedsSupportCount += 1;
     if (status.flags.includes("MD")) missingDescriptionCount += 1;
     if (status.flags.includes("DUP")) duplicateCount += 1;
     if (status.flags.includes("RS")) missingReceiptCount += 1;
+    if (status.flags.includes("RS") && !status.needsCategory && status.isMapped) mappedReceiptSupportCount += 1;
     if (["vehicle_fuel", "vehicle_maintenance", "vehicle_parking_tolls", "insurance_vehicle"].includes(status.categorySlug)) {
       vehicleCount += 1;
       vehicleTotal += amount;
@@ -1202,6 +1220,7 @@ function buildReviewInsights(transactions, categories, receipts, meta = {}) {
     expenseWithoutReceiptAttachmentCount: coverage.missing,
     receiptCoverageText: `${coverage.with_receipt} of ${coverage.expense_count}`,
     missingReceiptCount,
+    mappedReceiptSupportCount,
     needsCategoryCount,
     unmappedTaxCount,
     mappedNeedsSupportCount,
@@ -1680,8 +1699,14 @@ function buildTransactionPages(transactions, accounts, categories, receipts, cur
     const account = accountMap[txn?.account_id || txn?.accountId] || null;
     const receiptFilenames = receiptFilenameMap.get(txn.id) || [];
     const primaryHeight = buildTransactionText(txn).length > 56 ? 28 : 14;
-    const secondaryNeeded = 14;
-    const tertiaryNeeded = receiptFilenames.length ? 14 : 0;
+    const categoryName = normalizeExportCategoryName(txn.__category) || (String(txn.type || "").toLowerCase() === "income" ? "Imported Income" : "Imported Expense");
+    const detail = String(txn.type || "").toLowerCase() === "income"
+      ? `Cat: ${categoryName} | Payer: ${safeValue(txn.payer_name || txn.payerName, "-")} | Support: ${status.supportSummary || "Confirm payer/form"}`
+      : `Acct: ${safeValue(account?.name, "-")} | Cat: ${categoryName} | Support: ${status.supportSummary}`;
+    const detailLines = wrapText(detail, 108);
+    const receiptLines = receiptFilenames.length ? wrapText(`Receipts: ${receiptFilenames.join(", ")}`, 108) : [];
+    const secondaryNeeded = Math.max(14, detailLines.length * 14);
+    const tertiaryNeeded = receiptLines.length ? receiptLines.length * 14 : 0;
     ensureSpace(state, 22 + primaryHeight + secondaryNeeded + tertiaryNeeded, () => { pages.push(canvas); startPage(); });
     const amountValue = String(txn.type || "").toLowerCase() === "income"
       ? Number(txn.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn))
@@ -1697,15 +1722,15 @@ function buildTransactionPages(transactions, accounts, categories, receipts, cur
       canvas.text(104, state.y, payeeLines[1], 8);
       state.y -= 12;
     }
-    const categoryName = normalizeExportCategoryName(txn.__category) || (String(txn.type || "").toLowerCase() === "income" ? "Imported Income" : "Imported Expense");
-    const detail = String(txn.type || "").toLowerCase() === "income"
-      ? `Cat: ${categoryName} | Payer: ${safeValue(txn.payer_name || txn.payerName, "-")} | Support: ${status.supportSummary || "Confirm payer/form"}`
-      : `Acct: ${safeValue(account?.name, "-")} | Cat: ${categoryName} | Support: ${status.supportSummary}`;
-    canvas.text(104, state.y, truncateText(detail, 90), 7);
-    state.y -= 14;
-    if (receiptFilenames.length) {
-      canvas.text(104, state.y, truncateText(`Receipts: ${receiptFilenames.join(", ")}`, 90), 7);
+    detailLines.forEach((line) => {
+      canvas.text(104, state.y, line, 7);
       state.y -= 14;
+    });
+    if (receiptLines.length) {
+      receiptLines.forEach((line) => {
+        canvas.text(104, state.y, line, 7);
+        state.y -= 14;
+      });
     }
     canvas.drawDivider(state.y + 4);
     state.y -= 6;
@@ -1934,18 +1959,20 @@ function rowsCount(rows, predicate) {
   return (rows || []).reduce((sum, row) => sum + (predicate(row) ? 1 : 0), 0);
 }
 
-function buildPackageAttributionLines(packageAttribution = {}) {
+function buildPackageAttributionLines(packageAttribution = {}, isSecure = true) {
   const lines = [];
   if (packageAttribution.generatedByName) {
-    lines.push(`Generated by ${packageAttribution.generatedByName}${packageAttribution.generatedAt ? ` on ${normalizePdfDate(packageAttribution.generatedAt)}` : ""}`);
+    const actor = sanitizePackageActor(packageAttribution.generatedByName, "Preparer on file", isSecure);
+    lines.push(`Generated by ${actor}${packageAttribution.generatedAt ? ` on ${normalizePdfDate(packageAttribution.generatedAt)}` : ""}`);
   }
   if (packageAttribution.certifiedByName) {
-    lines.push(`Finalized by ${packageAttribution.certifiedByName}${packageAttribution.certifiedAt ? ` on ${normalizePdfDate(packageAttribution.certifiedAt)}` : ""}`);
+    const actor = sanitizePackageActor(packageAttribution.certifiedByName, "Finalizer on file", isSecure);
+    lines.push(`Finalized by ${actor}${packageAttribution.certifiedAt ? ` on ${normalizePdfDate(packageAttribution.certifiedAt)}` : ""}`);
   }
   return lines;
 }
 
-function buildReviewerDecisionPages(reviewStateRows, transactions, labels, region, packageAttribution = {}) {
+function buildReviewerDecisionPages(reviewStateRows, transactions, labels, region, packageAttribution = {}, isSecure = true) {
   const rows = Array.isArray(reviewStateRows) ? reviewStateRows : [];
   if (!rows.length) return [];
   const txMap = new Map((transactions || []).map((txn) => [txn.id, txn]));
@@ -1988,7 +2015,7 @@ function buildReviewerDecisionPages(reviewStateRows, transactions, labels, regio
       const openCount = scheduleRows.filter((row) => row.status === "open").length;
       const waivedCount = scheduleRows.filter((row) => row.status === "waived").length;
       const resolvedCount = scheduleRows.filter((row) => row.status === "resolved").length;
-      const attributionLines = buildPackageAttributionLines(packageAttribution);
+      const attributionLines = buildPackageAttributionLines(packageAttribution, isSecure);
       canvas.drawCard(40, y, 532, 84, "Reviewer state", [
         `${openCount} reviewer issues remain open in this package.`,
         `${waivedCount} issues were waived and ${resolvedCount} issues were marked resolved before export.`,
@@ -2020,8 +2047,8 @@ function buildReviewerDecisionPages(reviewStateRows, transactions, labels, regio
       }
       if (row.createdByName || row.resolvedByName) {
         const actorText = [
-          row.createdByName ? `Created by ${row.createdByName}` : "",
-          row.resolvedByName ? `${row.status === "waived" ? "Waived" : "Resolved"} by ${row.resolvedByName}` : ""
+          row.createdByName ? `Created by ${sanitizePackageActor(row.createdByName, "Reviewer on file", isSecure)}` : "",
+          row.resolvedByName ? `${row.status === "waived" ? "Waived" : "Resolved"} by ${sanitizePackageActor(row.resolvedByName, "Reviewer on file", isSecure)}` : ""
         ].filter(Boolean).join(" | ");
         if (actorText) {
           canvas.text(108, y, truncateText(actorText, 82), 7);
@@ -2034,10 +2061,8 @@ function buildReviewerDecisionPages(reviewStateRows, transactions, labels, regio
 }
 
 function buildCpaChecklistPage(opts) {
-  const { labels, region, reviewInsights, currency, reviewDecisionSummary = {}, packageAttribution = {} } = opts;
+  const { labels, region, reviewInsights, currency, reviewDecisionSummary = {}, packageAttribution = {}, isSecure = true } = opts;
   const isCA = normalizeRegionCode(region) === "CA";
-  const canvas = new PdfCanvas();
-  const header = drawReportHeader(canvas, { title: labels.checklist_title, subtitle: isCA ? "T2125 bookkeeping workpaper checklist" : "Schedule C bookkeeping workpaper checklist", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
   const items = [
     { badge: reviewInsights.missingReceiptCount > 0 ? "ACTION" : "OK", title: "Receipts", description: `${reviewInsights.receiptLinkedCount} of ${reviewInsights.expenseTransactionCount} expense transactions have attached receipts. ${reviewInsights.attachedReceiptFileCount} receipt files are attached across ${reviewInsights.transactionWithReceiptCount} transactions in this export.` },
     { badge: reviewInsights.needsCategoryCount > 0 ? "ACTION" : "OK", title: "Category cleanup", description: `${reviewInsights.needsCategoryCount} imported or uncategorized transactions need real business categories before filing.` },
@@ -2046,21 +2071,41 @@ function buildCpaChecklistPage(opts) {
     { badge: reviewInsights.phoneAllocationCount > 0 ? "ACTION" : "OK", title: "Phone / Internet allocation", description: `${reviewInsights.phoneAllocationCount} phone/internet transactions totaling ${formatCurrencyForPdf(reviewInsights.phoneAllocationTotal, currency)} require business-use allocation.` },
     { badge: reviewInsights.excludedCount > 0 ? "OK" : "REVIEW", title: "Excluded non-business items", description: `${reviewInsights.excludedCount} non-business items were excluded from P&L and listed in a separate schedule.` },
     { badge: Number(reviewDecisionSummary.openHard || 0) > 0 ? "ACTION" : Number(reviewDecisionSummary.openWarning || 0) > 0 ? "REVIEW" : "OK", title: "Reviewer decisions", description: `${Number(reviewDecisionSummary.openHard || 0)} hard reviewer issues and ${Number(reviewDecisionSummary.openWarning || 0)} warning reviewer issues remain open. ${Number(reviewDecisionSummary.waived || 0)} issues were waived and ${Number(reviewDecisionSummary.resolved || 0)} were resolved before export.` },
-    { badge: packageAttribution.certifiedByName ? "OK" : "REVIEW", title: "Package attribution", description: buildPackageAttributionLines(packageAttribution).join(". ") || "Package generation and finalization attribution will appear after reviewer actions and finalized export certification are recorded." }
+    { badge: packageAttribution.certifiedByName ? "OK" : "REVIEW", title: "Package attribution", description: buildPackageAttributionLines(packageAttribution, isSecure).join(". ") || "Package generation and finalization attribution will appear after reviewer actions and finalized export certification are recorded." }
   ];
+  const pages = [];
+  let canvas = new PdfCanvas();
+  let header = drawReportHeader(canvas, { title: labels.checklist_title, subtitle: isCA ? "T2125 bookkeeping workpaper checklist" : "Schedule C bookkeeping workpaper checklist", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
   let y = header.contentStartY - 4;
-  items.forEach((item) => {
-    const badgeVariant = item.badge === "ACTION" ? "warning" : item.badge === "OK" ? "success" : "neutral";
+  const colWidth = 252;
+  const colX = [40, 320];
+  const rowGap = 12;
+  const itemRows = chunkArray(items, 2);
 
-    canvas.drawCard(40, y, 532, 86, item.title, [item.description], { maxChars: 90 });
+  const startNewPage = () => {
+    pages.push(canvas);
+    canvas = new PdfCanvas();
+    header = drawReportHeader(canvas, { title: labels.checklist_title, subtitle: isCA ? "T2125 bookkeeping workpaper checklist" : "Schedule C bookkeeping workpaper checklist", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
+    y = header.contentStartY - 4;
+  };
 
-    // Keep status badge in the card header, right-aligned, away from title/description text.
-    const badgeWidth = Math.max(44, String(item.badge || "").length * 5.6 + 12);
-    canvas.drawBadge(560 - badgeWidth, y - 18, item.badge, badgeVariant);
-
-    y -= 98;
+  itemRows.forEach((row) => {
+    const rowHeight = Math.max(...row.map((item) => estimateCardHeight(colWidth, [item.description], { maxChars: 40, minHeight: 82 })));
+    if (y - rowHeight < PAGE.bottom + 8) {
+      startNewPage();
+    }
+    row.forEach((item, index) => {
+      const badgeVariant = item.badge === "ACTION" ? "warning" : item.badge === "OK" ? "success" : "neutral";
+      const x = colX[index];
+      canvas.drawCard(x, y, colWidth, rowHeight, item.title, [item.description], { maxChars: 40 });
+      const badgeWidth = Math.max(44, String(item.badge || "").length * 5.6 + 12);
+      canvas.drawBadge(x + colWidth - badgeWidth - 12, y - 18, item.badge, badgeVariant);
+    });
+    y -= rowHeight + rowGap;
   });
-  return [canvas];
+
+  pages.push(canvas);
+  return pages;
 }
 
 function summarizeVehicleCosts(vehicleCosts, currency) {
@@ -2117,9 +2162,9 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, suppor
   ], { maxChars: 34 });
   canvas.drawCard(320, top - 146, 252, 96, "Receipt Review", [
     `Attached receipt files: ${reviewInsights.attachedReceiptFileCount}`,
-    `Transactions with receipts: ${reviewInsights.transactionWithReceiptCount}`,
-    `With receipt: ${reviewInsights.receiptLinkedCount}`,
-    `Missing receipt: ${reviewInsights.missingReceiptCount}`,
+    `Transactions with any receipt file: ${reviewInsights.transactionWithReceiptCount}`,
+    `Expense rows with receipt: ${reviewInsights.receiptLinkedCount}`,
+    `Expense rows missing receipt: ${reviewInsights.expenseWithoutReceiptAttachmentCount}`,
     `Coverage: ${reviewInsights.expenseTransactionCount ? `${((reviewInsights.receiptLinkedCount / reviewInsights.expenseTransactionCount) * 100).toFixed(1)}%` : "-"}`
   ], { maxChars: 34 });
   canvas.drawCard(40, top - 256, 252, 98, "Support Artifact Summary", [
@@ -2132,6 +2177,13 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, suppor
     canvas.drawCard(320, top - 256, 252, 74, "Home Office Review", [
       `Total amount: ${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)}`,
       `Square-foot allocation and support needed`
+    ], { maxChars: 34 });
+  } else {
+    canvas.drawCard(320, top - 256, 252, 98, "Receipt Scope", [
+      `Expense rows in export: ${reviewInsights.expenseTransactionCount}`,
+      `Expense rows missing receipt: ${reviewInsights.expenseWithoutReceiptAttachmentCount}`,
+      `Mapped expense rows still missing receipt/support: ${reviewInsights.mappedReceiptSupportCount}`,
+      `Receipt counts use expense rows; attachment counts use all included transactions.`
     ], { maxChars: 34 });
   }
   const topExceptions = [...(transactions || [])]
@@ -2496,7 +2548,7 @@ function buildPdfExportDocument(options) {
   const quickMethodPages = buildQuickMethodRemittancePage(quickMethodSchedule, effectiveCurrency, labels);
   const unresolvedExceptionPages = buildUnresolvedExceptionPages(includedTransactions, effectiveCurrency, labels, normalizedRegion);
   const evidenceSchedulePages = buildEvidenceSchedulePages(includedTransactions, receipts, effectiveSupportArtifactMap, labels, normalizedRegion);
-  const reviewerDecisionPages = buildReviewerDecisionPages(reviewStateRows, transactions, labels, normalizedRegion, packageAttribution);
+  const reviewerDecisionPages = buildReviewerDecisionPages(reviewStateRows, transactions, labels, normalizedRegion, packageAttribution, isSecure);
   const reviewDecisionSummary = {
     openHard: rowsCount(reviewStateRows, (row) => row.issue_status === "open" && row.issue_severity === "hard"),
     openWarning: rowsCount(reviewStateRows, (row) => row.issue_status === "open" && row.issue_severity !== "hard"),
@@ -2538,7 +2590,7 @@ function buildPdfExportDocument(options) {
     ...evidenceSchedulePages,
     ...reviewerDecisionPages,
     ...buildExclusionPages(excludedTransactions, effectiveCurrency, labels),
-    ...buildCpaChecklistPage({ labels, region: normalizedRegion, reviewInsights, currency: effectiveCurrency, reviewDecisionSummary, packageAttribution }),
+    ...buildCpaChecklistPage({ labels, region: normalizedRegion, reviewInsights, currency: effectiveCurrency, reviewDecisionSummary, packageAttribution, isSecure }),
     ...buildSupportPages(receipts, includedTransactions, mileage, vehicleCosts, effectiveSupportArtifactMap, labels, effectiveCurrency, reviewInsights, normalizedRegion),
     // Phase 2 supporting schedules — only included when data exists
     ...vehicleSchedulePages,
