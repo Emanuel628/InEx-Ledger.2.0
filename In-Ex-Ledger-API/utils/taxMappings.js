@@ -59,6 +59,7 @@ const CATEGORY_TAX_OPTIONS = {
       "interest_bank_charges",
       "legal_accounting",
       "office_expense",
+      "office_supplies",
       "business_tax_fees_licenses_memberships",
       "property_taxes",
       "salaries_wages_benefits",

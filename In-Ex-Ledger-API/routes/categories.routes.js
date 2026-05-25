@@ -151,9 +151,17 @@ router.get("/", async (req, res) => {
     const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
     const result = await pool.query(
       `SELECT c.id, c.business_id, b.name AS business_name, c.name, c.kind, c.color,
-              b.region AS business_region, c.tax_map_us, c.tax_map_ca, c.is_default, c.is_active, c.created_at
+              b.region AS business_region, c.tax_map_us, c.tax_map_ca, c.is_default, c.is_active, c.created_at,
+              COALESCE(tx.transaction_count, 0)::int AS transaction_count
        FROM categories c
        JOIN businesses b ON b.id = c.business_id
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*)::int AS transaction_count
+         FROM transactions t
+         WHERE t.business_id = c.business_id
+           AND t.category_id = c.id
+           AND t.deleted_at IS NULL
+       ) tx ON true
        WHERE c.business_id = ANY($1::uuid[])${activeFilter}
          AND ${CATEGORY_REGION_FILTER_SQL}
        ORDER BY b.name ASC, c.kind, c.name
