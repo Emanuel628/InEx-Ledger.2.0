@@ -113,6 +113,7 @@ let settingsBusinessesState = [];
 let settingsSubscriptionState = null;
 let settingsPricingState = null;
 let activeExportProfileGuideKeys = [];
+let chatgptConnectorState = null;
 
 function resolveSettingsThemePreference() {
   try {
@@ -228,6 +229,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     applyExportProfileGuideFromQuery();
     await initAccountingLockPanel();
     await initAccountSettings();
+    await initChatgptConnector();
     if (isCpaUiEnabled()) {
       await initCpaAccess();
     } else {
@@ -465,6 +467,7 @@ function syncSettingsOverviewSummaries() {
   const businessNode = document.getElementById("overviewBusinessSummary");
   const billingNode = document.getElementById("overviewBillingSummary");
   const cpaNode = document.getElementById("overviewCpaSummary");
+  const connectedAppsNode = document.getElementById("overviewConnectedAppsSummary");
   const securityNode = document.getElementById("overviewSecuritySummary");
   const preferencesNode = document.getElementById("overviewPreferencesSummary");
   const privacyNode = document.getElementById("overviewPrivacySummary");
@@ -477,6 +480,19 @@ function syncSettingsOverviewSummaries() {
 
   if (billingNode) {
     billingNode.textContent = settingsOverviewState.billingStatus || t("settings_overview_billing_unavailable");
+  }
+
+  if (connectedAppsNode) {
+    if (!chatgptConnectorState) {
+      connectedAppsNode.textContent = "Checking connector status...";
+    } else if (chatgptConnectorState.connected) {
+      const current = chatgptConnectorState.current || {};
+      const mode = current.consentType === "personal_access" ? "Manual token active" : "OAuth access active";
+      const used = current.lastUsedAt ? `Last used ${formatSettingsDate(current.lastUsedAt, { month: "short", day: "numeric" })}` : "Not used yet";
+      connectedAppsNode.textContent = `${mode} • ${used}`;
+    } else {
+      connectedAppsNode.textContent = "Not connected";
+    }
   }
 
   if (cpaNode) {
@@ -3256,4 +3272,179 @@ function showSettingsToast(message) {
   toastTimer = setTimeout(() => {
     toast.classList.add("hidden");
   }, SETTINGS_TOAST_MS);
+}
+
+function setChatgptConnectorMessage(message, tone = "") {
+  const node = document.getElementById("chatgptConnectorMessage");
+  if (!node) {
+    return;
+  }
+  node.textContent = message || "";
+  node.classList.remove("is-error", "is-success");
+  if (tone) {
+    node.classList.add(tone);
+  }
+}
+
+function hideChatgptConnectorToken() {
+  document.getElementById("chatgptTokenWrap")?.classList.add("hidden");
+  const tokenValue = document.getElementById("chatgptTokenValue");
+  const tokenExpires = document.getElementById("chatgptTokenExpiresAt");
+  const tokenScope = document.getElementById("chatgptTokenScope");
+  if (tokenValue) tokenValue.value = "";
+  if (tokenExpires) tokenExpires.value = "";
+  if (tokenScope) tokenScope.value = "";
+}
+
+function renderChatgptConnectorStatus() {
+  const statusNode = document.getElementById("chatgptConnectorStatus");
+  const endpointNode = document.getElementById("chatgptConnectorEndpoint");
+  const revokeButton = document.getElementById("chatgptRevokeTokenBtn");
+  if (!statusNode || !endpointNode) {
+    return;
+  }
+
+  if (!chatgptConnectorState) {
+    statusNode.textContent = "Checking connector status...";
+    endpointNode.textContent = "Loading endpoint...";
+    if (revokeButton) revokeButton.disabled = true;
+    syncSettingsOverviewSummaries();
+    return;
+  }
+
+  endpointNode.textContent = chatgptConnectorState.mcpUrl || `${window.location.origin}/mcp`;
+  if (!chatgptConnectorState.connected) {
+    statusNode.textContent = chatgptConnectorState.oauthConfigured
+      ? "Not connected. You can create a manual token now or use OAuth when ChatGPT prompts for it."
+      : "Manual token only right now. OAuth still needs the connector client ID and redirect URI configured on the server.";
+    if (revokeButton) revokeButton.disabled = true;
+    syncSettingsOverviewSummaries();
+    return;
+  }
+
+  const current = chatgptConnectorState.current || {};
+  const parts = [
+    current.consentType === "personal_access" ? "Manual token active" : "OAuth access active"
+  ];
+  if (current.expiresAt) {
+    parts.push(`expires ${formatSettingsDate(current.expiresAt)}`);
+  }
+  if (current.lastUsedAt) {
+    parts.push(`last used ${formatSettingsDate(current.lastUsedAt)}`);
+  }
+  statusNode.textContent = parts.join(" • ");
+  if (revokeButton) revokeButton.disabled = false;
+  syncSettingsOverviewSummaries();
+}
+
+async function loadChatgptConnectorStatus() {
+  const response = await apiFetch("/api/chatgpt-connector/status");
+  const payload = response ? await response.json().catch(() => null) : null;
+  if (!response || !response.ok || !payload) {
+    throw new Error(payload?.error || "Failed to load connector status.");
+  }
+  chatgptConnectorState = payload;
+  renderChatgptConnectorStatus();
+  return payload;
+}
+
+async function createChatgptConnectorToken() {
+  const createButton = document.getElementById("chatgptCreateTokenBtn");
+  if (createButton) {
+    createButton.disabled = true;
+  }
+  setChatgptConnectorMessage("");
+  try {
+    const response = await apiFetch("/api/chatgpt-connector/personal-token", {
+      method: "POST"
+    });
+    const payload = response ? await response.json().catch(() => null) : null;
+    if (!response || !response.ok || !payload?.token) {
+      throw new Error(payload?.error || "Failed to create token.");
+    }
+
+    document.getElementById("chatgptTokenWrap")?.classList.remove("hidden");
+    if (document.getElementById("chatgptTokenValue")) {
+      document.getElementById("chatgptTokenValue").value = payload.token;
+    }
+    if (document.getElementById("chatgptTokenExpiresAt")) {
+      document.getElementById("chatgptTokenExpiresAt").value = formatSettingsDate(payload.expires_at);
+    }
+    if (document.getElementById("chatgptTokenScope")) {
+      document.getElementById("chatgptTokenScope").value = payload.scope || "";
+    }
+    chatgptConnectorState = {
+      ...(chatgptConnectorState || {}),
+      connected: true,
+      current: {
+        consentType: "personal_access",
+        scope: payload.scope || "",
+        expiresAt: payload.expires_at,
+        lastUsedAt: null
+      }
+    };
+    renderChatgptConnectorStatus();
+    setChatgptConnectorMessage("New read-only token created. Copy it now.", "is-success");
+  } catch (error) {
+    setChatgptConnectorMessage(error.message || "Failed to create token.", "is-error");
+  } finally {
+    if (createButton) {
+      createButton.disabled = false;
+    }
+  }
+}
+
+async function revokeChatgptConnectorAccess() {
+  const revokeButton = document.getElementById("chatgptRevokeTokenBtn");
+  if (revokeButton) {
+    revokeButton.disabled = true;
+  }
+  setChatgptConnectorMessage("");
+  try {
+    const response = await apiFetch("/api/chatgpt-connector/revoke", {
+      method: "POST"
+    });
+    const payload = response ? await response.json().catch(() => null) : null;
+    if (!response || !response.ok) {
+      throw new Error(payload?.error || "Failed to revoke connector access.");
+    }
+    hideChatgptConnectorToken();
+    chatgptConnectorState = {
+      ...(chatgptConnectorState || {}),
+      connected: false,
+      current: null
+    };
+    renderChatgptConnectorStatus();
+    setChatgptConnectorMessage("ChatGPT access revoked.", "is-success");
+  } catch (error) {
+    setChatgptConnectorMessage(error.message || "Failed to revoke connector access.", "is-error");
+  } finally {
+    if (revokeButton) {
+      revokeButton.disabled = !chatgptConnectorState?.connected;
+    }
+  }
+}
+
+async function initChatgptConnector() {
+  const statusNode = document.getElementById("chatgptConnectorStatus");
+  if (!statusNode) {
+    return;
+  }
+  hideChatgptConnectorToken();
+  document.getElementById("chatgptRefreshConnectorBtn")?.addEventListener("click", () => {
+    void loadChatgptConnectorStatus().catch((error) => {
+      setChatgptConnectorMessage(error.message || "Failed to refresh connector status.", "is-error");
+    });
+  });
+  document.getElementById("chatgptCreateTokenBtn")?.addEventListener("click", () => {
+    void createChatgptConnectorToken();
+  });
+  document.getElementById("chatgptRevokeTokenBtn")?.addEventListener("click", () => {
+    void revokeChatgptConnectorAccess();
+  });
+  try {
+    await loadChatgptConnectorStatus();
+  } catch (error) {
+    setChatgptConnectorMessage(error.message || "Failed to load connector status.", "is-error");
+  }
 }

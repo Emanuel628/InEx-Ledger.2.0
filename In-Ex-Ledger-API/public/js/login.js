@@ -15,6 +15,7 @@ function tx(key) {
 const OFFLINE_ERROR_MESSAGE = "login_error_offline";
 const EXPIRED_SESSION_MESSAGE = "login_error_expired";
 const AUTOFILL_CLEAR_RETRY_DELAYS_MS = [];
+const POST_LOGIN_DEFAULT_PATH = "/transactions";
 
 redirectIfAuthenticated();
 
@@ -85,6 +86,15 @@ function wireAutofillSuppression() {
   });
 }
 
+function resolveSafePostLoginPath() {
+  const params = new URLSearchParams(window.location.search);
+  const next = String(params.get("next") || "").trim();
+  if (!next || !next.startsWith("/") || next.startsWith("//") || /[\r\n]/.test(next)) {
+    return POST_LOGIN_DEFAULT_PATH;
+  }
+  return next;
+}
+
 async function handleLoginSubmit(event) {
   event.preventDefault();
   if (!loginForm || isSubmittingLogin) {
@@ -131,6 +141,7 @@ async function handleLoginSubmit(event) {
     if (data?.mfa_required && data?.mfa_token) {
       sessionStorage.setItem("lb_pending_mfa_token", data.mfa_token);
       sessionStorage.setItem("lb_pending_mfa_email", email);
+      sessionStorage.setItem("lb_pending_mfa_next", resolveSafePostLoginPath());
       window.location.href = "/mfa-challenge?v=20260506a";
       return;
     }
@@ -144,7 +155,7 @@ async function handleLoginSubmit(event) {
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }
-    window.location.href = "/transactions";
+    window.location.href = resolveSafePostLoginPath();
   } catch (err) {
     console.error("Login request failed:", err);
     showLoginError(tx(OFFLINE_ERROR_MESSAGE));

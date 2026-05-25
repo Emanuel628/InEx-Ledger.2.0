@@ -16,6 +16,14 @@ function getPendingMfaEmail() {
   return sessionStorage.getItem("lb_pending_mfa_email") || "";
 }
 
+function getPendingMfaNext() {
+  const next = String(sessionStorage.getItem("lb_pending_mfa_next") || "").trim();
+  if (!next || !next.startsWith("/") || next.startsWith("//") || /[\r\n]/.test(next)) {
+    return "/transactions";
+  }
+  return next;
+}
+
 function normalizeMfaCode(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 6);
 }
@@ -118,7 +126,7 @@ async function handleMfaChallengeSubmit(event) {
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }
-    window.location.href = "/transactions";
+    window.location.href = getPendingMfaNext();
   } catch (error) {
     console.error("MFA challenge request failed:", error);
     showMfaChallengeError(tx("login_error_offline"));
@@ -190,4 +198,5 @@ function clearMfaChallengeError() {
 function clearPendingMfaState() {
   sessionStorage.removeItem("lb_pending_mfa_token");
   sessionStorage.removeItem("lb_pending_mfa_email");
+  sessionStorage.removeItem("lb_pending_mfa_next");
 }

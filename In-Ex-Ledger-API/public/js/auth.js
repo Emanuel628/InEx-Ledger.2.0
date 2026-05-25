@@ -485,6 +485,19 @@ function buildTrialSetupPath(nextPath = "/transactions") {
   return `${TRIAL_SETUP_PAGE}?next=${encodeURIComponent(normalized)}`;
 }
 
+function resolveSafeNextPathFromLocation(defaultPath = "/transactions") {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const nextPath = String(params.get("next") || "").trim();
+    if (!nextPath || !nextPath.startsWith("/") || nextPath.startsWith("//") || /[\r\n]/.test(nextPath)) {
+      return defaultPath;
+    }
+    return nextPath;
+  } catch (_) {
+    return defaultPath;
+  }
+}
+
 function getPlanDisplayNameFromCode(tier) {
   if (tier === "v1") return "Pro";
   if (tier === "v2" || tier === "business") return authT("common_business");
@@ -832,7 +845,7 @@ async function redirectIfAuthenticated() {
         window.location.href = ONBOARDING_PAGE;
         return;
       }
-      const nextPath = resolvePostOnboardingPath(payload);
+      const nextPath = resolveSafeNextPathFromLocation(resolvePostOnboardingPath(payload));
       window.location.href = shouldRedirectToTrialSetup(payload, nextPath)
         ? buildTrialSetupPath(nextPath)
         : nextPath;
