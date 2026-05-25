@@ -1,51 +1,24 @@
 const LANDING_REGION_COPY = {
   US: {
-    heroKicker: "For U.S. solo businesses 🇺🇸",
-    heroLede: "Track income, expenses, receipts, mileage, categories, and exports in one clear ledger for U.S. solo businesses.",
-    ctaNote: "Built for U.S. businesses.",
-    regionNavLink: "United States",
-    distanceProof: "Attach receipts and track mileage",
-    taxContext: "U.S. business categories",
-    previewIncome: "$1,643.26",
-    previewExpenses: "$4,199.01",
-    previewProfit: "$2,555.75",
+    heroKicker: "FOR SOLO OPERATORS IN THE U.S. AND CANADA",
+    heroLede: "InEx Ledger helps solo businesses track income, expenses, receipts, mileage, invoices, and client replies, then turn messy records into review-ready Schedule C or T2125/T4A export packages.",
+    taxContext: "Schedule C-friendly categories and review status",
     rowIncome: "$1,250.00",
     rowExpense: "-$89.42",
-    rowClient: "$2,500.00",
     rowFuel: "-$65.00",
-    fuelCategory: "Vehicle",
+    rowImport: "-$42.18",
+    fuelCategory: "Vehicle & Transportation",
     mileageNav: "+ Mileage",
-    trustRegionTitle: "Built for U.S. businesses",
-    trustRegion: "Uses U.S. business categories and 1099 income language.",
-    trustDistanceTitle: "Receipts and mileage",
-    trustDistance: "Attach receipts and track mileage in one place.",
-    featureRegionTitle: "Built for U.S. and Canadian businesses",
-    featureRegion: "Includes U.S. and Canadian business categories, income tracking, receipts, mileage, and exports.",
-    regionSectionTitle: "Bookkeeping for U.S. solo businesses.",
-    regionSectionSubtitle: "U.S. business categories, 1099 income, mileage, receipts, and exports.",
-    regionFlag: "🇺🇸",
-    regionCardTitle: "United States",
-    regionCardBody: "U.S. business categories, 1099 income, receipts, mileage, and exports.",
-    pricingSubtitle: "Finish onboarding first, then confirm your Pro trial in Stripe. Pricing shown in USD.",
-    faqRegionQuestion: "What U.S. setup does InEx Ledger support?",
-    faqRegionAnswer: "The U.S. setup includes U.S. business categories, 1099 income, receipts, mileage, accounts, and exports. It helps you stay organized, but it does not replace professional advice.",
     receiptAmount: "$89.42 captured",
-    receiptDistanceCheck: "Mileage note optional",
-    analyticsIncome: "$8,420",
-    analyticsExpense: "$3,180",
-    analyticsNet: "$5,240",
-    analyticsRange: "Jan to Dec",
-    analyticsTopIncome: "$3,900 this month",
-    analyticsTopExpense: "$1,180 this month",
-    exportFormName: "Schedule C export",
-    exportRange: "Jan 1, 2026 to May 22, 2026",
+    receiptDistanceCheck: "Mileage log attached",
+    exportFormName: "Schedule C review package",
     exportSummaryIncome: "Income: $48,220.14",
     exportSummaryExpense: "Expenses: $18,094.32",
     exportSummaryNet: "Net: $30,125.82",
     exportPdfBadge: "Prepared PDF export",
-    exportPdfTitle: "Schedule C export",
+    exportPdfTitle: "Schedule C review packet",
     exportPdfFilename: "inex-ledger-schedule-c-review-packet-2026-ytd.pdf",
-    exportPdfPrepared: "Generated May 22, 2026",
+    exportPdfPrepared: "Generated May 25, 2026",
     exportPdfSectionOne: "Income summary",
     exportPdfSectionTwo: "Expense summary",
     exportPdfSectionThree: "Net income",
@@ -55,59 +28,41 @@ const LANDING_REGION_COPY = {
     exportPdfLineTwoAmount: "$6,420.00",
     exportPdfLineThree: "Office and software",
     exportPdfLineThreeAmount: "$2,184.32",
-    exportPdfPreparedFor: "Demo advisory review",
+    exportPdfPreparedFor: "CPA review package",
     exportPdfIncome: "$48,220.14",
     exportPdfExpense: "$18,094.32",
     exportPdfNet: "$30,125.82",
+    reminderContext: "Estimated tax reminders for U.S. solo businesses",
+    reminderBanner: "Installment 2 estimated taxes are due June 15 - in 21 days. Estimated amount: $238.33. Pay via IRS.",
+    reminderSubtext: "Due date, countdown, estimated amount, and pay link stay visible before it turns into a last-minute problem.",
+    trustRegion: "Built for U.S. and Canadian solo-business records.",
+    distanceLabel: "Track mileage support for vehicle-related records.",
+    pricingSubtitle: "No charge today. Confirm billing after setup.",
+    distancePricing: "Mileage and kilometre tracking",
+    pricingExports: "Schedule C or T2125/T4A exports",
+    pricingReminders: "Estimated tax installment reminders",
     currency: "usd"
   },
   CA: {
-    heroKicker: "For Canadian solo businesses 🇨🇦",
-    heroLede: "Track income, expenses, receipts, kilometres, categories, GST/HST details, and exports in one clear ledger for Canadian solo businesses.",
-    ctaNote: "Built for Canadian businesses.",
-    regionNavLink: "Canada",
-    distanceProof: "Attach receipts and track kilometres",
-    taxContext: "Canadian business categories",
-    previewIncome: "CA$1,643.26",
-    previewExpenses: "CA$4,199.01",
-    previewProfit: "CA$2,555.75",
+    heroKicker: "FOR SOLO OPERATORS IN THE U.S. AND CANADA",
+    heroLede: "InEx Ledger helps solo businesses track income, expenses, receipts, kilometres, invoices, and client replies, then turn messy records into review-ready Schedule C or T2125/T4A export packages.",
+    taxContext: "T2125 and T4A-friendly categories with GST/HST support",
     rowIncome: "CA$1,250.00",
     rowExpense: "-CA$89.42",
-    rowClient: "CA$2,500.00",
     rowFuel: "-CA$65.00",
+    rowImport: "-CA$42.18",
     fuelCategory: "Motor Vehicle",
     mileageNav: "+ Kilometres",
-    trustRegionTitle: "Built for Canadian businesses",
-    trustRegion: "Uses Canadian business categories, T4A language, kilometres, and GST/HST support.",
-    trustDistanceTitle: "Receipts and kilometres",
-    trustDistance: "Attach receipts and track kilometres in one place.",
-    featureRegionTitle: "Built for U.S. and Canadian businesses",
-    featureRegion: "Includes U.S. and Canadian business categories, income tracking, receipts, mileage, and exports.",
-    regionSectionTitle: "Bookkeeping for Canadian solo businesses.",
-    regionSectionSubtitle: "Canadian business categories, T4A details, GST/HST support, kilometres, receipts, and exports.",
-    regionFlag: "🇨🇦",
-    regionCardTitle: "Canada",
-    regionCardBody: "Canadian business categories, T4A details, GST/HST support, receipts, kilometres, and exports.",
-    pricingSubtitle: "Finish onboarding first, then confirm your Pro trial in Stripe. Pricing shown in CAD.",
-    faqRegionQuestion: "What Canadian setup does InEx Ledger support?",
-    faqRegionAnswer: "The Canadian setup includes Canadian business categories, T4A details, GST/HST support, receipts, kilometres, accounts, and exports. It helps you stay organized, but it does not replace professional advice.",
     receiptAmount: "CA$89.42 captured",
-    receiptDistanceCheck: "Kilometre note optional",
-    analyticsIncome: "CA$8,420",
-    analyticsExpense: "CA$3,180",
-    analyticsNet: "CA$5,240",
-    analyticsRange: "Jan to Dec",
-    analyticsTopIncome: "CA$3,900 this month",
-    analyticsTopExpense: "CA$1,180 this month",
-    exportFormName: "T2125 export",
-    exportRange: "Jan 1, 2026 to May 22, 2026",
+    receiptDistanceCheck: "Kilometre log attached",
+    exportFormName: "T2125/T4A review package",
     exportSummaryIncome: "Income: CA$48,220.14",
     exportSummaryExpense: "Expenses: CA$18,094.32",
     exportSummaryNet: "Net: CA$30,125.82",
     exportPdfBadge: "Prepared PDF export",
-    exportPdfTitle: "T2125 export",
+    exportPdfTitle: "T2125 review packet",
     exportPdfFilename: "inex-ledger-t2125-review-packet-2026-ytd.pdf",
-    exportPdfPrepared: "Generated May 22, 2026",
+    exportPdfPrepared: "Generated May 25, 2026",
     exportPdfSectionOne: "Income summary",
     exportPdfSectionTwo: "Expense summary",
     exportPdfSectionThree: "Net income",
@@ -117,19 +72,32 @@ const LANDING_REGION_COPY = {
     exportPdfLineTwoAmount: "CA$6,420.00",
     exportPdfLineThree: "Office and software",
     exportPdfLineThreeAmount: "CA$2,184.32",
-    exportPdfPreparedFor: "Demo accountant review",
+    exportPdfPreparedFor: "Tax preparer review package",
     exportPdfIncome: "CA$48,220.14",
     exportPdfExpense: "CA$18,094.32",
     exportPdfNet: "CA$30,125.82",
+    reminderContext: "CRA installment reminders for Canadian sole proprietors",
+    reminderBanner: "Installment 2 estimated taxes are due June 15 - in 21 days. Estimated amount: CA$238.33. Pay via CRA.",
+    reminderSubtext: "Due date, countdown, estimated amount, and pay link stay visible before it turns into a last-minute problem.",
+    trustRegion: "Built for U.S. and Canadian solo-business records.",
+    distanceLabel: "Track kilometre support for vehicle-related records.",
+    pricingSubtitle: "No charge today. Confirm billing after setup.",
+    distancePricing: "Mileage and kilometre tracking",
+    pricingExports: "Schedule C or T2125/T4A exports",
+    pricingReminders: "Estimated tax installment reminders",
     currency: "cad"
   }
 };
 
 const LANDING_ROLODEX_CAPTIONS = [
-  "Transactions · this month",
-  "Receipts · reviewed and ready to organize",
-  "Analytics · monthly trends at a glance",
-  "Exports · PDF and CSV ready to download"
+  "Transactions - Track the money and see what needs cleanup.",
+  "Warning checklist - Click the issue and fix the missing piece.",
+  "Receipts & support - Keep the proof with the transaction.",
+  "Invoices - Send work out without leaving your books.",
+  "Messages - Client replies stay tied to the invoice.",
+  "Exports - Build a review-ready package, not a pile.",
+  "Redacted history - Keep the full package secure and the saved record lighter.",
+  "Tax reminders - See the deadline before it turns urgent."
 ];
 
 function normalizeLandingRegion(value) {
@@ -145,7 +113,11 @@ function fallbackLandingRegionFromLocale() {
 
 async function detectLandingRegion() {
   try {
-    const res = await fetch("/api/region/detect", { method: "GET", credentials: "include", headers: { Accept: "application/json" } });
+    const res = await fetch("/api/region/detect", {
+      method: "GET",
+      credentials: "include",
+      headers: { Accept: "application/json" }
+    });
     if (res && res.ok) {
       const data = await res.json();
       return normalizeLandingRegion(data.region || data.country);
@@ -189,66 +161,67 @@ function updateLandingPricing(billingMode, regionOverride) {
     const monthlyPrice = Number((isCAD ? card.getAttribute("data-price-monthly-cad") : null) || card.getAttribute("data-price-monthly") || 0);
     const yearlyMonthlyPrice = Number((isCAD ? card.getAttribute("data-price-yearly-monthly-cad") : null) || card.getAttribute("data-price-yearly-monthly") || 0);
     const yearlyTotalPrice = Number((isCAD ? card.getAttribute("data-price-yearly-total-cad") : null) || card.getAttribute("data-price-yearly-total") || 0);
-    if (amountNode) amountNode.textContent = isYearly ? formatLandingPrice(yearlyMonthlyPrice, currency) : formatLandingPrice(monthlyPrice, currency);
-    if (periodNode) periodNode.textContent = "/ month" + (isCAD ? " CAD" : "");
-    if (noteNode) noteNode.textContent = isYearly
-      ? `Billed annually at ${formatLandingPrice(yearlyTotalPrice, currency)}. Save 15%.`
-      : `Billed monthly at ${formatLandingPrice(monthlyPrice, currency)}.`;
+    if (amountNode) {
+      amountNode.textContent = isYearly ? formatLandingPrice(yearlyMonthlyPrice, currency) : formatLandingPrice(monthlyPrice, currency);
+    }
+    if (periodNode) {
+      periodNode.textContent = "/ month" + (isCAD ? " CAD" : "");
+    }
+    if (noteNode) {
+      noteNode.textContent = isYearly
+        ? `Billed annually at ${formatLandingPrice(yearlyTotalPrice, currency)}. Save 15%.`
+        : `Billed monthly at ${formatLandingPrice(monthlyPrice, currency)}.`;
+    }
   });
 }
 
 function hydrateLandingStaticFixes() {
-  const regionFlag = document.querySelector(".region-card-flag");
-  if (regionFlag) {
-    regionFlag.textContent = "";
-  }
-
   const pdfCard = document.querySelector(".preview-pdf-card .preview-pdf-page");
-  if (!pdfCard) return;
-
-  pdfCard.innerHTML = `
-    <span class="preview-card-label" data-region-copy="exportPdfBadge">Prepared PDF export</span>
-    <strong data-region-copy="exportPdfTitle">Schedule C export</strong>
-    <div class="preview-pdf-meta">
-      <span data-region-copy="exportPdfFilename">inex-ledger-schedule-c-review-packet-2026-ytd.pdf</span>
-      <span data-region-copy="exportPdfPrepared">Generated May 22, 2026</span>
-    </div>
-    <div class="preview-pdf-lines">
-      <span></span>
-      <span></span>
-      <span class="short"></span>
-    </div>
-    <div class="preview-pdf-summary">
-      <div class="preview-pdf-summary-row">
-        <span data-region-copy="exportPdfSectionOne">Income summary</span>
-        <strong data-region-copy="exportPdfIncome">$48,220.14</strong>
+  if (pdfCard) {
+    pdfCard.innerHTML = `
+      <span class="preview-card-label" data-region-copy="exportPdfBadge">Prepared PDF export</span>
+      <strong data-region-copy="exportPdfTitle">Schedule C review packet</strong>
+      <div class="preview-pdf-meta">
+        <span data-region-copy="exportPdfFilename">inex-ledger-schedule-c-review-packet-2026-ytd.pdf</span>
+        <span data-region-copy="exportPdfPrepared">Generated May 25, 2026</span>
       </div>
-      <div class="preview-pdf-summary-row">
-        <span data-region-copy="exportPdfSectionTwo">Expense summary</span>
-        <strong data-region-copy="exportPdfExpense">$18,094.32</strong>
+      <div class="preview-pdf-lines">
+        <span></span>
+        <span></span>
+        <span class="short"></span>
       </div>
-      <div class="preview-pdf-summary-row">
-        <span data-region-copy="exportPdfSectionThree">Net income</span>
-        <strong data-region-copy="exportPdfNet">$30,125.82</strong>
+      <div class="preview-pdf-summary">
+        <div class="preview-pdf-summary-row">
+          <span data-region-copy="exportPdfSectionOne">Income summary</span>
+          <strong data-region-copy="exportPdfIncome">$48,220.14</strong>
+        </div>
+        <div class="preview-pdf-summary-row">
+          <span data-region-copy="exportPdfSectionTwo">Expense summary</span>
+          <strong data-region-copy="exportPdfExpense">$18,094.32</strong>
+        </div>
+        <div class="preview-pdf-summary-row">
+          <span data-region-copy="exportPdfSectionThree">Net income</span>
+          <strong data-region-copy="exportPdfNet">$30,125.82</strong>
+        </div>
       </div>
-    </div>
-    <div class="preview-pdf-table" role="presentation">
-      <div class="preview-pdf-table-row preview-pdf-table-head"><span>Section</span><span>Amount</span></div>
-      <div class="preview-pdf-table-row"><span data-region-copy="exportPdfLineOne">Sales income</span><span data-region-copy="exportPdfLineOneAmount">$34,800.00</span></div>
-      <div class="preview-pdf-table-row"><span data-region-copy="exportPdfLineTwo">Contractor costs</span><span data-region-copy="exportPdfLineTwoAmount">$6,420.00</span></div>
-      <div class="preview-pdf-table-row"><span data-region-copy="exportPdfLineThree">Office and software</span><span data-region-copy="exportPdfLineThreeAmount">$2,184.32</span></div>
-    </div>
-    <div class="preview-pdf-grid">
-      <div><small>Prepared for</small><strong data-region-copy="exportPdfPreparedFor">Demo advisory review</strong></div>
-      <div><small>File type</small><strong>PDF export</strong></div>
-      <div><small>Pages</small><strong>6 pages</strong></div>
-      <div><small>Export ID</small><strong>PDF-2048</strong></div>
-    </div>
-  `;
+      <div class="preview-pdf-table" role="presentation">
+        <div class="preview-pdf-table-row preview-pdf-table-head"><span>Section</span><span>Amount</span></div>
+        <div class="preview-pdf-table-row"><span data-region-copy="exportPdfLineOne">Sales income</span><span data-region-copy="exportPdfLineOneAmount">$34,800.00</span></div>
+        <div class="preview-pdf-table-row"><span data-region-copy="exportPdfLineTwo">Contractor costs</span><span data-region-copy="exportPdfLineTwoAmount">$6,420.00</span></div>
+        <div class="preview-pdf-table-row"><span data-region-copy="exportPdfLineThree">Office and software</span><span data-region-copy="exportPdfLineThreeAmount">$2,184.32</span></div>
+      </div>
+      <div class="preview-pdf-grid">
+        <div><small>Prepared for</small><strong data-region-copy="exportPdfPreparedFor">CPA review package</strong></div>
+        <div><small>File type</small><strong>PDF export</strong></div>
+        <div><small>Pages</small><strong>8 pages</strong></div>
+        <div><small>Export ID</small><strong>PDF-2048</strong></div>
+      </div>
+    `;
+  }
 
   const downloadChip = document.querySelector(".preview-download-chip");
   if (downloadChip) {
-    downloadChip.textContent = "Download PDF";
+    downloadChip.textContent = "Preview PDF";
   }
 }
 
@@ -277,17 +250,15 @@ function initLandingRolodex() {
   function setTransforms() {
     slides.forEach((slide, index) => {
       const distance = slideDistance(index);
-      slide.classList.remove("is-active", "is-prev", "is-next", "is-hidden");
+      slide.classList.remove("is-active", "is-hidden");
       if (distance === 0) {
         slide.classList.add("is-active");
-        slide.style.transform = "translateX(0) rotateY(0deg) scale(1)";
+        slide.style.transform = "translateX(0) scale(1)";
         slide.style.opacity = "1";
         slide.style.filter = "blur(0)";
       } else {
         slide.classList.add("is-hidden");
-        slide.style.transform = distance > 0
-          ? "translateX(8%) scale(0.98)"
-          : "translateX(-8%) scale(0.98)";
+        slide.style.transform = distance > 0 ? "translateX(8%) scale(0.985)" : "translateX(-8%) scale(0.985)";
         slide.style.opacity = "0";
         slide.style.filter = "blur(0.6px)";
       }
@@ -377,4 +348,3 @@ document.addEventListener("DOMContentLoaded", async () => {
   const detectedRegion = await detectLandingRegion();
   applyLandingRegion(detectedRegion);
 });
-
