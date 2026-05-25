@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260514c" />
-  <link rel="stylesheet" href="/css/pages/review.css?v=20260523a" />
+  <link rel="stylesheet" href="/css/pages/review.css?v=20260525a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -182,12 +182,63 @@
     </div>
   </div>
 
+  <div id="reviewIssueModal" class="review-modal hidden" role="dialog" aria-modal="true" aria-labelledby="reviewIssueTitle">
+    <div class="review-modal-backdrop" data-issue-modal-close></div>
+    <div class="review-modal-card">
+      <div class="review-modal-head">
+        <div>
+          <h3 id="reviewIssueTitle">Reviewer issue</h3>
+          <p id="reviewIssueContext" class="review-modal-subtitle"></p>
+        </div>
+        <button type="button" class="review-modal-close" data-issue-modal-close aria-label="Close">&times;</button>
+      </div>
+
+      <div id="reviewIssueExisting" class="review-existing-artifacts"></div>
+
+      <form id="reviewIssueForm" class="review-support-form">
+        <input type="hidden" id="reviewIssueTransactionId" />
+        <label class="review-form-field">
+          <span>Issue code</span>
+          <select id="reviewIssueCode" class="review-filter-select">
+            <option value="reviewer_note">Reviewer note</option>
+            <option value="needs_category">Needs category</option>
+            <option value="missing_description">Missing description</option>
+            <option value="needs_receipt_support">Needs receipt/support</option>
+            <option value="needs_business_purpose">Needs business purpose</option>
+            <option value="needs_allocation">Needs allocation</option>
+            <option value="needs_mileage_log">Needs mileage log</option>
+            <option value="needs_capital_asset_review">Needs capital asset review</option>
+            <option value="cpa_review_required">CPA review required</option>
+          </select>
+        </label>
+
+        <label class="review-form-field">
+          <span>Severity</span>
+          <select id="reviewIssueSeverity" class="review-filter-select">
+            <option value="warning">Warning</option>
+            <option value="hard">Hard blocker</option>
+          </select>
+        </label>
+
+        <label class="review-form-field">
+          <span>Reviewer note</span>
+          <textarea id="reviewIssueNotes" rows="4" placeholder="Explain the reviewer decision or what still needs to happen."></textarea>
+        </label>
+
+        <div class="review-modal-actions">
+          <button type="button" class="review-secondary-btn" data-issue-modal-close>Cancel</button>
+          <button type="submit" id="reviewIssueSubmit" class="review-primary-link">Save issue</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="../js/escape-html.js?v=20260410a"></script>
   <script src="../js/global.js?v=20260510c"></script>
   <script src="../js/i18n.js?v=20260523f"></script>
   <script src="../js/auth.js?v=20260518a"></script>
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
-  <script src="../js/review.js?v=20260523a"></script>
+  <script src="../js/review.js?v=20260525a"></script>
 </body>
 </html>

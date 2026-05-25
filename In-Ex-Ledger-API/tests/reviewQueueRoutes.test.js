@@ -22,7 +22,7 @@ function loadReviewRouterFixture(options = {}) {
         pool: {
           async query(sql, params = []) {
             state.queries.push({ sql, params });
-            if (/FROM transactions t/i.test(sql)) {
+            if (/FROM transactions(?:\s+t)?/i.test(sql)) {
               return { rows: [{ id: "tx_1" }], rowCount: 1 };
             }
             if (/FROM accounts/i.test(sql)) {
@@ -37,6 +37,9 @@ function loadReviewRouterFixture(options = {}) {
             if (/FROM support_artifacts/i.test(sql)) {
               return { rows: [], rowCount: 0 };
             }
+            if (/FROM transaction_review_states/i.test(sql)) {
+              return { rows: options.reviewStateRows || [], rowCount: (options.reviewStateRows || []).length };
+            }
             if (/FROM businesses/i.test(sql)) {
               return { rows: [{ id: "biz_1", name: "Biz", region: "US", currency: "USD" }], rowCount: 1 };
             }
@@ -45,6 +48,36 @@ function loadReviewRouterFixture(options = {}) {
             }
             if (/FROM capital_assets/i.test(sql)) {
               return { rows: [{ transaction_id: "tx_asset" }], rowCount: 1 };
+            }
+            if (/INSERT INTO transaction_review_states/i.test(sql)) {
+              return {
+                rows: [{
+                  id: "issue_created",
+                  transaction_id: params[0],
+                  issue_code: params[2],
+                  issue_severity: params[3],
+                  issue_status: params[4],
+                  review_notes: params[5],
+                  resolved_at: null,
+                  updated_at: new Date().toISOString()
+                }],
+                rowCount: 1
+              };
+            }
+            if (/UPDATE transaction_review_states/i.test(sql)) {
+              return {
+                rows: [{
+                  id: params[3],
+                  transaction_id: "tx_1",
+                  issue_code: "needs_category",
+                  issue_severity: "hard",
+                  issue_status: params[0] || "open",
+                  review_notes: params[1],
+                  resolved_at: params[0] && params[0] !== "open" ? new Date().toISOString() : null,
+                  updated_at: new Date().toISOString()
+                }],
+                rowCount: options.missingIssue ? 0 : 1
+              };
             }
             throw new Error(`Unhandled SQL: ${sql}`);
           }
@@ -240,4 +273,70 @@ test("GET /api/review/queue returns 500 when dataset build fails", async () => {
   assert.equal(response.status, 500);
   assert.equal(response.body.error, "Failed to load review queue.");
   assert.equal(state.logErrors.length, 1);
+});
+
+test("GET /api/review/queue suppresses derived issues already marked resolved", async () => {
+  const { app } = loadReviewRouterFixture({
+    reviewStateRows: [
+      {
+        id: "issue_1",
+        transaction_id: "tx_action",
+        issue_code: "needs_category",
+        issue_severity: "hard",
+        issue_status: "resolved",
+        review_notes: "Handled",
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: "issue_2",
+        transaction_id: "tx_action",
+        issue_code: "missing_description",
+        issue_severity: "hard",
+        issue_status: "resolved",
+        review_notes: "Handled",
+        updated_at: new Date().toISOString()
+      }
+    ]
+  });
+
+  const response = await request(app).get("/api/review/queue");
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(
+    response.body.queue.map((item) => item.id),
+    ["tx_review", "tx_excluded"]
+  );
+});
+
+test("POST /api/review/issues creates a reviewer issue", async () => {
+  const { app } = loadReviewRouterFixture();
+
+  const response = await request(app)
+    .post("/api/review/issues")
+    .send({
+      transaction_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      issue_code: "reviewer_note",
+      issue_severity: "warning",
+      issue_status: "open",
+      review_notes: "Check supporting memo"
+    });
+
+  assert.equal(response.status, 201);
+  assert.equal(response.body.issue_code, "reviewer_note");
+  assert.equal(response.body.issue_status, "open");
+});
+
+test("PATCH /api/review/issues/:id updates reviewer issue state", async () => {
+  const { app } = loadReviewRouterFixture();
+
+  const response = await request(app)
+    .patch("/api/review/issues/3fa85f64-5717-4562-b3fc-2c963f66afa6")
+    .send({
+      issue_status: "waived",
+      review_notes: "Immaterial test item"
+    });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.issue_status, "waived");
+  assert.equal(response.body.review_notes, "Immaterial test item");
 });

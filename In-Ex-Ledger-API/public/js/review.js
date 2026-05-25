@@ -2,6 +2,7 @@
 
 let reviewQueue = [];
 let activeSupportTransaction = null;
+let activeIssueTransaction = null;
 
 function tx(key, fallback) {
   if (typeof window.t === "function") {
@@ -132,6 +133,7 @@ function renderQueue() {
           <div class="review-row-actions">
             <a class="review-row-action" href="${escapeText(actionHref)}">${escapeText(actionLabel)}</a>
             <button type="button" class="review-row-support-btn" data-support-transaction="${escapeText(item.id)}">${escapeText(tx("review_add_support", "Add support"))}</button>
+            <button type="button" class="review-row-support-btn" data-issue-transaction="${escapeText(item.id)}">${escapeText(tx("review_manage_issue", "Manage issue"))}</button>
           </div>
         </td>
       </tr>
@@ -144,6 +146,15 @@ function renderQueue() {
       const item = reviewQueue.find((entry) => entry.id === transactionId);
       if (item) {
         void openSupportModal(item);
+      }
+    });
+  });
+  tbody.querySelectorAll("[data-issue-transaction]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const transactionId = button.getAttribute("data-issue-transaction");
+      const item = reviewQueue.find((entry) => entry.id === transactionId);
+      if (item) {
+        void openIssueModal(item);
       }
     });
   });
@@ -201,6 +212,69 @@ function closeSupportModal() {
   const form = document.getElementById("supportArtifactForm");
   form?.reset();
   syncSupportModalType();
+}
+
+function renderIssueList(issues) {
+  const container = document.getElementById("reviewIssueExisting");
+  if (!container) return;
+  if (!Array.isArray(issues) || !issues.length) {
+    container.innerHTML = `<div class="review-existing-empty">${escapeText(tx("review_issue_none", "No saved reviewer decisions on this transaction yet."))}</div>`;
+    return;
+  }
+  container.innerHTML = issues.map((issue) => `
+    <div class="review-existing-item">
+      <div>
+        <strong>${escapeText(issue.issue_code || "")}</strong>
+        <div class="review-support-subtle">${escapeText(`${issue.issue_severity || "warning"} · ${issue.issue_status || "open"}`)}</div>
+        ${issue.review_notes ? `<div class="review-support-subtle">${escapeText(issue.review_notes)}</div>` : ""}
+      </div>
+      <div class="review-row-actions">
+        ${issue.issue_status !== "resolved" ? `<button type="button" class="review-row-support-btn" data-issue-action="resolved" data-issue-id="${escapeText(issue.id)}">${escapeText(tx("review_issue_resolve", "Resolve"))}</button>` : ""}
+        ${issue.issue_status !== "waived" ? `<button type="button" class="review-row-support-btn" data-issue-action="waived" data-issue-id="${escapeText(issue.id)}">${escapeText(tx("review_issue_waive", "Waive"))}</button>` : ""}
+        ${issue.issue_status !== "open" ? `<button type="button" class="review-row-support-btn" data-issue-action="open" data-issue-id="${escapeText(issue.id)}">${escapeText(tx("review_issue_reopen", "Reopen"))}</button>` : ""}
+      </div>
+    </div>
+  `).join("");
+
+  container.querySelectorAll("[data-issue-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const issueId = button.getAttribute("data-issue-id");
+      const issueStatus = button.getAttribute("data-issue-action");
+      await updateIssue(issueId, { issue_status: issueStatus });
+      if (activeIssueTransaction) {
+        await openIssueModal(activeIssueTransaction);
+      }
+      await loadReviewQueue();
+    });
+  });
+}
+
+function closeIssueModal() {
+  activeIssueTransaction = null;
+  document.getElementById("reviewIssueModal")?.classList.add("hidden");
+  document.getElementById("reviewIssueForm")?.reset();
+}
+
+async function openIssueModal(item) {
+  activeIssueTransaction = item;
+  document.getElementById("reviewIssueContext").textContent = `${item.description || "(No description)"} · ${item.date || ""}`;
+  document.getElementById("reviewIssueTransactionId").value = item.id;
+  document.getElementById("reviewIssueCode").value = item.issueEntries?.[0]?.issueCode || "reviewer_note";
+  document.getElementById("reviewIssueSeverity").value = item.issueEntries?.[0]?.severity || "warning";
+  document.getElementById("reviewIssueNotes").value = "";
+  document.getElementById("reviewIssueModal")?.classList.remove("hidden");
+
+  try {
+    const response = await apiFetch(`/api/review/issues/${encodeURIComponent(item.id)}`);
+    if (!response || !response.ok) {
+      throw new Error(tx("review_issue_load_error", "Failed to load reviewer issue state."));
+    }
+    const issues = await response.json().catch(() => []);
+    renderIssueList(issues);
+  } catch (error) {
+    console.error("Failed to load review issues:", error);
+    renderIssueList([]);
+  }
 }
 
 async function openSupportModal(item) {
@@ -285,6 +359,58 @@ async function saveSupportArtifact(event) {
   }
 }
 
+async function updateIssue(issueId, payload) {
+  const response = await apiFetch(`/api/review/issues/${encodeURIComponent(issueId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!response || !response.ok) {
+    const body = await response?.json().catch(() => null);
+    throw new Error(body?.error || tx("review_issue_save_error", "Failed to save review issue."));
+  }
+  return response.json();
+}
+
+async function saveReviewIssue(event) {
+  event.preventDefault();
+  const transactionId = document.getElementById("reviewIssueTransactionId")?.value || "";
+  const issueCode = document.getElementById("reviewIssueCode")?.value || "";
+  const issueSeverity = document.getElementById("reviewIssueSeverity")?.value || "warning";
+  const reviewNotes = document.getElementById("reviewIssueNotes")?.value.trim() || "";
+  const submitButton = document.getElementById("reviewIssueSubmit");
+  submitButton.disabled = true;
+  submitButton.textContent = tx("review_issue_saving", "Saving...");
+  try {
+    const response = await apiFetch("/api/review/issues", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        transaction_id: transactionId,
+        issue_code: issueCode,
+        issue_severity: issueSeverity,
+        issue_status: "open",
+        review_notes: reviewNotes
+      })
+    });
+    if (!response || !response.ok) {
+      const body = await response?.json().catch(() => null);
+      throw new Error(body?.error || tx("review_issue_save_error", "Failed to save review issue."));
+    }
+    await loadReviewQueue();
+    if (activeIssueTransaction) {
+      const refreshed = reviewQueue.find((entry) => entry.id === activeIssueTransaction.id) || activeIssueTransaction;
+      await openIssueModal(refreshed);
+    }
+  } catch (error) {
+    console.error("Failed to save review issue:", error);
+    window.alert(error.message || tx("review_issue_save_error", "Failed to save review issue."));
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = tx("review_issue_submit", "Save issue");
+  }
+}
+
 async function loadReviewQueue() {
   const loading = document.getElementById("reviewQueueLoading");
   const empty = document.getElementById("reviewQueueEmpty");
@@ -327,6 +453,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("supportArtifactForm")?.addEventListener("submit", saveSupportArtifact);
   document.querySelectorAll("[data-support-modal-close]").forEach((node) => {
     node.addEventListener("click", closeSupportModal);
+  });
+  document.getElementById("reviewIssueForm")?.addEventListener("submit", saveReviewIssue);
+  document.querySelectorAll("[data-issue-modal-close]").forEach((node) => {
+    node.addEventListener("click", closeIssueModal);
   });
 
   await loadReviewQueue();
