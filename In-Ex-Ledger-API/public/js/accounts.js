@@ -59,10 +59,10 @@ function enhanceAccountsShell() {
   dashboard.className = "accounts-dashboard";
   dashboard.setAttribute("aria-label", tx("accounts_overview_aria"));
   dashboard.innerHTML = `
-    <article class="account-stat-card"><span class="account-stat-icon total" aria-hidden="true">A</span><div><span>${escapeHtml(tx("accounts_stat_active"))}</span><strong id="accountTotalCount">0</strong><small>${escapeHtml(tx("accounts_stat_active_hint"))}</small></div></article>
-    <article class="account-stat-card"><span class="account-stat-icon bank" aria-hidden="true">B</span><div><span>${escapeHtml(tx("accounts_stat_bank"))}</span><strong id="accountBankCount">0</strong><small>${escapeHtml(tx("accounts_stat_bank_hint"))}</small></div></article>
-    <article class="account-stat-card"><span class="account-stat-icon cash" aria-hidden="true">C</span><div><span>${escapeHtml(tx("accounts_stat_cash"))}</span><strong id="accountCashCardCount">0</strong><small>${escapeHtml(tx("accounts_stat_cash_hint"))}</small></div></article>
-    <article class="account-stat-card"><span class="account-stat-icon currency" aria-hidden="true">$</span><div><span>${escapeHtml(tx("accounts_stat_currency"))}</span><strong id="accountCurrencyLabel">USD</strong><small>${escapeHtml(tx("accounts_stat_currency_hint"))}</small></div></article>
+    <article class="account-stat-card"><span class="account-stat-icon total" aria-hidden="true">${renderAccountStatIcon("total")}</span><div><span>${escapeHtml(tx("accounts_stat_active"))}</span><strong id="accountTotalCount">0</strong><small>${escapeHtml(tx("accounts_stat_active_hint"))}</small></div></article>
+    <article class="account-stat-card"><span class="account-stat-icon bank" aria-hidden="true">${renderAccountStatIcon("bank")}</span><div><span>${escapeHtml(tx("accounts_stat_bank"))}</span><strong id="accountBankCount">0</strong><small>${escapeHtml(tx("accounts_stat_bank_hint"))}</small></div></article>
+    <article class="account-stat-card"><span class="account-stat-icon cash" aria-hidden="true">${renderAccountStatIcon("cash")}</span><div><span>${escapeHtml(tx("accounts_stat_cash"))}</span><strong id="accountCashCardCount">0</strong><small>${escapeHtml(tx("accounts_stat_cash_hint"))}</small></div></article>
+    <article class="account-stat-card"><span class="account-stat-icon currency" aria-hidden="true">${renderAccountStatIcon("currency")}</span><div><span>${escapeHtml(tx("accounts_stat_currency"))}</span><strong id="accountCurrencyLabel">USD</strong><small>${escapeHtml(tx("accounts_stat_currency_hint"))}</small></div></article>
   `;
   header.after(dashboard);
 
@@ -70,7 +70,7 @@ function enhanceAccountsShell() {
   toolbar.className = "accounts-toolbar";
   toolbar.setAttribute("aria-label", tx("accounts_tools_aria"));
   toolbar.innerHTML = `
-    <label class="account-search-wrap" for="accountSearchInput"><span aria-hidden="true">S</span><input id="accountSearchInput" type="search" placeholder="${escapeHtml(tx("accounts_search_placeholder"))}" autocomplete="off" /></label>
+    <label class="account-search-wrap" for="accountSearchInput"><span class="account-search-icon" aria-hidden="true">${renderAccountStatIcon("search")}</span><input id="accountSearchInput" type="search" placeholder="${escapeHtml(tx("accounts_search_placeholder"))}" autocomplete="off" /></label>
   `;
   dashboard.after(toolbar);
 
@@ -263,12 +263,12 @@ function renderAccountCard(account) {
   const type = account.type || "custom";
   const typeLabel = formatAccountType(type);
   const currency = String(account.currency || inferLedgerCurrency()).toUpperCase();
-  const icon = getAccountIcon(type);
+  const icon = getAccountIconMarkup(type);
   const accentClass = getAccountAccentClass(type);
   const isDefault = isLikelyDefaultAccount(account);
   return `
     <article class="account-card premium-account-card ${accentClass}">
-      <span class="account-card-icon" aria-hidden="true">${escapeHtml(icon)}</span>
+      <span class="account-card-icon" aria-hidden="true">${icon}</span>
       <div class="account-card-main">
         <div class="account-name">${escapeHtml(name)}</div>
         <div class="account-meta-row">
@@ -311,11 +311,38 @@ function inferLedgerCurrency() {
 }
 
 function getAccountIcon(type) {
-  if (type === "credit_card") return "C";
-  if (type === "cash") return "$";
-  if (type === "loan") return "L";
-  if (type === "savings") return "S";
-  return "B";
+  if (type === "credit_card") return "credit";
+  if (type === "cash") return "cash";
+  if (type === "loan") return "loan";
+  if (type === "savings") return "savings";
+  return "bank";
+}
+
+function getAccountIconMarkup(type) {
+  return renderAccountStatIcon(getAccountIcon(type));
+}
+
+function renderAccountStatIcon(kind) {
+  switch (kind) {
+    case "total":
+      return '<svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="3"></rect><path d="M6.5 7.5h7M6.5 10h7M6.5 12.5h4.5"></path></svg>';
+    case "bank":
+      return '<svg viewBox="0 0 20 20" fill="none"><path d="M3 8.2 10 4l7 4.2"></path><path d="M4.5 8.5h11"></path><path d="M5.5 8.5v6M9 8.5v6M11 8.5v6M14.5 8.5v6"></path><path d="M3.5 15.5h13"></path></svg>';
+    case "cash":
+      return '<svg viewBox="0 0 20 20" fill="none"><rect x="3" y="5.5" width="14" height="9" rx="2.5"></rect><circle cx="10" cy="10" r="2.1"></circle><path d="M6 8h.01M14 12h.01"></path></svg>';
+    case "currency":
+      return '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.5"></circle><path d="M10 6.2v7.6M12.8 7.7c0-.9-1.2-1.5-2.8-1.5-1.7 0-2.8.7-2.8 1.8 0 2.6 5.6 1.1 5.6 4 0 1.1-1.1 1.9-2.8 1.9-1.6 0-2.8-.7-2.8-1.6"></path></svg>';
+    case "credit":
+      return '<svg viewBox="0 0 20 20" fill="none"><rect x="3" y="5" width="14" height="10" rx="2.2"></rect><path d="M3 8.3h14"></path><path d="M6.2 12h2.2"></path></svg>';
+    case "loan":
+      return '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.5"></circle><path d="M7.4 12.6 12.6 7.4"></path><path d="M7.8 7.4h4.8v4.8"></path></svg>';
+    case "savings":
+      return '<svg viewBox="0 0 20 20" fill="none"><path d="M5.2 8.5c0-2.3 2.1-4.1 4.8-4.1s4.8 1.8 4.8 4.1c0 1.9-1.4 3.5-3.3 4v2.1H8.5v-2.1c-1.9-.5-3.3-2.1-3.3-4Z"></path><path d="M8.2 8.5h3.6"></path></svg>';
+    case "search":
+      return '<svg viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="4.8"></circle><path d="m13 13 3.2 3.2"></path></svg>';
+    default:
+      return '<svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="3"></rect></svg>';
+  }
 }
 
 function getAccountAccent(type) {
