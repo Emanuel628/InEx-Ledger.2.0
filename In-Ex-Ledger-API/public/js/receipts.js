@@ -42,8 +42,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 function wireReceiptFilters() {
   document.querySelectorAll("[data-filter]").forEach((button) => {
     button.addEventListener("click", () => {
-      currentReceiptFilter = button.getAttribute("data-filter") || "all";
-      renderReceipts(receiptRecords);
+      applyReceiptFilter(button.getAttribute("data-filter") || "all");
+    });
+  });
+  document.querySelectorAll("[data-receipt-summary-filter]").forEach((button) => {
+    button.addEventListener("click", () => {
+      applyReceiptFilter(button.getAttribute("data-receipt-summary-filter") || "all");
     });
   });
 }
@@ -57,6 +61,11 @@ function wireReceiptReviewActions() {
   document.getElementById("receiptFixNextButton")?.addEventListener("click", () => {
     openNextReceiptForReview();
   });
+}
+
+function applyReceiptFilter(nextFilter) {
+  currentReceiptFilter = nextFilter || "all";
+  renderReceipts(receiptRecords);
 }
 
 function wireUploadInput(inputEl) {
@@ -779,6 +788,11 @@ function updateReceiptFilterUi(filteredCount, totalCount) {
     button.classList.toggle("is-active", isActive);
     button.setAttribute("aria-selected", isActive ? "true" : "false");
   });
+  document.querySelectorAll("[data-receipt-summary-filter]").forEach((button) => {
+    const isActive = (button.getAttribute("data-receipt-summary-filter") || "all") === currentReceiptFilter;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
 
   const title = document.querySelector(".receipts-card-head h2");
   if (title) {
@@ -800,8 +814,7 @@ function openNextReceiptForReview() {
     showReceiptsToast(tx("receipts_focus_none_left"));
     return;
   }
-  currentReceiptFilter = "review";
-  renderReceipts(receiptRecords);
+  applyReceiptFilter("review");
   openReceiptLinkModal(nextReceipt.id);
 }
 

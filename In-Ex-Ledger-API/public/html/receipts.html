@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260525b" />
-  <link rel="stylesheet" href="/css/pages/receipts.css?v=20260525b" />
+  <link rel="stylesheet" href="/css/pages/receipts.css?v=20260526a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -72,26 +72,26 @@
       </section>
 
       <section class="receipts-summary-grid" aria-label="Receipt coverage summary">
-        <article class="receipts-summary-card">
+        <button type="button" class="receipts-summary-card" data-receipt-summary-filter="all">
           <span class="receipts-summary-label" data-i18n="receipts_summary_total_label">Total files</span>
           <strong id="receiptsSummaryTotal" class="receipts-summary-value">0</strong>
           <p class="receipts-summary-note" data-i18n="receipts_summary_total_note">Everything uploaded to this business so far.</p>
-        </article>
-        <article class="receipts-summary-card">
+        </button>
+        <button type="button" class="receipts-summary-card" data-receipt-summary-filter="linked">
           <span class="receipts-summary-label" data-i18n="receipts_summary_linked_label">Linked</span>
           <strong id="receiptsSummaryLinked" class="receipts-summary-value">0</strong>
           <p class="receipts-summary-note" data-i18n="receipts_summary_linked_note">Already tied to a transaction.</p>
-        </article>
-        <article class="receipts-summary-card receipts-summary-card--attention">
+        </button>
+        <button type="button" class="receipts-summary-card receipts-summary-card--attention" data-receipt-summary-filter="review">
           <span class="receipts-summary-label" data-i18n="receipts_summary_review_label">Needs review</span>
           <strong id="receiptsSummaryReview" class="receipts-summary-value">0</strong>
           <p class="receipts-summary-note" data-i18n="receipts_summary_review_note">Still needs a link or file follow-up.</p>
-        </article>
-        <article class="receipts-summary-card">
+        </button>
+        <button type="button" class="receipts-summary-card" data-receipt-summary-filter="recent">
           <span class="receipts-summary-label" data-i18n="receipts_summary_recent_label">Uploaded recently</span>
           <strong id="receiptsSummaryRecent" class="receipts-summary-value">0</strong>
           <p class="receipts-summary-note" data-i18n="receipts_summary_recent_note">Added in the last 7 days.</p>
-        </article>
+        </button>
       </section>
 
       <section class="receipts-focus-card" aria-live="polite">
@@ -197,7 +197,7 @@
   <script src="../js/auth.js?v=20260518a"></script>
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
-  <script src="../js/receipts.js?v=20260525b"></script>
+  <script src="../js/receipts.js?v=20260526a"></script>
 </body>
 </html>
 
