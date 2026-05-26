@@ -290,6 +290,15 @@ main {
   border: 1px solid rgba(15, 25, 35, 0.1);
   background: #ffffff;
   font-size: 14px;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.auth-form :is(input, select):focus,
+.auth-form :is(input, select):focus-visible {
+  border-color: rgba(36, 109, 187, 0.52);
+  box-shadow: 0 0 0 4px rgba(36, 109, 187, 0.14);
+  background: #ffffff;
+  outline: none;
 }
 
 .auth-submit,
