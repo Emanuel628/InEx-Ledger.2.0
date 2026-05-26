@@ -270,17 +270,12 @@ function kpiCard(label, value, note, extraClass) {
 }
 
 function barRow(label, value, max, type) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  const pct = max > 0 ? Math.max(0, Math.min(100, (Number(value || 0) / max) * 100)) : 0;
   return `<div class="bar-row">
     <span class="bar-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
-    <div class="bar-track"><div class="bar-fill ${escapeHtml(type)} ${resolveBarPctClass(pct)}"></div></div>
+    <div class="bar-track"><div class="bar-fill ${escapeHtml(type)}" style="width:${pct.toFixed(2)}%"></div></div>
     <span class="bar-amount">${fmt(value, { absolute: true })}</span>
   </div>`;
-}
-
-function resolveBarPctClass(pct) {
-  const rounded = Math.max(0, Math.min(100, Math.round(Number(pct || 0) / 5) * 5));
-  return `pct-${rounded}`;
 }
 
 // ---------------------------------------------------------------------------
