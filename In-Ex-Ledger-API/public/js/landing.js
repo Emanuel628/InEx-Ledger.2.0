@@ -91,7 +91,7 @@ const LANDING_REGION_COPY = {
 
 const LANDING_ROLODEX_CAPTIONS = [
   "Transactions - Track the money and see what needs cleanup.",
-  "Warning checklist - Click the issue and fix the missing piece.",
+  "Warning checklist - See what is set, what is missing, and what blocks export.",
   "Receipts & support - Keep the proof with the transaction.",
   "Invoices - Send work out without leaving your books.",
   "Messages - Client replies stay tied to the invoice.",
