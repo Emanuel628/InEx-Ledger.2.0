@@ -100,6 +100,8 @@ const LANDING_ROLODEX_CAPTIONS = [
   "Tax reminders - See the deadline before it turns urgent."
 ];
 
+const LANDING_BUILD_ID = "20260526b";
+
 function normalizeLandingRegion(value) {
   const raw = String(value || "").trim().toUpperCase();
   return raw === "CA" || raw === "CAN" || raw === "CANADA" ? "CA" : "US";
@@ -175,7 +177,50 @@ function updateLandingPricing(billingMode, regionOverride) {
   });
 }
 
+function setLandingBuildMarker() {
+  document.documentElement.dataset.landingBuild = LANDING_BUILD_ID;
+  let marker = document.querySelector('meta[name="inex-landing-build"]');
+  if (!marker) {
+    marker = document.createElement("meta");
+    marker.setAttribute("name", "inex-landing-build");
+    document.head.appendChild(marker);
+  }
+  marker.setAttribute("content", LANDING_BUILD_ID);
+}
+
+function hydrateWarningChecklistShowcase() {
+  const checklistCard = document.querySelector(".warning-checklist-card");
+  if (!checklistCard) return;
+
+  const heading = checklistCard.querySelector(".warning-checklist-head strong");
+  if (heading) {
+    heading.textContent = "One transaction. Every row shows what is set and what is still missing.";
+  }
+
+  const rowsHost = checklistCard.querySelector(".warning-checklist-items");
+  if (rowsHost) {
+    rowsHost.innerHTML = `
+      <article class="warning-check-row is-good"><span>Category</span><strong>Vehicle &amp; Transportation</strong><small>Assigned</small></article>
+      <article class="warning-check-row is-bad"><span>Tax line</span><strong>Not mapped</strong><small>Blocks export</small></article>
+      <article class="warning-check-row is-bad"><span>Receipt</span><strong>Missing</strong><small>No file yet</small></article>
+      <article class="warning-check-row is-bad"><span>Mileage support</span><strong>Missing log</strong><small>Blocks vehicle claim</small></article>
+    `;
+  }
+
+  const actionsHost = checklistCard.querySelector(".warning-checklist-actions");
+  if (actionsHost) {
+    actionsHost.innerHTML = `
+      <button type="button">Needs fix</button>
+      <button type="button">Cleared</button>
+      <button type="button">All</button>
+    `;
+  }
+}
+
 function hydrateLandingStaticFixes() {
+  setLandingBuildMarker();
+  hydrateWarningChecklistShowcase();
+
   const pdfCard = document.querySelector(".preview-pdf-card .preview-pdf-page");
   if (pdfCard) {
     pdfCard.innerHTML = `
