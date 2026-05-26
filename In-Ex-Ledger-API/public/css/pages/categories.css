@@ -160,10 +160,23 @@
   gap: 14px;
   min-height: 96px;
   padding: 20px 22px;
+  border: 0;
   border-right: 1px solid var(--cat-line);
+  background: transparent;
+  text-align: left;
+  transition: background-color 140ms ease, box-shadow 140ms ease;
 }
 
 .category-stat-card:last-child { border-right: 0; }
+.category-stat-card:hover { background: rgba(37, 99, 235, 0.04); }
+.category-stat-card.is-active {
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.08), rgba(255, 255, 255, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.16);
+}
+.category-stat-card:focus-visible {
+  outline: 0;
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.28);
+}
 .category-stat-card span:not(.category-stat-icon) { display: block; color: var(--cat-muted); font-size: 12px; font-weight: 800; letter-spacing: .02em; }
 .category-stat-card strong { display: block; margin-top: 4px; color: var(--cat-ink); font-size: 24px; line-height: 1; letter-spacing: -0.04em; }
 .category-stat-card small { display: block; margin-top: 6px; color: var(--cat-muted); font-size: 12px; }
@@ -362,7 +375,7 @@
 .status-review { background: #fef3c7; color: #92400e; }
 .status-tax { background: #dbeafe; color: #1d4ed8; }
 .status-default { background: #f1f5f9; color: #475569; }
-.status-unmapped { background: #eef2f7; color: #64748b; }
+.status-unmapped { background: #fff7ed; color: #b45309; border-color: rgba(245, 158, 11, 0.22); }
 .status-in-use { background: #e0f2fe; color: #075985; }
 
 .category-actions { position: relative; }

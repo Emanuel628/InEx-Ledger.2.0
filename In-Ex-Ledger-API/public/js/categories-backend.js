@@ -134,10 +134,10 @@ function enhanceCategoriesPageShell() {
   dashboard.className = "category-dashboard";
   dashboard.setAttribute("aria-label", "Category overview");
   dashboard.innerHTML = `
-    <article class="category-stat-card"><span class="category-stat-icon total" aria-hidden="true">CT</span><div><span>Total categories</span><strong id="categoryTotalCount">0</strong><small>Active categories</small></div></article>
-    <article class="category-stat-card"><span class="category-stat-icon mapped" aria-hidden="true">OK</span><div><span>Mapped</span><strong id="categoryMappedCount">0</strong><small id="categoryMappedPercent">0% of categories</small></div></article>
-    <article class="category-stat-card"><span class="category-stat-icon review" aria-hidden="true">RV</span><div><span>Needs review</span><strong id="categoryReviewCount">0</strong><small>Still missing a tax line</small></div></article>
-    <article class="category-stat-card"><span class="category-stat-icon tax" aria-hidden="true">TX</span><div><span id="categorySpecialTaxLabel">Tax categories</span><strong id="categorySpecialTaxCount">0</strong><small id="categorySpecialTaxHint">With tax treatment</small></div></article>
+    <button type="button" class="category-stat-card" data-category-filter="all"><span class="category-stat-icon total" aria-hidden="true">CT</span><div><span>Total categories</span><strong id="categoryTotalCount">0</strong><small>Active categories</small></div></button>
+    <button type="button" class="category-stat-card" data-category-filter="mapped"><span class="category-stat-icon mapped" aria-hidden="true">OK</span><div><span>Mapped</span><strong id="categoryMappedCount">0</strong><small id="categoryMappedPercent">0% of categories</small></div></button>
+    <button type="button" class="category-stat-card" data-category-filter="review" id="categoryReviewStat"><span class="category-stat-icon review" aria-hidden="true">RV</span><div><span>Needs review</span><strong id="categoryReviewCount">0</strong><small id="categoryReviewHint">Still missing a tax line</small></div></button>
+    <button type="button" class="category-stat-card" data-category-filter="tax"><span class="category-stat-icon tax" aria-hidden="true">TX</span><div><span id="categorySpecialTaxLabel">Tax categories</span><strong id="categorySpecialTaxCount">0</strong><small id="categorySpecialTaxHint">With tax treatment</small></div></button>
   `;
   header.after(dashboard);
 
@@ -193,24 +193,22 @@ function enhanceCategoriesPageShell() {
   consoleWrap.after(guidance);
 
   document.getElementById("categoryToolbarAddBtn")?.addEventListener("click", () => openCategoryModal("expense"));
-  document.getElementById("categoryReviewBtn")?.addEventListener("click", () => {
-    currentCategoryFilter = "review";
-    syncCategoryFilterUi();
-    renderCategoryLists();
-  });
+  document.getElementById("categoryReviewBtn")?.addEventListener("click", () => applyCategoryFilter("review"));
   document.getElementById("categorySearchInput")?.addEventListener("input", (event) => {
     categorySearchTerm = String(event.target.value || "").trim().toLowerCase();
     renderCategoryLists();
   });
   document.querySelectorAll("[data-category-filter]").forEach((button) => {
-    button.addEventListener("click", () => {
-      currentCategoryFilter = button.getAttribute("data-category-filter") || "all";
-      syncCategoryFilterUi();
-      renderCategoryLists();
-    });
+    button.addEventListener("click", () => applyCategoryFilter(button.getAttribute("data-category-filter") || "all"));
   });
 
   updateRegionContext();
+}
+
+function applyCategoryFilter(nextFilter) {
+  currentCategoryFilter = nextFilter || "all";
+  syncCategoryFilterUi();
+  renderCategoryLists();
 }
 
 function syncCategoryFilterUi() {
@@ -528,6 +526,12 @@ function renderCategoryRow(category) {
   const taxInfo = category.taxLabel ? getTaxInfo(category.taxLabel) : null;
   const mapped = Boolean(taxInfo);
   const tax = isTaxCategory(category, taxInfo);
+  const missingTaxLabel = currentRegion === "CA" ? "No T2125 line" : currentRegion === "US" ? "No Schedule C line" : "No tax line";
+  const missingTaxHint = currentRegion === "CA"
+    ? "Assign a T2125 line before export."
+    : currentRegion === "US"
+      ? "Assign a Schedule C line before export."
+      : "Assign a tax line before export.";
   const accentClass = !mapped ? "category-item-accent-review" : tax ? "category-item-accent-tax" : category.type === "income" ? "category-item-accent-income" : "category-item-accent-expense";
   const usageText = category.transactionCount > 0 ? `${category.transactionCount} linked transaction${category.transactionCount === 1 ? "" : "s"}` : "Not in use yet";
   const usageBadge = category.transactionCount > 0 ? `<span class="category-status-pill status-in-use">In use</span>` : "";
@@ -538,7 +542,7 @@ function renderCategoryRow(category) {
   const taxBadge = tax ? `<span class="category-status-pill status-tax">${currentRegion === "CA" ? "GST/HST" : "1099"}</span>` : "";
   const taxChip = mapped
     ? `<span class="category-tax-pill" title="${escapeHtml(taxInfo.label)}">${escapeHtml(taxInfo.line || taxInfo.label)}</span>`
-    : `<span class="category-tax-pill status-unmapped">No tax line</span>`;
+    : `<span class="category-tax-pill status-unmapped" title="${escapeHtml(missingTaxHint)}">${escapeHtml(missingTaxLabel)}</span>`;
 
   return `
     <div class="category-item ${accentClass}">
@@ -582,6 +586,7 @@ function updateCategoryDashboard() {
   setText("categoryReviewCount", review);
   setText("categorySpecialTaxCount", special);
   setText("categoryMappedPercent", `${pct}% of categories`);
+  setText("categoryReviewHint", review > 0 ? `Tap to filter ${review} unmapped categor${review === 1 ? "y" : "ies"}` : "Everything is mapped");
   setText("incomeCategorySummary", `${income.length} active · ${incomeMapped} mapped`);
   setText("expenseCategorySummary", `${expense.length} active · ${expenseMapped} mapped · ${Math.max(expense.length - expenseMapped, 0)} need review`);
 
