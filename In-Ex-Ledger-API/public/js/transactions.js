@@ -140,6 +140,8 @@ let transactionFxReferenceRequestId = 0;
 let pendingTransactionReceiptFiles = [];
 let recurringDrawerElement = null;
 let recurringToggleElement = null;
+let recurringPanelBodyElement = null;
+let recurringPanelToggleElement = null;
 let editingRecurringTemplateId = null;
 let transactionBusinessContext = {
   activeBusinessId: "",
@@ -320,6 +322,15 @@ function getTxnFlagBadgeLabel(flags) {
 function getTxnFlagBadgeCss(flags) {
   const top = getTxnTopFlag(flags);
   return top ? (TX_FLAG_BADGE_CSS[top] || "flag-missing") : "flag-ready";
+}
+
+function getTxnRowToneClass(flags, reviewStatus) {
+  const top = getTxnTopFlag(flags);
+  if (top === "NC" || top === "UM") return "row-flag-critical";
+  if (top === "ML" || top === "AL" || top === "BP" || top === "RS") return "row-flag-missing";
+  if (top === "IS" || top === "DUP") return "row-flag-warning";
+  if (!top && reviewStatus === "rv") return "row-flag-cpa";
+  return "";
 }
 
 function hasManualReviewState(txn) {
@@ -1302,13 +1313,33 @@ function closeTransactionDrawer() {
 function setupRecurringDrawer() {
   recurringDrawerElement = document.getElementById("recurringDrawer");
   recurringToggleElement = document.getElementById("recurringToggle");
+  recurringPanelBodyElement = document.getElementById("recurringPanelBody");
+  recurringPanelToggleElement = document.getElementById("recurringPanelToggle");
   const cancelButton = document.getElementById("recurringCancel");
 
   if (!recurringDrawerElement || !recurringToggleElement) {
     return;
   }
 
+  recurringPanelToggleElement?.addEventListener("click", () => {
+    if (recurringPanelBodyElement?.hasAttribute("hidden")) {
+      recurringPanelBodyElement.removeAttribute("hidden");
+      recurringPanelToggleElement.textContent = txT("transactions_recurring_hide_panel", "Hide templates");
+      recurringPanelToggleElement.setAttribute("aria-expanded", "true");
+    } else {
+      recurringPanelBodyElement?.setAttribute("hidden", "");
+      recurringPanelToggleElement.textContent = txT("transactions_recurring_show_panel", "Show templates");
+      recurringPanelToggleElement.setAttribute("aria-expanded", "false");
+      closeRecurringDrawer();
+    }
+  });
+
   recurringToggleElement.addEventListener("click", () => {
+    recurringPanelBodyElement?.removeAttribute("hidden");
+    recurringPanelToggleElement?.setAttribute("aria-expanded", "true");
+    if (recurringPanelToggleElement) {
+      recurringPanelToggleElement.textContent = txT("transactions_recurring_hide_panel", "Hide templates");
+    }
     if (recurringDrawerElement.hasAttribute("hidden")) {
       openRecurringDrawer();
     } else {
@@ -1941,6 +1972,7 @@ function buildRecurringEmptyStateMarkup() {
       </div>
       <h3 class="table-empty-title">${txT("transactions_recurring_empty", "No recurring templates yet.")}</h3>
       <p class="table-empty-copy">Create a template to automate your regular expenses.</p>
+      <button type="button" class="table-empty-button" id="recurringEmptyOpenButton">${txT("transactions_recurring_add", "+ Add recurring template")}</button>
     </div>
   `;
 }
@@ -2261,7 +2293,26 @@ function renderRecurringTemplates() {
     selectedRecurringTemplateIds.clear();
     closeRecurringRowActionPopup();
     tbody.innerHTML = `<tr class="placeholder-row"><td colspan="6" class="placeholder placeholder-cell">${buildRecurringEmptyStateMarkup()}</td></tr>`;
+    recurringPanelBodyElement?.setAttribute("hidden", "");
+    recurringPanelToggleElement?.setAttribute("aria-expanded", "false");
+    if (recurringPanelToggleElement) {
+      recurringPanelToggleElement.textContent = txT("transactions_recurring_show_panel", "Show templates");
+    }
+    document.getElementById("recurringEmptyOpenButton")?.addEventListener("click", () => {
+      recurringPanelBodyElement?.removeAttribute("hidden");
+      recurringPanelToggleElement?.setAttribute("aria-expanded", "true");
+      if (recurringPanelToggleElement) {
+        recurringPanelToggleElement.textContent = txT("transactions_recurring_hide_panel", "Hide templates");
+      }
+      openRecurringDrawer();
+    });
     return;
+  }
+
+  recurringPanelBodyElement?.removeAttribute("hidden");
+  recurringPanelToggleElement?.setAttribute("aria-expanded", "true");
+  if (recurringPanelToggleElement) {
+    recurringPanelToggleElement.textContent = txT("transactions_recurring_hide_panel", "Hide templates");
   }
 
   if (_popupRecurringTemplateId && !recurringState.templates.some((item) => String(item.id) === String(_popupRecurringTemplateId))) {
@@ -3320,6 +3371,7 @@ function renderTransactionsTable(filteredTransactions) {
     const descriptionSub = [businessBadge, descriptionTail, typeBadge, metadataBadges.join(" ")].filter(Boolean).join(" ");
     const amountClass = txn.type === "income" ? "amount-positive" : "amount-negative";
     const amountPrefix = txn.type === "income" ? "+" : "-";
+    const rowToneClass = getTxnRowToneClass(computeTxnFlags(txn), txn.reviewStatus);
     const clearedMarkup = txn.cleared
       ? `<span class="status-badge status-cleared">${txT("transactions_status_cleared", "Cleared")}</span>`
       : `<span class="status-badge status-pending">${txT("transactions_status_pending", "Pending")}</span>`;
@@ -3348,6 +3400,9 @@ function renderTransactionsTable(filteredTransactions) {
       </td>
       <td class="amount-cell"><span class="${amountClass}">${amountPrefix}${formatCurrency(Math.abs(Number(txn.amount) || 0), rowRegion)}</span></td>
     `;
+    if (rowToneClass) {
+      row.classList.add(rowToneClass);
+    }
     row.classList.toggle("is-selected", selectedTransactionIds.has(txnId));
     tbody.appendChild(row);
 

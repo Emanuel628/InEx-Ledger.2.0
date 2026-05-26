@@ -836,7 +836,7 @@ body {
 .page-header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 .scope-select-wrap {
@@ -2369,6 +2369,8 @@ body {
 
 .tx-sticky-add {
   position: static;
+  background: linear-gradient(135deg, #2d7fe0 0%, #246dbb 52%, #194f82 100%);
+  box-shadow: 0 14px 24px rgba(36, 109, 187, 0.22);
 }
 
 /* ── M-08: Period picker chips ───────────────────────────── */
@@ -3681,15 +3683,15 @@ tr.tx-highlight {
 
 .transactions-toolbar-tools {
   display: grid;
-  grid-template-columns: minmax(240px, 320px) minmax(170px, 184px);
+  grid-template-columns: minmax(240px, 320px) minmax(188px, 212px);
   align-items: start;
-  gap: 12px;
+  gap: 18px;
 }
 
 .transactions-toolbar-controls {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .toolbar-search,
@@ -3717,6 +3719,12 @@ tr.tx-highlight {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.recurring-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .recurring-toolbar-copy {
   align-self: center;
 }
@@ -3733,6 +3741,17 @@ tr.tx-highlight {
   background: linear-gradient(180deg, #2c79c4 0%, #246dbb 100%);
   color: #fff;
   box-shadow: 0 12px 22px rgba(36, 109, 187, 0.18);
+}
+
+.recurring-panel-toggle {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(21, 40, 61, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  color: #36506b;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .transactions-table thead th.col-select {
@@ -3768,6 +3787,29 @@ tr.tx-highlight {
 }
 
 .transactions-table tbody tr.is-selected td {
+  background: transparent;
+}
+
+.transactions-table tbody tr.row-flag-critical {
+  background: linear-gradient(90deg, rgba(254, 226, 226, 0.62) 0%, rgba(255, 255, 255, 0) 72%);
+}
+
+.transactions-table tbody tr.row-flag-missing {
+  background: linear-gradient(90deg, rgba(255, 237, 213, 0.58) 0%, rgba(255, 255, 255, 0) 72%);
+}
+
+.transactions-table tbody tr.row-flag-warning {
+  background: linear-gradient(90deg, rgba(254, 249, 195, 0.58) 0%, rgba(255, 255, 255, 0) 72%);
+}
+
+.transactions-table tbody tr.row-flag-cpa {
+  background: linear-gradient(90deg, rgba(237, 233, 254, 0.6) 0%, rgba(255, 255, 255, 0) 72%);
+}
+
+.transactions-table tbody tr.row-flag-critical td,
+.transactions-table tbody tr.row-flag-missing td,
+.transactions-table tbody tr.row-flag-warning td,
+.transactions-table tbody tr.row-flag-cpa td {
   background: transparent;
 }
 
@@ -3972,7 +4014,8 @@ tr.tx-highlight {
 }
 
 .table-empty-state-recurring {
-  min-height: 172px;
+  min-height: 140px;
+  gap: 12px;
 }
 
 .table-empty-illustration {

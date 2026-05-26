@@ -493,36 +493,42 @@
             <h2 class="transactions-panel-title">Recurring templates</h2>
             <p class="page-subtitle recurring-subtitle">Automate retainers, subscriptions, and fixed monthly expenses.</p>
           </div>
-          <button id="recurringToggle" class="toolbar-add-button recurring-add-inline" type="button" aria-expanded="false">
-            + Add recurring template
-          </button>
+          <div class="recurring-toolbar-actions">
+            <button type="button" id="recurringPanelToggle" class="recurring-panel-toggle" aria-expanded="false" aria-controls="recurringPanelBody">
+              Show templates
+            </button>
+            <button id="recurringToggle" class="toolbar-add-button recurring-add-inline" type="button" aria-expanded="false">
+              + Add recurring template
+            </button>
+          </div>
         </div>
 
-        <div id="recurringDrawer" hidden>
-          <form id="recurringForm" method="post">
-            <div class="transaction-drawer-card recurring-drawer-card">
-              <div class="transaction-drawer-head">
-                <h3 class="drawer-title">Recurring template</h3>
-              </div>
+        <div id="recurringPanelBody" hidden>
+          <div id="recurringDrawer" hidden>
+            <form id="recurringForm" method="post">
+              <div class="transaction-drawer-card recurring-drawer-card">
+                <div class="transaction-drawer-head">
+                  <h3 class="drawer-title">Recurring template</h3>
+                </div>
 
-              <div class="transaction-form-grid">
-                <div class="form-field">
-                  <label for="recurringType" class="form-label">Type</label>
-                  <select id="recurringType" class="form-control" required>
-                    <option value="expense">Expense</option>
-                    <option value="income">Income</option>
-                  </select>
-                </div>
-                <div class="form-field">
-                  <label for="recurringCadence" class="form-label">Cadence</label>
-                  <select id="recurringCadence" class="form-control" required>
-                    <option value="weekly">Weekly</option>
-                    <option value="biweekly">Biweekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="yearly">Yearly</option>
-                  </select>
-                </div>
+                <div class="transaction-form-grid">
+                  <div class="form-field">
+                    <label for="recurringType" class="form-label">Type</label>
+                    <select id="recurringType" class="form-control" required>
+                      <option value="expense">Expense</option>
+                      <option value="income">Income</option>
+                    </select>
+                  </div>
+                  <div class="form-field">
+                    <label for="recurringCadence" class="form-label">Cadence</label>
+                    <select id="recurringCadence" class="form-control" required>
+                      <option value="weekly">Weekly</option>
+                      <option value="biweekly">Biweekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
                 <div class="form-field">
                   <label for="recurringDescription" class="form-label">Description</label>
                   <input id="recurringDescription" class="form-control" type="text" required />
@@ -560,32 +566,33 @@
                 </div>
               </div>
 
-              <p id="recurringFormMessage" class="error-text"></p>
+                <p id="recurringFormMessage" class="error-text"></p>
 
-              <div class="tx-actions recurring-actions">
-                <button type="button" id="recurringCancel" class="modal-cancel">Cancel</button>
-                <button type="submit" id="recurringSubmit" class="drawer-submit">Save recurring template</button>
+                <div class="tx-actions recurring-actions">
+                  <button type="button" id="recurringCancel" class="modal-cancel">Cancel</button>
+                  <button type="submit" id="recurringSubmit" class="drawer-submit">Save recurring template</button>
+                </div>
               </div>
-            </div>
-          </form>
-        </div>
+            </form>
+          </div>
 
-        <div class="table-wrapper recurring-table-wrapper">
-          <table class="transactions-table recurring-table">
-            <thead>
-              <tr>
-                <th class="col-select"></th>
-                <th>Description</th>
-                <th>Cadence</th>
-                <th>Next run</th>
-                <th>Status</th>
-                <th class="col-amount">Amount</th>
-              </tr>
-            </thead>
-            <tbody id="recurringTableBody">
-              <tr><td colspan="6" class="placeholder">Loading recurring templates...</td></tr>
-            </tbody>
-          </table>
+          <div class="table-wrapper recurring-table-wrapper">
+            <table class="transactions-table recurring-table">
+              <thead>
+                <tr>
+                  <th class="col-select"></th>
+                  <th>Description</th>
+                  <th>Cadence</th>
+                  <th>Next run</th>
+                  <th>Status</th>
+                  <th class="col-amount">Amount</th>
+                </tr>
+              </thead>
+              <tbody id="recurringTableBody">
+                <tr><td colspan="6" class="placeholder">Loading recurring templates...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
     </div>
