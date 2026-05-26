@@ -143,6 +143,11 @@
 }
 
 .hero-rolodex-dot.is-active {
+  /* Keep the active dot a circle. landing.css widens the dot to 28px,
+     which turned it into an elongated pill; force matching width/height
+     so the active state stays the same shape, just colored and lifted. */
+  width: 9px;
+  height: 9px;
   background: #0f5bd7;
   transform: scale(1.18);
 }
@@ -524,21 +529,31 @@
   }
 
   .hero-rolodex-stage {
+    /* Stack all slides into a single grid cell so the stage height stays
+       stable when the active slide changes. Toggling display:none/block
+       per slide on mobile let each slide render at a slightly different
+       height, shifting the page below on every advance. */
+    display: grid;
+    grid-template-areas: "rolodex-slide";
     min-height: auto;
   }
 
   .hero-rolodex-slide {
     position: relative;
     inset: auto;
-    display: none;
-    visibility: visible;
+    grid-area: rolodex-slide;
+    display: block;
+    visibility: hidden;
+    opacity: 0 !important;
     transform: none !important;
-    opacity: 1 !important;
     filter: none !important;
+    pointer-events: none;
   }
 
   .hero-rolodex-slide.is-active {
-    display: block;
+    visibility: visible;
+    opacity: 1 !important;
+    pointer-events: auto;
   }
 
   .preview-two-up,
