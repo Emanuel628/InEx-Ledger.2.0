@@ -801,6 +801,43 @@ function renderExportPreflight(finalization) {
     statusLabel = tx("exports_preflight_status_warning");
   }
 
+  const formatIssueLabel = (item) => {
+    const code = String(item?.code || "").trim().toLowerCase();
+    const rawMessage = String(item?.message || "").trim();
+    const shorthandMessage = rawMessage.toLowerCase();
+    const codeLabels = {
+      needs_tax_mapping: "Transactions still need tax-line mapping",
+      needs_receipt_support: "Receipt or support files are still missing",
+      needs_business_purpose: "Business-purpose notes still need review",
+      needs_allocation: "Split allocations still need review",
+      needs_mileage_log: "Mileage logs or actual-expense support are still missing",
+      needs_home_office_support: "Home office support is still missing",
+      needs_capital_asset_review: "Capital asset review is still incomplete",
+      missing_description: "Transactions are still missing descriptions",
+      cpa_review_required: "Reviewer follow-up is still open",
+      final_confirmation_needed: "Final confirmation is still required",
+      needs_category: "Transactions still need categories",
+      business_profile_incomplete: "Business profile is incomplete",
+      finalization_certification_required: "Finalization certification is still required"
+    };
+
+    if (codeLabels[code]) {
+      return codeLabels[code];
+    }
+    if (shorthandMessage === "dup" || shorthandMessage.startsWith("dup ")) {
+      return "Duplicate transactions detected";
+    }
+    if (shorthandMessage === "pt" || shorthandMessage.startsWith("pt ")) {
+      return "Personal transactions still need review";
+    }
+    if (rawMessage && /^[a-z_]+$/i.test(rawMessage)) {
+      return rawMessage
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (match) => match.toUpperCase());
+    }
+    return rawMessage || code.replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase()) || tx("exports_preflight_none");
+  };
+
   const renderIssueList = (items) => {
     if (!items.length) {
       return `<li>${escapeHtml(tx("exports_preflight_none"))}</li>`;
@@ -808,7 +845,7 @@ function renderExportPreflight(finalization) {
     return items.map((item) => {
       const count = Number(item?.count || 0);
       const suffix = count > 0 ? ` (${count})` : "";
-      return `<li>${escapeHtml(String(item?.message || item?.code || ""))}${escapeHtml(suffix)}</li>`;
+      return `<li>${escapeHtml(formatIssueLabel(item))}${escapeHtml(suffix)}</li>`;
     }).join("");
   };
 
@@ -838,13 +875,13 @@ function renderExportPreflight(finalization) {
       <span class="export-preflight-status-badge ${statusClass}">${escapeHtml(statusLabel)}</span>
     </div>
     <div class="export-preflight-columns">
-      <section>
+      <section class="export-preflight-list">
         <h3>${escapeHtml(tx("exports_preflight_blockers_title"))}</h3>
-        <ul class="export-preflight-list">${renderIssueList(hardBlockers)}</ul>
+        <ul>${renderIssueList(hardBlockers)}</ul>
       </section>
-      <section>
+      <section class="export-preflight-list">
         <h3>${escapeHtml(tx("exports_preflight_warnings_title"))}</h3>
-        <ul class="export-preflight-list">${renderIssueList(warnings)}</ul>
+        <ul>${renderIssueList(warnings)}</ul>
       </section>
     </div>
     ${profileNote}
