@@ -112,20 +112,40 @@ function renderInvoiceStats() {
 function renderInvoiceTable() {
   const tbody = document.getElementById("invoiceTableBody");
   if (!invoiceList.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="placeholder">No invoices yet. Click <strong>+ New invoice</strong> to create one.</td></tr>';
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="placeholder placeholder-empty">
+          <div class="invoice-empty-state">
+            <span class="invoice-empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <rect x="5" y="3.5" width="14" height="17" rx="2"></rect>
+                <path d="M9 8h6M9 12h6"></path>
+                <path d="M12 15.5v4"></path>
+                <path d="M10 17.5h4"></path>
+              </svg>
+            </span>
+            <strong>No invoices yet</strong>
+            <span>Create your first invoice to start tracking receivables and client payments here.</span>
+            <button type="button" class="invoice-empty-button" data-empty-new-invoice>+ New invoice</button>
+          </div>
+        </td>
+      </tr>
+    `;
     return;
   }
 
   tbody.innerHTML = invoiceList.map((inv) => {
     const overdue = isOverdue(inv);
     const statusClass = STATUS_CLASSES[inv.status] || "";
-    const overdueTag = overdue ? '<span class="badge badge-overdue">Overdue</span>' : "";
+    const statusMarkup = overdue
+      ? `<span class="badge ${statusClass}">${escapeHtml(STATUS_LABELS[inv.status] || inv.status)}</span><span class="badge badge-overdue">Overdue</span>`
+      : `<span class="badge ${statusClass}">${escapeHtml(STATUS_LABELS[inv.status] || inv.status)}</span>`;
     return `<tr data-id="${escapeHtml(inv.id)}">
       <td class="inv-number">${escapeHtml(inv.invoice_number)}</td>
       <td>${escapeHtml(inv.customer_name)}</td>
       <td>${escapeHtml(fmtDate(inv.issue_date))}</td>
-      <td>${escapeHtml(fmtDate(inv.due_date))}${overdueTag}</td>
-      <td><span class="badge ${statusClass}">${escapeHtml(STATUS_LABELS[inv.status] || inv.status)}</span></td>
+      <td>${escapeHtml(fmtDate(inv.due_date))}</td>
+      <td><div class="invoice-status-cell">${statusMarkup}</div></td>
       <td class="col-amount">${escapeHtml(fmtMoney(inv.total_amount, inv.currency))}</td>
       <td class="col-actions">
       ${invoiceStatusFilter === "deleted"
@@ -476,7 +496,13 @@ document.getElementById(activeSidebarId)?.classList.add("is-active");
   // Table action delegation
   document.getElementById("invoiceTableBody")?.addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-action]");
-  if (!btn) return;
+  if (!btn) {
+    const emptyButton = e.target.closest("[data-empty-new-invoice]");
+    if (emptyButton) {
+      openInvoicePanel(null);
+    }
+    return;
+  }
 
   const id = btn.dataset.id;
   const action = btn.dataset.action;

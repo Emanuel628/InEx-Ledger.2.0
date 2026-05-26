@@ -113,6 +113,11 @@
   letter-spacing: -0.03em;
 }
 
+.toolbar-select {
+  margin-left: auto;
+  min-width: 180px;
+}
+
 .toolbar-select,
 .form-control,
 .invoice-line-row input,
@@ -191,6 +196,68 @@
   color: #667385;
 }
 
+.placeholder-empty {
+  padding: 0;
+}
+
+.invoice-empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  min-height: 320px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.invoice-empty-icon {
+  width: 68px;
+  height: 68px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(36, 109, 187, 0.12), rgba(36, 109, 187, 0.05));
+  color: var(--accent2);
+}
+
+.invoice-empty-icon svg {
+  width: 32px;
+  height: 32px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.invoice-empty-state strong {
+  color: #102236;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.invoice-empty-state span:not(.invoice-empty-icon) {
+  max-width: 420px;
+  color: #667385;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.invoice-empty-button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(36, 109, 187, 0.18);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--accent2);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.invoice-empty-button:hover {
+  background: #f8fbff;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
@@ -225,8 +292,16 @@
 
 .badge-overdue {
   margin-left: 6px;
-  background: var(--red-bg);
-  color: var(--red);
+  background: #fff7ed;
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.22);
+}
+
+.invoice-status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .inv-number {
