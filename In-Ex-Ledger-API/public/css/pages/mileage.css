@@ -314,6 +314,24 @@ textarea.form-control {
   color: var(--ink3);
   font-size: 13px;
   text-align: center;
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px;
+  border: 1px dashed rgba(15, 25, 35, 0.12);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(247, 250, 252, 0.9), rgba(255, 255, 255, 0.96));
+}
+
+.mileage-empty-title {
+  color: #102236;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.mileage-empty-body {
+  color: var(--ink3);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .mileage-pagination {

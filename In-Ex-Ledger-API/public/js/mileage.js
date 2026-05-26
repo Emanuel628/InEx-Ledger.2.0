@@ -56,7 +56,9 @@ function wireEntryModeToggle() {
 function setEntryMode(mode) {
   activeEntryMode = mode === "maintenance" ? "maintenance" : mode === "expense" ? "expense" : "trip";
   document.querySelectorAll("[data-entry-mode]").forEach((button) => {
-    button.classList.toggle("is-active", button.getAttribute("data-entry-mode") === activeEntryMode);
+    const isActive = button.getAttribute("data-entry-mode") === activeEntryMode;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
   });
 
   const tripPanel = document.querySelector('[data-entry-panel="trip"]');
@@ -322,12 +324,14 @@ function renderMileageHistory() {
   const empty = document.getElementById("mileageEmpty");
   if (!body || !empty) return;
 
+  const totalHistoryEntries = buildHistoryEntries();
   const allEntries = getFilteredHistoryEntries();
   renderMileageSummary(allEntries);
 
   if (!allEntries.length) {
     body.innerHTML = "";
     empty.hidden = false;
+    updateMileageEmptyState(totalHistoryEntries.length > 0);
     renderMileagePagination(0);
     return;
   }
@@ -376,6 +380,21 @@ function renderMileageHistory() {
   });
 
   renderMileagePagination(allEntries.length);
+}
+
+function updateMileageEmptyState(hasAnyHistory) {
+  const title = document.getElementById("mileageEmptyTitle");
+  const body = document.getElementById("mileageEmptyBody");
+  if (!title || !body) return;
+
+  if (hasAnyHistory) {
+    title.textContent = "No activity matches the current filters.";
+    body.textContent = "Try a different search term or clear the date and type filters.";
+    return;
+  }
+
+  title.textContent = "Your vehicle log history is empty.";
+  body.textContent = "Record a new trip, vehicle expense, or maintenance entry above to build your deduction trail.";
 }
 
 function renderMileagePagination(total) {
