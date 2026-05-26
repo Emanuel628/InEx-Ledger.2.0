@@ -570,6 +570,56 @@ body {
   justify-content: flex-start;
 }
 
+.preview-history-panel {
+  display: grid;
+  align-content: start;
+  gap: 22px;
+}
+
+.preview-history-panel .preview-page-header {
+  grid-template-columns: minmax(280px, 0.72fr) minmax(320px, 1fr);
+  gap: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.preview-history-panel .preview-page-header > :first-child {
+  max-width: 440px;
+}
+
+.preview-filter-pills {
+  width: 100%;
+  max-width: none;
+  display: flex;
+  justify-content: flex-start;
+  align-content: flex-start;
+}
+
+.preview-filter-pills button {
+  min-width: 116px;
+}
+
+.preview-history-grid-wide {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 0;
+}
+
+.preview-history-grid-wide .preview-micro-card {
+  min-width: 0;
+  min-height: 170px;
+}
+
+.preview-history-grid-wide .preview-micro-card strong {
+  font-size: clamp(1.7rem, 2.5vw, 2.5rem);
+  line-height: 1.02;
+}
+
+.preview-history-grid-wide .preview-micro-card p {
+  max-width: 24ch;
+  font-size: 13px;
+}
+
 .preview-page-header {
   display: flex;
   justify-content: space-between;
@@ -1546,6 +1596,20 @@ body {
   .preview-single-panel .preview-actions {
     width: 100%;
     max-width: none;
+  }
+
+  .preview-history-panel .preview-page-header {
+    gap: 18px;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .preview-history-grid-wide {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-history-grid-wide .preview-micro-card {
+    min-height: 0;
   }
 
   .warning-checklist-items {
