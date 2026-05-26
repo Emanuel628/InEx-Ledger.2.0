@@ -229,7 +229,6 @@ function initLandingRolodex() {
   const root = document.querySelector("[data-rolodex]");
   if (!root) return;
 
-  const stage = root.querySelector(".hero-rolodex-stage");
   const slides = Array.from(root.querySelectorAll("[data-rolodex-slide]"));
   const prevButton = root.querySelector("[data-rolodex-prev]");
   const nextButton = root.querySelector("[data-rolodex-next]");
@@ -239,7 +238,6 @@ function initLandingRolodex() {
 
   let activeIndex = 0;
   let autoplayTimer = null;
-  let activeSlideObserver = null;
 
   function slideDistance(index) {
     const total = slides.length;
@@ -291,36 +289,10 @@ function initLandingRolodex() {
     }
   }
 
-  function syncStageHeight() {
-    const activeSlide = slides[activeIndex];
-    const measuredNode = activeSlide?.querySelector(".app-preview-shell") || activeSlide;
-    if (!stage || !measuredNode) return;
-    const nextHeight = Math.ceil(measuredNode.getBoundingClientRect().height);
-    if (nextHeight > 0) {
-      stage.style.setProperty("--rolodex-stage-height", `${nextHeight}px`);
-    }
-  }
-
-  function watchActiveSlide() {
-    if (activeSlideObserver) {
-      activeSlideObserver.disconnect();
-    }
-    if (typeof ResizeObserver !== "function") return;
-    const activeSlide = slides[activeIndex];
-    const measuredNode = activeSlide?.querySelector(".app-preview-shell") || activeSlide;
-    if (!measuredNode) return;
-    activeSlideObserver = new ResizeObserver(() => {
-      syncStageHeight();
-    });
-    activeSlideObserver.observe(measuredNode);
-  }
-
   function render() {
     setTransforms();
     setDots();
     setCaption();
-    watchActiveSlide();
-    window.requestAnimationFrame(syncStageHeight);
   }
 
   function next() {
@@ -365,7 +337,6 @@ function initLandingRolodex() {
   root.addEventListener("mouseleave", startAutoplay);
   root.addEventListener("focusin", clearAutoplay);
   root.addEventListener("focusout", startAutoplay);
-  window.addEventListener("resize", syncStageHeight);
 
   render();
   startAutoplay();

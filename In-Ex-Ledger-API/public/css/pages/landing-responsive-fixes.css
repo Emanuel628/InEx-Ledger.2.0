@@ -124,11 +124,6 @@ html[data-region="CA"] .region-card-flag::before {
   isolation: isolate;
 }
 
-.hero-rolodex-stage {
-  min-height: 0 !important;
-  height: var(--rolodex-stage-height, auto);
-}
-
 .app-preview-shell {
   border: 1px solid rgba(15, 23, 42, 0.16) !important;
   outline: 1px solid rgba(255, 255, 255, 0.88);
