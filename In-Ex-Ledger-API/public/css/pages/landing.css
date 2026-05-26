@@ -548,6 +548,28 @@ body {
   padding: 22px;
 }
 
+.app-preview-body > .preview-single-panel {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.preview-single-panel .preview-page-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.preview-single-panel .preview-page-header > :first-child {
+  min-width: 0;
+  max-width: 560px;
+}
+
+.preview-single-panel .preview-actions {
+  width: fit-content;
+  max-width: 280px;
+  justify-content: flex-start;
+}
+
 .preview-page-header {
   display: flex;
   justify-content: space-between;
@@ -960,6 +982,11 @@ body {
 
 .preview-history-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 20px;
+}
+
+.preview-single-panel .preview-message-thread,
+.preview-single-panel .preview-history-grid {
   margin-top: 20px;
 }
 
@@ -1510,6 +1537,15 @@ body {
   .warning-checklist-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .preview-single-panel .preview-page-header {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-single-panel .preview-actions {
+    width: 100%;
+    max-width: none;
   }
 
   .warning-checklist-items {
