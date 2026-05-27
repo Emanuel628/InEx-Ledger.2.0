@@ -163,6 +163,25 @@ function deriveFlagsFromIssueEntries(issueEntries = []) {
   ));
 }
 
+function requiresTxnMileageLog(txn, category, categoryText) {
+  const catText = String(categoryText || txn?.categoryName || category?.name || "").toLowerCase();
+  const taxLabel = String(category?.taxLabel || txn?.taxLabel || "").toLowerCase();
+  if (/\bmileage\b/.test(catText)) return true;
+  if (/\b(vehicle|auto|car|truck)\b/.test(catText) && /\b(fuel|gas|parking|tolls?)\b/.test(catText)) return true;
+  if (/\b(fuel|gas|parking|tolls?)\b/.test(catText)) return true;
+  if (/car and truck expenses.*(fuel|parking|tolls)|motor vehicle expenses.*(fuel|parking|tolls)/.test(taxLabel)) return true;
+  return false;
+}
+
+function requiresTxnAllocation(txn, category, categoryText) {
+  const catText = String(categoryText || txn?.categoryName || category?.name || "").toLowerCase();
+  const vehicleMaintenance = /\b(repair|maintenance)\b/.test(catText) && /\b(vehicle|auto|car|truck)\b/.test(catText);
+  return /\bphone\b|\binternet\b|home.?office|vehicle|fuel|auto insurance|car\b|truck\b/.test(catText)
+    || vehicleMaintenance
+    || txn?.taxTreatment === "split_use"
+    || (txn?.personalUsePct != null && Number(txn.personalUsePct) > 0);
+}
+
 function initTransactionReviewFilterFromQuery() {
   const params = new URLSearchParams(window.location.search);
   const requestedFilter = String(params.get("review") || "").trim().toLowerCase();
