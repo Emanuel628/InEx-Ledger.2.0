@@ -839,9 +839,9 @@ if (filters.review) {
       search: filters.search || "",
       period: filters.period,
       returned_all: filters.wantsAll,
+      review_summary: reviewSummary,
+      review_filter: filters.review || "",
       summary: {
-        review_summary: reviewSummary,
-        review_filter: filters.review || "",
         transaction_count: total,
         income_total: Number(summaryRow.income_total || 0),
         expense_total: Number(summaryRow.expense_total || 0),
