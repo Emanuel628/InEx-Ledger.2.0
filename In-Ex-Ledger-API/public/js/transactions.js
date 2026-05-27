@@ -3160,15 +3160,17 @@ async function fetchTransactionsForPage(pageIndex = currentPage) {
 
   const payload = await response.json().catch(() => null);
   return {
-    transactions: extractListPayload(payload).map(normalizeTransaction).filter(Boolean),
-    meta: {
-      total: Number(payload?.total || 0),
-      limit: Number(payload?.limit || PAGE_SIZE),
-      offset: Number(payload?.offset || 0),
-      hasMore: payload?.has_more === true
-    },
-    summary: payload?.summary || null
-  };
+  transactions: extractListPayload(payload).map(normalizeTransaction).filter(Boolean),
+  meta: {
+    total: Number(payload?.total || 0),
+    limit: Number(payload?.limit || PAGE_SIZE),
+    offset: Number(payload?.offset || 0),
+    hasMore: payload?.has_more === true
+  },
+  summary: payload?.summary || null,
+  reviewSummary: payload?.review_summary || payload?.reviewSummary || null,
+  reviewFilter: payload?.review_filter || payload?.reviewFilter || ""
+};
 }
 
 async function fetchReceiptLinksSnapshot() {
