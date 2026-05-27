@@ -160,6 +160,11 @@ function requiresTxnAllocation(txn, category, categoryText) {
     || (txn?.personalUsePct != null && Number(txn.personalUsePct) > 0);
 }
 
+function requiresTxnBusinessPurpose(categoryText) {
+  const catText = String(categoryText || "").toLowerCase();
+  return /\bmeal|\bfood\b|\bdining\b|\brestaurant\b|\btravel\b|\bairfare\b|\bhotel\b|\bentertainment\b/i.test(catText);
+}
+
 function getOpenTransactionIdFromQuery() {
   const params = new URLSearchParams(window.location.search);
   return String(params.get("open") || params.get("transaction") || "").trim();
@@ -492,7 +497,7 @@ function computeTxnFlags(txn) {
     // Business purpose for meals/travel/etc. clears once an internal note
     // documents the purpose or the user marks the transaction reviewed.
     if (isExpense
-        && /\bmeal|\bfood\b|\bdining\b|\brestaurant\b|\btravel\b|\bairfare\b|\bhotel\b|\bentertainment\b/i.test(catName)
+        && requiresTxnBusinessPurpose(catName)
         && !hasNote && !reviewConfirmed) {
       flags.push("BP");
     }
