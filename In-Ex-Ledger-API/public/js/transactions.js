@@ -363,7 +363,7 @@ function getTxnRowToneClass(flags, reviewStatus) {
   if (top === "NC" || top === "UM") return "row-flag-critical";
   if (top === "ML" || top === "AL" || top === "BP" || top === "RS") return "row-flag-missing";
   if (top === "IS" || top === "DUP") return "row-flag-warning";
-  if (!top && reviewStatus === "rv") return "row-flag-cpa";
+  if (top === "RV" || (!top && reviewStatus === "needs_review")) return "row-flag-cpa";
   return "";
 }
 
