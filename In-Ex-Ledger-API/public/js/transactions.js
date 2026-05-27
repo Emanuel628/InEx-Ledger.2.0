@@ -145,6 +145,106 @@ function getOpenTransactionIdFromQuery() {
   return String(params.get("open") || params.get("transaction") || "").trim();
 }
 
+const TX_RESOLUTION_FIELD_TARGETS = {
+  NC: ["category"],
+  RS: ["transactionReceiptButton", "transactionReceiptInput"],
+  ML: ["transactionReceiptButton", "transactionReceiptInput", "transactionNote"],
+  AL: ["txBusinessUsePct"],
+  BP: ["transactionNote"],
+  IS: ["transactionReceiptButton", "transactionReceiptInput", "transactionNote"],
+  RV: ["transactionReviewStatus"]
+};
+
+function clearTransactionResolutionGuidance() {
+  document.querySelectorAll(".tx-resolution-highlight").forEach((node) => {
+    node.classList.remove("tx-resolution-highlight");
+  });
+
+  document.querySelectorAll(".tx-resolution-field").forEach((node) => {
+    node.classList.remove("tx-resolution-field");
+  });
+
+  document.getElementById("txResolutionMessage")?.remove();
+}
+
+function getResolutionMessageForFlag(flag) {
+  switch (flag) {
+    case "NC":
+      return "Assign a real category for this transaction.";
+    case "UM":
+      return 'This category needs a tax mapping. <a href="/categories">Open Categories</a> and map the category to a tax line.';
+    case "RS":
+      return "Attach the receipt or another support file.";
+    case "ML":
+      return "Attach mileage support, a vehicle log, or add a note confirming review.";
+    case "AL":
+      return "Enter the business-use percentage for this split-use expense.";
+    case "BP":
+      return "Add an internal note explaining the business purpose.";
+    case "IS":
+      return "Attach source support or add a note explaining the income source.";
+    case "RV":
+      return "Confirm the review status once you have checked this transaction.";
+    default:
+      return "";
+  }
+}
+
+function addTransactionResolutionMessage(flags) {
+  const form = document.getElementById("transactionForm");
+  const grid = form?.querySelector(".transaction-form-grid");
+  if (!form || !grid || !flags.length) return;
+
+  const message = document.createElement("div");
+  message.id = "txResolutionMessage";
+  message.className = "tx-resolution-message";
+
+  const items = flags
+    .map(getResolutionMessageForFlag)
+    .filter(Boolean)
+    .map((text) => `<li>${text}</li>`)
+    .join("");
+
+  message.innerHTML = `
+    <strong>Resolve this transaction</strong>
+    <span>Only the fields needed for this transaction are highlighted.</span>
+    <ul>${items}</ul>
+  `;
+
+  grid.parentNode.insertBefore(message, grid);
+}
+
+function highlightTransactionResolutionFields(transaction) {
+  clearTransactionResolutionGuidance();
+
+  const flags = computeTxnFlags(transaction);
+  if (!flags.length) return;
+
+  addTransactionResolutionMessage(flags);
+
+  const targets = new Set();
+  flags.forEach((flag) => {
+    (TX_RESOLUTION_FIELD_TARGETS[flag] || []).forEach((id) => targets.add(id));
+  });
+
+  targets.forEach((id) => {
+    const field = document.getElementById(id);
+    if (!field) return;
+
+    field.classList.add("tx-resolution-highlight");
+
+    const wrapper = field.closest(".form-field");
+    if (wrapper) {
+      wrapper.classList.add("tx-resolution-field");
+      wrapper.hidden = false;
+    }
+  });
+
+  if (flags.includes("RV")) {
+    document.getElementById("transactionAdvancedDetails")?.setAttribute("open", "");
+  }
+}
+
 async function openRequestedTransactionFromQuery() {
   const transactionId = getOpenTransactionIdFromQuery();
   if (!transactionId) return false;
@@ -181,9 +281,10 @@ async function openRequestedTransactionFromQuery() {
   }
 
   editingTransactionId = transaction.id;
-  setEditingMode(true);
-  prefillTransactionForm(transaction);
-  openTransactionDrawer();
+setEditingMode(true);
+prefillTransactionForm(transaction);
+openTransactionDrawer();
+highlightTransactionResolutionFields(transaction);
 
   const row = document.getElementById(`txn-${transaction.id}`);
   row?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -2613,6 +2714,8 @@ function prefillTransactionForm(transaction) {
 }
 
 function resetTransactionForm() {
+  clearTransactionResolutionGuidance();
+  
   const form = document.getElementById("transactionForm");
   if (form) {
     form.reset();
