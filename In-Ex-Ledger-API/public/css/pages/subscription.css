@@ -82,6 +82,13 @@
   align-items: start;
 }
 
+.subscription-history-link-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
 .subscription-panel {
   min-width: 0;
   padding: clamp(22px, 2.5vw, 34px);
@@ -96,6 +103,26 @@
     linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.96)),
     radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.34), transparent 35%);
   color: #fff;
+}
+
+.subscription-plan-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.subscription-plan-single {
+  display: grid;
+  gap: 18px;
+}
+
+.subscription-plan-row-actions {
+  display: flex;
+  align-items: center;
+}
+
+.subscription-plan-row-actions .sub-cta-primary {
+  width: auto;
+  min-width: min(100%, 360px);
 }
 
 .subscription-panel-head {
@@ -322,6 +349,15 @@
   align-items: start;
 }
 
+.subscription-capacity-board--inline {
+  display: block;
+}
+
+.subscription-capacity-board--inline #proCardAddonGroup {
+  display: grid;
+  gap: 16px;
+}
+
 .subscription-plan-stack {
   display: grid;
   gap: 14px;
@@ -515,6 +551,17 @@
   margin-top: 16px;
 }
 
+.sub-control-row-capacity {
+  align-items: center !important;
+  flex-wrap: wrap;
+}
+
+.sub-inline-price-note {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .sub-control-label,
 .sub-slots-stepper-label,
 .sub-access-stat-label {
@@ -644,11 +691,24 @@
   gap: 14px;
 }
 
+.sub-slots-inline-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
 .sub-slots-btn-row {
   display: flex;
   align-items: center;
   gap: 14px;
   justify-content: flex-start;
+}
+
+.sub-slots-inline-rate {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .sub-slots-arrow-btn {
@@ -747,6 +807,7 @@
   .subscription-grid-top,
   .subscription-grid-bottom,
   .subscription-plan-layout,
+  .subscription-history-link-panel,
   .sub-access-overview {
     grid-template-columns: 1fr !important;
   }
@@ -811,6 +872,10 @@
   .sub-slots-workbench,
   .sub-slots-footer,
   .sub-business-item {
+    display: grid !important;
+  }
+
+  .subscription-history-link-panel {
     display: grid !important;
   }
 

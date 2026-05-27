@@ -40,7 +40,7 @@
         <div>
           <span class="subscription-eyebrow">Subscription</span>
           <h1 id="subscriptionPageTitle">Billing dashboard</h1>
-          <p>Review your plan, manage Stripe billing, estimate Pro pricing, and control business capacity without digging through settings.</p>
+          <p>Check live plan access, hand billing off to Stripe, and manage business capacity without digging through settings.</p>
         </div>
         <a href="settings" class="settings-secondary-btn subscription-settings-link">Back to settings</a>
       </section>
@@ -69,32 +69,55 @@
 
       <section class="subscription-panel subscription-plan-workbench" id="sub-plans-section">
         <div class="subscription-section-title">
-          <span class="subscription-eyebrow">Plan workbench</span>
-          <h2>Choose access, then adjust capacity.</h2>
-          <p>Basic stays lightweight. Pro adds the full working ledger, receipt support, exports, analytics, and optional additional business slots.</p>
+          <span class="subscription-eyebrow">Subscription plan</span>
+          <h2>Use Stripe as the billing control center.</h2>
+          <p>This page shows your live plan state and estimated capacity pricing. Checkout, invoices, payment method changes, and renewals stay in Stripe.</p>
         </div>
 
-        <div class="subscription-plan-layout">
-          <div class="subscription-plan-stack">
-            <article class="sub-plan-card subscription-plan-row" id="planFree">
-              <div class="subscription-plan-row-main"><span class="subscription-plan-label">Basic</span><h3 class="sub-plan-name" data-i18n="subscription_starter_title">Basic</h3><p class="sub-plan-pitch">For light recordkeeping and getting started.</p></div>
-              <div class="subscription-plan-row-price"><strong>$0</strong><span>/ month</span></div>
-              <ul class="sub-plan-features"><li>50 transactions per month</li><li>25 receipt uploads per month</li><li>50 imported CSV rows per month</li><li>Mileage &amp; kilometre trip logging</li><li>Income &amp; expense ledger with CSV export</li><li>Recurring transactions not included</li><li>PDF / tax-ready exports not included</li></ul>
-              <button type="button" id="planFreeBtn" class="sub-cta-outline" data-i18n="subscription_starter_cta">Select Basic</button>
-            </article>
+        <div class="subscription-plan-shell">
+          <article class="sub-plan-card sub-plan-featured subscription-plan-row subscription-plan-single" id="planPro">
+            <div class="subscription-plan-row-main">
+              <span class="subscription-plan-label subscription-plan-label-pro">Pro access</span>
+              <h3 class="sub-plan-name" data-i18n="subscription_pro_title">Pro</h3>
+              <p class="sub-plan-pitch">For freelancers, contractors, and solo operators who need receipt-backed records, imports, analytics, and CPA-ready exports.</p>
+            </div>
+            <div class="subscription-plan-row-price">
+              <strong id="planProPriceLabel">$12 / mo</strong>
+              <span id="planProAddonPriceLabel">Additional businesses from $5&nbsp;/&nbsp;mo</span>
+            </div>
+            <div class="subscription-plan-row-actions">
+              <button type="button" id="planProBtn" class="sub-cta-primary" data-i18n="subscription_pro_cta">Manage Subscription &amp; Invoices on Stripe</button>
+            </div>
+          </article>
 
-            <article class="sub-plan-card sub-plan-featured subscription-plan-row" id="planPro">
-              <div class="subscription-plan-row-main"><span class="subscription-plan-label subscription-plan-label-pro" data-i18n="subscription_pro_badge">Recommended</span><h3 class="sub-plan-name" data-i18n="subscription_pro_title">Pro</h3><p class="sub-plan-pitch">For freelancers, contractors, gig workers, and solo operators who need receipt-backed records, mileage, imports, and tax-ready exports.</p></div>
-              <div class="subscription-plan-row-price"><strong id="planProPriceLabel">$12 / mo</strong><span id="planProAddonPriceLabel">Additional businesses from $5&nbsp;/&nbsp;mo</span></div>
-              <ul class="sub-plan-features"><li data-i18n="subscription_pro_1">Unlimited transactions</li><li>Receipt uploads &amp; OCR scanning</li><li>CSV import &amp; recurring transactions</li><li>Full mileage page &amp; vehicle expenses</li><li data-i18n="subscription_pro_4">Multi-format exports</li><li data-i18n="subscription_pro_3">Priority support</li><li>Multiple businesses with add-ons</li></ul>
-              <button type="button" id="planProBtn" class="sub-cta-primary" data-i18n="subscription_pro_cta">Upgrade to Pro</button>
-            </article>
+          <div class="subscription-capacity-board subscription-capacity-board--inline" aria-label="Pro billing estimate">
+            <div class="subscription-board-card" id="proCardAddonGroup">
+              <span class="subscription-eyebrow">Capacity calculator</span>
+              <h3>Estimate billed capacity before Stripe checkout.</h3>
+              <div class="sub-control-row">
+                <span class="sub-control-label" data-i18n="subscription_billing_interval_label">Billing</span>
+                <div class="sub-toggle" role="group" aria-label="Billing interval">
+                  <button type="button" class="sub-toggle-btn is-active" data-billing-interval="monthly" data-i18n="subscription_billing_monthly" aria-pressed="true">Monthly</button>
+                  <button type="button" class="sub-toggle-btn" data-billing-interval="yearly" data-i18n="subscription_billing_yearly" aria-pressed="false">Yearly</button>
+                </div>
+              </div>
+              <div class="sub-control-row sub-control-row-capacity">
+                <label class="sub-control-label" for="additionalBusinessesInput" data-i18n="subscription_additional_businesses_label">Extra businesses</label>
+                <div class="sub-quantity-control">
+                  <button type="button" class="sub-quantity-btn" data-qty-action="decrease" aria-label="Decrease">−</button>
+                  <input id="additionalBusinessesInput" class="sub-quantity-input" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" />
+                  <button type="button" class="sub-quantity-btn" data-qty-action="increase" aria-label="Increase">+</button>
+                </div>
+                <div class="sub-inline-price-note">Base plan plus per-business add-ons billed through Stripe.</div>
+              </div>
+              <div class="sub-price-summary subscription-board-card" id="subPriceSummary">
+                <div class="sub-price-row"><span class="sub-price-label" data-i18n="subscription_price_summary_plan">Plan</span><span class="sub-price-value" id="subPricePlan">—</span></div>
+                <div class="sub-price-row"><span class="sub-price-label" data-i18n="subscription_price_summary_addon">Add-ons</span><span class="sub-price-value" id="subPriceAddon">$0</span></div>
+                <div class="sub-price-row sub-price-total"><span class="sub-price-label" data-i18n="subscription_price_summary_total">Estimated total</span><span class="sub-price-value" id="subPriceTotal">—</span></div>
+                <p class="sub-price-note" id="subPriceNote" data-i18n="subscription_price_summary_note">Final pricing confirmed at checkout in Stripe.</p>
+              </div>
+            </div>
           </div>
-
-          <aside class="subscription-capacity-board" aria-label="Pro billing estimate">
-            <div class="subscription-board-card" id="proCardAddonGroup"><span class="subscription-eyebrow">Capacity calculator</span><h3>Estimate Pro before Stripe checkout.</h3><div class="sub-control-row"><span class="sub-control-label" data-i18n="subscription_billing_interval_label">Billing</span><div class="sub-toggle" role="group" aria-label="Billing interval"><button type="button" class="sub-toggle-btn is-active" data-billing-interval="monthly" data-i18n="subscription_billing_monthly" aria-pressed="true">Monthly</button><button type="button" class="sub-toggle-btn" data-billing-interval="yearly" data-i18n="subscription_billing_yearly" aria-pressed="false">Yearly</button></div></div><div class="sub-control-row"><label class="sub-control-label" for="additionalBusinessesInput" data-i18n="subscription_additional_businesses_label">Extra businesses</label><div class="sub-quantity-control"><button type="button" class="sub-quantity-btn" data-qty-action="decrease" aria-label="Decrease">−</button><input id="additionalBusinessesInput" class="sub-quantity-input" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" /><button type="button" class="sub-quantity-btn" data-qty-action="increase" aria-label="Increase">+</button></div></div></div>
-            <div class="sub-price-summary subscription-board-card" id="subPriceSummary"><div class="sub-price-row"><span class="sub-price-label" data-i18n="subscription_price_summary_plan">Plan</span><span class="sub-price-value" id="subPricePlan">—</span></div><div class="sub-price-row"><span class="sub-price-label" data-i18n="subscription_price_summary_addon">Add-ons</span><span class="sub-price-value" id="subPriceAddon">$0</span></div><div class="sub-price-row sub-price-total"><span class="sub-price-label" data-i18n="subscription_price_summary_total">Estimated total</span><span class="sub-price-value" id="subPriceTotal">—</span></div><p class="sub-price-note" id="subPriceNote" data-i18n="subscription_price_summary_note">Final pricing confirmed at checkout.</p></div>
-          </aside>
         </div>
       </section>
 
@@ -103,7 +126,14 @@
         <article class="subscription-panel"><div class="subscription-section-title compact"><span class="subscription-eyebrow">Business capacity</span><h2>Business slots</h2><p>Manage billed business access.</p></div><div id="businessSlotsManager" class="sub-detail-card"><div class="sub-status-loading" data-i18n="settings_loading">Loading…</div></div></article>
       </section>
 
-      <section class="subscription-panel subscription-history-panel" id="sub-history-section"><div class="subscription-section-title compact"><span class="subscription-eyebrow">Billing history</span><h2 data-i18n="sub_mgmt_history_title">Invoices and payment history.</h2><p>Past payments and invoices from Stripe.</p></div><div id="billingHistoryList" class="billing-history-list"><div class="sub-status-loading" data-i18n="settings_loading">Loading…</div></div></section>
+      <section class="subscription-panel subscription-history-link-panel" id="sub-history-section">
+        <div class="subscription-section-title compact">
+          <span class="subscription-eyebrow">Billing history</span>
+          <h2>Past invoices and receipts stay in Stripe.</h2>
+          <p>Use the Stripe portal for official invoice history, payment receipts, and payment-method updates.</p>
+        </div>
+        <button type="button" id="subHistoryPortalBtn" class="settings-secondary-btn">View invoices in Stripe</button>
+      </section>
     </main>
   </div>
 

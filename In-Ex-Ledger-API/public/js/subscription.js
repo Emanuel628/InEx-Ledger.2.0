@@ -360,14 +360,14 @@ function getSelectedPlanCode(sub) {
 
 function getPrimaryPlanAction(sub) {
   if (!sub) {
-    return { mode: "checkout", label: tx("subscription_pro_cta"), disabled: false };
+    return { mode: "checkout", label: "Set up Pro billing in Stripe", disabled: false };
   }
 
   const selectedPlanCode = getSelectedPlanCode(sub);
   const status = String(sub.status || sub.effectiveStatus || "").toLowerCase();
 
   if (status === "unpaid" && sub.stripeSubscriptionId) {
-    return { mode: "portal", label: "Update payment method", disabled: false };
+    return { mode: "portal", label: "Manage Subscription & Invoices on Stripe", disabled: false };
   }
 
   if (sub.isPaid && sub.cancelAtPeriodEnd && sub.stripeSubscriptionId && !sub.isTrialing) {
@@ -375,22 +375,22 @@ function getPrimaryPlanAction(sub) {
   }
 
   if (sub.isPaid && !sub.cancelAtPeriodEnd && !sub.isCanceledWithRemainingAccess) {
-    return { mode: "current", label: tx("subscription_current_plan"), disabled: true };
+    return { mode: "portal", label: "Manage Subscription & Invoices on Stripe", disabled: false };
   }
 
   if (sub.isTrialing && selectedPlanCode !== "v1") {
-    return { mode: "checkout", label: "Continue with Pro", disabled: false };
+    return { mode: "checkout", label: "Continue with Pro in Stripe", disabled: false };
   }
 
   if (sub.isTrialing) {
-    return { mode: "checkout", label: "Set up Pro billing", disabled: false };
+    return { mode: "checkout", label: "Set up Pro billing in Stripe", disabled: false };
   }
 
   if (sub.isCanceledWithRemainingAccess) {
-    return { mode: "checkout", label: "Start a new Pro cycle", disabled: false };
+    return { mode: "checkout", label: "Start a new Pro cycle in Stripe", disabled: false };
   }
 
-  return { mode: "checkout", label: tx("subscription_pro_cta"), disabled: false };
+  return { mode: "checkout", label: "Set up Pro billing in Stripe", disabled: false };
 }
 
 function buildStatusPanelMarkup(sub) {
@@ -441,12 +441,17 @@ function buildStatusPanelMarkup(sub) {
   const totalBusinesses = 1 + additionalBusinesses;
   const billingIntervalLabel = sub.billingInterval === "yearly" ? "Yearly" : "Monthly";
   const currencyLabel = String(sub.currency || pricingState.currency || "usd").toUpperCase();
+  const planLabel = sub.isTrialing
+    ? "Pro trial"
+    : sub.effectiveTier === "v1"
+      ? "Pro"
+      : "Basic";
 
   return `
     <div class="sub-status-spotlight">
       <div class="sub-status-spotlight-top">
         <span class="sub-status-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>
-        <span class="sub-status-plan-pill">${escapeHtml(sub.effectiveTier === "v1" ? "Pro" : "Basic")}</span>
+        <span class="sub-status-plan-pill">${escapeHtml(planLabel)}</span>
       </div>
       <h2 class="sub-status-headline">${escapeHtml(headline)}</h2>
       <p class="sub-status-copy">${escapeHtml(detail)}</p>
@@ -920,6 +925,9 @@ function renderBusinessAccessSection(sub) {
     : extra === 1
       ? `You have ${total} businesses: 1 included and 1 add-on.`
       : `You have ${total} businesses: 1 included and ${extra} add-ons.`;
+  const slotRateLabel = pricingState.billingInterval === "yearly"
+    ? `${formatMoney(pricingState.currency, pricingState.yearlyAdditionalBusinessPriceCents)} / year per extra slot`
+    : `${formatMoney(pricingState.currency, pricingState.monthlyAdditionalBusinessPriceCents)} / month per extra slot`;
 
   manager.innerHTML = `
     ${buildBusinessRosterMarkup(sub)}
@@ -930,17 +938,20 @@ function renderBusinessAccessSection(sub) {
           <h3>Business capacity</h3>
           <p>These controls change the billed add-on count only. Edit or delete individual businesses from Settings.</p>
         </div>
-        <div class="sub-slots-price-pill">${escapeHtml(tx("subscription_extra_business_slots_help"))}</div>
+        <div class="sub-slots-price-pill">${escapeHtml(slotRateLabel)}</div>
       </div>
       <div class="sub-slots-actions">
         <p class="sub-slots-state-label" id="slotsStateLabel">${escapeHtml(stateMsg)}</p>
-        <div class="sub-slots-btn-row">
-          <button type="button" id="removeSlotBtn" class="sub-slots-arrow-btn sub-slots-arrow-btn-prev" aria-label="Remove a business"${extra <= 0 ? " disabled" : ""}>
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 6 7 12l8 6Z"></path></svg>
-          </button>
-          <button type="button" id="addSlotBtn" class="sub-slots-arrow-btn sub-slots-arrow-btn-next" aria-label="Add a business">
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 6 8 6-8 6Z"></path></svg>
-          </button>
+        <div class="sub-slots-inline-controls">
+          <div class="sub-slots-btn-row">
+            <button type="button" id="removeSlotBtn" class="sub-slots-arrow-btn sub-slots-arrow-btn-prev" aria-label="Remove a business"${extra <= 0 ? " disabled" : ""}>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 6 7 12l8 6Z"></path></svg>
+            </button>
+            <span class="sub-slots-inline-rate">${escapeHtml(slotRateLabel)}</span>
+            <button type="button" id="addSlotBtn" class="sub-slots-arrow-btn sub-slots-arrow-btn-next" aria-label="Add a business">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 6 8 6-8 6Z"></path></svg>
+            </button>
+          </div>
         </div>
         <p class="sub-access-settings-note">Need to switch, rename, or delete a specific business? Go to Settings.</p>
         <div id="removeSlotConfirm" class="sub-slots-remove-confirm hidden">
@@ -960,6 +971,7 @@ function renderBusinessAccessSection(sub) {
 async function loadSubscription() {
   const statusBlock = document.getElementById("subStatusBlock");
   const manageBillingBtn = document.getElementById("subManageBillingBtn");
+  const historyPortalBtn = document.getElementById("subHistoryPortalBtn");
   const cancelBtn = document.getElementById("subCancelBtn");
   const cancelModalBody = document.getElementById("subCancelModalBody");
   const planFreeBtn = document.getElementById("planFreeBtn");
@@ -1015,6 +1027,9 @@ async function loadSubscription() {
 
     if (manageBillingBtn) {
       manageBillingBtn.classList.toggle("hidden", !sub.stripeCustomerId);
+    }
+    if (historyPortalBtn) {
+      historyPortalBtn.disabled = !sub.stripeCustomerId;
     }
     if (cancelBtn) {
       cancelBtn.classList.toggle("hidden", !(sub.isPaid && !sub.cancelAtPeriodEnd));
@@ -1387,6 +1402,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const manageBillingBtn = document.getElementById("subManageBillingBtn");
   manageBillingBtn?.addEventListener("click", openCustomerPortal);
+  document.getElementById("subHistoryPortalBtn")?.addEventListener("click", openCustomerPortal);
 
   wireFreeTierModal();
   wireBusinessDeleteModal();
