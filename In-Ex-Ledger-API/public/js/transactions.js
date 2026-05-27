@@ -145,11 +145,7 @@ function getOpenTransactionIdFromQuery() {
   return String(params.get("open") || params.get("transaction") || "").trim();
 }
 
-function openRequestedTransactionFromQuery() {
-  const transactionId = getOpenTransactionIdFromQuery();
-  if (!transactionId) return false;
-
-  async function openRequestedTransactionFromQuery() {
+async function openRequestedTransactionFromQuery() {
   const transactionId = getOpenTransactionIdFromQuery();
   if (!transactionId) return false;
 
@@ -193,16 +189,6 @@ function openRequestedTransactionFromQuery() {
   row?.scrollIntoView({ behavior: "smooth", block: "center" });
   row?.classList.add("tx-highlight");
   window.setTimeout(() => row?.classList.remove("tx-highlight"), 2200);
-
-  window.history.replaceState({}, "", "transactions");
-  return true;
-}
-
-  handleEditEntry(transactionId);
-
-  const row = document.getElementById(`txn-${transactionId}`);
-  row?.scrollIntoView({ behavior: "smooth", block: "center" });
-  row?.classList.add("is-review-target");
 
   window.history.replaceState({}, "", "transactions");
   return true;
