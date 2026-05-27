@@ -149,11 +149,54 @@ function openRequestedTransactionFromQuery() {
   const transactionId = getOpenTransactionIdFromQuery();
   if (!transactionId) return false;
 
-  const transaction = (ledgerState.transactions || []).find((txn) => String(txn.id) === transactionId);
+  async function openRequestedTransactionFromQuery() {
+  const transactionId = getOpenTransactionIdFromQuery();
+  if (!transactionId) return false;
+
+  let transaction = (ledgerState.transactions || []).find((txn) => String(txn.id) === transactionId);
+
   if (!transaction) {
-    setTransactionFormMessage("That transaction could not be opened from the current transaction view.");
+    try {
+      const response = await apiFetch(`/api/transactions/${encodeURIComponent(transactionId)}`);
+      if (!response || !response.ok) {
+        throw new Error("Transaction not found.");
+      }
+
+      transaction = normalizeTransaction(await response.json().catch(() => null));
+
+      if (transaction?.id) {
+        mergeSavedTransactionIntoLedger(transaction, {
+          accountName: transaction.accountName || transaction.account_name || "",
+          categoryName: transaction.categoryName || transaction.category_name || ""
+        });
+        applyFilters();
+        renderTotals();
+      }
+    } catch (error) {
+      console.error("[Transactions] Unable to open requested transaction", error);
+      setTransactionFormMessage("That transaction could not be opened.");
+      return false;
+    }
+  }
+
+  if (!transaction?.id) {
+    setTransactionFormMessage("That transaction could not be opened.");
     return false;
   }
+
+  editingTransactionId = transaction.id;
+  setEditingMode(true);
+  prefillTransactionForm(transaction);
+  openTransactionDrawer();
+
+  const row = document.getElementById(`txn-${transaction.id}`);
+  row?.scrollIntoView({ behavior: "smooth", block: "center" });
+  row?.classList.add("tx-highlight");
+  window.setTimeout(() => row?.classList.remove("tx-highlight"), 2200);
+
+  window.history.replaceState({}, "", "transactions");
+  return true;
+}
 
   handleEditEntry(transactionId);
 
@@ -820,7 +863,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await refreshAccountOptions();
   await refreshCategoryOptions();
   await loadTransactions();
-  openRequestedTransactionFromQuery();
+  await openRequestedTransactionFromQuery();
   await loadRecurringTemplates();
   setInterval(() => renderGhostSuggestions(), 5 * 60 * 1000);
   wireTransactionSearch();
