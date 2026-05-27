@@ -1556,6 +1556,20 @@ body {
     margin: 0;
     padding-bottom: 4px;
   }
+  
+@media (max-width: 900px) {
+  .checklist-split-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .checklist-copy {
+    order: 1;
+  }
+
+  .warning-checklist-showcase {
+    order: 2;
+  }
+}
 
   .marketing-main {
     width: calc(100vw - 24px);
