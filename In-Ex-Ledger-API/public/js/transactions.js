@@ -292,7 +292,11 @@ function computeTxnFlags(txn) {
   const hasNote = String(txn.note || "").trim().length > 0;
   const reviewConfirmed = txn.reviewStatus === "ready" || txn.reviewStatus === "matched";
   const personalUsePctValue = txn.personalUsePct != null ? Number(txn.personalUsePct) : null;
-  const hasAllocation = personalUsePctValue != null && Number.isFinite(personalUsePctValue) && personalUsePctValue > 0;
+  const hasAllocation =
+  personalUsePctValue != null &&
+  Number.isFinite(personalUsePctValue) &&
+  personalUsePctValue >= 0 &&
+  personalUsePctValue <= 100;
 
   if (isUncategorized) {
     flags.push("NC");
@@ -1135,7 +1139,7 @@ function wireTransactionForm() {
           const busRaw = String(document.getElementById("txBusinessUsePct")?.value ?? "").trim();
           if (busRaw !== "" && Number.isFinite(Number(busRaw))) {
             const clamped = Math.min(100, Math.max(0, Number(busRaw)));
-            return clamped >= 100 ? null : 100 - clamped;
+            return 100 - clamped;
           }
           return normalizeNumberOrEmpty(personalUseInput?.value);
         })(),
@@ -3413,12 +3417,19 @@ function renderTransactionsTable(filteredTransactions) {
       const txnFlags = computeTxnFlags(txn);
       const hasFlags = txnFlags.length > 0;
       const hasManualReview = txn.reviewStatus && txn.reviewStatus !== "ready" && txn.reviewStatus !== "matched";
-      if (hasFlags || hasManualReview) {
-        const badgeLabel = getTxnFlagBadgeLabel(txnFlags) || getReviewStatusLabel(txn.reviewStatus);
-        const badgeCss = hasFlags ? getTxnFlagBadgeCss(txnFlags) : txn.reviewStatus;
-        const tooltip = hasFlags ? txnFlags.map(f => TX_FLAG_LABELS[f] || f).join(" | ") : getReviewStatusLabel(txn.reviewStatus);
-        metadataBadges.push(`<button type="button" class="tx-meta-badge tx-flag-badge ${escapeHtml(badgeCss)}" data-review-txn-id="${escapeHtml(String(txn.id))}" title="${escapeHtml(tooltip)}" aria-label="Review checklist: ${escapeHtml(badgeLabel)}">${escapeHtml(badgeLabel)}</button>`);
-      }
+      const isReviewed = txn.reviewStatus === "ready" || txn.reviewStatus === "matched";
+      
+    if (hasFlags || hasManualReview) {
+      const badgeLabel = getTxnFlagBadgeLabel(txnFlags) || getReviewStatusLabel(txn.reviewStatus);
+      const badgeCss = hasFlags ? getTxnFlagBadgeCss(txnFlags) : txn.reviewStatus;
+      const tooltip = hasFlags
+      ? txnFlags.map(f => TX_FLAG_LABELS[f] || f).join(" | ")
+      : getReviewStatusLabel(txn.reviewStatus);
+      
+      metadataBadges.push(`<button type="button" class="tx-meta-badge tx-flag-badge ${escapeHtml(badgeCss)}" data-review-txn-id="${escapeHtml(String(txn.id))}" title="${escapeHtml(tooltip)}" aria-label="Review checklist: ${escapeHtml(badgeLabel)}">${escapeHtml(badgeLabel)}</button>`);
+    } else if (isReviewed) {
+      metadataBadges.push(`<button type="button" class="tx-meta-badge tx-flag-badge flag-ready" data-review-txn-id="${escapeHtml(String(txn.id))}" title="Review checklist: Ready" aria-label="Review checklist: Ready">Ready</button>`);
+    }
     }
     if (txn.type === "income" && txn.payerName) {
       metadataBadges.push(formatTransactionMetaBadge(`Payer: ${txn.payerName}`, "income-payer"));
