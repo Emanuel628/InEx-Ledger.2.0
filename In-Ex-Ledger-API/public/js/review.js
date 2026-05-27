@@ -242,7 +242,7 @@ function renderQueue() {
     const issues = Array.isArray(item.issueLabels) && item.issueLabels.length
       ? item.issueLabels
       : [tx("review_issue_fallback", "Needs review")];
-    const actionHref = item.actionTarget?.href || "/transactions";
+    const actionHref = buildTransactionTargetHref(item);
     const actionLabel = item.actionTarget?.label || tx("review_action_open", "Open");
     const amount = formatMoney(item.amount, item.currency);
     const supportParts = [];
