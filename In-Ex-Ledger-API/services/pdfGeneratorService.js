@@ -800,9 +800,9 @@ function buildTransactionStatus(txn, category, context = {}) {
   const hasAllocationWorksheet = supportArtifactTypes.has("allocation_worksheet");
   const hasHomeOfficeWorksheet = supportArtifactTypes.has("home_office_worksheet");
   const hasCapitalAssetSupport = supportArtifactTypes.has("capital_asset_support");
-  const needsMileageLog = ["vehicle_fuel", "vehicle_maintenance", "vehicle_parking_tolls", "insurance_vehicle"].includes(categorySlug) && !hasMileageLog;
+  const needsMileageLog = ["vehicle_fuel", "vehicle_parking_tolls"].includes(categorySlug) && !hasMileageLog;
   const needsBusinessPurpose = ["meals", "travel"].includes(categorySlug) && !hasReviewNote;
-  const needsAllocation = ["phone_internet", "insurance_vehicle", "vehicle_fuel", "vehicle_maintenance", "home_office"].includes(categorySlug)
+  const needsAllocation = ["phone_internet", "insurance_vehicle", "vehicle_fuel", "vehicle_maintenance", "vehicle_parking_tolls", "home_office"].includes(categorySlug)
     && !(hasAllocationWorksheet || hasHomeOfficeWorksheet)
     && !(categorySlug === "phone_internet" && personalUsePct > 0);
   const needsHomeOfficeSupport = categorySlug === "home_office" && !hasHomeOfficeWorksheet;
@@ -811,8 +811,11 @@ function buildTransactionStatus(txn, category, context = {}) {
   const incomeNeedsReview = isIncome && (importedIncome || nature === "unknown_needs_review");
   const hasFinalConfirmationSupport = (() => {
     if (context.vehicleClaim) return true;
-    if (["vehicle_fuel", "vehicle_maintenance", "vehicle_parking_tolls", "insurance_vehicle"].includes(categorySlug)) {
+    if (["vehicle_fuel", "vehicle_parking_tolls"].includes(categorySlug)) {
       return hasMileageLog || hasAllocationWorksheet;
+    }
+    if (["vehicle_maintenance", "insurance_vehicle"].includes(categorySlug)) {
+      return hasAllocationWorksheet;
     }
     if (["meals", "travel"].includes(categorySlug)) {
       return hasReviewNote;

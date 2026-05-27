@@ -96,6 +96,25 @@ test("dataset maps US fuel, meals, and phone rows to review lines with support f
   assert.ok(phone.reviewFlags.includes("AL"));
 });
 
+test("auto insurance requires allocation support without forcing a mileage-log flag", () => {
+  const dataset = buildNormalizedExportDataset(buildFixture({
+    transactions: [
+      { id: "insurance1", type: "expense", amount: 128, category_id: "insurance", account_id: "bank", date: "2026-04-14", description: "Progressive auto insurance" }
+    ],
+    categories: [
+      { id: "insurance", name: "Auto Insurance", kind: "expense", tax_map_us: "", tax_map_ca: "" }
+    ],
+    receipts: [],
+    mileage: [],
+    vehicleCosts: []
+  }));
+  const insurance = dataset.includedRows.find((row) => row.id === "insurance1");
+  assert.ok(insurance);
+  assert.ok(insurance.reviewFlags.includes("AL"));
+  assert.ok(insurance.reviewFlags.includes("FC"));
+  assert.equal(insurance.reviewFlags.includes("ML"), false);
+});
+
 test("dataset maps Canada rows with tax_map_ca-aware output", () => {
   const dataset = buildNormalizedExportDataset(buildFixture({
     region: "CA",

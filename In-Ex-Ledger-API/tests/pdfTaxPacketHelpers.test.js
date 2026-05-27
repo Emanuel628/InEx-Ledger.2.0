@@ -116,6 +116,19 @@ test("phone and internet mapped to allocation review do not use TM or UM", () =>
   assert.equal(status.flags.includes("UM"), false);
 });
 
+test("auto insurance uses allocation review without a mileage-log flag", () => {
+  const status = buildTransactionStatus(
+    { id: "ins1", type: "expense", amount: 128, description: "Progressive auto insurance", categoryId: "c1" },
+    { id: "c1", name: "Auto Insurance", tax_map_us: "" },
+    { region: "US", receiptTxIds: new Set() }
+  );
+  assert.match(status.taxLineDisplay, /Line 9/i);
+  assert.ok(status.flags.includes("AL"));
+  assert.ok(status.flags.includes("FC"));
+  assert.equal(status.flags.includes("ML"), false);
+  assert.equal(status.flags.includes("UM"), false);
+});
+
 test("imported expense has NC and UM when it remains unresolved", () => {
   const status = buildTransactionStatus(
     { id: "exp1", type: "expense", amount: 10, description: "Bank import" },

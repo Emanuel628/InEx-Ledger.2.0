@@ -39,6 +39,13 @@ let exportState = {
 };
 const EXPORT_PROFILE_MISSING_QUERY_KEY = "export_profile_missing";
 
+function requiresExportMileageLog(categoryText) {
+  const catText = String(categoryText || "").toLowerCase();
+  if (/\bmileage\b/.test(catText)) return true;
+  if (/\b(vehicle|auto|car|truck)\b/.test(catText) && /\b(fuel|gas|parking|tolls?)\b/.test(catText)) return true;
+  return /\b(fuel|gas|parking|tolls?)\b/.test(catText);
+}
+
 function getRequestedExportMode() {
   const params = new URLSearchParams(window.location.search);
   const mode = String(params.get("mode") || "").trim().toLowerCase();
@@ -1257,7 +1264,7 @@ function updateExportReadiness(transactions) {
     }
     if (!cat?.taxLabel) needsTaxMapping++;
     if (isExpense && !txn.receiptId) missingReceipt++;
-    if (isExpense && /\bvehicle\b|\bfuel\b|\bmileage\b|auto insurance/i.test(catName)) needsMileage++;
+    if (isExpense && requiresExportMileageLog(catName)) needsMileage++;
     if (/\bphone\b|\binternet\b|home.?office/i.test(catName)) needsAllocation++;
     if (isExpense && /\bmeal|\bfood\b|\bdining\b|\brestaurant\b|\btravel\b|\bentertainment\b/i.test(catName)) needsBusinessPurpose++;
     if (isIncome && txn.reviewStatus === "needs_review") incomeReview++;

@@ -141,6 +141,25 @@ function initTransactionReviewFilterFromQuery() {
   }
 }
 
+function requiresTxnMileageLog(txn, category, categoryText) {
+  const catText = String(categoryText || txn?.categoryName || category?.name || "").toLowerCase();
+  const taxLabel = String(category?.taxLabel || txn?.taxLabel || "").toLowerCase();
+  if (/\bmileage\b/.test(catText)) return true;
+  if (/\b(vehicle|auto|car|truck)\b/.test(catText) && /\b(fuel|gas|parking|tolls?)\b/.test(catText)) return true;
+  if (/\b(fuel|gas|parking|tolls?)\b/.test(catText)) return true;
+  if (/car and truck expenses.*(fuel|parking|tolls)|motor vehicle expenses.*(fuel|parking|tolls)/.test(taxLabel)) return true;
+  return false;
+}
+
+function requiresTxnAllocation(txn, category, categoryText) {
+  const catText = String(categoryText || txn?.categoryName || category?.name || "").toLowerCase();
+  const vehicleMaintenance = /\b(repair|maintenance)\b/.test(catText) && /\b(vehicle|auto|car|truck)\b/.test(catText);
+  return /\bphone\b|\binternet\b|home.?office|vehicle|fuel|auto insurance|car\b|truck\b/.test(catText)
+    || vehicleMaintenance
+    || txn?.taxTreatment === "split_use"
+    || (txn?.personalUsePct != null && Number(txn.personalUsePct) > 0);
+}
+
 function getOpenTransactionIdFromQuery() {
   const params = new URLSearchParams(window.location.search);
   return String(params.get("open") || params.get("transaction") || "").trim();
@@ -461,12 +480,12 @@ function computeTxnFlags(txn) {
     // Mileage / vehicle support clears when a receipt is attached
     // (vehicle log photo, fuel receipt, etc.) or the user marks the
     // transaction reviewed.
-    if ((/\bvehicle\b|\bfuel\b|\bmileage\b|auto insurance/i.test(catName) || txn.taxTreatment === "vehicle")
+    if (requiresTxnMileageLog(txn, category, catName)
         && !hasReceipt && !reviewConfirmed) {
       flags.push("ML");
     }
     // Personal-use allocation clears once a business-use percentage is recorded.
-    if ((/\bphone\b|\binternet\b|home.?office/i.test(catName) || txn.taxTreatment === "split_use")
+    if (requiresTxnAllocation(txn, category, catName)
         && !hasAllocation) {
       flags.push("AL");
     }
@@ -748,6 +767,8 @@ function buildTxnChecklistHtml(txn, flags) {
   const category = categoriesById[txn.categoryId] || null;
   const catName = String(txn.categoryName || category?.name || "");
   const catNameLower = catName.toLowerCase();
+  const needsAllocationSupport = requiresTxnAllocation(txn, category, catNameLower);
+  const needsMileageSupport = requiresTxnMileageLog(txn, category, catNameLower);
   const isExpense = txn.type !== "income";
   const isIncome = txn.type === "income";
   const items = [];
@@ -783,7 +804,7 @@ function buildTxnChecklistHtml(txn, flags) {
       }
     }
 
-    if (/\bphone\b|\binternet\b|home.?office/i.test(catNameLower) || txn.taxTreatment === "split_use") {
+    if (needsAllocationSupport) {
       if (flags.includes("AL")) {
         const pct = txn.personalUsePct != null ? Number(txn.personalUsePct) : null;
         items.push(fail(pct != null && pct > 0
@@ -795,7 +816,7 @@ function buildTxnChecklistHtml(txn, flags) {
       }
     }
 
-    if (/\bvehicle\b|\bfuel\b|\bmileage\b|auto insurance/i.test(catNameLower) || txn.taxTreatment === "vehicle") {
+    if (needsMileageSupport) {
       if (flags.includes("ML")) {
         items.push(fail("<strong>Mileage log:</strong> Mileage log or actual-expense support missing"));
       } else {
@@ -4317,11 +4338,9 @@ function syncAllocationField() {
   // visible for every transaction that needs a business-use %, not just
   // phone/internet — home-office categories and any split-use treatment
   // also need it.
-  const isAllocationCategory = /\bphone\b|\binternet\b|home.?office|vehicle|fuel|auto insurance|car\b|truck\b/.test(catText);
-  const isSplitUseTreatment = taxTreatmentSelect?.value === "split_use";
-  const showField = isAllocationCategory || isSplitUseTreatment;
-  allocationField.hidden = !showField;
-  if (!showField) {
+  const requiresUsagePct = requiresTxnAllocation({ taxTreatment: taxTreatmentSelect?.value || "" }, null, catText);
+  allocationField.hidden = !requiresUsagePct;
+  if (!requiresUsagePct) {
     const input = document.getElementById("txBusinessUsePct");
     if (input) {
       input.value = "";
