@@ -731,7 +731,7 @@ async function markTransactionReviewed(id) {
     const res = await apiFetch(`/api/transactions/${id}/review-status`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ review_status: "ready" })
+      body: JSON.stringify({ review_status: "matched" })
     });
     if (res && res.ok) await loadTransactions();
   } catch (err) {
@@ -3417,7 +3417,7 @@ function renderTransactionsTable(filteredTransactions) {
       const txnFlags = computeTxnFlags(txn);
       const hasFlags = txnFlags.length > 0;
       const hasManualReview = txn.reviewStatus && txn.reviewStatus !== "ready" && txn.reviewStatus !== "matched";
-      const isReviewed = txn.reviewStatus === "ready" || txn.reviewStatus === "matched";
+      const isReviewed = txn.reviewStatus === "matched";
       
     if (hasFlags || hasManualReview) {
       const badgeLabel = getTxnFlagBadgeLabel(txnFlags) || getReviewStatusLabel(txn.reviewStatus);
