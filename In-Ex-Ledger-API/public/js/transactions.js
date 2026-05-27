@@ -293,10 +293,10 @@ function computeTxnFlags(txn) {
   const reviewConfirmed = txn.reviewStatus === "matched";
   const personalUsePctValue = txn.personalUsePct != null ? Number(txn.personalUsePct) : null;
   const hasAllocation =
-  personalUsePctValue != null &&
-  Number.isFinite(personalUsePctValue) &&
-  personalUsePctValue >= 0 &&
-  personalUsePctValue <= 100;
+    personalUsePctValue != null &&
+    Number.isFinite(personalUsePctValue) &&
+    personalUsePctValue >= 0 &&
+    personalUsePctValue <= 100;
 
   if (isUncategorized) {
     flags.push("NC");
