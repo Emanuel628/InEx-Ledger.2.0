@@ -1569,6 +1569,11 @@ body {
   color: var(--green);
 }
 
+.tx-meta-badge.flag-ready {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--green);
+}
+
 .tx-meta-badge.income-type {
   background: rgba(16, 185, 129, 0.14);
   color: #065f46;
