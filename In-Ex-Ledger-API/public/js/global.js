@@ -1222,22 +1222,102 @@ function renderQuickExportAction(body, feature) {
   body.innerHTML = renderDynamicSidebarPremiumCard(feature, {
     heroKicker: "Review-ready",
     heroTitle: "Draft export",
-    heroDescription: "Open Exports with Draft mode already selected so you can review the package before finalizing anything.",
+    heroDescription: "Generate a draft export package directly from Quick Add so you can download a review copy without leaving the page.",
     points: [
       {
         title: "Safe default",
-        description: "Draft mode keeps the handoff editable while categories, support, and notes are still being cleaned up."
+        description: "The quick action generates a draft PDF package for the current year-to-date range while review items are still being cleaned up."
       },
       {
-        title: "One working action",
-        description: "Quick Add stays limited to the export path that is fully supported instead of exposing dead shortcuts."
+        title: "Direct action",
+        description: "This runs the export flow immediately instead of bouncing you to the Exports page and defeating the point of Quick Add."
       }
     ],
-    primaryHref: feature.route,
-    primaryLabel: getDynamicSidebarActionLabel(feature),
-    secondaryHref: "/exports",
-    secondaryLabel: "Open full exports page"
+    bodyHtml: `
+    <div class="dynamic-sidebar-export-actions" data-quick-export-actions>
+      <button type="button" class="dynamic-sidebar-primary-action dynamic-sidebar-primary-action--button" data-quick-export-run>${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</button>
+      <a class="dynamic-sidebar-secondary-action" href="/exports">Open full exports page</a>
+      <div class="dynamic-sidebar-form-message" data-quick-message></div>
+    </div>
+  `
   });
+
+  const runButton = body.querySelector("[data-quick-export-run]");
+  const messageNode = body.querySelector("[data-quick-message]");
+  runButton?.addEventListener("click", async () => {
+    if (!runButton) return;
+    runButton.disabled = true;
+    if (messageNode) messageNode.textContent = "Generating draft export...";
+    try {
+      await runQuickDraftExport();
+      if (messageNode) messageNode.textContent = "Draft export downloaded.";
+    } catch (error) {
+      if (messageNode) messageNode.textContent = error?.message || "Unable to generate draft export.";
+    } finally {
+      runButton.disabled = false;
+    }
+  });
+}
+
+function getQuickExportDateRange() {
+  const today = new Date();
+  const year = today.getUTCFullYear();
+  const month = String(today.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(today.getUTCDate()).padStart(2, "0");
+  return {
+    startDate: `${year}-01-01`,
+    endDate: `${year}-${month}-${day}`
+  };
+}
+
+function getQuickExportContext() {
+  const region = String(localStorage.getItem("lb_region") || localStorage.getItem("region") || window.LUNA_REGION || "us").toLowerCase();
+  const exportLang = String(localStorage.getItem("ledger_export_language") || "en").toLowerCase();
+  return {
+    region: region === "ca" ? "ca" : "us",
+    exportLang: ["en", "es", "fr"].includes(exportLang) ? exportLang : "en",
+    currency: getDynamicSidebarCurrency()
+  };
+}
+
+function makeQuickExportFilename(startDate, endDate, region) {
+  const slug = region === "ca" ? "t2125" : "schedule-c";
+  return `inex-ledger-${slug}-draft-export-${startDate}_to_${endDate}.pdf`;
+}
+
+async function runQuickDraftExport() {
+  const { startDate, endDate } = getQuickExportDateRange();
+  const { region, exportLang, currency } = getQuickExportContext();
+  const grantResponse = await dynamicSidebarApiFetch("/api/exports/request-grant", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      exportType: "pdf",
+      includeTaxId: false,
+      dateRange: { startDate, endDate },
+      metadata: { language: exportLang, currency }
+    })
+  });
+  await assertDynamicSidebarResponse(grantResponse, "Unable to prepare export.");
+  const grant = await grantResponse.json().catch(() => null);
+  const exportResponse = await dynamicSidebarApiFetch("/api/exports/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      grantToken: grant?.grantToken,
+      exportMode: "draft"
+    })
+  });
+  await assertDynamicSidebarResponse(exportResponse, "Unable to generate draft export.");
+  const blob = await exportResponse.blob();
+  const downloadUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = downloadUrl;
+  anchor.download = makeQuickExportFilename(startDate, endDate, region);
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(downloadUrl);
 }
 
 function renderDynamicSidebarOpenPage(body, feature) {

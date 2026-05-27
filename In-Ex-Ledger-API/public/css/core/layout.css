@@ -813,9 +813,19 @@ body[data-theme="light"] select option {
 }
 
 .dynamic-sidebar-primary-action {
+  border: 0;
   background: linear-gradient(135deg, #1d4ed8, #2563eb);
   color: #ffffff;
   box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
+}
+
+.dynamic-sidebar-primary-action--button {
+  cursor: pointer;
+}
+
+.dynamic-sidebar-primary-action--button:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .dynamic-sidebar-primary-action:hover,
