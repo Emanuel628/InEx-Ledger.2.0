@@ -125,14 +125,30 @@ function getReviewFocusItem() {
     || null;
 }
 
+function buildTransactionTargetHref(item) {
+  if (!item?.id) return "/transactions";
+
+  const rawHref = String(item.actionTarget?.href || "/transactions").trim() || "/transactions";
+
+  try {
+    const url = new URL(rawHref, window.location.origin);
+    const pathname = url.pathname.replace(/\/html\/transactions\.html$/i, "/transactions");
+
+    if (pathname === "/transactions" || pathname.endsWith("/transactions")) {
+      url.pathname = "/transactions";
+      url.searchParams.set("highlight", item.id);
+      return `${url.pathname}${url.search}${url.hash}`;
+    }
+  } catch (_) {
+    // Fall through to safe default.
+  }
+
+  return `/transactions?highlight=${encodeURIComponent(item.id)}`;
+}
+
 function openQueueTarget(item) {
   if (!item) return;
-  const href = item.actionTarget?.href || "/transactions";
-  if (href === "/transactions") {
-    window.location.href = `${href}?highlight=${encodeURIComponent(item.id)}`;
-    return;
-  }
-  window.location.href = href;
+  window.location.href = buildTransactionTargetHref(item);
 }
 
 function renderReviewFocusCard() {
