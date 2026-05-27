@@ -381,9 +381,8 @@ function getEmptyStateConfig() {
   if (_currentMailbox === "sent") {
     return {
       title: "No sent messages yet",
-      body: "Messages you send from InEx Ledger will appear here for follow-up and recordkeeping.",
-      actionLabel: "Compose Message",
-      action: "compose"
+      body: "Messages you send from InEx Ledger will appear here for follow-up and recordkeeping. Use + Compose above when you are ready to start a new thread.",
+      actionLabel: null
     };
   }
 
@@ -397,9 +396,8 @@ function getEmptyStateConfig() {
 
   return {
     title: "No messages yet",
-    body: translate("messages_empty", "No messages yet."),
-    actionLabel: "Compose Message",
-    action: "compose"
+    body: `${translate("messages_empty", "No messages yet.")} Use + Compose above to start a secure conversation.`,
+    actionLabel: null
   };
 }
 

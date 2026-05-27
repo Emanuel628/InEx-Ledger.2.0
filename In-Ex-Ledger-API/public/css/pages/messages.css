@@ -369,18 +369,19 @@
   min-height: 44px;
   padding: 0 16px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background: transparent;
   color: #fff;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 160ms ease, border-color 160ms ease;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
 
 .messages-focus-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.52);
+  transform: translateY(-1px);
 }
 
 .messages-panel {
@@ -1341,5 +1342,4 @@
     padding: 18px !important;
   }
 }
-
 
