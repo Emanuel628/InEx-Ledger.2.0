@@ -140,6 +140,31 @@ function initTransactionReviewFilterFromQuery() {
   }
 }
 
+function getOpenTransactionIdFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  return String(params.get("open") || params.get("transaction") || "").trim();
+}
+
+function openRequestedTransactionFromQuery() {
+  const transactionId = getOpenTransactionIdFromQuery();
+  if (!transactionId) return false;
+
+  const transaction = (ledgerState.transactions || []).find((txn) => String(txn.id) === transactionId);
+  if (!transaction) {
+    setTransactionFormMessage("That transaction could not be opened from the current transaction view.");
+    return false;
+  }
+
+  handleEditEntry(transactionId);
+
+  const row = document.getElementById(`txn-${transactionId}`);
+  row?.scrollIntoView({ behavior: "smooth", block: "center" });
+  row?.classList.add("is-review-target");
+
+  window.history.replaceState({}, "", "transactions");
+  return true;
+}
+
 let unattachedReceiptsCount = 0;
 const selectedTransactionIds = new Set();
 const selectedRecurringTemplateIds = new Set();
@@ -795,6 +820,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await refreshAccountOptions();
   await refreshCategoryOptions();
   await loadTransactions();
+  openRequestedTransactionFromQuery();
   await loadRecurringTemplates();
   setInterval(() => renderGhostSuggestions(), 5 * 60 * 1000);
   wireTransactionSearch();
