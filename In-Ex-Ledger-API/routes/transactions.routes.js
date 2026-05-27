@@ -896,6 +896,43 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.get("/:id", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.id)) {
+    return res.status(400).json({ error: "Invalid transaction ID." });
+  }
+
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+
+    const result = await pool.query(
+      `SELECT t.*,
+              a.name AS account_name,
+              c.name AS category_name,
+              c.tax_map_us,
+              c.tax_map_ca
+         FROM transactions t
+         LEFT JOIN accounts a ON a.id = t.account_id
+         LEFT JOIN categories c ON c.id = t.category_id
+        WHERE t.id = $1
+          AND t.business_id = $2
+          AND t.deleted_at IS NULL
+          AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
+          AND (t.is_void = false OR t.is_void IS NULL)
+        LIMIT 1`,
+      [req.params.id, businessId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Transaction not found." });
+    }
+
+    res.json(decryptTransactionRow(result.rows[0]));
+  } catch (err) {
+    logError("GET /transactions/:id error:", err);
+    res.status(500).json({ error: "Failed to load transaction." });
+  }
+});
+
 router.put("/:id", async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: "Invalid transaction ID." });
