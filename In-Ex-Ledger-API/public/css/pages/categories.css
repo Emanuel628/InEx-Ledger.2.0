@@ -307,7 +307,6 @@
 }
 .category-card-head p { margin: 4px 0 0; color: var(--cat-muted); font-size: 12px; font-weight: 700; }
 
-.category-card-menu,
 .category-row-menu {
   display: inline-flex;
   align-items: center;

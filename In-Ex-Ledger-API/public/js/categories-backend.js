@@ -183,7 +183,6 @@ function enhanceCategoriesPageShell() {
           <p id="${isIncome ? "incomeCategorySummary" : "expenseCategorySummary"}">0 active · 0 mapped</p>
         </div>
       </div>
-      <button type="button" class="category-card-menu" aria-label="${isIncome ? "Income" : "Expense"} category options">...</button>
     `;
     if (addButton) {
       addButton.className = "category-add-row";
