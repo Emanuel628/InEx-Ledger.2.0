@@ -13,7 +13,8 @@ const ledgerState = {
     offset: 0,
     hasMore: false
   },
-  transactionSummary: null
+  transactionSummary: null,
+  transactionReviewSummary: null
 };
 
 const recurringState = {
@@ -645,8 +646,40 @@ function renderTransactionReviewSummary(transactions = ledgerState.transactions 
     return;
   }
 
-  const snapshot = getTransactionReviewSnapshot(transactions);
-  const copy = getTransactionReviewSummaryCopy(snapshot, transactions.length);
+  const backendReviewSummary = ledgerState.transactionReviewSummary;
+const visibleSnapshot = getTransactionReviewSnapshot(transactions);
+
+const snapshot = backendReviewSummary
+  ? {
+      total: Number(getTransactionTotalCount() || 0),
+      unresolvedCount: Number(backendReviewSummary.any || 0),
+      readyCount: Number(backendReviewSummary.ready || 0),
+      manualReviewCount: 0,
+      hardCount:
+        Number(backendReviewSummary.nc || 0) +
+        Number(backendReviewSummary.um || 0) +
+        Number(backendReviewSummary.rs || 0) +
+        Number(backendReviewSummary.ml || 0) +
+        Number(backendReviewSummary.al || 0) +
+        Number(backendReviewSummary.bp || 0),
+      warningCount:
+        Number(backendReviewSummary.rv || 0) +
+        Number(backendReviewSummary.is || 0),
+      filterCounts: {
+        nc: Number(backendReviewSummary.nc || 0),
+        um: Number(backendReviewSummary.um || 0),
+        rs: Number(backendReviewSummary.rs || 0),
+        ml: Number(backendReviewSummary.ml || 0),
+        al: Number(backendReviewSummary.al || 0),
+        bp: Number(backendReviewSummary.bp || 0),
+        rv: Number(backendReviewSummary.rv || 0),
+        is: Number(backendReviewSummary.is || 0)
+      },
+      firstIssue: visibleSnapshot.firstIssue
+    }
+  : visibleSnapshot;
+
+const copy = getTransactionReviewSummaryCopy(snapshot, getTransactionTotalCount());
   titleNode.textContent = copy.title;
 
   if (iconNode) {
@@ -705,7 +738,7 @@ function renderTransactionReviewSummary(transactions = ledgerState.transactions 
       if (reviewFilterSelect) {
         reviewFilterSelect.value = resolvedFilter;
       }
-      applyFilters(true);
+      void loadTransactions({ resetPage: true });
     });
   });
 }
@@ -1668,6 +1701,7 @@ async function loadTransactions(options = {}) {
       hasMore: payload?.meta?.hasMore === true
     };
     ledgerState.transactionSummary = payload?.summary || null;
+    ledgerState.transactionReviewSummary = payload?.reviewSummary || payload?.review_summary || null;
     unattachedReceiptsCount = receiptSnapshot.unattachedCount;
   } catch (error) {
     console.error("Failed to load transactions:", error);
@@ -1675,6 +1709,7 @@ async function loadTransactions(options = {}) {
     ledgerState.transactions = [];
     ledgerState.transactionMeta = { total: 0, limit: PAGE_SIZE, offset: 0, hasMore: false };
     ledgerState.transactionSummary = null;
+    ledgerState.transactionReviewSummary = null;
     unattachedReceiptsCount = 0;
   } finally {
     renderAccountOptions();
@@ -1749,7 +1784,7 @@ function wireTransactionReviewFilter() {
   if (filter) {
     filter.addEventListener("change", () => {
       transactionFilters.review = filter.value;
-      applyFilters();
+    void loadTransactions({ resetPage: true });
     });
   }
 
@@ -3096,6 +3131,10 @@ async function fetchTransactionsForPage(pageIndex = currentPage) {
     offset: String(Math.max(0, pageIndex) * PAGE_SIZE),
     period: transactionFilters.period || "all"
   });
+  
+  if (transactionFilters.review) {
+    params.set("review", transactionFilters.review);
+  }
 
   if (getTransactionScope() === "all") {
     params.set("scope", "all");
@@ -3514,20 +3553,10 @@ function renderTransactionsTable(filteredTransactions) {
   const isAllScope = getTransactionScope() === "all";
   const canUseEdgeCaseTools = effectiveTier() === "v1";
 
-  const reviewFilterValue = transactionFilters.review || "";
-  const displayTransactions = reviewFilterValue
-    ? transactions.filter(txn => matchesTxReviewFilter(txn, computeTxnFlags(txn), reviewFilterValue))
-    : transactions;
+  const displayTransactions = transactions;
 
   tbody.innerHTML = "";
   renderPagination(totalTransactions);
-
-  if (displayTransactions.length === 0 && transactions.length > 0 && reviewFilterValue) {
-    tbody.innerHTML = `<tr class="placeholder-row"><td colspan="8" class="placeholder placeholder-cell">No transactions match the selected review filter on this page. Try a different page or filter.</td></tr>`;
-    syncBulkBar();
-    updateTransactionSelectionHeader();
-    return;
-  }
 
   displayTransactions.forEach((txn) => {
     const row = document.createElement("tr");
