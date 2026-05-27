@@ -313,7 +313,7 @@ router.get("/queue", async (req, res) => {
         [businessId]
       ),
       pool.query(
-        `SELECT id, name, region, province, currency, gst_hst_registered, gst_hst_method
+        `SELECT id, name, region, province, gst_hst_registered, gst_hst_method
            FROM businesses
           WHERE id = $1
           LIMIT 1`,
