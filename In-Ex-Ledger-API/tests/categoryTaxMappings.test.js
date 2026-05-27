@@ -10,19 +10,45 @@ function categoryByName(categories, name) {
   return categories.find((category) => category.name === name);
 }
 
-test("US default categories keep office supplies on Schedule C supplies", () => {
+test("US default categories map office supplies to Schedule C Line 18 (office expense)", () => {
+  // Per IRS Schedule C instructions, postage, stationery, and other
+  // office supplies belong on Line 18 (office_expense), not Line 22
+  // (supplies — reserved for materials consumed in trade/production).
   const defaults = getDefaultCategoriesForRegion("US");
-  assert.equal(categoryByName(defaults, "Office Supplies")?.tax_map_us, "supplies");
+  assert.equal(categoryByName(defaults, "Office Supplies")?.tax_map_us, "office_expense");
   assert.equal(categoryByName(defaults, "Phone & Internet")?.tax_map_us, "utilities");
   assert.equal(categoryByName(defaults, "Software & Subscriptions")?.tax_map_us, "software_subscriptions");
 });
 
-test("Canada default categories distinguish office expenses from office supplies", () => {
+test("Canada default categories map software/subscriptions to T2125 Line 8810 (office expenses)", () => {
+  // Per CRA T2125 guidance, software and subscription costs are
+  // deductible under Line 8810 office expenses, not the Line 9270
+  // "Other expenses" catch-all.
   const defaults = getDefaultCategoriesForRegion("CA");
   assert.equal(categoryByName(defaults, "Office Expenses")?.tax_map_ca, "office_expense");
   assert.equal(categoryByName(defaults, "Office Supplies")?.tax_map_ca, "office_supplies");
   assert.equal(categoryByName(defaults, "Phone & Internet")?.tax_map_ca, "utilities");
-  assert.equal(categoryByName(defaults, "Software & Subscriptions")?.tax_map_ca, "other_expense");
+  assert.equal(categoryByName(defaults, "Software & Subscriptions")?.tax_map_ca, "office_expense");
+});
+
+test("Every US default category carries a non-null tax_map_us slug", () => {
+  const defaults = getDefaultCategoriesForRegion("US");
+  for (const category of defaults) {
+    assert.ok(
+      category.tax_map_us && category.tax_map_us.length > 0,
+      `US default "${category.name}" is missing tax_map_us`
+    );
+  }
+});
+
+test("Every CA default category carries a non-null tax_map_ca slug", () => {
+  const defaults = getDefaultCategoriesForRegion("CA");
+  for (const category of defaults) {
+    assert.ok(
+      category.tax_map_ca && category.tax_map_ca.length > 0,
+      `CA default "${category.name}" is missing tax_map_ca`
+    );
+  }
 });
 
 test("Canada category tax mappings accept office_supplies", () => {
