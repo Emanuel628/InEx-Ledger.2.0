@@ -685,10 +685,6 @@ const reviewFilteredRows = filters.review
   ? reviewSourceRows.filter((row) => matchesReviewFilter(row, filters.review))
   : reviewSourceRows;
 const reviewFilteredIds = reviewFilteredRows.map((row) => row.id);
-    const params = [...filterParams];
-    params.push(filters.limit, filters.offset);
-    const limitParamIdx = params.length - 1;
-    const offsetParamIdx = params.length;
     
     let finalWhereSql = whereSql;
 let finalFilterParams = [...filterParams];
@@ -702,6 +698,11 @@ if (filters.review) {
   }
 }
 
+    const params = [...finalFilterParams];
+    params.push(filters.limit, filters.offset);
+    const limitParamIdx = params.length - 1;
+    const offsetParamIdx = params.length;
+
     const now = new Date();
     const currentMonthBounds = getTransactionPeriodBounds("this-month", now);
     const currentYearBounds = getTransactionPeriodBounds("ytd", now);
@@ -709,7 +710,7 @@ if (filters.review) {
     const previousYearEnd = new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0)).toISOString().slice(0, 10);
 
     const summaryParams = [
-      ...filterParams,
+      ...finalFilterParams,
       currentMonthBounds.start,
       currentMonthBounds.end,
       currentYearBounds.start,
@@ -717,12 +718,12 @@ if (filters.review) {
       previousYearStart,
       previousYearEnd
     ];
-    const summaryMonthStartParam = `$${filterParams.length + 1}`;
-    const summaryMonthEndParam = `$${filterParams.length + 2}`;
-    const summaryCurrentYearStartParam = `$${filterParams.length + 3}`;
-    const summaryCurrentYearEndParam = `$${filterParams.length + 4}`;
-    const summaryPreviousYearStartParam = `$${filterParams.length + 5}`;
-    const summaryPreviousYearEndParam = `$${filterParams.length + 6}`;
+    const summaryMonthStartParam = `$${finalFilterParams.length + 1}`;
+    const summaryMonthEndParam = `$${finalFilterParams.length + 2}`;
+    const summaryCurrentYearStartParam = `$${finalFilterParams.length + 3}`;
+    const summaryCurrentYearEndParam = `$${finalFilterParams.length + 4}`;
+    const summaryPreviousYearStartParam = `$${finalFilterParams.length + 5}`;
+    const summaryPreviousYearEndParam = `$${finalFilterParams.length + 6}`;
 
     const result = await pool.query(
       `SELECT t.id,
@@ -736,7 +737,7 @@ if (filters.review) {
                b.region AS business_region,
                c.tax_map_us,
                c.tax_map_ca,
-               COALESCE(rc.receipt_count, 0)::int AS receipt_count
+               COALESCE(rc.receipt_count, 0)::int AS receipt_count,
               t.type,
               t.cleared,
               t.description,
@@ -771,7 +772,7 @@ if (filters.review) {
       GROUP BY transaction_id
       ) rc ON rc.transaction_id = t.id
        LEFT JOIN categories c ON c.id = t.category_id
-       WHERE ${whereSql}
+       WHERE ${finalWhereSql}
        ORDER BY t.date DESC, t.created_at DESC
        LIMIT $${limitParamIdx} OFFSET $${offsetParamIdx}`,
       params
@@ -817,12 +818,14 @@ if (filters.review) {
          JOIN businesses b ON b.id = t.business_id
          LEFT JOIN accounts a ON a.id = t.account_id
          LEFT JOIN categories c ON c.id = t.category_id
-        WHERE ${whereSql}`,
+         WHERE ${finalWhereSql}`,
       summaryParams
     );
 
     const summaryRow = summaryResult.rows[0] || {};
-    const total = Number(summaryRow.transaction_count || 0);
+    const total = filters.review
+      ? reviewFilteredRows.length
+      : Number(summaryRow.transaction_count || 0);
 
     res.status(200).json({
       data: result.rows.map(decryptTransactionRow),
@@ -837,6 +840,8 @@ if (filters.review) {
       period: filters.period,
       returned_all: filters.wantsAll,
       summary: {
+        review_summary: reviewSummary,
+        review_filter: filters.review || "",
         transaction_count: total,
         income_total: Number(summaryRow.income_total || 0),
         expense_total: Number(summaryRow.expense_total || 0),
