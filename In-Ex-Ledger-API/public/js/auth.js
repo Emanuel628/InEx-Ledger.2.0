@@ -1054,6 +1054,7 @@ function initAccountMenus(displayName = authT("common_user"), profile = {}) {
         <span class="account-menu-label">${authT("auth_add_another_business")}</span>
         <span class="account-menu-hint">${authT("auth_create_and_switch")}</span>
       </button>
+      <a href="settings" class="account-menu-item" data-i18n="nav_settings" role="menuitem">${authT("nav_settings")}</a>
       <button type="button" class="account-menu-item" data-account-menu-action="logout" role="menuitem">
         ${typeof t === "function" ? t("auth_sign_out") : "Sign out"}
       </button>
