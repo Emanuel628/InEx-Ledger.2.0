@@ -5065,6 +5065,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initTransactionUndoBar();
   initRowActionPopup();
   initRecurringRowActionPopup();
+  initSidebarCollapse();
 });
 
 function initTransactionUndoBar() {
@@ -5099,6 +5100,26 @@ function initQuickAddTriggers() {
       event.preventDefault();
       toggle.click();
     });
+  });
+}
+
+function initSidebarCollapse() {
+  const toggle = document.getElementById("sidebarCollapseToggle");
+  if (!toggle) return;
+
+  const shell = document.querySelector(".app-shell");
+  const STORAGE_KEY = "quick-add-sidebar-collapsed";
+
+  if (localStorage.getItem(STORAGE_KEY) === "1") {
+    shell.classList.add("sidebar-collapsed");
+    toggle.classList.add("is-sidebar-collapsed");
+  }
+
+  toggle.addEventListener("click", () => {
+    const willCollapse = !shell.classList.contains("sidebar-collapsed");
+    shell.classList.toggle("sidebar-collapsed", willCollapse);
+    toggle.classList.toggle("is-sidebar-collapsed", willCollapse);
+    localStorage.setItem(STORAGE_KEY, willCollapse ? "1" : "0");
   });
 }
 

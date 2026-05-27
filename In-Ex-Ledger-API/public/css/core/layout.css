@@ -1065,6 +1065,7 @@ body[data-theme="light"] select option {
   align-self: flex-start !important;
   height: calc(100vh - 56px) !important;
   overflow-y: auto !important;
+  transition: width 200ms ease, min-width 200ms ease, padding 200ms ease;
 }
 
 .app-shell > .app-sidebar:not(.app-sidebar--dynamic) .sidebar-section-label {
@@ -1852,6 +1853,61 @@ body[data-theme="light"] select option {
 
 .mobile-view-link {
   display: block !important;
+}
+
+/* Quick Add sidebar collapse toggle */
+.sidebar-collapse-toggle {
+  position: fixed;
+  left: 224px;
+  top: calc(50vh + 28px);
+  transform: translateY(-50%);
+  z-index: 100;
+  width: 12px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  padding: 0;
+  color: var(--ink3);
+  transition: color 120ms ease, background 120ms ease, left 200ms ease;
+}
+
+.sidebar-collapse-toggle:hover {
+  color: var(--ink);
+  background: var(--surface2);
+}
+
+.sidebar-collapse-toggle svg {
+  width: 5px;
+  height: 9px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 200ms ease;
+}
+
+.sidebar-collapse-toggle.is-sidebar-collapsed {
+  left: 0;
+  border-left: 0.5px solid var(--border);
+}
+
+.sidebar-collapse-toggle.is-sidebar-collapsed svg {
+  transform: rotate(180deg);
+}
+
+/* Collapsed sidebar — overrides the !important sync block above */
+.app-shell.sidebar-collapsed > .app-sidebar:not(.app-sidebar--dynamic) {
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border-right: none !important;
 }
 
 
