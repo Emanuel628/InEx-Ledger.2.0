@@ -596,11 +596,13 @@ function updateCategoryDashboard() {
 
   const reviewButton = document.getElementById("categoryReviewBtn");
   if (reviewButton) {
+    const allMapped = total > 0 && review === 0;
+    
     reviewButton.textContent = review > 0 ? `Review ${review} unmapped categor${review === 1 ? "y" : "ies"}` : "All categories mapped";
-    reviewButton.disabled = review === 0;
+    reviewButton.disabled = allMapped;
+    reviewButton.classList.toggle("is-complete", allMapped);
   }
-}
-
+  
 function setText(id, value) {
   const node = document.getElementById(id);
   if (node) node.textContent = String(value);
