@@ -602,6 +602,7 @@ function updateCategoryDashboard() {
     reviewButton.disabled = allMapped;
     reviewButton.classList.toggle("is-complete", allMapped);
   }
+  }
   
 function setText(id, value) {
   const node = document.getElementById(id);
