@@ -175,20 +175,15 @@ function resolveExportIssueAction(item) {
 function syncExportActionState() {
   const pdfButton = document.getElementById("exportPdfBtn");
   const csvButton = document.getElementById("exportCsvBtn");
-  const finalization = exportPreflightState?.finalization;
-  const hasHardBlockers = Array.isArray(finalization?.hardBlockers) && finalization.hardBlockers.length > 0;
   const isV1 = (typeof effectiveTier === "function" ? effectiveTier() : "free") === "v1";
-  const disabledTitle = hasHardBlockers
-    ? (tx("exports_preflight_note_finalized_blocked") || "Resolve hard blockers before exporting.")
-    : "";
 
   if (pdfButton) {
-    pdfButton.disabled = !isV1 || hasHardBlockers;
-    pdfButton.title = hasHardBlockers ? disabledTitle : "";
+    pdfButton.disabled = !isV1;
+    pdfButton.title = "";
   }
   if (csvButton) {
-    csvButton.disabled = hasHardBlockers;
-    csvButton.title = hasHardBlockers ? disabledTitle : "";
+    csvButton.disabled = false;
+    csvButton.title = "";
   }
 }
 
@@ -688,11 +683,6 @@ function setupExportForm() {
 
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const finalization = exportPreflightState?.finalization;
-    if (Array.isArray(finalization?.hardBlockers) && finalization.hardBlockers.length > 0) {
-      showFinalizationError(finalization.hardBlockers);
-      return;
-    }
     const range = getValidatedExportRange();
     if (!range) {
       return;
@@ -739,27 +729,23 @@ function setupPdfButton() {
   const syncPdfState = () => {
     const isV1 = (typeof effectiveTier === "function" ? effectiveTier() : "free") === "v1";
     const finalization = exportPreflightState.finalization;
-    const hasHardBlockers =
-      getExportScope() !== "all"
+    const finalizedBlocked =
+      getSelectedExportMode() === "finalized"
+      && getExportScope() !== "all"
       && Array.isArray(finalization?.hardBlockers)
       && finalization.hardBlockers.length > 0;
-    button.disabled = !isV1 || hasHardBlockers;
-    button.title = hasHardBlockers ? tx("exports_preflight_note_finalized_blocked") : "";
+    button.disabled = !isV1 || finalizedBlocked;
+    button.title = finalizedBlocked ? tx("exports_preflight_note_finalized_blocked") : "";
     if (note) {
       note.hidden = isV1;
     }
-    return isV1 && !hasHardBlockers;
+    return isV1 && !finalizedBlocked;
   };
 
   syncPdfState();
 
   button.addEventListener("click", async () => {
     if (!syncPdfState()) {
-      return;
-    }
-    const finalization = exportPreflightState?.finalization;
-    if (Array.isArray(finalization?.hardBlockers) && finalization.hardBlockers.length > 0) {
-      showFinalizationError(finalization.hardBlockers);
       return;
     }
     const range = getValidatedExportRange();
