@@ -7,6 +7,7 @@ const ledgerState = {
   transactions: [],
   accounts: [],
   categories: [],
+  reviewQueueByTransactionId: new Map(),
   transactionMeta: {
     total: 0,
     limit: 0,
@@ -93,16 +94,19 @@ const TRANSACTION_REVIEW_LABELS = {
   locked: "Locked"
 };
 
-const TX_FLAG_PRIORITY = ["NC", "UM", "ML", "AL", "BP", "RS", "RV", "IS"];
+const TX_FLAG_PRIORITY = ["NC", "UM", "CA", "HO", "ML", "AL", "BP", "RS", "FC", "RV", "IS", "DUP"];
 
 const TX_FLAG_LABELS = {
   NC: "Needs Category",
   UM: "Needs Tax Mapping",
+  FC: "Needs Final Confirmation",
   RS: "Needs Receipt",
   IS: "Income Source Review",
   ML: "Needs Mileage Log",
   AL: "Needs Allocation",
   BP: "Needs Business Purpose",
+  HO: "Needs Home Office Support",
+  CA: "Needs Capital Asset Review",
   RV: "CPA Review",
   DUP: "Duplicate Review"
 };
@@ -110,24 +114,54 @@ const TX_FLAG_LABELS = {
 const TX_FLAG_BADGE_CSS = {
   NC: "flag-action",
   UM: "flag-action",
+  FC: "flag-warning",
   ML: "flag-missing",
   AL: "flag-missing",
   BP: "flag-missing",
+  HO: "flag-missing",
+  CA: "flag-missing",
   RS: "flag-missing",
   RV: "flag-cpa",
   IS: "flag-warning",
   DUP: "flag-warning"
 };
+const ISSUE_CODE_TO_TX_FLAG = {
+  needs_category: "NC",
+  needs_tax_mapping: "UM",
+  needs_receipt_support: "RS",
+  needs_business_purpose: "BP",
+  needs_allocation: "AL",
+  needs_mileage_log: "ML",
+  needs_home_office_support: "AL",
+  needs_capital_asset_review: "RV",
+  cpa_review_required: "RV",
+  possible_duplicate: "DUP"
+};
 const TRANSACTION_REVIEW_FILTER_OPTIONS = Object.freeze([
   { key: "nc", label: "Needs category", codes: ["NC"], tone: "hard" },
   { key: "rs", label: "Missing receipt", codes: ["RS"], tone: "hard" },
   { key: "um", label: "Tax mapping", codes: ["UM"], tone: "hard" },
+  { key: "fc", label: "Final confirmation", codes: ["FC"], tone: "warning" },
   { key: "ml", label: "Mileage support", codes: ["ML"], tone: "hard" },
   { key: "al", label: "Allocation", codes: ["AL"], tone: "hard" },
   { key: "bp", label: "Business purpose", codes: ["BP"], tone: "hard" },
+  { key: "ho", label: "Home office", codes: ["HO"], tone: "hard" },
+  { key: "ca", label: "Capital asset", codes: ["CA"], tone: "hard" },
   { key: "rv", label: "CPA review", codes: ["RV"], tone: "warning" },
   { key: "is", label: "Income review", codes: ["IS"], tone: "warning" }
 ]);
+
+function getTxnIssueEntries(txn) {
+  return Array.isArray(txn?.issueEntries) ? txn.issueEntries : [];
+}
+
+function deriveFlagsFromIssueEntries(issueEntries = []) {
+  return Array.from(new Set(
+    issueEntries
+      .map((entry) => ISSUE_CODE_TO_TX_FLAG[String(entry?.issueCode || entry?.issue_code || "").trim().toLowerCase()] || "")
+      .filter(Boolean)
+  ));
+}
 
 function initTransactionReviewFilterFromQuery() {
   const params = new URLSearchParams(window.location.search);
@@ -461,6 +495,13 @@ function getReviewStatusLabel(value) {
 }
 
 function computeTxnFlags(txn) {
+  const issueBackedFlags = Array.isArray(txn?.reviewFlags) && txn.reviewFlags.length
+    ? txn.reviewFlags
+    : deriveFlagsFromIssueEntries(getTxnIssueEntries(txn));
+  if (issueBackedFlags.length) {
+    return Array.from(new Set(issueBackedFlags.filter((flag) => TX_FLAG_LABELS[flag])));
+  }
+
   const categoriesById = mapById(getCategories());
   const category = categoriesById[txn.categoryId] || null;
   const flags = [];
@@ -541,13 +582,17 @@ function getTxnFlagBadgeCss(flags) {
 function getTxnRowToneClass(flags, reviewStatus) {
   const top = getTxnTopFlag(flags);
   if (top === "NC" || top === "UM") return "row-flag-critical";
-  if (top === "ML" || top === "AL" || top === "BP" || top === "RS") return "row-flag-missing";
+  if (top === "CA" || top === "HO" || top === "ML" || top === "AL" || top === "BP" || top === "RS") return "row-flag-missing";
   if (top === "IS" || top === "DUP") return "row-flag-warning";
-  if (top === "RV" || (!top && reviewStatus === "needs_review")) return "row-flag-cpa";
+  if (top === "FC") return "row-flag-warning";
+  if (!top && reviewStatus === "rv") return "row-flag-cpa";
   return "";
 }
 
 function hasManualReviewState(txn) {
+  if (Array.isArray(txn?.issueEntries)) {
+    return txn.issueEntries.length > 0 || txn.reviewStatus === "locked";
+  }
   return !!(txn?.reviewStatus && txn.reviewStatus !== "ready" && txn.reviewStatus !== "matched");
 }
 
@@ -557,10 +602,13 @@ function matchesTxReviewFilter(txn, flags, filterValue) {
     case "any": return flags.length > 0 || (txn.reviewStatus && txn.reviewStatus !== "ready" && txn.reviewStatus !== "matched");
     case "nc": return flags.includes("NC");
     case "um": return flags.includes("UM");
+    case "fc": return flags.includes("FC");
     case "rs": return flags.includes("RS");
     case "al": return flags.includes("AL");
     case "ml": return flags.includes("ML");
     case "bp": return flags.includes("BP");
+    case "ho": return flags.includes("HO");
+    case "ca": return flags.includes("CA");
     case "is": return flags.includes("IS");
     case "rv": return flags.includes("RV");
     case "ready": return flags.length === 0 && (!txn.reviewStatus || txn.reviewStatus === "ready" || txn.reviewStatus === "matched");
@@ -801,6 +849,10 @@ function buildTxnChecklistHtml(txn, flags) {
       items.push(ok(`<strong>Receipt/support:</strong> ${txn.receiptCount || 0} attached`));
     }
 
+    if (flags.includes("FC")) {
+      items.push(warn("<strong>Final confirmation:</strong> Add support or confirm the business treatment"));
+    }
+
     if (/\bmeal|\bfood\b|\bdining\b|\brestaurant\b|\btravel\b|\bairfare\b|\bhotel\b|\bentertainment\b/i.test(catNameLower)) {
       if (flags.includes("BP")) {
         items.push(fail("<strong>Business purpose:</strong> Document needed (50% limit applies)"));
@@ -828,6 +880,14 @@ function buildTxnChecklistHtml(txn, flags) {
         items.push(ok("<strong>Mileage log:</strong> On file"));
       }
     }
+
+    if (flags.includes("HO")) {
+      items.push(fail("<strong>Home-office support:</strong> Worksheet or support file missing"));
+    }
+
+    if (flags.includes("CA")) {
+      items.push(fail("<strong>Capital asset review:</strong> Asset support or classification record missing"));
+    }
   }
 
   if (isIncome && !flags.includes("NC")) {
@@ -839,7 +899,7 @@ function buildTxnChecklistHtml(txn, flags) {
   }
 
   if (flags.includes("RV")) {
-    items.push(fail("<strong>CPA review:</strong> Flagged for review - edit to resolve or mark ready"));
+    items.push(fail("<strong>CPA review:</strong> Flagged for review - mark ready when the transaction is confirmed"));
   }
 
   if (items.length === 0) {
@@ -880,12 +940,15 @@ function openTxReviewPopover(txnId, anchorEl) {
   if (flags.includes("RS")) {
     actions.push({ label: "Attach receipt", fix: "receipt", primary: true });
   }
-  if (flags.includes("ML") || flags.includes("AL") || flags.includes("BP")) {
-    actions.push({ label: "Add note / support", fix: "edit" });
+  if (flags.includes("AL")) {
+    actions.push({ label: "Set business-use %", fix: "edit", primary: !flags.includes("RS") });
+  }
+  if (flags.some((flag) => ["FC", "ML", "BP", "HO", "CA"].includes(flag))) {
+    actions.push({ label: "Add support", fix: "support" });
   }
   if (flags.includes("RV")) {
-    actions.push({ label: "Mark reviewed", fix: "mark_reviewed", primary: true });
-    actions.push({ label: "Edit & resolve", fix: "edit" });
+    actions.push({ label: "Mark ready", fix: "mark-ready", primary: true });
+    actions.push({ label: "Edit details", fix: "edit" });
   }
   if (flags.includes("IS")) {
     actions.push({ label: "Attach source document", fix: "receipt" });
@@ -920,6 +983,10 @@ function openTxReviewPopover(txnId, anchorEl) {
       closeTxReviewPopover();
       if (fix === "receipt") {
         triggerReceiptUpload(id);
+      } else if (fix === "support") {
+        openReviewSupport(id);
+      } else if (fix === "mark-ready") {
+        void markTransactionReady(id);
       } else if (fix === "edit") {
         handleEditEntry(id);
       } else if (fix === "mark_reviewed") {
@@ -1702,22 +1769,30 @@ async function loadTransactions(options = {}) {
     }
 
     const transactions = Array.isArray(payload?.transactions) ? payload.transactions : [];
-    let receiptSnapshot = { byTransactionId: {}, countByTransactionId: {}, idsByTransactionId: {}, unattachedCount: 0 };
-    try {
-      receiptSnapshot = await fetchReceiptLinksSnapshot();
-    } catch (receiptError) {
-      console.warn("[Transactions] Receipt snapshot unavailable", receiptError);
-    }
+    const [receiptSnapshot, reviewQueueByTransactionId] = await Promise.all([
+      fetchReceiptLinksSnapshot().catch((receiptError) => {
+        console.warn("[Transactions] Receipt snapshot unavailable", receiptError);
+        return { byTransactionId: {}, countByTransactionId: {}, idsByTransactionId: {}, unattachedCount: 0 };
+      }),
+      fetchReviewQueueSnapshot()
+    ]);
 
+    ledgerState.reviewQueueByTransactionId = reviewQueueByTransactionId;
     ledgerState.transactions = transactions.filter(Boolean).map((transaction) => {
       const receiptIds = receiptSnapshot.idsByTransactionId[transaction.id] || [];
+      const reviewItem = reviewQueueByTransactionId.get(String(transaction.id)) || null;
       return {
         ...transaction,
         receiptId: receiptSnapshot.byTransactionId[transaction.id] || transaction.receiptId || "",
         receiptIds,
         receiptCount:
           receiptSnapshot.countByTransactionId[transaction.id] ||
-          (transaction.receiptId ? 1 : 0)
+          (transaction.receiptId ? 1 : 0),
+        reviewFlags: Array.isArray(reviewItem?.reviewFlags) ? reviewItem.reviewFlags : [],
+        issueEntries: getTxnIssueEntries(reviewItem),
+        supportSummary: reviewItem?.supportSummary || "",
+        supportStatus: reviewItem?.supportStatus || "",
+        actionTarget: reviewItem?.actionTarget || null
       };
     });
     ledgerState.transactionMeta = {
@@ -1746,6 +1821,56 @@ async function loadTransactions(options = {}) {
     syncTransactionUndoBar();
     void syncTransactionUndoAvailability({ preserveMessage: true });
   }
+}
+
+function openReviewSupport(transactionId) {
+  const params = new URLSearchParams();
+  params.set("transaction", String(transactionId));
+  params.set("modal", "support");
+  window.location.href = `/review?${params.toString()}`;
+}
+
+async function markTransactionReady(transactionId) {
+  try {
+    const response = await apiFetch(`/api/transactions/${encodeURIComponent(transactionId)}/review-status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ review_status: "ready" })
+    });
+    if (!response || !response.ok) {
+      const payload = await response?.json().catch(() => null);
+      throw new Error(payload?.error || "Unable to mark transaction ready.");
+    }
+    await loadTransactions();
+    focusTransactionForReview(transactionId);
+  } catch (error) {
+    console.error("Failed to mark transaction ready:", error);
+    setTransactionFormMessage(error?.message || "Unable to mark transaction ready.");
+  }
+}
+
+async function fetchReviewQueueSnapshot() {
+  try {
+    const response = await apiFetch(`/api/review/queue?_ts=${Date.now()}`);
+    if (!response || !response.ok) {
+      return new Map();
+    }
+    const payload = await response.json().catch(() => ({}));
+    const queue = Array.isArray(payload?.queue) ? payload.queue : [];
+    return new Map(queue.map((item) => [String(item.id), item]));
+  } catch (error) {
+    console.warn("[Transactions] Review queue snapshot unavailable", error);
+    return new Map();
+  }
+}
+
+async function fetchTransactionById(transactionId) {
+  const response = await apiFetch(`/api/transactions/${encodeURIComponent(transactionId)}`);
+  if (!response || !response.ok) {
+    const payload = await response?.json().catch(() => null);
+    throw new Error(payload?.error || "Unable to load transaction.");
+  }
+  return normalizeTransaction(await response.json().catch(() => null));
 }
 
 function renderAccountOptions() {
@@ -1967,17 +2092,20 @@ function updateTransactionNote(transactionId, note) {
   applyFilters();
 }
 
-function handleEditEntry(transactionId) {
-  const transaction = (ledgerState.transactions || []).find((txn) => txn.id === transactionId);
+function openTransactionEditor(transaction) {
   if (!transaction) {
     return;
   }
-  deselectTransaction(transactionId);
-  editingTransactionId = transactionId;
+  editingTransactionId = transaction.id;
   setEditingMode(true);
   prefillTransactionForm(transaction);
   openTransactionDrawer();
   closeTransactionModal();
+}
+
+function handleEditEntry(transactionId) {
+  const transaction = (ledgerState.transactions || []).find((txn) => txn.id === transactionId);
+  openTransactionEditor(transaction);
 }
 
 function handleEditRecurringTemplate(templateId) {
@@ -3760,20 +3888,38 @@ function renderTransactionsTable(filteredTransactions) {
   maybeScrollToHighlightedTransaction();
 }
 
-function maybeScrollToHighlightedTransaction() {
+async function maybeScrollToHighlightedTransaction() {
   const params = new URLSearchParams(window.location.search);
   const id = params.get("highlight");
   if (!id) return;
+  const openMode = String(params.get("open") || "").trim().toLowerCase();
 
   const row = document.getElementById(`txn-${id}`);
-  if (!row) return;
+  if (row) {
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.add("tx-highlight");
+    setTimeout(() => row.classList.remove("tx-highlight"), 2000);
 
-  row.scrollIntoView({ behavior: "smooth", block: "center" });
-  row.classList.add("tx-highlight");
-  setTimeout(() => row.classList.remove("tx-highlight"), 2000);
+    if (openMode === "review") {
+      const badge = row.querySelector("[data-review-txn-id]");
+      if (badge) {
+        setTimeout(() => openTxReviewPopover(id, badge), 180);
+      }
+    }
+  } else if (openMode === "review") {
+    try {
+      const transaction = await fetchTransactionById(id);
+      if (transaction) {
+        openTransactionEditor(transaction);
+      }
+    } catch (error) {
+      console.warn("[Transactions] Unable to open highlighted transaction", error);
+    }
+  }
 
   const clean = new URL(window.location.href);
   clean.searchParams.delete("highlight");
+  clean.searchParams.delete("open");
   window.history.replaceState({}, "", clean.toString());
 }
 
@@ -4333,16 +4479,13 @@ function syncEdgeCaseUi() {
 
 function syncAllocationField() {
   const categorySelect = document.getElementById("category");
+  const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
   const allocationField = document.getElementById("txAllocationField");
   if (!allocationField) {
     return;
   }
   const catText = (categorySelect?.options[categorySelect?.selectedIndex]?.text || "").toLowerCase();
   const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
-  // Mirror the AL flag's triggers so the inline allocation field is
-  // visible for every transaction that needs a business-use %, not just
-  // phone/internet — home-office categories and any split-use treatment
-  // also need it.
   const requiresUsagePct = requiresTxnAllocation({ taxTreatment: taxTreatmentSelect?.value || "" }, null, catText);
   allocationField.hidden = !requiresUsagePct;
   if (!requiresUsagePct) {

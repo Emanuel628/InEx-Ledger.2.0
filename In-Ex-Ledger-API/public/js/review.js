@@ -148,7 +148,15 @@ function buildTransactionTargetHref(item) {
 
 function openQueueTarget(item) {
   if (!item) return;
-  window.location.href = buildTransactionTargetHref(item);
+  const href = item.actionTarget?.href || "/transactions";
+  if (href === "/transactions") {
+    const params = new URLSearchParams();
+    params.set("highlight", item.id);
+    params.set("open", "review");
+    window.location.href = `${href}?${params.toString()}`;
+    return;
+  }
+  window.location.href = href;
 }
 
 function renderReviewFocusCard() {
@@ -242,7 +250,9 @@ function renderQueue() {
     const issues = Array.isArray(item.issueLabels) && item.issueLabels.length
       ? item.issueLabels
       : [tx("review_issue_fallback", "Needs review")];
-    const actionHref = buildTransactionTargetHref(item);
+    const actionHref = item.actionTarget?.href === "/transactions"
+      ? `/transactions?highlight=${encodeURIComponent(item.id)}&open=review`
+      : (item.actionTarget?.href || "/transactions");
     const actionLabel = item.actionTarget?.label || tx("review_action_open", "Open");
     const amount = formatMoney(item.amount, item.currency);
     const supportParts = [];
@@ -583,6 +593,7 @@ async function loadReviewQueue() {
     reviewQueue = Array.isArray(payload.queue) ? payload.queue : [];
     renderSummary(payload.summary || {});
     renderQueue();
+    void maybeHandleDeepLinkedReviewAction();
   } catch (error) {
     console.error("Failed to load review queue:", error);
     reviewQueue = [];
@@ -593,6 +604,33 @@ async function loadReviewQueue() {
     empty.hidden = true;
     tableWrap.hidden = true;
   }
+}
+
+async function maybeHandleDeepLinkedReviewAction() {
+  const params = new URLSearchParams(window.location.search);
+  const transactionId = String(params.get("transaction") || "").trim();
+  const modal = String(params.get("modal") || "").trim().toLowerCase();
+  if (!transactionId || !modal) {
+    return;
+  }
+
+  const item = reviewQueue.find((entry) => String(entry.id) === transactionId);
+  if (!item) {
+    return;
+  }
+
+  if (modal === "support") {
+    await openSupportModal(item);
+  } else if (modal === "issue") {
+    await openIssueModal(item);
+  } else {
+    return;
+  }
+
+  const clean = new URL(window.location.href);
+  clean.searchParams.delete("transaction");
+  clean.searchParams.delete("modal");
+  window.history.replaceState({}, "", clean.toString());
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
