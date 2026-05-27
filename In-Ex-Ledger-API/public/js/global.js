@@ -1111,10 +1111,27 @@ function renderDynamicSidebarQuickAction(feature, body) {
 
 function renderQuickExportAction(body, feature) {
   body.innerHTML = `
-    <div class="dynamic-sidebar-action-stack">
-      <p>${escapeDynamicSidebarHtml("Open Exports with Draft mode preselected. Keep Quick Add limited to the one export action that actually works.")}</p>
-      <a class="dynamic-sidebar-primary-action" href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</a>
-    </div>
+    <section class="dynamic-sidebar-export-card" aria-label="Draft export quick action">
+      <div class="dynamic-sidebar-export-hero">
+        <div class="dynamic-sidebar-export-kicker">Review-ready</div>
+        <h3>Draft export</h3>
+        <p>Open Exports with Draft mode already selected so you can review the package before finalizing anything.</p>
+      </div>
+      <div class="dynamic-sidebar-export-points">
+        <div class="dynamic-sidebar-export-point">
+          <strong>Safe default</strong>
+          <span>Draft mode keeps the handoff editable while categories, support, and notes are still being cleaned up.</span>
+        </div>
+        <div class="dynamic-sidebar-export-point">
+          <strong>One working action</strong>
+          <span>Quick Add stays limited to the export path that is fully supported instead of exposing dead shortcuts.</span>
+        </div>
+      </div>
+      <div class="dynamic-sidebar-export-actions">
+        <a class="dynamic-sidebar-primary-action" href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</a>
+        <a class="dynamic-sidebar-secondary-action" href="/exports">Open full exports page</a>
+      </div>
+    </section>
   `;
 }
 
