@@ -852,10 +852,31 @@ body {
   margin-top: 20px;
 }
 
+.checklist-split-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(340px, 0.88fr);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: center;
+}
+
+.checklist-split-layout .section-heading {
+  margin: 0;
+  text-align: left;
+}
+
+.checklist-copy {
+  max-width: 580px;
+}
+
+.checklist-copy .section-subtitle {
+  margin-left: 0;
+  margin-right: 0;
+}
+
 .warning-checklist-showcase {
-  grid-template-columns: minmax(0, 960px);
-  justify-content: center;
-  margin-top: 28px;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: stretch;
+  margin-top: 0;
 }
 
 .preview-card-top,
