@@ -380,7 +380,6 @@ async function setFreePlanForBusiness(businessId) {
 function hasFeatureAccess(subscription, feature) {
   const tier = subscription?.effectiveTier || PLAN_FREE;
   const v1Features = new Set([
-    "receipts",
     "pdf_exports",
     "advanced_exports",
     "edge_case_tools",
