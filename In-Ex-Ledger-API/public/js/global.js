@@ -626,10 +626,9 @@ const DYNAMIC_SIDEBAR_FEATURES = [
     id: "exports",
     label: "Exports",
     labelKey: "nav_exports",
-    route: "exports",
+    route: "exports?mode=draft",
     group: "Core",
-    actionLabel: "Create export",
-    actionKey: "quick_add_action_create_export",
+    actionLabel: "Draft Quick Export",
     icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg>'
   },
   {
@@ -1103,7 +1102,20 @@ function renderDynamicSidebarQuickAction(feature, body) {
     renderQuickInvoiceForm(body, feature);
     return;
   }
+  if (feature.id === "exports") {
+    renderQuickExportAction(body, feature);
+    return;
+  }
   renderDynamicSidebarOpenPage(body, feature);
+}
+
+function renderQuickExportAction(body, feature) {
+  body.innerHTML = `
+    <div class="dynamic-sidebar-action-stack">
+      <p>${escapeDynamicSidebarHtml("Open Exports with Draft mode preselected. Keep Quick Add limited to the one export action that actually works.")}</p>
+      <a class="dynamic-sidebar-primary-action" href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</a>
+    </div>
+  `;
 }
 
 function renderDynamicSidebarOpenPage(body, feature) {

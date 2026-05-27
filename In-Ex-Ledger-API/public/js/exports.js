@@ -39,6 +39,12 @@ let exportState = {
 };
 const EXPORT_PROFILE_MISSING_QUERY_KEY = "export_profile_missing";
 
+function getRequestedExportMode() {
+  const params = new URLSearchParams(window.location.search);
+  const mode = String(params.get("mode") || "").trim().toLowerCase();
+  return ["draft", "workpaper", "finalized"].includes(mode) ? mode : "";
+}
+
 function normalizeMissingFieldKeys(values) {
   const source = Array.isArray(values) ? values : [values];
   return Array.from(new Set(
@@ -230,6 +236,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await hydrateExportData();
   populateExportFilters();
   initExportLanguageSelect();
+  applyRequestedExportMode();
   initPresetChips();
   initExportInfoPopover();
   setupExportForm();
@@ -347,6 +354,15 @@ function initExportScopeSelect() {
     await refreshExportPreflight();
     renderExportHistory();
   });
+}
+
+function applyRequestedExportMode() {
+  const requestedMode = getRequestedExportMode();
+  const select = document.getElementById("exportPackageMode");
+  if (!requestedMode || !select) {
+    return;
+  }
+  select.value = requestedMode;
 }
 
 function getExportScope() {
