@@ -57,6 +57,18 @@ test("Canada category tax mappings accept office_supplies", () => {
   assert.equal(normalized.value, "office_supplies");
 });
 
+test("every default category is tax mapped for its region", () => {
+  for (const region of ["US", "CA"]) {
+    const defaults = getDefaultCategoriesForRegion(region);
+    for (const category of defaults) {
+      const taxMap = region === "CA" ? category.tax_map_ca : category.tax_map_us;
+      assert.ok(taxMap, `${region} default category "${category.name}" is missing a tax map`);
+      const normalized = normalizeCategoryTaxMap(taxMap, region);
+      assert.equal(normalized.valid, true, `${region} default category "${category.name}" has an invalid tax map`);
+    }
+  }
+});
+
 test("all US default categories are tax mapped with valid values", () => {
   const defaults = getDefaultCategoriesForRegion("US");
 

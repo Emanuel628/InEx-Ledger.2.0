@@ -127,13 +127,6 @@ function renderCanonicalTopbarNavigation() {
       icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg>'
     },
     {
-      href: "/settings",
-      route: "settings",
-      i18n: "nav_settings",
-      label: "Settings",
-      icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5L5 11M11 5l1.5-1.5"></path></svg>'
-    },
-    {
       href: "/messages",
       route: "messages",
       label: "Messages",

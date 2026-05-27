@@ -4289,7 +4289,7 @@ function syncAllocationField() {
   // visible for every transaction that needs a business-use %, not just
   // phone/internet — home-office categories and any split-use treatment
   // also need it.
-  const isAllocationCategory = /\bphone\b|\binternet\b|home.?office/.test(catText);
+  const isAllocationCategory = /\bphone\b|\binternet\b|home.?office|vehicle|fuel|auto insurance|car\b|truck\b/.test(catText);
   const isSplitUseTreatment = taxTreatmentSelect?.value === "split_use";
   const showField = isAllocationCategory || isSplitUseTreatment;
   allocationField.hidden = !showField;
