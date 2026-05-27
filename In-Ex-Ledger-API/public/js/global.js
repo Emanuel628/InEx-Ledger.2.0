@@ -1711,14 +1711,11 @@ function renderQuickInvoiceForm(body, feature) {
         <option value="GBP">GBP</option>
       </select></label>
       <label>Tax rate (%)<input name="tax_rate" type="number" min="0" max="100" step="0.001" inputmode="decimal" value="0"></label>
-      <fieldset class="dynamic-sidebar-fieldset">
-        <legend>Line item</legend>
-        <label>Description<input name="line_description" type="text" autocomplete="off" required></label>
-        <div class="dynamic-sidebar-inline-fields">
-          <label>Qty<input name="line_quantity" type="number" min="0.01" step="0.01" inputmode="decimal" value="1" required></label>
-          <label>Unit price<input name="line_unit_price" type="number" min="0" step="0.01" inputmode="decimal" required></label>
-        </div>
-      </fieldset>
+      <label>Description<input name="line_description" type="text" autocomplete="off" required></label>
+      <div class="dynamic-sidebar-inline-fields">
+        <label>Qty<input name="line_quantity" type="number" min="0.01" step="0.01" inputmode="decimal" value="1" required></label>
+        <label>Unit price<input name="line_unit_price" type="number" min="0" step="0.01" inputmode="decimal" required></label>
+      </div>
       <label>Notes<textarea name="notes" rows="3"></textarea></label>
       <div class="dynamic-sidebar-form-actions">
         <a href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(gT("common_open_full_editor", "Open full editor"))}</a>
