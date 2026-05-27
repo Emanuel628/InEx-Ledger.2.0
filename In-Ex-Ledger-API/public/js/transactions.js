@@ -1946,6 +1946,7 @@ function handleEditEntry(transactionId) {
   if (!transaction) {
     return;
   }
+  deselectTransaction(transactionId);
   editingTransactionId = transactionId;
   setEditingMode(true);
   prefillTransactionForm(transaction);
@@ -2269,6 +2270,33 @@ function syncBulkBar() {
   } else {
     bar.hidden = true;
   }
+}
+
+function syncTransactionSelectionUi() {
+  syncBulkBar();
+  updateTransactionSelectionHeader(getCurrentTransactionPageItems());
+}
+
+function deselectTransaction(transactionId) {
+  const txnId = String(transactionId || "");
+  if (!txnId) {
+    return;
+  }
+
+  selectedTransactionIds.delete(txnId);
+
+  const tbody = document.querySelector("tbody");
+  const checkbox = tbody?.querySelector(`.tx-row-select[data-id="${txnId}"]`);
+  if (checkbox) {
+    checkbox.checked = false;
+    checkbox.closest("tr")?.classList.remove("is-selected");
+  }
+
+  if (_popupTxnId === txnId || selectedTransactionIds.size === 0) {
+    closeRowActionPopup();
+  }
+
+  syncTransactionSelectionUi();
 }
 
 function wireTransactionSelectionHeader() {
@@ -4450,6 +4478,7 @@ function triggerReceiptUpload(transactionId) {
     return;
   }
 
+  deselectTransaction(transactionId);
   receiptInputElement.dataset.transactionId = transactionId;
   receiptInputElement.value = "";
   receiptInputElement.click();
