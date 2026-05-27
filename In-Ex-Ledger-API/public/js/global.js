@@ -1109,43 +1109,166 @@ function renderDynamicSidebarQuickAction(feature, body) {
   renderDynamicSidebarOpenPage(body, feature);
 }
 
-function renderQuickExportAction(body, feature) {
-  body.innerHTML = `
-    <section class="dynamic-sidebar-export-card" aria-label="Draft export quick action">
-      <div class="dynamic-sidebar-export-hero">
-        <div class="dynamic-sidebar-export-kicker">Review-ready</div>
-        <h3>Draft export</h3>
-        <p>Open Exports with Draft mode already selected so you can review the package before finalizing anything.</p>
-      </div>
-      <div class="dynamic-sidebar-export-points">
-        <div class="dynamic-sidebar-export-point">
-          <strong>Safe default</strong>
-          <span>Draft mode keeps the handoff editable while categories, support, and notes are still being cleaned up.</span>
-        </div>
-        <div class="dynamic-sidebar-export-point">
-          <strong>One working action</strong>
-          <span>Quick Add stays limited to the export path that is fully supported instead of exposing dead shortcuts.</span>
-        </div>
-      </div>
-      <div class="dynamic-sidebar-export-actions">
-        <a class="dynamic-sidebar-primary-action" href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</a>
-        <a class="dynamic-sidebar-secondary-action" href="/exports">Open full exports page</a>
-      </div>
-    </section>
-  `;
+function getDynamicSidebarQuickMeta(feature) {
+  const label = getDynamicSidebarFeatureLabel(feature);
+  switch (feature.id) {
+    case "customers":
+      return {
+        kicker: "Relationship hub",
+        title: "Open customers",
+        description: "Jump directly into the customer workspace when you need full records, contacts, and history instead of a stripped-down shortcut.",
+        points: [
+          { title: "Full context", description: "Customer management usually depends on the full page, not a sidebar fragment." },
+          { title: "Cleaner workflow", description: "Open the main workspace directly when the next step involves searching, editing, or reviewing records." }
+        ]
+      };
+    case "bills":
+      return {
+        kicker: "Payables",
+        title: "Open bills",
+        description: "Go straight to the bills workspace when you need the full payable workflow, vendor context, and due-date controls.",
+        points: [
+          { title: "Full controls", description: "Bill entry and review are more reliable in the dedicated workspace than in a cramped sidebar." },
+          { title: "Better visibility", description: "You keep access to due dates, status, and vendor detail in one place." }
+        ]
+      };
+    case "vendors":
+      return {
+        kicker: "Vendor records",
+        title: "Open vendors",
+        description: "Open the vendors page when the task needs supplier detail, editing, or a broader setup flow than Quick Add should handle.",
+        points: [
+          { title: "Structured setup", description: "Vendor data tends to require full-page context, not a one-field shortcut." },
+          { title: "Accurate handoff", description: "Using the full workspace reduces sloppy records and duplicate vendors." }
+        ]
+      };
+    case "projects":
+      return {
+        kicker: "Project tracking",
+        title: "Open projects",
+        description: "Head straight to Projects when you need a proper setup flow for timelines, budgets, and linked activity.",
+        points: [
+          { title: "Broader context", description: "Projects usually need more context than Quick Add can responsibly surface." },
+          { title: "Cleaner execution", description: "The full page is the right place for scoped project creation and edits." }
+        ]
+      };
+    case "billable-expenses":
+    case "billable_expenses":
+      return {
+        kicker: "Client recovery",
+        title: "Open billable expenses",
+        description: "Use the full billable expenses workspace when you need to review charge-through items and client assignment in context.",
+        points: [
+          { title: "Review required", description: "Billable expense work usually depends on transaction context and invoice linkage." },
+          { title: "Safer routing", description: "The dedicated page is the better place to confirm what should actually flow through to clients." }
+        ]
+      };
+    default:
+      return {
+        kicker: "Full workspace",
+        title: getDynamicSidebarActionLabel(feature),
+        description: `Open the ${label} page from Quick Add when the workflow needs more than a lightweight sidebar action.`,
+        points: [
+          { title: "Right tool", description: "Not every workflow should be compressed into a shortcut just for the sake of having one." },
+          { title: "No dead ends", description: "Quick Add now hands off cleanly instead of exposing half-finished panels." }
+        ]
+      };
+  }
 }
 
-function renderDynamicSidebarOpenPage(body, feature) {
-  body.innerHTML = `
-    <div class="dynamic-sidebar-action-stack">
-      <a class="dynamic-sidebar-primary-action" href="${escapeDynamicSidebarAttr(feature.route)}">${escapeDynamicSidebarHtml(getDynamicSidebarActionLabel(feature))}</a>
+function renderDynamicSidebarPremiumPoints(points) {
+  if (!Array.isArray(points) || !points.length) return "";
+  return `
+    <div class="dynamic-sidebar-premium-points">
+      ${points.map((point) => `
+        <div class="dynamic-sidebar-premium-point">
+          <strong>${escapeDynamicSidebarHtml(point.title || "")}</strong>
+          <span>${escapeDynamicSidebarHtml(point.description || "")}</span>
+        </div>
+      `).join("")}
     </div>
   `;
 }
 
+function renderDynamicSidebarPremiumCard(feature, options) {
+  const heroKicker = options?.heroKicker || "Quick action";
+  const heroTitle = options?.heroTitle || getDynamicSidebarActionLabel(feature);
+  const heroDescription = options?.heroDescription || "";
+  const bodyHtml = options?.bodyHtml || "";
+  const pointsHtml = renderDynamicSidebarPremiumPoints(options?.points);
+  const primaryAction = options?.primaryHref && options?.primaryLabel
+    ? `<a class="dynamic-sidebar-primary-action" href="${escapeDynamicSidebarAttr(options.primaryHref)}">${escapeDynamicSidebarHtml(options.primaryLabel)}</a>`
+    : "";
+  const secondaryAction = options?.secondaryHref && options?.secondaryLabel
+    ? `<a class="dynamic-sidebar-secondary-action" href="${escapeDynamicSidebarAttr(options.secondaryHref)}">${escapeDynamicSidebarHtml(options.secondaryLabel)}</a>`
+    : "";
+
+  return `
+    <section class="dynamic-sidebar-premium-card" aria-label="${escapeDynamicSidebarAttr(heroTitle)}">
+      <div class="dynamic-sidebar-premium-hero">
+        <div class="dynamic-sidebar-premium-icon" aria-hidden="true">${feature.icon}</div>
+        <div class="dynamic-sidebar-premium-kicker">${escapeDynamicSidebarHtml(heroKicker)}</div>
+        <h3>${escapeDynamicSidebarHtml(heroTitle)}</h3>
+        <p>${escapeDynamicSidebarHtml(heroDescription)}</p>
+      </div>
+      ${pointsHtml}
+      ${bodyHtml ? `<div class="dynamic-sidebar-premium-surface">${bodyHtml}</div>` : ""}
+      ${primaryAction || secondaryAction ? `<div class="dynamic-sidebar-export-actions">${primaryAction}${secondaryAction}</div>` : ""}
+    </section>
+  `;
+}
+
+function renderQuickExportAction(body, feature) {
+  body.innerHTML = renderDynamicSidebarPremiumCard(feature, {
+    heroKicker: "Review-ready",
+    heroTitle: "Draft export",
+    heroDescription: "Open Exports with Draft mode already selected so you can review the package before finalizing anything.",
+    points: [
+      {
+        title: "Safe default",
+        description: "Draft mode keeps the handoff editable while categories, support, and notes are still being cleaned up."
+      },
+      {
+        title: "One working action",
+        description: "Quick Add stays limited to the export path that is fully supported instead of exposing dead shortcuts."
+      }
+    ],
+    primaryHref: feature.route,
+    primaryLabel: getDynamicSidebarActionLabel(feature),
+    secondaryHref: "/exports",
+    secondaryLabel: "Open full exports page"
+  });
+}
+
+function renderDynamicSidebarOpenPage(body, feature) {
+  const quickMeta = getDynamicSidebarQuickMeta(feature);
+  body.innerHTML = renderDynamicSidebarPremiumCard(feature, {
+    heroKicker: quickMeta.kicker,
+    heroTitle: quickMeta.title,
+    heroDescription: quickMeta.description,
+    points: quickMeta.points,
+    primaryHref: feature.route,
+    primaryLabel: getDynamicSidebarActionLabel(feature)
+  });
+}
+
 function renderQuickTransactionForm(body, feature) {
   const today = new Date().toISOString().slice(0, 10);
-  body.innerHTML = `
+  body.innerHTML = renderDynamicSidebarPremiumCard(feature, {
+    heroKicker: "Fast capture",
+    heroTitle: "Add transaction",
+    heroDescription: "Capture a transaction from the sidebar without losing your place in review or reconciliation.",
+    points: [
+      {
+        title: "Review-friendly",
+        description: "Log the essentials now and leave the full page for bulk cleanup and deeper edits."
+      },
+      {
+        title: "Clean routing",
+        description: "Account and category selections are loaded inline so the entry lands in the right workflow immediately."
+      }
+    ],
+    bodyHtml: `
     <form class="dynamic-sidebar-form" data-quick-transaction-form>
       <label>Date<input name="date" type="date" value="${today}" required></label>
       <label>Type<select name="type"><option value="expense">Expense</option><option value="income">Income</option></select></label>
@@ -1160,7 +1283,8 @@ function renderQuickTransactionForm(body, feature) {
       </div>
       <div class="dynamic-sidebar-form-message" data-quick-message></div>
     </form>
-  `;
+  `
+  });
 
   const form = body.querySelector("[data-quick-transaction-form]");
   const accountSelect = form?.elements.account_id;
@@ -1235,7 +1359,21 @@ function updateQuickTransactionCategories(select, categories, type) {
 }
 
 function renderQuickReceiptForm(body, feature) {
-  body.innerHTML = `
+  body.innerHTML = renderDynamicSidebarPremiumCard(feature, {
+    heroKicker: "Source first",
+    heroTitle: "Upload receipt",
+    heroDescription: "Attach the source document here so the receipt queue and transaction matching flow stay current.",
+    points: [
+      {
+        title: "Instant intake",
+        description: "Send a file straight into the ledger without opening the full receipts workspace first."
+      },
+      {
+        title: "Audit support",
+        description: "Keeping source files attached early reduces review friction later."
+      }
+    ],
+    bodyHtml: `
     <form class="dynamic-sidebar-form" data-quick-receipt-form>
       <label>Receipt file<input name="receipt" type="file" accept="image/*,application/pdf" required></label>
       <div class="dynamic-sidebar-form-actions">
@@ -1244,7 +1382,8 @@ function renderQuickReceiptForm(body, feature) {
       </div>
       <div class="dynamic-sidebar-form-message" data-quick-message></div>
     </form>
-  `;
+  `
+  });
   const form = body.querySelector("[data-quick-receipt-form]");
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1281,7 +1420,21 @@ function renderQuickMileageForm(body, feature) {
   const today = new Date().toISOString().slice(0, 10);
   const distanceName = localStorage.getItem("lb_unit_metric") === "true" ? "km" : "miles";
   const distanceLabel = distanceName === "km" ? "Kilometres" : "Miles";
-  body.innerHTML = `
+  body.innerHTML = renderDynamicSidebarPremiumCard(feature, {
+    heroKicker: "Trip log",
+    heroTitle: "Add trip",
+    heroDescription: "Record business mileage while the route and purpose are still fresh instead of backfilling it later.",
+    points: [
+      {
+        title: "Cleaner records",
+        description: "Prompt capture keeps mileage logs defensible and reduces missed deduction opportunities."
+      },
+      {
+        title: "Fast entry",
+        description: "This panel stays focused on the fields you actually need for a quick compliant log."
+      }
+    ],
+    bodyHtml: `
     <form class="dynamic-sidebar-form" data-quick-mileage-form>
       <label>Date<input name="date" type="date" value="${today}" required></label>
       <label>Purpose<input name="purpose" type="text" autocomplete="off" required></label>
@@ -1293,7 +1446,8 @@ function renderQuickMileageForm(body, feature) {
       </div>
       <div class="dynamic-sidebar-form-message" data-quick-message></div>
     </form>
-  `;
+  `
+  });
   const form = body.querySelector("[data-quick-mileage-form]");
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1325,7 +1479,21 @@ function renderQuickMileageForm(body, feature) {
 }
 
 function renderQuickAccountForm(body, feature) {
-  body.innerHTML = `
+  body.innerHTML = renderDynamicSidebarPremiumCard(feature, {
+    heroKicker: "Ledger setup",
+    heroTitle: "Add account",
+    heroDescription: "Create the account shell first so imported activity and manual entries have a clean destination.",
+    points: [
+      {
+        title: "Better structure",
+        description: "A well-named account keeps balances, reconciliations, and exports from turning sloppy later."
+      },
+      {
+        title: "Immediate use",
+        description: "New accounts become available to transactions as soon as the save completes."
+      }
+    ],
+    bodyHtml: `
     <form class="dynamic-sidebar-form" data-quick-account-form>
       <label>Name<input name="name" type="text" autocomplete="off" required></label>
       <label>Type<select name="type" required>
@@ -1341,7 +1509,8 @@ function renderQuickAccountForm(body, feature) {
       </div>
       <div class="dynamic-sidebar-form-message" data-quick-message></div>
     </form>
-  `;
+  `
+  });
   const form = body.querySelector("[data-quick-account-form]");
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1370,7 +1539,21 @@ function renderQuickAccountForm(body, feature) {
 }
 
 function renderQuickCategoryForm(body, feature) {
-  body.innerHTML = `
+  body.innerHTML = renderDynamicSidebarPremiumCard(feature, {
+    heroKicker: "Tax hygiene",
+    heroTitle: "Add category",
+    heroDescription: "Create the category from Quick Add when you need a clean bucket before processing more activity.",
+    points: [
+      {
+        title: "Classification first",
+        description: "Adding the category before the next transaction lands prevents avoidable review flags."
+      },
+      {
+        title: "Type-aware",
+        description: "Expense and income categories stay separated so downstream reporting remains clean."
+      }
+    ],
+    bodyHtml: `
     <form class="dynamic-sidebar-form" data-quick-category-form>
       <label>Name<input name="name" type="text" autocomplete="off" required></label>
       <label>Type<select name="kind" required>
@@ -1383,7 +1566,8 @@ function renderQuickCategoryForm(body, feature) {
       </div>
       <div class="dynamic-sidebar-form-message" data-quick-message></div>
     </form>
-  `;
+  `
+  });
   const form = body.querySelector("[data-quick-category-form]");
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -1420,7 +1604,21 @@ function renderQuickInvoiceForm(body, feature) {
   const defaultDueDate = dueDate.toISOString().slice(0, 10);
   const defaultCurrency = getDynamicSidebarCurrency();
 
-  body.innerHTML = `
+  body.innerHTML = renderDynamicSidebarPremiumCard(feature, {
+    heroKicker: "Client-ready",
+    heroTitle: "New invoice",
+    heroDescription: "Start an invoice from the sidebar when you need to get a draft in motion without leaving the current page.",
+    points: [
+      {
+        title: "Faster kickoff",
+        description: "Capture the client, dates, and first line item now, then refine the rest in the full invoice editor if needed."
+      },
+      {
+        title: "Professional output",
+        description: "A focused draft flow helps you issue invoices quickly without sacrificing structure."
+      }
+    ],
+    bodyHtml: `
     <form class="dynamic-sidebar-form" data-quick-invoice-form>
       <label>Client name<input name="customer_name" type="text" autocomplete="organization" required></label>
       <label>Client email<input name="customer_email" type="email" autocomplete="email"></label>
@@ -1448,7 +1646,8 @@ function renderQuickInvoiceForm(body, feature) {
       </div>
       <div class="dynamic-sidebar-form-message" data-quick-message></div>
     </form>
-  `;
+  `
+  });
 
   const form = body.querySelector("[data-quick-invoice-form]");
   form?.addEventListener("submit", async (event) => {

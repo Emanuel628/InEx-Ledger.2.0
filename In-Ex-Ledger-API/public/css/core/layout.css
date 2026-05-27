@@ -645,47 +645,47 @@ body[data-theme="light"] select option {
 
 .dynamic-sidebar-form {
   display: grid;
-  gap: 10px;
-  padding-bottom: 8px;
+  gap: 14px;
 }
 
 .dynamic-sidebar-form label {
   display: grid;
-  gap: 5px;
-  color: var(--ink2);
-  font-size: 12px;
+  gap: 7px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .dynamic-sidebar-form input,
 .dynamic-sidebar-form select,
 .dynamic-sidebar-form textarea {
   width: 100%;
-  min-height: 38px;
-  padding: 8px 10px;
-  border: 0.5px solid var(--border2);
-  border-radius: 7px;
-  background: var(--surface2);
-  color: var(--ink);
+  min-height: 46px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #0f172a;
   font: inherit;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
 .dynamic-sidebar-form textarea {
+  min-height: 104px;
   resize: vertical;
 }
 
 .dynamic-sidebar-form-actions,
 .dynamic-sidebar-action-stack {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+  display: grid;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .dynamic-sidebar-form-actions a,
 .dynamic-sidebar-primary-action {
-  color: var(--ink2);
-  font-size: 13px;
   text-decoration: none;
 }
 
@@ -694,11 +694,13 @@ body[data-theme="light"] select option {
   color: var(--accent2);
 }
 
+.dynamic-sidebar-premium-card,
 .dynamic-sidebar-export-card {
   display: grid;
   gap: 18px;
 }
 
+.dynamic-sidebar-premium-hero,
 .dynamic-sidebar-export-hero {
   display: grid;
   gap: 10px;
@@ -711,6 +713,25 @@ body[data-theme="light"] select option {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+.dynamic-sidebar-premium-icon {
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #dbeafe;
+}
+
+.dynamic-sidebar-premium-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+
+.dynamic-sidebar-premium-kicker,
 .dynamic-sidebar-export-kicker {
   font-size: 11px;
   font-weight: 700;
@@ -719,6 +740,7 @@ body[data-theme="light"] select option {
   color: rgba(191, 219, 254, 0.92);
 }
 
+.dynamic-sidebar-premium-hero h3,
 .dynamic-sidebar-export-hero h3 {
   margin: 0;
   font-size: 30px;
@@ -726,6 +748,7 @@ body[data-theme="light"] select option {
   letter-spacing: -0.05em;
 }
 
+.dynamic-sidebar-premium-hero p,
 .dynamic-sidebar-export-hero p {
   margin: 0;
   font-size: 15px;
@@ -733,11 +756,13 @@ body[data-theme="light"] select option {
   color: rgba(226, 232, 240, 0.92);
 }
 
+.dynamic-sidebar-premium-points,
 .dynamic-sidebar-export-points {
   display: grid;
   gap: 12px;
 }
 
+.dynamic-sidebar-premium-point,
 .dynamic-sidebar-export-point {
   display: grid;
   gap: 4px;
@@ -747,16 +772,26 @@ body[data-theme="light"] select option {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.dynamic-sidebar-premium-point strong,
 .dynamic-sidebar-export-point strong {
   color: #0f172a;
   font-size: 14px;
   letter-spacing: -0.01em;
 }
 
+.dynamic-sidebar-premium-point span,
 .dynamic-sidebar-export-point span {
   color: #475569;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.dynamic-sidebar-premium-surface {
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 250, 252, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .dynamic-sidebar-export-actions {
@@ -803,13 +838,17 @@ body[data-theme="light"] select option {
 }
 
 .dynamic-sidebar-form-actions button {
-  min-height: 36px;
-  padding: 0 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 18px;
   border: 0;
-  border-radius: 7px;
-  background: var(--accent2);
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
   color: #fff;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
   cursor: pointer;
 }
 
@@ -818,10 +857,36 @@ body[data-theme="light"] select option {
   opacity: 0.7;
 }
 
+.dynamic-sidebar-form-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 50px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #334155;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dynamic-sidebar-form input:focus,
+.dynamic-sidebar-form select:focus,
+.dynamic-sidebar-form textarea:focus {
+  outline: none;
+  border-color: rgba(37, 99, 235, 0.42);
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
 .dynamic-sidebar-form-message {
   min-height: 18px;
-  color: var(--ink3);
+  color: #475569;
   font-size: 12px;
+  font-weight: 600;
+  text-align: center;
 }
 
 @media (max-width: 1024px) {
