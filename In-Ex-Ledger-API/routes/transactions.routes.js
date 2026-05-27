@@ -43,6 +43,7 @@ const {
 const { getQuarterlyReminders } = require("../services/quarterlyTaxReminderService.js");
 const { getTaxDashboard } = require("../services/taxDashboardService.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
+const { normalizeReviewFilter, matchesReviewFilter, buildReviewSummary} = require("../services/transactionReviewFlagService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -572,7 +573,8 @@ function buildTransactionListFilters(query, now = new Date()) {
     search: String(query.search || "").trim(),
     period,
     periodBounds: getTransactionPeriodBounds(period, now),
-    reviewStatus: reviewStatus || ""
+    reviewStatus: reviewStatus || "", 
+    review: normalizeReviewFilter(query.review)
   };
 }
 
@@ -643,10 +645,62 @@ router.get("/", async (req, res) => {
     }
 
     const { whereSql, params: filterParams } = buildTransactionListWhereClause(scope.businessIds, filters);
+    const reviewSourceResult = await pool.query(
+  `SELECT t.id,
+          t.business_id,
+          b.region AS business_region,
+          t.category_id,
+          c.name AS category_name,
+          c.tax_map_us,
+          c.tax_map_ca,
+          t.amount,
+          t.type,
+          t.note,
+          t.date,
+          t.tax_treatment,
+          t.personal_use_pct,
+          t.review_status,
+          t.payer_name,
+          t.tax_form_type,
+          COALESCE(rc.receipt_count, 0)::int AS receipt_count
+     FROM transactions t
+     JOIN businesses b ON b.id = t.business_id
+     LEFT JOIN accounts a ON a.id = t.account_id
+     LEFT JOIN categories c ON c.id = t.category_id
+     LEFT JOIN (
+       SELECT transaction_id, COUNT(*)::int AS receipt_count
+         FROM receipts
+        WHERE business_id = ANY($1::uuid[])
+        GROUP BY transaction_id
+     ) rc ON rc.transaction_id = t.id
+    WHERE ${whereSql}
+    ORDER BY t.date DESC, t.created_at DESC
+    LIMIT 50000`,
+  filterParams
+);
+
+const reviewSourceRows = reviewSourceResult.rows || [];
+const reviewSummary = buildReviewSummary(reviewSourceRows);
+const reviewFilteredRows = filters.review
+  ? reviewSourceRows.filter((row) => matchesReviewFilter(row, filters.review))
+  : reviewSourceRows;
+const reviewFilteredIds = reviewFilteredRows.map((row) => row.id);
     const params = [...filterParams];
     params.push(filters.limit, filters.offset);
     const limitParamIdx = params.length - 1;
     const offsetParamIdx = params.length;
+    
+    let finalWhereSql = whereSql;
+let finalFilterParams = [...filterParams];
+
+if (filters.review) {
+  if (reviewFilteredIds.length === 0) {
+    finalWhereSql = `${whereSql}\n         AND false`;
+  } else {
+    finalFilterParams.push(reviewFilteredIds);
+    finalWhereSql = `${whereSql}\n         AND t.id = ANY($${finalFilterParams.length}::uuid[])`;
+  }
+}
 
     const now = new Date();
     const currentMonthBounds = getTransactionPeriodBounds("this-month", now);
@@ -679,6 +733,10 @@ router.get("/", async (req, res) => {
               t.category_id,
               c.name AS category_name,
               t.amount,
+               b.region AS business_region,
+               c.tax_map_us,
+               c.tax_map_ca,
+               COALESCE(rc.receipt_count, 0)::int AS receipt_count
               t.type,
               t.cleared,
               t.description,
@@ -706,6 +764,12 @@ router.get("/", async (req, res) => {
        FROM transactions t
        JOIN businesses b ON b.id = t.business_id
        LEFT JOIN accounts a ON a.id = t.account_id
+       LEFT JOIN (
+      SELECT transaction_id, COUNT(*)::int AS receipt_count
+      FROM receipts
+      WHERE business_id = ANY($1::uuid[])
+      GROUP BY transaction_id
+      ) rc ON rc.transaction_id = t.id
        LEFT JOIN categories c ON c.id = t.category_id
        WHERE ${whereSql}
        ORDER BY t.date DESC, t.created_at DESC
