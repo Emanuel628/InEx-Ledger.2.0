@@ -290,7 +290,7 @@ function computeTxnFlags(txn) {
   const isUncategorized = !txn.categoryId || /imported|needs[._-]?category|uncategorized/i.test(catName);
   const hasReceipt = (txn.receiptCount || 0) > 0;
   const hasNote = String(txn.note || "").trim().length > 0;
-  const reviewConfirmed = txn.reviewStatus === "ready" || txn.reviewStatus === "matched";
+  const reviewConfirmed = txn.reviewStatus === "matched";
   const personalUsePctValue = txn.personalUsePct != null ? Number(txn.personalUsePct) : null;
   const hasAllocation =
   personalUsePctValue != null &&
