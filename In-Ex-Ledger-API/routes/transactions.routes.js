@@ -896,9 +896,15 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+router.get("/:id", async (req, res, next) => {
   if (!UUID_REGEX.test(req.params.id)) {
-    return res.status(400).json({ error: "Invalid transaction ID." });
+    // Defined below this handler are static GET routes like
+    // /exchange-rate-reference and /undo-delete-status. Express matches
+    // `:id` first, so returning 400 here would shadow them and break
+    // their tests. Hand off to the next matching route; if none matches,
+    // Express will 404, which is the correct response for a non-UUID
+    // path that isn't a known static endpoint.
+    return next();
   }
 
   try {
