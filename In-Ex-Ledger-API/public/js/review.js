@@ -21,6 +21,15 @@ function tx(key, fallback) {
   return fallback || key;
 }
 
+function initReviewFilterFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const requestedIssue = String(params.get("issue") || "").trim().toLowerCase();
+  if (!requestedIssue || requestedIssue === "all") {
+    return;
+  }
+  reviewQuickFilter = requestedIssue;
+}
+
 function formatMoney(amount, currency) {
   const numeric = Number(amount || 0);
   try {
@@ -573,6 +582,7 @@ async function loadReviewQueue() {
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
+  initReviewFilterFromQuery();
 
   document.getElementById("reviewRefreshButton")?.addEventListener("click", () => {
     void loadReviewQueue();

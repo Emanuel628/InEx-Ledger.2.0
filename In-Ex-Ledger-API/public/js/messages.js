@@ -5,6 +5,7 @@ const POLL_INTERVAL_MS = 30000;
 const PAGE_SIZE = 25;
 const PREVIEW_MAX_LENGTH = 120;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MESSAGES_FOCUS_DISMISSED_KEY = "lb_messages_focus_banner_dismissed";
 
 const MAILBOX_META = {
   inbox: {
@@ -69,6 +70,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   wireTabBar();
   wireSidebar();
+  wireFocusBanner();
   wireComposeModal();
   wireDetailPanel();
   applyMailboxMeta();
@@ -102,6 +104,28 @@ function wireSidebar() {
   });
 
   document.getElementById("supportShortcutBtn")?.addEventListener("click", openSupportComposer);
+}
+
+function wireFocusBanner() {
+  const banner = document.querySelector(".messages-focus-banner");
+  const dismissButton = document.getElementById("messagesFocusDismissBtn");
+  if (!banner) {
+    return;
+  }
+
+  try {
+    if (localStorage.getItem(MESSAGES_FOCUS_DISMISSED_KEY) === "1") {
+      banner.hidden = true;
+      return;
+    }
+  } catch (_error) {}
+
+  dismissButton?.addEventListener("click", () => {
+    banner.hidden = true;
+    try {
+      localStorage.setItem(MESSAGES_FOCUS_DISMISSED_KEY, "1");
+    } catch (_error) {}
+  });
 }
 
 function switchFilter(filter) {

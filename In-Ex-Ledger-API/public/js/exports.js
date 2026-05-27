@@ -147,6 +147,51 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
+function resolveExportIssueAction(item) {
+  const code = String(item?.code || "").trim().toLowerCase();
+  if (!code) {
+    return null;
+  }
+
+  const actionMap = {
+    needs_category: { href: "transactions?review=nc", label: "Open filtered transactions" },
+    needs_tax_mapping: { href: "transactions?review=um", label: "Open tax-mapping gaps" },
+    needs_receipt_support: { href: "review?issue=needs_receipt_support", label: "Open missing support" },
+    needs_business_purpose: { href: "review?issue=needs_business_purpose", label: "Open business-purpose review" },
+    needs_allocation: { href: "review?issue=needs_allocation", label: "Open allocation review" },
+    needs_mileage_log: { href: "review?issue=needs_mileage_log", label: "Open mileage review" },
+    needs_home_office_support: { href: "review?issue=needs_home_office_support", label: "Open support review" },
+    needs_capital_asset_review: { href: "review?issue=needs_capital_asset_review", label: "Open capital-asset review" },
+    missing_description: { href: "review?issue=missing_description", label: "Open description review" },
+    cpa_review_required: { href: "review?issue=cpa_review_required", label: "Open CPA review" },
+    final_confirmation_needed: { href: "review?issue=final_confirmation_needed", label: "Open final review" },
+    business_profile_incomplete: { href: "settings?jump=settings-business", label: "Open business profile" },
+    finalization_certification_required: { href: "#exportInlineTaxIdCheckbox", label: "Review certification" }
+  };
+
+  return actionMap[code] || null;
+}
+
+function syncExportActionState() {
+  const pdfButton = document.getElementById("exportPdfBtn");
+  const csvButton = document.getElementById("exportCsvBtn");
+  const finalization = exportPreflightState?.finalization;
+  const hasHardBlockers = Array.isArray(finalization?.hardBlockers) && finalization.hardBlockers.length > 0;
+  const isV1 = (typeof effectiveTier === "function" ? effectiveTier() : "free") === "v1";
+  const disabledTitle = hasHardBlockers
+    ? (tx("exports_preflight_note_finalized_blocked") || "Resolve hard blockers before exporting.")
+    : "";
+
+  if (pdfButton) {
+    pdfButton.disabled = !isV1 || hasHardBlockers;
+    pdfButton.title = hasHardBlockers ? disabledTitle : "";
+  }
+  if (csvButton) {
+    csvButton.disabled = hasHardBlockers;
+    csvButton.title = hasHardBlockers ? disabledTitle : "";
+  }
+}
+
 function getSelectedExportMode() {
   return String(document.getElementById("exportPackageMode")?.value || "workpaper").trim().toLowerCase();
 }
@@ -643,6 +688,11 @@ function setupExportForm() {
 
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const finalization = exportPreflightState?.finalization;
+    if (Array.isArray(finalization?.hardBlockers) && finalization.hardBlockers.length > 0) {
+      showFinalizationError(finalization.hardBlockers);
+      return;
+    }
     const range = getValidatedExportRange();
     if (!range) {
       return;
@@ -689,23 +739,27 @@ function setupPdfButton() {
   const syncPdfState = () => {
     const isV1 = (typeof effectiveTier === "function" ? effectiveTier() : "free") === "v1";
     const finalization = exportPreflightState.finalization;
-    const finalizedBlocked =
-      getSelectedExportMode() === "finalized"
-      && getExportScope() !== "all"
+    const hasHardBlockers =
+      getExportScope() !== "all"
       && Array.isArray(finalization?.hardBlockers)
       && finalization.hardBlockers.length > 0;
-    button.disabled = !isV1 || finalizedBlocked;
-    button.title = finalizedBlocked ? tx("exports_preflight_note_finalized_blocked") : "";
+    button.disabled = !isV1 || hasHardBlockers;
+    button.title = hasHardBlockers ? tx("exports_preflight_note_finalized_blocked") : "";
     if (note) {
       note.hidden = isV1;
     }
-    return isV1 && !finalizedBlocked;
+    return isV1 && !hasHardBlockers;
   };
 
   syncPdfState();
 
   button.addEventListener("click", async () => {
     if (!syncPdfState()) {
+      return;
+    }
+    const finalization = exportPreflightState?.finalization;
+    if (Array.isArray(finalization?.hardBlockers) && finalization.hardBlockers.length > 0) {
+      showFinalizationError(finalization.hardBlockers);
       return;
     }
     const range = getValidatedExportRange();
@@ -845,7 +899,16 @@ function renderExportPreflight(finalization) {
     return items.map((item) => {
       const count = Number(item?.count || 0);
       const suffix = count > 0 ? ` (${count})` : "";
-      return `<li>${escapeHtml(formatIssueLabel(item))}${escapeHtml(suffix)}</li>`;
+      const action = resolveExportIssueAction(item);
+      const actionMarkup = action
+        ? `<a class="export-preflight-link" href="${escapeHtml(action.href)}">${escapeHtml(action.label)}</a>`
+        : "";
+      return `
+        <li class="export-preflight-item">
+          <div class="export-preflight-item-copy">${escapeHtml(formatIssueLabel(item))}${escapeHtml(suffix)}</div>
+          ${actionMarkup}
+        </li>
+      `;
     }).join("");
   };
 
@@ -891,26 +954,19 @@ function renderExportPreflight(finalization) {
 
 async function refreshExportPreflight(force = false) {
   const refreshButton = document.getElementById("exportPreflightRefreshBtn");
-  const button = document.getElementById("exportPdfBtn");
   const range = getValidatedExportRange();
 
   if (getExportScope() === "all") {
     exportPreflightState = { loading: false, finalization: null };
     renderExportPreflightEmpty(tx("exports_preflight_scope_all"));
-    if (button) {
-      button.title = "";
-      button.disabled = (typeof effectiveTier === "function" ? effectiveTier() : "free") !== "v1";
-    }
+    syncExportActionState();
     return;
   }
 
   if (!range) {
     exportPreflightState = { loading: false, finalization: null };
     renderExportPreflightEmpty(tx("exports_preflight_empty"));
-    if (button) {
-      button.title = "";
-      button.disabled = (typeof effectiveTier === "function" ? effectiveTier() : "free") !== "v1";
-    }
+    syncExportActionState();
     return;
   }
 
@@ -947,16 +1003,7 @@ async function refreshExportPreflight(force = false) {
     if (refreshButton) {
       refreshButton.disabled = false;
     }
-    if (button) {
-      const finalization = exportPreflightState.finalization;
-      const finalizedBlocked =
-        getSelectedExportMode() === "finalized"
-        && Array.isArray(finalization?.hardBlockers)
-        && finalization.hardBlockers.length > 0;
-      const isV1 = (typeof effectiveTier === "function" ? effectiveTier() : "free") === "v1";
-      button.disabled = !isV1 || finalizedBlocked;
-      button.title = finalizedBlocked ? tx("exports_preflight_note_finalized_blocked") : "";
-    }
+    syncExportActionState();
   }
 }
 

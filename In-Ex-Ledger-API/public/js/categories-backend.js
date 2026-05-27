@@ -113,6 +113,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (typeof enforceTrial === "function") enforceTrial();
 
   await loadBusinessRegion();
+  const params = new URLSearchParams(window.location.search);
+  const requestedFilter = String(params.get("filter") || "").trim().toLowerCase();
+  if (["all", "review", "mapped", "tax"].includes(requestedFilter)) {
+    currentCategoryFilter = requestedFilter;
+  }
   enhanceCategoriesPageShell();
   wireCategoryModal();
   wirePerListAddButtons();

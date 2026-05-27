@@ -293,6 +293,12 @@
   width: 100%;
 }
 
+.export-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  box-shadow: none;
+}
+
 .export-btn-secondary {
   border: 1px solid rgba(15, 25, 35, 0.12);
   background: #fff;
@@ -572,6 +578,29 @@
   color: #354255;
   font-size: 13px;
   line-height: 1.75;
+}
+
+.export-preflight-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.export-preflight-item-copy {
+  min-width: 0;
+}
+
+.export-preflight-link {
+  flex-shrink: 0;
+  color: var(--accent2);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.export-preflight-link:hover,
+.export-preflight-link:focus-visible {
+  text-decoration: underline;
 }
 
 .export-preflight-list li + li {

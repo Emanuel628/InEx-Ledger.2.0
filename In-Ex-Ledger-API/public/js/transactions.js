@@ -127,6 +127,19 @@ const TRANSACTION_REVIEW_FILTER_OPTIONS = Object.freeze([
   { key: "rv", label: "CPA review", codes: ["RV"], tone: "warning" },
   { key: "is", label: "Income review", codes: ["IS"], tone: "warning" }
 ]);
+
+function initTransactionReviewFilterFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const requestedFilter = String(params.get("review") || "").trim().toLowerCase();
+  if (!requestedFilter) {
+    return;
+  }
+  const valid = TRANSACTION_REVIEW_FILTER_OPTIONS.some((option) => option.key === requestedFilter);
+  if (valid) {
+    transactionFilters.review = requestedFilter;
+  }
+}
+
 let unattachedReceiptsCount = 0;
 const selectedTransactionIds = new Set();
 const selectedRecurringTemplateIds = new Set();
@@ -718,6 +731,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   initTransactionScopeSelect();
   setupTransactionDrawer();
   initSidebarTypeFilter();
+  initTransactionReviewFilterFromQuery();
   wireTransactionIntentButtons();
   await loadBusinessTaxProfile();
   setTransactionAdvancedDefaults();
@@ -743,6 +757,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireTransactionCategoryFilter();
   wireTransactionAccountFilter();
   wireTransactionReviewFilter();
+  const reviewFilterControl = document.getElementById("transactionReviewFilter");
+  if (reviewFilterControl) {
+    reviewFilterControl.value = transactionFilters.review || "";
+  }
   wirePagination();
   wireTransactionSelectionHeader();
   wireTransactionModal();

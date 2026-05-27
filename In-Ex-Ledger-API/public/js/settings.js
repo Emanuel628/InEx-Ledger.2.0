@@ -2759,6 +2759,18 @@ function initSettingsNav() {
 
     targets.forEach(({ target }) => observer.observe(target));
   }
+
+  const params = new URLSearchParams(window.location.search);
+  const requestedTarget = String(params.get("jump") || "").trim();
+  const requestedEntry = targets.find(({ target }) => target.id === requestedTarget);
+  if (requestedEntry) {
+    openTargetPanel(requestedEntry.target);
+    window.setTimeout(() => {
+      requestedEntry.target.scrollIntoView({ behavior: "smooth", block: "start" });
+      setActiveTarget(requestedEntry.target.id);
+      focusTargetField(requestedEntry.button);
+    }, 120);
+  }
 }
 
 function clearExportProfileGuide() {
