@@ -5042,6 +5042,49 @@ tr.tx-highlight {
   margin-top: 4px;
 }
 
+.tx-resolution-highlight {
+  border-color: rgba(220, 38, 38, 0.72) !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14) !important;
+  background: rgba(254, 242, 242, 0.72) !important;
+}
+
+.tx-resolution-field {
+  border-radius: 16px;
+  padding: 10px;
+  margin: -10px;
+  background: rgba(254, 242, 242, 0.42);
+}
+
+.tx-resolution-message {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(220, 38, 38, 0.22);
+  border-radius: 16px;
+  background: rgba(254, 242, 242, 0.78);
+  color: #7f1d1d;
+}
+
+.tx-resolution-message strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #991b1b;
+}
+
+.tx-resolution-message ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.tx-resolution-message li {
+  margin: 4px 0;
+}
+
+.tx-resolution-message a {
+  color: #991b1b;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
 @media (max-width: 900px) {
   .tx-review-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .transaction-review-chip:nth-child(4n) { border-right: 1px solid rgba(226, 232, 240, 0.9); }
