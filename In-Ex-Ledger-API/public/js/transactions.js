@@ -723,7 +723,7 @@ const copy = getTransactionReviewSummaryCopy(snapshot, getTransactionTotalCount(
         if (reviewFilterSelect) {
           reviewFilterSelect.value = filterOption.key;
         }
-        applyFilters();
+        void loadTransactions({ resetPage: true });
       }
     }
     focusTransactionForReview(snapshot.firstIssue.txn.id);
