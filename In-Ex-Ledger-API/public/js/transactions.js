@@ -288,24 +288,41 @@ function computeTxnFlags(txn) {
   const isIncome = txn.type === "income";
   const catName = String(txn.categoryName || category?.name || "").toLowerCase();
   const isUncategorized = !txn.categoryId || /imported|needs[._-]?category|uncategorized/i.test(catName);
+  const hasReceipt = (txn.receiptCount || 0) > 0;
+  const hasNote = String(txn.note || "").trim().length > 0;
+  const reviewConfirmed = txn.reviewStatus === "ready" || txn.reviewStatus === "matched";
+  const personalUsePctValue = txn.personalUsePct != null ? Number(txn.personalUsePct) : null;
+  const hasAllocation = personalUsePctValue != null && Number.isFinite(personalUsePctValue) && personalUsePctValue > 0;
 
   if (isUncategorized) {
     flags.push("NC");
   } else {
     if (!category?.taxLabel) flags.push("UM");
-    if (/\bvehicle\b|\bfuel\b|\bmileage\b|auto insurance/i.test(catName) || txn.taxTreatment === "vehicle") {
+    // Mileage / vehicle support clears when a receipt is attached
+    // (vehicle log photo, fuel receipt, etc.) or the user marks the
+    // transaction reviewed.
+    if ((/\bvehicle\b|\bfuel\b|\bmileage\b|auto insurance/i.test(catName) || txn.taxTreatment === "vehicle")
+        && !hasReceipt && !reviewConfirmed) {
       flags.push("ML");
     }
-    if (/\bphone\b|\binternet\b|home.?office/i.test(catName) || txn.taxTreatment === "split_use" || (txn.personalUsePct != null && Number(txn.personalUsePct) > 0)) {
+    // Personal-use allocation clears once a business-use percentage is recorded.
+    if ((/\bphone\b|\binternet\b|home.?office/i.test(catName) || txn.taxTreatment === "split_use")
+        && !hasAllocation) {
       flags.push("AL");
     }
-    if (isExpense && /\bmeal|\bfood\b|\bdining\b|\brestaurant\b|\btravel\b|\bairfare\b|\bhotel\b|\bentertainment\b/i.test(catName)) {
+    // Business purpose for meals/travel/etc. clears once an internal note
+    // documents the purpose or the user marks the transaction reviewed.
+    if (isExpense
+        && /\bmeal|\bfood\b|\bdining\b|\brestaurant\b|\btravel\b|\bairfare\b|\bhotel\b|\bentertainment\b/i.test(catName)
+        && !hasNote && !reviewConfirmed) {
       flags.push("BP");
     }
-    if (isExpense && txn.receiptCount === 0) {
+    if (isExpense && !hasReceipt) {
       flags.push("RS");
     }
-    if (isIncome && txn.receiptCount === 0) {
+    // Income source review clears with a source document, a documenting
+    // note, or a confirmed review.
+    if (isIncome && !hasReceipt && !hasNote && !reviewConfirmed) {
       flags.push("IS");
     }
   }
@@ -637,8 +654,10 @@ function openTxReviewPopover(txnId, anchorEl) {
   const typeCss = isExpense ? "expense" : "income";
 
   const actions = [];
-  if (flags.includes("NC") || flags.includes("UM")) {
-    actions.push({ label: "Edit transaction", fix: "edit" });
+  if (flags.includes("NC")) {
+    actions.push({ label: "Assign category", fix: "edit" });
+  } else if (flags.includes("UM")) {
+    actions.push({ label: "Fix tax mapping in Categories", fix: "edit_category" });
   }
   if (flags.includes("RS")) {
     actions.push({ label: "Attach receipt", fix: "receipt", primary: true });
@@ -647,6 +666,7 @@ function openTxReviewPopover(txnId, anchorEl) {
     actions.push({ label: "Add note / support", fix: "edit" });
   }
   if (flags.includes("RV")) {
+    actions.push({ label: "Mark reviewed", fix: "mark_reviewed", primary: true });
     actions.push({ label: "Edit & resolve", fix: "edit" });
   }
   if (flags.includes("IS")) {
@@ -684,6 +704,12 @@ function openTxReviewPopover(txnId, anchorEl) {
         triggerReceiptUpload(id);
       } else if (fix === "edit") {
         handleEditEntry(id);
+      } else if (fix === "mark_reviewed") {
+        markTransactionReviewed(id);
+      } else if (fix === "edit_category") {
+        // UM (tax mapping) is resolved on the categories page, not the
+        // transaction edit drawer. Take the user straight there.
+        window.location.href = "/categories";
       }
     });
   });
@@ -693,6 +719,20 @@ function closeTxReviewPopover() {
   const popover = document.getElementById("txReviewPopover");
   if (popover) popover.setAttribute("hidden", "");
   _reviewPopoverTxnId = null;
+}
+
+async function markTransactionReviewed(id) {
+  if (!id) return;
+  try {
+    const res = await apiFetch(`/api/transactions/${id}/review-status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ review_status: "ready" })
+    });
+    if (res && res.ok) await loadTransactions();
+  } catch (err) {
+    console.error("Mark reviewed failed", err);
+  }
 }
 
 function positionReviewPopover(popover, anchorEl) {
@@ -4044,9 +4084,16 @@ function syncAllocationField() {
     return;
   }
   const catText = (categorySelect?.options[categorySelect?.selectedIndex]?.text || "").toLowerCase();
-  const isPhoneInternet = /\bphone\b|\binternet\b/.test(catText);
-  allocationField.hidden = !isPhoneInternet;
-  if (!isPhoneInternet) {
+  const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
+  // Mirror the AL flag's triggers so the inline allocation field is
+  // visible for every transaction that needs a business-use %, not just
+  // phone/internet — home-office categories and any split-use treatment
+  // also need it.
+  const isAllocationCategory = /\bphone\b|\binternet\b|home.?office/.test(catText);
+  const isSplitUseTreatment = taxTreatmentSelect?.value === "split_use";
+  const showField = isAllocationCategory || isSplitUseTreatment;
+  allocationField.hidden = !showField;
+  if (!showField) {
     const input = document.getElementById("txBusinessUsePct");
     if (input) {
       input.value = "";
@@ -4703,6 +4750,12 @@ function initRowActionPopup() {
     } catch (err) {
       console.error("Mark for review failed", err);
     }
+  });
+
+  document.getElementById("txPopupMarkReviewed")?.addEventListener("click", () => {
+    const id = _popupTxnId;
+    closeRowActionPopup();
+    markTransactionReviewed(id);
   });
 
   document.getElementById("txPopupDelete")?.addEventListener("click", () => {
