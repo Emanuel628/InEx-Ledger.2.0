@@ -30,3 +30,39 @@ test("Canada category tax mappings accept office_supplies", () => {
   assert.equal(normalized.valid, true);
   assert.equal(normalized.value, "office_supplies");
 });
+
+test("all US default categories are tax mapped with valid values", () => {
+  const defaults = getDefaultCategoriesForRegion("US");
+
+  for (const category of defaults) {
+    assert.ok(
+      category.tax_map_us,
+      `US default category "${category.name}" is missing tax_map_us`
+    );
+
+    const normalized = normalizeCategoryTaxMap(category.tax_map_us, "US");
+    assert.equal(
+      normalized.valid,
+      true,
+      `US default category "${category.name}" has invalid tax_map_us "${category.tax_map_us}"`
+    );
+  }
+});
+
+test("all Canada default categories are tax mapped with valid values", () => {
+  const defaults = getDefaultCategoriesForRegion("CA");
+
+  for (const category of defaults) {
+    assert.ok(
+      category.tax_map_ca,
+      `Canada default category "${category.name}" is missing tax_map_ca`
+    );
+
+    const normalized = normalizeCategoryTaxMap(category.tax_map_ca, "CA");
+    assert.equal(
+      normalized.valid,
+      true,
+      `Canada default category "${category.name}" has invalid tax_map_ca "${category.tax_map_ca}"`
+    );
+  }
+});
