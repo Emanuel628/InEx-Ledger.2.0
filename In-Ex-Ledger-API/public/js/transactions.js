@@ -1841,6 +1841,7 @@ async function markTransactionReady(transactionId) {
       const payload = await response?.json().catch(() => null);
       throw new Error(payload?.error || "Unable to mark transaction ready.");
     }
+    deselectTransaction(transactionId);
     await loadTransactions();
     focusTransactionForReview(transactionId);
   } catch (error) {
@@ -2105,6 +2106,7 @@ function openTransactionEditor(transaction) {
 
 function handleEditEntry(transactionId) {
   const transaction = (ledgerState.transactions || []).find((txn) => txn.id === transactionId);
+  deselectTransaction(transactionId);
   openTransactionEditor(transaction);
 }
 
