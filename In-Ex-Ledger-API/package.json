@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
+    "backfill:category-tax-maps": "node scripts/backfill-default-category-tax-maps.mjs",
+    "backfill:category-tax-maps:dry": "node scripts/backfill-default-category-tax-maps.mjs --dry-run"
     "prestart": "node scripts/repair-migration-checksums.js --write --file 20260419_create_billable_expenses_table.sql",
     "start": "node server.js",
     "dev": "nodemon server.js",
