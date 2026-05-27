@@ -2703,7 +2703,6 @@ function initSettingsTabs() {
 }
 function initSettingsNav() {
   const triggers = Array.from(document.querySelectorAll("[data-settings-target]"));
-  const navButtons = Array.from(document.querySelectorAll("[data-settings-nav-item]"));
   if (!triggers.length) {
     return;
   }
@@ -2719,10 +2718,26 @@ function initSettingsNav() {
     setActiveSettingsNavTarget(targetId);
   };
 
+  const openTargetPanel = (target) => {
+    if (!target) return;
+    setSettingsPanelCollapsed(target, false);
+  };
+
+  const focusTargetField = (button) => {
+    const selector = String(button?.dataset.settingsFocus || "").trim();
+    if (!selector) return;
+    const field = document.querySelector(selector);
+    if (field instanceof HTMLElement) {
+      window.setTimeout(() => field.focus(), 260);
+    }
+  };
+
   targets.forEach(({ button, target }) => {
     button.addEventListener("click", () => {
+      openTargetPanel(target);
       target.scrollIntoView({ behavior: "smooth", block: "start" });
       setActiveTarget(target.id);
+      focusTargetField(button);
     });
   });
 

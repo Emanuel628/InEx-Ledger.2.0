@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260525b" />
-  <link rel="stylesheet" href="/css/pages/settings.css?v=20260525b" />
+  <link rel="stylesheet" href="/css/pages/settings.css?v=20260526a" />
 </head>
 
 <body class="settings-page settings-loading">
@@ -87,11 +87,11 @@
             <strong id="settingsHeroBillingStatus" class="settings-state-value">Loading...</strong>
             <p id="settingsHeroBillingMeta" class="settings-state-meta">Checking subscription state...</p>
           </div>
-          <div class="settings-state-card">
+          <button class="settings-state-card settings-state-card--action" type="button" data-settings-target="settings-security" data-settings-focus="#mfaEnabledToggle">
             <span class="settings-state-label">Security</span>
             <strong id="settingsHeroSecurityStatus" class="settings-state-value">Loading...</strong>
             <p id="settingsHeroSecurityMeta" class="settings-state-meta">Checking account protection...</p>
-          </div>
+          </button>
           <div class="settings-state-card">
             <span class="settings-state-label">Accounting lock</span>
             <strong id="settingsHeroLockStatus" class="settings-state-value">Loading...</strong>
@@ -511,6 +511,7 @@
           <div class="settings-row-copy">
             <div class="settings-row-title" data-i18n="settings_opt_out_title">Opt out of analytics</div>
             <div class="settings-row-desc" data-i18n="settings_opt_out_desc">Disable analytics and personal data sharing for product improvement.</div>
+            <p class="settings-helper-note">Operational diagnostics stay encrypted and scoped to product-health signals. Personal financial records are not exposed through this setting.</p>
           </div>
           <label class="switch">
             <input type="checkbox" id="optOutToggle" />
@@ -527,6 +528,7 @@
           <div class="settings-row-copy">
             <div class="settings-row-title" data-i18n="settings_qc_analytics_title">Enable Analytics Tracking</div>
             <div class="settings-row-desc" data-i18n="settings_qc_analytics_desc">Analytics tracking is disabled by default for Quebec residents (Law 25). Enable only if you consent to usage data collection.</div>
+            <p class="settings-helper-note">Usage telemetry never includes readable ledger lines, receipts, or taxpayer identifiers. Sensitive financial content remains encrypted and hidden by default.</p>
           </div>
           <label class="switch">
             <input type="checkbox" id="analyticsOptInToggle" />
@@ -881,7 +883,7 @@
   <script src="../js/trial.js?v=20260408a"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
   <script src="../js/privacyService.js?v=20260514a"></script>
-  <script src="../js/settings.js?v=20260525a"></script>
+  <script src="../js/settings.js?v=20260526a"></script>
 </body>
 </html>
 
