@@ -115,7 +115,7 @@ const T2125_LINE_MAP = {
   interest_bank_charges: "Line 8710 - Interest and bank charges",
   legal_accounting_ca: "Line 8860 - Legal, accounting, and professional fees",
   business_tax_fees_licenses_memberships: "Line 8760 - Business taxes, fees, and licences",
-  property_taxes: "Line 8760 - Business taxes, fees, and licences (property taxes)",
+  property_taxes: "Line 9180 - Property taxes",
   salaries_wages_benefits: "Line 9060 - Salaries, wages, and benefits",
   rent: "Line 8912 - Rent",
   maintenance_repairs: "Line 8960 - Repairs and maintenance",
