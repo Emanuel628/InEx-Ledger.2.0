@@ -58,7 +58,6 @@ function requiresExportBusinessPurpose(categoryText) {
   return /\bmeal|\bfood\b|\bdining\b|\brestaurant\b|\btravel\b|\bairfare\b|\bhotel\b|\bentertainment\b/i.test(catText);
 }
 
-
 function getRequestedExportMode() {
   const params = new URLSearchParams(window.location.search);
   const mode = String(params.get("mode") || "").trim().toLowerCase();

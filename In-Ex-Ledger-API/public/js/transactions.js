@@ -128,12 +128,13 @@ const TX_FLAG_BADGE_CSS = {
 const ISSUE_CODE_TO_TX_FLAG = {
   needs_category: "NC",
   needs_tax_mapping: "UM",
+  final_confirmation_needed: "FC",
   needs_receipt_support: "RS",
   needs_business_purpose: "BP",
   needs_allocation: "AL",
   needs_mileage_log: "ML",
-  needs_home_office_support: "AL",
-  needs_capital_asset_review: "RV",
+  needs_home_office_support: "HO",
+  needs_capital_asset_review: "CA",
   cpa_review_required: "RV",
   possible_duplicate: "DUP"
 };
