@@ -267,6 +267,18 @@
   transform: translateY(-1px);
 }
 
+.category-review-btn.is-complete {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.28);
+  cursor: default;
+}
+
+.category-review-btn.is-complete:hover {
+  background: rgba(16, 185, 129, 0.18);
+  color: #047857;
+}
+
 .category-console {
   display: grid;
   grid-template-columns: minmax(320px, 0.86fr) minmax(420px, 1.14fr);
