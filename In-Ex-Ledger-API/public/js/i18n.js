@@ -869,6 +869,8 @@ const TRANSLATIONS = {
     transactions_recurring_validation_end: 'End date must be on or after the start date.',
     transactions_recurring_delete_success: 'Recurring template deleted.',
     transactions_recurring_undo_success: 'Recurring template restored.',
+    transactions_recurring_hide_panel: 'Hide templates',
+    transactions_recurring_show_panel: 'Show templates',
     receipts_title: 'Receipts & Support',
     receipts_description:
       'Receipts can be uploaded and attached to transactions.',
@@ -2244,6 +2246,8 @@ const TRANSLATIONS = {
     transactions_recurring_validation_end: 'La fecha de fin debe ser igual o posterior a la fecha de inicio.',
     transactions_recurring_delete_success: 'Plantilla recurrente eliminada.',
     transactions_recurring_undo_success: 'Plantilla recurrente restaurada.',
+    transactions_recurring_hide_panel: 'Ocultar plantillas',
+    transactions_recurring_show_panel: 'Mostrar plantillas',
     receipts_title: 'Recibos y soporte',
     receipts_description:
       'Puedes subir recibos y vincularlos a transacciones.',
@@ -3664,6 +3668,8 @@ const TRANSLATIONS = {
     transactions_recurring_validation_end: 'La date de fin doit être égale ou postérieure à la date de début.',
     transactions_recurring_delete_success: 'Modèle récurrent supprimé.',
     transactions_recurring_undo_success: 'Modèle récurrent restauré.',
+    transactions_recurring_hide_panel: 'Masquer les modèles',
+    transactions_recurring_show_panel: 'Afficher les modèles',
     receipts_title: 'Reçus et justificatifs',
     receipts_description:
       'Vous pouvez téléverser des reçus et les lier à des transactions.',
