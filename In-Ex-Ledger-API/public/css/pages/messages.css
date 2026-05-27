@@ -369,9 +369,9 @@
   min-height: 44px;
   padding: 0 16px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  background: transparent;
-  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  background: #fff;
+  color: #143150;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -379,8 +379,8 @@
 }
 
 .messages-focus-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.92);
+  border-color: #fff;
   transform: translateY(-1px);
 }
 
@@ -1342,4 +1342,3 @@
     padding: 18px !important;
   }
 }
-
