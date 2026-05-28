@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="InEx Ledger app icon">
+  <defs>
+    <linearGradient id="bg" x1="28" y1="20" x2="152" y2="164" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="0.5" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="50" y1="46" x2="130" y2="134" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#c7d2fe"/>
+    </linearGradient>
+    <filter id="shadow" x="20" y="24" width="140" height="140" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#020617" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <rect width="180" height="180" rx="42" fill="url(#bg)"/>
+  <g filter="url(#shadow)">
+    <path d="M48 57c0-5.52 4.48-10 10-10h26c5.52 0 10 4.48 10 10v26c0 5.52-4.48 10-10 10H58c-5.52 0-10-4.48-10-10V57Z" fill="url(#tile)"/>
+    <path d="M105 57c0-5.52 4.48-10 10-10h9c5.52 0 10 4.48 10 10v66c0 5.52-4.48 10-10 10h-9c-5.52 0-10-4.48-10-10V57Z" fill="#ffffff" opacity="0.84"/>
+    <path d="M48 116c0-5.52 4.48-10 10-10h26c5.52 0 10 4.48 10 10v7c0 5.52-4.48 10-10 10H58c-5.52 0-10-4.48-10-10v-7Z" fill="#ffffff" opacity="0.72"/>
+  </g>
+  <path d="M60 70h22" stroke="#1e293b" stroke-width="8" stroke-linecap="round" opacity="0.78"/>
+  <path d="M60 122h22" stroke="#1e293b" stroke-width="8" stroke-linecap="round" opacity="0.58"/>
+</svg>
