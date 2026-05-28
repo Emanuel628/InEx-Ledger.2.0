@@ -449,6 +449,78 @@ body[data-theme="light"] select option {
   border-radius: 8px;
 }
 
+/* Quick Add sidebar collapse system */
+main.app-shell {
+  overflow-x: visible;
+}
+
+.app-sidebar.app-sidebar--dynamic {
+  position: sticky;
+  overflow: visible;
+}
+
+.sidebar-collapse-toggle {
+  position: absolute;
+  top: 18px;
+  right: -14px;
+  z-index: 90;
+  width: 28px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0.5px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink2);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+  padding: 0;
+}
+
+.sidebar-collapse-toggle:hover,
+.sidebar-collapse-toggle:focus-visible {
+  background: var(--surface2);
+  color: var(--ink);
+  outline: none;
+}
+
+.sidebar-collapse-toggle svg {
+  width: 8px;
+  height: 14px;
+  transition: transform 180ms ease;
+}
+
+/* Collapsed state: keep a visible rail so the user can reopen it */
+main.app-shell.sidebar-collapsed > .app-sidebar.app-sidebar--dynamic {
+  width: 48px !important;
+  min-width: 48px !important;
+  flex-basis: 48px !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+main.app-shell.sidebar-collapsed > .app-sidebar.app-sidebar--dynamic .dynamic-sidebar-scroll {
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+main.app-shell.sidebar-collapsed > .app-sidebar.app-sidebar--dynamic .sidebar-collapse-toggle {
+  right: 10px;
+}
+
+main.app-shell.sidebar-collapsed > .app-sidebar.app-sidebar--dynamic .sidebar-collapse-toggle svg {
+  transform: rotate(180deg);
+}
+
+/* If a quick panel is open, close visual overlap when sidebar collapses */
+main.app-shell.sidebar-collapsed ~ .dynamic-sidebar-quick-panel {
+  left: 64px;
+}
+
 .app-sidebar--dynamic .sidebar-link.dynamic-sidebar-link {
   width: 100%;
   min-height: 36px;
