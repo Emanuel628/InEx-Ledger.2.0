@@ -1985,7 +1985,9 @@ main.app-shell > .app-sidebar.app-sidebar--dynamic {
 }
 
 main.app-shell > .app-sidebar.app-sidebar--dynamic .sidebar-collapse-toggle {
+  top: 50% !important;
   right: 8px !important;
+  transform: translateY(-50%) !important;
   z-index: 999 !important;
 }
 
@@ -2004,7 +2006,9 @@ main.app-shell.sidebar-collapsed > .app-sidebar.app-sidebar--dynamic .dynamic-si
 }
 
 main.app-shell.sidebar-collapsed > .app-sidebar.app-sidebar--dynamic .sidebar-collapse-toggle {
+  top: 50% !important;
   right: 8px !important;
+  transform: translateY(-50%) !important;
 }
 
 main.app-shell > .app-content,
