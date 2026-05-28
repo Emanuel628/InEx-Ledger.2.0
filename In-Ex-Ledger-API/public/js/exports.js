@@ -2152,8 +2152,37 @@ function makeCsvFilenameForFormat(format, startDate, endDate) {
   return `inex-ledger-export-${startDate}_to_${endDate}.csv`;
 }
 
+function slugExportFilenamePart(value, fallback = "Business") {
+  return String(value || fallback)
+    .trim()
+    .replace(/&/g, "and")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || fallback;
+}
+
 function makePdfFilename(startDate, endDate, batch) {
-  return `inex-ledger-${buildExportFileSlug(batch)}-export-${startDate}_to_${endDate}.pdf`;
+  const businessName = slugExportFilenamePart(
+    batch?.businessName ||
+    batch?.businessProfile?.name ||
+    exportState.businessProfile?.name ||
+    "Business"
+  );
+
+  const taxForm = getTaxFormContext(String(batch?.region || getRegion()).toLowerCase()).slug === "t2125"
+    ? "T2125"
+    : "Schedule-C";
+
+  const year =
+    startDate &&
+    endDate &&
+    startDate.slice(0, 4) === endDate.slice(0, 4)
+      ? startDate.slice(0, 4)
+      : `${startDate}_to_${endDate}`;
+
+  const mode = getSelectedExportMode() === "finalized" ? "Final" : "Draft";
+
+  return `${businessName}_${taxForm}_${year}_${mode}.pdf`;
 }
 
 function formatHistoryDate(value) {
