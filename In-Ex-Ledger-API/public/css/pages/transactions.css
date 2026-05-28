@@ -15,6 +15,11 @@ section {
   font-weight: 500;
 }
 
+.page-header {
+  display: flex;
+  justify-content: space-between;
+}
+
 .scope-select-wrap {
   display: inline-flex;
   align-items: center;
