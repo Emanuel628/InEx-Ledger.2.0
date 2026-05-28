@@ -4509,7 +4509,6 @@ function syncAllocationField() {
     return;
   }
   const catText = (categorySelect?.options[categorySelect?.selectedIndex]?.text || "").toLowerCase();
-  const taxTreatmentSelect = document.getElementById("transactionTaxTreatment");
   const requiresUsagePct = requiresTxnAllocation({ taxTreatment: taxTreatmentSelect?.value || "" }, null, catText);
   allocationField.hidden = !requiresUsagePct;
   if (!requiresUsagePct) {
