@@ -385,8 +385,8 @@ app.use('/api', (req, res, next) => {
 });
 
 /* =========================================================
-   SYSTEM ROUTES (HEALTH & STATIC)
-   ========================================================= */
+    SYSTEM ROUTES (HEALTH & STATIC)
+    ========================================================= */
 
 // Railway Deployment Healthcheck
 app.get('/health', (req, res) => {
@@ -425,8 +425,8 @@ app.get('/index.html', (req, res) => {
 });
 
 /* =========================================================
-   API ROUTES
-   ========================================================= */
+    API ROUTES
+    ========================================================= */
 
 // Transaction management
 app.use('/api/transactions', transactionsRouter);
@@ -441,8 +441,8 @@ app.use('/api', routes);
 logInfo('MOUNTED: /api (Core Routes)');
 
 /* =========================================================
-   404 & ERROR HANDLERS (must come after all routes)
-   ========================================================= */
+    404 & ERROR HANDLERS (must come after all routes)
+    ========================================================= */
 
 app.use((req, res) => {
   if (req.path.startsWith('/api/')) {
@@ -456,6 +456,7 @@ app.use((req, res) => {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Page not found | InEx Ledger</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/css/app.css?v=20260508a" />
 </head>
 <body>
@@ -490,8 +491,8 @@ app.use((err, req, res, next) => {
 });
 
 /* =========================================================
-   SERVER INITIALIZATION
-   ========================================================= */
+    SERVER INITIALIZATION
+    ========================================================= */
 
 let server;
 
@@ -518,8 +519,7 @@ async function initializeDatabaseWithRetry() {
         }
         dbState = 'retrying';
         dbLastError = message;
-        logError('Database initialization failed:', { message });
-        logInfo(`Retrying database initialization in ${DB_RETRY_DELAY_MS}ms.`);
+        logError('Database initialization failed. Retrying after delay.', { message, retryDelayMs: DB_RETRY_DELAY_MS });
         await new Promise((resolve) => setTimeout(resolve, DB_RETRY_DELAY_MS));
       }
     }
@@ -528,47 +528,50 @@ async function initializeDatabaseWithRetry() {
   return dbInitPromise;
 }
 
-function registerShutdownHandlers() {
+async function startServer() {
+  initializeRateLimiterProtection();
+  initializeReceiptStorage();
 
-  /* =========================================================
-     GRACEFUL SHUTDOWN
-     ========================================================= */
+  server = app.listen(PORT, () => {
+    logInfo(`API running on port ${PORT}`);
+  });
 
-  process.on('SIGTERM', () => {
-    logInfo('SIGTERM: Shutdown signal received.');
+  initializeDatabaseWithRetry().catch((err) => {
+    dbState = 'failed';
+    dbLastError = err?.message || String(err);
+    logError('Database initialization failed unexpectedly.', { message: dbLastError });
+  });
+}
+
+function shutdown(signal) {
+  logWarn(`${signal} received, shutting down gracefully.`);
+  if (server) {
     server.close(() => {
-      logInfo('Server closed safely.');
+      logInfo('HTTP server closed.');
       process.exit(0);
     });
-  });
-}
-
-async function start() {
-  initializeReceiptStorage();
-  try {
-    await initializeRateLimiterProtection();
-  } catch (err) {
-    logError('Rate limiting initialization failed', {
-      message: err?.message || String(err)
-    });
-    logWarn('Rate limiting is unavailable; API requests will fail closed until restored.');
+    return;
   }
-  server = app.listen(PORT, '0.0.0.0', () => {
-    logInfo(`READY: InEx Ledger API live on port ${PORT}`);
-  });
-
-  registerShutdownHandlers();
-  void initializeDatabaseWithRetry();
+  process.exit(0);
 }
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 if (require.main === module) {
-  start().catch((err) => {
-    logError('Server startup failed', { message: err?.message || String(err) });
-    process.exit(1);
-  });
+  startServer();
 }
 
 module.exports = {
   app,
-  start
+  startServer,
+  resolveCanonicalAppOrigin,
+  resolveRequestedPageName,
+  getCanonicalPagePath,
+  buildCorsOptions,
+  isOriginlessRequestAllowed,
+  __test: {
+    getDbState: () => dbState,
+    getDbLastError: () => dbLastError
+  }
 };
