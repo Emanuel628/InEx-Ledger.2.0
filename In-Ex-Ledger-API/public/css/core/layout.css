@@ -461,11 +461,11 @@ main.app-shell {
 
 .sidebar-collapse-toggle {
   position: absolute;
-  top: 18px;
-  right: -14px;
-  z-index: 90;
-  width: 28px;
-  height: 44px;
+  top: 14px;
+  right: 8px;
+  z-index: 999;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -473,7 +473,7 @@ main.app-shell {
   border-radius: 999px;
   background: var(--surface);
   color: var(--ink2);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
   cursor: pointer;
   padding: 0;
 }
@@ -1975,6 +1975,42 @@ main.app-shell.sidebar-collapsed ~ .dynamic-sidebar-quick-panel {
 
 .app-shell.sidebar-collapsed .sidebar-collapse-toggle svg {
   transform: rotate(180deg);
+}
+
+/* Final Quick Add sidebar collapse safety rules */
+main.app-shell > .app-sidebar.app-sidebar--dynamic {
+  position: sticky !important;
+  z-index: 50 !important;
+  overflow: visible !important;
+}
+
+main.app-shell > .app-sidebar.app-sidebar--dynamic .sidebar-collapse-toggle {
+  right: 8px !important;
+  z-index: 999 !important;
+}
+
+main.app-shell.sidebar-collapsed > .app-sidebar.app-sidebar--dynamic {
+  width: 48px !important;
+  min-width: 48px !important;
+  flex-basis: 48px !important;
+}
+
+main.app-shell.sidebar-collapsed > .app-sidebar.app-sidebar--dynamic .dynamic-sidebar-scroll {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+main.app-shell.sidebar-collapsed > .app-sidebar.app-sidebar--dynamic .sidebar-collapse-toggle {
+  right: 8px !important;
+}
+
+main.app-shell > .app-content,
+main.app-shell > .app-page {
+  position: relative !important;
+  z-index: 0 !important;
 }
 
 
