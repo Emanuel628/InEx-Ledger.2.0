@@ -5113,3 +5113,22 @@ tr.tx-highlight {
   .tx-review-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tx-review-panel-title { font-size: 12px; }
 }
+
+/* Transactions page: keep Quick Add collapse handle above the content paint layer */
+.transactions-page .app-sidebar.app-sidebar--dynamic,
+body:has(.transactions-page) .app-sidebar.app-sidebar--dynamic {
+  position: sticky;
+  z-index: 80;
+  overflow: visible;
+}
+
+.transactions-page .sidebar-collapse-toggle,
+body:has(.transactions-page) .sidebar-collapse-toggle {
+  z-index: 120;
+}
+
+.transactions-page .app-content,
+body:has(.transactions-page) .app-content {
+  position: relative;
+  z-index: 0;
+}
