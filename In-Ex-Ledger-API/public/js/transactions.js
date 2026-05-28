@@ -1532,31 +1532,33 @@ function setupTransactionDrawer() {
     return;
   }
 
-  transactionToggleElement?.addEventListener("click", async () => {
-    const canOpen = await switchToActiveScopeIfNeeded();
-    if (!canOpen) {
-      return;
-    }
-    if (transactionDrawerElement.hasAttribute("hidden")) {
-      openTransactionDrawer();
-    } else {
-      closeTransactionDrawer();
-    }
+  transactionToggleElement?.addEventListener("click", () => {
+    void toggleTransactionDrawer();
   });
 
-  transactionPageToggleElement?.addEventListener("click", async () => {
-    const canOpen = await switchToActiveScopeIfNeeded();
-    if (!canOpen) {
-      return;
-    }
-    if (transactionDrawerElement.hasAttribute("hidden")) {
-      openTransactionDrawer();
-      return;
-    }
-    document.getElementById("txType")?.focus();
+  transactionPageToggleElement?.addEventListener("click", () => {
+    void toggleTransactionDrawer();
   });
 
   closeTransactionDrawer();
+}
+
+function isTransactionDrawerOpen() {
+  return !!transactionDrawerElement && !transactionDrawerElement.hasAttribute("hidden");
+}
+
+async function toggleTransactionDrawer() {
+  const canOpen = await switchToActiveScopeIfNeeded();
+
+  if (!canOpen || !transactionDrawerElement) {
+    return;
+  }
+
+  if (isTransactionDrawerOpen()) {
+    closeTransactionDrawer();
+  } else {
+    openTransactionDrawer();
+  }
 }
 
 function wireRecurringForm() {
@@ -5090,14 +5092,10 @@ function initDrawerCloseBtn() {
 }
 
 function initQuickAddTriggers() {
-  const toggle = document.getElementById("addTxTogglePage");
-  if (!toggle) {
-    return;
-  }
   document.querySelectorAll("[data-quick-add-trigger], [data-quick-add-link]").forEach((element) => {
     element.addEventListener("click", (event) => {
       event.preventDefault();
-      toggle.click();
+      void toggleTransactionDrawer();
     });
   });
 }
