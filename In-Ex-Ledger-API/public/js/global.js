@@ -784,30 +784,41 @@ function initDynamicSidebar() {
     }, {});
 
     sidebar.innerHTML = `
-      <div class="dynamic-sidebar-header">
-        <div>
-          <div class="sidebar-section-label">${escapeDynamicSidebarHtml(gT("quick_add_title", "Quick Add"))}</div>
-        </div>
-        <button type="button" class="dynamic-sidebar-manage" data-sidebar-manage aria-expanded="${String(shouldKeepLibraryOpen)}">${escapeDynamicSidebarHtml(shouldKeepLibraryOpen ? gT("common_done", "Done") : gT("common_add", "Add"))}</button>
-      </div>
-      <nav class="sidebar-nav dynamic-sidebar-favorites" data-sidebar-favorites aria-label="Quick add actions">
-        ${favoriteMarkup}
-      </nav>
-      <div class="dynamic-sidebar-empty" data-sidebar-empty${favorites.length ? " hidden" : ""}><span class="dynamic-sidebar-empty-icon">+</span> ${escapeDynamicSidebarHtml(gT("quick_add_empty", "Click Add above to add quick-add shortcuts"))}</div>
-      <div class="dynamic-sidebar-library" data-sidebar-library${shouldKeepLibraryOpen ? "" : " hidden"}>
-        ${Object.keys(groupedLibrary).map((group) => `
-          <div class="dynamic-sidebar-library-group">
-            <div class="sidebar-section-label">${escapeDynamicSidebarHtml(group === "Business" ? gT("quick_add_group_business", "Business") : gT("quick_add_group_core", "Core"))}</div>
-            ${groupedLibrary[group].map((feature) => renderDynamicSidebarLibraryItem(feature, favorites.includes(feature.id))).join("")}
+      <div class="dynamic-sidebar-scroll">
+        <div class="dynamic-sidebar-header">
+          <div>
+            <div class="sidebar-section-label">${escapeDynamicSidebarHtml(gT("quick_add_title", "Quick Add"))}</div>
           </div>
-        `).join("")}
+          <button type="button" class="dynamic-sidebar-manage" data-sidebar-manage aria-expanded="${String(shouldKeepLibraryOpen)}">${escapeDynamicSidebarHtml(shouldKeepLibraryOpen ? gT("common_done", "Done") : gT("common_add", "Add"))}</button>
+        </div>
+        <nav class="sidebar-nav dynamic-sidebar-favorites" data-sidebar-favorites aria-label="Quick add actions">
+          ${favoriteMarkup}
+        </nav>
+        <div class="dynamic-sidebar-empty" data-sidebar-empty${favorites.length ? " hidden" : ""}><span class="dynamic-sidebar-empty-icon">+</span> ${escapeDynamicSidebarHtml(gT("quick_add_empty", "Click Add above to add quick-add shortcuts"))}</div>
+        <div class="dynamic-sidebar-library" data-sidebar-library${shouldKeepLibraryOpen ? "" : " hidden"}>
+          ${Object.keys(groupedLibrary).map((group) => `
+            <div class="dynamic-sidebar-library-group">
+              <div class="sidebar-section-label">${escapeDynamicSidebarHtml(group === "Business" ? gT("quick_add_group_business", "Business") : gT("quick_add_group_core", "Core"))}</div>
+              ${groupedLibrary[group].map((feature) => renderDynamicSidebarLibraryItem(feature, favorites.includes(feature.id))).join("")}
+            </div>
+          `).join("")}
+        </div>
       </div>
+      <button type="button" class="sidebar-collapse-toggle" aria-label="Toggle sidebar"><svg viewBox="0 0 6 10" fill="none" aria-hidden="true"><path d="M5 1L1 5l4 4"/></svg></button>
     `;
 
     wireDynamicSidebarEvents();
   }
 
   function wireDynamicSidebarEvents() {
+    sidebar.querySelector(".sidebar-collapse-toggle")?.addEventListener("click", () => {
+      const shell = sidebar.closest(".app-shell");
+      if (!shell) return;
+      const willCollapse = !shell.classList.contains("sidebar-collapsed");
+      shell.classList.toggle("sidebar-collapsed", willCollapse);
+      try { localStorage.setItem("quick-add-sidebar-collapsed", willCollapse ? "1" : "0"); } catch (_) {}
+    });
+
     const manageButton = sidebar.querySelector("[data-sidebar-manage]");
     const library = sidebar.querySelector("[data-sidebar-library]");
     const favoritesNav = sidebar.querySelector("[data-sidebar-favorites]");
@@ -887,6 +898,13 @@ function initDynamicSidebar() {
   }
 
   render();
+
+  // Apply saved collapsed state once on initial render
+  try {
+    if (localStorage.getItem("quick-add-sidebar-collapsed") === "1") {
+      sidebar.closest(".app-shell")?.classList.add("sidebar-collapsed");
+    }
+  } catch (_) {}
 
   const applyProfileFavorites = (profile) => {
     const nextFavorites = getDynamicSidebarFavorites(featureMap, profile?.ui_preferences);
@@ -1835,46 +1853,11 @@ function escapeDynamicSidebarAttr(value) {
   return escapeDynamicSidebarHtml(value);
 }
 
-function initSidebarCollapse() {
-  const sidebar = document.querySelector(".app-shell > .app-sidebar:not(.app-sidebar--dynamic)");
-  if (!sidebar) return;
-
-  const shell = document.querySelector(".app-shell");
-  const STORAGE_KEY = "quick-add-sidebar-collapsed";
-
-  // Wrap all existing sidebar content in a scrollable inner div
-  const inner = document.createElement("div");
-  inner.className = "sidebar-inner";
-  while (sidebar.firstChild) inner.appendChild(sidebar.firstChild);
-  sidebar.appendChild(inner);
-
-  // Append the toggle as a right-edge strip inside the sidebar
-  const toggle = document.createElement("button");
-  toggle.type = "button";
-  toggle.id = "sidebarCollapseToggle";
-  toggle.className = "sidebar-collapse-toggle";
-  toggle.setAttribute("aria-label", "Toggle sidebar");
-  toggle.innerHTML = '<svg viewBox="0 0 6 10" fill="none" aria-hidden="true"><path d="M5 1L1 5l4 4"/></svg>';
-  sidebar.appendChild(toggle);
-
-  // Restore saved state immediately (before paint)
-  if (localStorage.getItem(STORAGE_KEY) === "1") {
-    shell.classList.add("sidebar-collapsed");
-  }
-
-  toggle.addEventListener("click", function () {
-    const willCollapse = !shell.classList.contains("sidebar-collapsed");
-    shell.classList.toggle("sidebar-collapsed", willCollapse);
-    localStorage.setItem(STORAGE_KEY, willCollapse ? "1" : "0");
-  });
-}
-
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
   injectSkipLink();
   renderCanonicalTopbarNavigation();
   initDynamicSidebar();
-  initSidebarCollapse();
   injectMobileMenu();   // clones the normalized nav
   highlightNavigation(); // runs on all nav a elements including the drawer
   applyDateInputConstraints();

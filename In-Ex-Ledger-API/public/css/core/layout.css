@@ -381,13 +381,22 @@ body[data-theme="light"] select option {
   min-width: 224px;
   background: var(--surface);
   border-right: 0.5px solid var(--border);
-  padding: 14px 12px;
   position: sticky;
   top: 56px;
   align-self: flex-start;
   height: calc(100vh - 56px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  transition: width 200ms ease, min-width 200ms ease;
+}
+
+.dynamic-sidebar-scroll {
+  flex: 1;
+  min-width: 0;
   overflow-y: auto;
   overflow-x: clip;
+  padding: 14px 12px;
 }
 
 .dynamic-sidebar-header {
@@ -1057,16 +1066,14 @@ body[data-theme="light"] select option {
 .app-shell > .app-sidebar:not(.app-sidebar--dynamic) {
   width: 224px !important;
   min-width: 224px !important;
-  padding: 0 !important;
+  padding: 18px 14px !important;
   background: var(--surface) !important;
   border-right: 0.5px solid var(--border) !important;
   position: sticky !important;
   top: 56px !important;
   align-self: flex-start !important;
   height: calc(100vh - 56px) !important;
-  overflow: hidden !important;
-  display: flex !important;
-  flex-direction: row !important;
+  overflow-y: auto !important;
   transition: width 200ms ease, min-width 200ms ease;
 }
 
@@ -1857,15 +1864,7 @@ body[data-theme="light"] select option {
   display: block !important;
 }
 
-/* Sidebar inner scroll wrapper (injected by initSidebarCollapse) */
-.sidebar-inner {
-  flex: 1;
-  min-width: 0;
-  overflow-y: auto;
-  padding: 18px 14px;
-}
-
-/* Sidebar collapse toggle — right-edge strip, always inside the sidebar */
+/* Sidebar collapse toggle — right-edge strip inside the dynamic sidebar */
 .sidebar-collapse-toggle {
   flex-shrink: 0;
   width: 16px;
@@ -1897,7 +1896,7 @@ body[data-theme="light"] select option {
 }
 
 /* Collapsed: sidebar shrinks to just the toggle strip */
-.app-shell.sidebar-collapsed > .app-sidebar:not(.app-sidebar--dynamic) {
+.app-shell.sidebar-collapsed > .app-sidebar {
   width: 16px !important;
   min-width: 16px !important;
 }
