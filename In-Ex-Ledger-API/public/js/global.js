@@ -1835,11 +1835,46 @@ function escapeDynamicSidebarAttr(value) {
   return escapeDynamicSidebarHtml(value);
 }
 
+function initSidebarCollapse() {
+  const sidebar = document.querySelector(".app-shell > .app-sidebar:not(.app-sidebar--dynamic)");
+  if (!sidebar) return;
+
+  const shell = document.querySelector(".app-shell");
+  const STORAGE_KEY = "quick-add-sidebar-collapsed";
+
+  // Wrap all existing sidebar content in a scrollable inner div
+  const inner = document.createElement("div");
+  inner.className = "sidebar-inner";
+  while (sidebar.firstChild) inner.appendChild(sidebar.firstChild);
+  sidebar.appendChild(inner);
+
+  // Append the toggle as a right-edge strip inside the sidebar
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.id = "sidebarCollapseToggle";
+  toggle.className = "sidebar-collapse-toggle";
+  toggle.setAttribute("aria-label", "Toggle sidebar");
+  toggle.innerHTML = '<svg viewBox="0 0 6 10" fill="none" aria-hidden="true"><path d="M5 1L1 5l4 4"/></svg>';
+  sidebar.appendChild(toggle);
+
+  // Restore saved state immediately (before paint)
+  if (localStorage.getItem(STORAGE_KEY) === "1") {
+    shell.classList.add("sidebar-collapsed");
+  }
+
+  toggle.addEventListener("click", function () {
+    const willCollapse = !shell.classList.contains("sidebar-collapsed");
+    shell.classList.toggle("sidebar-collapsed", willCollapse);
+    localStorage.setItem(STORAGE_KEY, willCollapse ? "1" : "0");
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   applyGlobalTheme();
   injectSkipLink();
   renderCanonicalTopbarNavigation();
   initDynamicSidebar();
+  initSidebarCollapse();
   injectMobileMenu();   // clones the normalized nav
   highlightNavigation(); // runs on all nav a elements including the drawer
   applyDateInputConstraints();
