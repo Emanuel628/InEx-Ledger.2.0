@@ -688,7 +688,7 @@ tbody tr:last-child {
   }
 }
 
-body {
+/*body {
   background: var(--surface2);
 }
 
@@ -700,8 +700,8 @@ body {
   min-height: calc(100vh - 56px);
 }
 
-/* Keep this scoped to the old static sidebar only.
-   The dynamic Quick Add sidebar is controlled by shared layout.css. */
+Keep this scoped to the old static sidebar only.
+   The dynamic Quick Add sidebar is controlled by shared layout.css. 
 .app-sidebar:not(.app-sidebar--dynamic) {
   width: 200px;
   background: var(--surface);
@@ -898,7 +898,8 @@ body {
 .toolbar-add-button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
-}
+}*/
+
 
 .stats-row {
   display: grid;
