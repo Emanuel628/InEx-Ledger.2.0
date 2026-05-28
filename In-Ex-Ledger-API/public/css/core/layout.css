@@ -1977,4 +1977,19 @@ main.app-shell.sidebar-collapsed ~ .dynamic-sidebar-quick-panel {
   transform: rotate(180deg);
 }
 
+main.app-shell > .app-sidebar.app-sidebar--dynamic {
+  z-index: 80;
+  overflow: visible;
+}
+
+main.app-shell > .app-sidebar.app-sidebar--dynamic .sidebar-collapse-toggle {
+  z-index: 120;
+}
+
+main.app-shell > .app-content,
+main.app-shell > .app-page {
+  position: relative;
+  z-index: 0;
+}
+
 
