@@ -876,10 +876,25 @@ function initDynamicSidebar() {
     });
 
     sidebar.querySelectorAll("[data-sidebar-action]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const feature = featureMap.get(button.getAttribute("data-sidebar-action") || "");
-        if (feature) openDynamicSidebarQuickPanel(feature, button, quickPanel);
-      });
+  button.addEventListener("click", () => {
+    const featureId = button.getAttribute("data-sidebar-action") || "";
+    const feature = featureMap.get(featureId);
+
+    if (!feature) {
+      return;
+    }
+
+    const isSamePanelOpen =
+      !quickPanel.hidden &&
+      quickPanel.dataset.currentFeatureId === featureId;
+
+    if (isSamePanelOpen) {
+      closeDynamicSidebarQuickPanel(quickPanel);
+      return;
+    }
+
+    openDynamicSidebarQuickPanel(feature, button, quickPanel);
+  });
     });
   }
 
@@ -1069,6 +1084,7 @@ function openDynamicSidebarQuickPanel(feature, anchor, panel) {
   const bottomMargin = 20;
   const availableHeight = Math.max(320, window.innerHeight - top - bottomMargin);
   panel.hidden = false;
+  panel.dataset.currentFeatureId = feature.id || "";
   panel.style.top = `${top}px`;
   panel.style.maxHeight = `${availableHeight}px`;
   showDynamicSidebarBackdrop();
@@ -1090,6 +1106,7 @@ function closeDynamicSidebarQuickPanel(panel) {
   if (!panel) return;
   panel.hidden = true;
   panel.style.maxHeight = "";
+  delete panel.dataset.currentFeatureId;
   panel.innerHTML = "";
   hideDynamicSidebarBackdrop();
 }
