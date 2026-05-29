@@ -112,12 +112,24 @@ function timingSafeStringEqual(a, b) {
 function pickRecipientList(payload) {
   const out = [];
   const candidates = [
-    payload?.to,
-    payload?.data?.to,
-    payload?.recipient,
-    payload?.recipients,
-    payload?.envelope?.to
-  ];
+  payload?.to,
+  payload?.data?.to,
+  payload?.recipient,
+  payload?.data?.recipient,
+  payload?.recipients,
+  payload?.data?.recipients,
+  payload?.envelope?.to,
+  payload?.data?.envelope?.to,
+  payload?.envelope?.recipients,
+  payload?.data?.envelope?.recipients,
+  payload?.envelope?.rcpt_to,
+  payload?.data?.envelope?.rcpt_to,
+  payload?.headers?.to,
+  payload?.headers?.To,
+  payload?.data?.headers?.to,
+  payload?.data?.headers?.To
+];
+  
   for (const candidate of candidates) {
     if (!candidate) continue;
     if (typeof candidate === "string") {
@@ -127,6 +139,9 @@ function pickRecipientList(payload) {
         if (typeof entry === "string") out.push(entry);
         else if (entry?.email) out.push(entry.email);
         else if (entry?.address) out.push(entry.address);
+        else if (entry?.raw) out.push(entry.raw);
+        else if (entry?.value) out.push(entry.value);
+        else if (entry?.name && entry?.email) out.push(`${entry.name} <${entry.email}>`);
       }
     } else if (candidate?.email) {
       out.push(candidate.email);
