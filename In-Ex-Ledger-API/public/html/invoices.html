@@ -170,7 +170,9 @@
           </div>
           <div class="form-field">
             <label for="invDueDate" class="form-label">Due date</label>
-            <input id="invDueDate" type="date" class="form-control" />
+            <!-- A due date is normally in the future (issue today, due later), so
+                 exempt it from the global "max = today" date-input constraint. -->
+            <input id="invDueDate" type="date" class="form-control" data-allow-future-date />
           </div>
           <div class="form-field">
             <label for="invCurrency" class="form-label">Currency</label>
