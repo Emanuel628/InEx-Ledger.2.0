@@ -233,8 +233,10 @@ function rawBodyUtf8(req) {
   if (typeof req.body === "string") {
     return req.body;
   }
-  
-  function verifyInboundEmailRequest(req, nowMs = Date.now()) {
+  return "";
+}
+
+function verifyInboundEmailRequest(req, nowMs = Date.now()) {
   const secret = String(process.env.INBOUND_EMAIL_WEBHOOK_SECRET || "").trim();
   
   if (!secret) {
