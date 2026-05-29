@@ -146,6 +146,13 @@ function pickRecipientList(payload) {
     } else if (candidate?.email) {
       out.push(candidate.email);
     }
+    else if (candidate?.address) {
+       out.push(candidate.address);
+    } else if (candidate?.raw) {
+       out.push(candidate.raw);
+    } else if (candidate?.value) {
+      out.push(candidate.value);
+    }
   }
   return out;
 }
