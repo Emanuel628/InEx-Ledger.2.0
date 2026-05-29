@@ -233,14 +233,10 @@ function rawBodyUtf8(req) {
   if (typeof req.body === "string") {
     return req.body;
   }
-  return "";
-}
-
-const allowLegacyFallback =
-  process.env.NODE_ENV !== "production" ||
-  process.env.ALLOW_INBOUND_EMAIL_SECRET_FALLBACK === "true";
-
+  
+  function verifyInboundEmailRequest(req, nowMs = Date.now()) {
   const secret = String(process.env.INBOUND_EMAIL_WEBHOOK_SECRET || "").trim();
+  
   if (!secret) {
     return { ok: false, status: 503, error: "Inbound email webhook is not configured." };
   }
@@ -249,7 +245,7 @@ const allowLegacyFallback =
   const timestampHeader = String(req.get("x-inbound-timestamp") || "").trim();
   const signatureHeader = String(req.get("x-inbound-signature") || "").trim();
   const legacySecretHeader = req.get("x-inbound-secret") || req.get("x-webhook-secret") || "";
-  const allowLegacyFallback = process.env.NODE_ENV !== "production";
+  const allowLegacyFallback = process.env.NODE_ENV !== "production" || process.env.ALLOW_INBOUND_EMAIL_SECRET_FALLBACK === "true";
 
   if (timestampHeader || signatureHeader) {
     if (!timestampHeader || !signatureHeader) {
