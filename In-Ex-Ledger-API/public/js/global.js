@@ -1885,7 +1885,10 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("lunaDistanceUnitChanged", applyMileageNavLabel);
   window.addEventListener("lunaLanguageChanged", applyMileageNavLabel);
 
-  // Poll unread message count for the nav badge every 60 s
+  // Keep the nav unread badge live: poll on a short interval and refresh the
+  // moment the page becomes visible/focused, so a new message lights the red
+  // dot on its own within a few seconds — no manual page refresh needed.
+  var GLOBAL_MSG_POLL_INTERVAL_MS = 15000;
   var _globalMsgPollTimer = null;
   function stopGlobalUnreadPolling() {
     if (_globalMsgPollTimer) {
@@ -1894,31 +1897,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  void pollGlobalUnreadCount().then(function (shouldContinue) {
-    if (shouldContinue === false) {
-      stopGlobalUnreadPolling();
-    }
-  });
-
-  _globalMsgPollTimer = setInterval(function () {
+  function refreshGlobalUnreadCount() {
     void pollGlobalUnreadCount().then(function (shouldContinue) {
       if (shouldContinue === false) {
         stopGlobalUnreadPolling();
       }
     });
-  }, 60000);
+  }
 
-  // Refresh the unread badge as soon as the tab regains focus, so a new
-  // message lights the red dot promptly instead of waiting for the next
-  // 60 s poll (e.g. right after replying from an email client).
+  refreshGlobalUnreadCount();
+  _globalMsgPollTimer = setInterval(refreshGlobalUnreadCount, GLOBAL_MSG_POLL_INTERVAL_MS);
+
+  // Refresh immediately when the user returns to the page — tab switch
+  // (visibilitychange), window focus, or back/forward navigation restored
+  // from the bfcache (pageshow). Covers the cases that previously looked
+  // like "I had to refresh for the dot to show".
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState !== "visible") return;
-    void pollGlobalUnreadCount().then(function (shouldContinue) {
-      if (shouldContinue === false) {
-        stopGlobalUnreadPolling();
-      }
-    });
+    if (document.visibilityState === "visible") refreshGlobalUnreadCount();
   });
+  window.addEventListener("focus", refreshGlobalUnreadCount);
+  window.addEventListener("pageshow", refreshGlobalUnreadCount);
 });
 
 (function () {
