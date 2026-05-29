@@ -44,8 +44,8 @@ const resolveEstimatedTaxProfileHelper = taxHelpers.resolveEstimatedTaxProfile |
   const normalizedRegion = String(region || "").toUpperCase() === "CA" ? "CA" : "US";
   const normalizedProvince = String(province || "").toUpperCase();
   const caRates = taxHelpers.CANADA_ESTIMATED_TAX_RATES || {
-    AB: 0.05, BC: 0.12, MB: 0.12, NB: 0.15, NL: 0.15, NS: 0.15,
-    NT: 0.05, NU: 0.05, ON: 0.13, PE: 0.15, QC: 0.14975, SK: 0.11, YT: 0.05
+    AB: 0.29, BC: 0.26, MB: 0.31, NB: 0.30, NL: 0.29, NS: 0.33,
+    NT: 0.26, NU: 0.26, ON: 0.27, PE: 0.31, QC: 0.34, SK: 0.31, YT: 0.28
   };
   return {
     region: normalizedRegion,
@@ -4018,9 +4018,8 @@ function renderTotals(filteredTransactions = getFilteredTransactions()) {
   const tier = effectiveTier();
   const hasTransactions = transactionsCount > 0;
   if (!isAllScope && taxLabel && setAsideLabel) {
-    const setAsideBase = businessTaxProfile.region === "CA"
-      ? Math.max(0, totals.income)
-      : Math.max(0, totals.income - totals.expenses);
+    // CA income tax (T2125) is assessed on net profit, same as US Schedule C.
+    const setAsideBase = Math.max(0, totals.income - totals.expenses);
     const estimatedTax = setAsideBase * businessTaxProfile.rate;
     const monthlySetAside = estimatedTax / 12;
     taxLabel.textContent = formatCurrency(estimatedTax, scopeRegion);

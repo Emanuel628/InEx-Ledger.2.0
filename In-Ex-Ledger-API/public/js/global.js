@@ -5,22 +5,25 @@ const DEFAULT_THEME = "light";
 const THEME_VERSION = "3";
 const BRAND_ICON_VERSION = "20260528a";
 const US_ESTIMATED_TAX_RATE = 0.24;
+// Combined estimate: federal income tax + provincial income tax + CPP (11.9%)
+// at ~$60K net self-employment income. NOT GST/HST rates.
+// Source: 2026 CRA brackets, provincial rate cards, CPP rates (canada.ca Jan 2026).
 const CANADA_ESTIMATED_TAX_RATES = {
-  AB: 0.05,
-  BC: 0.12,
-  MB: 0.12,
-  NB: 0.15,
-  NL: 0.15,
-  NS: 0.15,
-  NT: 0.05,
-  NU: 0.05,
-  ON: 0.13,
-  PE: 0.15,
-  QC: 0.14975,
-  SK: 0.11,
-  YT: 0.05
+  AB: 0.29,
+  BC: 0.26,
+  MB: 0.31,
+  NB: 0.30,
+  NL: 0.29,
+  NS: 0.33,
+  NT: 0.26,
+  NU: 0.26,
+  ON: 0.27,
+  PE: 0.31,
+  QC: 0.34,
+  SK: 0.31,
+  YT: 0.28
 };
-const DEFAULT_CA_ESTIMATED_TAX_RATE = 0.05;
+const DEFAULT_CA_ESTIMATED_TAX_RATE = 0.28;
 
 function ensureBrandIconLinks() {
   if (!document || !document.head) {
