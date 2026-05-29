@@ -8,6 +8,7 @@ const {
   getTaxLineSummaryForYear,
   getUnmappedCategories,
   expectedFormForPayer,
+  FIFTY_PCT_LIMITATION_LINES,
   __private: { yearBounds }
 } = require("../services/taxSummaryService.js");
 
@@ -102,4 +103,34 @@ test("getUnmappedCategories filters by region-specific column", async () => {
   const rows = await getUnmappedCategories(pool, { businessId: "biz", region: "US" });
   assert.equal(rows.length, 1);
   assert.ok(pool.queries[0].sql.includes("tax_map_us"));
+});
+
+test("getTaxLineSummaryForYear applies 50% limitation to meals (US) and meals_entertainment (CA)", async () => {
+  // US meals
+  const poolUs = makePool([[
+    { category_id: "c1", category_name: "Client Meals", category_kind: "expense", tax_line: "meals", transaction_count: 5, total_amount: "800.00", receipt_count: 4 },
+    { category_id: "c2", category_name: "Software", category_kind: "expense", tax_line: "advertising", transaction_count: 3, total_amount: "300.00", receipt_count: 3 }
+  ]]);
+  const usSum = await getTaxLineSummaryForYear(poolUs, { businessId: "biz", year: 2026, region: "US" });
+  const meals = usSum.mapped_lines.find((l) => l.tax_line === "meals");
+  assert.equal(meals.total_amount, 800);
+  assert.equal(meals.limitation_pct, 50);
+  assert.equal(meals.deductible_amount, 400); // IRC §274(n) — only 50% deductible
+  const ads = usSum.mapped_lines.find((l) => l.tax_line === "advertising");
+  assert.equal(ads.limitation_pct, null);
+  assert.equal(ads.deductible_amount, 300); // no limitation
+
+  // CA meals_entertainment
+  const poolCa = makePool([[
+    { category_id: "c3", category_name: "Entertainment", category_kind: "expense", tax_line: "meals_entertainment", transaction_count: 2, total_amount: "600.00", receipt_count: 2 }
+  ]]);
+  const caSum = await getTaxLineSummaryForYear(poolCa, { businessId: "biz", year: 2026, region: "CA" });
+  const caLine = caSum.mapped_lines.find((l) => l.tax_line === "meals_entertainment");
+  assert.equal(caLine.limitation_pct, 50);
+  assert.equal(caLine.deductible_amount, 300); // ITA s.67.1 — only 50% deductible
+});
+
+test("FIFTY_PCT_LIMITATION_LINES contains both US and CA meals keys", () => {
+  assert.ok(FIFTY_PCT_LIMITATION_LINES.has("meals"), "should include US meals key");
+  assert.ok(FIFTY_PCT_LIMITATION_LINES.has("meals_entertainment"), "should include CA meals_entertainment key");
 });

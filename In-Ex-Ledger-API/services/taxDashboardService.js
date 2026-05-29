@@ -8,8 +8,32 @@ const { getQuarterlyReminders } = require("./quarterlyTaxReminderService.js");
 // This is an *estimate* surfaced as a helper, not tax advice — the response
 // includes the rate that produced it so the UI can show the math.
 const DEFAULT_TAX_RATE = {
-  US: 0.25,
-  CA: 0.20
+  US: 0.24,
+  CA: 0.28
+};
+
+// Canadian set-aside rates represent a conservative combined estimate of:
+//   federal income tax (14% bracket for 2026, BPA $16,452)
+//   + provincial/territorial income tax
+//   + CPP self-employed contributions (11.9% on net earnings $3,500–$74,600)
+// Calibrated at ~$60K net self-employment income. Rates vary significantly
+// by income level — this is a planning estimate, not a tax calculation.
+// Source: 2026 federal brackets (CRA), provincial rate cards (TaxTips.ca),
+//         CPP rates (canada.ca, Jan 2026 announcement).
+const CANADA_SET_ASIDE_RATES = {
+  AB: 0.29, // Federal ~10% + Alberta 10% + CPP ~11% (minus credits) ≈ 29%
+  BC: 0.26, // Federal ~10% + BC 5-8% + CPP ~11% ≈ 26%
+  MB: 0.31, // Federal ~10% + Manitoba 10.8% + CPP ~11% ≈ 31%
+  NB: 0.30, // Federal ~10% + NB 9.4% + CPP ~11% ≈ 30%
+  NL: 0.29, // Federal ~10% + NL 8.7% + CPP ~11% ≈ 29%
+  NS: 0.33, // Federal ~10% + NS 8.79-14.95% + CPP ~11% ≈ 33% (NS HST dropped to 14% Apr 2025)
+  NT: 0.26, // Federal ~10% + NT 5.9% + CPP ~11% ≈ 26%
+  NU: 0.26, // Federal ~10% + NU 4% + CPP ~11% ≈ 26%
+  ON: 0.27, // Federal ~10% + Ontario 5.05-9.15% + CPP ~11% ≈ 27%
+  PE: 0.31, // Federal ~10% + PEI 9.65% + CPP ~11% ≈ 31%
+  QC: 0.34, // Federal ~8% (after 16.5% abatement) + QC 14-19% + QPP ~12% ≈ 34%
+  SK: 0.31, // Federal ~10% + SK 10.5% + CPP ~11% ≈ 31%
+  YT: 0.28  // Federal ~10% + YT 6.4% + CPP ~11% ≈ 28%
 };
 
 function clamp2(value) {
@@ -108,16 +132,51 @@ async function getMileageTotals(pool, businessId, year) {
   };
 }
 
+function resolveEffectiveRate(region, province, taxRateOverride) {
+  if (Number.isFinite(taxRateOverride) && taxRateOverride > 0 && taxRateOverride < 1) {
+    return Number(taxRateOverride);
+  }
+  if (region === "CA") {
+    return CANADA_SET_ASIDE_RATES[String(province || "").toUpperCase()] || DEFAULT_TAX_RATE.CA;
+  }
+  return DEFAULT_TAX_RATE.US;
+}
+
+function calculateEstimatedSetAside({ profit, rate }) {
+  // Both US and CA income tax is assessed on net business income (profit),
+  // not gross revenue. US: Schedule C net profit. CA: T2125 net income → T1.
+  return clamp2(Math.max(0, profit) * rate);
+}
+
+// GST/HST registration is mandatory once taxable supplies exceed $30,000
+// in any rolling 12-month period (CRA small-supplier threshold).
+const GST_HST_REGISTRATION_THRESHOLD = 30000;
+
+function buildGstHstAlert(income) {
+  const approaching = income >= GST_HST_REGISTRATION_THRESHOLD * 0.8;
+  const reached = income >= GST_HST_REGISTRATION_THRESHOLD;
+  return {
+    threshold: GST_HST_REGISTRATION_THRESHOLD,
+    income_ytd: clamp2(income),
+    threshold_reached: reached,
+    approaching: approaching,
+    note: reached
+      ? "Revenue has reached the $30,000 CRA GST/HST registration threshold. Registration may be required."
+      : approaching
+        ? "Revenue is approaching the $30,000 CRA GST/HST mandatory registration threshold."
+        : null
+  };
+}
+
 /**
  * Compose the year-end tax dashboard. Runs the underlying queries in
  * parallel so the round-trip stays snappy.
  */
-async function getTaxDashboard(pool, { businessId, year, region, taxRateOverride = null }) {
+async function getTaxDashboard(pool, { businessId, year, region, province = "", taxRateOverride = null }) {
   const safeYear = parseInt(year, 10) || new Date().getUTCFullYear();
   const safeRegion = region === "CA" ? "CA" : "US";
-  const effectiveRate = Number.isFinite(taxRateOverride) && taxRateOverride > 0 && taxRateOverride < 1
-    ? Number(taxRateOverride)
-    : DEFAULT_TAX_RATE[safeRegion];
+  const safeProvince = String(province || "").toUpperCase();
+  const effectiveRate = resolveEffectiveRate(safeRegion, safeProvince, taxRateOverride);
 
   const [totals, receiptCoverage, mileage, payerSummary, taxLineSummary] = await Promise.all([
     getYearTotals(pool, businessId, safeYear),
@@ -129,7 +188,10 @@ async function getTaxDashboard(pool, { businessId, year, region, taxRateOverride
 
   const quarterly = getQuarterlyReminders(safeRegion);
 
-  const estimatedTaxOwed = clamp2(Math.max(0, totals.profit) * effectiveRate);
+  const estimatedTaxOwed = calculateEstimatedSetAside({
+    profit: totals.profit,
+    rate: effectiveRate
+  });
 
   return {
     year: safeYear,
@@ -142,8 +204,11 @@ async function getTaxDashboard(pool, { businessId, year, region, taxRateOverride
     estimated_tax: {
       owed: estimatedTaxOwed,
       rate: effectiveRate,
-      note: "Rough estimate. Actual liability depends on deductions, filing status, and bracket."
+      note: safeRegion === "CA"
+        ? "Draft estimate for review. Rate reflects combined federal income tax + provincial income tax + CPP (self-employed). Actual liability depends on total income, deductions, credits, and professional review."
+        : "Draft estimate for review. Actual remittance depends on bookkeeping, filing details, and professional review."
     },
+    gst_hst_alert: safeRegion === "CA" ? buildGstHstAlert(totals.income) : null,
     receipts: receiptCoverage,
     mileage,
     payers: {
@@ -169,5 +234,15 @@ async function getTaxDashboard(pool, { businessId, year, region, taxRateOverride
 module.exports = {
   getTaxDashboard,
   DEFAULT_TAX_RATE,
-  __private: { getYearTotals, getReceiptCoverage, getMileageTotals, yearBounds, clamp2 }
+  GST_HST_REGISTRATION_THRESHOLD,
+  __private: {
+    getYearTotals,
+    getReceiptCoverage,
+    getMileageTotals,
+    yearBounds,
+    clamp2,
+    resolveEffectiveRate,
+    calculateEstimatedSetAside,
+    buildGstHstAlert
+  }
 };

@@ -6,7 +6,8 @@ const assert = require("node:assert/strict");
 const {
   getTaxDashboard,
   DEFAULT_TAX_RATE,
-  __private: { yearBounds, clamp2 }
+  GST_HST_REGISTRATION_THRESHOLD,
+  __private: { yearBounds, clamp2, buildGstHstAlert }
 } = require("../services/taxDashboardService.js");
 
 function makePool(plans) {
@@ -77,7 +78,7 @@ test("getTaxDashboard composes income/expense/profit/estimated_tax/receipts/mile
   assert.equal(dashboard.income_count, 12);
   assert.equal(dashboard.expense_count, 25);
   assert.equal(dashboard.estimated_tax.rate, DEFAULT_TAX_RATE.US);
-  assert.equal(dashboard.estimated_tax.owed, 1500); // 6000 * 0.25
+  assert.equal(dashboard.estimated_tax.owed, 1440); // 6000 * 0.24
   assert.equal(dashboard.receipts.missing_receipts, 5);
   assert.equal(dashboard.receipts.coverage_pct, 80);
   assert.equal(dashboard.mileage.total_miles, 1234.5);
@@ -100,7 +101,7 @@ test("getTaxDashboard clamps negative profit to zero for estimated tax", async (
   assert.equal(dashboard.estimated_tax.owed, 0);
 });
 
-test("getTaxDashboard honors tax_rate override and CA region", async () => {
+test("getTaxDashboard honors tax_rate override and CA region — applied to profit", async () => {
   const pool = makePool([
     { match: (s) => /GROUP BY type/.test(s), rows: [
       { type: "income", total: "10000", tx_count: 5 },
@@ -115,7 +116,54 @@ test("getTaxDashboard honors tax_rate override and CA region", async () => {
   });
   assert.equal(dashboard.region, "CA");
   assert.equal(dashboard.estimated_tax.rate, 0.30);
-  assert.equal(dashboard.estimated_tax.owed, 2400); // 8000 * 0.30
+  assert.equal(dashboard.estimated_tax.owed, 2400); // profit (8000) * 0.30, NOT gross income
+});
+
+test("getTaxDashboard uses province income-tax+CPP set-aside rate applied to profit for Canada", async () => {
+  const pool = makePool([
+    { match: (s) => /GROUP BY type/.test(s), rows: [
+      { type: "income", total: "10000", tx_count: 5 },
+      { type: "expense", total: "2000", tx_count: 5 }
+    ] }
+  ]);
+  const dashboard = await getTaxDashboard(pool, {
+    businessId: "biz",
+    year: 2026,
+    region: "CA",
+    province: "ON"
+  });
+  // ON rate is 0.27 (income tax + CPP estimate), applied to profit ($8,000)
+  assert.equal(dashboard.estimated_tax.rate, 0.27);
+  assert.equal(dashboard.estimated_tax.owed, 2160); // 8000 * 0.27
+  // GST/HST alert present for CA
+  assert.ok(dashboard.gst_hst_alert, "CA dashboard should include gst_hst_alert");
+  assert.equal(dashboard.gst_hst_alert.threshold, GST_HST_REGISTRATION_THRESHOLD);
+});
+
+test("buildGstHstAlert flags approaching and reached thresholds", () => {
+  const under = buildGstHstAlert(23999);
+  assert.equal(under.threshold_reached, false);
+  assert.equal(under.approaching, false);
+  assert.equal(under.note, null);
+
+  const approaching = buildGstHstAlert(24000);
+  assert.equal(approaching.threshold_reached, false);
+  assert.equal(approaching.approaching, true);
+  assert.ok(approaching.note);
+
+  const reached = buildGstHstAlert(30000);
+  assert.equal(reached.threshold_reached, true);
+  assert.ok(reached.note);
+});
+
+test("getTaxDashboard gst_hst_alert is null for US region", async () => {
+  const pool = makePool([
+    { match: (s) => /GROUP BY type/.test(s), rows: [
+      { type: "income", total: "50000", tx_count: 10 }
+    ] }
+  ]);
+  const dashboard = await getTaxDashboard(pool, { businessId: "biz", year: 2026, region: "US" });
+  assert.equal(dashboard.gst_hst_alert, null);
 });
 
 test("getTaxDashboard returns receipts.coverage_pct null when no expenses", async () => {

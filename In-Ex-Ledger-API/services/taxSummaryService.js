@@ -2,6 +2,10 @@
 
 const FORM_TYPES = ["1099-NEC", "1099-K", "T4A", "none"];
 
+// IRC §274(n) (US) and ITA s.67.1 (CA) limit meals & entertainment to 50%
+// of the actual cost. These tax-line keys are subject to that restriction.
+const FIFTY_PCT_LIMITATION_LINES = new Set(["meals", "meals_entertainment"]);
+
 const FORM_THRESHOLDS = {
   US: { "1099-NEC": 600, "1099-K_amount": 20000, "1099-K_count": 200 },
   CA: { "T4A": 500 }
@@ -185,10 +189,18 @@ async function getTaxLineSummaryForYear(pool, { businessId, year, region }) {
   }
 
   const mapped = Array.from(lines.values())
-    .map((line) => ({
-      ...line,
-      total_amount: Number(line.total_amount.toFixed(2))
-    }))
+    .map((line) => {
+      const total = Number(line.total_amount.toFixed(2));
+      const limitationPct = FIFTY_PCT_LIMITATION_LINES.has(line.tax_line) ? 50 : null;
+      return {
+        ...line,
+        total_amount: total,
+        limitation_pct: limitationPct,
+        deductible_amount: limitationPct !== null
+          ? Number((total * (limitationPct / 100)).toFixed(2))
+          : total
+      };
+    })
     .sort((a, b) => b.total_amount - a.total_amount);
 
   return {
@@ -223,5 +235,6 @@ module.exports = {
   expectedFormForPayer,
   FORM_TYPES,
   FORM_THRESHOLDS,
+  FIFTY_PCT_LIMITATION_LINES,
   __private: { normalizeYear, yearBounds }
 };
