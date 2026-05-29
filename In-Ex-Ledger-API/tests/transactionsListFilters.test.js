@@ -164,7 +164,14 @@ test("GET /api/transactions?all=true bumps limit to the hard cap and reports ret
   assert.equal(res.status, 200);
   assert.equal(res.body.returned_all, true);
   assert.equal(res.body.limit, 50000);
-  const mainQuery = stubbedPool.calls.find((c) => /SELECT t\.id/.test(c.sql));
+  // Two `SELECT t.id` queries run: the review-summary scan (hardcoded
+  // `LIMIT 50000`) and the paginated list query (`LIMIT $n OFFSET $m`). The
+  // hard-cap limit reaches the DB as a *parameter* only on the paginated
+  // query, so target that one specifically (it carries an OFFSET clause).
+  const mainQuery = stubbedPool.calls.find(
+    (c) => /SELECT t\.id/.test(c.sql) && /OFFSET/.test(c.sql)
+  );
+  assert.ok(mainQuery, "paginated main SELECT should have been issued");
   assert.ok(mainQuery.params.includes(50000), "limit param should be the 50k hard cap");
 });
 
