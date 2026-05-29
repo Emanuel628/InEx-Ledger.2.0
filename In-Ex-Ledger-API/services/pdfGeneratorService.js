@@ -584,20 +584,10 @@ function normalizeEntityTypeDisplay(entityType, region) {
   };
 }
 
-// Known placeholder / dummy NAICS codes that pass the 6-digit format check
-// but do not represent real industry classifications.
-const PLACEHOLDER_NAICS_CODES = new Set([
-  "000000", "111111", "222222", "333333", "444444", "555555",
-  "666666", "777777", "888888", "999999", "123456", "654321",
-  "100000", "200000", "900000"
-]);
-
 function getActivityCodeValidation(region, code) {
   const value = String(code || "").trim();
   if (!value) return "Needs review";
-  if (!/^\d{6}$/.test(value)) return "Needs review";
-  if (PLACEHOLDER_NAICS_CODES.has(value)) return "Possible placeholder — confirm with preparer";
-  return "Format OK";
+  return /^\d{6}$/.test(value) ? "Format OK" : "Needs review";
 }
 
 function formatFiscalYearDisplay(fiscalYearStart, endDate) {
