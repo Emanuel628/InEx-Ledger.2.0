@@ -1907,6 +1907,18 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }, 60000);
+
+  // Refresh the unread badge as soon as the tab regains focus, so a new
+  // message lights the red dot promptly instead of waiting for the next
+  // 60 s poll (e.g. right after replying from an email client).
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible") return;
+    void pollGlobalUnreadCount().then(function (shouldContinue) {
+      if (shouldContinue === false) {
+        stopGlobalUnreadPolling();
+      }
+    });
+  });
 });
 
 (function () {

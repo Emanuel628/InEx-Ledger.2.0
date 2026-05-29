@@ -251,6 +251,65 @@ test("POST /api/email/inbound 200s with ignored=no_matching_invoice when recipie
   }
 });
 
+test("POST /api/email/inbound accepts a Resend/Svix-signed webhook", async () => {
+  // Resend signs inbound webhooks with Svix: svix-id / svix-timestamp /
+  // svix-signature, using a whsec_<base64> secret over `${id}.${ts}.${body}`.
+  const svixSecret = "whsec_" + crypto.randomBytes(24).toString("base64");
+  const before = process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+  process.env.INBOUND_EMAIL_WEBHOOK_SECRET = svixSecret;
+  try {
+    const app = buildInboundApp();
+    const rawBody = JSON.stringify({
+      from: { email: "client@example.com" },
+      subject: "hi",
+      text: "yo"
+    });
+    const svixId = "msg_" + crypto.randomBytes(8).toString("hex");
+    const svixTimestamp = String(Math.floor(Date.now() / 1000));
+    const keyBytes = Buffer.from(svixSecret.slice("whsec_".length), "base64");
+    const signature = crypto
+      .createHmac("sha256", keyBytes)
+      .update(`${svixId}.${svixTimestamp}.${rawBody}`)
+      .digest("base64");
+
+    const res = await request(app)
+      .post("/api/email/inbound")
+      .set("Content-Type", "application/json")
+      .set("svix-id", svixId)
+      .set("svix-timestamp", svixTimestamp)
+      .set("svix-signature", `v1,${signature}`)
+      .send(rawBody);
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.ok, true);
+    assert.equal(res.body.ignored, "no_recipients");
+  } finally {
+    if (before === undefined) delete process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+    else process.env.INBOUND_EMAIL_WEBHOOK_SECRET = before;
+  }
+});
+
+test("POST /api/email/inbound rejects a Svix webhook with a bad signature", async () => {
+  const svixSecret = "whsec_" + crypto.randomBytes(24).toString("base64");
+  const before = process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+  process.env.INBOUND_EMAIL_WEBHOOK_SECRET = svixSecret;
+  try {
+    const app = buildInboundApp();
+    const res = await request(app)
+      .post("/api/email/inbound")
+      .set("Content-Type", "application/json")
+      .set("svix-id", "msg_deadbeef")
+      .set("svix-timestamp", String(Math.floor(Date.now() / 1000)))
+      .set("svix-signature", "v1,not-a-valid-signature")
+      .send(JSON.stringify({ from: { email: "client@example.com" }, text: "yo" }));
+
+    assert.equal(res.status, 401);
+  } finally {
+    if (before === undefined) delete process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+    else process.env.INBOUND_EMAIL_WEBHOOK_SECRET = before;
+  }
+});
+
 test("POST /api/email/inbound rejects a replayed signature within the TTL window", async () => {
   const before = process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
   process.env.INBOUND_EMAIL_WEBHOOK_SECRET = INBOUND_SECRET;
