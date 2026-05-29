@@ -58,11 +58,11 @@ function translate(key, fallback = "") {
   return typeof t === "function" ? t(key) : fallback;
 }
 
-function findSupportContact() {
-  return _contacts.find((contact) =>
-    isUuid(contact?.id) && (contact.role === "it_support" || contact.role === "admin")
-  ) || null;
-}
+// Default support contact. The in-app message store only routes to registered
+// users, so "contact support" is handled over email to this address. It is
+// surfaced as the default option in the compose recipient dropdown.
+const SUPPORT_EMAIL = "support.inex@gmail.com";
+const SUPPORT_CONTACT_VALUE = "support-email";
 
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
@@ -808,6 +808,12 @@ function populateContactSelect(select) {
     select.appendChild(option);
   }
 
+  // InEx Support is always offered as the default contact option.
+  const supportOption = document.createElement("option");
+  supportOption.value = SUPPORT_CONTACT_VALUE;
+  supportOption.textContent = `InEx Support (${SUPPORT_EMAIL})`;
+  select.appendChild(supportOption);
+
   _contacts.forEach((contact) => {
     if (!isUuid(contact.id)) return;
 
@@ -844,7 +850,7 @@ function openComposeModal(prefill = null) {
 
   populateContactSelect(toEl);
 
-  if (toEl) toEl.value = prefill?.to || "";
+  if (toEl) toEl.value = prefill?.to || SUPPORT_CONTACT_VALUE;
   if (typeEl) typeEl.value = prefill?.type || "general";
   if (subjectEl) subjectEl.value = prefill?.subject || "";
   if (bodyEl) bodyEl.value = prefill?.body || "";
@@ -859,14 +865,8 @@ function closeComposeModal() {
 }
 
 function openSupportComposer() {
-  const supportContact = findSupportContact();
-  if (!supportContact) {
-    showToast("Support messaging is unavailable right now. Use support@inexledger.com.");
-    return;
-  }
-
   openComposeModal({
-    to: supportContact.id,
+    to: SUPPORT_CONTACT_VALUE,
     type: "support_request",
     subject: "Support Request"
   });
@@ -891,7 +891,7 @@ async function sendComposedMessage() {
     return;
   }
 
-  if (!isUuid(receiverId)) {
+  if (receiverId !== SUPPORT_CONTACT_VALUE && !isUuid(receiverId)) {
     if (errorEl) errorEl.textContent = translate("messages_error_invalid_recipient", "Recipient is invalid.");
     toEl?.focus();
     return;
@@ -900,6 +900,17 @@ async function sendComposedMessage() {
   if (!body) {
     if (errorEl) errorEl.textContent = translate("messages_error_body_required", "Message body is required.");
     bodyEl?.focus();
+    return;
+  }
+
+  // Contacting support: hand off to the user's email client, since support is
+  // reached by email (support.inex@gmail.com) rather than an in-app account.
+  if (receiverId === SUPPORT_CONTACT_VALUE) {
+    const mailtoSubject = encodeURIComponent(subject || "Support Request");
+    const mailtoBody = encodeURIComponent(body);
+    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${mailtoSubject}&body=${mailtoBody}`;
+    closeComposeModal();
+    showToast(translate("messages_toast_support_email", "Opening your email app to contact support."));
     return;
   }
 
