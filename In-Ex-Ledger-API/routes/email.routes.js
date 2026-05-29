@@ -394,6 +394,25 @@ function verifyInboundEmailRequest(req, nowMs = Date.now()) {
 }
 
 /**
+ * Describe who is calling the inbound webhook, for diagnostics. Captures the
+ * caller's User-Agent and source IP plus WHICH signature-header family is
+ * present — never the secret or signature values themselves. This lets us
+ * identify the forwarder/service posting to the endpoint when requests are
+ * rejected.
+ */
+function describeInboundCaller(req) {
+  return {
+    userAgent: req.get("user-agent") || null,
+    ip: req.ip || null,
+    forwardedFor: req.get("x-forwarded-for") || null,
+    // Header families present (booleans only — values are never logged):
+    hasSvixHeaders: Boolean(req.get("svix-signature") || req.get("svix-id")),
+    hasCustomHeaders: Boolean(req.get("x-inbound-signature") || req.get("x-inbound-timestamp")),
+    hasLegacyHeaders: Boolean(req.get("x-inbound-secret") || req.get("x-webhook-secret"))
+  };
+}
+
+/**
  * POST /api/email/inbound
  * Public webhook entry point.
  *
@@ -407,7 +426,8 @@ router.post("/inbound", async (req, res) => {
   if (!verification.ok) {
     logWarn("inbound email webhook rejected", {
       status: verification.status,
-      reason: verification.error
+      reason: verification.error,
+      caller: describeInboundCaller(req)
     });
     return res.status(verification.status).json({ ok: false, error: verification.error });
   }
