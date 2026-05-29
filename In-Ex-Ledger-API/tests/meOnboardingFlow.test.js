@@ -169,7 +169,9 @@ function loadMeRouterFixture(options = {}) {
     if (requestName === "../services/subscriptionService.js" || /subscriptionService\.js$/.test(requestName)) {
       return {
         getSubscriptionSnapshotForBusiness: async () => ({ status: "active" }),
-        getSubscriptionSnapshotForUser: async () => ({ status: "active" })
+        getSubscriptionSnapshotForUser: async () => (
+          options.subscriptionSnapshot || { effectiveStatus: "active" }
+        )
       };
     }
 
@@ -265,6 +267,33 @@ test("PUT /api/me/onboarding creates a starter account when the business has non
   }
 });
 
+test("PUT /api/me/onboarding sends a first-time trial user directly to trial setup", async () => {
+  const fixture = loadMeRouterFixture({
+    subscriptionSnapshot: {
+      effectiveStatus: "trialing",
+      stripeSubscriptionId: null,
+      isTrialDowngradedToFree: false
+    }
+  });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .put("/api/me/onboarding")
+      .send({
+        business_name: "My Business",
+        region: "US",
+        language: "en",
+        starter_account_type: "checking",
+        start_focus: "transactions"
+      });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.redirect_to, "/trial-setup?next=%2Ftransactions");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("PUT /api/me/onboarding rejects oversized business names before opening a transaction", async () => {
   const fixture = loadMeRouterFixture();
   try {
@@ -332,6 +361,7 @@ test("guided setup import step finishes onboarding", async () => {
       .send({ action: "finish", page: "import" });
 
     assert.equal(response.status, 200);
+    assert.equal(response.body.redirect_to, "/transactions");
     assert.equal(response.body.onboarding.data.guided_setup_step, "complete");
     assert.equal(response.body.onboarding.data.guided_setup_active, false);
   } finally {

@@ -44,6 +44,7 @@ const { getQuarterlyReminders } = require("../services/quarterlyTaxReminderServi
 const { getTaxDashboard } = require("../services/taxDashboardService.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 const { normalizeReviewFilter, matchesReviewFilter, buildReviewSummary} = require("../services/transactionReviewFlagService.js");
+const { sendBookkeepingActivityEmail } = require("../services/bookkeepingEmailService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -316,12 +317,14 @@ function normalizeTransactionTaxPayload(payload, fallbackCurrency) {
 
 async function getBusinessRegionAndCurrency(businessId) {
   const result = await pool.query(
-    "SELECT region FROM businesses WHERE id = $1 LIMIT 1",
+    "SELECT region, province FROM businesses WHERE id = $1 LIMIT 1",
     [businessId]
   );
   const region = String(result.rows[0]?.region || "US").toUpperCase() === "CA" ? "CA" : "US";
+  const province = String(result.rows[0]?.province || "").toUpperCase();
   return {
     region,
+    province,
     currency: region === "CA" ? "CAD" : "USD"
   };
 }
@@ -1956,8 +1959,10 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
   }
 
   let client = null;
+  let businessId = null;
+  let importedFilename = String(req.file?.originalname || "").trim() || "CSV file";
   try {
-    const businessId = await resolveBusinessIdForUser(req.user);
+    businessId = await resolveBusinessIdForUser(req.user);
 
     // CSV import is available on every tier. Basic businesses are metered by
     // the monthly import + transaction caps, enforced below before any insert.
@@ -2173,6 +2178,17 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         subscription
       });
     }
+    void sendBookkeepingActivityEmail({
+      businessId,
+      userId: req.user?.id,
+      kind: "csv_completed",
+      actionPath: "/transactions",
+      details: [
+        { label: "File", value: importedFilename },
+        { label: "Imported", value: String(results.imported) },
+        { label: "Skipped", value: String(results.skipped + results.duplicates) }
+      ]
+    });
 
     const rangePart = (filterStartDate || filterEndDate)
       ? `, ${results.out_of_range} outside date range`
@@ -2191,6 +2207,18 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         error: err.message,
         code: err.code,
         ...err.details
+      });
+    }
+    if (businessId) {
+      void sendBookkeepingActivityEmail({
+        businessId,
+        userId: req.user?.id,
+        kind: "csv_failed",
+        actionPath: "/transactions",
+        details: [
+          { label: "File", value: importedFilename },
+          { label: "Issue", value: String(err?.message || "CSV import failed.").slice(0, 240) }
+        ]
       });
     }
     logError("POST /transactions/import/csv error:", err);
@@ -2331,7 +2359,13 @@ router.get("/tax-summary/dashboard", async (req, res) => {
     const year = parseYearOrCurrent(req.query.year);
     const taxRateRaw = parseFloat(req.query.tax_rate);
     const taxRateOverride = Number.isFinite(taxRateRaw) ? taxRateRaw : null;
-    const dashboard = await getTaxDashboard(pool, { businessId, year, region, taxRateOverride });
+    const dashboard = await getTaxDashboard(pool, {
+      businessId,
+      year,
+      region,
+      province: businessContext.province,
+      taxRateOverride
+    });
     res.json(dashboard);
   } catch (err) {
     logError("GET /transactions/tax-summary/dashboard error:", err);

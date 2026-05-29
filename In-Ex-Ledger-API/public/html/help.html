@@ -76,8 +76,10 @@
             <a href="#receipts">Receipts</a>
             <a href="#mileage">Mileage</a>
             <a href="#exports">Exports</a>
+            <a href="#invoices-messages">Invoices and messages</a>
             <a href="#edge-cases">Edge cases</a>
             <a href="#security">Security</a>
+            <a href="#tax-reminders">Tax reminders</a>
             <a href="#billing">Billing</a>
             <a href="#troubleshooting">Troubleshooting</a>
             <a href="#limits">What the app does not do</a>
@@ -186,7 +188,8 @@
               <ul class="help-list">
                 <li>Your onboarding details are stored in the account.</li>
                 <li>Your starter account is created if one does not already exist.</li>
-                <li>The app sends you to the workflow you chose as your start focus.</li>
+                <li>The app preserves the workflow you chose as your start focus.</li>
+                <li>If you start on a Pro trial, the app can send you to the billing decision page once before it opens that saved workflow.</li>
                 <li>Guided setup reminders can use your work type instead of showing generic filler.</li>
               </ul>
               <div class="help-callout">
@@ -415,10 +418,35 @@
           </div>
         </section>
 
+        <section id="invoices-messages" class="help-card help-section">
+          <div class="section-heading">
+            <p class="help-kicker">Collections and follow-up</p>
+            <h2>9. Invoices, replies, and the messages queue</h2>
+          </div>
+          <div class="help-grid-two">
+            <div>
+              <h3>Invoices</h3>
+              <ul class="help-list">
+                <li>Create and send invoices from the app when you want the billing record tied to your books.</li>
+                <li>Keep invoice numbers, customer details, and follow-up history clean because exports and support workflows depend on them.</li>
+                <li>If an invoice needs correction, update the invoice record instead of trying to remember the change later by email alone.</li>
+              </ul>
+            </div>
+            <div>
+              <h3>Messages</h3>
+              <ul class="help-list">
+                <li>The messages page is currently best for invoice replies, support requests, and verified-contact threads.</li>
+                <li>Do not treat it like a general live chat inbox for every customer conversation yet.</li>
+                <li>If support messaging is unavailable in-app, use <a href="mailto:support.inex@gmail.com">support.inex@gmail.com</a>.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
         <section id="edge-cases" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Advanced entries</p>
-            <h2>9. Edge cases: use the extra fields only when you need them</h2>
+            <h2>10. Edge cases: use the extra fields only when you need them</h2>
           </div>
           <div class="help-grid-two">
             <div>
@@ -465,7 +493,7 @@
         <section id="security" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Protection</p>
-            <h2>10. Security, MFA, sessions, and account control</h2>
+            <h2>11. Security, MFA, sessions, and account control</h2>
           </div>
           <div class="help-grid-two">
             <div>
@@ -489,10 +517,25 @@
           </div>
         </section>
 
+        <section id="tax-reminders" class="help-card help-section">
+          <div class="section-heading">
+            <p class="help-kicker">Deadlines</p>
+            <h2>12. Tax reminders and payment planning</h2>
+          </div>
+          <p>
+            Tax reminders are there to reduce deadline surprises. They are prompts, not final tax advice.
+          </p>
+          <ul class="help-list">
+            <li>Use reminders to see upcoming installment due dates and draft estimates earlier.</li>
+            <li>Always confirm the amount and payment destination with the relevant tax authority before you pay.</li>
+            <li>If the reminder looks wrong, check your region, business profile, and source records before you trust the estimate.</li>
+          </ul>
+        </section>
+
         <section id="billing" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Access control</p>
-            <h2>11. Billing, plans, and feature access</h2>
+            <h2>13. Billing, plans, and feature access</h2>
           </div>
           <p>
             Your plan affects what parts of the product are available. The billing pages manage checkout,
@@ -509,7 +552,7 @@
         <section id="troubleshooting" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Fixes</p>
-            <h2>12. Troubleshooting and common mistakes</h2>
+            <h2>14. Troubleshooting and common mistakes</h2>
           </div>
           <ul class="help-list">
             <li>If totals look wrong, check the business scope and date filter first.</li>
@@ -526,7 +569,7 @@
         <section id="limits" class="help-card help-section">
           <div class="section-heading">
             <p class="help-kicker">Boundary</p>
-            <h2>13. What InEx Ledger does not do</h2>
+            <h2>15. What InEx Ledger does not do</h2>
           </div>
           <p>
             InEx Ledger helps you keep cleaner books. It does not magically make every judgment call for you.
@@ -559,7 +602,6 @@
   <script src="../js/i18n.js?v=20260510c"></script>
 </body>
 </html>
-
 
 
 

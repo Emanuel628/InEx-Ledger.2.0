@@ -25,6 +25,10 @@ const {
 const { decrypt: decryptField } = require("../services/encryptionService.js");
 const { buildCsvBundle } = require("../services/csvExportService.js");
 const { buildQuickMethodSchedule } = require("../services/quickMethodService.js");
+const {
+  sendExportGeneratedEmail,
+  sendExportFailedEmail
+} = require("../services/exportEmailService.js");
 const { pool } = require("../db.js");
 const { logError, logInfo } = require("../utils/logger.js");
 const { sanitizePayload } = require("../utils/logSanitizer.js");
@@ -800,6 +804,13 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
         endDate: grantEndDate,
         exportType
       });
+      await sendExportGeneratedEmail({
+        businessId,
+        userId: user.id,
+        exportType,
+        startDate: grantStartDate,
+        endDate: grantEndDate
+      });
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Cache-Control", "private, no-store, max-age=0");
@@ -850,6 +861,13 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       includeTaxId,
       exportLang
     });
+    await sendExportGeneratedEmail({
+      businessId,
+      userId: user.id,
+      exportType: "pdf",
+      startDate: grantStartDate,
+      endDate: grantEndDate
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -863,6 +881,14 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
         missingFieldKeys: Array.isArray(err.missingFieldKeys) ? err.missingFieldKeys : undefined
       });
     }
+    await sendExportFailedEmail({
+      businessId,
+      userId: user?.id,
+      exportType: grantPayload?.exportType || "pdf",
+      startDate: grantPayload?.dateRange?.startDate || null,
+      endDate: grantPayload?.dateRange?.endDate || null,
+      reason: err.message
+    });
     logError("Export generation error", { body: sanitizedBody, err: err.message });
     return res.status(500).json({ error: "Failed to generate export." });
   }
@@ -1351,6 +1377,13 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       includeTaxId,
       exportLang
     });
+    await sendExportGeneratedEmail({
+      businessId,
+      userId: user.id,
+      exportType: "pdf",
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate
+    });
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -1364,6 +1397,14 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
         missingFieldKeys: Array.isArray(err.missingFieldKeys) ? err.missingFieldKeys : undefined
       });
     }
+    await sendExportFailedEmail({
+      businessId,
+      userId: user?.id,
+      exportType: "pdf",
+      startDate: req.body?.dateRange?.startDate || null,
+      endDate: req.body?.dateRange?.endDate || null,
+      reason: err.message
+    });
     logError("Secure export error", { body: sanitizedBody, err: err.message });
     return res.status(500).json({ error: "Failed to generate secure export." });
   }

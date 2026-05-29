@@ -143,16 +143,16 @@
       <section id="tax-cockpit" class="tax-banner">
         <div class="tax-banner-main">
           <div class="tax-banner-copy">
-            <div class="tax-banner-label" id="taxBannerLabel">Estimated tax owed (YTD)
-              <button type="button" class="tax-banner-info-btn" id="taxInfoBtn" aria-label="How is this calculated?" title="How is this calculated?">?</button>
+            <div class="tax-banner-label" id="taxBannerLabel">Estimated set-aside (YTD)
+              <button type="button" class="tax-banner-info-btn" id="taxInfoBtn" aria-label="How is this tracked?" title="How is this tracked?">?</button>
             </div>
             <div class="tax-banner-amount" id="taxOwed">$0.00</div>
-            <p class="tax-banner-note" id="taxBannerNote">Based on net profit at 24% self-employment rate</p>
-            <p class="tax-banner-tooltip" id="taxInfoTooltip" hidden>Estimated based on net profit x combined tax rate for your province/state. Set your region in Settings for accurate estimates.</p>
+            <p class="tax-banner-note" id="taxBannerNote">U.S. Schedule C tracking helper only. Based on net profit using a 24% combined tax set-aside buffer.</p>
+            <p class="tax-banner-tooltip" id="taxInfoTooltip" hidden>Draft estimate for review. U.S. uses net profit with a 24% buffer. Canada uses total income collected with your province or territory rate.</p>
           </div>
         </div>
         <div class="tax-banner-side">
-          <div class="tax-side-label">Suggested monthly set-aside</div>
+          <div class="tax-side-label">Monthly set-aside helper</div>
           <div class="tax-side-value" id="monthlySetAside">$0.00</div>
           <div class="tax-side-meta">Updates with each transaction</div>
         </div>
@@ -160,10 +160,10 @@
 
       <section id="tax-upsell" class="tax-upsell-card" hidden>
         <div>
-          <h2 data-i18n="transactions_upsell_title">Unlock Real-Time Tax Estimates</h2>
+          <h2 data-i18n="transactions_upsell_title">Unlock Real-Time Set-Aside Tracking</h2>
           <p data-i18n="transactions_upsell_body">
-            Upgrade to Pro to see your live estimated tax owed and monthly
-            set-aside.
+            Upgrade to Pro to see your live estimated set-aside and monthly
+            set-aside helper.
           </p>
         </div>
         <div class="upsell-actions">

@@ -5,7 +5,7 @@ const ONBOARDING_TOURS = {
     points: [
       "Use Add transaction to start building your books.",
       "Mark entries cleared once they match your bank or card statement.",
-      "Your tax estimate updates as transactions come in."
+      "Your set-aside helper updates as transactions come in."
     ]
   },
   accounts: {

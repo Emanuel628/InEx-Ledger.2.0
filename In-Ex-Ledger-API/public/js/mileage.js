@@ -204,8 +204,10 @@ function refreshMileageLabels() {
 }
 
 function shouldUseKilometers() {
+  const explicit = localStorage.getItem(METRIC_STORAGE_KEY);
+  if (explicit !== null) return explicit === "true";
   const region = (window.LUNA_REGION || localStorage.getItem("lb_region") || "us").toLowerCase();
-  return localStorage.getItem(METRIC_STORAGE_KEY) === "true" || region === "ca";
+  return region === "ca";
 }
 
 async function loadMileageDashboard() {

@@ -20,7 +20,7 @@ function loadAuthRouterFixture(options = {}) {
 
   const state = {
     insertedEmailChangeParams: null,
-    emailPayload: null,
+    emailPayloads: [],
     updatedEmail: null,
     revokedRefreshTokensForUserId: null,
     revokedMfaDevicesForUserId: null,
@@ -35,7 +35,7 @@ function loadAuthRouterFixture(options = {}) {
           constructor() {
             this.emails = {
               send: async (payload) => {
-                state.emailPayload = payload;
+                state.emailPayloads.push(payload);
                 return { id: "email_change_test_001" };
               }
             };
@@ -118,10 +118,17 @@ function loadAuthRouterFixture(options = {}) {
         buildWelcomeVerificationEmail: () => ({ subject: "", html: "", text: "" }),
         buildVerificationEmail: () => ({ subject: "", html: "", text: "" }),
         buildPasswordResetEmail: () => ({ subject: "", html: "", text: "" }),
+        buildPasswordChangedEmail: () => ({ subject: "", html: "", text: "" }),
+        buildNewSignInAlertEmail: () => ({ subject: "", html: "", text: "" }),
         buildEmailChangeEmail: (_lang, confirmLink) => ({
           subject: "Confirm email change",
           html: confirmLink,
           text: confirmLink
+        }),
+        buildEmailChangedConfirmationEmail: (_lang, options = {}) => ({
+          subject: "Email changed",
+          html: `${options.oldEmail || ""} -> ${options.newEmail || ""}`,
+          text: `${options.oldEmail || ""} -> ${options.newEmail || ""}`
         }),
         buildMfaEmailContent: () => ({ subject: "", html: "", text: "" })
       };
@@ -146,7 +153,8 @@ function loadAuthRouterFixture(options = {}) {
 
     if (requestName === "../services/auditEventService.js" || /auditEventService\.js$/.test(requestName)) {
       return {
-        AUDIT_ACTIONS: {},
+        AUDIT_ACTIONS: { EMAIL_CHANGE_COMPLETE: "auth.email_change.complete" },
+        recordAuditEvent: async () => null,
         recordAuditEventForRequest: async () => null
       };
     }
@@ -170,6 +178,13 @@ function loadAuthRouterFixture(options = {}) {
                   email: "current@example.com",
                   password_hash: "$2b$12$placeholder"
                 }],
+                rowCount: 1
+              };
+            }
+
+            if (/SELECT email FROM users WHERE id = \$1 LIMIT 1/i.test(sql)) {
+              return {
+                rows: [{ email: "current@example.com" }],
                 rowCount: 1
               };
             }
@@ -267,12 +282,12 @@ test("request-email-change stores only a token hash and emails the raw confirmat
 
     const storedHash = fixture.state.insertedEmailChangeParams[3];
     assert.match(storedHash, /^hashed:[a-f0-9]{64}$/);
-    assert.ok(fixture.state.emailPayload, "email should be sent");
+    assert.ok(fixture.state.emailPayloads.length > 0, "email should be sent");
 
-    const linkMatch = String(fixture.state.emailPayload.html || "").match(/token=([a-f0-9]{64})/i);
+    const linkMatch = String(fixture.state.emailPayloads[0].html || "").match(/token=([a-f0-9]{64})/i);
     assert.ok(linkMatch, "email link should contain the raw confirmation token");
     assert.equal(storedHash, `hashed:${linkMatch[1]}`);
-    assert.deepEqual(fixture.state.emailPayload.to, ["current@example.com"]);
+    assert.deepEqual(fixture.state.emailPayloads[0].to, ["current@example.com"]);
   } finally {
     fixture.cleanup();
   }
@@ -297,6 +312,7 @@ test("confirm-email-change consumes the hashed token path and revokes existing s
     });
     assert.equal(fixture.state.revokedRefreshTokensForUserId, "user_email_change_001");
     assert.equal(fixture.state.revokedMfaDevicesForUserId, "user_email_change_001");
+    assert.equal(fixture.state.emailPayloads.length, 2);
   } finally {
     fixture.cleanup();
   }

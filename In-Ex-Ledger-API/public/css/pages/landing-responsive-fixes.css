@@ -219,7 +219,7 @@ html[data-region="CA"] .region-card-flag::before {
 }
 
 .preview-stats::after {
-  content: "Estimated tax owed  $153.38   ·   Suggested monthly set-aside  $153.38";
+  content: "Estimated set-aside  $153.38   ·   Monthly set-aside helper  $153.38";
   grid-column: 1 / -1;
   display: flex;
   align-items: center;

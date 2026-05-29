@@ -3,6 +3,7 @@
 
 const DEFAULT_THEME = "light";
 const THEME_VERSION = "3";
+const BRAND_ICON_VERSION = "20260528a";
 const US_ESTIMATED_TAX_RATE = 0.24;
 const CANADA_ESTIMATED_TAX_RATES = {
   AB: 0.05,
@@ -20,6 +21,35 @@ const CANADA_ESTIMATED_TAX_RATES = {
   YT: 0.05
 };
 const DEFAULT_CA_ESTIMATED_TAX_RATE = 0.05;
+
+function ensureBrandIconLinks() {
+  if (!document || !document.head) {
+    return;
+  }
+
+  document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]').forEach((node) => {
+    node.remove();
+  });
+
+  const iconLinks = [
+    { rel: "icon", type: "image/png", href: `/favicon-32.png?v=${BRAND_ICON_VERSION}`, sizes: "32x32" },
+    { rel: "shortcut icon", type: "image/x-icon", href: `/favicon.ico?v=${BRAND_ICON_VERSION}` },
+    { rel: "apple-touch-icon", type: "image/png", href: `/apple-touch-icon.png?v=${BRAND_ICON_VERSION}`, sizes: "180x180" }
+  ];
+
+  iconLinks.forEach((definition) => {
+    const link = document.createElement("link");
+    link.rel = definition.rel;
+    if (definition.type) {
+      link.type = definition.type;
+    }
+    if (definition.sizes) {
+      link.sizes = definition.sizes;
+    }
+    link.href = definition.href;
+    document.head.appendChild(link);
+  });
+}
 
 function persistDefaultTheme() {
   try {
@@ -543,7 +573,9 @@ function pollGlobalUnreadCount() {
 }
 
 function applyMileageNavLabel() {
-  const isKm = localStorage.getItem("lb_unit_metric") === "true";
+  const explicit = localStorage.getItem("lb_unit_metric");
+  const region = (window.LUNA_REGION || localStorage.getItem("lb_region") || "us").toLowerCase();
+  const isKm = explicit !== null ? explicit === "true" : region === "ca";
   const label = isKm ? "Kilometres" : "Mileage";
   document.querySelectorAll('[data-i18n="nav_mileage"]').forEach((el) => {
     el.textContent = label;
@@ -1533,8 +1565,11 @@ function renderQuickReceiptForm(body, feature) {
 
 function renderQuickMileageForm(body, feature) {
   const today = new Date().toISOString().slice(0, 10);
-  const distanceName = localStorage.getItem("lb_unit_metric") === "true" ? "km" : "miles";
-  const distanceLabel = distanceName === "km" ? "Kilometres" : "Miles";
+  const _qmExplicit = localStorage.getItem("lb_unit_metric");
+  const _qmRegion = (window.LUNA_REGION || localStorage.getItem("lb_region") || "us").toLowerCase();
+  const _qmIsKm = _qmExplicit !== null ? _qmExplicit === "true" : _qmRegion === "ca";
+  const distanceName = _qmIsKm ? "km" : "miles";
+  const distanceLabel = _qmIsKm ? "Kilometres" : "Miles";
   body.innerHTML = renderDynamicSidebarPremiumCard(feature, {
     heroKicker: "Trip log",
     heroTitle: "Add trip",
@@ -1883,6 +1918,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initViewportSwitchLinks();
   applyMileageNavLabel();
   window.addEventListener("lunaDistanceUnitChanged", applyMileageNavLabel);
+  window.addEventListener("lunaRegionChanged", applyMileageNavLabel);
   window.addEventListener("lunaLanguageChanged", applyMileageNavLabel);
 
   // Keep the nav unread badge live: poll on a short interval and refresh the
@@ -2269,3 +2305,9 @@ function initPublicLanguageSwitcher(getTitleKey) {
 }
 
 window.initPublicLanguageSwitcher = initPublicLanguageSwitcher;
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", ensureBrandIconLinks);
+} else {
+  ensureBrandIconLinks();
+}

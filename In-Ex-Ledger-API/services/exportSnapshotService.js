@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const { pool } = require("../db.js");
+const { clearExportStaleReminderState, sendExportStaleEmail } = require("./exportEmailService.js");
 
 const DATASET_SCHEMA_VERSION = "cpa-export-dataset/v1";
 const RULE_VERSION = "2026-05-23";
@@ -336,6 +337,8 @@ async function createExportSnapshot({
     );
   }
 
+  await clearExportStaleReminderState(businessId, executor).catch(() => {});
+
   return snapshotId;
 }
 
@@ -354,6 +357,12 @@ async function invalidateSnapshotsForBusiness({
         AND status <> 'invalidated'`,
     [businessId, reason || null]
   );
+  if (Number(result.rowCount || 0) > 0) {
+    await sendExportStaleEmail({
+      businessId,
+      reason: reason || null
+    }, { db: executor }).catch(() => {});
+  }
   return Number(result.rowCount || 0);
 }
 

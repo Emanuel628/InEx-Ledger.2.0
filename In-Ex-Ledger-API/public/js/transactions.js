@@ -4018,23 +4018,25 @@ function renderTotals(filteredTransactions = getFilteredTransactions()) {
   const tier = effectiveTier();
   const hasTransactions = transactionsCount > 0;
   if (!isAllScope && taxLabel && setAsideLabel) {
-  const taxableIncome = Math.max(0, totals.income - totals.expenses);
-  const estimatedTax = taxableIncome * businessTaxProfile.rate;
-  const monthlySetAside = estimatedTax / 12;
-  taxLabel.textContent = formatCurrency(estimatedTax, scopeRegion);
-  setAsideLabel.textContent = formatCurrency(monthlySetAside, scopeRegion);
-} else if (taxLabel && setAsideLabel) {
-  taxLabel.textContent = isAllScope ? txT("transactions_tax_not_shown", "Not shown") : formatCurrency(0, scopeRegion);
-  setAsideLabel.textContent = isAllScope ? txT("transactions_tax_switch_one_business", "Switch to one business") : formatCurrency(0, scopeRegion);
-}
+    const setAsideBase = businessTaxProfile.region === "CA"
+      ? Math.max(0, totals.income)
+      : Math.max(0, totals.income - totals.expenses);
+    const estimatedTax = setAsideBase * businessTaxProfile.rate;
+    const monthlySetAside = estimatedTax / 12;
+    taxLabel.textContent = formatCurrency(estimatedTax, scopeRegion);
+    setAsideLabel.textContent = formatCurrency(monthlySetAside, scopeRegion);
+  } else if (taxLabel && setAsideLabel) {
+    taxLabel.textContent = isAllScope ? txT("transactions_tax_not_shown", "Not shown") : formatCurrency(0, scopeRegion);
+    setAsideLabel.textContent = isAllScope ? txT("transactions_tax_switch_one_business", "Switch to one business") : formatCurrency(0, scopeRegion);
+  }
   if (taxBannerLabel) {
     taxBannerLabel.textContent = isAllScope
-      ? txT("transactions_tax_estimated_owed", "Estimated tax owed")
-      : `${txT("transactions_tax_estimated_owed", "Estimated tax owed")} (${getAppliedTaxLabel()})`;
+      ? txT("transactions_tax_estimated_owed", "Estimated set-aside")
+      : `${txT("transactions_tax_estimated_owed", "Estimated set-aside")} (${getAppliedTaxLabel()})`;
   }
   if (taxBannerNote) {
     taxBannerNote.textContent = isAllScope
-      ? txT("transactions_tax_single_business_note", "Tax estimates stay single-business. Switch to Active business for a filing-specific estimate.")
+      ? txT("transactions_tax_single_business_note", "This tracking helper stays single-business. Switch to Active business for a filing-specific draft estimate.")
       : getAppliedTaxNote();
   }
   if (transactionsTaxContext) {
@@ -4126,9 +4128,9 @@ function getAppliedTaxLabel() {
 function getAppliedTaxNote() {
   if (businessTaxProfile.region === "CA") {
     const province = businessTaxProfile.province || txT("transactions_your_province", "your province");
-    return `${txT("transactions_tax_note_ca_prefix", "Canada T2125 estimate only. Based on net profit using the")} ${province} ${txT("transactions_tax_note_ca_suffix", "estimated combined GST/HST/PST/QST rate.")}`;
+    return `${txT("transactions_tax_note_ca_prefix", "Canada T2125 tracking helper only. Based on total income collected using the")} ${province} ${txT("transactions_tax_note_ca_suffix", "GST/HST/PST/QST rate.")}`;
   }
-  return txT("transactions_tax_note_us", "U.S. Schedule C estimate only. Based on net profit at 24% self-employment rate.");
+  return txT("transactions_tax_note_us", "U.S. Schedule C tracking helper only. Based on net profit using a 24% combined tax set-aside buffer.");
 }
 
 function getTaxFormContext() {
@@ -5108,13 +5110,13 @@ function initTaxBannerControls() {
   const COLLAPSE_KEY = "lb_tax_banner_collapsed";
   if (banner && localStorage.getItem(COLLAPSE_KEY) === "true") {
     banner.classList.add("is-collapsed");
-    if (collapseBtn) collapseBtn.setAttribute("aria-label", "Expand tax estimate");
+    if (collapseBtn) collapseBtn.setAttribute("aria-label", "Expand set-aside helper");
   }
 
   collapseBtn?.addEventListener("click", () => {
     const collapsed = banner?.classList.toggle("is-collapsed");
     try { localStorage.setItem(COLLAPSE_KEY, String(!!collapsed)); } catch (_) {}
-    collapseBtn.setAttribute("aria-label", collapsed ? "Expand tax estimate" : "Collapse tax estimate");
+    collapseBtn.setAttribute("aria-label", collapsed ? "Expand set-aside helper" : "Collapse set-aside helper");
   });
 
   infoBtn?.addEventListener("click", () => {

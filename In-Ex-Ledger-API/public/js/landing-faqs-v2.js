@@ -13,7 +13,7 @@ window.LANDING_POLISH_FAQS = {
       a: "No. It helps you keep cleaner records, catch missing details early, and hand over a stronger package when it is time to work with a CPA or tax preparer."
     },
     {
-      q: "Can my CPA or tax preparer use the export?",
+      q: "Can my CPA or tax preparer use the hand-off export?",
       a: "Yes. The export is built to be easier to review, with totals, category groupings, receipt and support coverage, blockers, warnings, excluded items, and review notes."
     },
     {
@@ -46,7 +46,7 @@ window.LANDING_POLISH_FAQS = {
     },
     {
       q: "Does it remind me about estimated tax installments?",
-      a: "Yes. The app can surface upcoming due dates, a countdown, an estimated amount when available, and the link to pay through the right tax authority."
+      a: "Yes. The app can surface upcoming due dates, a countdown, a draft estimate when available, and the link to pay through the right tax authority."
     },
     {
       q: "Can I manage multiple businesses?",
@@ -79,7 +79,7 @@ window.LANDING_POLISH_FAQS = {
       a: "No. It helps you keep cleaner records, catch missing details early, and hand over a stronger package when it is time to work with a CPA or tax preparer."
     },
     {
-      q: "Can my CPA or tax preparer use the export?",
+      q: "Can my CPA or tax preparer use the hand-off export?",
       a: "Yes. The export is built to be easier to review, with totals, category groupings, receipt and support coverage, blockers, warnings, excluded items, and review notes."
     },
     {
@@ -112,7 +112,7 @@ window.LANDING_POLISH_FAQS = {
     },
     {
       q: "Does it remind me about estimated tax installments?",
-      a: "Yes. The app can surface CRA installment reminders with the due date, a countdown, an estimated amount when available, and the pay link."
+      a: "Yes. The app can surface CRA installment reminders with the due date, a countdown, a draft estimate when available, and the pay link."
     },
     {
       q: "Can I manage multiple businesses?",
@@ -147,7 +147,7 @@ function renderExpandedLandingFaqs() {
   const openQuestions = new Set([
     "Who is InEx Ledger for?",
     "Is this meant to replace QuickBooks?",
-    "Can my CPA or tax preparer use the export?"
+    "Can my CPA or tax preparer use the hand-off export?"
   ]);
 
   window.__landingExpandedFaqRendering = true;

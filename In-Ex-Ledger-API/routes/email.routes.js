@@ -41,6 +41,7 @@ const {
   extractTokenFromRecipient,
   parseReplyToken
 } = require("../services/invoiceEmailService.js");
+const { sendInvoiceOwnerActivityEmail } = require("../services/invoiceOwnerEmailService.js");
 
 const router = express.Router();
 function getResendClient() {
@@ -539,6 +540,18 @@ const body =
   from: from.email,
   fetchedBody: !!receivedEmail,
   bodyLength: body.length
+    });
+    await sendInvoiceOwnerActivityEmail({
+      businessId: invoice.business_id,
+      kind: "replied",
+      userId: ownerId,
+      actionUrl: "/messages",
+      details: [
+        { label: "Invoice", value: invoice.invoice_number || "Invoice" },
+        ...(from.name ? [{ label: "From", value: `${from.name} <${from.email || ""}>`.trim() }] : from.email ? [{ label: "From", value: from.email }] : []),
+        { label: "Subject", value: subject.slice(0, 120) },
+        { label: "Reply preview", value: body.slice(0, 180) }
+      ]
     });
 
     res.json({

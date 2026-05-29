@@ -11,6 +11,7 @@ const {
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
 const { sendInvoiceEmail } = require("../services/invoiceEmailService.js");
+const { sendInvoiceOwnerActivityEmail } = require("../services/invoiceOwnerEmailService.js");
 const {
   AUDIT_ACTIONS,
   recordAuditEventForRequest
@@ -361,6 +362,17 @@ router.post("/:id/send", async (req, res) => {
         code: err.code || "email_failed", 
         details: err.details || null
       });
+      await sendInvoiceOwnerActivityEmail({
+        businessId,
+        kind: "failed",
+        userId: req.user.id,
+        actionUrl: "/invoices",
+        details: [
+          { label: "Invoice", value: invoice.invoice_number || "Invoice" },
+          { label: "Recipient", value: recipientEmail },
+          ...(err.message ? [{ label: "Issue", value: String(err.message).slice(0, 300) }] : [])
+        ]
+      });
       return res.status(status).json({
         error: err.message,
         code: err.code || "email_failed",
@@ -408,6 +420,17 @@ router.post("/:id/send", async (req, res) => {
     logInfo("Invoice email sent", {
       invoiceId: invoice.id,
       recipient: recipientEmail
+    });
+    await sendInvoiceOwnerActivityEmail({
+      businessId,
+      kind: "sent",
+      userId: req.user.id,
+      actionUrl: "/invoices",
+      details: [
+        { label: "Invoice", value: invoice.invoice_number || "Invoice" },
+        { label: "Recipient", value: recipientEmail },
+        { label: "Total", value: `${invoice.currency} ${Number(invoice.total_amount || 0).toFixed(2)}` }
+      ]
     });
 
     res.json({

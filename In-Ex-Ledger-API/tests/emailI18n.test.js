@@ -36,8 +36,17 @@ const {
   buildWelcomeVerificationEmail,
   buildVerificationEmail,
   buildPasswordResetEmail,
+  buildPasswordChangedEmail,
   buildNewSignInAlertEmail,
   buildEmailChangeEmail,
+  buildEmailChangedConfirmationEmail,
+  buildBillingLifecycleEmail,
+  buildTrialLifecycleEmail,
+  buildReviewQueueReminderEmail,
+  buildInvoiceOwnerActivityEmail,
+  buildPrivacyActivityEmail,
+  buildBookkeepingActivityEmail,
+  buildExportLifecycleEmail,
   buildMfaEmailContent
 } = require("../services/emailI18nService.js");
 
@@ -235,6 +244,263 @@ describe("buildEmailChangeEmail", () => {
     assert.ok(subject.includes("Confirmez votre nouvelle adresse courriel"));
     assert.ok(html.includes("Confirmez votre nouvelle adresse courriel"));
     assert.ok(text.includes("30 minutes"));
+  });
+});
+
+/* ================================================================== */
+
+describe("buildPasswordChangedEmail", () => {
+  it("returns English content", () => {
+    const { subject, html, text } = buildPasswordChangedEmail("en", {
+      resetLink: "https://app.inexledger.com/reset-password?token=changed"
+    });
+    assert.ok(subject.includes("password was changed"));
+    assert.ok(html.includes("changed successfully"));
+    assert.ok(text.includes("reset your password immediately"));
+  });
+
+  it("returns French content", () => {
+    const { subject, html } = buildPasswordChangedEmail("fr", {
+      resetLink: "https://app.inexledger.com/reset-password?token=changed"
+    });
+    assert.ok(subject.includes("mot de passe"));
+    assert.ok(html.includes("mot de passe"));
+  });
+});
+
+/* ================================================================== */
+
+describe("buildEmailChangedConfirmationEmail", () => {
+  it("returns English content with both email addresses", () => {
+    const { subject, html, text } = buildEmailChangedConfirmationEmail("en", {
+      oldEmail: "old@example.com",
+      newEmail: "new@example.com"
+    });
+    assert.ok(subject.includes("sign-in email was updated"));
+    assert.ok(html.includes("old@example.com"));
+    assert.ok(html.includes("new@example.com"));
+    assert.ok(text.includes("new@example.com"));
+  });
+
+  it("returns French content", () => {
+    const { subject, html } = buildEmailChangedConfirmationEmail("fr", {
+      oldEmail: "ancien@example.com",
+      newEmail: "nouveau@example.com"
+    });
+    assert.ok(subject.includes("a ete mise a jour"));
+    assert.ok(html.includes("nouveau@example.com"));
+  });
+});
+
+/* ================================================================== */
+
+describe("buildBillingLifecycleEmail", () => {
+  it("returns trial started copy", () => {
+    const { subject, html, text } = buildBillingLifecycleEmail("en", "trial_started", {
+      details: [{ label: "Trial ends", value: "2026-06-27" }],
+      billingUrl: "https://app.inexledger.com/subscription"
+    });
+    assert.ok(subject.includes("trial is active"));
+    assert.ok(html.includes("trial has started"));
+    assert.ok(text.includes("/subscription"));
+  });
+
+  it("returns ending soon copy", () => {
+    const { subject, html } = buildBillingLifecycleEmail("en", "ending_soon", {
+      details: [{ label: "Access ends", value: "2026-06-04" }],
+      billingUrl: "https://app.inexledger.com/subscription"
+    });
+    assert.ok(subject.includes("ends in 7 days"));
+    assert.ok(html.includes("2026-06-04"));
+  });
+
+  it("returns plan changed copy", () => {
+    const { subject, html } = buildBillingLifecycleEmail("en", "plan_changed", {
+      details: [{ label: "Additional businesses", value: "2" }],
+      billingUrl: "https://app.inexledger.com/subscription"
+    });
+    assert.ok(subject.includes("setup changed"));
+    assert.ok(html.includes("Billing updated"));
+  });
+});
+
+/* ================================================================== */
+
+describe("buildTrialLifecycleEmail", () => {
+  it("returns English 7-day reminder copy", () => {
+    const { subject, html, text } = buildTrialLifecycleEmail("en", "ending_7", {
+      actionUrl: "https://app.inexledger.com/upgrade"
+    });
+    assert.ok(subject.includes("ends in 7 days"));
+    assert.ok(html.includes("ends in 7 days"));
+    assert.ok(text.includes("https://app.inexledger.com/upgrade"));
+  });
+
+  it("returns English trial ended copy", () => {
+    const { subject, html } = buildTrialLifecycleEmail("en", "ended", {
+      actionUrl: "https://app.inexledger.com/upgrade"
+    });
+    assert.ok(subject.includes("trial has ended"));
+    assert.ok(html.includes("Your trial has ended"));
+  });
+});
+
+/* ================================================================== */
+
+describe("buildReviewQueueReminderEmail", () => {
+  it("returns English aggregated reminder copy", () => {
+    const { subject, html, text } = buildReviewQueueReminderEmail("en", {
+      count: 18,
+      actionUrl: "https://app.inexledger.com/review"
+    });
+    assert.ok(subject.includes("need review"));
+    assert.ok(html.includes("Open review items"));
+    assert.ok(html.includes(">18<"));
+    assert.ok(text.includes("/review"));
+  });
+
+  it("returns French aggregated reminder copy", () => {
+    const { subject, html } = buildReviewQueueReminderEmail("fr", {
+      count: 7,
+      actionUrl: "https://app.inexledger.com/review"
+    });
+    assert.ok(subject.includes("doivent encore etre revisees"));
+    assert.ok(html.includes("7"));
+  });
+});
+
+/* ================================================================== */
+
+describe("buildInvoiceOwnerActivityEmail", () => {
+  it("returns sent confirmation copy", () => {
+    const { subject, html, text } = buildInvoiceOwnerActivityEmail("en", "sent", {
+      details: [
+        { label: "Invoice", value: "INV-2026-0042" },
+        { label: "Recipient", value: "client@example.com" }
+      ],
+      actionUrl: "https://app.inexledger.com/invoices"
+    });
+    assert.ok(subject.includes("on its way"));
+    assert.ok(html.includes("Invoice sent"));
+    assert.ok(html.includes("INV-2026-0042"));
+    assert.ok(text.includes("/invoices"));
+  });
+
+  it("returns delivery failed copy", () => {
+    const { subject, html } = buildInvoiceOwnerActivityEmail("en", "failed", {
+      details: [{ label: "Issue", value: "Mailbox unavailable" }],
+      actionUrl: "https://app.inexledger.com/invoices"
+    });
+    assert.ok(subject.includes("couldn't send"));
+    assert.ok(html.includes("Mailbox unavailable"));
+  });
+
+  it("returns client reply copy", () => {
+    const { subject, html } = buildInvoiceOwnerActivityEmail("en", "replied", {
+      details: [{ label: "From", value: "Client Co <client@example.com>" }],
+      actionUrl: "https://app.inexledger.com/messages"
+    });
+    assert.ok(subject.includes("client replied"));
+    assert.ok(html.includes("client@example.com"));
+  });
+});
+
+/* ================================================================== */
+
+describe("buildPrivacyActivityEmail", () => {
+  it("returns export completed copy", () => {
+    const { subject, html, text } = buildPrivacyActivityEmail("en", "export_completed", {
+      details: [{ label: "Format", value: "JSON" }],
+      actionUrl: "https://app.inexledger.com/privacy"
+    });
+    assert.ok(subject.includes("data export is ready"));
+    assert.ok(html.includes("Data export completed"));
+    assert.ok(text.includes("/privacy"));
+  });
+
+  it("returns erasure completed copy", () => {
+    const { subject, html } = buildPrivacyActivityEmail("en", "erasure_completed", {
+      details: [{ label: "Scope", value: "Personal account data" }]
+    });
+    assert.ok(subject.includes("personal data was erased"));
+    assert.ok(html.includes("Personal account data"));
+  });
+
+  it("returns deletion completed copy", () => {
+    const { subject, html } = buildPrivacyActivityEmail("en", "deletion_completed", {
+      details: [{ label: "Businesses deleted", value: "2" }],
+      actionUrl: "https://app.inexledger.com/privacy"
+    });
+    assert.ok(subject.includes("business data was deleted"));
+    assert.ok(html.includes("Businesses deleted"));
+  });
+});
+
+/* ================================================================== */
+
+describe("buildBookkeepingActivityEmail", () => {
+  it("returns csv completed copy", () => {
+    const { subject, html, text } = buildBookkeepingActivityEmail("en", "csv_completed", {
+      details: [{ label: "Imported", value: "42" }],
+      actionUrl: "https://app.inexledger.com/transactions"
+    });
+    assert.ok(subject.includes("CSV import is complete"));
+    assert.ok(html.includes("CSV import completed"));
+    assert.ok(text.includes("/transactions"));
+  });
+
+  it("returns csv failed copy", () => {
+    const { subject, html } = buildBookkeepingActivityEmail("en", "csv_failed", {
+      details: [{ label: "Issue", value: "Unexpected parser failure" }],
+      actionUrl: "https://app.inexledger.com/transactions"
+    });
+    assert.ok(subject.includes("could not be completed"));
+    assert.ok(html.includes("Unexpected parser failure"));
+  });
+
+  it("returns receipt uploaded copy", () => {
+    const { subject, html } = buildBookkeepingActivityEmail("en", "receipt_uploaded", {
+      details: [{ label: "Filename", value: "receipt.png" }],
+      actionUrl: "https://app.inexledger.com/receipts"
+    });
+    assert.ok(subject.includes("receipt was saved"));
+    assert.ok(html.includes("receipt.png"));
+  });
+
+  it("returns receipt processing failed copy", () => {
+    const { subject, html } = buildBookkeepingActivityEmail("en", "receipt_processing_failed", {
+      details: [{ label: "Issue", value: "OCR service timed out." }],
+      actionUrl: "https://app.inexledger.com/receipts"
+    });
+    assert.ok(subject.includes("couldn't process your receipt"));
+    assert.ok(html.includes("OCR service timed out."));
+  });
+});
+
+/* ================================================================== */
+
+describe("buildExportLifecycleEmail", () => {
+  it("returns English generated export copy with details", () => {
+    const { subject, html, text } = buildExportLifecycleEmail("en", "generated", {
+      details: [
+        { label: "Format", value: "PDF" },
+        { label: "Date range", value: "2026-01-01 to 2026-03-31" }
+      ],
+      actionUrl: "https://app.inexledger.com/exports"
+    });
+    assert.ok(subject.includes("export is ready"));
+    assert.ok(html.includes("Export generated"));
+    assert.ok(html.includes("2026-01-01 to 2026-03-31"));
+    assert.ok(text.includes("/exports"));
+  });
+
+  it("returns English stale export copy", () => {
+    const { subject, html } = buildExportLifecycleEmail("en", "stale", {
+      details: [{ label: "Area", value: "Transactions" }],
+      actionUrl: "https://app.inexledger.com/exports"
+    });
+    assert.ok(subject.includes("now stale"));
+    assert.ok(html.includes("Transactions"));
   });
 });
 

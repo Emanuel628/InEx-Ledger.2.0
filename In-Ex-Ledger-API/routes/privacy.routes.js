@@ -12,6 +12,7 @@ const { logError } = require("../utils/logger.js");
 const { decrypt } = require("../services/encryptionService.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
 const { neutralizeFormulaCell } = require("../services/csvExportService.js");
+const { sendPrivacyActivityEmail } = require("../services/privacyEmailService.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -431,6 +432,17 @@ router.post("/export", requireMfaIfEnabled, async (req, res) => {
       userAgent,
       metadata: { businessIds }
     });
+    await sendPrivacyActivityEmail({
+      userId: req.user.id,
+      email: userResult.rows[0]?.email || "",
+      kind: "export_completed",
+      details: [
+        { label: "Format", value: format.toUpperCase() },
+        { label: "Businesses included", value: String(businessIds.length) },
+        { label: "Exported on", value: new Date().toISOString().slice(0, 10) }
+      ],
+      actionPath: "/privacy"
+    });
 
     if (format === "csv") {
       // CSV export: primary transactions sheet only (the most common use case).
@@ -519,7 +531,7 @@ router.post("/erase", requireMfaIfEnabled, async (req, res) => {
 
   try {
     const userResult = await pool.query(
-      "SELECT password_hash FROM users WHERE id = $1 LIMIT 1",
+      "SELECT email, password_hash FROM users WHERE id = $1 LIMIT 1",
       [userId]
     );
     if (!userResult.rowCount) {
@@ -610,6 +622,16 @@ router.post("/erase", requireMfaIfEnabled, async (req, res) => {
 
     await client.query("COMMIT");
 
+    await sendPrivacyActivityEmail({
+      userId,
+      email: userResult.rows[0]?.email || "",
+      kind: "erasure_completed",
+      details: [
+        { label: "Completed on", value: new Date().toISOString().slice(0, 10) },
+        { label: "Scope", value: "Personal account data" }
+      ]
+    });
+
     return res.json({
       ok: true,
       message: "Your personal information has been erased. Anonymised financial records are retained for tax compliance."
@@ -641,14 +663,16 @@ router.post("/delete", requireMfaIfEnabled, async (req, res) => {
 
   const client = await pool.connect();
   let transactionOpen = false;
+  let userEmail = "";
   try {
     const userResult = await client.query(
-      "SELECT password_hash FROM users WHERE id = $1 LIMIT 1",
+      "SELECT email, password_hash FROM users WHERE id = $1 LIMIT 1",
       [userId]
     );
     if (!userResult.rowCount) {
       return res.status(404).json({ error: "User not found." });
     }
+    userEmail = String(userResult.rows[0].email || "").trim();
     const { match } = await verifyPassword(password, userResult.rows[0].password_hash);
     if (!match) {
       return res.status(401).json({ error: "Incorrect password." });
@@ -750,6 +774,17 @@ router.post("/delete", requireMfaIfEnabled, async (req, res) => {
           }
         })
     );
+
+    await sendPrivacyActivityEmail({
+      userId,
+      email: userEmail,
+      kind: "deletion_completed",
+      details: [
+        { label: "Businesses deleted", value: String(businessIds.length) },
+        { label: "Completed on", value: new Date().toISOString().slice(0, 10) }
+      ],
+      actionPath: "/privacy"
+    });
 
     res.json({ message: "Business data deleted successfully." });
   } catch (err) {

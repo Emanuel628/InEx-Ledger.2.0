@@ -34,6 +34,7 @@ const {
   assertDateUnlocked
 } = require("../services/accountingLockService.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
+const { sendBookkeepingActivityEmail } = require("../services/bookkeepingEmailService.js");
 
 const router = express.Router();
 const storageDir = getReceiptStorageDir();
@@ -452,6 +453,17 @@ router.post("/", checkReceiptPlanAccess, upload.single("receipt"), async (req, r
 
     // Best-effort: notify Basic businesses as they approach their monthly cap.
     void evaluateUsageLimitEmails({ businessId, resources: ["receipts"], subscription });
+    void sendBookkeepingActivityEmail({
+      businessId,
+      userId: req.user?.id,
+      kind: "receipt_uploaded",
+      actionPath: "/receipts",
+      details: [
+        { label: "Filename", value: req.file.originalname },
+        ...(transactionId ? [{ label: "Attached to transaction", value: "Yes" }] : []),
+        { label: "Saved on", value: new Date().toISOString().slice(0, 10) }
+      ]
+    });
 
     return res.status(201).json({
       id: receiptId,
@@ -944,8 +956,10 @@ router.post("/:id/extract", async (req, res) => {
     return res.status(400).json({ error: "Invalid receipt ID." });
   }
 
+  let primaryBusinessId = null;
   try {
     const scope = await getBusinessScopeForUser(req.user, "all");
+    primaryBusinessId = Array.isArray(scope.businessIds) ? scope.businessIds[0] || null : null;
 
     const result = await pool.query(
       `SELECT filename, mime_type, storage_path, file_bytes
@@ -995,8 +1009,32 @@ router.post("/:id/extract", async (req, res) => {
     if (tempPath) {
       await safeUnlink(tempPath);
     }
+    if (!ocrResult?.available || !ocrResult?.extracted) {
+      void sendBookkeepingActivityEmail({
+        businessId: primaryBusinessId,
+        userId: req.user?.id,
+        kind: "receipt_processing_failed",
+        actionPath: "/receipts",
+        details: [
+          { label: "Receipt", value: result.rows[0]?.filename || "Receipt" },
+          { label: "Issue", value: String(ocrResult?.reason || "No structured data could be extracted.").slice(0, 240) }
+        ]
+      });
+    }
     return res.json(ocrResult);
   } catch (err) {
+    if (primaryBusinessId) {
+      void sendBookkeepingActivityEmail({
+        businessId: primaryBusinessId,
+        userId: req.user?.id,
+        kind: "receipt_processing_failed",
+        actionPath: "/receipts",
+        details: [
+          { label: "Receipt", value: receiptId },
+          { label: "Issue", value: String(err?.message || "Receipt scan failed.").slice(0, 240) }
+        ]
+      });
+    }
     logError("POST /receipts/:id/extract error:", err);
     return res.status(500).json({ error: "Failed to extract receipt data." });
   }

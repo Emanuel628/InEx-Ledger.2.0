@@ -116,8 +116,8 @@ function loadPrivacyRouter(options = {}) {
     if (/INSERT INTO user_action_audit_log/i.test(sql)) {
       return { rows: [], rowCount: 1 };
     }
-    if (/SELECT password_hash FROM users/i.test(sql)) {
-      return { rows: [{ password_hash: state.passwordHash }], rowCount: 1 };
+    if (/SELECT email,\s*password_hash FROM users/i.test(sql) || /SELECT password_hash FROM users/i.test(sql)) {
+      return { rows: [{ email: "owner@example.com", password_hash: state.passwordHash }], rowCount: 1 };
     }
     if (/SELECT id FROM businesses WHERE user_id = \$1/i.test(sql)) {
       return { rows: state.businesses.map((business) => ({ id: business.id })), rowCount: state.businesses.length };

@@ -40,10 +40,13 @@ async function getRemittanceRate(province, supplyType, taxYear) {
   return result.rows[0] || null;
 }
 
+// CRA Quick Method: 1% credit on the first $30,000 of eligible supplies per fiscal year.
+// Source: CRA RC4058 "Quick Method of Accounting for GST/HST"
+const QUICK_METHOD_CREDIT_RATE = 0.01;
+const QUICK_METHOD_CREDIT_CAP = 30000;
+
 // Compute Net Tax to Remit.
-// Formula: gross_sales_including_tax × remittance_rate
-// The 1% ITC credit on the first $30,000 of eligible supplies is applied automatically by CRA,
-// so we store the gross remittance; the 1% reduction is noted in the PDF sub-schedule.
+// Formula: (gross_sales_including_tax × remittance_rate) − 1% credit on first $30k
 async function computeQuickMethodRemittance(options = {}) {
   const { province, supplyType, grossSalesInclTax, taxYear } = options;
   const rateRow = await getRemittanceRate(province, supplyType, taxYear);
@@ -55,7 +58,10 @@ async function computeQuickMethodRemittance(options = {}) {
   const remittanceRate = Number(rateRow.remittance_rate);
   const hstRate = Number(rateRow.hst_rate);
 
-  const netTaxToRemit = Number((gross * remittanceRate).toFixed(2));
+  const grossRemittance = Number((gross * remittanceRate).toFixed(2));
+  // 1% credit on the first $30,000 of eligible supplies (CRA RC4058)
+  const itcCredit = Number((Math.min(gross, QUICK_METHOD_CREDIT_CAP) * QUICK_METHOD_CREDIT_RATE).toFixed(2));
+  const netTaxToRemit = Number(Math.max(0, grossRemittance - itcCredit).toFixed(2));
   // Tax collected from customers (for schedule display)
   const taxCollected = Number((gross * (hstRate / (1 + hstRate))).toFixed(2));
 
@@ -67,8 +73,10 @@ async function computeQuickMethodRemittance(options = {}) {
     grossSalesInclTax: gross,
     hstRate,
     remittanceRate,
-    taxCollected,
-    netTaxToRemit
+    grossRemittance,
+    itcCredit,
+    netTaxToRemit,
+    taxCollected
   };
 }
 
@@ -95,5 +103,7 @@ module.exports = {
   resolveProvinceGroup,
   getRemittanceRate,
   computeQuickMethodRemittance,
-  buildQuickMethodSchedule
+  buildQuickMethodSchedule,
+  QUICK_METHOD_CREDIT_RATE,
+  QUICK_METHOD_CREDIT_CAP
 };

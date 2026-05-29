@@ -1,7 +1,7 @@
 "use strict";
 
 const { pool } = require("../db.js");
-const { computeCcaDeduction, computeMacrsDeduction, getCcaClass } = require("../utils/depreciationSchedules.js");
+const { computeCcaDeduction, computeMacrsDeduction, computeRecoveryYear, getCcaClass } = require("../utils/depreciationSchedules.js");
 
 async function listCapitalAssets(businessId, taxYear) {
   const result = await pool.query(
@@ -40,8 +40,14 @@ function computeDepreciation(asset, region) {
     return { currentYearDepreciation: deduction, remainingBasis };
   }
 
-  // US MACRS
-  const recoveryYear = isFirstYear ? 1 : Math.round(priorDepreciation / (originalCost / 7)) + 1;
+  // US MACRS — derive recovery year from accumulated depreciation and class table.
+  const recoveryYear = computeRecoveryYear(
+    priorDepreciation,
+    originalCost,
+    asset.macrs_class || "7-year",
+    asset.section_179_elected ? originalCost : 0,
+    asset.bonus_depreciation_pct || 0
+  );
   const deduction = computeMacrsDeduction({
     originalCost,
     macrsClass: asset.macrs_class || "7-year",

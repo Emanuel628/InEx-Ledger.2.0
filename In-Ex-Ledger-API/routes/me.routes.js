@@ -61,6 +61,19 @@ function buildTrialSetupRedirect(nextPath = "/transactions") {
   return `/trial-setup?next=${encodeURIComponent(normalized)}`;
 }
 
+function shouldRedirectToTrialSetup(subscription) {
+  if (!subscription || typeof subscription !== "object") {
+    return false;
+  }
+  if (subscription.effectiveStatus !== "trialing") {
+    return false;
+  }
+  if (subscription.stripeSubscriptionId || subscription.isTrialDowngradedToFree) {
+    return false;
+  }
+  return true;
+}
+
 function normalizeOptionalTrimmedString(value) {
   if (typeof value !== "string") {
     return null;
@@ -411,9 +424,17 @@ router.put("/onboarding", async (req, res) => {
 
       await client.query("COMMIT");
 
+      const subscription = await getSubscriptionSnapshotForUser({
+        id: req.user.id,
+        business_id: businessId
+      });
+      const redirectTo = shouldRedirectToTrialSetup(subscription)
+        ? buildTrialSetupRedirect(`/${normalizedStartFocus}`)
+        : `/${normalizedStartFocus}`;
+
       return res.status(200).json({
         onboarding: normalizeOnboardingPayload(updated.rows[0]),
-        redirect_to: `/${normalizedStartFocus}`
+        redirect_to: redirectTo
       });
     } catch (err) {
       await client.query("ROLLBACK");
@@ -467,7 +488,7 @@ router.post("/onboarding/guide", async (req, res) => {
     const timestamp = new Date().toISOString();
 
     const isReplay = currentData.guided_setup_replay === true;
-    let redirectTo = isReplay ? "/transactions" : buildTrialSetupRedirect("/transactions");
+    let redirectTo = "/transactions";
     if (action === "skip") {
       GUIDED_SETUP_STEPS.forEach((step) => {
         currentTourSeen[step] = true;

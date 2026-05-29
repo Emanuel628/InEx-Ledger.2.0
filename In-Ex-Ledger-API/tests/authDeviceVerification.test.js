@@ -310,10 +310,25 @@ function loadAuthRouter(options = {}) {
           html: `<a href="${resetLink}">${resetLink}</a>`,
           text: resetLink
         }),
+        buildPasswordChangedEmail: (_lang, options = {}) => ({
+          subject: "password changed",
+          html: String(options.resetLink || ""),
+          text: String(options.resetLink || "")
+        }),
+        buildNewSignInAlertEmail: (_lang, options = {}) => ({
+          subject: "new sign-in",
+          html: String(options.resetLink || ""),
+          text: `New sign-in\n${String(options.resetLink || "")}`
+        }),
         buildEmailChangeEmail: (_lang, confirmLink) => ({
           subject: "confirm",
           html: `<a href="${confirmLink}">${confirmLink}</a>`,
           text: confirmLink
+        }),
+        buildEmailChangedConfirmationEmail: () => ({
+          subject: "email changed",
+          html: "",
+          text: ""
         }),
         buildMfaEmailContent: () => ({
           subject: "sign-in code",
@@ -490,7 +505,7 @@ test("new-device sign-in succeeds directly when MFA is disabled", async () => {
     assert.ok(loginResponse.body?.token, "login should return an auth token");
     assert.equal(loginResponse.body?.mfa_required, undefined);
     assert.equal(loginResponse.body?.device_verification_required, undefined);
-    assert.equal(fixture.state.sentEmails.length, 0);
+    assert.equal(fixture.state.sentEmails.length, 1);
     assert.equal(fixture.state.recognizedDevice, true);
 
     const secondLogin = await request(app)
@@ -501,6 +516,7 @@ test("new-device sign-in succeeds directly when MFA is disabled", async () => {
     assert.equal(secondLogin.status, 200);
     assert.ok(secondLogin.body?.token, "recognized device should log in directly");
     assert.equal(secondLogin.body?.mfa_required, undefined);
+    assert.equal(fixture.state.sentEmails.length, 1);
   } finally {
     fixture.cleanup();
   }

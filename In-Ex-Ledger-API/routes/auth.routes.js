@@ -22,6 +22,7 @@ const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
   AUDIT_ACTIONS,
+  recordAuditEvent,
   recordAuditEventForRequest
 } = require("../services/auditEventService.js");
 const {
@@ -34,7 +35,10 @@ const {
   buildWelcomeVerificationEmail,
   buildVerificationEmail,
   buildPasswordResetEmail,
+  buildPasswordChangedEmail,
+  buildNewSignInAlertEmail,
   buildEmailChangeEmail,
+  buildEmailChangedConfirmationEmail,
   buildMfaEmailContent
 } = require("../services/emailI18nService.js");
 const {
@@ -364,6 +368,69 @@ async function sendAppEmail({ to, subject, html, text }, { retries = 2, retryDel
     }
   }
   throw lastError;
+}
+
+async function sendPasswordChangedConfirmationEmail(user, req, { lang = null } = {}) {
+  if (!user?.email) return;
+  try {
+    const emailLang = lang || await getPreferredLanguageForUser(user.id);
+    const { token } = await createPasswordResetToken(user.email);
+    const resetLink = buildPasswordResetLink(req, token);
+    const emailContent = buildPasswordChangedEmail(emailLang, { resetLink });
+    await sendAppEmail({ to: user.email, ...emailContent });
+  } catch (err) {
+    logWarn("Password changed confirmation email failed", {
+      userId: user?.id || null,
+      err: err?.message || String(err)
+    });
+  }
+}
+
+async function sendNewSignInAlertEmail(user, req, deviceContext) {
+  if (!user?.email || !deviceContext?.ipAddress) return;
+  try {
+    const [lang, resetToken, location] = await Promise.all([
+      getPreferredLanguageForUser(user.id),
+      createPasswordResetToken(user.email),
+      fetchIpLocation(deviceContext.ipAddress)
+    ]);
+    const resetLink = buildPasswordResetLink(req, resetToken.token);
+    const emailContent = buildNewSignInAlertEmail(lang, {
+      signInTime: new Date().toISOString(),
+      city: location?.city || "",
+      country: location?.country || "",
+      resetLink
+    });
+    await sendAppEmail({ to: user.email, ...emailContent });
+  } catch (err) {
+    logWarn("New sign-in alert email failed", {
+      userId: user?.id || null,
+      err: err?.message || String(err)
+    });
+  }
+}
+
+async function sendEmailChangedConfirmationEmails({ userId, oldEmail, newEmail }) {
+  if (!newEmail) return;
+  try {
+    const lang = await getPreferredLanguageForUser(userId);
+    const emailContent = buildEmailChangedConfirmationEmail(lang, {
+      oldEmail,
+      newEmail
+    });
+    const recipients = [oldEmail, newEmail]
+      .map((value) => normalizeEmail(value))
+      .filter(Boolean);
+    const uniqueRecipients = Array.from(new Set(recipients));
+    for (const recipient of uniqueRecipients) {
+      await sendAppEmail({ to: recipient, ...emailContent });
+    }
+  } catch (err) {
+    logWarn("Email changed confirmation email failed", {
+      userId: userId || null,
+      err: err?.message || String(err)
+    });
+  }
 }
 
 /* =========================================================
@@ -1301,6 +1368,7 @@ router.post("/login", authLimiter, async (req, res) => {
     } else if (!recognizedDevice && deviceContext) {
       try {
         await insertRecognizedSignInDevice(user, deviceContext);
+        await sendNewSignInAlertEmail(user, req, deviceContext);
       } catch (securitySignalErr) {
         logWarn("New device registration warning:", securitySignalErr?.message || securitySignalErr);
       }
@@ -1512,6 +1580,13 @@ router.post("/change-password", authLimiter, requireAuth, requireCsrfProtection,
       businessId: req.user?.business_id || null,
       via: "authenticated_change"
     });
+    await recordAuditEventForRequest(pool, req, {
+      userId: user.id,
+      businessId: req.user?.business_id || null,
+      action: AUDIT_ACTIONS.PASSWORD_CHANGED,
+      metadata: { via: "authenticated_change" }
+    });
+    await sendPasswordChangedConfirmationEmail(user, req);
 
     return res.status(200).json({
       success: true,
@@ -2046,6 +2121,14 @@ router.post("/reset-password", passwordLimiter, async (req, res) => {
         userId,
         email: maskEmail(email)
       });
+      await recordAuditEvent(pool, {
+        userId,
+        action: AUDIT_ACTIONS.PASSWORD_RESET_COMPLETE,
+        metadata: { email_mask: maskEmail(email) }
+      });
+      await sendPasswordChangedConfirmationEmail({ id: userId, email }, req, {
+        lang: await getPreferredLanguageForEmail(email)
+      });
     }
     return res.status(200).json({ message: "Password updated successfully." });
   } catch (err) {
@@ -2180,11 +2263,26 @@ router.get("/confirm-email-change", async (req, res) => {
     if (!result?.user_id || !result?.new_email) return res.status(400).send("Invalid or expired link.");
 
     const { user_id, new_email } = result;
+    const currentUserResult = await pool.query("SELECT email FROM users WHERE id = $1 LIMIT 1", [user_id]);
+    const oldEmail = normalizeEmail(currentUserResult.rows[0]?.email);
     await pool.query("UPDATE users SET email = $1 WHERE id = $2", [new_email, user_id]);
     await revokeAllRefreshTokensForUser(user_id);
     await revokeTrustedMfaDevicesForUser(user_id);
     clearRefreshCookie(res);
     clearMfaTrustCookie(res);
+    await recordAuditEvent(pool, {
+      userId: user_id,
+      action: AUDIT_ACTIONS.EMAIL_CHANGE_COMPLETE,
+      metadata: {
+        old_email_mask: maskEmail(oldEmail),
+        new_email_mask: maskEmail(new_email)
+      }
+    });
+    await sendEmailChangedConfirmationEmails({
+      userId: user_id,
+      oldEmail,
+      newEmail: new_email
+    });
 
     return res.redirect("/login?email_changed=true");
   } catch (err) {

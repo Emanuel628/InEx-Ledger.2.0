@@ -154,12 +154,12 @@
     text.className = "trial-banner-text";
 
     const title = document.createElement("strong");
-    title.textContent = `${upcoming.quarter} estimated taxes are due ${dateStr}`;
+    title.textContent = `${upcoming.quarter} payment is due ${dateStr}`;
     text.appendChild(title);
     text.appendChild(document.createTextNode(` — ${daysMsg}.`));
 
     if (estimatedAmount) {
-      text.appendChild(document.createTextNode(` Current estimated amount: ${estimatedAmount}.`));
+      text.appendChild(document.createTextNode(` Current draft estimate: ${estimatedAmount}.`));
     }
 
     text.appendChild(document.createTextNode(" "));
@@ -174,7 +174,7 @@
     const dismissButton = document.createElement("button");
     dismissButton.type = "button";
     dismissButton.className = "trial-banner-dismiss";
-    dismissButton.setAttribute("aria-label", "Dismiss tax reminder");
+    dismissButton.setAttribute("aria-label", "Dismiss installment reminder");
     dismissButton.textContent = DISMISS_SYMBOL;
     dismissButton.addEventListener("click", () => {
       dismiss(upcoming.key);

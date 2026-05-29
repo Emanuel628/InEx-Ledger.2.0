@@ -1347,7 +1347,14 @@ async function initPreferences() {
       province,
       language: typeof getCurrentLanguage === "function" ? getCurrentLanguage() : businessSettingsState.language || "en",
       theme: resolveSavedTheme(),
-      distance: localStorage.getItem("lb_unit_metric") === "true" ? "km" : "mi",
+      distance: (() => {
+        const explicit = localStorage.getItem("lb_unit_metric");
+        if (explicit !== null) return explicit === "true" ? "km" : "mi";
+        const r = normalizeSettingsRegion(
+          businessSettingsState.region || (typeof getCurrentRegion === "function" ? getCurrentRegion() : "us")
+        );
+        return r === "ca" ? "km" : "mi";
+      })(),
       optOutAnalytics: optOutDefault
     };
   };
@@ -1428,7 +1435,12 @@ async function initPreferences() {
   };
 
   if (regionSelect) {
-    regionSelect.addEventListener("change", updatePendingPreferences);
+    regionSelect.addEventListener("change", () => {
+      if (distanceSelect && localStorage.getItem("lb_unit_metric") === null) {
+        distanceSelect.value = normalizeSettingsRegion(regionSelect.value) === "ca" ? "km" : "mi";
+      }
+      updatePendingPreferences();
+    });
   }
 
   if (provinceSelect) {

@@ -10,9 +10,9 @@ const MESSAGES_FOCUS_DISMISSED_KEY = "lb_messages_focus_banner_dismissed";
 const MAILBOX_META = {
   inbox: {
     title: "Inbox",
-    headerSubtitle: "Secure threads from accountants, support, and your account channel.",
+    headerSubtitle: "Invoice replies, support threads, and verified account contacts in one queue.",
     surfaceTitle: "Conversation queue",
-    surfaceSubtitle: "Review incoming threads, keep support work organized, and archive finished conversations without losing history.",
+    surfaceSubtitle: "Review invoice replies and support work, then archive finished threads without losing history.",
     queueMeta: "Visible in your inbox"
   },
   sent: {
@@ -420,7 +420,7 @@ function getEmptyStateConfig() {
 
   return {
     title: "No messages yet",
-    body: `${translate("messages_empty", "No messages yet.")} Use + Compose above to start a secure conversation.`,
+    body: `${translate("messages_empty", "No messages yet.")} Invoice replies, support requests, and verified-contact threads will appear here.`,
     actionLabel: null
   };
 }
@@ -865,6 +865,12 @@ function closeComposeModal() {
 }
 
 function openSupportComposer() {
+  const supportContact = findSupportContact();
+  if (!supportContact) {
+    showToast("Support messaging is unavailable right now. Use support.inex@gmail.com.");
+    return;
+  }
+
   openComposeModal({
     to: SUPPORT_CONTACT_VALUE,
     type: "support_request",

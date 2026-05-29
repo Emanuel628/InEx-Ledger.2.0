@@ -13,6 +13,7 @@
     "test:accounts-put": "node scripts/test-accounts-put.mjs",
     "test:mileage-put": "node scripts/test-mileage-put.mjs",
     "test:email": "node scripts/test-email.mjs",
+    "emails:reminders": "node scripts/send-email-reminders.js",
     "migrations:verify-checksums": "node scripts/repair-migration-checksums.js",
     "migrations:repair-checksums": "node scripts/repair-migration-checksums.js --write",
     "verify:redacted-storage": "node scripts/verify-redacted-storage.mjs",

@@ -28,19 +28,19 @@ const LANDING_REGION_COPY = {
     exportPdfLineTwoAmount: "$6,420.00",
     exportPdfLineThree: "Office and software",
     exportPdfLineThreeAmount: "$2,184.32",
-    exportPdfPreparedFor: "CPA review package",
+    exportPdfPreparedFor: "CPA hand-off package",
     exportPdfIncome: "$48,220.14",
     exportPdfExpense: "$18,094.32",
     exportPdfNet: "$30,125.82",
-    reminderContext: "Estimated tax reminders for U.S. solo businesses",
-    reminderBanner: "Installment 2 estimated taxes are due June 15 - in 21 days. Estimated amount: $238.33. Pay via IRS.",
-    reminderSubtext: "Due date, countdown, estimated amount, and pay link stay visible before it turns into a last-minute problem.",
+    reminderContext: "Installment reminders for U.S. solo businesses",
+    reminderBanner: "Q2 payment is due June 15 - in 21 days. Draft estimate: $238.33. Pay via IRS.",
+    reminderSubtext: "Due date, countdown, draft estimate, and pay link stay visible before it turns into a last-minute problem.",
     trustRegion: "Built for U.S. and Canadian solo-business records.",
     distanceLabel: "Track mileage support for vehicle-related records.",
     pricingSubtitle: "No charge today. Confirm billing after setup.",
     distancePricing: "Mileage and kilometre tracking",
     pricingExports: "Schedule C or T2125/T4A exports",
-    pricingReminders: "Estimated tax installment reminders",
+    pricingReminders: "Installment reminders",
     currency: "usd"
   },
   CA: {
@@ -72,19 +72,19 @@ const LANDING_REGION_COPY = {
     exportPdfLineTwoAmount: "CA$6,420.00",
     exportPdfLineThree: "Office and software",
     exportPdfLineThreeAmount: "CA$2,184.32",
-    exportPdfPreparedFor: "Tax preparer review package",
+    exportPdfPreparedFor: "Tax preparer hand-off package",
     exportPdfIncome: "CA$48,220.14",
     exportPdfExpense: "CA$18,094.32",
     exportPdfNet: "CA$30,125.82",
     reminderContext: "CRA installment reminders for Canadian sole proprietors",
-    reminderBanner: "Installment 2 estimated taxes are due June 15 - in 21 days. Estimated amount: CA$238.33. Pay via CRA.",
-    reminderSubtext: "Due date, countdown, estimated amount, and pay link stay visible before it turns into a last-minute problem.",
+    reminderBanner: "Instalment 2 payment is due June 15 - in 21 days. Draft estimate: CA$238.33. Pay via CRA.",
+    reminderSubtext: "Due date, countdown, draft estimate, and pay link stay visible before it turns into a last-minute problem.",
     trustRegion: "Built for U.S. and Canadian solo-business records.",
     distanceLabel: "Track kilometre support for vehicle-related records.",
     pricingSubtitle: "No charge today. Confirm billing after setup.",
     distancePricing: "Mileage and kilometre tracking",
     pricingExports: "Schedule C or T2125/T4A exports",
-    pricingReminders: "Estimated tax installment reminders",
+    pricingReminders: "Installment reminders",
     currency: "cad"
   }
 };
@@ -97,7 +97,7 @@ const LANDING_ROLODEX_CAPTIONS = [
   "Messages - Client replies stay tied to the invoice.",
   "Exports - Build a review-ready package, not a pile.",
   "Redacted history - Keep the full package secure and the saved record lighter.",
-  "Tax reminders - See the deadline before it turns urgent."
+  "Installment reminders - See the deadline before it turns urgent."
 ];
 
 function normalizeLandingRegion(value) {
@@ -211,7 +211,7 @@ function hydrateLandingStaticFixes() {
         <div class="preview-pdf-table-row"><span data-region-copy="exportPdfLineThree">Office and software</span><span data-region-copy="exportPdfLineThreeAmount">$2,184.32</span></div>
       </div>
       <div class="preview-pdf-grid">
-        <div><small>Prepared for</small><strong data-region-copy="exportPdfPreparedFor">CPA review package</strong></div>
+        <div><small>Prepared for</small><strong data-region-copy="exportPdfPreparedFor">CPA hand-off package</strong></div>
         <div><small>File type</small><strong>PDF export</strong></div>
         <div><small>Pages</small><strong>8 pages</strong></div>
         <div><small>Export ID</small><strong>PDF-2048</strong></div>

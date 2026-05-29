@@ -1122,7 +1122,7 @@ body {
 .settings-save-bar .settings-primary-btn:focus,
 .settings-save-bar .settings-primary-btn:focus-visible,
 .settings-save-bar .settings-primary-btn:active {
-  background: #2f80d0;
+  background: #1a6abf;
   color: #ffffff;
   box-shadow: none;
   outline: none;
@@ -2354,6 +2354,13 @@ select.is-export-profile-missing {
   background: var(--surface);
   color: var(--ink);
   box-shadow: none;
+}
+
+.settings-page .settings-save-bar .settings-primary-btn:hover,
+.settings-page .settings-save-bar .settings-primary-btn:focus,
+.settings-page .settings-save-bar .settings-primary-btn:focus-visible {
+  background: var(--surface);
+  color: var(--ink);
 }
 
 @media (max-width: 1100px) {

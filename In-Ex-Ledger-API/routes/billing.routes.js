@@ -1211,6 +1211,16 @@ router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billi
 
     await syncStripeSubscriptionForBusiness(billingBusinessId, updatedSub);
     const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    await sendBillingEmail({
+      businessId: billingBusinessId,
+      kind: "plan_changed",
+      details: [
+        { label: "Plan", value: "Pro" },
+        { label: "Additional businesses", value: String(Number(updated.additionalBusinesses) || 0) },
+        { label: "Billing", value: formatBillingIntervalLabel(updated.billingInterval) }
+      ],
+      actionUrl: buildAppUrl("/subscription")
+    });
     logInfo("Business slots updated", {
       userId: req.user?.id,
       businessId: billingBusinessId,
@@ -1346,7 +1356,37 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
         object?.metadata?.business_id ||
         (await findBusinessByStripeCustomerId(object.customer));
       if (businessId) {
+        const previousSubscription = await getSubscriptionSnapshotForBusiness(businessId).catch(() => null);
         await syncStripeSubscriptionForBusiness(businessId, object);
+        const updatedSubscription = await getSubscriptionSnapshotForBusiness(businessId).catch(() => null);
+        if (updatedSubscription?.isTrialing && !previousSubscription?.isTrialing) {
+          await sendBillingEmail({
+            businessId,
+            kind: "trial_started",
+            details: [
+              { label: "Plan", value: "Pro trial" },
+              { label: "Trial ends", value: formatDateLabel(updatedSubscription?.trialEndsAt) },
+              { label: "Additional businesses", value: String(Number(updatedSubscription?.additionalBusinesses) || 0) }
+            ],
+            actionUrl: buildAppUrl("/subscription")
+          });
+        }
+        if (
+          updatedSubscription?.cancelAtPeriodEnd &&
+          !updatedSubscription?.isTrialing &&
+          !previousSubscription?.cancelAtPeriodEnd
+        ) {
+          await sendBillingEmail({
+            businessId,
+            kind: "canceling",
+            details: [
+              { label: "Plan", value: "Pro" },
+              { label: "Access through", value: formatDateLabel(updatedSubscription?.currentPeriodEnd) },
+              { label: "Additional businesses", value: String(Number(updatedSubscription?.additionalBusinesses) || 0) }
+            ],
+            actionUrl: buildAppUrl("/subscription")
+          });
+        }
         logInfo("Stripe subscription synced:", event.type, "business:", businessId);
       }
     } else if (event.type === "customer.subscription.deleted") {
