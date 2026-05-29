@@ -111,50 +111,58 @@ function timingSafeStringEqual(a, b) {
 
 function pickRecipientList(payload) {
   const out = [];
-  const candidates = [
-  payload?.to,
-  payload?.data?.to,
-  payload?.recipient,
-  payload?.data?.recipient,
-  payload?.recipients,
-  payload?.data?.recipients,
-  payload?.envelope?.to,
-  payload?.data?.envelope?.to,
-  payload?.envelope?.recipients,
-  payload?.data?.envelope?.recipients,
-  payload?.envelope?.rcpt_to,
-  payload?.data?.envelope?.rcpt_to,
-  payload?.headers?.to,
-  payload?.headers?.To,
-  payload?.data?.headers?.to,
-  payload?.data?.headers?.To
-];
-  
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    if (typeof candidate === "string") {
-      out.push(candidate);
-    } else if (Array.isArray(candidate)) {
-      for (const entry of candidate) {
-        if (typeof entry === "string") out.push(entry);
-        else if (entry?.email) out.push(entry.email);
-        else if (entry?.address) out.push(entry.address);
-        else if (entry?.raw) out.push(entry.raw);
-        else if (entry?.value) out.push(entry.value);
-        else if (entry?.name && entry?.email) out.push(`${entry.name} <${entry.email}>`);
+
+  function collect(value) {
+    if (!value) return;
+
+    if (typeof value === "string") {
+      out.push(value);
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        collect(entry);
       }
-    } else if (candidate?.email) {
-      out.push(candidate.email);
+      return;
     }
-    else if (candidate?.address) {
-       out.push(candidate.address);
-    } else if (candidate?.raw) {
-       out.push(candidate.raw);
-    } else if (candidate?.value) {
-      out.push(candidate.value);
-    }
+
+    if (value.email) collect(value.email);
+    if (value.address) collect(value.address);
+    if (value.raw) collect(value.raw);
+    if (value.text) collect(value.text);
+
+    if (value.value) collect(value.value);
+
+    if (value.to) collect(value.to);
+    if (value.recipients) collect(value.recipients);
+    if (value.rcpt_to) collect(value.rcpt_to);
   }
-  return out;
+
+  const candidates = [
+    payload?.to,
+    payload?.data?.to,
+    payload?.recipient,
+    payload?.data?.recipient,
+    payload?.recipients,
+    payload?.data?.recipients,
+    payload?.envelope?.to,
+    payload?.data?.envelope?.to,
+    payload?.envelope?.recipients,
+    payload?.data?.envelope?.recipients,
+    payload?.envelope?.rcpt_to,
+    payload?.data?.envelope?.rcpt_to,
+    payload?.headers?.to,
+    payload?.headers?.To,
+    payload?.data?.headers?.to,
+    payload?.data?.headers?.To
+  ];
+
+  for (const candidate of candidates) {
+    collect(candidate);
+  }
+
+  return [...new Set(out.map((item) => String(item).trim()).filter(Boolean))];
 }
 
 function pickFromAddress(payload) {
