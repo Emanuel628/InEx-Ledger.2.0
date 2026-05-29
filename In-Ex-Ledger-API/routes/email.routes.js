@@ -256,6 +256,44 @@ function timingSafeHexEqual(a, b) {
   }
 }
 
+function timingSafeB64Equal(a, b) {
+  try {
+    const ab = Buffer.from(String(a || ""), "base64");
+    const bb = Buffer.from(String(b || ""), "base64");
+    if (ab.length === 0 || ab.length !== bb.length) return false;
+    return crypto.timingSafeEqual(ab, bb);
+  } catch (_) {
+    return false;
+  }
+}
+
+// Resend signs inbound webhooks with Svix (https://docs.svix.com). The request
+// carries three headers — svix-id, svix-timestamp and svix-signature — where
+// svix-signature is a space-delimited list of "v1,<base64sig>" entries. The
+// signing secret looks like "whsec_<base64>"; the bytes after the prefix are
+// the HMAC-SHA256 key. The signed content is `${id}.${timestamp}.${rawBody}`.
+function verifySvixSignature(secret, svixId, svixTimestamp, svixSignature, rawBody) {
+  const keyMaterial = secret.startsWith("whsec_") ? secret.slice("whsec_".length) : secret;
+
+  let keyBytes;
+  try {
+    keyBytes = Buffer.from(keyMaterial, "base64");
+  } catch (_) {
+    return false;
+  }
+  if (!keyBytes.length) return false;
+
+  const signedContent = `${svixId}.${svixTimestamp}.${rawBody}`;
+  const expected = crypto.createHmac("sha256", keyBytes).update(signedContent).digest("base64");
+
+  const provided = String(svixSignature || "")
+    .split(" ")
+    .map((part) => (part.includes(",") ? part.split(",")[1] : part))
+    .filter(Boolean);
+
+  return provided.some((sig) => timingSafeB64Equal(sig, expected));
+}
+
 function rawBodyUtf8(req) {
   if (Buffer.isBuffer(req.body)) {
     return req.body.toString("utf8");
@@ -274,12 +312,38 @@ function verifyInboundEmailRequest(req, nowMs = Date.now()) {
   }
 
   const rawBody = rawBodyUtf8(req);
+  const svixId = String(req.get("svix-id") || "").trim();
+  const svixTimestamp = String(req.get("svix-timestamp") || "").trim();
+  const svixSignature = String(req.get("svix-signature") || "").trim();
   const timestampHeader = String(req.get("x-inbound-timestamp") || "").trim();
   const signatureHeader = String(req.get("x-inbound-signature") || "").trim();
   const legacySecretHeader = req.get("x-inbound-secret") || req.get("x-webhook-secret") || "";
   const allowLegacyFallback = process.env.NODE_ENV !== "production" || process.env.ALLOW_INBOUND_EMAIL_SECRET_FALLBACK === "true";
 
-  if (timestampHeader || signatureHeader) {
+  if (svixId && svixTimestamp && svixSignature) {
+    // Resend (Svix) signed webhook — the standard setup when Resend's inbound
+    // webhook posts directly to this endpoint.
+    const timestampSeconds = Number.parseInt(svixTimestamp, 10);
+    if (!Number.isFinite(timestampSeconds) || timestampSeconds <= 0) {
+      return { ok: false, status: 400, error: "Malformed webhook timestamp." };
+    }
+
+    const nowSeconds = Math.floor(nowMs / 1000);
+    if (Math.abs(nowSeconds - timestampSeconds) > INBOUND_TIMESTAMP_TOLERANCE_SECONDS) {
+      return { ok: false, status: 401, error: "Webhook timestamp outside tolerance window." };
+    }
+
+    if (!verifySvixSignature(secret, svixId, svixTimestamp, svixSignature, rawBody)) {
+      return { ok: false, status: 401, error: "Invalid webhook signature." };
+    }
+
+    pruneReplayCache(nowMs);
+    const replayKey = `svix:${svixId}`;
+    if (hasSeenSignature(replayKey)) {
+      return { ok: false, status: 409, error: "Replayed webhook signature." };
+    }
+    rememberSignature(replayKey, nowMs);
+  } else if (timestampHeader || signatureHeader) {
     if (!timestampHeader || !signatureHeader) {
       return { ok: false, status: 400, error: "Missing webhook signature headers." };
     }
