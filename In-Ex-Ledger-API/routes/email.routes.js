@@ -318,10 +318,30 @@ router.post("/inbound", async (req, res) => {
     return res.status(verification.status).json({ ok: false, error: verification.error });
   }
 
-  const payload = verification.payload || {};
-  const recipients = pickRecipientList(payload);
+    const payload = verification.payload || {};
+
+  let receivedEmail = null;
+  try {
+    receivedEmail = await fetchReceivedEmailContent(payload);
+  } catch (err) {
+    logWarn("inbound email webhook: failed to fetch received email content", {
+      message: err?.message || String(err),
+      emailId: payload?.data?.email_id || payload?.email_id || null
+    });
+  }
+
+  const recipients = [
+    ...pickRecipientList(payload),
+    ...pickRecipientList(receivedEmail || {})
+  ];
+
   if (!recipients.length) {
-    logWarn("inbound email webhook: no recipients in payload");
+    logWarn("inbound email webhook: no recipients in payload or fetched email", {
+      payloadKeys: Object.keys(payload || {}),
+      dataKeys: Object.keys(payload?.data || {}),
+      fetchedEmail: !!receivedEmail,
+      fetchedEmailKeys: receivedEmail ? Object.keys(receivedEmail) : []
+    });
     return res.status(200).json({ ok: true, ignored: "no_recipients" });
   }
 
@@ -360,17 +380,6 @@ router.post("/inbound", async (req, res) => {
       logWarn("inbound email webhook: business has no owner", { invoiceId });
       return res.status(200).json({ ok: true, ignored: "no_owner" });
     }
-
-    let receivedEmail = null;
-
-try {
-  receivedEmail = await fetchReceivedEmailContent(payload);
-} catch (err) {
-  logWarn("inbound email webhook: failed to fetch received email content", {
-    message: err?.message || String(err),
-    emailId: payload?.data?.email_id || payload?.email_id || null
-  });
-}
 
 const from = pickFromAddress(receivedEmail || payload);
     const subject = String(
