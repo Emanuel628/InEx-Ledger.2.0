@@ -236,7 +236,10 @@ function rawBodyUtf8(req) {
   return "";
 }
 
-function verifyInboundEmailRequest(req, nowMs = Date.now()) {
+const allowLegacyFallback =
+  process.env.NODE_ENV !== "production" ||
+  process.env.ALLOW_INBOUND_EMAIL_SECRET_FALLBACK === "true";
+
   const secret = String(process.env.INBOUND_EMAIL_WEBHOOK_SECRET || "").trim();
   if (!secret) {
     return { ok: false, status: 503, error: "Inbound email webhook is not configured." };
