@@ -12,6 +12,14 @@ const FIFTY_PCT_LIMITATION_LINES = new Set(["meals", "meals_entertainment"]);
 // IRC §274(a) (TCJA, 2018): entertainment expenses are 0% deductible for US
 // filers. Track for documentation only — no Schedule C deduction allowed.
 const ZERO_PCT_LIMITATION_LINES = new Set(["entertainment"]);
+const REVIEW_ONLY_LINES = new Set([
+  "home_office",
+  "business_use_of_home",
+  "equipment_capital_asset",
+  "depreciation_section179",
+  "ca_9936",
+  "ca_9943"
+]);
 
 const FORM_THRESHOLDS = TAX_FORM_THRESHOLDS_BY_YEAR;
 
@@ -212,12 +220,16 @@ async function getTaxLineSummaryForYear(pool, { businessId, year, region, fiscal
       let limitationPct = null;
       if (FIFTY_PCT_LIMITATION_LINES.has(line.tax_line)) limitationPct = 50;
       else if (ZERO_PCT_LIMITATION_LINES.has(line.tax_line)) limitationPct = 0;
+      const isReviewOnly = REVIEW_ONLY_LINES.has(line.tax_line);
       return {
         ...line,
         total_amount: total,
         limitation_pct: limitationPct,
+        review_only: isReviewOnly,
         deductible_amount: limitationPct !== null
           ? Number((total * (limitationPct / 100)).toFixed(2))
+          : isReviewOnly
+            ? 0
           : total
       };
     })
@@ -257,5 +269,6 @@ module.exports = {
   FORM_THRESHOLDS,
   FIFTY_PCT_LIMITATION_LINES,
   ZERO_PCT_LIMITATION_LINES,
+  REVIEW_ONLY_LINES,
   __private: { normalizeYear, yearBounds }
 };

@@ -6,9 +6,12 @@ const assert = require("node:assert/strict");
 const {
   resolveProvinceGroup,
   finalizeRateSelection,
+  getQuickMethodEligibility,
+  buildQuickMethodSchedule,
   computeQuickMethodRemittance,
   QUICK_METHOD_CREDIT_RATE,
-  QUICK_METHOD_CREDIT_CAP
+  QUICK_METHOD_CREDIT_CAP,
+  QUICK_METHOD_REVENUE_LIMIT
 } = require("../services/quickMethodService.js");
 
 // Replace the real pool with a stub for unit tests
@@ -82,4 +85,43 @@ test("netTaxToRemit is never negative", () => {
   const net = +Math.max(0, grossRemittance - itcCredit).toFixed(2);
   assert.ok(net >= 0);
   assert.equal(net, 39);
+});
+
+test("resolveProvinceGroup uses split Atlantic groups in 2026", () => {
+  assert.equal(resolveProvinceGroup("NS", 2026), "NS");
+  assert.equal(resolveProvinceGroup("PE", 2026), "NB_NL_PEI");
+});
+
+test("getQuickMethodEligibility blocks excluded businesses and oversized revenue", () => {
+  const excluded = getQuickMethodEligibility({
+    province: "ON",
+    supplyType: "services",
+    taxYear: 2026,
+    grossSalesInclTax: 100000,
+    businessActivityCode: "541213"
+  });
+  assert.equal(excluded.eligible, false);
+  assert.match(excluded.reason, /excluded/i);
+
+  const oversized = getQuickMethodEligibility({
+    province: "ON",
+    supplyType: "services",
+    taxYear: 2026,
+    grossSalesInclTax: QUICK_METHOD_REVENUE_LIMIT + 1
+  });
+  assert.equal(oversized.eligible, false);
+  assert.match(excluded.reason, /Quick Method/);
+  assert.match(oversized.reason, /\$400,000/);
+});
+
+test("buildQuickMethodSchedule returns an unsupported review object when supply type cannot be verified", async () => {
+  const result = await buildQuickMethodSchedule({
+    businessId: "biz1",
+    province: "ON",
+    supplyType: null,
+    taxYear: 2026,
+    grossSalesInclTax: 20000
+  });
+  assert.equal(result.supported, false);
+  assert.match(result.unsupportedReason, /supply type/i);
 });

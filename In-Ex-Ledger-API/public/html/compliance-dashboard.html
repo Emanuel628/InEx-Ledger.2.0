@@ -316,6 +316,7 @@ let filteredRows = [];
 let selectedIds = new Set();
 let activeFilter = "all";
 let expandedId = null;
+let businessRegion = "US";
 
 // ── API helpers ────────────────────────────────────────────────────────────────
 
@@ -347,6 +348,9 @@ async function loadTransactions() {
     apiFetch(`/api/exports/dataset?startDate=${startDate}&endDate=${endDate}`).catch(() => null),
     apiFetch("/api/business")
   ]);
+
+  businessRegion = String(businessData?.region || "US").toUpperCase() === "CA" ? "CA" : "US";
+  syncBulkVehicleMethodOptions();
 
   if (!txData || !txData.rows) {
     return [];
@@ -461,14 +465,20 @@ function renderTable() {
 }
 
 function buildVehicleClaimForm(row) {
+  const isCA = businessRegion === "CA";
+  const methodOptions = isCA
+    ? `<option value="actual">Actual motor vehicle expense %</option>`
+    : `<option value="mileage">Standard mileage rate</option><option value="actual">Actual expense %</option>`;
+  const supportNote = isCA
+    ? `<div class="secondary" style="margin-top:6px">Canadian self-employed vehicle deductions use actual motor vehicle expenses with business-use allocation. Mileage logs remain support only.</div>`
+    : `<div class="secondary" style="margin-top:6px">Use one vehicle method consistently for the tax year until per-vehicle elections are supported.</div>`;
   return `
     <div class="claim-form" onclick="event.stopPropagation()">
       <div class="claim-row">
         <div>
           <label>Claim method</label>
           <select class="claim-method-sel" data-id="${row.id}">
-            <option value="mileage">Standard mileage rate</option>
-            <option value="actual">Actual expense %</option>
+            ${methodOptions}
           </select>
         </div>
         <div>
@@ -476,7 +486,7 @@ function buildVehicleClaimForm(row) {
           <input type="number" class="claim-year" data-id="${row.id}" value="${TAX_YEAR}" min="2020" max="2030" />
         </div>
       </div>
-      <div class="mileage-fields" data-id="${row.id}">
+      <div class="mileage-fields" data-id="${row.id}" style="${isCA ? "display:none" : "display:block"}">
         <div class="claim-row">
           <div><label>Distance</label><input type="number" class="claim-distance" data-id="${row.id}" placeholder="0.0" min="0" step="0.1" /></div>
           <div>
@@ -488,12 +498,23 @@ function buildVehicleClaimForm(row) {
           </div>
         </div>
       </div>
-      <div class="actual-fields" data-id="${row.id}" style="display:none">
+      <div class="actual-fields" data-id="${row.id}" style="${isCA ? "display:block" : "display:none"}">
         <label>Business use %</label>
         <input type="number" class="claim-pct" data-id="${row.id}" placeholder="0–100" min="0" max="100" step="1" />
       </div>
+      ${supportNote}
       <button class="btn btn-primary btn-sm btn-save-claim" data-id="${row.id}">Save Claim</button>
     </div>`;
+}
+
+function syncBulkVehicleMethodOptions() {
+  const select = document.getElementById("bulk-vehicle-method");
+  if (!select) return;
+  if (businessRegion === "CA") {
+    select.innerHTML = `<option value="">— Apply vehicle method —</option><option value="actual">Actual motor vehicle expense %</option>`;
+  } else {
+    select.innerHTML = `<option value="">— Apply vehicle method —</option><option value="mileage">Mileage method</option><option value="actual">Actual expense method</option>`;
+  }
 }
 
 // ── Claim / Asset save ─────────────────────────────────────────────────────────

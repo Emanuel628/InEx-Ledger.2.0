@@ -127,6 +127,53 @@ function buildExportMetadataRows(exportId, metadata) {
     .map(([key, value]) => [crypto.randomUUID(), exportId, key, String(value)]);
 }
 
+function inferQuickMethodSupplyType(transactions = [], categories = [], businessActivityCode = "") {
+  const categoriesById = new Map((categories || []).map((category) => [category.id, category]));
+  const incomeTransactions = (transactions || []).filter((row) => String(row.type || "").toLowerCase() === "income");
+  const detectedTypes = new Set();
+
+  incomeTransactions.forEach((row) => {
+    const category = categoriesById.get(row.category_id);
+    const taxKey = String(category?.tax_map_ca || category?.tax_map_us || "").trim().toLowerCase();
+    const name = String(category?.name || row.description || "").trim().toLowerCase();
+    if (["t4a_20", "nonemployee_compensation", "service_revenue"].includes(taxKey) || /(service|consult|design|repair|freelance|commission)/i.test(name)) {
+      detectedTypes.add("services");
+    } else if (["sales", "sales_revenue", "gross_receipts_sales"].includes(taxKey) || /(sale|retail|shop|store|inventory|product)/i.test(name)) {
+      detectedTypes.add("goods");
+    }
+  });
+
+  if (detectedTypes.size === 1) {
+    return {
+      supplyType: Array.from(detectedTypes)[0],
+      source: "income_category_mapping",
+      warning: null
+    };
+  }
+
+  const naicsSector = String(businessActivityCode || "").replace(/\D+/g, "").slice(0, 2);
+  if (["11", "21", "22", "23", "31", "32", "33", "42", "44", "45"].includes(naicsSector)) {
+    return {
+      supplyType: "goods",
+      source: "naics_inference",
+      warning: "Supply type was inferred from the business activity code. Confirm the CRA Quick Method rate with your preparer."
+    };
+  }
+  if (["48", "49", "51", "52", "53", "54", "55", "56", "61", "62", "71", "72", "81"].includes(naicsSector)) {
+    return {
+      supplyType: "services",
+      source: "naics_inference",
+      warning: "Supply type was inferred from the business activity code. Confirm the CRA Quick Method rate with your preparer."
+    };
+  }
+
+  return {
+    supplyType: null,
+    source: "unknown",
+    warning: "Supply type could not be safely inferred from the current ledger data."
+  };
+}
+
 function createPdfReportId(rawDate = new Date()) {
   const date = rawDate instanceof Date ? rawDate : new Date(rawDate);
   const stamp = [
@@ -695,16 +742,22 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
     let quickMethodSchedule = null;
     if (region === "ca" && business.gst_hst_registered === true && business.gst_hst_method === "quick") {
       try {
+        const quickMethodSupply = inferQuickMethodSupplyType(sourceRows.transactions, categories, business.business_activity_code || "");
         const grossSalesInclTax = sourceRows.transactions
           .filter((t) => String(t.type || "").toLowerCase() === "income")
           .reduce((sum, t) => sum + Math.abs(Number(t.amount || 0)), 0);
         quickMethodSchedule = await buildQuickMethodSchedule({
           businessId,
           province: business.province || "ON",
-          supplyType: "services",
+          supplyType: quickMethodSupply.supplyType,
+          supplyTypeSource: quickMethodSupply.source,
           taxYear: sourceRows.taxYear,
-          grossSalesInclTax
+          grossSalesInclTax,
+          businessActivityCode: business.business_activity_code || ""
         });
+        if (quickMethodSchedule && quickMethodSupply.warning && !quickMethodSchedule.warning) {
+          quickMethodSchedule.warning = quickMethodSupply.warning;
+        }
       } catch (qmErr) {
         logError("Quick Method schedule computation failed (non-fatal)", { err: qmErr.message });
       }

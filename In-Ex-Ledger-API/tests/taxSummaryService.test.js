@@ -10,6 +10,7 @@ const {
   expectedFormForPayer,
   FIFTY_PCT_LIMITATION_LINES,
   ZERO_PCT_LIMITATION_LINES,
+  REVIEW_ONLY_LINES,
   __private: { yearBounds }
 } = require("../services/taxSummaryService.js");
 
@@ -181,4 +182,25 @@ test("getTaxLineSummaryForYear applies 0% limitation to entertainment (US — no
 
 test("ZERO_PCT_LIMITATION_LINES contains entertainment key", () => {
   assert.ok(ZERO_PCT_LIMITATION_LINES.has("entertainment"), "entertainment is nondeductible post-TCJA");
+});
+
+test("getTaxLineSummaryForYear treats home office and capital asset review lines as non-deductible until schedules are completed", async () => {
+  const pool = makePool([[
+    { category_id: "c1", category_name: "Home Office", category_kind: "expense", tax_line: "home_office", transaction_count: 2, total_amount: "600.00", receipt_count: 2 },
+    { category_id: "c2", category_name: "Equipment", category_kind: "expense", tax_line: "equipment_capital_asset", transaction_count: 1, total_amount: "1500.00", receipt_count: 1 }
+  ]]);
+
+  const summary = await getTaxLineSummaryForYear(pool, { businessId: "biz", year: 2026, region: "US" });
+  const homeOffice = summary.mapped_lines.find((line) => line.tax_line === "home_office");
+  const capital = summary.mapped_lines.find((line) => line.tax_line === "equipment_capital_asset");
+
+  assert.equal(homeOffice.review_only, true);
+  assert.equal(homeOffice.deductible_amount, 0);
+  assert.equal(capital.review_only, true);
+  assert.equal(capital.deductible_amount, 0);
+});
+
+test("REVIEW_ONLY_LINES includes home office and capital asset keys", () => {
+  assert.ok(REVIEW_ONLY_LINES.has("home_office"));
+  assert.ok(REVIEW_ONLY_LINES.has("equipment_capital_asset"));
 });

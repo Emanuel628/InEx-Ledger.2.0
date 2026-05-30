@@ -4,12 +4,49 @@ const { pool } = require("../db.js");
 const { getIrsRate, getCraRate } = require("../utils/mileageRates.js");
 const { logError } = require("../utils/logger.js");
 
+const VALID_CLAIM_METHODS_BY_REGION = {
+  US: new Set(["mileage", "actual"]),
+  CA: new Set(["actual"])
+};
+
+function normalizeRegion(region) {
+  return String(region || "US").toUpperCase() === "CA" ? "CA" : "US";
+}
+
+function validateClaimMethodForRegion(claimMethod, region) {
+  const normalizedRegion = normalizeRegion(region);
+  const method = String(claimMethod || "").toLowerCase();
+  const allowedMethods = VALID_CLAIM_METHODS_BY_REGION[normalizedRegion] || VALID_CLAIM_METHODS_BY_REGION.US;
+  if (!allowedMethods.has(method)) {
+    if (normalizedRegion === "CA" && method === "mileage") {
+      throw new Error("CRA self-employed vehicle deductions must use actual motor vehicle expenses with a business-use allocation. Mileage logs remain support only.");
+    }
+    throw new Error(`Claim method '${method}' is not allowed for region ${normalizedRegion}.`);
+  }
+  return { normalizedRegion, method };
+}
+
+async function assertConsistentClaimMethodForYear({ businessId, taxYear, claimMethod, transactionId }) {
+  const result = await pool.query(
+    `SELECT claim_method
+       FROM vehicle_expense_details
+      WHERE business_id = $1
+        AND tax_year = $2
+        AND transaction_id != $3
+      LIMIT 1`,
+    [businessId, taxYear, transactionId]
+  );
+  const existingMethod = String(result.rows[0]?.claim_method || "").toLowerCase();
+  if (existingMethod && existingMethod !== String(claimMethod || "").toLowerCase()) {
+    throw new Error(`Vehicle claim method conflict for tax year ${taxYear}. Use one method per business tax year until per-vehicle elections are supported.`);
+  }
+}
+
 // Compute vehicle deduction variables without hitting the DB.
 // Returns the calculated_deduction and the rate used (for audit storage).
 function computeVehicleDeduction(options = {}) {
   const { claimMethod, region, taxYear, distance, distanceUnit, amount, businessUsePct } = options;
-  const method = String(claimMethod || "").toLowerCase();
-  const normalizedRegion = String(region || "US").toUpperCase();
+  const { normalizedRegion, method } = validateClaimMethodForRegion(claimMethod, region);
   const year = Number(taxYear);
 
   if (method === "mileage") {
@@ -70,10 +107,13 @@ async function upsertVehicleClaimDetail(transactionId, businessId, data) {
     region
   } = data;
 
+  const { normalizedRegion, method } = validateClaimMethodForRegion(claimMethod, region);
+  await assertConsistentClaimMethodForYear({ businessId, taxYear, claimMethod: method, transactionId });
+
   // For CRA mileage claims, accumulate km logged earlier this year so the
   // 5,000 km tier threshold is applied correctly across the full tax year.
   let priorYearKm = 0;
-  if (String(region || "").toUpperCase() === "CA" && String(claimMethod || "").toLowerCase() === "mileage") {
+  if (normalizedRegion === "CA" && method === "mileage") {
     const priorRes = await pool.query(
       `SELECT COALESCE(SUM(
          CASE WHEN distance_unit = 'km' THEN distance
@@ -91,8 +131,8 @@ async function upsertVehicleClaimDetail(transactionId, businessId, data) {
   }
 
   const { calculatedDeduction, taxYearRate } = computeVehicleDeduction({
-    claimMethod,
-    region,
+    claimMethod: method,
+    region: normalizedRegion,
     taxYear,
     distance,
     distanceUnit,
@@ -121,15 +161,24 @@ async function upsertVehicleClaimDetail(transactionId, businessId, data) {
       transactionId,
       businessId,
       taxYear,
-      claimMethod,
-      claimMethod === "mileage" ? distance : null,
-      claimMethod === "mileage" ? (distanceUnit || "mi") : null,
+      method,
+      method === "mileage" ? distance : null,
+      method === "mileage" ? (distanceUnit || "mi") : null,
       taxYearRate,
-      claimMethod === "actual" ? businessUsePct : null,
+      method === "actual" ? businessUsePct : null,
       calculatedDeduction
     ]
   );
   return result.rows[0];
 }
 
-module.exports = { computeVehicleDeduction, getVehicleClaimDetail, upsertVehicleClaimDetail };
+module.exports = {
+  computeVehicleDeduction,
+  getVehicleClaimDetail,
+  upsertVehicleClaimDetail,
+  validateClaimMethodForRegion,
+  __private: {
+    normalizeRegion,
+    assertConsistentClaimMethodForYear
+  }
+};

@@ -128,6 +128,16 @@ test("getTaxDashboard uses province income-tax+CPP set-aside rate applied to pro
     { match: (s) => /GROUP BY type/.test(s), rows: [
       { type: "income", total: "10000", tx_count: 5 },
       { type: "expense", total: "2000", tx_count: 5 }
+    ] },
+    { match: (s) => /with_receipt_count/.test(s), rows: [{ expense_count: 5, with_receipt_count: 5 }] },
+    { match: (s) => /FROM mileage\s+WHERE business_id/.test(s), rows: [{ total_miles: "0", total_km: "0", trip_count: 0 }] },
+    { match: (s) => /COALESCE\(NULLIF\(TRIM\(payer_name\)/.test(s), rows: [] },
+    { match: (s) => /FROM categories c/.test(s), rows: [] },
+    { match: (s) => /DATE_TRUNC\('quarter', date\)::date AS quarter_start/.test(s), rows: [
+      { quarter_start: "2025-01-01", total_amount: "12000" },
+      { quarter_start: "2025-04-01", total_amount: "9000" },
+      { quarter_start: "2025-07-01", total_amount: "7000" },
+      { quarter_start: "2025-10-01", total_amount: "5000" }
     ] }
   ]);
   const dashboard = await getTaxDashboard(pool, {
@@ -142,22 +152,39 @@ test("getTaxDashboard uses province income-tax+CPP set-aside rate applied to pro
   // GST/HST alert present for CA
   assert.ok(dashboard.gst_hst_alert, "CA dashboard should include gst_hst_alert");
   assert.equal(dashboard.gst_hst_alert.threshold, GST_HST_REGISTRATION_THRESHOLD);
+  assert.equal(dashboard.gst_hst_alert.max_rolling_four_quarters_revenue, 33000);
 });
 
-test("buildGstHstAlert flags approaching and reached thresholds", () => {
-  const under = buildGstHstAlert(23999);
+test("buildGstHstAlert uses CRA single-quarter and rolling-four-quarter tests", () => {
+  const under = buildGstHstAlert([
+    { quarter: "2025-Q1", revenue: 10000 },
+    { quarter: "2025-Q2", revenue: 7000 },
+    { quarter: "2025-Q3", revenue: 6000 },
+    { quarter: "2025-Q4", revenue: 999 }
+  ]);
   assert.equal(under.threshold_reached, false);
   assert.equal(under.approaching, false);
   assert.equal(under.note, null);
 
-  const approaching = buildGstHstAlert(24000);
+  const approaching = buildGstHstAlert([
+    { quarter: "2025-Q1", revenue: 8000 },
+    { quarter: "2025-Q2", revenue: 6000 },
+    { quarter: "2025-Q3", revenue: 5000 },
+    { quarter: "2025-Q4", revenue: 5000 }
+  ]);
   assert.equal(approaching.threshold_reached, false);
   assert.equal(approaching.approaching, true);
   assert.ok(approaching.note);
 
-  const reached = buildGstHstAlert(30000);
+  const reached = buildGstHstAlert([
+    { quarter: "2025-Q1", revenue: 12000 },
+    { quarter: "2025-Q2", revenue: 9000 },
+    { quarter: "2025-Q3", revenue: 7000 },
+    { quarter: "2025-Q4", revenue: 5000 }
+  ]);
   assert.equal(reached.threshold_reached, true);
   assert.ok(reached.note);
+  assert.equal(reached.reached_quarter, "2025-Q4");
 });
 
 test("getTaxDashboard gst_hst_alert is null for US region", async () => {
@@ -185,7 +212,8 @@ test("getTaxDashboard uses fiscal-year bounds for totals and passes them through
     { match: (s) => /with_receipt_count/.test(s), rows: [{ expense_count: 0, with_receipt_count: 0 }] },
     { match: (s) => /FROM mileage\s+WHERE business_id/.test(s), rows: [{ total_miles: "0", total_km: "0", trip_count: 0 }] },
     { match: (s) => /COALESCE\(NULLIF\(TRIM\(payer_name\)/.test(s), rows: [] },
-    { match: (s) => /FROM categories c/.test(s), rows: [] }
+    { match: (s) => /FROM categories c/.test(s), rows: [] },
+    { match: (s) => /DATE_TRUNC\('quarter', date\)::date AS quarter_start/.test(s), rows: [] }
   ]);
 
   const dashboard = await getTaxDashboard(pool, {

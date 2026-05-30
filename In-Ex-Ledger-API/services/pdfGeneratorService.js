@@ -2478,6 +2478,128 @@ function buildQuickMethodRemittancePage(qmSchedule, currency, labels) {
   return [canvas];
 }
 
+// Override with stricter launch-safe behavior for vehicle and Quick Method workpapers.
+function buildVehicleAuditSchedule(vehicleClaims, currency, labels, region) {
+  if (!vehicleClaims || vehicleClaims.length === 0) return [];
+  const isCA = normalizeRegionCode(region) === "CA";
+  const canvas = new PdfCanvas();
+  const header = drawReportHeader(canvas, {
+    title: "Auto Audit Support Schedule",
+    subtitle: isCA ? "CRA vehicle expense claim details (per-transaction)" : "IRS vehicle expense claim details (per-transaction)",
+    badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }]
+  });
+
+  const cols = [
+    { key: "date", label: "Date", x: 40, width: 68 },
+    { key: "description", label: "Description", x: 116, width: 174 },
+    { key: "method", label: "Method", x: 298, width: 62 },
+    { key: "detail", label: "Distance / Pct", x: 368, width: 90 },
+    { key: "rate", label: "Rate", x: 466, width: 48 },
+    { key: "deduction", label: "Deduction", x: 522, width: 50, align: "right" }
+  ];
+
+  let y = header.contentStartY - 10;
+  canvas.drawSectionHeader("Vehicle Claim Detail", 40, y);
+  y -= 24;
+  canvas.drawTableHeader(cols, y);
+  y -= 18;
+
+  let totalDeduction = 0;
+  vehicleClaims.forEach((claim, index) => {
+    const isMileage = claim.claim_method === "mileage";
+    const detail = isMileage
+      ? `${Number(claim.distance || 0).toFixed(1)} ${claim.distance_unit || "mi"}`
+      : `${Number(claim.business_use_pct || 0).toFixed(1)}%`;
+    const rate = isMileage && claim.tax_year_rate
+      ? `$${Number(claim.tax_year_rate).toFixed(4)}`
+      : "-";
+    const deductionAmt = Number(claim.calculated_deduction || 0);
+    totalDeduction += deductionAmt;
+
+    if (y < PAGE.bottom + 24) {
+      canvas.addFooter(1, 1, "Auto Audit Support Schedule continued");
+      return;
+    }
+
+    canvas.drawTableRow(cols, {
+      date: normalizePdfDate(claim.transaction_date || ""),
+      description: truncateText(claim.description || "(No description)", 28),
+      method: isMileage ? "Mileage" : "Actual %",
+      detail,
+      rate,
+      deduction: formatCurrencyForPdf(deductionAmt, currency)
+    }, y, { fillGray: index % 2 === 0 ? 0.985 : null });
+    y -= 13;
+  });
+
+  y -= 10;
+  canvas.setStrokeGray(COLORS.mid);
+  canvas.drawLine(40, y + 6, 572, y + 6);
+  canvas.setStrokeGray(COLORS.black);
+  canvas.text(40, y - 4, `Total audited vehicle deduction: ${formatCurrencyForPdf(totalDeduction, currency)}`, 9, "F2");
+  y -= 24;
+  canvas.drawCard(40, y, 532, 68, "Method Reference", [
+    isCA
+      ? "Canadian self-employed motor vehicle claims use actual expenses with business-use allocation. Mileage logs shown in this package are support only."
+      : "Mileage: IRS standard mileage rate applied. Actual: gross amount × business-use %. Use one method consistently for the tax year until per-vehicle elections are supported.",
+    "Rates stored per tax year. Run VALIDATE CONSTRAINT after data cleanup to enable query-planner optimization."
+  ], { maxChars: 90 });
+
+  return [canvas];
+}
+
+function buildQuickMethodRemittancePage(qmSchedule, currency, labels) {
+  if (!qmSchedule) return [];
+  const canvas = new PdfCanvas();
+  const header = drawReportHeader(canvas, {
+    title: "CRA Quick Method Remittance Schedule",
+    subtitle: "ETA s. 227 - Simplified accounting for small businesses",
+    badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }, { text: "QUICK METHOD", variant: "neutral" }]
+  });
+
+  let y = header.contentStartY - 10;
+  if (qmSchedule.supported === false) {
+    canvas.drawCard(40, y, 532, 136, "Quick Method Review Required", [
+      qmSchedule.unsupportedReason || "The current ledger data is not sufficient to compute a reliable Quick Method schedule.",
+      qmSchedule.warning || "",
+      "This export did not auto-calculate a remittance figure. Confirm eligibility, supply type, and current CRA rates before filing."
+    ].filter(Boolean), { maxChars: 92 });
+    return [canvas];
+  }
+
+  canvas.drawCard(40, y, 252, 118, "Remittance Calculation", [
+    `Gross revenues (incl. HST/GST): ${formatCurrencyForPdf(qmSchedule.grossSalesInclTax, currency)}`,
+    `Remittance rate (${String(qmSchedule.provinceGroup || "").replace(/_/g, "/")} ${qmSchedule.supplyType}): ${(Number(qmSchedule.remittanceRate) * 100).toFixed(1)}%`,
+    `Net tax to remit: ${formatCurrencyForPdf(qmSchedule.netTaxToRemit, currency)}`,
+    `Tax collected from customers: ${formatCurrencyForPdf(qmSchedule.taxCollected, currency)}`
+  ], { maxChars: 34 });
+
+  canvas.drawCard(320, y, 252, 118, "Method Parameters", [
+    `Province / group: ${qmSchedule.province || "-"}`,
+    `Supply type: ${qmSchedule.supplyType || "-"}`,
+    `Supply type source: ${qmSchedule.supplyTypeSource || "-"}`,
+    `Tax year: ${qmSchedule.taxYear || "-"}`,
+    `HST/GST rate: ${(Number(qmSchedule.hstRate) * 100).toFixed(0)}%`
+  ], { maxChars: 34 });
+
+  y -= 138;
+  canvas.drawCard(40, y, 532, 110, "Quick Method - ITC Treatment", [
+    "Under the Quick Method, ITCs on business expenses (other than capital property) are NOT claimed.",
+    "The expense amounts in the transaction ledger represent the full cost including GST/HST paid - this is correct under ETA s. 227.",
+    "The 1% credit on the first $30,000 of eligible supplies (ETA s. 227(6)) is applied separately by CRA.",
+    qmSchedule.warning || "",
+    qmSchedule.note || ""
+  ].filter(Boolean), { maxChars: 90 });
+
+  y -= 130;
+  canvas.drawCard(40, y, 532, 68, "Comparison", [
+    `Tax collected: ${formatCurrencyForPdf(qmSchedule.taxCollected, currency)}  |  Remittance: ${formatCurrencyForPdf(qmSchedule.netTaxToRemit, currency)}  |  Net benefit: ${formatCurrencyForPdf(qmSchedule.taxCollected - qmSchedule.netTaxToRemit, currency)}`,
+    "Confirm with preparer that the Quick Method election is current and that annual revenues are under the $400,000 threshold."
+  ], { maxChars: 92 });
+
+  return [canvas];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 function buildFooterText(labels, reportId, generatedAt, isSecure, pageNumber, totalPages, legalName, taxId) {

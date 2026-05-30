@@ -7,7 +7,8 @@ const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForU
 const { pool } = require("../db.js");
 const {
   getVehicleClaimDetail,
-  upsertVehicleClaimDetail
+  upsertVehicleClaimDetail,
+  validateClaimMethodForRegion
 } = require("../services/vehicleClaimService.js");
 const { logError } = require("../utils/logger.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
@@ -37,25 +38,11 @@ router.put("/:transactionId", async (req, res) => {
   const body = req.body ?? {};
   const { claim_method, tax_year, distance, distance_unit, business_use_pct } = body;
 
-  if (!claim_method || !VALID_CLAIM_METHODS.has(claim_method)) {
+  if (!claim_method || !VALID_CLAIM_METHODS.has(String(claim_method).toLowerCase())) {
     return res.status(400).json({ error: "claim_method must be 'mileage' or 'actual'." });
   }
   if (!tax_year || !Number.isInteger(Number(tax_year)) || Number(tax_year) < 2010) {
     return res.status(400).json({ error: "tax_year must be a valid year (2010+)." });
-  }
-  if (claim_method === "mileage") {
-    if (distance == null || Number(distance) <= 0) {
-      return res.status(400).json({ error: "distance is required and must be positive for the mileage method." });
-    }
-    if (distance_unit && !VALID_DISTANCE_UNITS.has(distance_unit)) {
-      return res.status(400).json({ error: "distance_unit must be 'mi' or 'km'." });
-    }
-  }
-  if (claim_method === "actual") {
-    const pct = Number(business_use_pct);
-    if (business_use_pct == null || !Number.isFinite(pct) || pct < 0 || pct > 100) {
-      return res.status(400).json({ error: "business_use_pct must be a number between 0 and 100 for the actual method." });
-    }
   }
 
   try {
@@ -83,10 +70,27 @@ router.put("/:transactionId", async (req, res) => {
       [businessId]
     );
     const region = bizRow.rows[0]?.region || "US";
+    const normalizedMethod = String(claim_method).toLowerCase();
+    validateClaimMethodForRegion(normalizedMethod, region);
+
+    if (normalizedMethod === "mileage") {
+      if (distance == null || Number(distance) <= 0) {
+        return res.status(400).json({ error: "distance is required and must be positive for the mileage method." });
+      }
+      if (distance_unit && !VALID_DISTANCE_UNITS.has(distance_unit)) {
+        return res.status(400).json({ error: "distance_unit must be 'mi' or 'km'." });
+      }
+    }
+    if (normalizedMethod === "actual") {
+      const pct = Number(business_use_pct);
+      if (business_use_pct == null || !Number.isFinite(pct) || pct < 0 || pct > 100) {
+        return res.status(400).json({ error: "business_use_pct must be a number between 0 and 100 for the actual method." });
+      }
+    }
 
     const detail = await upsertVehicleClaimDetail(req.params.transactionId, businessId, {
       taxYear: Number(tax_year),
-      claimMethod: claim_method,
+      claimMethod: normalizedMethod,
       distance: distance != null ? Number(distance) : null,
       distanceUnit: distance_unit || "mi",
       businessUsePct: business_use_pct != null ? Number(business_use_pct) : null,
@@ -100,6 +104,9 @@ router.put("/:transactionId", async (req, res) => {
     }).catch((error) => logError("Vehicle claim snapshot invalidation failed:", error));
     res.json(detail);
   } catch (err) {
+    if (String(err?.message || "").includes("Vehicle claim method conflict") || String(err?.message || "").includes("CRA self-employed vehicle deductions")) {
+      return res.status(400).json({ error: err.message });
+    }
     logError("PUT /vehicle-claims/:transactionId error:", err.stack || err);
     res.status(500).json({ error: "Server error saving vehicle claim." });
   }

@@ -157,20 +157,98 @@ function calculateEstimatedSetAside({ profit, rate }) {
 // in any rolling 12-month period (CRA small-supplier threshold).
 const GST_HST_REGISTRATION_THRESHOLD = 30000;
 
-function buildGstHstAlert(income) {
-  const approaching = income >= GST_HST_REGISTRATION_THRESHOLD * 0.8;
-  const reached = income >= GST_HST_REGISTRATION_THRESHOLD;
+function quarterKeyFromDate(value) {
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  const year = date.getUTCFullYear();
+  const quarter = Math.floor(date.getUTCMonth() / 3) + 1;
+  return `${year}-Q${quarter}`;
+}
+
+function buildQuarterKeys(year) {
+  const keys = [];
+  for (let y = year - 1; y <= year; y += 1) {
+    for (let q = 1; q <= 4; q += 1) {
+      keys.push(`${y}-Q${q}`);
+    }
+  }
+  return keys;
+}
+
+function buildGstHstAlert(quarterlyRevenue, threshold = GST_HST_REGISTRATION_THRESHOLD) {
+  const keys = Array.isArray(quarterlyRevenue)
+    ? quarterlyRevenue.map((entry) => String(entry.quarter || ""))
+    : [];
+  const valuesByQuarter = new Map(
+    Array.isArray(quarterlyRevenue)
+      ? quarterlyRevenue.map((entry) => [String(entry.quarter || ""), clamp2(entry.revenue || 0)])
+      : []
+  );
+
+  let maxSingleQuarter = 0;
+  let maxRollingFour = 0;
+  let reachedQuarter = null;
+  const ordered = keys.length ? keys : [];
+
+  for (let i = 0; i < ordered.length; i += 1) {
+    const quarter = ordered[i];
+    const single = valuesByQuarter.get(quarter) || 0;
+    if (single > maxSingleQuarter) maxSingleQuarter = single;
+    if (!reachedQuarter && single > threshold) reachedQuarter = quarter;
+    if (i >= 3) {
+      const rolling = ordered.slice(i - 3, i + 1).reduce((sum, key) => sum + (valuesByQuarter.get(key) || 0), 0);
+      if (rolling > maxRollingFour) maxRollingFour = rolling;
+      if (!reachedQuarter && rolling > threshold) reachedQuarter = quarter;
+    }
+  }
+
+  const approachingThreshold = threshold * 0.8;
+  const approaching = maxSingleQuarter >= approachingThreshold || maxRollingFour >= approachingThreshold;
+  const reached = maxSingleQuarter > threshold || maxRollingFour > threshold;
   return {
-    threshold: GST_HST_REGISTRATION_THRESHOLD,
-    income_ytd: clamp2(income),
+    threshold,
+    max_single_quarter_revenue: clamp2(maxSingleQuarter),
+    max_rolling_four_quarters_revenue: clamp2(maxRollingFour),
+    quarterly_revenue: Array.isArray(quarterlyRevenue) ? quarterlyRevenue : [],
     threshold_reached: reached,
     approaching: approaching,
+    reached_quarter: reachedQuarter,
     note: reached
-      ? "Revenue has reached the $30,000 CRA GST/HST registration threshold. Registration may be required."
+      ? "Taxable supplies exceeded the CRA small-supplier threshold in a calendar-quarter test. Review GST/HST registration timing."
       : approaching
-        ? "Revenue is approaching the $30,000 CRA GST/HST mandatory registration threshold."
+        ? "Taxable supplies are approaching the CRA small-supplier threshold. Review current and rolling four-quarter totals."
         : null
   };
+}
+
+async function getGstHstQuarterlyRevenue(pool, businessId, year) {
+  const start = `${year - 1}-01-01`;
+  const end = `${year}-12-31`;
+  const result = await pool.query(
+    `SELECT DATE_TRUNC('quarter', date)::date AS quarter_start,
+            COALESCE(SUM(amount), 0)::numeric AS total_amount
+       FROM transactions
+      WHERE business_id = $1
+        AND type = 'income'
+        AND date BETWEEN $2::date AND $3::date
+        AND deleted_at IS NULL
+        AND (is_void = false OR is_void IS NULL)
+        AND (is_adjustment = false OR is_adjustment IS NULL)
+      GROUP BY 1
+      ORDER BY 1 ASC`,
+    [businessId, start, end]
+  );
+
+  const totalsByQuarter = new Map(
+    result.rows
+      .map((row) => [quarterKeyFromDate(row.quarter_start), clamp2(row.total_amount || 0)])
+      .filter(([key]) => Boolean(key))
+  );
+
+  return buildQuarterKeys(year).map((quarter) => ({
+    quarter,
+    revenue: totalsByQuarter.get(quarter) || 0
+  }));
 }
 
 /**
@@ -190,6 +268,9 @@ async function getTaxDashboard(pool, { businessId, year, region, province = "", 
     getPayerSummaryForYear(pool, { businessId, year: safeYear, region: safeRegion, fiscalYearStart }),
     getTaxLineSummaryForYear(pool, { businessId, year: safeYear, region: safeRegion, fiscalYearStart })
   ]);
+  const gstHstQuarterlyRevenue = safeRegion === "CA"
+    ? await getGstHstQuarterlyRevenue(pool, businessId, safeYear)
+    : null;
 
   const quarterly = getQuarterlyReminders(safeRegion);
 
@@ -214,7 +295,7 @@ async function getTaxDashboard(pool, { businessId, year, region, province = "", 
         ? "Draft estimate for review. Rate reflects combined federal income tax + provincial income tax + CPP (self-employed). Actual liability depends on total income, deductions, credits, and professional review."
         : "Draft estimate for review. Actual remittance depends on bookkeeping, filing details, and professional review."
     },
-    gst_hst_alert: safeRegion === "CA" ? buildGstHstAlert(totals.income) : null,
+    gst_hst_alert: safeRegion === "CA" ? buildGstHstAlert(gstHstQuarterlyRevenue) : null,
     receipts: receiptCoverage,
     mileage,
     payers: {
@@ -249,6 +330,9 @@ module.exports = {
     clamp2,
     resolveEffectiveRate,
     calculateEstimatedSetAside,
-    buildGstHstAlert
+    buildGstHstAlert,
+    getGstHstQuarterlyRevenue,
+    quarterKeyFromDate,
+    buildQuarterKeys
   }
 };
