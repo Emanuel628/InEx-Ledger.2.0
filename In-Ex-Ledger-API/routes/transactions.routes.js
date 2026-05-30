@@ -317,7 +317,7 @@ function normalizeTransactionTaxPayload(payload, fallbackCurrency) {
 
 async function getBusinessRegionAndCurrency(businessId) {
   const result = await pool.query(
-    "SELECT region, province FROM businesses WHERE id = $1 LIMIT 1",
+    "SELECT region, province, fiscal_year_start FROM businesses WHERE id = $1 LIMIT 1",
     [businessId]
   );
   const region = String(result.rows[0]?.region || "US").toUpperCase() === "CA" ? "CA" : "US";
@@ -325,6 +325,7 @@ async function getBusinessRegionAndCurrency(businessId) {
   return {
     region,
     province,
+    fiscalYearStart: String(result.rows[0]?.fiscal_year_start || "01-01"),
     currency: region === "CA" ? "CAD" : "USD"
   };
 }
@@ -2360,9 +2361,9 @@ function parseYearOrCurrent(value) {
 router.get("/tax-summary/payers", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
-    const { region } = await getBusinessRegionAndCurrency(businessId);
+    const { region, fiscalYearStart } = await getBusinessRegionAndCurrency(businessId);
     const year = parseYearOrCurrent(req.query.year);
-    const summary = await getPayerSummaryForYear(pool, { businessId, year, region });
+    const summary = await getPayerSummaryForYear(pool, { businessId, year, region, fiscalYearStart });
     res.json(summary);
   } catch (err) {
     logError("GET /transactions/tax-summary/payers error:", err);
@@ -2379,7 +2380,12 @@ router.get("/tax-summary/tax-lines", async (req, res) => {
       ? requestedRegion
       : businessContext.region;
     const year = parseYearOrCurrent(req.query.year);
-    const summary = await getTaxLineSummaryForYear(pool, { businessId, year, region });
+    const summary = await getTaxLineSummaryForYear(pool, {
+      businessId,
+      year,
+      region,
+      fiscalYearStart: businessContext.fiscalYearStart
+    });
     res.json(summary);
   } catch (err) {
     logError("GET /transactions/tax-summary/tax-lines error:", err);
@@ -2427,6 +2433,7 @@ router.get("/tax-summary/dashboard", async (req, res) => {
       year,
       region,
       province: businessContext.province,
+      fiscalYearStart: businessContext.fiscalYearStart,
       taxRateOverride
     });
     res.json(dashboard);

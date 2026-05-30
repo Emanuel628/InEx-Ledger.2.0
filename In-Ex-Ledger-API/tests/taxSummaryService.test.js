@@ -29,6 +29,10 @@ test("yearBounds returns the YYYY-01-01 / YYYY-12-31 range", () => {
   assert.deepEqual(yearBounds(2026), { start: "2026-01-01", end: "2026-12-31" });
 });
 
+test("yearBounds supports non-calendar fiscal years", () => {
+  assert.deepEqual(yearBounds(2026, "07-01"), { start: "2026-07-01", end: "2027-06-30" });
+});
+
 test("expectedFormForPayer returns 1099-NEC at $600 in US", () => {
   assert.equal(expectedFormForPayer({ region: "US", total: 600, transactionCount: 1, taxYear: 2025 }), "1099-NEC");
   assert.equal(expectedFormForPayer({ region: "US", total: 599.99, transactionCount: 1, taxYear: 2025 }), null);
@@ -98,6 +102,12 @@ test("getTaxLineSummaryForYear picks tax_map_ca when region is CA", async () => 
   const pool = makePool([[]]);
   await getTaxLineSummaryForYear(pool, { businessId: "biz", year: 2026, region: "CA" });
   assert.ok(pool.queries[0].sql.includes("c.tax_map_ca"), "should query tax_map_ca for CA region");
+});
+
+test("getPayerSummaryForYear uses the provided fiscal year bounds", async () => {
+  const pool = makePool([[]]);
+  await getPayerSummaryForYear(pool, { businessId: "biz", year: 2026, region: "CA", fiscalYearStart: "07-01" });
+  assert.deepEqual(pool.queries[0].params, ["biz", "2026-07-01", "2027-06-30"]);
 });
 
 test("getTaxLineSummaryForYear applies personal-use allocation before summing expenses", async () => {

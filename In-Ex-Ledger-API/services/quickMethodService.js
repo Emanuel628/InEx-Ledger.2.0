@@ -23,12 +23,27 @@ function resolveProvinceGroup(province) {
   return PROVINCE_TO_GROUP[String(province || "").toUpperCase()] || "NON_HST";
 }
 
+function finalizeRateSelection(rateRow, taxYear) {
+  if (!rateRow) return null;
+  const effectiveYear = Number(rateRow.effective_year || 0);
+  const requestedYear = Number(taxYear || 0);
+  const isFallback = Number.isFinite(effectiveYear) && Number.isFinite(requestedYear) && effectiveYear < requestedYear;
+  return {
+    ...rateRow,
+    effective_year: effectiveYear,
+    is_fallback: isFallback,
+    warning: isFallback
+      ? `Quick Method rates for ${requestedYear} are not seeded; using ${effectiveYear} rates.`
+      : null
+  };
+}
+
 // Fetch the remittance rate for a province group + supply type + year.
 // Falls back to the most recent year if the exact year is not seeded.
 async function getRemittanceRate(province, supplyType, taxYear) {
   const group = resolveProvinceGroup(province);
   const result = await pool.query(
-    `SELECT remittance_rate, hst_rate
+    `SELECT remittance_rate, hst_rate, effective_year
      FROM quick_method_rates
      WHERE province_group = $1
        AND supply_type = $2
@@ -37,7 +52,7 @@ async function getRemittanceRate(province, supplyType, taxYear) {
      LIMIT 1`,
     [group, supplyType, taxYear]
   );
-  return result.rows[0] || null;
+  return finalizeRateSelection(result.rows[0] || null, taxYear);
 }
 
 // CRA Quick Method: 1% credit on the first $30,000 of eligible supplies per fiscal year.
@@ -70,6 +85,9 @@ async function computeQuickMethodRemittance(options = {}) {
     supplyType,
     taxYear,
     provinceGroup: resolveProvinceGroup(province),
+    rateEffectiveYear: rateRow.effective_year,
+    rateFallbackUsed: rateRow.is_fallback,
+    rateWarning: rateRow.warning,
     grossSalesInclTax: gross,
     hstRate,
     remittanceRate,
@@ -101,6 +119,7 @@ async function buildQuickMethodSchedule(options = {}) {
 
 module.exports = {
   resolveProvinceGroup,
+  finalizeRateSelection,
   getRemittanceRate,
   computeQuickMethodRemittance,
   buildQuickMethodSchedule,

@@ -2,6 +2,7 @@
 
 const { getPayerSummaryForYear, getTaxLineSummaryForYear } = require("./taxSummaryService.js");
 const { getQuarterlyReminders } = require("./quarterlyTaxReminderService.js");
+const { buildFiscalYearBounds } = require("../utils/fiscalYear.js");
 
 // Rough self-employment effective rate. US covers SE tax (15.3%) + a
 // conservative income tax band. CA is a federal+provincial ballpark.
@@ -44,12 +45,12 @@ function clamp2(value) {
   return Number(Number(value || 0).toFixed(2));
 }
 
-function yearBounds(year) {
-  return { start: `${year}-01-01`, end: `${year}-12-31` };
+function yearBounds(year, fiscalYearStart = "01-01") {
+  return buildFiscalYearBounds(year, fiscalYearStart);
 }
 
-async function getYearTotals(pool, businessId, year) {
-  const { start, end } = yearBounds(year);
+async function getYearTotals(pool, businessId, year, fiscalYearStart = "01-01") {
+  const { start, end } = yearBounds(year, fiscalYearStart);
   const totalsRes = await pool.query(
     `SELECT type,
             COALESCE(SUM(amount), 0)::numeric AS total,
@@ -88,8 +89,8 @@ async function getYearTotals(pool, businessId, year) {
   };
 }
 
-async function getReceiptCoverage(pool, businessId, year) {
-  const { start, end } = yearBounds(year);
+async function getReceiptCoverage(pool, businessId, year, fiscalYearStart = "01-01") {
+  const { start, end } = yearBounds(year, fiscalYearStart);
   const result = await pool.query(
     `SELECT
         COUNT(*) FILTER (WHERE t.type = 'expense')::int AS expense_count,
@@ -117,8 +118,8 @@ async function getReceiptCoverage(pool, businessId, year) {
   };
 }
 
-async function getMileageTotals(pool, businessId, year) {
-  const { start, end } = yearBounds(year);
+async function getMileageTotals(pool, businessId, year, fiscalYearStart = "01-01") {
+  const { start, end } = yearBounds(year, fiscalYearStart);
   const result = await pool.query(
     `SELECT COALESCE(SUM(COALESCE(miles, 0)), 0)::numeric AS total_miles,
             COALESCE(SUM(COALESCE(km, 0)), 0)::numeric    AS total_km,
@@ -176,18 +177,18 @@ function buildGstHstAlert(income) {
  * Compose the year-end tax dashboard. Runs the underlying queries in
  * parallel so the round-trip stays snappy.
  */
-async function getTaxDashboard(pool, { businessId, year, region, province = "", taxRateOverride = null }) {
+async function getTaxDashboard(pool, { businessId, year, region, province = "", fiscalYearStart = "01-01", taxRateOverride = null }) {
   const safeYear = parseInt(year, 10) || new Date().getUTCFullYear();
   const safeRegion = region === "CA" ? "CA" : "US";
   const safeProvince = String(province || "").toUpperCase();
   const effectiveRate = resolveEffectiveRate(safeRegion, safeProvince, taxRateOverride);
 
   const [totals, receiptCoverage, mileage, payerSummary, taxLineSummary] = await Promise.all([
-    getYearTotals(pool, businessId, safeYear),
-    getReceiptCoverage(pool, businessId, safeYear),
-    getMileageTotals(pool, businessId, safeYear),
-    getPayerSummaryForYear(pool, { businessId, year: safeYear, region: safeRegion }),
-    getTaxLineSummaryForYear(pool, { businessId, year: safeYear, region: safeRegion })
+    getYearTotals(pool, businessId, safeYear, fiscalYearStart),
+    getReceiptCoverage(pool, businessId, safeYear, fiscalYearStart),
+    getMileageTotals(pool, businessId, safeYear, fiscalYearStart),
+    getPayerSummaryForYear(pool, { businessId, year: safeYear, region: safeRegion, fiscalYearStart }),
+    getTaxLineSummaryForYear(pool, { businessId, year: safeYear, region: safeRegion, fiscalYearStart })
   ]);
 
   const quarterly = getQuarterlyReminders(safeRegion);
@@ -200,6 +201,7 @@ async function getTaxDashboard(pool, { businessId, year, region, province = "", 
   return {
     year: safeYear,
     region: safeRegion,
+    fiscal_year_start: fiscalYearStart,
     income: totals.income,
     expense: totals.expense,
     profit: totals.profit,

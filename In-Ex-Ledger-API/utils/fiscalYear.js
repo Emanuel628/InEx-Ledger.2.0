@@ -27,6 +27,33 @@ function normalizeFiscalYearStart(value) {
   };
 }
 
+function formatUtcDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function buildFiscalYearBounds(year, fiscalYearStart) {
+  const normalizedYear = Number.parseInt(year, 10);
+  if (!Number.isFinite(normalizedYear)) {
+    throw new Error("year must be a valid integer");
+  }
+
+  const normalizedFiscalYear = normalizeFiscalYearStart(fiscalYearStart);
+  const resolvedStart = normalizedFiscalYear.valid && normalizedFiscalYear.value
+    ? normalizedFiscalYear.value
+    : "01-01";
+  const [month, day] = resolvedStart.split("-").map(Number);
+
+  const startDate = new Date(Date.UTC(normalizedYear, month - 1, day));
+  const nextStartDate = new Date(Date.UTC(normalizedYear + 1, month - 1, day));
+  const endDate = new Date(nextStartDate.getTime() - 24 * 60 * 60 * 1000);
+
+  return {
+    start: formatUtcDate(startDate),
+    end: formatUtcDate(endDate)
+  };
+}
+
 module.exports = {
-  normalizeFiscalYearStart
+  normalizeFiscalYearStart,
+  buildFiscalYearBounds
 };

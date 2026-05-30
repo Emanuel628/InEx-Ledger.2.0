@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 
 const {
   resolveProvinceGroup,
+  finalizeRateSelection,
   computeQuickMethodRemittance,
   QUICK_METHOD_CREDIT_RATE,
   QUICK_METHOD_CREDIT_CAP
@@ -33,6 +34,19 @@ test("resolveProvinceGroup: ON → ON, NB → NS_NB_NL_PEI, AB → NON_HST", () 
 test("QUICK_METHOD_CREDIT constants are correct", () => {
   assert.equal(QUICK_METHOD_CREDIT_RATE, 0.01);
   assert.equal(QUICK_METHOD_CREDIT_CAP, 30000);
+});
+
+test("finalizeRateSelection flags stale fallback years", () => {
+  const selected = finalizeRateSelection({ remittance_rate: 0.088, hst_rate: 0.13, effective_year: 2025 }, 2026);
+  assert.equal(selected.effective_year, 2025);
+  assert.equal(selected.is_fallback, true);
+  assert.match(selected.warning, /2026/);
+});
+
+test("finalizeRateSelection stays quiet for exact-year matches", () => {
+  const selected = finalizeRateSelection({ remittance_rate: 0.088, hst_rate: 0.13, effective_year: 2026 }, 2026);
+  assert.equal(selected.is_fallback, false);
+  assert.equal(selected.warning, null);
 });
 
 test("1% ITC credit math: $50k gross → credit=$300, net=$4100 at 8.8% rate", () => {

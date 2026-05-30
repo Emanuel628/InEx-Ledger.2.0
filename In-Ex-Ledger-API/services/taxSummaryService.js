@@ -1,6 +1,7 @@
 "use strict";
 
 const { getTaxFormThresholds, TAX_FORM_THRESHOLDS_BY_YEAR } = require("../utils/taxFormThresholds.js");
+const { buildFiscalYearBounds } = require("../utils/fiscalYear.js");
 
 const FORM_TYPES = ["1099-NEC", "1099-K", "T4A", "none"];
 
@@ -20,8 +21,8 @@ function normalizeYear(value) {
   return n;
 }
 
-function yearBounds(year) {
-  return { start: `${year}-01-01`, end: `${year}-12-31` };
+function yearBounds(year, fiscalYearStart = "01-01") {
+  return buildFiscalYearBounds(year, fiscalYearStart);
 }
 
 function expectedFormForPayer({ region, total, transactionCount, taxYear }) {
@@ -39,8 +40,8 @@ function expectedFormForPayer({ region, total, transactionCount, taxYear }) {
   return null;
 }
 
-async function getPayerSummaryForYear(pool, { businessId, year, region }) {
-  const { start, end } = yearBounds(year);
+async function getPayerSummaryForYear(pool, { businessId, year, region, fiscalYearStart = "01-01" }) {
+  const { start, end } = yearBounds(year, fiscalYearStart);
 
   const result = await pool.query(
     `SELECT
@@ -121,8 +122,8 @@ async function getPayerSummaryForYear(pool, { businessId, year, region }) {
   };
 }
 
-async function getTaxLineSummaryForYear(pool, { businessId, year, region }) {
-  const { start, end } = yearBounds(year);
+async function getTaxLineSummaryForYear(pool, { businessId, year, region, fiscalYearStart = "01-01" }) {
+  const { start, end } = yearBounds(year, fiscalYearStart);
   const taxColumn = region === "CA" ? "c.tax_map_ca" : "c.tax_map_us";
 
   const result = await pool.query(

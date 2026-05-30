@@ -31,6 +31,10 @@ test("yearBounds returns YYYY-01-01..YYYY-12-31", () => {
   assert.deepEqual(yearBounds(2026), { start: "2026-01-01", end: "2026-12-31" });
 });
 
+test("yearBounds supports fiscal years that start mid-year", () => {
+  assert.deepEqual(yearBounds(2026, "07-01"), { start: "2026-07-01", end: "2027-06-30" });
+});
+
 test("clamp2 rounds to 2 decimals", () => {
   assert.equal(clamp2(1.234), 1.23);
   assert.equal(clamp2(1.001), 1);
@@ -173,4 +177,25 @@ test("getTaxDashboard returns receipts.coverage_pct null when no expenses", asyn
   ]);
   const dashboard = await getTaxDashboard(pool, { businessId: "biz", year: 2026, region: "US" });
   assert.equal(dashboard.receipts.coverage_pct, null);
+});
+
+test("getTaxDashboard uses fiscal-year bounds for totals and passes them through", async () => {
+  const pool = makePool([
+    { match: (s) => /GROUP BY type/.test(s), rows: [] },
+    { match: (s) => /with_receipt_count/.test(s), rows: [{ expense_count: 0, with_receipt_count: 0 }] },
+    { match: (s) => /FROM mileage\s+WHERE business_id/.test(s), rows: [{ total_miles: "0", total_km: "0", trip_count: 0 }] },
+    { match: (s) => /COALESCE\(NULLIF\(TRIM\(payer_name\)/.test(s), rows: [] },
+    { match: (s) => /FROM categories c/.test(s), rows: [] }
+  ]);
+
+  const dashboard = await getTaxDashboard(pool, {
+    businessId: "biz",
+    year: 2026,
+    region: "CA",
+    fiscalYearStart: "07-01"
+  });
+
+  assert.equal(dashboard.fiscal_year_start, "07-01");
+  const totalsQuery = pool.calls.find((call) => /GROUP BY type/.test(call.sql));
+  assert.deepEqual(totalsQuery.params, ["biz", "2026-07-01", "2027-06-30"]);
 });
