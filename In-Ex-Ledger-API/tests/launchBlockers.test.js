@@ -65,8 +65,8 @@ function loadTransactionsRouter(options = {}) {
             };
           },
           async query(sql, params) {
-            if (/SELECT region FROM businesses/i.test(sql)) {
-              return { rows: [{ region: "US" }], rowCount: 1 };
+            if (/SELECT region,\s*province,\s*fiscal_year_start FROM businesses/i.test(sql)) {
+              return { rows: [{ region: "US", province: "", fiscal_year_start: "01-01" }], rowCount: 1 };
             }
             if (/transaction_count/i.test(sql)) {
               return {

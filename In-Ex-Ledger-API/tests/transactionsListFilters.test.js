@@ -146,7 +146,7 @@ test("GET /api/transactions accepts valid account_id and threads it into the SQL
     .set(csrfHeaders(csrf));
   assert.equal(res.status, 200);
   assert.equal(res.body.account_id, VALID_ACCOUNT_ID);
-  const mainQuery = stubbedPool.calls.find((c) => /SELECT t\.id/.test(c.sql));
+  const mainQuery = stubbedPool.calls.find((c) => /SELECT t\.id/.test(c.sql) && c.params.includes(VALID_ACCOUNT_ID));
   assert.ok(mainQuery, "main SELECT should have been issued");
   assert.ok(mainQuery.sql.includes("AND t.account_id ="), "SQL should include account_id filter");
   assert.ok(mainQuery.params.includes(VALID_ACCOUNT_ID), "params should carry the account_id");
@@ -164,7 +164,7 @@ test("GET /api/transactions?all=true bumps limit to the hard cap and reports ret
   assert.equal(res.status, 200);
   assert.equal(res.body.returned_all, true);
   assert.equal(res.body.limit, 50000);
-  const mainQuery = stubbedPool.calls.find((c) => /SELECT t\.id/.test(c.sql));
+  const mainQuery = stubbedPool.calls.find((c) => /SELECT t\.id/.test(c.sql) && c.params.includes(50000));
   assert.ok(mainQuery.params.includes(50000), "limit param should be the 50k hard cap");
 });
 
@@ -226,7 +226,7 @@ test("GET /api/transactions threads type, category, search, and period filters i
   assert.equal(res.body.period, "last-month");
   assert.equal(res.body.summary.transaction_count, 1);
 
-  const mainQuery = stubbedPool.calls.find((c) => /SELECT t\.id/.test(c.sql));
+  const mainQuery = stubbedPool.calls.find((c) => /SELECT t\.id/.test(c.sql) && c.params.includes(categoryId));
   assert.ok(mainQuery, "main SELECT should have been issued");
   assert.match(mainQuery.sql, /t\.category_id =/i);
   assert.match(mainQuery.sql, /t\.type =/i);
