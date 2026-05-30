@@ -19,6 +19,45 @@ const MACRS_TABLES = {
   "7-year": [0.1429, 0.2449, 0.1749, 0.1249, 0.0893, 0.0892, 0.0893, 0.0446]
 };
 
+// Section 179 annual deduction limits and phase-out thresholds.
+// OBBBA (signed July 4, 2025) raised the limit to $2,500,000 effective for
+// property placed in service after December 31, 2024. Indexed for inflation.
+// Source: IRS Rev. Proc. 2025-28; OBBBA §130101.
+const SECTION_179_LIMITS = {
+  2022: { limit: 1080000, phaseout: 2700000 },
+  2023: { limit: 1160000, phaseout: 2890000 },
+  2024: { limit: 1220000, phaseout: 3050000 },
+  2025: { limit: 2500000, phaseout: 4000000 }, // OBBBA effective Dec 31 2024
+  2026: { limit: 2500000, phaseout: 4000000 }  // indexed; confirm each Jan
+};
+
+// Bonus depreciation rates by placed-in-service year.
+// TCJA phase-down: 100% (2018-2022) → 80% (2023) → 60% (2024) → 40% (2025 partial).
+// OBBBA (July 4, 2025) reinstated 100% for qualified property placed in service
+// after January 19, 2025, permanently.
+// Source: IRC §168(k) as amended by OBBBA §130102.
+const BONUS_DEPRECIATION_RATES = {
+  2018: 100, 2019: 100, 2020: 100, 2021: 100, 2022: 100,
+  2023: 80,
+  2024: 60,
+  2025: 100, // OBBBA reinstated for property placed in service after Jan 19, 2025
+  2026: 100
+};
+
+function getSection179Limit(taxYear) {
+  const year = Number(taxYear);
+  if (SECTION_179_LIMITS[year]) return SECTION_179_LIMITS[year];
+  const years = Object.keys(SECTION_179_LIMITS).map(Number).sort((a, b) => b - a);
+  return SECTION_179_LIMITS[years[0]];
+}
+
+function getBonusDepreciationRate(taxYear) {
+  const year = Number(taxYear);
+  if (BONUS_DEPRECIATION_RATES[year] != null) return BONUS_DEPRECIATION_RATES[year];
+  const years = Object.keys(BONUS_DEPRECIATION_RATES).map(Number).sort((a, b) => b - a);
+  return BONUS_DEPRECIATION_RATES[years[0]];
+}
+
 function getCcaClass(className) {
   return CCA_CLASSES[className] || null;
 }
@@ -99,8 +138,12 @@ function computeMacrsDeduction(options = {}) {
 module.exports = {
   CCA_CLASSES,
   MACRS_TABLES,
+  SECTION_179_LIMITS,
+  BONUS_DEPRECIATION_RATES,
   getCcaClass,
   getMacrsRate,
+  getSection179Limit,
+  getBonusDepreciationRate,
   computeCcaDeduction,
   computeMacrsDeduction,
   computeRecoveryYear

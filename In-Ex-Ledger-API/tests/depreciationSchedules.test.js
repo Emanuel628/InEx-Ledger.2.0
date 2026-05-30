@@ -6,8 +6,12 @@ const assert = require("node:assert/strict");
 const {
   CCA_CLASSES,
   MACRS_TABLES,
+  SECTION_179_LIMITS,
+  BONUS_DEPRECIATION_RATES,
   getCcaClass,
   getMacrsRate,
+  getSection179Limit,
+  getBonusDepreciationRate,
   computeCcaDeduction,
   computeMacrsDeduction,
   computeRecoveryYear
@@ -102,18 +106,16 @@ test("computeMacrsDeduction year 1 with §179 full expensing", () => {
   assert.equal(d, 5000);
 });
 
-test("computeMacrsDeduction year 1 with 60% bonus depreciation (2026 rate)", () => {
-  // Cost = $10,000, bonus = 60%
-  // bonus = 10000 * 0.60 = 6000; remaining basis = 4000
-  // year 1 MACRS on 4000 (7-year, rate=14.29%) = 571.60
-  // total = 6000 + 571.60 = 6571.60
+test("computeMacrsDeduction year 1 with 100% bonus depreciation (OBBBA 2026 rate)", () => {
+  // OBBBA reinstated 100% bonus for property placed in service after Jan 19, 2025.
+  // Cost = $10,000, bonus = 100% → full immediate expensing, no MACRS remainder.
   const d = computeMacrsDeduction({
     originalCost: 10000,
     macrsClass: "7-year",
     recoveryYear: 1,
-    bonusDepreciationPct: 60
+    bonusDepreciationPct: 100
   });
-  assert.equal(d, 6571.60);
+  assert.equal(d, 10000); // full cost expensed in year 1
 });
 
 // ── computeRecoveryYear ───────────────────────────────────────────────────────
@@ -152,10 +154,42 @@ test("computeRecoveryYear returns 1 when fully covered by §179", () => {
   assert.equal(computeRecoveryYear(10000, 10000, "7-year", 10000, 0), 1);
 });
 
-test("computeRecoveryYear handles 60% bonus depreciation correctly", () => {
-  // Cost=10000, bonus=60% → bonus=6000, macrsBasis=4000
+test("computeRecoveryYear handles partial bonus depreciation correctly", () => {
+  // Cost=10000, bonus=60% (pre-OBBBA 2024 example) → bonus=6000, macrsBasis=4000
   // After year 1 MACRS on 4000 at 14.29% = 571.60; prior=6571.60
   const prior = 6571.60;
   const next = computeRecoveryYear(prior, 10000, "7-year", 0, 60);
   assert.equal(next, 2);
+});
+
+// ── Section 179 and Bonus Depreciation Year Tables (OBBBA) ───────────────────
+
+test("getSection179Limit returns OBBBA $2.5M limit for 2025 and 2026", () => {
+  assert.equal(getSection179Limit(2025).limit, 2500000);
+  assert.equal(getSection179Limit(2026).limit, 2500000);
+  assert.equal(getSection179Limit(2026).phaseout, 4000000);
+});
+
+test("getSection179Limit returns pre-OBBBA limit for 2024", () => {
+  assert.equal(getSection179Limit(2024).limit, 1220000);
+});
+
+test("getSection179Limit falls back to most recent year for unknown years", () => {
+  const limit = getSection179Limit(2030);
+  assert.ok(limit.limit >= 2500000, "fallback should be at least OBBBA limit");
+});
+
+test("getBonusDepreciationRate returns 100% for 2026 (OBBBA reinstatement)", () => {
+  assert.equal(getBonusDepreciationRate(2026), 100);
+  assert.equal(getBonusDepreciationRate(2025), 100);
+});
+
+test("getBonusDepreciationRate returns phase-down rates for 2023 and 2024 (pre-OBBBA)", () => {
+  assert.equal(getBonusDepreciationRate(2023), 80);
+  assert.equal(getBonusDepreciationRate(2024), 60);
+});
+
+test("getBonusDepreciationRate returns 100% for 2018-2022 (original TCJA)", () => {
+  assert.equal(getBonusDepreciationRate(2022), 100);
+  assert.equal(getBonusDepreciationRate(2020), 100);
 });

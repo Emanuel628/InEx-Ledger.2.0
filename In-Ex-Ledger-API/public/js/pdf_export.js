@@ -58,7 +58,7 @@ const SCHEDULE_C_LINE_MAP = {
   meals: 'Line 24b — Deductible meals (50% limit)',
   meals_entertainment: 'Line 24b — Deductible meals (50% limit)',
   dining: 'Line 24b — Deductible meals (50% limit)',
-  entertainment: 'Line 24b — Deductible meals (50% limit)',
+  entertainment: 'Nondeductible — IRC §274(a) (TCJA). Track only; no Schedule C deduction.',
   deductible_meals: 'Line 24b — Deductible meals (50% limit)',
   utilities: 'Line 25 — Utilities',
   wages: 'Line 26 — Wages',
@@ -280,7 +280,8 @@ function inferTaxLineFromCategoryName(categoryName, isCA) {
     if (/office|supplies/.test(name)) return 'Line 8810 — Office expenses';
   } else {
     if (/fuel|gas|\bmotor\b|\bvehicle\b|\bauto\b|mileage|car expense/.test(name)) return 'Line 9 — Car and truck (mileage/actual support req.)';
-    if (/meal|food|dining|restaurant|entertainment/.test(name)) return 'Line 24b — Deductible meals (business purpose req.)';
+    if (/meal|food|dining|restaurant/.test(name)) return 'Line 24b — Deductible meals (business purpose req.)';
+    if (/entertainment|concert|ticket|sporting event|golf|theatre|theater/.test(name)) return 'Nondeductible — IRC §274(a) (TCJA). Track only; no Schedule C deduction.';
     if (/phone|internet|telephone/.test(name)) return 'Line 25/27a — Phone/utilities (business-use allocation req.)';
     if (/home\s*office|home\s*business/.test(name)) return 'Line 30 — Home office (Form 8829 allocation req.)';
     if (/\btravel\b/.test(name)) return 'Line 24a — Travel';
@@ -681,7 +682,7 @@ function buildReviewInsights(transactions, categories, excluded = [], region = '
       if (/\b(vehicle|auto|fuel|truck|mileage|car_and_truck)\b/.test(combined) || /\bgas\b/.test(combined) || /\bcar\b/.test(catName)) {
         vehicleCount += 1;
         vehicleTotal += amount;
-      } else if (/\b(meal|meals|meals_entertainment|dining|entertainment|deductible_meals)\b/.test(combined)) {
+      } else if (/\b(meal|meals|meals_entertainment|dining|deductible_meals)\b/.test(combined)) {
         mealsCount += 1;
         mealsTotal += amount;
       } else if (/home[_\s]?office|home[_\s]?business/.test(combined)) {

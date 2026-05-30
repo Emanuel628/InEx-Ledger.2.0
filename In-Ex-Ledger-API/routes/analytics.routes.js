@@ -208,16 +208,32 @@ router.get("/dashboard", async (req, res) => {
       : 0;
 
     // Self-employment tax estimate (freelancer-facing)
-    // US: SE net = net × 0.9235; SE tax = SE net × 0.153 (covers SS + Medicare both halves)
-    // CA: CPP = (net − $3,500 exemption) × 0.1188 (2024 combined self-employed rate)
+    // US: SE net = net × 0.9235; SS (12.4%) applies up to $184,500 wage base;
+    //     Medicare (2.9%) applies to all SE net. Combined 15.3% below cap.
+    //     Source: IRS Rev. Proc. 2025-28 (2026 SS wage base: $184,500).
+    // CA: CPP 11.9% on net earnings $3,500–$74,600 (max contribution $8,460.90);
+    //     CPP2 8% on net earnings $74,600–$85,000 (max contribution $832.00).
+    //     Source: CRA CPP contribution rates announcement Jan 2026.
     let seTaxEstimate = 0;
     if (netIncome > 0) {
       if (region === "CA") {
-        const cppBase = Math.max(0, netIncome - 3500);
-        seTaxEstimate = cppBase * 0.1188;
+        const CPP_RATE = 0.119;
+        const CPP_EXEMPTION = 3500;
+        const CPP_MAX_EARNINGS = 74600;
+        const CPP2_RATE = 0.08;
+        const CPP2_MIN_EARNINGS = 74600;
+        const CPP2_MAX_EARNINGS = 85000;
+        const cppBase = Math.min(Math.max(0, netIncome - CPP_EXEMPTION), CPP_MAX_EARNINGS - CPP_EXEMPTION);
+        const cpp = cppBase * CPP_RATE;
+        const cpp2Base = Math.min(Math.max(0, netIncome - CPP2_MIN_EARNINGS), CPP2_MAX_EARNINGS - CPP2_MIN_EARNINGS);
+        const cpp2 = cpp2Base * CPP2_RATE;
+        seTaxEstimate = cpp + cpp2;
       } else {
+        const SS_WAGE_BASE = 184500;
         const seNet = netIncome * 0.9235;
-        seTaxEstimate = seNet * 0.153;
+        const ssBase = Math.min(seNet, SS_WAGE_BASE);
+        const medicareOnly = Math.max(0, seNet - SS_WAGE_BASE);
+        seTaxEstimate = (ssBase * 0.153) + (medicareOnly * 0.029);
       }
     }
 

@@ -31,6 +31,9 @@ const SCHEDULE_C_LINE_MAP = {
   vehicle_parking_tolls: "Line 9 - Car and truck expenses (parking/tolls review)",
   travel: "Line 24a - Travel",
   meals: "Line 24b - Meals (50% limit review)",
+  // Entertainment is 0% deductible since TCJA (2018) — IRC §274(a).
+  // Track for documentation only; do NOT report as a Schedule C deduction.
+  entertainment: "Nondeductible — IRC §274(a) (TCJA). Not a Schedule C deduction.",
   wages: "Line 26 - Wages",
   taxes_licenses: "Line 23 - Taxes and licenses",
   equipment_capital_asset: "Line 13 - Depreciation and Section 179 review",
@@ -151,6 +154,7 @@ const CATEGORY_NAME_HINTS = [
   [/parking|toll/i, "vehicle_parking_tolls"],
   [/travel|airfare|hotel|lodging/i, "travel"],
   [/meal|food|dining|restaurant/i, "meals"],
+  [/entertainment|concert|ticket|sporting event|golf|theatre|theater/i, "entertainment"],
   [/wages?|payroll/i, "wages"],
   [/tax|license|licence|permit/i, "taxes_licenses"],
   [/equipment|asset|computer|machinery|camera|furniture/i, "equipment_capital_asset"],
@@ -193,6 +197,7 @@ const NORMALIZED_TAX_MAP_ALIASES = {
   meals: "meals",
   meals_and_entertainment: "meals",
   meals_entertainment: "meals_entertainment",
+  entertainment: "entertainment",
   wages: "wages",
   salaries_wages_and_benefits: "wages",
   salaries_wages_benefits: "salaries_wages_benefits",

@@ -33,6 +33,7 @@ const CATEGORY_TAX_OPTIONS = {
       "taxes_licenses",
       "travel",
       "meals",
+      "entertainment",
       "utilities",
       "wages",
       "home_office",

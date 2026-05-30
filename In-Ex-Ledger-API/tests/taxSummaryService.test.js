@@ -9,6 +9,7 @@ const {
   getUnmappedCategories,
   expectedFormForPayer,
   FIFTY_PCT_LIMITATION_LINES,
+  ZERO_PCT_LIMITATION_LINES,
   __private: { yearBounds }
 } = require("../services/taxSummaryService.js");
 
@@ -133,4 +134,23 @@ test("getTaxLineSummaryForYear applies 50% limitation to meals (US) and meals_en
 test("FIFTY_PCT_LIMITATION_LINES contains both US and CA meals keys", () => {
   assert.ok(FIFTY_PCT_LIMITATION_LINES.has("meals"), "should include US meals key");
   assert.ok(FIFTY_PCT_LIMITATION_LINES.has("meals_entertainment"), "should include CA meals_entertainment key");
+});
+
+test("getTaxLineSummaryForYear applies 0% limitation to entertainment (US — nondeductible IRC §274 TCJA)", async () => {
+  const pool = makePool([[
+    { category_id: "c1", category_name: "Concert tickets", category_kind: "expense", tax_line: "entertainment", transaction_count: 2, total_amount: "500.00", receipt_count: 2 },
+    { category_id: "c2", category_name: "Travel", category_kind: "expense", tax_line: "travel", transaction_count: 3, total_amount: "900.00", receipt_count: 3 }
+  ]]);
+  const summary = await getTaxLineSummaryForYear(pool, { businessId: "biz", year: 2026, region: "US" });
+  const ent = summary.mapped_lines.find((l) => l.tax_line === "entertainment");
+  assert.equal(ent.total_amount, 500);
+  assert.equal(ent.limitation_pct, 0);
+  assert.equal(ent.deductible_amount, 0); // 0% deductible — TCJA §274(a)
+  const travel = summary.mapped_lines.find((l) => l.tax_line === "travel");
+  assert.equal(travel.limitation_pct, null);
+  assert.equal(travel.deductible_amount, 900);
+});
+
+test("ZERO_PCT_LIMITATION_LINES contains entertainment key", () => {
+  assert.ok(ZERO_PCT_LIMITATION_LINES.has("entertainment"), "entertainment is nondeductible post-TCJA");
 });

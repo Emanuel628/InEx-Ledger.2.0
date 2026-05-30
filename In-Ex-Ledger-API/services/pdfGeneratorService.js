@@ -718,6 +718,14 @@ function deriveBusinessAmounts(txn, category, options = {}) {
     nonDeductibleAmount = Number((netAmount - deductibleAmount).toFixed(2));
   }
 
+  // Entertainment is 100% nondeductible for US filers since TCJA (IRC §274(a)).
+  // Track the spend for documentation; deductible amount is zero.
+  // Note: CA uses meals_entertainment (50% under ITA s.67.1), not this slug.
+  if (categorySlug === "entertainment" && region === "US") {
+    deductibleAmount = 0;
+    nonDeductibleAmount = netAmount;
+  }
+
   // Capital assets bypass the current-year deduction entirely; they enter a
   // depreciation / CCA schedule (Schedule C line 13 / T2125 line 9936).
   if (categorySlug === "equipment_capital_asset") {

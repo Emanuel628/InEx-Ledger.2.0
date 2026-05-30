@@ -6,6 +6,10 @@ const FORM_TYPES = ["1099-NEC", "1099-K", "T4A", "none"];
 // of the actual cost. These tax-line keys are subject to that restriction.
 const FIFTY_PCT_LIMITATION_LINES = new Set(["meals", "meals_entertainment"]);
 
+// IRC §274(a) (TCJA, 2018): entertainment expenses are 0% deductible for US
+// filers. Track for documentation only — no Schedule C deduction allowed.
+const ZERO_PCT_LIMITATION_LINES = new Set(["entertainment"]);
+
 const FORM_THRESHOLDS = {
   US: { "1099-NEC": 600, "1099-K_amount": 20000, "1099-K_count": 200 },
   CA: { "T4A": 500 }
@@ -191,7 +195,9 @@ async function getTaxLineSummaryForYear(pool, { businessId, year, region }) {
   const mapped = Array.from(lines.values())
     .map((line) => {
       const total = Number(line.total_amount.toFixed(2));
-      const limitationPct = FIFTY_PCT_LIMITATION_LINES.has(line.tax_line) ? 50 : null;
+      let limitationPct = null;
+      if (FIFTY_PCT_LIMITATION_LINES.has(line.tax_line)) limitationPct = 50;
+      else if (ZERO_PCT_LIMITATION_LINES.has(line.tax_line)) limitationPct = 0;
       return {
         ...line,
         total_amount: total,
@@ -236,5 +242,6 @@ module.exports = {
   FORM_TYPES,
   FORM_THRESHOLDS,
   FIFTY_PCT_LIMITATION_LINES,
+  ZERO_PCT_LIMITATION_LINES,
   __private: { normalizeYear, yearBounds }
 };
