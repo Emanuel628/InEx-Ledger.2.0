@@ -4,7 +4,10 @@
 const DEFAULT_THEME = "light";
 const THEME_VERSION = "3";
 const BRAND_ICON_VERSION = "20260528a";
-const US_ESTIMATED_TAX_RATE = 0.24;
+// 28% covers ~21% actual federal burden (SE tax + income tax) plus ~7% buffer
+// for state/local income taxes. 24% left only a 3% cushion — inadequate for
+// any state with income tax (e.g. NJ, NY, CA can add 5-13%).
+const US_ESTIMATED_TAX_RATE = 0.28;
 // Combined estimate: federal income tax + provincial income tax + CPP (11.9%)
 // at ~$60K net self-employment income. NOT GST/HST rates.
 // Source: 2026 CRA brackets, provincial rate cards, CPP rates (canada.ca Jan 2026).

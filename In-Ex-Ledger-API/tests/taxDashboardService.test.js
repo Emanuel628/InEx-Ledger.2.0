@@ -78,7 +78,7 @@ test("getTaxDashboard composes income/expense/profit/estimated_tax/receipts/mile
   assert.equal(dashboard.income_count, 12);
   assert.equal(dashboard.expense_count, 25);
   assert.equal(dashboard.estimated_tax.rate, DEFAULT_TAX_RATE.US);
-  assert.equal(dashboard.estimated_tax.owed, 1440); // 6000 * 0.24
+  assert.equal(dashboard.estimated_tax.owed, 1680); // 6000 * 0.28
   assert.equal(dashboard.receipts.missing_receipts, 5);
   assert.equal(dashboard.receipts.coverage_pct, 80);
   assert.equal(dashboard.mileage.total_miles, 1234.5);

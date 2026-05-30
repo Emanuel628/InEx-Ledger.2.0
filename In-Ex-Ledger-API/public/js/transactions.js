@@ -52,7 +52,7 @@ const resolveEstimatedTaxProfileHelper = taxHelpers.resolveEstimatedTaxProfile |
     province: normalizedProvince,
     rate: normalizedRegion === "CA"
       ? (caRates[normalizedProvince] || (taxHelpers.DEFAULT_CA_ESTIMATED_TAX_RATE || 0.05))
-      : (taxHelpers.US_ESTIMATED_TAX_RATE || 0.24)
+      : (taxHelpers.US_ESTIMATED_TAX_RATE || 0.28)
   };
 });
 const formatEstimatedTaxPercentHelper = taxHelpers.formatEstimatedTaxPercent || ((rate, province = "") => {

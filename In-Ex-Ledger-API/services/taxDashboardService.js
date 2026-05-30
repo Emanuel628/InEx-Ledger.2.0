@@ -7,8 +7,12 @@ const { getQuarterlyReminders } = require("./quarterlyTaxReminderService.js");
 // conservative income tax band. CA is a federal+provincial ballpark.
 // This is an *estimate* surfaced as a helper, not tax advice — the response
 // includes the rate that produced it so the UI can show the math.
+// US: 28% covers SE tax (~15.3% on 92.35% of net) + federal income tax (~6-7%)
+// + a ~7% buffer for state/local income taxes. At 24% the federal burden alone
+// is ~21%, leaving only 3% — insufficient for any state with income tax.
+// See: IRS Schedule C actual breakdown; state tax ranges 0-13%.
 const DEFAULT_TAX_RATE = {
-  US: 0.24,
+  US: 0.28,
   CA: 0.28
 };
 
