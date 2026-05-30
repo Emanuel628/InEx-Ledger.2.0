@@ -30,18 +30,19 @@ test("yearBounds returns the YYYY-01-01 / YYYY-12-31 range", () => {
 });
 
 test("expectedFormForPayer returns 1099-NEC at $600 in US", () => {
-  assert.equal(expectedFormForPayer({ region: "US", total: 600, transactionCount: 1 }), "1099-NEC");
-  assert.equal(expectedFormForPayer({ region: "US", total: 599.99, transactionCount: 1 }), null);
+  assert.equal(expectedFormForPayer({ region: "US", total: 600, transactionCount: 1, taxYear: 2025 }), "1099-NEC");
+  assert.equal(expectedFormForPayer({ region: "US", total: 599.99, transactionCount: 1, taxYear: 2025 }), null);
 });
 
-test("expectedFormForPayer returns 1099-K at $20k + 200 transactions in US", () => {
-  assert.equal(expectedFormForPayer({ region: "US", total: 20000, transactionCount: 200 }), "1099-K");
-  assert.equal(expectedFormForPayer({ region: "US", total: 25000, transactionCount: 50 }), "1099-NEC");
+test("expectedFormForPayer is year-aware for 1099-NEC and 1099-K thresholds in US", () => {
+  assert.equal(expectedFormForPayer({ region: "US", total: 20000, transactionCount: 200, taxYear: 2026 }), "1099-K");
+  assert.equal(expectedFormForPayer({ region: "US", total: 25000, transactionCount: 50, taxYear: 2026 }), "1099-NEC");
+  assert.equal(expectedFormForPayer({ region: "US", total: 1500, transactionCount: 1, taxYear: 2026 }), null);
 });
 
 test("expectedFormForPayer returns T4A at $500 in CA, null otherwise", () => {
-  assert.equal(expectedFormForPayer({ region: "CA", total: 500, transactionCount: 1 }), "T4A");
-  assert.equal(expectedFormForPayer({ region: "CA", total: 499, transactionCount: 1 }), null);
+  assert.equal(expectedFormForPayer({ region: "CA", total: 500, transactionCount: 1, taxYear: 2026 }), "T4A");
+  assert.equal(expectedFormForPayer({ region: "CA", total: 499, transactionCount: 1, taxYear: 2026 }), null);
 });
 
 test("getPayerSummaryForYear groups by payer and computes expected_form", async () => {
@@ -63,7 +64,7 @@ test("getPayerSummaryForYear groups by payer and computes expected_form", async 
   assert.equal(summary.payers[0].expected_form, "1099-K");
   assert.equal(summary.payers[0].declared_form, "1099-K");
   const fiverr = summary.payers.find((p) => p.payer_name === "Fiverr");
-  assert.equal(fiverr.expected_form, "1099-NEC");
+  assert.equal(fiverr.expected_form, null);
   assert.equal(fiverr.declared_form, "1099-NEC");
 });
 
@@ -97,6 +98,23 @@ test("getTaxLineSummaryForYear picks tax_map_ca when region is CA", async () => 
   const pool = makePool([[]]);
   await getTaxLineSummaryForYear(pool, { businessId: "biz", year: 2026, region: "CA" });
   assert.ok(pool.queries[0].sql.includes("c.tax_map_ca"), "should query tax_map_ca for CA region");
+});
+
+test("getTaxLineSummaryForYear applies personal-use allocation before summing expenses", async () => {
+  const pool = makePool([[{
+    category_id: "c1",
+    category_name: "Phone & Internet",
+    category_kind: "expense",
+    tax_line: "utilities",
+    transaction_count: 2,
+    total_amount: "75.00",
+    receipt_count: 1
+  }]]);
+
+  const summary = await getTaxLineSummaryForYear(pool, { businessId: "biz", year: 2026, region: "US" });
+
+  assert.equal(summary.mapped_lines[0].total_amount, 75);
+  assert.match(pool.queries[0].sql, /personal_use_pct/i);
 });
 
 test("getUnmappedCategories filters by region-specific column", async () => {

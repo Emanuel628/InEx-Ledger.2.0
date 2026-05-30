@@ -70,7 +70,7 @@ function computeTransactionReviewFlags(row) {
     }
 
     if (
-      (/\bvehicle\b|\bfuel\b|\bmileage\b|auto insurance/i.test(name) || row.tax_treatment === "vehicle") &&
+      /\bvehicle\b|\bfuel\b|\bmileage\b|auto insurance/i.test(name) &&
       !receiptAttached &&
       !matched
     ) {

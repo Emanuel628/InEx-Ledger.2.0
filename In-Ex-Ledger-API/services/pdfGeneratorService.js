@@ -1,5 +1,6 @@
 "use strict";
 
+const { getTaxFormThresholds } = require("../utils/taxFormThresholds.js");
 const {
   normalizeRegionCode,
   resolveCategorySlugFromName,
@@ -1129,10 +1130,10 @@ function buildReceiptFilenameMap(receipts) {
 
 function expectedTaxFormForPayer({ region, total, transactionCount, taxYear }) {
   const normalizedRegion = normalizeRegionCode(region);
-  if (normalizedRegion === "CA") return total >= 500 ? "T4A" : null;
-  if (total >= 20000 && transactionCount >= 200) return "1099-K";
-  const necThreshold = Number(taxYear) >= 2026 ? 2000 : 600;
-  return total >= necThreshold ? "1099-NEC" : null;
+  const thresholds = getTaxFormThresholds(normalizedRegion, taxYear);
+  if (normalizedRegion === "CA") return total >= thresholds.t4a ? "T4A" : null;
+  if (total >= thresholds.kAmount && transactionCount >= thresholds.kCount) return "1099-K";
+  return total >= thresholds.nec ? "1099-NEC" : null;
 }
 
 function computePayerSummary(transactions, region, taxYear) {

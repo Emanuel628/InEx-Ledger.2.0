@@ -1,5 +1,7 @@
 "use strict";
 
+const { getTaxFormThresholds, TAX_FORM_THRESHOLDS_BY_YEAR } = require("../utils/taxFormThresholds.js");
+
 const FORM_TYPES = ["1099-NEC", "1099-K", "T4A", "none"];
 
 // IRC §274(n) (US) and ITA s.67.1 (CA) limit meals & entertainment to 50%
@@ -10,10 +12,7 @@ const FIFTY_PCT_LIMITATION_LINES = new Set(["meals", "meals_entertainment"]);
 // filers. Track for documentation only — no Schedule C deduction allowed.
 const ZERO_PCT_LIMITATION_LINES = new Set(["entertainment"]);
 
-const FORM_THRESHOLDS = {
-  US: { "1099-NEC": 600, "1099-K_amount": 20000, "1099-K_count": 200 },
-  CA: { "T4A": 500 }
-};
+const FORM_THRESHOLDS = TAX_FORM_THRESHOLDS_BY_YEAR;
 
 function normalizeYear(value) {
   const n = parseInt(value, 10);
@@ -25,15 +24,16 @@ function yearBounds(year) {
   return { start: `${year}-01-01`, end: `${year}-12-31` };
 }
 
-function expectedFormForPayer({ region, total, transactionCount }) {
-  if (region === "CA") {
-    if (total >= FORM_THRESHOLDS.CA.T4A) return "T4A";
+function expectedFormForPayer({ region, total, transactionCount, taxYear }) {
+  const thresholds = getTaxFormThresholds(region, taxYear);
+  if (String(region || "").toUpperCase() === "CA") {
+    if (total >= thresholds.t4a) return "T4A";
     return null;
   }
-  if (total >= FORM_THRESHOLDS.US["1099-K_amount"] && transactionCount >= FORM_THRESHOLDS.US["1099-K_count"]) {
+  if (total >= thresholds.kAmount && transactionCount >= thresholds.kCount) {
     return "1099-K";
   }
-  if (total >= FORM_THRESHOLDS.US["1099-NEC"]) {
+  if (total >= thresholds.nec) {
     return "1099-NEC";
   }
   return null;
@@ -100,7 +100,8 @@ async function getPayerSummaryForYear(pool, { businessId, year, region }) {
       expected_form: expectedFormForPayer({
         region,
         total: entry.total_amount,
-        transactionCount: entry.transaction_count
+        transactionCount: entry.transaction_count,
+        taxYear: year
       })
     };
   });
@@ -131,7 +132,19 @@ async function getTaxLineSummaryForYear(pool, { businessId, year, region }) {
         c.kind AS category_kind,
         ${taxColumn} AS tax_line,
         COUNT(t.id)::int AS transaction_count,
-        COALESCE(SUM(t.amount), 0)::numeric AS total_amount,
+        COALESCE(
+          SUM(
+            t.amount * (
+              1 - (
+                CASE
+                  WHEN c.kind = 'expense' THEN COALESCE(t.personal_use_pct, 0)
+                  ELSE 0
+                END
+              ) / 100.0
+            )
+          ),
+          0
+        )::numeric AS total_amount,
         COUNT(DISTINCT t.id) FILTER (WHERE r.id IS NOT NULL)::int AS receipt_count
        FROM categories c
        LEFT JOIN transactions t ON t.category_id = c.id

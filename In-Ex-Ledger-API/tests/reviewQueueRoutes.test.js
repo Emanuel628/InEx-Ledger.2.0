@@ -265,6 +265,18 @@ test("GET /api/review/queue forwards date filters to transaction query", async (
   assert.deepEqual(transactionQuery.params, ["biz_1", "2026-05-01", "2026-05-31"]);
 });
 
+test("GET /api/review/queue reads review states without requiring created_at in the sort", async () => {
+  const { app, state } = loadReviewRouterFixture();
+
+  const response = await request(app).get("/api/review/queue");
+
+  assert.equal(response.status, 200);
+  const reviewStateQuery = state.queries.find((entry) => /FROM transaction_review_states/i.test(entry.sql));
+  assert.ok(reviewStateQuery);
+  assert.doesNotMatch(reviewStateQuery.sql, /created_at\s+DESC/i);
+  assert.match(reviewStateQuery.sql, /updated_at\s+DESC/i);
+});
+
 test("GET /api/review/queue returns 500 when dataset build fails", async () => {
   const { app, state } = loadReviewRouterFixture({ throwDataset: true });
 

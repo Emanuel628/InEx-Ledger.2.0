@@ -339,7 +339,7 @@ router.get("/queue", async (req, res) => {
         `SELECT id, transaction_id, issue_code, issue_severity, issue_status, review_notes, resolved_at, updated_at
            FROM transaction_review_states
           WHERE business_id = $1
-          ORDER BY updated_at DESC, created_at DESC`,
+          ORDER BY updated_at DESC`,
         [businessId]
       )
     ]);
