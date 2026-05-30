@@ -1784,17 +1784,40 @@ async function countImportableCsvRows(rows, cols, options = {}) {
 }
 
 // ─── Smart CSV Category Detection ────────────────────────────────────────────
+// CSV_CATEGORY_RULES — ordered most-specific first within each kind.
+// Each rule may optionally carry nameCA: the seeded category name for CA businesses.
+// This ensures imported transactions land in the pre-existing seeded category
+// (which already has the correct tax_map_ca / tax_map_us set), rather than
+// creating a new unmapped category.
 const CSV_CATEGORY_RULES = [
   // Expense rules — ordered most-specific first
   {
-    kind: "expense", name: "Bank Fees",
-    keywords: ["overdraft", "service charge", "maintenance fee", "wire transfer fee", "atm fee",
+    kind: "expense", name: "Bank Fees", nameCA: "Interest & Bank Charges",
+    keywords: [
+      // Description-pattern keywords (user-written, e.g. from our own CSV exports)
+      "bank service fee", "banking fee", "account service fee", "monthly banking",
+      "wire fee", "bank maintenance", "account maintenance fee",
+      // Merchant / system keywords
+      "overdraft", "service charge", "maintenance fee", "wire transfer fee", "atm fee",
       "foreign transaction", "bank fee", "interest charge", "nsf fee", "returned item",
-      "monthly fee", "account fee", "stop payment", "insufficient funds"]
+      "monthly fee", "account fee", "stop payment", "insufficient funds"
+    ]
   },
   {
-    kind: "expense", name: "Food & Dining",
-    keywords: ["mcdonald", "burger king", "wendy", "subway", "starbucks", "dunkin", "taco bell",
+    // US: "Meals" (50% deductible, Line 24b); CA: "Meals & Entertainment" (50%, T2125 Line 8523)
+    kind: "expense", name: "Meals", nameCA: "Meals & Entertainment",
+    keywords: [
+      // Description-pattern keywords — business meal descriptions
+      "client meal", "client meals", "client lunch", "client dinner", "client breakfast",
+      "business meal", "business lunch", "business dinner", "business breakfast",
+      "team lunch", "team dinner", "working lunch", "working dinner",
+      "networking lunch", "networking breakfast", "networking dinner",
+      "prospect lunch", "prospect dinner", "holiday dinner", "holiday lunch",
+      "milestone dinner", "strategy meeting", "kickoff lunch", "review dinner",
+      "lunch meeting", "dinner meeting", "breakfast meeting",
+      "meals -", "client meals -", "meals and entertainment",
+      // Merchant names
+      "mcdonald", "burger king", "wendy", "subway", "starbucks", "dunkin", "taco bell",
       "chick-fil-a", "chickfila", "pizza hut", "domino", "kfc ", "chipotle", "panera",
       "olive garden", "applebee", "denny", "ihop", "red lobster", "outback steakhouse",
       "buffalo wild", "five guys", "shake shack", "popeye", "panda express", "sonic drive",
@@ -1834,7 +1857,13 @@ const CSV_CATEGORY_RULES = [
   },
   {
     kind: "expense", name: "Travel",
-    keywords: ["delta air", "american airlines", "united airlines", "southwest air", "spirit air",
+    keywords: [
+      // Description-pattern keywords
+      "flight to", "train to", "bus to", "travel -", "client conference", "business trip",
+      "conference travel", "airfare", "flight ticket", "train ticket", "bus ticket",
+      "travel expense", "travel cost",
+      // Merchant names
+      "delta air", "american airlines", "united airlines", "southwest air", "spirit air",
       "air canada", "westjet", "jetblue", "frontier airlines", "alaska airlines",
       "lufthansa", "british airways", "air france", "air transat", "porter airlines",
       "flair airlines", "sunwing", "marriott", "hilton", "hyatt", "sheraton", "westin",
@@ -1846,7 +1875,12 @@ const CSV_CATEGORY_RULES = [
   },
   {
     kind: "expense", name: "Software & Subscriptions",
-    keywords: ["netflix", "spotify", "hulu", "disney plus", "disney+", "amazon prime",
+    keywords: [
+      // Description-pattern keywords
+      "software subscriptions", "software subscription", "software -", "app subscription",
+      "saas subscription", "annual subscription", "monthly subscription",
+      // Merchant names
+      "netflix", "spotify", "hulu", "disney plus", "disney+", "amazon prime",
       "apple tv+", "hbo max", "youtube premium", "adobe ", "microsoft 365", "microsoft office",
       "github", "slack", "zoom", "dropbox", "google one", "google workspace",
       "amazon web services", "aws ", "azure ", "digitalocean", "heroku", "notion ",
@@ -1864,7 +1898,13 @@ const CSV_CATEGORY_RULES = [
   },
   {
     kind: "expense", name: "Phone & Internet",
-    keywords: ["rogers", "bell canada", "telus", "fido wireless", "koodo", "virgin mobile",
+    keywords: [
+      // Description-pattern keywords
+      "home internet and phone", "internet and phone", "home internet", "business internet",
+      "business phone", "phone - business", "internet - business", "business use allocation",
+      "phone business", "internet service provider", "cell phone plan",
+      // Merchant names
+      "rogers", "bell canada", "telus", "fido wireless", "koodo", "virgin mobile",
       "freedom mobile", "shaw cable", "videotron", "eastlink", "at&t", "att wireless",
       "att mobility", "verizon", "t-mobile", "tmobile", "sprint wireless", "comcast",
       "xfinity", "spectrum ", "cox communication", "centurylink", "frontier comm",
@@ -1890,8 +1930,14 @@ const CSV_CATEGORY_RULES = [
   },
   {
     kind: "expense", name: "Office Supplies",
-    keywords: ["staples ", "office depot", "officemax", "office max", "uline ", "viking direct",
-      "grand & toy", "bureau en gros", "reliable office supplies"]
+    keywords: [
+      // Description-pattern keywords
+      "office supplies", "office supply", "supplies restock", "printer ink", "printer paper",
+      "office paper", "year-end supplies", "stationery", "toner cartridge",
+      // Merchant names
+      "staples ", "office depot", "officemax", "office max", "uline ", "viking direct",
+      "grand & toy", "bureau en gros", "reliable office supplies"
+    ]
   },
   {
     kind: "expense", name: "Shipping & Postage",
@@ -1914,10 +1960,17 @@ const CSV_CATEGORY_RULES = [
       "apartment rent", "electric utility", "natural gas utility"]
   },
   {
-    kind: "expense", name: "Professional Services",
-    keywords: ["law firm", "attorney", "accountant", "cpa firm", "consulting", "fiverr",
-      "upwork", "toptal", "99designs", "freelance payment", "contractor payment",
-      "legal fee", "professional fee", "notary"]
+    kind: "expense", name: "Legal & Professional", nameCA: "Legal & Accounting Fees",
+    keywords: [
+      // Description-pattern keywords
+      "legal and accounting", "legal & accounting", "bookkeeper", "bookkeeping",
+      "year-end bookkeeping", "quarterly bookkeeping", "monthly bookkeeping",
+      "cpa fee", "accounting fee", "legal fee", "professional fee",
+      "legal fees", "attorney fees", "lawyer fee", "notary fee",
+      // Merchant names
+      "law firm", "attorney", "accountant", "cpa firm", "fiverr",
+      "upwork", "toptal", "99designs", "freelance payment", "contractor payment", "notary"
+    ]
   },
   {
     kind: "expense", name: "Government & Taxes",
@@ -1936,18 +1989,28 @@ const CSV_CATEGORY_RULES = [
   },
   {
     kind: "income", name: "Sales Revenue",
-    keywords: ["square ", "stripe", "paypal", "shopify", "amazon seller", "etsy ", "ebay sale",
+    keywords: [
+      // Description-pattern keywords — consulting / freelance / service income
+      "consulting fee", "consultant fee", "consulting fee -", "service fee -",
+      "freelance fee", "retainer fee", "project fee", "client fee",
+      "professional service income", "service income", "billable",
+      // Payment platform / merchant keywords
+      "square ", "stripe", "paypal", "shopify", "amazon seller", "etsy ", "ebay sale",
       "venmo", "zelle", "e-transfer", "interac e-transfer", "interac etransfer",
       "payment received", "invoice payment", "client payment", "settlement deposit",
-      "transfer in", "deposit", "direct deposit"]
+      "transfer in", "deposit", "direct deposit"
+    ]
   },
 ];
 
-function detectCsvCategory(description, kind) {
+function detectCsvCategory(description, kind, region) {
   const desc = description.toLowerCase();
+  const isCA = String(region || "").toUpperCase() === "CA";
   for (const rule of CSV_CATEGORY_RULES) {
     if (rule.kind !== kind) continue;
-    if (rule.keywords.some(kw => desc.includes(kw))) return rule.name;
+    if (rule.keywords.some(kw => desc.includes(kw))) {
+      return (isCA && rule.nameCA) ? rule.nameCA : rule.name;
+    }
   }
   return kind === "income" ? "Imported Income" : "Imported Expense";
 }
@@ -2118,7 +2181,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         }
       }
 
-      const detectedCategory = detectCsvCategory(description, type);
+      const detectedCategory = detectCsvCategory(description, type, region);
       const categoryId = await getOrCreateCsvCategory(client, categoryCache, detectedCategory, type);
       if (!categoryId) {
         results.errors.push({ row: i + 2, reason: `Row ${i + 2}: could not resolve category` });
