@@ -28,7 +28,7 @@ const SECTION_179_LIMITS = {
   2023: { limit: 1160000, phaseout: 2890000 },
   2024: { limit: 1220000, phaseout: 3050000 },
   2025: { limit: 2500000, phaseout: 4000000 }, // OBBBA effective Dec 31 2024
-  2026: { limit: 2500000, phaseout: 4000000 }  // indexed; confirm each Jan
+  2026: { limit: 2560000, phaseout: 4090000 }
 };
 
 // Bonus depreciation rates by placed-in-service year.
@@ -40,9 +40,11 @@ const BONUS_DEPRECIATION_RATES = {
   2018: 100, 2019: 100, 2020: 100, 2021: 100, 2022: 100,
   2023: 80,
   2024: 60,
-  2025: 100, // OBBBA reinstated for property placed in service after Jan 19, 2025
+  2025: 40,
   2026: 100
 };
+
+const OBBBA_BONUS_REINSTATEMENT_START = Date.UTC(2025, 0, 20);
 
 function getSection179Limit(taxYear) {
   const year = Number(taxYear);
@@ -51,9 +53,39 @@ function getSection179Limit(taxYear) {
   return SECTION_179_LIMITS[years[0]];
 }
 
-function getBonusDepreciationRate(taxYear) {
-  const year = Number(taxYear);
+function normalizeYearFallback(year) {
   if (BONUS_DEPRECIATION_RATES[year] != null) return BONUS_DEPRECIATION_RATES[year];
+  const years = Object.keys(BONUS_DEPRECIATION_RATES).map(Number).sort((a, b) => b - a);
+  return BONUS_DEPRECIATION_RATES[years[0]];
+}
+
+function parsePlacedInServiceDate(input) {
+  if (input instanceof Date && !Number.isNaN(input.getTime())) {
+    return new Date(Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate()));
+  }
+  if (typeof input === "string") {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input.trim());
+    if (!match) return null;
+    const [, year, month, day] = match;
+    return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  }
+  return null;
+}
+
+function getBonusDepreciationRate(placedInServiceInput) {
+  const placedInServiceDate = parsePlacedInServiceDate(placedInServiceInput);
+  if (placedInServiceDate) {
+    const year = placedInServiceDate.getUTCFullYear();
+    if (year !== 2025) return normalizeYearFallback(year);
+    return placedInServiceDate.getTime() >= OBBBA_BONUS_REINSTATEMENT_START ? 100 : 40;
+  }
+
+  const year = Number(placedInServiceInput);
+  if (year === 2025) {
+    throw new Error("placed-in-service date is required to determine 2025 bonus depreciation");
+  }
+  if (Number.isFinite(year)) return normalizeYearFallback(year);
+
   const years = Object.keys(BONUS_DEPRECIATION_RATES).map(Number).sort((a, b) => b - a);
   return BONUS_DEPRECIATION_RATES[years[0]];
 }

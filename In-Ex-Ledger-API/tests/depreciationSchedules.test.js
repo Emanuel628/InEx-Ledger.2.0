@@ -164,10 +164,10 @@ test("computeRecoveryYear handles partial bonus depreciation correctly", () => {
 
 // ── Section 179 and Bonus Depreciation Year Tables (OBBBA) ───────────────────
 
-test("getSection179Limit returns OBBBA $2.5M limit for 2025 and 2026", () => {
+test("getSection179Limit returns indexed OBBBA limits for 2025 and 2026", () => {
   assert.equal(getSection179Limit(2025).limit, 2500000);
-  assert.equal(getSection179Limit(2026).limit, 2500000);
-  assert.equal(getSection179Limit(2026).phaseout, 4000000);
+  assert.equal(getSection179Limit(2026).limit, 2560000);
+  assert.equal(getSection179Limit(2026).phaseout, 4090000);
 });
 
 test("getSection179Limit returns pre-OBBBA limit for 2024", () => {
@@ -179,9 +179,21 @@ test("getSection179Limit falls back to most recent year for unknown years", () =
   assert.ok(limit.limit >= 2500000, "fallback should be at least OBBBA limit");
 });
 
-test("getBonusDepreciationRate returns 100% for 2026 (OBBBA reinstatement)", () => {
+test("getBonusDepreciationRate requires a placed-in-service date for 2025", () => {
+  assert.throws(
+    () => getBonusDepreciationRate(2025),
+    /placed-in-service date is required/i
+  );
+});
+
+test("getBonusDepreciationRate applies the January 19, 2025 cutoff", () => {
+  assert.equal(getBonusDepreciationRate("2025-01-19"), 40);
+  assert.equal(getBonusDepreciationRate("2025-01-20"), 100);
+});
+
+test("getBonusDepreciationRate returns 100% for 2026 (post-OBBBA)", () => {
   assert.equal(getBonusDepreciationRate(2026), 100);
-  assert.equal(getBonusDepreciationRate(2025), 100);
+  assert.equal(getBonusDepreciationRate("2026-01-01"), 100);
 });
 
 test("getBonusDepreciationRate returns phase-down rates for 2023 and 2024 (pre-OBBBA)", () => {
