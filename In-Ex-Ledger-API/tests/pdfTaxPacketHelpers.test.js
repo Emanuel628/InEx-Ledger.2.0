@@ -22,6 +22,7 @@ const {
     buildCleanupPriorityLines,
     buildSupportWorksheetLines,
     buildUnresolvedSummaryLines,
+    unresolvedSeverityWeight,
     buildFinalDisclosureLines,
     buildEvidenceRows,
     buildChecklistItems,
@@ -569,15 +570,26 @@ test("buildUnresolvedSummaryLines includes unmapped-tax blockers", () => {
   const lines = buildUnresolvedSummaryLines([
     { __status: { flags: ["NC"] } },
     { __status: { flags: ["UM"] } },
-    { __status: { flags: ["UM", "RS", "FC"] } },
+    { __status: { flags: ["UM", "RS", "FC", "MD"] } },
+    { __status: { flags: ["DUP"] } },
     { __status: { flags: ["HO"] } },
     { __status: { flags: ["RV"] } }
   ]);
 
   assert.ok(lines.some((line) => /1 transactions still need a real business category\./.test(line)));
   assert.ok(lines.some((line) => /2 categorized expense transactions still need tax-line mapping\./.test(line)));
+  assert.ok(lines.some((line) => /1 transactions still need a usable description or memo\./.test(line)));
+  assert.ok(lines.some((line) => /1 transactions are still flagged as potential duplicates\./.test(line)));
   assert.ok(lines.some((line) => /1 transactions still need final confirmation before handoff\./.test(line)));
   assert.ok(lines.some((line) => /1 transactions still need CPA review before filing\./.test(line)));
+});
+
+test("unresolvedSeverityWeight prioritizes description and duplicate blockers with category blockers", () => {
+  assert.equal(unresolvedSeverityWeight({ __status: { flags: ["MD"] } }), 0);
+  assert.equal(unresolvedSeverityWeight({ __status: { flags: ["DUP"] } }), 0);
+  assert.equal(unresolvedSeverityWeight({ __status: { flags: ["FC"] } }), 1);
+  assert.equal(unresolvedSeverityWeight({ __status: { flags: ["RS"] } }), 1);
+  assert.equal(unresolvedSeverityWeight({ __status: { flags: ["PR"] } }), 2);
 });
 
 test("buildFinalDisclosureLines uses the active packet status label", () => {

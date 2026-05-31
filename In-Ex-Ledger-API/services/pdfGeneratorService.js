@@ -1409,11 +1409,20 @@ function buildUnresolvedSummaryLines(flagged) {
   return [
     `${rows.filter((txn) => txn.__status.flags.includes("NC")).length} transactions still need a real business category.`,
     `${rows.filter((txn) => txn.__status.flags.includes("UM")).length} categorized expense transactions still need tax-line mapping.`,
+    `${rows.filter((txn) => txn.__status.flags.includes("MD")).length} transactions still need a usable description or memo.`,
+    `${rows.filter((txn) => txn.__status.flags.includes("DUP")).length} transactions are still flagged as potential duplicates.`,
     `${rows.filter((txn) => txn.__status.flags.includes("RS")).length} transactions still need receipt or source support.`,
     `${rows.filter((txn) => txn.__status.flags.some((flag) => ["ML", "BP", "AL", "HO", "CA"].includes(flag))).length} transactions still need schedule-specific support.`,
     `${rows.filter((txn) => txn.__status.flags.includes("FC")).length} transactions still need final confirmation before handoff.`,
     `${rows.filter((txn) => txn.__status.flags.includes("RV")).length} transactions still need CPA review before filing.`
   ];
+}
+
+function unresolvedSeverityWeight(txn) {
+  const flags = new Set(txn?.__status?.flags || []);
+  if (flags.has("NC") || flags.has("UM") || flags.has("RV") || flags.has("MD") || flags.has("DUP")) return 0;
+  if (flags.has("RS") || flags.has("ML") || flags.has("BP") || flags.has("AL") || flags.has("HO") || flags.has("CA") || flags.has("FC")) return 1;
+  return 2;
 }
 
 function buildFinalDisclosureLines(reviewInsights, artifactSummary, labels) {
@@ -1971,13 +1980,7 @@ function buildUnresolvedExceptionPages(transactions, currency, labels, region) {
   const flagged = [...(transactions || [])]
     .filter((txn) => Array.isArray(txn?.__status?.flags) && txn.__status.flags.length)
     .sort((a, b) => {
-      const severityWeight = (txn) => {
-        const flags = new Set(txn?.__status?.flags || []);
-        if (flags.has("NC") || flags.has("UM") || flags.has("RV")) return 0;
-        if (flags.has("RS") || flags.has("ML") || flags.has("BP") || flags.has("AL") || flags.has("HO") || flags.has("CA")) return 1;
-        return 2;
-      };
-      const bySeverity = severityWeight(a) - severityWeight(b);
+      const bySeverity = unresolvedSeverityWeight(a) - unresolvedSeverityWeight(b);
       if (bySeverity !== 0) return bySeverity;
       const amountA = Number(a?.__businessAmounts?.deductibleAmount ?? a?.__businessAmounts?.netAmount ?? 0);
       const amountB = Number(b?.__businessAmounts?.deductibleAmount ?? b?.__businessAmounts?.netAmount ?? 0);
@@ -2938,6 +2941,7 @@ module.exports = {
     buildCleanupPriorityLines,
     buildSupportWorksheetLines,
     buildUnresolvedSummaryLines,
+    unresolvedSeverityWeight,
     buildFinalDisclosureLines,
     buildEvidenceRows,
     buildChecklistItems,
