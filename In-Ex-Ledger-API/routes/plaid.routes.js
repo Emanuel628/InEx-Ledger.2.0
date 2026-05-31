@@ -41,6 +41,14 @@ const PLAID_WEBHOOK_VERIFICATION_HEADER = "plaid-verification";
 const PLAID_WEBHOOK_MAX_AGE_SECONDS = 5 * 60;
 const plaidWebhookKeyCache = new Map();
 
+function getMappingMetadata(result) {
+  return {
+    mappingReason: result?.reason || null,
+    mappingConfidence: result?.confidence || null,
+    mappingRuleId: result?.ruleId || null
+  };
+}
+
 function timingSafeStringEqual(a, b) {
   const ab = Buffer.from(String(a || ""));
   const bb = Buffer.from(String(b || ""));
@@ -452,6 +460,7 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
       merchantName: canonical.merchant_name,
       categoryGuess: canonical.category_guess
     });
+    const mappingMeta = getMappingMetadata(mappedCategory);
     const categoryId = mappedCategory?.categoryName
       ? await getOrCreateImportedCategoryId(mappedCategory.categoryName, canonical.type)
       : null;
@@ -461,10 +470,10 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
         `INSERT INTO transactions
            (id, business_id, account_id, category_id, amount, type, cleared, description,
             date, posted_date, merchant_name, category_guess, pending, currency, external_id,
-            import_source, import_batch_id, review_status)
+            import_source, import_batch_id, review_status, category_mapping_reason, category_mapping_confidence, category_mapping_rule_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
                  $9, $10, $11, $12, $13, $14, $15,
-                 'plaid', $16, 'needs_review')
+                 'plaid', $16, 'needs_review', $17, $18, $19)
          ON CONFLICT (account_id, external_id)
            WHERE external_id IS NOT NULL DO NOTHING
          RETURNING id`,
@@ -484,7 +493,10 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
           canonical.pending,
           canonical.currency,
           canonical.external_id,
-          batch.id
+          batch.id,
+          mappingMeta.mappingReason,
+          mappingMeta.mappingConfidence,
+          mappingMeta.mappingRuleId
         ]
       );
       if (insertResult.rowCount) inserted += 1;
@@ -521,6 +533,7 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
           categoryGuess: canonical.category_guess
         })
         : null;
+      const mappingMeta = getMappingMetadata(mappedCategory);
       const categoryId = mappedCategory?.categoryName && canonical
         ? await getOrCreateImportedCategoryId(mappedCategory.categoryName, canonical.type)
         : null;
@@ -534,9 +547,12 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
                 merchant_name = COALESCE($6, merchant_name),
                 type          = COALESCE($7, type),
                 category_id   = COALESCE($8, category_id),
-                category_guess = COALESCE($9, category_guess)
-          WHERE business_id = $10
-            AND external_id = $11`,
+                category_guess = COALESCE($9, category_guess),
+                category_mapping_reason = COALESCE($10, category_mapping_reason),
+                category_mapping_confidence = COALESCE($11, category_mapping_confidence),
+                category_mapping_rule_id = COALESCE($12, category_mapping_rule_id)
+          WHERE business_id = $13
+            AND external_id = $14`,
         [
           canonical ? canonical.amount : Math.abs(Number(raw.amount) || 0),
           canonical ? canonical.pending : raw.pending === true,
@@ -547,6 +563,9 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
           canonical?.type || null,
           categoryId,
           canonical?.category_guess || existingTxn?.category_guess || null,
+          mappingMeta.mappingReason,
+          mappingMeta.mappingConfidence,
+          mappingMeta.mappingRuleId,
           businessId,
           raw.transaction_id
         ]

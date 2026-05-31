@@ -256,7 +256,7 @@ function buildRuleIndex(rules = []) {
   for (const rule of rules) {
     if (!rule?.category_name || !rule?.transaction_kind || !rule?.match_field || !rule?.match_value_normalized) continue;
     const key = `${String(rule.transaction_kind).toLowerCase()}::${String(rule.match_field).toLowerCase()}::${String(rule.match_value_normalized).trim()}`;
-    index.set(key, rule.category_name);
+    index.set(key, rule);
   }
   return index;
 }
@@ -371,14 +371,19 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
     const haystack = `${rawMerchant} ${rawDescription} ${String(categoryGuess || "")}`.toLowerCase();
     const providerHintText = normalizeMappingText(categoryGuess);
 
-    const explicitRuleCategory =
+    const explicitRule =
       ruleIndex.get(`${kind}::merchant_name::${merchantKey}`)
       || ruleIndex.get(`${kind}::merchant_name::${merchantRuleKey}`)
       || ruleIndex.get(`${kind}::category_guess::${categoryGuessKey}`)
       || ruleIndex.get(`${kind}::description::${descriptionKey}`)
       || ruleIndex.get(`${kind}::description::${descriptionRuleKey}`);
-    if (explicitRuleCategory && categoryExists(categoryLookup, kind, explicitRuleCategory)) {
-      return { categoryName: explicitRuleCategory, reason: "mapping_rule", confidence: "high" };
+    if (explicitRule?.category_name && categoryExists(categoryLookup, kind, explicitRule.category_name)) {
+      return {
+        categoryName: explicitRule.category_name,
+        reason: "mapping_rule",
+        confidence: "high",
+        ruleId: explicitRule.id || null
+      };
     }
 
     const learnedMerchantCategory = selectHistoryWinner(merchantHistory.get(`${kind}::${merchantKey}`));
@@ -461,7 +466,8 @@ async function buildBusinessTransactionCategorizer(pool, { businessId, region = 
       [businessId, MAX_HISTORY_ROWS]
     ),
     pool.query(
-      `SELECT r.transaction_kind,
+      `SELECT r.id,
+              r.transaction_kind,
               r.match_field,
               r.match_value_normalized,
               c.name AS category_name

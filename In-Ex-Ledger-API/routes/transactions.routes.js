@@ -511,6 +511,14 @@ function hasAdvancedTransactionPayload(normalized, fallbackCurrency) {
   );
 }
 
+function getMappingMetadata(result, overrides = {}) {
+  return {
+    mappingReason: overrides.mappingReason || result?.reason || null,
+    mappingConfidence: overrides.mappingConfidence || result?.confidence || null,
+    mappingRuleId: overrides.mappingRuleId || result?.ruleId || null
+  };
+}
+
 const TRANSACTIONS_HARD_CAP = 50000;
 const TRANSACTIONS_DEFAULT_LIMIT = 100;
 const TRANSACTIONS_CAPPED_LIMIT = 5000;
@@ -924,10 +932,10 @@ router.post("/", async (req, res) => {
         (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted, date, note,
          currency, source_amount, exchange_rate, exchange_date, converted_amount, tax_treatment,
          indirect_tax_amount, indirect_tax_recoverable, personal_use_pct, review_status, review_notes,
-         payer_name, tax_form_type)
+         payer_name, tax_form_type, category_mapping_reason, category_mapping_confidence, category_mapping_rule_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
                $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
-               $23, $24)
+               $23, $24, $25, $26, $27)
        RETURNING *`,
       [
         crypto.randomUUID(),
@@ -955,7 +963,10 @@ router.post("/", async (req, res) => {
         validation.normalized.review_status || "ready",
         validation.normalized.review_notes,
         payerName,
-        taxFormType
+        taxFormType,
+        "manual",
+        "manual",
+        null
       ]
     );
     await client.query("COMMIT");
@@ -974,6 +985,35 @@ router.post("/", async (req, res) => {
     return handleTransactionMutationError(res, err, "Failed to save transaction.");
   } finally {
     if (client) client.release();
+  }
+});
+
+router.get("/mapping-rules", async (req, res) => {
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const result = await pool.query(
+      `SELECT r.id,
+              r.transaction_kind,
+              r.match_field,
+              r.match_operator,
+              r.match_value,
+              r.match_value_normalized,
+              r.confidence,
+              r.created_at,
+              r.updated_at,
+              c.id AS category_id,
+              c.name AS category_name,
+              c.kind AS category_kind
+         FROM transaction_mapping_rules r
+         JOIN categories c ON c.id = r.category_id
+        WHERE r.business_id = $1
+        ORDER BY r.match_field ASC, r.match_value ASC, r.created_at DESC`,
+      [businessId]
+    );
+    res.json({ rules: result.rows });
+  } catch (err) {
+    logError("GET /transactions/mapping-rules error:", err);
+    res.status(500).json({ error: "Failed to load mapping rules." });
   }
 });
 
@@ -1017,6 +1057,29 @@ router.get("/:id", async (req, res, next) => {
   } catch (err) {
     logError("GET /transactions/:id error:", err);
     res.status(500).json({ error: "Failed to load transaction." });
+  }
+});
+
+router.delete("/mapping-rules/:ruleId", async (req, res) => {
+  if (!UUID_REGEX.test(req.params.ruleId)) {
+    return res.status(400).json({ error: "Invalid mapping rule ID." });
+  }
+  try {
+    const businessId = await resolveBusinessIdForUser(req.user);
+    const result = await pool.query(
+      `DELETE FROM transaction_mapping_rules
+        WHERE id = $1
+          AND business_id = $2
+      RETURNING id`,
+      [req.params.ruleId, businessId]
+    );
+    if (!result.rowCount) {
+      return res.status(404).json({ error: "Mapping rule not found." });
+    }
+    res.json({ deleted: true, id: req.params.ruleId });
+  } catch (err) {
+    logError("DELETE /transactions/mapping-rules/:ruleId error:", err);
+    res.status(500).json({ error: "Failed to delete mapping rule." });
   }
 });
 
@@ -1093,10 +1156,13 @@ router.put("/:id", async (req, res) => {
               review_notes            = $20,
               payer_name              = $21,
               tax_form_type           = $22,
-              adjusted_by_id          = $23,
+              category_mapping_reason = $23,
+              category_mapping_confidence = $24,
+              category_mapping_rule_id = $25,
+              adjusted_by_id          = $26,
               adjusted_at             = NOW()
-        WHERE id = $24
-          AND business_id = $25
+        WHERE id = $27
+          AND business_id = $28
           AND deleted_at IS NULL
           AND (is_adjustment = false OR is_adjustment IS NULL)
        RETURNING *`,
@@ -1123,6 +1189,9 @@ router.put("/:id", async (req, res) => {
         validation.normalized.review_notes,
         payerName,
         taxFormType,
+        "manual",
+        "manual",
+        null,
         req.user.id,
         req.params.id,
         businessId
@@ -2296,6 +2365,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         merchantName,
         categoryGuess
       });
+      const mappingMeta = getMappingMetadata(detectedCategory);
       const categoryId = await getOrCreateCsvCategory(
         client,
         categoryCache,
@@ -2315,8 +2385,10 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         await client.query(
           `INSERT INTO transactions
             (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted,
-             date, merchant_name, category_guess, currency, tax_treatment, review_status, converted_amount, import_batch_id, import_source)
-           VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8, $9, $10, $11, $12, $13, 'needs_review', $5, $14, 'csv')`,
+             date, merchant_name, category_guess, currency, tax_treatment, review_status, converted_amount, import_batch_id, import_source,
+             category_mapping_reason, category_mapping_confidence, category_mapping_rule_id)
+           VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8, $9, $10, $11, $12, $13, 'needs_review', $5, $14, 'csv',
+                   $15, $16, $17)`,
           [
             crypto.randomUUID(),
             businessId,
@@ -2331,7 +2403,10 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
             categoryGuess || null,
             fallbackCurrency,
             taxTreatment,
-            batch.id
+            batch.id,
+            mappingMeta.mappingReason,
+            mappingMeta.mappingConfidence,
+            mappingMeta.mappingRuleId
           ]
         );
         results.imported++;

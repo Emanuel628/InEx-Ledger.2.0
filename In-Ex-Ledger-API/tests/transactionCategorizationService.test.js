@@ -128,6 +128,7 @@ test("categorizer applies persisted business mapping rules before history and ge
     region: "US",
     mappingRules: [
       {
+        id: "rule-openai",
         transaction_kind: "expense",
         match_field: "merchant_name",
         match_value_normalized: "openai",
@@ -148,6 +149,7 @@ test("categorizer applies persisted business mapping rules before history and ge
 
   assert.equal(result.categoryName, "Software & Subscriptions");
   assert.equal(result.reason, "mapping_rule");
+  assert.equal(result.ruleId, "rule-openai");
 });
 
 test("resolveCanonicalCategoryTemplate preserves seeded defaults and imported fallbacks", () => {
