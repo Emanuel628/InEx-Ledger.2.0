@@ -1223,26 +1223,6 @@ const BOOKKEEPING_ACTIVITY = {
       footer: "Vous pouvez l'associer a une transaction ou le verifier depuis la page des recus.",
       text: ({ summary, actionUrl }) => `Votre recu a ete enregistre avec succes.\n\n${summary}\n\nOuvrir les recus : ${actionUrl}`
     }
-  },
-  receipt_processing_failed: {
-    en: {
-      subject: "We couldn't process your receipt",
-      heading: "Receipt processing failed",
-      body: "We couldn't complete the receipt scan.",
-      detailsLabel: "Scan details",
-      buttonLabel: "Open receipts",
-      footer: "You can retry with another image or keep the receipt attached manually.",
-      text: ({ summary, actionUrl }) => `We couldn't complete the receipt scan.\n\n${summary}\n\nOpen receipts: ${actionUrl}`
-    },
-    fr: {
-      subject: "Nous n'avons pas pu traiter votre recu",
-      heading: "Echec du traitement du recu",
-      body: "Nous n'avons pas pu terminer la lecture du recu.",
-      detailsLabel: "Details de l'analyse",
-      buttonLabel: "Ouvrir les recus",
-      footer: "Vous pouvez reessayer avec une autre image ou conserver le recu en piece justificative manuelle.",
-      text: ({ summary, actionUrl }) => `Nous n'avons pas pu terminer la lecture du recu.\n\n${summary}\n\nOuvrir les recus : ${actionUrl}`
-    }
   }
 };
 

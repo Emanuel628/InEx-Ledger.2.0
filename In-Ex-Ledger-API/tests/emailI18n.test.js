@@ -467,14 +467,6 @@ describe("buildBookkeepingActivityEmail", () => {
     assert.ok(html.includes("receipt.png"));
   });
 
-  it("returns receipt processing failed copy", () => {
-    const { subject, html } = buildBookkeepingActivityEmail("en", "receipt_processing_failed", {
-      details: [{ label: "Issue", value: "OCR service timed out." }],
-      actionUrl: "https://app.inexledger.com/receipts"
-    });
-    assert.ok(subject.includes("couldn't process your receipt"));
-    assert.ok(html.includes("OCR service timed out."));
-  });
 });
 
 /* ================================================================== */

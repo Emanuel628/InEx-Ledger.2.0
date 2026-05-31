@@ -5509,7 +5509,6 @@ function initCsvImport() {
 
 document.addEventListener("DOMContentLoaded", () => {
   initCsvImport();
-  initOcrPrefill();
   initDrawerCloseBtn();
   initQuickAddTriggers();
   initTaxBannerControls();
@@ -5830,50 +5829,4 @@ function closeRecurringRowActionPopup() {
   _popupRecurringAnchorElement = null;
 }
 
-function initOcrPrefill() {
-  const params = new URLSearchParams(window.location.search);
-  const ocrAmount = params.get("ocr_amount");
-  const ocrDate = params.get("ocr_date");
-  const ocrDesc = params.get("ocr_desc");
-  const ocrMerchant = params.get("ocr_merchant");
-  const ocrCurrency = params.get("ocr_currency");
-
-  if (!ocrAmount && !ocrDate && !ocrDesc && !ocrMerchant) return;
-
-  // Wait for the drawer to initialise then pre-fill and open it
-  const tryPrefill = () => {
-    const toggle = document.getElementById("addTxTogglePage");
-    const amountEl = document.getElementById("amount");
-    const dateEl = document.getElementById("date");
-    const descEl = document.getElementById("description");
-    if (!amountEl) return false;
-
-    // Set expense intent
-    const expenseBtn = document.querySelector('[data-intent="expense"]');
-    expenseBtn?.click();
-
-    if (ocrAmount) amountEl.value = ocrAmount;
-    if (ocrDate) dateEl.value = ocrDate;
-    if (ocrDesc) descEl.value = ocrDesc;
-    else if (ocrMerchant) descEl.value = ocrMerchant;
-
-    // Open drawer
-    if (transactionDrawerElement && transactionDrawerElement.hidden) {
-      toggle?.click();
-    }
-
-    // Clean URL
-    const clean = new URL(window.location.href);
-    ["ocr_amount", "ocr_date", "ocr_desc", "ocr_merchant", "ocr_currency"].forEach((k) => clean.searchParams.delete(k));
-    window.history.replaceState({}, "", clean.toString());
-    return true;
-  };
-
-  // Retry up to 20 times (50ms each = 1s) waiting for form elements to mount
-  let attempts = 0;
-  const interval = setInterval(() => {
-    attempts++;
-    if (tryPrefill() || attempts >= 20) clearInterval(interval);
-  }, 50);
-}
 
