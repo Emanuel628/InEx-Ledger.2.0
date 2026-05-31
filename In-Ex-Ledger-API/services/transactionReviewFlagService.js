@@ -82,7 +82,7 @@ function computeTransactionReviewFlags(row) {
     });
   }
 
-  if (isIncome && !hasReceipt(row) && !notePresent && !matched) {
+  if (isIncome && !flags.includes("NC") && !hasReceipt(row) && !notePresent && !matched) {
     flags.push("IS");
   }
 

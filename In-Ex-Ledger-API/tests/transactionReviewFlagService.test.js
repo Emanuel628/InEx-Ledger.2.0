@@ -104,3 +104,34 @@ test("vehicle mileage flag still applies for obvious vehicle categories without 
 
   assert.ok(flags.includes("ML"));
 });
+
+test("Imported income stays focused on category assignment before source-support review", () => {
+  const flags = computeTransactionReviewFlags({
+    id: "tx_income_imported",
+    type: "income",
+    category_id: "cat_income_imported",
+    category_name: "Imported Income",
+    receipt_count: 0,
+    review_status: "ready",
+    region: "US",
+    tax_map_us: "gross_sales"
+  });
+
+  assert.ok(flags.includes("NC"), "should still require assigning a real income category");
+  assert.ok(!flags.includes("IS"), "should not add income-source review before category assignment is resolved");
+});
+
+test("Categorized income without support still emits source review", () => {
+  const flags = computeTransactionReviewFlags({
+    id: "tx_income_categorized",
+    type: "income",
+    category_id: "cat_income_sales",
+    category_name: "Sales Revenue",
+    receipt_count: 0,
+    review_status: "ready",
+    region: "US",
+    tax_map_us: "gross_sales"
+  });
+
+  assert.ok(flags.includes("IS"), "should still require source review once the income category is real");
+});
