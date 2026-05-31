@@ -20,6 +20,7 @@ const {
     normalizeRegionCode,
     buildCpaActionLines,
     buildCleanupPriorityLines,
+    buildChecklistItems,
     isWorkpaperReady,
     buildCategoryBuckets
   }
@@ -434,4 +435,37 @@ test("buildCleanupPriorityLines includes home office and capital asset prioritie
 
   assert.ok(priorities.some((line) => /2 home-office items/.test(line)));
   assert.ok(priorities.some((line) => /3 capital items/.test(line)));
+});
+
+test("buildChecklistItems surfaces tax mapping, home office, and capital asset cards", () => {
+  const items = buildChecklistItems({
+    missingReceiptCount: 0,
+    attachedReceiptFileCount: 4,
+    receiptLinkedCount: 3,
+    transactionWithReceiptCount: 4,
+    needsCategoryCount: 1,
+    unmappedTaxCount: 2,
+    vehicleCount: 0,
+    vehicleTotal: 0,
+    mealsCount: 0,
+    mealsTotal: 0,
+    phoneAllocationCount: 0,
+    phoneAllocationTotal: 0,
+    homeOfficeCount: 5,
+    homeOfficeTotal: 1250,
+    capitalAssetCount: 6,
+    capitalAssetTotal: 4800,
+    excludedCount: 0
+  }, "USD");
+
+  const taxMapping = items.find((item) => item.title === "Tax-line mapping");
+  const homeOffice = items.find((item) => item.title === "Home office support");
+  const capitalAsset = items.find((item) => item.title === "Capital asset review");
+
+  assert.equal(taxMapping.badge, "ACTION");
+  assert.match(taxMapping.description, /2 categorized expense transactions still need a real tax-line mapping/i);
+  assert.equal(homeOffice.badge, "ACTION");
+  assert.match(homeOffice.description, /5 home-office transactions totaling \$1,250\.00/i);
+  assert.equal(capitalAsset.badge, "ACTION");
+  assert.match(capitalAsset.description, /6 capital asset transactions totaling \$4,800\.00/i);
 });

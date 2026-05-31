@@ -1380,6 +1380,24 @@ function buildCleanupPriorityLines(reviewInsights) {
   return rawPriorities;
 }
 
+function buildChecklistItems(reviewInsights, currency, reviewDecisionSummary = {}, packageAttribution = {}, isSecure = true) {
+  const nonExpenseWithReceipt = Math.max(0, reviewInsights.transactionWithReceiptCount - reviewInsights.receiptLinkedCount);
+  const receiptNonExpenseNote = nonExpenseWithReceipt > 0 ? ` ${nonExpenseWithReceipt} linked to non-expense rows.` : "";
+  return [
+    { badge: reviewInsights.missingReceiptCount > 0 ? "ACTION" : "OK", title: "Receipts", description: `${reviewInsights.attachedReceiptFileCount} receipt file${reviewInsights.attachedReceiptFileCount !== 1 ? "s" : ""} linked total. ${reviewInsights.receiptLinkedCount} are linked to expense rows and count toward receipt coverage.${receiptNonExpenseNote}` },
+    { badge: reviewInsights.needsCategoryCount > 0 ? "ACTION" : "OK", title: "Category cleanup", description: `${reviewInsights.needsCategoryCount} imported or uncategorized transactions need real business categories before filing.` },
+    { badge: reviewInsights.unmappedTaxCount > 0 ? "ACTION" : "OK", title: "Tax-line mapping", description: `${reviewInsights.unmappedTaxCount} categorized expense transactions still need a real tax-line mapping after category review.` },
+    { badge: reviewInsights.vehicleCount > 0 ? "ACTION" : "OK", title: "Vehicle support", description: `${reviewInsights.vehicleCount} vehicle/fuel transactions totaling ${formatCurrencyForPdf(reviewInsights.vehicleTotal, currency)} need mileage or actual-expense support.` },
+    { badge: reviewInsights.mealsCount > 0 ? "REVIEW" : "OK", title: "Meals", description: `${reviewInsights.mealsCount} meal transactions totaling ${formatCurrencyForPdf(reviewInsights.mealsTotal, currency)} require business purpose documentation. Potential 50% limit applies.` },
+    { badge: reviewInsights.phoneAllocationCount > 0 ? "ACTION" : "OK", title: "Phone / Internet allocation", description: `${reviewInsights.phoneAllocationCount} phone/internet transactions totaling ${formatCurrencyForPdf(reviewInsights.phoneAllocationTotal, currency)} require business-use allocation.` },
+    { badge: reviewInsights.homeOfficeCount > 0 ? "ACTION" : "OK", title: "Home office support", description: `${reviewInsights.homeOfficeCount} home-office transactions totaling ${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)} need worksheet support and square-foot allocation.` },
+    { badge: reviewInsights.capitalAssetCount > 0 ? "ACTION" : "OK", title: "Capital asset review", description: `${reviewInsights.capitalAssetCount} capital asset transactions totaling ${formatCurrencyForPdf(reviewInsights.capitalAssetTotal, currency)} need depreciation or CCA review support.` },
+    { badge: reviewInsights.excludedCount > 0 ? "OK" : "REVIEW", title: "Excluded non-business items", description: `${reviewInsights.excludedCount} non-business items were excluded from P&L and listed in a separate schedule.` },
+    { badge: Number(reviewDecisionSummary.openHard || 0) > 0 ? "ACTION" : Number(reviewDecisionSummary.openWarning || 0) > 0 ? "REVIEW" : "OK", title: "Reviewer decisions", description: `${Number(reviewDecisionSummary.openHard || 0)} hard reviewer issues and ${Number(reviewDecisionSummary.openWarning || 0)} warning reviewer issues remain open. ${Number(reviewDecisionSummary.waived || 0)} issues were waived and ${Number(reviewDecisionSummary.resolved || 0)} were resolved before export.` },
+    { badge: packageAttribution.certifiedByName ? "OK" : "REVIEW", title: "Package attribution", description: buildPackageAttributionLines(packageAttribution, isSecure).join(". ") || "Package generation and finalization attribution will appear after reviewer actions and finalized export certification are recorded." }
+  ];
+}
+
 function isWorkpaperReady(reviewInsights = {}) {
   return Number(reviewInsights.reviewFlagCount || 0) === 0
     && Number(reviewInsights.needsCategoryCount || 0) === 0
@@ -2176,18 +2194,7 @@ function buildReviewerDecisionPages(reviewStateRows, transactions, labels, regio
 function buildCpaChecklistPage(opts) {
   const { labels, region, reviewInsights, currency, reviewDecisionSummary = {}, packageAttribution = {}, isSecure = true } = opts;
   const isCA = normalizeRegionCode(region) === "CA";
-  const nonExpenseWithReceipt = Math.max(0, reviewInsights.transactionWithReceiptCount - reviewInsights.receiptLinkedCount);
-  const receiptNonExpenseNote = nonExpenseWithReceipt > 0 ? ` ${nonExpenseWithReceipt} linked to non-expense rows.` : "";
-  const items = [
-    { badge: reviewInsights.missingReceiptCount > 0 ? "ACTION" : "OK", title: "Receipts", description: `${reviewInsights.attachedReceiptFileCount} receipt file${reviewInsights.attachedReceiptFileCount !== 1 ? "s" : ""} linked total. ${reviewInsights.receiptLinkedCount} are linked to expense rows and count toward receipt coverage.${receiptNonExpenseNote}` },
-    { badge: reviewInsights.needsCategoryCount > 0 ? "ACTION" : "OK", title: "Category cleanup", description: `${reviewInsights.needsCategoryCount} imported or uncategorized transactions need real business categories before filing.` },
-    { badge: reviewInsights.vehicleCount > 0 ? "ACTION" : "OK", title: "Vehicle support", description: `${reviewInsights.vehicleCount} vehicle/fuel transactions totaling ${formatCurrencyForPdf(reviewInsights.vehicleTotal, currency)} need mileage or actual-expense support.` },
-    { badge: reviewInsights.mealsCount > 0 ? "REVIEW" : "OK", title: "Meals", description: `${reviewInsights.mealsCount} meal transactions totaling ${formatCurrencyForPdf(reviewInsights.mealsTotal, currency)} require business purpose documentation. Potential 50% limit applies.` },
-    { badge: reviewInsights.phoneAllocationCount > 0 ? "ACTION" : "OK", title: "Phone / Internet allocation", description: `${reviewInsights.phoneAllocationCount} phone/internet transactions totaling ${formatCurrencyForPdf(reviewInsights.phoneAllocationTotal, currency)} require business-use allocation.` },
-    { badge: reviewInsights.excludedCount > 0 ? "OK" : "REVIEW", title: "Excluded non-business items", description: `${reviewInsights.excludedCount} non-business items were excluded from P&L and listed in a separate schedule.` },
-    { badge: Number(reviewDecisionSummary.openHard || 0) > 0 ? "ACTION" : Number(reviewDecisionSummary.openWarning || 0) > 0 ? "REVIEW" : "OK", title: "Reviewer decisions", description: `${Number(reviewDecisionSummary.openHard || 0)} hard reviewer issues and ${Number(reviewDecisionSummary.openWarning || 0)} warning reviewer issues remain open. ${Number(reviewDecisionSummary.waived || 0)} issues were waived and ${Number(reviewDecisionSummary.resolved || 0)} were resolved before export.` },
-    { badge: packageAttribution.certifiedByName ? "OK" : "REVIEW", title: "Package attribution", description: buildPackageAttributionLines(packageAttribution, isSecure).join(". ") || "Package generation and finalization attribution will appear after reviewer actions and finalized export certification are recorded." }
-  ];
+  const items = buildChecklistItems(reviewInsights, currency, reviewDecisionSummary, packageAttribution, isSecure);
   const pages = [];
   let canvas = new PdfCanvas();
   let header = drawReportHeader(canvas, { title: labels.checklist_title, subtitle: isCA ? "T2125 bookkeeping workpaper checklist" : "Schedule C bookkeeping workpaper checklist", badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }] });
@@ -2876,6 +2883,7 @@ module.exports = {
     buildCategoryBuckets,
     buildCpaActionLines,
     buildCleanupPriorityLines,
+    buildChecklistItems,
     isWorkpaperReady,
     buildExclusionSummary,
     getTaxMappingRules
