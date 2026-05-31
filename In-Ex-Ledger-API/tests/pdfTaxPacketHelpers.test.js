@@ -17,8 +17,8 @@ const {
     summarizeExportTransactions,
     deriveBusinessAmounts,
     resolveBusinessCurrency,
-    normalizeRegionCode
-    ,
+    normalizeRegionCode,
+    isWorkpaperReady,
     buildCategoryBuckets
   }
 } = require("../services/pdfGeneratorService.js");
@@ -364,4 +364,35 @@ test("buildCategoryBuckets preserves mapping status for needs-category rows", ()
 
   assert.equal(uncategorizedBucket.mappingStatus, "Needs category");
   assert.equal(mappedBucket.mappingStatus, "Mapped");
+});
+
+test("isWorkpaperReady stays draft for truly unmapped categorized expenses", () => {
+  assert.equal(isWorkpaperReady({
+    reviewFlagCount: 1,
+    needsCategoryCount: 0,
+    unmappedTaxCount: 1,
+    mappedNeedsSupportCount: 0,
+    missingDescriptionCount: 0,
+    duplicateCount: 0
+  }), false);
+});
+
+test("isWorkpaperReady only returns true when unresolved included-review counts are clear", () => {
+  assert.equal(isWorkpaperReady({
+    reviewFlagCount: 0,
+    needsCategoryCount: 0,
+    unmappedTaxCount: 0,
+    mappedNeedsSupportCount: 0,
+    missingDescriptionCount: 0,
+    duplicateCount: 0
+  }), true);
+
+  assert.equal(isWorkpaperReady({
+    reviewFlagCount: 0,
+    needsCategoryCount: 0,
+    unmappedTaxCount: 0,
+    mappedNeedsSupportCount: 0,
+    missingDescriptionCount: 1,
+    duplicateCount: 0
+  }), false);
 });

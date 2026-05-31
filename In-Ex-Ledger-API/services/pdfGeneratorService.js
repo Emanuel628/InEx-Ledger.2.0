@@ -1351,6 +1351,15 @@ function buildExclusionSummary(excluded, currency) {
   })).sort((a, b) => b.amount - a.amount);
 }
 
+function isWorkpaperReady(reviewInsights = {}) {
+  return Number(reviewInsights.reviewFlagCount || 0) === 0
+    && Number(reviewInsights.needsCategoryCount || 0) === 0
+    && Number(reviewInsights.unmappedTaxCount || 0) === 0
+    && Number(reviewInsights.mappedNeedsSupportCount || 0) === 0
+    && Number(reviewInsights.missingDescriptionCount || 0) === 0
+    && Number(reviewInsights.duplicateCount || 0) === 0;
+}
+
 function shortenTaxLine(text) {
   const value = String(text || "").trim();
   if (!value) return "Unmapped";
@@ -2747,16 +2756,11 @@ function buildPdfExportDocument(options) {
 
   // Determine compliance status. Caller may pass an explicit exportStatus (used by
   // generatePdfExportPair to guarantee both PDF builds carry the same badge). When null,
-  // auto-derive: workpaper requires all category, vehicle, phone, and support flags cleared.
+  // auto-derive: workpaper requires the included transaction set to have no unresolved review flags.
   const resolvedExportStatus =
     exportStatusOption === "workpaper" || exportStatusOption === "draft"
       ? exportStatusOption
-      : (reviewInsights.needsCategoryCount === 0 &&
-         reviewInsights.vehicleCount === 0 &&
-         reviewInsights.phoneAllocationCount === 0 &&
-         reviewInsights.mappedNeedsSupportCount === 0
-           ? "workpaper"
-           : "draft");
+      : (isWorkpaperReady(reviewInsights) ? "workpaper" : "draft");
 
   labels.statusBadgeText =
     resolvedExportStatus === "workpaper" ? labels.workpaper_badge : labels.draft_badge;
@@ -2857,6 +2861,7 @@ module.exports = {
     buildTransactionStatus,
     buildReviewInsights,
     buildCategoryBuckets,
+    isWorkpaperReady,
     buildExclusionSummary,
     getTaxMappingRules
   }
