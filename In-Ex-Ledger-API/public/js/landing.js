@@ -1,7 +1,7 @@
 const LANDING_REGION_COPY = {
   US: {
     heroKicker: "FOR SOLO OPERATORS IN THE U.S. AND CANADA",
-    heroLede: "InEx Ledger helps solo businesses track income, expenses, receipts, mileage, invoices, and client replies, then turn messy records into review-ready Schedule C or T2125/T4A export packages.",
+    heroLede: "InEx Ledger gives solo operators a focused bookkeeping system for imports, receipts, invoices, review, and CPA hand-off without the drag of a bloated accounting suite.",
     taxContext: "Schedule C-friendly categories and review status",
     rowIncome: "$1,250.00",
     rowExpense: "-$89.42",
@@ -45,7 +45,7 @@ const LANDING_REGION_COPY = {
   },
   CA: {
     heroKicker: "FOR SOLO OPERATORS IN THE U.S. AND CANADA",
-    heroLede: "InEx Ledger helps solo businesses track income, expenses, receipts, kilometres, invoices, and client replies, then turn messy records into review-ready Schedule C or T2125/T4A export packages.",
+    heroLede: "InEx Ledger gives solo operators a focused bookkeeping system for imports, receipts, invoices, review, and CPA hand-off without the drag of a bloated accounting suite.",
     taxContext: "T2125 and T4A-friendly categories with GST/HST support",
     rowIncome: "CA$1,250.00",
     rowExpense: "-CA$89.42",
