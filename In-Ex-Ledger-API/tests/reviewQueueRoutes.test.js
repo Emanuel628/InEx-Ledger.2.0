@@ -158,6 +158,26 @@ function loadReviewRouterFixture(options = {}) {
                 reviewNotes: ""
               },
               {
+                id: "tx_vehicle_review",
+                date: "2026-05-02",
+                description: "Fuel stop",
+                amount: 60,
+                signedAmount: -60,
+                rawType: "expense",
+                currency: "USD",
+                accountName: "Checking",
+                categoryName: "Fuel & Gas",
+                taxLineLabel: "Line 9",
+                mappingStatus: "Needs support",
+                supportStatus: "Mileage log needed",
+                reviewStatus: "Needs review",
+                reviewFlags: ["ML", "RS"],
+                receiptCount: 0,
+                receiptAttached: false,
+                supportSummary: "Mileage log needed + Receipt needed",
+                reviewNotes: ""
+              },
+              {
                 id: "tx_mapping",
                 date: "2026-05-01",
                 description: "Phone line",
@@ -254,22 +274,23 @@ test("GET /api/review/queue returns only unresolved items with summary", async (
   const response = await request(app).get("/api/review/queue");
 
   assert.equal(response.status, 200);
-  assert.equal(response.body.queue.length, 4);
+  assert.equal(response.body.queue.length, 5);
   assert.deepEqual(
     response.body.queue.map((item) => item.id),
-    ["tx_action", "tx_mapping", "tx_review", "tx_excluded"]
+    ["tx_action", "tx_mapping", "tx_vehicle_review", "tx_review", "tx_excluded"]
   );
-  assert.equal(response.body.summary.total, 4);
+  assert.equal(response.body.summary.total, 5);
   assert.equal(response.body.summary.actionNeededCount, 2);
-  assert.equal(response.body.summary.needsReviewCount, 1);
+  assert.equal(response.body.summary.needsReviewCount, 2);
   assert.equal(response.body.summary.excludedReviewCount, 1);
   assert.equal(response.body.summary.missingCategoryCount, 1);
-  assert.equal(response.body.summary.missingReceiptCount, 1);
+  assert.equal(response.body.summary.missingReceiptCount, 2);
   assert.equal(response.body.summary.missingDescriptionCount, 1);
   assert.equal(response.body.queue[0].actionTarget.href, "/transactions");
   assert.equal(response.body.queue[1].actionTarget.href, "/categories");
-  assert.equal(response.body.queue[2].actionTarget.href, "/receipts");
-  assert.equal(response.body.queue[3].actionTarget.href, "/exports");
+  assert.equal(response.body.queue[2].actionTarget.href, "/mileage");
+  assert.equal(response.body.queue[3].actionTarget.href, "/receipts");
+  assert.equal(response.body.queue[4].actionTarget.href, "/exports");
   assert.deepEqual(response.body.queue[0].quickAction, {
     label: "Assign category",
     action: "transactions"
@@ -280,11 +301,16 @@ test("GET /api/review/queue returns only unresolved items with summary", async (
     href: "/categories"
   });
   assert.deepEqual(response.body.queue[2].quickAction, {
+    label: "Open mileage",
+    action: "navigate",
+    href: "/mileage"
+  });
+  assert.deepEqual(response.body.queue[3].quickAction, {
     label: "Attach receipt",
     action: "support",
     supportType: "receipt"
   });
-  assert.deepEqual(response.body.queue[3].quickAction, {
+  assert.deepEqual(response.body.queue[4].quickAction, {
     label: "Review exclusions",
     action: "navigate",
     href: "/exports"
@@ -356,7 +382,7 @@ test("GET /api/review/queue suppresses derived issues already marked resolved", 
   assert.equal(response.status, 200);
   assert.deepEqual(
     response.body.queue.map((item) => item.id),
-    ["tx_mapping", "tx_review", "tx_excluded"]
+    ["tx_mapping", "tx_vehicle_review", "tx_review", "tx_excluded"]
   );
 });
 
