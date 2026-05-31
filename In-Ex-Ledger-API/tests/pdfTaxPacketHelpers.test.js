@@ -20,6 +20,7 @@ const {
     normalizeRegionCode,
     buildCpaActionLines,
     buildCleanupPriorityLines,
+    buildSupportWorksheetLines,
     buildChecklistItems,
     isWorkpaperReady,
     buildCategoryBuckets
@@ -468,4 +469,21 @@ test("buildChecklistItems surfaces tax mapping, home office, and capital asset c
   assert.match(homeOffice.description, /5 home-office transactions totaling \$1,250\.00/i);
   assert.equal(capitalAsset.badge, "ACTION");
   assert.match(capitalAsset.description, /6 capital asset transactions totaling \$4,800\.00/i);
+});
+
+test("buildSupportWorksheetLines surfaces home office and capital asset support together", () => {
+  const lines = buildSupportWorksheetLines({
+    homeOfficeCount: 2,
+    homeOfficeTotal: 900,
+    capitalAssetCount: 3,
+    capitalAssetTotal: 4100
+  }, {
+    homeOfficeWorksheetCount: 1,
+    capitalAssetSupportCount: 2
+  }, "USD");
+
+  assert.ok(lines.some((line) => /Home office: 2 totaling \$900\.00/.test(line)));
+  assert.ok(lines.some((line) => /Capital assets: 3 totaling \$4,100\.00/.test(line)));
+  assert.ok(lines.some((line) => /Home-office worksheets: 1 \| Asset support files: 2/.test(line)));
+  assert.ok(lines.some((line) => /Worksheet allocation and depreciation \/ CCA support still required\./.test(line)));
 });

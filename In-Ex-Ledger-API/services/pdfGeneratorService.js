@@ -1380,6 +1380,27 @@ function buildCleanupPriorityLines(reviewInsights) {
   return rawPriorities;
 }
 
+function buildSupportWorksheetLines(reviewInsights, artifactSummary, currency) {
+  const lines = [];
+  if (reviewInsights.homeOfficeCount > 0) {
+    lines.push(`Home office: ${reviewInsights.homeOfficeCount} totaling ${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)}`);
+  }
+  if (reviewInsights.capitalAssetCount > 0) {
+    lines.push(`Capital assets: ${reviewInsights.capitalAssetCount} totaling ${formatCurrencyForPdf(reviewInsights.capitalAssetTotal, currency)}`);
+  }
+  if (reviewInsights.homeOfficeCount > 0 || reviewInsights.capitalAssetCount > 0) {
+    lines.push(`Home-office worksheets: ${artifactSummary.homeOfficeWorksheetCount} | Asset support files: ${artifactSummary.capitalAssetSupportCount}`);
+  }
+  if (reviewInsights.homeOfficeCount > 0 && reviewInsights.capitalAssetCount > 0) {
+    lines.push("Worksheet allocation and depreciation / CCA support still required.");
+  } else if (reviewInsights.homeOfficeCount > 0) {
+    lines.push("Square-foot allocation and worksheet support still required.");
+  } else if (reviewInsights.capitalAssetCount > 0) {
+    lines.push("Depreciation / CCA support still required before final handoff.");
+  }
+  return lines;
+}
+
 function buildChecklistItems(reviewInsights, currency, reviewDecisionSummary = {}, packageAttribution = {}, isSecure = true) {
   const nonExpenseWithReceipt = Math.max(0, reviewInsights.transactionWithReceiptCount - reviewInsights.receiptLinkedCount);
   const receiptNonExpenseNote = nonExpenseWithReceipt > 0 ? ` ${nonExpenseWithReceipt} linked to non-expense rows.` : "";
@@ -2301,13 +2322,11 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, suppor
     `Linked: ${artifactSummary.totalCount} across ${artifactSummary.transactionCount} transactions`,
     `Accepted: ${artifactSummary.acceptedCount} | Pending: ${artifactSummary.pendingCount}`,
     `Review notes: ${artifactSummary.reviewNoteCount} | Mileage logs: ${artifactSummary.mileageLogCount}`,
-    `Allocation worksheets: ${artifactSummary.allocationWorksheetCount}`
+    `Allocation worksheets: ${artifactSummary.allocationWorksheetCount} | Asset support: ${artifactSummary.capitalAssetSupportCount}`
   ], { maxChars: 34 });
-  if (reviewInsights.homeOfficeCount > 0) {
-    canvas.drawCard(320, top - 256, 252, 74, "Home Office Review", [
-      `Total amount: ${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)}`,
-      `Square-foot allocation and support needed`
-    ], { maxChars: 34 });
+  const worksheetLines = buildSupportWorksheetLines(reviewInsights, artifactSummary, currency);
+  if (worksheetLines.length > 0) {
+    canvas.drawCard(320, top - 256, 252, 98, reviewInsights.homeOfficeCount > 0 && reviewInsights.capitalAssetCount > 0 ? "Worksheet / Asset Review" : (reviewInsights.homeOfficeCount > 0 ? "Home Office Review" : "Capital Asset Review"), worksheetLines, { maxChars: 34 });
   } else {
     canvas.drawCard(320, top - 256, 252, 98, "Receipt Scope", [
       `Expense rows in export: ${reviewInsights.expenseTransactionCount}`,
@@ -2883,6 +2902,7 @@ module.exports = {
     buildCategoryBuckets,
     buildCpaActionLines,
     buildCleanupPriorityLines,
+    buildSupportWorksheetLines,
     buildChecklistItems,
     isWorkpaperReady,
     buildExclusionSummary,
