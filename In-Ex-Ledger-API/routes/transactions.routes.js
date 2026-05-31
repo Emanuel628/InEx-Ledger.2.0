@@ -45,6 +45,7 @@ const { getTaxDashboard } = require("../services/taxDashboardService.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
 const { normalizeReviewFilter, matchesReviewFilter, buildReviewSummary} = require("../services/transactionReviewFlagService.js");
 const { sendBookkeepingActivityEmail } = require("../services/bookkeepingEmailService.js");
+const { findDefaultCategoryForRegion } = require("../api/utils/seedDefaultsForBusiness.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -2017,6 +2018,28 @@ function detectCsvCategory(description, kind, region) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+function resolveCsvCategoryTemplate(name, kind, region) {
+  const matchedDefault = findDefaultCategoryForRegion(region, name, kind);
+  if (matchedDefault) {
+    return {
+      color: matchedDefault.color || null,
+      tax_map_us: matchedDefault.tax_map_us || null,
+      tax_map_ca: matchedDefault.tax_map_ca || null
+    };
+  }
+
+  const normalizedRegion = String(region || "").toUpperCase() === "CA" ? "CA" : "US";
+  if (kind === "income") {
+    return normalizedRegion === "CA"
+      ? { color: "slate", tax_map_us: null, tax_map_ca: "other_income" }
+      : { color: "slate", tax_map_us: "other_income", tax_map_ca: null };
+  }
+
+  return normalizedRegion === "CA"
+    ? { color: "slate", tax_map_us: null, tax_map_ca: "other_expense" }
+    : { color: "slate", tax_map_us: "other_expense", tax_map_ca: null };
+}
+
 router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "CSV file is required." });
@@ -2081,12 +2104,43 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     async function getOrCreateCsvCategory(db, categoryCache, name, kind) {
       const key = `${kind}::${name.toLowerCase()}`;
       if (categoryCache.has(key)) return categoryCache.get(key);
+      const template = resolveCsvCategoryTemplate(name, kind, region);
+      const existing = await db.query(
+        "SELECT id, color, tax_map_us, tax_map_ca FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
+        [businessId, name]
+      );
+      if (existing.rowCount) {
+        const row = existing.rows[0];
+        const shouldBackfillUs = template.tax_map_us && !String(row.tax_map_us || "").trim();
+        const shouldBackfillCa = template.tax_map_ca && !String(row.tax_map_ca || "").trim();
+        const shouldBackfillColor = template.color && !String(row.color || "").trim();
+        if (shouldBackfillUs || shouldBackfillCa || shouldBackfillColor) {
+          await db.query(
+            `UPDATE categories
+                SET color = COALESCE(color, $3),
+                    tax_map_us = COALESCE(tax_map_us, $4),
+                    tax_map_ca = COALESCE(tax_map_ca, $5)
+              WHERE id = $1 AND business_id = $2`,
+            [row.id, businessId, template.color, template.tax_map_us, template.tax_map_ca]
+          );
+        }
+        categoryCache.set(key, row.id);
+        return row.id;
+      }
       let result = await db.query(
-        `INSERT INTO categories (id, business_id, name, kind, created_at)
-         VALUES ($1, $2, $3, $4, now())
+        `INSERT INTO categories (id, business_id, name, kind, color, tax_map_us, tax_map_ca, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, now())
          ON CONFLICT (business_id, lower(name)) DO NOTHING
          RETURNING id`,
-        [crypto.randomUUID(), businessId, name, kind]
+        [
+          crypto.randomUUID(),
+          businessId,
+          name,
+          kind,
+          template.color,
+          template.tax_map_us,
+          template.tax_map_ca
+        ]
       );
       if (!result.rowCount) {
         result = await db.query(
@@ -2451,5 +2505,6 @@ module.exports.__private = {
   extractRowData,
   parseImportDateRange,
   isPlannedCsvDuplicate,
-  countImportableCsvRows
+  countImportableCsvRows,
+  resolveCsvCategoryTemplate
 };

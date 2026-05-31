@@ -20,9 +20,50 @@ const ALLOWED_ACCOUNT_TYPES = ["checking", "savings", "credit_card", "cash", "lo
 const MAX_ACCOUNT_NAME_LENGTH = 120;
 const ACCOUNTS_DEFAULT_LIMIT = 500;
 const ACCOUNTS_MAX_LIMIT = 2000;
+const OPENING_BALANCE_SCALE = 2;
 
 function normalizeAccountName(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function parseOpeningBalance(value) {
+  if (value === undefined) {
+    return { valid: true, value: undefined };
+  }
+
+  if (value === null || value === "") {
+    return { valid: true, value: 0 };
+  }
+
+  const numericValue = typeof value === "number" ? value : Number.parseFloat(String(value).trim());
+  if (!Number.isFinite(numericValue)) {
+    return { valid: false, error: "opening_balance must be a valid number." };
+  }
+
+  const rounded = Number(numericValue.toFixed(OPENING_BALANCE_SCALE));
+  return { valid: true, value: rounded };
+}
+
+function parseOpeningBalanceDate(value) {
+  if (value === undefined) {
+    return { valid: true, value: undefined };
+  }
+
+  if (value === null || value === "") {
+    return { valid: true, value: null };
+  }
+
+  const normalized = String(value).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return { valid: false, error: "opening_balance_as_of must be a valid YYYY-MM-DD date." };
+  }
+
+  const parsed = new Date(`${normalized}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== normalized) {
+    return { valid: false, error: "opening_balance_as_of must be a valid YYYY-MM-DD date." };
+  }
+
+  return { valid: true, value: normalized };
 }
 
 const router = express.Router();
@@ -73,8 +114,10 @@ router.get("/", async (req, res) => {
  * CREATE new account
  */
 router.post("/", async (req, res) => {
-  const { name, type } = req.body;
+  const { name, type, opening_balance, opening_balance_as_of } = req.body;
   const normalizedName = normalizeAccountName(name);
+  const parsedOpeningBalance = parseOpeningBalance(opening_balance);
+  const parsedOpeningBalanceDate = parseOpeningBalanceDate(opening_balance_as_of);
 
   if (!normalizedName || !type) {
     return res.status(400).json({ error: "Account name and type are required." });
@@ -88,14 +131,29 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ error: `Account type must be one of: ${ALLOWED_ACCOUNT_TYPES.join(", ")}.` });
   }
 
+  if (!parsedOpeningBalance.valid) {
+    return res.status(400).json({ error: parsedOpeningBalance.error });
+  }
+
+  if (!parsedOpeningBalanceDate.valid) {
+    return res.status(400).json({ error: parsedOpeningBalanceDate.error });
+  }
+
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
 
     const result = await pool.query(
-      `INSERT INTO accounts (id, business_id, name, type)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO accounts (id, business_id, name, type, opening_balance, opening_balance_as_of)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [crypto.randomUUID(), businessId, normalizedName, type]
+      [
+        crypto.randomUUID(),
+        businessId,
+        normalizedName,
+        type,
+        parsedOpeningBalance.value ?? 0,
+        parsedOpeningBalanceDate.value ?? null
+      ]
     );
 
     res.status(201).json(result.rows[0]);
@@ -117,12 +175,16 @@ router.put("/:id", async (req, res) => {
   if (!UUID_REGEX.test(req.params.id)) {
     return res.status(400).json({ error: "Invalid account ID." });
   }
-  const { name, type } = req.body;
+  const { name, type, opening_balance, opening_balance_as_of } = req.body;
   const hasName = Object.prototype.hasOwnProperty.call(req.body || {}, "name");
+  const hasOpeningBalance = Object.prototype.hasOwnProperty.call(req.body || {}, "opening_balance");
+  const hasOpeningBalanceDate = Object.prototype.hasOwnProperty.call(req.body || {}, "opening_balance_as_of");
   const normalizedName = normalizeAccountName(name);
+  const parsedOpeningBalance = parseOpeningBalance(opening_balance);
+  const parsedOpeningBalanceDate = parseOpeningBalanceDate(opening_balance_as_of);
 
-  if (!hasName && !type) {
-    return res.status(400).json({ error: "At least one of name or type is required." });
+  if (!hasName && !type && !hasOpeningBalance && !hasOpeningBalanceDate) {
+    return res.status(400).json({ error: "At least one updatable account field is required." });
   }
 
   if (hasName && !normalizedName) {
@@ -135,6 +197,14 @@ router.put("/:id", async (req, res) => {
 
   if (type && !ALLOWED_ACCOUNT_TYPES.includes(type)) {
     return res.status(400).json({ error: `Account type must be one of: ${ALLOWED_ACCOUNT_TYPES.join(", ")}.` });
+  }
+
+  if (!parsedOpeningBalance.valid) {
+    return res.status(400).json({ error: parsedOpeningBalance.error });
+  }
+
+  if (!parsedOpeningBalanceDate.valid) {
+    return res.status(400).json({ error: parsedOpeningBalanceDate.error });
   }
 
   try {
@@ -159,10 +229,20 @@ router.put("/:id", async (req, res) => {
     const result = await pool.query(
       `UPDATE accounts
           SET name = COALESCE($1, name),
-              type = COALESCE($2, type)
-        WHERE id = $3 AND business_id = $4
+              type = COALESCE($2, type),
+              opening_balance = COALESCE($3, opening_balance),
+              opening_balance_as_of = CASE WHEN $4 THEN $5 ELSE opening_balance_as_of END
+        WHERE id = $6 AND business_id = $7
         RETURNING *`,
-      [hasName ? normalizedName : null, type || null, req.params.id, businessId]
+      [
+        hasName ? normalizedName : null,
+        type || null,
+        hasOpeningBalance ? parsedOpeningBalance.value : null,
+        hasOpeningBalanceDate,
+        hasOpeningBalanceDate ? parsedOpeningBalanceDate.value : null,
+        req.params.id,
+        businessId
+      ]
     );
 
     res.json(result.rows[0]);

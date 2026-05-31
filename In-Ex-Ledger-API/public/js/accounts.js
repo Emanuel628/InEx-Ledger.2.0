@@ -125,6 +125,8 @@ function wireAccountForm() {
   const formContainer = document.getElementById("accountFormContainer");
   const form = document.getElementById("accountForm");
   const nameInput = document.getElementById("account-name");
+  const openingBalanceInput = document.getElementById("account-opening-balance");
+  const openingBalanceAsOfInput = document.getElementById("account-opening-balance-as-of");
   const cancelButton = document.getElementById("cancelAccountEdit");
   const message = document.getElementById("accountFormMessage");
   const submitButton = form?.querySelector('button[type="submit"]');
@@ -138,6 +140,8 @@ function wireAccountForm() {
 
     const name = nameInput?.value.trim() || "";
     const type = document.querySelector("#accountTypeChips .account-type-chip.is-active")?.dataset.chipType || "";
+    const openingBalance = openingBalanceInput?.value?.trim?.() || "";
+    const openingBalanceAsOf = openingBalanceAsOfInput?.value?.trim?.() || "";
 
     if (!name || !type) {
       if (message) message.textContent = tx("accounts_error_name_type");
@@ -151,7 +155,12 @@ function wireAccountForm() {
       const response = await apiFetch(editingAccountId ? `/api/accounts/${editingAccountId}` : "/api/accounts", {
         method: editingAccountId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, type })
+        body: JSON.stringify({
+          name,
+          type,
+          opening_balance: openingBalance === "" ? 0 : openingBalance,
+          opening_balance_as_of: openingBalanceAsOf || null
+        })
       });
 
       if (!response) throw new Error(editingAccountId ? tx("accounts_error_update") : tx("accounts_error_save"));
@@ -172,10 +181,17 @@ function openAccountForm(account = null) {
   const formContainer = document.getElementById("accountFormContainer");
   const form = document.getElementById("accountForm");
   const nameInput = document.getElementById("account-name");
+  const openingBalanceInput = document.getElementById("account-opening-balance");
+  const openingBalanceAsOfInput = document.getElementById("account-opening-balance-as-of");
   const submitButton = form?.querySelector('button[type="submit"]');
   const message = document.getElementById("accountFormMessage");
   editingAccountId = account?.id || null;
   if (nameInput) nameInput.value = account?.name || "";
+  if (openingBalanceInput) {
+    const openingBalance = Number.parseFloat(String(account?.opening_balance ?? "0"));
+    openingBalanceInput.value = Number.isFinite(openingBalance) && openingBalance !== 0 ? openingBalance.toFixed(2) : "";
+  }
+  if (openingBalanceAsOfInput) openingBalanceAsOfInput.value = account?.opening_balance_as_of || "";
   setActiveAccountType(account?.type || "checking");
   if (submitButton) submitButton.textContent = editingAccountId ? tx("accounts_button_save_changes") : tx("accounts_button_save");
   if (message) message.textContent = "";
@@ -263,6 +279,8 @@ function renderAccountCard(account) {
   const type = account.type || "custom";
   const typeLabel = formatAccountType(type);
   const currency = String(account.currency || inferLedgerCurrency()).toUpperCase();
+  const openingBalance = Number.parseFloat(String(account.opening_balance ?? "0"));
+  const hasOpeningBalance = Number.isFinite(openingBalance) && openingBalance !== 0;
   const icon = getAccountIconMarkup(type);
   const accentClass = getAccountAccentClass(type);
   const isDefault = isLikelyDefaultAccount(account);
@@ -276,6 +294,7 @@ function renderAccountCard(account) {
           <span class="account-meta-pill">${escapeHtml(currency)}</span>
           <span class="account-meta-pill is-active">${escapeHtml(tx("accounts_status_active"))}</span>
           ${isDefault ? `<span class="account-meta-pill">${escapeHtml(tx("accounts_status_default"))}</span>` : ""}
+          ${hasOpeningBalance ? `<span class="account-meta-pill">${escapeHtml(`Opening ${formatMoney(openingBalance, currency)}`)}</span>` : ""}
         </div>
       </div>
       <div class="account-actions">
@@ -406,6 +425,19 @@ function formatAccountType(value) {
   const type = ACCOUNT_TYPES.find((item) => item.value === value);
   const label = type ? tx(type.labelKey) : "";
   return label && label !== type?.labelKey ? label : type?.label || value || tx("accounts_fallback_name");
+}
+
+function formatMoney(value, currency) {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currency || inferLedgerCurrency(),
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  } catch {
+    return `${currency || inferLedgerCurrency()} ${Number(value || 0).toFixed(2)}`;
+  }
 }
 
 async function updateReceiptsDot() {

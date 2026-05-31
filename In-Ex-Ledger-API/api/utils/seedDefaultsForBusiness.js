@@ -73,6 +73,15 @@ function getDefaultCategoriesForRegion(region = "US") {
   throw new Error(`Unknown or missing region: ${region}`);
 }
 
+function findDefaultCategoryForRegion(region = "US", name, kind) {
+  const normalizedName = String(name || "").trim().toLowerCase();
+  const normalizedKind = String(kind || "").trim().toLowerCase();
+  return getDefaultCategoriesForRegion(region).find((category) =>
+    category.kind === normalizedKind &&
+    String(category.name || "").trim().toLowerCase() === normalizedName
+  ) || null;
+}
+
 async function resolveBusinessRegion(targetDb, businessId) {
   let region = null;
   try {
@@ -169,4 +178,9 @@ async function seedDefaultsForBusiness(db = pool, businessId) {
   );
 }
 
-module.exports = { seedDefaultsForBusiness, seedDefaultCategoriesForBusiness, getDefaultCategoriesForRegion };
+module.exports = {
+  seedDefaultsForBusiness,
+  seedDefaultCategoriesForBusiness,
+  getDefaultCategoriesForRegion,
+  findDefaultCategoryForRegion
+};

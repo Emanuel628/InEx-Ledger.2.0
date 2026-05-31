@@ -26,7 +26,7 @@ Status legend:
 | GST/HST registration and Quick Method | `services/quickMethodService.js`, `services/gstHstNumberService.js`, `routes/exports.routes.js`, `routes/business.routes.js` | `quickMethodService.test.js`, `gstHstNumberService.test.js`, `taxDashboardService.test.js` | `partial` |
 | Exports, workpapers, tax packet PDF | `routes/exports.routes.js`, `services/exportDatasetService.js`, `services/exportSnapshotService.js`, `services/pdfGeneratorService.js` | `exportsRegression.test.js`, `exportDatasetService.test.js`, `exportSnapshotService.test.js`, `pdfTaxPacketHelpers.test.js` | `partial` |
 | A/R, A/P, invoices, bills | `services/arApService.js`, `routes/invoices-v1.routes.js`, `routes/bills.routes.js` | `invoicesV1Routes.test.js` | `partial` |
-| Accounts and balances | `routes/accounts.routes.js`, `public/json/accounts.json` | `accountingControls.test.js` | `wrong` |
+| Accounts and balances | `routes/accounts.routes.js`, `public/json/accounts.json`, `public/html/accounts.html` | `accountingControls.test.js`, `accountsOpeningBalanceRoutes.test.js` | `partial` |
 | Accounting period locks and audit controls | `services/accountingLockService.js`, `routes/business.routes.js`, `routes/transactions.routes.js` | `accountingControls.test.js` | `correct` |
 
 ## Rule Matrix
@@ -36,9 +36,9 @@ Status legend:
 | Business profile | Region, province, fiscal year, accounting method, activity code, and GST/HST profile are captured and validated | `partial` | `routes/business.routes.js`, `routes/businesses.routes.js`, `public/html/settings.html`, `public/html/business-settings-cpa.html` | `businessProfileNormalization.test.js` | Data collection is stronger than downstream enforcement. |
 | Accounting method | Cash vs accrual basis should change recognition timing and reporting logic | `wrong` | `routes/business.routes.js`, `routes/me.routes.js`, `services/exportSnapshotService.js` | none found that prove recognition behavior | `accounting_method` is required and exported, but there is no traced timing engine in transaction, invoice, bill, or tax summary logic. |
 | Fiscal year | Canadian and non-calendar businesses should summarize by configured fiscal-year bounds | `correct` | `utils/fiscalYear.js`, `services/taxSummaryService.js`, `services/taxDashboardService.js`, `routes/transactions.routes.js` | `taxSummaryService.test.js`, `taxDashboardService.test.js` | Fixed and now wired into summary/dashboard paths. |
-| Opening balances | Businesses adopting midstream need account opening balances for correct balance carryforward | `wrong` | `public/json/accounts.json`, `routes/accounts.routes.js` | none | `opening_balance` exists only in documentation JSON, not schema or services. |
+| Opening balances | Businesses adopting midstream need account opening balances for correct balance carryforward | `partial` | `public/json/accounts.json`, `routes/accounts.routes.js`, `public/html/accounts.html` | `accountsOpeningBalanceRoutes.test.js` | The field is now stored and editable, but broader balance-sheet rollforward logic still needs work. |
 | Transaction model | Income and expense entry should preserve tax-relevant fields consistently | `partial` | `routes/transactions.routes.js`, `public/js/transactions.js` | `criticalFlows.test.js`, `transactionsFeatureGating.test.js` | Core transaction flow is broad, but tax behavior still relies heavily on category mapping and review exceptions. |
-| CSV import | Imported rows should land in categories with valid jurisdiction-aware tax mapping | `partial` | `routes/transactions.routes.js` | `transactionImportService.test.js`, `transactionCsvImportHelpers.test.js`, `transactionsCsvImportLimit.test.js` | Import fallback can still create categories without explicit tax mapping. |
+| CSV import | Imported rows should land in categories with valid jurisdiction-aware tax mapping | `partial` | `routes/transactions.routes.js` | `transactionImportService.test.js`, `transactionCsvImportHelpers.test.js`, `transactionsCsvImportLimit.test.js` | Fallback-created categories now inherit region-valid default tax maps, but categorization accuracy is still heuristic. |
 | Review queue | Compliance issues should be surfaced for unsupported or weakly evidenced transactions | `partial` | `routes/review.routes.js`, `services/transactionReviewFlagService.js` | `reviewQueueRoutes.test.js`, `transactionReviewFlagService.test.js` | Queue works again, but scope is still narrower than a full accountant review workflow. |
 | 1099 and T4A | Payer thresholds should be year-aware and based on gross receipts from payer | `correct` | `services/taxSummaryService.js`, `services/pdfGeneratorService.js`, `utils/taxFormThresholds.js` | `taxSummaryService.test.js`, `pdfTaxPacketHelpers.test.js` | Thresholds are centralized and year-keyed. Gross treatment appears intentional. |
 | Tax line summaries | Auto-deductible totals should exclude areas that require separate schedules or elections | `partial` | `services/taxSummaryService.js`, `services/pdf/taxMappings.js` | `taxSummaryService.test.js` | Home office and capital-asset lines are now review-only, but there is no full schedule engine behind them. |
@@ -55,16 +55,15 @@ Status legend:
 | Export dataset | Workpaper dataset should preserve mapping, support, review status, and exclusions coherently | `partial` | `services/exportDatasetService.js`, `routes/exports.routes.js` | `exportDatasetService.test.js`, `exportsRegression.test.js` | Stronger than before, but correctness still depends on upstream tax categorization. |
 | PDF tax packet | CPA hand-off packet should not overstate certainty or auto-calculate unsupported schedules | `partial` | `services/pdfGeneratorService.js`, `routes/exports.routes.js` | `pdfTaxPacketHelpers.test.js` | Packet is safer and more review-oriented now, but still not equivalent to a formal tax-prep package. |
 | A/R and A/P | Invoices and bills should support receivable and payable tracking and aging | `partial` | `services/arApService.js`, `routes/invoices-v1.routes.js`, `routes/bills.routes.js` | `invoicesV1Routes.test.js` | Operational tracking exists, but this does not by itself deliver accrual-basis accounting. |
-| Balance sheet integrity | Accounts, balances, and ledger carryforwards should support trustworthy balance-sheet style reporting | `wrong` | `routes/accounts.routes.js`, `public/json/accounts.json` | limited control tests only | Opening balances and broader ledger-state completeness are not yet strong enough for confidence. |
+| Balance sheet integrity | Accounts, balances, and ledger carryforwards should support trustworthy balance-sheet style reporting | `partial` | `routes/accounts.routes.js`, `public/html/accounts.html`, `public/json/accounts.json` | `accountsOpeningBalanceRoutes.test.js`, limited control tests | Opening balances now exist, but broader ledger-state completeness is still not strong enough for confidence. |
 | Audit controls | Locked periods, soft-delete, and audit-oriented safeguards should reduce accidental ledger drift | `correct` | `services/accountingLockService.js`, `routes/transactions.routes.js` | `accountingControls.test.js` | This is one of the stronger areas in the codebase. |
 
 ## Immediate Priority Backlog
 
 ### Must fix before stronger CPA-facing claims
-1. Implement real `opening_balance` schema, API, and account workflow.
-2. Decide and implement actual cash-vs-accrual behavior, or stop collecting `accounting_method`.
-3. Build a dedicated home-office workflow if the app intends to support that line beyond review-only handoff.
-4. Tighten CSV fallback category creation so imported categories cannot bypass tax mapping.
+1. Decide and implement actual cash-vs-accrual behavior, or stop collecting `accounting_method`.
+2. Build a dedicated home-office workflow if the app intends to support that line beyond review-only handoff.
+3. Add real balance-sheet rollforward logic on top of the new opening-balance storage.
 
 ### Important but may be launch-deferrable with careful copy
 1. Expand vehicle handling from "safe guardrails" into a true per-vehicle workflow.

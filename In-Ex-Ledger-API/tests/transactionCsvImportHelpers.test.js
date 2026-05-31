@@ -131,3 +131,37 @@ test("parseImportDateRange rejects when start_date is after end_date", () => {
   const out = parseImportDateRange({ start_date: "2026-12-31", end_date: "2026-01-01" });
   assert.match(out.error || "", /on or before/);
 });
+
+test("resolveCsvCategoryTemplate uses seeded tax maps for known US categories", () => {
+  const { resolveCsvCategoryTemplate } = loadTransactionRouteModule().__private;
+  const template = resolveCsvCategoryTemplate("Office Supplies", "expense", "US");
+
+  assert.equal(template.tax_map_us, "office_expense");
+  assert.equal(template.tax_map_ca, null);
+  assert.equal(template.color, "blue");
+});
+
+test("resolveCsvCategoryTemplate uses seeded tax maps for known Canada categories", () => {
+  const { resolveCsvCategoryTemplate } = loadTransactionRouteModule().__private;
+  const template = resolveCsvCategoryTemplate("Motor Vehicle", "expense", "CA");
+
+  assert.equal(template.tax_map_us, null);
+  assert.equal(template.tax_map_ca, "motor_vehicle");
+  assert.equal(template.color, "amber");
+});
+
+test("resolveCsvCategoryTemplate falls back to other income and expense maps when no seeded match exists", () => {
+  const { resolveCsvCategoryTemplate } = loadTransactionRouteModule().__private;
+
+  assert.deepEqual(resolveCsvCategoryTemplate("Imported Income", "income", "US"), {
+    color: "slate",
+    tax_map_us: "other_income",
+    tax_map_ca: null
+  });
+
+  assert.deepEqual(resolveCsvCategoryTemplate("Imported Expense", "expense", "CA"), {
+    color: "slate",
+    tax_map_us: null,
+    tax_map_ca: "other_expense"
+  });
+});

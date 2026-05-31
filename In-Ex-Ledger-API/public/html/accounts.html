@@ -85,6 +85,14 @@
               <button type="button" class="account-type-chip" data-chip-type="custom">Custom</button>
             </div>
           </fieldset>
+          <div class="form-field">
+            <label class="field-label" for="account-opening-balance">Opening balance</label>
+            <input type="number" id="account-opening-balance" name="account-opening-balance" class="form-control" step="0.01" inputmode="decimal" />
+          </div>
+          <div class="form-field">
+            <label class="field-label" for="account-opening-balance-as-of">Opening balance as of</label>
+            <input type="date" id="account-opening-balance-as-of" name="account-opening-balance-as-of" class="form-control" />
+          </div>
           <div class="form-actions">
             <button type="submit" class="accounts-save-btn" data-i18n="accounts_button_save">Save account</button>
             <button type="button" id="cancelAccountEdit" class="accounts-cancel-btn" data-i18n="common_cancel">Cancel</button>
@@ -129,7 +137,6 @@
   <script src="../js/accounts.js?v=20260519a"></script>
 </body>
 </html>
-
 
 
 
