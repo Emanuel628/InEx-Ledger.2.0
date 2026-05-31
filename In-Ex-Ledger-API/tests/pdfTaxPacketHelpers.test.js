@@ -18,6 +18,8 @@ const {
     deriveBusinessAmounts,
     resolveBusinessCurrency,
     normalizeRegionCode
+    ,
+    buildCategoryBuckets
   }
 } = require("../services/pdfGeneratorService.js");
 
@@ -328,4 +330,38 @@ test("Canada mappings resolve review lines for fuel, meals, and phone", () => {
   assert.match(fuel.taxLineDisplay, /Line 9281/i);
   assert.match(meals.taxLineDisplay, /Line 8523/i);
   assert.match(phone.taxLineDisplay, /Line 9270/i);
+});
+
+test("buildCategoryBuckets preserves mapping status for needs-category rows", () => {
+  const uncategorized = {
+    id: "t_uncat",
+    type: "expense",
+    amount: 25,
+    __businessAmounts: { deductibleAmount: 25 },
+    __status: buildTransactionStatus(
+      { id: "t_uncat", type: "expense", amount: 25, description: "Imported row", categoryId: "c_uncat" },
+      { id: "c_uncat", name: "Imported Expense", tax_map_us: "" },
+      { region: "US" }
+    ),
+    __category: { id: "c_uncat", name: "Imported Expense", tax_map_us: "" }
+  };
+  const mapped = {
+    id: "t_mapped",
+    type: "expense",
+    amount: 40,
+    __businessAmounts: { deductibleAmount: 40 },
+    __status: buildTransactionStatus(
+      { id: "t_mapped", type: "expense", amount: 40, description: "Office depot", categoryId: "c_mapped" },
+      { id: "c_mapped", name: "Office Supplies", tax_map_us: "office_expense" },
+      { region: "US", receiptTxIds: new Set(["t_mapped"]) }
+    ),
+    __category: { id: "c_mapped", name: "Office Supplies", tax_map_us: "office_expense" }
+  };
+
+  const buckets = buildCategoryBuckets([uncategorized, mapped], "USD");
+  const uncategorizedBucket = buckets.find((row) => row.category === "Imported Expense");
+  const mappedBucket = buckets.find((row) => row.category === "Office Supplies");
+
+  assert.equal(uncategorizedBucket.mappingStatus, "Needs category");
+  assert.equal(mappedBucket.mappingStatus, "Mapped");
 });

@@ -1635,7 +1635,7 @@ function buildCategoryPages(transactions, categories, receipts, currency, labels
       const mappedSupportTransactions = transactions.filter((txn) => statusNeedsSupport(txn.__status));
       const riskCardTop = Math.max(y - 10, 210);
       canvas.drawCard(40, riskCardTop, 532, 76, "Support Risk Summary", [
-        `Mapped needing support: ${mappedSupportTransactions.length} | Needs category: ${rows.filter((row) => row.categoryStatus === "needs_category").length} | Missing receipts/support: ${coverage.missing}`,
+        `Mapped needing support: ${mappedSupportTransactions.length} | Needs category: ${rows.filter((row) => row.mappingStatus === "Needs category").length} | Missing receipts/support: ${coverage.missing}`,
         `Vehicle/mileage log categories: ${rows.filter((row) => /mileage/i.test(row.supportStatus)).length} | Meals/business-purpose categories: ${rows.filter((row) => /business purpose/i.test(row.supportStatus)).length} | Phone/internet allocation categories: ${rows.filter((row) => /allocation/i.test(row.supportStatus)).length}`
       ], { maxChars: 92 });
       canvas.drawCard(40, riskCardTop - 88, 532, 54, "Summary note", [
@@ -2856,6 +2856,7 @@ module.exports = {
     resolveBusinessCurrency,
     buildTransactionStatus,
     buildReviewInsights,
+    buildCategoryBuckets,
     buildExclusionSummary,
     getTaxMappingRules
   }
