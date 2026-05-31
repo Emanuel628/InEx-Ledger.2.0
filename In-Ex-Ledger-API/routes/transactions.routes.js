@@ -102,6 +102,48 @@ function deriveCategoryNameFromSlug(slug) {
   return normalized;
 }
 
+function normalizeRegionCode(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  return normalized === "CA" ? "CA" : "US";
+}
+
+async function resolveBusinessRegionCode(db, businessId) {
+  const result = await db.query(
+    "SELECT region FROM businesses WHERE id = $1 LIMIT 1",
+    [businessId]
+  );
+  return normalizeRegionCode(result.rows[0]?.region);
+}
+
+function getCategoryCacheEntryId(cached) {
+  if (!cached) {
+    return null;
+  }
+  return typeof cached === "object" ? cached.id || null : cached;
+}
+
+async function ensureCategoryTemplateFields(db, businessId, categoryId, template) {
+  if (!categoryId || !template) {
+    return;
+  }
+
+  await db.query(
+    `UPDATE categories
+        SET color = COALESCE(NULLIF(BTRIM(color), ''), $3),
+            tax_map_us = COALESCE(NULLIF(BTRIM(tax_map_us), ''), $4),
+            tax_map_ca = COALESCE(NULLIF(BTRIM(tax_map_ca), ''), $5)
+      WHERE id = $1
+        AND business_id = $2`,
+    [
+      categoryId,
+      businessId,
+      template.color || null,
+      template.tax_map_us || null,
+      template.tax_map_ca || null
+    ]
+  );
+}
+
 /**
  * Resolves a category reference to a category UUID for the given business.
  *
@@ -131,6 +173,8 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
 
   const kind = deriveCategoryKindFromSlug(raw) || fallbackKind || "expense";
   const name = deriveCategoryNameFromSlug(raw);
+  const region = await resolveBusinessRegionCode(pool, businessId);
+  const template = resolveCanonicalCategoryTemplate(name, kind, region);
 
   const existing = await pool.query(
     "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
@@ -138,15 +182,24 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
   );
 
   if (existing.rowCount) {
+    await ensureCategoryTemplateFields(pool, businessId, existing.rows[0].id, template);
     return existing.rows[0].id;
   }
 
   const inserted = await pool.query(
-    `INSERT INTO categories (id, business_id, name, kind, created_at)
-    VALUES ($1, $2, $3, $4, now())
+    `INSERT INTO categories (id, business_id, name, kind, color, tax_map_us, tax_map_ca, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, now())
     ON CONFLICT (business_id, lower(name)) DO NOTHING
     RETURNING id`,
-    [crypto.randomUUID(), businessId, name, kind]
+    [
+      crypto.randomUUID(),
+      businessId,
+      name,
+      kind,
+      template.color || null,
+      template.tax_map_us || null,
+      template.tax_map_ca || null
+    ]
   );
 
   if (inserted.rowCount) {
@@ -157,6 +210,9 @@ async function resolveCategoryId(businessId, categoryRef, fallbackKind) {
     "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
     [businessId, name]
   );
+  if (existingAfterInsert.rowCount) {
+    await ensureCategoryTemplateFields(pool, businessId, existingAfterInsert.rows[0].id, template);
+  }
   return existingAfterInsert.rows[0]?.id || null;
 }
 
@@ -2226,35 +2282,28 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
 
     async function getOrCreateCsvCategory(db, categoryCache, name, kind) {
       const key = `${kind}::${name.toLowerCase()}`;
-      if (categoryCache.has(key)) return categoryCache.get(key);
       const template = resolveCanonicalCategoryTemplate(name, kind, region);
+      if (categoryCache.has(key)) {
+        const cached = categoryCache.get(key);
+        const categoryId = getCategoryCacheEntryId(cached);
+        await ensureCategoryTemplateFields(db, businessId, categoryId, template);
+        return categoryId;
+      }
       const existing = await db.query(
         "SELECT id, color, tax_map_us, tax_map_ca FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
         [businessId, name]
       );
       if (existing.rowCount) {
         const row = existing.rows[0];
-        const shouldBackfillUs = template.tax_map_us && !String(row.tax_map_us || "").trim();
-        const shouldBackfillCa = template.tax_map_ca && !String(row.tax_map_ca || "").trim();
-        const shouldBackfillColor = template.color && !String(row.color || "").trim();
-        if (shouldBackfillUs || shouldBackfillCa || shouldBackfillColor) {
-          await db.query(
-            `UPDATE categories
-                SET color = COALESCE(color, $3),
-                    tax_map_us = COALESCE(tax_map_us, $4),
-                    tax_map_ca = COALESCE(tax_map_ca, $5)
-              WHERE id = $1 AND business_id = $2`,
-            [row.id, businessId, template.color, template.tax_map_us, template.tax_map_ca]
-          );
-        }
-        categoryCache.set(key, row.id);
+        await ensureCategoryTemplateFields(db, businessId, row.id, template);
+        categoryCache.set(key, row);
         return row.id;
       }
       let result = await db.query(
         `INSERT INTO categories (id, business_id, name, kind, color, tax_map_us, tax_map_ca, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, now())
          ON CONFLICT (business_id, lower(name)) DO NOTHING
-         RETURNING id`,
+         RETURNING id, color, tax_map_us, tax_map_ca`,
         [
           crypto.randomUUID(),
           businessId,
@@ -2267,12 +2316,16 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
       );
       if (!result.rowCount) {
         result = await db.query(
-          "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
+          "SELECT id, color, tax_map_us, tax_map_ca FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
           [businessId, name]
         );
       }
-      const id = result.rows[0]?.id;
-      if (id) categoryCache.set(key, id);
+      const row = result.rows[0] || null;
+      const id = row?.id;
+      if (id) {
+        await ensureCategoryTemplateFields(db, businessId, id, template);
+        categoryCache.set(key, row || { id });
+      }
       return id;
     }
 
@@ -2284,12 +2337,12 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [businessId]);
 
     const existingCats = await client.query(
-      "SELECT id, name, kind FROM categories WHERE business_id = $1",
+      "SELECT id, name, kind, color, tax_map_us, tax_map_ca FROM categories WHERE business_id = $1",
       [businessId]
     );
     const categoryCache = new Map();
     for (const cat of existingCats.rows) {
-      categoryCache.set(`${cat.kind}::${cat.name.toLowerCase()}`, cat.id);
+      categoryCache.set(`${cat.kind}::${cat.name.toLowerCase()}`, cat);
     }
 
     // Count rows that would actually import (valid fields + within the date
@@ -2647,5 +2700,8 @@ module.exports.__private = {
   parseImportDateRange,
   isPlannedCsvDuplicate,
   countImportableCsvRows,
-  resolveCsvCategoryTemplate
+  resolveCsvCategoryTemplate,
+  getCategoryCacheEntryId,
+  ensureCategoryTemplateFields,
+  resolveCategoryId
 };

@@ -7,6 +7,10 @@ const Module = require("node:module");
 const ROUTE_PATH = require.resolve("../routes/transactions.routes.js");
 
 function loadTransactionRouteModule() {
+  return loadTransactionRouteModuleWithDb();
+}
+
+function loadTransactionRouteModuleWithDb(dbImpl = null) {
   const originalLoad = Module._load.bind(Module);
 
   Module._load = function(requestName, parent, isMain) {
@@ -58,7 +62,7 @@ function loadTransactionRouteModule() {
     }
     if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
       return {
-        pool: {
+        pool: dbImpl || {
           async query() {
             return { rows: [], rowCount: 0 };
           }
@@ -185,4 +189,91 @@ test("resolveCsvCategoryTemplate falls back to other income and expense maps whe
     tax_map_us: null,
     tax_map_ca: "other_expense"
   });
+});
+
+test("getCategoryCacheEntryId supports both legacy id strings and cached category objects", () => {
+  const { getCategoryCacheEntryId } = loadTransactionRouteModule().__private;
+
+  assert.equal(getCategoryCacheEntryId("cat-1"), "cat-1");
+  assert.equal(getCategoryCacheEntryId({ id: "cat-2", tax_map_us: "" }), "cat-2");
+  assert.equal(getCategoryCacheEntryId(null), null);
+});
+
+test("ensureCategoryTemplateFields repairs blank tax-map strings instead of only nulls", async () => {
+  const calls = [];
+  const fakeDb = {
+    async query(sql, params) {
+      calls.push({ sql, params });
+      return { rows: [], rowCount: 1 };
+    }
+  };
+  const { ensureCategoryTemplateFields } = loadTransactionRouteModule().__private;
+
+  await ensureCategoryTemplateFields(fakeDb, "biz-test", "cat-1", {
+    color: "slate",
+    tax_map_us: "utilities",
+    tax_map_ca: null
+  });
+
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].sql, /NULLIF\(BTRIM\(tax_map_us\), ''\)/);
+  assert.deepEqual(calls[0].params, ["cat-1", "biz-test", "slate", "utilities", null]);
+});
+
+test("resolveCategoryId backfills missing canonical tax maps on existing categories", async () => {
+  const calls = [];
+  const fakeDb = {
+    async query(sql, params) {
+      calls.push({ sql, params });
+      if (/SELECT region FROM businesses/i.test(sql)) {
+        return { rowCount: 1, rows: [{ region: "US" }] };
+      }
+      if (/SELECT id FROM categories WHERE business_id = \$1 AND lower\(name\) = lower\(\$2\) LIMIT 1/i.test(sql)) {
+        return { rowCount: 1, rows: [{ id: "cat-existing" }] };
+      }
+      if (/UPDATE categories/i.test(sql)) {
+        return { rowCount: 1, rows: [] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  };
+  const { resolveCategoryId } = loadTransactionRouteModuleWithDb(fakeDb).__private;
+
+  const categoryId = await resolveCategoryId("biz-test", "Phone & Internet", "expense");
+
+  assert.equal(categoryId, "cat-existing");
+  const updateCall = calls.find((entry) => /UPDATE categories/i.test(entry.sql));
+  assert.ok(updateCall);
+  assert.deepEqual(updateCall.params, ["cat-existing", "biz-test", "slate", "utilities", null]);
+});
+
+test("resolveCategoryId inserts canonical tax maps when auto-creating a category by name", async () => {
+  const calls = [];
+  const fakeDb = {
+    async query(sql, params) {
+      calls.push({ sql, params });
+      if (/SELECT region FROM businesses/i.test(sql)) {
+        return { rowCount: 1, rows: [{ region: "US" }] };
+      }
+      if (/SELECT id FROM categories WHERE business_id = \$1 AND lower\(name\) = lower\(\$2\) LIMIT 1/i.test(sql)) {
+        return { rowCount: 0, rows: [] };
+      }
+      if (/INSERT INTO categories \(id, business_id, name, kind, color, tax_map_us, tax_map_ca, created_at\)/i.test(sql)) {
+        return { rowCount: 1, rows: [{ id: "cat-new" }] };
+      }
+      throw new Error(`Unexpected query: ${sql}`);
+    }
+  };
+  const { resolveCategoryId } = loadTransactionRouteModuleWithDb(fakeDb).__private;
+
+  const categoryId = await resolveCategoryId("biz-test", "Advertising & Marketing", "expense");
+
+  assert.equal(categoryId, "cat-new");
+  const insertCall = calls.find((entry) => /INSERT INTO categories/i.test(entry.sql));
+  assert.ok(insertCall);
+  assert.equal(insertCall.params[2], "Advertising & Marketing");
+  assert.equal(insertCall.params[3], "expense");
+  assert.equal(insertCall.params[4], "blue");
+  assert.equal(insertCall.params[5], "advertising");
+  assert.equal(insertCall.params[6], null);
 });
