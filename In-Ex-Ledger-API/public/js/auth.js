@@ -500,7 +500,7 @@ function resolveSafeNextPathFromLocation(defaultPath = "/transactions") {
 
 function getPlanDisplayNameFromCode(tier) {
   if (tier === "v1") return "Pro";
-  if (tier === "v2" || tier === "business") return authT("common_business");
+  if (tier === "v2" || tier === "business") return "Pro";
   return authT("plan_basic");
 }
 

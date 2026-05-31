@@ -768,8 +768,7 @@ function hasDynamicSidebarQuickAddAccess() {
 }
 
 function hasDynamicSidebarBusinessTier() {
-  const tier = getDynamicSidebarTier();
-  return tier === "business" || tier === "v2" || tier === "business_tier";
+  return false;
 }
 
 function getDynamicSidebarAvailableFeatures() {
@@ -836,7 +835,7 @@ function initDynamicSidebar() {
         <div class="dynamic-sidebar-library" data-sidebar-library${shouldKeepLibraryOpen ? "" : " hidden"}>
           ${Object.keys(groupedLibrary).map((group) => `
             <div class="dynamic-sidebar-library-group">
-              <div class="sidebar-section-label">${escapeDynamicSidebarHtml(group === "Business" ? gT("quick_add_group_business", "Business") : gT("quick_add_group_core", "Core"))}</div>
+              <div class="sidebar-section-label">${escapeDynamicSidebarHtml(group === "Business" ? gT("quick_add_group_business", "More") : gT("quick_add_group_core", "Core"))}</div>
               ${groupedLibrary[group].map((feature) => renderDynamicSidebarLibraryItem(feature, favorites.includes(feature.id))).join("")}
             </div>
           `).join("")}

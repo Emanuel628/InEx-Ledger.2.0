@@ -12,7 +12,7 @@ const PLAN_BUSINESS = "business";
 
 function getPlanDisplayName(tier) {
   if (tier === PLAN_V1) return "Pro";
-  if (tier === PLAN_BUSINESS) return "Business";
+  if (tier === PLAN_BUSINESS) return "Pro";
   return "Basic";
 }
 

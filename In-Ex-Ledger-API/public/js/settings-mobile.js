@@ -17,7 +17,10 @@
     if (!subscription) return 'Basic / Free';
     var tier = subscription.effectiveTier || subscription.tier || subscription.plan || subscription.planCode || subscription.plan_code || '';
     var status = subscription.status || subscription.subscription_status || '';
-    var label = String(tier || 'Basic').replace(/[_-]+/g, ' ');
+    var normalizedTier = String(tier || '').trim().toLowerCase();
+    var label = (normalizedTier === 'business' || normalizedTier === 'v2')
+      ? 'Pro'
+      : String(tier || 'Basic').replace(/[_-]+/g, ' ');
     label = label.charAt(0).toUpperCase() + label.slice(1);
     if (status) label += ' · ' + String(status).replace(/[_-]+/g, ' ');
     return label;

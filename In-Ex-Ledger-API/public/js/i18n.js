@@ -378,9 +378,9 @@ const TRANSLATIONS = {
     landing_included_item3_ca: 'Basic organization built for self-employed Canadians',
     landing_included_item4: 'CSV export for tax prep',
     landing_included_item5: '30-day Pro trial (billing confirmed after setup)',
-    landing_coming_title: "What's coming in Business",
+    landing_coming_title: "What's coming next",
     landing_coming_subline:
-      'Business adds automation and power features without losing the calm simplicity.',
+      'We are keeping the product focused while we decide which deeper workflows actually belong here.',
     landing_coming_item1: 'Bank sync (automatic imports)',
     landing_coming_item2: 'Smarter categorization suggestions',
     landing_coming_item3: 'Receipt capture improvements',
@@ -1766,9 +1766,9 @@ const TRANSLATIONS = {
     landing_included_item3_ca: 'Organización básica para trabajadores autónomos en Canadá',
     landing_included_item4: 'Exportación CSV para impuestos',
     landing_included_item5: 'Prueba Pro de 30 días (facturación confirmada después de la configuración)',
-    landing_coming_title: 'Qué viene en Business',
+    landing_coming_title: 'Qué viene después',
     landing_coming_subline:
-      'Business añade automatización y potencia sin perder la calma.',
+      'Estamos manteniendo el producto enfocado mientras decidimos qué flujos más profundos realmente pertenecen aquí.',
     landing_coming_item1: 'Sincronización bancaria (importaciones automáticas)',
     landing_coming_item2: 'Sugerencias inteligentes de categorías',
     landing_coming_item3: 'Mejoras en captura de recibos',
@@ -3187,9 +3187,9 @@ const TRANSLATIONS = {
     landing_included_item3_ca: 'Organisation simple pour les travailleurs autonomes au Canada',
     landing_included_item4: 'Export CSV pour la préparation fiscale',
     landing_included_item5: 'Essai Pro de 30 jours (facturation confirmée après la configuration)',
-    landing_coming_title: 'Ce qui arrive dans Business',
+    landing_coming_title: 'Ce qui arrive ensuite',
     landing_coming_subline:
-      'Business ajoute de l\'automatisation et de la puissance sans perdre sa simplicité.',
+      'Nous gardons le produit ciblé pendant que nous décidons quels flux plus avancés ont vraiment leur place ici.',
     landing_coming_item1:
       'Synchronisation bancaire (importations automatiques)',
     landing_coming_item2: 'Suggestions intelligentes de catégories',
