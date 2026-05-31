@@ -919,7 +919,12 @@ If a field cannot be determined, use null. Do not include any other text.`
         try {
           const parsed = JSON.parse(body);
           if (parsed.error) {
-            resolve({ available: false, reason: `Anthropic API error: ${parsed.error.message || parsed.error.type}` });
+            const type = parsed.error.type || "";
+            const isBilling = type === "invalid_request_error" && /credit|balance|billing/i.test(parsed.error.message || "");
+            const reason = isBilling
+              ? "Receipt scanning is temporarily unavailable. Please try again later."
+              : "Receipt scanning could not be completed. Please try again.";
+            resolve({ available: false, reason });
             return;
           }
           const text = parsed.content?.[0]?.text || "";
