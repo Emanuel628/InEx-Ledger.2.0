@@ -18,6 +18,8 @@ const {
     deriveBusinessAmounts,
     resolveBusinessCurrency,
     normalizeRegionCode,
+    buildCpaActionLines,
+    buildCleanupPriorityLines,
     isWorkpaperReady,
     buildCategoryBuckets
   }
@@ -395,4 +397,41 @@ test("isWorkpaperReady only returns true when unresolved included-review counts 
     missingDescriptionCount: 1,
     duplicateCount: 0
   }), false);
+});
+
+test("buildCpaActionLines includes home office and capital asset support counts", () => {
+  const lines = buildCpaActionLines({
+    needsCategoryCount: 1,
+    unmappedTaxCount: 2,
+    mappedReceiptSupportCount: 3,
+    attachedReceiptFileCount: 4,
+    receiptLinkedCount: 2,
+    transactionWithReceiptCount: 5,
+    expenseWithoutReceiptAttachmentCount: 6,
+    vehicleCount: 7,
+    mealsCount: 8,
+    phoneAllocationCount: 9,
+    homeOfficeCount: 10,
+    capitalAssetCount: 11
+  }, "USD");
+
+  assert.ok(lines.some((line) => /10 home-office items require worksheet support\./.test(line)));
+  assert.ok(lines.some((line) => /11 capital asset items require asset review support\./.test(line)));
+});
+
+test("buildCleanupPriorityLines includes home office and capital asset priorities", () => {
+  const priorities = buildCleanupPriorityLines({
+    needsCategoryCount: 0,
+    unmappedTaxCount: 0,
+    expenseWithoutReceiptAttachmentCount: 0,
+    vehicleCount: 0,
+    mealsCount: 0,
+    phoneAllocationCount: 0,
+    homeOfficeCount: 2,
+    capitalAssetCount: 3,
+    duplicateCount: 0
+  });
+
+  assert.ok(priorities.some((line) => /2 home-office items/.test(line)));
+  assert.ok(priorities.some((line) => /3 capital items/.test(line)));
 });

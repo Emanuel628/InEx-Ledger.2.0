@@ -1351,6 +1351,35 @@ function buildExclusionSummary(excluded, currency) {
   })).sort((a, b) => b.amount - a.amount);
 }
 
+function buildCpaActionLines(reviewInsights, currency) {
+  return [
+    `${reviewInsights.needsCategoryCount} imported / uncategorized transactions need real category assignment.`,
+    `${reviewInsights.unmappedTaxCount} categorized transactions remain truly unmapped after category review.`,
+    `${reviewInsights.mappedReceiptSupportCount} mapped expense rows still missing receipt or support document.`,
+    `${reviewInsights.attachedReceiptFileCount} receipt file${reviewInsights.attachedReceiptFileCount !== 1 ? "s" : ""} linked total - ${reviewInsights.receiptLinkedCount} to expense rows, ${Math.max(0, reviewInsights.transactionWithReceiptCount - reviewInsights.receiptLinkedCount)} to non-expense rows.`,
+    `${reviewInsights.expenseWithoutReceiptAttachmentCount} expense transactions do not have receipt attachments.`,
+    `${reviewInsights.vehicleCount} vehicle items require mileage or actual-expense support.`,
+    `${reviewInsights.mealsCount} meal items require business-purpose support.`,
+    `${reviewInsights.phoneAllocationCount} phone/internet items require business-use allocation.`,
+    `${reviewInsights.homeOfficeCount} home-office items require worksheet support.`,
+    `${reviewInsights.capitalAssetCount} capital asset items require asset review support.`
+  ];
+}
+
+function buildCleanupPriorityLines(reviewInsights) {
+  const rawPriorities = [];
+  if (reviewInsights.needsCategoryCount > 0) rawPriorities.push(`Categorize ${reviewInsights.needsCategoryCount} imported or uncategorized transaction${reviewInsights.needsCategoryCount !== 1 ? "s" : ""}.`);
+  if (reviewInsights.unmappedTaxCount > 0) rawPriorities.push(`Map ${reviewInsights.unmappedTaxCount} categorized expense transaction${reviewInsights.unmappedTaxCount !== 1 ? "s" : ""} to a tax line.`);
+  if (reviewInsights.expenseWithoutReceiptAttachmentCount > 0) rawPriorities.push(`Add receipts or support for ${reviewInsights.expenseWithoutReceiptAttachmentCount} expense row${reviewInsights.expenseWithoutReceiptAttachmentCount !== 1 ? "s" : ""}.`);
+  if (reviewInsights.vehicleCount > 0) rawPriorities.push(`Link mileage or actual-expense support for ${reviewInsights.vehicleCount} vehicle item${reviewInsights.vehicleCount !== 1 ? "s" : ""}.`);
+  if (reviewInsights.mealsCount > 0) rawPriorities.push(`Document business purpose for ${reviewInsights.mealsCount} meal item${reviewInsights.mealsCount !== 1 ? "s" : ""} (50% limit applies).`);
+  if (reviewInsights.phoneAllocationCount > 0) rawPriorities.push(`Set business-use percentage for ${reviewInsights.phoneAllocationCount} phone/internet item${reviewInsights.phoneAllocationCount !== 1 ? "s" : ""}.`);
+  if (reviewInsights.homeOfficeCount > 0) rawPriorities.push(`Attach worksheet support for ${reviewInsights.homeOfficeCount} home-office item${reviewInsights.homeOfficeCount !== 1 ? "s" : ""}.`);
+  if (reviewInsights.capitalAssetCount > 0) rawPriorities.push(`Attach asset review support for ${reviewInsights.capitalAssetCount} capital item${reviewInsights.capitalAssetCount !== 1 ? "s" : ""}.`);
+  if (reviewInsights.duplicateCount > 0) rawPriorities.push(`Review ${reviewInsights.duplicateCount} potential duplicate transaction${reviewInsights.duplicateCount !== 1 ? "s" : ""} flagged in the ledger.`);
+  return rawPriorities;
+}
+
 function isWorkpaperReady(reviewInsights = {}) {
   return Number(reviewInsights.reviewFlagCount || 0) === 0
     && Number(reviewInsights.needsCategoryCount || 0) === 0
@@ -1540,16 +1569,7 @@ function buildIdentityPage(data) {
   canvas.drawMetricCard(400, metricY, 82, 72, "Included", String(reviewInsights.transactionCount), "Transactions");
   canvas.drawMetricCard(490, metricY, 82, 72, "Excluded", String(reviewInsights.excludedCount), "Transactions");
 
-  const actionLines = [
-    `${reviewInsights.needsCategoryCount} imported / uncategorized transactions need real category assignment.`,
-    `${reviewInsights.unmappedTaxCount} categorized transactions remain truly unmapped after category review.`,
-    `${reviewInsights.mappedReceiptSupportCount} mapped expense rows still missing receipt or support document.`,
-    `${reviewInsights.attachedReceiptFileCount} receipt file${reviewInsights.attachedReceiptFileCount !== 1 ? "s" : ""} linked total - ${reviewInsights.receiptLinkedCount} to expense rows, ${Math.max(0, reviewInsights.transactionWithReceiptCount - reviewInsights.receiptLinkedCount)} to non-expense rows.`,
-    `${reviewInsights.expenseWithoutReceiptAttachmentCount} expense transactions do not have receipt attachments.`,
-    `${reviewInsights.vehicleCount} vehicle items require mileage or actual-expense support.`,
-    `${reviewInsights.mealsCount} meal items require business-purpose support.`,
-    `${reviewInsights.phoneAllocationCount} phone/internet items require business-use allocation.`
-  ];
+  const actionLines = buildCpaActionLines(reviewInsights, currency);
   canvas.drawCard(40, metricY - 88, 532, 172, "CPA Action Required", actionLines, { maxChars: 88 });
   canvas.text(52, metricY - 242, labels.not_filed, 9, "F2");
   if (regionCode === "CA") {
@@ -2176,14 +2196,7 @@ function buildCpaChecklistPage(opts) {
   const colX = [40, 320];
   const rowGap = 12;
 
-  const rawPriorities = [];
-  if (reviewInsights.needsCategoryCount > 0) rawPriorities.push(`Categorize ${reviewInsights.needsCategoryCount} imported or uncategorized transaction${reviewInsights.needsCategoryCount !== 1 ? "s" : ""}.`);
-  if (reviewInsights.unmappedTaxCount > 0) rawPriorities.push(`Map ${reviewInsights.unmappedTaxCount} categorized expense transaction${reviewInsights.unmappedTaxCount !== 1 ? "s" : ""} to a tax line.`);
-  if (reviewInsights.expenseWithoutReceiptAttachmentCount > 0) rawPriorities.push(`Add receipts or support for ${reviewInsights.expenseWithoutReceiptAttachmentCount} expense row${reviewInsights.expenseWithoutReceiptAttachmentCount !== 1 ? "s" : ""}.`);
-  if (reviewInsights.vehicleCount > 0) rawPriorities.push(`Link mileage or actual-expense support for ${reviewInsights.vehicleCount} vehicle item${reviewInsights.vehicleCount !== 1 ? "s" : ""}.`);
-  if (reviewInsights.mealsCount > 0) rawPriorities.push(`Document business purpose for ${reviewInsights.mealsCount} meal item${reviewInsights.mealsCount !== 1 ? "s" : ""} (50% limit applies).`);
-  if (reviewInsights.phoneAllocationCount > 0) rawPriorities.push(`Set business-use percentage for ${reviewInsights.phoneAllocationCount} phone/internet item${reviewInsights.phoneAllocationCount !== 1 ? "s" : ""}.`);
-  if (reviewInsights.duplicateCount > 0) rawPriorities.push(`Review ${reviewInsights.duplicateCount} potential duplicate transaction${reviewInsights.duplicateCount !== 1 ? "s" : ""} flagged in the ledger.`);
+  const rawPriorities = buildCleanupPriorityLines(reviewInsights);
   const topPriorities = rawPriorities.slice(0, 4).map((line, idx) => `${idx + 1}. ${line}`);
   const priorityCardLines = topPriorities.length ? topPriorities : ["No critical cleanup items detected. Review the checklist below for any remaining action items."];
   const priorityCardHeight = estimateCardHeight(532, priorityCardLines, { maxChars: 88, minHeight: 68 });
@@ -2861,6 +2874,8 @@ module.exports = {
     buildTransactionStatus,
     buildReviewInsights,
     buildCategoryBuckets,
+    buildCpaActionLines,
+    buildCleanupPriorityLines,
     isWorkpaperReady,
     buildExclusionSummary,
     getTaxMappingRules
