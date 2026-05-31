@@ -460,11 +460,11 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
       const insertResult = await pool.query(
         `INSERT INTO transactions
            (id, business_id, account_id, category_id, amount, type, cleared, description,
-            date, posted_date, merchant_name, pending, currency, external_id,
+            date, posted_date, merchant_name, category_guess, pending, currency, external_id,
             import_source, import_batch_id, review_status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
-                 $9, $10, $11, $12, $13, $14,
-                 'plaid', $15, 'needs_review')
+                 $9, $10, $11, $12, $13, $14, $15,
+                 'plaid', $16, 'needs_review')
          ON CONFLICT (account_id, external_id)
            WHERE external_id IS NOT NULL DO NOTHING
          RETURNING id`,
@@ -480,6 +480,7 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
           canonical.date,
           canonical.posted_date,
           canonical.merchant_name,
+          canonical.category_guess,
           canonical.pending,
           canonical.currency,
           canonical.external_id,
@@ -499,7 +500,7 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
     if (!raw?.transaction_id) continue;
     try {
       const existingTxnResult = await pool.query(
-        `SELECT t.account_id, a.currency
+        `SELECT t.account_id, t.category_guess, a.currency
            FROM transactions t
            LEFT JOIN accounts a ON a.id = t.account_id
           WHERE t.business_id = $1
@@ -532,9 +533,10 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
                 description   = COALESCE($5, description),
                 merchant_name = COALESCE($6, merchant_name),
                 type          = COALESCE($7, type),
-                category_id   = COALESCE($8, category_id)
-          WHERE business_id = $9
-            AND external_id = $10`,
+                category_id   = COALESCE($8, category_id),
+                category_guess = COALESCE($9, category_guess)
+          WHERE business_id = $10
+            AND external_id = $11`,
         [
           canonical ? canonical.amount : Math.abs(Number(raw.amount) || 0),
           canonical ? canonical.pending : raw.pending === true,
@@ -544,6 +546,7 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
           canonical?.merchant_name || raw.merchant_name || null,
           canonical?.type || null,
           categoryId,
+          canonical?.category_guess || existingTxn?.category_guess || null,
           businessId,
           raw.transaction_id
         ]

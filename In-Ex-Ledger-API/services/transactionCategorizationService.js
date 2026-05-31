@@ -1,6 +1,7 @@
 "use strict";
 
 const { findDefaultCategoryForRegion } = require("../api/utils/seedDefaultsForBusiness.js");
+const { normalizeRuleValue } = require("./transactionMappingRuleService.js");
 
 const MAX_HISTORY_ROWS = 4000;
 const IMPORTED_CATEGORY_NAMES = {
@@ -250,6 +251,16 @@ function buildCategoryLookup(categories = []) {
   return lookup;
 }
 
+function buildRuleIndex(rules = []) {
+  const index = new Map();
+  for (const rule of rules) {
+    if (!rule?.category_name || !rule?.transaction_kind || !rule?.match_field || !rule?.match_value_normalized) continue;
+    const key = `${String(rule.transaction_kind).toLowerCase()}::${String(rule.match_field).toLowerCase()}::${String(rule.match_value_normalized).trim()}`;
+    index.set(key, rule.category_name);
+  }
+  return index;
+}
+
 function recordHistorySignal(targetMap, key, categoryName, kind) {
   if (!key || !categoryName || !kind) return;
   const scopedKey = `${kind}::${key}`;
@@ -338,9 +349,10 @@ function scoreRule(rule, { haystack, providerHintText }) {
   return score;
 }
 
-function createTransactionCategorizer({ categories = [], region = "US", historyRows = [] } = {}) {
+function createTransactionCategorizer({ categories = [], region = "US", historyRows = [], mappingRules = [] } = {}) {
   const categoryLookup = buildCategoryLookup(categories);
   const { merchantHistory, descriptionHistory } = buildHistoryIndex(historyRows);
+  const ruleIndex = buildRuleIndex(mappingRules);
 
   return function categorizeTransaction({
     type,
@@ -353,8 +365,21 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
     const rawMerchant = String(merchantName || "");
     const merchantKey = normalizeMappingText(rawMerchant);
     const descriptionKey = normalizeMappingText(rawDescription);
+    const merchantRuleKey = normalizeRuleValue(rawMerchant);
+    const descriptionRuleKey = normalizeRuleValue(rawDescription);
+    const categoryGuessKey = normalizeRuleValue(categoryGuess);
     const haystack = `${rawMerchant} ${rawDescription} ${String(categoryGuess || "")}`.toLowerCase();
     const providerHintText = normalizeMappingText(categoryGuess);
+
+    const explicitRuleCategory =
+      ruleIndex.get(`${kind}::merchant_name::${merchantKey}`)
+      || ruleIndex.get(`${kind}::merchant_name::${merchantRuleKey}`)
+      || ruleIndex.get(`${kind}::category_guess::${categoryGuessKey}`)
+      || ruleIndex.get(`${kind}::description::${descriptionKey}`)
+      || ruleIndex.get(`${kind}::description::${descriptionRuleKey}`);
+    if (explicitRuleCategory && categoryExists(categoryLookup, kind, explicitRuleCategory)) {
+      return { categoryName: explicitRuleCategory, reason: "mapping_rule", confidence: "high" };
+    }
 
     const learnedMerchantCategory = selectHistoryWinner(merchantHistory.get(`${kind}::${merchantKey}`));
     if (learnedMerchantCategory && categoryExists(categoryLookup, kind, learnedMerchantCategory)) {
@@ -407,7 +432,7 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
 }
 
 async function buildBusinessTransactionCategorizer(pool, { businessId, region = "US" } = {}) {
-  const [categoriesResult, historyResult] = await Promise.all([
+  const [categoriesResult, historyResult, rulesResult] = await Promise.all([
     pool.query(
       `SELECT id, name, kind, color, tax_map_us, tax_map_ca, is_active
          FROM categories
@@ -427,16 +452,32 @@ async function buildBusinessTransactionCategorizer(pool, { businessId, region = 
           AND t.deleted_at IS NULL
           AND t.category_id IS NOT NULL
           AND c.is_active = true
+          AND (
+            COALESCE(t.import_source, '') = ''
+            OR t.review_status IN ('ready', 'matched', 'locked')
+          )
         ORDER BY t.date DESC, t.created_at DESC
         LIMIT $2`,
       [businessId, MAX_HISTORY_ROWS]
+    ),
+    pool.query(
+      `SELECT r.transaction_kind,
+              r.match_field,
+              r.match_value_normalized,
+              c.name AS category_name
+         FROM transaction_mapping_rules r
+         JOIN categories c ON c.id = r.category_id
+        WHERE r.business_id = $1
+          AND c.is_active = true`,
+      [businessId]
     )
   ]);
 
   return createTransactionCategorizer({
     categories: categoriesResult.rows,
     region,
-    historyRows: historyResult.rows
+    historyRows: historyResult.rows,
+    mappingRules: rulesResult.rows
   });
 }
 
@@ -449,6 +490,7 @@ module.exports = {
     normalizeMappingText,
     buildHistoryIndex,
     selectHistoryWinner,
-    buildCategoryLookup
+    buildCategoryLookup,
+    buildRuleIndex
   }
 };

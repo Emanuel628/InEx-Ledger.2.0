@@ -50,6 +50,9 @@ const {
   buildBusinessTransactionCategorizer,
   resolveCanonicalCategoryTemplate
 } = require("../services/transactionCategorizationService.js");
+const {
+  learnTransactionMappingRules
+} = require("../services/transactionMappingRuleService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -1039,7 +1042,10 @@ router.put("/:id", async (req, res) => {
 
     // Verify the original transaction exists and belongs to this business
     const originalResult = await pool.query(
-      "SELECT id, date FROM transactions WHERE id = $1 AND business_id = $2 AND is_adjustment = false AND deleted_at IS NULL",
+      `SELECT id, date, type, category_id, import_source, merchant_name, category_guess,
+              COALESCE(description, description_encrypted) AS description
+         FROM transactions
+        WHERE id = $1 AND business_id = $2 AND is_adjustment = false AND deleted_at IS NULL`,
       [req.params.id, businessId]
     );
     if (originalResult.rowCount === 0) {
@@ -1125,6 +1131,25 @@ router.put("/:id", async (req, res) => {
 
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Transaction not found." });
+    }
+    const originalTxn = originalResult.rows[0];
+    if (
+      originalTxn
+      && ["csv", "plaid"].includes(String(originalTxn.import_source || "").toLowerCase())
+      && mappedCategoryId
+      && mappedCategoryId !== originalTxn.category_id
+      && ["ready", "matched", "locked"].includes(String(validation.normalized.review_status || "ready"))
+    ) {
+      const ruleTxn = {
+        type,
+        merchant_name: originalTxn.merchant_name,
+        category_guess: originalTxn.category_guess,
+        description: tryDecrypt(originalTxn.description)
+      };
+      await learnTransactionMappingRules(pool, businessId, ruleTxn, {
+        categoryId: mappedCategoryId,
+        userId: req.user.id
+      });
     }
     void invalidateSnapshotsForBusiness({
       businessId,
@@ -2290,8 +2315,8 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         await client.query(
           `INSERT INTO transactions
             (id, business_id, account_id, category_id, amount, type, cleared, description, description_encrypted,
-             date, currency, tax_treatment, review_status, converted_amount, import_batch_id, import_source)
-           VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8, $9, $10, $11, 'needs_review', $5, $12, 'csv')`,
+             date, merchant_name, category_guess, currency, tax_treatment, review_status, converted_amount, import_batch_id, import_source)
+           VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8, $9, $10, $11, $12, $13, 'needs_review', $5, $14, 'csv')`,
           [
             crypto.randomUUID(),
             businessId,
@@ -2302,6 +2327,8 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
             storedDescription.description,
             storedDescription.descriptionEncrypted,
             date,
+            merchantName || null,
+            categoryGuess || null,
             fallbackCurrency,
             taxTreatment,
             batch.id

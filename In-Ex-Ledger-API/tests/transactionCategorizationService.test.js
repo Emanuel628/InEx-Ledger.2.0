@@ -122,6 +122,34 @@ test("categorizer uses provider category hints when descriptions are weak", () =
   assert.equal(result.reason, "canonical_rule");
 });
 
+test("categorizer applies persisted business mapping rules before history and generic rules", () => {
+  const categorize = createTransactionCategorizer({
+    categories: makeCategories("US"),
+    region: "US",
+    mappingRules: [
+      {
+        transaction_kind: "expense",
+        match_field: "merchant_name",
+        match_value_normalized: "openai",
+        category_name: "Software & Subscriptions"
+      }
+    ],
+    historyRows: [
+      { merchant_name: "OpenAI", description: "OPENAI API", category_name: "Car & Truck Expenses", category_kind: "expense" },
+      { merchant_name: "OpenAI", description: "OPENAI API", category_name: "Car & Truck Expenses", category_kind: "expense" }
+    ]
+  });
+
+  const result = categorize({
+    type: "expense",
+    merchantName: "OpenAI",
+    description: "OPENAI API MAY"
+  });
+
+  assert.equal(result.categoryName, "Software & Subscriptions");
+  assert.equal(result.reason, "mapping_rule");
+});
+
 test("resolveCanonicalCategoryTemplate preserves seeded defaults and imported fallbacks", () => {
   assert.deepEqual(resolveCanonicalCategoryTemplate("Software & Subscriptions", "expense", "US"), {
     color: "blue",
