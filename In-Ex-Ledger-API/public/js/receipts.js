@@ -375,10 +375,9 @@ function renderReceipts(receipts) {
         <td data-label="${escapeHtml(tx("receipts_table_attached"))}">${transactionCell}</td>
         <td data-label="${escapeHtml(tx("common_actions"))}">
           <div class="receipt-row-actions">
-            <button type="button" class="receipt-link-btn" data-receipt-link="${escapeHtml(receipt.id || "")}">${escapeHtml(tx("receipts_link_action"))}</button>
             ${receipt.transaction_id
               ? `<button type="button" class="receipt-link-btn" data-receipt-unlink="${escapeHtml(receipt.id || "")}">Unlink</button>`
-              : ""}
+              : `<button type="button" class="receipt-link-btn" data-receipt-link="${escapeHtml(receipt.id || "")}">${escapeHtml(tx("receipts_link_action"))}</button>`}
             ${!receipt.mime_type || receipt.mime_type !== "application/pdf"
               ? `<button type="button" class="receipt-scan-btn" data-receipt-scan="${escapeHtml(receipt.id || "")}" title="Extract data from this receipt">Scan</button>`
               : ""}
