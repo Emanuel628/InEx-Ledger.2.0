@@ -99,6 +99,10 @@ function plaidTransactionToCanonical(plaidTxn, { accountId, defaultCurrency = "U
   const rawAmount = Number(plaidTxn.amount);
   if (!Number.isFinite(rawAmount)) return null;
   const type = rawAmount > 0 ? "expense" : "income";
+  const personalFinanceCategory = plaidTxn.personal_finance_category || null;
+  const categoryGuess = personalFinanceCategory?.detailed
+    || personalFinanceCategory?.primary
+    || (Array.isArray(plaidTxn.category) && plaidTxn.category.length ? plaidTxn.category.join(" > ") : null);
   return {
     source: "plaid",
     external_id: plaidTxn.transaction_id || null,
@@ -110,9 +114,7 @@ function plaidTransactionToCanonical(plaidTxn, { accountId, defaultCurrency = "U
     amount: Math.abs(rawAmount),
     currency: String(plaidTxn.iso_currency_code || plaidTxn.unofficial_currency_code || defaultCurrency).toUpperCase(),
     pending: plaidTxn.pending === true,
-    category_guess: Array.isArray(plaidTxn.category) && plaidTxn.category.length
-      ? plaidTxn.category[0]
-      : null,
+    category_guess: categoryGuess,
     type,
     duplicate_candidate: false
   };

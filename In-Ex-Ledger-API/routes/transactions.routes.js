@@ -46,6 +46,10 @@ const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotSe
 const { normalizeReviewFilter, matchesReviewFilter, buildReviewSummary} = require("../services/transactionReviewFlagService.js");
 const { sendBookkeepingActivityEmail } = require("../services/bookkeepingEmailService.js");
 const { findDefaultCategoryForRegion } = require("../api/utils/seedDefaultsForBusiness.js");
+const {
+  buildBusinessTransactionCategorizer,
+  resolveCanonicalCategoryTemplate
+} = require("../services/transactionCategorizationService.js");
 
 const router = express.Router();
 const VALID_TRANSACTION_TYPES = new Set(["income", "expense"]);
@@ -2081,6 +2085,10 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
 
     const { region, currency: fallbackCurrency } = await getBusinessRegionAndCurrency(businessId);
     const lockState = await loadAccountingLockState(pool, businessId);
+    const categorizeImportedTransaction = await buildBusinessTransactionCategorizer(pool, {
+      businessId,
+      region
+    });
 
     const csvText = req.file.buffer.toString("utf-8").replace(/^\uFEFF/, "");
     const rows = parseCsv(csvText);
@@ -2104,7 +2112,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
     async function getOrCreateCsvCategory(db, categoryCache, name, kind) {
       const key = `${kind}::${name.toLowerCase()}`;
       if (categoryCache.has(key)) return categoryCache.get(key);
-      const template = resolveCsvCategoryTemplate(name, kind, region);
+      const template = resolveCanonicalCategoryTemplate(name, kind, region);
       const existing = await db.query(
         "SELECT id, color, tax_map_us, tax_map_ca FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
         [businessId, name]
@@ -2236,8 +2244,16 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
         }
       }
 
-      const detectedCategory = detectCsvCategory(description, type, region);
-      const categoryId = await getOrCreateCsvCategory(client, categoryCache, detectedCategory, type);
+      const detectedCategory = categorizeImportedTransaction({
+        type,
+        description
+      });
+      const categoryId = await getOrCreateCsvCategory(
+        client,
+        categoryCache,
+        detectedCategory.categoryName,
+        type
+      );
       if (!categoryId) {
         results.errors.push({ row: i + 2, reason: `Row ${i + 2}: could not resolve category` });
         results.skipped++;

@@ -23,6 +23,10 @@ const {
   updateBankConnectionStatus
 } = require("../services/bankConnectionService.js");
 const {
+  buildBusinessTransactionCategorizer,
+  resolveCanonicalCategoryTemplate
+} = require("../services/transactionCategorizationService.js");
+const {
   createImportBatch,
   finalizeImportBatch
 } = require("../services/transactionImportService.js");
@@ -379,6 +383,47 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
     if (row.external_account_id) accountMap.set(row.external_account_id, row);
   }
 
+  const businessRegionResult = await pool.query(
+    "SELECT region FROM businesses WHERE id = $1 LIMIT 1",
+    [businessId]
+  );
+  const businessRegion = String(businessRegionResult.rows[0]?.region || "").toUpperCase() === "CA" ? "CA" : "US";
+  const categorizeImportedTransaction = await buildBusinessTransactionCategorizer(pool, {
+    businessId,
+    region: businessRegion
+  });
+  const categoryIdCache = new Map();
+
+  async function getOrCreateImportedCategoryId(name, kind) {
+    const cacheKey = `${kind}::${String(name || "").trim().toLowerCase()}`;
+    if (categoryIdCache.has(cacheKey)) return categoryIdCache.get(cacheKey);
+    const template = resolveCanonicalCategoryTemplate(name, kind, businessRegion);
+    let result = await pool.query(
+      `INSERT INTO categories (id, business_id, name, kind, color, tax_map_us, tax_map_ca, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+       ON CONFLICT (business_id, lower(name)) DO NOTHING
+       RETURNING id`,
+      [
+        crypto.randomUUID(),
+        businessId,
+        name,
+        kind,
+        template.color,
+        template.tax_map_us,
+        template.tax_map_ca
+      ]
+    );
+    if (!result.rowCount) {
+      result = await pool.query(
+        "SELECT id FROM categories WHERE business_id = $1 AND lower(name) = lower($2) LIMIT 1",
+        [businessId, name]
+      );
+    }
+    const categoryId = result.rows[0]?.id || null;
+    if (categoryId) categoryIdCache.set(cacheKey, categoryId);
+    return categoryId;
+  }
+
   const batch = await createImportBatch(pool, {
     businessId,
     accountId: null, // multiple accounts can be touched by one Plaid sync
@@ -401,16 +446,25 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
       defaultCurrency: internalAccount.currency || "USD"
     });
     if (!canonical || !canonical.date) continue;
+    const mappedCategory = categorizeImportedTransaction({
+      type: canonical.type,
+      description: canonical.description,
+      merchantName: canonical.merchant_name,
+      categoryGuess: canonical.category_guess
+    });
+    const categoryId = mappedCategory?.categoryName
+      ? await getOrCreateImportedCategoryId(mappedCategory.categoryName, canonical.type)
+      : null;
 
     try {
       const insertResult = await pool.query(
         `INSERT INTO transactions
-           (id, business_id, account_id, amount, type, cleared, description,
+           (id, business_id, account_id, category_id, amount, type, cleared, description,
             date, posted_date, merchant_name, pending, currency, external_id,
             import_source, import_batch_id, review_status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7,
-                 $8, $9, $10, $11, $12, $13,
-                 'plaid', $14, 'needs_review')
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+                 $9, $10, $11, $12, $13, $14,
+                 'plaid', $15, 'needs_review')
          ON CONFLICT (account_id, external_id)
            WHERE external_id IS NOT NULL DO NOTHING
          RETURNING id`,
@@ -418,6 +472,7 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
           crypto.randomUUID(),
           businessId,
           internalAccount.id,
+          categoryId,
           canonical.amount,
           canonical.type,
           !canonical.pending,
