@@ -345,7 +345,7 @@ test("POST /api/transactions/import/csv maps the real merchant set through the l
         categoryId: categoryIdByName.get("Advertising & Marketing"),
         type: "expense",
         reason: "canonical_rule",
-        confidence: "low"
+        confidence: "medium"
       },
       {
         merchant: "Amazon.com",

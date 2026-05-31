@@ -229,4 +229,5 @@ test("categorizer still maps 'Facebook Ads - Campaign 1' to Advertising & Market
   const result = categorize({ type: "expense", merchantName: "Facebook", description: "Ads - Campaign 1" });
   assert.equal(result.categoryName, "Advertising & Marketing");
   assert.equal(result.reason, "canonical_rule");
+  assert.equal(result.confidence, "medium");
 });

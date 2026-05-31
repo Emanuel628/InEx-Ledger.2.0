@@ -446,7 +446,11 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
       return {
         categoryName,
         reason: "canonical_rule",
-        confidence: best.score >= 5 ? "high" : best.merchantStrong ? "medium" : "low"
+        confidence: best.score >= 5
+          ? "high"
+          : (best.merchantStrong || best.score >= 3)
+            ? "medium"
+            : "low"
       };
     }
 
