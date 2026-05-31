@@ -22,6 +22,7 @@ const {
     buildCleanupPriorityLines,
     buildSupportWorksheetLines,
     buildUnresolvedSummaryLines,
+    buildFinalDisclosureLines,
     buildChecklistItems,
     isWorkpaperReady,
     buildCategoryBuckets
@@ -503,4 +504,29 @@ test("buildUnresolvedSummaryLines includes unmapped-tax blockers", () => {
   assert.ok(lines.some((line) => /1 transactions still need a real business category\./.test(line)));
   assert.ok(lines.some((line) => /2 categorized expense transactions still need tax-line mapping\./.test(line)));
   assert.ok(lines.some((line) => /1 transactions still need CPA review before filing\./.test(line)));
+});
+
+test("buildFinalDisclosureLines uses the active packet status label", () => {
+  const workpaperLines = buildFinalDisclosureLines({
+    attachedReceiptFileCount: 2
+  }, {
+    totalCount: 3,
+    transactionCount: 2
+  }, {
+    statusBadgeText: "CPA Workpaper Ready",
+    not_filed: "This export is a bookkeeping workpaper, not a filed return."
+  });
+
+  const draftLines = buildFinalDisclosureLines({
+    attachedReceiptFileCount: 1
+  }, {
+    totalCount: 0,
+    transactionCount: 0
+  }, {
+    statusBadgeText: "Draft - CPA Review Required",
+    not_filed: "This export is a bookkeeping workpaper, not a filed return."
+  });
+
+  assert.ok(workpaperLines.some((line) => /CPA Workpaper Ready\. This export is a bookkeeping workpaper, not a filed return\./.test(line)));
+  assert.ok(draftLines.some((line) => /Draft - CPA Review Required\. This export is a bookkeeping workpaper, not a filed return\./.test(line)));
 });

@@ -1412,6 +1412,14 @@ function buildUnresolvedSummaryLines(flagged) {
   ];
 }
 
+function buildFinalDisclosureLines(reviewInsights, artifactSummary, labels) {
+  return [
+    "Potential deductible amounts shown here are bookkeeping workpaper estimates only.",
+    `${labels.statusBadgeText}. ${labels.not_filed}`,
+    `${reviewInsights.attachedReceiptFileCount} receipt file${reviewInsights.attachedReceiptFileCount !== 1 ? "s" : ""} linked; ${artifactSummary.totalCount} additional support artifact${artifactSummary.totalCount !== 1 ? "s" : ""} linked across ${artifactSummary.transactionCount} transaction${artifactSummary.transactionCount !== 1 ? "s" : ""}.`
+  ];
+}
+
 function buildChecklistItems(reviewInsights, currency, reviewDecisionSummary = {}, packageAttribution = {}, isSecure = true) {
   const nonExpenseWithReceipt = Math.max(0, reviewInsights.transactionWithReceiptCount - reviewInsights.receiptLinkedCount);
   const receiptNonExpenseNote = nonExpenseWithReceipt > 0 ? ` ${nonExpenseWithReceipt} linked to non-expense rows.` : "";
@@ -2347,11 +2355,7 @@ function buildSupportPages(receipts, transactions, mileage, vehicleCosts, suppor
     .slice(0, 5)
     .map((txn) => `${truncateText(buildTransactionText(txn) || "(No description)", 34)} - ${formatCurrencyForPdf(Number(txn.__businessAmounts?.deductibleAmount ?? txn.__businessAmounts?.netAmount ?? 0), currency)} - ${txn.__status.flags.join(" ")}`);
   canvas.drawCard(40, top - 372, 532, 132, "Top Exceptions", topExceptions.length ? topExceptions : ["No large flagged exceptions detected."], { maxChars: 90 });
-  canvas.drawCard(40, top - 520, 532, 92, "Final Disclosure", [
-    "Potential deductible amounts shown here are bookkeeping workpaper estimates only.",
-    "Draft - CPA review required. Not a filed tax return.",
-    `${reviewInsights.attachedReceiptFileCount} receipt file${reviewInsights.attachedReceiptFileCount !== 1 ? "s" : ""} linked; ${artifactSummary.totalCount} additional support artifact${artifactSummary.totalCount !== 1 ? "s" : ""} linked across ${artifactSummary.transactionCount} transaction${artifactSummary.transactionCount !== 1 ? "s" : ""}.`
-  ], { maxChars: 90 });
+  canvas.drawCard(40, top - 520, 532, 92, "Final Disclosure", buildFinalDisclosureLines(reviewInsights, artifactSummary, labels), { maxChars: 90 });
   return [canvas];
 }
 
@@ -2910,6 +2914,7 @@ module.exports = {
     buildCleanupPriorityLines,
     buildSupportWorksheetLines,
     buildUnresolvedSummaryLines,
+    buildFinalDisclosureLines,
     buildChecklistItems,
     isWorkpaperReady,
     buildExclusionSummary,
