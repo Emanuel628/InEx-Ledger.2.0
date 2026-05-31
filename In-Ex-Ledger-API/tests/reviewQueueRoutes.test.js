@@ -270,6 +270,25 @@ test("GET /api/review/queue returns only unresolved items with summary", async (
   assert.equal(response.body.queue[1].actionTarget.href, "/categories");
   assert.equal(response.body.queue[2].actionTarget.href, "/receipts");
   assert.equal(response.body.queue[3].actionTarget.href, "/exports");
+  assert.deepEqual(response.body.queue[0].quickAction, {
+    label: "Assign category",
+    action: "transactions"
+  });
+  assert.deepEqual(response.body.queue[1].quickAction, {
+    label: "Open categories",
+    action: "navigate",
+    href: "/categories"
+  });
+  assert.deepEqual(response.body.queue[2].quickAction, {
+    label: "Attach receipt",
+    action: "support",
+    supportType: "receipt"
+  });
+  assert.deepEqual(response.body.queue[3].quickAction, {
+    label: "Review exclusions",
+    action: "navigate",
+    href: "/exports"
+  });
   assert.equal(state.datasetOptions.vehicleClaimMap.get("tx_vehicle").transaction_id, "tx_vehicle");
   assert.equal(state.datasetOptions.capitalAssetTxMap.get("tx_asset").transaction_id, "tx_asset");
 });

@@ -12,14 +12,6 @@ const REVIEW_FILTER_PRESETS = Object.freeze([
   { key: "needs_mileage_log", label: "Mileage support" },
   { key: "needs_business_purpose", label: "Business purpose" }
 ]);
-const REVIEW_SUPPORT_TYPE_BY_ISSUE = Object.freeze({
-  needs_receipt_support: "receipt",
-  needs_mileage_log: "mileage_log",
-  needs_home_office_support: "home_office_worksheet",
-  needs_capital_asset_review: "capital_asset_support",
-  final_confirmation_needed: "review_note"
-});
-
 function tx(key, fallback) {
   if (typeof window.t === "function") {
     const value = window.t(key);
@@ -171,14 +163,17 @@ function getTopIssue(item) {
 }
 
 function getReviewQuickAction(item) {
+  if (item?.quickAction && item.quickAction.label) {
+    return item.quickAction;
+  }
+
   const issue = getTopIssue(item);
   const issueCode = String(issue?.issueCode || "").trim().toLowerCase();
   if (!issueCode) return null;
-  const supportType = REVIEW_SUPPORT_TYPE_BY_ISSUE[issueCode] || "";
 
   switch (issueCode) {
     case "needs_receipt_support":
-      return { label: tx("review_quick_attach_receipt", "Attach receipt"), action: "support", supportType };
+      return { label: tx("review_quick_attach_receipt", "Attach receipt"), action: "support", supportType: "receipt" };
     case "needs_mileage_log":
       return { label: tx("review_quick_open_mileage", "Open mileage"), action: "navigate", href: "/mileage" };
     case "needs_tax_mapping":
@@ -192,11 +187,11 @@ function getReviewQuickAction(item) {
     case "missing_description":
       return { label: tx("review_quick_edit_details", "Edit details"), action: "transactions" };
     case "needs_home_office_support":
-      return { label: tx("review_quick_add_home_support", "Add home-office support"), action: "support", supportType };
+      return { label: tx("review_quick_add_home_support", "Add home-office support"), action: "support", supportType: "home_office_worksheet" };
     case "needs_capital_asset_review":
-      return { label: tx("review_quick_add_asset_support", "Add asset support"), action: "support", supportType };
+      return { label: tx("review_quick_add_asset_support", "Add asset support"), action: "support", supportType: "capital_asset_support" };
     case "final_confirmation_needed":
-      return { label: tx("review_quick_add_support", "Add support"), action: "support", supportType };
+      return { label: tx("review_quick_add_support", "Add support"), action: "support", supportType: "review_note" };
     case "cpa_review_required":
       return { label: tx("review_quick_open_review", "Open review"), action: "transactions" };
     case "excluded_review":

@@ -230,6 +230,42 @@ function deriveActionTargetFromIssue(issueEntry, row) {
   }
 }
 
+function deriveQuickActionFromIssue(issueEntry, row) {
+  if (row?.reviewStatus === "Excluded - review schedule") {
+    return { label: "Review exclusions", action: "navigate", href: "/exports" };
+  }
+  if (!issueEntry) return null;
+
+  switch (issueEntry.issueCode) {
+    case "needs_receipt_support":
+      return { label: "Attach receipt", action: "support", supportType: "receipt" };
+    case "needs_mileage_log":
+      return { label: "Open mileage", action: "navigate", href: "/mileage" };
+    case "needs_tax_mapping":
+      return { label: "Open categories", action: "navigate", href: "/categories" };
+    case "needs_business_purpose":
+      return { label: "Add business note", action: "transactions" };
+    case "needs_allocation":
+      return { label: "Set business-use %", action: "transactions" };
+    case "needs_category":
+      return { label: "Assign category", action: "transactions" };
+    case "missing_description":
+      return { label: "Edit details", action: "transactions" };
+    case "needs_home_office_support":
+      return { label: "Add home-office support", action: "support", supportType: "home_office_worksheet" };
+    case "needs_capital_asset_review":
+      return { label: "Add asset support", action: "support", supportType: "capital_asset_support" };
+    case "final_confirmation_needed":
+      return { label: "Add support", action: "support", supportType: "review_note" };
+    case "cpa_review_required":
+      return { label: "Open review", action: "transactions" };
+    case "excluded_review":
+      return { label: "Review exclusions", action: "navigate", href: "/exports" };
+    default:
+      return null;
+  }
+}
+
 function buildQueueRows(rows, issueStateRowsByTransaction = new Map()) {
   return (rows || [])
     .map((row) => {
@@ -260,7 +296,8 @@ function buildQueueRows(rows, issueStateRowsByTransaction = new Map()) {
         receiptAttached: row.receiptAttached === true,
         supportSummary: row.supportSummary || "",
         reviewNotes: row.reviewNotes || "",
-        actionTarget: deriveActionTargetFromIssue(primaryIssue, row)
+        actionTarget: deriveActionTargetFromIssue(primaryIssue, row),
+        quickAction: deriveQuickActionFromIssue(primaryIssue, row)
       };
     })
     .filter(Boolean)
