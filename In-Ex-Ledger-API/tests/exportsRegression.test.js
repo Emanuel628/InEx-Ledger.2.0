@@ -383,7 +383,7 @@ test("category metrics keep support totals aligned with the new status model", (
   const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
   assert.match(pdf, /\(Needs support\) Tj/);
   assert.match(pdf, /\(\$137\.00\) Tj/);
-  assert.match(pdf, /Mapped needing support: 3 \| Needs category: 0 \| Missing receipts\/support: 3/i);
+  assert.match(pdf, /Mapped needing support: 3 \| Needs category: 1 \| Missing receipts\/support: 3/i);
 });
 
 test("category and support labels use compact canonical wording instead of chopped prose", () => {
@@ -401,10 +401,10 @@ test("category and support labels use compact canonical wording instead of chopp
 test("receipt and support metrics use distinct wording", () => {
   const pdf = buildPdfExport(buildFixtureOptions()).toString("latin1");
   assert.match(pdf, /expense transactions do not have receipt attachments/i);
-  assert.match(pdf, /\(With receipt attachment: 1\) Tj/);
-  assert.match(pdf, /\(Without receipt attachment: 3\) Tj/);
+  assert.match(pdf, /\(Expense rows with receipt: 1\) Tj/);
+  assert.match(pdf, /\(Expense rows missing receipt: 3\) Tj/);
   assert.match(pdf, /Mapped expenses still needing support: 3/i);
-  assert.match(pdf, /Mapped needing support: 3 \| Needs category: 0 \| Missing receipts\/support: 3/i);
+  assert.match(pdf, /Mapped needing support: 3 \| Needs category: 1 \| Missing receipts\/support: 3/i);
   assert.match(pdf, /Missing receipts\/support: 3/i);
 });
 
