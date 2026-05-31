@@ -12,6 +12,13 @@ const REVIEW_FILTER_PRESETS = Object.freeze([
   { key: "needs_mileage_log", label: "Mileage support" },
   { key: "needs_business_purpose", label: "Business purpose" }
 ]);
+const REVIEW_SUPPORT_TYPE_BY_ISSUE = Object.freeze({
+  needs_receipt_support: "receipt",
+  needs_mileage_log: "mileage_log",
+  needs_home_office_support: "home_office_worksheet",
+  needs_capital_asset_review: "capital_asset_support",
+  final_confirmation_needed: "review_note"
+});
 
 function tx(key, fallback) {
   if (typeof window.t === "function") {
@@ -159,6 +166,66 @@ function openQueueTarget(item) {
   window.location.href = href;
 }
 
+function getTopIssue(item) {
+  return (item?.issueEntries || [])[0] || null;
+}
+
+function getReviewQuickAction(item) {
+  const issue = getTopIssue(item);
+  const issueCode = String(issue?.issueCode || "").trim().toLowerCase();
+  if (!issueCode) return null;
+  const supportType = REVIEW_SUPPORT_TYPE_BY_ISSUE[issueCode] || "";
+
+  switch (issueCode) {
+    case "needs_receipt_support":
+      return { label: tx("review_quick_attach_receipt", "Attach receipt"), action: "support", supportType };
+    case "needs_mileage_log":
+      return { label: tx("review_quick_open_mileage", "Open mileage"), action: "navigate", href: "/mileage" };
+    case "needs_tax_mapping":
+      return { label: tx("review_quick_open_categories", "Open categories"), action: "navigate", href: "/categories" };
+    case "needs_business_purpose":
+      return { label: tx("review_quick_add_note", "Add business note"), action: "transactions" };
+    case "needs_allocation":
+      return { label: tx("review_quick_set_allocation", "Set business-use %"), action: "transactions" };
+    case "needs_category":
+      return { label: tx("review_quick_assign_category", "Assign category"), action: "transactions" };
+    case "missing_description":
+      return { label: tx("review_quick_edit_details", "Edit details"), action: "transactions" };
+    case "needs_home_office_support":
+      return { label: tx("review_quick_add_home_support", "Add home-office support"), action: "support", supportType };
+    case "needs_capital_asset_review":
+      return { label: tx("review_quick_add_asset_support", "Add asset support"), action: "support", supportType };
+    case "final_confirmation_needed":
+      return { label: tx("review_quick_add_support", "Add support"), action: "support", supportType };
+    case "cpa_review_required":
+      return { label: tx("review_quick_open_review", "Open review"), action: "transactions" };
+    case "excluded_review":
+      return { label: tx("review_quick_review_exclusion", "Review exclusions"), action: "navigate", href: "/exports" };
+    default:
+      return null;
+  }
+}
+
+function runReviewQuickAction(item) {
+  const quickAction = getReviewQuickAction(item);
+  if (!item || !quickAction) return;
+
+  if (quickAction.action === "support") {
+    void openSupportModal(item, { preferredType: quickAction.supportType || "" });
+    return;
+  }
+
+  if (quickAction.action === "navigate" && quickAction.href) {
+    window.location.href = quickAction.href;
+    return;
+  }
+
+  openQueueTarget({
+    ...item,
+    actionTarget: { href: "/transactions", label: "Review transaction" }
+  });
+}
+
 function renderReviewFocusCard() {
   const card = document.getElementById("reviewFocusCard");
   const button = document.getElementById("reviewFixNextButton");
@@ -171,8 +238,9 @@ function renderReviewFocusCard() {
     return;
   }
 
-  const topIssue = (item.issueEntries || [])[0] || null;
+  const topIssue = getTopIssue(item);
   const severity = topIssue?.severity === "hard" ? "Hard blocker" : "Warning";
+  const quickAction = getReviewQuickAction(item);
   card.hidden = false;
   card.innerHTML = `
     <div class="review-focus-card-copy">
@@ -183,9 +251,11 @@ function renderReviewFocusCard() {
     </div>
     <div class="review-focus-card-actions">
       <button type="button" class="review-secondary-btn" data-review-focus-open>Open item</button>
+      ${quickAction ? `<button type="button" class="review-secondary-btn" data-review-focus-quick>${escapeText(quickAction.label)}</button>` : ""}
     </div>
   `;
   card.querySelector("[data-review-focus-open]")?.addEventListener("click", () => openQueueTarget(item));
+  card.querySelector("[data-review-focus-quick]")?.addEventListener("click", () => runReviewQuickAction(item));
   button.disabled = false;
   button.onclick = () => openQueueTarget(item);
 }
@@ -254,6 +324,7 @@ function renderQueue() {
       ? `/transactions?highlight=${encodeURIComponent(item.id)}&open=review`
       : (item.actionTarget?.href || "/transactions");
     const actionLabel = item.actionTarget?.label || tx("review_action_open", "Open");
+    const quickAction = getReviewQuickAction(item);
     const amount = formatMoney(item.amount, item.currency);
     const supportParts = [];
     if (item.supportStatus) supportParts.push(item.supportStatus);
@@ -295,7 +366,9 @@ function renderQueue() {
         <td>
           <div class="review-row-actions">
             <a class="review-row-action" href="${escapeText(actionHref)}">${escapeText(actionLabel)}</a>
-            <button type="button" class="review-row-support-btn" data-support-transaction="${escapeText(item.id)}">${escapeText(tx("review_add_support", "Add support"))}</button>
+            ${quickAction
+              ? `<button type="button" class="review-row-support-btn" data-quick-transaction="${escapeText(item.id)}">${escapeText(quickAction.label)}</button>`
+              : `<button type="button" class="review-row-support-btn" data-support-transaction="${escapeText(item.id)}">${escapeText(tx("review_add_support", "Add support"))}</button>`}
             <button type="button" class="review-row-support-btn" data-issue-transaction="${escapeText(item.id)}">${escapeText(tx("review_manage_issue", "Manage issue"))}</button>
           </div>
         </td>
@@ -309,6 +382,15 @@ function renderQueue() {
       const item = reviewQueue.find((entry) => entry.id === transactionId);
       if (item) {
         void openSupportModal(item);
+      }
+    });
+  });
+  tbody.querySelectorAll("[data-quick-transaction]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const transactionId = button.getAttribute("data-quick-transaction");
+      const item = reviewQueue.find((entry) => entry.id === transactionId);
+      if (item) {
+        runReviewQuickAction(item);
       }
     });
   });
@@ -440,7 +522,7 @@ async function openIssueModal(item) {
   }
 }
 
-async function openSupportModal(item) {
+async function openSupportModal(item, options = {}) {
   activeSupportTransaction = item;
   const modal = document.getElementById("supportArtifactModal");
   const context = document.getElementById("supportArtifactContext");
@@ -450,6 +532,11 @@ async function openSupportModal(item) {
   context.textContent = `${item.description || "(No description)"} · ${item.date || ""}`;
   transactionIdInput.value = item.id;
   modal.classList.remove("hidden");
+  const supportTypeInput = document.getElementById("supportArtifactType");
+  const preferredType = String(options?.preferredType || "").trim();
+  if (supportTypeInput && preferredType) {
+    supportTypeInput.value = preferredType;
+  }
   syncSupportModalType();
 
   try {
