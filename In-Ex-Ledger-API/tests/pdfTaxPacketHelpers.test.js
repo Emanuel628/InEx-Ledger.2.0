@@ -45,6 +45,27 @@ test("computeReceiptCoverage counts only receipts attached to expense transactio
   assert.equal(cov.coverage_pct, 33.3);
 });
 
+test("computeReceiptCoverage treats linked receipt-like support artifacts as receipt coverage", () => {
+  const supportArtifactMap = new Map([
+    ["t2", [{ artifact_type: "receipt", review_status: "accepted" }]],
+    ["t3", [{ artifact_type: "invoice", review_status: "pending" }]]
+  ]);
+  const cov = computeReceiptCoverage(
+    [
+      { id: "t1", type: "expense" },
+      { id: "t2", type: "expense" },
+      { id: "t3", type: "income" }
+    ],
+    [{ transaction_id: "t1" }],
+    supportArtifactMap
+  );
+
+  assert.equal(cov.expense_count, 2);
+  assert.equal(cov.with_receipt, 2);
+  assert.equal(cov.missing, 0);
+  assert.equal(cov.coverage_pct, 100);
+});
+
 test("computeAttachedReceiptSummary counts receipt files on any included transaction type", () => {
   const summary = computeAttachedReceiptSummary(
     [

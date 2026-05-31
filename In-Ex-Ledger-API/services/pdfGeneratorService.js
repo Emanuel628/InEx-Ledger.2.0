@@ -1677,9 +1677,9 @@ function formatSupportStatus(status) {
   return "Mapped";
 }
 
-function buildCategoryPages(transactions, categories, receipts, currency, labels, embeddedCount = 0, region = "US") {
+function buildCategoryPages(transactions, categories, receipts, currency, labels, embeddedCount = 0, region = "US", supportArtifactMap = null) {
   const rows = buildCategoryBuckets(transactions, currency).slice(embeddedCount);
-  const coverage = computeReceiptCoverage(transactions, receipts);
+  const coverage = computeReceiptCoverage(transactions, receipts, supportArtifactMap);
   const totals = {
     needsCategory: rows.filter((row) => row.mappingStatus === "Needs category").reduce((sum, row) => sum + row.amount, 0),
     mappedNeedsSupport: rows.filter((row) => row.mappingStatus === "Needs support").reduce((sum, row) => sum + row.amount, 0),
@@ -2859,7 +2859,7 @@ function buildPdfExportDocument(options) {
       reviewInsights,
       isSecure
     }),
-    ...buildCategoryPages(includedTransactions, categories, receipts, effectiveCurrency, labels, 0, normalizedRegion),
+    ...buildCategoryPages(includedTransactions, categories, receipts, effectiveCurrency, labels, 0, normalizedRegion, effectiveSupportArtifactMap),
     ...buildTaxPacketPages({ transactions: includedTransactions, categories, receipts, currency: effectiveCurrency, region: normalizedRegion, labels, taxYear }),
     ...buildTransactionPages(includedTransactions, accounts, categories, receipts, effectiveCurrency, labels, normalizedRegion),
     ...unresolvedExceptionPages,
