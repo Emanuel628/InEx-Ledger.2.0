@@ -1651,7 +1651,7 @@ function buildCategoryBuckets(transactions, currency) {
       type: String(txn.type || "").toLowerCase() === "income" ? "Income" : "Expense",
       taxLine: status.taxLineDisplay,
       amount: 0,
-      mappingStatus: status.needsCategory ? "Needs category" : (!status.isMapped ? "Unmapped" : (status.flags.some((flag) => ["FC", "RS", "BP", "AL", "ML", "HO", "CA", "RV"].includes(flag)) ? "Needs support" : "Mapped")),
+      mappingStatus: status.needsCategory ? "Needs category" : (!status.isMapped ? "Unmapped" : (statusNeedsSupport(status) ? "Needs support" : "Mapped")),
       supportStatus: formatSupportStatus(status)
     };
     bucket.amount += Number(txn.__businessAmounts?.deductibleAmount ?? txn.__businessAmounts?.netAmount ?? normalizeMoneyAmount(txn));
@@ -1667,12 +1667,18 @@ function buildCategoryBuckets(transactions, currency) {
 function formatSupportStatus(status) {
   if (status.needsCategory) return "Needs category";
   if (!status.isMapped) return "Unmapped";
-  if (status.needsMileageLog) return "Needs mileage log";
-  if (status.needsBusinessPurpose) return "Business purpose needed";
-  if (status.needsHomeOfficeSupport) return "Needs home-office support";
-  if (status.needsCapitalAssetReview) return "Capital asset review";
-  if (status.needsAllocation) return "Needs allocation";
-  if (status.needsReceipt) return "Needs receipt/support";
+  switch (status.supportStatus) {
+    case "receipt_missing": return "Needs receipt/support";
+    case "business_purpose_needed": return "Business purpose needed";
+    case "allocation_needed": return "Needs allocation";
+    case "mileage_log_needed": return "Needs mileage log";
+    case "home_office_support_needed": return "Needs home-office support";
+    case "capital_asset_review_needed": return "Capital asset review";
+    case "payer_support_needed": return "Payer support needed";
+    case "refund_reversal_match_needed": return "Refund/reversal review";
+    case "cpa_review": return "CPA review";
+    case "category_required": return "Needs category";
+  }
   if (status.needsFinalConfirmation) return "Needs final confirmation";
   return "Mapped";
 }

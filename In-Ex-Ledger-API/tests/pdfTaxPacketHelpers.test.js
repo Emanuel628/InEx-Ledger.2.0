@@ -393,6 +393,44 @@ test("buildCategoryBuckets preserves mapping status for needs-category rows", ()
   assert.equal(mappedBucket.mappingStatus, "Mapped");
 });
 
+test("buildCategoryBuckets treats CPA-review and refund-review rows as mapped but incomplete", () => {
+  const cpaReviewTxn = {
+    type: "expense",
+    amount: 120,
+    __category: { name: "Other Expense" },
+    __status: {
+      needsCategory: false,
+      isMapped: true,
+      supportStatus: "cpa_review",
+      taxLineDisplay: "Line 27a - Other expenses",
+      flags: ["RV"],
+      needsFinalConfirmation: false
+    },
+    __businessAmounts: { deductibleAmount: 120 }
+  };
+  const refundReviewTxn = {
+    type: "income",
+    amount: 45,
+    __category: { name: "Sales" },
+    __status: {
+      needsCategory: false,
+      isMapped: true,
+      supportStatus: "refund_reversal_match_needed",
+      taxLineDisplay: "Line 1 - Gross receipts or sales",
+      flags: ["RR"],
+      needsFinalConfirmation: false
+    },
+    __businessAmounts: { netAmount: 45 }
+  };
+
+  const buckets = buildCategoryBuckets([cpaReviewTxn, refundReviewTxn], "USD");
+  const cpaReviewBucket = buckets.find((row) => row.supportStatus === "CPA review");
+  const refundReviewBucket = buckets.find((row) => row.supportStatus === "Refund/reversal review");
+
+  assert.equal(cpaReviewBucket.mappingStatus, "Needs support");
+  assert.equal(refundReviewBucket.mappingStatus, "Mapped");
+});
+
 test("isWorkpaperReady stays draft for truly unmapped categorized expenses", () => {
   assert.equal(isWorkpaperReady({
     reviewFlagCount: 1,
