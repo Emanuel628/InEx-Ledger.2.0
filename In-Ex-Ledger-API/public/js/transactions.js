@@ -189,8 +189,33 @@ function dedupeIssueActions(actions = []) {
   });
 }
 
+function mapReviewQuickActionToTxnAction(quickAction) {
+  if (!quickAction?.label) return null;
+
+  if (quickAction.action === "navigate") {
+    if (quickAction.href === "/categories") return { label: quickAction.label, fix: "edit_category", primary: true };
+    if (quickAction.href === "/mileage") return { label: quickAction.label, fix: "open_mileage", primary: true };
+    if (quickAction.href === "/exports") return { label: quickAction.label, fix: "open_exports", primary: true };
+  }
+
+  if (quickAction.action === "support") {
+    if (quickAction.supportType === "receipt") return { label: quickAction.label, fix: "receipt", primary: true };
+    return { label: quickAction.label, fix: "support", primary: true };
+  }
+
+  if (quickAction.action === "transactions") {
+    return { label: quickAction.label, fix: "edit", primary: true };
+  }
+
+  return null;
+}
+
 function buildTxnActionsFromIssueEntries(txn, issueEntries = []) {
   const actions = [];
+  const quickAction = mapReviewQuickActionToTxnAction(txn?.quickAction);
+  if (quickAction) {
+    actions.push(quickAction);
+  }
   for (const entry of issueEntries) {
     const issueCode = String(entry?.issueCode || entry?.issue_code || "").trim().toLowerCase();
     const mapped = TX_ISSUE_ACTIONS[issueCode];
@@ -1099,6 +1124,8 @@ function openTxReviewPopover(txnId, anchorEl) {
         openReviewSupport(id);
       } else if (fix === "open_mileage") {
         window.location.href = "/mileage";
+      } else if (fix === "open_exports") {
+        window.location.href = "/exports";
       } else if (fix === "mark-ready") {
         void markTransactionReady(id);
       } else if (fix === "edit") {
@@ -1908,6 +1935,7 @@ async function loadTransactions(options = {}) {
           (transaction.receiptId ? 1 : 0),
         reviewFlags: Array.isArray(reviewItem?.reviewFlags) ? reviewItem.reviewFlags : [],
         issueEntries: getTxnIssueEntries(reviewItem),
+        quickAction: reviewItem?.quickAction || null,
         supportSummary: reviewItem?.supportSummary || "",
         supportStatus: reviewItem?.supportStatus || "",
         actionTarget: reviewItem?.actionTarget || null
