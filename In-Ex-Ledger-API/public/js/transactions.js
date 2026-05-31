@@ -139,6 +139,20 @@ const ISSUE_CODE_TO_TX_FLAG = {
   cpa_review_required: "RV",
   possible_duplicate: "DUP"
 };
+const TX_ISSUE_ACTIONS = {
+  needs_category: { label: "Assign category", fix: "edit", primary: true },
+  needs_tax_mapping: { label: "Open categories", fix: "edit_category", primary: true },
+  missing_description: { label: "Edit details", fix: "edit", primary: true },
+  needs_receipt_support: { label: "Attach receipt", fix: "receipt", primary: true },
+  needs_business_purpose: { label: "Add business purpose note", fix: "edit", primary: true },
+  needs_allocation: { label: "Set business-use %", fix: "edit", primary: true },
+  needs_mileage_log: { label: "Open mileage", fix: "open_mileage", primary: true },
+  needs_home_office_support: { label: "Add support", fix: "support", primary: true },
+  needs_capital_asset_review: { label: "Add support", fix: "support", primary: true },
+  final_confirmation_needed: { label: "Add support", fix: "support", primary: false },
+  cpa_review_required: { label: "Mark ready", fix: "mark-ready", primary: true },
+  possible_duplicate: { label: "Edit details", fix: "edit", primary: false }
+};
 const TRANSACTION_REVIEW_FILTER_OPTIONS = Object.freeze([
   { key: "nc", label: "Needs category", codes: ["NC"], tone: "hard" },
   { key: "rs", label: "Missing receipt", codes: ["RS"], tone: "hard" },
@@ -163,6 +177,40 @@ function deriveFlagsFromIssueEntries(issueEntries = []) {
       .map((entry) => ISSUE_CODE_TO_TX_FLAG[String(entry?.issueCode || entry?.issue_code || "").trim().toLowerCase()] || "")
       .filter(Boolean)
   ));
+}
+
+function dedupeIssueActions(actions = []) {
+  const seen = new Set();
+  return actions.filter((action) => {
+    const key = `${action.fix}|${action.label}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function buildTxnActionsFromIssueEntries(txn, issueEntries = []) {
+  const actions = [];
+  for (const entry of issueEntries) {
+    const issueCode = String(entry?.issueCode || entry?.issue_code || "").trim().toLowerCase();
+    const mapped = TX_ISSUE_ACTIONS[issueCode];
+    if (!mapped) continue;
+    actions.push({ ...mapped });
+    if (issueCode === "cpa_review_required") {
+      actions.push({ label: "Edit details", fix: "edit", primary: false });
+    }
+  }
+
+  const actionHref = String(txn?.actionTarget?.href || "").trim();
+  if (actionHref === "/categories") {
+    actions.unshift({ label: "Open categories", fix: "edit_category", primary: true });
+  } else if (actionHref === "/receipts") {
+    actions.unshift({ label: "Attach receipt", fix: "receipt", primary: true });
+  } else if (actionHref === "/mileage") {
+    actions.unshift({ label: "Open mileage", fix: "open_mileage", primary: true });
+  }
+
+  return dedupeIssueActions(actions);
 }
 
 function requiresTxnMileageLog(txn, category, categoryText) {
@@ -981,32 +1029,41 @@ function openTxReviewPopover(txnId, anchorEl) {
 
   _reviewPopoverTxnId = txnId;
   const flags = computeTxnFlags(txn);
+  const issueEntries = getTxnIssueEntries(txn);
   const isExpense = txn.type !== "income";
   const title = isExpense ? "Expense Review Checklist" : "Income Review Checklist";
   const typeLabel = isExpense ? "Expense" : "Income";
   const typeCss = isExpense ? "expense" : "income";
 
-  const actions = [];
-  if (flags.includes("NC")) {
-    actions.push({ label: "Assign category", fix: "edit" });
-  } else if (flags.includes("UM")) {
-    actions.push({ label: "Fix tax mapping in Categories", fix: "edit_category" });
-  }
-  if (flags.includes("RS")) {
-    actions.push({ label: "Attach receipt", fix: "receipt", primary: true });
-  }
-  if (flags.includes("AL")) {
-    actions.push({ label: "Set business-use %", fix: "edit", primary: !flags.includes("RS") });
-  }
-  if (flags.some((flag) => ["FC", "ML", "BP", "HO", "CA"].includes(flag))) {
-    actions.push({ label: "Add support", fix: "support" });
-  }
-  if (flags.includes("RV")) {
-    actions.push({ label: "Mark ready", fix: "mark-ready", primary: true });
-    actions.push({ label: "Edit details", fix: "edit" });
-  }
-  if (flags.includes("IS")) {
-    actions.push({ label: "Attach source document", fix: "receipt" });
+  const actions = issueEntries.length
+    ? buildTxnActionsFromIssueEntries(txn, issueEntries)
+    : [];
+
+  if (!actions.length) {
+    if (flags.includes("NC")) {
+      actions.push({ label: "Assign category", fix: "edit", primary: true });
+    } else if (flags.includes("UM")) {
+      actions.push({ label: "Open categories", fix: "edit_category", primary: true });
+    }
+    if (flags.includes("RS")) {
+      actions.push({ label: "Attach receipt", fix: "receipt", primary: true });
+    }
+    if (flags.includes("AL")) {
+      actions.push({ label: "Set business-use %", fix: "edit", primary: !flags.includes("RS") });
+    }
+    if (flags.includes("ML")) {
+      actions.push({ label: "Open mileage", fix: "open_mileage", primary: !flags.includes("RS") && !flags.includes("AL") });
+    }
+    if (flags.some((flag) => ["FC", "BP", "HO", "CA"].includes(flag))) {
+      actions.push({ label: "Add support", fix: "support" });
+    }
+    if (flags.includes("RV")) {
+      actions.push({ label: "Mark ready", fix: "mark-ready", primary: true });
+      actions.push({ label: "Edit details", fix: "edit" });
+    }
+    if (flags.includes("IS")) {
+      actions.push({ label: "Attach source document", fix: "receipt", primary: true });
+    }
   }
   if (flags.length === 0) {
     actions.push({ label: null, fix: "none" });
@@ -1040,6 +1097,8 @@ function openTxReviewPopover(txnId, anchorEl) {
         triggerReceiptUpload(id);
       } else if (fix === "support") {
         openReviewSupport(id);
+      } else if (fix === "open_mileage") {
+        window.location.href = "/mileage";
       } else if (fix === "mark-ready") {
         void markTransactionReady(id);
       } else if (fix === "edit") {
