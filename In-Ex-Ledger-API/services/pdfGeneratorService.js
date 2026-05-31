@@ -2005,8 +2005,9 @@ function buildUnresolvedExceptionPages(transactions, currency, labels, region) {
     let y = header.contentStartY - 8;
     if (index === 0) {
       const summaryLines = buildUnresolvedSummaryLines(flagged);
-      canvas.drawCard(40, y, 532, 108, "Open blocker summary", summaryLines, { maxChars: 90 });
-      y -= 126;
+      const summaryHeight = estimateCardHeight(532, summaryLines, { maxChars: 90, minHeight: 108 });
+      canvas.drawCard(40, y, 532, summaryHeight, "Open blocker summary", summaryLines, { maxChars: 90 });
+      y -= summaryHeight + 18;
     }
 
     const cols = [
@@ -2115,11 +2116,13 @@ function buildEvidenceSchedulePages(transactions, receipts, supportArtifactMap, 
     });
     let y = header.contentStartY - 8;
     if (index === 0) {
-      canvas.drawCard(40, y, 532, 72, "Evidence mapping", [
+      const evidenceIntroLines = [
         `${evidenceRows.length} support artifacts are linked to transactions in this export.`,
         `This schedule shows which transaction each artifact supports and whether the artifact was accepted into the workpaper.`
-      ], { maxChars: 90 });
-      y -= 90;
+      ];
+      const evidenceIntroHeight = estimateCardHeight(532, evidenceIntroLines, { maxChars: 90, minHeight: 72 });
+      canvas.drawCard(40, y, 532, evidenceIntroHeight, "Evidence mapping", evidenceIntroLines, { maxChars: 90 });
+      y -= evidenceIntroHeight + 18;
     }
 
     const cols = [
