@@ -55,7 +55,7 @@ const defaultCategoriesCA = [
   { name: "Motor Vehicle", kind: "expense", color: "amber", tax_map_ca: "motor_vehicle" },
   { name: "Office Expenses", kind: "expense", color: "blue", tax_map_ca: "office_expense" },
   { name: "Office Supplies", kind: "expense", color: "blue", tax_map_ca: "office_supplies" },
-  { name: "Phone & Internet", kind: "expense", color: "slate", tax_map_ca: "utilities" },
+  { name: "Phone & Internet", kind: "expense", color: "slate", tax_map_ca: "other_expense" },
   { name: "Property Taxes", kind: "expense", color: "red", tax_map_ca: "property_taxes" },
   { name: "Rent", kind: "expense", color: "blue", tax_map_ca: "rent" },
   { name: "Repairs & Maintenance", kind: "expense", color: "slate", tax_map_ca: "maintenance_repairs" },

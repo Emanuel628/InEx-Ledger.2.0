@@ -20,14 +20,14 @@ test("US default categories map office supplies to Schedule C Line 18 (office ex
   assert.equal(categoryByName(defaults, "Software & Subscriptions")?.tax_map_us, "software_subscriptions");
 });
 
-test("Canada default categories map software/subscriptions to T2125 Line 8810 (office expenses)", () => {
-  // Per CRA T2125 guidance, software and subscription costs are
-  // deductible under Line 8810 office expenses, not the Line 9270
-  // "Other expenses" catch-all.
+test("Canada default categories keep software on office expense and phone/internet on other expense review", () => {
+  // Per CRA T2125 handling in InEx, software and subscriptions stay on
+  // Line 8810 office expenses, while phone/internet is treated as an
+  // allocation-heavy other-expense review item rather than generic utilities.
   const defaults = getDefaultCategoriesForRegion("CA");
   assert.equal(categoryByName(defaults, "Office Expenses")?.tax_map_ca, "office_expense");
   assert.equal(categoryByName(defaults, "Office Supplies")?.tax_map_ca, "office_supplies");
-  assert.equal(categoryByName(defaults, "Phone & Internet")?.tax_map_ca, "utilities");
+  assert.equal(categoryByName(defaults, "Phone & Internet")?.tax_map_ca, "other_expense");
   assert.equal(categoryByName(defaults, "Software & Subscriptions")?.tax_map_ca, "office_expense");
 });
 

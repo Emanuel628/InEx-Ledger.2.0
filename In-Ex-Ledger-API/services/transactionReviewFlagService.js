@@ -1,5 +1,7 @@
 "use strict";
 
+const { __private: { buildTransactionStatus } } = require("./pdfGeneratorService.js");
+
 const REVIEW_FILTER_KEYS = new Set(["any", "nc", "um", "rs", "ml", "al", "bp", "rv", "is", "ready"]);
 
 const REVIEW_FILTER_CODE_MAP = {
@@ -34,15 +36,8 @@ function hasReceipt(row) {
   return Number(row.receipt_count || 0) > 0;
 }
 
-function isUncategorized(row) {
-  const name = categoryName(row);
-  return !row.category_id || !row.category_name || /imported|needs[._-]?category|uncategorized/i.test(name);
-}
-
-function hasTaxMap(row) {
-  const region = String(row.business_region || row.region || "").toUpperCase() === "CA" ? "CA" : "US";
-  const taxMap = region === "CA" ? row.tax_map_ca : row.tax_map_us;
-  return hasText(taxMap);
+function normalizeRegion(row) {
+  return String(row.business_region || row.region || "").toUpperCase() === "CA" ? "CA" : "US";
 }
 
 function hasAllocation(row) {
@@ -52,64 +47,72 @@ function hasAllocation(row) {
   return Number.isFinite(number) && number >= 0 && number <= 100;
 }
 
+function buildReviewStatus(row) {
+  const receiptCount = Number(row.receipt_count || 0);
+  const txn = {
+    ...row,
+    receipt_id: row.receipt_id || row.receiptId || (receiptCount > 0 ? "__review_receipt__" : null)
+  };
+  const category = row.category_id || row.category_name
+    ? {
+      id: row.category_id || row.categoryId || null,
+      name: row.category_name || row.categoryName || null,
+      tax_map_us: row.tax_map_us ?? null,
+      tax_map_ca: row.tax_map_ca ?? null
+    }
+    : null;
+
+  return buildTransactionStatus(txn, category, {
+    region: normalizeRegion(row)
+  });
+}
+
 function computeTransactionReviewFlags(row) {
-  const flags = [];
   const type = String(row.type || "").toLowerCase();
   const isIncome = type === "income";
-  const isExpense = !isIncome;
-  const name = categoryName(row);
   const matched = isMatchedReview(row);
-  const receiptAttached = hasReceipt(row);
   const notePresent = hasText(row.note);
+  const status = buildReviewStatus(row);
+  const flags = status.flags.filter((flag) => ["NC", "UM", "RS", "ML", "AL", "BP", "RV"].includes(flag));
 
-  if (isUncategorized(row)) {
-    flags.push("NC");
-  } else {
-    if (!hasTaxMap(row)) {
-      flags.push("UM");
-    }
+  if (matched) {
+    ["ML", "BP"].forEach((flag) => {
+      const index = flags.indexOf(flag);
+      if (index !== -1) flags.splice(index, 1);
+    });
+  }
 
-    if (
-      /\bvehicle\b|\bfuel\b|\bmileage\b|auto insurance/i.test(name) &&
-      !receiptAttached &&
-      !matched
-    ) {
-      flags.push("ML");
-    }
+  if (isIncome && !hasReceipt(row) && !notePresent && !matched) {
+    flags.push("IS");
+  }
 
-    if (
-      (/\bphone\b|\binternet\b|home.?office/i.test(name) || row.tax_treatment === "split_use") &&
-      !hasAllocation(row)
-    ) {
-      flags.push("AL");
-    }
+  const normalizedName = categoryName(row);
+  const storedTaxMap = normalizeRegion(row) === "CA" ? row.tax_map_ca : row.tax_map_us;
+  if (
+    /imported|needs[._-]?category|uncategorized/i.test(normalizedName) &&
+    hasText(storedTaxMap)
+  ) {
+    const unmappedIndex = flags.indexOf("UM");
+    if (unmappedIndex !== -1) flags.splice(unmappedIndex, 1);
+  }
 
-    if (
-      isExpense &&
-      /\bmeal|\bfood\b|\bdining\b|\brestaurant\b|\btravel\b|\bairfare\b|\bhotel\b|\bentertainment\b/i.test(name) &&
-      !notePresent &&
-      !matched
-    ) {
-      flags.push("BP");
-    }
-
-    if (isExpense && !receiptAttached) {
-      flags.push("RS");
-    }
-
-    if (isIncome && !receiptAttached && !notePresent && !matched) {
-      flags.push("IS");
-    }
+  if (
+    status.categorySlug === "phone_internet" &&
+    !hasAllocation(row) &&
+    !flags.includes("AL")
+  ) {
+    flags.push("AL");
   }
 
   if (
     row.review_status === "needs_review" &&
     !flags.some((flag) => ["NC", "UM", "RS", "ML", "AL", "BP"].includes(flag))
+    && !flags.includes("RV")
   ) {
     flags.push("RV");
   }
 
-  return flags;
+  return Array.from(new Set(flags));
 }
 
 function matchesReviewFilter(row, reviewFilter) {

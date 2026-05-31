@@ -55,6 +55,40 @@ test("Phone & Internet with valid tax map but no personal_use_pct emits AL not U
   assert.ok(!flags.includes("NC"), "should not flag uncategorized when category is real");
 });
 
+test("Canada Phone & Internet with blank stored tax map follows export fallback and stays AL, not UM", () => {
+  const flags = computeTransactionReviewFlags({
+    id: "tx_phone_ca",
+    type: "expense",
+    category_id: "cat_phone_ca",
+    category_name: "Phone & Internet",
+    receipt_count: 1,
+    review_status: "ready",
+    region: "CA",
+    tax_map_ca: "",
+    personal_use_pct: null
+  });
+
+  assert.ok(flags.includes("AL"), "should still require allocation support");
+  assert.ok(!flags.includes("UM"), "should not report unmapped when export status resolves the category");
+});
+
+test("Canada Fuel & Gas with blank stored tax map follows export fallback and stays mileage review, not UM", () => {
+  const flags = computeTransactionReviewFlags({
+    id: "tx_fuel_ca",
+    type: "expense",
+    category_id: "cat_fuel_ca",
+    category_name: "Fuel & Gas",
+    receipt_count: 0,
+    review_status: "ready",
+    region: "CA",
+    tax_map_ca: ""
+  });
+
+  assert.ok(flags.includes("ML"), "should still require mileage support");
+  assert.ok(flags.includes("RS"), "should still require receipt support");
+  assert.ok(!flags.includes("UM"), "should not report unmapped when export status resolves the category");
+});
+
 test("vehicle mileage flag still applies for obvious vehicle categories without receipts", () => {
   const flags = computeTransactionReviewFlags({
     id: "tx_2",
