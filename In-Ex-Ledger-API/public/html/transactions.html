@@ -332,6 +332,10 @@
                   </div>
                   <input class="receipt-upload-input" type="file" id="transactionReceiptInput" accept="image/*,.pdf,application/pdf" multiple />
                   <p class="small-note">You can upload up to 10 files for one transaction. Long receipt? Upload multiple photos for the same transaction.</p>
+                  <div class="transaction-receipt-manage-row">
+                    <button type="button" id="transactionReceiptManageButton" class="receipt-manage-button" disabled>Manage linked receipts</button>
+                    <p class="small-note" id="transactionReceiptManageNote">Save the transaction first to link or unlink existing receipts.</p>
+                  </div>
                 </div>
               </div>
 
@@ -702,6 +706,34 @@
       <div class="modal-actions">
         <button type="button" id="csvImportDone" class="drawer-submit">Done</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="transactionReceiptModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="transactionReceiptModalTitle">
+  <div class="transaction-modal-content transaction-receipt-modal-content">
+    <h3 id="transactionReceiptModalTitle">Manage receipts</h3>
+    <p id="transactionReceiptModalSubtitle" class="transaction-receipt-modal-subtitle">Attach uploaded receipts, unlink them without deleting, or upload new ones for this transaction.</p>
+    <div class="transaction-receipt-modal-sections">
+      <section class="transaction-receipt-section">
+        <div class="transaction-receipt-section-head">
+          <h4>Attached</h4>
+          <span id="transactionReceiptAttachedCount" class="transaction-receipt-count">0</span>
+        </div>
+        <div id="transactionReceiptAttachedList" class="transaction-receipt-list transaction-receipt-list--attached"></div>
+      </section>
+      <section class="transaction-receipt-section">
+        <div class="transaction-receipt-section-head">
+          <h4>Available to link</h4>
+          <span id="transactionReceiptAvailableCount" class="transaction-receipt-count">0</span>
+        </div>
+        <div id="transactionReceiptAvailableList" class="transaction-receipt-list"></div>
+      </section>
+    </div>
+    <div class="modal-actions transaction-receipt-modal-actions">
+      <button type="button" id="transactionReceiptModalClose" class="modal-cancel">Close</button>
+      <button type="button" id="transactionReceiptLinkNext" class="modal-cancel">Link next receipt</button>
+      <button type="button" id="transactionReceiptUploadMore" class="drawer-submit">Upload new receipt</button>
     </div>
   </div>
 </div>

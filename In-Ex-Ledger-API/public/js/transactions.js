@@ -1339,6 +1339,7 @@ function wireTransactionForm() {
 
   updateHelpText(accountHelp, categoryHelp);
   initTransactionReceiptField();
+  initTransactionReceiptModal();
   wireEdgeCaseFields();
   categorySelect?.addEventListener("change", () => {
     syncCustomCategoryField("category", "customCategoryName");
@@ -2950,6 +2951,7 @@ function prefillTransactionForm(transaction) {
   if (taxFormTypeInput) {
     taxFormTypeInput.value = transaction.taxFormType || transaction.tax_form_type || "";
   }
+  syncTransactionReceiptManagerButton();
   syncEdgeCaseUi();
   void refreshTransactionFxReference();
 }
@@ -2969,6 +2971,7 @@ function resetTransactionForm() {
   setTransactionAdvancedDefaults();
   transactionFxReferenceDismissed = false;
   clearTransactionFxReferenceBox();
+  syncTransactionReceiptManagerButton();
   const message = document.getElementById("transactionFormMessage");
   if (message) {
     message.textContent = "";
@@ -3847,8 +3850,8 @@ function renderTransactionsTable(filteredTransactions) {
       ? "1 receipt attached"
       : `${rowReceiptCount} receipts attached`;
     const receiptMarkup = rowReceiptCount > 0
-      ? `<span class="receipt-status attached" title="${escapeHtml(rowReceiptAriaLabel)}"><span class="receipt-dot"></span><span>${escapeHtml(rowReceiptLabel)}</span></span>`
-      : `<button type="button" class="receipt-attach-hover" data-action="upload-receipt" data-id="${txn.id}" title="Attach a receipt">+ attach</button>`;
+      ? `<button type="button" class="receipt-status attached" data-action="manage-receipts" data-id="${txn.id}" title="${escapeHtml(rowReceiptAriaLabel)}" aria-label="${escapeHtml(rowReceiptAriaLabel)}"><span class="receipt-dot"></span><span>${escapeHtml(rowReceiptLabel)}</span></button>`
+      : `<button type="button" class="receipt-attach-hover" data-action="manage-receipts" data-id="${txn.id}" title="Manage receipts">+ attach</button>`;
 
     row.innerHTML = `
       <td class="table-select-cell"><input type="checkbox" class="tx-row-select" data-id="${txn.id}" aria-label="Select transaction ${escapeHtml(txn.description || txn.id)}" ${selectedTransactionIds.has(txnId) ? "checked" : ""}></td>
@@ -3870,8 +3873,9 @@ function renderTransactionsTable(filteredTransactions) {
     row.classList.toggle("is-selected", selectedTransactionIds.has(txnId));
     tbody.appendChild(row);
 
-    row.querySelector('[data-action="upload-receipt"]')?.addEventListener("click", () => {
-      triggerReceiptUpload(txn.id);
+    row.querySelector('[data-action="manage-receipts"]')?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void openTransactionReceiptManager(txn.id, event.currentTarget);
     });
     row.querySelector('[data-action="toggle-cleared"]')?.addEventListener("click", async (e) => {
       e.stopPropagation();
@@ -4600,12 +4604,16 @@ function syncRegionNotes() {
 
 
 let receiptInputElement = null;
+let transactionReceiptModalElement = null;
+let activeReceiptManagerTransactionId = null;
+let lastTransactionReceiptTrigger = null;
 const TRANSACTION_ID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89abAB][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function initTransactionReceiptField() {
   const button = document.getElementById("transactionReceiptButton");
   const input = document.getElementById("transactionReceiptInput");
+  const manageButton = document.getElementById("transactionReceiptManageButton");
   if (!button || !input) {
     return;
   }
@@ -4619,7 +4627,19 @@ function initTransactionReceiptField() {
     });
   }
 
+  if (manageButton && manageButton.dataset.wired !== "true") {
+    manageButton.dataset.wired = "true";
+    manageButton.addEventListener("click", () => {
+      if (!editingTransactionId) {
+        setTransactionFormMessage("Save the transaction first to manage existing receipts.");
+        return;
+      }
+      void openTransactionReceiptManager(editingTransactionId, manageButton);
+    });
+  }
+
   updateTransactionReceiptLabel();
+  syncTransactionReceiptManagerButton();
 }
 
 function updateTransactionReceiptLabel() {
@@ -4657,6 +4677,9 @@ function initReceiptInput() {
     if (files.length && transactionId) {
       await uploadReceiptFiles(transactionId, files);
       await loadTransactions();
+      if (activeReceiptManagerTransactionId && activeReceiptManagerTransactionId === transactionId) {
+        await refreshTransactionReceiptManager();
+      }
     }
     receiptInputElement.value = "";
   });
@@ -4673,6 +4696,307 @@ function triggerReceiptUpload(transactionId) {
   receiptInputElement.dataset.transactionId = transactionId;
   receiptInputElement.value = "";
   receiptInputElement.click();
+}
+
+function syncTransactionReceiptManagerButton() {
+  const manageButton = document.getElementById("transactionReceiptManageButton");
+  const note = document.getElementById("transactionReceiptManageNote");
+  if (!manageButton) {
+    return;
+  }
+
+  const canManage = !!editingTransactionId;
+  manageButton.disabled = !canManage;
+  if (note) {
+    note.textContent = canManage
+      ? "Link an uploaded receipt, unlink it without deleting, or upload more support."
+      : "Save the transaction first to link or unlink existing receipts.";
+  }
+}
+
+function initTransactionReceiptModal() {
+  if (transactionReceiptModalElement) {
+    return;
+  }
+
+  transactionReceiptModalElement = document.getElementById("transactionReceiptModal");
+  if (!transactionReceiptModalElement) {
+    return;
+  }
+
+  document.getElementById("transactionReceiptModalClose")?.addEventListener("click", () => {
+    closeTransactionReceiptManager();
+  });
+  document.getElementById("transactionReceiptUploadMore")?.addEventListener("click", () => {
+    if (activeReceiptManagerTransactionId) {
+      triggerReceiptUpload(activeReceiptManagerTransactionId);
+    }
+  });
+  document.getElementById("transactionReceiptLinkNext")?.addEventListener("click", async () => {
+    if (!activeReceiptManagerTransactionId) {
+      return;
+    }
+    await linkNextReceiptToTransaction(activeReceiptManagerTransactionId);
+  });
+  transactionReceiptModalElement.addEventListener("click", async (event) => {
+    if (event.target === transactionReceiptModalElement) {
+      closeTransactionReceiptManager();
+      return;
+    }
+
+    const actionButton = event.target.closest("[data-receipt-manager-action]");
+    if (!actionButton) {
+      return;
+    }
+
+    const action = actionButton.getAttribute("data-receipt-manager-action") || "";
+    const receiptId = actionButton.getAttribute("data-receipt-id") || "";
+    if (!receiptId) {
+      return;
+    }
+
+    if (action === "preview") {
+      openManagedReceiptPreview(receiptId);
+      return;
+    }
+    if (action === "attach" && activeReceiptManagerTransactionId) {
+      await attachReceiptToTransaction(receiptId, activeReceiptManagerTransactionId);
+      return;
+    }
+    if (action === "unlink") {
+      await detachReceiptFromTransaction(receiptId);
+    }
+  });
+  transactionReceiptModalElement.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeTransactionReceiptManager();
+    }
+  });
+}
+
+function formatReceiptManagerDate(value) {
+  if (!value) {
+    return "Unknown upload date";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  }).format(date);
+}
+
+function openManagedReceiptPreview(receiptId) {
+  if (!receiptId) {
+    return;
+  }
+  const previewUrl = buildApiUrl(`/api/receipts/${encodeURIComponent(receiptId)}?_ts=${Date.now()}`);
+  window.open(previewUrl, "_blank", "noopener");
+}
+
+async function fetchReceiptsForManager() {
+  const query = buildTransactionScopeQuery();
+  const noCacheQuery = query ? `${query}&_ts=${Date.now()}` : `?_ts=${Date.now()}`;
+  const response = await apiFetch(`/api/receipts${noCacheQuery}`);
+  if (!response || !response.ok) {
+    const payload = await response?.json().catch(() => null);
+    throw new Error(payload?.error || "Unable to load receipts.");
+  }
+  const payload = await response.json().catch(() => []);
+  return Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.receipts)
+    ? payload.receipts
+    : [];
+}
+
+function getTransactionById(transactionId) {
+  return (ledgerState.transactions || []).find((transaction) => transaction.id === transactionId) || null;
+}
+
+async function openTransactionReceiptManager(transactionId, triggerElement = null) {
+  if (!transactionId) {
+    setTransactionFormMessage("Save the transaction first to manage receipts.");
+    return;
+  }
+
+  initTransactionReceiptModal();
+  if (!transactionReceiptModalElement) {
+    return;
+  }
+
+  const transaction = getTransactionById(transactionId);
+  if (!transaction) {
+    setTransactionFormMessage("That transaction could not be found.");
+    return;
+  }
+
+  activeReceiptManagerTransactionId = transactionId;
+  lastTransactionReceiptTrigger = triggerElement instanceof HTMLElement
+    ? triggerElement
+    : (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  transactionReceiptModalElement.classList.remove("hidden");
+  renderTransactionReceiptManager(transaction, { attached: [], available: [] }, true);
+
+  try {
+    const receipts = await fetchReceiptsForManager();
+    const attached = receipts.filter((receipt) => receipt?.transaction_id === transactionId);
+    const available = receipts
+      .filter((receipt) => !receipt?.transaction_id)
+      .sort((left, right) => String(right?.created_at || "").localeCompare(String(left?.created_at || "")));
+    renderTransactionReceiptManager(transaction, {
+      attached,
+      available: available.slice(0, 30)
+    });
+  } catch (error) {
+    console.error("[Transactions] Receipt manager load failed", error);
+    renderTransactionReceiptManager(transaction, { attached: [], available: [] }, false, error.message || "Unable to load receipts.");
+  }
+}
+
+function closeTransactionReceiptManager() {
+  if (transactionReceiptModalElement) {
+    transactionReceiptModalElement.classList.add("hidden");
+  }
+  activeReceiptManagerTransactionId = null;
+  if (lastTransactionReceiptTrigger?.isConnected) {
+    lastTransactionReceiptTrigger.focus();
+  }
+  lastTransactionReceiptTrigger = null;
+}
+
+async function refreshTransactionReceiptManager() {
+  if (!activeReceiptManagerTransactionId) {
+    return;
+  }
+  await openTransactionReceiptManager(activeReceiptManagerTransactionId, lastTransactionReceiptTrigger);
+}
+
+function renderTransactionReceiptManager(transaction, snapshot, isLoading = false, errorText = "") {
+  const titleNode = document.getElementById("transactionReceiptModalTitle");
+  const subtitleNode = document.getElementById("transactionReceiptModalSubtitle");
+  const attachedCountNode = document.getElementById("transactionReceiptAttachedCount");
+  const availableCountNode = document.getElementById("transactionReceiptAvailableCount");
+  const attachedListNode = document.getElementById("transactionReceiptAttachedList");
+  const availableListNode = document.getElementById("transactionReceiptAvailableList");
+  const linkNextButton = document.getElementById("transactionReceiptLinkNext");
+  if (!attachedListNode || !availableListNode) {
+    return;
+  }
+
+  if (titleNode) {
+    titleNode.textContent = transaction?.description
+      ? `Manage receipts for ${transaction.description}`
+      : "Manage receipts";
+  }
+  if (subtitleNode) {
+    subtitleNode.textContent = errorText || "Attach uploaded receipts, unlink them without deleting, or upload new ones for this transaction.";
+  }
+
+  if (isLoading) {
+    attachedListNode.innerHTML = `<div class="transaction-receipt-empty">Loading receipts...</div>`;
+    availableListNode.innerHTML = `<div class="transaction-receipt-empty">Loading receipts...</div>`;
+    if (attachedCountNode) attachedCountNode.textContent = "0";
+    if (availableCountNode) availableCountNode.textContent = "0";
+    if (linkNextButton) linkNextButton.disabled = true;
+    return;
+  }
+
+  const attached = Array.isArray(snapshot?.attached) ? snapshot.attached : [];
+  const available = Array.isArray(snapshot?.available) ? snapshot.available : [];
+  if (attachedCountNode) attachedCountNode.textContent = String(attached.length);
+  if (availableCountNode) availableCountNode.textContent = String(available.length);
+  if (linkNextButton) {
+    linkNextButton.disabled = available.length === 0;
+  }
+
+  attachedListNode.innerHTML = attached.length
+    ? attached.map((receipt) => renderManagedReceiptItem(receipt, true)).join("")
+    : `<div class="transaction-receipt-empty">No receipts are linked to this transaction yet.</div>`;
+  availableListNode.innerHTML = available.length
+    ? available.map((receipt) => renderManagedReceiptItem(receipt, false)).join("")
+    : `<div class="transaction-receipt-empty">No uploaded unlinked receipts are available right now.</div>`;
+}
+
+function renderManagedReceiptItem(receipt, isAttached) {
+  const canPreview = receipt?.is_viewable !== false;
+  const name = escapeHtml(receipt?.filename || "Receipt");
+  const date = escapeHtml(formatReceiptManagerDate(receipt?.created_at));
+  const previewMarkup = canPreview
+    ? `<button type="button" class="transaction-receipt-action" data-receipt-manager-action="preview" data-receipt-id="${escapeHtml(receipt?.id || "")}">Preview</button>`
+    : `<span class="transaction-receipt-item-meta">Preview unavailable</span>`;
+  const actionMarkup = isAttached
+    ? `<button type="button" class="transaction-receipt-action transaction-receipt-action--danger" data-receipt-manager-action="unlink" data-receipt-id="${escapeHtml(receipt?.id || "")}">Unlink</button>`
+    : `<button type="button" class="transaction-receipt-action transaction-receipt-action--primary" data-receipt-manager-action="attach" data-receipt-id="${escapeHtml(receipt?.id || "")}">Link receipt</button>`;
+
+  return `
+    <article class="transaction-receipt-item">
+      <div class="transaction-receipt-item-head">
+        <div>
+          <p class="transaction-receipt-item-name">${name}</p>
+          <p class="transaction-receipt-item-meta">Uploaded ${date}</p>
+        </div>
+      </div>
+      <div class="transaction-receipt-item-actions">
+        ${previewMarkup}
+        ${actionMarkup}
+      </div>
+    </article>
+  `;
+}
+
+async function attachReceiptToTransaction(receiptId, transactionId) {
+  const response = await apiFetch(`/api/receipts/${encodeURIComponent(receiptId)}/attach`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ transaction_id: transactionId })
+  });
+  if (!response || !response.ok) {
+    const payload = await response?.json().catch(() => null);
+    setTransactionFormMessage(payload?.error || "Unable to link receipt.");
+    return;
+  }
+  setTransactionFormMessage("Receipt linked.");
+  await loadTransactions();
+  await refreshTransactionReceiptManager();
+}
+
+async function detachReceiptFromTransaction(receiptId) {
+  const response = await apiFetch(`/api/receipts/${encodeURIComponent(receiptId)}/attach`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ transaction_id: null })
+  });
+  if (!response || !response.ok) {
+    const payload = await response?.json().catch(() => null);
+    setTransactionFormMessage(payload?.error || "Unable to unlink receipt.");
+    return;
+  }
+  setTransactionFormMessage("Receipt unlinked. The file is still saved.");
+  await loadTransactions();
+  await refreshTransactionReceiptManager();
+}
+
+async function linkNextReceiptToTransaction(transactionId) {
+  try {
+    const receipts = await fetchReceiptsForManager();
+    const nextReceipt = receipts
+      .filter((receipt) => !receipt?.transaction_id)
+      .sort((left, right) => String(left?.created_at || "").localeCompare(String(right?.created_at || "")))[0];
+    if (!nextReceipt?.id) {
+      setTransactionFormMessage("No unlinked receipts are available to attach.");
+      await refreshTransactionReceiptManager();
+      return;
+    }
+    await attachReceiptToTransaction(nextReceipt.id, transactionId);
+  } catch (error) {
+    console.error("[Transactions] Unable to link next receipt", error);
+    setTransactionFormMessage(error.message || "Unable to load unlinked receipts.");
+  }
 }
 
 /**

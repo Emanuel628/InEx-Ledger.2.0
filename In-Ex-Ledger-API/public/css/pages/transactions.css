@@ -1525,6 +1525,10 @@ tbody tr:last-child {
   align-items: center;
   gap: 6px;
   font-size: 11px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
 }
 
 .receipt-dot {
@@ -1735,6 +1739,167 @@ tbody tr:last-child {
   margin-top: 24px;
 }
 
+.transaction-receipt-manage-row {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.receipt-manage-button {
+  width: fit-content;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(15, 25, 35, 0.12);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.receipt-manage-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.transaction-receipt-modal-content {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  box-shadow: 0 20px 60px rgba(15, 25, 35, 0.18);
+}
+
+.transaction-receipt-modal-subtitle {
+  margin-top: 8px;
+  color: var(--ink2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.transaction-receipt-modal-sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.transaction-receipt-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 16px;
+  background: #fbfdff;
+}
+
+.transaction-receipt-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.transaction-receipt-section-head h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.transaction-receipt-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(44, 121, 196, 0.08);
+  color: var(--accent2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.transaction-receipt-list {
+  display: grid;
+  gap: 10px;
+}
+
+.transaction-receipt-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(15, 25, 35, 0.08);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.transaction-receipt-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.transaction-receipt-item-name {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.transaction-receipt-item-meta {
+  margin: 4px 0 0;
+  color: var(--ink3);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.transaction-receipt-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.transaction-receipt-action {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 25, 35, 0.12);
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.transaction-receipt-action--primary {
+  border-color: rgba(44, 121, 196, 0.18);
+  color: var(--accent2);
+}
+
+.transaction-receipt-action--danger {
+  border-color: rgba(185, 28, 28, 0.18);
+  color: var(--red);
+}
+
+.transaction-receipt-empty {
+  padding: 14px;
+  border: 1px dashed rgba(15, 25, 35, 0.12);
+  border-radius: 14px;
+  color: var(--ink3);
+  font-size: 13px;
+  line-height: 1.6;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.transaction-receipt-modal-actions {
+  margin-top: 20px;
+}
+
 .modal-cancel {
   padding: 8px 16px;
   border: 0.5px solid var(--border2);
@@ -1755,6 +1920,10 @@ tbody tr:last-child {
 }
 
 @media (max-width: 1024px) {
+  .transaction-receipt-modal-sections {
+    grid-template-columns: 1fr;
+  }
+
   .stats-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;

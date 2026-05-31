@@ -376,6 +376,9 @@ function renderReceipts(receipts) {
         <td data-label="${escapeHtml(tx("common_actions"))}">
           <div class="receipt-row-actions">
             <button type="button" class="receipt-link-btn" data-receipt-link="${escapeHtml(receipt.id || "")}">${escapeHtml(tx("receipts_link_action"))}</button>
+            ${receipt.transaction_id
+              ? `<button type="button" class="receipt-link-btn" data-receipt-unlink="${escapeHtml(receipt.id || "")}">Unlink</button>`
+              : ""}
             ${!receipt.mime_type || receipt.mime_type !== "application/pdf"
               ? `<button type="button" class="receipt-scan-btn" data-receipt-scan="${escapeHtml(receipt.id || "")}" title="Extract data from this receipt">Scan</button>`
               : ""}
@@ -426,6 +429,13 @@ function renderReceipts(receipts) {
     button.addEventListener("click", () => {
       const receiptId = button.getAttribute("data-receipt-link") || "";
       openReceiptLinkModal(receiptId);
+    });
+  });
+
+  tableBody.querySelectorAll("[data-receipt-unlink]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const receiptId = button.getAttribute("data-receipt-unlink") || "";
+      await saveReceiptLink(receiptId, "");
     });
   });
 
@@ -812,6 +822,10 @@ function openNextReceiptForReview() {
   const nextReceipt = getNextReceiptForReview(receiptRecords);
   if (!nextReceipt) {
     showReceiptsToast(tx("receipts_focus_none_left"));
+    return;
+  }
+  if (!Object.keys(transactionMap || {}).length) {
+    showReceiptsToast("Add a transaction first so this receipt has somewhere to link.");
     return;
   }
   applyReceiptFilter("review");
