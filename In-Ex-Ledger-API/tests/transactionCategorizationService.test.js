@@ -204,10 +204,10 @@ test("categorizer maps 'Shell Oil 48293 New Jersey' to Car & Truck Expenses", ()
   assert.equal(result.reason, "canonical_rule");
 });
 
-test("categorizer maps 'Stripe Payout - Bulk Sales' to a non-imported income category", () => {
+test("categorizer maps 'Stripe Payout - Bulk Sales' to Sales Revenue, not Service Income", () => {
   const categorize = createTransactionCategorizer({ categories: makeCategories("US"), region: "US" });
   const result = categorize({ type: "income", merchantName: "Stripe", description: "Payout - Bulk Sales" });
-  assert.notEqual(result.categoryName, "Imported Income");
+  assert.equal(result.categoryName, "Sales Revenue");
   assert.equal(result.reason, "canonical_rule");
 });
 

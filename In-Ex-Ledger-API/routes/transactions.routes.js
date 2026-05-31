@@ -1786,6 +1786,18 @@ function detectColumns(headers) {
   return { dateCol, descCol, merchantCol, categoryCol, amountCol, withdrawalCol, depositCol };
 }
 
+function derivePseudoMerchant(description) {
+  if (!description) return "";
+  const cleaned = String(description)
+    .toLowerCase()
+    .replace(/\b(usd|cad|payment|debit|credit|purchase|pos|online|withdrawal|transfer)\b/g, " ")
+    .replace(/[#*]+\d+|\d{3,}/g, " ")
+    .replace(/[^a-z\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned.split(" ").filter(Boolean).slice(0, 3).join(" ");
+}
+
 function extractRowData(row, cols) {
   let amount = null;
   let type = null;
@@ -1818,14 +1830,14 @@ function extractRowData(row, cols) {
     row["details"] ||
     ""
   ).trim().slice(0, 500);
-  const merchantName = String(
+  const merchantName = (String(
     row[cols.merchantCol] ||
     row["merchant_name"] ||
     row["merchant"] ||
     row["payee"] ||
     row["beneficiary"] ||
     ""
-  ).trim().slice(0, 200);
+  ).trim() || derivePseudoMerchant(description)).slice(0, 200);
   const categoryGuess = String(
     row[cols.categoryCol] ||
     row["category_guess"] ||

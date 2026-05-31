@@ -47,14 +47,11 @@ const CATEGORY_RULES = [
     kind: "income",
     usCategory: "Service Income",
     caCategory: "Service Income",
-    merchantKeywords: ["stripe", "square", "paypal"],
     keywords: [
       "consulting fee", "consultant fee", "service fee", "freelance fee", "retainer fee",
       "project fee", "client payment", "invoice payment", "payment received",
-      "stripe payout", "square payout", "paypal payout",
       "stripe", "paypal", "square", "direct deposit client", "billable"
     ],
-    tokenKeywords: ["payout"],
     providerHints: ["income", "service", "professional_services", "business_services"]
   },
   {
@@ -63,7 +60,9 @@ const CATEGORY_RULES = [
     caCategory: "Sales Revenue",
     keywords: [
       "shopify", "amazon seller", "etsy", "ebay sale", "point of sale", "store sale",
-      "retail sale", "sales receipt", "product sale", "merchant payout"
+      "retail sale", "sales receipt", "product sale", "merchant payout",
+      "stripe payout", "square payout", "paypal payout", "sq payout",
+      "bulk sales", "sales payout", "order payout", "shop payout", "payout"
     ],
     providerHints: ["general_merchandise", "shopping", "retail", "sales"]
   },
@@ -89,14 +88,12 @@ const CATEGORY_RULES = [
     kind: "expense",
     usCategory: "Software & Subscriptions",
     caCategory: "Software & Subscriptions",
-    merchantKeywords: ["adobe", "openai", "github", "slack", "zoom"],
     keywords: [
       "adobe", "adobe systems", "photoshop", "github", "slack", "zoom", "dropbox",
       "google workspace", "notion", "figma", "canva", "aws", "digitalocean",
       "cloudflare", "twilio", "sendgrid", "openai", "chatgpt", "anthropic",
       "subscription", "saas", "software"
     ],
-    tokenKeywords: ["sub"],
     providerHints: ["software", "internet_software", "digital_goods"]
   },
   {
@@ -136,7 +133,6 @@ const CATEGORY_RULES = [
     kind: "expense",
     usCategory: "Meals",
     caCategory: "Meals & Entertainment",
-    merchantKeywords: ["uber eats", "ubereats", "doordash", "grubhub"],
     keywords: [
       "restaurant", "coffee", "cafe", "pizza", "burger",
       "uber eats", "ubereats", "doordash", "skip the dishes", "grubhub",
@@ -159,7 +155,6 @@ const CATEGORY_RULES = [
     kind: "expense",
     usCategory: "Car & Truck Expenses",
     caCategory: "Motor Vehicle",
-    merchantKeywords: ["shell", "chevron", "esso", "autozone", "jiffy lube", "valvoline"],
     keywords: [
       "shell", "shell oil", "chevron", "esso", "petro canada", "gas station", "fuel", "gas",
       "jiffy lube", "valvoline", "autozone", "napa auto", "parking meter", "parking lot",
@@ -343,23 +338,33 @@ function categoryExists(categoryLookup, kind, name) {
   return categoryLookup.has(`${kind}::${String(name || "").trim().toLowerCase()}`);
 }
 
-function scoreRule(rule, { normalizedMerchant, normalizedHaystack, tokenSet, providerHintText }) {
+function normalizedContains(normalizedText, compactText, keyword) {
+  const normalizedKw = normalizeMappingText(keyword);
+  if (!normalizedKw) return false;
+  const compactKw = normalizedKw.replace(/\s+/g, "");
+  return normalizedText.includes(normalizedKw) || (compactKw && compactText.includes(compactKw));
+}
+
+function scoreRule(rule, { normalizedMerchant, compactMerchant, normalizedDescFull, compactDescFull, providerHintText }) {
   let score = 0;
-  for (const merchantKeyword of rule.merchantKeywords || []) {
-    if (normalizedMerchant.includes(merchantKeyword)) score += 4;
-  }
-  for (const phrase of rule.keywords || []) {
-    if (normalizedHaystack.includes(phrase)) {
-      score += phrase.includes(" ") ? 3 : 2;
+  let merchantStrong = false;
+
+  for (const keyword of rule.keywords || []) {
+    const isMultiWord = keyword.includes(" ");
+    const merchantHit = normalizedContains(normalizedMerchant, compactMerchant, keyword);
+    if (merchantHit) {
+      score += isMultiWord ? 4 : 3;
+      merchantStrong = true;
+    } else if (normalizedContains(normalizedDescFull, compactDescFull, keyword)) {
+      score += isMultiWord ? 3 : 2;
     }
   }
-  for (const token of rule.tokenKeywords || []) {
-    if (tokenSet.has(token)) score += 1;
-  }
+
   for (const hint of rule.providerHints || []) {
     if (providerHintText.includes(hint)) score += 2;
   }
-  return score;
+
+  return { score, merchantStrong };
 }
 
 function createTransactionCategorizer({ categories = [], region = "US", historyRows = [], mappingRules = [] } = {}) {
@@ -383,8 +388,9 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
     const categoryGuessKey = normalizeRuleValue(categoryGuess);
     const haystack = `${rawMerchant} ${rawDescription} ${String(categoryGuess || "")}`.toLowerCase();
     const normalizedMerchant = normalizeMappingText(rawMerchant);
-    const normalizedHaystack = normalizeMappingText(`${rawMerchant} ${rawDescription} ${String(categoryGuess || "")}`);
-    const tokenSet = new Set(normalizedHaystack.split(" ").filter(Boolean));
+    const compactMerchant = normalizedMerchant.replace(/\s+/g, "");
+    const normalizedDescFull = normalizeMappingText(`${rawMerchant} ${rawDescription} ${String(categoryGuess || "")}`);
+    const compactDescFull = normalizedDescFull.replace(/\s+/g, "");
     const providerHintText = normalizeMappingText(categoryGuess);
 
     const explicitRule =
@@ -420,27 +426,27 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
       };
     }
 
-    let bestRule = null;
-    let bestScore = 0;
+    let best = null;
     let secondBestScore = 0;
     for (const rule of CATEGORY_RULES) {
       if (rule.kind !== kind) continue;
-      const score = scoreRule(rule, { normalizedMerchant, normalizedHaystack, tokenSet, providerHintText });
-      if (score > bestScore) {
-        secondBestScore = bestScore;
-        bestScore = score;
-        bestRule = rule;
+      const { score, merchantStrong } = scoreRule(rule, { normalizedMerchant, compactMerchant, normalizedDescFull, compactDescFull, providerHintText });
+      if (!best || score > best.score) {
+        secondBestScore = best?.score || 0;
+        best = { rule, score, merchantStrong };
       } else if (score > secondBestScore) {
         secondBestScore = score;
       }
     }
 
-    if (bestRule && bestScore >= 3 && bestScore > secondBestScore) {
-      const categoryName = pickRuleCategoryName(bestRule, region);
+    const winsGeneric = best && best.score >= 3 && best.score > secondBestScore;
+    const winsMerchant = best && best.merchantStrong && best.score >= 2 && best.score >= secondBestScore + 1;
+    if (winsGeneric || winsMerchant) {
+      const categoryName = pickRuleCategoryName(best.rule, region);
       return {
         categoryName,
         reason: "canonical_rule",
-        confidence: bestScore >= 5 ? "high" : "medium"
+        confidence: best.score >= 5 ? "high" : best.merchantStrong ? "medium" : "low"
       };
     }
 
