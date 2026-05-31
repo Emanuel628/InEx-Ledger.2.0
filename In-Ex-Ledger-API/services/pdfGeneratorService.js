@@ -897,6 +897,7 @@ function buildTransactionStatus(txn, category, context = {}) {
   if (needsAllocation) supportPhrases.push("Allocation needed");
   if (needsHomeOfficeSupport) supportPhrases.push("Home-office support needed");
   if (needsCapitalAssetReview) supportPhrases.push("Capital asset review");
+  if (flags.includes("FC")) supportPhrases.push("Final confirmation needed");
   if (flags.includes("RR")) supportPhrases.push("Refund/reversal review");
   if (flags.includes("RV")) supportPhrases.push("CPA review required");
 
@@ -1408,6 +1409,7 @@ function buildUnresolvedSummaryLines(flagged) {
     `${rows.filter((txn) => txn.__status.flags.includes("UM")).length} categorized expense transactions still need tax-line mapping.`,
     `${rows.filter((txn) => txn.__status.flags.includes("RS")).length} transactions still need receipt or source support.`,
     `${rows.filter((txn) => txn.__status.flags.some((flag) => ["ML", "BP", "AL", "HO", "CA"].includes(flag))).length} transactions still need schedule-specific support.`,
+    `${rows.filter((txn) => txn.__status.flags.includes("FC")).length} transactions still need final confirmation before handoff.`,
     `${rows.filter((txn) => txn.__status.flags.includes("RV")).length} transactions still need CPA review before filing.`
   ];
 }

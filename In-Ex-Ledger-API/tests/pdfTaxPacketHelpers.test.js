@@ -129,6 +129,7 @@ test("meals mapped to Line 24b do not use TM or UM", () => {
   assert.match(status.taxLineDisplay, /Line 24b/i);
   assert.ok(status.flags.includes("BP"));
   assert.ok(status.flags.includes("FC"));
+  assert.match(status.supportSummary, /Final confirmation needed/);
   assert.equal(status.flags.includes("TM"), false);
   assert.equal(status.flags.includes("UM"), false);
 });
@@ -556,13 +557,14 @@ test("buildUnresolvedSummaryLines includes unmapped-tax blockers", () => {
   const lines = buildUnresolvedSummaryLines([
     { __status: { flags: ["NC"] } },
     { __status: { flags: ["UM"] } },
-    { __status: { flags: ["UM", "RS"] } },
+    { __status: { flags: ["UM", "RS", "FC"] } },
     { __status: { flags: ["HO"] } },
     { __status: { flags: ["RV"] } }
   ]);
 
   assert.ok(lines.some((line) => /1 transactions still need a real business category\./.test(line)));
   assert.ok(lines.some((line) => /2 categorized expense transactions still need tax-line mapping\./.test(line)));
+  assert.ok(lines.some((line) => /1 transactions still need final confirmation before handoff\./.test(line)));
   assert.ok(lines.some((line) => /1 transactions still need CPA review before filing\./.test(line)));
 });
 
