@@ -473,6 +473,8 @@ test("buildCpaActionLines includes home office and capital asset support counts"
     receiptLinkedCount: 2,
     transactionWithReceiptCount: 5,
     expenseWithoutReceiptAttachmentCount: 6,
+    missingDescriptionCount: 12,
+    duplicateCount: 13,
     vehicleCount: 7,
     mealsCount: 8,
     phoneAllocationCount: 9,
@@ -482,6 +484,8 @@ test("buildCpaActionLines includes home office and capital asset support counts"
 
   assert.ok(lines.some((line) => /10 home-office items require worksheet support\./.test(line)));
   assert.ok(lines.some((line) => /11 capital asset items require asset review support\./.test(line)));
+  assert.ok(lines.some((line) => /12 transactions still need a clear description or memo\./.test(line)));
+  assert.ok(lines.some((line) => /13 transactions are flagged as potential duplicates\./.test(line)));
 });
 
 test("buildCleanupPriorityLines includes home office and capital asset priorities", () => {
@@ -509,6 +513,8 @@ test("buildChecklistItems surfaces tax mapping, home office, and capital asset c
     transactionWithReceiptCount: 4,
     needsCategoryCount: 1,
     unmappedTaxCount: 2,
+    missingDescriptionCount: 7,
+    duplicateCount: 8,
     vehicleCount: 0,
     vehicleTotal: 0,
     mealsCount: 0,
@@ -523,11 +529,17 @@ test("buildChecklistItems surfaces tax mapping, home office, and capital asset c
   }, "USD");
 
   const taxMapping = items.find((item) => item.title === "Tax-line mapping");
+  const descriptions = items.find((item) => item.title === "Descriptions");
+  const duplicates = items.find((item) => item.title === "Duplicate review");
   const homeOffice = items.find((item) => item.title === "Home office support");
   const capitalAsset = items.find((item) => item.title === "Capital asset review");
 
   assert.equal(taxMapping.badge, "ACTION");
   assert.match(taxMapping.description, /2 categorized expense transactions still need a real tax-line mapping/i);
+  assert.equal(descriptions.badge, "ACTION");
+  assert.match(descriptions.description, /7 transactions still need a usable description or memo/i);
+  assert.equal(duplicates.badge, "ACTION");
+  assert.match(duplicates.description, /8 transactions are flagged as potential duplicates/i);
   assert.equal(homeOffice.badge, "ACTION");
   assert.match(homeOffice.description, /5 home-office transactions totaling \$1,250\.00/i);
   assert.equal(capitalAsset.badge, "ACTION");
