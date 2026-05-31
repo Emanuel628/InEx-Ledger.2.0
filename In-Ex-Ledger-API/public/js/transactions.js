@@ -7,6 +7,7 @@ const ledgerState = {
   transactions: [],
   accounts: [],
   categories: [],
+  reviewQueueItems: [],
   reviewQueueByTransactionId: new Map(),
   transactionMeta: {
     total: 0,
@@ -680,6 +681,27 @@ function getTransactionReviewSnapshot(transactions = ledgerState.transactions ||
   return snapshot;
 }
 
+function getOrderedVisibleReviewItems(transactions = ledgerState.transactions || []) {
+  const visibleById = new Map(
+    (transactions || []).map((txn) => [String(txn.id), txn])
+  );
+
+  return (ledgerState.reviewQueueItems || [])
+    .map((item) => {
+      const txn = visibleById.get(String(item.id));
+      if (!txn) return null;
+      const flags = Array.isArray(item.reviewFlags) && item.reviewFlags.length
+        ? item.reviewFlags
+        : computeTxnFlags(txn);
+      return {
+        ...item,
+        txn,
+        flags
+      };
+    })
+    .filter(Boolean);
+}
+
 function getTransactionReviewSummaryCopy(snapshot, totalTransactions) {
   if (!totalTransactions) {
     return {
@@ -740,6 +762,14 @@ function renderTransactionReviewSummary(transactions = ledgerState.transactions 
 
   const backendReviewSummary = ledgerState.transactionReviewSummary;
 const visibleSnapshot = getTransactionReviewSnapshot(transactions);
+const orderedVisibleReviewItems = getOrderedVisibleReviewItems(transactions);
+const queueFirstIssue = orderedVisibleReviewItems[0]
+  ? {
+      txn: orderedVisibleReviewItems[0].txn,
+      flags: orderedVisibleReviewItems[0].flags,
+      actionTarget: orderedVisibleReviewItems[0].actionTarget || null
+    }
+  : null;
 
 const snapshot = backendReviewSummary
   ? {
@@ -767,7 +797,7 @@ const snapshot = backendReviewSummary
         rv: Number(backendReviewSummary.rv || 0),
         is: Number(backendReviewSummary.is || 0)
       },
-      firstIssue: visibleSnapshot.firstIssue
+      firstIssue: queueFirstIssue || visibleSnapshot.firstIssue
     }
   : visibleSnapshot;
 
@@ -806,17 +836,22 @@ const copy = getTransactionReviewSummaryCopy(snapshot, getTransactionTotalCount(
     if (!snapshot.firstIssue) {
       return;
     }
-    const firstFlag = getTxnTopFlag(snapshot.firstIssue.flags);
-    if (firstFlag) {
-      const filterOption = TRANSACTION_REVIEW_FILTER_OPTIONS.find((option) => option.codes.includes(firstFlag));
-      if (filterOption && transactionFilters.review !== filterOption.key) {
-        const reviewFilterSelect = document.getElementById("transactionReviewFilter");
-        transactionFilters.review = filterOption.key;
-        if (reviewFilterSelect) {
-          reviewFilterSelect.value = filterOption.key;
-        }
-        void loadTransactions({ resetPage: true });
-      }
+    const actionHref = String(snapshot.firstIssue.actionTarget?.href || "/transactions").trim() || "/transactions";
+    if (actionHref === "/categories") {
+      window.location.href = "/categories";
+      return;
+    }
+    if (actionHref === "/receipts") {
+      triggerReceiptUpload(snapshot.firstIssue.txn.id);
+      return;
+    }
+    if (actionHref === "/mileage") {
+      window.location.href = "/mileage";
+      return;
+    }
+    if (actionHref === "/exports") {
+      window.location.href = "/exports";
+      return;
     }
     focusTransactionForReview(snapshot.firstIssue.txn.id);
   };
@@ -1792,7 +1827,7 @@ async function loadTransactions(options = {}) {
     }
 
     const transactions = Array.isArray(payload?.transactions) ? payload.transactions : [];
-    const [receiptSnapshot, reviewQueueByTransactionId] = await Promise.all([
+    const [receiptSnapshot, reviewQueueSnapshot] = await Promise.all([
       fetchReceiptLinksSnapshot().catch((receiptError) => {
         console.warn("[Transactions] Receipt snapshot unavailable", receiptError);
         return { byTransactionId: {}, countByTransactionId: {}, idsByTransactionId: {}, unattachedCount: 0 };
@@ -1800,10 +1835,11 @@ async function loadTransactions(options = {}) {
       fetchReviewQueueSnapshot()
     ]);
 
-    ledgerState.reviewQueueByTransactionId = reviewQueueByTransactionId;
+    ledgerState.reviewQueueItems = Array.isArray(reviewQueueSnapshot?.queue) ? reviewQueueSnapshot.queue : [];
+    ledgerState.reviewQueueByTransactionId = reviewQueueSnapshot?.byTransactionId || new Map();
     ledgerState.transactions = transactions.filter(Boolean).map((transaction) => {
       const receiptIds = receiptSnapshot.idsByTransactionId[transaction.id] || [];
-      const reviewItem = reviewQueueByTransactionId.get(String(transaction.id)) || null;
+      const reviewItem = ledgerState.reviewQueueByTransactionId.get(String(transaction.id)) || null;
       return {
         ...transaction,
         receiptId: receiptSnapshot.byTransactionId[transaction.id] || transaction.receiptId || "",
@@ -1877,14 +1913,17 @@ async function fetchReviewQueueSnapshot() {
   try {
     const response = await apiFetch(`/api/review/queue?_ts=${Date.now()}`);
     if (!response || !response.ok) {
-      return new Map();
+      return { queue: [], byTransactionId: new Map() };
     }
     const payload = await response.json().catch(() => ({}));
     const queue = Array.isArray(payload?.queue) ? payload.queue : [];
-    return new Map(queue.map((item) => [String(item.id), item]));
+    return {
+      queue,
+      byTransactionId: new Map(queue.map((item) => [String(item.id), item]))
+    };
   } catch (error) {
     console.warn("[Transactions] Review queue snapshot unavailable", error);
-    return new Map();
+    return { queue: [], byTransactionId: new Map() };
   }
 }
 

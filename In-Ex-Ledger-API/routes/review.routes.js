@@ -77,6 +77,28 @@ const ISSUE_CODE_LABELS = {
   reviewer_note: "Reviewer note"
 };
 
+const ISSUE_PRIORITY = {
+  needs_category: 0,
+  needs_tax_mapping: 1,
+  missing_description: 2,
+  needs_receipt_support: 3,
+  needs_business_purpose: 4,
+  needs_allocation: 5,
+  needs_mileage_log: 6,
+  needs_home_office_support: 7,
+  needs_capital_asset_review: 8,
+  indirect_tax_review: 9,
+  cpa_review_required: 10,
+  final_confirmation_needed: 11,
+  possible_duplicate: 12,
+  possible_personal_item: 13,
+  foreign_currency_review: 14,
+  transfer_review: 15,
+  refund_reversal_review: 16,
+  reviewer_note: 17,
+  excluded_review: 18
+};
+
 const VALID_ISSUE_SEVERITIES = new Set(["warning", "hard"]);
 const VALID_ISSUE_STATUSES = new Set(["open", "resolved", "waived"]);
 const USER_NAME_SQL = "COALESCE(u.display_name, u.full_name, u.email)";
@@ -164,29 +186,59 @@ function mergeIssueState(row, stateRows = []) {
   return merged;
 }
 
-function deriveActionTarget(row) {
-  const flags = new Set(row.reviewFlags || []);
-  if (flags.has("RS")) return { href: "/receipts", label: "Open receipts" };
-  if (flags.has("ML")) return { href: "/mileage", label: "Open mileage" };
-  if (flags.has("NC") || flags.has("UM") || flags.has("MD") || flags.has("DUP") || flags.has("RV")) {
+function issueSeverityWeight(entry) {
+  return entry?.severity === "hard" ? 0 : 1;
+}
+
+function issuePriority(entry) {
+  return ISSUE_PRIORITY[entry?.issueCode] ?? 99;
+}
+
+function compareIssueEntries(left, right) {
+  const bySeverity = issueSeverityWeight(left) - issueSeverityWeight(right);
+  if (bySeverity !== 0) return bySeverity;
+  const byPriority = issuePriority(left) - issuePriority(right);
+  if (byPriority !== 0) return byPriority;
+  return String(left?.label || "").localeCompare(String(right?.label || ""));
+}
+
+function deriveActionTargetFromIssue(issueEntry, row) {
+  if (!issueEntry) {
     return { href: "/transactions", label: "Review transaction" };
   }
-  if (flags.has("AL") || flags.has("HO") || flags.has("CA") || flags.has("IT") || flags.has("BP")) {
-    return { href: "/transactions", label: "Update details" };
+
+  switch (issueEntry.issueCode) {
+    case "needs_tax_mapping":
+      return { href: "/categories", label: "Open categories" };
+    case "needs_receipt_support":
+      return { href: "/receipts", label: "Open receipts" };
+    case "needs_mileage_log":
+      return { href: "/mileage", label: "Open mileage" };
+    case "excluded_review":
+      return { href: "/exports", label: "Review exclusions" };
+    case "needs_allocation":
+    case "needs_business_purpose":
+    case "needs_home_office_support":
+    case "needs_capital_asset_review":
+    case "indirect_tax_review":
+      return { href: "/transactions", label: "Update details" };
+    default:
+      if (row.reviewStatus === "Excluded - review schedule") {
+        return { href: "/exports", label: "Review exclusions" };
+      }
+      return { href: "/transactions", label: "Review transaction" };
   }
-  if (row.reviewStatus === "Excluded - review schedule") {
-    return { href: "/exports", label: "Review exclusions" };
-  }
-  return { href: "/transactions", label: "Review transaction" };
 }
 
 function buildQueueRows(rows, issueStateRowsByTransaction = new Map()) {
   return (rows || [])
     .map((row) => {
-      const issueEntries = mergeIssueState(row, issueStateRowsByTransaction.get(row.id) || []);
+      const issueEntries = mergeIssueState(row, issueStateRowsByTransaction.get(row.id) || [])
+        .sort(compareIssueEntries);
       if (!issueEntries.length) {
         return null;
       }
+      const primaryIssue = issueEntries[0] || null;
       return {
         id: row.id,
         date: row.date,
@@ -208,11 +260,15 @@ function buildQueueRows(rows, issueStateRowsByTransaction = new Map()) {
         receiptAttached: row.receiptAttached === true,
         supportSummary: row.supportSummary || "",
         reviewNotes: row.reviewNotes || "",
-        actionTarget: deriveActionTarget(row)
+        actionTarget: deriveActionTargetFromIssue(primaryIssue, row)
       };
     })
     .filter(Boolean)
     .sort((left, right) => {
+      const bySeverity = issueSeverityWeight(left.issueEntries[0]) - issueSeverityWeight(right.issueEntries[0]);
+      if (bySeverity !== 0) return bySeverity;
+      const byPriority = issuePriority(left.issueEntries[0]) - issuePriority(right.issueEntries[0]);
+      if (byPriority !== 0) return byPriority;
       const statusWeight = (status) => {
         if (status === "Action needed") return 0;
         if (status === "Needs review") return 1;
