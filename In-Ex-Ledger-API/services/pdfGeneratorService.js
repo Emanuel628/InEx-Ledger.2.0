@@ -1643,13 +1643,16 @@ function buildIdentityPage(data) {
   canvas.drawMetricCard(490, metricY, 82, 72, "Excluded", String(reviewInsights.excludedCount), "Transactions");
 
   const actionLines = buildCpaActionLines(reviewInsights, currency);
-  canvas.drawCard(40, metricY - 88, 532, 172, "CPA Action Required", actionLines, { maxChars: 88 });
-  canvas.text(52, metricY - 242, labels.not_filed, 9, "F2");
+  const actionCardHeight = estimateCardHeight(532, actionLines, { maxChars: 88, minHeight: 172 });
+  const actionCardTop = metricY - 88;
+  canvas.drawCard(40, actionCardTop, 532, actionCardHeight, "CPA Action Required", actionLines, { maxChars: 88 });
+  const disclosureY = actionCardTop - actionCardHeight - 14;
+  canvas.text(52, disclosureY, labels.not_filed, 9, "F2");
   if (regionCode === "CA") {
-    canvas.text(52, metricY - 258, `${formatFiscalYearDisplay(fiscalYearStart, endDate)} | GST/HST method: ${gstHstRegistered ? safeValue(gstHstMethod) : "Not registered"}`, 8);
-    canvas.text(52, metricY - 272, "Confirm fiscal year with preparer.", 8);
+    canvas.text(52, disclosureY - 16, `${formatFiscalYearDisplay(fiscalYearStart, endDate)} | GST/HST method: ${gstHstRegistered ? safeValue(gstHstMethod) : "Not registered"}`, 8);
+    canvas.text(52, disclosureY - 30, "Confirm fiscal year with preparer.", 8);
   } else {
-    canvas.text(52, metricY - 258, `Business address: ${safeValue(address)}`, 8);
+    canvas.text(52, disclosureY - 16, `Business address: ${safeValue(address)}`, 8);
   }
 
   return canvas;
