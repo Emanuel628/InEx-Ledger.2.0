@@ -123,6 +123,19 @@
 
         <div id="reviewQuickFilters" class="review-quick-filters"></div>
 
+        <div id="reviewBulkBar" class="review-bulk-bar" hidden>
+          <div class="review-bulk-copy">
+            <strong id="reviewBulkCount">0 selected</strong>
+            <span id="reviewBulkScope">Use bulk actions for the selected queue rows.</span>
+          </div>
+          <div class="review-bulk-actions">
+            <button type="button" id="reviewSelectVisibleButton" class="review-secondary-btn">Select visible</button>
+            <button type="button" id="reviewClearSelectionButton" class="review-secondary-btn">Clear</button>
+            <button type="button" id="reviewBulkResolveButton" class="review-row-support-btn">Resolve selected</button>
+            <button type="button" id="reviewBulkWaiveButton" class="review-row-support-btn">Waive selected</button>
+          </div>
+        </div>
+
         <div id="reviewQueueLoading" class="review-empty-state" data-i18n="common_loading">Loading...</div>
         <div id="reviewQueueEmpty" class="review-empty-state" hidden>
           <h3 data-i18n="review_empty_title">Nothing is blocking the queue.</h3>
@@ -133,6 +146,9 @@
           <table class="review-table">
             <thead>
               <tr>
+                <th class="review-select-col">
+                  <input id="reviewSelectAllVisible" type="checkbox" aria-label="Select all visible review rows" />
+                </th>
                 <th data-i18n="review_col_transaction">Transaction</th>
                 <th data-i18n="review_col_status">Status</th>
                 <th data-i18n="review_col_issue">Issue</th>

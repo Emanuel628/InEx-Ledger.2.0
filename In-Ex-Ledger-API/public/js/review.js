@@ -4,6 +4,8 @@ let reviewQueue = [];
 let activeSupportTransaction = null;
 let activeIssueTransaction = null;
 let reviewQuickFilter = "all";
+let selectedReviewIds = new Set();
+let reviewBulkBusy = false;
 const REVIEW_FILTER_PRESETS = Object.freeze([
   { key: "hard", label: "Hard blockers" },
   { key: "warning", label: "Warnings" },
@@ -79,6 +81,58 @@ function summarizeIssues(queue = []) {
   return stats;
 }
 
+function getFilteredQueue() {
+  const filter = document.getElementById("reviewStatusFilter")?.value || "all";
+  return reviewQueue.filter((item) => {
+    if (filter !== "all" && mapFilterStatus(item) !== filter) {
+      return false;
+    }
+    return matchesQuickFilter(item, reviewQuickFilter);
+  });
+}
+
+function pruneSelection() {
+  const validIds = new Set(reviewQueue.map((item) => String(item.id)));
+  selectedReviewIds = new Set([...selectedReviewIds].filter((id) => validIds.has(String(id))));
+}
+
+function getSelectedQueueItems() {
+  const selectedIds = new Set([...selectedReviewIds].map((id) => String(id)));
+  return reviewQueue.filter((item) => selectedIds.has(String(item.id)));
+}
+
+function updateBulkBar(filtered = getFilteredQueue()) {
+  const bar = document.getElementById("reviewBulkBar");
+  const countNode = document.getElementById("reviewBulkCount");
+  const scopeNode = document.getElementById("reviewBulkScope");
+  const selectAll = document.getElementById("reviewSelectAllVisible");
+  const resolveButton = document.getElementById("reviewBulkResolveButton");
+  const waiveButton = document.getElementById("reviewBulkWaiveButton");
+  const clearButton = document.getElementById("reviewClearSelectionButton");
+  const selectVisibleButton = document.getElementById("reviewSelectVisibleButton");
+  if (!bar || !countNode || !scopeNode || !selectAll) return;
+
+  const visibleIds = filtered.map((item) => String(item.id));
+  const selectedVisibleCount = visibleIds.filter((id) => selectedReviewIds.has(id)).length;
+  const selectedTotal = selectedReviewIds.size;
+
+  bar.hidden = filtered.length === 0;
+  countNode.textContent = `${selectedTotal} selected`;
+  scopeNode.textContent = selectedTotal
+    ? "Bulk actions apply to the primary issue on each selected row."
+    : `${filtered.length} row${filtered.length !== 1 ? "s" : ""} visible in this review view.`;
+
+  const allVisibleSelected = filtered.length > 0 && selectedVisibleCount === filtered.length;
+  selectAll.checked = allVisibleSelected;
+  selectAll.indeterminate = selectedVisibleCount > 0 && !allVisibleSelected;
+  selectAll.disabled = filtered.length === 0 || reviewBulkBusy;
+
+  if (resolveButton) resolveButton.disabled = selectedTotal === 0 || reviewBulkBusy;
+  if (waiveButton) waiveButton.disabled = selectedTotal === 0 || reviewBulkBusy;
+  if (clearButton) clearButton.disabled = selectedTotal === 0 || reviewBulkBusy;
+  if (selectVisibleButton) selectVisibleButton.disabled = filtered.length === 0 || reviewBulkBusy;
+}
+
 function renderSummary(summary = {}) {
   document.getElementById("reviewTotalCount").textContent = String(summary.total || 0);
   document.getElementById("reviewActionCount").textContent = String(summary.actionNeededCount || 0);
@@ -101,6 +155,7 @@ function renderSummary(summary = {}) {
 
   renderReviewFocusCard();
   renderQuickFilters(issueSummary);
+  updateBulkBar();
 }
 
 function mapFilterStatus(item) {
@@ -289,22 +344,16 @@ function renderQuickFilters(issueSummary) {
 }
 
 function renderQueue() {
-  const filter = document.getElementById("reviewStatusFilter")?.value || "all";
   const tbody = document.getElementById("reviewQueueBody");
   const loading = document.getElementById("reviewQueueLoading");
   const empty = document.getElementById("reviewQueueEmpty");
   const tableWrap = document.getElementById("reviewTableWrap");
-
-  const filtered = reviewQueue.filter((item) => {
-    if (filter !== "all" && mapFilterStatus(item) !== filter) {
-      return false;
-    }
-    return matchesQuickFilter(item, reviewQuickFilter);
-  });
+  const filtered = getFilteredQueue();
 
   loading.hidden = true;
   empty.hidden = filtered.length > 0;
   tableWrap.hidden = filtered.length === 0;
+  updateBulkBar(filtered);
 
   if (!filtered.length) {
     tbody.innerHTML = "";
@@ -330,6 +379,9 @@ function renderQueue() {
     }
     return `
       <tr>
+        <td class="review-select-col">
+          <input class="review-row-select" type="checkbox" data-select-transaction="${escapeText(item.id)}" ${selectedReviewIds.has(String(item.id)) ? "checked" : ""} aria-label="Select review item ${escapeText(item.description || item.id)}" />
+        </td>
         <td>
           <div class="review-transaction-cell">
             <div class="review-transaction-main">${escapeText(item.description || "(No description)")}</div>
@@ -396,6 +448,15 @@ function renderQueue() {
       if (item) {
         void openIssueModal(item);
       }
+    });
+  });
+  tbody.querySelectorAll("[data-select-transaction]").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      const transactionId = String(checkbox.getAttribute("data-select-transaction") || "");
+      if (!transactionId) return;
+      if (checkbox.checked) selectedReviewIds.add(transactionId);
+      else selectedReviewIds.delete(transactionId);
+      updateBulkBar(filtered);
     });
   });
 }
@@ -617,6 +678,64 @@ async function updateIssue(issueId, payload) {
   return response.json();
 }
 
+async function createIssueOverride(payload) {
+  const response = await apiFetch("/api/review/issues", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!response || !response.ok) {
+    const body = await response?.json().catch(() => null);
+    throw new Error(body?.error || tx("review_issue_save_error", "Failed to save review issue."));
+  }
+  return response.json();
+}
+
+async function persistIssueStatus(item, issueEntry, issueStatus) {
+  if (!item?.id || !issueEntry?.issueCode) return null;
+  if (issueEntry.id) {
+    return updateIssue(issueEntry.id, { issue_status: issueStatus });
+  }
+  return createIssueOverride({
+    transaction_id: item.id,
+    issue_code: issueEntry.issueCode,
+    issue_severity: issueEntry.severity || "warning",
+    issue_status: issueStatus,
+    review_notes: issueEntry.notes || ""
+  });
+}
+
+async function applyBulkIssueStatus(issueStatus) {
+  if (reviewBulkBusy) return;
+  const selectedItems = getSelectedQueueItems();
+  if (!selectedItems.length) return;
+
+  const actionLabel = issueStatus === "resolved"
+    ? tx("review_issue_resolve", "Resolve")
+    : tx("review_issue_waive", "Waive");
+  if (!window.confirm(`${actionLabel} the primary review issue for ${selectedItems.length} selected row${selectedItems.length !== 1 ? "s" : ""}?`)) {
+    return;
+  }
+
+  reviewBulkBusy = true;
+  updateBulkBar();
+  try {
+    for (const item of selectedItems) {
+      const issueEntry = getTopIssue(item);
+      if (!issueEntry) continue;
+      await persistIssueStatus(item, issueEntry, issueStatus);
+    }
+    selectedReviewIds.clear();
+    await loadReviewQueue();
+  } catch (error) {
+    console.error("Failed to apply bulk review update:", error);
+    window.alert(error.message || tx("review_issue_save_error", "Failed to save review issue."));
+  } finally {
+    reviewBulkBusy = false;
+    updateBulkBar();
+  }
+}
+
 async function saveReviewIssue(event) {
   event.preventDefault();
   const transactionId = document.getElementById("reviewIssueTransactionId")?.value || "";
@@ -673,12 +792,14 @@ async function loadReviewQueue() {
     }
     const payload = await response.json().catch(() => ({}));
     reviewQueue = Array.isArray(payload.queue) ? payload.queue : [];
+    pruneSelection();
     renderSummary(payload.summary || {});
     renderQueue();
     void maybeHandleDeepLinkedReviewAction();
   } catch (error) {
     console.error("Failed to load review queue:", error);
     reviewQueue = [];
+    selectedReviewIds.clear();
     reviewQuickFilter = "all";
     renderSummary({});
     loading.hidden = false;
@@ -724,6 +845,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     void loadReviewQueue();
   });
   document.getElementById("reviewStatusFilter")?.addEventListener("change", renderQueue);
+  document.getElementById("reviewSelectVisibleButton")?.addEventListener("click", () => {
+    getFilteredQueue().forEach((item) => selectedReviewIds.add(String(item.id)));
+    renderQueue();
+  });
+  document.getElementById("reviewClearSelectionButton")?.addEventListener("click", () => {
+    selectedReviewIds.clear();
+    renderQueue();
+  });
+  document.getElementById("reviewBulkResolveButton")?.addEventListener("click", () => {
+    void applyBulkIssueStatus("resolved");
+  });
+  document.getElementById("reviewBulkWaiveButton")?.addEventListener("click", () => {
+    void applyBulkIssueStatus("waived");
+  });
+  document.getElementById("reviewSelectAllVisible")?.addEventListener("change", (event) => {
+    const checked = !!event.target?.checked;
+    const visible = getFilteredQueue();
+    visible.forEach((item) => {
+      const itemId = String(item.id);
+      if (checked) selectedReviewIds.add(itemId);
+      else selectedReviewIds.delete(itemId);
+    });
+    renderQueue();
+  });
   document.getElementById("supportArtifactType")?.addEventListener("change", syncSupportModalType);
   document.getElementById("supportArtifactForm")?.addEventListener("submit", saveSupportArtifact);
   document.querySelectorAll("[data-support-modal-close]").forEach((node) => {
