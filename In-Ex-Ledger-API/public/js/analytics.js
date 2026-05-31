@@ -273,7 +273,7 @@ function barRow(label, value, max, type) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (Number(value || 0) / max) * 100)) : 0;
   return `<div class="bar-row">
     <span class="bar-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
-    <div class="bar-track"><div class="bar-fill ${escapeHtml(type)}" style="width:${pct.toFixed(2)}%"></div></div>
+    <progress class="bar-track ${escapeHtml(type)}" max="100" value="${pct.toFixed(2)}" aria-label="${escapeHtml(label)} ${pct.toFixed(0)}%"></progress>
     <span class="bar-amount">${fmt(value, { absolute: true })}</span>
   </div>`;
 }
