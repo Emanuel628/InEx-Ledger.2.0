@@ -1401,6 +1401,17 @@ function buildSupportWorksheetLines(reviewInsights, artifactSummary, currency) {
   return lines;
 }
 
+function buildUnresolvedSummaryLines(flagged) {
+  const rows = Array.isArray(flagged) ? flagged : [];
+  return [
+    `${rows.filter((txn) => txn.__status.flags.includes("NC")).length} transactions still need a real business category.`,
+    `${rows.filter((txn) => txn.__status.flags.includes("UM")).length} categorized expense transactions still need tax-line mapping.`,
+    `${rows.filter((txn) => txn.__status.flags.includes("RS")).length} transactions still need receipt or source support.`,
+    `${rows.filter((txn) => txn.__status.flags.some((flag) => ["ML", "BP", "AL", "HO", "CA"].includes(flag))).length} transactions still need schedule-specific support.`,
+    `${rows.filter((txn) => txn.__status.flags.includes("RV")).length} transactions still need CPA review before filing.`
+  ];
+}
+
 function buildChecklistItems(reviewInsights, currency, reviewDecisionSummary = {}, packageAttribution = {}, isSecure = true) {
   const nonExpenseWithReceipt = Math.max(0, reviewInsights.transactionWithReceiptCount - reviewInsights.receiptLinkedCount);
   const receiptNonExpenseNote = nonExpenseWithReceipt > 0 ? ` ${nonExpenseWithReceipt} linked to non-expense rows.` : "";
@@ -1413,7 +1424,7 @@ function buildChecklistItems(reviewInsights, currency, reviewDecisionSummary = {
     { badge: reviewInsights.phoneAllocationCount > 0 ? "ACTION" : "OK", title: "Phone / Internet allocation", description: `${reviewInsights.phoneAllocationCount} phone/internet transactions totaling ${formatCurrencyForPdf(reviewInsights.phoneAllocationTotal, currency)} require business-use allocation.` },
     { badge: reviewInsights.homeOfficeCount > 0 ? "ACTION" : "OK", title: "Home office support", description: `${reviewInsights.homeOfficeCount} home-office transactions totaling ${formatCurrencyForPdf(reviewInsights.homeOfficeTotal, currency)} need worksheet support and square-foot allocation.` },
     { badge: reviewInsights.capitalAssetCount > 0 ? "ACTION" : "OK", title: "Capital asset review", description: `${reviewInsights.capitalAssetCount} capital asset transactions totaling ${formatCurrencyForPdf(reviewInsights.capitalAssetTotal, currency)} need depreciation or CCA review support.` },
-    { badge: reviewInsights.excludedCount > 0 ? "OK" : "REVIEW", title: "Excluded non-business items", description: `${reviewInsights.excludedCount} non-business items were excluded from P&L and listed in a separate schedule.` },
+    { badge: "OK", title: "Excluded non-business items", description: `${reviewInsights.excludedCount} non-business items were excluded from P&L and listed in a separate schedule.` },
     { badge: Number(reviewDecisionSummary.openHard || 0) > 0 ? "ACTION" : Number(reviewDecisionSummary.openWarning || 0) > 0 ? "REVIEW" : "OK", title: "Reviewer decisions", description: `${Number(reviewDecisionSummary.openHard || 0)} hard reviewer issues and ${Number(reviewDecisionSummary.openWarning || 0)} warning reviewer issues remain open. ${Number(reviewDecisionSummary.waived || 0)} issues were waived and ${Number(reviewDecisionSummary.resolved || 0)} were resolved before export.` },
     { badge: packageAttribution.certifiedByName ? "OK" : "REVIEW", title: "Package attribution", description: buildPackageAttributionLines(packageAttribution, isSecure).join(". ") || "Package generation and finalization attribution will appear after reviewer actions and finalized export certification are recorded." }
   ];
@@ -1967,14 +1978,9 @@ function buildUnresolvedExceptionPages(transactions, currency, labels, region) {
 
     let y = header.contentStartY - 8;
     if (index === 0) {
-      const summaryLines = [
-        `${flagged.filter((txn) => txn.__status.flags.includes("NC")).length} transactions still need a real business category.`,
-        `${flagged.filter((txn) => txn.__status.flags.includes("RS")).length} transactions still need receipt or source support.`,
-        `${flagged.filter((txn) => txn.__status.flags.some((flag) => ["ML", "BP", "AL", "HO", "CA"].includes(flag))).length} transactions still need schedule-specific support.`,
-        `${flagged.filter((txn) => txn.__status.flags.includes("RV")).length} transactions still need CPA review before filing.`
-      ];
-      canvas.drawCard(40, y, 532, 96, "Open blocker summary", summaryLines, { maxChars: 90 });
-      y -= 114;
+      const summaryLines = buildUnresolvedSummaryLines(flagged);
+      canvas.drawCard(40, y, 532, 108, "Open blocker summary", summaryLines, { maxChars: 90 });
+      y -= 126;
     }
 
     const cols = [
@@ -2903,6 +2909,7 @@ module.exports = {
     buildCpaActionLines,
     buildCleanupPriorityLines,
     buildSupportWorksheetLines,
+    buildUnresolvedSummaryLines,
     buildChecklistItems,
     isWorkpaperReady,
     buildExclusionSummary,

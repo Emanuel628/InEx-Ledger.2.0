@@ -21,6 +21,7 @@ const {
     buildCpaActionLines,
     buildCleanupPriorityLines,
     buildSupportWorksheetLines,
+    buildUnresolvedSummaryLines,
     buildChecklistItems,
     isWorkpaperReady,
     buildCategoryBuckets
@@ -469,6 +470,8 @@ test("buildChecklistItems surfaces tax mapping, home office, and capital asset c
   assert.match(homeOffice.description, /5 home-office transactions totaling \$1,250\.00/i);
   assert.equal(capitalAsset.badge, "ACTION");
   assert.match(capitalAsset.description, /6 capital asset transactions totaling \$4,800\.00/i);
+  const excluded = items.find((item) => item.title === "Excluded non-business items");
+  assert.equal(excluded.badge, "OK");
 });
 
 test("buildSupportWorksheetLines surfaces home office and capital asset support together", () => {
@@ -486,4 +489,18 @@ test("buildSupportWorksheetLines surfaces home office and capital asset support 
   assert.ok(lines.some((line) => /Capital assets: 3 totaling \$4,100\.00/.test(line)));
   assert.ok(lines.some((line) => /Home-office worksheets: 1 \| Asset support files: 2/.test(line)));
   assert.ok(lines.some((line) => /Worksheet allocation and depreciation \/ CCA support still required\./.test(line)));
+});
+
+test("buildUnresolvedSummaryLines includes unmapped-tax blockers", () => {
+  const lines = buildUnresolvedSummaryLines([
+    { __status: { flags: ["NC"] } },
+    { __status: { flags: ["UM"] } },
+    { __status: { flags: ["UM", "RS"] } },
+    { __status: { flags: ["HO"] } },
+    { __status: { flags: ["RV"] } }
+  ]);
+
+  assert.ok(lines.some((line) => /1 transactions still need a real business category\./.test(line)));
+  assert.ok(lines.some((line) => /2 categorized expense transactions still need tax-line mapping\./.test(line)));
+  assert.ok(lines.some((line) => /1 transactions still need CPA review before filing\./.test(line)));
 });
