@@ -2030,46 +2030,58 @@ function buildUnresolvedExceptionPages(transactions, currency, labels, region) {
   });
 }
 
-function buildEvidenceSchedulePages(transactions, receipts, supportArtifactMap, labels, region) {
+function buildEvidenceRows(transactions, receipts, supportArtifactMap) {
   const supportMap = supportArtifactMap instanceof Map ? supportArtifactMap : new Map();
   const txMap = new Map((transactions || []).map((txn) => [txn.id, txn]));
   const evidenceRows = [];
+  const seen = new Set();
 
-  if (supportMap.size > 0) {
-    for (const [transactionId, artifacts] of supportMap.entries()) {
-      const txn = txMap.get(transactionId);
-      if (!txn) continue;
-      for (const artifact of artifacts || []) {
-        const reviewStatus = String(artifact?.review_status || artifact?.reviewStatus || "").trim().toLowerCase();
-        const storageStatus = String(artifact?.storage_status || artifact?.storageStatus || "").trim().toLowerCase();
-        if (reviewStatus === "rejected" || storageStatus === "deleted") continue;
-        evidenceRows.push({
-          transactionId,
-          date: normalizePdfDate(txn.date),
-          payee: buildTransactionText(txn) || "(No description)",
-          artifactType: String(artifact?.artifact_type || artifact?.artifactType || "").trim() || "support",
-          artifactName: String(artifact?.filename || artifact?.name || "Support item").trim(),
-          artifactStatus: String(artifact?.review_status || artifact?.reviewStatus || "accepted").trim(),
-          notes: String(artifact?.notes || "").trim()
-        });
-      }
-    }
-  } else {
-    for (const receipt of receipts || []) {
-      const transactionId = receipt?.transaction_id || receipt?.transactionId;
-      const txn = txMap.get(transactionId);
-      if (!txn) continue;
-      evidenceRows.push({
+  const pushRow = (row) => {
+    const key = [row.transactionId, row.artifactType, row.artifactName, row.artifactStatus].join("::");
+    if (seen.has(key)) return;
+    seen.add(key);
+    evidenceRows.push(row);
+  };
+
+  for (const [transactionId, artifacts] of supportMap.entries()) {
+    const txn = txMap.get(transactionId);
+    if (!txn) continue;
+    for (const artifact of artifacts || []) {
+      const reviewStatus = String(artifact?.review_status || artifact?.reviewStatus || "").trim().toLowerCase();
+      const storageStatus = String(artifact?.storage_status || artifact?.storageStatus || "").trim().toLowerCase();
+      if (reviewStatus === "rejected" || storageStatus === "deleted") continue;
+      pushRow({
         transactionId,
         date: normalizePdfDate(txn.date),
         payee: buildTransactionText(txn) || "(No description)",
-        artifactType: "receipt",
-        artifactName: String(receipt?.filename || "Receipt").trim(),
-        artifactStatus: "accepted",
-        notes: ""
+        artifactType: String(artifact?.artifact_type || artifact?.artifactType || "").trim() || "support",
+        artifactName: String(artifact?.filename || artifact?.name || "Support item").trim(),
+        artifactStatus: String(artifact?.review_status || artifact?.reviewStatus || "accepted").trim(),
+        notes: String(artifact?.notes || "").trim()
       });
     }
   }
+
+  for (const receipt of receipts || []) {
+    const transactionId = receipt?.transaction_id || receipt?.transactionId;
+    const txn = txMap.get(transactionId);
+    if (!txn) continue;
+    pushRow({
+      transactionId,
+      date: normalizePdfDate(txn.date),
+      payee: buildTransactionText(txn) || "(No description)",
+      artifactType: "receipt",
+      artifactName: String(receipt?.filename || "Receipt").trim(),
+      artifactStatus: "accepted",
+      notes: ""
+    });
+  }
+
+  return evidenceRows;
+}
+
+function buildEvidenceSchedulePages(transactions, receipts, supportArtifactMap, labels, region) {
+  const evidenceRows = buildEvidenceRows(transactions, receipts, supportArtifactMap);
 
   if (!evidenceRows.length) return [];
 
@@ -2921,6 +2933,7 @@ module.exports = {
     buildSupportWorksheetLines,
     buildUnresolvedSummaryLines,
     buildFinalDisclosureLines,
+    buildEvidenceRows,
     buildChecklistItems,
     isWorkpaperReady,
     buildExclusionSummary,

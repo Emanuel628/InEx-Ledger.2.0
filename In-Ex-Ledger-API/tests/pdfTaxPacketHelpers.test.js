@@ -23,6 +23,7 @@ const {
     buildSupportWorksheetLines,
     buildUnresolvedSummaryLines,
     buildFinalDisclosureLines,
+    buildEvidenceRows,
     buildChecklistItems,
     isWorkpaperReady,
     buildCategoryBuckets
@@ -588,4 +589,25 @@ test("buildFinalDisclosureLines uses the active packet status label", () => {
 
   assert.ok(workpaperLines.some((line) => /CPA Workpaper Ready\. This export is a bookkeeping workpaper, not a filed return\./.test(line)));
   assert.ok(draftLines.some((line) => /Draft - CPA Review Required\. This export is a bookkeeping workpaper, not a filed return\./.test(line)));
+});
+
+test("buildEvidenceRows merges receipts with support artifacts", () => {
+  const rows = buildEvidenceRows(
+    [
+      { id: "t1", date: "2026-01-10", description: "Office Depot" },
+      { id: "t2", date: "2026-01-11", description: "Client lunch" }
+    ],
+    [
+      { transaction_id: "t1", filename: "office-receipt.pdf" }
+    ],
+    new Map([
+      ["t1", [{ artifact_type: "review_note", name: "office-note.txt", review_status: "accepted" }]],
+      ["t2", [{ artifact_type: "receipt", filename: "meal-receipt.jpg", review_status: "accepted" }]]
+    ])
+  );
+
+  assert.equal(rows.length, 3);
+  assert.ok(rows.some((row) => row.transactionId === "t1" && row.artifactType === "review_note"));
+  assert.ok(rows.some((row) => row.transactionId === "t1" && row.artifactType === "receipt" && row.artifactName === "office-receipt.pdf"));
+  assert.ok(rows.some((row) => row.transactionId === "t2" && row.artifactType === "receipt" && row.artifactName === "meal-receipt.jpg"));
 });
