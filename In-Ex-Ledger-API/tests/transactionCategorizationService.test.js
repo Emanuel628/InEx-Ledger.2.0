@@ -33,8 +33,8 @@ test("categorizer learns a stable merchant-to-category mapping from prior busine
     categories: makeCategories("US"),
     region: "US",
     historyRows: [
-      { merchant_name: "OpenAI", description: "OPENAI API", category_name: "Software & Subscriptions" },
-      { merchant_name: "OpenAI", description: "OPENAI CREDITS", category_name: "Software & Subscriptions" }
+      { merchant_name: "OpenAI", description: "OPENAI API", category_name: "Software & Subscriptions", category_kind: "expense" },
+      { merchant_name: "OpenAI", description: "OPENAI CREDITS", category_name: "Software & Subscriptions", category_kind: "expense" }
     ]
   });
 
@@ -46,6 +46,26 @@ test("categorizer learns a stable merchant-to-category mapping from prior busine
 
   assert.equal(result.categoryName, "Software & Subscriptions");
   assert.equal(result.reason, "merchant_history");
+});
+
+test("categorizer ignores low-signal generic history keys and falls back to canonical rules", () => {
+  const categorize = createTransactionCategorizer({
+    categories: makeCategories("US"),
+    region: "US",
+    historyRows: [
+      { merchant_name: "", description: "PAYMENT", category_name: "Software & Subscriptions", category_kind: "expense" },
+      { merchant_name: "", description: "PAYMENT", category_name: "Software & Subscriptions", category_kind: "expense" }
+    ]
+  });
+
+  const result = categorize({
+    type: "expense",
+    merchantName: "Shell",
+    description: "Shell fuel purchase"
+  });
+
+  assert.equal(result.categoryName, "Car & Truck Expenses");
+  assert.equal(result.reason, "canonical_rule");
 });
 
 test("categorizer maps canonical vehicle rules to seeded US and Canada category names", () => {
@@ -83,6 +103,23 @@ test("categorizer uses imported fallback buckets for review-only transfer and ca
   assert.equal(result.categoryName, "Imported Expense");
   assert.equal(result.reason, "review_only_pattern");
   assert.equal(getImportedFallbackCategoryName("expense"), "Imported Expense");
+});
+
+test("categorizer uses provider category hints when descriptions are weak", () => {
+  const categorize = createTransactionCategorizer({
+    categories: makeCategories("US"),
+    region: "US"
+  });
+
+  const result = categorize({
+    type: "expense",
+    description: "ACH DEBIT",
+    merchantName: "",
+    categoryGuess: "INTERNET_SOFTWARE"
+  });
+
+  assert.equal(result.categoryName, "Software & Subscriptions");
+  assert.equal(result.reason, "canonical_rule");
 });
 
 test("resolveCanonicalCategoryTemplate preserves seeded defaults and imported fallbacks", () => {

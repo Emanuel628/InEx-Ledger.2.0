@@ -498,23 +498,52 @@ authedRouter.post("/connections/:id/sync", async (req, res) => {
   for (const raw of modified) {
     if (!raw?.transaction_id) continue;
     try {
+      const existingTxnResult = await pool.query(
+        `SELECT t.account_id, a.currency
+           FROM transactions t
+           LEFT JOIN accounts a ON a.id = t.account_id
+          WHERE t.business_id = $1
+            AND t.external_id = $2
+          LIMIT 1`,
+        [businessId, raw.transaction_id]
+      );
+      const existingTxn = existingTxnResult.rows[0] || null;
+      const canonical = plaidTransactionToCanonical(raw, {
+        accountId: existingTxn?.account_id || null,
+        defaultCurrency: existingTxn?.currency || "USD"
+      });
+      const mappedCategory = canonical
+        ? categorizeImportedTransaction({
+          type: canonical.type,
+          description: canonical.description,
+          merchantName: canonical.merchant_name,
+          categoryGuess: canonical.category_guess
+        })
+        : null;
+      const categoryId = mappedCategory?.categoryName && canonical
+        ? await getOrCreateImportedCategoryId(mappedCategory.categoryName, canonical.type)
+        : null;
       const upd = await pool.query(
-        `UPDATE transactions
+          `UPDATE transactions
             SET amount        = $1,
                 pending       = $2,
                 cleared       = $3,
                 posted_date   = $4,
                 description   = COALESCE($5, description),
-                merchant_name = COALESCE($6, merchant_name)
-          WHERE business_id = $7
-            AND external_id = $8`,
+                merchant_name = COALESCE($6, merchant_name),
+                type          = COALESCE($7, type),
+                category_id   = COALESCE($8, category_id)
+          WHERE business_id = $9
+            AND external_id = $10`,
         [
-          Math.abs(Number(raw.amount) || 0),
-          raw.pending === true,
-          raw.pending !== true,
-          raw.authorized_date && raw.date && raw.date !== raw.authorized_date ? raw.date : (raw.date || null),
-          raw.name || null,
-          raw.merchant_name || null,
+          canonical ? canonical.amount : Math.abs(Number(raw.amount) || 0),
+          canonical ? canonical.pending : raw.pending === true,
+          canonical ? !canonical.pending : raw.pending !== true,
+          canonical ? canonical.posted_date : (raw.authorized_date && raw.date && raw.date !== raw.authorized_date ? raw.date : (raw.date || null)),
+          canonical?.description || raw.name || null,
+          canonical?.merchant_name || raw.merchant_name || null,
+          canonical?.type || null,
+          categoryId,
           businessId,
           raw.transaction_id
         ]

@@ -7,6 +7,20 @@ const IMPORTED_CATEGORY_NAMES = {
   income: "Imported Income",
   expense: "Imported Expense"
 };
+const LOW_SIGNAL_HISTORY_KEYS = new Set([
+  "payment",
+  "deposit",
+  "purchase",
+  "transfer",
+  "withdrawal",
+  "debit",
+  "credit",
+  "online payment",
+  "card payment",
+  "bank transfer",
+  "direct deposit",
+  "thank you"
+]);
 
 const REVIEW_ONLY_PATTERNS = [
   /\bonline payment thank you\b/i,
@@ -219,6 +233,13 @@ function isImportedPlaceholderCategory(name) {
   return /^(imported income|imported expense)$/i.test(String(name || "").trim());
 }
 
+function isLowSignalHistoryKey(key) {
+  const normalized = String(key || "").trim();
+  if (!normalized) return true;
+  if (normalized.length < 5) return true;
+  return LOW_SIGNAL_HISTORY_KEYS.has(normalized);
+}
+
 function buildCategoryLookup(categories = []) {
   const lookup = new Map();
   for (const category of categories) {
@@ -229,11 +250,12 @@ function buildCategoryLookup(categories = []) {
   return lookup;
 }
 
-function recordHistorySignal(targetMap, key, categoryName) {
-  if (!key || !categoryName) return;
-  const bucket = targetMap.get(key) || new Map();
+function recordHistorySignal(targetMap, key, categoryName, kind) {
+  if (!key || !categoryName || !kind) return;
+  const scopedKey = `${kind}::${key}`;
+  const bucket = targetMap.get(scopedKey) || new Map();
   bucket.set(categoryName, (bucket.get(categoryName) || 0) + 1);
-  targetMap.set(key, bucket);
+  targetMap.set(scopedKey, bucket);
 }
 
 function selectHistoryWinner(bucket) {
@@ -251,11 +273,17 @@ function buildHistoryIndex(rows = []) {
   const descriptionHistory = new Map();
 
   for (const row of rows) {
+    const kind = String(row?.category_kind || "").toLowerCase();
     if (!row?.category_name || isImportedPlaceholderCategory(row.category_name)) continue;
+    if (kind !== "income" && kind !== "expense") continue;
     const merchantKey = normalizeMappingText(row.merchant_name);
     const descriptionKey = normalizeMappingText(row.description);
-    recordHistorySignal(merchantHistory, merchantKey, row.category_name);
-    recordHistorySignal(descriptionHistory, descriptionKey, row.category_name);
+    if (!isLowSignalHistoryKey(merchantKey)) {
+      recordHistorySignal(merchantHistory, merchantKey, row.category_name, kind);
+    }
+    if (!isLowSignalHistoryKey(descriptionKey)) {
+      recordHistorySignal(descriptionHistory, descriptionKey, row.category_name, kind);
+    }
   }
 
   return { merchantHistory, descriptionHistory };
@@ -328,12 +356,12 @@ function createTransactionCategorizer({ categories = [], region = "US", historyR
     const haystack = `${rawMerchant} ${rawDescription} ${String(categoryGuess || "")}`.toLowerCase();
     const providerHintText = normalizeMappingText(categoryGuess);
 
-    const learnedMerchantCategory = selectHistoryWinner(merchantHistory.get(merchantKey));
+    const learnedMerchantCategory = selectHistoryWinner(merchantHistory.get(`${kind}::${merchantKey}`));
     if (learnedMerchantCategory && categoryExists(categoryLookup, kind, learnedMerchantCategory)) {
       return { categoryName: learnedMerchantCategory, reason: "merchant_history", confidence: "high" };
     }
 
-    const learnedDescriptionCategory = selectHistoryWinner(descriptionHistory.get(descriptionKey));
+    const learnedDescriptionCategory = selectHistoryWinner(descriptionHistory.get(`${kind}::${descriptionKey}`));
     if (learnedDescriptionCategory && categoryExists(categoryLookup, kind, learnedDescriptionCategory)) {
       return { categoryName: learnedDescriptionCategory, reason: "description_history", confidence: "medium" };
     }
@@ -390,6 +418,7 @@ async function buildBusinessTransactionCategorizer(pool, { businessId, region = 
     pool.query(
       `SELECT t.category_id,
               c.name AS category_name,
+              c.kind AS category_kind,
               t.description,
               t.merchant_name
          FROM transactions t

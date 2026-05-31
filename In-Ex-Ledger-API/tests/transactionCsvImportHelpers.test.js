@@ -132,6 +132,27 @@ test("parseImportDateRange rejects when start_date is after end_date", () => {
   assert.match(out.error || "", /on or before/);
 });
 
+test("detectColumns and extractRowData preserve merchant and provider hint fields for mapping", () => {
+  const routeModule = loadTransactionRouteModule();
+  const { detectColumns, extractRowData } = routeModule.__private;
+  const headers = ["Date", "Merchant_Name", "Description", "Personal_Finance_Category", "Amount"];
+  const cols = detectColumns(headers);
+  const row = {
+    date: "2026-05-01",
+    merchant_name: "OpenAI",
+    description: "ACH DEBIT",
+    personal_finance_category: "INTERNET_SOFTWARE",
+    amount: "-42.50"
+  };
+
+  const parsed = extractRowData(row, cols);
+
+  assert.equal(parsed.type, "expense");
+  assert.equal(parsed.amount, 42.5);
+  assert.equal(parsed.merchantName, "OpenAI");
+  assert.equal(parsed.categoryGuess, "INTERNET_SOFTWARE");
+});
+
 test("resolveCsvCategoryTemplate uses seeded tax maps for known US categories", () => {
   const { resolveCsvCategoryTemplate } = loadTransactionRouteModule().__private;
   const template = resolveCsvCategoryTemplate("Office Supplies", "expense", "US");

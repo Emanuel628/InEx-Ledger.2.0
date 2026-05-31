@@ -1615,6 +1615,12 @@ function detectColumns(headers) {
     "payee", "merchant", "memo", "details", "narrative",
     "trans__description", "particulars", "beneficiary", "name"
   );
+  const merchantCol = find(
+    "merchant_name", "merchant", "payee", "beneficiary", "counterparty", "vendor", "name"
+  );
+  const categoryCol = find(
+    "category", "category_guess", "plaid_category", "personal_finance_category", "type_description"
+  );
   const amountCol = find(
     "amount", "transaction_amount", "net_amount", "debit_credit", "cad_", "usd_"
   );
@@ -1627,7 +1633,7 @@ function detectColumns(headers) {
     "deposits_credits", "deposits__cr_", "amount_credit", "credit_amount", "money_in"
   );
 
-  return { dateCol, descCol, amountCol, withdrawalCol, depositCol };
+  return { dateCol, descCol, merchantCol, categoryCol, amountCol, withdrawalCol, depositCol };
 }
 
 function extractRowData(row, cols) {
@@ -1662,10 +1668,25 @@ function extractRowData(row, cols) {
     row["details"] ||
     ""
   ).trim().slice(0, 500);
+  const merchantName = String(
+    row[cols.merchantCol] ||
+    row["merchant_name"] ||
+    row["merchant"] ||
+    row["payee"] ||
+    row["beneficiary"] ||
+    ""
+  ).trim().slice(0, 200);
+  const categoryGuess = String(
+    row[cols.categoryCol] ||
+    row["category_guess"] ||
+    row["category"] ||
+    row["personal_finance_category"] ||
+    ""
+  ).trim().slice(0, 120);
 
   const date = normalizeDate(row[cols.dateCol]);
 
-  return { amount, type, description, date };
+  return { amount, type, description, merchantName, categoryGuess, date };
 }
 
 const IMPORT_ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -2204,7 +2225,7 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
 
     for (let i = 0; i < rowsToProcess.length; i++) {
       const row = rowsToProcess[i];
-      const { amount, type, description, date } = extractRowData(row, cols);
+      const { amount, type, description, merchantName, categoryGuess, date } = extractRowData(row, cols);
 
       if (!date || !amount || !type || amount <= 0 || !description) {
         results.skipped++;
@@ -2246,7 +2267,9 @@ router.post("/import/csv", csvUpload.single("file"), async (req, res) => {
 
       const detectedCategory = categorizeImportedTransaction({
         type,
-        description
+        description,
+        merchantName,
+        categoryGuess
       });
       const categoryId = await getOrCreateCsvCategory(
         client,
