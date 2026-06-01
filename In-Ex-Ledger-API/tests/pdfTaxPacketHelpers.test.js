@@ -346,6 +346,48 @@ test("deriveBusinessAmounts splits meals and removes tracked GST/HST in Canada",
   assert.equal(amounts.nonDeductibleAmount, 50);
 });
 
+test("deriveBusinessAmounts applies the stored personal-use split to phone/internet", () => {
+  const amounts = deriveBusinessAmounts(
+    { type: "expense", amount: 100, personal_use_pct: 40, description: "Cell phone" },
+    { name: "Phone & Internet", tax_map_us: "Line 25 - Utilities" },
+    { region: "US" }
+  );
+  assert.equal(amounts.grossAmount, 100);
+  assert.equal(amounts.netAmount, 100);
+  assert.equal(amounts.deductibleAmount, 60);
+  assert.equal(amounts.nonDeductibleAmount, 40);
+});
+
+test("deriveBusinessAmounts keeps the full amount deductible when no personal use is recorded", () => {
+  const amounts = deriveBusinessAmounts(
+    { type: "expense", amount: 100, personal_use_pct: 0, description: "Cell phone" },
+    { name: "Phone & Internet", tax_map_us: "Line 25 - Utilities" },
+    { region: "US" }
+  );
+  assert.equal(amounts.deductibleAmount, 100);
+  assert.equal(amounts.nonDeductibleAmount, 0);
+});
+
+test("deriveBusinessAmounts treats US entertainment as fully non-deductible", () => {
+  const amounts = deriveBusinessAmounts(
+    { type: "expense", amount: 200, description: "Concert tickets" },
+    { name: "Entertainment", tax_map_us: "" },
+    { region: "US" }
+  );
+  assert.equal(amounts.deductibleAmount, 0);
+  assert.equal(amounts.nonDeductibleAmount, 200);
+});
+
+test("deriveBusinessAmounts holds capital assets out of the current-year deduction", () => {
+  const amounts = deriveBusinessAmounts(
+    { type: "expense", amount: 1500, description: "Laptop" },
+    { name: "Equipment (Capital Asset)", tax_map_us: "" },
+    { region: "US" }
+  );
+  assert.equal(amounts.deductibleAmount, 0);
+  assert.equal(amounts.nonDeductibleAmount, 1500);
+});
+
 test("resolveBusinessCurrency and normalizeRegionCode keep jurisdiction stable", () => {
   assert.equal(resolveBusinessCurrency("CA", "USD"), "USD");
   assert.equal(resolveBusinessCurrency("US", ""), "USD");
