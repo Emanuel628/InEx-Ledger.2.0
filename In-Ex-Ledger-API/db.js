@@ -130,6 +130,13 @@ const MIGRATION_CHECKSUM_COMPATIBILITY = {
 const HISTORICAL_MIGRATION_FILENAME_ALIASES = {
   "026_fix_exports_schema.sql": new Set([
     "20260510_fix_exports_schema.sql"
+  ]),
+
+  // Renamed so it sorts after 20260531_create_transaction_mapping_rules.sql:
+  // the metadata migration adds a FK to transaction_mapping_rules, so the table
+  // must exist first. The content is unchanged; only the filename moved.
+  "20260601_add_transaction_mapping_metadata.sql": new Set([
+    "20260531_add_transaction_mapping_metadata.sql"
   ])
 };
 

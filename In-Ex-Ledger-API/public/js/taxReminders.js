@@ -18,7 +18,6 @@
   const DISMISS_KEY = "inex_tax_reminder_dismissed";
   const LEAD_DAYS   = 21; // show banner this many days before deadline
   const DAY_MS = 24 * 60 * 60 * 1000;
-  const ESTIMATE_UNAVAILABLE_PATTERN = /not shown|switch to one business/i;
   const DISMISS_SYMBOL = "×";
 
   function getRegion() {
@@ -94,15 +93,6 @@
     return null;
   }
 
-  function getEstimatedAmount() {
-    const taxEstimate = document.getElementById("taxOwed");
-    if (!taxEstimate) return "";
-    const value = String(taxEstimate.textContent || "").trim();
-    if (!value) return "";
-    if (ESTIMATE_UNAVAILABLE_PATTERN.test(value)) return "";
-    return value;
-  }
-
   function resolveBannerHost() {
     const existing = document.querySelector("[data-page-alerts]");
     if (existing) return existing;
@@ -136,7 +126,6 @@
 
     const dateStr = upcoming.deadline.toLocaleDateString("en-US", { month: "long", day: "numeric" });
     const daysMsg = upcoming.diffDays === 0 ? "today" : `in ${upcoming.diffDays} day${upcoming.diffDays === 1 ? "" : "s"}`;
-    const estimatedAmount = getEstimatedAmount();
 
     let payLink, payText;
     if (region === "CA") {
@@ -157,10 +146,6 @@
     title.textContent = `${upcoming.quarter} payment is due ${dateStr}`;
     text.appendChild(title);
     text.appendChild(document.createTextNode(` — ${daysMsg}.`));
-
-    if (estimatedAmount) {
-      text.appendChild(document.createTextNode(` Current draft estimate: ${estimatedAmount}.`));
-    }
 
     text.appendChild(document.createTextNode(" "));
     const link = document.createElement("a");
