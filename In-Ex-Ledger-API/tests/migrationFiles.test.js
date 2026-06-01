@@ -100,6 +100,32 @@ test("historical exports migration filename alias resolves to the canonical file
   );
 });
 
+test("transaction mapping metadata migration sorts after the table it references", () => {
+  const files = fs
+    .readdirSync(migrationsDir)
+    .filter((file) => file.endsWith(".sql"))
+    .sort();
+
+  const createIndex = files.indexOf("20260531_create_transaction_mapping_rules.sql");
+  const metadataIndex = files.indexOf("20260601_add_transaction_mapping_metadata.sql");
+
+  assert.ok(createIndex !== -1, "expected the create-rules migration to exist");
+  assert.ok(metadataIndex !== -1, "expected the metadata migration to exist");
+  // The metadata migration adds a FK to transaction_mapping_rules, so the table
+  // must be created first in apply order (fresh databases run in filename sort).
+  assert.ok(
+    createIndex < metadataIndex,
+    "transaction_mapping_rules must be created before the metadata FK migration"
+  );
+});
+
+test("renamed transaction mapping metadata migration resolves from its historical filename", () => {
+  assert.equal(
+    getCanonicalMigrationFilename("20260531_add_transaction_mapping_metadata.sql"),
+    "20260601_add_transaction_mapping_metadata.sql"
+  );
+});
+
 test("required-column helper only passes when every expected column exists", () => {
   assert.equal(
     hasRequiredColumns(
