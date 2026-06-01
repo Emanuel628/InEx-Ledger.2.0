@@ -30,6 +30,9 @@ function buildDataset() {
       { id: "imported_expense", name: "Imported Expense", kind: "expense", tax_map_us: "", tax_map_ca: "" }
     ],
     receipts: [{ id: "r1", transaction_id: "fuel1", filename: "fuel receipt.pdf" }],
+    supportArtifactMap: new Map([
+      ["fuel1", [{ artifact_type: "mileage_log", review_status: "accepted" }]]
+    ]),
     mileage: [],
     vehicleCosts: [],
     business: { id: "biz1", name: "Jose Consulting", region: "US", province: "" },
@@ -87,6 +90,12 @@ test("full CPA CSV includes authoritative workpaper columns and no Tax ID", () =
   assert.doesNotMatch(csv, /Fri Apr/);
   assert.doesNotMatch(csv, /insurance_other_than_health/);
   assert.doesNotMatch(csv, /Tax ID/i);
+});
+
+test("full CPA CSV inventories support artifacts beyond receipts", () => {
+  const csv = buildFullCpaCsv(buildDataset()).toString("utf8");
+  assert.match(csv, /Support Artifacts,Support Artifact Count/);
+  assert.match(csv, /mileage_log/);
 });
 
 test("excluded items CSV contains excluded reason codes from dataset parity logic", () => {

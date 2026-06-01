@@ -130,6 +130,25 @@ function listReceiptFilenames(receiptsByTxId, txnId) {
   return (receiptsByTxId.get(txnId) || []).map((receipt) => String(receipt?.filename || "").trim()).filter(Boolean);
 }
 
+// Summarize the support artifacts attached to a transaction so exports can
+// show evidence beyond receipts (mileage logs, allocation worksheets, etc.).
+// Mirrors the status engine's filter — rejected or deleted artifacts are not
+// counted — so the CSV inventory agrees with the cleared review flags.
+function summarizeRowSupportArtifacts(enrichedTxn) {
+  const artifacts = Array.isArray(enrichedTxn?.__supportArtifacts) ? enrichedTxn.__supportArtifacts : [];
+  const present = artifacts.filter((artifact) => {
+    const reviewStatus = String(artifact?.review_status || artifact?.reviewStatus || "pending").trim().toLowerCase();
+    const storageStatus = String(artifact?.storage_status || artifact?.storageStatus || "present").trim().toLowerCase();
+    return reviewStatus !== "rejected" && storageStatus !== "deleted";
+  });
+  const types = Array.from(new Set(
+    present
+      .map((artifact) => String(artifact?.artifact_type || artifact?.artifactType || "").trim().toLowerCase())
+      .filter(Boolean)
+  )).sort();
+  return { types, count: present.length };
+}
+
 function buildReceiptMap(receipts) {
   const byTxId = new Map();
   for (const receipt of receipts || []) {
@@ -286,6 +305,7 @@ function buildNormalizedRow(enrichedTxn, context) {
   const receipts = listReceiptFilenames(receiptsByTxId, enrichedTxn.id);
   const receiptCount = receipts.length;
   const receiptAttached = receiptCount > 0;
+  const supportArtifacts = summarizeRowSupportArtifacts(enrichedTxn);
   const businessName = String(
     business?.name ||
     business?.businessName ||
@@ -336,6 +356,8 @@ function buildNormalizedRow(enrichedTxn, context) {
     receiptAttached,
     receiptCount,
     receiptFilenames: receipts,
+    supportArtifactTypes: supportArtifacts.types,
+    supportArtifactCount: supportArtifacts.count,
     needsCategory: !!status.needsCategory,
     needsReceipt: !!status.needsReceipt,
     needsBusinessPurpose: !!status.needsBusinessPurpose,
