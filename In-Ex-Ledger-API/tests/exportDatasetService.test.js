@@ -168,6 +168,27 @@ test("support artifacts clear matching review flags and receipt gaps", () => {
   assert.ok(!capitalAsset.reviewFlags.includes("CA"));
   assert.ok(!capitalAsset.reviewFlags.includes("FC"));
   assert.ok(dataset.totals.missingReceiptCount < buildNormalizedExportDataset(buildFixture()).totals.missingReceiptCount);
+
+  // The same support that clears the flags is now visible on the row, so a CPA
+  // can see the evidence inventory directly instead of inferring it.
+  assert.deepEqual(fuel.supportArtifactTypes, ["mileage_log", "receipt"]);
+  assert.equal(fuel.supportArtifactCount, 2);
+  assert.deepEqual(phone.supportArtifactTypes, ["allocation_worksheet"]);
+  assert.equal(phone.supportArtifactCount, 1);
+});
+
+test("rejected or deleted support artifacts are left out of the export inventory", () => {
+  const supportArtifactMap = new Map([
+    ["fuel1", [
+      { artifact_type: "mileage_log", review_status: "accepted" },
+      { artifact_type: "allocation_worksheet", review_status: "rejected" },
+      { artifact_type: "home_office_worksheet", review_status: "accepted", storage_status: "deleted" }
+    ]]
+  ]);
+  const dataset = buildNormalizedExportDataset(buildFixture({ supportArtifactMap }));
+  const fuel = dataset.includedRows.find((row) => row.id === "fuel1");
+  assert.deepEqual(fuel.supportArtifactTypes, ["mileage_log"]);
+  assert.equal(fuel.supportArtifactCount, 1);
 });
 
 test("resolved reviewer issues suppress open blockers in the normalized dataset", () => {
