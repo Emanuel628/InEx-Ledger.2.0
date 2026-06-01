@@ -118,12 +118,14 @@
             <p data-i18n="receipts_uploaded_blurb">Filter what is linked, what still needs attention, and clean up your receipt trail before export.</p>
           </div>
           <div class="receipts-toolbar">
-            <div class="receipts-filter-group" id="receiptsFilterGroup" role="tablist" aria-label="Receipt filters">
-              <button type="button" class="receipts-filter-chip is-active" data-filter="all" data-i18n="receipts_filter_all">All</button>
-              <button type="button" class="receipts-filter-chip" data-filter="unlinked" data-i18n="receipts_filter_unlinked">Unlinked</button>
-              <button type="button" class="receipts-filter-chip" data-filter="linked" data-i18n="receipts_filter_linked">Linked</button>
-              <button type="button" class="receipts-filter-chip" data-filter="review" data-i18n="receipts_filter_review">Needs review</button>
-              <button type="button" class="receipts-filter-chip" data-filter="recent" data-i18n="receipts_filter_recent">Uploaded recently</button>
+            <div class="receipts-filter-group" id="receiptsFilterGroup">
+              <select id="receiptsFilterSelect" class="receipt-link-select" aria-label="Filter receipts">
+                <option value="all" data-i18n="receipts_filter_all">All</option>
+                <option value="unlinked" data-i18n="receipts_filter_unlinked">Unlinked</option>
+                <option value="linked" data-i18n="receipts_filter_linked">Linked</option>
+                <option value="review" data-i18n="receipts_filter_review">Needs review</option>
+                <option value="recent" data-i18n="receipts_filter_recent">Uploaded recently</option>
+              </select>
             </div>
             <button type="button" class="receipt-refresh-btn" id="receiptRefreshButton" data-i18n="common_refresh">Refresh</button>
           </div>

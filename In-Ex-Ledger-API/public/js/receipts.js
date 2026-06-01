@@ -40,11 +40,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function wireReceiptFilters() {
-  document.querySelectorAll("[data-filter]").forEach((button) => {
-    button.addEventListener("click", () => {
-      applyReceiptFilter(button.getAttribute("data-filter") || "all");
+  const filterSelect = document.getElementById("receiptsFilterSelect");
+  if (filterSelect) {
+    filterSelect.addEventListener("change", () => {
+      applyReceiptFilter(filterSelect.value || "all");
     });
-  });
+  }
   document.querySelectorAll("[data-receipt-summary-filter]").forEach((button) => {
     button.addEventListener("click", () => {
       applyReceiptFilter(button.getAttribute("data-receipt-summary-filter") || "all");
@@ -783,11 +784,10 @@ function updateReceiptFocus(receipts) {
 }
 
 function updateReceiptFilterUi(filteredCount, totalCount) {
-  document.querySelectorAll("[data-filter]").forEach((button) => {
-    const isActive = (button.getAttribute("data-filter") || "all") === currentReceiptFilter;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-selected", isActive ? "true" : "false");
-  });
+  const filterSelect = document.getElementById("receiptsFilterSelect");
+  if (filterSelect && filterSelect.value !== currentReceiptFilter) {
+    filterSelect.value = currentReceiptFilter;
+  }
   document.querySelectorAll("[data-receipt-summary-filter]").forEach((button) => {
     const isActive = (button.getAttribute("data-receipt-summary-filter") || "all") === currentReceiptFilter;
     button.classList.toggle("is-active", isActive);
