@@ -18,7 +18,6 @@
   const DISMISS_KEY = "inex_tax_reminder_dismissed";
   const LEAD_DAYS   = 21; // show banner this many days before deadline
   const DAY_MS = 24 * 60 * 60 * 1000;
-  const ESTIMATE_UNAVAILABLE_PATTERN = /not shown|switch to one business/i;
   const DISMISS_SYMBOL = "×";
 
   function getRegion() {
@@ -32,7 +31,6 @@
   }
 
   const DISMISS_TTL_MS = 365 * DAY_MS;
-  let estimateObserver = null;
 
   function getDismissed() {
     try {
@@ -95,49 +93,6 @@
     return null;
   }
 
-  function getEstimatedAmount() {
-    const taxEstimate = document.getElementById("taxOwed");
-    if (!taxEstimate) return "";
-    return cleanEstimate(taxEstimate.textContent);
-  }
-
-  // Strip placeholder / unavailable values so the banner never echoes the
-  // "$0.00" the page shows before transactions finish loading.
-  function cleanEstimate(value) {
-    const text = String(value || "").trim();
-    if (!text) return "";
-    if (ESTIMATE_UNAVAILABLE_PATTERN.test(text)) return "";
-    return text;
-  }
-
-  // A draft estimate is only worth showing once a real, non-zero figure has
-  // been computed. "$0.00" is the static placeholder (or a trivial value), so
-  // we hold the sentence back until the live estimate lands.
-  function estimateIsMeaningful(value) {
-    const text = cleanEstimate(value);
-    if (!text) return false;
-    const numeric = Number(text.replace(/[^0-9.-]/g, ""));
-    return Number.isFinite(numeric) && numeric !== 0;
-  }
-
-  function applyEstimate(node) {
-    if (!node) return;
-    const amount = getEstimatedAmount();
-    node.textContent = estimateIsMeaningful(amount)
-      ? ` Current draft estimate: ${amount}.`
-      : "";
-  }
-
-  // The page computes the estimate asynchronously after transactions load, so
-  // watch #taxOwed and refresh the banner figure when it changes.
-  function observeEstimate(callback) {
-    const target = document.getElementById("taxOwed");
-    if (!target || typeof MutationObserver === "undefined") return;
-    if (estimateObserver) estimateObserver.disconnect();
-    estimateObserver = new MutationObserver(() => callback());
-    estimateObserver.observe(target, { childList: true, characterData: true, subtree: true });
-  }
-
   function resolveBannerHost() {
     const existing = document.querySelector("[data-page-alerts]");
     if (existing) return existing;
@@ -192,11 +147,6 @@
     text.appendChild(title);
     text.appendChild(document.createTextNode(` — ${daysMsg}.`));
 
-    const estimateNode = document.createElement("span");
-    estimateNode.className = "tax-reminder-estimate";
-    applyEstimate(estimateNode);
-    text.appendChild(estimateNode);
-
     text.appendChild(document.createTextNode(" "));
     const link = document.createElement("a");
     link.href = payLink;
@@ -218,7 +168,6 @@
     banner.appendChild(dismissButton);
 
     container.insertBefore(banner, container.firstChild);
-    observeEstimate(() => applyEstimate(estimateNode));
   }
 
   function initTaxReminder() {
@@ -226,10 +175,6 @@
     const deadlines = region === "CA" ? CA_DEADLINES : US_DEADLINES;
     const upcoming = nextDeadline(deadlines);
     if (upcoming) renderBanner(upcoming, region);
-  }
-
-  if (typeof window !== "undefined") {
-    window.inexTaxReminder = { cleanEstimate, estimateIsMeaningful };
   }
 
   if (document.readyState === "loading") {
