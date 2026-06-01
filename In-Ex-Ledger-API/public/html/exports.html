@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260601b" />
-  <link rel="stylesheet" href="/css/pages/exports.css?v=20260526a" />
+  <link rel="stylesheet" href="/css/pages/exports.css?v=20260601c" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -246,26 +246,38 @@
         </section>
       </form>
 
-      <section class="history-card export-preflight-card">
+      <section class="history-card export-preflight-card is-collapsible is-collapsed" id="exportPreflightCard">
         <div class="history-card-head export-preflight-head">
           <div>
             <h2 data-i18n="exports_preflight_title">Finalization review</h2>
             <p data-i18n="exports_preflight_subtitle">Check blockers and reviewer warnings before exporting a finalized CPA package.</p>
           </div>
-          <button type="button" id="exportPreflightRefreshBtn" class="history-download export-preflight-refresh" data-i18n="common_refresh">Refresh</button>
+          <div class="exports-section-actions">
+            <button type="button" class="exports-section-toggle" data-collapse-toggle aria-expanded="false" aria-controls="exportPreflightBody">
+              <span class="exports-section-toggle-label">Open</span>
+              <span class="exports-section-toggle-icon" aria-hidden="true">+</span>
+            </button>
+            <button type="button" id="exportPreflightRefreshBtn" class="history-download export-preflight-refresh" data-i18n="common_refresh">Refresh</button>
+          </div>
         </div>
-        <div id="exportPreflightState" class="export-preflight-state">
-          <div class="history-empty" data-i18n="exports_preflight_empty">Choose a valid date range to load the finalization review.</div>
+        <div id="exportPreflightBody" class="exports-collapsible-body" hidden>
+          <div id="exportPreflightState" class="export-preflight-state">
+            <div class="history-empty" data-i18n="exports_preflight_empty">Choose a valid date range to load the finalization review.</div>
+          </div>
         </div>
       </section>
 
-      <section class="history-card export-review-card" id="exportReviewQueueSection">
+      <section class="history-card export-review-card is-collapsible is-collapsed" id="exportReviewQueueSection">
         <div class="history-card-head export-review-head">
           <div>
             <h2>Review queue</h2>
             <p>Use the same export window to clear the transactions that still block a clean handoff.</p>
           </div>
           <div class="export-review-controls">
+            <button type="button" class="exports-section-toggle" data-collapse-toggle aria-expanded="false" aria-controls="exportReviewBody">
+              <span class="exports-section-toggle-label">Open</span>
+              <span class="exports-section-toggle-icon" aria-hidden="true">+</span>
+            </button>
             <label for="exportReviewFilter" class="export-review-filter-label">Filter</label>
             <select id="exportReviewFilter" class="export-review-filter">
               <option value="all">All open items</option>
@@ -274,26 +286,34 @@
             </select>
           </div>
         </div>
-        <div id="exportReviewState" class="export-review-state">
-          <div class="history-empty">Choose a valid date range to load the review queue.</div>
+        <div id="exportReviewBody" class="exports-collapsible-body" hidden>
+          <div id="exportReviewState" class="export-review-state">
+            <div class="history-empty">Choose a valid date range to load the review queue.</div>
+          </div>
         </div>
       </section>
 
-      <section class="history-card">
+      <section class="history-card is-collapsible is-collapsed" id="exportHistorySection">
         <div class="history-card-head">
           <div>
             <h2 data-i18n="exports_history_title">Export history</h2>
             <p data-i18n="exports_history_subtitle">Your last 5 generated exports</p>
           </div>
+          <button type="button" class="exports-section-toggle" data-collapse-toggle aria-expanded="false" aria-controls="exportHistoryBody">
+            <span class="exports-section-toggle-label">Open</span>
+            <span class="exports-section-toggle-icon" aria-hidden="true">+</span>
+          </button>
         </div>
-        <div class="history-columns" aria-hidden="true">
-          <span data-i18n="exports_history_file_name">File name</span>
-          <span data-i18n="exports_summary_period">Period</span>
-          <span data-i18n="exports_history_generated">Generated</span>
-          <span data-i18n="exports_history_size">Size</span>
-          <span></span>
+        <div id="exportHistoryBody" class="exports-collapsible-body" hidden>
+          <div class="history-columns" aria-hidden="true">
+            <span data-i18n="exports_history_file_name">File name</span>
+            <span data-i18n="exports_summary_period">Period</span>
+            <span data-i18n="exports_history_generated">Generated</span>
+            <span data-i18n="exports_history_size">Size</span>
+            <span></span>
+          </div>
+          <div id="exportHistoryRows" class="history-rows"></div>
         </div>
-        <div id="exportHistoryRows" class="history-rows"></div>
       </section>
     </div>
   </main>
@@ -314,7 +334,7 @@
   <script src="../js/jwe-utils.js?v=20260502e"></script>
   <script src="../js/pdf_labels.js?v=20260502e"></script>
   <script src="../js/pdf_export.js?v=20260517a"></script>
-  <script src="../js/exports.js?v=20260526b"></script>
+  <script src="../js/exports.js?v=20260601c"></script>
 </body>
 </html>
 

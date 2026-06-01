@@ -279,6 +279,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
 
+  initExportCollapsibleSections();
   await hydrateBusinessList();
   initExportScopeSelect();
   await hydrateExportData();
@@ -296,6 +297,66 @@ document.addEventListener("DOMContentLoaded", async () => {
   await refreshExportReviewQueue();
   renderExportHistory();
 });
+
+function setExportSectionCollapsed(section, collapsed) {
+  if (!section) {
+    return;
+  }
+  const body = section.querySelector(".exports-collapsible-body");
+  const toggle = section.querySelector("[data-collapse-toggle]");
+  const label = toggle?.querySelector(".exports-section-toggle-label");
+  const icon = toggle?.querySelector(".exports-section-toggle-icon");
+  const nextCollapsed = Boolean(collapsed);
+
+  section.classList.toggle("is-collapsed", nextCollapsed);
+  if (body) {
+    body.hidden = nextCollapsed;
+  }
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", String(!nextCollapsed));
+  }
+  if (label) {
+    label.textContent = nextCollapsed ? "Open" : "Close";
+  }
+  if (icon) {
+    icon.textContent = nextCollapsed ? "+" : "−";
+  }
+}
+
+function expandExportSectionForHash() {
+  const hash = String(window.location.hash || "").trim();
+  if (!hash) {
+    return;
+  }
+  const target = document.querySelector(hash);
+  if (!target) {
+    return;
+  }
+  const section = target.classList?.contains("is-collapsible")
+    ? target
+    : target.closest(".is-collapsible");
+  if (section) {
+    setExportSectionCollapsed(section, false);
+  }
+}
+
+function initExportCollapsibleSections() {
+  document.querySelectorAll(".is-collapsible").forEach((section) => {
+    const toggle = section.querySelector("[data-collapse-toggle]");
+    const body = section.querySelector(".exports-collapsible-body");
+    if (!toggle || !body) {
+      return;
+    }
+    setExportSectionCollapsed(section, true);
+    toggle.addEventListener("click", () => {
+      const collapsed = section.classList.contains("is-collapsed");
+      setExportSectionCollapsed(section, !collapsed);
+    });
+  });
+
+  expandExportSectionForHash();
+  window.addEventListener("hashchange", expandExportSectionForHash);
+}
 
 function initExportInfoPopover() {
   const button = document.getElementById("exportsInfoBtn");

@@ -468,6 +468,55 @@
   font-size: 14px;
 }
 
+.exports-section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.exports-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(15, 25, 35, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #233448;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.exports-section-toggle:hover,
+.exports-section-toggle:focus-visible {
+  border-color: rgba(37, 99, 168, 0.26);
+  color: var(--accent2);
+  outline: none;
+}
+
+.exports-section-toggle-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(37, 99, 168, 0.08);
+  color: var(--accent2);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.is-collapsible .exports-collapsible-body[hidden] {
+  display: none !important;
+}
+
+.is-collapsible.is-collapsed .history-card-head {
+  margin-bottom: 0;
+}
+
 .export-preflight-card {
   padding-bottom: 20px;
 }
