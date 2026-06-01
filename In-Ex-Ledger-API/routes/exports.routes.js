@@ -26,6 +26,7 @@ const { decrypt: decryptField } = require("../services/encryptionService.js");
 const { buildCsvBundle } = require("../services/csvExportService.js");
 const { buildQuickMethodSchedule } = require("../services/quickMethodService.js");
 const { buildRegularMethodSchedule } = require("../services/regularMethodService.js");
+const { getHomeOfficeWorksheet, buildHomeOfficeWorksheet } = require("../services/homeOfficeService.js");
 const {
   sendExportGeneratedEmail,
   sendExportFailedEmail
@@ -778,6 +779,23 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       }
     }
 
+    // Phase 6: compute the Home Office worksheet when structured inputs exist.
+    let homeOfficeWorksheet = null;
+    try {
+      const homeOfficeRow = await getHomeOfficeWorksheet(businessId, sourceRows.taxYear);
+      if (homeOfficeRow) {
+        homeOfficeWorksheet = buildHomeOfficeWorksheet({
+          worksheet: homeOfficeRow,
+          transactions: sourceRows.transactions,
+          categories,
+          region,
+          taxYear: sourceRows.taxYear
+        });
+      }
+    } catch (hoErr) {
+      logError("Home Office worksheet computation failed (non-fatal)", { err: hoErr.message });
+    }
+
     const sharedOptions = {
       transactions: sourceRows.transactions,
       accounts: sourceRows.accounts,
@@ -815,6 +833,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       capitalAssetTxMap: sourceRows.capitalAssetTxMap,
       quickMethodSchedule,
       regularMethodSchedule,
+      homeOfficeWorksheet,
       packageAttribution: {
         generatedByName: actorDisplayName,
         generatedAt,

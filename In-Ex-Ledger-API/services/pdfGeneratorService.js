@@ -2768,6 +2768,63 @@ function buildRegularMethodWorksheetPage(schedule, currency, labels) {
   return [canvas];
 }
 
+function buildHomeOfficeWorksheetPage(worksheet, currency, labels, region) {
+  if (!worksheet) return [];
+  const isCA = normalizeRegionCode(region) === "CA";
+  const canvas = new PdfCanvas();
+  const header = drawReportHeader(canvas, {
+    title: "Home Office Worksheet",
+    subtitle: isCA ? "T2125 line 9945 - Business-use-of-home" : "Schedule C line 30 - Form 8829",
+    badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }, { text: "HOME OFFICE", variant: "neutral" }]
+  });
+
+  let y = header.contentStartY - 10;
+  if (worksheet.supported === false) {
+    canvas.drawCard(40, y, 532, 120, "Home Office Review Required", [
+      worksheet.unsupportedReason || "The current home-office inputs are not sufficient to compute a deduction.",
+      "Provide the home-office worksheet inputs (area split or method), then re-export before filing."
+    ].filter(Boolean), { maxChars: 92 });
+    return [canvas];
+  }
+
+  if (worksheet.method === "simplified") {
+    canvas.drawCard(40, y, 252, 118, "Simplified Method", [
+      `Office area: ${worksheet.officeAreaSqft} sq ft`,
+      `Area used (capped at ${worksheet.cappedAreaSqft >= 300 ? 300 : worksheet.cappedAreaSqft} sq ft): ${worksheet.cappedAreaSqft} sq ft`,
+      `Rate: $${worksheet.ratePerSqft}/sq ft`,
+      `Months used: ${worksheet.monthsUsed}`,
+      `Home office deduction: ${formatCurrencyForPdf(worksheet.deduction, currency)}`
+    ], { maxChars: 34 });
+  } else {
+    canvas.drawCard(40, y, 252, 118, "Actual Method", [
+      `Total home area: ${worksheet.totalAreaSqft} sq ft`,
+      `Home office area: ${worksheet.officeAreaSqft} sq ft`,
+      `Business-use: ${worksheet.businessUsePct}%`,
+      `Eligible home expenses: ${formatCurrencyForPdf(worksheet.eligibleExpensesTotal, currency)}`,
+      `Home office deduction: ${formatCurrencyForPdf(worksheet.deduction, currency)}`
+    ], { maxChars: 34 });
+  }
+
+  canvas.drawCard(320, y, 252, 118, "Source & Coverage", [
+    `Method: ${worksheet.method}`,
+    `Tax year: ${worksheet.taxYear || "-"}`,
+    `Months used: ${worksheet.monthsUsed}`,
+    `Eligible home-office expense rows: ${worksheet.eligibleExpenseCount || 0}`,
+    isCA ? "Jurisdiction: Canada (T2125)" : "Jurisdiction: United States (Form 8829)"
+  ], { maxChars: 34 });
+
+  y -= 138;
+  canvas.drawCard(40, y, 532, 110, "Home Office - How This Is Computed", [
+    worksheet.method === "simplified"
+      ? "Simplified method: $5/sq ft of office space (capped at 300 sq ft), prorated for months of use. Eligible home expenses are not used."
+      : "Actual method: business-use percent (office area / total home area) applied to eligible home expenses aggregated from the ledger.",
+    "Eligible expenses are taken from home-office-categorized transactions and should be reviewed for completeness.",
+    worksheet.note || ""
+  ].filter(Boolean), { maxChars: 90 });
+
+  return [canvas];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 function buildFooterText(labels, reportId, generatedAt, isSecure, pageNumber, totalPages, legalName, taxId) {
@@ -2851,6 +2908,7 @@ function buildPdfExportDocument(options) {
     capitalAssetTxMap = null,     // Map<transactionId, capital_assets row>
     quickMethodSchedule = null,   // Output of buildQuickMethodSchedule, or null
     regularMethodSchedule = null, // Output of buildRegularMethodSchedule, or null
+    homeOfficeWorksheet = null,   // Output of buildHomeOfficeWorksheet, or null
     reviewStateRows = [],
     packageAttribution = {},
     exportStatus: exportStatusOption = null  // "draft" | "workpaper" | null (null = auto-derive from reviewInsights)
@@ -2934,6 +2992,7 @@ function buildPdfExportDocument(options) {
   const capitalAssetPages = buildCapitalAssetSchedule(effectiveCapitalAssets, effectiveCurrency, labels, normalizedRegion);
   const quickMethodPages = buildQuickMethodRemittancePage(quickMethodSchedule, effectiveCurrency, labels);
   const regularMethodPages = buildRegularMethodWorksheetPage(regularMethodSchedule, effectiveCurrency, labels);
+  const homeOfficePages = buildHomeOfficeWorksheetPage(homeOfficeWorksheet, effectiveCurrency, labels, normalizedRegion);
   const unresolvedExceptionPages = buildUnresolvedExceptionPages(includedTransactions, effectiveCurrency, labels, normalizedRegion);
   const evidenceSchedulePages = buildEvidenceSchedulePages(includedTransactions, receipts, effectiveSupportArtifactMap, labels, normalizedRegion);
   const reviewerDecisionPages = buildReviewerDecisionPages(reviewStateRows, transactions, labels, normalizedRegion, packageAttribution, isSecure);
@@ -2984,7 +3043,8 @@ function buildPdfExportDocument(options) {
     ...vehicleSchedulePages,
     ...capitalAssetPages,
     ...quickMethodPages,
-    ...regularMethodPages
+    ...regularMethodPages,
+    ...homeOfficePages
   ];
 
   const pageCount = canvases.length;

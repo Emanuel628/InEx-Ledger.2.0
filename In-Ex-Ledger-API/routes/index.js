@@ -81,5 +81,6 @@ router.use('/consent', require('./consent.routes.js'));
 router.use('/check-email-verified', require('./check-email-verified.routes.js'));
 router.use('/vehicle-claims', require('./vehicleClaims.routes.js'));
 router.use('/capital-assets', require('./capitalAssets.routes.js'));
+router.use('/home-office-worksheet', require('./homeOffice.routes.js'));
 
 module.exports = router;
