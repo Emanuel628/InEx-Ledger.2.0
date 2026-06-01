@@ -260,7 +260,7 @@ async function sendReviewQueueReminderEmails({ db = pool, resendClient = getRese
       const lang = await getPreferredLanguageForUser(row.user_id);
       const emailContent = buildReviewQueueReminderEmail(lang, {
         count,
-        actionUrl: buildAppUrl("/review")
+        actionUrl: buildAppUrl("/exports?focus=review")
       });
       await sendEmail(resendClient, {
         to: row.email,

@@ -25,6 +25,11 @@ let exportPreflightState = {
   loading: false,
   finalization: null
 };
+let exportReviewState = {
+  loading: false,
+  queue: [],
+  summary: null
+};
 let exportContext = {
   activeBusinessId: "",
   businesses: []
@@ -109,7 +114,7 @@ function showFinalizationError(blockers) {
       return `<li>${escapeHtml(b.message || "Some transactions still need tax-line mapping")} - <a href="categories">Fix in Categories</a></li>`;
     }
     if (["needs_receipt_support", "needs_business_purpose", "needs_allocation", "needs_mileage_log", "needs_home_office_support", "needs_capital_asset_review", "missing_description", "cpa_review_required", "final_confirmation_needed"].includes(b.code)) {
-      return `<li>${escapeHtml(b.message || b.code)} - <a href="review">Fix in Review Queue</a></li>`;
+      return `<li>${escapeHtml(b.message || b.code)} - <a href="${escapeHtml(buildExportReviewUrl({ issue: b.code }))}">Fix in export review</a></li>`;
     }
     if (b.code === "needs_category") {
       const label = n === 1 ? "1 transaction needs a category" : `${n} transactions need a category`;
@@ -172,6 +177,30 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 
+function getExportReviewRouteState() {
+  const params = new URLSearchParams(window.location.search);
+  const issue = String(params.get("issue") || "").trim().toLowerCase();
+  const transactionId = String(params.get("transaction") || "").trim();
+  const focus = String(params.get("focus") || "").trim().toLowerCase() === "review";
+  return {
+    issue: /^[a-z_]+$/.test(issue) ? issue : "",
+    transactionId,
+    focus
+  };
+}
+
+function buildExportReviewUrl({ issue = "", transactionId = "" } = {}) {
+  const params = new URLSearchParams();
+  params.set("focus", "review");
+  if (issue) {
+    params.set("issue", issue);
+  }
+  if (transactionId) {
+    params.set("transaction", transactionId);
+  }
+  return `exports?${params.toString()}#exportReviewQueueSection`;
+}
+
 function resolveExportIssueAction(item) {
   const code = String(item?.code || "").trim().toLowerCase();
   if (!code) {
@@ -181,15 +210,15 @@ function resolveExportIssueAction(item) {
   const actionMap = {
     needs_category: { href: "transactions?review=nc", label: "Open filtered transactions" },
     needs_tax_mapping: { href: "transactions?review=um", label: "Open tax-mapping gaps" },
-    needs_receipt_support: { href: "review?issue=needs_receipt_support", label: "Open missing support" },
-    needs_business_purpose: { href: "review?issue=needs_business_purpose", label: "Open business-purpose review" },
-    needs_allocation: { href: "review?issue=needs_allocation", label: "Open allocation review" },
-    needs_mileage_log: { href: "review?issue=needs_mileage_log", label: "Open mileage review" },
-    needs_home_office_support: { href: "review?issue=needs_home_office_support", label: "Open support review" },
-    needs_capital_asset_review: { href: "review?issue=needs_capital_asset_review", label: "Open capital-asset review" },
-    missing_description: { href: "review?issue=missing_description", label: "Open description review" },
-    cpa_review_required: { href: "review?issue=cpa_review_required", label: "Open CPA review" },
-    final_confirmation_needed: { href: "review?issue=final_confirmation_needed", label: "Open final review" },
+    needs_receipt_support: { href: buildExportReviewUrl({ issue: "needs_receipt_support" }), label: "Open export review" },
+    needs_business_purpose: { href: buildExportReviewUrl({ issue: "needs_business_purpose" }), label: "Open export review" },
+    needs_allocation: { href: buildExportReviewUrl({ issue: "needs_allocation" }), label: "Open export review" },
+    needs_mileage_log: { href: buildExportReviewUrl({ issue: "needs_mileage_log" }), label: "Open export review" },
+    needs_home_office_support: { href: buildExportReviewUrl({ issue: "needs_home_office_support" }), label: "Open export review" },
+    needs_capital_asset_review: { href: buildExportReviewUrl({ issue: "needs_capital_asset_review" }), label: "Open export review" },
+    missing_description: { href: buildExportReviewUrl({ issue: "missing_description" }), label: "Open export review" },
+    cpa_review_required: { href: buildExportReviewUrl({ issue: "cpa_review_required" }), label: "Open export review" },
+    final_confirmation_needed: { href: buildExportReviewUrl({ issue: "final_confirmation_needed" }), label: "Open export review" },
     business_profile_incomplete: { href: "settings?jump=settings-business", label: "Open business profile" },
     finalization_certification_required: { href: "#exportInlineTaxIdCheckbox", label: "Review certification" }
   };
@@ -264,6 +293,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await refreshReceiptsDot();
   updateExportSummary();
   await refreshExportPreflight();
+  await refreshExportReviewQueue();
   renderExportHistory();
 });
 
@@ -371,6 +401,7 @@ function initExportScopeSelect() {
     syncExportScopeUi();
     updateExportSummary();
     await refreshExportPreflight();
+    await refreshExportReviewQueue(true);
     renderExportHistory();
   });
 }
@@ -696,6 +727,7 @@ function setupExportForm() {
   const form = document.getElementById("exportForm");
   const historyRows = document.getElementById("exportHistoryRows");
   const preflightRefreshButton = document.getElementById("exportPreflightRefreshBtn");
+  const reviewFilter = document.getElementById("exportReviewFilter");
   const ytdYear = new Date().getUTCFullYear();
   const defaultPreset = `${ytdYear}-ytd`;
 
@@ -709,11 +741,17 @@ function setupExportForm() {
       }
       updateExportSummary();
       await refreshExportPreflight();
+      await refreshExportReviewQueue(true);
     });
   });
 
   preflightRefreshButton?.addEventListener("click", async () => {
     await refreshExportPreflight(true);
+    await refreshExportReviewQueue(true);
+  });
+
+  reviewFilter?.addEventListener("change", () => {
+    renderExportReviewQueue(exportReviewState.queue, exportReviewState.summary);
   });
 
   form?.addEventListener("submit", async (event) => {
@@ -839,6 +877,7 @@ function initPresetChips() {
       updatePresetChipState(preset);
       updateExportSummary();
       await refreshExportPreflight();
+      await refreshExportReviewQueue(true);
     });
   });
 }
@@ -849,6 +888,118 @@ function renderExportPreflightEmpty(message) {
     return;
   }
   stateNode.innerHTML = `<div class="history-empty">${escapeHtml(message || tx("exports_preflight_empty"))}</div>`;
+}
+
+function getFilteredExportReviewQueue(queue = exportReviewState.queue) {
+  const routeState = getExportReviewRouteState();
+  const filterValue = String(document.getElementById("exportReviewFilter")?.value || "all").trim().toLowerCase();
+  return (queue || []).filter((item) => {
+    const entries = Array.isArray(item?.issueEntries) ? item.issueEntries : [];
+    if (routeState.transactionId && String(item?.id || "") !== routeState.transactionId) {
+      return false;
+    }
+    if (routeState.issue && !entries.some((entry) => String(entry?.issueCode || "").trim().toLowerCase() === routeState.issue)) {
+      return false;
+    }
+    if (filterValue === "hard" && !entries.some((entry) => entry?.severity === "hard")) {
+      return false;
+    }
+    if (filterValue === "warning" && !entries.some((entry) => entry?.severity !== "hard")) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function buildExportReviewActionHref(item) {
+  const actionTarget = item?.actionTarget || {};
+  const href = String(actionTarget.href || "/transactions").trim() || "/transactions";
+  if (href === "/transactions" || href.endsWith("/transactions")) {
+    const params = new URLSearchParams();
+    params.set("highlight", String(item?.id || ""));
+    params.set("open", "review");
+    return `/transactions?${params.toString()}`;
+  }
+  return href;
+}
+
+function renderExportReviewQueue(queue = [], summary = null) {
+  const stateNode = document.getElementById("exportReviewState");
+  if (!stateNode) {
+    return;
+  }
+
+  const filtered = getFilteredExportReviewQueue(queue);
+  const routeState = getExportReviewRouteState();
+  const total = Number(summary?.total || queue.length || 0);
+  const introBits = [];
+  introBits.push(`${total} open item${total === 1 ? "" : "s"} in this export window.`);
+  if (routeState.issue) {
+    introBits.push(`Filtered to ${routeState.issue.replace(/_/g, " ")}.`);
+  }
+  if (routeState.transactionId) {
+    introBits.push("Focused on one transaction.");
+  }
+
+  if (!queue.length) {
+    stateNode.innerHTML = `<div class="history-empty">No review items are open for this date range.</div>`;
+    return;
+  }
+
+  if (!filtered.length) {
+    stateNode.innerHTML = `<div class="history-empty">No review items match this filter.</div>`;
+    return;
+  }
+
+  stateNode.innerHTML = `
+    <div class="export-review-summary">${escapeHtml(introBits.join(" "))}</div>
+    <div class="export-review-list">
+      ${filtered.map((item) => {
+        const issueEntries = Array.isArray(item.issueEntries) ? item.issueEntries : [];
+        const primaryIssue = issueEntries[0] || null;
+        const issueLabel = primaryIssue?.label || "Needs review";
+        const issueSeverity = primaryIssue?.severity === "hard" ? "hard" : "warning";
+        const actionLabel = item?.actionTarget?.label || "Open transaction";
+        const amount = typeof formatMoney === "function"
+          ? formatMoney(item.amount, item.currency)
+          : `${item.currency || "USD"} ${Number(item.amount || 0).toFixed(2)}`;
+        return `
+          <article class="export-review-item export-review-item--${escapeHtml(issueSeverity)}">
+            <div class="export-review-item-main">
+              <div class="export-review-item-head">
+                <strong>${escapeHtml(item.description || "(No description)")}</strong>
+                <span class="export-review-status">${escapeHtml(item.reviewStatus || "Needs review")}</span>
+              </div>
+              <div class="export-review-item-meta">
+                <span>${escapeHtml(String(item.date || ""))}</span>
+                <span>${escapeHtml(amount)}</span>
+                <span>${escapeHtml(item.categoryName || "Uncategorized")}</span>
+              </div>
+              <div class="export-review-item-issue">
+                <span class="export-review-issue-badge export-review-issue-badge--${escapeHtml(issueSeverity)}">${escapeHtml(issueLabel)}</span>
+                <span>${escapeHtml(item.supportSummary || item.supportStatus || "")}</span>
+              </div>
+            </div>
+            <div class="export-review-item-actions">
+              <a class="export-preflight-link" href="${escapeHtml(buildExportReviewActionHref(item))}">${escapeHtml(actionLabel)}</a>
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
+
+  if (routeState.focus || routeState.issue || routeState.transactionId) {
+    document.getElementById("exportReviewQueueSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function renderExportReviewQueueEmpty(message) {
+  const stateNode = document.getElementById("exportReviewState");
+  if (!stateNode) {
+    return;
+  }
+  stateNode.innerHTML = `<div class="history-empty">${escapeHtml(message)}</div>`;
 }
 
 function renderExportPreflight(finalization) {
@@ -1025,6 +1176,49 @@ async function refreshExportPreflight(force = false) {
       refreshButton.disabled = false;
     }
     syncExportActionState();
+  }
+}
+
+async function refreshExportReviewQueue(force = false) {
+  const range = getValidatedExportRange();
+  if (getExportScope() === "all") {
+    exportReviewState = { loading: false, queue: [], summary: null };
+    renderExportReviewQueueEmpty("Review queue is available for the active business only.");
+    return;
+  }
+  if (!range) {
+    exportReviewState = { loading: false, queue: [], summary: null };
+    renderExportReviewQueueEmpty("Choose a valid date range to load the review queue.");
+    return;
+  }
+
+  if (!force && exportReviewState.loading) {
+    return;
+  }
+
+  exportReviewState = { ...exportReviewState, loading: true };
+  renderExportReviewQueueEmpty("Loading review queue...");
+
+  try {
+    const params = new URLSearchParams({
+      startDate: range.startDate,
+      endDate: range.endDate
+    });
+    const response = await apiFetch(`/api/review/queue?${params.toString()}`);
+    if (!response || !response.ok) {
+      throw new Error("review_queue_failed");
+    }
+    const payload = await response.json().catch(() => ({}));
+    exportReviewState = {
+      loading: false,
+      queue: Array.isArray(payload?.queue) ? payload.queue : [],
+      summary: payload?.summary || null
+    };
+    renderExportReviewQueue(exportReviewState.queue, exportReviewState.summary);
+  } catch (error) {
+    console.warn("[Exports] Unable to load export review queue", error);
+    exportReviewState = { loading: false, queue: [], summary: null };
+    renderExportReviewQueueEmpty("Unable to load the review queue right now.");
   }
 }
 

@@ -351,18 +351,18 @@ describe("buildReviewQueueReminderEmail", () => {
   it("returns English aggregated reminder copy", () => {
     const { subject, html, text } = buildReviewQueueReminderEmail("en", {
       count: 18,
-      actionUrl: "https://app.inexledger.com/review"
+      actionUrl: "https://app.inexledger.com/exports?focus=review"
     });
     assert.ok(subject.includes("need review"));
     assert.ok(html.includes("Open review items"));
     assert.ok(html.includes(">18<"));
-    assert.ok(text.includes("/review"));
+    assert.ok(text.includes("/exports"));
   });
 
   it("returns French aggregated reminder copy", () => {
     const { subject, html } = buildReviewQueueReminderEmail("fr", {
       count: 7,
-      actionUrl: "https://app.inexledger.com/review"
+      actionUrl: "https://app.inexledger.com/exports?focus=review"
     });
     assert.ok(subject.includes("doivent encore etre revisees"));
     assert.ok(html.includes("7"));

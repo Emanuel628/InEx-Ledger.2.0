@@ -259,6 +259,26 @@
         </div>
       </section>
 
+      <section class="history-card export-review-card" id="exportReviewQueueSection">
+        <div class="history-card-head export-review-head">
+          <div>
+            <h2>Review queue</h2>
+            <p>Use the same export window to clear the transactions that still block a clean handoff.</p>
+          </div>
+          <div class="export-review-controls">
+            <label for="exportReviewFilter" class="export-review-filter-label">Filter</label>
+            <select id="exportReviewFilter" class="export-review-filter">
+              <option value="all">All open items</option>
+              <option value="hard">Hard blockers</option>
+              <option value="warning">Warnings</option>
+            </select>
+          </div>
+        </div>
+        <div id="exportReviewState" class="export-review-state">
+          <div class="history-empty">Choose a valid date range to load the review queue.</div>
+        </div>
+      </section>
+
       <section class="history-card">
         <div class="history-card-head">
           <div>

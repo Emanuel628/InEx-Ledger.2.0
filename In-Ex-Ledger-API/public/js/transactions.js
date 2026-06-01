@@ -1971,9 +1971,10 @@ async function loadTransactions(options = {}) {
 
 function openReviewSupport(transactionId) {
   const params = new URLSearchParams();
+  params.set("focus", "review");
+  params.set("issue", "needs_receipt_support");
   params.set("transaction", String(transactionId));
-  params.set("modal", "support");
-  window.location.href = `/review?${params.toString()}`;
+  window.location.href = `/exports?${params.toString()}#exportReviewQueueSection`;
 }
 
 async function markTransactionReady(transactionId) {

@@ -1022,7 +1022,134 @@
     min-width: 0 !important;
   }
 
-  .history-card {
-    overflow-x: hidden !important;
+.history-card {
+  overflow-x: hidden !important;
+  }
+}
+
+.export-review-head {
+  gap: 16px;
+}
+
+.export-review-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.export-review-filter-label {
+  font-size: 0.9rem;
+  color: var(--muted-foreground, #64748b);
+}
+
+.export-review-filter {
+  min-width: 180px;
+}
+
+.export-review-state {
+  display: grid;
+  gap: 14px;
+}
+
+.export-review-summary {
+  color: var(--muted-foreground, #64748b);
+  font-size: 0.95rem;
+}
+
+.export-review-list {
+  display: grid;
+  gap: 12px;
+}
+
+.export-review-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.export-review-item--hard {
+  border-color: rgba(190, 24, 93, 0.28);
+  background: rgba(255, 241, 242, 0.88);
+}
+
+.export-review-item--warning {
+  border-color: rgba(217, 119, 6, 0.24);
+  background: rgba(255, 251, 235, 0.92);
+}
+
+.export-review-item-main {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.export-review-item-head,
+.export-review-item-meta,
+.export-review-item-issue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.export-review-item-head strong {
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.export-review-status,
+.export-review-issue-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.export-review-status {
+  background: rgba(226, 232, 240, 0.9);
+  color: #334155;
+}
+
+.export-review-issue-badge--hard {
+  background: rgba(225, 29, 72, 0.12);
+  color: #be123c;
+}
+
+.export-review-issue-badge--warning {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+.export-review-item-meta,
+.export-review-item-issue {
+  color: #475569;
+  font-size: 0.92rem;
+}
+
+.export-review-item-actions {
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 820px) {
+  .export-review-item {
+    grid-template-columns: 1fr;
+  }
+
+  .export-review-controls {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .export-review-filter {
+    width: 100%;
   }
 }

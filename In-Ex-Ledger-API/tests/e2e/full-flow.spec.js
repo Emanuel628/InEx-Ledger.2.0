@@ -306,8 +306,8 @@ test("5 · generate CSV export", async ({ page }) => {
 // 6. Review page
 // ---------------------------------------------------------------------------
 test("6 · review page", async ({ page }) => {
-  await page.goto(`${BASE}/review`);
-  await page.waitForSelector("body");
+  await page.goto(`${BASE}/exports?focus=review#exportReviewQueueSection`);
+  await page.waitForSelector("#exportReviewQueueSection");
   await page.waitForTimeout(4000);
 
   await page.screenshot({ path: "tests/e2e/screenshots/06a-review-viewport.png", fullPage: false });
