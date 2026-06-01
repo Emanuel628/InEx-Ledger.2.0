@@ -5382,7 +5382,29 @@ Object.assign(TRANSLATIONS.en, {
   review_issue_saving: 'Saving...',
   review_issue_submit: 'Save issue',
   review_issue_waive: 'Waive',
-  review_manage_issue: 'Manage issue'
+  review_manage_issue: 'Manage issue',
+  review_why_toggle: 'Why?',
+  review_blocks_export: 'Blocks export',
+  review_why_categorized: 'Why it was categorized this way',
+  review_why_no_category: 'No category assigned yet.',
+  review_why_flagged: 'Why it is flagged',
+  review_why_no_flags: 'No open flags.',
+  review_why_blocks_export: 'Blocks export',
+  review_why_export: 'What is blocking export readiness',
+  review_why_export_blocked: 'Still blocking a finalized export package:',
+  review_why_export_ready: 'Nothing here blocks a finalized export - remaining items are review-only.',
+  review_quick_attach_receipt: 'Attach receipt',
+  review_quick_open_mileage: 'Open mileage',
+  review_quick_open_categories: 'Open categories',
+  review_quick_add_note: 'Add business note',
+  review_quick_set_allocation: 'Set business-use %',
+  review_quick_assign_category: 'Assign category',
+  review_quick_edit_details: 'Edit details',
+  review_quick_add_home_support: 'Add home-office support',
+  review_quick_add_asset_support: 'Add asset support',
+  review_quick_add_support: 'Add support',
+  review_quick_open_review: 'Open review',
+  review_quick_review_exclusion: 'Review exclusions'
 });
 
 Object.assign(TRANSLATIONS.es, {
@@ -5452,7 +5474,29 @@ Object.assign(TRANSLATIONS.es, {
   review_issue_saving: 'Guardando...',
   review_issue_submit: 'Guardar problema',
   review_issue_waive: 'Dispensar',
-  review_manage_issue: 'Gestionar problema'
+  review_manage_issue: 'Gestionar problema',
+  review_why_toggle: 'Por que?',
+  review_blocks_export: 'Bloquea exportacion',
+  review_why_categorized: 'Por que se categorizo asi',
+  review_why_no_category: 'Aun sin categoria asignada.',
+  review_why_flagged: 'Por que esta marcado',
+  review_why_no_flags: 'Sin marcas abiertas.',
+  review_why_blocks_export: 'Bloquea exportacion',
+  review_why_export: 'Que bloquea la exportacion final',
+  review_why_export_blocked: 'Sigue bloqueando un paquete de exportacion final:',
+  review_why_export_ready: 'Nada aqui bloquea una exportacion final; los demas elementos son solo de revision.',
+  review_quick_attach_receipt: 'Adjuntar recibo',
+  review_quick_open_mileage: 'Abrir kilometraje',
+  review_quick_open_categories: 'Abrir categorias',
+  review_quick_add_note: 'Agregar nota de negocio',
+  review_quick_set_allocation: 'Definir % de uso de negocio',
+  review_quick_assign_category: 'Asignar categoria',
+  review_quick_edit_details: 'Editar detalles',
+  review_quick_add_home_support: 'Agregar soporte de oficina en casa',
+  review_quick_add_asset_support: 'Agregar soporte de activo',
+  review_quick_add_support: 'Agregar soporte',
+  review_quick_open_review: 'Abrir revision',
+  review_quick_review_exclusion: 'Revisar exclusiones'
 });
 
 Object.assign(TRANSLATIONS.fr, {
@@ -5522,7 +5566,29 @@ Object.assign(TRANSLATIONS.fr, {
   review_issue_saving: 'Enregistrement...',
   review_issue_submit: 'Enregistrer le probleme',
   review_issue_waive: 'Dispenser',
-  review_manage_issue: 'Gerer le probleme'
+  review_manage_issue: 'Gerer le probleme',
+  review_why_toggle: 'Pourquoi ?',
+  review_blocks_export: 'Bloque l\'export',
+  review_why_categorized: 'Pourquoi cette categorie',
+  review_why_no_category: 'Aucune categorie attribuee pour le moment.',
+  review_why_flagged: 'Pourquoi c\'est signale',
+  review_why_no_flags: 'Aucune alerte ouverte.',
+  review_why_blocks_export: 'Bloque l\'export',
+  review_why_export: 'Ce qui bloque la finalisation de l\'export',
+  review_why_export_blocked: 'Bloque encore un paquet d\'export final :',
+  review_why_export_ready: 'Rien ici ne bloque un export final ; les autres elements sont en revision seulement.',
+  review_quick_attach_receipt: 'Joindre un recu',
+  review_quick_open_mileage: 'Ouvrir le kilometrage',
+  review_quick_open_categories: 'Ouvrir les categories',
+  review_quick_add_note: 'Ajouter une note pro',
+  review_quick_set_allocation: 'Definir le % d\'usage pro',
+  review_quick_assign_category: 'Attribuer une categorie',
+  review_quick_edit_details: 'Modifier les details',
+  review_quick_add_home_support: 'Ajouter un support bureau a domicile',
+  review_quick_add_asset_support: 'Ajouter un support d\'actif',
+  review_quick_add_support: 'Ajouter un support',
+  review_quick_open_review: 'Ouvrir la revision',
+  review_quick_review_exclusion: 'Revoir les exclusions'
 });
 
 

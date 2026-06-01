@@ -215,6 +215,128 @@
   color: #8a5a10;
 }
 
+.review-issue-chip.is-blocking {
+  box-shadow: inset 2px 0 0 0 #a54816;
+  cursor: help;
+}
+
+.review-transaction-reason {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: #66748a;
+  font-style: italic;
+}
+
+.review-blocks-export-tag {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(181, 61, 22, 0.12);
+  color: #a54816;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.review-row-why-btn.is-active {
+  background: #eef2f9;
+  border-color: rgba(15, 23, 42, 0.18);
+}
+
+.review-why-row > td {
+  background: #f8fafc;
+  border-top: none;
+}
+
+.review-why-detail {
+  display: grid;
+  gap: 14px;
+  padding: 4px 0 10px;
+}
+
+.review-why-section h4 {
+  margin: 0 0 4px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #46546b;
+}
+
+.review-why-section p {
+  margin: 0;
+  color: #233046;
+  font-size: 0.92rem;
+}
+
+.review-why-flags {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.review-why-flags li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.review-why-flag {
+  font-weight: 700;
+  color: #233046;
+}
+
+.review-why-flag.is-hard {
+  color: #a54816;
+}
+
+.review-why-flag.is-warning {
+  color: #8a5a10;
+}
+
+.review-why-flag-note {
+  color: #5a6679;
+  font-size: 0.88rem;
+}
+
+.review-why-block-tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(181, 61, 22, 0.12);
+  color: #a54816;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.review-why-export-blocked {
+  color: #a54816;
+  font-weight: 700;
+}
+
+.review-why-export-ready {
+  color: #1f7a4d;
+  font-weight: 700;
+}
+
+.review-focus-why {
+  color: #46546b;
+  font-size: 0.9rem;
+}
+
+.review-focus-reason {
+  color: #66748a;
+  font-size: 0.82rem;
+  font-style: italic;
+}
+
 .review-filter-wrap {
   display: flex;
   align-items: center;
