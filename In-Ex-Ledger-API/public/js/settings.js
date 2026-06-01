@@ -403,7 +403,7 @@ function syncSettingsHeroState() {
   const businessProfile = settingsOverviewState.businessProfile || getBusinessProfile();
   const activeBusinessName = businessProfile?.name || t("settings_overview_business_missing");
   const businessCount = Array.isArray(settingsBusinessesState) ? settingsBusinessesState.length : 0;
-  const businessCountLabel = businessCount === 1 ? "1 business in workspace" : `${businessCount} businesses in workspace`;
+  const businessCountLabel = businessCount === 1 ? "1 business on this account" : `${businessCount} businesses on this account`;
 
   if (activeBusinessNode) activeBusinessNode.textContent = activeBusinessName;
   if (businessMetaNode) businessMetaNode.textContent = businessCountLabel;
@@ -739,7 +739,7 @@ async function renderBusinessList() {
       const businessName = biz.name || t("common_business");
       const businessInitial = String(businessName).trim().charAt(0).toUpperCase() || "B";
       const businessType = localizeBusinessType(biz.business_type);
-      const createdLabel = biz.created_at ? `Created ${formatSettingsDate(biz.created_at)}` : "Workspace";
+      const createdLabel = biz.created_at ? `Created ${formatSettingsDate(biz.created_at)}` : "Business";
       const lockMeta = biz.locked_through_date ? `Locked through ${formatSettingsDate(biz.locked_through_date)}` : createdLabel;
       return `
       <div class="business-list-item ${biz.id === activeId ? "is-active" : ""}">
