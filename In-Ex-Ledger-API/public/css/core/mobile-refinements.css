@@ -1,0 +1,37 @@
+/* mobile-refinements.css
+ *
+ * App-wide mobile layout refinements grounded in current responsive
+ * best-practice numbers. Everything here is scoped to touch widths so the
+ * denser desktop layout is left unchanged.
+ *
+ * Numbers and why:
+ *  - Form controls render at >= 16px on touch widths. The base control font
+ *    in components.css is 13px, and iOS Safari auto-zooms the whole viewport
+ *    whenever a < 16px field gains focus, which is the main reason forms
+ *    "look bad" on phones. 16px stops that.
+ *  - Interactive controls are >= 44px tall, the Apple Human Interface
+ *    Guidelines / WCAG 2.5.5 minimum touch-target size (Material uses 48dp).
+ *  - Breakpoint ladder already used across the app: 900px (sidebar hides),
+ *    768px (touch layout), 640px (single column). This file uses 768px so it
+ *    covers phones and small tablets without affecting laptops.
+ */
+
+@media (max-width: 768px) {
+  /* Prevent iOS Safari from auto-zooming when a small field gains focus. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* Comfortable, consistent touch targets (skip checkbox/radio/range/color,
+     which should keep their native size). */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea,
+  .primary-btn,
+  .btn-primary,
+  .primary-cta {
+    min-height: 44px;
+  }
+}
