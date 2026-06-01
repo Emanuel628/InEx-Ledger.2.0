@@ -594,7 +594,7 @@ function buildBusinessRosterMarkup(sub) {
                     ${biz.id === billingOwnerId ? `<span class="sub-business-badge is-billing">Billing owner</span>` : ""}
                   </div>
                 </div>
-                <p>${biz.id === billingOwnerId ? "This business owns the current billing relationship." : "Operational workspace on this account."}</p>
+                <p>${biz.id === billingOwnerId ? "This business owns the current billing relationship." : "Operational business on this account."}</p>
               </div>
               <div class="sub-business-item-actions">
                 ${biz.id !== activeId ? `<button type="button" class="settings-secondary-btn" data-business-switch="${escapeHtml(biz.id)}">Switch</button>` : ""}
@@ -880,7 +880,7 @@ function renderBusinessAccessSection(sub) {
       <article class="sub-access-stat">
         <span class="sub-access-stat-label">${escapeHtml(tx("subscription_total_businesses_allowed"))}</span>
         <strong class="sub-access-stat-value">${isProTier ? total : 1}</strong>
-        <span class="sub-access-stat-meta">${isProTier ? "Maximum workspaces on the current plan" : "Upgrade to unlock more businesses"}</span>
+        <span class="sub-access-stat-meta">${isProTier ? "Maximum businesses on the current plan" : "Upgrade to unlock more businesses"}</span>
       </article>
     </div>`;
 

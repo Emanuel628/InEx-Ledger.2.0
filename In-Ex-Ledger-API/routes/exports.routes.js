@@ -38,6 +38,10 @@ const {
   getSubscriptionSnapshotForBusiness,
   hasFeatureAccess
 } = require("../services/subscriptionService.js");
+const {
+  AUDIT_ACTIONS,
+  recordAuditEventForRequest
+} = require("../services/auditEventService.js");
 
 const exportGrantLimiter = createExportGrantLimiter();
 const secureExportLimiter = createSecureExportLimiter();
@@ -894,6 +898,20 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
         endDate: grantEndDate,
         exportType
       });
+      await recordAuditEventForRequest(pool, req, {
+        action: AUDIT_ACTIONS.EXPORT_GENERATED,
+        businessId,
+        metadata: {
+          exportType,
+          exportMode: finalization.resolvedMode,
+          startDate: grantStartDate,
+          endDate: grantEndDate,
+          language: exportLang,
+          currency,
+          includeTaxId: false,
+          route: "grant_generate"
+        }
+      });
       await sendExportGeneratedEmail({
         businessId,
         userId: user.id,
@@ -950,6 +968,20 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       endDate: grantEndDate,
       includeTaxId,
       exportLang
+    });
+    await recordAuditEventForRequest(pool, req, {
+      action: AUDIT_ACTIONS.EXPORT_GENERATED,
+      businessId,
+      metadata: {
+        exportType: "pdf",
+        exportMode: finalization.resolvedMode,
+        startDate: grantStartDate,
+        endDate: grantEndDate,
+        language: exportLang,
+        currency,
+        includeTaxId,
+        route: "grant_generate"
+      }
     });
     await sendExportGeneratedEmail({
       businessId,
@@ -1550,6 +1582,20 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       endDate: dateRange.endDate,
       includeTaxId,
       exportLang
+    });
+    await recordAuditEventForRequest(pool, req, {
+      action: AUDIT_ACTIONS.EXPORT_GENERATED,
+      businessId,
+      metadata: {
+        exportType: "pdf",
+        exportMode: finalization.resolvedMode,
+        startDate: dateRange.startDate,
+        endDate: dateRange.endDate,
+        language: exportLang,
+        currency,
+        includeTaxId,
+        route: "secure_export"
+      }
     });
     await sendExportGeneratedEmail({
       businessId,

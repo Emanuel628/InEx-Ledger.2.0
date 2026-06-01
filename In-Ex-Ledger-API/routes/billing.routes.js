@@ -27,6 +27,10 @@ const {
 const { pool } = require("../db.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const { getStripeSecretKey, stripeRequest, stripeGet, STRIPE_API_BASE, STRIPE_API_VERSION } = require("../services/stripeClient.js");
+const {
+  AUDIT_ACTIONS,
+  recordAuditEventForRequest
+} = require("../services/auditEventService.js");
 
 const router = express.Router();
 
@@ -911,6 +915,17 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       currency: priceSelection.currency,
       billingInterval: priceSelection.billingInterval,
       additionalBusinesses
+    });
+    await recordAuditEventForRequest(pool, req, {
+      action: AUDIT_ACTIONS.BILLING_CHECKOUT_STARTED,
+      businessId: billingBusinessId,
+      metadata: {
+        billingInterval: priceSelection.billingInterval,
+        currency: priceSelection.currency,
+        additionalBusinesses,
+        isTrialing: Boolean(subscription?.isTrialing),
+        returnPath: requestedReturnPath
+      }
     });
 
     res.status(200).json({ url: session.url, id: session.id });

@@ -146,7 +146,7 @@ function renderPricing() {
   if (addonAmount) addonAmount.textContent = addonTotalText;
   if (grandTotalAmount) grandTotalAmount.textContent = grandTotalText;
   if (addonNote) {
-    addonNote.textContent = `Add another business workspace only when you need it. Each additional business is billed at ${addonCycleText} on the same cycle you choose for Pro.`;
+    addonNote.textContent = `Add another business only when you need it. Each additional business is billed at ${addonCycleText} on the same cycle you choose for Pro.`;
   }
 
   if (totalFootnote) {

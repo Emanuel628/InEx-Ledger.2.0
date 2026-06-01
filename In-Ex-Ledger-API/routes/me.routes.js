@@ -12,7 +12,11 @@ const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { logError, logInfo } = require("../utils/logger.js");
 const { isManagedReceiptPath } = require("../services/receiptStorage.js");
-const { listAuditEventsForUser } = require("../services/auditEventService.js");
+const {
+  AUDIT_ACTIONS,
+  listAuditEventsForUser,
+  recordAuditEventForRequest
+} = require("../services/auditEventService.js");
 
 const router = express.Router();
 
@@ -431,6 +435,20 @@ router.put("/onboarding", async (req, res) => {
       const redirectTo = shouldRedirectToTrialSetup(subscription)
         ? buildTrialSetupRedirect(`/${normalizedStartFocus}`)
         : `/${normalizedStartFocus}`;
+
+      await recordAuditEventForRequest(pool, req, {
+        action: AUDIT_ACTIONS.ONBOARDING_COMPLETED,
+        businessId,
+        metadata: {
+          region,
+          province: region === "CA" ? province : null,
+          language,
+          startFocus: normalizedStartFocus,
+          starterAccountType: normalizedStarterAccountType,
+          firstCompletion: !alreadyCompleted,
+          redirectedToTrialSetup: redirectTo.startsWith("/trial-setup")
+        }
+      });
 
       return res.status(200).json({
         onboarding: normalizeOnboardingPayload(updated.rows[0]),

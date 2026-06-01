@@ -7,6 +7,10 @@ const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const { Resend } = require("resend");
 const { getInvoiceFromEmail,buildReplyToAddress} = require("../services/invoiceEmailService.js");
+const {
+  AUDIT_ACTIONS,
+  recordAuditEventForRequest
+} = require("../services/auditEventService.js");
 
 
 const router = express.Router();
@@ -691,6 +695,18 @@ router.post("/", async (req, res) => {
         WHERE m.id = $1`,
       [result.rows[0].id]
     );
+
+    if (messageType === "support_request" || messageType === "it_support") {
+      await recordAuditEventForRequest(pool, req, {
+        action: AUDIT_ACTIONS.SUPPORT_REQUEST_CREATED,
+        metadata: {
+          messageId: result.rows[0].id,
+          messageType,
+          receiverId,
+          parentId: parentId || null
+        }
+      });
+    }
 
     res.status(201).json({ message: mapMessageRow(rows[0], req.user.id) });
   } catch (err) {

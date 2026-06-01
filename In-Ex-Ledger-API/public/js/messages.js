@@ -843,7 +843,7 @@ function closeComposeModal() {
 function openSupportComposer() {
   const supportContact = findSupportContact();
   if (!supportContact) {
-    showToast("Support messaging is unavailable right now. Use support.inex@gmail.com.");
+    showToast("No live in-app support contact is available right now. Use support.inex@gmail.com.");
     return;
   }
 

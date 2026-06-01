@@ -119,7 +119,7 @@ const WELCOME_VERIFY = {
     subject: "Welcome to InEx Ledger - verify your email",
     eyebrow: "Welcome to InEx Ledger",
     heading: "Your account is ready. One last step.",
-    body: "Thanks for signing up. Verify your email to unlock your workspace and start tracking income, expenses, receipts, mileage, and tax-ready exports.",
+    body: "Thanks for signing up. Verify your email to unlock your account and start tracking income, expenses, receipts, mileage, and tax-ready exports.",
     buttonLabel: "Verify email",
     expiry: "This verification link expires in 15 minutes. If the button does not work, copy and paste this link into your browser:",
     text: (link) =>
@@ -129,7 +129,7 @@ const WELCOME_VERIFY = {
     subject: "Bienvenue dans InEx Ledger - vérifiez votre courriel",
     eyebrow: "Bienvenue dans InEx Ledger",
     heading: "Votre compte est prêt. Une dernière étape.",
-    body: "Merci de vous être inscrit. Vérifiez votre courriel pour accéder à votre espace de travail et commencer à suivre vos revenus, dépenses, reçus, kilométrage et exports fiscaux.",
+    body: "Merci de vous être inscrit. Vérifiez votre courriel pour accéder à votre compte et commencer à suivre vos revenus, dépenses, reçus, kilométrage et exports fiscaux.",
     buttonLabel: "Vérifier le courriel",
     expiry: "Ce lien de vérification expire dans 15 minutes. Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :",
     text: (link) =>
@@ -729,50 +729,50 @@ function buildBillingLifecycleEmail(lang, kind, options = {}) {
 const BUSINESS_LIFECYCLE = {
   added: {
     en: {
-      subject: "A business was added to your InEx Ledger workspace",
+      subject: "A business was added to your InEx Ledger account",
       eyebrow: "InEx Ledger businesses",
       heading: "Business added",
-      body: "A new business was added to your workspace. Review the updated business count and billing summary below.",
-      detailsLabel: "Workspace details",
+      body: "A new business was added to your account. Review the updated business count and billing summary below.",
+      detailsLabel: "Business details",
       actionLabel: "Open billing",
       footer: "Use Settings to switch or edit businesses, and Subscription to review billing changes.",
       text: ({ summary, actionUrl }) =>
-        `A new business was added to your InEx Ledger workspace.\n\n${summary}\n\nReview details: ${actionUrl}`
+        `A new business was added to your InEx Ledger account.\n\n${summary}\n\nReview details: ${actionUrl}`
     },
     fr: {
-      subject: "Une entreprise a été ajoutée à votre espace InEx Ledger",
+      subject: "Une entreprise a été ajoutée à votre compte InEx Ledger",
       eyebrow: "Entreprises InEx Ledger",
       heading: "Entreprise ajoutée",
-      body: "Une nouvelle entreprise a été ajoutée à votre espace. Consultez ci-dessous le nombre d’entreprises et le résumé de facturation mis à jour.",
-      detailsLabel: "Détails de l’espace",
+      body: "Une nouvelle entreprise a été ajoutée à votre compte. Consultez ci-dessous le nombre d’entreprises et le résumé de facturation mis à jour.",
+      detailsLabel: "Détails de l’entreprise",
       actionLabel: "Ouvrir la facturation",
       footer: "Utilisez les Paramètres pour changer ou modifier les entreprises et Abonnement pour revoir les changements de facturation.",
       text: ({ summary, actionUrl }) =>
-        `Une nouvelle entreprise a été ajoutée à votre espace InEx Ledger.\n\n${summary}\n\nConsulter les détails : ${actionUrl}`
+        `Une nouvelle entreprise a été ajoutée à votre compte InEx Ledger.\n\n${summary}\n\nConsulter les détails : ${actionUrl}`
     }
   },
   deleted: {
     en: {
-      subject: "A business was deleted from your InEx Ledger workspace",
+      subject: "A business was deleted from your InEx Ledger account",
       eyebrow: "InEx Ledger businesses",
       heading: "Business deleted",
-      body: "A business was deleted from your workspace. Review the updated business count and billing summary below.",
-      detailsLabel: "Workspace details",
+      body: "A business was deleted from your account. Review the updated business count and billing summary below.",
+      detailsLabel: "Business details",
       actionLabel: "Open billing",
       footer: "Use Settings to confirm the remaining businesses and Subscription to review the updated billing state.",
       text: ({ summary, actionUrl }) =>
-        `A business was deleted from your InEx Ledger workspace.\n\n${summary}\n\nReview details: ${actionUrl}`
+        `A business was deleted from your InEx Ledger account.\n\n${summary}\n\nReview details: ${actionUrl}`
     },
     fr: {
-      subject: "Une entreprise a été supprimée de votre espace InEx Ledger",
+      subject: "Une entreprise a été supprimée de votre compte InEx Ledger",
       eyebrow: "Entreprises InEx Ledger",
       heading: "Entreprise supprimée",
-      body: "Une entreprise a été supprimée de votre espace. Consultez ci-dessous le nombre d’entreprises et le résumé de facturation mis à jour.",
-      detailsLabel: "Détails de l’espace",
+      body: "Une entreprise a été supprimée de votre compte. Consultez ci-dessous le nombre d’entreprises et le résumé de facturation mis à jour.",
+      detailsLabel: "Détails de l’entreprise",
       actionLabel: "Ouvrir la facturation",
       footer: "Utilisez les Paramètres pour confirmer les entreprises restantes et Abonnement pour revoir l’état de facturation mis à jour.",
       text: ({ summary, actionUrl }) =>
-        `Une entreprise a été supprimée de votre espace InEx Ledger.\n\n${summary}\n\nConsulter les détails : ${actionUrl}`
+        `Une entreprise a été supprimée de votre compte InEx Ledger.\n\n${summary}\n\nConsulter les détails : ${actionUrl}`
     }
   }
 };
