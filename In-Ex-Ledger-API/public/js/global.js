@@ -105,10 +105,11 @@ function normalizeRoute(value) {
 }
 
 function renderCanonicalTopbarNavigation() {
-  // Ordered to match the core bookkeeping flow: bring in transactions, fix
-  // uncertain items (review), keep proof (receipts), bill (invoices), hand off
-  // (exports), with categories/accounts as setup. Secondary surfaces (mileage,
-  // analytics, messages) are grouped after a separator so the hierarchy reads.
+  // Ordered to match the core bookkeeping flow: bring in transactions, keep
+  // proof (receipts), bill (invoices), hand off (exports), with
+  // categories/accounts as setup. Review stays inside Exports rather than as a
+  // competing top-level destination. Secondary surfaces (mileage, analytics,
+  // messages) are grouped after a separator so the hierarchy reads.
   const links = [
     {
       href: "/transactions",
@@ -116,13 +117,6 @@ function renderCanonicalTopbarNavigation() {
       i18n: "nav_transactions",
       label: "Transactions",
       icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg>'
-    },
-    {
-      href: "/review",
-      route: "review",
-      i18n: "nav_review",
-      label: "Review",
-      icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 6l1.4 1.4L10 4.6"></path><path d="M6 10h4"></path></svg>'
     },
     {
       href: "/receipts",
