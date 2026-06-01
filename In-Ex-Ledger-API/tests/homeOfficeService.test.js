@@ -6,7 +6,8 @@ const assert = require("node:assert/strict");
 const {
   computeHomeOfficeDeduction,
   sumEligibleHomeOfficeExpenses,
-  buildHomeOfficeWorksheet
+  buildHomeOfficeWorksheet,
+  isEligibleHomeOfficeCategory
 } = require("../services/homeOfficeService.js");
 
 test("actual method applies business-use percent to eligible expenses", () => {
@@ -82,20 +83,34 @@ test("Canada actual method notes the income limitation / carry-forward", () => {
   assert.match(result.note, /carries forward|income/i);
 });
 
-test("sumEligibleHomeOfficeExpenses totals only home-office expense rows", () => {
+test("sumEligibleHomeOfficeExpenses totals ledger categories that are eligible for home-office allocation", () => {
   const categories = [
     { id: "c_home", name: "Home Office" },
-    { id: "c_other", name: "Office Supplies" }
+    { id: "c_rent", name: "Rent", tax_map_us: "rent_lease_other" },
+    { id: "c_util", name: "Utilities", tax_map_us: "utilities" },
+    { id: "c_other", name: "Office Supplies", tax_map_us: "office_expense" }
   ];
   const transactions = [
     { type: "expense", category_id: "c_home", amount: 500 },
-    { type: "expense", category_id: "c_home", amount: 250 },
+    { type: "expense", category_id: "c_rent", amount: 250 },
+    { type: "expense", category_id: "c_util", amount: 100 },
     { type: "expense", category_id: "c_other", amount: 99 },
     { type: "income", category_id: "c_home", amount: 1000 }
   ];
-  const { total, count } = sumEligibleHomeOfficeExpenses(transactions, categories);
-  assert.equal(total, 750);
-  assert.equal(count, 2);
+  const { total, count } = sumEligibleHomeOfficeExpenses(transactions, categories, { region: "US" });
+  assert.equal(total, 850);
+  assert.equal(count, 3);
+});
+
+test("isEligibleHomeOfficeCategory stays conservative for Canada phone/internet", () => {
+  assert.equal(
+    isEligibleHomeOfficeCategory({ name: "Phone & Internet", tax_map_ca: "other_expense" }, "CA"),
+    true
+  );
+  assert.equal(
+    isEligibleHomeOfficeCategory({ name: "Other Expense", tax_map_ca: "other_expense" }, "CA"),
+    false
+  );
 });
 
 test("buildHomeOfficeWorksheet aggregates the ledger and computes the deduction", () => {
@@ -103,17 +118,22 @@ test("buildHomeOfficeWorksheet aggregates the ledger and computes the deduction"
     region: "US",
     taxYear: 2026,
     worksheet: { method: "actual", total_area_sqft: 1000, office_area_sqft: 250, months_used: 12, tax_year: 2026 },
-    categories: [{ id: "c_home", name: "Business Use of Home" }],
+    categories: [
+      { id: "c_home", name: "Business Use of Home" },
+      { id: "c_rent", name: "Rent", tax_map_us: "rent_lease_other" },
+      { id: "c_util", name: "Utilities", tax_map_us: "utilities" }
+    ],
     transactions: [
       { type: "expense", category_id: "c_home", amount: 400 },
-      { type: "expense", category_id: "c_home", amount: 400 }
+      { type: "expense", category_id: "c_rent", amount: 400 },
+      { type: "expense", category_id: "c_util", amount: 200 }
     ]
   });
   assert.equal(schedule.supported, true);
-  assert.equal(schedule.eligibleExpenseCount, 2);
-  assert.equal(schedule.eligibleExpensesTotal, 800);
+  assert.equal(schedule.eligibleExpenseCount, 3);
+  assert.equal(schedule.eligibleExpensesTotal, 1000);
   assert.equal(schedule.businessUsePct, 25);
-  assert.equal(schedule.deduction, 200); // 800 * 25%
+  assert.equal(schedule.deduction, 250); // 1000 * 25%
 });
 
 test("buildHomeOfficeWorksheet returns null when there is no worksheet row", () => {

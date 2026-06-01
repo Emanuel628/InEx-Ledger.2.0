@@ -6,6 +6,34 @@ const { pool } = require("../db.js");
 const SIMPLIFIED_RATE_PER_SQFT = 5;
 const SIMPLIFIED_MAX_SQFT = 300;
 const HOME_OFFICE_NAME_PATTERN = /home office|business[- ]use[- ]of[- ]home|work[- ]space[- ]in[- ]home/i;
+const HOME_OFFICE_ELIGIBLE_NAME_PATTERNS = [
+  HOME_OFFICE_NAME_PATTERN,
+  /^rent$/i,
+  /^utilities?$/i,
+  /^insurance$/i,
+  /^property taxes?$/i,
+  /^repairs? ?& ?maintenance$/i,
+  /^phone ?& ?internet$/i,
+  /^mortgage interest$/i
+];
+const HOME_OFFICE_ELIGIBLE_TAX_MAPS = {
+  US: new Set([
+    "home_office",
+    "rent_lease_other",
+    "utilities",
+    "insurance_other_than_health",
+    "repairs_maintenance",
+    "interest_mortgage"
+  ]),
+  CA: new Set([
+    "home_office",
+    "rent",
+    "utilities",
+    "insurance",
+    "property_taxes",
+    "maintenance_repairs"
+  ])
+};
 
 function round2(value) {
   return Number((Number(value) || 0).toFixed(2));
@@ -99,11 +127,25 @@ function computeHomeOfficeDeduction(input = {}) {
   };
 }
 
-// Sum home-office-categorized expense amounts from the ledger as the eligible pool.
-function sumEligibleHomeOfficeExpenses(transactions = [], categories = []) {
+// Sum home-office-eligible ledger expense amounts as the eligible pool.
+function isEligibleHomeOfficeCategory(category, region) {
+  const normalizedRegion = normalizeRegion(region);
+  const name = String(category?.name || "").trim();
+  const taxMapKey = normalizedRegion === "CA" ? "tax_map_ca" : "tax_map_us";
+  const taxMap = String(category?.[taxMapKey] || "").trim().toLowerCase();
+
+  if (HOME_OFFICE_ELIGIBLE_TAX_MAPS[normalizedRegion]?.has(taxMap)) {
+    return true;
+  }
+
+  return HOME_OFFICE_ELIGIBLE_NAME_PATTERNS.some((pattern) => pattern.test(name));
+}
+
+function sumEligibleHomeOfficeExpenses(transactions = [], categories = [], options = {}) {
+  const region = normalizeRegion(options.region);
   const homeOfficeCategoryIds = new Set(
     (categories || [])
-      .filter((cat) => HOME_OFFICE_NAME_PATTERN.test(String(cat?.name || "")))
+      .filter((cat) => isEligibleHomeOfficeCategory(cat, region))
       .map((cat) => cat.id)
   );
   let total = 0;
@@ -127,7 +169,8 @@ function buildHomeOfficeWorksheet(options = {}) {
   const taxYear = options.taxYear || worksheet.tax_year || null;
   const { total: eligibleExpensesTotal, count: eligibleExpenseCount } = sumEligibleHomeOfficeExpenses(
     options.transactions,
-    options.categories
+    options.categories,
+    { region }
   );
 
   const computed = computeHomeOfficeDeduction({
@@ -208,6 +251,7 @@ module.exports = {
   computeHomeOfficeDeduction,
   sumEligibleHomeOfficeExpenses,
   buildHomeOfficeWorksheet,
+  isEligibleHomeOfficeCategory,
   getHomeOfficeWorksheet,
   upsertHomeOfficeWorksheet,
   deleteHomeOfficeWorksheet,

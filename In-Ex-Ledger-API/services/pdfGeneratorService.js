@@ -2818,7 +2818,7 @@ function buildHomeOfficeWorksheetPage(worksheet, currency, labels, region) {
     worksheet.method === "simplified"
       ? "Simplified method: $5/sq ft of office space (capped at 300 sq ft), prorated for months of use. Eligible home expenses are not used."
       : "Actual method: business-use percent (office area / total home area) applied to eligible home expenses aggregated from the ledger.",
-    "Eligible expenses are taken from home-office-categorized transactions and should be reviewed for completeness.",
+    "Eligible expenses are aggregated from ledger categories such as rent, utilities, insurance, repairs, and other home-office-related lines and should be reviewed for completeness.",
     worksheet.note || ""
   ].filter(Boolean), { maxChars: 90 });
 

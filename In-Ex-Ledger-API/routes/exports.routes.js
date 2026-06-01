@@ -698,6 +698,8 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       reviewStateRows: sourceRows.reviewStateRows,
       mileage: sourceRows.mileage,
       vehicleCosts: sourceRows.vehicleCosts,
+      vehicleClaimMap: sourceRows.vehicleClaimMap,
+      capitalAssetTxMap: sourceRows.capitalAssetTxMap,
       business,
       region,
       province: business.province || "",
@@ -1243,7 +1245,8 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       return res.status(400).json({ error: "certifiedByUser must be acknowledged to include Tax ID in the export." });
     }
 
-    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult, supportArtifactResult, reviewStateResult] =
+    const taxYear = Number(String(dateRange.endDate || "").slice(0, 4)) || new Date().getFullYear();
+    const [txResult, accountResult, categoryResult, receiptResult, mileageResult, bizResult, supportArtifactResult, reviewStateResult, vehicleClaimResult, capitalAssetResult] =
       await Promise.all([
         pool.query(
           `SELECT id, account_id, category_id, amount, type, description, date, note,
@@ -1304,6 +1307,21 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
              FROM transaction_review_states
             WHERE business_id = $1`,
           [businessId]
+        ),
+        pool.query(
+          `SELECT ved.*, t.date AS transaction_date, t.description AS description
+             FROM vehicle_expense_details ved
+             JOIN transactions t ON t.id = ved.transaction_id
+            WHERE ved.business_id = $1
+              AND t.date >= $2 AND t.date <= $3
+              AND t.deleted_at IS NULL`,
+          [businessId, dateRange.startDate, dateRange.endDate]
+        ),
+        pool.query(
+          `SELECT * FROM capital_assets
+            WHERE business_id = $1 AND tax_year = $2 AND is_disposed = FALSE
+            ORDER BY purchase_date ASC, name ASC`,
+          [businessId, taxYear]
         )
       ]);
 
@@ -1335,6 +1353,14 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       current.push(row);
       supportArtifactMap.set(row.transaction_id, current);
     }
+    const vehicleClaimMap = new Map(
+      vehicleClaimResult.rows.map((row) => [row.transaction_id, row])
+    );
+    const capitalAssetTxMap = new Map(
+      capitalAssetResult.rows
+        .filter((row) => row.transaction_id)
+        .map((row) => [row.transaction_id, row])
+    );
     const dataset = buildNormalizedExportDataset({
       transactions: txResult.rows,
       accounts: accountResult.rows,
@@ -1344,6 +1370,8 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       reviewStateRows: reviewStateResult.rows,
       mileage: mileageResult.rows,
       vehicleCosts: vehicleCostResult.rows,
+      vehicleClaimMap,
+      capitalAssetTxMap,
       business,
       region,
       province: business.province || "",
@@ -1385,6 +1413,59 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
     const generatedAt = new Date().toISOString();
     const reportId = createPdfReportId(generatedAt);
 
+    let quickMethodSchedule = null;
+    if (region === "ca" && business.gst_hst_registered === true && business.gst_hst_method === "quick") {
+      try {
+        const quickMethodSupply = inferQuickMethodSupplyType(txResult.rows, categories, business.business_activity_code || "");
+        const grossSalesInclTax = txResult.rows
+          .filter((t) => String(t.type || "").toLowerCase() === "income")
+          .reduce((sum, t) => sum + Math.abs(Number(t.amount || 0)), 0);
+        quickMethodSchedule = await buildQuickMethodSchedule({
+          businessId,
+          province: business.province || "ON",
+          supplyType: quickMethodSupply.supplyType,
+          supplyTypeSource: quickMethodSupply.source,
+          taxYear,
+          grossSalesInclTax,
+          businessActivityCode: business.business_activity_code || ""
+        });
+        if (quickMethodSchedule && quickMethodSupply.warning && !quickMethodSchedule.warning) {
+          quickMethodSchedule.warning = quickMethodSupply.warning;
+        }
+      } catch (qmErr) {
+        logError("Secure export Quick Method schedule computation failed (non-fatal)", { err: qmErr.message });
+      }
+    }
+
+    let regularMethodSchedule = null;
+    if (region === "ca" && business.gst_hst_registered === true && business.gst_hst_method === "regular") {
+      try {
+        regularMethodSchedule = buildRegularMethodSchedule({
+          transactions: txResult.rows,
+          taxYear,
+          province: business.province || ""
+        });
+      } catch (rmErr) {
+        logError("Secure export Regular Method schedule computation failed (non-fatal)", { err: rmErr.message });
+      }
+    }
+
+    let homeOfficeWorksheet = null;
+    try {
+      const homeOfficeRow = await getHomeOfficeWorksheet(businessId, taxYear);
+      if (homeOfficeRow) {
+        homeOfficeWorksheet = buildHomeOfficeWorksheet({
+          worksheet: homeOfficeRow,
+          transactions: txResult.rows,
+          categories,
+          region,
+          taxYear
+        });
+      }
+    } catch (hoErr) {
+      logError("Secure export Home Office worksheet computation failed (non-fatal)", { err: hoErr.message });
+    }
+
     const sharedOptions = {
       transactions: txResult.rows,
       accounts: accountResult.rows,
@@ -1413,9 +1494,14 @@ router.post("/secure-export", secureExportLimiter, async (req, res) => {
       generatedAt,
       reportId,
       region,
-      province: business.province || ""
-      ,
-      reviewStateRows: reviewStateResult.rows
+      province: business.province || "",
+      reviewStateRows: reviewStateResult.rows,
+      vehicleClaimMap,
+      capitalAssets: capitalAssetResult.rows,
+      capitalAssetTxMap,
+      quickMethodSchedule,
+      regularMethodSchedule,
+      homeOfficeWorksheet
     };
 
     const { fullBuffer: fullPdfBuffer, redactedBuffer, pageCount: pdfPageCount } =
