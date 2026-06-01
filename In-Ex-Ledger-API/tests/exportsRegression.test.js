@@ -668,6 +668,38 @@ test("Canada regular-method export shows a review notice when GST/HST was not ca
   assert.match(pdf, /Regular Method Review Required/);
 });
 
+test("home office worksheet renders the actual-method deduction", () => {
+  const pdf = buildPdfExport(buildFixtureOptions({
+    homeOfficeWorksheet: {
+      supported: true,
+      method: "actual",
+      taxYear: 2026,
+      totalAreaSqft: 1000,
+      officeAreaSqft: 200,
+      businessUsePct: 20,
+      monthsUsed: 12,
+      eligibleExpensesTotal: 6000,
+      eligibleExpenseCount: 4,
+      deduction: 1200,
+      note: "Actual method: business-use percent of eligible home expenses (IRS Form 8829)."
+    }
+  })).toString("latin1");
+  assert.match(pdf, /Home Office Worksheet/);
+  assert.match(pdf, /Business-use: 20%/);
+  assert.match(pdf, /Home office deduction:/);
+});
+
+test("home office worksheet shows a review notice when inputs are incomplete", () => {
+  const pdf = buildPdfExport(buildFixtureOptions({
+    homeOfficeWorksheet: {
+      supported: false,
+      method: "actual",
+      unsupportedReason: "The actual method needs both the total home area and the home-office area in square feet to derive the business-use percentage."
+    }
+  })).toString("latin1");
+  assert.match(pdf, /Home Office Review Required/);
+});
+
 test("route generate stores nonzero page count metadata and saves only the redacted copy", async () => {
   const fixture = loadExportsRouter();
   try {

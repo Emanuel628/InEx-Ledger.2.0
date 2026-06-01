@@ -267,6 +267,14 @@
   <div class="metric"><div class="label">Mapped + Ready</div><div class="value ok" id="count-ok">—</div></div>
 </div>
 
+<div class="summary-bar" id="home-office-bar" style="justify-content:space-between;align-items:center;">
+  <div>
+    <div class="label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">Home Office Worksheet</div>
+    <div id="home-office-status" style="font-size:14px;font-weight:600;margin-top:3px;">—</div>
+  </div>
+  <button class="btn btn-secondary btn-sm" id="btn-home-office">Set / Update</button>
+</div>
+
 <div class="main">
   <div class="bulk-panel" id="bulk-panel">
     <span class="sel-count" id="sel-count-label">0 selected</span>
@@ -688,10 +696,72 @@ async function refreshData() {
   render();
 }
 
+// ── Home office worksheet ────────────────────────────────────────────────────
+
+function formatHomeOfficeStatus(worksheet) {
+  if (!worksheet) return "Not set — add a worksheet so the export includes a home-office deduction.";
+  if (worksheet.method === "simplified") {
+    return `Simplified · ${worksheet.office_area_sqft || 0} sq ft · ${worksheet.months_used} mo (tax year ${worksheet.tax_year})`;
+  }
+  const total = Number(worksheet.total_area_sqft) || 0;
+  const office = Number(worksheet.office_area_sqft) || 0;
+  const pct = total > 0 ? Math.round((office / total) * 100) : 0;
+  return `Actual · ${office}/${total} sq ft (${pct}% business use) · ${worksheet.months_used} mo (tax year ${worksheet.tax_year})`;
+}
+
+async function loadHomeOffice() {
+  const statusEl = document.getElementById("home-office-status");
+  if (!statusEl) return;
+  try {
+    const data = await apiFetch(`/api/home-office-worksheet?tax_year=${TAX_YEAR}`);
+    statusEl.textContent = formatHomeOfficeStatus(data && data.worksheet);
+  } catch (_) {
+    statusEl.textContent = "Could not load the home-office worksheet.";
+  }
+}
+
+async function openHomeOfficeForm() {
+  const region = (await apiFetch("/api/business").catch(() => ({ region: "US" }))).region || "US";
+  const isCA = String(region).toUpperCase() === "CA";
+  const method = isCA
+    ? "actual"
+    : ((prompt("Method: type 'simplified' ($5/sq ft, US only) or 'actual':", "actual") || "actual").trim().toLowerCase() === "simplified" ? "simplified" : "actual");
+
+  const office = prompt("Home-office area (square feet):");
+  if (office === null) return;
+  let total = null;
+  if (method === "actual") {
+    total = prompt("Total home area (square feet):");
+    if (total === null) return;
+  }
+  const months = prompt("Months the office was used this year (1-12):", "12") || "12";
+
+  try {
+    await apiFetch("/api/home-office-worksheet", {
+      method: "PUT",
+      headers: { "X-CSRF-Token": getCsrf() },
+      body: JSON.stringify({
+        tax_year: TAX_YEAR,
+        method,
+        office_area_sqft: Number(office),
+        total_area_sqft: method === "actual" ? Number(total) : null,
+        months_used: Number(months)
+      })
+    });
+    showToast("Home-office worksheet saved", "success");
+    await loadHomeOffice();
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+document.getElementById("btn-home-office").addEventListener("click", openHomeOfficeForm);
+
 // ── Init ───────────────────────────────────────────────────────────────────────
 
 (async () => {
   await refreshData();
+  await loadHomeOffice();
 })();
 </script>
 </body>
