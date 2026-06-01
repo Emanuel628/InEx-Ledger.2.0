@@ -1353,7 +1353,7 @@ function buildExclusionSummary(excluded, currency) {
 }
 
 function buildCpaActionLines(reviewInsights, currency) {
-  return [
+  const detailLines = [
     `${reviewInsights.needsCategoryCount} imported / uncategorized transactions need real category assignment.`,
     `${reviewInsights.unmappedTaxCount} categorized transactions remain truly unmapped after category review.`,
     `${reviewInsights.mappedReceiptSupportCount} mapped expense rows still missing receipt or support document.`,
@@ -1367,6 +1367,34 @@ function buildCpaActionLines(reviewInsights, currency) {
     `${reviewInsights.homeOfficeCount} home-office items require worksheet support.`,
     `${reviewInsights.capitalAssetCount} capital asset items require asset review support.`
   ];
+  // Lead with an explicit "ready vs still needs judgment" verdict so a CPA can
+  // tell at a glance whether anything is blocking, without parsing every count.
+  return [cpaReadinessHeadline(reviewInsights), ...detailLines];
+}
+
+// Count the action areas on the cover card that still have outstanding items.
+function countOutstandingActionAreas(reviewInsights = {}) {
+  return [
+    reviewInsights.needsCategoryCount,
+    reviewInsights.unmappedTaxCount,
+    reviewInsights.mappedReceiptSupportCount,
+    reviewInsights.expenseWithoutReceiptAttachmentCount,
+    reviewInsights.missingDescriptionCount,
+    reviewInsights.duplicateCount,
+    reviewInsights.vehicleCount,
+    reviewInsights.mealsCount,
+    reviewInsights.phoneAllocationCount,
+    reviewInsights.homeOfficeCount,
+    reviewInsights.capitalAssetCount
+  ].filter((count) => Number(count) > 0).length;
+}
+
+function cpaReadinessHeadline(reviewInsights = {}) {
+  const outstanding = countOutstandingActionAreas(reviewInsights);
+  if (outstanding === 0) {
+    return "Filing readiness: no blocking items - every included transaction is categorized, mapped, and supported. Ready for CPA review.";
+  }
+  return `Filing readiness: ${outstanding} area${outstanding !== 1 ? "s" : ""} still need attention before this packet is filing-ready (detailed below).`;
 }
 
 function buildCleanupPriorityLines(reviewInsights) {
@@ -1643,9 +1671,12 @@ function buildIdentityPage(data) {
   canvas.drawMetricCard(490, metricY, 82, 72, "Excluded", String(reviewInsights.excludedCount), "Transactions");
 
   const actionLines = buildCpaActionLines(reviewInsights, currency);
+  const actionCardTitle = countOutstandingActionAreas(reviewInsights) === 0
+    ? "Filing Readiness - Ready for CPA Review"
+    : "CPA Action Required";
   const actionCardHeight = estimateCardHeight(532, actionLines, { maxChars: 88, minHeight: 172 });
   const actionCardTop = metricY - 88;
-  canvas.drawCard(40, actionCardTop, 532, actionCardHeight, "CPA Action Required", actionLines, { maxChars: 88 });
+  canvas.drawCard(40, actionCardTop, 532, actionCardHeight, actionCardTitle, actionLines, { maxChars: 88 });
   const disclosureY = actionCardTop - actionCardHeight - 14;
   canvas.text(52, disclosureY, labels.not_filed, 9, "F2");
   if (regionCode === "CA") {

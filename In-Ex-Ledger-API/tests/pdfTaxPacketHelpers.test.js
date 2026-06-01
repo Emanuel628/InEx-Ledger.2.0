@@ -531,6 +531,51 @@ test("buildCpaActionLines includes home office and capital asset support counts"
   assert.ok(lines.some((line) => /13 transactions are flagged as potential duplicates\./.test(line)));
 });
 
+test("buildCpaActionLines leads with an attention verdict when items are outstanding", () => {
+  const lines = buildCpaActionLines({
+    needsCategoryCount: 1,
+    unmappedTaxCount: 0,
+    mappedReceiptSupportCount: 0,
+    attachedReceiptFileCount: 0,
+    receiptLinkedCount: 0,
+    transactionWithReceiptCount: 0,
+    expenseWithoutReceiptAttachmentCount: 0,
+    missingDescriptionCount: 0,
+    duplicateCount: 0,
+    vehicleCount: 2,
+    mealsCount: 0,
+    phoneAllocationCount: 0,
+    homeOfficeCount: 0,
+    capitalAssetCount: 0
+  }, "USD");
+
+  // Two areas outstanding (category + vehicle); the zero lines remain for audit.
+  assert.match(lines[0], /Filing readiness: 2 areas still need attention/);
+  assert.ok(lines.some((line) => /0 categorized transactions remain truly unmapped/.test(line)));
+});
+
+test("buildCpaActionLines leads with a ready verdict when nothing is outstanding", () => {
+  const lines = buildCpaActionLines({
+    needsCategoryCount: 0,
+    unmappedTaxCount: 0,
+    mappedReceiptSupportCount: 0,
+    attachedReceiptFileCount: 3,
+    receiptLinkedCount: 3,
+    transactionWithReceiptCount: 3,
+    expenseWithoutReceiptAttachmentCount: 0,
+    missingDescriptionCount: 0,
+    duplicateCount: 0,
+    vehicleCount: 0,
+    mealsCount: 0,
+    phoneAllocationCount: 0,
+    homeOfficeCount: 0,
+    capitalAssetCount: 0
+  }, "USD");
+
+  assert.match(lines[0], /Filing readiness: no blocking items/);
+  assert.match(lines[0], /Ready for CPA review/);
+});
+
 test("buildCleanupPriorityLines includes home office and capital asset priorities", () => {
   const priorities = buildCleanupPriorityLines({
     needsCategoryCount: 0,
