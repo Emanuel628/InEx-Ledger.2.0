@@ -2722,6 +2722,52 @@ function buildQuickMethodRemittancePage(qmSchedule, currency, labels) {
   return [canvas];
 }
 
+function buildRegularMethodWorksheetPage(schedule, currency, labels) {
+  if (!schedule) return [];
+  const canvas = new PdfCanvas();
+  const header = drawReportHeader(canvas, {
+    title: "GST/HST Regular Method Worksheet",
+    subtitle: "ETA s. 225 - Net tax: tax collected on sales less input tax credits",
+    badges: [{ text: labels.statusBadgeText, variant: labels.statusBadgeVariant }, { text: "REGULAR METHOD", variant: "neutral" }]
+  });
+
+  let y = header.contentStartY - 10;
+  if (schedule.supported === false) {
+    canvas.drawCard(40, y, 532, 120, "Regular Method Review Required", [
+      schedule.unsupportedReason || "The current ledger data is not sufficient to compute a GST/HST reconciliation.",
+      "Capture GST/HST per transaction, then reconcile to the filed GST34 return before filing."
+    ].filter(Boolean), { maxChars: 92 });
+    return [canvas];
+  }
+
+  const netLabel = schedule.isRefund ? "Net tax (refund claimable)" : "Net tax to remit";
+  const netValue = formatCurrencyForPdf(Math.abs(schedule.netTaxToRemit), currency);
+
+  canvas.drawCard(40, y, 252, 118, "Net Tax Reconciliation", [
+    `GST/HST collected on sales: ${formatCurrencyForPdf(schedule.collectedOnSales, currency)}`,
+    `Input tax credits (ITCs): ${formatCurrencyForPdf(schedule.itcsClaimed, currency)}`,
+    `${netLabel}: ${netValue}`,
+    `Tax year: ${schedule.taxYear || "-"}  |  Province: ${schedule.province || "-"}`
+  ], { maxChars: 34 });
+
+  canvas.drawCard(320, y, 252, 118, "Data Coverage", [
+    `Income rows with GST/HST recorded: ${schedule.incomeWithTaxCount} of ${schedule.incomeCount}`,
+    `Expense rows claimed as ITCs: ${schedule.expenseRecoverableCount}`,
+    `Expense rows with GST/HST not flagged recoverable: ${schedule.expenseTaxNotRecoverableCount}`,
+    `Unclaimed expense tax to review: ${formatCurrencyForPdf(schedule.taxPaidNotClaimed, currency)}`
+  ], { maxChars: 34 });
+
+  y -= 138;
+  canvas.drawCard(40, y, 532, 110, "Regular Method - How This Is Computed", [
+    "Net tax = GST/HST collected on taxable sales minus input tax credits (ITCs) on eligible business expenses (ETA s. 225).",
+    "Only expenses flagged as recoverable are included as ITCs. Review any GST/HST paid that was not flagged recoverable.",
+    "Figures are aggregated from per-transaction GST/HST amounts in the ledger and should be reconciled to the filed GST34 return.",
+    schedule.note || ""
+  ].filter(Boolean), { maxChars: 90 });
+
+  return [canvas];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 function buildFooterText(labels, reportId, generatedAt, isSecure, pageNumber, totalPages, legalName, taxId) {
@@ -2804,6 +2850,7 @@ function buildPdfExportDocument(options) {
     capitalAssets = null,         // Array of capital_assets rows for the tax year
     capitalAssetTxMap = null,     // Map<transactionId, capital_assets row>
     quickMethodSchedule = null,   // Output of buildQuickMethodSchedule, or null
+    regularMethodSchedule = null, // Output of buildRegularMethodSchedule, or null
     reviewStateRows = [],
     packageAttribution = {},
     exportStatus: exportStatusOption = null  // "draft" | "workpaper" | null (null = auto-derive from reviewInsights)
@@ -2886,6 +2933,7 @@ function buildPdfExportDocument(options) {
   const vehicleSchedulePages = buildVehicleAuditSchedule(vehicleClaimRows, effectiveCurrency, labels, normalizedRegion);
   const capitalAssetPages = buildCapitalAssetSchedule(effectiveCapitalAssets, effectiveCurrency, labels, normalizedRegion);
   const quickMethodPages = buildQuickMethodRemittancePage(quickMethodSchedule, effectiveCurrency, labels);
+  const regularMethodPages = buildRegularMethodWorksheetPage(regularMethodSchedule, effectiveCurrency, labels);
   const unresolvedExceptionPages = buildUnresolvedExceptionPages(includedTransactions, effectiveCurrency, labels, normalizedRegion);
   const evidenceSchedulePages = buildEvidenceSchedulePages(includedTransactions, receipts, effectiveSupportArtifactMap, labels, normalizedRegion);
   const reviewerDecisionPages = buildReviewerDecisionPages(reviewStateRows, transactions, labels, normalizedRegion, packageAttribution, isSecure);
@@ -2935,7 +2983,8 @@ function buildPdfExportDocument(options) {
     // Phase 2 supporting schedules — only included when data exists
     ...vehicleSchedulePages,
     ...capitalAssetPages,
-    ...quickMethodPages
+    ...quickMethodPages,
+    ...regularMethodPages
   ];
 
   const pageCount = canvases.length;
