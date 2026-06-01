@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Compliance Dashboard — InEx Ledger</title>
+  <title>Compliance Dashboard � InEx Ledger</title>
   <style>
     :root {
       --bg-base: #0A0A0B;
@@ -260,17 +260,17 @@
 </div>
 
 <div class="summary-bar" id="summary-bar">
-  <div class="metric"><div class="label">Needs Action</div><div class="value action" id="count-action">—</div></div>
-  <div class="metric"><div class="label">Mileage</div><div class="value" id="count-ml">—</div></div>
-  <div class="metric"><div class="label">Capital Assets</div><div class="value" id="count-ca">—</div></div>
-  <div class="metric"><div class="label">Missing Receipt</div><div class="value" id="count-rs">—</div></div>
-  <div class="metric"><div class="label">Mapped + Ready</div><div class="value ok" id="count-ok">—</div></div>
+  <div class="metric"><div class="label">Needs Action</div><div class="value action" id="count-action">�</div></div>
+  <div class="metric"><div class="label">Mileage</div><div class="value" id="count-ml">�</div></div>
+  <div class="metric"><div class="label">Capital Assets</div><div class="value" id="count-ca">�</div></div>
+  <div class="metric"><div class="label">Missing Receipt</div><div class="value" id="count-rs">�</div></div>
+  <div class="metric"><div class="label">Mapped + Ready</div><div class="value ok" id="count-ok">�</div></div>
 </div>
 
 <div class="summary-bar" id="home-office-bar" style="justify-content:space-between;align-items:center;">
   <div>
     <div class="label" style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">Home Office Worksheet</div>
-    <div id="home-office-status" style="font-size:14px;font-weight:600;margin-top:3px;">—</div>
+    <div id="home-office-status" style="font-size:14px;font-weight:600;margin-top:3px;">�</div>
   </div>
   <button class="btn btn-secondary btn-sm" id="btn-home-office">Set / Update</button>
 </div>
@@ -280,7 +280,7 @@
     <span class="sel-count" id="sel-count-label">0 selected</span>
     <div class="bulk-actions-row">
       <select class="bulk-select" id="bulk-vehicle-method">
-        <option value="">— Apply vehicle method —</option>
+        <option value="">� Apply vehicle method �</option>
         <option value="mileage">Mileage method</option>
         <option value="actual">Actual expense method</option>
       </select>
@@ -326,7 +326,7 @@ let activeFilter = "all";
 let expandedId = null;
 let businessRegion = "US";
 
-// ── API helpers ────────────────────────────────────────────────────────────────
+// -- API helpers ----------------------------------------------------------------
 
 async function apiFetch(url, opts = {}) {
   const res = await fetch(url, {
@@ -345,7 +345,7 @@ function getCsrf() {
   return document.cookie.split("; ").find((c) => c.startsWith("csrf_token="))?.split("=")[1] || "";
 }
 
-// ── Data loading ───────────────────────────────────────────────────────────────
+// -- Data loading ---------------------------------------------------------------
 
 async function loadTransactions() {
   const today = new Date();
@@ -366,7 +366,7 @@ async function loadTransactions() {
   return txData.rows;
 }
 
-// ── Rendering ──────────────────────────────────────────────────────────────────
+// -- Rendering ------------------------------------------------------------------
 
 function buildFlagBadges(flags) {
   return (flags || []).map((f) => `<span class="flag flag-${f}">${f}</span>`).join("");
@@ -414,7 +414,7 @@ function renderTable() {
           ${claimFormHtml}
         </td>
         <td>${row.categoryName || ""}</td>
-        <td style="font-size:12px;color:var(--text-secondary)">${(row.taxLineLabel || "").slice(0, 28) || "—"}</td>
+        <td style="font-size:12px;color:var(--text-secondary)">${(row.taxLineLabel || "").slice(0, 28) || "�"}</td>
         <td class="amount-cell ${row.rawType}">${formatCurrency(row.rawType === "income" ? row.amount : row.potentialDeductibleAmount)}</td>
         <td class="flags-cell">${buildFlagBadges(row.reviewFlags)}</td>
         <td class="support-cell">${row.supportStatus || row.mappingStatus || ""}</td>
@@ -508,7 +508,7 @@ function buildVehicleClaimForm(row) {
       </div>
       <div class="actual-fields" data-id="${row.id}" style="${isCA ? "display:block" : "display:none"}">
         <label>Business use %</label>
-        <input type="number" class="claim-pct" data-id="${row.id}" placeholder="0–100" min="0" max="100" step="1" />
+        <input type="number" class="claim-pct" data-id="${row.id}" placeholder="0�100" min="0" max="100" step="1" />
       </div>
       ${supportNote}
       <button class="btn btn-primary btn-sm btn-save-claim" data-id="${row.id}">Save Claim</button>
@@ -519,13 +519,13 @@ function syncBulkVehicleMethodOptions() {
   const select = document.getElementById("bulk-vehicle-method");
   if (!select) return;
   if (businessRegion === "CA") {
-    select.innerHTML = `<option value="">— Apply vehicle method —</option><option value="actual">Actual motor vehicle expense %</option>`;
+    select.innerHTML = `<option value="">� Apply vehicle method �</option><option value="actual">Actual motor vehicle expense %</option>`;
   } else {
-    select.innerHTML = `<option value="">— Apply vehicle method —</option><option value="mileage">Mileage method</option><option value="actual">Actual expense method</option>`;
+    select.innerHTML = `<option value="">� Apply vehicle method �</option><option value="mileage">Mileage method</option><option value="actual">Actual expense method</option>`;
   }
 }
 
-// ── Claim / Asset save ─────────────────────────────────────────────────────────
+// -- Claim / Asset save ---------------------------------------------------------
 
 async function saveVehicleClaim(txId) {
   const method = document.querySelector(`.claim-method-sel[data-id="${txId}"]`)?.value;
@@ -588,7 +588,7 @@ async function openAssetForm(txId) {
   }
 }
 
-// ── Bulk apply ─────────────────────────────────────────────────────────────────
+// -- Bulk apply -----------------------------------------------------------------
 
 document.getElementById("btn-bulk-apply").addEventListener("click", async () => {
   if (!selectedIds.size) return;
@@ -623,7 +623,7 @@ document.getElementById("btn-bulk-apply").addEventListener("click", async () => 
   await refreshData();
 });
 
-// ── Selection helpers ──────────────────────────────────────────────────────────
+// -- Selection helpers ----------------------------------------------------------
 
 function toggleSelect(id) {
   if (selectedIds.has(id)) selectedIds.delete(id);
@@ -656,7 +656,7 @@ document.getElementById("chk-all").addEventListener("change", (e) => {
   render();
 });
 
-// ── Filter tabs ────────────────────────────────────────────────────────────────
+// -- Filter tabs ----------------------------------------------------------------
 
 document.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => {
@@ -668,7 +668,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
   });
 });
 
-// ── Toast ──────────────────────────────────────────────────────────────────────
+// -- Toast ----------------------------------------------------------------------
 
 function showToast(msg, type = "neutral") {
   const el = document.getElementById("toast");
@@ -677,7 +677,7 @@ function showToast(msg, type = "neutral") {
   setTimeout(() => el.classList.remove("show"), 3200);
 }
 
-// ── Render orchestration ───────────────────────────────────────────────────────
+// -- Render orchestration -------------------------------------------------------
 
 function render() {
   filteredRows = applyFilter(allRows, activeFilter);
@@ -696,17 +696,17 @@ async function refreshData() {
   render();
 }
 
-// ── Home office worksheet ────────────────────────────────────────────────────
+// -- Home office worksheet ----------------------------------------------------
 
 function formatHomeOfficeStatus(worksheet) {
-  if (!worksheet) return "Not set — add a worksheet so the export includes a home-office deduction.";
+  if (!worksheet) return "Not set � add a worksheet so the export includes a home-office deduction.";
   if (worksheet.method === "simplified") {
-    return `Simplified · ${worksheet.office_area_sqft || 0} sq ft · ${worksheet.months_used} mo (tax year ${worksheet.tax_year})`;
+    return `Simplified � ${worksheet.office_area_sqft || 0} sq ft � ${worksheet.months_used} mo (tax year ${worksheet.tax_year})`;
   }
   const total = Number(worksheet.total_area_sqft) || 0;
   const office = Number(worksheet.office_area_sqft) || 0;
   const pct = total > 0 ? Math.round((office / total) * 100) : 0;
-  return `Actual · ${office}/${total} sq ft (${pct}% business use) · ${worksheet.months_used} mo (tax year ${worksheet.tax_year})`;
+  return `Actual � ${office}/${total} sq ft (${pct}% business use) � ${worksheet.months_used} mo (tax year ${worksheet.tax_year})`;
 }
 
 async function loadHomeOffice() {
@@ -757,7 +757,7 @@ async function openHomeOfficeForm() {
 
 document.getElementById("btn-home-office").addEventListener("click", openHomeOfficeForm);
 
-// ── Init ───────────────────────────────────────────────────────────────────────
+// -- Init -----------------------------------------------------------------------
 
 (async () => {
   await refreshData();

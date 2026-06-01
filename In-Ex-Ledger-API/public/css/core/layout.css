@@ -1099,12 +1099,6 @@ main.app-shell.sidebar-collapsed ~ .dynamic-sidebar-quick-panel {
   flex-wrap: nowrap !important;
 }
 
-/* Separate the secondary surfaces (mileage, analytics, messages) from the core
-   workflow links so the navigation hierarchy reads at a glance. */
-.topbar-nav a.is-secondary-start {
-  margin-left: auto !important;
-}
-
 .app-topbar .topbar-nav:not(.is-ready) {
   visibility: hidden !important;
   pointer-events: none !important;

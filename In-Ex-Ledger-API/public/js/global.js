@@ -105,11 +105,8 @@ function normalizeRoute(value) {
 }
 
 function renderCanonicalTopbarNavigation() {
-  // Ordered to match the core bookkeeping flow: bring in transactions, keep
-  // proof (receipts), bill (invoices), hand off (exports), with
-  // categories/accounts as setup. Review stays inside Exports rather than as a
-  // competing top-level destination. Secondary surfaces (mileage, analytics,
-  // messages) are grouped after a separator so the hierarchy reads.
+  // Keep the familiar in-app navigation order. Review stays inside Exports
+  // rather than as a competing top-level destination.
   const links = [
     {
       href: "/transactions",
@@ -119,25 +116,11 @@ function renderCanonicalTopbarNavigation() {
       icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg>'
     },
     {
-      href: "/receipts",
-      route: "receipts",
-      i18n: "nav_receipts",
-      label: "Receipts",
-      icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg>'
-    },
-    {
-       href: "/invoices",
-       route: "invoices",
-       i18n: "nav_invoices",
-       label: "Invoices",
-       icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5"></rect><path d="M5 5h6M5 8h6M5 11h4"></path></svg>'
-    },
-    {
-      href: "/exports",
-      route: "exports",
-      i18n: "nav_exports",
-      label: "Exports",
-      icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg>'
+      href: "/accounts",
+      route: "accounts",
+      i18n: "nav_accounts",
+      label: "Accounts",
+      icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg>'
     },
     {
       href: "/categories",
@@ -147,33 +130,44 @@ function renderCanonicalTopbarNavigation() {
       icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg>'
     },
     {
-      href: "/accounts",
-      route: "accounts",
-      i18n: "nav_accounts",
-      label: "Accounts",
-      icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg>'
+      href: "/receipts",
+      route: "receipts",
+      i18n: "nav_receipts",
+      label: "Receipts",
+      icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="12" rx="1.5"></rect><path d="M6 5h4M6 8h4M6 11h2"></path></svg>'
     },
     {
       href: "/mileage",
       route: "mileage",
       i18n: "nav_mileage",
       label: "Mileage",
-      secondary: true,
       icon: '<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2"></circle><path d="M8 2v2M8 12v2M2 8h2M12 8h2"></path></svg>'
+    },
+    {
+      href: "/exports",
+      route: "exports",
+      i18n: "nav_exports",
+      label: "Exports",
+      icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M3 10l3-4 2 2 3-4 3 4"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg>'
+    },
+    {
+       href: "/invoices",
+       route: "invoices",
+       i18n: "nav_invoices",
+       label: "Invoices",
+       icon: '<svg viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="12" height="14" rx="1.5"></rect><path d="M5 5h6M5 8h6M5 11h4"></path></svg>'
     },
     {
       href: "/analytics",
       route: "analytics",
       i18n: "nav_analytics",
       label: "Analytics",
-      secondary: true,
       icon: '<svg viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 2 4-6"></path><rect x="2" y="2" width="12" height="12" rx="2"></rect></svg>'
     },
     {
       href: "/messages",
       route: "messages",
       label: "Messages",
-      secondary: true,
       dataAttr: ' data-nav-messages="true"',
       icon: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4z"></path><path d="M2 4l6 5 6-5"></path></svg>',
       trailing: '<span class="nav-msg-badge" data-count="0" hidden></span>'
@@ -187,14 +181,9 @@ function renderCanonicalTopbarNavigation() {
       return;
     }
 
-    nav.innerHTML = links.map((link, index) => {
+    nav.innerHTML = links.map((link) => {
       const classes = [];
       if (currentRoute === link.route) classes.push("is-active");
-      if (link.secondary) {
-        classes.push("is-secondary");
-        // Mark the first demoted item so CSS can separate it from the core group.
-        if (index === 0 || !links[index - 1].secondary) classes.push("is-secondary-start");
-      }
       const i18nAttr = link.i18n ? ` data-i18n="${link.i18n}"` : "";
       const dataAttr = link.dataAttr || "";
       return `<a href="${link.href}" class="${classes.join(" ")}"${dataAttr}>
