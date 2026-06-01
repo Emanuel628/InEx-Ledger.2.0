@@ -6,27 +6,50 @@ let pendingDeleteId = null;
 let invoiceStatusFilter = "";
 
 let invoiceDefaultCurrency = "CAD";
+let invoiceRegion = "CA";
 
 function currencyForRegion(region) {
   const normalized = String(region || "").trim().toUpperCase();
   return normalized === "US" ? "USD" : "CAD";
 }
 
+function localeForRegion(region) {
+  return String(region || "").trim().toUpperCase() === "US" ? "en-US" : "en-CA";
+}
+
+function resolveInvoiceRegionCandidate(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  return normalized === "US" ? "US" : normalized === "CA" ? "CA" : "";
+}
+
 async function loadInvoiceDefaults() {
+  const storedRegion = resolveInvoiceRegionCandidate(
+    (typeof localStorage !== "undefined" && (localStorage.getItem("lb_region") || localStorage.getItem("region")))
+    || window.LUNA_REGION
+  );
+  if (storedRegion) {
+    invoiceRegion = storedRegion;
+    invoiceDefaultCurrency = currencyForRegion(storedRegion);
+  }
+
   try {
     const res = await apiFetch("/api/me");
     if (!res || !res.ok) return;
 
     const profile = await res.json();
-    const region =
+    const region = resolveInvoiceRegionCandidate(
       profile?.active_business?.region ||
       profile?.onboarding?.data?.region ||
       profile?.country ||
-      "CA";
+      storedRegion ||
+      "CA"
+    );
 
+    invoiceRegion = region || "CA";
     invoiceDefaultCurrency = currencyForRegion(region);
   } catch (_) {
-    invoiceDefaultCurrency = "CAD";
+    invoiceRegion = storedRegion || "CA";
+    invoiceDefaultCurrency = currencyForRegion(invoiceRegion);
   }
 }
 
@@ -35,7 +58,7 @@ const STATUS_CLASSES = { draft: "badge-draft", sent: "badge-sent", paid: "badge-
 
 function fmtMoney(amount, currency) {
   const n = Number(amount) || 0;
-  const locale = (typeof navigator !== "undefined" && navigator.language) || "en-CA";
+  const locale = localeForRegion(invoiceRegion);
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: currency || invoiceDefaultCurrency,
@@ -96,10 +119,10 @@ function renderInvoiceStats() {
 
   const drafts = invoiceList.filter((inv) => inv.status === "draft").length;
   const overdue = invoiceList.filter(isOverdue).length;
-  const sampleCurrency = invoiceList[0]?.currency || invoiceDefaultCurrency;
+  const statsCurrency = invoiceDefaultCurrency;
 
-  document.getElementById("statOutstanding").textContent = fmtMoney(outstanding, sampleCurrency);
-  document.getElementById("statPaid30").textContent = fmtMoney(paid30, sampleCurrency);
+  document.getElementById("statOutstanding").textContent = fmtMoney(outstanding, statsCurrency);
+  document.getElementById("statPaid30").textContent = fmtMoney(paid30, statsCurrency);
   document.getElementById("statDrafts").textContent = String(drafts);
   document.getElementById("statTotal").textContent = String(invoiceList.length);
   const overdueEl = document.getElementById("statOverdue");

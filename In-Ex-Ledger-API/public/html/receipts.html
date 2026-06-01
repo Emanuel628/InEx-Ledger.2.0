@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260601b" />
-  <link rel="stylesheet" href="/css/pages/receipts.css?v=20260526a" />
+  <link rel="stylesheet" href="/css/pages/receipts.css?v=20260601b" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -110,13 +110,17 @@
         <button type="button" class="receipt-drop-browse" id="receiptDropBrowse" data-i18n="receipts_drop_browse">browse to upload</button>
       </div>
 
-      <section class="receipts-card">
+      <section class="receipts-card receipts-card--collapsible is-collapsed" id="receiptsTrailSection">
         <div class="receipts-card-head">
           <div>
             <h2 data-i18n="receipts_uploaded_title">Receipts in your support trail</h2>
             <p data-i18n="receipts_uploaded_blurb">Filter what is linked, what still needs attention, and clean up your receipt trail before export.</p>
           </div>
           <div class="receipts-toolbar">
+            <button type="button" class="receipts-section-toggle" id="receiptsTrailToggle" aria-expanded="false" aria-controls="receiptsTrailBody">
+              <span class="receipts-section-toggle-label">Open</span>
+              <span class="receipts-section-toggle-icon" aria-hidden="true">+</span>
+            </button>
             <div class="receipts-filter-group" id="receiptsFilterGroup">
               <select id="receiptsFilterSelect" class="receipt-link-select" aria-label="Filter receipts">
                 <option value="all" data-i18n="receipts_filter_all">All</option>
@@ -129,28 +133,28 @@
             <button type="button" class="receipt-refresh-btn" id="receiptRefreshButton" data-i18n="common_refresh">Refresh</button>
           </div>
         </div>
+        <div id="receiptsTrailBody" class="receipts-collapsible-body" hidden>
+          <table class="receipts-table">
+            <thead>
+              <tr>
+                <th class="receipt-column receipt-column-filename" data-i18n="receipts_table_filename">Filename</th>
+                <th class="receipt-column receipt-column-uploaded" data-i18n="receipts_table_uploaded">Uploaded date</th>
+                <th data-i18n="receipts_table_attached">Attached to transaction</th>
+                <th class="receipt-column receipt-column-actions" data-i18n="common_actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="receiptsTableBody"></tbody>
+          </table>
 
-        <table class="receipts-table">
-          <thead>
-            <tr>
-              <th class="receipt-column receipt-column-filename" data-i18n="receipts_table_filename">Filename</th>
-              <th class="receipt-column receipt-column-uploaded" data-i18n="receipts_table_uploaded">Uploaded date</th>
-              <th data-i18n="receipts_table_attached">Attached to transaction</th>
-              <th class="receipt-column receipt-column-actions" data-i18n="common_actions">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="receiptsTableBody"></tbody>
-        </table>
+          <div id="receiptsEmptyState" class="receipts-empty-state">
+            <h3 data-i18n="receipts_empty_title">No receipts yet</h3>
+            <p data-i18n="receipts_empty_body">Upload a receipt and link it to a transaction.</p>
+          </div>
 
-        <div id="receiptsEmptyState" class="receipts-empty-state">
-          <h3 data-i18n="receipts_empty_title">No receipts yet</h3>
-          <p data-i18n="receipts_empty_body">Upload a receipt and link it to a transaction.</p>
-        </div>
-
-        <!-- M-15: Bottom upload button -->
-        <div class="receipts-card-footer">
-          <input type="file" id="receiptUploadInputBottom" class="hidden-upload-input" accept="image/*,.pdf" multiple />
-          <button type="button" class="receipt-bottom-upload-btn" id="receiptUploadButtonBottom" data-i18n="receipts_button_upload">+ Upload receipt</button>
+          <div class="receipts-card-footer">
+            <input type="file" id="receiptUploadInputBottom" class="hidden-upload-input" accept="image/*,.pdf" multiple />
+            <button type="button" class="receipt-bottom-upload-btn" id="receiptUploadButtonBottom" data-i18n="receipts_button_upload">+ Upload receipt</button>
+          </div>
         </div>
       </section>
     </div>
@@ -197,7 +201,7 @@
   <script src="../js/auth.js?v=20260527c"></script>
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
-  <script src="../js/receipts.js?v=20260526a"></script>
+  <script src="../js/receipts.js?v=20260601b"></script>
 </body>
 </html>
 

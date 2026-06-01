@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
 
+  initReceiptsTrailCollapse();
   wireReceiptUpload();
   wireReceiptDropZone();
   wireReceiptLinkModal();
@@ -38,6 +39,44 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadReceipts();
   updateReceiptsDot();
 });
+
+function setReceiptsTrailCollapsed(collapsed) {
+  const section = document.getElementById("receiptsTrailSection");
+  const body = document.getElementById("receiptsTrailBody");
+  const toggle = document.getElementById("receiptsTrailToggle");
+  const label = toggle?.querySelector(".receipts-section-toggle-label");
+  const icon = toggle?.querySelector(".receipts-section-toggle-icon");
+  const nextCollapsed = Boolean(collapsed);
+
+  if (section) {
+    section.classList.toggle("is-collapsed", nextCollapsed);
+  }
+  if (body) {
+    body.hidden = nextCollapsed;
+  }
+  if (toggle) {
+    toggle.setAttribute("aria-expanded", String(!nextCollapsed));
+  }
+  if (label) {
+    label.textContent = nextCollapsed ? "Open" : "Close";
+  }
+  if (icon) {
+    icon.textContent = nextCollapsed ? "+" : "−";
+  }
+}
+
+function initReceiptsTrailCollapse() {
+  const toggle = document.getElementById("receiptsTrailToggle");
+  if (!toggle) {
+    return;
+  }
+  setReceiptsTrailCollapsed(true);
+  toggle.addEventListener("click", () => {
+    const section = document.getElementById("receiptsTrailSection");
+    const isCollapsed = section?.classList.contains("is-collapsed");
+    setReceiptsTrailCollapsed(!isCollapsed);
+  });
+}
 
 function wireReceiptFilters() {
   const filterSelect = document.getElementById("receiptsFilterSelect");
