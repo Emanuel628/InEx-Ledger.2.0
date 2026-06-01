@@ -45,7 +45,7 @@
       if (!response.ok) throw new Error('Unable to load profile.');
       var profile = await response.json();
       var business = profile.active_business || profile.business || profile.current_business || {};
-      setText('mobileActiveBusiness', business.name || profile.business_name || profile.activeBusinessName || 'Current workspace');
+      setText('mobileActiveBusiness', business.name || profile.business_name || profile.activeBusinessName || 'Current business');
       setText('mobilePlanStatus', formatPlan(profile.subscription));
       var mfaEnabled = Boolean(profile.mfa_enabled || profile.mfaEnabled || profile.security?.mfa_enabled);
       setText('mobileSecurityStatus', mfaEnabled ? 'MFA on' : 'MFA not enabled');

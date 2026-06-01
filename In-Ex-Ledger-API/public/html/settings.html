@@ -65,9 +65,9 @@
       <section class="settings-overview" id="settings-overview">
         <div class="settings-page-heading">
           <div class="settings-page-heading-copy">
-            <span class="settings-page-kicker">Workspace administration</span>
+            <span class="settings-page-kicker">Account &amp; business settings</span>
             <h1 data-i18n="settings_overview_title">Settings</h1>
-            <p data-i18n="settings_overview_intro">Keep your business profile, billing, security, and privacy controls organized in one calm workspace.</p>
+            <p data-i18n="settings_overview_intro">Keep your business profile, billing, security, and privacy controls organized in one place.</p>
           </div>
           <div class="settings-page-heading-actions">
             <a href="subscription" class="settings-secondary-btn" data-i18n="settings_manage_subscription">Manage subscription</a>
@@ -75,11 +75,11 @@
           </div>
         </div>
 
-        <div class="settings-state-strip" aria-label="Workspace status">
+        <div class="settings-state-strip" aria-label="Account status">
           <div class="settings-state-card">
             <span class="settings-state-label">Active business</span>
             <strong id="settingsHeroActiveBusiness" class="settings-state-value">Loading...</strong>
-            <p id="settingsHeroBusinessMeta" class="settings-state-meta">Checking workspace businesses...</p>
+            <p id="settingsHeroBusinessMeta" class="settings-state-meta">Checking businesses...</p>
           </div>
           <div class="settings-state-card">
             <span class="settings-state-label">Billing</span>
@@ -208,7 +208,7 @@
         <div class="settings-subpanel">
           <div class="settings-subpanel-head">
             <h3 data-i18n="settings_business_details_title">Active business details</h3>
-            <p data-i18n="settings_business_details_desc">Business identity, tax profile, and address for the currently active workspace.</p>
+            <p data-i18n="settings_business_details_desc">Business identity, tax profile, and address.</p>
           </div>
           <p id="exportProfileGuideNote" class="settings-helper-note settings-export-guide-note hidden">Complete the highlighted fields to finish your secure export.</p>
           <form id="businessProfileForm" class="business-form">
@@ -649,7 +649,7 @@
         <div class="settings-subpanel">
           <div class="settings-subpanel-head">
             <h3>ChatGPT connector</h3>
-            <p>Read-only in this phase. ChatGPT can review your books, receipts, exports, invoices, and tax reminders, but it cannot change anything.</p>
+            <p>Read-only by design. ChatGPT can review your books, receipts, exports, invoices, and tax reminders, but it cannot change anything.</p>
           </div>
           <div class="settings-row">
             <div class="settings-row-copy">
@@ -814,7 +814,7 @@
   <div id="businessEditModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="businessEditModalTitle">
     <div class="transaction-modal-content business-edit-modal">
       <h3 id="businessEditModalTitle">Edit business</h3>
-      <p class="business-edit-modal-copy">Update the selected business without switching away from the current workspace.</p>
+      <p class="business-edit-modal-copy">Update the selected business without switching your active business.</p>
       <form id="businessEditForm" class="business-form">
         <input type="hidden" id="businessEditId" />
         <div class="settings-form-grid">
