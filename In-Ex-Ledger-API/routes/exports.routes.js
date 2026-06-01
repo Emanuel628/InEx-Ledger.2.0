@@ -25,6 +25,7 @@ const {
 const { decrypt: decryptField } = require("../services/encryptionService.js");
 const { buildCsvBundle } = require("../services/csvExportService.js");
 const { buildQuickMethodSchedule } = require("../services/quickMethodService.js");
+const { buildRegularMethodSchedule } = require("../services/regularMethodService.js");
 const {
   sendExportGeneratedEmail,
   sendExportFailedEmail
@@ -763,6 +764,20 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       }
     }
 
+    // Phase 6: compute Regular Method GST/HST reconciliation if applicable
+    let regularMethodSchedule = null;
+    if (region === "ca" && business.gst_hst_registered === true && business.gst_hst_method === "regular") {
+      try {
+        regularMethodSchedule = buildRegularMethodSchedule({
+          transactions: sourceRows.transactions,
+          taxYear: sourceRows.taxYear,
+          province: business.province || ""
+        });
+      } catch (rmErr) {
+        logError("Regular Method schedule computation failed (non-fatal)", { err: rmErr.message });
+      }
+    }
+
     const sharedOptions = {
       transactions: sourceRows.transactions,
       accounts: sourceRows.accounts,
@@ -799,6 +814,7 @@ router.post("/generate", exportGrantLimiter, async (req, res) => {
       capitalAssets: sourceRows.capitalAssets,
       capitalAssetTxMap: sourceRows.capitalAssetTxMap,
       quickMethodSchedule,
+      regularMethodSchedule,
       packageAttribution: {
         generatedByName: actorDisplayName,
         generatedAt,

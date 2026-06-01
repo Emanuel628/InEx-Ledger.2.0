@@ -611,6 +611,63 @@ test("Canada export resolves T2125 review lines", () => {
   assert.match(pdf, /\(Confirm fiscal year with preparer\.\) Tj/);
 });
 
+test("Canada regular-method export renders the GST/HST reconciliation worksheet", () => {
+  const pdf = buildPdfExport(buildFixtureOptions({
+    region: "ca",
+    province: "ON",
+    currency: "CAD",
+    gstHstRegistered: true,
+    gstHstNumber: "123456789RT0001",
+    gstHstMethod: "regular",
+    fiscalYearStart: "2025-12-31",
+    entityType: "sole_prop",
+    naics: "541510",
+    regularMethodSchedule: {
+      supported: true,
+      taxYear: 2026,
+      province: "ON",
+      collectedOnSales: 195,
+      itcsClaimed: 39,
+      taxPaidNotClaimed: 6.5,
+      netTaxToRemit: 156,
+      isRefund: false,
+      incomeCount: 2,
+      incomeWithTaxCount: 2,
+      expenseRecoverableCount: 2,
+      expenseTaxNotRecoverableCount: 1,
+      note: "Net tax = GST/HST collected on sales minus input tax credits (ITCs) on eligible expenses (ETA s. 225)."
+    }
+  })).toString("latin1");
+  assert.match(pdf, /GST\/HST Regular Method Worksheet/);
+  assert.match(pdf, /GST\/HST collected on sales:/);
+  assert.match(pdf, /Net tax to remit:/);
+});
+
+test("Canada regular-method export shows a review notice when GST/HST was not captured", () => {
+  const pdf = buildPdfExport(buildFixtureOptions({
+    region: "ca",
+    province: "ON",
+    currency: "CAD",
+    gstHstRegistered: true,
+    gstHstNumber: "123456789RT0001",
+    gstHstMethod: "regular",
+    fiscalYearStart: "2025-12-31",
+    entityType: "sole_prop",
+    naics: "541510",
+    regularMethodSchedule: {
+      supported: false,
+      taxYear: 2026,
+      province: "ON",
+      collectedOnSales: 0,
+      itcsClaimed: 0,
+      netTaxToRemit: 0,
+      unsupportedReason: "No GST/HST amounts were recorded on transactions in this period.",
+      note: "Regular-method reconciliation needs per-transaction GST/HST amounts."
+    }
+  })).toString("latin1");
+  assert.match(pdf, /Regular Method Review Required/);
+});
+
 test("route generate stores nonzero page count metadata and saves only the redacted copy", async () => {
   const fixture = loadExportsRouter();
   try {
