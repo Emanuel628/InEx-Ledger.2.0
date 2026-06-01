@@ -20,7 +20,8 @@ function loadBillingRouter({
     stripeCustomerId: null,
     normalizationUpdates: 0,
     country,
-    missingSubscriptionRow
+    missingSubscriptionRow,
+    auditCalls: []
   };
 
   const originalLoad = Module._load.bind(Module);
@@ -99,6 +100,18 @@ function loadBillingRouter({
         updateStripeCustomerForBusiness: async () => {},
         syncStripeSubscriptionForBusiness: async () => {},
         setFreePlanForBusiness: async () => {}
+      };
+    }
+
+    if (requestName === "../services/auditEventService.js" || /auditEventService\.js$/.test(requestName)) {
+      return {
+        AUDIT_ACTIONS: {
+          BILLING_CHECKOUT_STARTED: "billing.checkout.started"
+        },
+        async recordAuditEventForRequest(_pool, _req, payload) {
+          state.auditCalls.push(payload);
+          return "audit-1";
+        }
       };
     }
 
@@ -513,6 +526,30 @@ test("billing checkout persists a created Stripe customer even when the subscrip
       String(entry.url).endsWith("/customers")
     );
     assert.ok(customerInsert, "Stripe customer should still be created and persisted");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout records an audit event with resolved checkout metadata", async () => {
+  const fixture = loadBillingRouter({ country: "Canada" });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 2,
+        returnPath: "/trial-setup?next=%2Ftransactions"
+      });
+
+    assert.equal(res.status, 200);
+    assert.equal(fixture.state.auditCalls.length, 1);
+    assert.equal(fixture.state.auditCalls[0].action, "billing.checkout.started");
+    assert.equal(fixture.state.auditCalls[0].businessId, "22222222-2222-4222-8222-222222222222");
+    assert.equal(fixture.state.auditCalls[0].metadata.billingInterval, "monthly");
+    assert.equal(fixture.state.auditCalls[0].metadata.currency, "cad");
+    assert.equal(fixture.state.auditCalls[0].metadata.additionalBusinesses, 2);
   } finally {
     fixture.cleanup();
   }

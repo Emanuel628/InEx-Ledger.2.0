@@ -8,16 +8,50 @@ const request = require("supertest");
 
 const MESSAGES_ROUTE_PATH = require.resolve("../routes/messages.routes.js");
 
-function loadMessagesRouter({ contactRows = [], archivedRows = [] } = {}) {
+function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows = null } = {}) {
   const originalLoad = Module._load.bind(Module);
+  const state = { auditCalls: [] };
 
   Module._load = function (requestName, parent, isMain) {
     if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
       return {
         pool: {
-          async query(sql) {
+          async query(sql, params = []) {
             if (/FROM users u/i.test(sql)) {
               return { rows: contactRows, rowCount: contactRows.length };
+            }
+
+            if (/SELECT id, role FROM users WHERE id = \$1 LIMIT 1/i.test(sql)) {
+              const rows = receiverRows || [{ id: params[0], role: "it_support" }];
+              return { rows, rowCount: rows.length };
+            }
+
+            if (/INSERT INTO messages/i.test(sql)) {
+              return {
+                rows: [{
+                  id: "55555555-5555-4555-8555-555555555555"
+                }],
+                rowCount: 1
+              };
+            }
+
+            if (/WHERE m.id = \$1$/i.test(sql.trim())) {
+              return {
+                rows: [{
+                  id: "55555555-5555-4555-8555-555555555555",
+                  sender_id: "11111111-1111-4111-8111-111111111111",
+                  receiver_id: params[0] ? "22222222-2222-4222-8222-222222222222" : null,
+                  sender_name: "Owner Example",
+                  sender_email: "owner@example.com",
+                  receiver_name: "Support Example",
+                  receiver_email: "support@example.com",
+                  message_type: "support_request",
+                  subject: "Need help",
+                  body: "Please help with export cleanup",
+                  invoice_number: null
+                }],
+                rowCount: 1
+              };
             }
 
             if (/GET \/messages\/archived/i.test(sql)) {
@@ -64,6 +98,18 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [] } = {}) {
       return { logError() {}, logWarn() {}, logInfo() {} };
     }
 
+    if (requestName === "../services/auditEventService.js" || /auditEventService\.js$/.test(requestName)) {
+      return {
+        AUDIT_ACTIONS: {
+          SUPPORT_REQUEST_CREATED: "support.request.created"
+        },
+        async recordAuditEventForRequest(_pool, _req, payload) {
+          state.auditCalls.push(payload);
+          return "audit-1";
+        }
+      };
+    }
+
     return originalLoad(requestName, parent, isMain);
   };
 
@@ -77,6 +123,7 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [] } = {}) {
 
     return {
       app,
+      state,
       cleanup() {
         delete require.cache[MESSAGES_ROUTE_PATH];
         Module._load = originalLoad;
@@ -95,6 +142,28 @@ test("messages contacts do not inject a non-UUID support placeholder", async () 
     const res = await request(fixture.app).get("/api/messages/contacts");
     assert.equal(res.status, 200);
     assert.deepEqual(res.body, { contacts: [] });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("messages POST records an audit event for support requests", async () => {
+  const fixture = loadMessagesRouter();
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/messages")
+      .send({
+        receiver_id: "22222222-2222-4222-8222-222222222222",
+        message_type: "support_request",
+        subject: "Need help",
+        body: "Please help with export cleanup"
+      });
+
+    assert.equal(res.status, 201);
+    assert.equal(fixture.state.auditCalls.length, 1);
+    assert.equal(fixture.state.auditCalls[0].action, "support.request.created");
+    assert.equal(fixture.state.auditCalls[0].metadata.messageType, "support_request");
   } finally {
     fixture.cleanup();
   }

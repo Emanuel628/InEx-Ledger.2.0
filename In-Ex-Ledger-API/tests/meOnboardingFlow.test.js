@@ -15,7 +15,8 @@ function loadMeRouterFixture(options = {}) {
     resolvedOptions: [],
     dbQueries: [],
     txQueries: [],
-    clientReleased: false
+    clientReleased: false,
+    auditCalls: []
   };
 
   const userRow = {
@@ -175,6 +176,21 @@ function loadMeRouterFixture(options = {}) {
       };
     }
 
+    if (requestName === "../services/auditEventService.js" || /auditEventService\.js$/.test(requestName)) {
+      return {
+        AUDIT_ACTIONS: {
+          ONBOARDING_COMPLETED: "onboarding.completed"
+        },
+        async recordAuditEventForRequest(_pool, _req, payload) {
+          state.auditCalls.push(payload);
+          return "audit-1";
+        },
+        async listAuditEventsForUser() {
+          return [];
+        }
+      };
+    }
+
     if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
       return {
         logError() {},
@@ -289,6 +305,39 @@ test("PUT /api/me/onboarding sends a first-time trial user directly to trial set
 
     assert.equal(response.status, 200);
     assert.equal(response.body.redirect_to, "/trial-setup?next=%2Ftransactions");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("PUT /api/me/onboarding records an onboarding completed audit event", async () => {
+  const fixture = loadMeRouterFixture({
+    subscriptionSnapshot: {
+      effectiveStatus: "trialing",
+      stripeSubscriptionId: null,
+      isTrialDowngradedToFree: false
+    }
+  });
+
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .put("/api/me/onboarding")
+      .send({
+        business_name: "Audit Trail LLC",
+        starter_account_type: "checking",
+        starter_account_name: "Main Checking",
+        region: "US",
+        language: "en",
+        start_focus: "transactions"
+      });
+
+    assert.equal(response.status, 200);
+    assert.equal(fixture.state.auditCalls.length, 1);
+    assert.equal(fixture.state.auditCalls[0].action, "onboarding.completed");
+    assert.equal(fixture.state.auditCalls[0].businessId, "business-1");
+    assert.equal(fixture.state.auditCalls[0].metadata.startFocus, "transactions");
+    assert.equal(fixture.state.auditCalls[0].metadata.redirectedToTrialSetup, true);
   } finally {
     fixture.cleanup();
   }
