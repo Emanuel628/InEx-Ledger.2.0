@@ -98,7 +98,7 @@ test("plaidTransactionToCanonical flips Plaid sign convention (positive=expense)
   assert.equal(expense.type, "expense");
   assert.equal(expense.currency, "USD");
   assert.equal(expense.pending, false);
-  assert.equal(expense.category_guess, "Food and Drink");
+  assert.equal(expense.category_guess, "Food and Drink > Restaurants");
 });
 
 test("plaidTransactionToCanonical maps negative amount to income", () => {

@@ -124,6 +124,21 @@ function loadTransactionsRouter(options = {}) {
                 ]
               };
             }
+            if (/SELECT id, date, type, category_id, import_source/i.test(sql)) {
+              return {
+                rowCount: 1,
+                rows: [{
+                  id: TEST_TRANSACTION_ID,
+                  date: "2026-05-01",
+                  type: "income",
+                  category_id: TEST_CATEGORY_ID,
+                  import_source: null,
+                  merchant_name: null,
+                  category_guess: null,
+                  description: "Client A"
+                }]
+              };
+            }
             if (/SELECT id,\s*date\s+FROM transactions/i.test(sql)) {
               return {
                 rowCount: 1,
