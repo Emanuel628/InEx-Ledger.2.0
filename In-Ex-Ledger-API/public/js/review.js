@@ -291,13 +291,17 @@ function renderReviewFocusCard() {
   const topIssue = getTopIssue(item);
   const severity = topIssue?.severity === "hard" ? "Hard blocker" : "Warning";
   const quickAction = getReviewQuickAction(item);
+  const focusExplanation = topIssue?.explanation || item.supportSummary || "Needs cleanup";
+  const reasonText = getCategoryReasonText(item);
   card.hidden = false;
   card.innerHTML = `
     <div class="review-focus-card-copy">
       <span class="review-focus-badge ${topIssue?.severity === "hard" ? "is-hard" : "is-warning"}">${escapeText(severity)}</span>
       <h3>${escapeText(item.description || "(No description)")}</h3>
       <p>${escapeText(item.date || "")} · ${escapeText(item.categoryName || "Uncategorized")} · ${escapeText(formatMoney(item.amount, item.currency))}</p>
-      <p class="review-focus-note">${escapeText(topIssue?.label || item.supportSummary || "Needs cleanup")}</p>
+      <p class="review-focus-note">${escapeText(topIssue?.label || "Needs cleanup")}</p>
+      <p class="review-focus-why">${escapeText(focusExplanation)}</p>
+      ${reasonText ? `<p class="review-focus-reason">${escapeText(reasonText)}</p>` : ""}
     </div>
     <div class="review-focus-card-actions">
       <button type="button" class="review-secondary-btn" data-review-focus-open>Open item</button>
@@ -343,6 +347,59 @@ function renderQuickFilters(issueSummary) {
   });
 }
 
+function getCategoryReasonText(item) {
+  const reason = item?.categoryReason;
+  if (!reason) return "";
+  return String(reason.summary || "").trim();
+}
+
+function renderIssueChip(issue) {
+  const severityClass = issue.severity === "hard" ? "is-hard" : "is-warning";
+  const blockClass = issue.blocksExport ? " is-blocking" : "";
+  const title = issue.explanation ? ` title="${escapeText(issue.explanation)}"` : "";
+  return `<span class="review-issue-chip ${severityClass}${blockClass}"${title}>${escapeText(issue.label)}</span>`;
+}
+
+function renderWhyDetail(item) {
+  const reasonText = getCategoryReasonText(item);
+  const issues = item.issueEntries || [];
+
+  const categorySection = `
+    <div class="review-why-section">
+      <h4>${escapeText(tx("review_why_categorized", "Why it was categorized this way"))}</h4>
+      <p>${escapeText(item.categoryName || tx("review_why_no_category", "No category assigned yet."))}${reasonText ? ` — ${escapeText(reasonText)}` : ""}</p>
+    </div>
+  `;
+
+  const flagItems = issues.map((issue) => `
+    <li>
+      <span class="review-why-flag ${issue.severity === "hard" ? "is-hard" : "is-warning"}">${escapeText(issue.label)}</span>
+      ${issue.blocksExport ? `<span class="review-why-block-tag">${escapeText(tx("review_why_blocks_export", "Blocks export"))}</span>` : ""}
+      ${issue.explanation ? `<span class="review-why-flag-note">${escapeText(issue.explanation)}</span>` : ""}
+    </li>
+  `).join("");
+
+  const flagSection = `
+    <div class="review-why-section">
+      <h4>${escapeText(tx("review_why_flagged", "Why it is flagged"))}</h4>
+      <ul class="review-why-flags">${flagItems || `<li><span class="review-why-flag-note">${escapeText(tx("review_why_no_flags", "No open flags."))}</span></li>`}</ul>
+    </div>
+  `;
+
+  const blockerLabels = Array.isArray(item.exportBlockerLabels) ? item.exportBlockerLabels : [];
+  const exportText = item.blocksExport
+    ? `${tx("review_why_export_blocked", "Still blocking a finalized export package:")} ${blockerLabels.join(", ")}`
+    : tx("review_why_export_ready", "Nothing here blocks a finalized export — remaining items are review-only.");
+  const exportSection = `
+    <div class="review-why-section">
+      <h4>${escapeText(tx("review_why_export", "What is blocking export readiness"))}</h4>
+      <p class="${item.blocksExport ? "review-why-export-blocked" : "review-why-export-ready"}">${escapeText(exportText)}</p>
+    </div>
+  `;
+
+  return `${categorySection}${flagSection}${exportSection}`;
+}
+
 function renderQueue() {
   const tbody = document.getElementById("reviewQueueBody");
   const loading = document.getElementById("reviewQueueLoading");
@@ -377,6 +434,7 @@ function renderQueue() {
     } else if ((item.receiptCount || 0) === 0) {
       supportParts.push(tx("review_support_no_receipt", "No receipt linked"));
     }
+    const reasonText = getCategoryReasonText(item);
     return `
       <tr>
         <td class="review-select-col">
@@ -390,17 +448,19 @@ function renderQueue() {
               <span>${escapeText(amount)}</span>
               <span>${escapeText(item.categoryName || "")}</span>
             </div>
+            ${reasonText ? `<div class="review-transaction-reason">${escapeText(reasonText)}</div>` : ""}
           </div>
         </td>
         <td>
           <span class="review-status-badge review-status-badge--${escapeText(mapFilterStatus(item))}">
             ${escapeText(item.reviewStatus)}
           </span>
+          ${item.blocksExport ? `<div class="review-blocks-export-tag">${escapeText(tx("review_blocks_export", "Blocks export"))}</div>` : ""}
         </td>
         <td>
           <div class="review-issue-list">
             ${((item.issueEntries || []).length
-              ? item.issueEntries.map((issue) => `<span class="review-issue-chip ${issue.severity === "hard" ? "is-hard" : "is-warning"}">${escapeText(issue.label)}</span>`).join("")
+              ? item.issueEntries.map((issue) => renderIssueChip(issue)).join("")
               : issues.map((issue) => `<span class="review-issue-chip">${escapeText(issue)}</span>`).join(""))}
           </div>
         </td>
@@ -417,7 +477,14 @@ function renderQueue() {
               ? `<button type="button" class="review-row-support-btn" data-quick-transaction="${escapeText(item.id)}">${escapeText(quickAction.label)}</button>`
               : `<button type="button" class="review-row-support-btn" data-support-transaction="${escapeText(item.id)}">${escapeText(tx("review_add_support", "Add support"))}</button>`}
             <button type="button" class="review-row-support-btn" data-issue-transaction="${escapeText(item.id)}">${escapeText(tx("review_manage_issue", "Manage issue"))}</button>
+            <button type="button" class="review-row-why-btn" data-why-transaction="${escapeText(item.id)}" aria-expanded="false">${escapeText(tx("review_why_toggle", "Why?"))}</button>
           </div>
+        </td>
+      </tr>
+      <tr class="review-why-row" data-why-row="${escapeText(item.id)}" hidden>
+        <td></td>
+        <td colspan="5">
+          <div class="review-why-detail">${renderWhyDetail(item)}</div>
         </td>
       </tr>
     `;
@@ -448,6 +515,17 @@ function renderQueue() {
       if (item) {
         void openIssueModal(item);
       }
+    });
+  });
+  tbody.querySelectorAll("[data-why-transaction]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const transactionId = button.getAttribute("data-why-transaction");
+      const detailRow = tbody.querySelector(`[data-why-row="${CSS.escape(String(transactionId))}"]`);
+      if (!detailRow) return;
+      const nextHidden = !detailRow.hidden;
+      detailRow.hidden = nextHidden;
+      button.setAttribute("aria-expanded", nextHidden ? "false" : "true");
+      button.classList.toggle("is-active", !nextHidden);
     });
   });
   tbody.querySelectorAll("[data-select-transaction]").forEach((checkbox) => {

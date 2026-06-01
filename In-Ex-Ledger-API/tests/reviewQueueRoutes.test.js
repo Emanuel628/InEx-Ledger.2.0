@@ -135,7 +135,9 @@ function loadReviewRouterFixture(options = {}) {
                 receiptCount: 0,
                 receiptAttached: false,
                 supportSummary: "Assign category",
-                reviewNotes: ""
+                reviewNotes: "",
+                categoryMappingReason: "fallback_imported",
+                categoryMappingConfidence: "low"
               },
               {
                 id: "tx_review",
@@ -215,7 +217,9 @@ function loadReviewRouterFixture(options = {}) {
                 receiptCount: 0,
                 receiptAttached: false,
                 supportSummary: "Refund/reversal review",
-                reviewNotes: ""
+                reviewNotes: "",
+                categoryMappingReason: "manual",
+                categoryMappingConfidence: "manual"
               },
               {
                 id: "tx_mapped",
@@ -317,6 +321,37 @@ test("GET /api/review/queue returns only unresolved items with summary", async (
   });
   assert.equal(state.datasetOptions.vehicleClaimMap.get("tx_vehicle").transaction_id, "tx_vehicle");
   assert.equal(state.datasetOptions.capitalAssetTxMap.get("tx_asset").transaction_id, "tx_asset");
+});
+
+test("GET /api/review/queue surfaces why-visibility data on queue rows", async () => {
+  const { app, state } = loadReviewRouterFixture();
+
+  const response = await request(app).get("/api/review/queue");
+
+  assert.equal(response.status, 200);
+
+  const transactionQuery = state.queries.find((entry) => /FROM transactions t/i.test(entry.sql));
+  assert.match(transactionQuery.sql, /category_mapping_reason/);
+  assert.match(transactionQuery.sql, /category_mapping_confidence/);
+  assert.match(transactionQuery.sql, /category_mapping_rule_id/);
+
+  const actionItem = response.body.queue.find((item) => item.id === "tx_action");
+  assert.ok(actionItem.categoryReason, "expected a category reason summary");
+  assert.equal(actionItem.categoryReason.code, "fallback_imported");
+  assert.match(actionItem.categoryReason.summary, /import placeholder/i);
+  assert.match(actionItem.categoryReason.summary, /low confidence/i);
+
+  // tx_action has hard flags (NC, MD), so it blocks a finalized export.
+  assert.equal(actionItem.blocksExport, true);
+  const categoryIssue = actionItem.issueEntries.find((entry) => entry.issueCode === "needs_category");
+  assert.equal(categoryIssue.blocksExport, true);
+  assert.match(categoryIssue.explanation, /category/i);
+  assert.ok(actionItem.exportBlockerLabels.length >= 1);
+
+  // Excluded refund/reversal items are review-only and should not block export.
+  const excludedItem = response.body.queue.find((item) => item.id === "tx_excluded");
+  assert.equal(excludedItem.blocksExport, false);
+  assert.equal(excludedItem.categoryReason.code, "manual");
 });
 
 test("GET /api/review/queue forwards date filters to transaction query", async () => {

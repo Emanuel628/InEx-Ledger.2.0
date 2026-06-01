@@ -103,6 +103,88 @@ const VALID_ISSUE_SEVERITIES = new Set(["warning", "hard"]);
 const VALID_ISSUE_STATUSES = new Set(["open", "resolved", "waived"]);
 const USER_NAME_SQL = "COALESCE(u.display_name, u.full_name, u.email)";
 
+// Plain-language explanation of how a category was assigned during import,
+// so the queue can answer "why was this categorized this way?".
+const CATEGORY_REASON_LABELS = {
+  mapping_rule: "Matched one of your saved mapping rules",
+  merchant_history: "Learned from how you categorized this merchant before",
+  description_history: "Learned from similar past descriptions",
+  canonical_rule: "Matched a built-in merchant keyword rule",
+  review_only_pattern: "Matched a pattern that always needs a human check",
+  fallback_imported: "No confident match was found, so it was left as an import placeholder",
+  manual: "You set this category by hand"
+};
+
+const CONFIDENCE_LABELS = {
+  high: "high confidence",
+  medium: "medium confidence",
+  low: "low confidence",
+  manual: "set manually"
+};
+
+// Plain-language reason each issue is flagged, so the queue can answer
+// "why is this flagged?" without the user translating a code or short label.
+const ISSUE_EXPLANATIONS = {
+  needs_category: "No real business category is assigned yet, so it can't be totaled or mapped to a tax line.",
+  needs_tax_mapping: "The category isn't mapped to a filing line, so it won't land anywhere on the tax form.",
+  final_confirmation_needed: "Everything looks mapped, but it still needs a final confirmation before export.",
+  needs_receipt_support: "There's no receipt or source document tied to this expense yet.",
+  needs_business_purpose: "A documented business purpose is needed to support the deduction.",
+  needs_allocation: "Part of this may be personal, so a business-use split is needed.",
+  needs_mileage_log: "Vehicle costs need a mileage log to support the business-use claim.",
+  needs_home_office_support: "Home-office costs need supporting detail before they can be claimed.",
+  needs_capital_asset_review: "This looks like a capital item that needs an asset review, not a straight expense.",
+  possible_personal_item: "The details suggest this might be personal rather than a business expense.",
+  transfer_review: "This looks like a transfer or balance movement, not real income or expense.",
+  refund_reversal_review: "This looks like a refund or reversal that should be matched to its original item.",
+  possible_duplicate: "This closely matches another transaction and may be a duplicate.",
+  missing_description: "There's no usable description, so it can't be reliably categorized or audited.",
+  foreign_currency_review: "Foreign-currency details need a check before the converted amount can be trusted.",
+  indirect_tax_review: "The sales-tax (GST/HST) treatment needs a review.",
+  cpa_review_required: "This is judgment-heavy and is being held for CPA review.",
+  excluded_review: "It's excluded from the business P&L but still needs a quick confirmation that's correct.",
+  reviewer_note: "A reviewer left a note that still needs follow-up."
+};
+
+// Hard issues are the ones that block a finalized export package.
+const EXPORT_BLOCKING_ISSUE_CODES = new Set([
+  "needs_category",
+  "needs_tax_mapping",
+  "needs_receipt_support",
+  "needs_business_purpose",
+  "needs_allocation",
+  "needs_mileage_log",
+  "needs_home_office_support",
+  "needs_capital_asset_review",
+  "missing_description",
+  "cpa_review_required"
+]);
+
+function issueBlocksExport(entry) {
+  if (!entry) return false;
+  return entry.severity === "hard" || EXPORT_BLOCKING_ISSUE_CODES.has(entry.issueCode);
+}
+
+function describeCategoryReason(row) {
+  const code = String(row?.categoryMappingReason || "").trim().toLowerCase();
+  const confidence = String(row?.categoryMappingConfidence || "").trim().toLowerCase();
+  if (!code && !confidence) return null;
+
+  const reasonText = CATEGORY_REASON_LABELS[code] || "";
+  const confidenceText = CONFIDENCE_LABELS[confidence] || "";
+  const summary = [reasonText, confidenceText].filter(Boolean).join(" · ");
+  if (!summary) return null;
+
+  return {
+    code: code || "",
+    confidence: confidence || "",
+    reasonLabel: reasonText,
+    confidenceLabel: confidenceText,
+    ruleId: row?.categoryMappingRuleId || "",
+    summary
+  };
+}
+
 function parseDateFilter(value) {
   const raw = String(value || "").trim();
   if (!raw) return null;
@@ -270,11 +352,17 @@ function buildQueueRows(rows, issueStateRowsByTransaction = new Map()) {
   return (rows || [])
     .map((row) => {
       const issueEntries = mergeIssueState(row, issueStateRowsByTransaction.get(row.id) || [])
-        .sort(compareIssueEntries);
+        .sort(compareIssueEntries)
+        .map((entry) => ({
+          ...entry,
+          explanation: ISSUE_EXPLANATIONS[entry.issueCode] || "",
+          blocksExport: issueBlocksExport(entry)
+        }));
       if (!issueEntries.length) {
         return null;
       }
       const primaryIssue = issueEntries[0] || null;
+      const exportBlockers = issueEntries.filter((entry) => entry.blocksExport);
       return {
         id: row.id,
         date: row.date,
@@ -292,6 +380,9 @@ function buildQueueRows(rows, issueStateRowsByTransaction = new Map()) {
         reviewFlags: row.reviewFlags || [],
         issueLabels: issueEntries.map((entry) => entry.label),
         issueEntries,
+        categoryReason: describeCategoryReason(row),
+        blocksExport: exportBlockers.length > 0,
+        exportBlockerLabels: exportBlockers.map((entry) => entry.label),
         receiptCount: row.receiptCount || 0,
         receiptAttached: row.receiptAttached === true,
         supportSummary: row.supportSummary || "",
@@ -376,7 +467,8 @@ router.get("/queue", async (req, res) => {
         `SELECT t.id, t.account_id, t.category_id, t.amount, t.type, t.description, t.note, t.date,
                 t.currency, t.source_amount, t.exchange_rate, t.exchange_date, t.converted_amount,
                 t.tax_treatment, t.indirect_tax_amount, t.indirect_tax_recoverable, t.personal_use_pct,
-                t.review_status, t.review_notes, t.payer_name, t.tax_form_type
+                t.review_status, t.review_notes, t.payer_name, t.tax_form_type,
+                t.category_mapping_reason, t.category_mapping_confidence, t.category_mapping_rule_id
            FROM transactions t
           WHERE t.business_id = $1
             AND t.deleted_at IS NULL
