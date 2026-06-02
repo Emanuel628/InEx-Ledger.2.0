@@ -247,19 +247,13 @@
       </form>
 
       <section class="history-card export-preflight-card is-collapsible is-collapsed" id="exportPreflightCard">
-        <div class="history-card-head export-preflight-head">
-          <div>
+        <button type="button" class="history-card-head exports-card-head-toggle export-preflight-head" data-collapse-toggle aria-expanded="false" aria-controls="exportPreflightBody">
+          <div class="exports-card-title-copy">
             <h2 data-i18n="exports_preflight_title">Finalization review</h2>
             <p data-i18n="exports_preflight_subtitle">Check blockers and reviewer warnings before exporting a finalized CPA package.</p>
           </div>
-          <div class="exports-section-actions">
-            <button type="button" class="exports-section-toggle" data-collapse-toggle aria-expanded="false" aria-controls="exportPreflightBody">
-              <span class="exports-section-toggle-label">Open</span>
-              <span class="exports-section-toggle-icon" aria-hidden="true">+</span>
-            </button>
-            <button type="button" id="exportPreflightRefreshBtn" class="history-download export-preflight-refresh" data-i18n="common_refresh">Refresh</button>
-          </div>
-        </div>
+          <span class="exports-section-chevron" aria-hidden="true"></span>
+        </button>
         <div id="exportPreflightBody" class="exports-collapsible-body" hidden>
           <div id="exportPreflightState" class="export-preflight-state">
             <div class="history-empty" data-i18n="exports_preflight_empty">Choose a valid date range to load the finalization review.</div>
@@ -267,43 +261,50 @@
         </div>
       </section>
 
-      <section class="history-card export-review-card is-collapsible is-collapsed" id="exportReviewQueueSection">
-        <div class="history-card-head export-review-head">
-          <div>
-            <h2>Review queue</h2>
-            <p>Use the same export window to clear the transactions that still block a clean handoff.</p>
-          </div>
-          <div class="export-review-controls">
-            <button type="button" class="exports-section-toggle" data-collapse-toggle aria-expanded="false" aria-controls="exportReviewBody">
-              <span class="exports-section-toggle-label">Open</span>
-              <span class="exports-section-toggle-icon" aria-hidden="true">+</span>
-            </button>
-            <label for="exportReviewFilter" class="export-review-filter-label">Filter</label>
-            <select id="exportReviewFilter" class="export-review-filter">
-              <option value="all">All open items</option>
-              <option value="hard">Hard blockers</option>
-              <option value="warning">Warnings</option>
-            </select>
-          </div>
+      <button
+        type="button"
+        class="history-card-head exports-card-head-toggle export-review-head"
+        data-collapse-toggle
+        aria-expanded="false"
+        aria-controls="exportReviewBody"
+        >
+        <div class="exports-card-title-copy">
+          <h2>Review queue</h2>
+          <p>Use the same export window to clear the transactions that still block a clean handoff.</p>
         </div>
+        <span class="exports-section-chevron" aria-hidden="true"></span>
+      </button>
+      
         <div id="exportReviewBody" class="exports-collapsible-body" hidden>
           <div id="exportReviewState" class="export-review-state">
             <div class="history-empty">Choose a valid date range to load the review queue.</div>
           </div>
         </div>
+        <div class="exports-filter-bar">
+          <label for="exportReviewFilter" class="export-review-filter-label">Filter</label>
+          <select id="exportReviewFilter" class="export-review-filter">
+            <option value="all">All open items</option>
+            <option value="hard">Hard blockers</option>
+            <option value="warning">Warnings</option>
+          </select>
+        </div>
       </section>
 
       <section class="history-card is-collapsible is-collapsed" id="exportHistorySection">
-        <div class="history-card-head">
-          <div>
+        <button
+          type="button"
+          class="history-card-head exports-card-head-toggle"
+          data-collapse-toggle
+          aria-expanded="false"
+          aria-controls="exportHistoryBody"
+          >
+          <div class="exports-card-title-copy">
             <h2 data-i18n="exports_history_title">Export history</h2>
             <p data-i18n="exports_history_subtitle">Your last 5 generated exports</p>
           </div>
-          <button type="button" class="exports-section-toggle" data-collapse-toggle aria-expanded="false" aria-controls="exportHistoryBody">
-            <span class="exports-section-toggle-label">Open</span>
-            <span class="exports-section-toggle-icon" aria-hidden="true">+</span>
-          </button>
-        </div>
+          
+          <span class="exports-section-chevron" aria-hidden="true"></span>
+        </button>
         <div id="exportHistoryBody" class="exports-collapsible-body" hidden>
           <div class="history-columns" aria-hidden="true">
             <span data-i18n="exports_history_file_name">File name</span>
