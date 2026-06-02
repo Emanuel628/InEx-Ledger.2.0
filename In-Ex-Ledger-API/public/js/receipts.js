@@ -44,24 +44,19 @@ function setReceiptsTrailCollapsed(collapsed) {
   const section = document.getElementById("receiptsTrailSection");
   const body = document.getElementById("receiptsTrailBody");
   const toggle = document.getElementById("receiptsTrailToggle");
-  const label = toggle?.querySelector(".receipts-section-toggle-label");
-  const icon = toggle?.querySelector(".receipts-section-toggle-icon");
   const nextCollapsed = Boolean(collapsed);
 
   if (section) {
     section.classList.toggle("is-collapsed", nextCollapsed);
+    section.classList.toggle("is-open", !nextCollapsed);
   }
+
   if (body) {
     body.hidden = nextCollapsed;
   }
+
   if (toggle) {
     toggle.setAttribute("aria-expanded", String(!nextCollapsed));
-  }
-  if (label) {
-    label.textContent = nextCollapsed ? "Open" : "Close";
-  }
-  if (icon) {
-    icon.textContent = nextCollapsed ? "+" : "−";
   }
 }
 
@@ -91,12 +86,6 @@ function wireReceiptFilters() {
     });
   });
 }
-
-function wireReceiptReviewActions() {
-  document.getElementById("receiptRefreshButton")?.addEventListener("click", async () => {
-    await loadTransactionMap();
-    await loadReceipts();
-  });
 
   document.getElementById("receiptFixNextButton")?.addEventListener("click", () => {
     openNextReceiptForReview();
