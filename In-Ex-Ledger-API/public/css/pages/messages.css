@@ -1343,3 +1343,33 @@
     padding: 18px !important;
   }
 }
+
+@media (max-width: 720px) {
+  .messages-refresh-btn {
+    width: 100%;
+  }
+}
+
+.messages-refresh-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(15, 25, 35, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--accent2);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.messages-refresh-btn:hover,
+.messages-refresh-btn:focus-visible {
+  background: #f8fbff;
+  border-color: rgba(36, 109, 187, 0.18);
+  outline: none;
+}
+
+.messages-refresh-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
