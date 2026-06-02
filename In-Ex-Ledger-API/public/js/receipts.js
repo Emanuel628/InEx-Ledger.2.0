@@ -44,6 +44,8 @@ function setReceiptsTrailCollapsed(collapsed) {
   const section = document.getElementById("receiptsTrailSection");
   const body = document.getElementById("receiptsTrailBody");
   const toggle = document.getElementById("receiptsTrailToggle");
+  const label = toggle?.querySelector(".receipts-section-toggle-label");
+  const icon = toggle?.querySelector(".receipts-section-toggle-icon");
   const nextCollapsed = Boolean(collapsed);
 
   if (section) {
@@ -57,6 +59,12 @@ function setReceiptsTrailCollapsed(collapsed) {
 
   if (toggle) {
     toggle.setAttribute("aria-expanded", String(!nextCollapsed));
+  }
+  if (label) {
+    label.textContent = nextCollapsed ? tx("review_support_open") : tx("common_close");
+  }
+  if (icon) {
+    icon.textContent = nextCollapsed ? "+" : "-";
   }
 }
 

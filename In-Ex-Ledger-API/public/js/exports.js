@@ -305,6 +305,8 @@ function setExportSectionCollapsed(section, collapsed) {
 
   const body = section.querySelector(".exports-collapsible-body");
   const toggle = section.querySelector("[data-collapse-toggle]");
+  const label = toggle?.querySelector(".exports-section-toggle-label");
+  const icon = toggle?.querySelector(".exports-section-toggle-icon");
   const nextCollapsed = Boolean(collapsed);
 
   section.classList.toggle("is-collapsed", nextCollapsed);
@@ -316,6 +318,12 @@ function setExportSectionCollapsed(section, collapsed) {
 
   if (toggle) {
     toggle.setAttribute("aria-expanded", String(!nextCollapsed));
+  }
+  if (label) {
+    label.textContent = nextCollapsed ? tx("review_support_open") : tx("common_close");
+  }
+  if (icon) {
+    icon.textContent = nextCollapsed ? "+" : "-";
   }
 }
 

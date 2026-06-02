@@ -18,8 +18,14 @@ function localeForRegion(region) {
 }
 
 function resolveInvoiceRegionCandidate(value) {
-  const normalized = String(value || "").trim().toUpperCase();
-  return normalized === "US" ? "US" : normalized === "CA" ? "CA" : "";
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["us", "usa", "united states", "united states of america"].includes(normalized)) {
+    return "US";
+  }
+  if (["ca", "canada"].includes(normalized)) {
+    return "CA";
+  }
+  return "";
 }
 
 async function loadInvoiceDefaults() {
