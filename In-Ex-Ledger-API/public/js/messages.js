@@ -905,23 +905,44 @@ async function sendComposedMessage() {
     bodyEl?.focus();
     return;
   }
-
-  // Contacting support stays inside the internal message center.
-  const supportContact = receiverId === SUPPORT_CONTACT_VALUE ? findSupportContact() : null;
-  if (receiverId === SUPPORT_CONTACT_VALUE && !supportContact) {
-  if (errorEl) {
-    errorEl.textContent = "No in-app support contact is available right now.";
-  }
-  return;
-  }
   
-  const normalizedReceiverId = receiverId === SUPPORT_CONTACT_VALUE
-  ? supportContact.id
-  : receiverId;
+  if (receiverId === SUPPORT_CONTACT_VALUE) {
+  if (errorEl) errorEl.textContent = "";
 
-  const normalizedMessageType = receiverId === SUPPORT_CONTACT_VALUE
-  ? "support_request"
-  : messageType;
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.textContent = translate("messages_sending", "Sending...");
+  }
+
+  try {
+    const response = await apiFetch("/api/messages/support-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subject: subject || "Support Request",
+        body
+      })
+    });
+
+    if (!response || !response.ok) {
+      const error = response ? await response.json().catch(() => ({})) : {};
+      if (errorEl) errorEl.textContent = error.error || "Failed to send support request.";
+      return;
+    }
+
+    closeComposeModal();
+    showToast("Support request sent.");
+    return;
+  } catch {
+    if (errorEl) errorEl.textContent = "Network error. Please try again.";
+    return;
+  } finally {
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.textContent = translate("messages_compose_send_btn", "Send");
+    }
+  }
+}
 
   if (errorEl) errorEl.textContent = "";
 
@@ -935,8 +956,8 @@ async function sendComposedMessage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        receiver_id: normalizedReceiverId,
-        message_type: normalizedMessageType,
+        receiver_id: receiverId,
+        message_type: messageType,
         subject: subject || undefined,
         body
       })
