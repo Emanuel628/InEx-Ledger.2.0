@@ -454,7 +454,8 @@
   font-size: 12px;
 }
 
-.history-card {
+.history-card + .history-card {
+  margin-top: 22px;
   padding: 22px;
 }
 
