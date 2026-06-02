@@ -1202,3 +1202,63 @@
     width: 100%;
   }
 }
+
+.exports-card-head-toggle {
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-card-head.exports-card-head-toggle {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 56px 22px 22px;
+}
+
+.exports-card-title-copy {
+  min-width: 0;
+}
+
+.exports-section-chevron {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 11px;
+  height: 11px;
+  border-right: 2px solid #9aa4b2;
+  border-bottom: 2px solid #9aa4b2;
+  transform: rotate(45deg);
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.history-card.is-open .exports-section-chevron {
+  transform: rotate(225deg);
+}
+
+.exports-card-head-toggle:hover .exports-section-chevron,
+.exports-card-head-toggle:focus-visible .exports-section-chevron {
+  border-color: #64748b;
+}
+
+.exports-card-head-toggle:focus-visible {
+  outline: 2px solid rgba(37, 99, 168, 0.25);
+  outline-offset: -4px;
+}
+
+.exports-filter-bar {
+  padding: 0 22px 18px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.exports-filter-bar .export-review-filter {
+  width: min(260px, 100%);
+}
