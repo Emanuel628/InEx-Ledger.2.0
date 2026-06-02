@@ -861,12 +861,6 @@ function closeComposeModal() {
 }
 
 function openSupportComposer() {
-  const supportContact = findSupportContact();
-  if (!supportContact) {
-    showToast("No live in-app support contact is available right now. Use support.inex@gmail.com.");
-    return;
-  }
-
   openComposeModal({
     to: SUPPORT_CONTACT_VALUE,
     type: "support_request",
@@ -907,14 +901,10 @@ async function sendComposedMessage() {
 
   // Contacting support: hand off to the user's email client, since support is
   // reached by email (support.inex@gmail.com) rather than an in-app account.
-  if (receiverId === SUPPORT_CONTACT_VALUE) {
-    const mailtoSubject = encodeURIComponent(subject || "Support Request");
-    const mailtoBody = encodeURIComponent(body);
-    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${mailtoSubject}&body=${mailtoBody}`;
-    closeComposeModal();
-    showToast(translate("messages_toast_support_email", "Opening your email app to contact support."));
-    return;
-  }
+  const normalizedReceiverId = receiverId === SUPPORT_CONTACT_VALUE ? null : receiverId;
+  const normalizedMessageType = receiverId === SUPPORT_CONTACT_VALU
+  ? "support_request"
+  : messageType;
 
   if (errorEl) errorEl.textContent = "";
 
@@ -928,8 +918,8 @@ async function sendComposedMessage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        receiver_id: receiverId,
-        message_type: messageType,
+        receiver_id: normalizedReceiverId,
+        message_type: normalizedMessageType,
         subject: subject || undefined,
         body
       })
