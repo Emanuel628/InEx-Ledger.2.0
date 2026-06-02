@@ -578,6 +578,88 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+router.post("/support-email", async (req, res) => {
+  try {
+    const subject = String(req.body?.subject || "Support Request").trim().slice(0, MAX_SUBJECT_LEN);
+    const body = String(req.body?.body || "").trim().slice(0, MAX_BODY_LEN);
+
+    if (!body) {
+      return res.status(400).json({ error: "Message body is required." });
+    }
+
+    const resend = getResendClient();
+    if (!resend) {
+      return res.status(503).json({ error: "Email service is not configured." });
+    }
+
+    const supportTo = String(process.env.SUPPORT_TO_EMAIL || "support.inex@gmail.com").trim();
+    const supportFrom = String(
+      process.env.SUPPORT_FROM_EMAIL ||
+      process.env.RESEND_FROM_EMAIL ||
+      process.env.EMAIL_FROM ||
+      "InEx Ledger Support <support@inexledger.com>"
+    ).trim();
+
+    const userEmail = req.user?.email || "Unknown user";
+    const userId = req.user?.id || "Unknown ID";
+
+    const text = [
+      `Support request from InEx Ledger`,
+      ``,
+      `User email: ${userEmail}`,
+      `User ID: ${userId}`,
+      ``,
+      `Subject: ${subject}`,
+      ``,
+      body
+    ].join("\n");
+
+    const html = `
+      <p><strong>Support request from InEx Ledger</strong></p>
+      <p>
+        <strong>User email:</strong> ${escapeHtml(userEmail)}<br/>
+        <strong>User ID:</strong> ${escapeHtml(userId)}
+      </p>
+      <p><strong>Subject:</strong> ${escapeHtml(subject)}</p>
+      <p>${escapeHtml(body).replace(/\n/g, "<br/>")}</p>
+    `;
+
+    const sendResult = await resend.emails.send({
+      from: supportFrom,
+      to: supportTo,
+      subject: `[InEx Support] ${subject}`,
+      text,
+      html
+    });
+
+    if (sendResult?.error) {
+      return res.status(sendResult.error.statusCode || 502).json({
+        error: sendResult.error.message || "Failed to send support request.",
+        details: sendResult.error
+      });
+    }
+
+    await recordAuditEventForRequest(pool, req, {
+      action: AUDIT_ACTIONS.SUPPORT_REQUEST_CREATED,
+      metadata: {
+        delivery: "email",
+        to: supportTo,
+        subject
+      }
+    });
+
+    res.status(201).json({
+      ok: true,
+      delivery: "email",
+      to: supportTo,
+      resend_id: sendResult?.data?.id || null
+    });
+  } catch (err) {
+    logError("POST /messages/support-email error:", err.message);
+    res.status(500).json({ error: "Failed to send support request." });
+  }
+});
+
 // POST /api/messages
 // Send a new message (or reply when parent_id is provided).
 router.post("/", async (req, res) => {
