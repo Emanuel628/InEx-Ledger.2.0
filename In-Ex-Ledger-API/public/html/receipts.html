@@ -111,29 +111,23 @@
       </div>
 
       <section class="receipts-card receipts-card--collapsible is-collapsed" id="receiptsTrailSection">
-        <div class="receipts-card-head">
-          <div>
+        <button type="button" class="receipts-card-head receipts-card-head-toggle" id="receiptsTrailToggle" aria-expanded="false" aria-controls="receiptsTrailBody">
+          <div class="receipts-card-title-copy">
             <h2 data-i18n="receipts_uploaded_title">Receipts in your support trail</h2>
             <p data-i18n="receipts_uploaded_blurb">Filter what is linked, what still needs attention, and clean up your receipt trail before export.</p>
           </div>
-          <div class="receipts-toolbar">
-            <button type="button" class="receipts-section-toggle" id="receiptsTrailToggle" aria-expanded="false" aria-controls="receiptsTrailBody">
-              <span class="receipts-section-toggle-label">Open</span>
-              <span class="receipts-section-toggle-icon" aria-hidden="true">+</span>
-            </button>
-            <div class="receipts-filter-group" id="receiptsFilterGroup">
-              <select id="receiptsFilterSelect" class="receipt-link-select" aria-label="Filter receipts">
-                <option value="all" data-i18n="receipts_filter_all">All</option>
-                <option value="unlinked" data-i18n="receipts_filter_unlinked">Unlinked</option>
-                <option value="linked" data-i18n="receipts_filter_linked">Linked</option>
-                <option value="review" data-i18n="receipts_filter_review">Needs review</option>
-                <option value="recent" data-i18n="receipts_filter_recent">Uploaded recently</option>
-              </select>
-            </div>
-            <button type="button" class="receipt-refresh-btn" id="receiptRefreshButton" data-i18n="common_refresh">Refresh</button>
-          </div>
-        </div>
+          <span class="receipts-section-chevron" aria-hidden="true"></span>
+        </button>
         <div id="receiptsTrailBody" class="receipts-collapsible-body" hidden>
+          <div class="receipts-filter-bar">
+            <select id="receiptsFilterSelect" class="receipt-link-select" aria-label="Filter receipts">
+              <option value="all" data-i18n="receipts_filter_all">All</option>
+              <option value="unlinked" data-i18n="receipts_filter_unlinked">Unlinked</option>
+              <option value="linked" data-i18n="receipts_filter_linked">Linked</option>
+              <option value="review" data-i18n="receipts_filter_review">Needs review</option>
+              <option value="recent" data-i18n="receipts_filter_recent">Uploaded recently</option>
+            </select>
+          </div>
           <table class="receipts-table">
             <thead>
               <tr>
