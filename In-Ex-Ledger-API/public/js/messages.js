@@ -11,7 +11,7 @@ const MAILBOX_META = {
     title: "Inbox",
     headerSubtitle: "Invoice replies, support threads, and verified account contacts in one queue.",
     surfaceTitle: "Conversation queue",
-    surfaceSubtitle: "Review invoice replies and support work, then archive finished threads without losing history.",
+    surfaceSubtitle: "Review invoice follow-up, client replies, and support work, then archive finished threads without losing the history behind them.",
     queueMeta: "Visible in your inbox"
   },
   sent: {

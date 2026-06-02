@@ -201,6 +201,20 @@ function buildExportReviewUrl({ issue = "", transactionId = "" } = {}) {
   return `exports?${params.toString()}#exportReviewQueueSection`;
 }
 
+function formatMissingProfileFieldLabel(fieldKey) {
+  const normalized = String(fieldKey || "").trim().toLowerCase();
+  const labels = {
+    business_type: tx("settings_label_business_type"),
+    business_activity_code: tx("onboarding_business_activity_code"),
+    accounting_method: tx("onboarding_accounting_method")
+  };
+  const translated = labels[normalized];
+  if (translated && translated !== normalized) {
+    return translated;
+  }
+  return normalized.replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
 function resolveExportIssueAction(item) {
   const code = String(item?.code || "").trim().toLowerCase();
   if (!code) {
@@ -1144,7 +1158,7 @@ function renderExportPreflight(finalization) {
   };
 
   const profileNote = missingFields.length
-    ? `<p class="export-preflight-note">${escapeHtml(tx("exports_preflight_profile_missing"))}: ${escapeHtml(missingFields.join(", "))}</p>`
+    ? `<p class="export-preflight-note">${escapeHtml(tx("exports_preflight_profile_missing"))}: ${escapeHtml(missingFields.map(formatMissingProfileFieldLabel).join(", "))}</p>`
     : "";
   const blockedNote = hardBlockers.length > 0 && getSelectedExportMode() === "finalized"
     ? `<p class="export-preflight-note">${escapeHtml(tx("exports_preflight_note_finalized_blocked"))}</p>`

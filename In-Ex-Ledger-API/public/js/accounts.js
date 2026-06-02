@@ -324,7 +324,21 @@ function setText(id, value) {
   if (node) node.textContent = String(value);
 }
 
+function getActiveBusinessRegion() {
+  const activeBusiness = window.__LUNA_ME__?.active_business;
+  const normalized = String(activeBusiness?.region || "").trim().toUpperCase();
+  return normalized === "CA" ? "CA" : normalized === "US" ? "US" : "";
+}
+
 function inferLedgerCurrency() {
+  const activeBusinessRegion = getActiveBusinessRegion();
+  if (activeBusinessRegion) {
+    return activeBusinessRegion === "CA" ? "CAD" : "USD";
+  }
+  const accountCurrency = accountRecordsCache.find((account) => account?.currency)?.currency;
+  if (accountCurrency) {
+    return String(accountCurrency).toUpperCase();
+  }
   const storedRegion = String(localStorage.getItem("lb_region") || window.LUNA_REGION || "").toUpperCase();
   return storedRegion === "CA" ? "CAD" : "USD";
 }
