@@ -806,6 +806,13 @@ function populateContactSelect(select) {
   if (currentValue) select.value = currentValue;
 }
 
+function findSupportContact() {
+  return _contacts.find((contact) =>
+    isUuid(contact.id) &&
+    ["it_support", "admin"].includes(String(contact.role || "").toLowerCase())
+  ) || null;
+}
+
 function wireComposeModal() {
   document.getElementById("composeBtn")?.addEventListener("click", openComposeModal);
   document.getElementById("composeCancelBtn")?.addEventListener("click", closeComposeModal);
