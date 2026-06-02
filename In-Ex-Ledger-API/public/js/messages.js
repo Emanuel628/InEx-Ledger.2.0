@@ -900,7 +900,18 @@ async function sendComposedMessage() {
   }
 
   // Contacting support stays inside the internal message center.
-  const normalizedReceiverId = receiverId === SUPPORT_CONTACT_VALUE ? null : receiverId;
+  const supportContact = receiverId === SUPPORT_CONTACT_VALUE ? findSupportContact() : null;
+  if (receiverId === SUPPORT_CONTACT_VALUE && !supportContact) {
+  if (errorEl) {
+    errorEl.textContent = "No in-app support contact is available right now.";
+  }
+  return;
+  }
+  
+  const normalizedReceiverId = receiverId === SUPPORT_CONTACT_VALUE
+  ? supportContact.id
+  : receiverId;
+
   const normalizedMessageType = receiverId === SUPPORT_CONTACT_VALUE
   ? "support_request"
   : messageType;
