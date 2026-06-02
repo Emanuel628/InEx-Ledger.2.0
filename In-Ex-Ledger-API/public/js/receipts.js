@@ -87,6 +87,7 @@ function wireReceiptFilters() {
   });
 }
 
+function wireReceiptReviewActions() {
   document.getElementById("receiptFixNextButton")?.addEventListener("click", () => {
     openNextReceiptForReview();
   });
