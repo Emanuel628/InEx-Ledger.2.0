@@ -71,6 +71,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   wireSidebar();
   wireComposeModal();
   wireDetailPanel();
+  wireMessageRefresh();
   applyMailboxMeta();
 
   await Promise.all([loadContacts(), loadMessages()]);
@@ -811,6 +812,25 @@ function wireComposeModal() {
   document.getElementById("composeSendBtn")?.addEventListener("click", sendComposedMessage);
   document.getElementById("composeOverlay")?.addEventListener("click", (event) => {
     if (event.target === event.currentTarget) closeComposeModal();
+  });
+}
+
+function wireMessageRefresh() {
+  document.getElementById("messagesRefreshBtn")?.addEventListener("click", async () => {
+    const button = document.getElementById("messagesRefreshBtn");
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Refreshing...";
+    }
+
+    try {
+      await loadMessages();
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Refresh";
+      }
+    }
   });
 }
 
