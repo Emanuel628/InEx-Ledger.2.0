@@ -309,6 +309,65 @@
   margin-bottom: 0;
 }
 
+.receipts-card-head-toggle {
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.receipts-card-head {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 56px 22px 22px;
+}
+
+.receipts-card-title-copy {
+  min-width: 0;
+}
+
+.receipts-section-chevron {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 11px;
+  height: 11px;
+  border-right: 2px solid #9aa4b2;
+  border-bottom: 2px solid #9aa4b2;
+  transform: rotate(45deg);
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.receipts-card.is-open .receipts-section-chevron {
+  transform: rotate(225deg);
+}
+
+.receipts-card-head-toggle:hover .receipts-section-chevron,
+.receipts-card-head-toggle:focus-visible .receipts-section-chevron {
+  border-color: #64748b;
+}
+
+.receipts-card-head-toggle:focus-visible {
+  outline: 2px solid rgba(37, 99, 168, 0.25);
+  outline-offset: -4px;
+}
+
+.receipts-filter-bar {
+  padding: 0 22px 18px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.receipts-filter-bar .receipt-link-select {
+  width: min(260px, 100%);
+  margin-top: 0;
+}
+
 .receipts-toolbar {
   display: flex;
   align-items: center;
@@ -732,7 +791,6 @@
 
   .receipts-focus-card,
   .receipts-page-header,
-  .receipts-card-head,
   .receipt-modal-actions {
     flex-direction: column;
     align-items: stretch;
@@ -792,7 +850,6 @@
   }
 
   .receipts-page-header,
-  .receipts-card-head,
   .receipt-modal-actions,
   .modal-actions {
     flex-direction: column !important;
