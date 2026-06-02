@@ -302,24 +302,20 @@ function setExportSectionCollapsed(section, collapsed) {
   if (!section) {
     return;
   }
+
   const body = section.querySelector(".exports-collapsible-body");
   const toggle = section.querySelector("[data-collapse-toggle]");
-  const label = toggle?.querySelector(".exports-section-toggle-label");
-  const icon = toggle?.querySelector(".exports-section-toggle-icon");
   const nextCollapsed = Boolean(collapsed);
 
   section.classList.toggle("is-collapsed", nextCollapsed);
+  section.classList.toggle("is-open", !nextCollapsed);
+
   if (body) {
     body.hidden = nextCollapsed;
   }
+
   if (toggle) {
     toggle.setAttribute("aria-expanded", String(!nextCollapsed));
-  }
-  if (label) {
-    label.textContent = nextCollapsed ? "Open" : "Close";
-  }
-  if (icon) {
-    icon.textContent = nextCollapsed ? "+" : "−";
   }
 }
 
@@ -787,7 +783,6 @@ async function hydrateBusinessProfileCache() {
 function setupExportForm() {
   const form = document.getElementById("exportForm");
   const historyRows = document.getElementById("exportHistoryRows");
-  const preflightRefreshButton = document.getElementById("exportPreflightRefreshBtn");
   const reviewFilter = document.getElementById("exportReviewFilter");
   const ytdYear = new Date().getUTCFullYear();
   const defaultPreset = `${ytdYear}-ytd`;
@@ -804,11 +799,6 @@ function setupExportForm() {
       await refreshExportPreflight();
       await refreshExportReviewQueue(true);
     });
-  });
-
-  preflightRefreshButton?.addEventListener("click", async () => {
-    await refreshExportPreflight(true);
-    await refreshExportReviewQueue(true);
   });
 
   reviewFilter?.addEventListener("change", () => {
