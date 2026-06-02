@@ -899,10 +899,9 @@ async function sendComposedMessage() {
     return;
   }
 
-  // Contacting support: hand off to the user's email client, since support is
-  // reached by email (support.inex@gmail.com) rather than an in-app account.
+  // Contacting support stays inside the internal message center.
   const normalizedReceiverId = receiverId === SUPPORT_CONTACT_VALUE ? null : receiverId;
-  const normalizedMessageType = receiverId === SUPPORT_CONTACT_VALU
+  const normalizedMessageType = receiverId === SUPPORT_CONTACT_VALUE
   ? "support_request"
   : messageType;
 
