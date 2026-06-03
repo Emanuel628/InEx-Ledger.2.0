@@ -10,7 +10,7 @@ const MESSAGES_ROUTE_PATH = require.resolve("../routes/messages.routes.js");
 
 function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows = null } = {}) {
   const originalLoad = Module._load.bind(Module);
-  const state = { auditCalls: [] };
+  const state = { auditCalls: [], sentEmails: [], insertedMessages: [] };
 
   Module._load = function (requestName, parent, isMain) {
     if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
@@ -27,6 +27,7 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
             }
 
             if (/INSERT INTO messages/i.test(sql)) {
+              state.insertedMessages.push({ sql, params });
               return {
                 rows: [{
                   id: "55555555-5555-4555-8555-555555555555"
@@ -74,7 +75,10 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
     ) {
       return {
         requireAuth: (req, _res, next) => {
-          req.user = { id: "11111111-1111-4111-8111-111111111111" };
+          req.user = {
+            id: "11111111-1111-4111-8111-111111111111",
+            email: "owner@example.com"
+          };
           next();
         }
       };
@@ -106,6 +110,21 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
         async recordAuditEventForRequest(_pool, _req, payload) {
           state.auditCalls.push(payload);
           return "audit-1";
+        }
+      };
+    }
+
+    if (requestName === "resend") {
+      return {
+        Resend: class Resend {
+          constructor() {
+            this.emails = {
+              send: async (payload) => {
+                state.sentEmails.push(payload);
+                return { data: { id: "resend-msg-1" } };
+              }
+            };
+          }
         }
       };
     }
@@ -166,6 +185,41 @@ test("messages POST records an audit event for support requests", async () => {
     assert.equal(fixture.state.auditCalls[0].metadata.messageType, "support_request");
   } finally {
     fixture.cleanup();
+  }
+});
+
+test("messages support-email stores an outbound support thread and reply-to routing", async () => {
+  const beforeApiKey = process.env.RESEND_API_KEY;
+  const beforeReplyBase = process.env.SUPPORT_REPLY_BASE_EMAIL;
+  const beforeReplySecret = process.env.SUPPORT_REPLY_HMAC_SECRET;
+  process.env.RESEND_API_KEY = "re_test_123";
+  process.env.SUPPORT_REPLY_BASE_EMAIL = "support@inex.app";
+  process.env.SUPPORT_REPLY_HMAC_SECRET = "support-reply-secret-32-bytes-aaaa";
+
+  const fixture = loadMessagesRouter();
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/messages/support-email")
+      .send({
+        subject: "Need help",
+        body: "Please help with export cleanup"
+      });
+
+    assert.equal(res.status, 201);
+    assert.equal(fixture.state.sentEmails.length, 1);
+    assert.match(String(fixture.state.sentEmails[0].reply_to || ""), /support\+support-/i);
+    assert.equal(fixture.state.insertedMessages.length, 1);
+    assert.equal(fixture.state.auditCalls.length, 1);
+    assert.equal(fixture.state.auditCalls[0].metadata.delivery, "email");
+  } finally {
+    fixture.cleanup();
+    if (beforeApiKey === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = beforeApiKey;
+    if (beforeReplyBase === undefined) delete process.env.SUPPORT_REPLY_BASE_EMAIL;
+    else process.env.SUPPORT_REPLY_BASE_EMAIL = beforeReplyBase;
+    if (beforeReplySecret === undefined) delete process.env.SUPPORT_REPLY_HMAC_SECRET;
+    else process.env.SUPPORT_REPLY_HMAC_SECRET = beforeReplySecret;
   }
 });
 

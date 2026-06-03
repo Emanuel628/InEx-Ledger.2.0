@@ -533,8 +533,11 @@ _currentThread = messages;
     // Inbound invoice replies have no in-app sender to reply to; hide the
     // in-app reply UI in that case.
     const canEmailReply =
-    Boolean(message.invoice_id) &&
-    Boolean(message.external_sender_email) && ["invoice_sent", "invoice_reply"].includes(message.message_type); 
+    Boolean(message.external_sender_email) &&
+    (
+      Boolean(message.invoice_id)
+      || ["support_request", "it_support", "invoice_sent", "invoice_reply"].includes(message.message_type)
+    );
     _currentReplyMode = canEmailReply ? "email" : "in-app";
 
     if (detailReplyBtn) {
@@ -906,6 +909,51 @@ async function sendComposedMessage() {
     return;
   }
   
+  const supportContact = receiverId === SUPPORT_CONTACT_VALUE ? findSupportContact() : null;
+
+  if (receiverId === SUPPORT_CONTACT_VALUE && supportContact) {
+    if (errorEl) errorEl.textContent = "";
+
+    if (sendBtn) {
+      sendBtn.disabled = true;
+      sendBtn.textContent = translate("messages_sending", "Sending...");
+    }
+
+    try {
+      const response = await apiFetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          receiver_id: supportContact.id,
+          message_type: "support_request",
+          subject: subject || "Support Request",
+          body
+        })
+      });
+
+      if (!response || !response.ok) {
+        const error = response ? await response.json().catch(() => ({})) : {};
+        if (errorEl) errorEl.textContent = error.error || "Failed to send support request.";
+        return;
+      }
+
+      closeComposeModal();
+      showToast("Support request sent.");
+      if (_currentMailbox === "sent") {
+        await loadMessages();
+      }
+      return;
+    } catch {
+      if (errorEl) errorEl.textContent = "Network error. Please try again.";
+      return;
+    } finally {
+      if (sendBtn) {
+        sendBtn.disabled = false;
+        sendBtn.textContent = translate("messages_compose_send_btn", "Send");
+      }
+    }
+  }
+  
   if (receiverId === SUPPORT_CONTACT_VALUE) {
   if (errorEl) errorEl.textContent = "";
 
@@ -932,6 +980,9 @@ async function sendComposedMessage() {
 
     closeComposeModal();
     showToast("Support request sent.");
+    if (_currentMailbox === "sent") {
+      await loadMessages();
+    }
     return;
   } catch {
     if (errorEl) errorEl.textContent = "Network error. Please try again.";

@@ -7,9 +7,10 @@ const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const { Resend } = require("resend");
 const { getInvoiceFromEmail, buildReplyToAddress } = require("../services/invoiceEmailService.js");
-const { buildSupportReplyToAddress,
-getSupportFromEmail,
-getSupportToEmail
+const {
+  buildSupportReplyToAddress,
+  getSupportFromEmail,
+  getSupportToEmail
 } = require("../services/supportEmailService.js");
 const {
   AUDIT_ACTIONS,
@@ -77,6 +78,13 @@ function mapMessageRow(row, viewerId) {
     thread_count: row.thread_count || 1,
     thread_has_unread: Boolean(row.thread_has_unread || false),
   };
+}
+
+function threadKeySql(alias = "m") {
+  return `CASE
+    WHEN ${alias}.invoice_id IS NOT NULL THEN 'invoice:' || ${alias}.invoice_id::text
+    ELSE 'message:' || COALESCE(${alias}.parent_id, ${alias}.id)::text
+  END`;
 }
 
 // GET /api/messages/unread-count
@@ -153,10 +161,7 @@ router.get("/inbox", async (req, res) => {
     const { rows } = await pool.query(
   `WITH visible_messages AS (
       SELECT m.*,
-             CASE
-               WHEN m.invoice_id IS NOT NULL THEN 'invoice:' || m.invoice_id::text
-               ELSE 'message:' || m.id::text
-             END AS thread_key
+             ${threadKeySql("m")} AS thread_key
         FROM messages m
        WHERE m.receiver_id = $1
          AND m.is_deleted_by_receiver = FALSE
@@ -205,10 +210,7 @@ router.get("/sent", async (req, res) => {
     const { rows } = await pool.query(
   `WITH visible_messages AS (
       SELECT m.*,
-             CASE
-               WHEN m.invoice_id IS NOT NULL THEN 'invoice:' || m.invoice_id::text
-               ELSE 'message:' || m.id::text
-             END AS thread_key
+             ${threadKeySql("m")} AS thread_key
         FROM messages m
        WHERE m.sender_id = $1
          AND m.is_deleted_by_sender = FALSE
@@ -257,10 +259,7 @@ router.get("/archived", async (req, res) => {
     const { rows } = await pool.query(
   `WITH visible_messages AS (
       SELECT m.*,
-             CASE
-               WHEN m.invoice_id IS NOT NULL THEN 'invoice:' || m.invoice_id::text
-               ELSE 'message:' || m.id::text
-             END AS thread_key
+             ${threadKeySql("m")} AS thread_key
         FROM messages m
        WHERE (
           m.receiver_id = $1
@@ -331,29 +330,35 @@ router.post("/:id/reply-email", async (req, res) => {
               inv.invoice_number,
               inv.business_id,
               b.name AS business_name,
-              b.user_id AS owner_id
+              b.user_id AS owner_id,
+              COALESCE(m.parent_id, m.id) AS thread_root_id
          FROM messages m
-         JOIN invoices_v1 inv ON inv.id = m.invoice_id
-         JOIN businesses b ON b.id = inv.business_id
+         LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
+         LEFT JOIN businesses b ON b.id = inv.business_id
         WHERE m.id = $1
-          AND m.receiver_id = $2
-          AND m.message_type IN ('invoice_sent', 'invoice_reply')
+          AND (
+            (m.receiver_id = $2 AND m.is_deleted_by_receiver = FALSE)
+            OR
+            (m.sender_id = $2 AND m.is_deleted_by_sender = FALSE)
+          )
           AND m.external_sender_email IS NOT NULL
         LIMIT 1`,
       [messageId, req.user.id]
     );
 
     if (!rows.length) {
-      return res.status(404).json({ error: "Invoice reply message not found." });
+      return res.status(404).json({ error: "Email reply message not found." });
     }
 
     const original = rows[0];
 
-    if (original.owner_id !== req.user.id) {
+    if (original.invoice_id && original.owner_id !== req.user.id) {
       return res.status(403).json({ error: "You are not allowed to reply to this message." });
     }
 
-    const replyTo = buildReplyToAddress(original.invoice_id);
+    const replyTo = original.invoice_id
+      ? buildReplyToAddress(original.invoice_id)
+      : buildSupportReplyToAddress(original.thread_root_id || original.id);
     const companyName = String(original.business_name || "InEx Ledger")
       .replace(/[<>"]/g, "")
       .trim()
@@ -400,24 +405,27 @@ router.post("/:id/reply-email", async (req, res) => {
     await pool.query(
       `INSERT INTO messages
          (id, sender_id, receiver_id, message_type, subject, body,
-          external_sender_email, external_sender_name, invoice_id, parent_id)
-       VALUES ($1, $2, $2, 'invoice_sent', $3, $4, $5, $6, $7, $8)`,
+          external_sender_email, external_sender_name, invoice_id, parent_id,
+          is_read, is_deleted_by_receiver)
+       VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9, TRUE, TRUE)`,
       [
         outboundMessageId,
         req.user.id,
+        original.invoice_id ? "invoice_sent" : "support_request",
         subject,
         replyBody,
         original.external_sender_email,
         original.external_sender_name,
-        original.invoice_id,
-        original.id
+        original.invoice_id || null,
+        original.thread_root_id || original.id
       ]
     );
 
     logInfo("invoice reply email sent", {
       originalMessageId: original.id,
       outboundMessageId,
-      invoiceId: original.invoice_id,
+      invoiceId: original.invoice_id || null,
+      threadRootId: original.thread_root_id || original.id,
       to: original.external_sender_email,
       resendId: sendResult?.data?.id || null
     });
@@ -446,7 +454,7 @@ router.get("/:id/thread", async (req, res) => {
     }
 
     const baseResult = await pool.query(
-      `SELECT id, invoice_id
+      `SELECT id, invoice_id, COALESCE(parent_id, id) AS thread_root_id
          FROM messages
         WHERE id = $1
           AND (
@@ -490,6 +498,7 @@ router.get("/:id/thread", async (req, res) => {
 
       rows = result.rows;
     } else {
+      const rootId = baseMessage.thread_root_id || baseMessage.id;
       const result = await pool.query(
         `SELECT m.*,
                 COALESCE(s.display_name, s.full_name, s.email) AS sender_name,
@@ -501,14 +510,14 @@ router.get("/:id/thread", async (req, res) => {
            LEFT JOIN users s ON s.id = m.sender_id
            LEFT JOIN users r ON r.id = m.receiver_id
            LEFT JOIN invoices_v1 inv ON inv.id = m.invoice_id
-          WHERE m.id = $1
+          WHERE COALESCE(m.parent_id, m.id) = $1
             AND (
               (m.receiver_id = $2 AND m.is_deleted_by_receiver = FALSE)
               OR
               (m.sender_id = $2 AND m.is_deleted_by_sender = FALSE)
             )
-          LIMIT 1`,
-        [messageId, req.user.id]
+          ORDER BY m.created_at ASC`,
+        [rootId, req.user.id]
       );
 
       rows = result.rows;
@@ -600,37 +609,24 @@ router.post("/support-email", async (req, res) => {
     const supportFrom = getSupportFromEmail();
 
     const userResult = await pool.query(
-      `SELECT full_name,
-      display_name, email
-      FROM users
-      WHERE id = $1
-      LIMIT 1`,
+      `SELECT full_name, display_name, email
+         FROM users
+        WHERE id = $1
+        LIMIT 1`,
       [req.user.id]
-      );
-      
-      const userRow = userResult.rows[0] || {};
-      const accountName = userRow.full_name ||
-      userRow.display_name || userRow.email ||
-      req.user?.email || "Unknown account";
-      
-      const userEmail = userRow.email || req.user?.email || "Unknown email";
-      const userId = req.user?.id || "Unknown ID";
-      
-      const supportMessageId = crypto.randomUUID();
-      
-      await pool.query(
-        `INSERT INTO messages
-        (id, sender_id, receiver_id, message_type, subject, body)
-        VALUES ($1, $2, NULL, 'support_request', $3, $4)`,
-        [
-          supportMessageId,
-          req.user.id,
-          subject || "Support Request",
-          body
-        ]
-        );
-        
-        const supportReplyTo = buildSupportReplyToAddress(supportMessageId);
+    );
+
+    const userRow = userResult.rows[0] || {};
+    const accountName =
+      userRow.full_name ||
+      userRow.display_name ||
+      userRow.email ||
+      req.user?.email ||
+      "Unknown account";
+    const userEmail = userRow.email || req.user?.email || "Unknown email";
+    const userId = req.user?.id || "Unknown ID";
+    const messageId = crypto.randomUUID();
+    const replyTo = buildSupportReplyToAddress(messageId);
 
     const text = [
       `Support request from InEx Ledger`,
@@ -657,26 +653,21 @@ router.post("/support-email", async (req, res) => {
     User ID: ${escapeHtml(userId)}</p>
     `;
 
-    const supportReplyToDisplay = supportReplyTo
-    ? `InEx Ledger Support <${supportReplyTo}>`
-    : supportFrom;
-    
-    logInfo("support email reply-to debug", {
-      supportMessageId,
-      replyBase: process.env.SUPPORT_REPLY_BASE_EMAIL || null,
-      supportReplyTo,
-      payloadReplyTo: supportReplyToDisplay
-    });
-    
-    const sendResult = await resend.emails.send({
+    const payload = {
       from: supportFrom,
       to: supportTo,
-      replyTo: supportReplyToDisplay,
-      reply_to: supportReplyToDisplay,
       subject: `[InEx Support] ${subject}`,
       text,
       html
-    });
+    };
+
+    if (replyTo) {
+      const replyToDisplay = `InEx Ledger Support <${replyTo}>`;
+      payload.replyTo = replyToDisplay;
+      payload.reply_to = replyToDisplay;
+    }
+
+    const sendResult = await resend.emails.send(payload);
 
     if (sendResult?.error) {
       return res.status(sendResult.error.statusCode || 502).json({
@@ -685,9 +676,28 @@ router.post("/support-email", async (req, res) => {
       });
     }
 
+    await pool.query(
+      `INSERT INTO messages
+         (id, sender_id, receiver_id, message_type, subject, body,
+          external_sender_email, external_sender_name,
+          is_read, is_deleted_by_receiver, external_message_id)
+       VALUES ($1, $2, $3, 'support_request', $4, $5, $6, $7, TRUE, TRUE, $8)`,
+      [
+        messageId,
+        req.user.id,
+        req.user.id,
+        subject,
+        body,
+        supportTo,
+        "InEx Support",
+        sendResult?.data?.id || null
+      ]
+    );
+
     await recordAuditEventForRequest(pool, req, {
       action: AUDIT_ACTIONS.SUPPORT_REQUEST_CREATED,
       metadata: {
+        messageId,
         delivery: "email",
         to: supportTo,
         subject
@@ -696,6 +706,7 @@ router.post("/support-email", async (req, res) => {
 
     res.status(201).json({
       ok: true,
+      message_id: messageId,
       delivery: "email",
       to: supportTo,
       resend_id: sendResult?.data?.id || null
@@ -778,7 +789,7 @@ router.post("/", async (req, res) => {
     // Verify parent message exists and belongs to this conversation (if provided)
     if (parentId) {
       const parentCheck = await pool.query(
-        `SELECT id FROM messages
+        `SELECT id, COALESCE(parent_id, id) AS thread_root_id FROM messages
           WHERE id = $1
             AND (
               (sender_id = $2 AND receiver_id = $3)
@@ -790,6 +801,7 @@ router.post("/", async (req, res) => {
       if (!parentCheck.rowCount) {
         return res.status(400).json({ error: "Invalid parent message." });
       }
+      req.threadRootId = parentCheck.rows[0].thread_root_id || parentCheck.rows[0].id;
     }
 
     const result = await pool.query(
@@ -804,7 +816,7 @@ router.post("/", async (req, res) => {
         messageType,
         subject || null,
         body,
-        parentId || null
+        req.threadRootId || parentId || null
       ]
     );
 

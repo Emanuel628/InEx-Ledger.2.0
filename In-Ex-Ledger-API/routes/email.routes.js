@@ -41,9 +41,8 @@ const {
   extractTokenFromRecipient,
   parseReplyToken
 } = require("../services/invoiceEmailService.js");
+const { parseSupportReplyToken } = require("../services/supportEmailService.js");
 const { sendInvoiceOwnerActivityEmail } = require("../services/invoiceOwnerEmailService.js");
-const { parseSupportReplyToken
-    } = require("../services/supportEmailService.js");
 
 const router = express.Router();
 function getResendClient() {
@@ -463,39 +462,69 @@ router.post("/inbound", async (req, res) => {
   }
 
   let invoiceId = null;
+  let supportThreadId = null;
   for (const recipient of recipients) {
     const token = extractTokenFromRecipient(recipient);
     if (!token) continue;
-    const candidate = parseReplyToken(token);
-    if (candidate) {
-      invoiceId = candidate;
+    const invoiceCandidate = parseReplyToken(token);
+    if (invoiceCandidate) {
+      invoiceId = invoiceCandidate;
+      break;
+    }
+    const supportCandidate = parseSupportReplyToken(token);
+    if (supportCandidate) {
+      supportThreadId = supportCandidate;
       break;
     }
   }
 
-  if (!invoiceId) {
+  if (!invoiceId && !supportThreadId) {
     logWarn("inbound email webhook: no matching reply token", { recipients });
     return res.status(200).json({ ok: true, ignored: "no_matching_invoice" });
   }
 
   try {
-    const invoiceResult = await pool.query(
-      `SELECT i.id, i.invoice_number, i.business_id, b.user_id AS owner_id
-         FROM invoices_v1 i
-         JOIN businesses b ON b.id = i.business_id
-        WHERE i.id = $1
-        LIMIT 1`,
-      [invoiceId]
-    );
-    if (!invoiceResult.rowCount) {
-      logWarn("inbound email webhook: invoice not found", { invoiceId });
-      return res.status(200).json({ ok: true, ignored: "invoice_not_found" });
-    }
-    const invoice = invoiceResult.rows[0];
-    const ownerId = invoice.owner_id;
-    if (!ownerId) {
-      logWarn("inbound email webhook: business has no owner", { invoiceId });
-      return res.status(200).json({ ok: true, ignored: "no_owner" });
+    let invoice = null;
+    let ownerId = null;
+    let rootMessageId = supportThreadId || null;
+
+    if (invoiceId) {
+      const invoiceResult = await pool.query(
+        `SELECT i.id, i.invoice_number, i.business_id, b.user_id AS owner_id
+           FROM invoices_v1 i
+           JOIN businesses b ON b.id = i.business_id
+          WHERE i.id = $1
+          LIMIT 1`,
+        [invoiceId]
+      );
+      if (!invoiceResult.rowCount) {
+        logWarn("inbound email webhook: invoice not found", { invoiceId });
+        return res.status(200).json({ ok: true, ignored: "invoice_not_found" });
+      }
+      invoice = invoiceResult.rows[0];
+      ownerId = invoice.owner_id;
+      if (!ownerId) {
+        logWarn("inbound email webhook: business has no owner", { invoiceId });
+        return res.status(200).json({ ok: true, ignored: "no_owner" });
+      }
+    } else {
+      const supportThreadResult = await pool.query(
+        `SELECT id, sender_id
+           FROM messages
+          WHERE id = $1
+          LIMIT 1`,
+        [supportThreadId]
+      );
+      if (!supportThreadResult.rowCount) {
+        logWarn("inbound email webhook: support thread not found", { supportThreadId });
+        return res.status(200).json({ ok: true, ignored: "support_thread_not_found" });
+      }
+      ownerId = supportThreadResult.rows[0].sender_id || null;
+      rootMessageId = supportThreadResult.rows[0].id;
+      if (!ownerId) {
+        logWarn("inbound email webhook: support thread missing owner", { supportThreadId });
+        return res.status(200).json({ ok: true, ignored: "no_owner" });
+      }
     }
 
 const from = pickFromAddress(receivedEmail || payload);
@@ -503,7 +532,7 @@ const from = pickFromAddress(receivedEmail || payload);
   receivedEmail?.subject ||
   payload?.subject ||
   payload?.data?.subject ||
-  `Re: Invoice ${invoice.invoice_number}`
+  (invoice ? `Re: Invoice ${invoice.invoice_number}` : "Re: Support Request")
 ).slice(0, 200);
 
 const rawBody =
@@ -519,46 +548,52 @@ const body =
     await pool.query(
       `INSERT INTO messages
    (id, sender_id, receiver_id, message_type, subject, body,
-    external_sender_email, external_sender_name, invoice_id,
+    external_sender_email, external_sender_name, invoice_id, parent_id,
     external_message_id, external_references, external_in_reply_to)
- VALUES ($1, NULL, $2, 'invoice_reply', $3, $4, $5, $6, $7, $8, $9, $10)`,
+ VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         messageId,
         ownerId,
+        invoice ? "invoice_reply" : "it_support",
         subject,
         body,
         from.email,
         from.name,
-        invoice.id,
+        invoice?.id || null,
+        rootMessageId,
         receivedEmail?.message_id || payload?.data?.message_id || null,
         receivedEmail?.headers?.references || receivedEmail?.headers?.References || null,
         receivedEmail?.headers?.in_reply_to || receivedEmail?.headers?.["In-Reply-To"] || null
       ]
     );
 
-    logInfo("inbound email webhook: invoice reply stored", {
-  invoiceId: invoice.id,
+    logInfo("inbound email webhook: external reply stored", {
+  invoiceId: invoice?.id || null,
+  supportThreadId: rootMessageId,
   messageId,
   from: from.email,
   fetchedBody: !!receivedEmail,
   bodyLength: body.length
     });
-    await sendInvoiceOwnerActivityEmail({
-      businessId: invoice.business_id,
-      kind: "replied",
-      userId: ownerId,
-      actionUrl: "/messages",
-      details: [
-        { label: "Invoice", value: invoice.invoice_number || "Invoice" },
-        ...(from.name ? [{ label: "From", value: `${from.name} <${from.email || ""}>`.trim() }] : from.email ? [{ label: "From", value: from.email }] : []),
-        { label: "Subject", value: subject.slice(0, 120) },
-        { label: "Reply preview", value: body.slice(0, 180) }
-      ]
-    });
+    if (invoice) {
+      await sendInvoiceOwnerActivityEmail({
+        businessId: invoice.business_id,
+        kind: "replied",
+        userId: ownerId,
+        actionUrl: "/messages",
+        details: [
+          { label: "Invoice", value: invoice.invoice_number || "Invoice" },
+          ...(from.name ? [{ label: "From", value: `${from.name} <${from.email || ""}>`.trim() }] : from.email ? [{ label: "From", value: from.email }] : []),
+          { label: "Subject", value: subject.slice(0, 120) },
+          { label: "Reply preview", value: body.slice(0, 180) }
+        ]
+      });
+    }
 
     res.json({
       ok: true,
-      invoice_id: invoice.id,
+      invoice_id: invoice?.id || null,
+      support_thread_id: rootMessageId,
       message_id: messageId
     });
   } catch (err) {

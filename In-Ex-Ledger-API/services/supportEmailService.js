@@ -36,12 +36,17 @@ function getSupportToEmail() {
 }
 
 function getSupportReplyBaseEmail() {
-  return String(process.env.SUPPORT_REPLY_BASE_EMAIL || "").trim() || null;
+  return (
+    String(process.env.SUPPORT_REPLY_BASE_EMAIL || "").trim()
+    || String(process.env.INVOICE_REPLY_BASE_EMAIL || "").trim()
+    || null
+  );
 }
 
 function getSupportReplyHmacSecret() {
   return String(
     process.env.SUPPORT_REPLY_HMAC_SECRET ||
+    process.env.INVOICE_REPLY_HMAC_SECRET ||
     process.env.CSRF_SECRET ||
     ""
   ).trim() || null;
@@ -56,7 +61,7 @@ function buildSupportReplyToken(messageId) {
   const compactId = compactUuid(id);
   const secret = getSupportReplyHmacSecret();
 
-  if (!secret) return compactId;
+  if (!secret) return `support-${compactId}`;
 
   const sig = crypto
     .createHmac("sha256", secret)
@@ -64,13 +69,17 @@ function buildSupportReplyToken(messageId) {
     .digest("base64url")
     .slice(0, 16);
 
-  return `${compactId}.${sig}`;
+  return `support-${compactId}.${sig}`;
 }
 
 function parseSupportReplyToken(token) {
   if (typeof token !== "string" || !token) return null;
 
-  const parts = token.split(".");
+  const normalized = String(token).trim();
+  const tokenBody = normalized.toLowerCase().startsWith("support-")
+    ? normalized.slice("support-".length)
+    : normalized;
+  const parts = tokenBody.split(".");
   const rawId = parts[0];
 
   let compactId = null;
