@@ -596,13 +596,8 @@ router.post("/support-email", async (req, res) => {
       return res.status(503).json({ error: "Email service is not configured." });
     }
 
-    const supportTo = String(process.env.SUPPORT_TO_EMAIL || "support.inex@gmail.com").trim();
-    const supportFrom = String(
-      process.env.SUPPORT_FROM_EMAIL ||
-      process.env.RESEND_FROM_EMAIL ||
-      process.env.EMAIL_FROM ||
-      "InEx Ledger Support <support@inexledger.com>"
-    ).trim();
+    const supportTo = getSupportToEmail();
+    const supportFrom = getSupportFromEmail();
 
     const userResult = await pool.query(
       `SELECT full_name,
@@ -620,6 +615,22 @@ router.post("/support-email", async (req, res) => {
       
       const userEmail = userRow.email || req.user?.email || "Unknown email";
       const userId = req.user?.id || "Unknown ID";
+      
+      const supportMessageId = crypto.randomUUID();
+      
+      await pool.query(
+        `INSERT INTO messages
+        (id, sender_id, receiver_id, message_type, subject, body)
+        VALUES ($1, $2, NULL, 'support_request', $3, $4)`,
+        [
+          supportMessageId,
+          req.user.id,
+          subject || "Support Request",
+          body
+        ]
+        );
+        
+        const supportReplyTo = buildSupportReplyToAddress(supportMessageId);
 
     const text = [
       `Support request from InEx Ledger`,
@@ -649,6 +660,7 @@ router.post("/support-email", async (req, res) => {
     const sendResult = await resend.emails.send({
       from: supportFrom,
       to: supportTo,
+      reply_to: supportReplyTo || supportFrom,
       subject: `[InEx Support] ${subject}`,
       text,
       html
