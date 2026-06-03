@@ -80,7 +80,8 @@ const INDEXABLE_PUBLIC_PAGES = new Set([
 const SAFE_HTTP_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const ORIGINLESS_API_WRITE_ALLOWLIST = new Set([
   "/api/billing/webhook",
-  "/api/email/inbound"
+  "/api/email/inbound",
+  "/api/support-email/inbound"
 ]);
 
 function setStaticAssetCacheHeaders(res, filePath) {
@@ -349,6 +350,7 @@ for (const pageName of htmlPageNames) {
 }
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/email/inbound', express.raw({ type: '*/*', limit: '256kb' }));
+app.use('/api/support-email/inbound', express.raw({ type: '*/*', limit: '256kb' }));
 app.use('/html', express.static(htmlDir, {
   index: false,
   setHeaders: setStaticAssetCacheHeaders
