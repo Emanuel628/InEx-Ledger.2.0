@@ -6,7 +6,11 @@ const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const { Resend } = require("resend");
-const { getInvoiceFromEmail,buildReplyToAddress} = require("../services/invoiceEmailService.js");
+const { getInvoiceFromEmail, buildReplyToAddress } = require("../services/invoiceEmailService.js");
+const { buildSupportReplyToAddress,
+getSupportFromEmail,
+getSupportToEmail
+} = require("../services/supportEmailService.js");
 const {
   AUDIT_ACTIONS,
   recordAuditEventForRequest
