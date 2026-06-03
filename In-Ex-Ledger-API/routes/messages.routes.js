@@ -657,10 +657,22 @@ router.post("/support-email", async (req, res) => {
     User ID: ${escapeHtml(userId)}</p>
     `;
 
+    const supportReplyToDisplay = supportReplyTo
+    ? `InEx Ledger Support <${supportReplyTo}>`
+    : supportFrom;
+    
+    logInfo("support email reply-to debug", {
+      supportMessageId,
+      replyBase: process.env.SUPPORT_REPLY_BASE_EMAIL || null,
+      supportReplyTo,
+      payloadReplyTo: supportReplyToDisplay
+    });
+    
     const sendResult = await resend.emails.send({
       from: supportFrom,
       to: supportTo,
-      reply_to: supportReplyTo || supportFrom,
+      replyTo: supportReplyToDisplay,
+      reply_to: supportReplyToDisplay,
       subject: `[InEx Support] ${subject}`,
       text,
       html
