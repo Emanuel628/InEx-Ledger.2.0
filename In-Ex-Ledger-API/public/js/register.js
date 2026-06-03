@@ -93,6 +93,8 @@ async function handleRegisterSubmit(event) {
   }
 
   const submitButton = form.querySelector("button[type=\"submit\"]");
+  const firstName = document.getElementById("firstName")?.value.trim() || "";
+  const lastName = document.getElementById("lastName")?.value.trim() || "";
   const email = document.getElementById("email")?.value.trim() || "";
   const password = document.getElementById("password")?.value || "";
   const confirmPassword = document.getElementById("confirm-password")?.value || "";
@@ -103,8 +105,8 @@ async function handleRegisterSubmit(event) {
     return;
   }
 
-  if (!email || !password) {
-    showRegisterError(tx("register_error_missing_fields"));
+  if (!firstName || !lastName || !email || !password) {
+    showRegisterError("First name, last name, email, and password are required.");
     return;
   }
 
@@ -135,12 +137,14 @@ async function handleRegisterSubmit(event) {
     ...(typeof csrfHeader === "function" ? csrfHeader("POST") : {})
   },
   body: JSON.stringify({
+    first_name: firstName,
+    last_name: lastName,
     email,
     password,
     tos_consent: true,
     marketing_email_opt_in: marketingEmailOptIn
   })
-});
+    });
 
     const regBody = await regResponse.json().catch(() => null);
 
