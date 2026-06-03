@@ -83,11 +83,21 @@
           <p class="register-intro">One email, one password. You'll confirm before setup begins.</p>
         </div>
 
-        <form id="registerForm" class="auth-form register-form" method="post" action="/api/auth/register">
-          <div class="form-field">
-            <label for="email" data-i18n="register_email_label">Email address</label>
-            <input type="email" id="email" name="email" required autocomplete="email" />
-          </div>
+          <form id="registerForm" class="auth-form register-form" method="post" action="/api/auth/register">
+            <div class="form-field">
+              <label for="firstName" data-i18n="register_first_name_label">First name</label>
+              <input type="text" id="firstName" name="first_name" required autocomplete="given-name" maxlength="80" />
+            </div>
+            
+            <div class="form-field">
+              <label for="lastName" data-i18n="register_last_name_label">Last name</label>
+              <input type="text" id="lastName" name="last_name" required autocomplete="family-name" maxlength="80" />
+            </div>
+            
+            <div class="form-field">
+              <label for="email" data-i18n="register_email_label">Email address</label>
+              <input type="email" id="email" name="email" required autocomplete="email" />
+            </div>
 
           <div class="password-block">
             <div class="form-field">
