@@ -55,6 +55,7 @@ router.use('/auth', require('./auth.routes.js'));
 router.use('/accounts', require('./accounts.routes.js'));
 router.use('/bank-connections', require('./bank-connections.routes.js'));
 router.use('/email', require('./email.routes.js'));
+router.use('/support-email', require('./supportEmail.routes.js'));
 router.use('/plaid', require('./plaid.routes.js'));
 router.use('/receipts', require('./receipts.routes.js'));
 router.use('/support-artifacts', require('./supportArtifacts.routes.js'));
