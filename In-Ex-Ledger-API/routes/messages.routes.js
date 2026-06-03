@@ -600,8 +600,21 @@ router.post("/support-email", async (req, res) => {
       "InEx Ledger Support <support@inexledger.com>"
     ).trim();
 
-    const userEmail = req.user?.email || "Unknown user";
-    const userId = req.user?.id || "Unknown ID";
+    const userResult = await pool.query(
+      `SELECT full_name,
+      display_name, email
+      FROM usersWHERE id = $1
+      LIMIT 1`,
+      [req.user.id]
+      );
+      
+      const userRow = userResult.rows[0] || {};
+      const accountName = userRow.full_name ||
+      userRow.display_name || userRow.email ||
+      req.user?.email || "Unknown account";
+      
+      const userEmail = userRow.email || req.user?.email || "Unknown email";
+      const userId = req.user?.id || "Unknown ID";
 
     const text = [
       `Support request from InEx Ledger`,
