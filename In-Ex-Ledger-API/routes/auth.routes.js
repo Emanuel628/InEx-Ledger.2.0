@@ -968,6 +968,10 @@ async function insertRecognizedSignInDevice(user, deviceContext) {
 router.post("/register", authLimiter, async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password = req.body?.password;
+  const firstName = String(req.body?.first_name || req.body?.firstName || "").trim();
+  const lastName = String(req.body?.last_name || req.body?.lastName || "").trim();
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+  const displayName = firstName;
 
   // Optional geo-tagging fields for data residency tracking (PIPEDA / Quebec Law 25)
   const country = String(req.body?.country || "").trim().toUpperCase() || null;
@@ -984,6 +988,18 @@ router.post("/register", authLimiter, async (req, res) => {
   
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
+  }
+  
+  if (!firstName || !lastName) {
+  return res.status(400).json({ error: "First name and last name are required" });
+  }
+
+  if (firstName.length < 2 || firstName.length > 80) {
+    return res.status(400).json({ error: "First name must be between 2 and 80 characters." });
+  }
+
+  if (lastName.length < 2 || lastName.length > 80) {
+    return res.status(400).json({ error: "Last name must be between 2 and 80 characters." });
   }
 
   if (!isStrongPassword(password)) {
@@ -1007,11 +1023,11 @@ router.post("/register", authLimiter, async (req, res) => {
     }
 
     const result = await client.query(
-      `INSERT INTO users (id, email, password_hash, country, province, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())
-       RETURNING id, email`,
-      [crypto.randomUUID(), email, hashedPassword, country, province]
-    );
+      `INSERT INTO users (id, email, password_hash, full_name, display_name, country, province, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      RETURNING id, email, full_name, display_name`,
+      [crypto.randomUUID(), email, hashedPassword, fullName, displayName, country, province]
+      );
 
     const newUserId = result.rows[0].id;
 
