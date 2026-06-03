@@ -619,22 +619,26 @@ router.post("/support-email", async (req, res) => {
     const text = [
       `Support request from InEx Ledger`,
       ``,
-      `User email: ${userEmail}`,
-      `User ID: ${userId}`,
+      `From: ${accountName}`,
+      `Email: ${userEmail}`,
       ``,
       `Subject: ${subject}`,
       ``,
-      body
+      body,
+      ``,
+      `---`,
+      `Technical details`,
+      `User ID: ${userId}`
     ].join("\n");
 
-    const html = `
-      <p><strong>Support request from InEx Ledger</strong></p>
-      <p>
-        <strong>User email:</strong> ${escapeHtml(userEmail)}<br/>
-        <strong>User ID:</strong> ${escapeHtml(userId)}
-      </p>
-      <p><strong>Subject:</strong> ${escapeHtml(subject)}</p>
-      <p>${escapeHtml(body).replace(/\n/g, "<br/>")}</p>
+    const html = `<p><strong>Support request from InEx Ledger</strong></p>
+    <p> <strong>From:</strong> ${escapeHtml(accountName)}<br/>
+    <strong>Email:</strong> ${escapeHtml(userEmail)} </p>
+    <p><strong>Subject:</strong> ${escapeHtml(subject)}</p>
+    <p>${escapeHtml(body).replace(/\n/g, "<br/>")}</p>
+    <hr/>
+    <p style="color:#64748b;font-size:12px;"><strong>Technical details</strong><br/>
+    User ID: ${escapeHtml(userId)}</p>
     `;
 
     const sendResult = await resend.emails.send({
