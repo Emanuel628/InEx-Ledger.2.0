@@ -42,6 +42,8 @@ const {
   parseReplyToken
 } = require("../services/invoiceEmailService.js");
 const { sendInvoiceOwnerActivityEmail } = require("../services/invoiceOwnerEmailService.js");
+const { parseSupportReplyToken
+    } = require("../services/supportEmailService.js");
 
 const router = express.Router();
 function getResendClient() {
