@@ -415,6 +415,87 @@ function describeInboundCaller(req) {
   };
 }
 
+async function handleSupportInboundReply({ res, payload, receivedEmail, supportMessageId }) {
+  try {
+    const originalResult = await pool.query(
+      `SELECT id, sender_id, subject
+         FROM messages
+        WHERE id = $1
+          AND message_type = 'support_request'
+        LIMIT 1`,
+      [supportMessageId]
+    );
+
+    if (!originalResult.rowCount) {
+      logWarn("inbound email webhook: support request not found", { supportMessageId });
+      return res.status(200).json({ ok: true, ignored: "support_request_not_found" });
+    }
+
+    const original = originalResult.rows[0];
+    const ownerId = original.sender_id;
+
+    if (!ownerId) {
+      logWarn("inbound email webhook: support request has no sender", { supportMessageId });
+      return res.status(200).json({ ok: true, ignored: "support_request_no_sender" });
+    }
+
+    const from = pickFromAddress(receivedEmail || payload);
+
+    const subject = String(
+      receivedEmail?.subject ||
+      payload?.subject ||
+      payload?.data?.subject ||
+      `Re: ${original.subject || "Support Request"}`
+    ).slice(0, 200);
+
+    const rawBody =
+      String(receivedEmail?.text || "").trim() ||
+      String(receivedEmail?.html || "").trim() ||
+      pickBody(payload).trim();
+
+    const body =
+      cleanInboundReplyBody(rawBody).slice(0, 50000) ||
+      "(support reply received — body not included in inbound metadata)";
+
+    const messageId = crypto.randomUUID();
+
+    await pool.query(
+      `INSERT INTO messages
+         (id, sender_id, receiver_id, message_type, subject, body,
+          external_sender_email, external_sender_name,
+          external_message_id, external_references, external_in_reply_to)
+       VALUES ($1, NULL, $2, 'support_request', $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        messageId,
+        ownerId,
+        subject,
+        body,
+        from.email,
+        from.name,
+        receivedEmail?.message_id || payload?.data?.message_id || null,
+        receivedEmail?.headers?.references || receivedEmail?.headers?.References || null,
+        receivedEmail?.headers?.in_reply_to || receivedEmail?.headers?.["In-Reply-To"] || null
+      ]
+    );
+
+    logInfo("inbound email webhook: support reply stored", {
+      supportMessageId,
+      messageId,
+      from: from.email,
+      bodyLength: body.length
+    });
+
+    return res.json({
+      ok: true,
+      support_message_id: supportMessageId,
+      message_id: messageId
+    });
+  } catch (err) {
+    logError("inbound support email webhook error:", err.message);
+    return res.status(500).json({ ok: false, error: "Failed to process inbound support email." });
+  }
+}
+
 /**
  * POST /api/email/inbound
  * Public webhook entry point.
