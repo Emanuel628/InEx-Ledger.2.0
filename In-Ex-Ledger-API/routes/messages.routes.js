@@ -603,7 +603,8 @@ router.post("/support-email", async (req, res) => {
     const userResult = await pool.query(
       `SELECT full_name,
       display_name, email
-      FROM usersWHERE id = $1
+      FROM users
+      WHERE id = $1
       LIMIT 1`,
       [req.user.id]
       );
