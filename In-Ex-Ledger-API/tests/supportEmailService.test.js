@@ -57,6 +57,6 @@ test("buildSupportReplyToAddress plus-addresses the configured support base", ()
     CSRF_SECRET: undefined
   }, () => {
     const addr = buildSupportReplyToAddress("77777777-7777-4777-8777-777777777777");
-    assert.equal(addr, "support+support-77777777777747778777777777777777@inex.app");
+    assert.equal(addr, "support+s.77777777777747778777777777777777@inex.app");
   });
 });

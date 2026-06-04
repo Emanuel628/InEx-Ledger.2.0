@@ -61,7 +61,7 @@ function buildSupportReplyToken(messageId) {
   const compactId = compactUuid(id);
   const secret = getSupportReplyHmacSecret();
 
-  if (!secret) return `support-${compactId}`;
+  if (!secret) return `s.${compactId}`;
 
   const sig = crypto
     .createHmac("sha256", secret)
@@ -69,7 +69,7 @@ function buildSupportReplyToken(messageId) {
     .digest("base64url")
     .slice(0, 16);
 
-  return `support-${compactId}.${sig}`;
+  return `s.${compactId}.${sig}`;
 }
 
 function parseSupportReplyToken(token) {
@@ -78,7 +78,9 @@ function parseSupportReplyToken(token) {
   const normalized = String(token).trim();
   const tokenBody = normalized.toLowerCase().startsWith("support-")
     ? normalized.slice("support-".length)
-    : normalized;
+    : normalized.toLowerCase().startsWith("s.")
+      ? normalized.slice(2)
+      : normalized;
   const parts = tokenBody.split(".");
   const rawId = parts[0];
 
