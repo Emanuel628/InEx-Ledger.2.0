@@ -617,6 +617,9 @@
 .message-row.is-unread {
   border-left: 3px solid var(--accent2);
   padding-left: 16px;
+  background: rgba(239, 246, 255, 0.96);
+  border-color: rgba(37, 99, 235, 0.28);
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.08);
 }
 
 .message-avatar {

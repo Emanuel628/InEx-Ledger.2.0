@@ -347,14 +347,16 @@ router.post("/inbound", async (req, res) => {
     await pool.query(
       `INSERT INTO messages
          (id, sender_id, receiver_id, message_type, subject, body,
+          is_read, parent_id,
           external_sender_email, external_sender_name,
           external_message_id, external_references, external_in_reply_to)
-       VALUES ($1, NULL, $2, 'support_request', $3, $4, $5, $6, $7, $8, $9)`,
+       VALUES ($1, NULL, $2, 'it_support', $3, $4, FALSE, $5, $6, $7, $8, $9, $10)`,
       [
         messageId,
         ownerId,
         subject,
         body,
+        supportMessageId,
         from.email,
         from.name,
         receivedEmail?.message_id || payload?.data?.message_id || null,
