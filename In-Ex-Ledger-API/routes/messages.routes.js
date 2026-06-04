@@ -625,9 +625,18 @@ router.post("/support-email", async (req, res) => {
       "Unknown account";
     const userEmail = userRow.email || req.user?.email || "Unknown email";
     const userId = req.user?.id || "Unknown ID";
+    
     const messageId = crypto.randomUUID();
     const replyTo = buildSupportReplyToAddress(messageId);
-
+    
+    logInfo("support email reply-to debug", {
+      messageId,
+       supportReplyBaseEmail: process.env.SUPPORT_REPLY_BASE_EMAIL || null,
+      hasSupportReplyBaseEmail: Boolean(process.env.SUPPORT_REPLY_BASE_EMAIL),
+      replyTo,
+      hasReplyTo: Boolean(replyTo)
+    });
+    
     const text = [
       `Support request from InEx Ledger`,
       ``,
