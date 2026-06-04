@@ -401,6 +401,7 @@ function normalizeBusinessProfileRow(row) {
   return {
     ...row,
     tax_id: decryptTaxId(row.tax_id),
+    contact_full_name: row.contact_full_name || "",
     business_type: row.business_type || null,
     operating_name: row.operating_name || null,
     business_activity_code: row.business_activity_code || null,
@@ -418,7 +419,7 @@ function normalizeBusinessProfileRow(row) {
 async function fetchOwnedBusinessProfile(userId, businessId) {
   const result = await pool.query(
     `SELECT id, name, region, language, fiscal_year_start, province,
-            business_type, tax_id, address, operating_name,
+            business_type, tax_id, address, contact_full_name, operating_name,
             business_activity_code, accounting_method, material_participation,
             gst_hst_registered, gst_hst_number, gst_hst_method,
             locked_through_date, locked_period_note,
@@ -448,6 +449,7 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
     business_type,
     tax_id,
     address,
+    contact_full_name,
     operating_name,
     business_activity_code,
     accounting_method,
@@ -461,9 +463,13 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
   const resolvedProvince = resolvedRegion === "CA"
     ? String(province || current.province || "").trim().toUpperCase() || null
     : null;
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(payload, key);
   const normalizedFiscalYear = Object.prototype.hasOwnProperty.call(payload, "fiscal_year_start")
     ? normalizeFiscalYearStart(fiscal_year_start)
     : { valid: true, value: current.fiscal_year_start };
+  const resolvedContactFullName = hasOwn("contact_full_name")
+    ? normalizeOptionalTrimmedString(contact_full_name)
+    : current.contact_full_name;
 
   if (region && !VALID_REGIONS.has(resolvedRegion)) {
     return { error: "region must be 'US' or 'CA'" };
@@ -473,6 +479,9 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
   }
   if (!normalizedFiscalYear.valid) {
     return { error: normalizedFiscalYear.error };
+  }
+  if (!resolvedContactFullName) {
+    return { error: "contact_full_name is required." };
   }
   if (resolvedProvince && !CA_PROVINCES.has(resolvedProvince)) {
     return { error: "Invalid Canadian province code" };
@@ -490,8 +499,6 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
     return { error: "gst_hst_registered must be a boolean" };
   }
   
-  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(payload, key);
-
   const resolvedAccountingMethod = hasOwn("accounting_method")
   ? normalizeOptionalTrimmedString(String(accounting_method || "").toLowerCase())
   : current.accounting_method;
@@ -536,17 +543,18 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
             business_type = $6,
             tax_id = $7,
             address = $8,
-            operating_name = $9,
-            business_activity_code = $10,
-            accounting_method = $11,
-            material_participation = $12,
-            gst_hst_registered = $13,
-            gst_hst_number = $14,
-            gst_hst_method = $15
-      WHERE id = $16
-        AND user_id = $17
+            contact_full_name = $9,
+            operating_name = $10,
+            business_activity_code = $11,
+            accounting_method = $12,
+            material_participation = $13,
+            gst_hst_registered = $14,
+            gst_hst_number = $15,
+            gst_hst_method = $16
+      WHERE id = $17
+        AND user_id = $18
       RETURNING id, name, region, language, fiscal_year_start, province,
-                business_type, tax_id, address, operating_name,
+                business_type, tax_id, address, contact_full_name, operating_name,
                 business_activity_code, accounting_method, material_participation,
                 gst_hst_registered, gst_hst_number, gst_hst_method,
                 locked_through_date, locked_period_note,
@@ -564,6 +572,7 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
       Object.prototype.hasOwnProperty.call(payload, "address")
         ? normalizeOptionalTrimmedString(address)
         : current.address,
+      resolvedContactFullName,
       Object.prototype.hasOwnProperty.call(payload, "operating_name")
         ? normalizeOptionalTrimmedString(operating_name)
         : current.operating_name,

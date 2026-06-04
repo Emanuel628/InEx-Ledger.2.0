@@ -10,6 +10,23 @@ function buildBusinessName(user) {
   return "My Business";
 }
 
+function buildBusinessContactName(user) {
+  const candidates = [
+    user?.display_name,
+    user?.full_name,
+    user?.name,
+    typeof user?.email === "string" ? user.email.split("@")[0] : ""
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return "Business owner";
+}
+
 async function resolveBusinessIdForUser(user, options = {}) {
   if (!user?.id) {
     throw new Error("User is required to resolve business");
@@ -81,9 +98,9 @@ async function resolveBusinessIdForUser(user, options = {}) {
     }
 
     await client.query(
-      `INSERT INTO businesses (id, user_id, name, region, language)
-       VALUES ($1, $2, $3, 'US', 'en')`,
-      [businessId, user.id, businessName]
+      `INSERT INTO businesses (id, user_id, name, region, language, contact_full_name)
+       VALUES ($1, $2, $3, 'US', 'en', $4)`,
+      [businessId, user.id, businessName, buildBusinessContactName(user)]
     );
 
     await client.query(
@@ -221,11 +238,12 @@ async function createBusinessForUserInTransaction(client, user, payload = {}) {
   const language = ["en", "es", "fr"].includes(String(payload.language || "").trim())
     ? String(payload.language).trim()
     : "en";
+  const contactFullName = String(payload.contact_full_name || "").trim() || buildBusinessContactName(user);
 
   await client.query(
-    `INSERT INTO businesses (id, user_id, name, region, language)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [businessId, user.id, businessName, region, language]
+    `INSERT INTO businesses (id, user_id, name, region, language, contact_full_name)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [businessId, user.id, businessName, region, language, contactFullName]
   );
 
   await seedDefaultsForBusiness(client, businessId);

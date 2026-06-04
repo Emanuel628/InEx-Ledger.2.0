@@ -111,6 +111,7 @@ function loadBusinessesRouterFixture() {
                 rows: [{
                   id: "biz_profile_001",
                   name: "Biz",
+                  contact_full_name: "Owner Name",
                   region: "US",
                   language: "en",
                   fiscal_year_start: "01-01",
@@ -139,6 +140,7 @@ function loadBusinessesRouterFixture() {
                 rows: [{
                   id: "biz_profile_001",
                   name: "Biz",
+                  contact_full_name: params[8],
                   region: "US",
                   language: "en",
                   fiscal_year_start: params[3],
@@ -198,6 +200,21 @@ test("business profile update normalizes YYYY-MM-DD fiscal year input to MM-DD s
     assert.ok(Array.isArray(fixture.state.updateParams));
     assert.equal(fixture.state.updateParams[3], "04-15");
     assert.equal(response.body?.fiscal_year_start, "04-15");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("business profile update rejects blank contact_full_name", async () => {
+  const fixture = loadBusinessesRouterFixture();
+
+  try {
+    const response = await request(fixture.app)
+      .put("/api/businesses/biz_profile_001/profile")
+      .send({ contact_full_name: "   " });
+
+    assert.equal(response.status, 400);
+    assert.equal(response.body?.error, "contact_full_name is required.");
   } finally {
     fixture.cleanup();
   }

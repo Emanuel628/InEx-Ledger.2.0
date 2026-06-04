@@ -34,7 +34,7 @@ const VALID_ENTITY_TYPES = new Set([
 ]);
 
 const BUSINESS_SELECT = `SELECT id, name, region, language, fiscal_year_start, province,
-                                business_type, tax_id, address, operating_name,
+                                business_type, tax_id, address, contact_full_name, operating_name,
                                 business_activity_code, accounting_method,
                                 material_participation, gst_hst_registered,
                                 gst_hst_number, gst_hst_method, created_at
@@ -53,6 +53,7 @@ function normalizeBusinessRow(row) {
     business_type: null,
     tax_id: null,
     address: null,
+    contact_full_name: "",
     operating_name: null,
     business_activity_code: null,
     accounting_method: null,
@@ -85,16 +86,17 @@ async function updateBusinessRow(businessId, payload) {
          business_type = $6,
          tax_id = $7,
          address = $8,
-         operating_name = $9,
-         business_activity_code = $10,
-         accounting_method = $11,
-         material_participation = $12,
-         gst_hst_registered = $13,
-         gst_hst_number = $14,
-         gst_hst_method = $15
-     WHERE id = $16
+         contact_full_name = $9,
+         operating_name = $10,
+         business_activity_code = $11,
+         accounting_method = $12,
+         material_participation = $13,
+         gst_hst_registered = $14,
+         gst_hst_number = $15,
+         gst_hst_method = $16
+     WHERE id = $17
      RETURNING id, name, region, language, fiscal_year_start, province,
-               business_type, tax_id, address, operating_name,
+               business_type, tax_id, address, contact_full_name, operating_name,
                business_activity_code, accounting_method,
                material_participation, gst_hst_registered,
                gst_hst_number, gst_hst_method, created_at`,
@@ -107,6 +109,7 @@ async function updateBusinessRow(businessId, payload) {
       payload.business_type,
       encryptedTaxId,
       payload.address,
+      payload.contact_full_name,
       payload.operating_name,
       payload.business_activity_code,
       payload.accounting_method,
@@ -210,6 +213,13 @@ router.put("/", async (req, res) => {
       return res.status(400).json({ error: "accounting_method is required." });
     }
 
+    const resolvedContactFullName = ('contact_full_name' in body)
+      ? normalizeOptionalTrimmedString(body.contact_full_name)
+      : current.contact_full_name;
+    if (!resolvedContactFullName) {
+      return res.status(400).json({ error: "contact_full_name is required." });
+    }
+
     const resolvedMaterialParticipation = ('material_participation' in body)
       ? body.material_participation
       : current.material_participation;
@@ -238,6 +248,7 @@ router.put("/", async (req, res) => {
       business_type: businessType,
       tax_id: 'tax_id' in body ? normalizeOptionalTrimmedString(body.tax_id) : current.tax_id,
       address: 'address' in body ? normalizeOptionalTrimmedString(body.address) : current.address,
+      contact_full_name: resolvedContactFullName,
       operating_name: 'operating_name' in body
         ? normalizeOptionalTrimmedString(body.operating_name)
         : current.operating_name,

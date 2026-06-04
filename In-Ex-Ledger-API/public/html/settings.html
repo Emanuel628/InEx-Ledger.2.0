@@ -218,6 +218,10 @@
               <input type="text" id="business-name" name="business_name" required />
             </div>
             <div class="form-field">
+              <label for="business-contact-full-name">Contact name</label>
+              <input type="text" id="business-contact-full-name" name="contact_full_name" required />
+            </div>
+            <div class="form-field">
               <label for="business-type-select" data-i18n="settings_label_business_type">Business type</label>
               <select id="business-type-select" name="business_type_select">
                 <option value="">Select type</option>
@@ -336,7 +340,7 @@
             <div class="settings-row-copy">
               <div class="settings-row-title" data-i18n="settings_subscription_status_title">Subscription</div>
               <div class="settings-row-desc">
-                <span id="accountSubStatusLabel" class="settings-billing-chip settings-billing-chip--free">Loading…</span>
+                <span id="accountSubStatusLabel" class="settings-billing-chip settings-billing-chip--free">Loadingâ€¦</span>
               </div>
             </div>
             <a href="subscription" class="settings-secondary-btn" data-i18n="settings_manage_subscription">Manage subscription</a>
@@ -560,7 +564,7 @@
         </div>
         <div class="security-trust-summary" id="securityTrustSummary" aria-live="polite">
           <span id="securityTrustMfaBadge" class="security-trust-badge security-trust-badge--off">MFA off</span>
-          <span class="security-trust-sep" aria-hidden="true">·</span>
+          <span class="security-trust-sep" aria-hidden="true">Â·</span>
           <a href="sessions" class="security-trust-link">Manage active sessions</a>
         </div>
         <div class="settings-subpanel">
@@ -817,10 +821,14 @@
       <p class="business-edit-modal-copy">Update the selected business without switching your active business.</p>
       <form id="businessEditForm" class="business-form">
         <input type="hidden" id="businessEditId" />
-        <div class="settings-form-grid">
-          <div class="form-field">
+          <div class="settings-form-grid">
+            <div class="form-field">
             <label for="businessEditName">Business name</label>
             <input type="text" id="businessEditName" required />
+          </div>
+          <div class="form-field">
+            <label for="businessEditContactFullName">Contact name</label>
+            <input type="text" id="businessEditContactFullName" required />
           </div>
           <div class="form-field">
             <label for="businessEditType">Business type</label>
@@ -882,6 +890,6 @@
   <script src="../js/trial.js?v=20260408a"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
   <script src="../js/privacyService.js?v=20260514a"></script>
-  <script src="../js/settings.js?v=20260526a"></script>
+  <script src="../js/settings.js?v=20260603a"></script>
 </body>
 </html>

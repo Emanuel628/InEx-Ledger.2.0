@@ -563,6 +563,7 @@ async function initBusinessProfileForm() {
     ];
     const nextProfile = {
       name: document.getElementById("business-name").value.trim(),
+      contactFullName: document.getElementById("business-contact-full-name").value.trim(),
       type: document.getElementById("business-type-select").value,
       fiscalYearStart: fiscalYearInputToStorage(document.getElementById("fiscal-year").value),
       address: serializeBusinessAddress(addressParts),
@@ -588,6 +589,7 @@ async function initBusinessProfileForm() {
     }
     const savedProfile = {
       name: savedBusiness?.name || nextProfile.name,
+      contactFullName: savedBusiness?.contact_full_name || nextProfile.contactFullName,
       type: savedBusiness?.business_type || nextProfile.type,
       fiscalYearStart: savedBusiness?.fiscal_year_start || nextProfile.fiscalYearStart,
       address: savedBusiness?.address || nextProfile.address,
@@ -616,6 +618,7 @@ async function initBusinessProfileForm() {
               ? {
                   ...business,
                   name: savedProfile.name || business?.name || "",
+                  contact_full_name: savedProfile.contactFullName || business?.contact_full_name || "",
                   business_type: savedProfile.type || business?.business_type || null,
                   fiscal_year_start: savedProfile.fiscalYearStart || business?.fiscal_year_start || null,
                   address: savedProfile.address || business?.address || null,
@@ -640,6 +643,7 @@ async function initBusinessProfileForm() {
             ? {
                 ...profile.active_business,
                 name: savedProfile.name || profile.active_business.name || "",
+                contact_full_name: savedProfile.contactFullName || profile.active_business.contact_full_name || "",
                 business_type: savedProfile.type || profile.active_business.business_type || null,
                 fiscal_year_start: savedProfile.fiscalYearStart || profile.active_business.fiscal_year_start || null,
                 address: savedProfile.address || profile.active_business.address || null,
@@ -689,6 +693,7 @@ async function initBusinessProfileForm() {
 
 function applyBusinessProfileForm(profile) {
   document.getElementById("business-name").value = profile.name || "";
+  document.getElementById("business-contact-full-name").value = profile.contactFullName || "";
   document.getElementById("business-type-select").value = profile.type || "";
   document.getElementById("fiscal-year").value = fiscalYearStorageToInput(profile.fiscalYearStart);
   document.getElementById("operating-name").value = profile.operatingName || "";
@@ -922,6 +927,7 @@ async function openBusinessEditModal(businessId) {
 
   document.getElementById("businessEditId").value = businessId;
   document.getElementById("businessEditName").value = payload.name || "";
+  document.getElementById("businessEditContactFullName").value = payload.contact_full_name || "";
   document.getElementById("businessEditType").value = payload.business_type || "";
   document.getElementById("businessEditFiscalYear").value = fiscalYearStorageToInput(payload.fiscal_year_start);
   document.getElementById("businessEditOperatingName").value = payload.operating_name || "";
@@ -964,6 +970,7 @@ function wireBusinessEditModal() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: document.getElementById("businessEditName").value.trim(),
+          contact_full_name: document.getElementById("businessEditContactFullName").value.trim(),
           business_type: document.getElementById("businessEditType").value,
           fiscal_year_start: fiscalYearInputToStorage(document.getElementById("businessEditFiscalYear").value),
           operating_name: document.getElementById("businessEditOperatingName").value.trim(),
@@ -978,9 +985,10 @@ function wireBusinessEditModal() {
       const activeBusinessId = window.__LUNA_ME__?.active_business_id || window.__LUNA_ME__?.active_business?.id || "";
       if (businessId === activeBusinessId) {
         const currentProfile = getBusinessProfile();
-      const updatedProfile = {
+        const updatedProfile = {
           ...currentProfile,
           name: payload?.name || currentProfile.name || "",
+          contactFullName: payload?.contact_full_name || currentProfile.contactFullName || "",
           type: payload?.business_type || currentProfile.type || "",
           fiscalYearStart: payload?.fiscal_year_start || currentProfile.fiscalYearStart || "",
           address: payload?.address || currentProfile.address || "",
@@ -1196,6 +1204,7 @@ async function initAccountingLockPanel() {
 async function loadBusinessProfile() {
   const emptyProfile = {
     name: "",
+    contactFullName: "",
     type: "",
     fiscalYearStart: "",
     address: "",
@@ -1217,6 +1226,7 @@ async function loadBusinessProfile() {
     const business = await response.json().catch(() => null);
     const profile = {
       name: business?.name || "",
+      contactFullName: business?.contact_full_name || "",
       type: business?.business_type || "",
       fiscalYearStart: business?.fiscal_year_start || "",
       address: serializeBusinessAddress(parseBusinessAddress(business?.address || "")),
@@ -1247,6 +1257,7 @@ async function saveBusinessProfileToApi(profile) {
     },
     body: JSON.stringify({
       name: profile.name,
+      contact_full_name: profile.contactFullName,
       fiscal_year_start: profile.fiscalYearStart || null,
       business_type: profile.type || null,
       address: profile.address || null,
