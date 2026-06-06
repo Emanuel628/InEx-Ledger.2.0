@@ -132,20 +132,39 @@ function normalizeOnboardingPayload(user) {
   };
 }
 
-function resolveNextGuidedSetupStep(currentStep) {
-  const currentIndex = GUIDED_SETUP_STEPS.indexOf(currentStep);
-  if (currentIndex === -1) {
-    return GUIDED_SETUP_STEPS[0];
-  }
-  return GUIDED_SETUP_STEPS[currentIndex + 1] || null;
+function resolveGuidedSetupAnchor(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return GUIDED_SETUP_STEPS.includes(normalized) ? normalized : GUIDED_SETUP_STEPS[0];
 }
 
-function resolvePreviousGuidedSetupStep(currentStep) {
-  const currentIndex = GUIDED_SETUP_STEPS.indexOf(currentStep);
+function getGuidedSetupSequence(anchorStep) {
+  const anchor = resolveGuidedSetupAnchor(anchorStep);
+  const anchorIndex = GUIDED_SETUP_STEPS.indexOf(anchor);
+  if (anchorIndex <= 0) {
+    return [...GUIDED_SETUP_STEPS];
+  }
+  return [
+    ...GUIDED_SETUP_STEPS.slice(anchorIndex),
+    ...GUIDED_SETUP_STEPS.slice(0, anchorIndex)
+  ];
+}
+
+function resolveNextGuidedSetupStep(currentStep, anchorStep) {
+  const sequence = getGuidedSetupSequence(anchorStep);
+  const currentIndex = sequence.indexOf(currentStep);
+  if (currentIndex === -1) {
+    return sequence[0];
+  }
+  return sequence[currentIndex + 1] || null;
+}
+
+function resolvePreviousGuidedSetupStep(currentStep, anchorStep) {
+  const sequence = getGuidedSetupSequence(anchorStep);
+  const currentIndex = sequence.indexOf(currentStep);
   if (currentIndex <= 0) {
     return null;
   }
-  return GUIDED_SETUP_STEPS[currentIndex - 1] || null;
+  return sequence[currentIndex - 1] || null;
 }
 
 function resolveDefaultStartFocus() {
@@ -399,6 +418,10 @@ router.put("/onboarding", async (req, res) => {
         }
       }
 
+      const guidedSetupAnchor = guidedSetupActive
+        ? resolveGuidedSetupAnchor(normalizedStartFocus)
+        : null;
+
       const onboardingData = {
         business_name: businessName,
         starter_account_type: normalizedStarterAccountType,
@@ -413,7 +436,8 @@ router.put("/onboarding", async (req, res) => {
         recommended_categories: onboardingRecommendations.recommended_categories,
         setup_notes: onboardingRecommendations.setup_notes,
         guided_setup_active: guidedSetupActive,
-        guided_setup_step: guidedSetupActive ? normalizedStartFocus : "complete"
+        guided_setup_step: guidedSetupActive ? guidedSetupAnchor : "complete",
+        guided_setup_anchor: guidedSetupAnchor
       };
 
       const updated = await client.query(
@@ -501,14 +525,18 @@ router.post("/onboarding/guide", async (req, res) => {
       current.rows[0]?.onboarding_tour_seen && typeof current.rows[0].onboarding_tour_seen === "object"
         ? { ...current.rows[0].onboarding_tour_seen }
         : {};
+    const guidedSetupAnchor = resolveGuidedSetupAnchor(
+      currentData.guided_setup_anchor || currentData.start_focus || GUIDED_SETUP_STEPS[0]
+    );
+    const guidedSequence = getGuidedSetupSequence(guidedSetupAnchor);
     const effectivePage =
-      page || (GUIDED_SETUP_STEPS.includes(currentData.guided_setup_step) ? currentData.guided_setup_step : GUIDED_SETUP_STEPS[0]);
+      page || (GUIDED_SETUP_STEPS.includes(currentData.guided_setup_step) ? currentData.guided_setup_step : guidedSequence[0]);
     const timestamp = new Date().toISOString();
 
     const isReplay = currentData.guided_setup_replay === true;
     let redirectTo = "/transactions";
     if (action === "skip") {
-      GUIDED_SETUP_STEPS.forEach((step) => {
+      guidedSequence.forEach((step) => {
         currentTourSeen[step] = true;
       });
       currentData.guided_setup_active = false;
@@ -523,13 +551,13 @@ router.post("/onboarding/guide", async (req, res) => {
       currentData.guided_setup_completed_at = timestamp;
       delete currentData.guided_setup_replay;
     } else if (action === "back") {
-      const previousStep = resolvePreviousGuidedSetupStep(effectivePage);
+      const previousStep = resolvePreviousGuidedSetupStep(effectivePage, guidedSetupAnchor);
       currentData.guided_setup_active = true;
-      currentData.guided_setup_step = previousStep || GUIDED_SETUP_STEPS[0];
+      currentData.guided_setup_step = previousStep || guidedSequence[0];
       redirectTo = GUIDED_SETUP_ROUTES[currentData.guided_setup_step] || `/${currentData.guided_setup_step}`;
     } else {
       currentTourSeen[effectivePage] = true;
-      const nextStep = resolveNextGuidedSetupStep(effectivePage);
+      const nextStep = resolveNextGuidedSetupStep(effectivePage, guidedSetupAnchor);
       if (nextStep) {
         currentData.guided_setup_active = true;
         currentData.guided_setup_step = nextStep;
@@ -616,15 +644,19 @@ router.post("/onboarding/replay", async (req, res) => {
         : {};
     delete nextData.guided_setup_completed_at;
     delete nextData.guided_setup_skipped_at;
+    const replayAnchor = resolveGuidedSetupAnchor(
+      nextData.guided_setup_anchor || nextData.start_focus || GUIDED_SETUP_STEPS[0]
+    );
     nextData.guided_setup_active = true;
-    nextData.guided_setup_step = GUIDED_SETUP_STEPS[0];
+    nextData.guided_setup_step = replayAnchor;
+    nextData.guided_setup_anchor = replayAnchor;
     nextData.guided_setup_replay = true;
 
     await pool.query(
       "UPDATE users SET onboarding_tour_seen = '{}'::jsonb, onboarding_data = $1::jsonb WHERE id = $2",
       [JSON.stringify(nextData), req.user.id]
     );
-    return res.status(200).json({ success: true, redirect_to: `/${GUIDED_SETUP_STEPS[0]}` });
+    return res.status(200).json({ success: true, redirect_to: GUIDED_SETUP_ROUTES[replayAnchor] || `/${replayAnchor}` });
   } catch (err) {
     logError("POST /me/onboarding/replay error:", err.message);
     return res.status(500).json({ error: "Failed to reset onboarding tips." });

@@ -59,18 +59,28 @@ function loadMeRouterFixture(options = {}) {
                /onboarding_tour_seen\s*=\s*'\{\}'::jsonb/i.test(sql) &&
                /onboarding_data = \$1::jsonb/i.test(sql))
             ) {
+              const nextTourSeen =
+                params[1] && typeof params[1] === "string" && String(params[1]).trim().startsWith("{")
+                  ? JSON.parse(params[1])
+                  : {};
               return {
                 rows: [{
                   onboarding_completed: true,
                   onboarding_completed_at: new Date().toISOString(),
                   onboarding_data: JSON.parse(params[0] || "{}"),
-                  onboarding_tour_seen: JSON.parse(params[1] || "{}")
+                  onboarding_tour_seen: nextTourSeen
                 }],
                 rowCount: 1
               };
             }
             if (/FROM users\s+WHERE id = \$1/i.test(sql)) {
-              return { rows: [userRow], rowCount: 1 };
+              return {
+                rows: [{
+                  ...userRow,
+                  onboarding_data: options.currentOnboardingData || userRow.onboarding_data
+                }],
+                rowCount: 1
+              };
             }
             if (/UPDATE users\s+SET full_name = CASE WHEN \$4::boolean THEN \$1 ELSE full_name END,/i.test(sql)) {
               return {
@@ -396,6 +406,87 @@ test("guided setup advances from transactions to a 4th import step", async () =>
     assert.equal(response.body.redirect_to, "/transactions");
     assert.equal(response.body.onboarding.data.guided_setup_step, "import");
     assert.equal(response.body.onboarding.data.guided_setup_active, true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("PUT /api/me/onboarding stores a guided setup anchor when the selected first page is guided", async () => {
+  const fixture = loadMeRouterFixture({
+    subscriptionSnapshot: {
+      effectiveStatus: "active"
+    }
+  });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .put("/api/me/onboarding")
+      .send({
+        business_name: "My Business",
+        region: "US",
+        language: "en",
+        starter_account_type: "checking",
+        starter_account_name: "Primary Checking",
+        start_focus: "transactions",
+        business_activity_code: "541611",
+        accounting_method: "cash",
+        material_participation: "yes"
+      });
+
+    assert.equal(response.status, 200);
+    const onboardingUpdate = fixture.state.txQueries.find((entry) =>
+      /UPDATE users\s+SET onboarding_completed = true/i.test(entry.sql)
+    );
+    assert.ok(onboardingUpdate, "onboarding should persist onboarding data");
+    const onboardingData = JSON.parse(onboardingUpdate.params[0]);
+    assert.equal(onboardingData.guided_setup_step, "transactions");
+    assert.equal(onboardingData.guided_setup_anchor, "transactions");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("guided setup rotates next step based on the selected anchor", async () => {
+  const fixture = loadMeRouterFixture({
+    currentOnboardingData: {
+      start_focus: "transactions",
+      guided_setup_active: true,
+      guided_setup_anchor: "transactions",
+      guided_setup_step: "transactions"
+    }
+  });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/me/onboarding/guide")
+      .send({ action: "next", page: "transactions" });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.redirect_to, "/transactions");
+    assert.equal(response.body.onboarding.data.guided_setup_step, "import");
+    assert.equal(response.body.onboarding.data.guided_setup_anchor, "transactions");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("guided setup replay restarts from the stored anchor instead of categories", async () => {
+  const fixture = loadMeRouterFixture({
+    currentOnboardingData: {
+      start_focus: "transactions",
+      guided_setup_active: false,
+      guided_setup_anchor: "transactions",
+      guided_setup_step: "complete"
+    }
+  });
+  try {
+    const app = buildApp(fixture.router);
+    const response = await request(app)
+      .post("/api/me/onboarding/replay")
+      .send({});
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.redirect_to, "/transactions");
   } finally {
     fixture.cleanup();
   }

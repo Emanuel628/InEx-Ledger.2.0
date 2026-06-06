@@ -619,7 +619,7 @@ function maybeLoadOnboardingRuntime(profile = {}) {
 
   if (!document.querySelector('script[src*="onboarding.js"]')) {
     const script = document.createElement("script");
-    script.src = "/js/onboarding.js?v=20260514a";
+    script.src = "/js/onboarding.js?v=20260606a";
     script.dataset.onboardingRuntime = "true";
     document.body.appendChild(script);
   }

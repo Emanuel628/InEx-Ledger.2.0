@@ -55,7 +55,6 @@ const ONBOARDING_TOURS = {
 const GUIDED_SETUP_ORDER = ["categories", "accounts", "transactions", "import"];
 const GUIDED_SETUP_CONFIG = {
   categories: {
-    stepNumber: 1,
     titleKey: "onboarding_guide_categories_title",
     bodyKey: "onboarding_guide_categories_body",
     helperKey: "onboarding_guide_categories_helper",
@@ -70,7 +69,6 @@ const GUIDED_SETUP_CONFIG = {
     nextLabelKey: "onboarding_guide_next"
   },
   accounts: {
-    stepNumber: 2,
     titleKey: "onboarding_guide_accounts_title",
     bodyKey: "onboarding_guide_accounts_body",
     helperKey: "onboarding_guide_accounts_helper",
@@ -84,7 +82,6 @@ const GUIDED_SETUP_CONFIG = {
     nextLabelKey: "onboarding_guide_next"
   },
   transactions: {
-    stepNumber: 3,
     titleKey: "onboarding_guide_transactions_title",
     bodyKey: "onboarding_guide_transactions_body",
     helperKey: "onboarding_guide_transactions_helper",
@@ -99,7 +96,6 @@ const GUIDED_SETUP_CONFIG = {
     nextLabelKey: "onboarding_guide_next"
   },
   import: {
-    stepNumber: 4,
     // The import step runs on the transactions page (the CSV import modal
     // lives there); `page` decouples the step key from the route.
     page: "transactions",
@@ -262,6 +258,23 @@ function getOnboardingData() {
   return window.__LUNA_ME__?.onboarding?.data || window.__LUNA_ONBOARDING__?.data || {};
 }
 
+function resolveGuidedSetupAnchor(startFocus) {
+  const normalized = String(startFocus || "").trim().toLowerCase();
+  return GUIDED_SETUP_ORDER.includes(normalized) ? normalized : GUIDED_SETUP_ORDER[0];
+}
+
+function getGuidedSetupSequence(anchorStep) {
+  const anchor = resolveGuidedSetupAnchor(anchorStep);
+  const anchorIndex = GUIDED_SETUP_ORDER.indexOf(anchor);
+  if (anchorIndex <= 0) {
+    return [...GUIDED_SETUP_ORDER];
+  }
+  return [
+    ...GUIDED_SETUP_ORDER.slice(anchorIndex),
+    ...GUIDED_SETUP_ORDER.slice(0, anchorIndex)
+  ];
+}
+
 function getWorkTypeTourNote(page) {
   const onboardingData = getOnboardingData();
   const startFocus = String(onboardingData.start_focus || "").trim().toLowerCase();
@@ -316,6 +329,12 @@ function renderGuidedSetupCard(stepKey) {
   if (!config) {
     return;
   }
+  const onboardingData = getOnboardingData();
+  const guidedSetupAnchor = resolveGuidedSetupAnchor(
+    onboardingData.guided_setup_anchor || onboardingData.start_focus || GUIDED_SETUP_ORDER[0]
+  );
+  const guidedSequence = getGuidedSetupSequence(guidedSetupAnchor);
+  const stepNumber = Math.max(1, guidedSequence.indexOf(stepKey) + 1);
   const uiState = readGuidedCardUiState(stepKey);
 
   const card = document.createElement("div");
@@ -324,8 +343,8 @@ function renderGuidedSetupCard(stepKey) {
   if (uiState.minimized) {
     card.classList.add("is-minimized");
   }
-  const stepLabel = `${tx("onboarding_guide_step_prefix")} ${config.stepNumber} ${tx("onboarding_guide_step_of")} ${GUIDED_SETUP_ORDER.length}`;
-  const canGoBack = config.stepNumber > 1;
+  const stepLabel = `${tx("onboarding_guide_step_prefix")} ${stepNumber} ${tx("onboarding_guide_step_of")} ${guidedSequence.length}`;
+  const canGoBack = stepNumber > 1;
   const launchButton = getFirstGuidedTarget(config.launchSelector)
     ? `<button type="button" class="onboarding-tour-secondary onboarding-guide-launch">${escapeHtml(tx(config.launchLabelKey))}</button>`
     : "";
