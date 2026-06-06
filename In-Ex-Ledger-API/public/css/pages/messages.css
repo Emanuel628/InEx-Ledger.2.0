@@ -482,7 +482,7 @@
   display: none !important;
 }
 
-#inboxBadge.messages-tab-badge {
+.messages-tab-badge.is-dot {
   width: 7px;
   min-width: 7px;
   height: 7px;

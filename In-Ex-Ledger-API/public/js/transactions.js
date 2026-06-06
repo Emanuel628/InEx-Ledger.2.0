@@ -3900,7 +3900,8 @@ function renderTransactionsTable(filteredTransactions) {
     const row = document.createElement("tr");
     row.id = `txn-${txn.id}`;
     const txnId = String(txn.id);
-    const categoryName = txn.categoryName || categoriesById[txn.categoryId]?.name || "-";
+    const category = categoriesById[txn.categoryId] || null;
+    const categoryName = txn.categoryName || category?.name || "-";
     const accountName = txn.accountName || accountsById[txn.accountId]?.name || "-";
     const rowRegion = String(
       getBusinessById(txn.businessId)?.region || businessTaxProfile.region || getResolvedRegion()
@@ -3985,7 +3986,7 @@ function renderTransactionsTable(filteredTransactions) {
       <td><span class="date-cell">${formatDisplayDate(txn.date)}</span></td>
       <td><div class="description-primary">${escapeHtml(txn.description || "-")}</div><div class="description-sub">${descriptionSub}</div></td>
       <td><span class="account-tag">${escapeHtml(accountName)}</span></td>
-      <td><span class="category-pill ${getCategoryToneClass(categoryName)}">${escapeHtml(categoryName)}</span></td>
+      <td><span class="category-pill ${getCategoryToneClass(categoryName, category?.color)}">${escapeHtml(categoryName)}</span></td>
       <td>${receiptMarkup}</td>
       <td>
         <button type="button" class="status-toggle-button ${txn.cleared ? "is-cleared" : ""}" data-action="toggle-cleared" data-id="${txn.id}">
@@ -4296,13 +4297,23 @@ function formatDisplayDate(value) {
   });
 }
 
-function getCategoryToneClass(name) {
+function getCategoryToneClass(name, color = "") {
+  const normalizedColor = String(color || "").trim().toLowerCase();
+  if (normalizedColor === "green") return "tone-green";
+  if (normalizedColor === "blue") return "tone-blue";
+  if (normalizedColor === "amber" || normalizedColor === "yellow") return "tone-amber";
+  if (normalizedColor === "red") return "tone-red";
+  if (normalizedColor === "slate" || normalizedColor === "gray" || normalizedColor === "grey") return "tone-slate";
+  if (normalizedColor === "purple" || normalizedColor === "violet") return "tone-purple";
+
   const value = String(name || "").toLowerCase();
-  if (value.includes("consult")) return "tone-consulting";
-  if (value.includes("income") || value.includes("software")) return "tone-green";
-  if (value.includes("travel")) return "tone-travel";
-  if (value.includes("office")) return "tone-office";
-  if (value.includes("marketing")) return "tone-marketing";
+
+  if (/(sales|service income|interest income|income|grant|subsid)/.test(value)) return "tone-green";
+  if (/(advertis|marketing|contract|labor|wages|salary|software|subscription|suppl|office|rent)/.test(value)) return "tone-blue";
+  if (/(travel|meal|home office|car|truck|motor vehicle|delivery|freight)/.test(value)) return "tone-amber";
+  if (/(tax|gst|hst|license|property tax)/.test(value)) return "tone-red";
+  if (/(bank|insurance|legal|professional|phone|internet|utilit|repair|maint|interest|other expense)/.test(value)) return "tone-slate";
+  if (/(consult)/.test(value)) return "tone-consulting";
   return "tone-default";
 }
 

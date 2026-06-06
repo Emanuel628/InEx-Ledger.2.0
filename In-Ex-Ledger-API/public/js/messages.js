@@ -1058,18 +1058,21 @@ async function updateUnreadBadge() {
   }
 }
 
-function setCountBadge(badge, count, singularLabel, pluralLabel) {
+function setCountBadge(badge, count, singularLabel, pluralLabel, options = {}) {
   if (!badge) return;
+  const asDot = Boolean(options.asDot);
   if (count > 0) {
-    badge.textContent = count > 99 ? "99+" : String(count);
+    badge.textContent = asDot ? "" : (count > 99 ? "99+" : String(count));
     badge.hidden = false;
     const label = count === 1 ? singularLabel : pluralLabel.replace("%d", String(count));
     badge.setAttribute("aria-label", label);
     badge.title = label;
+    badge.classList.toggle("is-dot", asDot);
   } else {
     badge.hidden = true;
     badge.removeAttribute("aria-label");
     badge.removeAttribute("title");
+    badge.classList.remove("is-dot");
   }
 }
 
@@ -1084,25 +1087,29 @@ function setUnreadBadge(unreadCounts) {
     document.getElementById("inboxBadge"),
     messageCount,
     "1 unread message",
-    "%d unread messages"
+    "%d unread messages",
+    { asDot: true }
   );
   setCountBadge(
     document.getElementById("sidebarUnreadBadge"),
     messageCount,
     "1 unread message",
-    "%d unread messages"
+    "%d unread messages",
+    { asDot: true }
   );
   setCountBadge(
     document.getElementById("supportBadge"),
     supportCount,
     "1 unread support thread",
-    "%d unread support threads"
+    "%d unread support threads",
+    { asDot: true }
   );
   setCountBadge(
     document.getElementById("notificationBadge"),
     notificationCount,
     "1 unread notification",
-    "%d unread notifications"
+    "%d unread notifications",
+    { asDot: true }
   );
 
   document.getElementById("messagesUnreadMetric")?.replaceChildren(document.createTextNode(String(totalCount)));

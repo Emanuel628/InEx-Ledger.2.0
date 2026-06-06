@@ -1495,16 +1495,23 @@ tbody tr:last-child {
   color: #1a3a5c;
 }
 
+.category-pill.tone-blue {
+  background: #e8f0fb;
+  color: #1f4f7a;
+}
+
 .category-pill.tone-green {
   background: #eaf5ef;
   color: #1a5c35;
 }
 
+.category-pill.tone-amber,
 .category-pill.tone-travel {
   background: #fefce8;
   color: #7a4f0a;
 }
 
+.category-pill.tone-purple,
 .category-pill.tone-office {
   background: #faf0fb;
   color: #5c1a5a;
@@ -1515,9 +1522,19 @@ tbody tr:last-child {
   color: #8a1c1c;
 }
 
+.category-pill.tone-red {
+  background: #fef2f2;
+  color: #8a1c1c;
+}
+
+.category-pill.tone-slate {
+  background: #eef2f7;
+  color: #475569;
+}
+
 .category-pill.tone-default {
-  background: var(--surface2);
-  color: var(--ink2);
+  background: #edf4fb;
+  color: #31506d;
 }
 
 .receipt-status {
