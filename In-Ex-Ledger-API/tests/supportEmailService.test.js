@@ -60,3 +60,16 @@ test("buildSupportReplyToAddress plus-addresses the configured support base", ()
     assert.equal(addr, "support+s.77777777777747778777777777777777@inex.app");
   });
 });
+
+test("support reply-to prefers the invoice reply base when both are configured", () => {
+  withEnv({
+    SUPPORT_REPLY_BASE_EMAIL: "support@inexledger.com",
+    INVOICE_REPLY_BASE_EMAIL: "invoices@oixenoisou.resend.app",
+    SUPPORT_REPLY_HMAC_SECRET: undefined,
+    INVOICE_REPLY_HMAC_SECRET: undefined,
+    CSRF_SECRET: undefined
+  }, () => {
+    const addr = buildSupportReplyToAddress("77777777-7777-4777-8777-777777777777");
+    assert.equal(addr, "invoices+s.77777777777747778777777777777777@oixenoisou.resend.app");
+  });
+});
