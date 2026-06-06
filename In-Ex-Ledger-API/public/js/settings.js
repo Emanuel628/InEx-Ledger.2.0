@@ -1313,6 +1313,7 @@ async function initPreferences() {
   const darkModeToggle = document.getElementById("darkModeToggle");
   const distanceSelect = document.getElementById("distanceSelect");
   const optOutToggle = document.getElementById("optOutToggle");
+  const marketingEmailToggle = document.getElementById("marketingEmailToggle");
   const consentStatus = document.getElementById("consentStatus");
   const downloadBtn = document.getElementById("downloadMyDataBtn");
   const replayOnboardingTipsButton = document.getElementById("replayOnboardingTips");
@@ -1492,6 +1493,16 @@ async function initPreferences() {
         // Disabling tracking: no consent prompt needed; save immediately.
         saveQcAnalyticsOptIn(false);
       }
+    });
+  }
+
+  if (marketingEmailToggle) {
+    marketingEmailToggle.checked = !!privacySettings.marketingEmailOptIn;
+    marketingEmailToggle.addEventListener("change", async () => {
+      const nextValue = !!marketingEmailToggle.checked;
+      await setPrivacySettingsSafe({ marketingEmailOptIn: nextValue });
+      privacySettings = { ...privacySettings, marketingEmailOptIn: nextValue };
+      showSettingsToast(nextValue ? t("settings_optional_email_enabled") : t("settings_optional_email_disabled"));
     });
   }
 

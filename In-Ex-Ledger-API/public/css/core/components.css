@@ -413,10 +413,11 @@ h2 + p {
   min-width: 8px;
   height: 8px;
   padding: 0;
-  background: var(--red, #e53935);
+  background: #34d399;
   border-radius: 999px;
   margin-left: 6px;
   vertical-align: middle;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.16);
 }
 
 .nav-msg-badge[hidden] {

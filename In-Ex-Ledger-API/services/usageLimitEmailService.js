@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * usageLimitEmailService — calm, non-pushy usage-limit emails for Basic-tier
+ * usageLimitEmailService - calm, non-pushy usage-limit emails for Basic-tier
  * businesses.
  *
  * Emails are sent at 70%, 90%, and 100% of each monthly cap (transactions,
@@ -16,6 +16,10 @@
 const { pool } = require("../db.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const { getUsageSummary } = require("./basicPlanUsageService.js");
+const {
+  appendOptionalEmailFooter,
+  getOptionalEmailRecipientForBusiness
+} = require("./emailPreferencesService.js");
 
 const THRESHOLDS = [70, 90, 100];
 
@@ -74,9 +78,6 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
-/**
- * Returns calm, helpful email copy for a given resource + threshold.
- */
 function buildUsageEmailCopy(resource, threshold, metric) {
   const used = metric.used;
   const limit = metric.limit;
@@ -91,12 +92,12 @@ function buildUsageEmailCopy(resource, threshold, metric) {
     if (threshold === 90) {
       return {
         subject: "A heads-up on your InEx Ledger transactions",
-        body: `You've used ${used} of your ${limit} Basic transactions this month. You're close to this month's limit — no action is needed yet. If your business activity is growing, Pro gives you higher limits, receipt-backed records, mileage tools, imports, and tax-ready exports.`
+        body: `You've used ${used} of your ${limit} Basic transactions this month. You're close to this month's limit. If your business activity is growing, Pro gives you higher limits, receipt-backed records, mileage tools, imports, and tax-ready exports.`
       };
     }
     return {
       subject: "A heads-up on your InEx Ledger transactions",
-      body: `You've used ${used} of your ${limit} Basic transactions this month. No action is needed yet — we just wanted to give you a heads-up so your recordkeeping does not get interrupted. If your business activity is growing, Pro gives you higher limits, receipt-backed records, mileage tools, imports, and tax-ready exports.`
+      body: `You've used ${used} of your ${limit} Basic transactions this month. This is just a heads-up so your recordkeeping does not get interrupted. If your business activity is growing, Pro gives you higher limits, receipt-backed records, mileage tools, imports, and tax-ready exports.`
     };
   }
 
@@ -113,7 +114,6 @@ function buildUsageEmailCopy(resource, threshold, metric) {
     };
   }
 
-  // csvImportRows
   if (threshold === 100) {
     return {
       subject: "You've reached your Basic import limit this month",
@@ -122,30 +122,31 @@ function buildUsageEmailCopy(resource, threshold, metric) {
   }
   return {
     subject: "A heads-up on your InEx Ledger CSV imports",
-    body: `You've used ${used} of your ${limit} Basic CSV import rows this month. No action is needed yet — just a heads-up. Pro gives you higher import limits, receipt-backed records, mileage tools, and tax-ready exports.`
+    body: `You've used ${used} of your ${limit} Basic CSV import rows this month. This is just a heads-up. Pro gives you higher import limits, receipt-backed records, mileage tools, and tax-ready exports.`
   };
 }
 
 function renderEmailHtml({ subject, body, businessName }) {
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/><title>${escapeHtml(subject)}</title></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;color:#1f2937;background:#f9fafb;margin:0;padding:24px;">
-  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;margin:0 auto;background:#fff;border-radius:8px;padding:32px;">
-    <tr><td>
-      <h1 style="font-size:18px;margin:0 0 16px;">${escapeHtml(subject)}</h1>
-      <p style="margin:0 0 16px;line-height:1.6;">${escapeHtml(body)}</p>
-      <p style="margin:0 0 16px;line-height:1.6;color:#6b7280;font-size:13px;">This note is for ${escapeHtml(businessName || "your business")}. Your monthly limits reset at the start of each calendar month.</p>
-      <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">InEx Ledger · You're receiving this because usage limit notices are part of your Basic plan.</p>
-    </td></tr>
-  </table>
+<body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;color:#1f2937;background:#f3f7fb;margin:0;padding:28px;">
+  <div style="max-width:600px;margin:0 auto;background:#fff;border:1px solid #dbe4f0;border-radius:20px;overflow:hidden;box-shadow:0 24px 64px rgba(15,23,42,0.08);">
+    <div style="padding:24px 28px;background:linear-gradient(135deg,#0f172a,#0f766e);color:#fff;">
+      <div style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.9;">InEx Ledger</div>
+      <h1 style="margin:12px 0 0;font-size:28px;line-height:1.15;">${escapeHtml(subject)}</h1>
+    </div>
+    <div style="padding:28px;">
+      <p style="margin:0 0 16px;line-height:1.7;color:#0f172a;font-size:15px;">${escapeHtml(body)}</p>
+      <div style="margin:20px 0;padding:16px 18px;border:1px solid #dbe4f0;border-radius:14px;background:#f8fafc;color:#334155;font-size:14px;line-height:1.6;">
+        <strong style="color:#0f172a;">Business:</strong> ${escapeHtml(businessName || "your business")}<br/>
+        <strong style="color:#0f172a;">Reset schedule:</strong> Monthly limits reset at the start of each calendar month.
+      </div>
+      <p style="margin:0;color:#64748b;font-size:12px;line-height:1.6;">This is a bookkeeping update notice for your Basic plan.</p>
+    </div>
+  </div>
 </body></html>`;
 }
 
-/**
- * Atomically claims the crossed thresholds for one resource. Returns true when
- * this caller won the claim (and should therefore send the email), false when
- * another concurrent caller already claimed it.
- */
 async function claimThresholds(db, periodId, resource, crossedThresholds) {
   const cfg = RESOURCE_CONFIG[resource];
   const highest = Math.max(...crossedThresholds);
@@ -161,19 +162,11 @@ async function claimThresholds(db, periodId, resource, crossedThresholds) {
 }
 
 async function loadRecipient(db, businessId) {
-  const result = await db.query(
-    `SELECT u.email, u.is_erased, b.name AS business_name
-       FROM businesses b
-       JOIN users u ON u.id = b.user_id
-      WHERE b.id = $1
-      LIMIT 1`,
-    [businessId]
-  );
-  const row = result.rows[0];
-  if (!row || row.is_erased || !row.email || !String(row.email).includes("@")) {
+  const row = await getOptionalEmailRecipientForBusiness(businessId, db);
+  if (!row || !row.email || !String(row.email).includes("@") || !row.marketing_email_opt_in) {
     return null;
   }
-  return { email: row.email, businessName: row.business_name };
+  return { email: row.email, businessName: row.business_name, userId: row.user_id };
 }
 
 async function evaluateResource(db, resendClient, { businessId, resource, metric, period, recipient }) {
@@ -188,8 +181,6 @@ async function evaluateResource(db, resendClient, { businessId, resource, metric
     return;
   }
 
-  // Claim every crossed threshold so a large jump (e.g. a big CSV import) does
-  // not later trigger a lower-threshold email. Only the highest is emailed.
   const won = await claimThresholds(db, period.id, resource, crossed);
   if (!won) {
     return;
@@ -208,12 +199,18 @@ async function evaluateResource(db, resendClient, { businessId, resource, metric
   }
 
   try {
-    const result = await resendClient.emails.send({
-      from: getFromEmail(),
-      to: recipient.email,
+    const emailContent = appendOptionalEmailFooter({
       subject: copy.subject,
       html: renderEmailHtml({ subject: copy.subject, body: copy.body, businessName: recipient.businessName }),
       text: copy.body
+    }, recipient.userId);
+
+    const result = await resendClient.emails.send({
+      from: getFromEmail(),
+      to: recipient.email,
+      subject: emailContent.subject,
+      html: emailContent.html,
+      text: emailContent.text
     });
     if (result?.error) {
       logWarn("usageLimitEmailService: Resend reported an error", {
@@ -235,29 +232,17 @@ async function evaluateResource(db, resendClient, { businessId, resource, metric
   }
 }
 
-/**
- * Evaluates and (if needed) sends usage-limit emails for a Basic business.
- * Best-effort: never throws. Safe to call fire-and-forget after a write.
- *
- * @param {object}   args
- * @param {string}   args.businessId
- * @param {string[]} [args.resources] - subset of transactions|receipts|csvImportRows
- * @param {object}   [args.subscription] - pre-resolved subscription snapshot
- * @param {object}   [args.db] - db handle (defaults to the shared pool)
- */
 async function evaluateUsageLimitEmails({ businessId, resources = null, subscription = null, db = pool } = {}) {
   try {
     if (!businessId) {
       return;
     }
-    // Fast path: usage-limit emails apply only to Basic-tier businesses. When
-    // the caller already knows the tier, skip the usage queries entirely.
     if (subscription && (subscription.effectiveTier || "free") !== "free") {
       return;
     }
     const summary = await getUsageSummary(db, businessId, { subscription });
     if (!summary.enforced || !summary.period) {
-      return; // Only Basic-tier businesses receive usage-limit emails.
+      return;
     }
 
     const recipient = await loadRecipient(db, businessId);

@@ -7,6 +7,10 @@ const {
   getPreferredLanguageForUser,
   buildBookkeepingActivityEmail
 } = require("./emailI18nService.js");
+const {
+  appendOptionalEmailFooter,
+  getOptionalEmailRecipientForBusiness
+} = require("./emailPreferencesService.js");
 
 function getResendClient() {
   const apiKey = String(process.env.RESEND_API_KEY || "").trim();
@@ -36,16 +40,7 @@ function buildAppUrl(path) {
 }
 
 async function loadBusinessOwner(businessId, db = pool) {
-  const result = await db.query(
-    `SELECT b.user_id, u.email
-       FROM businesses b
-       JOIN users u ON u.id = b.user_id
-      WHERE b.id = $1
-        AND u.is_erased = FALSE
-      LIMIT 1`,
-    [businessId]
-  );
-  return result.rows[0] || null;
+  return getOptionalEmailRecipientForBusiness(businessId, db);
 }
 
 async function sendBookkeepingActivityEmail({
@@ -58,12 +53,12 @@ async function sendBookkeepingActivityEmail({
   try {
     if (!resendClient) return false;
     const owner = await loadBusinessOwner(businessId, db);
-    if (!owner?.email) return false;
+    if (!owner?.email || !owner.marketing_email_opt_in) return false;
     const lang = await getPreferredLanguageForUser(userId || owner.user_id);
-    const emailContent = buildBookkeepingActivityEmail(lang, kind, {
+    const emailContent = appendOptionalEmailFooter(buildBookkeepingActivityEmail(lang, kind, {
       details,
       actionUrl: buildAppUrl(actionPath || "/")
-    });
+    }), owner.user_id);
     const result = await resendClient.emails.send({
       from: getFromEmail(),
       to: owner.email,

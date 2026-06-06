@@ -94,12 +94,14 @@ async function getPreferredLanguageForEmail(email) {
    ========================================================= */
 function wrapEmailHtml(headerHtml, bodyHtml) {
   return `
-    <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background: #ffffff;">
-      <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #1d4ed8); color: #ffffff;">
+    <div style="font-family: Arial, sans-serif; background:#f3f7fb; padding: 28px 12px;">
+      <div style="max-width: 620px; margin: 0 auto; border: 1px solid #dbe4f0; border-radius: 20px; overflow: hidden; background: #ffffff; box-shadow: 0 24px 64px rgba(15, 23, 42, 0.08);">
+        <div style="padding: 24px 28px; background: linear-gradient(135deg, #0f172a, #0f766e); color: #ffffff;">
         ${headerHtml}
-      </div>
-      <div style="padding: 28px;">
-        ${bodyHtml}
+        </div>
+        <div style="padding: 28px;">
+          ${bodyHtml}
+        </div>
       </div>
     </div>
   `;

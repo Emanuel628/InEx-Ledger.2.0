@@ -489,10 +489,10 @@
   margin-left: 8px;
   padding: 0;
   border-radius: 999px;
-  background: #e24b4a;
+  background: #34d399;
   color: transparent;
   font-size: 0;
-  box-shadow: none;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.16);
 }
 
 .messages-list-shell,
@@ -989,8 +989,9 @@
   margin-left: 6px;
   padding: 0;
   border-radius: 999px;
-  background: var(--red);
+  background: #34d399;
   vertical-align: middle;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.16);
 }
 
 .nav-msg-badge[hidden] {

@@ -11,6 +11,10 @@ const {
   buildTrialLifecycleEmail,
   buildReviewQueueReminderEmail
 } = require("./emailI18nService.js");
+const {
+  appendOptionalEmailFooter,
+  getOptionalEmailRecipientForBusiness
+} = require("./emailPreferencesService.js");
 
 const REVIEW_REMINDER_KEY = "review_queue_biweekly";
 const CANCELLATION_ENDING_SOON_KEY = "subscription_ending_soon_7";
@@ -147,12 +151,18 @@ async function sendTrialLifecycleReminders({ db = pool, resendClient = getResend
         continue;
       }
 
+      const recipient = await getOptionalEmailRecipientForBusiness(row.business_id, db);
+      if (!recipient?.marketing_email_opt_in || !recipient.email) {
+        stats.skipped += 1;
+        continue;
+      }
+
       const lang = await getPreferredLanguageForUser(row.user_id);
-      const emailContent = buildTrialLifecycleEmail(lang, reminder.kind, {
+      const emailContent = appendOptionalEmailFooter(buildTrialLifecycleEmail(lang, reminder.kind, {
         actionUrl: buildAppUrl("/subscription")
-      });
+      }), recipient.user_id);
       await sendEmail(resendClient, {
-        to: row.email,
+        to: recipient.email,
         ...emailContent
       });
       await saveReminderState(db, row.business_id, reminder.key, {
@@ -257,13 +267,19 @@ async function sendReviewQueueReminderEmails({ db = pool, resendClient = getRese
         continue;
       }
 
+      const recipient = await getOptionalEmailRecipientForBusiness(row.business_id, db);
+      if (!recipient?.marketing_email_opt_in || !recipient.email) {
+        stats.skipped += 1;
+        continue;
+      }
+
       const lang = await getPreferredLanguageForUser(row.user_id);
-      const emailContent = buildReviewQueueReminderEmail(lang, {
+      const emailContent = appendOptionalEmailFooter(buildReviewQueueReminderEmail(lang, {
         count,
         actionUrl: buildAppUrl("/exports?focus=review")
-      });
+      }), recipient.user_id);
       await sendEmail(resendClient, {
-        to: row.email,
+        to: recipient.email,
         ...emailContent
       });
       await saveReminderState(db, row.business_id, REVIEW_REMINDER_KEY, {

@@ -135,6 +135,13 @@ function loadBusinessesRouterFixture(options = {}) {
       };
     }
 
+    if (requestName === "../services/emailPreferencesService.js" || /emailPreferencesService\.js$/.test(requestName)) {
+      return {
+        getOptionalEmailPreferenceForUser: async () => true,
+        appendOptionalEmailFooter: (emailContent) => emailContent
+      };
+    }
+
     if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
       return { logError() {}, logWarn() {}, logInfo() {} };
     }

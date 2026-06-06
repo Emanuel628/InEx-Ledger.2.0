@@ -34,6 +34,10 @@ const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const { stripeRequest, stripeGet } = require("../services/stripeClient.js");
 const { normalizeFiscalYearStart } = require("../utils/fiscalYear.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
+const {
+  appendOptionalEmailFooter,
+  getOptionalEmailPreferenceForUser
+} = require("../services/emailPreferencesService.js");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -201,6 +205,10 @@ async function sendBusinessLifecycleEmail({ userId, kind, businessName, subscrip
     if (!contact?.email) {
       return;
     }
+    const marketingEmailOptIn = await getOptionalEmailPreferenceForUser(userId, pool);
+    if (!marketingEmailOptIn) {
+      return;
+    }
 
     const lang = await getPreferredLanguageForUser(userId);
     const details = [
@@ -208,10 +216,10 @@ async function sendBusinessLifecycleEmail({ userId, kind, businessName, subscrip
       ...(await buildBusinessLifecycleDetails(subscription, businessCount))
     ];
     const actionUrl = buildAppUrl("/subscription");
-    const emailContent = buildBusinessLifecycleEmail(lang, kind, {
+    const emailContent = appendOptionalEmailFooter(buildBusinessLifecycleEmail(lang, kind, {
       details,
       actionUrl
-    });
+    }), userId);
 
     await getResend().emails.send({
       from: RESEND_FROM_EMAIL,

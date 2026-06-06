@@ -4,6 +4,10 @@ const { Resend } = require("resend");
 const { pool } = require("../db.js");
 const { logWarn } = require("../utils/logger.js");
 const { getPreferredLanguageForUser, buildExportLifecycleEmail } = require("./emailI18nService.js");
+const {
+  appendOptionalEmailFooter,
+  getOptionalEmailRecipientForBusiness
+} = require("./emailPreferencesService.js");
 
 const EXPORT_STALE_REMINDER_KEY = "export_stale";
 const INVALIDATION_LABELS = [
@@ -66,25 +70,16 @@ function summarizeInvalidationReason(reason) {
 }
 
 async function loadBusinessOwner(businessId, db = pool) {
-  const result = await db.query(
-    `SELECT b.user_id, u.email
-       FROM businesses b
-       JOIN users u ON u.id = b.user_id
-      WHERE b.id = $1
-        AND u.is_erased = FALSE
-      LIMIT 1`,
-    [businessId]
-  );
-  return result.rows[0] || null;
+  return getOptionalEmailRecipientForBusiness(businessId, db);
 }
 
 async function sendEmailToUser({ userId, email, kind, details, actionUrl }, resendClient = getResendClient()) {
   if (!email || !resendClient) return false;
   const lang = await getPreferredLanguageForUser(userId);
-  const emailContent = buildExportLifecycleEmail(lang, kind, {
+  const emailContent = appendOptionalEmailFooter(buildExportLifecycleEmail(lang, kind, {
     details,
     actionUrl
-  });
+  }), userId);
   const result = await resendClient.emails.send({
     from: getFromEmail(),
     to: email,
@@ -107,7 +102,7 @@ async function sendExportGeneratedEmail({
 }, { db = pool, resendClient = getResendClient() } = {}) {
   try {
     const owner = await loadBusinessOwner(businessId, db);
-    if (!owner?.email) return false;
+    if (!owner?.email || !owner.marketing_email_opt_in) return false;
     return await sendEmailToUser({
       userId: userId || owner.user_id,
       email: owner.email,
@@ -134,7 +129,7 @@ async function sendExportFailedEmail({
 }, { db = pool, resendClient = getResendClient() } = {}) {
   try {
     const owner = await loadBusinessOwner(businessId, db);
-    if (!owner?.email) return false;
+    if (!owner?.email || !owner.marketing_email_opt_in) return false;
     return await sendEmailToUser({
       userId: userId || owner.user_id,
       email: owner.email,
@@ -196,7 +191,7 @@ async function sendExportStaleEmail({
       return false;
     }
     const owner = await loadBusinessOwner(businessId, db);
-    if (!owner?.email) return false;
+    if (!owner?.email || !owner.marketing_email_opt_in) return false;
     const invalidation = summarizeInvalidationReason(reason || "");
     await sendEmailToUser({
       userId: owner.user_id,
