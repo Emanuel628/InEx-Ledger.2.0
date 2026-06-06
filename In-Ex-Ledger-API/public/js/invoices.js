@@ -341,9 +341,36 @@ function collectInvoicePayload(status) {
   };
 }
 
+function validateInvoiceFormBeforeSave() {
+  const form = document.getElementById("invoiceForm");
+  if (form && typeof form.reportValidity === "function" && !form.reportValidity()) {
+    return "Please complete the required invoice fields.";
+  }
+
+  const lineRows = document.querySelectorAll(".invoice-line-row");
+  for (const row of lineRows) {
+    const description = row.querySelector(".line-desc")?.value?.trim() || "";
+    const unitPrice = Number(row.querySelector(".line-rate")?.value || 0);
+    if (!description && unitPrice > 0) {
+      row.querySelector(".line-desc")?.focus();
+      return "Each billed line needs a description before you save the invoice.";
+    }
+  }
+
+  return "";
+}
+
 async function saveInvoice(status) {
   const errorEl = document.getElementById("invoiceFormError");
   errorEl.hidden = true;
+  errorEl.textContent = "";
+
+  const validationMessage = validateInvoiceFormBeforeSave();
+  if (validationMessage) {
+    errorEl.textContent = validationMessage;
+    errorEl.hidden = false;
+    return;
+  }
 
 const payload = collectInvoicePayload(status === "sent" ? "draft" : status);
 
