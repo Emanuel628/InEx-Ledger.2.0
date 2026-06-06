@@ -21,6 +21,18 @@ function loadMessagesRouter({ contactRows = [], archivedRows = [], receiverRows 
               return { rows: contactRows, rowCount: contactRows.length };
             }
 
+            if (/FROM messages\s+WHERE receiver_id = \$1\s+AND is_read = FALSE\s+AND is_deleted_by_receiver = FALSE/i.test(sql.replace(/\s+/g, " "))) {
+              return {
+                rows: [{
+                  total_count: 4,
+                  support_count: 1,
+                  notification_count: 2,
+                  message_count: 1
+                }],
+                rowCount: 1
+              };
+            }
+
             if (/SELECT id, role FROM users WHERE id = \$1 LIMIT 1/i.test(sql)) {
               const rows = receiverRows || [{ id: params[0], role: "it_support" }];
               return { rows, rowCount: rows.length };
@@ -220,6 +232,23 @@ test("messages support-email stores an outbound support thread and reply-to rout
     else process.env.SUPPORT_REPLY_BASE_EMAIL = beforeReplyBase;
     if (beforeReplySecret === undefined) delete process.env.SUPPORT_REPLY_HMAC_SECRET;
     else process.env.SUPPORT_REPLY_HMAC_SECRET = beforeReplySecret;
+  }
+});
+
+test("messages unread-count returns split unread buckets", async () => {
+  const fixture = loadMessagesRouter();
+
+  try {
+    const res = await request(fixture.app).get("/api/messages/unread-count");
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body, {
+      total: 4,
+      messages: 1,
+      support: 1,
+      notifications: 2
+    });
+  } finally {
+    fixture.cleanup();
   }
 });
 

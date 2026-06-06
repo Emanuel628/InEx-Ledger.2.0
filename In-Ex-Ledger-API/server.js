@@ -4,7 +4,6 @@ const helmet = require('helmet');
 const fs = require('fs');
 const path = require('path');
 const routes = require('./routes/index.js');
-const mcpRouter = require('./routes/mcp.routes.js');
 const cookieParser = require('cookie-parser');
 const transactionsRouter = require('./routes/transactions.routes.js');
 const { createGlobalLimiter } = require('./middleware/rateLimitTiers.js');
@@ -410,14 +409,6 @@ app.get('/favicon.svg', (req, res) => {
   res.sendFile(path.join(publicDir, 'favicon.svg'));
 });
 
-app.get('/.well-known/oauth-authorization-server', (req, res) => {
-  res.redirect(302, '/mcp/.well-known/oauth-authorization-server');
-});
-
-app.get('/.well-known/oauth-protected-resource', (req, res) => {
-  res.redirect(302, '/mcp/.well-known/oauth-protected-resource');
-});
-
 app.get('/', (req, res) => {
   sendCanonicalPage('landing', req, res);
 });
@@ -433,10 +424,6 @@ app.get('/index.html', (req, res) => {
 // Transaction management
 app.use('/api/transactions', transactionsRouter);
 logInfo('MOUNTED: /api/transactions');
-
-// Public MCP connector
-app.use('/mcp', mcpRouter);
-logInfo('MOUNTED: /mcp');
 
 // Core auth and index routes
 app.use('/api', routes);

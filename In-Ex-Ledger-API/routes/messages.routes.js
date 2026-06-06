@@ -88,18 +88,34 @@ function threadKeySql(alias = "m") {
 }
 
 // GET /api/messages/unread-count
-// Lightweight endpoint polled by the frontend for notification badge.
+// Lightweight endpoint polled by the frontend for unread badges.
 router.get("/unread-count", async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT COUNT(*)::int AS count
+      `SELECT COUNT(*)::int AS total_count,
+              COUNT(*) FILTER (
+                WHERE message_type IN ('it_support', 'support_request')
+              )::int AS support_count,
+              COUNT(*) FILTER (
+                WHERE message_type = 'notification'
+              )::int AS notification_count,
+              COUNT(*) FILTER (
+                WHERE message_type IS NULL
+                   OR message_type IN ('general', 'cpa', 'general_cpa', 'invoice_sent', 'invoice_reply')
+              )::int AS message_count
          FROM messages
         WHERE receiver_id = $1
           AND is_read = FALSE
           AND is_deleted_by_receiver = FALSE`,
       [req.user.id]
     );
-    res.json({ count: result.rows[0]?.count ?? 0 });
+    const row = result.rows[0] || {};
+    res.json({
+      total: row.total_count ?? 0,
+      messages: row.message_count ?? 0,
+      support: row.support_count ?? 0,
+      notifications: row.notification_count ?? 0
+    });
   } catch (err) {
     logError("GET /messages/unread-count error:", err.message);
     res.status(500).json({ error: "Failed to fetch unread count." });

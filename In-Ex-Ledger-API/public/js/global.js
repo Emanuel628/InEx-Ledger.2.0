@@ -552,7 +552,7 @@ function pollGlobalUnreadCount() {
         if (!response.ok) return !response || response.status === 401 ? false : true;
         return response.json().then(function (data) {
           if (!data) return true;
-          var count = data.count || 0;
+          var count = data.total || 0;
           updateNavMessageBadges(count);
           return true;
         });
@@ -573,7 +573,7 @@ function pollGlobalUnreadCount() {
       if (!response.ok) return true;
       return response.json().then(function (data) {
         if (!data) return true;
-        var count = data.count || 0;
+        var count = data.total || 0;
         updateNavMessageBadges(count);
         return true;
       });

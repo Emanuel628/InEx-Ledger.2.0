@@ -335,7 +335,8 @@ function getTypeLabel(type) {
     support_request: translate("messages_type_support_request", "Support Request"),
     general: translate("messages_type_general", "General"),
     invoice_sent: translate("messages_type_invoice_sent", "Invoice sent"),
-    invoice_reply: translate("messages_type_invoice_reply", "Invoice reply")
+    invoice_reply: translate("messages_type_invoice_reply", "Invoice reply"),
+    notification: translate("messages_tab_notifications", "Notifications")
   }[type] || type || "Message";
 }
 
@@ -1049,39 +1050,70 @@ async function updateUnreadBadge() {
     }
     if (!response.ok) return true;
 
-    const { count } = await response.json();
-    setUnreadBadge(count);
+    const unreadCounts = await response.json();
+    setUnreadBadge(unreadCounts);
     return true;
   } catch {
     return true;
   }
 }
 
-function setUnreadBadge(count) {
-  const badges = [
+function setCountBadge(badge, count, singularLabel, pluralLabel) {
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent = count > 99 ? "99+" : String(count);
+    badge.hidden = false;
+    const label = count === 1 ? singularLabel : pluralLabel.replace("%d", String(count));
+    badge.setAttribute("aria-label", label);
+    badge.title = label;
+  } else {
+    badge.hidden = true;
+    badge.removeAttribute("aria-label");
+    badge.removeAttribute("title");
+  }
+}
+
+function setUnreadBadge(unreadCounts) {
+  const counts = unreadCounts && typeof unreadCounts === "object" ? unreadCounts : {};
+  const messageCount = Number(counts.messages || 0);
+  const supportCount = Number(counts.support || 0);
+  const notificationCount = Number(counts.notifications || 0);
+  const totalCount = Number(counts.total || (messageCount + supportCount + notificationCount));
+
+  setCountBadge(
     document.getElementById("inboxBadge"),
-    document.getElementById("sidebarUnreadBadge")
-  ];
+    messageCount,
+    "1 unread message",
+    "%d unread messages"
+  );
+  setCountBadge(
+    document.getElementById("sidebarUnreadBadge"),
+    messageCount,
+    "1 unread message",
+    "%d unread messages"
+  );
+  setCountBadge(
+    document.getElementById("supportBadge"),
+    supportCount,
+    "1 unread support thread",
+    "%d unread support threads"
+  );
+  setCountBadge(
+    document.getElementById("notificationBadge"),
+    notificationCount,
+    "1 unread notification",
+    "%d unread notifications"
+  );
 
-  badges.forEach((badge) => {
-    if (!badge) return;
-    if (count > 0) {
-      badge.textContent = count > 99 ? "99+" : String(count);
-      badge.hidden = false;
-    } else {
-      badge.hidden = true;
-    }
-  });
-
-  document.getElementById("messagesUnreadMetric")?.replaceChildren(document.createTextNode(String(count)));
+  document.getElementById("messagesUnreadMetric")?.replaceChildren(document.createTextNode(String(totalCount)));
 
   document.querySelectorAll(".nav-msg-badge").forEach((badge) => {
-    badge.setAttribute("data-count", String(count));
+    badge.setAttribute("data-count", String(totalCount));
     badge.textContent = "";
-    badge.hidden = count <= 0;
+    badge.hidden = totalCount <= 0;
 
-    const label = count === 1 ? "1 unread message" : `${count} unread messages`;
-    if (count > 0) {
+    const label = totalCount === 1 ? "1 unread item" : `${totalCount} unread items`;
+    if (totalCount > 0) {
       badge.setAttribute("aria-label", label);
       badge.title = label;
     } else {
