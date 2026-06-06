@@ -5,6 +5,7 @@ const POLL_INTERVAL_MS = 30000;
 const PAGE_SIZE = 25;
 const PREVIEW_MAX_LENGTH = 120;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 const MAILBOX_META = {
   inbox: {
@@ -53,6 +54,10 @@ function isUuid(value) {
   return typeof value === "string" && UUID_RE.test(value);
 }
 
+function isEmail(value) {
+  return typeof value === "string" && EMAIL_RE.test(String(value).trim());
+}
+
 function translate(key, fallback = "") {
   return typeof t === "function" ? t(key) : fallback;
 }
@@ -61,7 +66,6 @@ function translate(key, fallback = "") {
 // users, so "contact support" is handled over email to this address. It is
 // surfaced as the default option in the compose recipient dropdown.
 const SUPPORT_EMAIL = "support.inex@gmail.com";
-const SUPPORT_CONTACT_VALUE = "support-email";
 
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
@@ -767,47 +771,38 @@ async function loadContacts() {
 
     const { contacts } = await response.json();
     _contacts = contacts || [];
-    populateContactSelect(document.getElementById("composeTo"));
+    populateContactSuggestions(
+      document.getElementById("composeTo"),
+      document.getElementById("composeToList")
+    );
   } catch {
     _contacts = [];
   }
 }
 
-function populateContactSelect(select) {
-  if (!select) return;
+function populateContactSuggestions(input, datalist) {
+  if (!input || !datalist) return;
 
-  const currentValue = select.value;
-  const placeholder = select.querySelector("option[value='']");
-  select.innerHTML = "";
+  const currentValue = input.value;
+  datalist.innerHTML = "";
 
-  if (placeholder) {
-    select.appendChild(placeholder);
-  } else {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "Select contact...";
-    select.appendChild(option);
-  }
-
-  // InEx Support is always offered as the default contact option.
   const supportOption = document.createElement("option");
-  supportOption.value = SUPPORT_CONTACT_VALUE;
-  supportOption.textContent = `InEx Support (${SUPPORT_EMAIL})`;
-  select.appendChild(supportOption);
+  supportOption.value = SUPPORT_EMAIL;
+  supportOption.label = "InEx Support";
+  datalist.appendChild(supportOption);
 
   _contacts.forEach((contact) => {
-    if (!isUuid(contact.id)) return;
-
+    if (!isUuid(contact.id) || !isEmail(contact.email)) return;
     const option = document.createElement("option");
-    option.value = contact.id;
+    option.value = contact.email;
     const roleTag = contact.role && contact.role !== "user"
       ? ` (${String(contact.role).replace("_", " ")})`
       : "";
-    option.textContent = `${contact.name}${roleTag}`;
-    select.appendChild(option);
+    option.label = `${contact.name}${roleTag}`;
+    datalist.appendChild(option);
   });
 
-  if (currentValue) select.value = currentValue;
+  if (currentValue) input.value = currentValue;
 }
 
 function findSupportContact() {
@@ -855,9 +850,9 @@ function openComposeModal(prefill = null) {
   const bodyEl = document.getElementById("composeBody");
   const errorEl = document.getElementById("composeError");
 
-  populateContactSelect(toEl);
+  populateContactSuggestions(toEl, document.getElementById("composeToList"));
 
-  if (toEl) toEl.value = prefill?.to || SUPPORT_CONTACT_VALUE;
+  if (toEl) toEl.value = prefill?.to || "";
   if (typeEl) typeEl.value = prefill?.type || "general";
   if (subjectEl) subjectEl.value = prefill?.subject || "";
   if (bodyEl) bodyEl.value = prefill?.body || "";
@@ -873,10 +868,26 @@ function closeComposeModal() {
 
 function openSupportComposer() {
   openComposeModal({
-    to: SUPPORT_CONTACT_VALUE,
+    to: SUPPORT_EMAIL,
     type: "support_request",
-    subject: "Support Request"
+    subject: ""
   });
+}
+
+function resolveComposeRecipient(rawValue) {
+  const value = String(rawValue || "").trim();
+  if (!value) return { kind: "empty", value: "" };
+  if (value.toLowerCase() === SUPPORT_EMAIL.toLowerCase()) {
+    return { kind: "support", value: SUPPORT_EMAIL };
+  }
+  const contact = _contacts.find((item) => isEmail(item.email) && item.email.toLowerCase() === value.toLowerCase());
+  if (contact && isUuid(contact.id)) {
+    return { kind: "internal", value: contact.id, email: contact.email };
+  }
+  if (isEmail(value)) {
+    return { kind: "external", value };
+  }
+  return { kind: "invalid", value };
 }
 
 async function sendComposedMessage() {
@@ -887,18 +898,18 @@ async function sendComposedMessage() {
   const errorEl = document.getElementById("composeError");
   const sendBtn = document.getElementById("composeSendBtn");
 
-  const receiverId = (toEl?.value || "").trim();
+  const recipient = resolveComposeRecipient((toEl?.value || "").trim());
   const messageType = (typeEl?.value || "general").trim();
   const subject = (subjectEl?.value || "").trim();
   const body = (bodyEl?.value || "").trim();
 
-  if (!receiverId) {
-    if (errorEl) errorEl.textContent = translate("messages_error_no_recipient", "Select a recipient.");
+  if (recipient.kind === "empty") {
+    if (errorEl) errorEl.textContent = translate("messages_error_no_recipient", "Enter a recipient email.");
     toEl?.focus();
     return;
   }
 
-  if (receiverId !== SUPPORT_CONTACT_VALUE && !isUuid(receiverId)) {
+  if (recipient.kind === "invalid") {
     if (errorEl) errorEl.textContent = translate("messages_error_invalid_recipient", "Recipient is invalid.");
     toEl?.focus();
     return;
@@ -910,9 +921,9 @@ async function sendComposedMessage() {
     return;
   }
   
-  const supportContact = receiverId === SUPPORT_CONTACT_VALUE ? findSupportContact() : null;
+  const supportContact = recipient.kind === "support" ? findSupportContact() : null;
 
-  if (receiverId === SUPPORT_CONTACT_VALUE && supportContact) {
+  if (recipient.kind === "support" && supportContact) {
     if (errorEl) errorEl.textContent = "";
 
     if (sendBtn) {
@@ -955,7 +966,7 @@ async function sendComposedMessage() {
     }
   }
   
-  if (receiverId === SUPPORT_CONTACT_VALUE) {
+  if (recipient.kind === "support") {
   if (errorEl) errorEl.textContent = "";
 
   if (sendBtn) {
@@ -965,11 +976,11 @@ async function sendComposedMessage() {
 
   try {
     const response = await apiFetch("/api/messages/support-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subject: subject || "Support Request",
-        body
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: subject || "Support Request",
+          body
       })
     });
 
@@ -1004,16 +1015,27 @@ async function sendComposedMessage() {
   }
 
   try {
-    const response = await apiFetch("/api/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        receiver_id: receiverId,
-        message_type: messageType,
-        subject: subject || undefined,
-        body
-      })
-    });
+    const response = recipient.kind === "external"
+      ? await apiFetch("/api/messages/send-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to_email: recipient.value,
+            message_type: messageType,
+            subject: subject || undefined,
+            body
+          })
+        })
+      : await apiFetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            receiver_id: recipient.value,
+            message_type: messageType,
+            subject: subject || undefined,
+            body
+          })
+        });
 
     if (!response || !response.ok) {
       const error = response ? await response.json().catch(() => ({})) : {};

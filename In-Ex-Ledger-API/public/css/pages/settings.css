@@ -2825,7 +2825,13 @@ select.is-export-profile-missing {
 }
 
 .settings-page .business-edit-modal {
+  width: min(720px, calc(100vw - 32px));
   max-width: 720px;
+  padding: 28px;
+  border-radius: 24px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
 }
 
 .settings-page .business-edit-modal-copy {

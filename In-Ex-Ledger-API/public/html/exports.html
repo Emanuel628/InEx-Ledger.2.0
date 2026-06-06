@@ -174,12 +174,15 @@
             <div class="secure-export-input-row">
               <input
                 id="exportInlineTaxIdInput"
-                type="password"
+                type="text"
                 maxlength="20"
-                autocomplete="new-password"
+                inputmode="numeric"
+                autocomplete="off"
                 autocapitalize="off"
                 autocorrect="off"
                 spellcheck="false"
+                data-lpignore="true"
+                data-1p-ignore="true"
                 class="secure-export-tax-input"
                 data-i18n-placeholder="secure_export_modal_input_placeholder"
                 placeholder="Taxpayer ID for this export"
@@ -336,7 +339,7 @@
   <script src="../js/jwe-utils.js?v=20260502e"></script>
   <script src="../js/pdf_labels.js?v=20260502e"></script>
   <script src="../js/pdf_export.js?v=20260517a"></script>
-  <script src="../js/exports.js?v=20260602a"></script>
+  <script src="../js/exports.js?v=20260606a"></script>
 </body>
 </html>
 

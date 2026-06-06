@@ -925,9 +925,10 @@ function renderBusinessAccessSection(sub) {
     : extra === 1
       ? `You have ${total} businesses: 1 included and 1 add-on.`
       : `You have ${total} businesses: 1 included and ${extra} add-ons.`;
+  const slotPricing = getPricingDetails();
   const slotRateLabel = pricingState.billingInterval === "yearly"
-    ? `${formatMoney(pricingState.currency, pricingState.yearlyAdditionalBusinessPriceCents)} / year per extra slot`
-    : `${formatMoney(pricingState.currency, pricingState.monthlyAdditionalBusinessPriceCents)} / month per extra slot`;
+    ? `${formatMoney(pricingState.currency, slotPricing.addon)} / year per extra slot`
+    : `${formatMoney(pricingState.currency, slotPricing.addon)} / month per extra slot`;
 
   manager.innerHTML = `
     ${buildBusinessRosterMarkup(sub)}

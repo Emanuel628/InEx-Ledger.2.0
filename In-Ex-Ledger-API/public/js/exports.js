@@ -1376,9 +1376,12 @@ function wireInlineTaxId() {
   resetInlineTaxIdState = ({ hideSection = false } = {}) => {
     if (input) {
       input.value = "";
-      input.type = "password";
+      input.type = "text";
     }
-    if (toggle) toggle.textContent = tx("secure_export_modal_show");
+    if (toggle) {
+      toggle.textContent = tx("secure_export_modal_show");
+      toggle.hidden = true;
+    }
     const cb = document.getElementById("exportInlineTaxIdCheckbox");
     if (cb) cb.checked = false;
     const errorEl = document.getElementById("exportInlineTaxIdError");
@@ -1409,12 +1412,9 @@ function wireInlineTaxId() {
     }
   });
 
-  toggle?.addEventListener("click", () => {
-    if (!input) return;
-    const isPassword = input.type === "password";
-    input.type = isPassword ? "text" : "password";
-    if (toggle) toggle.textContent = isPassword ? tx("secure_export_modal_hide") : tx("secure_export_modal_show");
-  });
+  if (toggle) {
+    toggle.hidden = true;
+  }
 }
 
 function getValidatedExportRange() {

@@ -28,9 +28,14 @@ const MAX_SUBJECT_LEN = 200;
 const MAX_BODY_LEN = 10000;
 const MAX_PAGE_SIZE = 50;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 function isUuid(value) {
   return typeof value === "string" && UUID_RE.test(value);
+}
+
+function isEmail(value) {
+  return typeof value === "string" && EMAIL_RE.test(String(value).trim());
 }
 
 function getResendClient() {
@@ -739,6 +744,117 @@ router.post("/support-email", async (req, res) => {
   } catch (err) {
     logError("POST /messages/support-email error:", err.message);
     res.status(500).json({ error: "Failed to send support request." });
+  }
+});
+
+router.post("/send-email", async (req, res) => {
+  try {
+    const toEmail = String(req.body?.to_email || "").trim().toLowerCase();
+    const messageType = String(req.body?.message_type || "general").trim();
+    const subject = String(req.body?.subject || "Message from InEx Ledger").trim().slice(0, MAX_SUBJECT_LEN);
+    const body = String(req.body?.body || "").trim().slice(0, MAX_BODY_LEN);
+
+    if (!isEmail(toEmail)) {
+      return res.status(400).json({ error: "A valid recipient email is required." });
+    }
+    if (!VALID_MESSAGE_TYPES.has(messageType)) {
+      return res.status(400).json({ error: `message_type must be one of: ${[...VALID_MESSAGE_TYPES].join(", ")}.` });
+    }
+    if (!body) {
+      return res.status(400).json({ error: "Message body is required." });
+    }
+
+    const resend = getResendClient();
+    if (!resend) {
+      return res.status(503).json({ error: "Email service is not configured." });
+    }
+
+    const supportFrom = getSupportFromEmail();
+    const supportTo = getSupportToEmail();
+    const messageId = crypto.randomUUID();
+    const replyTo = buildSupportReplyToAddress(messageId);
+
+    const userResult = await pool.query(
+      `SELECT full_name, display_name, email
+         FROM users
+        WHERE id = $1
+        LIMIT 1`,
+      [req.user.id]
+    );
+
+    const userRow = userResult.rows[0] || {};
+    const accountName =
+      userRow.full_name ||
+      userRow.display_name ||
+      userRow.email ||
+      req.user?.email ||
+      "InEx Ledger user";
+    const userEmail = userRow.email || req.user?.email || "";
+
+    const text = [
+      `${accountName} sent you a message from InEx Ledger.`,
+      userEmail ? `Replying account: ${userEmail}` : null,
+      "",
+      body
+    ].filter(Boolean).join("\n");
+
+    const html = [
+      `<p><strong>${escapeHtml(accountName)}</strong> sent you a message from InEx Ledger.</p>`,
+      userEmail ? `<p><strong>Replying account:</strong> ${escapeHtml(userEmail)}</p>` : "",
+      `<p>${escapeHtml(body).replace(/\n/g, "<br/>")}</p>`
+    ].filter(Boolean).join("");
+
+    const payload = {
+      from: supportFrom,
+      to: toEmail,
+      subject,
+      text,
+      html
+    };
+
+    if (replyTo) {
+      const replyToDisplay = `InEx Ledger Messages <${replyTo}>`;
+      payload.replyTo = replyToDisplay;
+      payload.reply_to = replyToDisplay;
+    }
+
+    const sendResult = await resend.emails.send(payload);
+
+    if (sendResult?.error) {
+      return res.status(sendResult.error.statusCode || 502).json({
+        error: sendResult.error.message || "Failed to send email.",
+        details: sendResult.error
+      });
+    }
+
+    await pool.query(
+      `INSERT INTO messages
+         (id, sender_id, receiver_id, message_type, subject, body,
+          external_sender_email, external_sender_name,
+          is_read, is_deleted_by_receiver, external_message_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, TRUE, $9)`,
+      [
+        messageId,
+        req.user.id,
+        req.user.id,
+        messageType,
+        subject || null,
+        body,
+        toEmail,
+        accountName,
+        sendResult?.data?.id || null
+      ]
+    );
+
+    res.status(201).json({
+      ok: true,
+      message_id: messageId,
+      to: toEmail,
+      resend_id: sendResult?.data?.id || null
+    });
+  } catch (err) {
+    logError("POST /messages/send-email error:", err.message);
+    res.status(500).json({ error: "Failed to send email." });
   }
 });
 
