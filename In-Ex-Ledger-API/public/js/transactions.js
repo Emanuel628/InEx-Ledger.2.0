@@ -29,7 +29,7 @@ const transactionFilters = {
   category: "",
   account: "",
   review: "",
-  period: localStorage.getItem("lb_tx_period") || "this-month"
+  period: "all"
 };
 
 const DRAWER_OPEN_LABEL = "+ Add new";
@@ -5580,8 +5580,7 @@ function initPeriodPicker() {
     chip.addEventListener("click", () => {
       chips.forEach((c) => c.classList.remove("is-active"));
       chip.classList.add("is-active");
-      transactionFilters.period = chip.dataset.period || "this-month";
-      localStorage.setItem("lb_tx_period", transactionFilters.period);
+      transactionFilters.period = chip.dataset.period || "all";
       void loadTransactions({ resetPage: true });
       window.dispatchEvent(new CustomEvent("txPeriodChanged", { detail: chip.dataset.period }));
     });
