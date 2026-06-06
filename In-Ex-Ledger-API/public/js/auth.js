@@ -19,6 +19,10 @@ const USER_PILL_CHEVRON_MARKUP = '<svg class="user-pill-chevron" viewBox="0 0 10
 const CSRF_COOKIE_NAME = "csrf_token";
 const CSRF_HEADER_NAME = "X-CSRF-Token";
 const LOGIN_RESET_KEY = "lb_login_reset";
+const IDLE_TIMEOUT_MS = Math.max(
+  60_000,
+  Number((typeof window !== "undefined" && window.__LUNA_FLAGS__?.idleTimeoutMs) || 15 * 60 * 1000) || 15 * 60 * 1000
+);
 const ONBOARDING_PAGE = "/onboarding";
 const TRIAL_SETUP_PAGE = "/trial-setup";
 const GUIDED_ONBOARDING_STEPS = new Set(["categories", "accounts", "transactions"]);
@@ -60,6 +64,9 @@ if (!window.__AUTH_GUARD_STATE__) {
 }
 
 let pendingRefreshPromise = null;
+let idleLogoutTimer = null;
+let idleGuardWired = false;
+let lastActivityAt = 0;
 
 function authT(key) {
   return typeof t === "function" ? t(key) : key;
@@ -156,6 +163,83 @@ function clearAppState() {
   try {
     sessionStorage.clear();
   } catch (_) {}
+}
+
+function clearIdleLogoutTimer() {
+  if (idleLogoutTimer) {
+    clearTimeout(idleLogoutTimer);
+    idleLogoutTimer = null;
+  }
+}
+
+function getIdleRedirectPath() {
+  return `${LOGIN_PAGE}?reason=idle`;
+}
+
+async function forceIdleLogout() {
+  try {
+    await fetch(buildApiUrl("/api/auth/logout"), {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        ...authHeader(),
+        ...csrfHeader("POST")
+      }
+    });
+  } catch (_) {}
+  clearIdleLogoutTimer();
+  markLoginReset();
+  clearToken();
+  window.location.href = getIdleRedirectPath();
+}
+
+function scheduleIdleLogout() {
+  clearIdleLogoutTimer();
+  if (!isAuthenticated()) {
+    return;
+  }
+  idleLogoutTimer = setTimeout(() => {
+    if (!isAuthenticated()) {
+      return;
+    }
+    forceIdleLogout();
+  }, IDLE_TIMEOUT_MS);
+}
+
+function markUserActivity() {
+  lastActivityAt = Date.now();
+  scheduleIdleLogout();
+}
+
+function ensureIdleLogoutGuard() {
+  if (idleGuardWired) {
+    scheduleIdleLogout();
+    return;
+  }
+  idleGuardWired = true;
+  lastActivityAt = Date.now();
+  const activityEvents = ["pointerdown", "keydown", "scroll", "touchstart", "mousemove"];
+  const throttledActivity = (() => {
+    let lastTick = 0;
+    return () => {
+      const now = Date.now();
+      if (now - lastTick < 15_000) {
+        return;
+      }
+      lastTick = now;
+      markUserActivity();
+    };
+  })();
+
+  activityEvents.forEach((eventName) => {
+    window.addEventListener(eventName, throttledActivity, { passive: true });
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      markUserActivity();
+    }
+  });
+  scheduleIdleLogout();
 }
 
 function markLoginReset() {
@@ -596,6 +680,7 @@ function setToken(token) {
 }
 
 function clearToken() {
+  clearIdleLogoutTimer();
   try {
     sessionStorage.removeItem(TOKEN_KEY);
   } catch (_) {}
@@ -784,6 +869,7 @@ async function requireValidSessionOrRedirect() {
       if (typeof window !== "undefined" && typeof CustomEvent === "function") {
         window.dispatchEvent(new CustomEvent("lunaProfileReady", { detail: payload }));
       }
+      ensureIdleLogoutGuard();
       window.__AUTH_GUARD_STATE__.running = false;
       window.__AUTH_GUARD_STATE__.lastError = null;
       return true;
@@ -944,6 +1030,7 @@ function requireAuth() {
 }
 
 async function signOut() {
+  clearIdleLogoutTimer();
   try {
     await fetch(buildApiUrl("/api/auth/logout"), {
       method: "POST",
