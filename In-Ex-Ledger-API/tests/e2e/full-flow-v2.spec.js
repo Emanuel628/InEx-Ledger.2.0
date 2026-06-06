@@ -121,11 +121,10 @@ async function getLastTxId(page) {
   return arr[arr.length - 1]?.id || null;
 }
 
-/** Fetch the first available invoice ID via API (invoices-v1 is accessible to trial accounts) */
+/** Fetch the first available invoice ID via API (invoices-v1 returns a plain array) */
 async function getFirstInvoiceId(page) {
   const result = await api(page, "GET", "/api/invoices-v1");
-  const invoices = result.data.invoices || result.data.data || result.data || [];
-  const arr = Array.isArray(invoices) ? invoices : Object.values(invoices);
+  const arr = Array.isArray(result.data) ? result.data : [];
   return arr[0]?.id || null;
 }
 
@@ -646,14 +645,13 @@ test.describe("Stage 7 · Invoices", () => {
     await page.waitForTimeout(2000);
     await ss(page, "07a-invoice-saved");
 
-    // Capture the new invoice ID via invoices-v1 (accessible to trial accounts)
+    // invoices-v1 returns a plain array; field is customer_name not client_name
     const result = await api(page, "GET", "/api/invoices-v1");
-    const invoices = result.data.invoices || result.data.data || result.data || [];
-    const arr = Array.isArray(invoices) ? invoices : Object.values(invoices);
+    const arr = Array.isArray(result.data) ? result.data : [];
     if (arr.length > 0) {
-      const inv = arr.find(i => i.client_name === "Acme Corp") || arr[arr.length - 1];
+      const inv = arr.find(i => i.customer_name === "Acme Corp") || arr[arr.length - 1];
       STATE.invoiceId = inv.id;
-      console.log(`✅ Invoice captured — id: ${STATE.invoiceId}, status: ${inv.status}`);
+      console.log(`✅ Invoice captured — id: ${STATE.invoiceId}, customer: ${inv.customer_name}, status: ${inv.status}`);
     } else {
       console.log("⚠ Invoice not found via invoices-v1 after creation");
     }
@@ -1059,12 +1057,12 @@ test.describe("Stage 13 · End-to-end data integrity", () => {
     await page.goto(`${BASE}/invoices`);
     await waitForApp(page);
 
+    // invoices-v1 returns a plain array; field is customer_name
     const result = await api(page, "GET", "/api/invoices-v1");
-    const invoices = result.data.invoices || result.data.data || result.data || [];
-    const arr = Array.isArray(invoices) ? invoices : Object.values(invoices);
+    const arr = Array.isArray(result.data) ? result.data : [];
     expect(arr.length).toBeGreaterThanOrEqual(1);
-    const inv = arr.find(i => i.client_name === "Acme Corp") || arr[0];
-    console.log(`✅ Invoice: client="${inv?.client_name}", status="${inv?.status}"`);
+    const inv = arr.find(i => i.customer_name === "Acme Corp") || arr[0];
+    console.log(`✅ Invoice: customer="${inv?.customer_name}", status="${inv?.status}"`);
   });
 
   test("13e · categories API: ≥12 total (10 defaults + 2 custom)", async ({ page }) => {
