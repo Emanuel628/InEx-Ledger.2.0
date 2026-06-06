@@ -27,6 +27,17 @@ function rawBodyUtf8(req) {
   return "";
 }
 
+function timingSafeStringEqual(a, b) {
+  const ab = Buffer.from(String(a || ""));
+  const bb = Buffer.from(String(b || ""));
+  if (ab.length !== bb.length) return false;
+  try {
+    return crypto.timingSafeEqual(ab, bb);
+  } catch (_) {
+    return false;
+  }
+}
+
 function timingSafeB64Equal(a, b) {
   try {
     const ab = Buffer.from(String(a || ""), "base64");
@@ -69,6 +80,24 @@ function pruneReplayCache(nowMs) {
   }
 }
 
+function computeInboundSignature(secret, timestampHeader, rawBody) {
+  return crypto
+    .createHmac("sha256", secret)
+    .update(`${timestampHeader}.${rawBody}`)
+    .digest("hex");
+}
+
+function timingSafeHexEqual(a, b) {
+  try {
+    const ab = Buffer.from(String(a || ""), "hex");
+    const bb = Buffer.from(String(b || ""), "hex");
+    if (ab.length === 0 || ab.length !== bb.length) return false;
+    return crypto.timingSafeEqual(ab, bb);
+  } catch (_) {
+    return false;
+  }
+}
+
 function verifySupportInboundRequest(req, nowMs = Date.now()) {
   const secret = String(process.env.SUPPORT_INBOUND_WEBHOOK_SECRET || process.env.INBOUND_EMAIL_WEBHOOK_SECRET || "").trim();
 
@@ -80,31 +109,65 @@ function verifySupportInboundRequest(req, nowMs = Date.now()) {
   const svixId = String(req.get("svix-id") || "").trim();
   const svixTimestamp = String(req.get("svix-timestamp") || "").trim();
   const svixSignature = String(req.get("svix-signature") || "").trim();
+  const timestampHeader = String(req.get("x-inbound-timestamp") || "").trim();
+  const signatureHeader = String(req.get("x-inbound-signature") || "").trim();
+  const legacySecretHeader = req.get("x-inbound-secret") || req.get("x-webhook-secret") || "";
+  const allowLegacyFallback = process.env.NODE_ENV !== "production" || process.env.ALLOW_INBOUND_EMAIL_SECRET_FALLBACK === "true";
 
-  if (!svixId || !svixTimestamp || !svixSignature) {
+  if (svixId && svixTimestamp && svixSignature) {
+    const timestampSeconds = Number.parseInt(svixTimestamp, 10);
+    if (!Number.isFinite(timestampSeconds) || timestampSeconds <= 0) {
+      return { ok: false, status: 400, error: "Malformed support webhook timestamp." };
+    }
+
+    const nowSeconds = Math.floor(nowMs / 1000);
+    if (Math.abs(nowSeconds - timestampSeconds) > INBOUND_TIMESTAMP_TOLERANCE_SECONDS) {
+      return { ok: false, status: 401, error: "Support webhook timestamp outside tolerance window." };
+    }
+
+    if (!verifySvixSignature(secret, svixId, svixTimestamp, svixSignature, rawBody)) {
+      return { ok: false, status: 401, error: "Invalid support webhook signature." };
+    }
+
+    pruneReplayCache(nowMs);
+    const replayKey = `support-svix:${svixId}`;
+    if (inboundReplayCache.has(replayKey)) {
+      return { ok: false, status: 409, error: "Replayed support webhook signature." };
+    }
+    inboundReplayCache.set(replayKey, nowMs);
+  } else if (timestampHeader || signatureHeader) {
+    if (!timestampHeader || !signatureHeader) {
+      return { ok: false, status: 400, error: "Missing support webhook signature headers." };
+    }
+
+    const timestampSeconds = Number.parseInt(timestampHeader, 10);
+    if (!Number.isFinite(timestampSeconds) || timestampSeconds <= 0) {
+      return { ok: false, status: 400, error: "Malformed support webhook timestamp." };
+    }
+
+    const nowSeconds = Math.floor(nowMs / 1000);
+    if (Math.abs(nowSeconds - timestampSeconds) > INBOUND_TIMESTAMP_TOLERANCE_SECONDS) {
+      return { ok: false, status: 401, error: "Support webhook timestamp outside tolerance window." };
+    }
+
+    const expectedSignature = computeInboundSignature(secret, timestampHeader, rawBody);
+    if (!timingSafeHexEqual(signatureHeader, expectedSignature)) {
+      return { ok: false, status: 401, error: "Invalid support webhook signature." };
+    }
+
+    pruneReplayCache(nowMs);
+    const replayKey = `support-custom:${signatureHeader}`;
+    if (inboundReplayCache.has(replayKey)) {
+      return { ok: false, status: 409, error: "Replayed support webhook signature." };
+    }
+    inboundReplayCache.set(replayKey, nowMs);
+  } else if (allowLegacyFallback && legacySecretHeader) {
+    if (!timingSafeStringEqual(legacySecretHeader, secret)) {
+      return { ok: false, status: 401, error: "Invalid support webhook secret." };
+    }
+  } else {
     return { ok: false, status: 401, error: "Missing support webhook signature." };
   }
-
-  const timestampSeconds = Number.parseInt(svixTimestamp, 10);
-  if (!Number.isFinite(timestampSeconds) || timestampSeconds <= 0) {
-    return { ok: false, status: 400, error: "Malformed support webhook timestamp." };
-  }
-
-  const nowSeconds = Math.floor(nowMs / 1000);
-  if (Math.abs(nowSeconds - timestampSeconds) > INBOUND_TIMESTAMP_TOLERANCE_SECONDS) {
-    return { ok: false, status: 401, error: "Support webhook timestamp outside tolerance window." };
-  }
-
-  if (!verifySvixSignature(secret, svixId, svixTimestamp, svixSignature, rawBody)) {
-    return { ok: false, status: 401, error: "Invalid support webhook signature." };
-  }
-
-  pruneReplayCache(nowMs);
-  const replayKey = `support-svix:${svixId}`;
-  if (inboundReplayCache.has(replayKey)) {
-    return { ok: false, status: 409, error: "Replayed support webhook signature." };
-  }
-  inboundReplayCache.set(replayKey, nowMs);
 
   let payload = {};
   try {
@@ -118,6 +181,17 @@ function verifySupportInboundRequest(req, nowMs = Date.now()) {
   }
 
   return { ok: true, payload };
+}
+
+function describeInboundCaller(req) {
+  return {
+    userAgent: req.get("user-agent") || null,
+    ip: req.ip || null,
+    forwardedFor: req.get("x-forwarded-for") || null,
+    hasSvixHeaders: Boolean(req.get("svix-signature") || req.get("svix-id")),
+    hasCustomHeaders: Boolean(req.get("x-inbound-signature") || req.get("x-inbound-timestamp")),
+    hasLegacyHeaders: Boolean(req.get("x-inbound-secret") || req.get("x-webhook-secret"))
+  };
 }
 
 function pickRecipientList(payload) {
@@ -256,12 +330,18 @@ router.post("/inbound", async (req, res) => {
   if (!verification.ok) {
     logWarn("support inbound email webhook rejected", {
       status: verification.status,
-      reason: verification.error
+      reason: verification.error,
+      caller: describeInboundCaller(req)
     });
     return res.status(verification.status).json({ ok: false, error: verification.error });
   }
 
   const payload = verification.payload || {};
+  logInfo("support inbound email webhook accepted", {
+    caller: describeInboundCaller(req),
+    payloadKeys: Object.keys(payload || {}),
+    dataKeys: Object.keys(payload?.data || {})
+  });
 
   let receivedEmail = null;
   try {

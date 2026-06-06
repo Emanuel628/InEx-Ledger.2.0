@@ -34,6 +34,14 @@ function signSvix(secret, rawBody, id = "msg_test_123", timestamp = String(Math.
   return { id, timestamp, signature: `v1,${signature}` };
 }
 
+function signLegacy(secret, rawBody, timestamp = String(Math.floor(Date.now() / 1000))) {
+  const signature = crypto
+    .createHmac("sha256", secret)
+    .update(`${timestamp}.${rawBody}`)
+    .digest("hex");
+  return { timestamp, signature };
+}
+
 function loadLegacySupportInboundApp() {
   const originalLoad = Module._load.bind(Module);
   const state = { insertedMessages: [] };
@@ -137,6 +145,40 @@ test("legacy support inbound route stores unread threaded support replies", asyn
       assert.equal(fixture.state.insertedMessages.length, 1);
       assert.equal(fixture.state.insertedMessages[0].params[1], "11111111-1111-4111-8111-111111111111");
       assert.equal(fixture.state.insertedMessages[0].params[4], "77777777-7777-4777-8777-777777777777");
+    } finally {
+      fixture.cleanup();
+    }
+  });
+});
+
+test("legacy support inbound route also accepts x-inbound signature headers", async () => {
+  await withEnv({
+    SUPPORT_INBOUND_WEBHOOK_SECRET: "legacy-hex-secret-123",
+    SUPPORT_REPLY_BASE_EMAIL: "support@inex.app",
+    SUPPORT_REPLY_HMAC_SECRET: "support-reply-secret-32-bytes-aaaa"
+  }, async () => {
+    const fixture = loadLegacySupportInboundApp();
+
+    try {
+      const { buildSupportReplyToAddress } = require("../services/supportEmailService.js");
+      const replyTo = buildSupportReplyToAddress("77777777-7777-4777-8777-777777777777");
+      const rawBody = JSON.stringify({
+        from: { email: "support.inex@gmail.com", name: "InEx Support" },
+        to: [{ email: replyTo }],
+        subject: "Re: Need help",
+        text: "Header-signed support reply."
+      });
+      const signed = signLegacy(process.env.SUPPORT_INBOUND_WEBHOOK_SECRET, rawBody);
+
+      const res = await request(fixture.app)
+        .post("/api/support-email/inbound")
+        .set("Content-Type", "application/json")
+        .set("x-inbound-timestamp", signed.timestamp)
+        .set("x-inbound-signature", signed.signature)
+        .send(rawBody);
+
+      assert.equal(res.status, 200);
+      assert.equal(fixture.state.insertedMessages.length, 1);
     } finally {
       fixture.cleanup();
     }
