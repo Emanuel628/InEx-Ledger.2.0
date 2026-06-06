@@ -28,6 +28,8 @@ const BASE = "http://localhost:8080";
 const SS_PATH = path.join(__dirname, "screenshots", "auth.json");
 const TOKEN_FILE = path.join(__dirname, "screenshots", "session-token.json");
 const SHOT_DIR = "tests/e2e/screenshots";
+const CURRENT_YEAR = new Date().getFullYear();
+const YTD_PRESET = `${CURRENT_YEAR}-ytd`;
 
 // Shared state — populated by early tests, consumed by later ones.
 // All tests run in the same Node process so this object persists.
@@ -227,14 +229,14 @@ test.describe("Stage 2 · Transactions — bulk create", () => {
     await waitForApp(page);
 
     const txns = [
-      { type: "income",  date: "2026-01-10", description: "Client A — January retainer",  amount: 4500,   categoryLabel: "Service Income" },
-      { type: "income",  date: "2026-02-01", description: "Client B — February invoice",  amount: 3200,   categoryLabel: "Service Income" },
-      { type: "income",  date: "2026-03-05", description: "Freelance design — logo work", amount: 1200,   categoryLabel: "Sales Revenue" },
-      { type: "expense", date: "2026-01-15", description: "Adobe Creative Cloud",         amount: 54.99,  categoryLabel: "Software" },
-      { type: "expense", date: "2026-01-22", description: "Office supplies — Staples",    amount: 127.50, categoryLabel: "Office Supplies" },
-      { type: "expense", date: "2026-02-08", description: "Client lunch — downtown",      amount: 89.40,  categoryLabel: "Meals" },
-      { type: "expense", date: "2026-02-20", description: "Shaw Internet — January",      amount: 79.99,  categoryLabel: "Phone & Internet", businessUsePct: 60 },
-      { type: "expense", date: "2026-03-10", description: "Uber — client site visit",     amount: 28.75,  categoryLabel: "Travel" },
+      { type: "income",  date: `${CURRENT_YEAR}-01-10`, description: "Client A — January retainer",  amount: 4500,   categoryLabel: "Service Income" },
+      { type: "income",  date: `${CURRENT_YEAR}-02-01`, description: "Client B — February invoice",  amount: 3200,   categoryLabel: "Service Income" },
+      { type: "income",  date: `${CURRENT_YEAR}-03-05`, description: "Freelance design — logo work", amount: 1200,   categoryLabel: "Sales Revenue" },
+      { type: "expense", date: `${CURRENT_YEAR}-01-15`, description: "Adobe Creative Cloud",         amount: 54.99,  categoryLabel: "Software" },
+      { type: "expense", date: `${CURRENT_YEAR}-01-22`, description: "Office supplies — Staples",    amount: 127.50, categoryLabel: "Office Supplies" },
+      { type: "expense", date: `${CURRENT_YEAR}-02-08`, description: "Client lunch — downtown",      amount: 89.40,  categoryLabel: "Meals" },
+      { type: "expense", date: `${CURRENT_YEAR}-02-20`, description: "Shaw Internet — January",      amount: 79.99,  categoryLabel: "Phone & Internet", businessUsePct: 60 },
+      { type: "expense", date: `${CURRENT_YEAR}-03-10`, description: "Uber — client site visit",     amount: 28.75,  categoryLabel: "Travel" },
     ];
 
     const results = await page.evaluate(async ({ txns, accountId }) => {
@@ -327,7 +329,7 @@ test.describe("Stage 3 · Transaction CRUD", () => {
 
     const result = await api(page, "PUT", `/api/transactions/${txId}`, {
       description: "Client A — January retainer (EDITED)",
-      date: tx.date || "2026-01-10",
+      date: tx.date || `${CURRENT_YEAR}-01-10`,
       amount: tx.amount || 4500,
       type: tx.type || "income",
       account_id: tx.account_id || STATE.accountId,
@@ -432,7 +434,7 @@ test.describe("Stage 4 · Transaction filters", () => {
     await page.goto(`${BASE}/transactions`);
     await waitForApp(page);
 
-    const result = await api(page, "GET", "/api/transactions?date_from=2026-01-01&date_to=2026-01-31");
+    const result = await api(page, "GET", `/api/transactions?date_from=${CURRENT_YEAR}-01-01&date_to=${CURRENT_YEAR}-01-31`);
     expect(result.ok).toBe(true);
     const txns = result.data.transactions || result.data.data || result.data || [];
     const arr = Array.isArray(txns) ? txns : Object.values(txns);
@@ -529,7 +531,7 @@ test.describe("Stage 6 · Mileage", () => {
     await page.locator('button.mileage-mode-button[data-entry-mode="trip"]').click();
     await page.waitForTimeout(400);
 
-    await page.locator("#mileageDate").fill("2026-02-15");
+    await page.locator("#mileageDate").fill(`${CURRENT_YEAR}-02-15`);
     await page.locator("#mileagePurpose").fill("Client site visit — ABC Corp");
     const dest = page.locator("#mileageDestination");
     if ((await dest.count()) > 0) await dest.fill("123 Main St, Austin TX");
@@ -558,7 +560,7 @@ test.describe("Stage 6 · Mileage", () => {
     await page.locator('button.mileage-mode-button[data-entry-mode="expense"]').click();
     await page.waitForTimeout(500);
 
-    await page.locator("#vehicleCostDate").fill("2026-02-20");
+    await page.locator("#vehicleCostDate").fill(`${CURRENT_YEAR}-02-20`);
     await page.locator("#vehicleCostTitle").fill("Shell — fuel");
     const vendor = page.locator("#vehicleCostVendor");
     if ((await vendor.count()) > 0) await vendor.fill("Shell Gas Station");
@@ -580,7 +582,7 @@ test.describe("Stage 6 · Mileage", () => {
 
     const dateField = page.locator("#vehicleCostDate");
     if ((await dateField.count()) > 0 && await dateField.isVisible().catch(() => false)) {
-      await dateField.fill("2026-03-01");
+      await dateField.fill(`${CURRENT_YEAR}-03-01`);
       await page.locator("#vehicleCostTitle").fill("Oil change — Jiffy Lube");
       await page.locator("#vehicleCostAmount").fill("89.00");
       await page.locator("#vehicleCostSubmit").click();
@@ -626,8 +628,8 @@ test.describe("Stage 7 · Invoices", () => {
 
     await fillIfPresent("#invClientName", "Acme Corp");
     await fillIfPresent("#invClientEmail", "billing@acmecorp.example.com");
-    await fillIfPresent("#invIssueDate", "2026-03-01");
-    await fillIfPresent("#invDueDate", "2026-03-31");
+    await fillIfPresent("#invIssueDate", `${CURRENT_YEAR}-03-01`);
+    await fillIfPresent("#invDueDate", `${CURRENT_YEAR}-03-31`);
 
     const addLineBtn = page.locator("#addLineItemBtn").first();
     if ((await addLineBtn.count()) > 0) {
@@ -707,11 +709,13 @@ test.describe("Stage 7 · Invoices", () => {
 // STAGE 8 — REVIEW PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-test.describe("Stage 8 · Review page", () => {
-  test("8a · review page loads with transaction data", async ({ page }) => {
-    await page.goto(`${BASE}/review`);
+test.describe("Stage 8 · Exports review queue", () => {
+  test("8a · review queue loads with transaction data", async ({ page }) => {
+    await page.goto(`${BASE}/exports#exportReviewQueueSection`);
     await waitForApp(page);
     await page.waitForTimeout(3000);
+    const toggle = page.locator("#exportReviewQueueSection [data-collapse-toggle]").first();
+    if ((await toggle.count()) > 0) await toggle.click();
     await ss(page, "08a-review");
 
     const body = await page.locator("body").innerText();
@@ -719,40 +723,33 @@ test.describe("Stage 8 · Review page", () => {
     console.log("✅ Review page has financial data");
   });
 
-  test("8b · all four filter tabs clickable", async ({ page }) => {
-    await page.goto(`${BASE}/review`);
+  test("8b · review queue filter options are selectable", async ({ page }) => {
+    await page.goto(`${BASE}/exports#exportReviewQueueSection`);
     await waitForApp(page);
     await page.waitForTimeout(2000);
-
-    for (const filter of ["all", "action", "review", "excluded"]) {
-      const tab = page.locator(`[data-filter="${filter}"], button:has-text("${filter}")`).first();
-      if ((await tab.count()) > 0 && await tab.isVisible().catch(() => false)) {
-        await tab.click();
-        await page.waitForTimeout(500);
-        await ss(page, `08b-review-${filter}`);
-        console.log(`  ✅ Review filter: ${filter}`);
-      }
+    const toggle = page.locator("#exportReviewQueueSection [data-collapse-toggle]").first();
+    if ((await toggle.count()) > 0) await toggle.click();
+    const filter = page.locator("#exportReviewFilter");
+    await expect(filter).toBeAttached();
+    for (const value of ["all", "hard", "warning"]) {
+      await filter.selectOption(value);
+      await page.waitForTimeout(500);
+      await ss(page, `08b-review-${value}`);
+      console.log(`  ✅ Export review filter: ${value}`);
     }
   });
 
-  test("8c · fix-next button is present and clickable", async ({ page }) => {
-    await page.goto(`${BASE}/review`);
+  test("8c · review queue controls are present", async ({ page }) => {
+    await page.goto(`${BASE}/exports#exportReviewQueueSection`);
     await waitForApp(page);
     await page.waitForTimeout(2000);
     await dismissCookieBanner(page);
-
-    const fixNext = page.locator("#reviewFixNextButton");
-    if ((await fixNext.count()) > 0) {
-      const isVisible = await fixNext.isVisible().catch(() => false);
-      if (isVisible) {
-        await fixNext.click();
-        await page.waitForTimeout(1000);
-        await ss(page, "08c-review-fix-next");
-        console.log("✅ Fix-next clicked");
-      } else {
-        console.log("⚠ Fix-next present but hidden (no items to fix)");
-      }
-    }
+    const toggle = page.locator("#exportReviewQueueSection [data-collapse-toggle]").first();
+    if ((await toggle.count()) > 0) await toggle.click();
+    await expect(page.locator("#exportReviewState")).toBeAttached();
+    await expect(page.locator("#exportReviewFilter")).toBeAttached();
+    await ss(page, "08c-review-controls");
+    console.log("✅ Exports review queue controls attached");
   });
 });
 
@@ -820,7 +817,7 @@ test.describe("Stage 10 · Exports with real data", () => {
     await waitForApp(page);
     await page.waitForTimeout(2000);
 
-    const ytdBtn = page.locator('[data-range-preset="2026-ytd"]');
+    const ytdBtn = page.locator(`[data-range-preset="${YTD_PRESET}"]`);
     if ((await ytdBtn.count()) > 0) { await ytdBtn.click(); await page.waitForTimeout(800); }
     await ss(page, "10a-exports-preflight");
 
@@ -835,7 +832,7 @@ test.describe("Stage 10 · Exports with real data", () => {
     await waitForApp(page);
     await page.waitForTimeout(1000);
 
-    const ytdBtn = page.locator('[data-range-preset="2026-ytd"]');
+    const ytdBtn = page.locator(`[data-range-preset="${YTD_PRESET}"]`);
     if ((await ytdBtn.count()) > 0) { await ytdBtn.click(); await page.waitForTimeout(500); }
 
     try {
@@ -857,7 +854,7 @@ test.describe("Stage 10 · Exports with real data", () => {
     await waitForApp(page);
     await page.waitForTimeout(1000);
 
-    const ytdBtn = page.locator('[data-range-preset="2026-ytd"]');
+    const ytdBtn = page.locator(`[data-range-preset="${YTD_PRESET}"]`);
     if ((await ytdBtn.count()) > 0) { await ytdBtn.click(); await page.waitForTimeout(500); }
 
     let pdfOk = false;

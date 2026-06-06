@@ -702,36 +702,46 @@ test.describe("App: Exports page", () => {
 
 // ── Review ───────────────────────────────────────────────────────────────────
 
-test.describe("App: Review page", () => {
+test.describe("App: Exports review queue", () => {
   useAuth(test);
 
-  test("page loads with financial content", async ({ page }) => {
-    await page.goto(`${BASE}/review`);
+  test("section loads with financial content", async ({ page }) => {
+    await page.goto(`${BASE}/exports#exportReviewQueueSection`);
     await page.waitForFunction(() => !!window.__LUNA_ME__, { timeout: 15_000 });
     await page.waitForTimeout(2000);
+    const toggle = page.locator("#exportReviewQueueSection [data-collapse-toggle]").first();
+    if ((await toggle.count()) > 0) await toggle.click();
     await ss(page, "21-review");
     const bodyText = await page.locator("body").innerText();
     expect(/income|expense|transaction|category|review|action/i.test(bodyText)).toBe(true);
     console.log("✅ Review: page has financial content");
   });
 
-  test("filter tabs (all, action, review, excluded) clickable", async ({ page }) => {
-    await page.goto(`${BASE}/review`);
+  test("filter options (all, hard, warning) are selectable", async ({ page }) => {
+    await page.goto(`${BASE}/exports#exportReviewQueueSection`);
     await page.waitForFunction(() => !!window.__LUNA_ME__, { timeout: 15_000 });
     await page.waitForTimeout(1500);
-    for (const filter of ["all", "action", "review", "excluded"]) {
-      const tab = page.locator(`[data-filter="${filter}"], button:has-text("${filter}"), [data-tab="${filter}"]`).first();
+    const toggle = page.locator("#exportReviewQueueSection [data-collapse-toggle]").first();
+    if ((await toggle.count()) > 0) await toggle.click();
+    const filter = "all";
+    const tab = page.locator("#exportReviewFilter");
+    if (true) {
       if ((await tab.count()) > 0) { await tab.click(); await page.waitForTimeout(400); console.log(`  ✅ Review filter: ${filter}`); }
+    }
+    for (const value of ["hard", "warning"]) {
+      await tab.selectOption(value);
+      await page.waitForTimeout(400);
+      console.log(`  âœ… Export review filter: ${value}`);
     }
     await ss(page, "21b-review-filters");
   });
 
-  test("fix-next and refresh buttons in DOM", async ({ page }) => {
-    await page.goto(`${BASE}/review`);
+  test("review queue state and filter controls are attached", async ({ page }) => {
+    await page.goto(`${BASE}/exports#exportReviewQueueSection`);
     await page.waitForFunction(() => !!window.__LUNA_ME__, { timeout: 15_000 });
     await page.waitForTimeout(1000);
-    if ((await page.locator("#reviewFixNextButton").count()) > 0) await expect(page.locator("#reviewFixNextButton")).toBeAttached();
-    if ((await page.locator("#reviewRefreshButton").count()) > 0) await expect(page.locator("#reviewRefreshButton")).toBeAttached();
+    await expect(page.locator("#exportReviewState")).toBeAttached();
+    await expect(page.locator("#exportReviewFilter")).toBeAttached();
     console.log("✅ Review: fix-next and refresh in DOM");
   });
 });
@@ -777,7 +787,6 @@ test.describe("App: Settings page — all sidebar sections", () => {
     { target: "settings-overview",       label: "Overview" },
     { target: "settings-business",       label: "Business" },
     { target: "settings-billing",        label: "Billing" },
-    { target: "settings-connected-apps", label: "Connected Apps" },
     { target: "settings-cpa-access",     label: "CPA Access" },
     { target: "settings-security",       label: "Security" },
     { target: "settings-preferences",    label: "Preferences" },
@@ -978,7 +987,6 @@ test.describe("Mobile: horizontal-overflow checks (390px)", () => {
     "/analytics",
     "/mileage",
     "/exports",
-    "/review",
     "/messages",
     "/settings",
     // /help excluded — redirects for trial accounts against remote DB
