@@ -21,6 +21,12 @@ function addDays(date, days) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
+function buildTrialEndsAt(startedAt, days = DEFAULT_TRIAL_DAYS) {
+  const end = addDays(new Date(startedAt), days);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
 function normalizeDate(value) {
   if (!value) return null;
   const date = new Date(value);
@@ -49,7 +55,7 @@ async function ensureBusinessSubscription(businessId) {
   }
 
   const now = new Date();
-  const trialEndsAt = addDays(now, DEFAULT_TRIAL_DAYS);
+  const trialEndsAt = buildTrialEndsAt(now, DEFAULT_TRIAL_DAYS);
   const inserted = await pool.query(
     `INSERT INTO business_subscriptions (
         id,

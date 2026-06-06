@@ -78,6 +78,19 @@ const webhookLimiter = rateLimit({
   keyGenerator: () => "stripe-webhook"
 });
 
+function isEnvFlagEnabled(name, defaultValue = false) {
+  const raw = String(process.env[name] ?? "").trim().toLowerCase();
+  if (!raw) return defaultValue;
+  return !["0", "false", "no", "off"].includes(raw);
+}
+
+function normalizeTrialEndForCheckout(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(23, 59, 59, 999);
+  return Math.floor(date.getTime() / 1000);
+}
+
 // Stripe can retry failed deliveries for up to 72 h; keep IDs for 7 days so a
 // late retry is never treated as a new event.
 const _WEBHOOK_IDEMPOTENCY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -886,6 +899,10 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
       "subscription_data[metadata][additional_businesses]": additionalBusinesses
     };
 
+    if (isEnvFlagEnabled("STRIPE_AUTOMATIC_TAX_ENABLED", true)) {
+      sessionPayload["automatic_tax[enabled]"] = true;
+    }
+
     if (priceSelection.addonPriceId) {
       sessionPayload["line_items[1][price]"] = priceSelection.addonPriceId;
       sessionPayload["line_items[1][quantity]"] = additionalBusinesses;
@@ -894,7 +911,7 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
     }
 
     if (subscription.isTrialing && subscription.trialEndsAt) {
-      const trialEndUnix = Math.floor(new Date(subscription.trialEndsAt).getTime() / 1000);
+      const trialEndUnix = normalizeTrialEndForCheckout(subscription.trialEndsAt);
       if (trialEndUnix > Math.floor(Date.now() / 1000)) {
         sessionPayload["subscription_data[trial_end]"] = trialEndUnix;
       }

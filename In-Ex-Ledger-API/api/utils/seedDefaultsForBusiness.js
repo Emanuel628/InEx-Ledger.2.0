@@ -169,6 +169,7 @@ async function seedDefaultsForBusiness(db = pool, businessId) {
 
   const trialDays = Number(process.env.DEFAULT_TRIAL_DAYS || 30);
   const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
+  trialEndsAt.setHours(23, 59, 59, 999);
   await targetDb.query(
     `INSERT INTO business_subscriptions
        (id, business_id, provider, plan_code, status, trial_started_at, trial_ends_at)

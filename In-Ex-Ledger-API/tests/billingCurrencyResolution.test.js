@@ -839,6 +839,54 @@ test("billing checkout normalizes downgraded trial state before creating Stripe 
   }
 });
 
+test("billing checkout enables Stripe automatic tax by default", async () => {
+  const fixture = loadBillingRouter({ country: "United States" });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 0
+      });
+
+    assert.equal(res.status, 200);
+    const checkoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+    assert.ok(checkoutRequest, "Stripe checkout request should be created");
+    assert.equal(checkoutRequest.body.get("automatic_tax[enabled]"), "true");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing checkout can disable Stripe automatic tax with env flag", async () => {
+  const beforeFlag = process.env.STRIPE_AUTOMATIC_TAX_ENABLED;
+  process.env.STRIPE_AUTOMATIC_TAX_ENABLED = "false";
+  const fixture = loadBillingRouter({ country: "United States" });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/checkout-session")
+      .send({
+        billingInterval: "monthly",
+        additionalBusinesses: 0
+      });
+
+    assert.equal(res.status, 200);
+    const checkoutRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/checkout/sessions")
+    );
+    assert.ok(checkoutRequest, "Stripe checkout request should be created");
+    assert.equal(checkoutRequest.body.get("automatic_tax[enabled]"), null);
+  } finally {
+    if (beforeFlag === undefined) delete process.env.STRIPE_AUTOMATIC_TAX_ENABLED;
+    else process.env.STRIPE_AUTOMATIC_TAX_ENABLED = beforeFlag;
+    fixture.cleanup();
+  }
+});
+
 test("billing resume clears cancel_at_period_end on the existing Stripe subscription", async () => {
   const fixture = loadBillingRouter({
     country: "United States",
