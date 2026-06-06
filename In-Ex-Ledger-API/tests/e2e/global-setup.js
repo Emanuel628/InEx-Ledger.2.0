@@ -52,6 +52,8 @@ module.exports = async function globalSetup() {
   // 1. Register via HTTP
   console.log(`\n[setup] Registering ${email}`);
   const reg = await httpPost("/api/auth/register", {
+    first_name: "E2E",
+    last_name: "Smoke",
     email,
     password,
     country: "US",
@@ -81,10 +83,10 @@ module.exports = async function globalSetup() {
   // Create business
   const businessId = crypto.randomUUID();
   await pool.query(
-    `INSERT INTO businesses (id, user_id, name, region, language)
-     VALUES ($1, $2, $3, 'US', 'en')
+    `INSERT INTO businesses (id, user_id, name, region, language, contact_full_name)
+     VALUES ($1, $2, $3, 'US', 'en', $4)
      ON CONFLICT DO NOTHING`,
-    [businessId, userId, "Acme Consulting LLC"]
+    [businessId, userId, "Acme Consulting LLC", "E2E Smoke"]
   );
 
   // Set active business and mark onboarding complete

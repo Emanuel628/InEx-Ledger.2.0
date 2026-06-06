@@ -21,6 +21,7 @@ require('dotenv').config();
 const BASE = 'http://localhost:8080';
 const TEST_EMAIL = `pw-audit-${Date.now()}@inexledger.test`;
 const TEST_PASS  = 'Audit#2026!';
+const CURRENT_YEAR = new Date().getFullYear();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -134,6 +135,8 @@ test.describe('InEx Ledger full walkthrough', () => {
 
   test('registers a new CA test account', async () => {
     await page.goto(`${BASE}/register`);
+    await page.fill('#firstName', 'Playwright');
+    await page.fill('#lastName', 'Audit');
     await page.fill('#email', TEST_EMAIL);
     await page.fill('#password', TEST_PASS);
     await page.fill('#confirm-password', TEST_PASS);
@@ -215,7 +218,7 @@ test.describe('InEx Ledger full walkthrough', () => {
     await assertCtaVisible(page, '.drawer-submit', 'Transaction save button');
 
     await page.selectOption('#txType', 'income');
-    await page.fill('#date', '2026-05-01');
+    await page.fill('#date', `${CURRENT_YEAR}-05-01`);
     await page.fill('#description', 'Client Payment - Audit Test');
     await page.selectOption('#account', { index: 1 });
     await page.selectOption('#category', { index: 1 });
@@ -228,7 +231,7 @@ test.describe('InEx Ledger full walkthrough', () => {
     await addBtn.click();
     await expect(page.locator('#txType')).toBeVisible({ timeout: 5000 });
     await page.selectOption('#txType', 'expense');
-    await page.fill('#date', '2026-05-05');
+    await page.fill('#date', `${CURRENT_YEAR}-05-05`);
     await page.fill('#description', 'Office Supplies - Audit Test');
     await page.selectOption('#account', { index: 1 });
     await page.selectOption('#category', { index: 1 });
@@ -265,8 +268,8 @@ test.describe('InEx Ledger full walkthrough', () => {
 
     await page.fill('#invClientName', 'Test Client Co.');
     await page.fill('#invClientEmail', 'client@test.example.com');
-    await page.fill('#invIssueDate', '2026-05-17');
-    await page.fill('#invDueDate', '2026-06-17');
+    await page.fill('#invIssueDate', `${CURRENT_YEAR}-05-17`);
+    await page.fill('#invDueDate', `${CURRENT_YEAR}-06-17`);
     await page.click('#addLineItemBtn');
     const descInput = page.locator('.invoice-line-desc').first();
     await expect(descInput).toBeVisible({ timeout: 3000 });

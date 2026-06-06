@@ -76,6 +76,16 @@ function csrfHeaders(token) {
   };
 }
 
+function validRegisterPayload(overrides = {}) {
+  return {
+    first_name: "Test",
+    last_name: "User",
+    email: "user@example.com",
+    password: "Password1!",
+    ...overrides
+  };
+}
+
 /**
  * Builds a minimal Express app that mirrors the production middleware stack
  * for a single route file.
@@ -111,7 +121,7 @@ test("register: missing password returns 400", async () => {
 
   const res = await request(app)
     .post("/api/auth/register")
-    .send({ email: "test@example.com" });
+    .send({ ...validRegisterPayload({ email: "test@example.com" }), password: undefined });
 
   assert.equal(res.status, 400);
 });
@@ -122,7 +132,7 @@ test("register: missing email returns 400", async () => {
 
   const res = await request(app)
     .post("/api/auth/register")
-    .send({ password: "SomePass1!" });
+    .send({ ...validRegisterPayload({ password: "SomePass1!" }), email: undefined });
 
   assert.equal(res.status, 400);
 });
@@ -133,7 +143,7 @@ test("register: weak password (too short) returns 400", async () => {
 
   const res = await request(app)
     .post("/api/auth/register")
-    .send({ email: "user@example.com", password: "abc" });
+    .send(validRegisterPayload({ password: "abc" }));
 
   assert.equal(res.status, 400);
   assert.match(res.body.error, /[Pp]assword/);
@@ -145,7 +155,7 @@ test("register: password with no uppercase returns 400", async () => {
 
   const res = await request(app)
     .post("/api/auth/register")
-    .send({ email: "user@example.com", password: "password1!" });
+    .send(validRegisterPayload({ password: "password1!" }));
 
   assert.equal(res.status, 400);
 });
@@ -156,7 +166,7 @@ test("register: password with no symbol returns 400", async () => {
 
   const res = await request(app)
     .post("/api/auth/register")
-    .send({ email: "user@example.com", password: "Password1" });
+    .send(validRegisterPayload({ password: "Password1" }));
 
   assert.equal(res.status, 400);
 });
