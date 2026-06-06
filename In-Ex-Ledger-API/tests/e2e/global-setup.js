@@ -177,6 +177,16 @@ module.exports = async function globalSetup() {
   const sessionToken = await page.evaluate(() => sessionStorage.getItem("token") || "").catch(() => "");
   console.log("[setup] Session token captured:", sessionToken ? "yes" : "no");
 
+  // Pre-accept cookie consent so the banner never blocks form buttons during tests
+  await page.evaluate(() => {
+    localStorage.setItem("lb_cookie_consent", JSON.stringify({
+      decision: "accepted",
+      version: "1",
+      at: Date.now(),
+    }));
+  }).catch(() => {});
+  console.log("[setup] Cookie consent pre-accepted");
+
   await ctx.storageState({ path: SS_PATH });
   await browser.close();
   console.log("[setup] Auth state saved →", SS_PATH);

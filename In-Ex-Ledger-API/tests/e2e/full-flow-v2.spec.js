@@ -121,9 +121,9 @@ async function getLastTxId(page) {
   return arr[arr.length - 1]?.id || null;
 }
 
-/** Fetch the first available invoice ID via API */
+/** Fetch the first available invoice ID via API (invoices-v1 is accessible to trial accounts) */
 async function getFirstInvoiceId(page) {
-  const result = await api(page, "GET", "/api/invoices");
+  const result = await api(page, "GET", "/api/invoices-v1");
   const invoices = result.data.invoices || result.data.data || result.data || [];
   const arr = Array.isArray(invoices) ? invoices : Object.values(invoices);
   return arr[0]?.id || null;
@@ -646,16 +646,16 @@ test.describe("Stage 7 · Invoices", () => {
     await page.waitForTimeout(2000);
     await ss(page, "07a-invoice-saved");
 
-    // Capture the new invoice ID
-    const result = await api(page, "GET", "/api/invoices");
+    // Capture the new invoice ID via invoices-v1 (accessible to trial accounts)
+    const result = await api(page, "GET", "/api/invoices-v1");
     const invoices = result.data.invoices || result.data.data || result.data || [];
     const arr = Array.isArray(invoices) ? invoices : Object.values(invoices);
     if (arr.length > 0) {
       const inv = arr.find(i => i.client_name === "Acme Corp") || arr[arr.length - 1];
       STATE.invoiceId = inv.id;
-      console.log(`✅ Invoice created — id: ${STATE.invoiceId}, status: ${inv.status}`);
+      console.log(`✅ Invoice captured — id: ${STATE.invoiceId}, status: ${inv.status}`);
     } else {
-      console.log("⚠ Invoice not found in list after creation");
+      console.log("⚠ Invoice not found via invoices-v1 after creation");
     }
   });
 
@@ -676,7 +676,7 @@ test.describe("Stage 7 · Invoices", () => {
     if (!STATE.invoiceId) STATE.invoiceId = await getFirstInvoiceId(page);
     if (!STATE.invoiceId) { console.log("⚠ No invoice ID — skipping"); return; }
 
-    const result = await api(page, "PUT", `/api/invoices/${STATE.invoiceId}`, {
+    const result = await api(page, "PUT", `/api/invoices-v1/${STATE.invoiceId}`, {
       status: "sent",
     });
     if (result.ok) {
@@ -697,7 +697,7 @@ test.describe("Stage 7 · Invoices", () => {
     if (!STATE.invoiceId) STATE.invoiceId = await getFirstInvoiceId(page);
     if (!STATE.invoiceId) { console.log("⚠ No invoice ID — skipping"); return; }
 
-    const result = await api(page, "PUT", `/api/invoices/${STATE.invoiceId}`, {
+    const result = await api(page, "PUT", `/api/invoices-v1/${STATE.invoiceId}`, {
       notes: "Net 30 — thank you for your business!",
     });
     expect(result.ok, `Edit invoice failed: ${result.status}`).toBe(true);
@@ -1059,7 +1059,7 @@ test.describe("Stage 13 · End-to-end data integrity", () => {
     await page.goto(`${BASE}/invoices`);
     await waitForApp(page);
 
-    const result = await api(page, "GET", "/api/invoices");
+    const result = await api(page, "GET", "/api/invoices-v1");
     const invoices = result.data.invoices || result.data.data || result.data || [];
     const arr = Array.isArray(invoices) ? invoices : Object.values(invoices);
     expect(arr.length).toBeGreaterThanOrEqual(1);
