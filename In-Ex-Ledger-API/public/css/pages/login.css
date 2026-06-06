@@ -31,16 +31,42 @@
   width: 28px;
   height: 28px;
   border-radius: 7px;
-  background: rgba(26, 58, 92, 0.12);
+  background: linear-gradient(135deg, rgba(12, 57, 95, 0.14), rgba(31, 122, 122, 0.18));
   color: var(--accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.brand-mark::before,
+.brand-mark::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(12, 57, 95, 0.92), rgba(31, 122, 122, 0.72));
+}
+
+.brand-mark::before {
+  width: 34%;
+  height: 78%;
+  left: 25%;
+  top: 10%;
+  transform: rotate(33deg);
+}
+
+.brand-mark::after {
+  width: 22%;
+  height: 42%;
+  right: 19%;
+  bottom: 18%;
 }
 
 .brand-mark svg {
-  width: 16px;
-  height: 16px;
+  display: none;
 }
 
 .brand-text {

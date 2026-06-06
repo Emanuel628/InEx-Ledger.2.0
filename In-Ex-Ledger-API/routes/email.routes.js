@@ -176,6 +176,36 @@ function pickFromAddress(payload) {
   return { email: null, name: null };
 }
 
+function buildInboundNotification({ invoice, from, subject, body }) {
+  const senderLabel = from?.name
+    ? `${from.name} <${from.email || ""}>`.trim()
+    : (from?.email || "External sender");
+
+  if (invoice) {
+    return {
+      subject: `New invoice reply: ${invoice.invoice_number || "Invoice"}`.slice(0, 200),
+      body: [
+        `${senderLabel} replied to ${invoice.invoice_number || "an invoice"}.`,
+        "",
+        `Subject: ${subject}`,
+        "",
+        body
+      ].join("\n").slice(0, 10000)
+    };
+  }
+
+  return {
+    subject: "New support reply".slice(0, 200),
+    body: [
+      `${senderLabel} replied to your support thread.`,
+      "",
+      `Subject: ${subject}`,
+      "",
+      body
+    ].join("\n").slice(0, 10000)
+  };
+}
+
 function pickBody(payload) {
   return String(payload?.text || payload?.plain || payload?.body || "")
     .slice(0, 50000)
@@ -564,6 +594,22 @@ const body =
         receivedEmail?.message_id || payload?.data?.message_id || null,
         receivedEmail?.headers?.references || receivedEmail?.headers?.References || null,
         receivedEmail?.headers?.in_reply_to || receivedEmail?.headers?.["In-Reply-To"] || null
+      ]
+    );
+
+    const notification = buildInboundNotification({ invoice, from, subject, body });
+    await pool.query(
+      `INSERT INTO messages
+   (id, sender_id, receiver_id, message_type, subject, body,
+    external_sender_email, external_sender_name, is_read)
+ VALUES ($1, NULL, $2, 'notification', $3, $4, $5, $6, FALSE)`,
+      [
+        crypto.randomUUID(),
+        ownerId,
+        notification.subject,
+        notification.body,
+        from.email,
+        from.name
       ]
     );
 

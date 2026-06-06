@@ -137,9 +137,10 @@ test("POST /api/email/inbound routes support reply tokens into the user's messag
 
       assert.equal(res.status, 200);
       assert.equal(res.body.ok, true);
-      assert.equal(fixture.state.insertedMessages.length, 1);
+      assert.equal(fixture.state.insertedMessages.length, 2);
       assert.equal(fixture.state.insertedMessages[0].params[2], "it_support");
       assert.equal(fixture.state.insertedMessages[0].params[8], "77777777-7777-4777-8777-777777777777");
+      assert.match(fixture.state.insertedMessages[1].sql, /'notification'/i);
     } finally {
       fixture.cleanup();
     }

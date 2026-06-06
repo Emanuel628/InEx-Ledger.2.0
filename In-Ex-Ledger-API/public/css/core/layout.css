@@ -1076,6 +1076,39 @@ main.app-shell.sidebar-collapsed ~ .dynamic-sidebar-quick-panel {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  position: relative !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+}
+
+.brand-mark::before,
+.brand-mark::after {
+  content: "" !important;
+  position: absolute !important;
+  border-radius: 999px !important;
+  pointer-events: none !important;
+}
+
+.brand-mark::before {
+  width: 34% !important;
+  height: 78% !important;
+  left: 25% !important;
+  top: 10% !important;
+  transform: rotate(33deg) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.55)) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset !important;
+}
+
+.brand-mark::after {
+  width: 22% !important;
+  height: 42% !important;
+  right: 19% !important;
+  bottom: 18% !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.48)) !important;
+}
+
+.brand-mark svg {
+  display: none !important;
 }
 
 .brand-mark-topbar {
