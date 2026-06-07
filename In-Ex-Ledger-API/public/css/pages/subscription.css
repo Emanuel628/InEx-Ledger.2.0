@@ -647,7 +647,6 @@
   text-transform: uppercase !important;
 }
 
-.sub-toggle,
 .sub-quantity-control,
 .sub-quantity-control-slots {
   display: inline-flex !important;
@@ -657,23 +656,6 @@
   border: 1px solid rgba(15, 23, 42, 0.08) !important;
   padding: 3px !important;
   gap: 4px !important;
-}
-
-.sub-toggle-btn {
-  border: 0 !important;
-  border-radius: 12px !important;
-  background: transparent !important;
-  color: #64748b !important;
-  font-size: 12px !important;
-  font-weight: 800 !important;
-  padding: 7px 14px !important;
-  cursor: pointer !important;
-}
-
-.sub-toggle-btn.is-active {
-  background: #ffffff !important;
-  color: #0f172a !important;
-  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.12) !important;
 }
 
 .sub-quantity-btn {

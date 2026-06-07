@@ -6,7 +6,6 @@ const SUBSCRIPTION_ACTIVATION_POLL_INTERVAL_MS = 1_500;
 
 let currentSubscription = null;
 let currentBillingPricing = null;
-let selectedBillingInterval = "monthly";
 let pendingDeleteBusinessId = null;
 let subscriptionBusinessesState = {
   isLoaded: false,
@@ -553,98 +552,13 @@ async function openCustomerPortal() {
   }
 }
 
-function getCheckoutCtaConfig(sub) {
-  if (!sub) return null;
-  if (sub.cancelAtPeriodEnd || sub.isCanceledWithRemainingAccess) {
-    return {
-      label: "Reactivate now",
-      note: "Choose monthly or yearly billing before reopening Pro access."
-    };
-  }
-  if (sub.isTrialing && !sub.stripeSubscriptionId) {
-    return {
-      label: "Secure Pro billing",
-      note: "Lock in billing now so Pro stays active when the trial ends."
-    };
-  }
-  if (sub.effectiveTier !== "v1" && !sub.isPaid) {
-    return {
-      label: "Upgrade to Pro",
-      note: "Choose the billing interval you want before Stripe checkout starts."
-    };
-  }
-  return null;
-}
-
 function renderStatusActionArea(sub) {
   const container = document.getElementById("subStatusActionArea");
   if (!container) return;
-
-  const config = getCheckoutCtaConfig(sub);
-  if (!config) {
-    container.innerHTML = "";
-    container.classList.add("hidden");
-    return;
-  }
-
-  const interval = selectedBillingInterval === "yearly" ? "yearly" : "monthly";
-  const summary = getSubscriptionPriceSummary(sub, { billingInterval: interval });
-  const monthlyTotal = fmtMoney(summary.monthlyEquivalent, summary.currency);
-  const cycleTotal = fmtMoney(summary.cycleTotal, summary.currency);
-  const intervalLabel = interval === "yearly" ? "yearly" : "monthly";
-
-  container.innerHTML = `
-    <div class="sub-status-inline-controls">
-      <div class="sub-toggle" role="group" aria-label="Billing interval">
-        <button type="button" class="sub-toggle-btn ${interval === "monthly" ? "is-active" : ""}" data-sub-billing-interval="monthly" aria-pressed="${interval === "monthly" ? "true" : "false"}">Monthly</button>
-        <button type="button" class="sub-toggle-btn ${interval === "yearly" ? "is-active" : ""}" data-sub-billing-interval="yearly" aria-pressed="${interval === "yearly" ? "true" : "false"}">Yearly</button>
-      </div>
-      <button type="button" id="subStartCheckoutBtn" class="sub-cta-primary">${escapeHtml(config.label)}</button>
-    </div>
-    <p class="sub-status-inline-note">${escapeHtml(config.note)} ${escapeHtml(cycleTotal)} billed ${intervalLabel}. Monthly equivalent: ${escapeHtml(monthlyTotal)}.</p>
-  `;
-
+  void sub;
+  container.innerHTML = "";
   container.classList.remove("hidden");
-
-  container.querySelectorAll("[data-sub-billing-interval]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const nextInterval = String(button.getAttribute("data-sub-billing-interval") || "").toLowerCase();
-      if (nextInterval !== "monthly" && nextInterval !== "yearly") return;
-      selectedBillingInterval = nextInterval;
-      renderStatusActionArea(sub);
-    });
-  });
-
-  container.querySelector("#subStartCheckoutBtn")?.addEventListener("click", startSubscriptionCheckout);
-}
-
-async function startSubscriptionCheckout() {
-  if (!currentSubscription) return;
-  const interval = selectedBillingInterval === "yearly" ? "yearly" : "monthly";
-  try {
-    const res = await apiFetch("/api/billing/checkout-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        billingInterval: interval,
-        additionalBusinesses: Number(currentSubscription.additionalBusinesses || 0),
-        returnPath: "/subscription"
-      })
-    });
-    if (!res) return;
-    const payload = await res.json().catch(() => null);
-    if (!res.ok) {
-      throw new Error(payload?.error || "Unable to start checkout.");
-    }
-    if (payload?.url) {
-      if (!isAllowedBillingRedirect(payload.url)) {
-        throw new Error(tx("subscription_portal_error"));
-      }
-      window.location.href = payload.url;
-    }
-  } catch (err) {
-    showSubToast(err.message || "Unable to start checkout.");
-  }
+  container.classList.add("hidden");
 }
 
 async function openCancelPortalOrCancelSubscription() {
@@ -817,9 +731,6 @@ async function loadSubscription() {
     }
 
     currentSubscription = sub;
-    if (!selectedBillingInterval || selectedBillingInterval === "monthly") {
-      selectedBillingInterval = sub.billingInterval === "yearly" ? "yearly" : "monthly";
-    }
     try {
       const pricingRes = await apiFetch("/api/billing/pricing");
       const pricingPayload = pricingRes ? await pricingRes.json().catch(() => null) : null;
