@@ -425,6 +425,33 @@ async function openCustomerPortal() {
   }
 }
 
+async function openCancelPortalOrCancelSubscription() {
+  if (currentSubscription?.stripeSubscriptionId) {
+    try {
+      const res = await apiFetch("/api/billing/customer-portal/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (!res) return;
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(payload?.error || tx("settings_cancel_sub_error"));
+      if (payload?.url) {
+        if (!isAllowedBillingRedirect(payload.url)) {
+          throw new Error(tx("subscription_portal_error"));
+        }
+        window.location.href = payload.url;
+      }
+      return;
+    } catch (err) {
+      showSubToast(err.message || tx("settings_cancel_sub_error"));
+      return;
+    }
+  }
+
+  const cancelModal = document.getElementById("subCancelModal");
+  cancelModal?.classList.remove("hidden");
+}
+
 // ─── Business Delete Modal ────────────────────────────────────────────────────
 
 function setBusinessDeleteError(message = "") {
@@ -632,7 +659,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const cancelModalCancel = document.getElementById("subCancelModalCancel");
   const cancelModalConfirm = document.getElementById("subCancelModalConfirm");
 
-  document.getElementById("subCancelBtn")?.addEventListener("click", () => cancelModal?.classList.remove("hidden"));
+  document.getElementById("subCancelBtn")?.addEventListener("click", openCancelPortalOrCancelSubscription);
   cancelModalCancel?.addEventListener("click", () => cancelModal?.classList.add("hidden"));
   cancelModal?.addEventListener("click", (e) => { if (e.target === cancelModal) cancelModal.classList.add("hidden"); });
 
@@ -646,8 +673,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
       cancelModal?.classList.add("hidden");
-      showSubToast(tx("settings_cancel_sub_success"));
-      currentSubscription = await loadSubscription();
+      window.location.href = "/subscription?portal=cancelled";
     } catch (err) {
       console.error("Cancel subscription failed", err);
       showSubToast(tx("settings_cancel_sub_error"));
@@ -664,6 +690,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   } else if (params.get("checkout") === "cancel") {
     showSubToast(tx("sub_mgmt_checkout_cancelled"));
+    window.history.replaceState({}, "", window.location.pathname);
+  } else if (params.get("portal") === "cancelled") {
+    showSubToast(tx("settings_cancel_sub_success"));
     window.history.replaceState({}, "", window.location.pathname);
   }
 

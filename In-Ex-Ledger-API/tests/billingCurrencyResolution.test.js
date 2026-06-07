@@ -351,6 +351,16 @@ function loadBillingRouter({
       };
     }
 
+    if (String(url).endsWith("/billing_portal/sessions")) {
+      return {
+        ok: true,
+        json: async () => ({
+          id: "bps_test_123",
+          url: "https://billing.stripe.com/p/session/test_123"
+        })
+      };
+    }
+
     throw new Error(`Unexpected fetch URL: ${url}`);
   };
 
@@ -446,6 +456,43 @@ test("billing checkout ignores client currency and uses verified region currency
     assert.equal(checkoutRequest.body.get("metadata[currency]"), "cad");
     assert.equal(checkoutRequest.body.get("metadata[country_code]"), "ca");
     assert.equal(checkoutRequest.body.get("metadata[currency_source]"), "ip_geolocation");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing cancel portal deep link redirects back to subscription after completion", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [{
+      stripeSubscriptionId: "sub_test_cancel_123",
+      stripeCustomerId: "cus_test_123",
+      effectiveTier: "v1",
+      isPaid: true,
+      isTrialing: false
+    }]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/customer-portal/cancel")
+      .send({});
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.url, "https://billing.stripe.com/p/session/test_123");
+
+    const portalRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/billing_portal/sessions")
+    );
+
+    assert.ok(portalRequest, "Stripe billing portal request should be created");
+    assert.equal(portalRequest.body.get("flow_data[type]"), "subscription_cancel");
+    assert.equal(portalRequest.body.get("flow_data[subscription_cancel][subscription]"), "sub_test_cancel_123");
+    assert.equal(portalRequest.body.get("flow_data[after_completion][type]"), "redirect");
+    assert.equal(
+      portalRequest.body.get("flow_data[after_completion][redirect][return_url]"),
+      "https://app.inexledger.test/subscription?portal=cancelled"
+    );
   } finally {
     fixture.cleanup();
   }

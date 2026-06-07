@@ -974,6 +974,36 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
   }
 });
 
+router.post("/customer-portal/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
+  try {
+    const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+
+    if (!subscription?.stripeSubscriptionId) {
+      return res.status(409).json({ error: "No active Stripe subscription found." });
+    }
+
+    const customerId = await ensureStripeCustomer(billingBusinessId, req.user);
+    const session = await stripeRequest("/billing_portal/sessions", {
+      customer: customerId,
+      "flow_data[type]": "subscription_cancel",
+      "flow_data[subscription_cancel][subscription]": subscription.stripeSubscriptionId,
+      "flow_data[after_completion][type]": "redirect",
+      "flow_data[after_completion][redirect][return_url]": buildAppUrl("/subscription?portal=cancelled")
+    });
+
+    logInfo("Billing cancel portal session created", {
+      userId: req.user?.id,
+      businessId: billingBusinessId,
+      stripeSubscriptionId: subscription.stripeSubscriptionId
+    });
+    res.status(200).json({ url: session.url });
+  } catch (err) {
+    logError("POST /api/billing/customer-portal/cancel error:", err.message);
+    res.status(500).json({ error: "Failed to open cancellation flow." });
+  }
+});
+
 router.post("/resume", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);

@@ -98,6 +98,32 @@
   border-radius: 16px !important;
 }
 
+.subscription-dashboard-shell .settings-secondary-btn,
+.subscription-dashboard-shell .safe-action,
+.subscription-dashboard-shell .modal-cancel {
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.subscription-dashboard-shell .settings-secondary-btn:hover,
+.subscription-dashboard-shell .settings-secondary-btn:focus-visible,
+.subscription-dashboard-shell .safe-action:hover,
+.subscription-dashboard-shell .safe-action:focus-visible,
+.subscription-dashboard-shell .modal-cancel:hover,
+.subscription-dashboard-shell .modal-cancel:focus-visible {
+  background: #f8fafc !important;
+  color: #081225 !important;
+  border-color: rgba(37, 99, 235, 0.28) !important;
+}
+
+.subscription-history-link-panel .settings-secondary-btn {
+  min-width: 220px;
+  justify-content: center;
+  font-weight: 800;
+}
+
 .subscription-grid {
   display: grid;
   gap: 22px;
