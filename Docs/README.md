@@ -1,68 +1,41 @@
 # InEx Ledger Docs
 
-This folder is for important documentation related to the application itself.
+This folder holds the active documentation for the application itself.
 
-Use `Docs/` for product, operational, security, privacy, deployment, runbook, authentication, style, and instructional documentation.
+Use `Docs/` for current product, operational, security, privacy, deployment, runbook, authentication, style, and instructional documentation.
 
-Do not use this folder as a dumping ground for old task trackers, stale audits, or temporary cleanup notes.
+Do not use this folder for stale blockers, finished roadmap phases, or historical cleanup notes.
+
+## Current entry points
+
+- product overview: [PROJECT-README.md](PROJECT-README.md)
+- current status: [CURRENT_STATUS.md](CURRENT_STATUS.md)
+- production gate: [PRODUCTION-READINESS.md](PRODUCTION-READINESS.md)
+- release steps: [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md)
 
 ## Folder structure
 
 ### `Docs/`
 
-Application and operational documentation.
-
-Examples:
-
-- README / product overview
-- authentication contract
-- deployment checklist
-- security notes
-- privacy impact assessment
-- breach notification runbook
-- accounting trust rules
-- style/spec documents
-- maintenance-script instructions
-- repository governance rules
+Active application and operational documentation.
 
 ### `Work-To-Do/`
 
 Markdown files for planned or unfinished work.
 
-Examples:
-
-- build plans
-- rollout plans
-- unfinished cleanup trackers
-- production-readiness work that still requires action
-
 ### `Work-Completed/`
 
 Markdown files for work that is done, stale, archived, or historical.
-
-Examples:
-
-- completed audit reports
-- completed task-status files
-- stale reports marked `DONE — DO NOT USE`
 
 ### `Work-Review/`
 
 Markdown files that exist mainly for review, audit, sweep, investigation, or analysis.
 
-Examples:
-
-- mutation audits
-- table audits
-- critical sweeps
-- code review notes
-
 ## Rules
 
-- Only `.md` files belong in `Work-To-Do/`, `Work-Completed/`, and `Work-Review/`.
 - Keep app-facing documentation in `Docs/`.
-- Move completed/stale work documents to `Work-Completed/`.
-- Move audit/review/sweep documents to `Work-Review/`.
+- Move completed or stale work documents to `Work-Completed/`.
+- Move audit, review, and sweep documents to `Work-Review/`.
 - Move unfinished plans and active work trackers to `Work-To-Do/`.
 - Do not maintain both lowercase `docs/` and uppercase `Docs/`.
 - Do not create duplicate trackers for the same work.
