@@ -553,7 +553,7 @@
                   <select id="recurringCategory" class="form-control" required>
                     <option value="">Select category</option>
                   </select>
-                  <input id="recurringCustomCategoryName" class="form-control" type="text" data-i18n-placeholder="transactions_custom_category_placeholder" placeholder="Enter custom category name" hidden />
+                  <input id="recurringCustomCategoryName" class="form-control" type="text" data-i18n-placeholder="transactions_custom_category_placeholder" placeholder="Enter custom category name" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" hidden />
                 </div>
                 <div class="form-field">
                   <label for="recurringStartDate" class="form-label">Start date</label>
@@ -561,7 +561,7 @@
                 </div>
                 <div class="form-field form-field-full">
                   <label for="recurringNote" class="form-label">Internal note</label>
-                  <input id="recurringNote" class="form-control" type="text" placeholder="Optional note for generated entries" />
+                  <input id="recurringNote" class="form-control" type="text" placeholder="Optional note for generated entries" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
                 </div>
                 <div class="form-field form-field-full">
                   <label class="status-toggle-row" for="recurringClearedDefault">
