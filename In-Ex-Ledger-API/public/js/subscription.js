@@ -49,47 +49,6 @@ function showSubToast(message) {
   clearTimeout(subToastTimer);
   subToastTimer = setTimeout(() => toast.classList.add("hidden"), SUB_TOAST_MS);
 }
-
-<<<<<<< HEAD
-function resolveSafeNextPath(value) {
-  const normalized = String(value || "").trim();
-  if (!normalized.startsWith("/") || normalized.startsWith("//") || /[\r\n]/.test(normalized)) {
-    return "/transactions";
-  }
-  return normalized;
-}
-
-function syncReactivationBanner() {
-  const banner = document.getElementById("subscriptionReactivationNotice");
-  const continueLink = document.getElementById("subscriptionReactivationContinue");
-  if (!banner) return;
-
-  const params = new URLSearchParams(window.location.search);
-  const show = params.get("reactivated") === "1";
-  banner.classList.toggle("hidden", !show);
-  if (continueLink) {
-    continueLink.href = resolveSafeNextPath(params.get("next"));
-  }
-}
-
-function setBusinessDeleteError(message = "") {
-  const errorNode = document.getElementById("subBusinessDeleteError");
-  if (!errorNode) return;
-  if (!message) {
-    errorNode.textContent = "";
-    errorNode.classList.add("hidden");
-    return;
-  }
-  errorNode.textContent = message;
-  errorNode.classList.remove("hidden");
-}
-
-function tx(key) {
-  return typeof window.t === "function" ? window.t(key) : key;
-}
-
-=======
->>>>>>> 00101ce3 (Redesign Subscription page: 3-section layout with provision-add-on modal)
 function resolveTimestampMs(ts) {
   if (ts == null || ts === "") return NaN;
   const numeric = typeof ts === "number" ? ts : Number(ts);
@@ -372,79 +331,7 @@ function renderWorkspaceCapacity(sub) {
     <div class="sub-add-business-row">
       <button type="button" id="addBusinessBtn" class="settings-primary-btn">+ Add a business</button>
     </div>` : "";
-
-<<<<<<< HEAD
-  if (isCancelingPro) {
-    manager.innerHTML = `
-      ${buildBusinessRosterMarkup(sub)}
-      ${statsHtml}
-      <div class="sub-access-message-card">
-        <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceling_help"))}</p>
-        <p class="sub-access-settings-note">Delete or edit businesses from Settings. Capacity changes resume once Pro is active again.</p>
-      </div>`;
-    wireBusinessRosterActions();
-    return;
-  }
-
-  if (isEndedProWithRemainingAccess) {
-    manager.innerHTML = `
-      ${buildBusinessRosterMarkup(sub)}
-      ${statsHtml}
-      <div class="sub-access-message-card">
-        <p class="sub-access-cancel-note">${escapeHtml(tx("subscription_business_slots_canceled_help"))}</p>
-        <p class="sub-access-settings-note">Business administration stays in Settings. Start a new Pro cycle before changing paid capacity.</p>
-      </div>`;
-    wireBusinessRosterActions();
-    return;
-  }
-
-  const stateMsg = extra === 0
-    ? "You have 1 business included with Pro."
-    : extra === 1
-      ? `You have ${total} businesses: 1 included and 1 add-on.`
-      : `You have ${total} businesses: 1 included and ${extra} add-ons.`;
-  const slotPricing = getPricingDetails();
-  const slotRateLabel = pricingState.billingInterval === "yearly"
-    ? `${formatMoney(pricingState.currency, slotPricing.addon)} / year per extra slot`
-    : `${formatMoney(pricingState.currency, slotPricing.addon)} / month per extra slot`;
-
-  manager.innerHTML = `
-    ${buildBusinessRosterMarkup(sub)}
-    ${statsHtml}
-    <div class="sub-slots-panel">
-      <div class="sub-slots-panel-head">
-        <div class="sub-slots-panel-copy">
-          <h3>Business capacity</h3>
-          <p>These controls change the billed add-on count only. Edit or delete individual businesses from Settings.</p>
-        </div>
-        <div class="sub-slots-price-pill">${escapeHtml(slotRateLabel)}</div>
-      </div>
-      <div class="sub-slots-actions">
-        <p class="sub-slots-state-label" id="slotsStateLabel">${escapeHtml(stateMsg)}</p>
-        <div class="sub-slots-inline-controls">
-          <div class="sub-slots-btn-row">
-            <button type="button" id="removeSlotBtn" class="sub-slots-arrow-btn sub-slots-arrow-btn-prev" aria-label="Remove a business"${extra <= 0 ? " disabled" : ""}>
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 6 7 12l8 6Z"></path></svg>
-            </button>
-            <span class="sub-slots-inline-rate">${escapeHtml(slotRateLabel)}</span>
-            <button type="button" id="addSlotBtn" class="sub-slots-arrow-btn sub-slots-arrow-btn-next" aria-label="Add a business">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 6 8 6-8 6Z"></path></svg>
-            </button>
-          </div>
-        </div>
-        <p class="sub-access-settings-note">Need to switch, rename, or delete a specific business? Go to Settings.</p>
-        <div id="removeSlotConfirm" class="sub-slots-remove-confirm hidden">
-          <p>This removes 1 business slot from your bill. Make sure the business you want gone is deleted first.</p>
-          <div class="sub-slots-confirm-btns">
-            <button type="button" id="removeSlotCancelBtn" class="sub-slots-confirm-cancel">Keep it</button>
-            <button type="button" id="removeSlotConfirmBtn" class="sub-slots-confirm-ok">Yes, remove it</button>
-          </div>
-        </div>
-      </div>
-    </div>`;
-=======
   manager.innerHTML = `${statsHtml}${buildBusinessRosterMarkup(sub)}${addBtnHtml}`;
->>>>>>> 00101ce3 (Redesign Subscription page: 3-section layout with provision-add-on modal)
 
   wireBusinessRosterActions();
 
