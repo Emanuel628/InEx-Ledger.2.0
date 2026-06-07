@@ -309,7 +309,7 @@ test("business deletion sends a lifecycle email with the updated zero-dollar tot
   }
 });
 
-test("business deletion still succeeds when post-commit Stripe slot sync fails", async () => {
+test("business deletion fails when Stripe slot sync fails before the database delete", async () => {
   process.env.RESEND_API_KEY = process.env.RESEND_API_KEY || "re_test_123";
   process.env.APP_BASE_URL = process.env.APP_BASE_URL || "https://www.inexledger.com";
 
@@ -337,10 +337,10 @@ test("business deletion still succeeds when post-commit Stripe slot sync fails",
       .delete("/api/businesses/biz_main_001")
       .send({ password: "secret" });
 
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 500);
     assert.equal(fixture.state.stripeSyncFailed, true);
-    assert.equal(fixture.sentEmails.length, 1);
-    assert.match(response.body?.message || "", /deleted/i);
+    assert.equal(fixture.sentEmails.length, 0);
+    assert.match(response.body?.error || "", /failed/i);
   } finally {
     fixture.cleanup();
   }

@@ -52,6 +52,7 @@ if (ENABLE_V2_BUSINESS) {
 }
 
 router.use('/auth', require('./auth.routes.js'));
+router.use('/internal/support', require('./internalSupport.routes.js'));
 router.use('/accounts', require('./accounts.routes.js'));
 router.use('/bank-connections', require('./bank-connections.routes.js'));
 router.use('/email', require('./email.routes.js'));

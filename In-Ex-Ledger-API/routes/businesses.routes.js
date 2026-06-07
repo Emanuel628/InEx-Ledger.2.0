@@ -15,8 +15,7 @@ const {
 const {
   PLAN_V1,
   findBillingAnchorBusinessIdForUser,
-  getSubscriptionSnapshotForBusiness,
-  syncStripeSubscriptionForBusiness
+  getSubscriptionSnapshotForBusiness
 } = require("../services/subscriptionService.js");
 const { buildStripePriceEnvMap, buildStripePriceLookup } = require("../services/stripePriceConfig.js");
 const { decryptTaxId, encryptTaxId } = require("../services/taxIdService.js");
@@ -44,7 +43,11 @@ router.use(requireAuth);
 router.use(requireCsrfProtection);
 
 const businessDeleteLimiter = createBusinessDeleteLimiter();
-const { addonPriceIds: STRIPE_ADDON_PRICE_IDS } = buildStripePriceLookup();
+const {
+  basePriceIds: STRIPE_BASE_PRICE_IDS,
+  addonPriceIds: STRIPE_ADDON_PRICE_IDS,
+  metadataByPriceId: STRIPE_PRICE_METADATA_BY_ID
+} = buildStripePriceLookup();
 const { base: BASE_PRICE_ENV, addon: ADDON_PRICE_ENV } = buildStripePriceEnvMap();
 const VALID_REGIONS = new Set(["US", "CA"]);
 const VALID_LANGUAGES = new Set(["en", "es", "fr"]);
@@ -91,6 +94,79 @@ function normalizeBillingCurrency(currency) {
 
 function normalizeBillingInterval(interval) {
   return String(interval || "").trim().toLowerCase() === "yearly" ? "yearly" : "monthly";
+}
+
+function normalizeOptionalBillingInterval(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "yearly" ? "yearly" : normalized === "monthly" ? "monthly" : null;
+}
+
+function normalizeOptionalCurrency(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "cad" ? "cad" : normalized === "usd" ? "usd" : null;
+}
+
+function getStripeBaseItem(subscription) {
+  const items = Array.isArray(subscription?.items?.data) ? subscription.items.data : [];
+  return items.find((item) => STRIPE_BASE_PRICE_IDS.has(item?.price?.id)) || null;
+}
+
+function getStripeAddonItem(subscription) {
+  const items = Array.isArray(subscription?.items?.data) ? subscription.items.data : [];
+  return items.find((item) => STRIPE_ADDON_PRICE_IDS.has(item?.price?.id)) || null;
+}
+
+function resolveStripeAdditionalBusinesses(subscription) {
+  const addonItem = getStripeAddonItem(subscription);
+  const addonQuantity = Number(addonItem?.quantity);
+  if (Number.isSafeInteger(addonQuantity) && addonQuantity >= 0) {
+    return addonQuantity;
+  }
+
+  const metadataQuantity = Number(subscription?.metadata?.additional_businesses);
+  if (Number.isSafeInteger(metadataQuantity) && metadataQuantity >= 0) {
+    return metadataQuantity;
+  }
+
+  return 0;
+}
+
+function resolveStripeSubscriptionBillingTerms(subscription, stripeSub) {
+  const stripeMetadata = stripeSub?.metadata && typeof stripeSub.metadata === "object"
+    ? stripeSub.metadata
+    : {};
+  const baseItem = getStripeBaseItem(stripeSub);
+  const addonItem = getStripeAddonItem(stripeSub);
+  const basePriceMeta = baseItem?.price?.id ? STRIPE_PRICE_METADATA_BY_ID.get(baseItem.price.id) : null;
+  const addonPriceMeta = addonItem?.price?.id ? STRIPE_PRICE_METADATA_BY_ID.get(addonItem.price.id) : null;
+  const stripePriceCurrency = normalizeOptionalCurrency(baseItem?.price?.currency || addonItem?.price?.currency);
+  const stripeRecurringInterval = normalizeOptionalBillingInterval(
+    baseItem?.price?.recurring?.interval || addonItem?.price?.recurring?.interval
+  );
+
+  return {
+    billingInterval: normalizeOptionalBillingInterval(subscription?.billingInterval) ||
+      normalizeOptionalBillingInterval(stripeMetadata.billing_interval) ||
+      normalizeOptionalBillingInterval(basePriceMeta?.billingInterval) ||
+      normalizeOptionalBillingInterval(addonPriceMeta?.billingInterval) ||
+      stripeRecurringInterval ||
+      "monthly",
+    currency: normalizeOptionalCurrency(subscription?.currency) ||
+      normalizeOptionalCurrency(stripeMetadata.currency) ||
+      normalizeOptionalCurrency(basePriceMeta?.currency) ||
+      normalizeOptionalCurrency(addonPriceMeta?.currency) ||
+      stripePriceCurrency ||
+      "usd"
+  };
+}
+
+function resolveAddonPriceIdForTerms(billingInterval, currency) {
+  const addonEnv = ADDON_PRICE_ENV[billingInterval]?.[currency] || null;
+  const addonPriceId = addonEnv ? String(process.env[addonEnv] || "").trim() : "";
+  if (!addonPriceId) {
+    throw new Error("Additional business pricing is not configured for this billing interval and currency.");
+  }
+  return addonPriceId;
 }
 
 function parseStripeUnitAmount(price) {
@@ -248,6 +324,249 @@ async function updateAnchorAdditionalBusinesses(client, businessId, additionalBu
   );
 }
 
+async function syncStripeSubscriptionForBusinessInTransaction(client, businessId, subscription) {
+  const items = Array.isArray(subscription?.items?.data) ? subscription.items.data : [];
+  const baseItem = items.find((item) => STRIPE_BASE_PRICE_IDS.has(item?.price?.id)) || null;
+  const addonItem = items.find((item) => STRIPE_ADDON_PRICE_IDS.has(item?.price?.id)) || null;
+  const stripeMetadata = subscription?.metadata || {};
+  const basePriceMeta = baseItem?.price?.id ? STRIPE_PRICE_METADATA_BY_ID.get(baseItem.price.id) : null;
+  const addonPriceMeta = addonItem?.price?.id ? STRIPE_PRICE_METADATA_BY_ID.get(addonItem.price.id) : null;
+  const addonQuantityValue = Number(addonItem?.quantity);
+  const addonQuantity = Number.isSafeInteger(addonQuantityValue) ? addonQuantityValue : null;
+  const metadataQuantityValue = Number(stripeMetadata.additional_businesses);
+  const metadataQuantity = Number.isSafeInteger(metadataQuantityValue) ? metadataQuantityValue : null;
+  const additionalBusinesses = addonQuantity ?? metadataQuantity ?? 0;
+  const billingInterval =
+    stripeMetadata.billing_interval || basePriceMeta?.billingInterval || addonPriceMeta?.billingInterval || null;
+  const currency =
+    stripeMetadata.currency || basePriceMeta?.currency || addonPriceMeta?.currency || null;
+  const addonPriceId = addonItem?.price?.id || stripeMetadata.addon_price_id || null;
+  const trialEndsAt = subscription?.trial_end ? new Date(subscription.trial_end * 1000) : null;
+  const currentPeriodStart = subscription?.current_period_start
+    ? new Date(subscription.current_period_start * 1000)
+    : null;
+  const currentPeriodEnd = subscription?.current_period_end
+    ? new Date(subscription.current_period_end * 1000)
+    : null;
+  const canceledAt = subscription?.canceled_at ? new Date(subscription.canceled_at * 1000) : null;
+
+  const currentSnapshotResult = await client.query(
+    `SELECT status, metadata_json
+       FROM business_subscriptions
+      WHERE business_id = $1
+      LIMIT 1`,
+    [businessId]
+  );
+  const currentSnapshot = currentSnapshotResult.rows[0] || null;
+  const currentMetadata =
+    currentSnapshot?.metadata_json && typeof currentSnapshot.metadata_json === "object"
+      ? currentSnapshot.metadata_json
+      : {};
+  const nextStatus = subscription?.status || "active";
+  const pastDueStartedAt =
+    nextStatus === "past_due"
+      ? currentSnapshot?.status === "past_due" && currentMetadata.past_due_started_at
+        ? currentMetadata.past_due_started_at
+        : new Date().toISOString()
+      : null;
+
+  await client.query(
+    `UPDATE business_subscriptions
+        SET plan_code = $2,
+            status = $3,
+            stripe_customer_id = $4,
+            stripe_subscription_id = $5,
+            stripe_price_id = $6,
+            trial_started_at = COALESCE(trial_started_at, NOW()),
+            trial_ends_at = $7,
+            current_period_start = $8,
+            current_period_end = $9,
+            cancel_at_period_end = $10,
+            canceled_at = $11,
+            metadata_json = $12::jsonb,
+            updated_at = NOW()
+      WHERE business_id = $1`,
+    [
+      businessId,
+      PLAN_V1,
+      nextStatus,
+      subscription?.customer || null,
+      subscription?.id || null,
+      baseItem?.price?.id || null,
+      trialEndsAt,
+      currentPeriodStart,
+      currentPeriodEnd,
+      Boolean(subscription?.cancel_at_period_end),
+      canceledAt,
+      JSON.stringify({
+        raw_status: subscription?.status || null,
+        billing_interval: billingInterval,
+        currency,
+        additional_businesses: additionalBusinesses,
+        addon_price_id: addonPriceId,
+        addon_subscription_item_id: addonItem?.id || null,
+        base_subscription_item_id: baseItem?.id || null,
+        past_due_started_at: pastDueStartedAt
+      })
+    ]
+  );
+}
+
+async function setStripeBusinessSlotState({
+  subscription,
+  businessId,
+  additionalBusinesses,
+  billingInterval,
+  currency,
+  stripeSub = null
+}) {
+  if (!subscription?.stripeSubscriptionId) {
+    return null;
+  }
+
+  const liveSub = stripeSub || await stripeGet(
+    `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`
+  );
+  const liveMetadata = liveSub?.metadata && typeof liveSub.metadata === "object"
+    ? liveSub.metadata
+    : {};
+  const liveAddonItem = getStripeAddonItem(liveSub);
+  const resolvedTerms = {
+    billingInterval: normalizeOptionalBillingInterval(billingInterval) ||
+      resolveStripeSubscriptionBillingTerms(subscription, liveSub).billingInterval,
+    currency: normalizeOptionalCurrency(currency) ||
+      resolveStripeSubscriptionBillingTerms(subscription, liveSub).currency
+  };
+  const targetBusinessId = businessId || liveMetadata.business_id || subscription.businessId || null;
+  const nextAdditionalBusinesses = Math.max(Number(additionalBusinesses) || 0, 0);
+  const metadataPatch = {
+    "metadata[additional_businesses]": nextAdditionalBusinesses
+  };
+  if (targetBusinessId) {
+    metadataPatch["metadata[business_id]"] = targetBusinessId;
+  }
+  if (resolvedTerms.billingInterval) {
+    metadataPatch["metadata[billing_interval]"] = resolvedTerms.billingInterval;
+  }
+  if (resolvedTerms.currency) {
+    metadataPatch["metadata[currency]"] = resolvedTerms.currency;
+  }
+
+  let updatedSub = liveSub;
+  if (nextAdditionalBusinesses === 0 && liveAddonItem) {
+    updatedSub = await stripeRequest(
+      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
+      {
+        "items[0][id]": liveAddonItem.id,
+        "items[0][deleted]": "true",
+        ...metadataPatch,
+        proration_behavior: "create_prorations"
+      }
+    );
+  } else if (nextAdditionalBusinesses > 0 && liveAddonItem) {
+    updatedSub = await stripeRequest(
+      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
+      {
+        "items[0][id]": liveAddonItem.id,
+        "items[0][quantity]": nextAdditionalBusinesses,
+        ...metadataPatch,
+        proration_behavior: "create_prorations"
+      }
+    );
+  } else if (nextAdditionalBusinesses > 0) {
+    const addonPriceId = resolveAddonPriceIdForTerms(
+      resolvedTerms.billingInterval,
+      resolvedTerms.currency
+    );
+    updatedSub = await stripeRequest(
+      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
+      {
+        "items[0][price]": addonPriceId,
+        "items[0][quantity]": nextAdditionalBusinesses,
+        ...metadataPatch,
+        proration_behavior: "create_prorations"
+      }
+    );
+  } else {
+    updatedSub = await stripeRequest(
+      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
+      {
+        ...metadataPatch,
+        proration_behavior: "create_prorations"
+      }
+    );
+  }
+
+  const currentBusinessId = String(liveMetadata.business_id || subscription.businessId || "");
+  if (subscription?.stripeCustomerId && targetBusinessId && currentBusinessId !== String(targetBusinessId)) {
+    await stripeRequest(`/customers/${encodeURIComponent(subscription.stripeCustomerId)}`, {
+      "metadata[business_id]": targetBusinessId
+    });
+  }
+
+  return updatedSub;
+}
+
+function buildStripeBusinessSlotStateFromSubscription(subscription, stripeSub, fallbackBusinessId) {
+  const terms = resolveStripeSubscriptionBillingTerms(subscription, stripeSub);
+  const metadata = stripeSub?.metadata && typeof stripeSub.metadata === "object"
+    ? stripeSub.metadata
+    : {};
+
+  return {
+    businessId: metadata.business_id || fallbackBusinessId || subscription?.businessId || null,
+    additionalBusinesses: resolveStripeAdditionalBusinesses(stripeSub),
+    billingInterval: terms.billingInterval,
+    currency: terms.currency
+  };
+}
+
+async function applyStripeBusinessSlotState({
+  subscription,
+  businessId,
+  additionalBusinesses
+}) {
+  if (!subscription?.stripeSubscriptionId) {
+    return {
+      updatedSub: null,
+      async rollback() {}
+    };
+  }
+
+  const originalSub = await stripeGet(
+    `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`
+  );
+  const updatedSub = await setStripeBusinessSlotState({
+    subscription,
+    businessId,
+    additionalBusinesses,
+    stripeSub: originalSub
+  });
+  const originalState = buildStripeBusinessSlotStateFromSubscription(
+    subscription,
+    originalSub,
+    subscription.businessId
+  );
+  let restored = false;
+
+  return {
+    updatedSub,
+    async rollback() {
+      if (restored) {
+        return;
+      }
+      restored = true;
+      await setStripeBusinessSlotState({
+        subscription,
+        businessId: originalState.businessId,
+        additionalBusinesses: originalState.additionalBusinesses,
+        billingInterval: originalState.billingInterval,
+        currency: originalState.currency
+      });
+    }
+  };
+}
+
 async function migrateBillingAnchorSubscription(client, sourceBusinessId, targetBusinessId, additionalBusinesses) {
   const sourceResult = await client.query(
     `SELECT provider, plan_code, status, stripe_customer_id, stripe_subscription_id, stripe_price_id,
@@ -313,66 +632,6 @@ async function migrateBillingAnchorSubscription(client, sourceBusinessId, target
       JSON.stringify(nextMetadata)
     ]
   );
-}
-
-async function syncStripeBusinessSlotsAfterDelete({
-  billingBusinessId,
-  successorBusinessId,
-  subscription,
-  additionalBusinesses
-}) {
-  if (!billingBusinessId || !subscription?.stripeSubscriptionId) {
-    return;
-  }
-
-  const stripeSub = await stripeGet(
-    `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`
-  );
-  const items = Array.isArray(stripeSub.items?.data) ? stripeSub.items.data : [];
-  const existingAddonItem = items.find((item) => STRIPE_ADDON_PRICE_IDS.has(item?.price?.id)) || null;
-  const nextBusinessId = billingBusinessId;
-  const movedAnchor = Boolean(subscription?.businessId && subscription.businessId !== billingBusinessId);
-
-  let updatedSub = stripeSub;
-  if (additionalBusinesses === 0 && existingAddonItem) {
-    updatedSub = await stripeRequest(
-      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
-      {
-        "items[0][id]": existingAddonItem.id,
-        "items[0][deleted]": "true",
-        "metadata[business_id]": nextBusinessId,
-        "metadata[additional_businesses]": additionalBusinesses,
-        proration_behavior: "create_prorations"
-      }
-    );
-  } else if (existingAddonItem) {
-    updatedSub = await stripeRequest(
-      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
-      {
-        "items[0][id]": existingAddonItem.id,
-        "items[0][quantity]": additionalBusinesses,
-        "metadata[business_id]": nextBusinessId,
-        "metadata[additional_businesses]": additionalBusinesses,
-        proration_behavior: "create_prorations"
-      }
-    );
-  } else if (movedAnchor) {
-    updatedSub = await stripeRequest(
-      `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`,
-      {
-        "metadata[business_id]": nextBusinessId,
-        "metadata[additional_businesses]": additionalBusinesses
-      }
-    );
-  }
-
-  if (subscription?.stripeCustomerId && movedAnchor) {
-    await stripeRequest(`/customers/${encodeURIComponent(subscription.stripeCustomerId)}`, {
-      "metadata[business_id]": nextBusinessId
-    });
-  }
-
-  await syncStripeSubscriptionForBusiness(nextBusinessId, updatedSub);
 }
 
 function normalizeBusinessPayload(payload = {}) {
@@ -631,6 +890,104 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.post("/provision-add-on", async (req, res) => {
+  const name = String(req.body?.name || "").trim();
+  if (!name) {
+    return res.status(400).json({ success: false, error: "Business name is required." });
+  }
+
+  const client = await pool.connect();
+  let stripeCompensation = null;
+  let transactionCommitted = false;
+  try {
+    const activeBusinessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
+    const billingBusinessId =
+      await findBillingAnchorBusinessIdForUser(req.user.id, activeBusinessId) || activeBusinessId;
+    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    const hasActiveProAccess =
+      subscription?.effectiveTier === PLAN_V1 &&
+      (subscription?.isPaid || subscription?.isTrialing);
+
+    if (!hasActiveProAccess) {
+      return res.status(403).json({
+        success: false,
+        error: "Adding a business requires an active Pro subscription."
+      });
+    }
+
+    await client.query("BEGIN");
+    const lockKey = BigInt("0x" + crypto.createHash("sha256").update(String(req.user.id)).digest("hex").slice(0, 15));
+    await client.query("SELECT pg_advisory_xact_lock($1)", [String(lockKey)]);
+
+    const countResult = await client.query(
+      "SELECT COUNT(*)::int AS count FROM businesses WHERE user_id = $1",
+      [req.user.id]
+    );
+    const currentActive = Number(countResult.rows[0]?.count || 0);
+    const newStripeQty = Math.max(0, (currentActive + 1) - 1);
+
+    if (subscription?.stripeSubscriptionId) {
+      const stripeMutation = await applyStripeBusinessSlotState({
+        subscription,
+        businessId: billingBusinessId,
+        additionalBusinesses: newStripeQty
+      });
+      stripeCompensation = stripeMutation.rollback;
+      if (stripeMutation.updatedSub) {
+        await syncStripeSubscriptionForBusinessInTransaction(
+          client,
+          billingBusinessId,
+          stripeMutation.updatedSub
+        );
+      } else {
+        await updateAnchorAdditionalBusinesses(client, billingBusinessId, newStripeQty);
+      }
+    } else {
+      await updateAnchorAdditionalBusinesses(client, billingBusinessId, newStripeQty);
+    }
+
+    const businessId = await createBusinessForUserInTransaction(client, req.user, {
+      name,
+      region: "US",
+      language: "en"
+    });
+
+    await client.query(
+      `UPDATE business_subscriptions
+          SET metadata_json = COALESCE(metadata_json, '{}'::jsonb) || jsonb_build_object('additional_businesses', $2::integer),
+              updated_at = NOW()
+        WHERE business_id = $1`,
+      [billingBusinessId, newStripeQty]
+    );
+
+    await client.query("COMMIT");
+    transactionCommitted = true;
+    res.status(201).json({ success: true, businessId });
+  } catch (err) {
+    try {
+      if (!transactionCommitted) {
+        await client.query("ROLLBACK");
+      }
+    } catch (_) {
+      // noop
+    }
+    if (!transactionCommitted && typeof stripeCompensation === "function") {
+      try {
+        await stripeCompensation();
+      } catch (stripeRollbackErr) {
+        logError("POST /businesses/provision-add-on: Stripe compensation failed", {
+          userId: req.user?.id,
+          err: stripeRollbackErr.message
+        });
+      }
+    }
+    logError("POST /businesses/provision-add-on error:", err.message);
+    res.status(500).json({ success: false, error: "Failed to add business." });
+  } finally {
+    client.release();
+  }
+});
+
 router.get("/:id/profile", async (req, res) => {
   try {
     const business = await fetchOwnedBusinessProfile(req.user.id, req.params.id);
@@ -861,6 +1218,7 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
     const client = await pool.connect();
     let storagePaths = [];
     let transactionCommitted = false;
+    let stripeCompensation = null;
     try {
       await client.query("BEGIN");
 
@@ -898,6 +1256,31 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
 
       // Delete the business — all remaining child rows cascade (transactions, receipts,
       // mileage, accounts, categories, exports, subscriptions)
+      const nextBillingBusinessId =
+        billingBusinessId && businessId === billingBusinessId
+          ? successorBusinessId
+          : billingBusinessId;
+
+      if (nextBillingBusinessId && subscription?.effectiveTier === PLAN_V1) {
+        if (subscription?.stripeSubscriptionId) {
+          const stripeMutation = await applyStripeBusinessSlotState({
+            subscription,
+            businessId: nextBillingBusinessId,
+            additionalBusinesses: nextAdditionalBusinesses
+          });
+          stripeCompensation = stripeMutation.rollback;
+          if (stripeMutation.updatedSub) {
+            await syncStripeSubscriptionForBusinessInTransaction(
+              client,
+              nextBillingBusinessId,
+              stripeMutation.updatedSub
+            );
+          }
+        } else if (nextBillingBusinessId !== billingBusinessId) {
+          await updateAnchorAdditionalBusinesses(client, nextBillingBusinessId, nextAdditionalBusinesses);
+        }
+      }
+
       await client.query(
         "DELETE FROM businesses WHERE id = $1 AND user_id = $2",
         [businessId, req.user.id]
@@ -934,30 +1317,20 @@ router.delete("/:id", businessDeleteLimiter, requireMfaIfEnabled, async (req, re
         })
       );
 
-      const nextBillingBusinessId =
-        billingBusinessId && businessId === billingBusinessId
-          ? successorBusinessId
-          : billingBusinessId;
-
-      if (nextBillingBusinessId && subscription?.effectiveTier === PLAN_V1) {
-        try {
-          await syncStripeBusinessSlotsAfterDelete({
-            billingBusinessId: nextBillingBusinessId,
-            successorBusinessId,
-            subscription,
-            additionalBusinesses: nextAdditionalBusinesses
-          });
-        } catch (stripeErr) {
-          logError("DELETE /businesses/:id: failed to sync Stripe business slots", {
-            businessId,
-            nextBillingBusinessId,
-            err: stripeErr.message
-          });
-        }
-      }
     } catch (err) {
       if (!transactionCommitted) {
         await client.query("ROLLBACK");
+      }
+      if (!transactionCommitted && typeof stripeCompensation === "function") {
+        try {
+          await stripeCompensation();
+        } catch (stripeRollbackErr) {
+          logError("DELETE /businesses/:id: Stripe compensation failed", {
+            businessId,
+            userId: req.user?.id,
+            err: stripeRollbackErr.message
+          });
+        }
       }
       throw err;
     } finally {
