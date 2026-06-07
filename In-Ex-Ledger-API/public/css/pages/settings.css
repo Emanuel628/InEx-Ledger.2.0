@@ -1416,23 +1416,29 @@ select.is-export-profile-missing {
 }
 
 .security-show-password {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  margin-top: 10px;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  margin: 0 !important;
+  padding: 0 !important;
   font-size: 13px;
-  width: 100%;
-  max-width: none;
+  width: fit-content !important;
+  max-width: max-content !important;
+  min-width: 0 !important;
   color: var(--ink2);
   cursor: pointer;
   white-space: nowrap;
   text-align: left;
+  place-content: flex-start !important;
+  place-items: center start !important;
 }
 
 .security-show-password input {
-  margin: 0;
+  margin: 0 !important;
   flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
 }
 
 .security-show-password span {
@@ -1440,6 +1446,13 @@ select.is-export-profile-missing {
   line-height: 1.2;
   letter-spacing: 0;
   text-transform: none;
+}
+
+.security-show-password-row {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  text-align: left;
 }
 
 #securitySaveButton {
