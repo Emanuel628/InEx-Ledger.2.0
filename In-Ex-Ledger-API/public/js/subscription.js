@@ -5,6 +5,7 @@ const SUBSCRIPTION_ACTIVATION_POLL_WINDOW_MS = 15_000;
 const SUBSCRIPTION_ACTIVATION_POLL_INTERVAL_MS = 1_500;
 
 let currentSubscription = null;
+let currentBillingPricing = null;
 let pendingDeleteBusinessId = null;
 let subscriptionBusinessesState = {
   isLoaded: false,
@@ -157,10 +158,12 @@ function buildStatusPanelMarkup(sub) {
   }
 
   const additionalBusinesses = Number(sub.additionalBusinesses || 0);
-  const totalBusinesses = 1 + additionalBusinesses;
+  const totalBusinesses = Number(sub.maxBusinessesAllowed || (1 + additionalBusinesses));
   const billingIntervalLabel = sub.billingInterval === "yearly" ? "Yearly" : "Monthly";
   const currencyLabel = String(sub.currency || "usd").toUpperCase();
   const planLabel = sub.isTrialing ? "Pro trial" : sub.effectiveTier === "v1" ? "Pro" : "Basic";
+  const pricingSummary = getSubscriptionPriceSummary(sub);
+  const monthlyTotalLabel = fmtMoney(pricingSummary.monthlyEquivalent, pricingSummary.currency);
 
   return `
     <div class="sub-status-spotlight">
@@ -175,6 +178,11 @@ function buildStatusPanelMarkup(sub) {
           <span class="sub-status-stat-label">Billing cycle</span>
           <strong class="sub-status-stat-value">${escapeHtml(billingIntervalLabel)}</strong>
           <span class="sub-status-stat-meta">${escapeHtml(currencyLabel)} pricing</span>
+        </article>
+        <article class="sub-status-stat-card">
+          <span class="sub-status-stat-label">Monthly total</span>
+          <strong class="sub-status-stat-value">${escapeHtml(monthlyTotalLabel)}</strong>
+          <span class="sub-status-stat-meta">${billingIntervalLabel === "Yearly" ? "Monthly equivalent, billed yearly" : "Current monthly total"}</span>
         </article>
         <article class="sub-status-stat-card">
           <span class="sub-status-stat-label">Businesses allowed</span>
@@ -246,10 +254,12 @@ function buildBusinessRosterMarkup(sub) {
                   class="danger-outline-btn"
                   data-business-delete="${escapeHtml(biz.id)}"
                   data-business-name="${escapeHtml(biz.name || "Business")}"
+                  title="${canDeleteMultiple ? "Delete this business" : "Keep at least one business on this account."}"
                   ${!canDeleteMultiple ? "disabled" : ""}
                 >
                   Delete business
                 </button>
+                ${!canDeleteMultiple ? `<span class="sub-business-action-note">Keep at least 1 business on this account.</span>` : ""}
               </div>
             </article>
           `).join("")
@@ -307,6 +317,9 @@ function renderWorkspaceCapacity(sub) {
   const activeCount = businesses.length;
   const allowed = Number(sub?.maxBusinessesAllowed || 1);
   const additionalBusinesses = Number(sub?.additionalBusinesses || 0);
+  const pricingSummary = getSubscriptionPriceSummary(sub);
+  const monthlyTotalLabel = fmtMoney(pricingSummary.monthlyEquivalent, pricingSummary.currency);
+  const addonLabel = fmtMoney(pricingSummary.addonMonthlyEquivalent, pricingSummary.currency);
 
   const statsHtml = `
     <div class="sub-access-overview">
@@ -323,7 +336,12 @@ function renderWorkspaceCapacity(sub) {
       <article class="sub-access-stat">
         <span class="sub-access-stat-label">${escapeHtml(tx("subscription_extra_business_slots"))}</span>
         <strong class="sub-access-stat-value">${additionalBusinesses}</strong>
-        <span class="sub-access-stat-meta">${additionalBusinesses > 0 ? `+$${additionalBusinesses * 5}/mo (est.)` : "Included with plan"}</span>
+        <span class="sub-access-stat-meta">${additionalBusinesses > 0 ? `${additionalBusinesses} paid slot${additionalBusinesses === 1 ? "" : "s"} at ${addonLabel}/mo${pricingSummary.billingInterval === "yearly" ? " equivalent" : ""}` : "Included with plan"}</span>
+      </article>
+      <article class="sub-access-stat">
+        <span class="sub-access-stat-label">Monthly total</span>
+        <strong class="sub-access-stat-value">${monthlyTotalLabel}</strong>
+        <span class="sub-access-stat-meta">${pricingSummary.billingInterval === "yearly" ? "Monthly equivalent, billed yearly" : "Current monthly total"}</span>
       </article>
     </div>`;
 
@@ -346,7 +364,15 @@ function openAddBusinessModal() {
   const modal = document.getElementById("addBusinessModal");
   const input = document.getElementById("addBusinessNameInput");
   const errorEl = document.getElementById("addBusinessModalError");
+  const noteEl = document.getElementById("addBusinessModalPriceNote");
   if (!modal) return;
+  if (noteEl && currentSubscription) {
+    const currentSummary = getSubscriptionPriceSummary(currentSubscription);
+    const nextSummary = getSubscriptionPriceSummary(currentSubscription, {
+      additionalBusinesses: currentSummary.additionalBusinesses + 1
+    });
+    noteEl.innerHTML = `Adding a business changes your monthly total from <strong>${escapeHtml(fmtMoney(currentSummary.monthlyEquivalent, currentSummary.currency))}</strong> to <strong>${escapeHtml(fmtMoney(nextSummary.monthlyEquivalent, nextSummary.currency))}</strong>${currentSummary.billingInterval === "yearly" ? " (monthly equivalent, billed yearly)" : ""}.`;
+  }
   if (input) input.value = "";
   if (errorEl) { errorEl.textContent = ""; errorEl.classList.add("hidden"); }
   modal.classList.remove("hidden");
@@ -425,6 +451,67 @@ async function openCustomerPortal() {
   }
 }
 
+function fmtMoney(amount, currency) {
+  const normalizedCurrency = String(currency || "usd").toUpperCase();
+  const value = Number(amount || 0);
+  if (!Number.isFinite(value)) return "-";
+  const locale = normalizedCurrency === "CAD" ? "en-CA" : "en-US";
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: normalizedCurrency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  } catch (_) {
+    return `${normalizedCurrency} ${value.toFixed(2)}`;
+  }
+}
+
+function getFallbackPricing(currency = "usd") {
+  const normalizedCurrency = String(currency || "usd").toLowerCase() === "cad" ? "cad" : "usd";
+  if (normalizedCurrency === "cad") {
+    return {
+      monthly: { base: 17, addon: 7 },
+      yearly: { base: 175, addon: 72 }
+    };
+  }
+  return {
+    monthly: { base: 12, addon: 5 },
+    yearly: { base: 122.4, addon: 51 }
+  };
+}
+
+function getSubscriptionPriceSummary(sub, overrides = {}) {
+  const currency = String(
+    overrides.currency || currentBillingPricing?.currency || sub?.currency || "usd"
+  ).toLowerCase() === "cad" ? "cad" : "usd";
+  const billingInterval = String(sub?.billingInterval || "monthly").toLowerCase() === "yearly"
+    ? "yearly"
+    : "monthly";
+  const pricingTable = currentBillingPricing?.pricing || getFallbackPricing(currency);
+  const intervalPricing = pricingTable?.[billingInterval] || getFallbackPricing(currency)[billingInterval];
+  const additionalBusinesses = Math.max(0, Number(
+    overrides.additionalBusinesses ?? sub?.additionalBusinesses ?? 0
+  ) || 0);
+  const base = Number(intervalPricing?.base || 0);
+  const addon = Number(intervalPricing?.addon || 0);
+  const cycleTotal = base + (additionalBusinesses * addon);
+  const monthlyEquivalent = billingInterval === "yearly" ? cycleTotal / 12 : cycleTotal;
+  const addonMonthlyEquivalent = billingInterval === "yearly" ? addon / 12 : addon;
+
+  return {
+    currency,
+    billingInterval,
+    base,
+    addon,
+    cycleTotal,
+    monthlyEquivalent,
+    addonMonthlyEquivalent,
+    additionalBusinesses
+  };
+}
+
 async function openCancelPortalOrCancelSubscription() {
   if (currentSubscription?.stripeSubscriptionId) {
     try {
@@ -474,6 +561,10 @@ function openBusinessDeleteModal(businessId, businessName) {
   const remainingBusinesses = Math.max((subscriptionBusinessesState.items || []).length - 1, 0);
   const nextAdditionalBusinesses = Math.max(remainingBusinesses - 1, 0);
   const currentAdditionalBusinesses = Number(currentSubscription?.additionalBusinesses || 0);
+  const currentSummary = getSubscriptionPriceSummary(currentSubscription);
+  const nextSummary = getSubscriptionPriceSummary(currentSubscription, {
+    additionalBusinesses: nextAdditionalBusinesses
+  });
 
   if (body) {
     const lines = [
@@ -484,6 +575,9 @@ function openBusinessDeleteModal(businessId, businessName) {
     if (currentSubscription?.effectiveTier === "v1") {
       lines.push(
         `<span>Your paid add-on count will change from <strong>${currentAdditionalBusinesses}</strong> to <strong>${nextAdditionalBusinesses}</strong>.</span>`
+      );
+      lines.push(
+        `<span>Your monthly total will change from <strong>${escapeHtml(fmtMoney(currentSummary.monthlyEquivalent, currentSummary.currency))}</strong> to <strong>${escapeHtml(fmtMoney(nextSummary.monthlyEquivalent, nextSummary.currency))}</strong>${currentSummary.billingInterval === "yearly" ? " (monthly equivalent, billed yearly)" : ""}.</span>`
       );
     }
 
@@ -588,6 +682,15 @@ async function loadSubscription() {
     }
 
     currentSubscription = sub;
+    try {
+      const pricingRes = await apiFetch("/api/billing/pricing");
+      const pricingPayload = pricingRes ? await pricingRes.json().catch(() => null) : null;
+      currentBillingPricing = pricingRes && pricingRes.ok && pricingPayload?.pricing
+        ? pricingPayload
+        : null;
+    } catch (_) {
+      currentBillingPricing = null;
+    }
     syncSubscriptionBusinessesState(sub);
 
     if (statusBlock) {

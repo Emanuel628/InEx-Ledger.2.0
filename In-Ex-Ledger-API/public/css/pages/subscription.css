@@ -725,7 +725,7 @@
 
 .sub-access-overview {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px;
   margin-bottom: 18px;
 }
@@ -811,6 +811,20 @@
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.sub-business-item-actions .danger-outline-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.sub-business-action-note {
+  width: 100%;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: right;
 }
 
 .business-modal-backdrop,
