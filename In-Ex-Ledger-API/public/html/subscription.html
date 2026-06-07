@@ -53,106 +53,72 @@
         <a id="subscriptionReactivationContinue" href="/transactions" class="settings-secondary-btn">Continue to app</a>
       </section>
 
-      <section class="subscription-grid subscription-grid-top" id="sub-status-section" aria-label="Current subscription overview">
+      <!-- 1. Executive Summary Card -->
+      <section id="sub-status-section" aria-label="Current subscription overview">
         <article class="subscription-panel subscription-status-panel">
           <div class="subscription-panel-head">
             <span class="subscription-eyebrow">Current status</span>
             <span class="subscription-chip">Live account</span>
           </div>
-          <div class="sub-status-block" id="subStatusBlock"><div class="sub-status-loading" data-i18n="settings_loading">Loading...</div></div>
+          <div class="sub-status-block" id="subStatusBlock">
+            <div class="sub-status-loading" data-i18n="settings_loading">Loading...</div>
+          </div>
           <div class="subscription-actions-row">
             <button type="button" id="subManageBillingBtn" class="settings-secondary-btn hidden" data-i18n="subscription_manage_billing">Manage billing</button>
-            <button type="button" id="subCancelBtn" class="danger-outline-btn hidden" data-i18n="settings_cancel_subscription_btn">Cancel subscription...</button>
+            <button type="button" id="subCancelBtn" class="danger-outline-btn hidden" data-i18n="settings_cancel_subscription_btn">Cancel subscription</button>
           </div>
         </article>
-
-        <aside class="subscription-panel subscription-stripe-panel">
-          <span class="subscription-eyebrow">Secure billing</span>
-          <h2>Stripe handles the money movement.</h2>
-          <p>Cards, taxes, invoices, checkout, and billing-portal changes stay in Stripe. InEx Ledger keeps the bookkeeping workflow and access state in sync.</p>
-          <div class="sub-stripe-note"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true" class="sub-stripe-icon"><rect x="2" y="7" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5 7V5a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span>Payment details, invoices, taxes, and plan changes stay in Stripe. InEx Ledger does not store card details inside the app.</span></div>
-          <div class="subscription-mini-metrics"><div><strong>Plans</strong><span>Basic + Pro</span></div><div><strong>Add-ons</strong><span>Extra businesses</span></div><div><strong>Billing</strong><span>Monthly / yearly</span></div></div>
-        </aside>
       </section>
 
-      <section class="subscription-panel subscription-plan-workbench" id="sub-plans-section">
-        <div class="subscription-section-title">
-          <span class="subscription-eyebrow">Subscription plan</span>
-          <h2>Know the number before checkout opens.</h2>
-          <p>Review live access, estimate add-on capacity, and then hand the final charge, invoice, and tax details to Stripe.</p>
+      <!-- 2. Workspace Capacity -->
+      <section class="subscription-panel" id="sub-access-section">
+        <div class="subscription-section-title compact">
+          <span class="subscription-eyebrow">Workspace capacity</span>
+          <h2>Businesses on this plan</h2>
+          <p>Each additional business adds $5/mo to your bill, billed through Stripe.</p>
         </div>
-
-        <div class="subscription-plan-shell">
-          <article class="sub-plan-card sub-plan-featured subscription-plan-row subscription-plan-single" id="planPro">
-            <div class="subscription-plan-row-main">
-              <span class="subscription-plan-label subscription-plan-label-pro">Pro access</span>
-              <h3 class="sub-plan-name" data-i18n="subscription_pro_title">Pro</h3>
-              <p class="sub-plan-pitch">For solo operators who want the full bookkeeping workflow: imports, receipts, mileage, exports, analytics, and CPA hand-off support in one system.</p>
-            </div>
-            <div class="subscription-plan-row-price">
-              <strong id="planProPriceLabel">$12 / mo</strong>
-              <span id="planProAddonPriceLabel">Additional businesses from $5&nbsp;/&nbsp;mo</span>
-            </div>
-            <div class="subscription-plan-row-actions">
-              <button type="button" id="planProBtn" class="sub-cta-primary" data-i18n="subscription_pro_cta">Manage Subscription &amp; Invoices on Stripe</button>
-            </div>
-          </article>
-
-          <div class="subscription-capacity-board subscription-capacity-board--inline" aria-label="Pro billing estimate">
-            <div class="subscription-board-card" id="proCardAddonGroup">
-              <span class="subscription-eyebrow">Capacity calculator</span>
-              <h3>Estimate billed capacity before Stripe checkout.</h3>
-              <div class="sub-control-row">
-                <span class="sub-control-label" data-i18n="subscription_billing_interval_label">Billing</span>
-                <div class="sub-toggle" role="group" aria-label="Billing interval">
-                  <button type="button" class="sub-toggle-btn is-active" data-billing-interval="monthly" data-i18n="subscription_billing_monthly" aria-pressed="true">Monthly</button>
-                  <button type="button" class="sub-toggle-btn" data-billing-interval="yearly" data-i18n="subscription_billing_yearly" aria-pressed="false">Yearly</button>
-                </div>
-              </div>
-              <div class="sub-control-row sub-control-row-capacity">
-                <label class="sub-control-label" for="additionalBusinessesInput" data-i18n="subscription_additional_businesses_label">Extra businesses</label>
-                <div class="sub-quantity-control">
-                  <button type="button" class="sub-quantity-btn" data-qty-action="decrease" aria-label="Decrease">-</button>
-                  <input id="additionalBusinessesInput" class="sub-quantity-input" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" />
-                  <button type="button" class="sub-quantity-btn" data-qty-action="increase" aria-label="Increase">+</button>
-                </div>
-                <div class="sub-inline-price-note">Base plan plus per-business add-ons billed through Stripe with the final amount verified server-side.</div>
-              </div>
-              <div class="sub-price-summary subscription-board-card" id="subPriceSummary">
-                <div class="sub-price-row"><span class="sub-price-label" data-i18n="subscription_price_summary_plan">Plan</span><span class="sub-price-value" id="subPricePlan">-</span></div>
-                <div class="sub-price-row"><span class="sub-price-label" data-i18n="subscription_price_summary_addon">Add-ons</span><span class="sub-price-value" id="subPriceAddon">$0</span></div>
-                <div class="sub-price-row sub-price-total"><span class="sub-price-label" data-i18n="subscription_price_summary_total">Estimated total</span><span class="sub-price-value" id="subPriceTotal">-</span></div>
-                <p class="sub-price-note" id="subPriceNote" data-i18n="subscription_price_summary_note">Final pricing confirmed at checkout in Stripe.</p>
-              </div>
-            </div>
-          </div>
+        <div id="businessSlotsManager" class="sub-detail-card">
+          <div class="sub-status-loading" data-i18n="settings_loading">Loading...</div>
         </div>
       </section>
 
-      <section class="subscription-grid subscription-grid-bottom" id="sub-access-section">
-        <article class="subscription-panel"><div class="subscription-section-title compact"><span class="subscription-eyebrow">Payment method</span><h2>Billing details</h2><p>Managed through Stripe.</p></div><div id="subPaymentMethodCard" class="sub-detail-card"><div class="sub-status-loading" data-i18n="settings_loading">Loading...</div></div></article>
-        <article class="subscription-panel"><div class="subscription-section-title compact"><span class="subscription-eyebrow">Business capacity</span><h2>Business slots</h2><p>Manage billed business access.</p></div><div id="businessSlotsManager" class="sub-detail-card"><div class="sub-status-loading" data-i18n="settings_loading">Loading...</div></div></article>
-      </section>
-
+      <!-- 3. Stripe billing portal footer -->
       <section class="subscription-panel subscription-history-link-panel" id="sub-history-section">
         <div class="subscription-section-title compact">
-          <span class="subscription-eyebrow">Billing history</span>
-          <h2>Official invoices and receipts stay in Stripe.</h2>
-          <p>Use the Stripe portal for invoice history, payment receipts, tax details, and payment-method updates.</p>
+          <span class="subscription-eyebrow">Billing</span>
+          <h2>Payment, invoices, and plan changes stay in Stripe.</h2>
+          <p>Use the Stripe portal for invoice history, payment receipts, and payment-method updates.</p>
         </div>
-        <button type="button" id="subHistoryPortalBtn" class="settings-secondary-btn">View invoices in Stripe</button>
+        <button type="button" id="subHistoryPortalBtn" class="settings-secondary-btn">Open Stripe billing portal</button>
       </section>
     </main>
   </div>
 
+  <!-- Add Business Modal -->
+  <div id="addBusinessModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="addBusinessModalTitle">
+    <div class="transaction-modal-content">
+      <h3 id="addBusinessModalTitle">Add a new business</h3>
+      <p>Adding a business will increase your monthly cost by <strong>+$5/mo</strong> (prorated immediately for paid plans).</p>
+      <div class="danger-confirm-wrap">
+        <label for="addBusinessNameInput">Business name</label>
+        <input type="text" id="addBusinessNameInput" maxlength="100" autocomplete="off" placeholder="e.g. Acme Consulting" />
+      </div>
+      <p id="addBusinessModalError" class="sub-inline-error hidden" role="alert" aria-live="assertive"></p>
+      <div class="modal-actions">
+        <button type="button" id="addBusinessModalCancel" class="modal-cancel">Cancel</button>
+        <button type="button" id="addBusinessModalSubmit" class="settings-primary-btn">Add business</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cancel Subscription Modal -->
   <div id="subCancelModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="subCancelModalTitle" aria-describedby="subCancelModalBody"><div class="transaction-modal-content danger-modal"><div class="danger-modal-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 3L14 13H2L8 3Z"></path><line x1="8" y1="7" x2="8" y2="10"></line><circle cx="8" cy="12" r=".5" fill="currentColor"></circle></svg></div><h3 id="subCancelModalTitle" data-i18n="settings_cancel_sub_modal_title">Cancel subscription?</h3><p id="subCancelModalBody" data-i18n="settings_cancel_sub_modal_body">Your subscription will remain active until the end of the current billing period.</p><div class="modal-actions danger-actions"><button type="button" id="subCancelModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button><button type="button" id="subCancelModalConfirm" class="modal-delete" data-i18n="settings_cancel_sub_confirm_btn">Yes, cancel subscription</button></div></div></div>
-  <div id="subFreeModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="subFreeModalTitle" aria-describedby="subFreeModalBody"><div class="transaction-modal-content danger-modal"><div class="danger-modal-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 3L14 13H2L8 3Z"></path><line x1="8" y1="7" x2="8" y2="10"></line><circle cx="8" cy="12" r=".5" fill="currentColor"></circle></svg></div><h3 id="subFreeModalTitle" data-i18n="subscription_free_confirm_title">Switch to Basic?</h3><p id="subFreeModalBody" data-i18n="subscription_free_confirm_body_generic">This business will move to Basic.</p><div class="modal-actions danger-actions"><button type="button" id="subFreeModalCancel" class="modal-cancel" data-i18n="common_cancel">Cancel</button><button type="button" id="subFreeModalConfirm" class="modal-delete" data-i18n="subscription_free_confirm_action">Confirm Basic</button></div></div></div>
+
+  <!-- Business Delete Modal -->
   <div id="subBusinessDeleteModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="subBusinessDeleteTitle" aria-describedby="subBusinessDeleteBody"><div class="transaction-modal-content danger-modal"><div class="danger-modal-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 3L14 13H2L8 3Z"></path><line x1="8" y1="7" x2="8" y2="10"></line><circle cx="8" cy="12" r=".5" fill="currentColor"></circle></svg></div><h3 id="subBusinessDeleteTitle">Delete business?</h3><p id="subBusinessDeleteBody">This action permanently deletes the selected business and its associated data.</p><div class="danger-confirm-wrap"><label for="subBusinessDeletePassword">Enter your password to confirm</label><input type="password" id="subBusinessDeletePassword" autocomplete="current-password" /></div><p id="subBusinessDeleteError" class="sub-inline-error hidden" role="alert" aria-live="assertive"></p><div class="modal-actions danger-actions"><button type="button" id="subBusinessDeleteCancel" class="modal-cancel">Cancel</button><button type="button" id="subBusinessDeleteConfirm" class="modal-delete">Delete business</button></div></div></div>
+
   <div id="subToast" class="settings-toast hidden" role="status" aria-live="polite"><span id="subToastMessage">Saved</span></div>
 
-<script src="../js/escape-html.js?v=20260410a"></script><script src="../js/global.js?v=20260601b"></script><script src="../js/i18n.js?v=20260510f"></script><script src="../js/auth.js?v=20260527c"></script><script src="../js/trial.js?v=20260405c"></script><script src="../js/taxReminders.js?v=20260405c"></script><script src="../js/billing-pricing.js?v=20260419a"></script><script src="../js/subscription.js?v=20260607b"></script>
+  <script src="../js/escape-html.js?v=20260410a"></script><script src="../js/global.js?v=20260601b"></script><script src="../js/i18n.js?v=20260510f"></script><script src="../js/auth.js?v=20260527c"></script><script src="../js/trial.js?v=20260405c"></script><script src="../js/taxReminders.js?v=20260405c"></script><script src="../js/billing-pricing.js?v=20260419a"></script><script src="../js/subscription.js?v=20260607b"></script>
 </body>
 </html>
-
-
-
