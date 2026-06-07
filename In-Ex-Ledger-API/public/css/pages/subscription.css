@@ -347,6 +347,25 @@
   margin-top: 22px;
 }
 
+.sub-status-action-area {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.sub-status-inline-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.sub-status-inline-note {
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .subscription-actions-row .settings-secondary-btn,
 .subscription-actions-row .danger-outline-btn {
   min-height: 44px;

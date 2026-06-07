@@ -6,6 +6,7 @@ const SUBSCRIPTION_ACTIVATION_POLL_INTERVAL_MS = 1_500;
 
 let currentSubscription = null;
 let currentBillingPricing = null;
+let selectedBillingInterval = "monthly";
 let pendingDeleteBusinessId = null;
 let subscriptionBusinessesState = {
   isLoaded: false,
@@ -164,6 +165,11 @@ function buildStatusPanelMarkup(sub) {
   const planLabel = sub.isTrialing ? "Pro trial" : sub.effectiveTier === "v1" ? "Pro" : "Basic";
   const pricingSummary = getSubscriptionPriceSummary(sub);
   const monthlyTotalLabel = fmtMoney(pricingSummary.monthlyEquivalent, pricingSummary.currency);
+  const isCanceled = Boolean(sub.cancelAtPeriodEnd || sub.isCanceledWithRemainingAccess);
+  const statusValue = isCanceled ? "Canceled" : "Active";
+  const statusMeta = isCanceled
+    ? "Reactivate below to restore paid access."
+    : `${planLabel}${sub.effectiveTier === "v1" ? ` ${billingIntervalLabel.toLowerCase()}` : ""}`;
 
   return `
     <div class="sub-status-spotlight">
@@ -190,9 +196,9 @@ function buildStatusPanelMarkup(sub) {
           <span class="sub-status-stat-meta">${additionalBusinesses > 0 ? `${additionalBusinesses} paid add-on${additionalBusinesses === 1 ? "" : "s"}` : "1 included with plan"}</span>
         </article>
         <article class="sub-status-stat-card">
-          <span class="sub-status-stat-label">Billing system</span>
-          <strong class="sub-status-stat-value">Stripe</strong>
-          <span class="sub-status-stat-meta">Portal, invoices, payment method</span>
+          <span class="sub-status-stat-label">Subscription state</span>
+          <strong class="sub-status-stat-value">${escapeHtml(statusValue)}</strong>
+          <span class="sub-status-stat-meta">${escapeHtml(statusMeta)}</span>
         </article>
       </div>
     </div>`;
@@ -451,65 +457,98 @@ async function openCustomerPortal() {
   }
 }
 
-function fmtMoney(amount, currency) {
-  const normalizedCurrency = String(currency || "usd").toUpperCase();
-  const value = Number(amount || 0);
-  if (!Number.isFinite(value)) return "-";
-  const locale = normalizedCurrency === "CAD" ? "en-CA" : "en-US";
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency: normalizedCurrency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value);
-  } catch (_) {
-    return `${normalizedCurrency} ${value.toFixed(2)}`;
-  }
-}
-
-function getFallbackPricing(currency = "usd") {
-  const normalizedCurrency = String(currency || "usd").toLowerCase() === "cad" ? "cad" : "usd";
-  if (normalizedCurrency === "cad") {
+function getCheckoutCtaConfig(sub) {
+  if (!sub) return null;
+  if (sub.cancelAtPeriodEnd || sub.isCanceledWithRemainingAccess) {
     return {
-      monthly: { base: 17, addon: 7 },
-      yearly: { base: 175, addon: 72 }
+      label: "Reactivate now",
+      note: "Choose monthly or yearly billing before reopening Pro access."
     };
   }
-  return {
-    monthly: { base: 12, addon: 5 },
-    yearly: { base: 122.4, addon: 51 }
-  };
+  if (sub.isTrialing && !sub.stripeSubscriptionId) {
+    return {
+      label: "Secure Pro billing",
+      note: "Lock in billing now so Pro stays active when the trial ends."
+    };
+  }
+  if (sub.effectiveTier !== "v1" && !sub.isPaid) {
+    return {
+      label: "Upgrade to Pro",
+      note: "Choose the billing interval you want before Stripe checkout starts."
+    };
+  }
+  return null;
 }
 
-function getSubscriptionPriceSummary(sub, overrides = {}) {
-  const currency = String(
-    overrides.currency || currentBillingPricing?.currency || sub?.currency || "usd"
-  ).toLowerCase() === "cad" ? "cad" : "usd";
-  const billingInterval = String(sub?.billingInterval || "monthly").toLowerCase() === "yearly"
-    ? "yearly"
-    : "monthly";
-  const pricingTable = currentBillingPricing?.pricing || getFallbackPricing(currency);
-  const intervalPricing = pricingTable?.[billingInterval] || getFallbackPricing(currency)[billingInterval];
-  const additionalBusinesses = Math.max(0, Number(
-    overrides.additionalBusinesses ?? sub?.additionalBusinesses ?? 0
-  ) || 0);
-  const base = Number(intervalPricing?.base || 0);
-  const addon = Number(intervalPricing?.addon || 0);
-  const cycleTotal = base + (additionalBusinesses * addon);
-  const monthlyEquivalent = billingInterval === "yearly" ? cycleTotal / 12 : cycleTotal;
-  const addonMonthlyEquivalent = billingInterval === "yearly" ? addon / 12 : addon;
+function renderStatusActionArea(sub) {
+  const container = document.getElementById("subStatusActionArea");
+  if (!container) return;
 
-  return {
-    currency,
-    billingInterval,
-    base,
-    addon,
-    cycleTotal,
-    monthlyEquivalent,
-    addonMonthlyEquivalent,
-    additionalBusinesses
-  };
+  const config = getCheckoutCtaConfig(sub);
+  if (!config) {
+    container.innerHTML = "";
+    container.classList.add("hidden");
+    return;
+  }
+
+  const interval = selectedBillingInterval === "yearly" ? "yearly" : "monthly";
+  const summary = getSubscriptionPriceSummary(sub, { billingInterval: interval });
+  const monthlyTotal = fmtMoney(summary.monthlyEquivalent, summary.currency);
+  const cycleTotal = fmtMoney(summary.cycleTotal, summary.currency);
+  const intervalLabel = interval === "yearly" ? "yearly" : "monthly";
+
+  container.innerHTML = `
+    <div class="sub-status-inline-controls">
+      <div class="sub-toggle" role="group" aria-label="Billing interval">
+        <button type="button" class="sub-toggle-btn ${interval === "monthly" ? "is-active" : ""}" data-sub-billing-interval="monthly" aria-pressed="${interval === "monthly" ? "true" : "false"}">Monthly</button>
+        <button type="button" class="sub-toggle-btn ${interval === "yearly" ? "is-active" : ""}" data-sub-billing-interval="yearly" aria-pressed="${interval === "yearly" ? "true" : "false"}">Yearly</button>
+      </div>
+      <button type="button" id="subStartCheckoutBtn" class="sub-cta-primary">${escapeHtml(config.label)}</button>
+    </div>
+    <p class="sub-status-inline-note">${escapeHtml(config.note)} ${escapeHtml(cycleTotal)} billed ${intervalLabel}. Monthly equivalent: ${escapeHtml(monthlyTotal)}.</p>
+  `;
+
+  container.classList.remove("hidden");
+
+  container.querySelectorAll("[data-sub-billing-interval]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const nextInterval = String(button.getAttribute("data-sub-billing-interval") || "").toLowerCase();
+      if (nextInterval !== "monthly" && nextInterval !== "yearly") return;
+      selectedBillingInterval = nextInterval;
+      renderStatusActionArea(sub);
+    });
+  });
+
+  container.querySelector("#subStartCheckoutBtn")?.addEventListener("click", startSubscriptionCheckout);
+}
+
+async function startSubscriptionCheckout() {
+  if (!currentSubscription) return;
+  const interval = selectedBillingInterval === "yearly" ? "yearly" : "monthly";
+  try {
+    const res = await apiFetch("/api/billing/checkout-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        billingInterval: interval,
+        additionalBusinesses: Number(currentSubscription.additionalBusinesses || 0),
+        returnPath: "/subscription"
+      })
+    });
+    if (!res) return;
+    const payload = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(payload?.error || "Unable to start checkout.");
+    }
+    if (payload?.url) {
+      if (!isAllowedBillingRedirect(payload.url)) {
+        throw new Error(tx("subscription_portal_error"));
+      }
+      window.location.href = payload.url;
+    }
+  } catch (err) {
+    showSubToast(err.message || "Unable to start checkout.");
+  }
 }
 
 async function openCancelPortalOrCancelSubscription() {
@@ -682,6 +721,9 @@ async function loadSubscription() {
     }
 
     currentSubscription = sub;
+    if (!selectedBillingInterval || selectedBillingInterval === "monthly") {
+      selectedBillingInterval = sub.billingInterval === "yearly" ? "yearly" : "monthly";
+    }
     try {
       const pricingRes = await apiFetch("/api/billing/pricing");
       const pricingPayload = pricingRes ? await pricingRes.json().catch(() => null) : null;
@@ -696,6 +738,7 @@ async function loadSubscription() {
     if (statusBlock) {
       statusBlock.innerHTML = buildStatusPanelMarkup(sub);
     }
+    renderStatusActionArea(sub);
 
     if (cancelModalBody && sub.currentPeriodEnd) {
       const endDate = fmtDate(sub.currentPeriodEnd);

@@ -563,15 +563,15 @@ const BILLING_LIFECYCLE = {
   },
   canceling: {
     en: {
-      subject: "Your InEx Ledger subscription will end at period close",
+      subject: "Your InEx Ledger subscription has been canceled",
       eyebrow: "InEx Ledger billing",
-      heading: "Cancellation scheduled",
-      body: "Your paid subscription will stay active until the end of the current billing period.",
+      heading: "Subscription canceled",
+      body: "Your paid subscription has been canceled, and access stays active until the end of the current billing period. We're sorry to see you go.",
       detailsLabel: "Access details",
       actionLabel: "Open billing",
-      footer: "You can resubscribe at any time before access ends.",
+      footer: "You can reactivate anytime before access ends if you want to keep Pro active.",
       text: ({ summary, billingUrl }) =>
-        `Your InEx Ledger subscription is scheduled to cancel.\n\n${summary}\n\nReview billing: ${billingUrl}`
+        `Your InEx Ledger subscription has been canceled, and access stays active until the end of the current billing period. We're sorry to see you go.\n\n${summary}\n\nReview billing: ${billingUrl}`
     },
     fr: {
       subject: "Votre abonnement InEx Ledger prendra fin à la fin de la période",

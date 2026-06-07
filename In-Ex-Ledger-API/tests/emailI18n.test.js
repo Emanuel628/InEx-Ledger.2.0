@@ -322,6 +322,16 @@ describe("buildBillingLifecycleEmail", () => {
     assert.ok(subject.includes("setup changed"));
     assert.ok(html.includes("Billing updated"));
   });
+
+  it("returns explicit cancellation confirmation copy", () => {
+    const { subject, html, text } = buildBillingLifecycleEmail("en", "canceling", {
+      details: [{ label: "Access through", value: "2026-07-06" }],
+      billingUrl: "https://app.inexledger.com/subscription"
+    });
+    assert.ok(subject.includes("has been canceled"));
+    assert.ok(html.includes("We're sorry to see you go."));
+    assert.ok(text.includes("We're sorry to see you go."));
+  });
 });
 
 /* ================================================================== */

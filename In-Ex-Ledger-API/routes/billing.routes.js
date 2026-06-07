@@ -1060,6 +1060,15 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
     if (subscription.isTrialing && !subscription.stripeSubscriptionId) {
       await setTrialPlanSelectionForBusiness(billingBusinessId, "free");
       const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+      await sendBillingEmail({
+        businessId: billingBusinessId,
+        kind: "canceling",
+        details: [
+          { label: "Plan", value: updated.effectiveTierName || "Basic" },
+          { label: "Access through", value: formatDateLabel(updated.trialEndsAt || updated.currentPeriodEnd) }
+        ],
+        actionUrl: buildAppUrl("/subscription")
+      });
       return res.status(200).json({ subscription: updated });
     }
 
@@ -1091,15 +1100,6 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
     }
 
     const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
-    await sendBillingEmail({
-      businessId: billingBusinessId,
-      kind: "canceling",
-      details: [
-        { label: "Plan", value: updated.effectiveTierName || "Pro" },
-        { label: "Access until", value: formatDateLabel(updated.currentPeriodEnd) }
-      ],
-      actionUrl: buildAppUrl("/subscription")
-    });
     logInfo("Billing cancellation scheduled", {
       userId: req.user?.id,
       businessId: billingBusinessId,
