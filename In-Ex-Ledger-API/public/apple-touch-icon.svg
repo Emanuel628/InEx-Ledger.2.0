@@ -1,13 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="InEx Ledger app icon">
   <defs>
     <linearGradient id="bg" x1="20" y1="16" x2="160" y2="166" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#194a7a"/>
-      <stop offset="1" stop-color="#0d2038"/>
+      <stop offset="0" stop-color="#0c395f"/>
+      <stop offset="1" stop-color="#1f7a7a"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="64" y1="28" x2="102" y2="146" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d9f4f0"/>
+    </linearGradient>
+    <linearGradient id="chip" x1="110" y1="98" x2="140" y2="138" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#cfe9e6"/>
     </linearGradient>
   </defs>
   <rect width="180" height="180" rx="40" fill="url(#bg)"/>
-  <rect x="32" y="32" width="44" height="44" rx="10" fill="#fff"/>
-  <rect x="104" y="32" width="44" height="44" rx="10" fill="#fff" opacity=".66"/>
-  <rect x="32" y="104" width="44" height="44" rx="10" fill="#fff" opacity=".66"/>
-  <rect x="104" y="104" width="44" height="44" rx="10" fill="#fff" opacity=".4"/>
+  <rect x="62" y="28" width="34" height="124" rx="17" transform="rotate(33 79 90)" fill="url(#stroke)"/>
+  <rect x="106" y="99" width="28" height="46" rx="12" fill="url(#chip)"/>
 </svg>
