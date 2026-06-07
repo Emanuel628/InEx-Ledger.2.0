@@ -48,6 +48,10 @@ const {
   buildDeviceFingerprint,
   fetchIpLocation
 } = require("../services/signInSecurityService.js");
+const {
+  getDeletedAccountRecordByEmail,
+  markDeletedAccountReactivated
+} = require("../services/deletedAccountService.js");
 const { normalizeEmail } = require("../utils/emailNormalization.js");
 
 const router = express.Router();
@@ -1022,14 +1026,24 @@ router.post("/register", authLimiter, async (req, res) => {
       return res.status(409).json({ error: "Email already registered" });
     }
 
+    const deletedAccount = await getDeletedAccountRecordByEmail(email, client);
+    const reopenedWithoutTrial = Boolean(deletedAccount);
+
     const result = await client.query(
-      `INSERT INTO users (id, email, password_hash, full_name, display_name, country, province, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-      RETURNING id, email, full_name, display_name`,
-      [crypto.randomUUID(), email, hashedPassword, fullName, displayName, country, province]
+      `INSERT INTO users (id, email, password_hash, full_name, display_name, country, province, trial_eligible, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+      RETURNING id, email, full_name, display_name, trial_eligible`,
+      [crypto.randomUUID(), email, hashedPassword, fullName, displayName, country, province, !reopenedWithoutTrial]
       );
 
     const newUserId = result.rows[0].id;
+
+    if (reopenedWithoutTrial) {
+      await markDeletedAccountReactivated(client, email, {
+        reopened_user_id: newUserId,
+        reopened_at: new Date().toISOString()
+      });
+    }
 
     // Quebec Privacy Default (Law 25): data sharing is opt-OUT by default for QC residents.
 // Terms/Privacy consent is required for registration. Marketing email consent is optional.
@@ -1069,7 +1083,10 @@ await client.query(
 
     return res.status(201).json({
       success: true,
-      message: "Account created. Check your email!",
+      message: reopenedWithoutTrial
+        ? "Account reopened. Check your email to continue. A new free trial is not available on reopened accounts."
+        : "Account created. Check your email!",
+      reactivated_without_trial: reopenedWithoutTrial,
       verification_state: createVerificationStatusToken(email),
       signup_bootstrap_token: createVerifiedSignupBootstrapToken({ id: newUserId, email }, req)
     });

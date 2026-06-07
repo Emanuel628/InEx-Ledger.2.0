@@ -58,6 +58,27 @@ function showSubToast(message) {
   subToastTimer = setTimeout(() => toast.classList.add("hidden"), SUB_TOAST_MS);
 }
 
+function resolveSafeNextPath(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized.startsWith("/") || normalized.startsWith("//") || /[\r\n]/.test(normalized)) {
+    return "/transactions";
+  }
+  return normalized;
+}
+
+function syncReactivationBanner() {
+  const banner = document.getElementById("subscriptionReactivationNotice");
+  const continueLink = document.getElementById("subscriptionReactivationContinue");
+  if (!banner) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const show = params.get("reactivated") === "1";
+  banner.classList.toggle("hidden", !show);
+  if (continueLink) {
+    continueLink.href = resolveSafeNextPath(params.get("next"));
+  }
+}
+
 function setBusinessDeleteError(message = "") {
   const errorNode = document.getElementById("subBusinessDeleteError");
   if (!errorNode) return;
@@ -1388,6 +1409,7 @@ function wireFreeTierModal() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  syncReactivationBanner();
   if (typeof requireValidSessionOrRedirect === "function") {
     await requireValidSessionOrRedirect();
   }

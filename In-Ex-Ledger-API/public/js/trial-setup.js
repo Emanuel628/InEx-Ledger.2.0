@@ -149,7 +149,7 @@
       lead.textContent = `Your business is set to fall back to Basic on ${ends}. You can still secure Pro billing now if you want uninterrupted access after the trial.`;
       return;
     }
-    lead.textContent = `Add your payment method now — you won't be charged until ${ends}. Cancel anytime before then and you owe nothing.`;
+    lead.textContent = `Add your payment method now - you won't be charged until ${ends}. Cancel anytime before then and you owe nothing.`;
   }
 
   function updateUi() {

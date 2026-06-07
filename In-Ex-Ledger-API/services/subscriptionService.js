@@ -33,6 +33,19 @@ function normalizeDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+async function isTrialEligibleForBusiness(db, businessId) {
+  const result = await db.query(
+    `SELECT COALESCE(u.trial_eligible, TRUE) AS trial_eligible
+       FROM businesses b
+       JOIN users u ON u.id = b.user_id
+      WHERE b.id = $1
+      LIMIT 1`,
+    [businessId]
+  );
+
+  return result.rows[0]?.trial_eligible !== false;
+}
+
 function resolvePastDueStartedAt(row) {
   const metadata = row?.metadata_json && typeof row.metadata_json === "object" ? row.metadata_json : {};
   return normalizeDate(metadata.past_due_started_at);
@@ -55,6 +68,7 @@ async function ensureBusinessSubscription(businessId) {
   }
 
   const now = new Date();
+  const trialEligible = await isTrialEligibleForBusiness(pool, businessId);
   const trialEndsAt = buildTrialEndsAt(now, DEFAULT_TRIAL_DAYS);
   const inserted = await pool.query(
     `INSERT INTO business_subscriptions (
@@ -68,10 +82,12 @@ async function ensureBusinessSubscription(businessId) {
         current_period_start,
         current_period_end
      )
-     VALUES ($1, $2, 'stripe', $3, 'trialing', $4, $5, $4, $5)
+     VALUES ($1, $2, 'stripe', $3, $4, $5, $6, $7, $8)
      ON CONFLICT (business_id) DO NOTHING
      RETURNING *`,
-    [crypto.randomUUID(), businessId, PLAN_V1, now, trialEndsAt]
+    trialEligible
+      ? [crypto.randomUUID(), businessId, PLAN_V1, "trialing", now, trialEndsAt, now, trialEndsAt]
+      : [crypto.randomUUID(), businessId, PLAN_FREE, "free", null, null, null, null]
   );
 
   if (inserted.rowCount) {

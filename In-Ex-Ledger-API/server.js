@@ -59,7 +59,15 @@ const LEGACY_HTML_REDIRECTS = new Map([
   ['/html/sessions.html', '/sessions'],
   ['/sessions.html', '/sessions'],
   ['/html/mfa.html', '/settings#settings-security'],
-  ['/mfa.html', '/settings#settings-security']
+  ['/mfa.html', '/settings#settings-security'],
+  ['/business-settings-cpa', '/settings'],
+  ['/html/business-settings-cpa', '/settings'],
+  ['/html/business-settings-cpa.html', '/settings'],
+  ['/business-settings-cpa.html', '/settings'],
+  ['/compliance-dashboard', '/settings'],
+  ['/html/compliance-dashboard', '/settings'],
+  ['/html/compliance-dashboard.html', '/settings'],
+  ['/compliance-dashboard.html', '/settings']
 ]);
 const INDEXABLE_PUBLIC_PAGES = new Set([
   "landing",

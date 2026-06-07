@@ -103,8 +103,8 @@ function loadMeRouterFixture(options = {}) {
                 if (/^BEGIN$/i.test(sql) || /^COMMIT$/i.test(sql) || /^ROLLBACK$/i.test(sql)) {
                   return { rows: [], rowCount: 0 };
                 }
-                if (/SELECT onboarding_completed FROM users WHERE id = \$1 FOR UPDATE/i.test(sql)) {
-                  return { rows: [{ onboarding_completed: false }], rowCount: 1 };
+                if (/SELECT onboarding_completed,\s*trial_eligible FROM users WHERE id = \$1 FOR UPDATE/i.test(sql)) {
+                  return { rows: [{ onboarding_completed: false, trial_eligible: true }], rowCount: 1 };
                 }
                 if (/UPDATE businesses/i.test(sql)) {
                   return { rows: [], rowCount: 1 };
@@ -278,7 +278,7 @@ test("PUT /api/me/onboarding creates a starter account when the business has non
     assert.deepEqual(fixture.state.resolvedOptions[0], { seedDefaults: false });
 
     const txSql = fixture.state.txQueries.map((entry) => entry.sql);
-    const lockSql = txSql.find((sql) => /SELECT onboarding_completed FROM users WHERE id = \$1 FOR UPDATE/i.test(sql));
+    const lockSql = txSql.find((sql) => /SELECT onboarding_completed,\s*trial_eligible FROM users WHERE id = \$1 FOR UPDATE/i.test(sql));
     const existingIdx = txSql.findIndex((sql) => /SELECT id FROM accounts WHERE business_id = \$1 LIMIT 1/i.test(sql));
     const insertIdx = txSql.findIndex((sql) => /INSERT INTO accounts/i.test(sql));
     assert.ok(lockSql, "onboarding should lock the user row before mutating starter-account state");

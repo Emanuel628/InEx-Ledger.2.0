@@ -32,6 +32,36 @@
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.07);
 }
 
+.subscription-reactivation-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  padding: 22px 24px;
+  border: 1px solid rgba(14, 116, 144, 0.18);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.15), transparent 34%),
+    linear-gradient(135deg, rgba(239, 246, 255, 0.96), rgba(248, 250, 252, 0.98));
+  box-shadow: 0 16px 38px rgba(14, 116, 144, 0.10);
+}
+
+.subscription-reactivation-banner h2 {
+  margin: 8px 0 8px;
+  color: #0f172a;
+  font-size: clamp(26px, 3vw, 38px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.subscription-reactivation-banner p {
+  margin: 0;
+  max-width: 720px;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
 .subscription-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -808,6 +838,7 @@
   .subscription-grid-bottom,
   .subscription-plan-layout,
   .subscription-history-link-panel,
+  .subscription-reactivation-banner,
   .sub-access-overview {
     grid-template-columns: 1fr !important;
   }
@@ -839,6 +870,10 @@
   }
 
   .subscription-page-header {
+    grid-template-columns: 1fr;
+  }
+
+  .subscription-reactivation-banner {
     grid-template-columns: 1fr;
   }
 

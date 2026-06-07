@@ -477,7 +477,7 @@ router.post("/history", exportGrantLimiter, async (req, res) => {
     const format = String(req.body?.format || "").toLowerCase();
     const dateRange = validateDateRange(req.body);
     const language = String(req.body?.language || "en").toLowerCase();
-    const scope = req.body?.scope === "all" ? "all" : "active";
+    const scope = "active";
     const filename = String(req.body?.filename || "").trim();
     const batchMode = req.body?.batchMode === true;
 

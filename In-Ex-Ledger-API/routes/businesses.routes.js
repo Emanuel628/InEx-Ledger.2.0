@@ -515,11 +515,7 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
   ? material_participation
   : current.material_participation;
   
-  if (!resolvedAccountingMethod) {
-    return { error: "accounting_method is required." };
-  }
-  
-  if (!VALID_ACCOUNTING_METHODS.has(resolvedAccountingMethod)) {
+  if (resolvedAccountingMethod && !VALID_ACCOUNTING_METHODS.has(resolvedAccountingMethod)) {
     return { error: "accounting_method must be 'cash' or 'accrual'" };
   }
   
@@ -587,7 +583,7 @@ async function updateOwnedBusinessProfile(userId, businessId, payload = {}) {
       Object.prototype.hasOwnProperty.call(payload, "business_activity_code")
         ? normalizeOptionalTrimmedString(business_activity_code)
         : current.business_activity_code,
-      resolvedAccountingMethod,
+      resolvedAccountingMethod || null,
       resolvedMaterialParticipation,
       resolvedRegion === "CA" ? resolvedGstRegistered : false,
       resolvedRegion === "CA" && resolvedGstRegistered

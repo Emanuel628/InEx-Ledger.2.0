@@ -17,6 +17,7 @@ const {
   listAuditEventsForUser,
   recordAuditEventForRequest
 } = require("../services/auditEventService.js");
+const { upsertDeletedAccountRecord } = require("../services/deletedAccountService.js");
 
 const router = express.Router();
 
@@ -63,6 +64,14 @@ function buildTrialSetupRedirect(nextPath = "/transactions") {
     return "/trial-setup";
   }
   return `/trial-setup?next=${encodeURIComponent(normalized)}`;
+}
+
+function buildReactivationRedirect(nextPath = "/transactions") {
+  const normalized = String(nextPath || "/transactions").trim();
+  if (!normalized.startsWith("/") || normalized.startsWith("//") || /[\r\n]/.test(normalized)) {
+    return "/subscription?reactivated=1";
+  }
+  return `/subscription?reactivated=1&next=${encodeURIComponent(normalized)}`;
 }
 
 function shouldRedirectToTrialSetup(subscription) {
@@ -322,8 +331,9 @@ router.put("/onboarding", async (req, res) => {
   const region = String(req.body?.region || "").trim().toUpperCase();
   const province = String(req.body?.province || "").trim().toUpperCase();
   const businessActivityCode = String(req.body?.business_activity_code || "").trim();
-  const rawAccountingMethod = String(req.body?.accounting_method || "").trim().toLowerCase();
-  const accountingMethod = VALID_ACCOUNTING_METHODS.has(rawAccountingMethod) ? rawAccountingMethod : "cash";
+  const rawAccountingMethod = normalizeOptionalTrimmedString(
+    String(req.body?.accounting_method || "").trim().toLowerCase()
+  );
   const rawMaterialParticipation = String(req.body?.material_participation || "").trim().toLowerCase();
   const materialParticipation = VALID_MATERIAL_PARTICIPATION.has(rawMaterialParticipation) ? rawMaterialParticipation : "yes";
   const language = String(req.body?.language || "").trim();
@@ -352,9 +362,13 @@ router.put("/onboarding", async (req, res) => {
   if (businessActivityCode && !BUSINESS_ACTIVITY_CODE_PATTERN.test(businessActivityCode)) {
     return res.status(400).json({ error: "Business activity code must be exactly 6 digits." });
   }
+  if (rawAccountingMethod && !VALID_ACCOUNTING_METHODS.has(rawAccountingMethod)) {
+    return res.status(400).json({ error: "Accounting method must be 'cash' or 'accrual'." });
+  }
   if (starterAccountName?.error) {
     return res.status(400).json({ error: `Starter account name ${starterAccountName.error}` });
   }
+  const accountingMethod = rawAccountingMethod || null;
   try {
     const businessId = await resolveBusinessIdForUser(req.user, { seedDefaults: false });
     const client = await pool.connect();
@@ -363,10 +377,11 @@ router.put("/onboarding", async (req, res) => {
       await client.query("BEGIN");
 
       const currentUser = await client.query(
-        "SELECT onboarding_completed FROM users WHERE id = $1 FOR UPDATE",
+        "SELECT onboarding_completed, trial_eligible FROM users WHERE id = $1 FOR UPDATE",
         [req.user.id]
       );
       const alreadyCompleted = !!currentUser.rows[0]?.onboarding_completed;
+      const trialEligible = currentUser.rows[0]?.trial_eligible !== false;
       const normalizedStarterAccountType = VALID_STARTER_ACCOUNT_TYPES.has(starterAccountType)
         ? starterAccountType
         : "checking";
@@ -430,7 +445,7 @@ router.put("/onboarding", async (req, res) => {
         region,
         province: region === "CA" ? province : "",
         business_activity_code: businessActivityCode,
-        accounting_method: accountingMethod,
+        accounting_method: accountingMethod || "",
         material_participation: materialParticipation,
         language,
         recommended_categories: onboardingRecommendations.recommended_categories,
@@ -456,9 +471,12 @@ router.put("/onboarding", async (req, res) => {
         id: req.user.id,
         business_id: businessId
       });
-      const redirectTo = shouldRedirectToTrialSetup(subscription)
-        ? buildTrialSetupRedirect(`/${normalizedStartFocus}`)
-        : `/${normalizedStartFocus}`;
+      let redirectTo = `/${normalizedStartFocus}`;
+      if (!trialEligible && !subscription?.isPaid && !subscription?.isTrialing) {
+        redirectTo = buildReactivationRedirect(`/${normalizedStartFocus}`);
+      } else if (shouldRedirectToTrialSetup(subscription)) {
+        redirectTo = buildTrialSetupRedirect(`/${normalizedStartFocus}`);
+      }
 
       await recordAuditEventForRequest(pool, req, {
         action: AUDIT_ACTIONS.ONBOARDING_COMPLETED,
@@ -470,7 +488,8 @@ router.put("/onboarding", async (req, res) => {
           startFocus: normalizedStartFocus,
           starterAccountType: normalizedStarterAccountType,
           firstCompletion: !alreadyCompleted,
-          redirectedToTrialSetup: redirectTo.startsWith("/trial-setup")
+          redirectedToTrialSetup: redirectTo.startsWith("/trial-setup"),
+          redirectedToReactivationBilling: redirectTo.startsWith("/subscription?reactivated=1")
         }
       });
 
@@ -740,7 +759,7 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
     }
 
     const userResult = await client.query(
-      "SELECT id, email, password_hash, mfa_enabled FROM users WHERE id = $1 LIMIT 1",
+      "SELECT id, email, full_name, country, province, password_hash, mfa_enabled FROM users WHERE id = $1 LIMIT 1",
       [req.user.id]
     );
     if (!userResult.rowCount) {
@@ -828,6 +847,34 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
       [req.user.id]
     );
     const businessIds = businessesResult.rows.map((row) => row.id);
+    let hadTrial = false;
+    let hadPaidSubscription = false;
+
+    if (businessIds.length) {
+      const subscriptionHistory = await client.query(
+        `SELECT COALESCE(BOOL_OR(status = 'trialing' OR trial_started_at IS NOT NULL), FALSE) AS had_trial,
+                COALESCE(BOOL_OR(plan_code = 'v1' AND status IN ('active', 'past_due', 'unpaid', 'canceled')), FALSE) AS had_paid
+           FROM business_subscriptions
+          WHERE business_id = ANY($1::uuid[])`,
+        [businessIds]
+      );
+      hadTrial = subscriptionHistory.rows[0]?.had_trial === true;
+      hadPaidSubscription = subscriptionHistory.rows[0]?.had_paid === true;
+    }
+
+    await upsertDeletedAccountRecord(client, {
+      email: userResult.rows[0].email,
+      fullName: userResult.rows[0].full_name || null,
+      country: userResult.rows[0].country || null,
+      province: userResult.rows[0].province || null,
+      hadTrial,
+      hadPaidSubscription,
+      deletedAt: new Date().toISOString(),
+      metadata: {
+        deleted_user_id: req.user.id,
+        deleted_business_count: businessIds.length
+      }
+    });
 
     await client.query(
       `INSERT INTO user_action_audit_log

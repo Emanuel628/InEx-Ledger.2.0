@@ -207,11 +207,8 @@ router.put("/", async (req, res) => {
     }
 
     const resolvedAccountingMethod = ('accounting_method' in body)
-      ? String(body.accounting_method || "").toLowerCase()
+      ? normalizeOptionalTrimmedString(String(body.accounting_method || "").toLowerCase())
       : current.accounting_method;
-    if (!resolvedAccountingMethod) {
-      return res.status(400).json({ error: "accounting_method is required." });
-    }
 
     const resolvedContactFullName = ('contact_full_name' in body)
       ? normalizeOptionalTrimmedString(body.contact_full_name)
@@ -255,7 +252,7 @@ router.put("/", async (req, res) => {
       business_activity_code: 'business_activity_code' in body
         ? normalizeOptionalTrimmedString(body.business_activity_code)
         : current.business_activity_code,
-      accounting_method: resolvedAccountingMethod,
+      accounting_method: resolvedAccountingMethod || null,
       material_participation: resolvedMaterialParticipation,
       gst_hst_registered: resolvedGstHstRegistered,
       gst_hst_number: region === "CA" ? resolvedGstHstNumber : null,
