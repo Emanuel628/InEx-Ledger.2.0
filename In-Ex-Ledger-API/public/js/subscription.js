@@ -79,6 +79,102 @@ function fmtAmount(amount, currency) {
   }
 }
 
+function fmtMoney(amount, currency) {
+  const normalizedCurrency = String(currency || "usd").toLowerCase();
+  const numericAmount = Number(amount || 0);
+  if (!Number.isFinite(numericAmount)) return "-";
+
+  if (window.billingPricing && typeof window.billingPricing.formatMoney === "function") {
+    return window.billingPricing.formatMoney(normalizedCurrency, numericAmount);
+  }
+
+  try {
+    return new Intl.NumberFormat(normalizedCurrency === "cad" ? "en-CA" : "en-US", {
+      style: "currency",
+      currency: normalizedCurrency.toUpperCase(),
+      minimumFractionDigits: Number.isInteger(numericAmount) ? 0 : 2,
+      maximumFractionDigits: 2
+    }).format(numericAmount);
+  } catch (_) {
+    return `${normalizedCurrency.toUpperCase()} ${numericAmount.toFixed(2)}`;
+  }
+}
+
+function normalizeBillingCurrency(currency) {
+  const normalized = String(currency || "usd").trim().toLowerCase();
+  return normalized === "cad" ? "cad" : "usd";
+}
+
+function normalizeBillingInterval(interval) {
+  const normalized = String(interval || "monthly").trim().toLowerCase();
+  return normalized === "yearly" ? "yearly" : "monthly";
+}
+
+function resolvePricingTable(currency, interval) {
+  const normalizedCurrency = normalizeBillingCurrency(currency);
+  const normalizedInterval = normalizeBillingInterval(interval);
+
+  if (currentBillingPricing?.pricing?.[normalizedInterval]) {
+    const serverPricing = currentBillingPricing.pricing[normalizedInterval];
+    const base = Number(serverPricing?.base);
+    const addon = Number(serverPricing?.addon);
+    if (Number.isFinite(base) && Number.isFinite(addon)) {
+      return { base, addon };
+    }
+  }
+
+  if (window.billingPricing && typeof window.billingPricing.getPricing === "function") {
+    const sharedPricing = window.billingPricing.getPricing(normalizedCurrency, normalizedInterval);
+    const base = Number(sharedPricing?.base);
+    const addon = Number(sharedPricing?.addon);
+    if (Number.isFinite(base) && Number.isFinite(addon)) {
+      return { base, addon };
+    }
+  }
+
+  const fallbackTable = {
+    usd: {
+      monthly: { base: 12, addon: 5 },
+      yearly: { base: 122.4, addon: 51 }
+    },
+    cad: {
+      monthly: { base: 17, addon: 7 },
+      yearly: { base: 175, addon: 72 }
+    }
+  };
+  return fallbackTable[normalizedCurrency][normalizedInterval];
+}
+
+function getSubscriptionPriceSummary(sub, overrides = {}) {
+  const source = sub && typeof sub === "object" ? sub : {};
+  const currency = normalizeBillingCurrency(overrides.currency || source.currency || currentBillingPricing?.currency || "usd");
+  const billingInterval = normalizeBillingInterval(overrides.billingInterval || source.billingInterval || "monthly");
+  const additionalBusinesses = Math.max(
+    Number.isFinite(Number(overrides.additionalBusinesses))
+      ? Number(overrides.additionalBusinesses)
+      : Number(source.additionalBusinesses || 0),
+    0
+  );
+  const pricing = resolvePricingTable(currency, billingInterval);
+  const cycleBase = Number(pricing?.base || 0);
+  const cycleAddonUnit = Number(pricing?.addon || 0);
+  const cycleAddonTotal = cycleAddonUnit * additionalBusinesses;
+  const cycleTotal = cycleBase + cycleAddonTotal;
+  const divisor = billingInterval === "yearly" ? 12 : 1;
+
+  return {
+    currency,
+    billingInterval,
+    additionalBusinesses,
+    basePrice: cycleBase,
+    addonUnitPrice: cycleAddonUnit,
+    addonCycleTotal: cycleAddonTotal,
+    cycleTotal,
+    monthlyEquivalent: cycleTotal / divisor,
+    addonMonthlyEquivalent: cycleAddonUnit / divisor
+  };
+}
+
 function isAllowedBillingRedirect(url) {
   if (!url) return false;
   try {
