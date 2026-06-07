@@ -163,6 +163,10 @@ function enhanceCategoriesPageShell() {
     </div>
   `;
   dashboard.after(toolbar);
+  const searchIcon = toolbar.querySelector(".category-search-wrap span[aria-hidden='true']");
+  if (searchIcon) {
+    searchIcon.innerHTML = "&#8981;";
+  }
 
   const consoleWrap = document.createElement("section");
   consoleWrap.className = "category-console";

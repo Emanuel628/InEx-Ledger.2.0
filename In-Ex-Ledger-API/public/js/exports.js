@@ -293,6 +293,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
   if (typeof enforceTrial === "function") enforceTrial();
 
+  normalizeExportStaticText();
   initExportCollapsibleSections();
   await hydrateBusinessList();
   initExportScopeSelect();
@@ -311,6 +312,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   await refreshExportReviewQueue();
   renderExportHistory();
 });
+
+function normalizeExportStaticText() {
+  const taxIdHint = document.querySelector(".export-taxid-ephemeral-hint");
+  if (taxIdHint) {
+    taxIdHint.innerHTML = "&#x1F512; Not stored &mdash; processed in-memory only, never saved to your records.";
+  }
+}
 
 function setExportSectionCollapsed(section, collapsed) {
   if (!section) {
