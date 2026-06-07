@@ -5320,7 +5320,7 @@ Object.assign(TRANSLATIONS.fr, {
   onboarding_business_address_placeholder: 'Rue, ville, état/province, code postal, pays',
   onboarding_error_accounting_method: 'Choisissez une méthode comptable avant de continuer.',
   onboarding_error_activity_code: 'Entrez votre code d’activité avant de continuer.',
-  onboarding_error_activity_code_format: 'Entrez un code d�activité à 6 chiffres avant de continuer.',
+  onboarding_error_activity_code_format: 'Entrez un code d’activité à 6 chiffres avant de continuer.',
   onboarding_error_business_address: 'Entrez l’adresse de l’entreprise avant de continuer.',
   onboarding_error_material_participation: 'Indiquez si vous participez activement à cette entreprise avant de continuer.',
   onboarding_help_label: 'Besoin d’aide?',
