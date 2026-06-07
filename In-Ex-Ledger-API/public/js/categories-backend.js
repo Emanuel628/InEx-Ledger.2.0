@@ -150,7 +150,7 @@ function enhanceCategoriesPageShell() {
   toolbar.className = "category-toolbar";
   toolbar.setAttribute("aria-label", "Category tools");
   toolbar.innerHTML = `
-    <label class="category-search-wrap" for="categorySearchInput"><span aria-hidden="true">⌕</span><input id="categorySearchInput" type="search" placeholder="Search categories" autocomplete="off" /></label>
+    <label class="category-search-wrap" for="categorySearchInput"><span aria-hidden="true">&#8981;</span><input id="categorySearchInput" type="search" placeholder="Search categories" autocomplete="off" /></label>
     <div class="category-toolbar-actions">
       <div class="category-filter-row">
         <button type="button" class="category-filter-chip is-active" data-category-filter="all">All</button>
@@ -163,10 +163,6 @@ function enhanceCategoriesPageShell() {
     </div>
   `;
   dashboard.after(toolbar);
-  const searchIcon = toolbar.querySelector(".category-search-wrap span[aria-hidden='true']");
-  if (searchIcon) {
-    searchIcon.innerHTML = "&#8981;";
-  }
 
   const consoleWrap = document.createElement("section");
   consoleWrap.className = "category-console";

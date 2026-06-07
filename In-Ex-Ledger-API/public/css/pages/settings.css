@@ -1416,16 +1416,18 @@ select.is-export-profile-missing {
 }
 
 .security-show-password {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
   margin-top: 10px;
   font-size: 13px;
-  width: fit-content;
-  max-width: 100%;
+  width: 100%;
+  max-width: none;
   color: var(--ink2);
   cursor: pointer;
   white-space: nowrap;
+  text-align: left;
 }
 
 .security-show-password input {
@@ -1434,8 +1436,10 @@ select.is-export-profile-missing {
 }
 
 .security-show-password span {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 #securitySaveButton {
