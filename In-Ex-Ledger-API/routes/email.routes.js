@@ -336,10 +336,24 @@ function rawBodyUtf8(req) {
   return "";
 }
 
+function resolveInboundWebhookSecrets() {
+  const rawValues = [
+    process.env.INBOUND_EMAIL_WEBHOOK_SECRET,
+    process.env.SUPPORT_INBOUND_WEBHOOK_SECRET
+  ];
+
+  return [...new Set(
+    rawValues
+      .flatMap((value) => String(value || "").split(","))
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+  )];
+}
+
 function verifyInboundEmailRequest(req, nowMs = Date.now()) {
-  const secret = String(process.env.INBOUND_EMAIL_WEBHOOK_SECRET || "").trim();
-  
-  if (!secret) {
+  const secrets = resolveInboundWebhookSecrets();
+
+  if (!secrets.length) {
     return { ok: false, status: 503, error: "Inbound email webhook is not configured." };
   }
 
@@ -365,7 +379,10 @@ function verifyInboundEmailRequest(req, nowMs = Date.now()) {
       return { ok: false, status: 401, error: "Webhook timestamp outside tolerance window." };
     }
 
-    if (!verifySvixSignature(secret, svixId, svixTimestamp, svixSignature, rawBody)) {
+    const signatureValid = secrets.some((secret) =>
+      verifySvixSignature(secret, svixId, svixTimestamp, svixSignature, rawBody)
+    );
+    if (!signatureValid) {
       return { ok: false, status: 401, error: "Invalid webhook signature." };
     }
 
@@ -390,8 +407,11 @@ function verifyInboundEmailRequest(req, nowMs = Date.now()) {
       return { ok: false, status: 401, error: "Webhook timestamp outside tolerance window." };
     }
 
-    const expectedSignature = computeInboundSignature(secret, timestampHeader, rawBody);
-    if (!timingSafeHexEqual(signatureHeader, expectedSignature)) {
+    const signatureValid = secrets.some((secret) => {
+      const expectedSignature = computeInboundSignature(secret, timestampHeader, rawBody);
+      return timingSafeHexEqual(signatureHeader, expectedSignature);
+    });
+    if (!signatureValid) {
       return { ok: false, status: 401, error: "Invalid webhook signature." };
     }
 
@@ -403,7 +423,8 @@ function verifyInboundEmailRequest(req, nowMs = Date.now()) {
   } else if (allowLegacyFallback && legacySecretHeader) {
     // Dev-only fallback: pre-signing clients (local scripts, manual smoke
     // tests) may still send the static secret. Never accepted in production.
-    if (!timingSafeStringEqual(legacySecretHeader, secret)) {
+    const secretMatched = secrets.some((secret) => timingSafeStringEqual(legacySecretHeader, secret));
+    if (!secretMatched) {
       return { ok: false, status: 401, error: "Invalid webhook secret." };
     }
   } else {

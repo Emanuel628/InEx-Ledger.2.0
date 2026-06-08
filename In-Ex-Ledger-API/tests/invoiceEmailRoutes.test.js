@@ -115,7 +115,9 @@ test("POST /api/invoices-v1/:id/send rejects invalid UUID (400)", async () => {
 
 test("POST /api/email/inbound returns 503 when webhook secret is not configured", async () => {
   const before = process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+  const beforeSupport = process.env.SUPPORT_INBOUND_WEBHOOK_SECRET;
   delete process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+  delete process.env.SUPPORT_INBOUND_WEBHOOK_SECRET;
   try {
     const app = buildInboundApp();
     const res = await sendSignedInbound(app, { from: { email: "client@example.com" }, subject: "hi", text: "yo" });
@@ -123,6 +125,31 @@ test("POST /api/email/inbound returns 503 when webhook secret is not configured"
   } finally {
     if (before === undefined) delete process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
     else process.env.INBOUND_EMAIL_WEBHOOK_SECRET = before;
+    if (beforeSupport === undefined) delete process.env.SUPPORT_INBOUND_WEBHOOK_SECRET;
+    else process.env.SUPPORT_INBOUND_WEBHOOK_SECRET = beforeSupport;
+  }
+});
+
+test("POST /api/email/inbound accepts SUPPORT_INBOUND_WEBHOOK_SECRET as a fallback", async () => {
+  const before = process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+  const beforeSupport = process.env.SUPPORT_INBOUND_WEBHOOK_SECRET;
+  delete process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+  process.env.SUPPORT_INBOUND_WEBHOOK_SECRET = INBOUND_SECRET;
+  try {
+    const app = buildInboundApp();
+    const res = await sendSignedInbound(app, {
+      from: { email: "client@example.com" },
+      subject: "hi",
+      text: "yo"
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.ok, true);
+    assert.equal(res.body.ignored, "no_recipients");
+  } finally {
+    if (before === undefined) delete process.env.INBOUND_EMAIL_WEBHOOK_SECRET;
+    else process.env.INBOUND_EMAIL_WEBHOOK_SECRET = before;
+    if (beforeSupport === undefined) delete process.env.SUPPORT_INBOUND_WEBHOOK_SECRET;
+    else process.env.SUPPORT_INBOUND_WEBHOOK_SECRET = beforeSupport;
   }
 });
 
