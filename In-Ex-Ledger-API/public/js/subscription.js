@@ -275,7 +275,7 @@ function buildStatusPanelMarkup(sub) {
     <div class="sub-status-spotlight">
       <div class="sub-status-spotlight-top">
         <span class="sub-status-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>
-        <span class="sub-status-plan-pill">${escapeHtml(planLabel)}</span>
+        <span class="sub-status-plan-pill">${escapeHtml(currentPlanLabel)}</span>
       </div>
       <h2 class="sub-status-headline">${escapeHtml(headline)}</h2>
       <p class="sub-status-copy">${escapeHtml(detail)}</p>
