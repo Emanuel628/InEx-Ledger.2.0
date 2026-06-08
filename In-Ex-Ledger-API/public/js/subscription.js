@@ -258,13 +258,18 @@ function buildStatusPanelMarkup(sub) {
   const billingIntervalLabel = sub.billingInterval === "yearly" ? "Yearly" : "Monthly";
   const currencyLabel = String(sub.currency || "usd").toUpperCase();
   const planLabel = sub.isTrialing ? "Pro trial" : sub.effectiveTier === "v1" ? "Pro" : "Basic";
+  const currentPlanLabel = sub.isTrialing
+    ? "Pro trial"
+    : sub.effectiveTier === "v1"
+      ? `${planLabel} ${billingIntervalLabel}`
+      : planLabel;
   const pricingSummary = getSubscriptionPriceSummary(sub);
   const monthlyTotalLabel = fmtMoney(pricingSummary.monthlyEquivalent, pricingSummary.currency);
   const isCanceled = Boolean(sub.cancelAtPeriodEnd || sub.isCanceledWithRemainingAccess);
   const statusValue = isCanceled ? "Canceled" : "Active";
   const statusMeta = isCanceled
     ? "Reactivate below to restore paid access."
-    : `${planLabel}${sub.effectiveTier === "v1" ? ` ${billingIntervalLabel.toLowerCase()}` : ""}`;
+    : `${currentPlanLabel}`;
 
   return `
     <div class="sub-status-spotlight">
@@ -276,8 +281,8 @@ function buildStatusPanelMarkup(sub) {
       <p class="sub-status-copy">${escapeHtml(detail)}</p>
       <div class="sub-status-stats">
         <article class="sub-status-stat-card">
-          <span class="sub-status-stat-label">Billing cycle</span>
-          <strong class="sub-status-stat-value">${escapeHtml(billingIntervalLabel)}</strong>
+          <span class="sub-status-stat-label">Current plan</span>
+          <strong class="sub-status-stat-value">${escapeHtml(currentPlanLabel)}</strong>
           <span class="sub-status-stat-meta">${escapeHtml(currencyLabel)} pricing</span>
         </article>
         <article class="sub-status-stat-card">
