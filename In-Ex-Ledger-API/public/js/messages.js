@@ -58,6 +58,13 @@ function isEmail(value) {
   return typeof value === "string" && EMAIL_RE.test(String(value).trim());
 }
 
+function parseEmailList(value) {
+  return String(value || "")
+    .split(/[;,]/)
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 function translate(key, fallback = "") {
   return typeof t === "function" ? t(key) : fallback;
 }
@@ -877,6 +884,16 @@ function openSupportComposer() {
 function resolveComposeRecipient(rawValue) {
   const value = String(rawValue || "").trim();
   if (!value) return { kind: "empty", value: "" };
+  const emails = parseEmailList(value);
+  if (emails.length > 1) {
+    if (emails.some((email) => email === SUPPORT_EMAIL.toLowerCase())) {
+      return { kind: "invalid", value };
+    }
+    if (emails.every((email) => isEmail(email))) {
+      return { kind: "external-list", value: emails };
+    }
+    return { kind: "invalid", value };
+  }
   if (value.toLowerCase() === SUPPORT_EMAIL.toLowerCase()) {
     return { kind: "support", value: SUPPORT_EMAIL };
   }
@@ -1015,12 +1032,12 @@ async function sendComposedMessage() {
   }
 
   try {
-    const response = recipient.kind === "external"
+    const response = recipient.kind === "external" || recipient.kind === "external-list"
       ? await apiFetch("/api/messages/send-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            to_email: recipient.value,
+            to_email: recipient.kind === "external-list" ? recipient.value : recipient.value,
             message_type: messageType,
             subject: subject || undefined,
             body
@@ -1223,3 +1240,4 @@ function showToast(message) {
   if (_toastTimer) clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => toast.classList.add("hidden"), TOAST_MS);
 }
+

@@ -131,6 +131,26 @@ function normalizeEmailAddress(value) {
   return email.replace(/[<>]/g, "").trim();
 }
 
+function normalizeRecipientList(value) {
+  const values = Array.isArray(value)
+    ? value
+    : String(value || "")
+        .split(/[;,]/)
+        .map((entry) => entry.trim());
+
+  const unique = [];
+  const seen = new Set();
+
+  for (const item of values) {
+    const email = normalizeEmailAddress(item).toLowerCase();
+    if (!email || !email.includes("@") || seen.has(email)) continue;
+    seen.add(email);
+    unique.push(email);
+  }
+
+  return unique;
+}
+
 function buildReplyToAddress(invoiceId) {
   const rawBase = getInvoiceReplyBaseEmail();
   if (!rawBase) return null;
@@ -280,6 +300,7 @@ function buildInvoiceEmailBody({ invoice, businessName, senderName, customMessag
 async function sendInvoiceEmail(resendClient, {
   invoice,
   recipientEmail,
+  ccEmails,
   businessName,
   senderName,
   customMessage
@@ -290,7 +311,10 @@ async function sendInvoiceEmail(resendClient, {
     err.code = "email_not_configured";
     throw err;
   }
-  if (!recipientEmail || typeof recipientEmail !== "string" || !recipientEmail.includes("@")) {
+  const toList = normalizeRecipientList(recipientEmail);
+  const ccList = normalizeRecipientList(ccEmails).filter((email) => !toList.includes(email));
+
+  if (!toList.length) {
     const err = new Error("recipient email is required and must be a valid address.");
     err.status = 400;
     throw err;
@@ -302,11 +326,15 @@ async function sendInvoiceEmail(resendClient, {
 
   const payload = {
   from: fromAddress,
-  to: recipientEmail,
+  to: toList,
   subject: body.subject,
   html: body.html,
   text: body.text
 };
+
+if (ccList.length) {
+  payload.cc = ccList;
+}
 
 if (replyTo) {
   const companyName = String(businessName || "InEx Ledger")
@@ -358,5 +386,5 @@ module.exports = {
   sendInvoiceEmail,
   getInvoiceFromEmail,
   getInvoiceReplyBaseEmail,
-  __private: { formatCurrency, escapeHtml }
+  __private: { formatCurrency, escapeHtml, normalizeRecipientList }
 };

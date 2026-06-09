@@ -204,13 +204,15 @@ test("sendInvoiceEmail passes from, to, subject, reply_to to the Resend client",
   }, async () => {
     const result = await sendInvoiceEmail(stub, {
       invoice: SAMPLE_INVOICE,
-      recipientEmail: "billing@acme.com",
+      recipientEmail: ["billing@acme.com", "owner@acme.com"],
+      ccEmails: ["bookkeeper@acme.com", "billing@acme.com"],
       businessName: "Sample Co",
       senderName: "Jane"
     });
     assert.equal(calls.length, 1);
     assert.equal(calls[0].from, "InEx <pay@inex.app>");
-    assert.equal(calls[0].to, "billing@acme.com");
+    assert.deepEqual(calls[0].to, ["billing@acme.com", "owner@acme.com"]);
+    assert.deepEqual(calls[0].cc, ["bookkeeper@acme.com"]);
     assert.ok(calls[0].subject.includes("INV-2026-0001"));
     assert.equal(
       calls[0].reply_to,

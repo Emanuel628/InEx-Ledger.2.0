@@ -249,7 +249,7 @@ test("messages send-email delivers to typed external recipients and stores the o
     const res = await request(fixture.app)
       .post("/api/messages/send-email")
       .send({
-        to_email: "client@example.com",
+        to_email: "client@example.com; second@example.com",
         message_type: "general",
         subject: "Brief Subject",
         body: "Thanks for reaching out."
@@ -257,11 +257,12 @@ test("messages send-email delivers to typed external recipients and stores the o
 
     assert.equal(res.status, 201);
     assert.equal(fixture.state.sentEmails.length, 1);
-    assert.equal(fixture.state.sentEmails[0].to, "client@example.com");
+    assert.deepEqual(fixture.state.sentEmails[0].to, ["client@example.com", "second@example.com"]);
     assert.match(String(fixture.state.sentEmails[0].reply_to || ""), /support\+s\.[0-9a-f]{32}\.[A-Za-z0-9_-]{16}@/i);
     assert.equal(fixture.state.insertedMessages.length, 1);
     assert.equal(fixture.state.auditCalls.length, 0);
     assert.match(fixture.state.insertedMessages[0].params[6], /client@example\.com/i);
+    assert.match(fixture.state.insertedMessages[0].params[6], /second@example\.com/i);
   } finally {
     fixture.cleanup();
     if (beforeApiKey === undefined) delete process.env.RESEND_API_KEY;
@@ -270,6 +271,27 @@ test("messages send-email delivers to typed external recipients and stores the o
     else process.env.SUPPORT_REPLY_BASE_EMAIL = beforeReplyBase;
     if (beforeReplySecret === undefined) delete process.env.SUPPORT_REPLY_HMAC_SECRET;
     else process.env.SUPPORT_REPLY_HMAC_SECRET = beforeReplySecret;
+  }
+});
+
+test("messages send-email rejects malformed email inside a recipient list", async () => {
+  const fixture = loadMessagesRouter();
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/messages/send-email")
+      .send({
+        to_email: "client@example.com, bad-address",
+        message_type: "general",
+        subject: "Brief Subject",
+        body: "Thanks for reaching out."
+      });
+
+    assert.equal(res.status, 400);
+    assert.match(String(res.body?.error || ""), /invalid recipient email/i);
+    assert.equal(fixture.state.sentEmails.length, 0);
+  } finally {
+    fixture.cleanup();
   }
 });
 

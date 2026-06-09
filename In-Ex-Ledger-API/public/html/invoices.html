@@ -162,7 +162,7 @@
           </div>
           <div class="form-field">
             <label for="invClientEmail" class="form-label">Client email</label>
-            <input id="invClientEmail" type="email" class="form-control" placeholder="client@example.com" />
+            <input id="invClientEmail" type="text" class="form-control" placeholder="client@example.com, billing@example.com" />
           </div>
           <div class="form-field">
             <label for="invIssueDate" class="form-label">Issue date <span class="required">*</span></label>
@@ -242,12 +242,16 @@
       </p>
       <div class="form-field">
         <label for="invoiceEmailTo" class="form-label">Recipient email</label>
-        <input type="email" id="invoiceEmailTo" class="form-control" placeholder="client@example.com" />
+        <input type="text" id="invoiceEmailTo" class="form-control" placeholder="client@example.com, billing@example.com" />
+      </div>
+      <div class="form-field">
+        <label for="invoiceEmailCc" class="form-label">CC (optional)</label>
+        <input type="text" id="invoiceEmailCc" class="form-control" placeholder="owner@example.com, bookkeeper@example.com" />
       </div>
       <div class="form-field">
         <label for="invoiceEmailMessage" class="form-label">Message (optional)</label>
         <textarea id="invoiceEmailMessage" class="form-control" rows="4"
-          placeholder="Hi — invoice attached, let me know if you have any questions."></textarea>
+          placeholder="Hi â€” invoice attached, let me know if you have any questions."></textarea>
       </div>
       <p id="invoiceEmailError" class="error-text" hidden></p>
       <p class="invoice-email-hint">
@@ -278,9 +282,10 @@
   <script src="/js/i18n.js?v=20260510f"></script>
   <script src="/js/auth.js?v=20260527c"></script>
   <script src="/js/trial.js?v=20260408a"></script>
-  <script src="/js/invoices.js?v=20260606b"></script>
+  <script src="/js/invoices.js?v=20260608b"></script>
 </body>
 </html>
+
 
 
 

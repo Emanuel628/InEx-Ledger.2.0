@@ -31,6 +31,31 @@ router.use(requireCsrfProtection);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const VALID_STATUSES = new Set(["draft", "sent", "paid", "void"]);
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+function parseEmailList(value) {
+  const values = Array.isArray(value)
+    ? value
+    : String(value || "")
+        .split(/[;,]/)
+        .map((entry) => entry.trim());
+
+  const normalized = [];
+  const seen = new Set();
+
+  for (const item of values) {
+    const email = String(item || "").trim().toLowerCase();
+    if (!email) continue;
+    if (!EMAIL_RE.test(email)) {
+      return { ok: false, invalid: email };
+    }
+    if (seen.has(email)) continue;
+    seen.add(email);
+    normalized.push(email);
+  }
+
+  return { ok: true, emails: normalized };
+}
 
 async function requireProPlan(businessId, res) {
   const sub = await getSubscriptionSnapshotForBusiness(businessId);
@@ -92,7 +117,7 @@ function validateInvoicePayload(body) {
     valid: true,
     normalized: {
       customer_name: String(customer_name).trim().slice(0, 200),
-      customer_email: String(body.customer_email || "").trim().slice(0, 200) || null,
+      customer_email: String(body.customer_email || "").trim().slice(0, 1000) || null,
       issue_date: String(issue_date).slice(0, 10),
       due_date: due_date ? String(due_date).slice(0, 10) : null,
       currency: rawCurrency,
@@ -337,11 +362,20 @@ router.post("/:id/send", async (req, res) => {
     if (!existing.rowCount) return res.status(404).json({ error: "Invoice not found." });
     const invoice = existing.rows[0];
 
-    const overrideEmail = String(req.body?.recipient_email || "").trim();
-    const recipientEmail = overrideEmail || invoice.customer_email;
-    if (!recipientEmail) {
+    const parsedTo = parseEmailList(req.body?.recipient_email || invoice.customer_email || "");
+    if (!parsedTo.ok) {
+      return res.status(400).json({ error: `Invalid recipient email: ${parsedTo.invalid}` });
+    }
+    if (!parsedTo.emails.length) {
       return res.status(400).json({ error: "Invoice has no customer email. Add one before sending." });
     }
+    const parsedCc = parseEmailList(req.body?.cc_emails || "");
+    if (!parsedCc.ok) {
+      return res.status(400).json({ error: `Invalid CC email: ${parsedCc.invalid}` });
+    }
+    const ccEmails = parsedCc.emails.filter((email) => !parsedTo.emails.includes(email));
+    const recipientEmail = parsedTo.emails.join(", ");
+    const ccEmailText = ccEmails.join(", ");
 
     const customMessage = String(req.body?.message || "").trim().slice(0, 2000) || null;
 
@@ -350,7 +384,8 @@ router.post("/:id/send", async (req, res) => {
     try {
       sendResult = await sendInvoiceEmail(resendClient, {
         invoice,
-        recipientEmail,
+        recipientEmail: parsedTo.emails,
+        ccEmails,
         businessName: invoice.business_name,
         senderName: req.user?.email || null,
         customMessage
@@ -370,6 +405,7 @@ router.post("/:id/send", async (req, res) => {
         details: [
           { label: "Invoice", value: invoice.invoice_number || "Invoice" },
           { label: "Recipient", value: recipientEmail },
+          ...(ccEmailText ? [{ label: "CC", value: ccEmailText }] : []),
           ...(err.message ? [{ label: "Issue", value: String(err.message).slice(0, 300) }] : [])
         ]
       });
@@ -398,8 +434,8 @@ router.post("/:id/send", async (req, res) => {
       [
         messageId,
         req.user.id,
-        `Invoice ${invoice.invoice_number} sent to ${recipientEmail}`,
-        customMessage || `Invoice ${invoice.invoice_number} was emailed to ${recipientEmail}.`,
+        `Invoice ${invoice.invoice_number} sent to ${recipientEmail}${ccEmailText ? ` (cc ${ccEmailText})` : ""}`,
+        customMessage || `Invoice ${invoice.invoice_number} was emailed to ${recipientEmail}${ccEmailText ? ` (cc ${ccEmailText})` : ""}.`,
         recipientEmail,
         invoice.customer_name || null,
         invoice.id
@@ -413,13 +449,15 @@ router.post("/:id/send", async (req, res) => {
       metadata: {
         invoice_id: invoice.id,
         recipient: recipientEmail,
+        cc: ccEmails,
         resend_id: sendResult?.data?.id || null
       }
     });
 
     logInfo("Invoice email sent", {
       invoiceId: invoice.id,
-      recipient: recipientEmail
+      recipient: recipientEmail,
+      cc: ccEmails
     });
     await sendInvoiceOwnerActivityEmail({
       businessId,
@@ -429,6 +467,7 @@ router.post("/:id/send", async (req, res) => {
       details: [
         { label: "Invoice", value: invoice.invoice_number || "Invoice" },
         { label: "Recipient", value: recipientEmail },
+        ...(ccEmailText ? [{ label: "CC", value: ccEmailText }] : []),
         { label: "Total", value: `${invoice.currency} ${Number(invoice.total_amount || 0).toFixed(2)}` }
       ]
     });
@@ -437,6 +476,7 @@ router.post("/:id/send", async (req, res) => {
       ok: true,
       message_id: messageId,
       recipient_email: recipientEmail,
+      cc_emails: ccEmails,
       resend_id: sendResult?.data?.id || null
     });
   } catch (err) {

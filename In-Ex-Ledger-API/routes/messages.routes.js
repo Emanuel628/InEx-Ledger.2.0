@@ -38,6 +38,30 @@ function isEmail(value) {
   return typeof value === "string" && EMAIL_RE.test(String(value).trim());
 }
 
+function parseEmailList(value) {
+  const values = Array.isArray(value)
+    ? value
+    : String(value || "")
+        .split(/[;,]/)
+        .map((entry) => entry.trim());
+
+  const emails = [];
+  const seen = new Set();
+
+  for (const item of values) {
+    const email = String(item || "").trim().toLowerCase();
+    if (!email) continue;
+    if (!isEmail(email)) {
+      return { ok: false, invalid: email };
+    }
+    if (seen.has(email)) continue;
+    seen.add(email);
+    emails.push(email);
+  }
+
+  return { ok: true, emails };
+}
+
 function getResendClient() {
   const key = String(process.env.RESEND_API_KEY || "").trim();
   if (!key) return null;
@@ -749,12 +773,15 @@ router.post("/support-email", async (req, res) => {
 
 router.post("/send-email", async (req, res) => {
   try {
-    const toEmail = String(req.body?.to_email || "").trim().toLowerCase();
+    const parsedTo = parseEmailList(req.body?.to_email);
     const messageType = String(req.body?.message_type || "general").trim();
     const subject = String(req.body?.subject || "Message from InEx Ledger").trim().slice(0, MAX_SUBJECT_LEN);
     const body = String(req.body?.body || "").trim().slice(0, MAX_BODY_LEN);
 
-    if (!isEmail(toEmail)) {
+    if (!parsedTo.ok) {
+      return res.status(400).json({ error: `Invalid recipient email: ${parsedTo.invalid}` });
+    }
+    if (!parsedTo.emails.length) {
       return res.status(400).json({ error: "A valid recipient email is required." });
     }
     if (!VALID_MESSAGE_TYPES.has(messageType)) {
@@ -806,7 +833,7 @@ router.post("/send-email", async (req, res) => {
 
     const payload = {
       from: supportFrom,
-      to: toEmail,
+      to: parsedTo.emails,
       subject,
       text,
       html
@@ -840,7 +867,7 @@ router.post("/send-email", async (req, res) => {
         messageType,
         subject || null,
         body,
-        toEmail,
+        parsedTo.emails.join(", "),
         accountName,
         sendResult?.data?.id || null
       ]
@@ -849,7 +876,7 @@ router.post("/send-email", async (req, res) => {
     res.status(201).json({
       ok: true,
       message_id: messageId,
-      to: toEmail,
+      to: parsedTo.emails,
       resend_id: sendResult?.data?.id || null
     });
   } catch (err) {

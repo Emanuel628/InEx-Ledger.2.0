@@ -1,4 +1,4 @@
-/* invoices.js — Pro-plan invoicing for InEx Ledger */
+/* invoices.js -- Pro-plan invoicing for InEx Ledger */
 
 let invoiceList = [];
 let activeInvoiceId = null;
@@ -62,6 +62,13 @@ async function loadInvoiceDefaults() {
 const STATUS_LABELS = { draft: "Draft", sent: "Sent", paid: "Paid", void: "Void" };
 const STATUS_CLASSES = { draft: "badge-draft", sent: "badge-sent", paid: "badge-paid", void: "badge-void" };
 
+function parseEmailList(value) {
+  return String(value || "")
+    .split(/[;,]/)
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 function fmtMoney(amount, currency) {
   const n = Number(amount) || 0;
   const locale = localeForRegion(invoiceRegion);
@@ -73,13 +80,13 @@ function fmtMoney(amount, currency) {
 }
 
 function fmtDate(value) {
-  if (!value) return "—";
+  if (!value) return "--";
 
   const raw = String(value);
   const dateOnly = raw.includes("T") ? raw.slice(0, 10) : raw;
   const d = new Date(`${dateOnly}T00:00:00`);
 
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "--";
 
   return d.toLocaleDateString("en-CA", {
     year: "numeric",
@@ -93,7 +100,7 @@ function isOverdue(invoice) {
   return new Date(invoice.due_date) < new Date();
 }
 
-/* ── Load & render ─────────────────────────────────────── */
+/* â”€â”€ Load & render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 async function loadInvoices() {
   try {
@@ -189,7 +196,7 @@ function renderInvoiceTable() {
   }).join("");
 }
 
-/* ── Invoice Panel (create/edit) ───────────────────────── */
+/* â”€â”€ Invoice Panel (create/edit) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function openInvoicePanel(invoiceId) {
   const panel = document.getElementById("invoicePanel");
@@ -420,7 +427,7 @@ async function sendInvoiceAfterSave(invoice) {
     throw new Error("Invoice was saved, but no invoice ID was returned.");
   }
 
-  if (!recipient || !recipient.includes("@")) {
+  if (!parseEmailList(recipient).length) {
     throw new Error("Invoice was saved, but no valid customer email was found.");
   }
 
@@ -491,7 +498,7 @@ async function restoreInvoice(id) {
   }
 }
 
-/* ── Event wiring ──────────────────────────────────────── */
+/* â”€â”€ Event wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
@@ -628,7 +635,7 @@ document.getElementById(activeSidebarId)?.classList.add("is-active");
   });
 });
 
-/* ── Email invoice modal ─────────────────────────────────── */
+/* â”€â”€ Email invoice modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 let pendingEmailInvoiceId = null;
 
@@ -641,6 +648,7 @@ function openEmailModal(invoiceId) {
   document.getElementById("invoiceEmailNumber").textContent = inv.invoice_number || "";
   document.getElementById("invoiceEmailCustomer").textContent = inv.customer_name || "";
   document.getElementById("invoiceEmailTo").value = inv.customer_email || "";
+  document.getElementById("invoiceEmailCc").value = "";
   document.getElementById("invoiceEmailMessage").value = "";
   document.getElementById("invoiceEmailError").hidden = true;
   modal.classList.remove("hidden");
@@ -651,24 +659,29 @@ async function submitInvoiceEmail() {
   const id = pendingEmailInvoiceId;
   if (!id) return;
   const recipient = String(document.getElementById("invoiceEmailTo").value || "").trim();
+  const ccRecipients = String(document.getElementById("invoiceEmailCc").value || "").trim();
   const customMessage = String(document.getElementById("invoiceEmailMessage").value || "").trim();
   const errorEl = document.getElementById("invoiceEmailError");
   const sendBtn = document.getElementById("invoiceEmailSend");
   errorEl.hidden = true;
 
-  if (!recipient || !recipient.includes("@")) {
-    errorEl.textContent = "Please enter a valid recipient email address.";
+  if (!parseEmailList(recipient).length) {
+    errorEl.textContent = "Please enter at least one valid recipient email address.";
     errorEl.hidden = false;
     return;
   }
 
   sendBtn.disabled = true;
-  sendBtn.textContent = "Sending…";
+  sendBtn.textContent = "Sending...";
   try {
     const res = await apiFetch(`/api/invoices-v1/${id}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ recipient_email: recipient, message: customMessage || undefined })
+      body: JSON.stringify({
+        recipient_email: recipient,
+        cc_emails: ccRecipients || undefined,
+        message: customMessage || undefined
+      })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -687,3 +700,4 @@ async function submitInvoiceEmail() {
     sendBtn.textContent = "Send email";
   }
 }
+
