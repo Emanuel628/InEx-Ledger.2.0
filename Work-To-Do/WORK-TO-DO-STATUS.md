@@ -262,32 +262,83 @@ Note: a few items in this memo were always documentation/legal-operational and d
 
 ---
 
+## `Docs/SECURITY_AUDIT_2026-06-10.md`
+
+Status: INCOMPLETE / HIGH PRIORITY. The app is not in crisis, but it is not yet at enterprise/security-review standard. The remaining risk is concentrated in a few structural areas.
+
+Highest-priority engineering items from the audit:
+
+1. INCOMPLETE - Replace browser-readable bearer-token storage.
+   - Risk: `public/js/auth.js` stores the access token in `sessionStorage`, and other frontend files read/send it directly.
+   - Owner files: `In-Ex-Ledger-API/public/js/auth.js`, `In-Ex-Ledger-API/public/js/login.js`, `In-Ex-Ledger-API/public/js/mfa-challenge.js`, `In-Ex-Ledger-API/public/js/global.js`
+   - Required direction: move to cookie/session-authoritative browser auth, or otherwise remove JS-readable bearer-token persistence.
+
+2. INCOMPLETE - Replace the bespoke JWT implementation.
+   - Risk: `middleware/auth.middleware.js` hand-rolls token signing and verification.
+   - Owner file: `In-Ex-Ledger-API/middleware/auth.middleware.js`
+   - Required direction: migrate to a standard maintained token/session library and simplify the auth trust boundary.
+
+3. INCOMPLETE - Stop trusting raw `X-Forwarded-For` values in application code.
+   - Risk: several services/routes parse `x-forwarded-for` directly instead of consistently relying on trusted proxy handling plus `req.ip`.
+   - Owner files: `In-Ex-Ledger-API/services/sessionContextService.js`, `In-Ex-Ledger-API/services/signInSecurityService.js`, `In-Ex-Ledger-API/services/auditEventService.js`, `In-Ex-Ledger-API/routes/consent.routes.js`
+
+4. INCOMPLETE - Harden support-artifact upload/download to the same bar as receipts.
+   - Risk: support artifacts are weaker than receipts on validation, abuse controls, and path confinement.
+   - Owner files: `In-Ex-Ledger-API/routes/supportArtifacts.routes.js`, `In-Ex-Ledger-API/services/supportArtifactStorage.js`
+
+5. INCOMPLETE - Confine receipt file resolution to the receipt storage root only.
+   - Owner file: `In-Ex-Ledger-API/services/receiptStorage.js`
+
+6. INCOMPLETE - Reduce sensitive identifier logging.
+   - Owner files: `In-Ex-Ledger-API/routes/auth.routes.js`, `In-Ex-Ledger-API/routes/email.routes.js`, `In-Ex-Ledger-API/routes/supportEmail.routes.js`
+
+Security standards summary from the audit:
+
+- OWASP Top 10: partial pass overall, but fails remain in session/crypto architecture, insecure design, security misconfiguration, and logging/monitoring hygiene.
+- OWASP API Security Top 10 2023: partial pass overall, but fails remain in broken authentication, unrestricted resource consumption, and security misconfiguration.
+- OWASP ASVS 5.0.0: not yet compliant enough for an enterprise/security-review claim.
+- CISA Secure by Design: meaningful progress, but not yet secure-by-default for auth/session architecture.
+
+Recommended execution order:
+
+1. Auth/session architecture hardening.
+2. Upload/path confinement hardening.
+3. Trusted proxy/IP/logging cleanup.
+4. Re-audit against the same four standards after fixes land.
+
+---
+
 ## Final Active Work List
 
-Launch-relevant: ✅ all complete.
+Launch-relevant: not all complete.
 
-1. ✅ ~~Live `/api/receipts` returns `200`.~~
-2. ✅ ~~Stripe webhook endpoint host verified; missed failed events replayed.~~
-3. ✅ ~~Full `npm run test:all` green.~~
-4. ✅ ~~`Docs/RELEASE-CHECKLIST.md` / real browser smoke pass complete.~~
-5. ✅ ~~Cookie-consent CSRF roundtrip verified.~~
+1. COMPLETE - Live `/api/receipts` returns `200`.
+2. COMPLETE - Stripe webhook endpoint host verified; missed failed events replayed.
+3. COMPLETE - Full `npm run test:all` green.
+4. COMPLETE - `Docs/RELEASE-CHECKLIST.md` / real browser smoke pass complete.
+5. COMPLETE - Cookie-consent CSRF roundtrip verified.
+6. INCOMPLETE - Browser auth/session hardening still required before claiming enterprise-grade security posture.
+7. INCOMPLETE - Support artifact upload/download hardening still required.
+8. INCOMPLETE - Receipt/support file path confinement cleanup still required.
+9. INCOMPLETE - Trusted proxy/IP handling cleanup still required.
+10. INCOMPLETE - Sensitive logging cleanup still required.
 
-No launch blockers remain. Everything below is post-launch backlog.
+Launch-blocking security hardening remains. Product/design backlog stays below that line.
 
 Product/design backlog:
 
-1. ❌ Categories page redesign.
-2. ❌ Landing page updates.
-3. ❌ Yearly Additional Business UI/backend wiring check.
-4. ❌ Terms of Service completion.
-5. ❌ Impeccable Style rollout completion across remaining pages.
-6. ❌ V2 planning documents if/when Pro-tier work is complete.
+1. INCOMPLETE - Categories page redesign.
+2. INCOMPLETE - Landing page updates.
+3. INCOMPLETE - Yearly Additional Business UI/backend wiring check.
+4. INCOMPLETE - Terms of Service completion.
+5. INCOMPLETE - Impeccable Style rollout completion across remaining pages.
+6. INCOMPLETE - V2 planning documents if/when Pro-tier work is complete.
 
 Cleanup backlog (mostly closed this pass):
 
-1. ❌ Dated recovery artifact folder cleanup.
-2. ❌ Checksum repair script consolidation/documentation.
-3. ❌ Test naming/audit drift cleanup.
-4. ❌ Guardrail/utility script review.
+1. INCOMPLETE - Dated recovery artifact folder cleanup.
+2. INCOMPLETE - Checksum repair script consolidation/documentation.
+3. INCOMPLETE - Test naming/audit drift cleanup.
+4. INCOMPLETE - Guardrail/utility script review.
 
-Security/legal readiness: ✅ complete — see the `SECURITY-LEGAL-READINESS-US-CANADA.md` section above. Remaining items are operational (executed DPAs, named Privacy Officer delegation), not engineering work.
+Security/legal readiness: the earlier US/Canada legal-readiness memo is complete, but the 2026-06-10 engineering security audit opened new launch-relevant hardening work.
