@@ -556,6 +556,14 @@ async function resetCurrentRefreshSession(res, user, { mfaAuthenticated = false,
   return accessPayload;
 }
 
+function buildPublicSessionPayload(session) {
+  if (!session || typeof session !== "object") {
+    return {};
+  }
+  const { token, ...publicPayload } = session;
+  return publicPayload;
+}
+
 function ensureArrayValue(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -1216,7 +1224,6 @@ router.post("/complete-verified-signup", requireCsrfProtection, authLimiter, asy
     }
 
     return res.status(200).json({
-      token: session.token,
       email_verified: true,
       onboarding_completed: false,
       next: "/onboarding"
@@ -1433,7 +1440,7 @@ router.post("/login", authLimiter, async (req, res) => {
         logWarn("Sign-in device tracking warning:", securitySignalErr?.message || securitySignalErr);
       }
     }
-    res.status(200).json(session);
+    res.status(200).json(buildPublicSessionPayload(session));
   } catch (err) {
     logError("Login error:", err);
     if (isTransientLoginInfrastructureError(err)) {
@@ -1652,7 +1659,6 @@ router.post("/change-password", authLimiter, requireAuth, requireCsrfProtection,
     return res.status(200).json({
       success: true,
       message: "Password updated.",
-      token: session.token,
       subscription: session.subscription
     });
   } catch (err) {
@@ -1865,7 +1871,6 @@ router.post("/mfa/enable", requireAuth, requireCsrfProtection, mfaVerifyLimiter,
       success: true,
       message: "MFA enabled.",
       status: buildMfaStatusPayload(refreshedUser),
-      token: session.token,
       subscription: session.subscription
     });
   } catch (err) {
@@ -1956,7 +1961,6 @@ router.post("/mfa/disable", requireAuth, requireCsrfProtection, mfaVerifyLimiter
       success: true,
       message: "MFA disabled.",
       status: buildMfaStatusPayload(refreshedUser),
-      token: session.token,
       subscription: session.subscription
     });
   } catch (err) {
@@ -2018,7 +2022,7 @@ router.post("/mfa/verify", requireCsrfProtection, mfaVerifyLimiter, async (req, 
       mfaAuthenticated: true,
       req
     });
-    return res.status(200).json(session);
+    return res.status(200).json(buildPublicSessionPayload(session));
   } catch (err) {
     if (err instanceof EmailNotVerifiedError) {
       clearRefreshCookie(res);

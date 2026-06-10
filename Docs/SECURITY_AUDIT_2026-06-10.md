@@ -70,24 +70,18 @@ At-risk files/functions:
 What changed in this pass:
 
 - Access-token persistence in `sessionStorage` / `localStorage` was removed from the main auth helper.
-- The browser frontend now relies on cookie-backed auth flows first, with legacy in-memory/bearer fallback during transition.
+- The browser frontend now relies on cookie-backed auth flows end-to-end.
 - Login, MFA, onboarding, privacy, settings-mobile, unread polling, and consent paths were updated so they no longer require a stored browser token to function.
 
-Remaining gap:
+Residual risk:
 
-- The frontend auth helper still contains transitional bearer-token code paths for compatibility, so this is not yet a full cookie-only architecture.
-- A successful same-origin XSS can still act within the user session; the reduction here is removal of persistent token storage, not elimination of all session abuse risk.
+- A successful same-origin XSS can still act within the user session; the reduction here is removal of browser-held bearer tokens, not elimination of all session abuse risk.
 
 Recommended patch:
 
-1. Replace SPA-held access tokens with an `HttpOnly`, `Secure`, `SameSite=Lax` or `Strict` session cookie.
-2. Move from client-built `Authorization: Bearer ...` to cookie-backed authenticated requests.
-3. If you need a split-token architecture, keep the short-lived access token server-side and expose only a session cookie to the browser.
-4. Remove all token persistence logic from frontend JS.
-
-Next step to fully close:
-
-- Remove the remaining bearer fallback from browser-owned JS paths and drive the UI entirely from authenticated cookies plus `/api/me`.
+1. Keep browser auth cookie-only with `HttpOnly`, `Secure`, `SameSite=Lax` or `Strict` cookies.
+2. Keep client requests same-origin and CSRF-protected instead of reintroducing browser-managed bearer tokens.
+3. If a future native/mobile client needs bearer semantics, keep that path isolated from the browser bundle.
 
 ### 2. Custom JWT implementation
 
@@ -245,10 +239,10 @@ Remaining gap:
 | A01 Broken Access Control | `PASS / PARTIAL` | Business scoping is broadly good; object ownership checks are present in core routes. Remaining file-path issues are more storage-safety than classic BOLA. |
 | A02 Cryptographic Failures | `PARTIAL FAIL` | The bespoke JWT implementation is gone, but issuer/audience/key-rotation hardening is still open. |
 | A03 Injection | `PASS` | SQL is parameterized broadly; no obvious command injection surface found in mounted app code. |
-| A04 Insecure Design | `PARTIAL FAIL` | Frontend token persistence was removed, but the browser auth architecture still needs a final cookie-only cleanup pass. |
+| A04 Insecure Design | `PASS / PARTIAL` | Browser auth is now cookie-only in the audited web bundle; residual risk is standard same-origin session exposure if XSS lands. |
 | A05 Security Misconfiguration | `PARTIAL FAIL` | Trusted-IP handling is fixed in the audited core paths; support-artifact controls are improved but not fully identical to receipts. |
 | A06 Vulnerable and Outdated Components | `PARTIAL` | No full SCA result is embedded in repo. Dependency posture should be validated separately in CI. |
-| A07 Identification and Authentication Failures | `PARTIAL FAIL` | JWT handling now uses a maintained library, but browser auth still has transitional bearer-compatibility paths. |
+| A07 Identification and Authentication Failures | `PASS / PARTIAL` | JWT handling now uses a maintained library and the audited browser flow is cookie-only. Further issuer/audience/key-rotation hardening still remains. |
 | A08 Software and Data Integrity Failures | `PARTIAL PASS` | Webhooks are verified; no obvious unsafe auto-update path found. Token library replacement still recommended. |
 | A09 Security Logging and Monitoring Failures | `PARTIAL FAIL` | Good audit coverage exists, but client-IP spoofing and some over-detailed logging weaken trustworthiness. |
 | A10 SSRF | `PASS` | `signInSecurityService.js` uses HTTPS-only geolocation host allowlisting. |
@@ -258,7 +252,7 @@ Remaining gap:
 | Category | Status | Notes |
 |---|---|---|
 | API1 Broken Object Level Authorization | `PASS / PARTIAL` | Core resource routes scope by `business_id` and validate ownership. |
-| API2 Broken Authentication | `PARTIAL FAIL` | Persistent browser token storage is removed and JWTs use a maintained library, but auth is not yet fully cookie-only. |
+| API2 Broken Authentication | `PASS / PARTIAL` | Persistent browser token storage is removed, JWTs use a maintained library, and the audited browser flow is cookie-only. |
 | API3 Broken Object Property Level Authorization | `PARTIAL` | Several V2 services accept loose `metadata` objects without schema enforcement. |
 | API4 Unrestricted Resource Consumption | `PARTIAL FAIL` | Support-artifact routes now have a dedicated limiter, but in-memory 10 MB uploads still deserve future tightening. |
 | API5 Broken Function Level Authorization | `PASS` | Mounted route gating is generally present. Internal support endpoints are secret-protected. |
@@ -309,9 +303,8 @@ Remaining gap:
 
 ### Priority 1
 
-1. Finish the remaining browser cookie-only auth cleanup.
-2. Add schema validation for V2 `metadata` payloads.
-3. Add a dedicated security regression suite for:
+1. Add schema validation for V2 `metadata` payloads.
+2. Add a dedicated security regression suite for:
    - support artifact upload MIME/signature mismatch
    - path escape attempts
    - session theft resistance after XSS simulation assumptions

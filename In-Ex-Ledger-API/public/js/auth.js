@@ -6,7 +6,6 @@
  * Do NOT embed Railway or hardcoded API URLs here.
  */
 
-const TOKEN_KEY = "token";
 const TIER_KEY = "tier";
 const TRIAL_EXPIRED_KEY = "luna_trial_expired";
 const TRIAL_ENDS_AT_KEY = "luna_trial_ends_at";
@@ -67,8 +66,6 @@ let pendingRefreshPromise = null;
 let idleLogoutTimer = null;
 let idleGuardWired = false;
 let lastActivityAt = 0;
-let accessTokenMemory = "";
-let legacyTokenHydrated = false;
 
 function authT(key) {
   return typeof t === "function" ? t(key) : key;
@@ -666,45 +663,23 @@ preloadAuthenticatedChrome();
 
 
 function getToken() {
-  if (accessTokenMemory) {
-    return accessTokenMemory;
-  }
-
-  if (!legacyTokenHydrated) {
-    legacyTokenHydrated = true;
-    try {
-      const legacyToken = sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY) || "";
-      if (legacyToken) {
-        accessTokenMemory = legacyToken;
-      }
-      sessionStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(TOKEN_KEY);
-    } catch (_) {}
-  }
-
-  try {
-    return accessTokenMemory || "";
-  } catch (_) {}
   return "";
 }
 
 function setToken(token) {
-  accessTokenMemory = String(token || "").trim();
   try {
-    sessionStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem("token");
+    localStorage.removeItem("token");
   } catch (_) {}
 }
 
 function clearToken() {
   clearIdleLogoutTimer();
-  accessTokenMemory = "";
-  legacyTokenHydrated = true;
   try {
-    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem("token");
   } catch (_) {}
   try {
-    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem("token");
   } catch (_) {}
   clearSubscriptionState();
   clearAppState();
@@ -714,8 +689,7 @@ function clearToken() {
 }
 
 function authHeader() {
-  const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return {};
 }
 
 function getCookieValue(name) {
@@ -793,7 +767,6 @@ async function refreshAccessToken() {
       }
 
       const payload = await response.json().catch(() => null);
-      setToken(payload?.token || "");
       if (payload?.subscription) {
         applySubscriptionState(payload.subscription);
       }
@@ -1017,7 +990,7 @@ function isTrialValid() {
 }
 
 function isAuthenticated() {
-  return Boolean(window.__LUNA_ME__?.id || getToken());
+  return Boolean(window.__LUNA_ME__?.id);
 }
 
 function requireAuth() {

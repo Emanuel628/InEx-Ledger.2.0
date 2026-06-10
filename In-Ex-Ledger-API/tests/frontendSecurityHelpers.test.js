@@ -361,7 +361,6 @@ test("auth apiFetch can return an expected 401 without forcing logout when expli
     FormData: class FormData {}
   });
 
-  context.setToken("token_123");
   const response = await context.apiFetch("/api/businesses/biz_123", {
     method: "DELETE",
     allowUnauthorizedResponse: true
@@ -369,7 +368,7 @@ test("auth apiFetch can return an expected 401 without forcing logout when expli
 
   assert.equal(response.status, 401);
   assert.equal(context.window.location.href, "/subscription");
-  assert.equal(context.getToken(), "token_123");
+  assert.equal(context.getToken(), "");
   assert.equal(fetchCalls.length, 2);
 });
 

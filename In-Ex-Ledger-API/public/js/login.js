@@ -146,9 +146,6 @@ async function handleLoginSubmit(event) {
       return;
     }
 
-    if (data?.token && typeof setToken === "function") {
-      setToken(data.token);
-    }
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }

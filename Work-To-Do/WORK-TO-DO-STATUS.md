@@ -268,11 +268,10 @@ Status: INCOMPLETE / HIGH PRIORITY. The app is not in crisis, but it is not yet 
 
 Highest-priority engineering items from the audit:
 
-1. PARTIAL - Replace browser-readable bearer-token storage.
-   - Current status: main frontend auth no longer persists access tokens in `sessionStorage` / `localStorage`, and the backend now supports cookie-backed auth.
-   - Remaining gap: transitional bearer-token compatibility paths still exist in browser JS and should be removed in a follow-up pass.
-   - Owner files: `In-Ex-Ledger-API/public/js/auth.js`, `In-Ex-Ledger-API/public/js/login.js`, `In-Ex-Ledger-API/public/js/mfa-challenge.js`, `In-Ex-Ledger-API/public/js/global.js`
-   - Required direction: finish the move to cookie/session-authoritative browser auth and remove the remaining bearer fallback paths.
+1. COMPLETE - Replace browser-readable bearer-token storage.
+   - Current status: the audited browser flow is now cookie/session-authoritative end-to-end; frontend auth no longer persists access tokens, no longer emits browser bearer headers, and auth route responses no longer return fresh access tokens in JSON.
+   - Owner files: `In-Ex-Ledger-API/public/js/auth.js`, `In-Ex-Ledger-API/public/js/login.js`, `In-Ex-Ledger-API/public/js/mfa-challenge.js`, `In-Ex-Ledger-API/public/js/settings.js`, `In-Ex-Ledger-API/public/js/verify-email.js`, `In-Ex-Ledger-API/routes/auth.routes.js`
+   - Residual note: same-origin XSS would still act within the live cookie-backed session, so CSP/output-encoding discipline still matters.
 
 2. COMPLETE - Replace the bespoke JWT implementation.
    - Current status: `middleware/auth.middleware.js` now uses `jsonwebtoken` instead of a hand-rolled HMAC JWT implementation.

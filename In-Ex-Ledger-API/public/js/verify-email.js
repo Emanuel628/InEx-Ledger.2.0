@@ -182,31 +182,18 @@ function consumeVerifiedSessionFromHash() {
   }
 
   const params = new URLSearchParams(hash);
-  const token = String(params.get("token") || "").trim();
   const verified = params.get("verified") === "true";
   const next = safeInternalNext(params.get("next"), "/onboarding");
-  if (!token && !verified) {
+  if (!verified) {
     return false;
   }
 
-  try {
-    if (token) {
-      if (typeof setToken === "function") {
-        setToken(token);
-      } else {
-        sessionStorage.setItem("token", token);
-      }
-    }
-    clearTransientSignupState();
-  } catch (_) {
-    updateStatus(tx("verify_email_status_success"));
-    return true;
-  }
+  clearTransientSignupState();
 
   updateStatus(tx("verify_email_status_success"));
   stopVerificationPolling();
   window.history.replaceState({}, document.title, "/verify-email");
-  if (!token && typeof refreshAccessToken === "function") {
+  if (typeof refreshAccessToken === "function") {
     refreshAccessToken()
       .then((refreshed) => {
         if (refreshed) {
@@ -295,12 +282,7 @@ async function finalizeVerifiedSignup() {
             body: JSON.stringify({ signupBootstrapToken })
           });
       const payload = response ? await response.json().catch(() => null) : null;
-      if (response && response.ok && payload?.token) {
-        if (typeof setToken === "function") {
-          setToken(payload.token);
-        } else {
-          sessionStorage.setItem("token", payload.token);
-        }
+      if (response && response.ok) {
         clearTransientSignupState();
         updateStatus(tx("verify_email_status_success"));
         window.location.replace(payload?.next || "/onboarding");

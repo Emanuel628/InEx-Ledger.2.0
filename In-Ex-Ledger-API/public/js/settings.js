@@ -2487,9 +2487,6 @@ function initSecurityForm() {
         return;
       }
 
-      if (payload?.token && typeof setToken === "function") {
-        setToken(payload.token);
-      }
       if (payload?.subscription && typeof applySubscriptionState === "function") {
         applySubscriptionState(payload.subscription);
       }
@@ -2582,9 +2579,6 @@ function initSecurityForm() {
           return;
         }
 
-        if (payload?.token && typeof setToken === "function") {
-          setToken(payload.token);
-        }
         if (payload?.subscription && typeof applySubscriptionState === "function") {
           applySubscriptionState(payload.subscription);
         }
@@ -2654,9 +2648,6 @@ function initSecurityForm() {
           return;
         }
 
-        if (payload?.token && typeof setToken === "function") {
-          setToken(payload.token);
-        }
         if (payload?.subscription && typeof applySubscriptionState === "function") {
           applySubscriptionState(payload.subscription);
         }

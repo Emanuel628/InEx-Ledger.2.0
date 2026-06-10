@@ -122,9 +122,6 @@ async function handleMfaChallengeSubmit(event) {
     }
 
     clearPendingMfaState();
-    if (data?.token && typeof setToken === "function") {
-      setToken(data.token);
-    }
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }

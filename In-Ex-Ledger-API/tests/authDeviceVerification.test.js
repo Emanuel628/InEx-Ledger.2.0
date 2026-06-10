@@ -502,7 +502,7 @@ test("new-device sign-in succeeds directly when MFA is disabled", async () => {
       .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
 
     assert.equal(loginResponse.status, 200);
-    assert.ok(loginResponse.body?.token, "login should return an auth token");
+    assert.equal(loginResponse.body?.token, undefined);
     assert.equal(loginResponse.body?.mfa_required, undefined);
     assert.equal(loginResponse.body?.device_verification_required, undefined);
     assert.equal(fixture.state.sentEmails.length, 1);
@@ -514,7 +514,7 @@ test("new-device sign-in succeeds directly when MFA is disabled", async () => {
       .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
 
     assert.equal(secondLogin.status, 200);
-    assert.ok(secondLogin.body?.token, "recognized device should log in directly");
+    assert.equal(secondLogin.body?.token, undefined);
     assert.equal(secondLogin.body?.mfa_required, undefined);
     assert.equal(fixture.state.sentEmails.length, 1);
   } finally {
@@ -618,7 +618,7 @@ test("mfa sign-in trusts the device and skips another code on the next login", a
       });
 
     assert.equal(verifyResponse.status, 200);
-    assert.ok(verifyResponse.body?.token, "successful verification should return auth token");
+    assert.equal(verifyResponse.body?.token, undefined);
     const trustCookie = verifyResponse.headers["set-cookie"]?.find((cookie) => cookie.startsWith("mfa_trust="));
     assert.ok(trustCookie, "successful MFA verification should set an mfa_trust cookie");
 
@@ -629,7 +629,7 @@ test("mfa sign-in trusts the device and skips another code on the next login", a
       .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
 
     assert.equal(secondLogin.status, 200);
-    assert.ok(secondLogin.body?.token, "trusted device should log in directly");
+    assert.equal(secondLogin.body?.token, undefined);
     assert.equal(secondLogin.body?.mfa_required, undefined);
   } finally {
     fixture.cleanup();
@@ -658,7 +658,7 @@ test("global MFA trust cookie can satisfy login without the middleware sidecar",
       .send({ email: fixture.state.user.email, password: "CorrectPassword1!" });
 
     assert.equal(loginResponse.status, 200);
-    assert.ok(loginResponse.body?.token, "global trust should allow the login route to issue a session directly");
+    assert.equal(loginResponse.body?.token, undefined);
     assert.equal(loginResponse.body?.mfa_required, undefined);
     const refreshedGlobalTrust = loginResponse.headers["set-cookie"]?.find((cookie) => cookie.startsWith("mfa_global_trust="));
     assert.ok(refreshedGlobalTrust, "trusted browser login should refresh the global MFA trust cookie");
@@ -765,13 +765,13 @@ test("multiple MFA code requests do not immediately invalidate the earlier chall
       });
 
     assert.equal(verifyFirst.status, 200);
-    assert.ok(verifyFirst.body?.token, "first challenge should still verify after a second code is issued");
+    assert.equal(verifyFirst.body?.token, undefined);
   } finally {
     fixture.cleanup();
   }
 });
 
-test("mfa enable returns a fresh MFA-authenticated access token for subsequent protected actions", async () => {
+test("mfa enable rotates the authenticated session for subsequent protected actions", async () => {
   const fixture = loadAuthRouter({
     nodeEnv: "test",
     appBaseUrl: "https://app.inexledger.test"
@@ -814,11 +814,8 @@ test("mfa enable returns a fresh MFA-authenticated access token for subsequent p
 
     assert.equal(finishResponse.status, 200);
     assert.equal(finishResponse.body?.success, true);
-    assert.ok(finishResponse.body?.token, "completed MFA enable should return a fresh access token");
-
-    const decoded = verifyToken(finishResponse.body.token);
-    assert.equal(decoded.mfa_enabled, true);
-    assert.equal(decoded.mfa_authenticated, true);
+    assert.equal(finishResponse.body?.token, undefined);
+    assert.equal(finishResponse.body?.status?.enabled, true);
     assert.equal(fixture.state.user.mfa_enabled, true);
   } finally {
     fixture.cleanup();
