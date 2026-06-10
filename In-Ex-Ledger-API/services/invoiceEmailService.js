@@ -1,6 +1,13 @@
 "use strict";
 
 const crypto = require("crypto");
+const { logWarn } = require("../utils/logger.js");
+
+// A deliberately strict single-address check: local@domain.tld, no spaces,
+// no display name. Used to reject a misconfigured reply-base before it reaches
+// Resend (a bad reply_to 422s the ENTIRE invoice send, so we degrade to "no
+// reply-to" instead of failing the send).
+const SIMPLE_EMAIL_RE = /^[^\s<>@",]+@[^\s<>@",]+\.[^\s<>@",]+$/;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -37,8 +44,35 @@ function getInvoiceFromEmail() {
  * INVOICE_REPLY_BASE_EMAIL is optional: when unset, replies still work but
  * use a query-style suffix and inbound parsing relies on the To header only.
  */
+/**
+ * Strip a value that was pasted with its own `KEY=` prefix. A surprisingly
+ * common deploy mistake is putting the whole `INVOICE_REPLY_BASE_EMAIL=foo@bar`
+ * line into the variable's VALUE field, which makes the reply address
+ * `INVOICE_REPLY_BASE_EMAIL=foo+token@bar` and gets the invoice rejected with
+ * a 422. We defensively drop a leading `WORD=` assignment prefix.
+ */
+function stripEnvAssignmentPrefix(value) {
+  return String(value || "").replace(/^\s*[A-Za-z_][A-Za-z0-9_]*\s*=\s*/, "").trim();
+}
+
 function getInvoiceReplyBaseEmail() {
-  return String(process.env.INVOICE_REPLY_BASE_EMAIL || "").trim() || null;
+  const raw = String(process.env.INVOICE_REPLY_BASE_EMAIL || "").trim();
+  if (!raw) return null;
+
+  const cleaned = normalizeEmailAddress(stripEnvAssignmentPrefix(raw));
+
+  if (!SIMPLE_EMAIL_RE.test(cleaned)) {
+    // Misconfigured value (e.g. still carries a `NAME=` prefix, has spaces, or
+    // isn't an address). Surface it loudly and return null so invoices still
+    // send — just without an inbound reply-to — rather than 422-ing every send.
+    logWarn("invoice reply base email is misconfigured; replies will not route", {
+      hasValue: true,
+      looksLikeEnvPaste: /=/.test(raw)
+    });
+    return null;
+  }
+
+  return cleaned;
 }
 
 function getReplyHmacSecret() {
@@ -167,7 +201,11 @@ function buildReplyToAddress(invoiceId) {
 
   if (!local || !domain.startsWith("@")) return base;
 
-  return `${local}+${token}${domain}`;
+  const plusAddressed = `${local}+${token}${domain}`;
+
+  // Never hand Resend an invalid reply_to — it 422s the whole send. If the
+  // composed address somehow isn't a clean email, drop reply routing instead.
+  return SIMPLE_EMAIL_RE.test(plusAddressed) ? plusAddressed : null;
 }
 
 /**
@@ -337,16 +375,12 @@ if (ccList.length) {
 }
 
 if (replyTo) {
-  payload.reply_to = replyTo;
+  // Resend's Node SDK reads `replyTo` (camelCase) and maps it to the API's
+  // `reply_to`; an unknown snake_case `reply_to` key is silently dropped, which
+  // would ship the invoice with no Reply-To and route replies to the From
+  // address instead of the inbound address.
+  payload.replyTo = businessName ? `${businessName} Billing <${replyTo}>` : replyTo;
 }
-
-console.log("[invoice-email] replyTo debug", {
-  invoiceId: invoice.id,
-  replyBase: getInvoiceReplyBaseEmail(),
-  replyTo,
-  replyToLocalLength: replyTo ? replyTo.split("@")[0].length : null,
-  payloadReplyTo: payload.reply_to || null
-});
 
 const result = await resendClient.emails.send(payload);
 

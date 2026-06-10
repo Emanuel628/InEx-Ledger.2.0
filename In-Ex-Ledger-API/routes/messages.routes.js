@@ -433,7 +433,6 @@ router.post("/:id/reply-email", async (req, res) => {
     if (replyTo) {
       const replyToDisplay = `${companyName} Billing <${replyTo}>`;
       payload.replyTo = replyToDisplay;
-      payload.reply_to = replyToDisplay;
     }
 
     const sendResult = await resend.emails.send(payload);
@@ -716,12 +715,14 @@ router.post("/support-email", async (req, res) => {
     };
 
     if (replyTo) {
-      payload.reply_to = replyTo;
-      
+      // Resend's Node SDK reads `replyTo` (camelCase); a snake_case `reply_to`
+      // key is dropped, so the reply would never route back into the app.
+      payload.replyTo = replyTo;
+
       logInfo("support email reply-to applied", {
         messageId,
         replyTo,
-        hasPayloadReplyTo: Boolean(payload.reply_to)
+        hasPayloadReplyTo: Boolean(payload.replyTo)
       });
     }
 
@@ -846,7 +847,6 @@ router.post("/send-email", async (req, res) => {
     if (replyTo) {
       const replyToDisplay = `InEx Ledger Messages <${replyTo}>`;
       payload.replyTo = replyToDisplay;
-      payload.reply_to = replyToDisplay;
     }
 
     const sendResult = await resend.emails.send(payload);

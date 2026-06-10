@@ -86,3 +86,50 @@ test("buildDiagnostics reflects unconfigured state cleanly", () => {
     assert.equal(d.receipt_storage, null);
   });
 });
+
+test("email.inbound reports ready only when all reply vars are configured", () => {
+  withEnv({
+    INVOICE_REPLY_BASE_EMAIL: "invoices@reply.example.com",
+    INBOUND_EMAIL_WEBHOOK_SECRET: "whsec_secret",
+    INVOICE_REPLY_HMAC_SECRET: "long-random-secret",
+    SUPPORT_REPLY_BASE_EMAIL: "support@reply.example.com",
+    RESEND_FROM_EMAIL: "noreply@example.com",
+    SUPPORT_INBOUND_WEBHOOK_SECRET: undefined,
+    SUPPORT_REPLY_HMAC_SECRET: undefined,
+    CSRF_SECRET: undefined,
+    EMAIL_FROM: undefined
+  }, () => {
+    const d = buildDiagnostics({});
+    assert.equal(d.email.inbound.ready, true);
+    assert.equal(d.email.inbound.invoice_reply_routing_configured, true);
+    assert.equal(d.email.inbound.support_reply_routing_configured, true);
+    assert.equal(d.email.inbound.webhook_secret_configured, true);
+    assert.equal(d.email.inbound.reply_token_secret_configured, true);
+    // reply domain (reply.example.com) differs from send domain (example.com)
+    assert.equal(d.email.inbound.reply_domain_differs_from_send_domain, true);
+
+    // never expose raw secret/address values
+    const serialized = JSON.stringify(d.email.inbound);
+    assert.ok(!serialized.includes("whsec_secret"));
+    assert.ok(!serialized.includes("reply.example.com"));
+  });
+});
+
+test("email.inbound is not ready when reply routing or secrets are missing", () => {
+  withEnv({
+    INVOICE_REPLY_BASE_EMAIL: undefined,
+    INBOUND_EMAIL_WEBHOOK_SECRET: undefined,
+    SUPPORT_INBOUND_WEBHOOK_SECRET: undefined,
+    INVOICE_REPLY_HMAC_SECRET: undefined,
+    SUPPORT_REPLY_HMAC_SECRET: undefined,
+    CSRF_SECRET: undefined,
+    RESEND_FROM_EMAIL: undefined,
+    EMAIL_FROM: undefined
+  }, () => {
+    const d = buildDiagnostics({});
+    assert.equal(d.email.inbound.ready, false);
+    assert.equal(d.email.inbound.invoice_reply_routing_configured, false);
+    assert.equal(d.email.inbound.webhook_secret_configured, false);
+    assert.equal(d.email.inbound.reply_domain_differs_from_send_domain, false);
+  });
+});
