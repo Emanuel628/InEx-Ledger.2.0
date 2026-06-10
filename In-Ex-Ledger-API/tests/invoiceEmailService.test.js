@@ -217,7 +217,7 @@ test("sendInvoiceEmail passes from, to, subject, reply_to to the Resend client",
     assert.equal(
       calls[0].reply_to,
       `Sample Co Billing <invoices+${SAMPLE_INVOICE.id.replace(/-/g, "").toLowerCase()}@inex.app>`
-    );
+      );
     assert.equal(result.data.id, "resend-id-1");
   });
 });
