@@ -59,6 +59,33 @@ test("getInvoiceFromEmail falls back through INVOICE_FROM_EMAIL -> RESEND_FROM_E
   });
 });
 
+test("buildReplyToAddress strips an accidental NAME= prefix pasted into the env value", () => {
+  // Reproduces the production incident: the whole `KEY=value` line was pasted
+  // into the variable's value, which previously produced an invalid reply_to
+  // (`INVOICE_REPLY_BASE_EMAIL=invoices+token@...`) and 422'd every invoice.
+  withEnv({
+    INVOICE_REPLY_BASE_EMAIL: "INVOICE_REPLY_BASE_EMAIL=invoices@oixenoisou.resend.app",
+    INVOICE_REPLY_HMAC_SECRET: undefined,
+    CSRF_SECRET: undefined
+  }, () => {
+    const addr = buildReplyToAddress(SAMPLE_INVOICE.id);
+    assert.equal(
+      addr,
+      `invoices+${SAMPLE_INVOICE.id.replace(/-/g, "").toLowerCase()}@oixenoisou.resend.app`
+    );
+  });
+});
+
+test("buildReplyToAddress returns null for a hopelessly malformed reply base (send still succeeds)", () => {
+  withEnv({
+    INVOICE_REPLY_BASE_EMAIL: "not an email at all",
+    INVOICE_REPLY_HMAC_SECRET: undefined,
+    CSRF_SECRET: undefined
+  }, () => {
+    assert.equal(buildReplyToAddress(SAMPLE_INVOICE.id), null);
+  });
+});
+
 test("buildReplyToken returns plain id when no HMAC secret configured", () => {
   withEnv({ INVOICE_REPLY_HMAC_SECRET: undefined, CSRF_SECRET: undefined }, () => {
     assert.equal(buildReplyToken(SAMPLE_INVOICE.id), SAMPLE_INVOICE.id.replace(/-/g, "").toLowerCase());
