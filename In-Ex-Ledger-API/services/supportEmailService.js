@@ -36,7 +36,17 @@ function getSupportToEmail() {
 }
 
 function getSupportReplyBaseEmail() {
-  return String(process.env.SUPPORT_REPLY_BASE_EMAIL || "").trim() || null;
+  // Prefer the invoice reply base when set: most deployments configure inbound
+  // (MX + webhook) on a single domain via INVOICE_REPLY_BASE_EMAIL. Routing
+  // support replies through that same inbound-capable domain — carrying the
+  // support `s.` token, which /api/email/inbound also parses — means support
+  // replies land back in-app without a second inbound domain. Falls back to a
+  // dedicated SUPPORT_REPLY_BASE_EMAIL when no invoice base is configured.
+  return (
+    String(process.env.INVOICE_REPLY_BASE_EMAIL || "").trim() ||
+    String(process.env.SUPPORT_REPLY_BASE_EMAIL || "").trim() ||
+    null
+  );
 }
 
 function getSupportReplyHmacSecret() {

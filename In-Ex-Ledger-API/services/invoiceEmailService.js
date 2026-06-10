@@ -337,16 +337,12 @@ if (ccList.length) {
 }
 
 if (replyTo) {
-  payload.reply_to = replyTo;
+  // Resend's Node SDK reads `replyTo` (camelCase) and maps it to the API's
+  // `reply_to`; an unknown snake_case `reply_to` key is silently dropped, which
+  // would ship the invoice with no Reply-To and route replies to the From
+  // address instead of the inbound address.
+  payload.replyTo = businessName ? `${businessName} Billing <${replyTo}>` : replyTo;
 }
-
-console.log("[invoice-email] replyTo debug", {
-  invoiceId: invoice.id,
-  replyBase: getInvoiceReplyBaseEmail(),
-  replyTo,
-  replyToLocalLength: replyTo ? replyTo.split("@")[0].length : null,
-  payloadReplyTo: payload.reply_to || null
-});
 
 const result = await resendClient.emails.send(payload);
 

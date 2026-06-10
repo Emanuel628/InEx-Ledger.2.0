@@ -215,11 +215,12 @@ test("sendInvoiceEmail passes from, to, subject, reply_to to the Resend client",
     assert.deepEqual(calls[0].cc, ["bookkeeper@acme.com"]);
     assert.ok(calls[0].subject.includes("INV-2026-0001"));
     assert.equal(
-      calls[0].reply_to,
+      calls[0].replyTo,
       `Sample Co Billing <invoices+${SAMPLE_INVOICE.id.replace(/-/g, "").toLowerCase()}@inex.app>`
       );
     assert.equal(result.data.id, "resend-id-1");
-    assert.equal(calls[0].replyTo, undefined);
+    // The Resend SDK only honours camelCase `replyTo`; a snake_case key would be dropped.
+    assert.equal(calls[0].reply_to, undefined);
   });
 });
 
