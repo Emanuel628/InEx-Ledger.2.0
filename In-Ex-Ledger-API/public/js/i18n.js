@@ -5609,4 +5609,28 @@ Object.assign(TRANSLATIONS.fr, {
   review_quick_review_exclusion: 'Revoir les exclusions'
 });
 
+// French pass: fill the few keys that were missing or left in English, and
+// align section labels with the French terms used everywhere else in this file
+// (entreprise / forfait / exportation / mille). Genuine French cognates
+// (Transactions, Messages, Notifications, Description, Actions, Province,
+// Canada, Contact, Audit, Session, Support, Notes…) are intentionally left
+// unchanged. This Object.assign runs last, so these values win.
+Object.assign(TRANSLATIONS.fr, {
+  // Previously missing from FR entirely.
+  secure_export_modal_show_me: 'Montrez-moi',
+  secure_export_modal_show_me_hint: 'Nous vous amènerons directement aux champs manquants du profil d\'entreprise et les mettrons en surbrillance.',
+  settings_export_profile_guide_note: 'Complétez les champs en surbrillance pour terminer votre exportation sécurisée.',
+
+  // Were still showing the English word.
+  subscription_v2_title_short: 'Entreprise',
+  subscription_plans_title: 'Forfaits',
+  sub_mgmt_nav_plans: 'Forfaits',
+  nav_exports: 'Exportations',
+  exports_title: 'Exportations',
+  review_sidebar_exports: 'Exportations',
+  mileage_label_miles: 'Milles',
+  mileage_table_miles: 'Milles',
+  settings_units_miles: 'Milles (mi)'
+});
+
 
