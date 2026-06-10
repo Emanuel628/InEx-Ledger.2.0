@@ -337,15 +337,7 @@ if (ccList.length) {
 }
 
 if (replyTo) {
-  const companyName = String(businessName || "InEx Ledger")
-    .replace(/[<>"]/g, "")
-    .trim()
-    .slice(0, 70);
-
-  const replyToDisplay = `${companyName} Billing <${replyTo}>`;
-
-  payload.replyTo = replyToDisplay;
-  payload.reply_to = replyToDisplay;
+  payload.reply_to = replyTo;
 }
 
 console.log("[invoice-email] replyTo debug", {
@@ -353,7 +345,7 @@ console.log("[invoice-email] replyTo debug", {
   replyBase: getInvoiceReplyBaseEmail(),
   replyTo,
   replyToLocalLength: replyTo ? replyTo.split("@")[0].length : null,
-  payloadReplyTo: payload.replyTo || null
+  payloadReplyTo: payload.reply_to || null
 });
 
 const result = await resendClient.emails.send(payload);
