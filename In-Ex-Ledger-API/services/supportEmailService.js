@@ -36,14 +36,7 @@ function getSupportToEmail() {
 }
 
 function getSupportReplyBaseEmail() {
-  const supportBase = String(process.env.SUPPORT_REPLY_BASE_EMAIL || "").trim();
-  const invoiceBase = String(process.env.INVOICE_REPLY_BASE_EMAIL || "").trim();
-
-  // Prefer the shared invoice inbound path when it exists. Invoice reply
-  // routing is already the proven working inbound domain in production, and
-  // splitting support onto a separate reply domain has repeatedly caused
-  // invisible delivery/debugging failures.
-  return invoiceBase || supportBase || null;
+  return String(process.env.SUPPORT_REPLY_BASE_EMAIL || "").trim() || null;
 }
 
 function getSupportReplyHmacSecret() {
