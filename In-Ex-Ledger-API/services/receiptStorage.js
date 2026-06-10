@@ -113,37 +113,24 @@ function isManagedReceiptPath(filePath) {
   return path.resolve(filePath).startsWith(storageDir);
 }
 
-function resolveReceiptFilePath(filePath) {
-  if (!filePath) {
-    return null;
-  }
-
-  const rawPath = String(filePath).trim();
+function normalizeReceiptStorageCandidate(filePath) {
+  const storageDir = getReceiptStorageDir();
+  const rawPath = String(filePath || "").trim();
   if (!rawPath) {
     return null;
   }
 
-  const candidates = [];
-  const resolvedRaw = path.resolve(rawPath);
-  candidates.push(resolvedRaw);
-
-  if (!path.isAbsolute(rawPath)) {
-    candidates.push(path.resolve(process.cwd(), rawPath));
+  const candidate = path.resolve(storageDir, path.basename(rawPath));
+  const storageRoot = `${storageDir}${path.sep}`;
+  if (!candidate.startsWith(storageRoot)) {
+    return null;
   }
+  return candidate;
+}
 
-  const basename = path.basename(rawPath);
-  if (basename) {
-    candidates.push(path.join(getReceiptStorageDir(), basename));
-  }
-
-  const uniqueCandidates = [...new Set(candidates)];
-  for (const candidate of uniqueCandidates) {
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  return null;
+function resolveReceiptFilePath(filePath) {
+  const candidate = normalizeReceiptStorageCandidate(filePath);
+  return candidate && fs.existsSync(candidate) ? candidate : null;
 }
 
 function requirePersistentReceiptStorage(req, res, next) {
@@ -176,6 +163,7 @@ module.exports = {
   getReceiptStorageStatus,
   initializeReceiptStorage,
   isManagedReceiptPath,
+  normalizeReceiptStorageCandidate,
   resolveReceiptFilePath,
   requirePersistentReceiptStorage,
   resetReceiptStorageStatusForTests

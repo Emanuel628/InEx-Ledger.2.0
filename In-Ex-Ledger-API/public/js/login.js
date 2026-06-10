@@ -146,12 +146,9 @@ async function handleLoginSubmit(event) {
       return;
     }
 
-    if (!data?.token) {
-      showLoginError(tx("login_error_generic"));
-      return;
+    if (data?.token && typeof setToken === "function") {
+      setToken(data.token);
     }
-
-    setToken(data.token);
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }

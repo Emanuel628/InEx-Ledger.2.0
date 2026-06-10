@@ -1076,7 +1076,7 @@ async function sendComposedMessage() {
 }
 
 async function updateUnreadBadge() {
-  if (typeof getToken === "function" && !getToken()) {
+  if (typeof isAuthenticated === "function" && !isAuthenticated()) {
     stopPoll();
     return false;
   }
@@ -1213,20 +1213,7 @@ function formatClock(date) {
 }
 
 function getCurrentUserId() {
-  try {
-    const token = typeof getToken === "function"
-      ? getToken()
-      : sessionStorage.getItem("token");
-    if (!token) return null;
-
-    const parts = token.split(".");
-    if (parts.length < 2) return null;
-
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return payload.id || payload.sub || null;
-  } catch {
-    return null;
-  }
+  return window.__LUNA_ME__?.id || window.__LUNA_ME__?.user_id || null;
 }
 
 function showToast(message) {

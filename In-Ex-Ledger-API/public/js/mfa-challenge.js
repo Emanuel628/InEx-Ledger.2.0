@@ -116,13 +116,15 @@ async function handleMfaChallengeSubmit(event) {
     });
 
     const data = response ? await response.json().catch(() => null) : null;
-    if (!response || !response.ok || !data?.token) {
+    if (!response || !response.ok) {
       showMfaChallengeError(data?.error || tx("mfa_challenge_error_verify"));
       return;
     }
 
     clearPendingMfaState();
-    setToken(data.token);
+    if (data?.token && typeof setToken === "function") {
+      setToken(data.token);
+    }
     if (data?.subscription && typeof applySubscriptionState === "function") {
       applySubscriptionState(data.subscription);
     }

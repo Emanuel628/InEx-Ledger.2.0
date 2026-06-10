@@ -15,31 +15,29 @@ function ensureSupportArtifactStorageDir() {
   return directory;
 }
 
+function normalizeSupportArtifactCandidate(filePath) {
+  const storageDir = getSupportArtifactStorageDir();
+  const rawPath = String(filePath || "").trim();
+  if (!rawPath) {
+    return null;
+  }
+
+  const candidate = path.resolve(storageDir, path.basename(rawPath));
+  const storageRoot = `${storageDir}${path.sep}`;
+  if (!candidate.startsWith(storageRoot)) {
+    return null;
+  }
+  return candidate;
+}
+
 function resolveSupportArtifactFilePath(filePath) {
-  if (!filePath) return null;
-  const rawPath = String(filePath).trim();
-  if (!rawPath) return null;
-
-  const candidates = [];
-  candidates.push(path.resolve(rawPath));
-  if (!path.isAbsolute(rawPath)) {
-    candidates.push(path.resolve(process.cwd(), rawPath));
-  }
-  const basename = path.basename(rawPath);
-  if (basename) {
-    candidates.push(path.join(getSupportArtifactStorageDir(), basename));
-  }
-
-  for (const candidate of [...new Set(candidates)]) {
-    if (fs.existsSync(candidate)) {
-      return candidate;
-    }
-  }
-  return null;
+  const candidate = normalizeSupportArtifactCandidate(filePath);
+  return candidate && fs.existsSync(candidate) ? candidate : null;
 }
 
 module.exports = {
   ensureSupportArtifactStorageDir,
   getSupportArtifactStorageDir,
+  normalizeSupportArtifactCandidate,
   resolveSupportArtifactFilePath
 };

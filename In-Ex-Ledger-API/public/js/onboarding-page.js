@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   screen2El = document.getElementById("onboardingScreen2");
 
   const valid = await requireValidSessionOrRedirect();
-  if (valid === false || !getToken()) return;
+  if (valid === false) return;
 
   const profile = window.__LUNA_ME__ || null;
   if (profile?.onboarding?.completed) {

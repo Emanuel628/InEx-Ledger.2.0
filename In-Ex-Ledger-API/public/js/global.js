@@ -537,13 +537,8 @@ function updateNavMessageBadges(count) {
 }
 
 function pollGlobalUnreadCount() {
-  var token = "";
-  try {
-    token = typeof getToken === "function"
-      ? (getToken() || "")
-      : (sessionStorage.getItem("token") || "");
-  } catch (_) {}
-  if (!token) return Promise.resolve(false);
+  var authenticated = typeof isAuthenticated === "function" ? isAuthenticated() : false;
+  if (!authenticated) return Promise.resolve(false);
 
   if (typeof apiFetch === "function") {
     return apiFetch("/api/messages/unread-count")
@@ -561,7 +556,7 @@ function pollGlobalUnreadCount() {
   }
 
   return fetch("/api/messages/unread-count", {
-    headers: { Authorization: "Bearer " + token }
+    credentials: "include"
   })
     .then(function (response) {
       if (response.status === 401) {
@@ -2121,17 +2116,10 @@ window.LUNA_TAX = {
       return null;
     }
     try {
-      var headers = {};
-      if (typeof getToken === 'function') {
-        var token = getToken();
-        if (token) {
-          headers.Authorization = 'Bearer ' + token;
-        }
-      }
       var response = await window.fetch('/api/consent/cookie', {
         method: 'GET',
         credentials: 'include',
-        headers: headers
+        headers: {}
       });
       if (!response || !response.ok) {
         return null;
@@ -2152,14 +2140,7 @@ window.LUNA_TAX = {
       if (typeof csrfHeader === 'function') {
         Object.assign(headers, csrfHeader('POST'));
       }
-      
-      if (typeof getToken === 'function') {
-        var token = getToken();
-        if (token) {
-          headers.Authorization = 'Bearer ' + token;
-        }
-      }
-      
+
       window.fetch('/api/consent/cookie', {
         method: 'POST',
         credentials: 'include',

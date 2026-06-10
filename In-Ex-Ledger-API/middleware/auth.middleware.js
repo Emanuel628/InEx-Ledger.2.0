@@ -1,5 +1,6 @@
-const crypto = require("crypto");
-const { logError, logWarn, logInfo } = require("../utils/logger.js");
+const jwt = require("jsonwebtoken");
+const { ACCESS_TOKEN_COOKIE } = require("../utils/authUtils.js");
+const { logWarn } = require("../utils/logger.js");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const DEFAULT_JWT_EXPIRY_SECONDS = Number(process.env.JWT_EXPIRY_SECONDS) || 15 * 60;
@@ -10,68 +11,35 @@ if (!JWT_SECRET) {
   );
 }
 
-function encodeSegment(value) {
-  const payload =
-    typeof value === "string" ? value : JSON.stringify(value ?? {});
-  return Buffer.from(payload, "utf8").toString("base64url");
-}
-
-function decodeSegment(value) {
-  return Buffer.from(value, "base64url").toString("utf8");
-}
-
-function signWithSecret(message) {
-  return crypto.createHmac("sha256", JWT_SECRET).update(message).digest("base64url");
-}
-
 function signToken(payload, expiresInSeconds = DEFAULT_JWT_EXPIRY_SECONDS) {
-  const header = encodeSegment({ alg: "HS256", typ: "JWT" });
-  const now = Math.floor(Date.now() / 1000);
-  const bodyPayload = {
-    ...payload,
-    iat: now,
-    ...(typeof expiresInSeconds === "number" && expiresInSeconds > 0
-      ? { exp: now + expiresInSeconds }
-      : {})
-  };
-  const body = encodeSegment(bodyPayload);
-  const signature = signWithSecret(`${header}.${body}`);
-  return `${header}.${body}.${signature}`;
+  const options = { algorithm: "HS256" };
+  if (typeof expiresInSeconds === "number" && expiresInSeconds > 0) {
+    options.expiresIn = expiresInSeconds;
+  }
+  return jwt.sign(payload ?? {}, JWT_SECRET, options);
 }
 
 function verifyToken(token) {
-  const parts = token.split(".");
-  if (parts.length !== 3) {
-    throw new Error("Invalid token format");
+  return jwt.verify(String(token || "").trim(), JWT_SECRET, {
+    algorithms: ["HS256"]
+  });
+}
+
+function getRequestToken(req) {
+  const authHeader = String(req.headers.authorization || "").trim();
+  if (authHeader.startsWith("Bearer ")) {
+    return authHeader.slice("Bearer ".length).trim();
   }
 
-  const [header, body, signature] = parts;
-  const expected = signWithSecret(`${header}.${body}`);
-  const bufferSignature = Buffer.from(signature, "base64url");
-  const bufferExpected = Buffer.from(expected, "base64url");
-  if (
-    bufferSignature.length !== bufferExpected.length ||
-    !crypto.timingSafeEqual(bufferSignature, bufferExpected)
-  ) {
-    throw new Error("Invalid token signature");
-  }
-
-  const decoded = JSON.parse(decodeSegment(body));
-  const now = Math.floor(Date.now() / 1000);
-  if (typeof decoded.exp === "number" && decoded.exp <= now) {
-    throw new Error("Token expired");
-  }
-
-  return decoded;
+  return String(req.cookies?.[ACCESS_TOKEN_COOKIE] || "").trim();
 }
 
 function requireAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  const token = getRequestToken(req);
+  if (!token) {
     return res.status(401).json({ error: "Authentication required" });
   }
 
-  const token = authHeader.slice("Bearer ".length).trim();
   try {
     req.user = verifyToken(token);
   } catch (err) {
@@ -83,23 +51,18 @@ function requireAuth(req, res, next) {
 }
 
 function optionalAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith("Bearer ")) {
+  const token = getRequestToken(req);
+  if (token) {
     try {
-      req.user = verifyToken(authHeader.slice("Bearer ".length).trim());
+      req.user = verifyToken(token);
     } catch (err) {
-      logWarn("optionalAuth: rejected invalid token —", err.message);
+      logWarn(`optionalAuth rejected invalid token: ${err.message}`);
     }
   }
 
   next();
 }
 
-/**
- * Middleware that requires BOTH MFA to be enabled AND the current session to be
- * MFA-authenticated. Use only for actions that should be completely inaccessible
- * to users who have not configured MFA (rare; prefer requireMfaIfEnabled below).
- */
 function requireMfa(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ error: "Authentication required" });
@@ -126,11 +89,6 @@ function requireMfa(req, res, next) {
   next();
 }
 
-/**
- * Middleware that enforces MFA-authentication only when the user HAS MFA enabled.
- * Users without MFA enabled pass through freely (they re-authenticate via password).
- * Must be placed after requireAuth.
- */
 function requireMfaIfEnabled(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ error: "Authentication required" });
@@ -148,4 +106,11 @@ function requireMfaIfEnabled(req, res, next) {
   next();
 }
 
-module.exports = { signToken, verifyToken, requireAuth, optionalAuth, requireMfa, requireMfaIfEnabled };
+module.exports = {
+  signToken,
+  verifyToken,
+  requireAuth,
+  optionalAuth,
+  requireMfa,
+  requireMfaIfEnabled
+};

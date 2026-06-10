@@ -9,6 +9,7 @@ const multer = require("multer");
 const { pool } = require("../db.js");
 const { requireAuth } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
+const { createRouteLimiter } = require("../middleware/rate-limit.middleware.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { logError } = require("../utils/logger.js");
 const { invalidateSnapshotsForBusiness } = require("../services/exportSnapshotService.js");
@@ -20,6 +21,13 @@ const {
 const router = express.Router();
 router.use(requireAuth);
 router.use(requireCsrfProtection);
+router.use(createRouteLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyPrefix: "rl:support-artifacts",
+  keyStrategy: "user",
+  message: "Too many support artifact requests. Please slow down and try again."
+}));
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -46,12 +54,36 @@ const ALLOWED_MIME_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 ]);
 
+const ALLOWED_EXTENSIONS = new Set([
+  ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".txt",
+  ".csv",
+  ".xls",
+  ".xlsx"
+]);
+
+const MIME_BY_EXTENSION = new Map([
+  [".pdf", "application/pdf"],
+  [".jpg", "image/jpeg"],
+  [".jpeg", "image/jpeg"],
+  [".png", "image/png"],
+  [".webp", "image/webp"],
+  [".txt", "text/plain"],
+  [".csv", "text/csv"],
+  [".xls", "application/vnd.ms-excel"],
+  [".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]
+]);
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_BYTES },
   fileFilter(_req, file, cb) {
-    const mimeType = String(file?.mimetype || "").trim().toLowerCase();
-    if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+    const mimeType = normalizeUploadedSupportMimeType(file);
+    if (!mimeType) {
       const error = new Error("Unsupported support file type.");
       error.status = 400;
       return cb(error);
@@ -62,6 +94,22 @@ const upload = multer({
 
 function isUuid(value) {
   return typeof value === "string" && UUID_RE.test(value);
+}
+
+function normalizeUploadedSupportMimeType(file) {
+  const rawMime = String(file?.mimetype || "").trim().toLowerCase();
+  const ext = path.extname(String(file?.originalname || "")).toLowerCase();
+  const inferredMime = MIME_BY_EXTENSION.get(ext) || null;
+
+  if (
+    ALLOWED_MIME_TYPES.has(rawMime) &&
+    ALLOWED_EXTENSIONS.has(ext) &&
+    inferredMime === rawMime
+  ) {
+    return rawMime;
+  }
+
+  return null;
 }
 
 async function writeSupportArtifactFile(buffer, originalName) {

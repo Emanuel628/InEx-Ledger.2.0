@@ -1,13 +1,4 @@
 (function () {
-  function getTokenSafe() {
-    try {
-      if (typeof getToken === 'function') return getToken() || '';
-      return sessionStorage.getItem('token') || localStorage.getItem('token') || '';
-    } catch (_) {
-      return '';
-    }
-  }
-
   function setText(id, value) {
     var node = document.getElementById(id);
     if (node) node.textContent = value || '—';
@@ -27,15 +18,13 @@
   }
 
   async function loadStatus() {
-    var token = getTokenSafe();
-    if (!token) {
+    if (typeof isAuthenticated === "function" && !isAuthenticated()) {
       window.location.href = '/login';
       return;
     }
 
     try {
       var response = await fetch('/api/me', {
-        headers: { Authorization: 'Bearer ' + token },
         credentials: 'include'
       });
       if (response.status === 401) {

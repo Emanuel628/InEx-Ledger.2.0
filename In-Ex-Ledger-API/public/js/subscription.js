@@ -66,6 +66,20 @@ function fmtDate(ts) {
   return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+function getSafeInvoiceUrl(invoice = {}) {
+  const raw = String(invoice?.hosted_invoice_url || invoice?.hostedInvoiceUrl || "").trim();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(raw, window.location.origin);
+    if (parsed.protocol !== "https:") return "";
+    if (!BILLING_REDIRECT_HOSTS.has(parsed.hostname)) return "";
+    return parsed.toString();
+  } catch (_) {
+    return "";
+  }
+}
+
 function fmtAmount(amount, currency) {
   const normalizedCurrency = String(currency || "usd").toUpperCase();
   const value = Number(amount || 0) / 100;

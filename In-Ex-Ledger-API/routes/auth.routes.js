@@ -18,7 +18,12 @@ const {
 const { pool } = require("../db.js");
 const { resolveBusinessIdForUser } = require("../api/utils/resolveBusinessIdForUser.js");
 const { getSubscriptionSnapshotForUser } = require("../services/subscriptionService.js");
-const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
+const {
+  ACCESS_TOKEN_COOKIE,
+  COOKIE_OPTIONS,
+  isLegacyScryptHash,
+  verifyPassword
+} = require("../utils/authUtils.js");
 const { logError, logWarn, logInfo } = require("../utils/logger.js");
 const {
   AUDIT_ACTIONS,
@@ -346,6 +351,7 @@ function getAppBaseUrl(req) {
 async function sendAppEmail({ to, subject, html, text }, { retries = 2, retryDelayMs = 500 } = {}) {
   const replyTo = process.env.RESEND_REPLY_TO || process.env.EMAIL_REPLY_TO || undefined;
   const recipient = Array.isArray(to) ? to : [to];
+  const maskedRecipients = recipient.map((value) => maskEmail(value)).filter(Boolean);
 
   let lastError;
   // One initial attempt plus up to `retries` additional attempts
@@ -360,12 +366,12 @@ async function sendAppEmail({ to, subject, html, text }, { retries = 2, retryDel
         replyTo
       });
       if (process.env.NODE_ENV !== "production") {
-        logInfo(`[email] sent to ${recipient.join(", ")} (subject: "${subject}")`);
+        logInfo(`[email] sent to ${maskedRecipients.join(", ")} (subject: "${subject}")`);
       }
       return result;
     } catch (err) {
       lastError = err;
-      logError("[email] attempt", attempt + 1, "failed for subject", JSON.stringify(subject), "to", recipient.join(", "), "-", err?.message || err);
+      logError("[email] attempt", attempt + 1, "failed for subject", JSON.stringify(subject), "to", maskedRecipients.join(", "), "-", err?.message || err);
       if (attempt < retries) {
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs * Math.pow(2, attempt)));
       }
@@ -525,6 +531,7 @@ async function issueAuthenticatedSession(
   const accessPayload = await buildAuthenticatedAccessPayload(user, businessIdOverride, {
     mfaAuthenticated
   });
+  setAccessCookie(res, accessPayload.token);
 
   const { token: refreshToken, expiresAt } = await createRefreshToken(user.id, {
     mfaAuthenticated: !!mfaAuthenticated,
@@ -544,7 +551,9 @@ async function resetCurrentRefreshSession(res, user, { mfaAuthenticated = false,
     req
   });
   setRefreshCookie(res, token, expiresAt);
-  return buildAuthenticatedAccessPayload(user, null, { mfaAuthenticated });
+  const accessPayload = await buildAuthenticatedAccessPayload(user, null, { mfaAuthenticated });
+  setAccessCookie(res, accessPayload.token);
+  return accessPayload;
 }
 
 function ensureArrayValue(value) {
@@ -768,6 +777,17 @@ function setRefreshCookie(res, token, expiresAt) {
 
 function clearRefreshCookie(res) {
   res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
+}
+
+function setAccessCookie(res, token) {
+  res.cookie(ACCESS_TOKEN_COOKIE, token, {
+    ...COOKIE_OPTIONS,
+    maxAge: ACCESS_TOKEN_EXPIRY_SECONDS * 1000
+  });
+}
+
+function clearAccessCookie(res) {
+  res.clearCookie(ACCESS_TOKEN_COOKIE, COOKIE_OPTIONS);
 }
 
 function setMfaTrustCookie(res, token, expiresAt) {
@@ -1310,6 +1330,7 @@ router.post("/login", authLimiter, async (req, res) => {
     const verified = Boolean(user.email_verified);
     if (!verified) {
       clearRefreshCookie(res);
+      clearAccessCookie(res);
       clearMfaTrustCookie(res);
       return res.status(403).json({
         error: "Please verify your email address before signing in. Check your inbox for a verification link.",
@@ -1432,6 +1453,7 @@ router.post("/refresh", tokenRefreshLimiter, requireCsrfProtection, async (req, 
   const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
   if (!rawToken) {
     clearRefreshCookie(res);
+    clearAccessCookie(res);
     return res.status(401).json({ error: "Missing refresh token" });
   }
 
@@ -1450,16 +1472,19 @@ router.post("/refresh", tokenRefreshLimiter, requireCsrfProtection, async (req, 
 
     if (!result.rowCount) {
       clearRefreshCookie(res);
+      clearAccessCookie(res);
       return res.status(401).json({ error: "Invalid refresh token" });
     }
     if (result.rows[0].is_erased) {
       await revokeAllRefreshTokensForUser(result.rows[0].user_id);
       clearRefreshCookie(res);
+      clearAccessCookie(res);
       return res.status(401).json({ error: "Invalid refresh token" });
     }
     if (!result.rows[0].email_verified) {
       await revokeRefreshTokenByHash(hashed);
       clearRefreshCookie(res);
+      clearAccessCookie(res);
       return res.status(403).json({ error: "Please verify your email before signing in." });
     }
 
@@ -1493,10 +1518,12 @@ router.post("/refresh", tokenRefreshLimiter, requireCsrfProtection, async (req, 
       ACCESS_TOKEN_EXPIRY_SECONDS
     );
 
-    res.status(200).json({ token, subscription });
+    setAccessCookie(res, token);
+    res.status(200).json({ subscription });
   } catch (err) {
     logError("Refresh token error:", err);
     clearRefreshCookie(res);
+    clearAccessCookie(res);
     res.status(500).json({ error: "Failed to refresh token" });
   }
 });
@@ -1518,6 +1545,7 @@ router.post("/logout", requireAuth, requireCsrfProtection, async (req, res) => {
     businessId: req.user?.business_id || null
   });
   clearRefreshCookie(res);
+  clearAccessCookie(res);
   clearMfaTrustCookie(res);
   res.status(204).end();
 });
@@ -1994,6 +2022,7 @@ router.post("/mfa/verify", requireCsrfProtection, mfaVerifyLimiter, async (req, 
   } catch (err) {
     if (err instanceof EmailNotVerifiedError) {
       clearRefreshCookie(res);
+      clearAccessCookie(res);
       clearMfaTrustCookie(res);
       return res.status(403).json({ error: "Please verify your email before signing in." });
     }
@@ -2060,7 +2089,7 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
         const emailContent = buildPasswordResetEmail(lang, resetLink);
         await sendAppEmail({ to: email, ...emailContent });
       } catch (emailErr) {
-        logError("[forgot-password] failed to send reset email to", email, ":", emailErr?.message || emailErr);
+        logError("[forgot-password] failed to send reset email to", maskEmail(email), ":", emailErr?.message || emailErr);
         // Continue — do not expose email delivery failure to the caller
       }
 
@@ -2105,7 +2134,7 @@ router.post("/account-recovery", passwordLimiter, async (req, res) => {
         const emailContent = buildPasswordResetEmail(lang, resetLink);
         await sendAppEmail({ to: recoveryEmail, ...emailContent });
       } catch (emailErr) {
-        logError("[account-recovery] failed to send reset email to", recoveryEmail, ":", emailErr?.message || emailErr);
+        logError("[account-recovery] failed to send reset email to", maskEmail(recoveryEmail), ":", emailErr?.message || emailErr);
       }
     }
 
@@ -2302,6 +2331,7 @@ router.get("/confirm-email-change", async (req, res) => {
     await revokeAllRefreshTokensForUser(user_id);
     await revokeTrustedMfaDevicesForUser(user_id);
     clearRefreshCookie(res);
+    clearAccessCookie(res);
     clearMfaTrustCookie(res);
     await recordAuditEvent(pool, {
       userId: user_id,

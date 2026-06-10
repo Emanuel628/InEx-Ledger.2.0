@@ -268,28 +268,32 @@ Status: INCOMPLETE / HIGH PRIORITY. The app is not in crisis, but it is not yet 
 
 Highest-priority engineering items from the audit:
 
-1. INCOMPLETE - Replace browser-readable bearer-token storage.
-   - Risk: `public/js/auth.js` stores the access token in `sessionStorage`, and other frontend files read/send it directly.
+1. PARTIAL - Replace browser-readable bearer-token storage.
+   - Current status: main frontend auth no longer persists access tokens in `sessionStorage` / `localStorage`, and the backend now supports cookie-backed auth.
+   - Remaining gap: transitional bearer-token compatibility paths still exist in browser JS and should be removed in a follow-up pass.
    - Owner files: `In-Ex-Ledger-API/public/js/auth.js`, `In-Ex-Ledger-API/public/js/login.js`, `In-Ex-Ledger-API/public/js/mfa-challenge.js`, `In-Ex-Ledger-API/public/js/global.js`
-   - Required direction: move to cookie/session-authoritative browser auth, or otherwise remove JS-readable bearer-token persistence.
+   - Required direction: finish the move to cookie/session-authoritative browser auth and remove the remaining bearer fallback paths.
 
-2. INCOMPLETE - Replace the bespoke JWT implementation.
-   - Risk: `middleware/auth.middleware.js` hand-rolls token signing and verification.
+2. COMPLETE - Replace the bespoke JWT implementation.
+   - Current status: `middleware/auth.middleware.js` now uses `jsonwebtoken` instead of a hand-rolled HMAC JWT implementation.
    - Owner file: `In-Ex-Ledger-API/middleware/auth.middleware.js`
-   - Required direction: migrate to a standard maintained token/session library and simplify the auth trust boundary.
+   - Follow-up: issuer/audience/key-rotation hardening is still desirable, but the bespoke implementation itself is gone.
 
 3. INCOMPLETE - Stop trusting raw `X-Forwarded-For` values in application code.
    - Risk: several services/routes parse `x-forwarded-for` directly instead of consistently relying on trusted proxy handling plus `req.ip`.
    - Owner files: `In-Ex-Ledger-API/services/sessionContextService.js`, `In-Ex-Ledger-API/services/signInSecurityService.js`, `In-Ex-Ledger-API/services/auditEventService.js`, `In-Ex-Ledger-API/routes/consent.routes.js`
 
-4. INCOMPLETE - Harden support-artifact upload/download to the same bar as receipts.
-   - Risk: support artifacts are weaker than receipts on validation, abuse controls, and path confinement.
+4. COMPLETE - Harden support-artifact upload/download core controls.
+   - Current status: support-artifact routes now have a dedicated limiter, MIME/extension consistency checks, and storage-root-confined path resolution.
    - Owner files: `In-Ex-Ledger-API/routes/supportArtifacts.routes.js`, `In-Ex-Ledger-API/services/supportArtifactStorage.js`
+   - Follow-up: file-signature sniffing and `nosniff` response hardening are still worthwhile, but the core gap from the audit is closed.
 
-5. INCOMPLETE - Confine receipt file resolution to the receipt storage root only.
+5. COMPLETE - Confine receipt file resolution to the receipt storage root only.
    - Owner file: `In-Ex-Ledger-API/services/receiptStorage.js`
 
-6. INCOMPLETE - Reduce sensitive identifier logging.
+6. PARTIAL - Reduce sensitive identifier logging.
+   - Current status: password-reset delivery logs and inbound invoice/support recipient logs are now masked.
+   - Remaining gap: a broader repository-wide logging minimization pass is still worth doing.
    - Owner files: `In-Ex-Ledger-API/routes/auth.routes.js`, `In-Ex-Ledger-API/routes/email.routes.js`, `In-Ex-Ledger-API/routes/supportEmail.routes.js`
 
 Security standards summary from the audit:
@@ -317,11 +321,11 @@ Launch-relevant: not all complete.
 3. COMPLETE - Full `npm run test:all` green.
 4. COMPLETE - `Docs/RELEASE-CHECKLIST.md` / real browser smoke pass complete.
 5. COMPLETE - Cookie-consent CSRF roundtrip verified.
-6. INCOMPLETE - Browser auth/session hardening still required before claiming enterprise-grade security posture.
-7. INCOMPLETE - Support artifact upload/download hardening still required.
-8. INCOMPLETE - Receipt/support file path confinement cleanup still required.
+6. INCOMPLETE - Final browser auth/session hardening still required before claiming enterprise-grade security posture.
+7. COMPLETE - Support artifact upload/download hardening core controls landed.
+8. COMPLETE - Receipt/support file path confinement cleanup landed.
 9. INCOMPLETE - Trusted proxy/IP handling cleanup still required.
-10. INCOMPLETE - Sensitive logging cleanup still required.
+10. PARTIAL - Sensitive logging cleanup started; broad follow-up still required.
 
 Launch-blocking security hardening remains. Product/design backlog stays below that line.
 

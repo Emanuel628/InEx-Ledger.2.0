@@ -67,6 +67,8 @@ let pendingRefreshPromise = null;
 let idleLogoutTimer = null;
 let idleGuardWired = false;
 let lastActivityAt = 0;
+let accessTokenMemory = "";
+let legacyTokenHydrated = false;
 
 function authT(key) {
   return typeof t === "function" ? t(key) : key;
@@ -664,23 +666,40 @@ preloadAuthenticatedChrome();
 
 
 function getToken() {
+  if (accessTokenMemory) {
+    return accessTokenMemory;
+  }
+
+  if (!legacyTokenHydrated) {
+    legacyTokenHydrated = true;
+    try {
+      const legacyToken = sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY) || "";
+      if (legacyToken) {
+        accessTokenMemory = legacyToken;
+      }
+      sessionStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+    } catch (_) {}
+  }
+
   try {
-    return sessionStorage.getItem(TOKEN_KEY) || "";
+    return accessTokenMemory || "";
   } catch (_) {}
   return "";
 }
 
 function setToken(token) {
+  accessTokenMemory = String(token || "").trim();
   try {
-    sessionStorage.setItem(TOKEN_KEY, token);
-  } catch (_) {}
-  try {
+    sessionStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(TOKEN_KEY);
   } catch (_) {}
 }
 
 function clearToken() {
   clearIdleLogoutTimer();
+  accessTokenMemory = "";
+  legacyTokenHydrated = true;
   try {
     sessionStorage.removeItem(TOKEN_KEY);
   } catch (_) {}
@@ -774,11 +793,7 @@ async function refreshAccessToken() {
       }
 
       const payload = await response.json().catch(() => null);
-      if (!payload?.token) {
-        return false;
-      }
-
-      setToken(payload.token);
+      setToken(payload?.token || "");
       if (payload?.subscription) {
         applySubscriptionState(payload.subscription);
       }
@@ -808,19 +823,6 @@ async function requireValidSessionOrRedirect() {
 
   window.__AUTH_GUARD_STATE__.running = true;
   window.__AUTH_GUARD_STATE__.count += 1;
-
-    let token = getToken();
-    if (!token) {
-      const refreshed = await refreshAccessToken();
-      token = refreshed ? getToken() : "";
-
-    if (!token) {
-      window.__AUTH_GUARD_STATE__.running = false;
-      window.__AUTH_GUARD_STATE__.lastError = "expired";
-      window.location.href = `${LOGIN_PAGE}?reason=expired`;
-      return;
-    }
-  }
 
   const loadProfile = async () => {
     const meUrl = buildApiUrl("/api/me");
@@ -896,11 +898,6 @@ async function requireValidSessionOrRedirect() {
 
 async function redirectIfAuthenticated() {
   try {
-    const existingToken = getToken();
-    if (!existingToken) {
-      return;
-    }
-
     const loadProfile = () => fetch(buildApiUrl("/api/me"), {
       method: "GET",
       credentials: "include",
@@ -1020,7 +1017,7 @@ function isTrialValid() {
 }
 
 function isAuthenticated() {
-  return Boolean(getToken());
+  return Boolean(window.__LUNA_ME__?.id || getToken());
 }
 
 function requireAuth() {

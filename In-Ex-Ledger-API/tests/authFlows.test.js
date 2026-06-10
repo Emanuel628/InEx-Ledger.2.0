@@ -139,7 +139,7 @@ test("verifyToken throws on a tampered signature", () => {
 });
 
 test("verifyToken throws on a token with fewer than three parts", () => {
-  assert.throws(() => verifyToken("onlytwoparts.here"), /invalid token format/i);
+  assert.throws(() => verifyToken("onlytwoparts.here"), /(invalid token format|jwt malformed)/i);
 });
 
 test("verifyToken throws on an empty string", () => {

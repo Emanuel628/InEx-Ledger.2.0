@@ -31,8 +31,8 @@ What is strong:
 
 What currently fails or needs remediation:
 
-1. **Access tokens are stored in browser session storage and used as JavaScript-readable Bearer tokens.**
-2. **JWT signing and verification are implemented manually instead of using a vetted token library.**
+1. **Browser auth still needs a final cookie-first cleanup pass, but session/storage persistence of access tokens has been removed from the main frontend flow.**
+2. **JWT signing and verification were implemented manually; this has now been migrated to `jsonwebtoken`, but issuer/audience/key-rotation hardening is still open.**
 3. **Client IP attribution trusts `X-Forwarded-For` directly in multiple security-sensitive paths.**
 4. **Support artifact upload is materially weaker than receipt upload: no dedicated rate limit, MIME-only validation, and path resolution is not storage-confined.**
 5. **File path resolution for stored artifacts accepts arbitrary existing paths instead of enforcing managed-directory confinement.**
@@ -40,9 +40,9 @@ What currently fails or needs remediation:
 
 ## Highest-Risk Findings
 
-### 1. Browser-readable access tokens
+### 1. Browser auth token handling
 
-- Status: `FAIL`
+- Status: `PARTIAL PASS`
 - Standards impact:
   - OWASP Top 10 2021: A04 Insecure Design, A07 Identification and Authentication Failures
   - ASVS 5.0.0: Session management, credential/token handling
@@ -54,18 +54,29 @@ At-risk files/functions:
 - `In-Ex-Ledger-API/public/js/auth.js`
   - `getToken()`
   - `setToken(token)`
-  - `authHeader()`
+  - `refreshAccessToken()`
+  - `requireValidSessionOrRedirect()`
 - `In-Ex-Ledger-API/public/js/global.js`
-  - API helper paths that read token state and build `Authorization` headers
+  - unread-count polling and consent fetch paths
 - `In-Ex-Ledger-API/public/js/login.js`
-  - stores auth token after login
+  - no longer requires a returned token to complete login
 - `In-Ex-Ledger-API/public/js/mfa-challenge.js`
-  - stores auth token after MFA
+  - no longer requires a returned token to complete MFA
+- `In-Ex-Ledger-API/middleware/auth.middleware.js`
+  - now accepts secure auth cookies in addition to bearer headers
+- `In-Ex-Ledger-API/routes/auth.routes.js`
+  - now sets/clears an `HttpOnly` access-token cookie alongside refresh-token rotation
 
-Why this is a problem:
+What changed in this pass:
 
-- Any successful XSS becomes full session compromise because the access token is readable by JavaScript.
-- This weakens otherwise good CSRF and refresh-token protections because the attacker can just steal the bearer token directly.
+- Access-token persistence in `sessionStorage` / `localStorage` was removed from the main auth helper.
+- The browser frontend now relies on cookie-backed auth flows first, with legacy in-memory/bearer fallback during transition.
+- Login, MFA, onboarding, privacy, settings-mobile, unread polling, and consent paths were updated so they no longer require a stored browser token to function.
+
+Remaining gap:
+
+- The frontend auth helper still contains transitional bearer-token code paths for compatibility, so this is not yet a full cookie-only architecture.
+- A successful same-origin XSS can still act within the user session; the reduction here is removal of persistent token storage, not elimination of all session abuse risk.
 
 Recommended patch:
 
@@ -74,15 +85,13 @@ Recommended patch:
 3. If you need a split-token architecture, keep the short-lived access token server-side and expose only a session cookie to the browser.
 4. Remove all token persistence logic from frontend JS.
 
-Implementation direction:
+Next step to fully close:
 
-- Introduce a server session or signed/encrypted auth cookie in `auth.routes.js`.
-- Remove `TOKEN_KEY`, `getToken`, `setToken`, and `authHeader` usage from `public/js/auth.js`.
-- Update `requireAuth` to read the cookie or a server session instead of bearer headers for browser traffic.
+- Remove the remaining bearer fallback from browser-owned JS paths and drive the UI entirely from authenticated cookies plus `/api/me`.
 
 ### 2. Custom JWT implementation
 
-- Status: `FAIL`
+- Status: `PARTIAL PASS`
 - Standards impact:
   - OWASP Top 10 2021: A02 Cryptographic Failures
   - ASVS 5.0.0: cryptographic architecture and token verification controls
@@ -97,14 +106,14 @@ At-risk files/functions:
 
 Why this is a problem:
 
-- The implementation is simple and not obviously broken, but it is still bespoke security code.
-- There is no issuer/audience validation, no key rotation model, no `jti`, and no library-level hardening.
-- Bespoke JWT handling creates avoidable long-term maintenance risk.
+- The original implementation was bespoke security code.
+- This pass moved signing and verification to `jsonwebtoken`, which removes the highest-risk maintenance issue.
+- Issuer/audience validation, `jti`, and key-rotation discipline are still not implemented.
 
 Recommended patch:
 
-1. Replace the custom implementation with `jose`.
-2. Validate `iss`, `aud`, `exp`, `nbf`, and optionally `jti`.
+1. Keep the library-based implementation.
+2. Add `iss`, `aud`, `exp`, `nbf`, and optionally `jti` validation.
 3. Add explicit key identifiers and a rotation path.
 4. Separate access-token signing keys from any other HMAC uses.
 
@@ -160,7 +169,7 @@ Implementation direction:
 
 ### 4. Support artifact upload/download hardening gap
 
-- Status: `FAIL`
+- Status: `PASS / PARTIAL`
 - Standards impact:
   - OWASP Top 10 2021: A05 Security Misconfiguration
   - ASVS 5.0.0: file upload validation, resource controls, safe file retrieval
@@ -176,25 +185,16 @@ At-risk files/functions:
 - `In-Ex-Ledger-API/services/supportArtifactStorage.js`
   - `resolveSupportArtifactFilePath(filePath)`
 
-Why this is a problem:
+What changed in this pass:
 
-- Uploads are accepted into memory with a 10 MB limit but no dedicated rate limiter.
-- Validation is MIME-only; there is no extension/content-signature verification.
-- Stored path resolution accepts arbitrary existing paths and basename fallbacks instead of enforcing the managed storage root.
-- Download responses do not add a dedicated `X-Content-Type-Options: nosniff` header here.
+- A dedicated per-user route limiter was added to support-artifact routes.
+- Upload validation now enforces MIME/extension consistency instead of MIME-only acceptance.
+- Support-artifact file resolution is now confined to the managed support-artifact storage root.
 
-Recommended patch:
+Remaining gap:
 
-1. Add a dedicated upload limiter similar to receipts.
-2. Mirror receipt validation:
-   - allowlist extensions
-   - require MIME/extension consistency
-   - inspect file signature for PDF/JPEG/PNG/WebP where possible
-3. Constrain file resolution:
-   - resolve only under the managed support-artifact directory
-   - reject any path that escapes that root
-4. Add `X-Content-Type-Options: nosniff` on downloads.
-5. Prefer storing an internal object key or filename only, not an arbitrary path.
+- File-signature sniffing and explicit `nosniff` response hardening are still worth adding.
+- Uploads still use in-memory buffering with a 10 MB limit; that is acceptable for now, but not ideal forever.
 
 Implementation direction:
 
@@ -203,7 +203,7 @@ Implementation direction:
 
 ### 5. Receipt path resolution should also be storage-confined
 
-- Status: `FAIL`
+- Status: `PASS`
 - Standards impact:
   - ASVS 5.0.0: file storage / path safety
   - OWASP Top 10 2021: A05 Security Misconfiguration
@@ -213,15 +213,13 @@ At-risk files/functions:
 - `In-Ex-Ledger-API/services/receiptStorage.js`
   - `resolveReceiptFilePath(filePath)`
 
-Why this is a problem:
+What changed in this pass:
 
-- It checks multiple candidate paths and accepts any existing file, including absolute paths.
-- That is safer than an unauthenticated arbitrary file endpoint, but still not strict enough for a finance application.
+- `resolveReceiptFilePath(filePath)` now resolves only inside the managed receipt storage directory and no longer accepts arbitrary absolute/raw paths.
 
-Recommended patch:
+Result:
 
-- Only permit files whose resolved path stays within `getReceiptStorageDir()`.
-- Remove candidate logic that accepts arbitrary absolute/raw paths.
+- This specific path-confinement finding is closed.
 
 ### 6. Excessive identifier logging in some error paths
 
@@ -240,16 +238,14 @@ At-risk files/functions:
 - `In-Ex-Ledger-API/routes/supportEmail.routes.js`
   - similar inbound recipient logging
 
-Why this is a problem:
+What changed in this pass:
 
-- The log sanitizer helps, but some call sites still log raw email addresses or recipient arrays directly in error flows.
-- In a bookkeeping product, log minimization should be stricter than generic web-app defaults.
+- Password-reset delivery failures in `auth.routes.js` now mask recipient email addresses before logging.
+- Inbound invoice/support mail handlers now mask recipient arrays and sender email values before logging.
 
-Recommended patch:
+Remaining gap:
 
-- Mask email addresses before logging.
-- Log counts or hashed identifiers where possible.
-- Treat inbound recipient arrays as sensitive operational metadata.
+- A broader repository-wide logging sweep is still warranted, but the concrete high-signal call sites identified in this audit are now reduced.
 
 ## Framework Checklist
 
@@ -260,10 +256,10 @@ Recommended patch:
 | A01 Broken Access Control | `PASS / PARTIAL` | Business scoping is broadly good; object ownership checks are present in core routes. Remaining file-path issues are more storage-safety than classic BOLA. |
 | A02 Cryptographic Failures | `FAIL` | Custom JWT implementation in `middleware/auth.middleware.js`. |
 | A03 Injection | `PASS` | SQL is parameterized broadly; no obvious command injection surface found in mounted app code. |
-| A04 Insecure Design | `FAIL` | Browser-readable bearer token architecture in `public/js/auth.js` and related frontend auth flows. |
-| A05 Security Misconfiguration | `FAIL` | Spoofable `X-Forwarded-For` handling; weaker support-artifact upload/download controls. |
+| A04 Insecure Design | `PARTIAL FAIL` | Frontend token persistence was removed, but the browser auth architecture still needs a final cookie-only cleanup pass. |
+| A05 Security Misconfiguration | `PARTIAL FAIL` | Spoofable `X-Forwarded-For` handling remains; support-artifact controls are improved but not fully identical to receipts. |
 | A06 Vulnerable and Outdated Components | `PARTIAL` | No full SCA result is embedded in repo. Dependency posture should be validated separately in CI. |
-| A07 Identification and Authentication Failures | `FAIL` | Token handling architecture and bespoke JWT logic are below best practice. |
+| A07 Identification and Authentication Failures | `PARTIAL FAIL` | JWT handling now uses a maintained library, but browser auth still has transitional bearer-compatibility paths. |
 | A08 Software and Data Integrity Failures | `PARTIAL PASS` | Webhooks are verified; no obvious unsafe auto-update path found. Token library replacement still recommended. |
 | A09 Security Logging and Monitoring Failures | `PARTIAL FAIL` | Good audit coverage exists, but client-IP spoofing and some over-detailed logging weaken trustworthiness. |
 | A10 SSRF | `PASS` | `signInSecurityService.js` uses HTTPS-only geolocation host allowlisting. |
@@ -273,13 +269,13 @@ Recommended patch:
 | Category | Status | Notes |
 |---|---|---|
 | API1 Broken Object Level Authorization | `PASS / PARTIAL` | Core resource routes scope by `business_id` and validate ownership. |
-| API2 Broken Authentication | `FAIL` | Access tokens in session storage; bespoke JWT handling. |
+| API2 Broken Authentication | `PARTIAL FAIL` | Persistent browser token storage is removed and JWTs use a maintained library, but auth is not yet fully cookie-only. |
 | API3 Broken Object Property Level Authorization | `PARTIAL` | Several V2 services accept loose `metadata` objects without schema enforcement. |
-| API4 Unrestricted Resource Consumption | `FAIL` | `supportArtifacts.routes.js` lacks a dedicated limiter while accepting in-memory 10 MB uploads. |
+| API4 Unrestricted Resource Consumption | `PARTIAL FAIL` | Support-artifact routes now have a dedicated limiter, but in-memory 10 MB uploads still deserve future tightening. |
 | API5 Broken Function Level Authorization | `PASS` | Mounted route gating is generally present. Internal support endpoints are secret-protected. |
 | API6 Unrestricted Access to Sensitive Business Flows | `PARTIAL PASS` | Billing and privacy flows are gated; no obvious unauthenticated business-flow bypass found in mounted code. |
 | API7 Server-Side Request Forgery | `PASS` | Geolocation outbound call is allowlisted and HTTPS-only. |
-| API8 Security Misconfiguration | `FAIL` | Raw `X-Forwarded-For` trust and weak support-artifact file resolution. |
+| API8 Security Misconfiguration | `PARTIAL FAIL` | Raw `X-Forwarded-For` trust remains, but support-artifact and receipt file resolution are now storage-confined. |
 | API9 Improper Inventory Management | `PARTIAL` | Route surface is large and mixed V1/V2; should be formally inventoried and tagged in CI. |
 | API10 Unsafe Consumption of APIs | `PASS / PARTIAL` | Stripe/Plaid/webhook verification is present; continue enforcing strict response and dependency validation. |
 

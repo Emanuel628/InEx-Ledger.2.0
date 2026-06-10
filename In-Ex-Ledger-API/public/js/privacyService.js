@@ -47,12 +47,6 @@
 
   function authHeaders(method = "GET") {
     const headers = { "Content-Type": "application/json" };
-    if (typeof getToken === "function") {
-      const token = getToken();
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-    }
     if (typeof csrfHeader === "function") {
       Object.assign(headers, csrfHeader(method));
     }

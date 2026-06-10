@@ -14,6 +14,8 @@ const COOKIE_OPTIONS = {
   path: "/"
 };
 
+const ACCESS_TOKEN_COOKIE = "access_token";
+
 function isLegacyScryptHash(stored) {
   return typeof stored === "string" && stored.includes("$") && stored.split("$").length === 2;
 }
@@ -42,4 +44,9 @@ async function verifyPassword(password, stored) {
   return { match, legacy: false };
 }
 
-module.exports = { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword };
+module.exports = {
+  ACCESS_TOKEN_COOKIE,
+  COOKIE_OPTIONS,
+  isLegacyScryptHash,
+  verifyPassword
+};

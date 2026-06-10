@@ -102,7 +102,9 @@ function loadSupportArtifactsRouterFixture() {
       return {
         logError(...args) {
           state.logErrors.push(args);
-        }
+        },
+        logInfo() {},
+        logWarn() {}
       };
     }
 

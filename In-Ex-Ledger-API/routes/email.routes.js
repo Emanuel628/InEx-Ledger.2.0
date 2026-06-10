@@ -176,6 +176,26 @@ function pickFromAddress(payload) {
   return { email: null, name: null };
 }
 
+function maskEmailLike(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const match = raw.match(/<([^>]+)>/);
+  const address = (match ? match[1] : raw).trim().toLowerCase();
+  const [local, domain] = address.split("@");
+  if (!local || !domain) {
+    return raw.slice(0, 3) + "***";
+  }
+  const localPrefix = local.length <= 2 ? `${local[0] || "*"}*` : `${local.slice(0, 2)}***`;
+  const domainParts = domain.split(".");
+  const domainName = domainParts.shift() || "";
+  const maskedDomain = domainName.length <= 2 ? `${domainName[0] || "*"}*` : `${domainName.slice(0, 2)}***`;
+  return `${localPrefix}@${[maskedDomain, ...domainParts].join(".")}`;
+}
+
+function maskRecipientList(recipients = []) {
+  return recipients.map((recipient) => maskEmailLike(recipient)).filter(Boolean);
+}
+
 function buildInboundNotification({ invoice, from, subject, body }) {
   const senderLabel = from?.name
     ? `${from.name} <${from.email || ""}>`.trim()
@@ -530,7 +550,7 @@ router.post("/inbound", async (req, res) => {
   }
 
   if (!invoiceId && !supportThreadId) {
-    logWarn("inbound email webhook: no matching reply token", { recipients });
+    logWarn("inbound email webhook: no matching reply token", { recipients: maskRecipientList(recipients) });
     return res.status(200).json({ ok: true, ignored: "no_matching_invoice" });
   }
 
@@ -638,7 +658,7 @@ const body =
   invoiceId: invoice?.id || null,
   supportThreadId: rootMessageId,
   messageId,
-  from: from.email,
+  from: maskEmailLike(from.email),
   fetchedBody: !!receivedEmail,
   bodyLength: body.length
     });
