@@ -716,9 +716,13 @@ router.post("/support-email", async (req, res) => {
     };
 
     if (replyTo) {
-      const replyToDisplay = `InEx Ledger Support <${replyTo}>`;
-      payload.replyTo = replyToDisplay;
-      payload.reply_to = replyToDisplay;
+      payload.reply_to = replyTo;
+      
+      logInfo("support email reply-to applied", {
+        messageId,
+        replyTo,
+        hasPayloadReplyTo: Boolean(payload.reply_to)
+      });
     }
 
     const sendResult = await resend.emails.send(payload);
