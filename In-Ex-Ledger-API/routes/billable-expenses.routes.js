@@ -5,6 +5,7 @@ const { requireAuth } = require('../middleware/auth.middleware.js');
 const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
 const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
+const { normalizeV2Metadata } = require('../api/utils/v2MetadataValidator');
 const { logError } = require('../utils/logger.js');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -47,6 +48,15 @@ function formatRouteError(err) {
   return err instanceof Error ? err.message : String(err || 'unknown_error');
 }
 
+function validateMetadata(body) {
+  const normalized = normalizeV2Metadata(body?.metadata);
+  if (!normalized.ok) {
+    return normalized;
+  }
+  body.metadata = normalized.value;
+  return normalized;
+}
+
 // List billable expenses
 router.get('/', async (req, res) => {
   try {
@@ -78,6 +88,10 @@ router.post('/', async (req, res) => {
   if (!hasBillableExpensePayload(req.body)) {
     return res.status(400).json({ error: 'Missing required billable expense fields.' });
   }
+  const metadataCheck = validateMetadata(req.body);
+  if (!metadataCheck.ok) {
+    return res.status(400).json({ error: metadataCheck.error });
+  }
   try {
     const expense = await BillableExpenseService.createBillableExpense(req.business.id, req.body);
     res.status(201).json({ expense });
@@ -94,6 +108,10 @@ router.put('/:id', async (req, res) => {
   }
   if (!hasBillableExpensePayload(req.body)) {
     return res.status(400).json({ error: 'Missing required billable expense fields.' });
+  }
+  const metadataCheck = validateMetadata(req.body);
+  if (!metadataCheck.ok) {
+    return res.status(400).json({ error: metadataCheck.error });
   }
   try {
     const expense = await BillableExpenseService.updateBillableExpense(req.business.id, req.params.id, req.body);

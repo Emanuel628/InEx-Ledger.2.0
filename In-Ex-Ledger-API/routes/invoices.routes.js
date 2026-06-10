@@ -6,6 +6,7 @@ const invoiceService = require('../services/invoiceService');
 const { requireAuth } = require('../middleware/auth.middleware.js');
 const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
+const { normalizeV2Metadata } = require('../api/utils/v2MetadataValidator');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const INVOICE_STATUS_VALUES = new Set(['draft', 'open', 'sent', 'partial', 'paid', 'void']);
@@ -44,6 +45,15 @@ function hasInvoicePayload(body) {
 	);
 }
 
+function validateMetadata(body) {
+	const normalized = normalizeV2Metadata(body?.metadata);
+	if (!normalized.ok) {
+		return normalized;
+	}
+	body.metadata = normalized.value;
+	return normalized;
+}
+
 // List invoices (GET /invoices)
 router.get('/', async (req, res) => {
 	const businessId = req.business.id;
@@ -60,6 +70,10 @@ router.post('/', async (req, res) => {
 	const businessId = req.business.id;
 	if (!hasInvoicePayload(req.body)) {
 		return res.status(400).json({ error: 'Missing required invoice fields.' });
+	}
+	const metadataCheck = validateMetadata(req.body);
+	if (!metadataCheck.ok) {
+		return res.status(400).json({ error: metadataCheck.error });
 	}
 	try {
 		const invoice = await invoiceService.createInvoice(businessId, req.body);
@@ -94,6 +108,10 @@ router.put('/:id', async (req, res) => {
 	}
 	if (!hasInvoicePayload(req.body)) {
 		return res.status(400).json({ error: 'Missing required invoice fields.' });
+	}
+	const metadataCheck = validateMetadata(req.body);
+	if (!metadataCheck.ok) {
+		return res.status(400).json({ error: metadataCheck.error });
 	}
 	try {
 		const invoice = await invoiceService.updateInvoice(businessId, req.params.id, req.body);

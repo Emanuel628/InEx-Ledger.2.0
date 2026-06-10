@@ -253,7 +253,7 @@ Remaining gap:
 |---|---|---|
 | API1 Broken Object Level Authorization | `PASS / PARTIAL` | Core resource routes scope by `business_id` and validate ownership. |
 | API2 Broken Authentication | `PASS / PARTIAL` | Persistent browser token storage is removed, JWTs use a maintained library, and the audited browser flow is cookie-only. |
-| API3 Broken Object Property Level Authorization | `PARTIAL` | Several V2 services accept loose `metadata` objects without schema enforcement. |
+| API3 Broken Object Property Level Authorization | `PASS / PARTIAL` | Shared validation now constrains V2 `metadata` payloads in the audited project/bill/invoice/expense routes; broader field-level schema enforcement can still expand over time. |
 | API4 Unrestricted Resource Consumption | `PARTIAL FAIL` | Support-artifact routes now have a dedicated limiter, but in-memory 10 MB uploads still deserve future tightening. |
 | API5 Broken Function Level Authorization | `PASS` | Mounted route gating is generally present. Internal support endpoints are secret-protected. |
 | API6 Unrestricted Access to Sensitive Business Flows | `PARTIAL PASS` | Billing and privacy flows are gated; no obvious unauthenticated business-flow bypass found in mounted code. |
@@ -303,8 +303,7 @@ Remaining gap:
 
 ### Priority 1
 
-1. Add schema validation for V2 `metadata` payloads.
-2. Add a dedicated security regression suite for:
+1. Add a dedicated security regression suite for:
    - support artifact upload MIME/signature mismatch
    - path escape attempts
    - session theft resistance after XSS simulation assumptions

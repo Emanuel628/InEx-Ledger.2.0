@@ -276,6 +276,23 @@ test("projects create rejects missing names before the service layer", async () 
   }
 });
 
+test("projects create rejects non-object metadata before the service layer", async () => {
+  const fixture = loadRouter(PROJECTS_ROUTE_PATH, "projects");
+  try {
+    const response = await authedWithCsrf(request(fixture.app).post("/api/test"))
+      .send({
+        name: "Website refresh",
+        metadata: ["not", "an", "object"]
+      });
+
+    assert.equal(response.status, 400);
+    assert.match(String(response.body?.error || ""), /metadata must be a json object/i);
+    assert.equal(fixture.state.serviceCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("vendors read rejects invalid ids before the service layer", async () => {
   const fixture = loadRouter(VENDORS_ROUTE_PATH, "vendors");
   try {
@@ -344,6 +361,30 @@ test("bills create rejects arbitrary status strings before the service layer", a
   }
 });
 
+test("bills create rejects metadata with invalid keys before the service layer", async () => {
+  const fixture = loadRouter(BILLS_ROUTE_PATH, "bills");
+  try {
+    const response = await authedWithCsrf(request(fixture.app).post("/api/test"))
+      .send({
+        vendor_id: "00000000-0000-4000-8000-000000009004",
+        number: "BILL-001",
+        status: "draft",
+        issue_date: "2026-05-14",
+        total_amount: 50,
+        currency: "USD",
+        metadata: {
+          "bad key": "nope"
+        }
+      });
+
+    assert.equal(response.status, 400);
+    assert.match(String(response.body?.error || ""), /invalid key/i);
+    assert.equal(fixture.state.serviceCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("billable expenses create rejects malformed payloads before the service layer", async () => {
   const fixture = loadRouter(BILLABLE_EXPENSES_ROUTE_PATH, "billable-expenses");
   try {
@@ -356,6 +397,37 @@ test("billable expenses create rejects malformed payloads before the service lay
       });
 
     assert.equal(response.status, 400);
+    assert.equal(fixture.state.serviceCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billable expenses create rejects deeply nested metadata before the service layer", async () => {
+  const fixture = loadRouter(BILLABLE_EXPENSES_ROUTE_PATH, "billable-expenses");
+  try {
+    const response = await authedWithCsrf(request(fixture.app).post("/api/test"))
+      .send({
+        project_id: "00000000-0000-4000-8000-000000009005",
+        description: "Travel expense",
+        amount: 12.5,
+        currency: "USD",
+        expense_date: "2026-05-14",
+        metadata: {
+          one: {
+            two: {
+              three: {
+                four: {
+                  five: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+    assert.equal(response.status, 400);
+    assert.match(String(response.body?.error || ""), /maximum nesting depth/i);
     assert.equal(fixture.state.serviceCalls.length, 0);
   } finally {
     fixture.cleanup();
@@ -396,6 +468,30 @@ test("invoices delete enforces CSRF on mutations at the router level", async () 
     );
 
     assert.equal(response.status, 403);
+    assert.equal(fixture.state.serviceCalls.length, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("invoices create rejects oversized metadata before the service layer", async () => {
+  const fixture = loadRouter(INVOICES_ROUTE_PATH, "invoices");
+  try {
+    const response = await authedWithCsrf(request(fixture.app).post("/api/test"))
+      .send({
+        customer_id: "00000000-0000-4000-8000-000000009006",
+        number: "INV-001",
+        status: "draft",
+        issue_date: "2026-05-14",
+        total_amount: 120,
+        currency: "USD",
+        metadata: {
+          notes: "x".repeat(5000)
+        }
+      });
+
+    assert.equal(response.status, 400);
+    assert.match(String(response.body?.error || ""), /500 characters|4096 bytes/i);
     assert.equal(fixture.state.serviceCalls.length, 0);
   } finally {
     fixture.cleanup();

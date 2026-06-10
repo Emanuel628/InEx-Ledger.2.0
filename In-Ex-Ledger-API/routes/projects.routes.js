@@ -5,6 +5,7 @@ const { requireAuth } = require('../middleware/auth.middleware.js');
 const { requireCsrfProtection } = require('../middleware/csrf.middleware.js');
 const { createDataApiLimiter } = require('../middleware/rate-limit.middleware.js');
 const { requireV2BusinessEnabled, requireV2Entitlement } = require('../api/utils/requireV2BusinessEnabled');
+const { normalizeV2Metadata } = require('../api/utils/v2MetadataValidator');
 const { logError } = require('../utils/logger.js');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -24,6 +25,15 @@ function isUuid(value) {
 
 function hasProjectPayload(body) {
   return typeof body?.name === 'string' && body.name.trim().length > 0;
+}
+
+function validateMetadata(body) {
+  const normalized = normalizeV2Metadata(body?.metadata);
+  if (!normalized.ok) {
+    return normalized;
+  }
+  body.metadata = normalized.value;
+  return normalized;
 }
 
 function formatRouteError(err) {
@@ -61,6 +71,10 @@ router.post('/', async (req, res) => {
   if (!hasProjectPayload(req.body)) {
     return res.status(400).json({ error: 'Project name is required.' });
   }
+  const metadataCheck = validateMetadata(req.body);
+  if (!metadataCheck.ok) {
+    return res.status(400).json({ error: metadataCheck.error });
+  }
   try {
     const project = await ProjectService.createProject(req.business.id, req.body);
     res.status(201).json({ project });
@@ -77,6 +91,10 @@ router.put('/:id', async (req, res) => {
   }
   if (!hasProjectPayload(req.body)) {
     return res.status(400).json({ error: 'Project name is required.' });
+  }
+  const metadataCheck = validateMetadata(req.body);
+  if (!metadataCheck.ok) {
+    return res.status(400).json({ error: metadataCheck.error });
   }
   try {
     const project = await ProjectService.updateProject(req.business.id, req.params.id, req.body);

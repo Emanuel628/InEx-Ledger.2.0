@@ -295,6 +295,11 @@ Highest-priority engineering items from the audit:
    - Remaining gap: a broader repository-wide logging minimization pass is still worth doing.
    - Owner files: `In-Ex-Ledger-API/routes/auth.routes.js`, `In-Ex-Ledger-API/routes/email.routes.js`, `In-Ex-Ledger-API/routes/supportEmail.routes.js`
 
+7. COMPLETE - Add schema validation for V2 metadata payloads.
+   - Current status: shared validation now constrains V2 `metadata` on the legacy business `projects`, `bills`, `billable-expenses`, and `invoices` routes before the service layer.
+   - Owner files: `In-Ex-Ledger-API/api/utils/v2MetadataValidator.js`, `In-Ex-Ledger-API/routes/projects.routes.js`, `In-Ex-Ledger-API/routes/bills.routes.js`, `In-Ex-Ledger-API/routes/billable-expenses.routes.js`, `In-Ex-Ledger-API/routes/invoices.routes.js`, `In-Ex-Ledger-API/tests/v2RouteHardening.test.js`
+   - Enforcement: root object only, bounded depth/array size/key count/string length, JSON-serializable values, and max payload bytes.
+
 Security standards summary from the audit:
 
 - OWASP Top 10: partial pass overall, but fails remain in session/crypto architecture, insecure design, security misconfiguration, and logging/monitoring hygiene.
