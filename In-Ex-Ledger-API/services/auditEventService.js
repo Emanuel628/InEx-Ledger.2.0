@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto = require("crypto");
+const { getTrustedClientIp } = require("./requestIpService.js");
 
 const AUDIT_ACTIONS = Object.freeze({
   LOGIN_SUCCESS: "auth.login.success",
@@ -47,9 +48,7 @@ function truncate(value, max) {
 
 function extractRequestContext(req) {
   if (!req) return { ipAddress: null, userAgent: null };
-  const xff = req.headers?.["x-forwarded-for"];
-  const forwarded = typeof xff === "string" ? xff.split(",")[0].trim() : null;
-  const ipAddress = forwarded || req.ip || req.connection?.remoteAddress || null;
+  const ipAddress = getTrustedClientIp(req) || null;
   const userAgent = req.headers?.["user-agent"] || null;
   return {
     ipAddress: truncate(ipAddress, MAX_IP_LEN),

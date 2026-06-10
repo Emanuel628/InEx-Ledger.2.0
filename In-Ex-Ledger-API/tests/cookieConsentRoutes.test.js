@@ -168,6 +168,21 @@ test("GET /api/consent/cookie restores the latest saved database decision for th
   }
 });
 
+test("GET /api/consent/cookie accepts the access-token cookie for authenticated lookup", async () => {
+  const fixture = loadConsentRouterFixture();
+
+  try {
+    const response = await request(fixture.app)
+      .get("/api/consent/cookie")
+      .set("Cookie", ["access_token=valid_access_token"]);
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body?.record?.decision, "declined");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("GET /api/consent/cookie falls back to the existing browser cookie when no authenticated database record exists", async () => {
   const fixture = loadConsentRouterFixture({ refreshUserId: null, latestRecord: null });
 

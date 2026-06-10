@@ -279,8 +279,8 @@ Highest-priority engineering items from the audit:
    - Owner file: `In-Ex-Ledger-API/middleware/auth.middleware.js`
    - Follow-up: issuer/audience/key-rotation hardening is still desirable, but the bespoke implementation itself is gone.
 
-3. INCOMPLETE - Stop trusting raw `X-Forwarded-For` values in application code.
-   - Risk: several services/routes parse `x-forwarded-for` directly instead of consistently relying on trusted proxy handling plus `req.ip`.
+3. COMPLETE - Stop trusting raw `X-Forwarded-For` values in application code for the audited core paths.
+   - Current status: a shared trusted-IP helper now drives `sessionContextService.js`, `signInSecurityService.js`, `auditEventService.js`, and `consent.routes.js`.
    - Owner files: `In-Ex-Ledger-API/services/sessionContextService.js`, `In-Ex-Ledger-API/services/signInSecurityService.js`, `In-Ex-Ledger-API/services/auditEventService.js`, `In-Ex-Ledger-API/routes/consent.routes.js`
 
 4. COMPLETE - Harden support-artifact upload/download core controls.
@@ -324,7 +324,7 @@ Launch-relevant: not all complete.
 6. INCOMPLETE - Final browser auth/session hardening still required before claiming enterprise-grade security posture.
 7. COMPLETE - Support artifact upload/download hardening core controls landed.
 8. COMPLETE - Receipt/support file path confinement cleanup landed.
-9. INCOMPLETE - Trusted proxy/IP handling cleanup still required.
+9. COMPLETE - Trusted proxy/IP handling cleanup landed for the audited core paths.
 10. PARTIAL - Sensitive logging cleanup started; broad follow-up still required.
 
 Launch-blocking security hardening remains. Product/design backlog stays below that line.

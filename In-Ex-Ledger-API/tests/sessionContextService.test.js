@@ -16,13 +16,13 @@ test("truncate clamps strings to the given max", () => {
   assert.equal(truncate(null, 5), null);
 });
 
-test("extractRequestContext prefers x-forwarded-for first hop over req.ip", () => {
+test("extractRequestContext uses trusted req.ip instead of raw x-forwarded-for", () => {
   const req = {
     headers: { "x-forwarded-for": "10.0.0.1, 10.0.0.2", "user-agent": "UA/1" },
     ip: "127.0.0.1"
   };
   const ctx = extractRequestContext(req);
-  assert.equal(ctx.ipAddress, "10.0.0.1");
+  assert.equal(ctx.ipAddress, "127.0.0.1");
   assert.equal(ctx.userAgent, "UA/1");
 });
 

@@ -2,6 +2,7 @@
 
 const crypto = require("crypto");
 const net = require("net");
+const { normalizeIpAddress, getTrustedClientIp } = require("./requestIpService.js");
 
 const DEFAULT_GEOLOCATION_API_URL = "https://ipapi.co/{ip}/json/";
 const DEFAULT_ALLOWED_GEOLOCATION_HOSTS = new Set(["ipapi.co", "www.ipapi.co"]);
@@ -10,25 +11,8 @@ function normalizeUserAgent(userAgent) {
   return String(userAgent || "").trim().slice(0, 512);
 }
 
-function normalizeIpAddress(ipAddress) {
-  const ip = String(ipAddress || "").trim();
-  if (!ip) return "";
-  if (ip.startsWith("::ffff:")) {
-    return ip.slice("::ffff:".length);
-  }
-  if (ip === "::1") {
-    return "127.0.0.1";
-  }
-  return ip;
-}
-
 function extractClientIp(req) {
-  const forwarded = String(req?.get?.("x-forwarded-for") || req?.headers?.["x-forwarded-for"] || "").trim();
-  if (forwarded) {
-    const first = forwarded.split(",")[0];
-    return normalizeIpAddress(first);
-  }
-  return normalizeIpAddress(req?.ip || req?.socket?.remoteAddress || "");
+  return getTrustedClientIp(req);
 }
 
 function hashValue(value) {

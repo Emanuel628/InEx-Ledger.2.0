@@ -4,6 +4,8 @@ const { pool } = require("../db.js");
 const { createRouteLimiter } = require("../middleware/rate-limit.middleware.js");
 const { verifyToken } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
+const { ACCESS_TOKEN_COOKIE } = require("../utils/authUtils.js");
+const { getTrustedClientIp } = require("../services/requestIpService.js");
 const { logError } = require("../utils/logger.js");
 
 const router = express.Router();
@@ -57,8 +59,10 @@ function parseConsentCookie(rawValue) {
 
 async function resolveAuthenticatedUserId(req) {
   try {
-    const authHeader = req.headers.authorization || "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const authHeader = String(req.headers.authorization || "").trim();
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : String(req.cookies?.[ACCESS_TOKEN_COOKIE] || "").trim();
     if (token) {
       const payload = verifyToken(token);
       return payload?.id || payload?.userId || payload?.sub || null;
@@ -129,7 +133,7 @@ router.post("/cookie", consentLimiter, requireCsrfProtection, async (req, res) =
   }
 
   const record = buildConsentRecord(decision, version);
-  const ipAddress = (req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "").slice(0, 64);
+  const ipAddress = String(getTrustedClientIp(req) || "").slice(0, 64);
   const userAgent = String(req.headers["user-agent"] || "").slice(0, MAX_USER_AGENT_LENGTH);
   const userId = await resolveAuthenticatedUserId(req);
 

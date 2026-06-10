@@ -44,7 +44,7 @@ test("buildDeviceFingerprint changes when IP changes", () => {
   assert.notEqual(first, second);
 });
 
-test("extractClientIp uses x-forwarded-for first", () => {
+test("extractClientIp uses trusted req.ip instead of raw x-forwarded-for", () => {
   const req = {
     get(name) {
       if (name === "x-forwarded-for") return "198.51.100.9, 10.0.0.1";
@@ -52,7 +52,7 @@ test("extractClientIp uses x-forwarded-for first", () => {
     },
     ip: "203.0.113.5"
   };
-  assert.equal(extractClientIp(req), "198.51.100.9");
+  assert.equal(extractClientIp(req), "203.0.113.5");
 });
 
 test("normalizeIpAddress strips IPv6-mapped prefix", () => {

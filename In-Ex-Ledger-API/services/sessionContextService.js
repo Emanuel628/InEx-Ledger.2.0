@@ -1,14 +1,14 @@
 "use strict";
 
+const { getTrustedClientIp } = require("./requestIpService.js");
+
 const MAX_USER_AGENT_LEN = 512;
 const MAX_IP_LEN = 64;
 const MAX_DEVICE_LABEL_LEN = 120;
 
 function extractRequestContext(req) {
   if (!req) return { ipAddress: null, userAgent: null };
-  const xff = req.headers?.["x-forwarded-for"];
-  const forwarded = typeof xff === "string" ? xff.split(",")[0].trim() : null;
-  const ipAddress = forwarded || req.ip || req.connection?.remoteAddress || null;
+  const ipAddress = getTrustedClientIp(req) || null;
   const userAgent = req.headers?.["user-agent"] || req.get?.("user-agent") || null;
   return {
     ipAddress: truncate(ipAddress, MAX_IP_LEN),

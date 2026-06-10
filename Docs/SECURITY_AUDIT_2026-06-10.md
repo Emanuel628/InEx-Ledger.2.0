@@ -33,7 +33,7 @@ What currently fails or needs remediation:
 
 1. **Browser auth still needs a final cookie-first cleanup pass, but session/storage persistence of access tokens has been removed from the main frontend flow.**
 2. **JWT signing and verification were implemented manually; this has now been migrated to `jsonwebtoken`, but issuer/audience/key-rotation hardening is still open.**
-3. **Client IP attribution trusts `X-Forwarded-For` directly in multiple security-sensitive paths.**
+3. **Trusted client IP handling has been centralized; raw forwarded-header chains are no longer used as the canonical client IP in the audited security-sensitive paths.**
 4. **Support artifact upload is materially weaker than receipt upload: no dedicated rate limit, MIME-only validation, and path resolution is not storage-confined.**
 5. **File path resolution for stored artifacts accepts arbitrary existing paths instead of enforcing managed-directory confinement.**
 6. **Some logging paths still capture more user-identifying detail than necessary for a finance app.**
@@ -124,7 +124,7 @@ Implementation direction:
 
 ### 3. Spoofable client IP handling
 
-- Status: `FAIL`
+- Status: `PASS`
 - Standards impact:
   - OWASP Top 10 2021: A09 Security Logging and Monitoring Failures
   - ASVS 5.0.0: logging, trusted infrastructure metadata, fraud/security telemetry
@@ -146,26 +146,15 @@ At-risk files/functions:
   - `createRefreshToken`
   - login alert/device-recognition paths
 
-Why this is a problem:
+What changed in this pass:
 
-- These functions prefer `X-Forwarded-For` directly from the request header.
-- In app code, that header should be consumed via Express trusted proxy handling (`req.ip` / `req.ips`) after `app.set('trust proxy', ...)`, not by trusting the raw header value.
-- Today a client can spoof the source IP used for device fingerprinting, audit trails, and some security analytics.
+- A shared `requestIpService.js` now owns client-IP normalization and extraction.
+- `sessionContextService.js`, `signInSecurityService.js`, `auditEventService.js`, and `consent.routes.js` now use trusted proxy-derived `req.ip` / socket fallback instead of trusting raw `X-Forwarded-For` as canonical identity.
+- The forwarded chain can still be gathered separately for diagnostics, but it is no longer the source of truth for audit/security attribution in these paths.
 
-Recommended patch:
+Result:
 
-1. Centralize client IP resolution in one helper that uses `req.ip` only.
-2. Stop reading `x-forwarded-for` directly in application code.
-3. If you need the full chain for diagnostics, store it separately as untrusted metadata and never as the canonical client IP.
-
-Implementation direction:
-
-- Add one helper, e.g. `getTrustedClientIp(req)`, and use it everywhere.
-- Update:
-  - `services/sessionContextService.js`
-  - `services/signInSecurityService.js`
-  - `services/auditEventService.js`
-  - `routes/consent.routes.js`
+- This spoofable-client-IP finding is closed for the audited core auth/session/audit/consent paths.
 
 ### 4. Support artifact upload/download hardening gap
 
@@ -254,10 +243,10 @@ Remaining gap:
 | Category | Status | Notes |
 |---|---|---|
 | A01 Broken Access Control | `PASS / PARTIAL` | Business scoping is broadly good; object ownership checks are present in core routes. Remaining file-path issues are more storage-safety than classic BOLA. |
-| A02 Cryptographic Failures | `FAIL` | Custom JWT implementation in `middleware/auth.middleware.js`. |
+| A02 Cryptographic Failures | `PARTIAL FAIL` | The bespoke JWT implementation is gone, but issuer/audience/key-rotation hardening is still open. |
 | A03 Injection | `PASS` | SQL is parameterized broadly; no obvious command injection surface found in mounted app code. |
 | A04 Insecure Design | `PARTIAL FAIL` | Frontend token persistence was removed, but the browser auth architecture still needs a final cookie-only cleanup pass. |
-| A05 Security Misconfiguration | `PARTIAL FAIL` | Spoofable `X-Forwarded-For` handling remains; support-artifact controls are improved but not fully identical to receipts. |
+| A05 Security Misconfiguration | `PARTIAL FAIL` | Trusted-IP handling is fixed in the audited core paths; support-artifact controls are improved but not fully identical to receipts. |
 | A06 Vulnerable and Outdated Components | `PARTIAL` | No full SCA result is embedded in repo. Dependency posture should be validated separately in CI. |
 | A07 Identification and Authentication Failures | `PARTIAL FAIL` | JWT handling now uses a maintained library, but browser auth still has transitional bearer-compatibility paths. |
 | A08 Software and Data Integrity Failures | `PARTIAL PASS` | Webhooks are verified; no obvious unsafe auto-update path found. Token library replacement still recommended. |
@@ -275,7 +264,7 @@ Remaining gap:
 | API5 Broken Function Level Authorization | `PASS` | Mounted route gating is generally present. Internal support endpoints are secret-protected. |
 | API6 Unrestricted Access to Sensitive Business Flows | `PARTIAL PASS` | Billing and privacy flows are gated; no obvious unauthenticated business-flow bypass found in mounted code. |
 | API7 Server-Side Request Forgery | `PASS` | Geolocation outbound call is allowlisted and HTTPS-only. |
-| API8 Security Misconfiguration | `PARTIAL FAIL` | Raw `X-Forwarded-For` trust remains, but support-artifact and receipt file resolution are now storage-confined. |
+| API8 Security Misconfiguration | `PARTIAL FAIL` | Trusted-IP handling is fixed in the audited core paths, and support-artifact/receipt file resolution is now storage-confined. |
 | API9 Improper Inventory Management | `PARTIAL` | Route surface is large and mixed V1/V2; should be formally inventoried and tagged in CI. |
 | API10 Unsafe Consumption of APIs | `PASS / PARTIAL` | Stripe/Plaid/webhook verification is present; continue enforcing strict response and dependency validation. |
 
@@ -320,10 +309,9 @@ Remaining gap:
 
 ### Priority 1
 
-1. Mask email addresses and recipient arrays in all auth/inbound-email log paths.
+1. Finish the remaining browser cookie-only auth cleanup.
 2. Add schema validation for V2 `metadata` payloads.
 3. Add a dedicated security regression suite for:
-   - spoofed `X-Forwarded-For`
    - support artifact upload MIME/signature mismatch
    - path escape attempts
    - session theft resistance after XSS simulation assumptions
