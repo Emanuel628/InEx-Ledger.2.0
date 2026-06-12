@@ -217,7 +217,6 @@ body,
   font-size: var(--fs-sm) !important;
 }
 
-button,
 .primary-btn,
 .btn-primary,
 .page-add-button,
@@ -235,13 +234,12 @@ button,
   border: 1px solid var(--brand) !important;
   border-radius: var(--radius-sm) !important;
   background: var(--brand) !important;
-  color: var(--bg-page) !important;
+  color: #fff !important;
   box-shadow: none !important;
   font-size: var(--fs-md) !important;
   font-weight: 600 !important;
 }
 
-button:hover,
 .primary-btn:hover,
 .btn-primary:hover,
 .page-add-button:hover,
@@ -256,6 +254,7 @@ button:hover,
 .whatif-run-btn:hover {
   background: var(--brand-hover) !important;
   border-color: var(--brand-hover) !important;
+  color: #fff !important;
 }
 
 .btn-secondary,
@@ -296,6 +295,267 @@ button:hover,
   background: var(--bg-page) !important;
   color: var(--danger) !important;
   box-shadow: none !important;
+}
+
+.segmented,
+.tx-period-picker,
+.mileage-mode-toggle,
+.analytics-tabs,
+.messages-tabs,
+.settings-nav {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  padding: 2px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 999px !important;
+  background: var(--bg-subtle) !important;
+  box-shadow: none !important;
+}
+
+.settings-nav {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  border-radius: var(--radius-md) !important;
+}
+
+.segmented > button,
+.segmented > a,
+.tx-period-picker > button,
+.mileage-mode-toggle > button,
+.analytics-tabs > button,
+.messages-tabs > button,
+.settings-nav > button {
+  min-height: 32px !important;
+  padding: 0.5rem 0.875rem !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  font-size: var(--fs-sm) !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  text-decoration: none !important;
+  box-shadow: none !important;
+}
+
+.settings-nav > button {
+  border-radius: calc(var(--radius-md) - 2px) !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+}
+
+.segmented > button:hover,
+.segmented > a:hover,
+.tx-period-picker > button:hover,
+.mileage-mode-toggle > button:hover,
+.analytics-tabs > button:hover,
+.messages-tabs > button:hover,
+.settings-nav > button:hover {
+  background: color-mix(in srgb, var(--brand) 8%, var(--bg-page)) !important;
+  color: var(--text-primary) !important;
+  text-decoration: none !important;
+}
+
+.segmented > .is-active,
+.segmented > [aria-selected="true"],
+.tx-period-picker > .is-active,
+.tx-period-picker > [aria-selected="true"],
+.mileage-mode-toggle > .is-active,
+.mileage-mode-toggle > [aria-selected="true"],
+.analytics-tabs > .is-active,
+.analytics-tabs > [aria-selected="true"],
+.messages-tabs > .is-active,
+.messages-tabs > [aria-selected="true"],
+.settings-nav > .is-active,
+.settings-nav > [aria-selected="true"] {
+  background: var(--bg-page) !important;
+  color: var(--brand) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 28%, var(--border)) !important;
+}
+
+.chip,
+.preset-chip,
+.category-filter-chip,
+.account-type-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 32px !important;
+  padding: 0.45rem 0.875rem !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 999px !important;
+  background: var(--bg-page) !important;
+  color: var(--text-secondary) !important;
+  font-size: var(--fs-sm) !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+
+.chip:hover,
+.preset-chip:hover,
+.category-filter-chip:hover,
+.account-type-chip:hover {
+  border-color: color-mix(in srgb, var(--brand) 30%, var(--border)) !important;
+  color: var(--text-primary) !important;
+}
+
+.chip.is-active,
+.chip[aria-selected="true"],
+.preset-chip.is-active,
+.category-filter-chip.is-active,
+.account-type-chip.is-active {
+  background: color-mix(in srgb, var(--brand) 10%, var(--bg-page)) !important;
+  border-color: var(--brand) !important;
+  color: var(--brand) !important;
+}
+
+.btn-icon,
+.account-menu-btn,
+.category-row-menu {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  box-shadow: none !important;
+}
+
+.btn-icon:hover,
+.account-menu-btn:hover,
+.category-row-menu:hover {
+  background: var(--bg-subtle) !important;
+  color: var(--text-primary) !important;
+}
+
+.pager,
+.mileage-pagination {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: var(--sp-2) !important;
+}
+
+.pager button,
+.mileage-page-btn {
+  min-width: 36px !important;
+  min-height: 36px !important;
+  padding: 0.5rem 0.75rem !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  box-shadow: none !important;
+}
+
+.pager button:hover,
+.mileage-page-btn:hover {
+  background: var(--bg-subtle) !important;
+  color: var(--text-primary) !important;
+}
+
+.collapse-header,
+.exports-card-head-toggle,
+.receipts-card-head-toggle {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  padding: var(--sp-4) 0 !important;
+  border: 0 !important;
+  border-top: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--text-primary) !important;
+  box-shadow: none !important;
+  text-align: left !important;
+}
+
+.export-preflight-card > .exports-card-head-toggle,
+.export-review-card > .exports-card-head-toggle,
+#exportHistorySection > .exports-card-head-toggle,
+#receiptsTrailSection > .receipts-card-head-toggle {
+  border-top: 0 !important;
+}
+
+.exports-section-chevron,
+.receipts-section-chevron {
+  width: 10px !important;
+  height: 10px !important;
+  border-right: 1.5px solid var(--text-muted) !important;
+  border-bottom: 1.5px solid var(--text-muted) !important;
+  transform: rotate(-45deg) !important;
+  transition: transform 140ms ease !important;
+}
+
+.is-open .exports-section-chevron,
+.is-open .receipts-section-chevron {
+  transform: rotate(45deg) !important;
+}
+
+.tx-action-btn,
+.receipt-link-btn,
+.mileage-edit-btn,
+.msg-btn,
+.transaction-fix-next-btn,
+.tx-ghost-accept,
+.tx-ghost-dismiss,
+.transaction-receipt-action,
+.receipt-delete-btn,
+.history-delete,
+.export-preflight-link {
+  min-height: 32px !important;
+  padding: 0.45rem 0.75rem !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  background: var(--bg-page) !important;
+  color: var(--text-secondary) !important;
+  box-shadow: none !important;
+  font-size: var(--fs-sm) !important;
+  font-weight: 600 !important;
+}
+
+.tx-action-btn.action-delete,
+.receipt-delete-btn,
+.msg-btn.danger,
+.history-delete {
+  border-color: var(--danger) !important;
+  color: var(--danger) !important;
+}
+
+.receipt-attach-hover,
+.tx-ghost-dismiss,
+.export-preflight-link {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--brand) !important;
+  min-height: auto !important;
+}
+
+.transaction-receipt-action--primary {
+  border-color: var(--border) !important;
+  background: var(--bg-page) !important;
+  color: var(--text-secondary) !important;
+}
+
+.messages-tab-badge.is-dot,
+.sidebar-link .messages-tab-badge.is-dot {
+  width: 6px !important;
+  min-width: 6px !important;
+  height: 6px !important;
+  min-height: 6px !important;
+  padding: 0 !important;
+  border-radius: 999px !important;
+  background: var(--positive) !important;
+  color: transparent !important;
 }
 
 .badge,
@@ -417,6 +677,69 @@ tbody tr:hover td {
 .summary-expense,
 .expense {
   color: var(--text-primary) !important;
+}
+
+#tax-cockpit {
+  background: var(--bg-subtle) !important;
+  color: var(--text-primary) !important;
+}
+
+.tax-banner-label,
+.tax-side-label,
+.tax-banner-note,
+.tax-side-meta,
+.tax-banner-tooltip {
+  color: var(--text-muted) !important;
+}
+
+.tax-banner-label:first-child,
+.tax-banner-amount,
+.tax-side-value {
+  color: var(--text-primary) !important;
+}
+
+.tax-banner-label-secondary {
+  margin-top: var(--sp-2) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--sp-2) !important;
+}
+
+.receipts-content.receipts-empty-only .receipts-focus-card,
+.receipts-content.receipts-empty-only #receiptsTrailSection {
+  display: none !important;
+}
+
+.row-flag-critical td,
+.row-flag-missing td,
+.row-flag-warning td,
+.row-flag-cpa td {
+  background: transparent !important;
+}
+
+.settings-summary-card,
+.settings-state-card,
+.settings-state-card--action {
+  background: var(--bg-page) !important;
+  color: var(--text-primary) !important;
+}
+
+.settings-summary-card:hover,
+.settings-state-card:hover,
+.settings-state-card--action:hover {
+  border-color: color-mix(in srgb, var(--brand) 24%, var(--border)) !important;
+  box-shadow: none !important;
+}
+
+.settings-state-card--action,
+.settings-summary-card {
+  border: 1px solid var(--border) !important;
+}
+
+.danger-outline-btn,
+.settings-nav-danger,
+.settings-nav-danger.is-active {
+  color: var(--danger) !important;
 }
 
 .category-pill,

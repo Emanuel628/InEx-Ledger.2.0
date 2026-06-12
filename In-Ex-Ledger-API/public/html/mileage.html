@@ -5,7 +5,7 @@
   <title>InEx Ledger - Mileage</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
-  <link rel="stylesheet" href="/css/app.css?v=20260612a" />
+  <link rel="stylesheet" href="/css/app.css?v=20260612b" />
   <link rel="stylesheet" href="/css/pages/mileage.css?v=20260526a" />
 </head>
 <body>
@@ -87,10 +87,10 @@
             <h2>Add activity</h2>
             <p class="mileage-card-copy">Record a trip or keep a vehicle-cost trail without leaving the page.</p>
           </div>
-          <div class="mileage-mode-toggle" role="tablist" aria-label="Entry mode">
-            <button type="button" class="mileage-mode-button is-active" data-entry-mode="trip">Trip</button>
-            <button type="button" class="mileage-mode-button" data-entry-mode="expense">Expense</button>
-            <button type="button" class="mileage-mode-button" data-entry-mode="maintenance">Maintenance</button>
+          <div class="mileage-mode-toggle segmented" role="tablist" aria-label="Entry mode">
+            <button type="button" class="mileage-mode-button is-active" data-entry-mode="trip" role="tab" aria-selected="true">Trip</button>
+            <button type="button" class="mileage-mode-button" data-entry-mode="expense" role="tab" aria-selected="false">Expense</button>
+            <button type="button" class="mileage-mode-button" data-entry-mode="maintenance" role="tab" aria-selected="false">Maintenance</button>
           </div>
         </div>
 
@@ -164,7 +164,7 @@
           <strong id="mileageEmptyTitle" class="mileage-empty-title">No activity matches the current filters.</strong>
           <span id="mileageEmptyBody" class="mileage-empty-body">Try a different search term or clear the date and type filters.</span>
         </div>
-        <div class="mileage-pagination" id="mileagePagination" hidden>
+        <div class="mileage-pagination pager" id="mileagePagination" hidden>
           <button type="button" class="mileage-page-btn" id="mileagePagePrev" aria-label="Previous page">&#8249;</button>
           <span class="mileage-page-info" id="mileagePageInfo">Page 1 of 1</span>
           <button type="button" class="mileage-page-btn" id="mileagePageNext" aria-label="Next page">&#8250;</button>
@@ -214,7 +214,7 @@
   <script src="../js/auth.js?v=20260527c"></script>
   <script src="../js/trial.js?v=20260405c"></script>
   <script src="../js/taxReminders.js?v=20260405c"></script>
-  <script src="../js/mileage.js?v=20260612a"></script>
+  <script src="../js/mileage.js?v=20260612b"></script>
 </body>
 </html>
 

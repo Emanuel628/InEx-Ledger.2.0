@@ -5,7 +5,7 @@
   <title>InEx Ledger - Exports</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
-  <link rel="stylesheet" href="/css/app.css?v=20260612a" />
+  <link rel="stylesheet" href="/css/app.css?v=20260612b" />
   <link rel="stylesheet" href="/css/pages/exports.css?v=20260601c" />
 </head>
 <body>
@@ -79,11 +79,11 @@
 
           <div class="field-label" data-i18n="exports_date_range_presets">Date range presets</div>
           <div class="preset-row" id="exportPresetRow">
-            <button type="button" class="preset-chip" data-range-preset="2025-tax-year" data-i18n="exports_preset_2025_tax_year">2025 tax year</button>
-            <button type="button" class="preset-chip is-active" data-range-preset="2026-ytd" data-i18n="exports_preset_2026_ytd">2026 YTD</button>
-            <button type="button" class="preset-chip" data-range-preset="q1-2026" data-i18n="exports_preset_q1_2026">Q1 2026</button>
-            <button type="button" class="preset-chip" data-range-preset="q4-2025" data-i18n="exports_preset_q4_2025">Q4 2025</button>
-            <button type="button" class="preset-chip" data-range-preset="custom" data-i18n="exports_preset_custom">Custom...</button>
+            <button type="button" class="preset-chip chip" data-range-preset="2025-tax-year" data-i18n="exports_preset_2025_tax_year">2025 tax year</button>
+            <button type="button" class="preset-chip chip is-active" data-range-preset="2026-ytd" data-i18n="exports_preset_2026_ytd">2026 YTD</button>
+            <button type="button" class="preset-chip chip" data-range-preset="q1-2026" data-i18n="exports_preset_q1_2026">Q1 2026</button>
+            <button type="button" class="preset-chip chip" data-range-preset="q4-2025" data-i18n="exports_preset_q4_2025">Q4 2025</button>
+            <button type="button" class="preset-chip chip" data-range-preset="custom" data-i18n="exports_preset_custom">Custom...</button>
           </div>
 
           <div class="date-grid">
@@ -238,7 +238,7 @@
       </form>
 
       <section class="history-card export-preflight-card is-collapsible is-collapsed" id="exportPreflightCard">
-        <button type="button" class="history-card-head exports-card-head-toggle export-preflight-head" data-collapse-toggle aria-expanded="false" aria-controls="exportPreflightBody">
+        <button type="button" class="history-card-head exports-card-head-toggle export-preflight-head collapse-header" data-collapse-toggle aria-expanded="false" aria-controls="exportPreflightBody">
           <div class="exports-card-title-copy">
             <h2 data-i18n="exports_preflight_title">Finalization review</h2>
             <p data-i18n="exports_preflight_subtitle">Check blockers and reviewer warnings before exporting a finalized CPA package.</p>
@@ -255,7 +255,7 @@
       <section class="history-card export-review-card is-collapsible is-collapsed" id="exportReviewQueueSection">
       <button
         type="button"
-        class="history-card-head exports-card-head-toggle export-review-head"
+        class="history-card-head exports-card-head-toggle export-review-head collapse-header"
         data-collapse-toggle
         aria-expanded="false"
         aria-controls="exportReviewBody"
@@ -285,7 +285,7 @@
       <section class="history-card is-collapsible is-collapsed" id="exportHistorySection">
         <button
           type="button"
-          class="history-card-head exports-card-head-toggle"
+          class="history-card-head exports-card-head-toggle collapse-header"
           data-collapse-toggle
           aria-expanded="false"
           aria-controls="exportHistoryBody"

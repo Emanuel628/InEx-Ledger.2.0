@@ -122,20 +122,16 @@ function renderInvoiceStats() {
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const outstanding = invoiceList
-    .filter((inv) => inv.status === "sent")
-    .reduce((s, inv) => s + Number(inv.total_amount), 0);
+  const outstanding = summarizeInvoiceTotals(invoiceList.filter((inv) => inv.status === "sent"));
 
-  const paid30 = invoiceList
-    .filter((inv) => inv.status === "paid" && new Date(inv.updated_at) >= thirtyDaysAgo)
-    .reduce((s, inv) => s + Number(inv.total_amount), 0);
+  const paid30 = summarizeInvoiceTotals(
+    invoiceList.filter((inv) => inv.status === "paid" && new Date(inv.updated_at) >= thirtyDaysAgo)
+  );
 
   const drafts = invoiceList.filter((inv) => inv.status === "draft").length;
   const overdue = invoiceList.filter(isOverdue).length;
-  const statsCurrency = invoiceDefaultCurrency;
-
-  document.getElementById("statOutstanding").textContent = fmtMoney(outstanding, statsCurrency);
-  document.getElementById("statPaid30").textContent = fmtMoney(paid30, statsCurrency);
+  document.getElementById("statOutstanding").textContent = formatInvoiceSummaryTotals(outstanding);
+  document.getElementById("statPaid30").textContent = formatInvoiceSummaryTotals(paid30);
   document.getElementById("statDrafts").textContent = String(drafts);
   document.getElementById("statTotal").textContent = String(invoiceList.length);
   const overdueEl = document.getElementById("statOverdue");
@@ -189,7 +185,7 @@ function renderInvoiceTable() {
       <button class="tx-action-btn" data-action="edit" data-id="${escapeHtml(inv.id)}" title="Edit">Edit</button>
       ${inv.status === "draft" ? `<button class="tx-action-btn action-email" data-action="email" data-id="${escapeHtml(inv.id)}" title="Email invoice">Email</button>` : ""}
       ${inv.status === "sent" ? `<button class="tx-action-btn action-pay" data-action="pay" data-id="${escapeHtml(inv.id)}" title="Mark paid">Mark paid</button>` : ""}
-      <button class="tx-action-btn action-delete" data-action="delete" data-id="${escapeHtml(inv.id)}" title="Delete">Delete</button>
+      <button class="tx-action-btn action-delete" data-action="${inv.status === "draft" ? "delete" : "void"}" data-id="${escapeHtml(inv.id)}" title="${inv.status === "draft" ? "Delete" : "Void"}">${inv.status === "draft" ? "Delete" : "Void"}</button>
     `}
 </td>
     </tr>`;
@@ -348,6 +344,22 @@ function collectInvoicePayload(status) {
   };
 }
 
+function summarizeInvoiceTotals(invoices) {
+  return invoices.reduce((totals, invoice) => {
+    const currency = String(invoice.currency || invoiceDefaultCurrency).toUpperCase();
+    totals[currency] = (totals[currency] || 0) + Number(invoice.total_amount || 0);
+    return totals;
+  }, {});
+}
+
+function formatInvoiceSummaryTotals(totals) {
+  const entries = Object.entries(totals || {}).filter(([, amount]) => Number(amount || 0) !== 0);
+  if (!entries.length) {
+    return fmtMoney(0, invoiceDefaultCurrency);
+  }
+  return entries.map(([currency, amount]) => fmtMoney(amount, currency)).join(" · ");
+}
+
 function validateInvoiceFormBeforeSave() {
   const form = document.getElementById("invoiceForm");
   if (form && typeof form.reportValidity === "function" && !form.reportValidity()) {
@@ -480,6 +492,24 @@ async function deleteInvoice(id) {
   }
 }
 
+async function voidInvoice(id) {
+  try {
+    const res = await apiFetch(`/api/invoices-v1/${id}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "void" })
+    });
+    if (!res || !res.ok) {
+      const d = res ? await res.json().catch(() => ({})) : {};
+      alert(d.error || "Failed to void invoice.");
+      return;
+    }
+    await loadInvoices();
+  } catch (err) {
+    alert("An unexpected error occurred.");
+  }
+}
+
 async function restoreInvoice(id) {
   try {
     const res = await apiFetch(`/api/invoices-v1/${id}/restore`, {
@@ -578,25 +608,29 @@ document.getElementById(activeSidebarId)?.classList.add("is-active");
   if (confirm("Mark this invoice as paid?")) await updateInvoiceStatus(id, "paid");
 } else if (action === "restore") {
   if (confirm("Restore this invoice?")) await restoreInvoice(id);
-} else if (action === "delete") {
+} else if (action === "delete" || action === "void") {
   pendingDeleteId = id;
 
     const inv = invoiceList.find((invoice) => invoice.id === id);
-    const wasSent = inv && inv.status !== "draft";
+    const shouldVoid = inv && inv.status !== "draft";
     
     const title = document.querySelector("#invoiceDeleteModal h3");
     const copy = document.querySelector("#invoiceDeleteModal p");
+    const confirmButton = document.getElementById("invoiceDeleteConfirm");
 
     if (title) {
-      title.textContent = wasSent
-        ? "Delete sent invoice?"
+      title.textContent = shouldVoid
+        ? "Void this invoice?"
         : "Delete this draft invoice?";
     }
 
     if (copy) {
-      copy.textContent = wasSent
-        ? "This invoice has already been sent or recorded. Deleting it may remove history connected to customer communication and payment tracking. Are you sure you want to delete it?"
+      copy.textContent = shouldVoid
+        ? "This invoice has already been sent or paid. Voiding keeps it in history, marks it Void, and removes it from active totals."
         : "This draft invoice has not been sent yet. This cannot be undone.";
+    }
+    if (confirmButton) {
+      confirmButton.textContent = shouldVoid ? "Void" : "Delete";
     }
 
     document.getElementById("invoiceDeleteModal").classList.remove("hidden");
@@ -611,7 +645,12 @@ document.getElementById(activeSidebarId)?.classList.add("is-active");
   document.getElementById("invoiceDeleteConfirm")?.addEventListener("click", async () => {
     document.getElementById("invoiceDeleteModal").classList.add("hidden");
     if (pendingDeleteId) {
-      await deleteInvoice(pendingDeleteId);
+      const invoice = invoiceList.find((item) => item.id === pendingDeleteId);
+      if (invoice && invoice.status !== "draft") {
+        await voidInvoice(pendingDeleteId);
+      } else {
+        await deleteInvoice(pendingDeleteId);
+      }
       pendingDeleteId = null;
       }
   });

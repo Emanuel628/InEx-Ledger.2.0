@@ -222,7 +222,7 @@ function updateMileageDeductionEstimate() {
   if (!distanceMeta) return;
   const totalMiles = mileageRecords.reduce((sum, record) => sum + Number(record.miles || 0), 0);
   const estimate = totalMiles * MILEAGE_RATE_2026;
-  distanceMeta.textContent = `Standard mileage estimate ≈ ${formatMoney(estimate)}`;
+  distanceMeta.textContent = `Standard mileage estimate · ≈ ${formatMoney(estimate)} deduction`;
 }
 
 async function loadMileageRecords() {
@@ -398,15 +398,21 @@ function updateMileageEmptyState(hasAnyHistory) {
   const title = document.getElementById("mileageEmptyTitle");
   const body = document.getElementById("mileageEmptyBody");
   if (!title || !body) return;
+  const hasActiveFilters = Boolean(
+    (document.getElementById("mileageSearch")?.value || "").trim()
+    || document.getElementById("mileageHistoryFilter")?.value !== "all"
+    || document.getElementById("mileageDateFrom")?.value
+    || document.getElementById("mileageDateTo")?.value
+  );
 
-  if (hasAnyHistory) {
+  if (hasAnyHistory || hasActiveFilters) {
     title.textContent = "No activity matches the current filters.";
     body.textContent = "Try a different search term or clear the date and type filters.";
     return;
   }
 
-  title.textContent = "Your vehicle log history is empty.";
-  body.textContent = "Record a new trip, vehicle expense, or maintenance entry above to build your deduction trail.";
+  title.textContent = "No trips or expenses logged yet.";
+  body.textContent = "Add your first above.";
 }
 
 function renderMileagePagination(total) {

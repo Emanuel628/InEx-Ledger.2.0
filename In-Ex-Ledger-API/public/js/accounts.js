@@ -291,7 +291,7 @@ function renderAccountCard(account) {
         <div class="account-secondary-meta">${transactionCount} transaction${transactionCount === 1 ? "" : "s"} · Last activity ${escapeHtml(lastActivity)}</div>
       </div>
       <div class="account-actions">
-        <button type="button" class="account-menu-btn" aria-label="${escapeHtml(tx("accounts_actions_aria"))}">...</button>
+        <button type="button" class="account-menu-btn btn-icon" aria-label="${escapeHtml(tx("accounts_actions_aria"))}">...</button>
         <div class="account-action-menu">
           <button type="button" data-account-edit="${escapeHtml(account.id || "")}">${escapeHtml(tx("common_edit"))}</button>
           <button type="button" class="account-delete-menu-btn" data-account-delete="${escapeHtml(account.id || "")}">${escapeHtml(tx("common_delete"))}</button>

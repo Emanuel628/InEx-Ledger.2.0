@@ -142,7 +142,6 @@ function enhanceCategoriesPageShell() {
   dashboard.innerHTML = `
     <button type="button" class="category-stat-card" data-category-filter="all"><div><span>Total categories</span><strong id="categoryTotalCount">0</strong><small>Active categories</small></div></button>
     <button type="button" class="category-stat-card" data-category-filter="review" id="categoryReviewStat"><div><span>Needs review</span><strong id="categoryReviewCount">0</strong><small id="categoryReviewHint">Still missing a tax line</small></div></button>
-    <button type="button" class="category-stat-card" data-category-filter="tax"><div><span>Tax categories</span><strong id="categorySpecialTaxCount">0</strong><small id="categorySpecialTaxHint">With tax treatment</small></div></button>
   `;
   header.after(dashboard);
 
@@ -153,12 +152,12 @@ function enhanceCategoriesPageShell() {
     <label class="category-search-wrap" for="categorySearchInput"><span aria-hidden="true">&#8981;</span><input id="categorySearchInput" type="search" placeholder="Search categories" autocomplete="off" /></label>
     <div class="category-toolbar-actions">
       <div class="category-filter-row">
-        <button type="button" class="category-filter-chip is-active" data-category-filter="all">All</button>
-        <button type="button" class="category-filter-chip" data-category-filter="review">Needs review</button>
-        <button type="button" class="category-filter-chip" data-category-filter="mapped">Mapped</button>
-        <button type="button" class="category-filter-chip" data-category-filter="tax">Tax line</button>
+        <button type="button" class="category-filter-chip chip is-active" data-category-filter="all">All</button>
+        <button type="button" class="category-filter-chip chip" data-category-filter="review">Needs review</button>
+        <button type="button" class="category-filter-chip chip" data-category-filter="mapped">Mapped</button>
+        <button type="button" class="category-filter-chip chip" data-category-filter="tax">Tax line</button>
       </div>
-      <button id="categoryReviewBtn" type="button" class="category-review-btn">Review unmapped categories</button>
+      <span id="categoryReviewBtn" class="category-review-btn" aria-live="polite">Review unmapped categories</span>
       <button id="categoryToolbarAddBtn" type="button" class="categories-primary-btn">+ Add category</button>
     </div>
   `;
@@ -197,7 +196,6 @@ function enhanceCategoriesPageShell() {
   consoleWrap.after(guidance);
 
   document.getElementById("categoryToolbarAddBtn")?.addEventListener("click", () => openCategoryModal("expense"));
-  document.getElementById("categoryReviewBtn")?.addEventListener("click", () => applyCategoryFilter("review"));
   document.getElementById("categorySearchInput")?.addEventListener("input", (event) => {
     categorySearchTerm = String(event.target.value || "").trim().toLowerCase();
     renderCategoryLists();
@@ -549,7 +547,7 @@ function renderCategoryRow(category) {
         <div class="category-row-usage">${escapeHtml(usageText)}</div>
       </div>
       <div class="category-actions">
-        <button type="button" class="category-row-menu" aria-label="Category actions">...</button>
+        <button type="button" class="category-row-menu btn-icon" aria-label="Category actions">...</button>
         <div class="category-action-menu">
           <button type="button" data-category-edit="${escapeHtml(category.id)}">Edit category</button>
           <button type="button" class="category-delete" data-category-delete="${escapeHtml(category.id)}">Delete category</button>
@@ -563,7 +561,6 @@ function updateCategoryDashboard() {
   const total = categoryRecords.length;
   const mapped = categoryRecords.filter((item) => Boolean(getTaxInfo(item.taxLabel))).length;
   const review = total - mapped;
-  const special = categoryRecords.filter((item) => isTaxCategory(item, getTaxInfo(item.taxLabel))).length;
   const pct = total ? Math.round((mapped / total) * 100) : 0;
   const income = categoryRecords.filter((item) => item.type === "income");
   const expense = categoryRecords.filter((item) => item.type === "expense");
@@ -573,7 +570,6 @@ function updateCategoryDashboard() {
   setText("categoryTotalCount", total);
   setText("categoryMappedCount", mapped);
   setText("categoryReviewCount", review);
-  setText("categorySpecialTaxCount", special);
   setText("categoryMappedPercent", `${pct}% of categories`);
   setText("categoryReviewHint", review > 0 ? `Tap to filter ${review} unmapped categor${review === 1 ? "y" : "ies"}` : "Everything is mapped");
   setText("incomeCategorySummary", `${income.length} active · ${incomeMapped} mapped`);
@@ -581,13 +577,12 @@ function updateCategoryDashboard() {
 
   const reviewButton = document.getElementById("categoryReviewBtn");
   if (reviewButton) {
-    const allMapped = total > 0 && review === 0;
-    
-    reviewButton.textContent = review > 0 ? `Review ${review} unmapped categor${review === 1 ? "y" : "ies"}` : "All categories mapped";
-    reviewButton.disabled = allMapped;
-    reviewButton.classList.toggle("is-complete", allMapped);
+    reviewButton.textContent = review > 0
+      ? `${review} categor${review === 1 ? "y needs" : "ies need"} review`
+      : "All categories mapped";
+    reviewButton.classList.toggle("is-complete", total > 0 && review === 0);
   }
-  }
+}
   
 function setText(id, value) {
   const node = document.getElementById(id);

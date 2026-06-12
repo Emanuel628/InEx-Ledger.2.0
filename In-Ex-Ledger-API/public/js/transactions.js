@@ -5528,7 +5528,6 @@ function initCsvImport() {
 document.addEventListener("DOMContentLoaded", () => {
   initCsvImport();
   initDrawerCloseBtn();
-  initQuickAddTriggers();
   initTaxBannerControls();
   initPeriodPicker();
   initTransactionUndoBar();
@@ -5558,32 +5557,9 @@ function initDrawerCloseBtn() {
   closeBtn?.addEventListener("click", () => closeTransactionDrawer());
 }
 
-function initQuickAddTriggers() {
-  document.querySelectorAll("[data-quick-add-trigger], [data-quick-add-link]").forEach((element) => {
-    element.addEventListener("click", (event) => {
-      event.preventDefault();
-      void toggleTransactionDrawer();
-    });
-  });
-}
-
 function initTaxBannerControls() {
-  const banner = document.getElementById("tax-cockpit");
-  const collapseBtn = document.getElementById("taxBannerCollapseBtn");
   const infoBtn = document.getElementById("taxInfoBtn");
   const tooltip = document.getElementById("taxInfoTooltip");
-
-  const COLLAPSE_KEY = "lb_tax_banner_collapsed";
-  if (banner && localStorage.getItem(COLLAPSE_KEY) === "true") {
-    banner.classList.add("is-collapsed");
-    if (collapseBtn) collapseBtn.setAttribute("aria-label", "Expand set-aside helper");
-  }
-
-  collapseBtn?.addEventListener("click", () => {
-    const collapsed = banner?.classList.toggle("is-collapsed");
-    try { localStorage.setItem(COLLAPSE_KEY, String(!!collapsed)); } catch (_) {}
-    collapseBtn.setAttribute("aria-label", collapsed ? "Expand set-aside helper" : "Collapse set-aside helper");
-  });
 
   infoBtn?.addEventListener("click", () => {
     if (tooltip) tooltip.hidden = !tooltip.hidden;
@@ -5593,10 +5569,16 @@ function initTaxBannerControls() {
 function initPeriodPicker() {
   const chips = document.querySelectorAll(".tx-period-chip");
   chips.forEach((chip) => {
-    chip.classList.toggle("is-active", chip.dataset.period === transactionFilters.period);
+    const isActive = chip.dataset.period === transactionFilters.period;
+    chip.classList.toggle("is-active", isActive);
+    chip.setAttribute("aria-selected", isActive ? "true" : "false");
     chip.addEventListener("click", () => {
-      chips.forEach((c) => c.classList.remove("is-active"));
+      chips.forEach((c) => {
+        c.classList.remove("is-active");
+        c.setAttribute("aria-selected", "false");
+      });
       chip.classList.add("is-active");
+      chip.setAttribute("aria-selected", "true");
       transactionFilters.period = chip.dataset.period || "all";
       void loadTransactions({ resetPage: true });
       window.dispatchEvent(new CustomEvent("txPeriodChanged", { detail: chip.dataset.period }));

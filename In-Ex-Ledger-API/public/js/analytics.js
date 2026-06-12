@@ -89,6 +89,9 @@ async function loadDashboard() {
 
 function renderDashboard(data) {
   const { summary, monthly_breakdown, top_income_sources, top_expense_categories, current_month } = data;
+  const visibleMonthlyBreakdown = Array.isArray(monthly_breakdown)
+    ? monthly_breakdown.slice(findFirstNonZeroMonthIndex(monthly_breakdown))
+    : [];
 
   // KPI cards
   const kpiRow = document.getElementById("kpiRow");
@@ -110,19 +113,19 @@ function renderDashboard(data) {
   if (current_month) renderThisMonth(current_month);
 
   // 12-month trend sparkline
-  if (monthly_breakdown && monthly_breakdown.length) {
-    renderTrendChart(monthly_breakdown);
+  if (visibleMonthlyBreakdown.length) {
+    renderTrendChart(visibleMonthlyBreakdown);
   }
 
   // Monthly breakdown table
-  if (monthly_breakdown && monthly_breakdown.length) {
+  if (visibleMonthlyBreakdown.length) {
     const tbody = document.getElementById("monthlyTableBody");
     const activeMonthLabel = current_month?.label || "";
-    tbody.innerHTML = monthly_breakdown.map((m) => {
+    tbody.innerHTML = visibleMonthlyBreakdown.map((m) => {
       const netClass = m.net >= 0 ? "net-positive" : "net-negative";
       const activeClass = m.month === activeMonthLabel ? " projection-row--active" : "";
       return `<tr class="projection-row${activeClass}">
-        <td>${escapeHtml(m.month)}</td>
+        <td>${escapeHtml(formatMonthAxisLabel(m.month))}</td>
         <td>${fmt(m.income)}</td>
         <td>${fmt(m.expense)}</td>
         <td class="${netClass}">${fmt(m.net)}</td>
@@ -173,18 +176,22 @@ function renderThisMonth(cm) {
     return `<span class="pct-badge ${cls}">${sign}${pct}%</span>`;
   }
 
+  const incomeBadge = pctBadge(cm.income_vs_prior_pct, false);
+  const expenseBadge = pctBadge(cm.expense_vs_prior_pct, true);
+  const netBadge = pctBadge(cm.net_vs_prior_pct, false);
+
   grid.innerHTML = [
     `<div class="this-month-item">
       <div class="this-month-val income">${fmt(cm.income, { absolute: true })}</div>
-      <div class="this-month-key">${escapeHtml(t("analytics_legend_income"))} ${pctBadge(cm.income_vs_prior_pct, false)}</div>
+      <div class="this-month-key">${escapeHtml(t("analytics_legend_income"))}${incomeBadge ? ` ${incomeBadge}` : ""}</div>
     </div>`,
     `<div class="this-month-item">
       <div class="this-month-val expense">${fmt(cm.expense, { absolute: true })}</div>
-      <div class="this-month-key">${escapeHtml(t("analytics_legend_expenses"))} ${pctBadge(cm.expense_vs_prior_pct, true)}</div>
+      <div class="this-month-key">${escapeHtml(t("analytics_legend_expenses"))}${expenseBadge ? ` ${expenseBadge}` : ""}</div>
     </div>`,
     `<div class="this-month-item">
       <div class="this-month-val ${cm.net >= 0 ? "net-pos" : "net-neg"}">${fmt(cm.net)}</div>
-      <div class="this-month-key">${escapeHtml(t("analytics_this_month_net"))} ${pctBadge(cm.net_vs_prior_pct, false)}</div>
+      <div class="this-month-key">${escapeHtml(t("analytics_this_month_net"))}${netBadge ? ` ${netBadge}` : ""}</div>
     </div>`
   ].join("");
 
@@ -206,13 +213,14 @@ function renderTrendChart(months) {
   const chartH = H - PAD.top - PAD.bottom;
 
   const maxVal = Math.max(...months.map((m) => Math.max(m.income, m.expense)), 1);
+  const roundedMax = Math.max(5000, Math.ceil(maxVal / 1000) * 1000);
   const n = months.length;
 
   function xPos(i) {
     return PAD.left + (i / (n - 1)) * chartW;
   }
   function yPos(v) {
-    return PAD.top + chartH - (v / maxVal) * chartH;
+    return PAD.top + chartH - (v / roundedMax) * chartH;
   }
   function polyline(points) {
     return points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
@@ -222,10 +230,10 @@ function renderTrendChart(months) {
   const expensePoints = months.map((m, i) => [xPos(i), yPos(m.expense)]);
 
   // Y-axis ticks
-  const tickCount = 4;
+  const tickCount = 5;
   let yTicks = "";
   for (let t = 0; t <= tickCount; t++) {
-    const val = (maxVal / tickCount) * t;
+    const val = (roundedMax / tickCount) * t;
     const y = yPos(val).toFixed(1);
     yTicks += `<line x1="${PAD.left - 4}" y1="${y}" x2="${W - PAD.right}" y2="${y}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3 3"/>`;
     yTicks += `<text x="${PAD.left - 8}" y="${y}" text-anchor="end" dominant-baseline="middle" class="chart-tick">${fmtCompact(val)}</text>`;
@@ -236,7 +244,7 @@ function renderTrendChart(months) {
   months.forEach((m, i) => {
     if (i % 3 === 0 || i === n - 1) {
       const x = xPos(i).toFixed(1);
-      const short = m.month.slice(5);
+      const short = formatMonthAxisLabel(m.month);
       xLabels += `<text x="${x}" y="${H - 4}" text-anchor="middle" class="chart-tick">${escapeHtml(short)}</text>`;
     }
   });
@@ -276,6 +284,20 @@ function barRow(label, value, max, type) {
     <progress class="bar-track ${escapeHtml(type)}" max="100" value="${pct.toFixed(2)}" aria-label="${escapeHtml(label)} ${pct.toFixed(0)}%"></progress>
     <span class="bar-amount">${fmt(value, { absolute: true })}</span>
   </div>`;
+}
+
+function findFirstNonZeroMonthIndex(months) {
+  const index = months.findIndex((month) => Number(month?.income || 0) !== 0 || Number(month?.expense || 0) !== 0 || Number(month?.net || 0) !== 0);
+  return index === -1 ? 0 : index;
+}
+
+function formatMonthAxisLabel(value) {
+  const raw = String(value || "");
+  const date = /^\d{4}-\d{2}$/.test(raw) ? new Date(`${raw}-01T00:00:00`) : new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    return raw;
+  }
+  return date.toLocaleDateString("en-US", { month: "short", year: "2-digit" }).replace(" ", " '");
 }
 
 // ---------------------------------------------------------------------------
