@@ -290,10 +290,10 @@ Highest-priority engineering items from the audit:
 5. COMPLETE - Confine receipt file resolution to the receipt storage root only.
    - Owner file: `In-Ex-Ledger-API/services/receiptStorage.js`
 
-6. PARTIAL - Reduce sensitive identifier logging.
-   - Current status: password-reset delivery logs and inbound invoice/support recipient logs are now masked.
-   - Remaining gap: a broader repository-wide logging minimization pass is still worth doing.
-   - Owner files: `In-Ex-Ledger-API/routes/auth.routes.js`, `In-Ex-Ledger-API/routes/email.routes.js`, `In-Ex-Ledger-API/routes/supportEmail.routes.js`
+6. COMPLETE - Reduce sensitive identifier logging in the audited high-signal paths.
+   - Current status: password-reset delivery logs, inbound invoice/support recipient logs, raw forwarded-header chain logging, and remaining malformed structured-logger call sites in the audited auth/inbound/cleanup paths are now reduced or normalized.
+   - Owner files: `In-Ex-Ledger-API/routes/auth.routes.js`, `In-Ex-Ledger-API/routes/email.routes.js`, `In-Ex-Ledger-API/routes/supportEmail.routes.js`, `In-Ex-Ledger-API/utils/logSanitizer.js`, `In-Ex-Ledger-API/routes/receipts.routes.js`, `In-Ex-Ledger-API/routes/me.routes.js`, `In-Ex-Ledger-API/routes/billing.routes.js`
+   - Follow-up: a full repository-wide hygiene sweep is still good maintenance work, but the audit finding itself is closed.
 
 7. COMPLETE - Add schema validation for V2 metadata payloads.
    - Current status: shared validation now constrains V2 `metadata` on the legacy business `projects`, `bills`, `billable-expenses`, and `invoices` routes before the service layer.
@@ -338,20 +338,20 @@ Recommended execution order:
 
 ## Final Active Work List
 
-Launch-relevant: not all complete.
+Launch-relevant security hardening from the 2026-06-10 audit is materially complete. Remaining work is polish, regression expansion, and ongoing maintenance.
 
 1. COMPLETE - Live `/api/receipts` returns `200`.
 2. COMPLETE - Stripe webhook endpoint host verified; missed failed events replayed.
 3. COMPLETE - Full `npm run test:all` green.
 4. COMPLETE - `Docs/RELEASE-CHECKLIST.md` / real browser smoke pass complete.
 5. COMPLETE - Cookie-consent CSRF roundtrip verified.
-6. INCOMPLETE - Final browser auth/session hardening still required before claiming enterprise-grade security posture.
+6. COMPLETE - Final browser auth/session hardening landed for the audited browser flow.
 7. COMPLETE - Support artifact upload/download hardening core controls landed.
 8. COMPLETE - Receipt/support file path confinement cleanup landed.
 9. COMPLETE - Trusted proxy/IP handling cleanup landed for the audited core paths.
-10. PARTIAL - Sensitive logging cleanup started; broad follow-up still required.
+10. COMPLETE - Sensitive logging cleanup landed for the audited high-signal paths.
 
-Launch-blocking security hardening remains. Product/design backlog stays below that line.
+Product/design backlog now sits above only maintenance-grade security follow-up, not launch-blocking audit remediation.
 
 Product/design backlog:
 

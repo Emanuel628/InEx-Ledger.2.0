@@ -8,7 +8,9 @@ const SENSITIVE_KEYS = new Set([
   "password", "password_hash", "passwordhash",
   "token", "access_token", "refresh_token", "accesstoken", "refreshtoken",
   "secret", "api_key", "apikey", "private_key", "privatekey",
-  "credit_card", "creditcard", "card_number", "cardnumber", "cvv", "cvc"
+  "credit_card", "creditcard", "card_number", "cardnumber", "cvv", "cvc",
+  "authorization", "cookie", "set-cookie", "setcookie",
+  "forwardedfor", "forwarded_for", "x-forwarded-for"
 ]);
 
 const STRING_PATTERNS = [
@@ -21,13 +23,31 @@ const STRING_PATTERNS = [
   /\bsin\b/gi
 ];
 
+const EMAIL_PATTERN = /([A-Z0-9._%+-]{1,64})@([A-Z0-9.-]+\.[A-Z]{2,})/gi;
+
+function maskEmailString(value) {
+  return String(value).replace(EMAIL_PATTERN, (_full, localPart, domainPart) => {
+    const safeLocal = String(localPart || "");
+    const safeDomain = String(domainPart || "");
+    const maskedLocal = safeLocal.length <= 2
+      ? `${safeLocal.charAt(0) || "*"}*`
+      : `${safeLocal.slice(0, 2)}***`;
+    const domainSegments = safeDomain.split(".");
+    const root = domainSegments.shift() || "";
+    const maskedRoot = root.length <= 2
+      ? `${root.charAt(0) || "*"}*`
+      : `${root.slice(0, 2)}***`;
+    return `${maskedLocal}@${[maskedRoot, ...domainSegments].join(".")}`;
+  });
+}
+
 function maskString(value) {
   if (typeof value !== "string") return value;
   let redacted = value;
   for (const pattern of STRING_PATTERNS) {
     redacted = redacted.replace(pattern, "[REDACTED]");
   }
-  return redacted;
+  return maskEmailString(redacted);
 }
 
 function sanitizePayload(payload) {

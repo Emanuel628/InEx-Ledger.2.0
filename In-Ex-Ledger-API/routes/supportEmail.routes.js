@@ -204,10 +204,12 @@ function verifySupportInboundRequest(req, nowMs = Date.now()) {
 }
 
 function describeInboundCaller(req) {
+  const forwardedFor = String(req.get("x-forwarded-for") || "").trim();
   return {
     userAgent: req.get("user-agent") || null,
     ip: req.ip || null,
-    forwardedFor: req.get("x-forwarded-for") || null,
+    hasForwardedFor: Boolean(forwardedFor),
+    forwardedForHopCount: forwardedFor ? forwardedFor.split(",").map((part) => part.trim()).filter(Boolean).length : 0,
     hasSvixHeaders: Boolean(req.get("svix-signature") || req.get("svix-id")),
     hasCustomHeaders: Boolean(req.get("x-inbound-signature") || req.get("x-inbound-timestamp")),
     hasLegacyHeaders: Boolean(req.get("x-inbound-secret") || req.get("x-webhook-secret"))

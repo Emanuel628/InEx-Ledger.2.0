@@ -993,7 +993,10 @@ router.delete("/", accountDeleteLimiter, async (req, res) => {
     );
     unlinkResults.forEach((result, index) => {
       if (result.status === "rejected" && result.reason?.code !== "ENOENT") {
-        logError("DELETE /me: failed to unlink receipt file:", storagePaths[index], result.reason);
+        logError("DELETE /me: failed to unlink receipt file", {
+          filePath: storagePaths[index],
+          message: result.reason?.message || String(result.reason || "")
+        });
       }
     });
 

@@ -371,7 +371,12 @@ async function sendAppEmail({ to, subject, html, text }, { retries = 2, retryDel
       return result;
     } catch (err) {
       lastError = err;
-      logError("[email] attempt", attempt + 1, "failed for subject", JSON.stringify(subject), "to", maskedRecipients.join(", "), "-", err?.message || err);
+      logError("[email] send attempt failed", {
+        attempt: attempt + 1,
+        subject,
+        recipients: maskedRecipients,
+        message: err?.message || String(err)
+      });
       if (attempt < retries) {
         await new Promise((resolve) => setTimeout(resolve, retryDelayMs * Math.pow(2, attempt)));
       }
@@ -2093,7 +2098,10 @@ router.post("/forgot-password", passwordLimiter, async (req, res) => {
         const emailContent = buildPasswordResetEmail(lang, resetLink);
         await sendAppEmail({ to: email, ...emailContent });
       } catch (emailErr) {
-        logError("[forgot-password] failed to send reset email to", maskEmail(email), ":", emailErr?.message || emailErr);
+        logError("[forgot-password] failed to send reset email", {
+          email: maskEmail(email),
+          message: emailErr?.message || String(emailErr)
+        });
         // Continue — do not expose email delivery failure to the caller
       }
 
@@ -2138,7 +2146,10 @@ router.post("/account-recovery", passwordLimiter, async (req, res) => {
         const emailContent = buildPasswordResetEmail(lang, resetLink);
         await sendAppEmail({ to: recoveryEmail, ...emailContent });
       } catch (emailErr) {
-        logError("[account-recovery] failed to send reset email to", maskEmail(recoveryEmail), ":", emailErr?.message || emailErr);
+        logError("[account-recovery] failed to send reset email", {
+          recoveryEmail: maskEmail(recoveryEmail),
+          message: emailErr?.message || String(emailErr)
+        });
       }
     }
 

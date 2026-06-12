@@ -206,7 +206,7 @@ Result:
 
 ### 6. Excessive identifier logging in some error paths
 
-- Status: `PARTIAL FAIL`
+- Status: `PASS / PARTIAL`
 - Standards impact:
   - OWASP Top 10 2021: A09 Security Logging and Monitoring Failures
   - ASVS 5.0.0: log minimization and sensitive-data handling
@@ -225,10 +225,12 @@ What changed in this pass:
 
 - Password-reset delivery failures in `auth.routes.js` now mask recipient email addresses before logging.
 - Inbound invoice/support mail handlers now mask recipient arrays and sender email values before logging.
+- Shared log sanitization now masks email-like strings and strips raw forwarded-header chains from structured log payloads.
+- Remaining malformed variadic logger call sites in auth, billing, receipt cleanup, and account-deletion cleanup paths were converted to structured log contexts.
 
 Remaining gap:
 
-- A broader repository-wide logging sweep is still warranted, but the concrete high-signal call sites identified in this audit are now reduced.
+- A broader repository-wide logging sweep is still worthwhile over time, but the concrete high-signal call sites identified in this audit are now closed.
 
 ## Framework Checklist
 
@@ -244,7 +246,7 @@ Remaining gap:
 | A06 Vulnerable and Outdated Components | `PARTIAL` | No full SCA result is embedded in repo. Dependency posture should be validated separately in CI. |
 | A07 Identification and Authentication Failures | `PASS / PARTIAL` | JWT handling now uses a maintained library and the audited browser flow is cookie-only. Further issuer/audience/key-rotation hardening still remains. |
 | A08 Software and Data Integrity Failures | `PARTIAL PASS` | Webhooks are verified; no obvious unsafe auto-update path found. Token library replacement still recommended. |
-| A09 Security Logging and Monitoring Failures | `PARTIAL FAIL` | Good audit coverage exists, but client-IP spoofing and some over-detailed logging weaken trustworthiness. |
+| A09 Security Logging and Monitoring Failures | `PASS / PARTIAL` | Audit coverage is good, trusted client-IP handling is fixed in the audited core paths, and the concrete sensitive-log call sites from this audit are now reduced. |
 | A10 SSRF | `PASS` | `signInSecurityService.js` uses HTTPS-only geolocation host allowlisting. |
 
 ## OWASP API Security Top 10 2023
@@ -272,7 +274,7 @@ Remaining gap:
 | Access Control | `PASS / PARTIAL` | Core business scoping is good; continue expanding object/property tests. |
 | Validation and Sanitization | `PASS / PARTIAL` | Receipt upload validation is solid, support-artifact type checks are covered, and V2 metadata validation now exists; continue broadening schema enforcement. |
 | Stored Cryptography | `PASS / PARTIAL` | The bespoke JWT implementation is gone, but issuer/audience/key-rotation hardening is still recommended. |
-| Error Handling and Logging | `PARTIAL FAIL` | Audit coverage is good, but canonical client-IP handling and log minimization need work. |
+| Error Handling and Logging | `PASS / PARTIAL` | Audit coverage is good, trusted client-IP handling is fixed in the audited core paths, and shared sanitization now reduces common identifier leakage in logs. |
 | Data Protection | `PASS / PARTIAL` | Refresh tokens are hashed, Plaid token encryption exists, and browser-held bearer token exposure was removed; continue minimizing sensitive logs. |
 | Communications | `PASS` | HTTPS-oriented settings, HSTS, CORS allowlisting, CSP, and webhook validation are present. |
 | Malicious Code / Supply Chain | `PARTIAL` | No CI-enforced dependency/vuln policy was evident from this review alone. |
@@ -285,7 +287,7 @@ Remaining gap:
 
 | Principle | Status | Notes |
 |---|---|---|
-| Take ownership of customer security outcomes | `PASS / PARTIAL` | Many controls exist and key browser-token/artifact gaps have been reduced, but dependency policy and log minimization still need tightening. |
+| Take ownership of customer security outcomes | `PASS / PARTIAL` | Many controls exist and the key browser-token, artifact, dependency, and concrete sensitive-log gaps identified in this audit have been reduced; remaining work is mostly ongoing hardening discipline. |
 | Embrace radical transparency and accountability | `PARTIAL PASS` | Audit events and system diagnostics exist; security debt should be tracked explicitly in release criteria. |
 | Build security in from the start / secure defaults | `PASS / PARTIAL` | The audited browser auth flow now uses cookie-backed sessions by default; continue raising the floor with dependency gates and broader regression coverage. |
 | Reduce attack surface | `PASS / PARTIAL` | Good CSP/CORS work, storage-root confinement, and stricter upload validation reduce exposure; route inventory and further trimming are still worthwhile. |

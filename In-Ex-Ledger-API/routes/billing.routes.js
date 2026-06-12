@@ -1403,7 +1403,7 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
   }
 
   if (!reserved) {
-    logInfo("Stripe webhook duplicate skipped:", event.id, event.type);
+    logInfo("Stripe webhook duplicate skipped", { eventId: event.id, eventType: event.type });
     return res.status(200).json({ received: true, duplicate: true });
   }
 
@@ -1449,7 +1449,7 @@ router.post("/webhook", webhookLimiter, async (req, res) => {
             actionUrl: buildAppUrl("/subscription")
           });
         }
-        logInfo("Stripe subscription synced:", event.type, "business:", businessId);
+        logInfo("Stripe subscription synced", { eventType: event.type, businessId });
       }
     } else if (event.type === "customer.subscription.deleted") {
       const businessId =

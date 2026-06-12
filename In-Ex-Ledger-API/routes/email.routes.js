@@ -474,10 +474,12 @@ function verifyInboundEmailRequest(req, nowMs = Date.now()) {
  * rejected.
  */
 function describeInboundCaller(req) {
+  const forwardedFor = String(req.get("x-forwarded-for") || "").trim();
   return {
     userAgent: req.get("user-agent") || null,
     ip: req.ip || null,
-    forwardedFor: req.get("x-forwarded-for") || null,
+    hasForwardedFor: Boolean(forwardedFor),
+    forwardedForHopCount: forwardedFor ? forwardedFor.split(",").map((part) => part.trim()).filter(Boolean).length : 0,
     // Header families present (booleans only — values are never logged):
     hasSvixHeaders: Boolean(req.get("svix-signature") || req.get("svix-id")),
     hasCustomHeaders: Boolean(req.get("x-inbound-signature") || req.get("x-inbound-timestamp")),

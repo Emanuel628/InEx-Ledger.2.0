@@ -155,7 +155,10 @@ async function safeUnlink(filePath) {
     if (err?.code === "ENOENT") {
       return;
     }
-    logError("Failed to delete file:", filePath, err);
+    logError("Failed to delete file", {
+      filePath,
+      message: err?.message || String(err)
+    });
   }
 }
 
