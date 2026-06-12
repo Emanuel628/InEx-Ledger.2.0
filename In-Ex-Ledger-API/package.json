@@ -17,6 +17,7 @@
     "migrations:verify-checksums": "node scripts/repair-migration-checksums.js",
     "migrations:repair-checksums": "node scripts/repair-migration-checksums.js --write",
     "verify:redacted-storage": "node scripts/verify-redacted-storage.mjs",
+    "security:deps": "npm audit --omit=dev --audit-level=high",
     "log_scan": "node scripts/log_scan.js",
     "i18n:audit": "node scripts/i18n-audit.js",
     "i18n:fix": "node scripts/i18n-fix.js",
@@ -43,7 +44,7 @@
     "seed:dev": "node scripts/seed-dev.mjs"
   },
   "dependencies": {
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

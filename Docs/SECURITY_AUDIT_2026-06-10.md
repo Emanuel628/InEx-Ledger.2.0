@@ -303,8 +303,6 @@ Remaining gap:
 
 ### Priority 1
 
-1. Add CI SCA/dependency vulnerability gates.
-
 ### Priority 2
 
 1. Expand targeted regression coverage beyond the current upload/path/session suite to more abuse-case scenarios.

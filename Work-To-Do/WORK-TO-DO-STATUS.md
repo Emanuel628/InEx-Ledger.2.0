@@ -315,6 +315,11 @@ Highest-priority engineering items from the audit:
    - Owner files: `In-Ex-Ledger-API/tests/asvsControls.test.js`, `In-Ex-Ledger-API/routes/supportArtifacts.routes.js`, `In-Ex-Ledger-API/routes/sessions.routes.js`, `In-Ex-Ledger-API/public/js/auth.js`, `In-Ex-Ledger-API/package.json`
    - Verification: `node -e "require('./tests/asvsControls.test.js')"` and the updated `test:all` suite include this coverage.
 
+11. COMPLETE - Add CI dependency/security gates.
+   - Current status: `.github/workflows/dependency-security.yml` now enforces PR dependency review and a recurring/push `npm audit` gate for production dependencies, and `package.json` exposes `npm run security:deps` for local parity.
+   - Owner files: `.github/workflows/dependency-security.yml`, `In-Ex-Ledger-API/package.json`
+   - Enforcement: `actions/dependency-review-action` fails PRs on high-severity dependency changes, and `npm audit --omit=dev --audit-level=high` runs in CI on pushes, PRs, and a weekly schedule.
+
 Security standards summary from the audit:
 
 - OWASP Top 10: partial pass overall, but fails remain in session/crypto architecture, insecure design, security misconfiguration, and logging/monitoring hygiene.
