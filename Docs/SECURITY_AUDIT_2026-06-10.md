@@ -304,13 +304,13 @@ Remaining gap:
 ### Priority 1
 
 1. Add CI SCA/dependency vulnerability gates.
-2. Add a route inventory with authn/authz/rate-limit annotations.
-3. Add ASVS-mapped tests for session, upload, and audit controls.
+2. Add ASVS-mapped tests for session, upload, and audit controls.
 
 ### Priority 2
 
 1. Expand targeted regression coverage beyond the current upload/path/session suite to more abuse-case scenarios.
 2. Continue repository-wide logging minimization and redaction review.
+3. Keep the route inventory current as new mounts are added or retired.
 
 ## Good Controls Already Present
 

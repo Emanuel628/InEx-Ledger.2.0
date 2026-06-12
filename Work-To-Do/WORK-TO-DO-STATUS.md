@@ -305,6 +305,11 @@ Highest-priority engineering items from the audit:
    - Owner files: `In-Ex-Ledger-API/tests/securityRegressionSuite.test.js`, `In-Ex-Ledger-API/routes/supportArtifacts.routes.js`, `In-Ex-Ledger-API/services/supportArtifactStorage.js`, `In-Ex-Ledger-API/services/receiptStorage.js`, `In-Ex-Ledger-API/public/js/auth.js`
    - Verification: run in-process with `node -e "require('./tests/securityRegressionSuite.test.js')"` in this sandbox, plus `node -e "require('./tests/criticalFlows.test.js')"` for the core auth/CSRF regression set.
 
+9. COMPLETE - Add a mounted route inventory with authn/authz/rate-limit annotations.
+   - Current status: the mounted API surface is documented in `Docs/API_ROUTE_INVENTORY.md`, including global controls, route-family auth model, scope/authorization notes, CSRF posture, and route-local limiter notes.
+   - Owner files: `Docs/API_ROUTE_INVENTORY.md`, `In-Ex-Ledger-API/server.js`, `In-Ex-Ledger-API/routes/index.js`
+   - Follow-up: add a CI reminder/check so future route mounts cannot drift from the inventory silently.
+
 Security standards summary from the audit:
 
 - OWASP Top 10: partial pass overall, but fails remain in session/crypto architecture, insecure design, security misconfiguration, and logging/monitoring hygiene.
