@@ -240,10 +240,10 @@ body,
   min-height: 36px !important;
   padding: var(--sp-2) var(--sp-4) !important;
   border: 1px solid var(--brand) !important;
-  border-radius: var(--radius-sm) !important;
-  background: var(--brand) !important;
+  border-radius: 14px !important;
+  background: var(--cta-gradient) !important;
   color: #fff !important;
-  box-shadow: none !important;
+  box-shadow: var(--shadow-cta) !important;
   font-size: var(--fs-md) !important;
   font-weight: 600 !important;
 }
@@ -260,9 +260,11 @@ body,
 .export-btn-primary:hover,
 .categories-primary-btn:hover,
 .whatif-run-btn:hover {
-  background: var(--brand-hover) !important;
+  background: var(--cta-gradient) !important;
   border-color: var(--brand-hover) !important;
   color: #fff !important;
+  filter: saturate(1.03) brightness(1.02) !important;
+  transform: translateY(-1px) !important;
 }
 
 .btn-secondary,
@@ -281,10 +283,10 @@ body,
   min-height: 36px !important;
   padding: var(--sp-2) var(--sp-4) !important;
   border: 1px solid var(--border) !important;
-  border-radius: var(--radius-sm) !important;
-  background: var(--bg-page) !important;
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 254, 0.98) 100%) !important;
   color: var(--text-primary) !important;
-  box-shadow: none !important;
+  box-shadow: 0 8px 18px rgba(16, 34, 54, 0.04) !important;
   font-size: var(--fs-md) !important;
   font-weight: 600 !important;
 }
@@ -299,10 +301,10 @@ body,
   min-height: 36px !important;
   padding: var(--sp-2) var(--sp-4) !important;
   border: 1px solid var(--danger) !important;
-  border-radius: var(--radius-sm) !important;
-  background: var(--bg-page) !important;
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(251, 244, 242, 0.98) 100%) !important;
   color: var(--danger) !important;
-  box-shadow: none !important;
+  box-shadow: 0 8px 18px rgba(180, 84, 62, 0.08) !important;
 }
 
 .segmented,
@@ -396,11 +398,11 @@ body,
   padding: 0.45rem 0.875rem !important;
   border: 1px solid var(--border) !important;
   border-radius: 999px !important;
-  background: var(--bg-page) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 254, 0.98) 100%) !important;
   color: var(--text-secondary) !important;
   font-size: var(--fs-sm) !important;
   font-weight: 600 !important;
-  box-shadow: none !important;
+  box-shadow: 0 8px 18px rgba(16, 34, 54, 0.03) !important;
 }
 
 .chip:hover,
@@ -638,10 +640,11 @@ label,
 .table-wrapper,
 .mileage-table-wrap,
 .messages-list-shell {
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius-md) !important;
-  box-shadow: none !important;
-  background: var(--bg-page) !important;
+  border: 1px solid color-mix(in srgb, var(--brand) 10%, var(--border)) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 16px 34px rgba(16, 34, 54, 0.06) !important;
+  background: linear-gradient(180deg, rgba(252, 253, 255, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%) !important;
+  overflow: hidden !important;
 }
 
 table {
@@ -650,7 +653,7 @@ table {
 }
 
 th {
-  background: transparent !important;
+  background: linear-gradient(180deg, rgba(247, 250, 252, 0.98) 0%, rgba(242, 246, 251, 0.98) 100%) !important;
   color: var(--text-muted) !important;
   font-size: var(--fs-xs) !important;
   font-weight: 500 !important;
@@ -667,7 +670,7 @@ td {
 }
 
 tbody tr:hover td {
-  background: var(--bg-subtle) !important;
+  background: linear-gradient(180deg, rgba(243, 248, 255, 0.9) 0%, rgba(248, 251, 255, 0.94) 100%) !important;
 }
 
 .col-amount,
@@ -741,7 +744,7 @@ tbody tr:hover td {
 .settings-state-card:hover,
 .settings-state-card--action:hover {
   border-color: color-mix(in srgb, var(--brand) 24%, var(--border)) !important;
-  box-shadow: none !important;
+  box-shadow: 0 14px 28px rgba(16, 34, 54, 0.06) !important;
 }
 
 .settings-state-card--action,
@@ -763,12 +766,15 @@ tbody tr:hover td {
 .tx-meta-badge,
 .type-badge,
 .business-chip {
-  border: 0 !important;
-  background: transparent !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 24px !important;
+  padding: 0 10px !important;
+  border: 1px solid color-mix(in srgb, var(--brand) 12%, var(--border)) !important;
+  background: linear-gradient(180deg, rgba(250, 252, 255, 0.98) 0%, rgba(245, 248, 252, 0.98) 100%) !important;
   color: var(--text-secondary) !important;
-  padding: 0 !important;
-  border-radius: 0 !important;
-  font-size: var(--fs-sm) !important;
+  border-radius: 999px !important;
+  font-size: var(--fs-xs) !important;
 }
 
 .transactions-toolbar-copy p,
@@ -947,10 +953,10 @@ tbody tr:hover td {
 .accounts-list,
 .category-list {
   display: grid;
-  gap: 0 !important;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
+  gap: 12px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
 }
 
 .account-card,
@@ -960,16 +966,16 @@ tbody tr:hover td {
   justify-content: space-between !important;
   gap: var(--sp-4) !important;
   padding: var(--sp-4) !important;
-  border: 0 !important;
-  border-bottom: 1px solid var(--border) !important;
-  border-radius: 0 !important;
-  background: var(--bg-page) !important;
-  box-shadow: none !important;
+  border: 1px solid color-mix(in srgb, var(--brand) 10%, var(--border)) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--brand) 10%, var(--border)) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(249, 251, 255, 0.98) 100%) !important;
+  box-shadow: 0 12px 26px rgba(16, 34, 54, 0.04) !important;
 }
 
 .account-card:last-child,
 .category-item:last-child {
-  border-bottom: 0 !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--brand) 10%, var(--border)) !important;
 }
 
 .account-card-main,
@@ -1002,9 +1008,10 @@ tbody tr:hover td {
 }
 
 .status-toggle-button .status-badge {
-  background: transparent !important;
-  color: var(--text-muted) !important;
-  padding: 0 !important;
+  background: linear-gradient(180deg, rgba(245, 248, 252, 0.98) 0%, rgba(240, 244, 249, 0.98) 100%) !important;
+  color: var(--text-secondary) !important;
+  padding: 2px 10px !important;
+  border: 1px solid var(--border) !important;
 }
 
 .message-row.is-unread,
