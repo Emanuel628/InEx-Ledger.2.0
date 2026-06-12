@@ -4168,8 +4168,8 @@ function renderTotals(filteredTransactions = getFilteredTransactions()) {
   }
   if (taxBannerLabel) {
     taxBannerLabel.textContent = isAllScope
-      ? txT("transactions_tax_estimated_owed", "Estimated set-aside")
-      : `${txT("transactions_tax_estimated_owed", "Estimated set-aside")} (${getAppliedTaxLabel()})`;
+      ? "Tax form context: multi-business reporting view"
+      : `Tax form context: ${getTaxFormContext().label} draft estimate`;
   }
   if (taxBannerNote) {
     taxBannerNote.textContent = isAllScope

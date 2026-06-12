@@ -799,6 +799,7 @@ function setupExportForm() {
 function setupPdfButton() {
   const button = document.getElementById("exportPdfBtn");
   const note = document.getElementById("exportPdfNote");
+  const buttonLabel = button?.querySelector('[data-i18n="exports_button_pdf"]');
   if (!button) {
     return;
   }
@@ -810,10 +811,24 @@ function setupPdfButton() {
       getSelectedExportMode() === "finalized"
       && Array.isArray(finalization?.hardBlockers)
       && finalization.hardBlockers.length > 0;
+    const openItems =
+      Number(finalization?.summary?.openItemCount || 0)
+      || Number(finalization?.summary?.total || 0)
+      || (Array.isArray(finalization?.hardBlockers) ? finalization.hardBlockers.length : 0)
+      || (Array.isArray(finalization?.warnings) ? finalization.warnings.length : 0);
+    const mode = getSelectedExportMode();
     button.disabled = !isV1 || finalizedBlocked;
     button.title = finalizedBlocked ? tx("exports_preflight_note_finalized_blocked") : "";
+    if (buttonLabel) {
+      buttonLabel.textContent = mode === "finalized"
+        ? "Export PDF"
+        : `Export draft PDF${openItems > 0 ? ` (${openItems} open items)` : ""}`;
+    }
     if (note) {
-      note.hidden = isV1;
+      note.hidden = isV1 && !finalizedBlocked;
+      if (finalizedBlocked) {
+        note.textContent = tx("exports_preflight_note_finalized_blocked");
+      }
     }
     return isV1 && !finalizedBlocked;
   };
@@ -1478,6 +1493,77 @@ function updateExportReadiness(transactions) {
   }
 
   section.hidden = false;
+}
+
+function updateExportReadiness(transactions) {
+  const section = document.getElementById("exportReadinessSection");
+  const itemsEl = document.getElementById("exportReadinessItems");
+  if (!section || !itemsEl || !transactions || transactions.length === 0) {
+    if (section) section.hidden = true;
+    return;
+  }
+
+  const categories = getCategories();
+  const catById = {};
+  categories.forEach((category) => { catById[category.id] = category; });
+
+  let needsCategory = 0;
+  let needsTaxMapping = 0;
+  let missingReceipt = 0;
+  let needsMileage = 0;
+  let needsAllocation = 0;
+  let needsBusinessPurpose = 0;
+  let incomeReview = 0;
+
+  for (const txn of transactions) {
+    const cat = catById[txn.categoryId];
+    const catName = String(cat?.name || txn.categoryName || "").toLowerCase();
+    const isExpense = txn.type !== "income";
+    const isIncome = txn.type === "income";
+    const isUncategorized = !txn.categoryId || /imported|needs[._-]?category|uncategorized/i.test(catName);
+
+    if (isUncategorized) {
+      needsCategory++;
+      continue;
+    }
+    if (!cat?.taxLabel) needsTaxMapping++;
+    if (isExpense && !txn.receiptId) missingReceipt++;
+    if (isExpense && requiresExportMileageLog(catName)) needsMileage++;
+    if (requiresExportAllocation(catName)) needsAllocation++;
+    if (isExpense && requiresExportBusinessPurpose(catName)) needsBusinessPurpose++;
+    if (isIncome && txn.reviewStatus === "needs_review") incomeReview++;
+  }
+
+  const readinessRows = [
+    { label: "Need category assignment", count: needsCategory, key: "nc" },
+    { label: "Expenses missing receipts/support", count: missingReceipt, key: "rs" },
+    { label: "Need tax line mapping", count: needsTaxMapping, key: "um" },
+    { label: "Need mileage log", count: needsMileage, key: "ml" },
+    { label: "Need business-use allocation", count: needsAllocation, key: "al" },
+    { label: "Need business purpose note", count: needsBusinessPurpose, key: "bp" },
+    { label: "Income rows flagged for review", count: incomeReview, key: "is" }
+  ];
+
+  itemsEl.innerHTML = readinessRows.map((row) => {
+    if (row.count > 0) {
+      return `<a class="export-readiness-item" href="${escapeHtml(buildExportReadinessHref(row.key))}">
+        <span class="export-readiness-label">${escapeHtml(row.label)}</span>
+        <span class="export-readiness-count badge-warning">${row.count}</span>
+      </a>`;
+    }
+    return `<div class="export-readiness-item export-readiness-item--clear">
+      <span class="export-readiness-label">${escapeHtml(row.label)}</span>
+      <span class="export-readiness-all-clear">✓</span>
+    </div>`;
+  }).join("");
+
+  section.hidden = false;
+}
+
+function buildExportReadinessHref(key) {
+  const params = new URLSearchParams();
+  params.set("review", key);
+  return `transactions?${params.toString()}`;
 }
 
 async function exportCsv(startDate, endDate, recordHistory = true, explicitFilename, tierOverride, exportLangOverride, formatOverride) {
