@@ -304,7 +304,6 @@ Remaining gap:
 ### Priority 1
 
 1. Add CI SCA/dependency vulnerability gates.
-2. Add ASVS-mapped tests for session, upload, and audit controls.
 
 ### Priority 2
 

@@ -310,6 +310,11 @@ Highest-priority engineering items from the audit:
    - Owner files: `Docs/API_ROUTE_INVENTORY.md`, `In-Ex-Ledger-API/server.js`, `In-Ex-Ledger-API/routes/index.js`
    - Follow-up: add a CI reminder/check so future route mounts cannot drift from the inventory silently.
 
+10. COMPLETE - Add ASVS-mapped session/upload/audit control tests.
+   - Current status: `tests/asvsControls.test.js` now locks in three control classes explicitly: cookie-only browser session behavior, safe support-artifact download headers for unsafe MIME types, and audit-event emission for session revocation.
+   - Owner files: `In-Ex-Ledger-API/tests/asvsControls.test.js`, `In-Ex-Ledger-API/routes/supportArtifacts.routes.js`, `In-Ex-Ledger-API/routes/sessions.routes.js`, `In-Ex-Ledger-API/public/js/auth.js`, `In-Ex-Ledger-API/package.json`
+   - Verification: `node -e "require('./tests/asvsControls.test.js')"` and the updated `test:all` suite include this coverage.
+
 Security standards summary from the audit:
 
 - OWASP Top 10: partial pass overall, but fails remain in session/crypto architecture, insecure design, security misconfiguration, and logging/monitoring hygiene.

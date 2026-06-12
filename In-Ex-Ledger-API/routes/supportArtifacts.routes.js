@@ -78,6 +78,17 @@ const MIME_BY_EXTENSION = new Map([
   [".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]
 ]);
 
+const INLINE_SAFE_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "text/plain",
+  "text/csv",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+]);
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_BYTES },
@@ -110,6 +121,18 @@ function normalizeUploadedSupportMimeType(file) {
   }
 
   return null;
+}
+
+function getSafeSupportArtifactResponseMimeType(mimeType) {
+  const normalized = String(mimeType || "").trim().toLowerCase();
+  return INLINE_SAFE_MIME_TYPES.has(normalized)
+    ? normalized
+    : "application/octet-stream";
+}
+
+function shouldInlineSupportArtifactMimeType(mimeType) {
+  const normalized = String(mimeType || "").trim().toLowerCase();
+  return INLINE_SAFE_MIME_TYPES.has(normalized);
 }
 
 async function writeSupportArtifactFile(buffer, originalName) {
@@ -286,8 +309,14 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "Support file missing." });
     }
 
-    res.setHeader("Content-Type", row.mime_type || "application/octet-stream");
-    res.setHeader("Content-Disposition", `inline; filename="${String(row.filename || "support-file").replace(/"/g, "")}"`);
+    const responseMimeType = getSafeSupportArtifactResponseMimeType(row.mime_type);
+    const dispositionType = shouldInlineSupportArtifactMimeType(row.mime_type) ? "inline" : "attachment";
+    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader("Content-Type", responseMimeType);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Disposition", `${dispositionType}; filename="${String(row.filename || "support-file").replace(/"/g, "")}"`);
     return res.sendFile(resolvedPath);
   } catch (err) {
     logError("GET /support-artifacts/:id error:", err);
