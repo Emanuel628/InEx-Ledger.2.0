@@ -820,7 +820,12 @@ tbody tr:hover td {
 }
 
 .analytics-this-month .this-month-progress {
-  color: rgba(255, 255, 255, 0.76) !important;
+  color: #e8eefc !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 999px !important;
+  padding: 0 12px !important;
+  min-height: 32px !important;
 }
 
 .analytics-this-month .this-month-val.income,
@@ -877,6 +882,27 @@ tbody tr:hover td {
   border-radius: 18px !important;
   box-shadow: 0 14px 30px rgba(16, 34, 54, 0.05) !important;
   padding: 18px 18px 20px !important;
+}
+
+.analytics-content #kpiRow > .kpi-card::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 auto auto 0 !important;
+  width: 100% !important;
+  height: 4px !important;
+  background: linear-gradient(90deg, rgba(37, 87, 214, 0.22), rgba(37, 87, 214, 0.74)) !important;
+}
+
+.analytics-content #kpiRow > .kpi-card:nth-child(1)::after {
+  background: linear-gradient(90deg, rgba(21, 115, 71, 0.24), rgba(21, 115, 71, 0.78)) !important;
+}
+
+.analytics-content #kpiRow > .kpi-card:nth-child(2)::after {
+  background: linear-gradient(90deg, rgba(180, 35, 24, 0.2), rgba(180, 35, 24, 0.68)) !important;
+}
+
+.analytics-content #kpiRow > .kpi-card:nth-child(3)::after {
+  background: linear-gradient(90deg, rgba(37, 87, 214, 0.22), rgba(37, 87, 214, 0.74)) !important;
 }
 
 .analytics-content #kpiRow > .kpi-card:last-child {
