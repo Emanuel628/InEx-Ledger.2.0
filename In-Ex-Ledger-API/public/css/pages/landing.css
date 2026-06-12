@@ -419,18 +419,9 @@ h3 {
   gap: 28px;
 }
 
-.step,
-.feature,
-.handoff-card,
-.region-card,
-.plan-card {
-  border: 1px solid var(--landing-line);
-  border-radius: var(--landing-radius);
-  background: var(--landing-paper);
-}
-
 .step {
-  padding: 30px 28px;
+  padding: 22px 0 0;
+  border-top: 1px solid var(--landing-line);
 }
 
 .step-number {
@@ -465,11 +456,12 @@ h3 {
 
 .feature-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
+  gap: 34px 28px;
 }
 
 .feature {
-  padding: 26px;
+  padding: 24px 0 0;
+  border-top: 1px solid var(--landing-line);
 }
 
 .feature-icon {
@@ -509,12 +501,12 @@ h3 {
 
 .handoff-card,
 .region-card {
-  padding: 30px;
+  padding: 0;
 }
 
 .handoff-card-highlight {
-  border-color: #bfd3f4;
-  background: linear-gradient(180deg, #f4f8fe, #ffffff);
+  padding-left: 24px;
+  border-left: 3px solid var(--landing-blue);
 }
 
 .handoff-card h3 {
@@ -522,6 +514,8 @@ h3 {
   align-items: center;
   gap: 10px;
   margin-bottom: 18px;
+  padding-top: 20px;
+  border-top: 1px solid var(--landing-line);
   font-size: 18px;
 }
 
@@ -555,6 +549,8 @@ h3 {
 }
 
 .region-card h3 {
+  padding-top: 20px;
+  border-top: 1px solid var(--landing-line);
   margin-bottom: 6px;
   font-size: 18px;
 }
@@ -564,6 +560,9 @@ h3 {
   display: flex;
   flex-direction: column;
   padding: 34px;
+  border: 1px solid var(--landing-line);
+  border-radius: var(--landing-radius);
+  background: var(--landing-paper);
 }
 
 .plan-card-pro {
