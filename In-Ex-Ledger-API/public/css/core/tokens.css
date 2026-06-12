@@ -65,17 +65,20 @@ html {
   --radius-panel: var(--radius-md);
   --radius-section: var(--radius-md);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --shadow-card: none;
-  --shadow-card-lg: none;
-  --shadow-stat: none;
-  --shadow-accent: none;
-  --shadow-cta: none;
+  --shadow-card: 0 10px 24px rgba(16, 34, 54, 0.04);
+  --shadow-card-lg: 0 16px 36px rgba(16, 34, 54, 0.06);
+  --shadow-stat: 0 14px 30px rgba(16, 34, 54, 0.06);
+  --shadow-accent: 0 20px 42px rgba(37, 87, 214, 0.18);
+  --shadow-cta: 0 16px 30px rgba(37, 87, 214, 0.18);
   --page-bg: var(--bg-page);
-  --page-bleed: var(--bg-page);
+  --page-bleed:
+    radial-gradient(circle at top right, rgba(37, 87, 214, 0.08), transparent 26%),
+    radial-gradient(circle at bottom left, rgba(22, 38, 63, 0.05), transparent 22%),
+    linear-gradient(180deg, #f7f9fd 0%, #ffffff 18%);
   --panel-bg: var(--bg-page);
   --card-bg-strong: var(--bg-page);
-  --cta-gradient: var(--brand);
-  --accent-panel: var(--bg-subtle);
+  --cta-gradient: linear-gradient(180deg, #2c79c4 0%, #2557d6 100%);
+  --accent-panel: linear-gradient(135deg, rgba(31, 80, 185, 0.97) 0%, rgba(18, 54, 121, 0.96) 100%);
   --card-bg: var(--bg-page);
   --bg-surface: var(--bg-page);
   --input-bg: var(--bg-page);
@@ -86,10 +89,10 @@ html {
   --accent-success: var(--positive);
   --primary: var(--brand);
   --success: var(--positive);
-  --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-soft: none;
-  --shadow: none;
+  --shadow-sm: 0 10px 22px rgba(16, 34, 54, 0.05);
+  --shadow-md: 0 14px 30px rgba(16, 34, 54, 0.08);
+  --shadow-soft: 0 8px 18px rgba(16, 34, 54, 0.04);
+  --shadow: 0 14px 30px rgba(16, 34, 54, 0.08);
   --radius-modern: var(--radius-md);
   --surface-alt: var(--bg-subtle);
   --primary-muted: var(--bg-subtle);

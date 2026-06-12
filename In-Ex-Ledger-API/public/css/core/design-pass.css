@@ -44,7 +44,7 @@ body,
   background: var(--bg-page) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-md) !important;
-  box-shadow: none !important;
+  box-shadow: 0 12px 28px rgba(16, 34, 54, 0.05) !important;
   padding: var(--sp-5) !important;
 }
 
@@ -89,17 +89,21 @@ body,
   max-width: 72ch;
 }
 
-.app-page-kicker,
-.messages-page-eyebrow,
 .page-context-note,
 .messages-page-context,
 .messages-focus-banner,
-.exports-info-btn,
-.exports-info-popover,
-.card-title-icon,
 .receipts-focus-card .app-page-kicker,
 .receipts-summary-card[data-receipt-summary-filter="recent"] {
   display: none !important;
+}
+
+.app-page-kicker,
+.messages-page-eyebrow {
+  display: inline-flex !important;
+  border-color: rgba(37, 87, 214, 0.16) !important;
+  background: rgba(237, 244, 255, 0.94) !important;
+  color: var(--brand) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7) !important;
 }
 
 .page-header-actions,
@@ -857,6 +861,36 @@ tbody tr:hover td {
   padding: 0 0 var(--sp-4) !important;
   margin-bottom: var(--sp-4) !important;
   border-bottom: 1px solid var(--border) !important;
+}
+
+.exports-info-btn,
+.analytics-info-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-color: color-mix(in srgb, var(--brand) 18%, var(--border)) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  color: var(--brand) !important;
+  box-shadow: 0 8px 18px rgba(16, 34, 54, 0.04) !important;
+}
+
+.exports-info-btn:hover,
+.exports-info-btn[aria-expanded="true"],
+.analytics-info-btn:hover,
+.analytics-info-btn[aria-expanded="true"] {
+  background: rgba(237, 244, 255, 0.96) !important;
+  border-color: rgba(37, 87, 214, 0.28) !important;
+}
+
+.exports-info-popover,
+.analytics-info-popover {
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%) !important;
+  border-color: color-mix(in srgb, var(--brand) 12%, var(--border)) !important;
+  box-shadow: 0 18px 36px rgba(16, 34, 54, 0.1) !important;
+}
+
+.card-title-icon {
+  display: inline-flex !important;
 }
 
 .receipt-drop-zone {
