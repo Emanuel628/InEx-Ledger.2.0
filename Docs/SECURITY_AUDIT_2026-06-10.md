@@ -266,30 +266,30 @@ Remaining gap:
 
 | Area | Status | Notes |
 |---|---|---|
-| Architecture, Design and Threat Modeling | `PARTIAL FAIL` | Secure patterns exist, but browser-readable bearer tokens are a design-level weakness. |
+| Architecture, Design and Threat Modeling | `PASS / PARTIAL` | Secure patterns exist and the audited browser flow is cookie-only, but issuer/audience/key-rotation hardening and broader threat-model regression coverage still remain. |
 | Authentication | `PASS / PARTIAL` | Password strength, verification, lockout, MFA, and email verification are present. |
-| Session Management | `FAIL` | Frontend stores access tokens in session storage instead of fully `HttpOnly` session handling. |
+| Session Management | `PASS / PARTIAL` | The audited browser flow now relies on `HttpOnly` cookie-backed auth; keep expanding session abuse and fixation/regression coverage. |
 | Access Control | `PASS / PARTIAL` | Core business scoping is good; continue expanding object/property tests. |
-| Validation and Sanitization | `PARTIAL FAIL` | Receipt upload validation is solid; support-artifact validation is weaker. |
-| Stored Cryptography | `FAIL` | Custom JWT signing/verification should be replaced with a vetted library. |
+| Validation and Sanitization | `PASS / PARTIAL` | Receipt upload validation is solid, support-artifact type checks are covered, and V2 metadata validation now exists; continue broadening schema enforcement. |
+| Stored Cryptography | `PASS / PARTIAL` | The bespoke JWT implementation is gone, but issuer/audience/key-rotation hardening is still recommended. |
 | Error Handling and Logging | `PARTIAL FAIL` | Audit coverage is good, but canonical client-IP handling and log minimization need work. |
-| Data Protection | `PASS / PARTIAL` | Refresh tokens are hashed; Plaid token encryption exists; token exposure in browser lowers the overall score. |
+| Data Protection | `PASS / PARTIAL` | Refresh tokens are hashed, Plaid token encryption exists, and browser-held bearer token exposure was removed; continue minimizing sensitive logs. |
 | Communications | `PASS` | HTTPS-oriented settings, HSTS, CORS allowlisting, CSP, and webhook validation are present. |
 | Malicious Code / Supply Chain | `PARTIAL` | No CI-enforced dependency/vuln policy was evident from this review alone. |
 | Business Logic | `PARTIAL PASS` | Billing and trial logic are reasonably guarded; keep abuse-case tests expanding. |
-| File Handling | `FAIL` | Support-artifact upload/download path needs stronger validation and path confinement. |
-| API and Web Service Security | `PARTIAL FAIL` | Core API patterns are solid, but authentication/storage and resource-consumption gaps remain. |
+| File Handling | `PASS / PARTIAL` | Support-artifact and receipt storage are storage-root confined, and targeted regression tests now cover MIME mismatch and traversal-style inputs; add signature sniffing if desired. |
+| API and Web Service Security | `PASS / PARTIAL` | Core API patterns are solid, browser auth is cookie-only, and targeted upload/path/session regressions exist; resource-consumption and inventory work still remain. |
 | Configuration / Operations | `PARTIAL PASS` | Strong startup validation exists; strengthen inventory and dependency control evidence. |
 
 ## CISA Secure by Design
 
 | Principle | Status | Notes |
 |---|---|---|
-| Take ownership of customer security outcomes | `PARTIAL` | Many controls exist, but browser token storage and weak artifact handling still shift too much risk to the app/user boundary. |
+| Take ownership of customer security outcomes | `PASS / PARTIAL` | Many controls exist and key browser-token/artifact gaps have been reduced, but dependency policy and log minimization still need tightening. |
 | Embrace radical transparency and accountability | `PARTIAL PASS` | Audit events and system diagnostics exist; security debt should be tracked explicitly in release criteria. |
-| Build security in from the start / secure defaults | `FAIL` | The current auth architecture is not the safest default for a finance app SPA. |
-| Reduce attack surface | `PARTIAL FAIL` | Good CSP/CORS work, but support artifact endpoints remain broader than they need to be. |
-| Make exploitation expensive | `PARTIAL PASS` | Rate limiting, CSRF, refresh rotation, and MFA help, but XSS impact remains too high because of token storage. |
+| Build security in from the start / secure defaults | `PASS / PARTIAL` | The audited browser auth flow now uses cookie-backed sessions by default; continue raising the floor with dependency gates and broader regression coverage. |
+| Reduce attack surface | `PASS / PARTIAL` | Good CSP/CORS work, storage-root confinement, and stricter upload validation reduce exposure; route inventory and further trimming are still worthwhile. |
+| Make exploitation expensive | `PASS / PARTIAL` | Rate limiting, CSRF, refresh rotation, MFA, and removal of browser-held bearer tokens all raise attacker cost; continue with logging and dependency hardening. |
 
 ## Recommended Patch Plan
 
@@ -303,16 +303,14 @@ Remaining gap:
 
 ### Priority 1
 
-1. Add a dedicated security regression suite for:
-   - support artifact upload MIME/signature mismatch
-   - path escape attempts
-   - session theft resistance after XSS simulation assumptions
-
-### Priority 2
-
 1. Add CI SCA/dependency vulnerability gates.
 2. Add a route inventory with authn/authz/rate-limit annotations.
 3. Add ASVS-mapped tests for session, upload, and audit controls.
+
+### Priority 2
+
+1. Expand targeted regression coverage beyond the current upload/path/session suite to more abuse-case scenarios.
+2. Continue repository-wide logging minimization and redaction review.
 
 ## Good Controls Already Present
 

@@ -300,6 +300,11 @@ Highest-priority engineering items from the audit:
    - Owner files: `In-Ex-Ledger-API/api/utils/v2MetadataValidator.js`, `In-Ex-Ledger-API/routes/projects.routes.js`, `In-Ex-Ledger-API/routes/bills.routes.js`, `In-Ex-Ledger-API/routes/billable-expenses.routes.js`, `In-Ex-Ledger-API/routes/invoices.routes.js`, `In-Ex-Ledger-API/tests/v2RouteHardening.test.js`
    - Enforcement: root object only, bounded depth/array size/key count/string length, JSON-serializable values, and max payload bytes.
 
+8. COMPLETE - Add the dedicated upload/path/session security regression suite.
+   - Current status: a focused suite now covers support-artifact MIME mismatch rejection, managed-root confinement for traversal-style file-path candidates, and the cookie-only browser auth contract under XSS-style token-planting assumptions.
+   - Owner files: `In-Ex-Ledger-API/tests/securityRegressionSuite.test.js`, `In-Ex-Ledger-API/routes/supportArtifacts.routes.js`, `In-Ex-Ledger-API/services/supportArtifactStorage.js`, `In-Ex-Ledger-API/services/receiptStorage.js`, `In-Ex-Ledger-API/public/js/auth.js`
+   - Verification: run in-process with `node -e "require('./tests/securityRegressionSuite.test.js')"` in this sandbox, plus `node -e "require('./tests/criticalFlows.test.js')"` for the core auth/CSRF regression set.
+
 Security standards summary from the audit:
 
 - OWASP Top 10: partial pass overall, but fails remain in session/crypto architecture, insecure design, security misconfiguration, and logging/monitoring hygiene.
