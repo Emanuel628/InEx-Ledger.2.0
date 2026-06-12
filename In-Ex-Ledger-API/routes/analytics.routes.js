@@ -122,7 +122,9 @@ router.get("/dashboard", async (req, res) => {
       [businessId]
     );
     const region = businessRow.rows[0]?.region || "US";
+    const now = new Date();
     const since = monthStartOffset(11);
+    const upperBound = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().slice(0, 10);
 
     // Monthly income / expense totals
     const monthlyResult = await pool.query(
@@ -133,12 +135,13 @@ router.get("/dashboard", async (req, res) => {
         FROM transactions
         WHERE business_id = $1
           AND date >= $2
+          AND date < $3
           AND (is_adjustment = false OR is_adjustment IS NULL)
           AND deleted_at IS NULL
           AND (is_void = false OR is_void IS NULL)
         GROUP BY month, type
         ORDER BY month ASC`,
-      [businessId, since]
+      [businessId, since, upperBound]
     );
 
     // Top categories by income
@@ -151,13 +154,14 @@ router.get("/dashboard", async (req, res) => {
         WHERE t.business_id = $1
           AND t.type = 'income'
           AND t.date >= $2
+          AND t.date < $3
           AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
           AND t.deleted_at IS NULL
           AND (t.is_void = false OR t.is_void IS NULL)
         GROUP BY c.name
         ORDER BY total DESC
         LIMIT 5`,
-      [businessId, since]
+      [businessId, since, upperBound]
     );
 
     // Top categories by expense
@@ -170,13 +174,14 @@ router.get("/dashboard", async (req, res) => {
         WHERE t.business_id = $1
           AND t.type = 'expense'
           AND t.date >= $2
+          AND t.date < $3
           AND (t.is_adjustment = false OR t.is_adjustment IS NULL)
           AND t.deleted_at IS NULL
           AND (t.is_void = false OR t.is_void IS NULL)
         GROUP BY c.name
         ORDER BY total DESC
         LIMIT 5`,
-      [businessId, since]
+      [businessId, since, upperBound]
     );
 
     // Build monthly map
@@ -238,19 +243,19 @@ router.get("/dashboard", async (req, res) => {
     }
 
     // Current month vs prior month comparison
-    const now = new Date();
     const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().slice(0, 10);
     const priorMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10);
     const priorMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().slice(0, 10);
 
      const currentMonthResult = await pool.query(
        `SELECT type, SUM(${ANALYTICS_AMOUNT_EXPR}) AS total
         FROM transactions
-        WHERE business_id = $1 AND date >= $2
+        WHERE business_id = $1 AND date >= $2 AND date < $3
           AND (is_adjustment = false OR is_adjustment IS NULL)
           AND deleted_at IS NULL AND (is_void = false OR is_void IS NULL)
         GROUP BY type`,
-      [businessId, currentMonthStart]
+      [businessId, currentMonthStart, nextMonthStart]
     );
 
      const priorMonthResult = await pool.query(
@@ -273,7 +278,8 @@ router.get("/dashboard", async (req, res) => {
     }
 
     function pctChange(current, prior) {
-      if (prior === 0) return current > 0 ? 100 : 0;
+      if (!prior && !current) return 0;
+      if (!prior) return null;
       return Number(((current - prior) / prior * 100).toFixed(1));
     }
 

@@ -5,7 +5,7 @@ const CATEGORY_TAX_OPTIONS = {
     income: [
       { value: "gross_receipts_sales", label: "Gross receipts or sales", line: "Schedule C Line 1" },
       { value: "returns_allowances", label: "Returns and allowances", line: "Schedule C Line 2" },
-      { value: "interest_income", label: "Interest income", line: "Schedule B" },
+      { value: "interest_income", label: "Interest income", line: "Schedule C Line 6" },
       { value: "other_income", label: "Other income", line: "Schedule C Line 6" },
       { value: "nonemployee_compensation", label: "Nonemployee compensation", line: "1099-NEC" },
       { value: "payment_card_income", label: "Payment card / third-party network income", line: "1099-K" },
@@ -22,6 +22,7 @@ const CATEGORY_TAX_OPTIONS = {
       { value: "interest_other", label: "Interest: other", line: "Schedule C Line 16b" },
       { value: "legal_professional", label: "Legal and professional services", line: "Schedule C Line 17" },
       { value: "office_expense", label: "Office expense", line: "Schedule C Line 18" },
+      { value: "rent_lease_other", label: "Rent or lease (other business property)", line: "Schedule C Line 20b" },
       { value: "repairs_maintenance", label: "Repairs and maintenance", line: "Schedule C Line 21" },
       { value: "supplies", label: "Supplies", line: "Schedule C Line 22" },
       { value: "taxes_licenses", label: "Taxes and licenses", line: "Schedule C Line 23" },
@@ -30,9 +31,9 @@ const CATEGORY_TAX_OPTIONS = {
       { value: "utilities", label: "Utilities", line: "Schedule C Line 25" },
       { value: "wages", label: "Wages", line: "Schedule C Line 26" },
       { value: "home_office", label: "Home office", line: "Form 8829 / Line 30" },
-      { value: "bank_fees", label: "Bank service charges", line: "Schedule C Line 27b" },
-      { value: "software_subscriptions", label: "Software and subscriptions", line: "Schedule C Line 27b" },
-      { value: "other_expense", label: "Other business expenses", line: "Schedule C Line 27b" }
+      { value: "bank_fees", label: "Bank service charges", line: "Schedule C Line 27a / Part V" },
+      { value: "software_subscriptions", label: "Software and subscriptions", line: "Schedule C Line 27a / Part V" },
+      { value: "other_expense", label: "Other business expenses", line: "Schedule C Line 27a / Part V" }
     ]
   },
   CA: {

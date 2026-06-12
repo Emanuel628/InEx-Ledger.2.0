@@ -166,7 +166,7 @@ function renderThisMonth(cm) {
   }
 
   function pctBadge(pct, inverse) {
-    if (pct === 0) return "";
+    if (pct == null || pct === 0) return "";
     const positive = inverse ? pct < 0 : pct > 0;
     const cls = positive ? "pct-badge--up" : "pct-badge--down";
     const sign = pct > 0 ? "+" : "";

@@ -4131,11 +4131,17 @@ function renderTotals(filteredTransactions = getFilteredTransactions()) {
       isAllScope && mixedCurrencies ? txT("exports_per_business", "Per-business") : formatCurrency(totals.income - totals.expenses, scopeRegion);
   }
   if (incomeDelta) {
-    incomeDelta.innerHTML = `<span class="stat-delta-positive">${formatPercentChange(comparison.income)}</span> ${txT("transactions_vs_last_year", "vs last year")}`;
+    incomeDelta.innerHTML = comparison.income == null
+      ? ""
+      : `<span class="stat-delta-positive">${formatPercentChange(comparison.income)}</span> ${txT("transactions_vs_last_year", "vs last year")}`;
   }
   if (expensesDelta) {
-    const expenseDeltaClass = comparison.expenses > 0 ? "stat-delta-negative" : "stat-delta-positive";
-    expensesDelta.innerHTML = `<span class="${expenseDeltaClass}">${formatPercentChange(comparison.expenses)}</span> ${txT("transactions_vs_last_year", "vs last year")}`;
+    if (comparison.expenses == null) {
+      expensesDelta.innerHTML = "";
+    } else {
+      const expenseDeltaClass = comparison.expenses > 0 ? "stat-delta-negative" : "stat-delta-positive";
+      expensesDelta.innerHTML = `<span class="${expenseDeltaClass}">${formatPercentChange(comparison.expenses)}</span> ${txT("transactions_vs_last_year", "vs last year")}`;
+    }
   }
   if (transactionCountValue) {
     transactionCountValue.textContent = String(transactionsCount);
@@ -4348,7 +4354,7 @@ function computePercentDelta(currentValue, previousValue) {
     return 0;
   }
   if (!previousValue) {
-    return 100;
+    return null;
   }
   return ((currentValue - previousValue) / previousValue) * 100;
 }
