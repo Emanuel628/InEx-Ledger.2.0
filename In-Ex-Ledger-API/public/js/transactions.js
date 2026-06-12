@@ -3968,7 +3968,7 @@ function renderTransactionsTable(filteredTransactions) {
     const amountPrefix = txn.type === "income" ? "+" : "-";
     const rowToneClass = getTxnRowToneClass(computeTxnFlags(txn), txn.reviewStatus);
     const clearedMarkup = txn.cleared
-      ? `<span class="status-badge status-cleared">${txT("transactions_status_cleared", "Cleared")}</span>`
+      ? `<span class="status-badge status-cleared">${txT("transactions_status_cleared", "Reconciled")}</span>`
       : `<span class="status-badge status-pending">${txT("transactions_status_pending", "Pending")}</span>`;
     const rowReceiptCount = Number(txn.receiptCount || 0) || (txn.receiptId ? 1 : 0);
     const rowReceiptLabel = rowReceiptCount === 1
@@ -3986,7 +3986,7 @@ function renderTransactionsTable(filteredTransactions) {
       <td><span class="date-cell">${formatDisplayDate(txn.date)}</span></td>
       <td><div class="description-primary">${escapeHtml(txn.description || "-")}</div><div class="description-sub">${descriptionSub}</div></td>
       <td><span class="account-tag">${escapeHtml(accountName)}</span></td>
-      <td><span class="category-pill ${getCategoryToneClass(categoryName, category?.color)}">${escapeHtml(categoryName)}</span></td>
+      <td><span class="category-pill">${escapeHtml(categoryName)}</span></td>
       <td>${receiptMarkup}</td>
       <td>
         <button type="button" class="status-toggle-button ${txn.cleared ? "is-cleared" : ""}" data-action="toggle-cleared" data-id="${txn.id}">

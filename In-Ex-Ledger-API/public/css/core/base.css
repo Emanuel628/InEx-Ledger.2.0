@@ -11,9 +11,9 @@ body {
 
 body {
   font-family: var(--font);
-  background: var(--surface2);
-  color: var(--ink);
-  font-size: 14px;
+  background: var(--bg-page);
+  color: var(--text-secondary);
+  font-size: var(--fs-md);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
@@ -27,7 +27,7 @@ button {
 }
 
 a {
-  color: var(--accent2);
+  color: var(--brand);
   text-decoration: none;
 }
 
@@ -80,9 +80,9 @@ video {
   transform: translateX(-50%);
   z-index: 9999;
   padding: 8px 16px;
-  background: var(--accent2, #2563a8);
-  color: #fff;
-  border-radius: 0 0 6px 6px;
+  background: var(--brand);
+  color: var(--bg-page);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   font-weight: 600;
   white-space: nowrap;
   text-decoration: none;
@@ -90,6 +90,6 @@ video {
 
 .skip-link:focus {
   top: 0;
-  outline: 2px solid #fff;
+  outline: 2px solid var(--bg-page);
   outline-offset: 2px;
 }

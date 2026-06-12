@@ -333,11 +333,13 @@ function setReceiptRefreshBusy(isBusy) {
 function renderReceipts(receipts) {
   const tableBody = document.getElementById("receiptsTableBody");
   const emptyState = document.getElementById("receiptsEmptyState");
+  const pageBody = document.querySelector(".receipts-content");
   const filteredReceipts = filterReceipts(receipts, currentReceiptFilter);
 
   updateReceiptSummary(receipts);
   updateReceiptFocus(receipts);
   updateReceiptFilterUi(filteredReceipts.length, receipts.length);
+  pageBody?.classList.toggle("receipts-empty-only", !receiptsLoading && !receiptsLoadFailed && receipts.length === 0);
 
   if (!tableBody) {
     return;
@@ -787,12 +789,10 @@ function updateReceiptSummary(receipts) {
   const total = receipts.length;
   const linked = receipts.filter((receipt) => getReceiptState(receipt).linked).length;
   const review = receipts.filter((receipt) => getReceiptState(receipt).needsReview).length;
-  const recent = receipts.filter((receipt) => getReceiptState(receipt).recent).length;
 
   setCountText("receiptsSummaryTotal", total);
   setCountText("receiptsSummaryLinked", linked);
   setCountText("receiptsSummaryReview", review);
-  setCountText("receiptsSummaryRecent", recent);
 }
 
 function updateReceiptFocus(receipts) {
@@ -809,6 +809,7 @@ function updateReceiptFocus(receipts) {
     titleNode.textContent = tx("receipts_focus_title");
     bodyNode.textContent = tx("receipts_focus_body");
     button.disabled = true;
+    button.hidden = receipts.length === 0;
     return;
   }
 
@@ -818,6 +819,7 @@ function updateReceiptFocus(receipts) {
     ? `${nextReceipt.filename || tx("receipts_this_receipt")} ${tx("receipts_focus_followup_body")}`
     : `${nextReceipt.filename || tx("receipts_this_receipt")} ${tx("receipts_focus_link_body")}`;
   button.disabled = false;
+  button.hidden = false;
 }
 
 function updateReceiptFilterUi(filteredCount, totalCount) {

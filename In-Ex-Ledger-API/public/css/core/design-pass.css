@@ -1,0 +1,661 @@
+.app-shell,
+.app-content,
+.app-page,
+.messages-content,
+.analytics-content {
+  background: var(--bg-page) !important;
+}
+
+body,
+.app-shell td,
+.amount,
+.stat-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.app-page,
+.app-content,
+.messages-content,
+.analytics-content {
+  padding: var(--sp-6) !important;
+}
+
+.app-page > section,
+.app-content > section,
+.messages-content > section,
+.analytics-content > section,
+.analytics-panel > .analytics-card,
+.history-card,
+.exports-card,
+.transactions-panel,
+.mileage-card,
+.category-card,
+.account-form-card,
+.accounts-guidance,
+.receipts-card,
+.receipts-focus-card,
+.transaction-drawer-card,
+.summary-panel,
+#tax-cockpit,
+#tax-upsell,
+#transactionReviewSummary,
+#txUndoBar,
+.message-empty-card {
+  background: var(--bg-page) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: none !important;
+  padding: var(--sp-5) !important;
+}
+
+.page-header,
+.app-page-header,
+.messages-page-header,
+.mileage-header-card,
+.analytics-page-header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: var(--sp-4) !important;
+  padding: 0 !important;
+  margin: 0 0 var(--sp-5) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  min-height: 0 !important;
+}
+
+.page-title,
+.app-page-title,
+.messages-page-header h1,
+.mileage-header-card h1 {
+  margin: 0 !important;
+  color: var(--text-primary) !important;
+  font-size: var(--fs-xl) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.2 !important;
+}
+
+.page-subtitle,
+.app-page-subtitle,
+.messages-page-subtitle,
+.mileage-header-card p {
+  margin: var(--sp-2) 0 0 !important;
+  color: var(--text-muted) !important;
+  font-size: var(--fs-sm) !important;
+  line-height: 1.4 !important;
+  max-width: 72ch;
+}
+
+.app-page-kicker,
+.messages-page-eyebrow,
+.page-context-note,
+.messages-page-context,
+.messages-focus-banner,
+.messages-overview-card:last-child,
+.exports-info-btn,
+.exports-info-popover,
+.card-title-icon,
+.receipts-focus-card .app-page-kicker,
+.receipts-summary-card[data-receipt-summary-filter="recent"] {
+  display: none !important;
+}
+
+.page-header-actions,
+.messages-page-actions,
+.categories-header-actions,
+.transactions-toolbar,
+.mileage-history-toolbar,
+.accounts-toolbar,
+.category-toolbar,
+.receipts-filter-bar,
+.messages-panel-tools,
+.transactions-toolbar-tools,
+.transactions-toolbar-controls {
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--sp-3) !important;
+  flex-wrap: wrap !important;
+}
+
+.stats-row,
+.receipts-summary-grid,
+.mileage-summary-grid,
+.messages-overview-grid,
+.accounts-dashboard,
+.category-dashboard,
+#kpiRow {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 !important;
+  padding: var(--sp-4) var(--sp-5) !important;
+  background: var(--bg-page) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.receipts-summary-grid,
+.messages-overview-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stats-row > *,
+.receipts-summary-grid > *,
+.mileage-summary-grid > *,
+.messages-overview-grid > *,
+.accounts-dashboard > *,
+.category-dashboard > *,
+#kpiRow > * {
+  background: transparent !important;
+  border: 0 !important;
+  border-right: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 var(--sp-4) !important;
+}
+
+.stats-row > *:last-child,
+.receipts-summary-grid > *:last-child,
+.mileage-summary-grid > *:last-child,
+.messages-overview-grid > *:last-child,
+.accounts-dashboard > *:last-child,
+.category-dashboard > *:last-child,
+#kpiRow > *:last-child {
+  border-right: 0 !important;
+}
+
+.stat-card-icon,
+.messages-overview-icon,
+.account-stat-icon,
+.category-stat-icon {
+  display: none !important;
+}
+
+.stat-label,
+.receipts-summary-label,
+.mileage-summary-label,
+.messages-overview-label,
+.kpi-label,
+.account-stat-card span,
+.category-stat-card span {
+  color: var(--text-muted) !important;
+  font-size: var(--fs-xs) !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+}
+
+.stat-value,
+.receipts-summary-value,
+.mileage-summary-value,
+.messages-overview-value,
+.kpi-value,
+.account-stat-card strong,
+.category-stat-card strong {
+  margin-top: var(--sp-2) !important;
+  color: var(--text-primary) !important;
+  font-size: var(--fs-xl) !important;
+  font-weight: 600 !important;
+}
+
+.stat-delta,
+.receipts-summary-note,
+.mileage-summary-meta,
+.messages-overview-meta,
+.kpi-note,
+.account-stat-card small,
+.category-stat-card small,
+.mileage-header-note,
+#messagesRefreshMeta {
+  margin-top: var(--sp-2) !important;
+  color: var(--text-muted) !important;
+  font-size: var(--fs-sm) !important;
+}
+
+button,
+.primary-btn,
+.btn-primary,
+.page-add-button,
+.accounts-add-btn,
+.receipt-primary-btn,
+.mileage-save-btn,
+.messages-compose-btn,
+.compose-send,
+.drawer-submit,
+.export-btn-primary,
+.categories-primary-btn,
+.whatif-run-btn {
+  min-height: 36px !important;
+  padding: var(--sp-2) var(--sp-4) !important;
+  border: 1px solid var(--brand) !important;
+  border-radius: var(--radius-sm) !important;
+  background: var(--brand) !important;
+  color: var(--bg-page) !important;
+  box-shadow: none !important;
+  font-size: var(--fs-md) !important;
+  font-weight: 600 !important;
+}
+
+button:hover,
+.primary-btn:hover,
+.btn-primary:hover,
+.page-add-button:hover,
+.accounts-add-btn:hover,
+.receipt-primary-btn:hover,
+.mileage-save-btn:hover,
+.messages-compose-btn:hover,
+.compose-send:hover,
+.drawer-submit:hover,
+.export-btn-primary:hover,
+.categories-primary-btn:hover,
+.whatif-run-btn:hover {
+  background: var(--brand-hover) !important;
+  border-color: var(--brand-hover) !important;
+}
+
+.btn-secondary,
+.ghost-btn,
+.modal-cancel,
+.receipt-secondary-btn,
+.export-btn-secondary,
+.messages-refresh-btn,
+.receipt-drop-browse,
+#importCsvBtn,
+#supportShortcutBtn,
+#receiptLinkNext,
+#invoiceSaveDraft,
+#exportProfileShowMeBtn,
+#exportGeneralShowMeBtn {
+  min-height: 36px !important;
+  padding: var(--sp-2) var(--sp-4) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  background: var(--bg-page) !important;
+  color: var(--text-primary) !important;
+  box-shadow: none !important;
+  font-size: var(--fs-md) !important;
+  font-weight: 600 !important;
+}
+
+.btn-danger,
+.btn-delete,
+.modal-delete,
+.receipt-danger-btn,
+.tx-popup-delete,
+.action-delete,
+.account-delete-menu-btn {
+  min-height: 36px !important;
+  padding: var(--sp-2) var(--sp-4) !important;
+  border: 1px solid var(--danger) !important;
+  border-radius: var(--radius-sm) !important;
+  background: var(--bg-page) !important;
+  color: var(--danger) !important;
+  box-shadow: none !important;
+}
+
+.badge,
+.status-badge,
+.message-state-badge,
+.message-direction-badge,
+.messages-tab-badge,
+.messages-mailbox-pill,
+.messages-count-pill,
+.history-badge,
+.button-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 2px var(--sp-2) !important;
+  border-radius: 999px !important;
+  border: 0 !important;
+  background: var(--bg-subtle) !important;
+  color: var(--text-secondary) !important;
+  font-size: var(--fs-xs) !important;
+  font-weight: 600 !important;
+}
+
+.badge-warning,
+.badge-overdue,
+.export-readiness-count {
+  background: var(--warning-bg) !important;
+  color: var(--warning) !important;
+}
+
+.badge-positive {
+  background: var(--positive-bg) !important;
+  color: var(--positive) !important;
+}
+
+input,
+select,
+textarea,
+.form-control {
+  min-height: 38px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: var(--sp-2) var(--sp-3) !important;
+  font-size: var(--fs-md) !important;
+  color: var(--text-primary) !important;
+  background: var(--bg-page) !important;
+  box-shadow: none !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.form-control:focus {
+  outline: 2px solid color-mix(in srgb, var(--brand) 24%, var(--bg-page)) !important;
+  outline-offset: 1px !important;
+  border-color: var(--brand) !important;
+}
+
+label,
+.form-label,
+.field-label {
+  display: block !important;
+  margin-bottom: var(--sp-2) !important;
+  color: var(--text-secondary) !important;
+  font-size: var(--fs-sm) !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+.table-wrapper,
+.mileage-table-wrap,
+.messages-list-shell {
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: none !important;
+  background: var(--bg-page) !important;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  font-size: var(--fs-xs) !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+td {
+  color: var(--text-secondary) !important;
+  font-size: var(--fs-sm) !important;
+  border-bottom: 1px solid var(--border) !important;
+  background: transparent !important;
+}
+
+tbody tr:hover td {
+  background: var(--bg-subtle) !important;
+}
+
+.col-amount,
+.amount-cell,
+.amount {
+  text-align: right !important;
+}
+
+.amount-positive,
+.summary-income,
+.income,
+.net-positive {
+  color: var(--positive) !important;
+}
+
+.amount-negative,
+.summary-expense,
+.expense {
+  color: var(--text-primary) !important;
+}
+
+.category-pill,
+.account-tag,
+.category-tax-pill,
+.category-status-pill,
+.account-meta-pill,
+.tx-meta-badge,
+.type-badge,
+.business-chip {
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-size: var(--fs-sm) !important;
+}
+
+.transactions-toolbar-copy p,
+.receipts-card-title-copy p,
+.messages-panel-copy p,
+.analytics-card > p,
+.mileage-card-copy,
+.categories-defaults-hint,
+.export-taxid-ephemeral-hint {
+  color: var(--text-muted) !important;
+  font-size: var(--fs-sm) !important;
+}
+
+#tax-cockpit,
+.receipts-focus-card,
+.accounts-guidance,
+.category-guidance,
+.analytics-this-month,
+.export-preflight-state,
+.export-review-state {
+  background: var(--bg-subtle) !important;
+}
+
+.transactions-toolbar,
+.messages-panel-header,
+.mileage-card-head,
+.category-card-head,
+.history-card-head {
+  padding: 0 0 var(--sp-4) !important;
+  margin-bottom: var(--sp-4) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.receipt-drop-zone {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--sp-2) !important;
+  min-height: 120px !important;
+  border: 1px dashed var(--border) !important;
+  border-radius: var(--radius-md) !important;
+  background: var(--bg-page) !important;
+}
+
+.receipts-empty-only .receipt-drop-zone {
+  min-height: 320px !important;
+}
+
+.export-readiness-item,
+.export-readiness-link {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: var(--sp-3) !important;
+  padding: var(--sp-3) 0 !important;
+  border-top: 1px solid var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+.export-readiness-item:first-child,
+.export-readiness-link:first-child {
+  border-top: 0 !important;
+}
+
+.this-month-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 !important;
+}
+
+.this-month-item {
+  padding: 0 var(--sp-4) !important;
+  border-right: 1px solid var(--border) !important;
+}
+
+.this-month-item:last-child {
+  border-right: 0 !important;
+}
+
+.chart-tick {
+  fill: var(--text-muted);
+  font-size: var(--fs-xs);
+}
+
+.accounts-list,
+.category-list {
+  display: grid;
+  gap: 0 !important;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.account-card,
+.category-item {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: var(--sp-4) !important;
+  padding: var(--sp-4) !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  background: var(--bg-page) !important;
+  box-shadow: none !important;
+}
+
+.account-card:last-child,
+.category-item:last-child {
+  border-bottom: 0 !important;
+}
+
+.account-card-main,
+.category-row-main {
+  display: grid;
+  gap: var(--sp-1);
+}
+
+.account-name,
+.category-row-title,
+.description-primary,
+.message-subject,
+.message-from {
+  color: var(--text-primary) !important;
+  font-size: var(--fs-md) !important;
+  font-weight: 500 !important;
+}
+
+.account-secondary-meta,
+.category-row-usage,
+.description-sub {
+  color: var(--text-muted) !important;
+  font-size: var(--fs-sm) !important;
+}
+
+.status-toggle-button {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.status-toggle-button .status-badge {
+  background: transparent !important;
+  color: var(--text-muted) !important;
+  padding: 0 !important;
+}
+
+.message-row.is-unread,
+.message-thread-item.is-unread-thread-message {
+  background: var(--bg-subtle) !important;
+}
+
+@media (max-width: 1024px) {
+  .app-page,
+  .app-content,
+  .messages-content,
+  .analytics-content {
+    padding: var(--sp-5) !important;
+  }
+
+  .stats-row,
+  .receipts-summary-grid,
+  .mileage-summary-grid,
+  .messages-overview-grid,
+  .accounts-dashboard,
+  .category-dashboard,
+  #kpiRow,
+  .this-month-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-page,
+  .app-content,
+  .messages-content,
+  .analytics-content {
+    padding: var(--sp-4) !important;
+  }
+
+  .page-header,
+  .app-page-header,
+  .messages-page-header,
+  .mileage-header-card,
+  .analytics-page-header,
+  .transactions-toolbar,
+  .messages-panel-header {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .stats-row,
+  .receipts-summary-grid,
+  .mileage-summary-grid,
+  .messages-overview-grid,
+  .accounts-dashboard,
+  .category-dashboard,
+  #kpiRow,
+  .this-month-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stats-row > *,
+  .receipts-summary-grid > *,
+  .mileage-summary-grid > *,
+  .messages-overview-grid > *,
+  .accounts-dashboard > *,
+  .category-dashboard > *,
+  #kpiRow > *,
+  .this-month-item {
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding: var(--sp-3) 0 !important;
+  }
+
+  .stats-row > *:last-child,
+  .receipts-summary-grid > *:last-child,
+  .mileage-summary-grid > *:last-child,
+  .messages-overview-grid > *:last-child,
+  .accounts-dashboard > *:last-child,
+  .category-dashboard > *:last-child,
+  #kpiRow > *:last-child,
+  .this-month-item:last-child {
+    border-bottom: 0 !important;
+  }
+}

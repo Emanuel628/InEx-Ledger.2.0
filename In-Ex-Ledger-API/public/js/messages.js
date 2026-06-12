@@ -72,7 +72,7 @@ function translate(key, fallback = "") {
 // Default support contact. The in-app message store only routes to registered
 // users, so "contact support" is handled over email to this address. It is
 // surfaced as the default option in the compose recipient dropdown.
-const SUPPORT_EMAIL = "support.inex@gmail.com";
+const SUPPORT_EMAIL = "support@inexledger.com";
 
 document.addEventListener("DOMContentLoaded", async () => {
   await requireValidSessionOrRedirect();
@@ -223,6 +223,9 @@ function updateOverviewMetrics(filteredMessages, mailboxMessages) {
   const queueMetric = document.getElementById("messagesQueueMetric");
   const supportMetric = document.getElementById("messagesSupportMetric");
   const countPill = document.getElementById("messagesVisibleCount");
+  const unreadLabel = document.getElementById("messagesUnreadMetric")?.closest(".messages-overview-copy")?.querySelector(".messages-overview-label");
+  const queueLabel = queueMetric?.closest(".messages-overview-copy")?.querySelector(".messages-overview-label");
+  const supportLabel = supportMetric?.closest(".messages-overview-copy")?.querySelector(".messages-overview-label");
 
   const visibleCount = filteredMessages.length;
   const supportCount = mailboxMessages.filter(MESSAGE_TYPE_FILTERS.support).length;
@@ -230,14 +233,17 @@ function updateOverviewMetrics(filteredMessages, mailboxMessages) {
   if (queueMetric) queueMetric.textContent = String(visibleCount);
   if (supportMetric) supportMetric.textContent = String(supportCount);
   if (countPill) countPill.textContent = `${visibleCount} ${visibleCount === 1 ? "thread" : "threads"} visible`;
+  if (unreadLabel) unreadLabel.textContent = "Unread (all tabs)";
+  if (queueLabel) queueLabel.textContent = "In queue (current tab)";
+  if (supportLabel) supportLabel.textContent = "Support threads";
 }
 
 function updateRefreshUI() {
-  const refreshMetric = document.getElementById("messagesRefreshMetric");
   const syncStatus = document.getElementById("messagesSyncStatus");
+  const refreshMeta = document.getElementById("messagesRefreshMeta");
   const formatted = _lastRefreshAt ? formatClock(_lastRefreshAt) : "-";
 
-  if (refreshMetric) refreshMetric.textContent = formatted;
+  if (refreshMeta) refreshMeta.textContent = _lastRefreshAt ? `Last checked ${formatted}` : "Last checked -";
   if (syncStatus) {
     syncStatus.textContent = _lastRefreshAt
       ? `Last checked ${formatted}`

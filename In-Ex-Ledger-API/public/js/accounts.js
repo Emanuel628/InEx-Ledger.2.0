@@ -59,10 +59,10 @@ function enhanceAccountsShell() {
   dashboard.className = "accounts-dashboard";
   dashboard.setAttribute("aria-label", tx("accounts_overview_aria"));
   dashboard.innerHTML = `
-    <article class="account-stat-card"><span class="account-stat-icon total" aria-hidden="true">${renderAccountStatIcon("total")}</span><div><span>${escapeHtml(tx("accounts_stat_active"))}</span><strong id="accountTotalCount">0</strong><small>${escapeHtml(tx("accounts_stat_active_hint"))}</small></div></article>
-    <article class="account-stat-card"><span class="account-stat-icon bank" aria-hidden="true">${renderAccountStatIcon("bank")}</span><div><span>${escapeHtml(tx("accounts_stat_bank"))}</span><strong id="accountBankCount">0</strong><small>${escapeHtml(tx("accounts_stat_bank_hint"))}</small></div></article>
-    <article class="account-stat-card"><span class="account-stat-icon cash" aria-hidden="true">${renderAccountStatIcon("cash")}</span><div><span>${escapeHtml(tx("accounts_stat_cash"))}</span><strong id="accountCashCardCount">0</strong><small>${escapeHtml(tx("accounts_stat_cash_hint"))}</small></div></article>
-    <article class="account-stat-card"><span class="account-stat-icon currency" aria-hidden="true">${renderAccountStatIcon("currency")}</span><div><span>${escapeHtml(tx("accounts_stat_currency"))}</span><strong id="accountCurrencyLabel">USD</strong><small>${escapeHtml(tx("accounts_stat_currency_hint"))}</small></div></article>
+    <article class="account-stat-card"><div><span>${escapeHtml(tx("accounts_stat_active"))}</span><strong id="accountTotalCount">0</strong><small>${escapeHtml(tx("accounts_stat_active_hint"))}</small></div></article>
+    <article class="account-stat-card"><div><span>${escapeHtml(tx("accounts_stat_bank"))}</span><strong id="accountBankCount">0</strong><small>${escapeHtml(tx("accounts_stat_bank_hint"))}</small></div></article>
+    <article class="account-stat-card"><div><span>${escapeHtml(tx("accounts_stat_cash"))}</span><strong id="accountCashCardCount">0</strong><small>${escapeHtml(tx("accounts_stat_cash_hint"))}</small></div></article>
+    <article class="account-stat-card"><div><span>${escapeHtml(tx("accounts_stat_currency"))}</span><strong id="accountCurrencyLabel">USD</strong><small>${escapeHtml(tx("accounts_stat_currency_hint"))}</small></div></article>
   `;
   header.after(dashboard);
 
@@ -70,7 +70,7 @@ function enhanceAccountsShell() {
   toolbar.className = "accounts-toolbar";
   toolbar.setAttribute("aria-label", tx("accounts_tools_aria"));
   toolbar.innerHTML = `
-    <label class="account-search-wrap" for="accountSearchInput"><span class="account-search-icon" aria-hidden="true">${renderAccountStatIcon("search")}</span><input id="accountSearchInput" type="search" placeholder="${escapeHtml(tx("accounts_search_placeholder"))}" autocomplete="off" /></label>
+    <label class="account-search-wrap" for="accountSearchInput"><input id="accountSearchInput" type="search" placeholder="${escapeHtml(tx("accounts_search_placeholder"))}" autocomplete="off" /></label>
   `;
   dashboard.after(toolbar);
 
@@ -279,23 +279,16 @@ function renderAccountCard(account) {
   const type = account.type || "custom";
   const typeLabel = formatAccountType(type);
   const currency = String(account.currency || inferLedgerCurrency()).toUpperCase();
-  const openingBalance = Number.parseFloat(String(account.opening_balance ?? "0"));
-  const hasOpeningBalance = Number.isFinite(openingBalance) && openingBalance !== 0;
-  const icon = getAccountIconMarkup(type);
-  const accentClass = getAccountAccentClass(type);
-  const isDefault = isLikelyDefaultAccount(account);
+  const transactionCount = Number(account.transaction_count || 0);
+  const lastActivity = account.last_activity ? formatDisplayDate(account.last_activity) : "No activity yet";
   return `
-    <article class="account-card premium-account-card ${accentClass}">
-      <span class="account-card-icon" aria-hidden="true">${icon}</span>
+    <article class="account-card premium-account-card">
       <div class="account-card-main">
         <div class="account-name">${escapeHtml(name)}</div>
         <div class="account-meta-row">
-          <span class="account-type">${escapeHtml(txf("accounts_type_account", { type: typeLabel }))}</span>
-          <span class="account-meta-pill">${escapeHtml(currency)}</span>
-          <span class="account-meta-pill is-active">${escapeHtml(tx("accounts_status_active"))}</span>
-          ${isDefault ? `<span class="account-meta-pill">${escapeHtml(tx("accounts_status_default"))}</span>` : ""}
-          ${hasOpeningBalance ? `<span class="account-meta-pill">${escapeHtml(`Opening ${formatMoney(openingBalance, currency)}`)}</span>` : ""}
+          <span class="account-type">${escapeHtml(txf("accounts_type_account", { type: typeLabel }))} · ${escapeHtml(currency)}</span>
         </div>
+        <div class="account-secondary-meta">${transactionCount} transaction${transactionCount === 1 ? "" : "s"} · Last activity ${escapeHtml(lastActivity)}</div>
       </div>
       <div class="account-actions">
         <button type="button" class="account-menu-btn" aria-label="${escapeHtml(tx("accounts_actions_aria"))}">...</button>

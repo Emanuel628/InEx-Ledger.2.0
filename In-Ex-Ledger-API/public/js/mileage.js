@@ -1,5 +1,6 @@
 const METRIC_STORAGE_KEY = "lb_unit_metric";
 const MILES_TO_KM = 1.609344;
+const MILEAGE_RATE_2026 = 0.67;
 const MILEAGE_TOAST_MS = 3000;
 const MILEAGE_PAGE_SIZE = 25;
 
@@ -212,7 +213,16 @@ function shouldUseKilometers() {
 
 async function loadMileageDashboard() {
   await Promise.all([loadMileageRecords(), loadVehicleCosts()]);
+  updateMileageDeductionEstimate();
   renderMileageHistory();
+}
+
+function updateMileageDeductionEstimate() {
+  const distanceMeta = document.getElementById("mileageSummaryDistanceMeta");
+  if (!distanceMeta) return;
+  const totalMiles = mileageRecords.reduce((sum, record) => sum + Number(record.miles || 0), 0);
+  const estimate = totalMiles * MILEAGE_RATE_2026;
+  distanceMeta.textContent = `Standard mileage estimate ≈ ${formatMoney(estimate)}`;
 }
 
 async function loadMileageRecords() {
