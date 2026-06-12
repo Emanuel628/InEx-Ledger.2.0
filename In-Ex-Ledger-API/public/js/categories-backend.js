@@ -221,18 +221,12 @@ function syncCategoryFilterUi() {
 }
 
 function updateRegionContext() {
-  const label = currentRegion === "CA"
-    ? "Tax region: Canada | T2125 and GST/HST"
-    : currentRegion === "US"
-      ? "Tax region: United States | Schedule C and 1099"
-      : "Tax region unavailable";
   const hint = currentRegion === "CA"
     ? "Categories and mappings follow Canadian T2125 and GST/HST reporting."
     : currentRegion === "US"
       ? "Categories and mappings follow U.S. Schedule C and 1099 reporting."
       : "Set a business region to enable region-specific tax mapping.";
 
-  document.documentElement.style.setProperty("--categories-region-label", JSON.stringify(label));
   const defaultsHint = document.querySelector(".categories-defaults-hint");
   if (defaultsHint) defaultsHint.textContent = hint;
   const specialHint = document.getElementById("categorySpecialTaxHint");

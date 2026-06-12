@@ -141,34 +141,18 @@ body.dark:has(main.app-shell) .dynamic-sidebar-link:hover {
 
 /* Topbar nav is rendered canonically by global.js. Do not show the per-page
    hardcoded nav while the script is preparing the canonical nav. */
-.app-topbar .topbar-nav:not(.is-ready) {
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
-.app-topbar .topbar-nav.is-ready {
+.app-topbar .topbar-nav:not(.is-ready),
+.app-topbar .topbar-nav.is-ready,
+.app-topbar .topbar-nav {
   visibility: visible !important;
   pointer-events: auto !important;
 }
 
-@media (min-width: 1025px) {
-  /* Hide the old static page sidebar, but keep its column reserved so the page
-     does not jump horizontally while global.js converts it to .app-sidebar--dynamic. */
-  main.app-shell > .app-sidebar:not(.app-sidebar--dynamic) {
-    visibility: hidden !important;
-  }
-
-  main.app-shell > .app-sidebar:not(.app-sidebar--dynamic) * {
-    visibility: hidden !important;
-  }
-
-  main.app-shell > .app-sidebar.app-sidebar--dynamic {
-    visibility: visible !important;
-  }
-
-  main.app-shell > .app-sidebar.app-sidebar--dynamic * {
-    visibility: visible !important;
-  }
+main.app-shell > .app-sidebar,
+main.app-shell > .app-sidebar:not(.app-sidebar--dynamic),
+main.app-shell > .app-sidebar.app-sidebar--dynamic,
+main.app-shell > .app-sidebar * {
+  visibility: visible !important;
 }
 
 /* Quick Add sidebar alignment
@@ -246,34 +230,24 @@ body.dark:has(main.app-shell) .dynamic-sidebar-link:hover {
    the actual shell normalization signal instead of a blind white delay. */
 body:has(main.app-shell) main.app-shell,
 body:has(main.app-shell) .app-topbar {
-  opacity: 0;
+  opacity: 1 !important;
 }
 
 body:has(main.app-shell):has(.app-topbar .topbar-nav.is-ready) main.app-shell,
 body:has(main.app-shell):has(.app-topbar .topbar-nav.is-ready) .app-topbar {
-  opacity: 1;
+  opacity: 1 !important;
 }
 
 /* Full-screen boot surface shown only while the app shell is normalizing. */
 body:has(main.app-shell)::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
-  background:
-    radial-gradient(circle at 10% 0%, rgba(99, 102, 241, 0.11), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(248, 250, 252, 0.94)),
-    var(--page-bleed, var(--page-bg, #f8fafc));
-  opacity: 1;
-  pointer-events: none;
+  content: none !important;
+  display: none !important;
 }
 
 html[data-theme="dark"] body:has(main.app-shell)::before,
 body.dark:has(main.app-shell)::before {
-  background:
-    radial-gradient(circle at 10% 0%, rgba(96, 165, 250, 0.17), transparent 30%),
-    linear-gradient(180deg, rgba(8, 17, 31, 0.88), rgba(8, 17, 31, 0.96)),
-    #08111f;
+  content: none !important;
+  display: none !important;
 }
 
 /* Tiny Chrome-dino-style loader: simple, quiet, and CSS-only. */
@@ -330,4 +304,21 @@ body:has(main.app-shell):has(.app-topbar .topbar-nav.is-ready)::after {
   100% {
     transform: translate(-50%, -50%) translate(28px, -30px) rotate(-10deg) scale(1);
   }
+}
+
+/* Final shell fallback: never hide the entire app behind the loader surface. */
+body:has(main.app-shell) .app-topbar,
+body:has(main.app-shell) main.app-shell,
+body:has(main.app-shell):has(.app-topbar .topbar-nav.is-ready) .app-topbar,
+body:has(main.app-shell):has(.app-topbar .topbar-nav.is-ready) main.app-shell {
+  opacity: 1 !important;
+}
+
+body:has(main.app-shell)::before,
+body:has(main.app-shell)::after,
+html[data-theme="dark"] body:has(main.app-shell)::before,
+body.dark:has(main.app-shell)::before {
+  content: none !important;
+  display: none !important;
+  animation: none !important;
 }
