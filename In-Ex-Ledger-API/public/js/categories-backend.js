@@ -179,7 +179,7 @@ function enhanceCategoriesPageShell() {
         <span class="category-section-icon ${isIncome ? "income" : "expense"}" aria-hidden="true">${isIncome ? "IN" : "EX"}</span>
         <div>
           <h2>${isIncome ? "Income categories" : "Expense categories"}</h2>
-          <p id="${isIncome ? "incomeCategorySummary" : "expenseCategorySummary"}">0 active · 0 mapped</p>
+          <p id="${isIncome ? "incomeCategorySummary" : "expenseCategorySummary"}">0 active - 0 mapped</p>
         </div>
       </div>
     `;
@@ -572,8 +572,8 @@ function updateCategoryDashboard() {
   setText("categoryReviewCount", review);
   setText("categoryMappedPercent", `${pct}% of categories`);
   setText("categoryReviewHint", review > 0 ? `Tap to filter ${review} unmapped categor${review === 1 ? "y" : "ies"}` : "Everything is mapped");
-  setText("incomeCategorySummary", `${income.length} active · ${incomeMapped} mapped`);
-  setText("expenseCategorySummary", `${expense.length} active · ${expenseMapped} mapped · ${Math.max(expense.length - expenseMapped, 0)} need review`);
+  setText("incomeCategorySummary", `${income.length} active - ${incomeMapped} mapped`);
+  setText("expenseCategorySummary", `${expense.length} active - ${expenseMapped} mapped - ${Math.max(expense.length - expenseMapped, 0)} need review`);
 
   const reviewButton = document.getElementById("categoryReviewBtn");
   if (reviewButton) {
@@ -747,3 +747,4 @@ function showCategoriesToast(message) {
   if (categoriesToastTimer) clearTimeout(categoriesToastTimer);
   categoriesToastTimer = window.setTimeout(() => toast.classList.add("hidden"), CATEGORIES_TOAST_MS);
 }
+

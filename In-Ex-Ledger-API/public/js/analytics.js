@@ -1,4 +1,4 @@
-/* analytics.js — Phase 5 Advanced Analytics & Forecasting */
+/* analytics.js - Phase 5 Advanced Analytics & Forecasting */
 
 const ANALYTICS_VERSION = "20260407a";
 
@@ -328,7 +328,7 @@ function renderCashFlow(data, container) {
   // Risk notifications
   const risks = projections.filter((p) => p.risk_notification);
   if (risks.length) {
-    html += risks.map((p) => `<div class="risk-alert">⚠️ ${escapeHtml(p.risk_notification)}</div>`).join("");
+    html += risks.map((p) => `<div class="risk-alert">&#9888;&#65039; ${escapeHtml(p.risk_notification)}</div>`).join("");
   }
 
   // Projection table
@@ -378,11 +378,11 @@ function renderSeasonal(data, container) {
   let html = "";
   if (insights && insights.length) {
     html += `<div class="insight-list">
-      ${insights.map((i) => `<div class="insight-item">💡 ${escapeHtml(i)}</div>`).join("")}
+      ${insights.map((i) => `<div class="insight-item">&#128161; ${escapeHtml(i)}</div>`).join("")}
     </div>`;
   }
 
-  // Heatmap grid — colour intensity based on deviation from mean
+  // Heatmap grid - colour intensity based on deviation from mean
   const maxAvg = Math.max(...months.map((m) => m.avg_income), 1);
   html += '<div class="heatmap">';
   for (const m of months) {
@@ -399,7 +399,7 @@ function renderSeasonal(data, container) {
   const callouts = months.filter((m) => m.insight);
   if (callouts.length) {
     html += `<div class="insight-list insight-list--spaced">
-      ${callouts.map((m) => `<div class="insight-item">📅 ${escapeHtml(m.insight)}</div>`).join("")}
+      ${callouts.map((m) => `<div class="insight-item">&#128197; ${escapeHtml(m.insight)}</div>`).join("")}
     </div>`;
   }
 
@@ -460,7 +460,7 @@ async function runWhatIf() {
 function renderWhatIf(data, messagesEl, tableEl) {
   const { baseline, scenario, messages } = data;
 
-  messagesEl.innerHTML = messages.map((m) => `<div class="whatif-msg">• ${escapeHtml(m)}</div>`).join("") ||
+  messagesEl.innerHTML = messages.map((m) => `<div class="whatif-msg">&#8226; ${escapeHtml(m)}</div>`).join("") ||
     `<div class="whatif-msg">${escapeHtml(t("analytics_whatif_no_changes"))}</div>`;
 
   const netClass = scenario.net_delta >= 0 ? "whatif-net-positive" : "whatif-net-negative";
@@ -510,3 +510,4 @@ function parseFloatOrNull(str) {
   const n = Number.parseFloat(str);
   return Number.isFinite(n) ? n : null;
 }
+

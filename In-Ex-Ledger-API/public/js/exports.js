@@ -118,20 +118,20 @@ function showFinalizationError(blockers) {
     }
     if (b.code === "needs_category") {
       const label = n === 1 ? "1 transaction needs a category" : `${n} transactions need a category`;
-      return `<li>${escapeHtml(label)} — <a href="transactions?filter=uncategorized">Fix in Transactions →</a></li>`;
+      return `<li>${escapeHtml(label)} - <a href="transactions?filter=uncategorized">Fix in Transactions -></a></li>`;
     }
     if (b.code === "business_profile_incomplete") {
-      return `<li>${escapeHtml(b.message || "Business profile is incomplete")} — <a href="settings">Fix in Settings →</a></li>`;
+      return `<li>${escapeHtml(b.message || "Business profile is incomplete")} - <a href="settings">Fix in Settings -></a></li>`;
     }
     if (b.code === "finalization_certification_required") {
-      return `<li>${escapeHtml("Certification is required — check the box above.")}</li>`;
+      return `<li>${escapeHtml("Certification is required - check the box above.")}</li>`;
     }
-    const label = n > 0 ? `${n} — ${b.message || b.code}` : (b.message || b.code);
+    const label = n > 0 ? `${n} - ${b.message || b.code}` : (b.message || b.code);
     return `<li>${escapeHtml(label)}</li>`;
   }).join("");
 
   const heading = list.length === 1 ? "1 issue blocking finalization:" : `${list.length} issues blocking finalization:`;
-  errorEl.innerHTML = `<strong>${escapeHtml("Can't finalize yet")} — ${escapeHtml(heading)}</strong><ul class="export-blocker-list">${items}</ul>`;
+  errorEl.innerHTML = `<strong>${escapeHtml("Can't finalize yet")} - ${escapeHtml(heading)}</strong><ul class="export-blocker-list">${items}</ul>`;
   errorEl.classList.remove("hidden");
 }
 
@@ -1442,69 +1442,6 @@ function updateExportReadiness(transactions) {
 
   const categories = getCategories();
   const catById = {};
-  categories.forEach(c => { catById[c.id] = c; });
-
-  let needsCategory = 0;
-  let needsTaxMapping = 0;
-  let missingReceipt = 0;
-  let needsMileage = 0;
-  let needsAllocation = 0;
-  let needsBusinessPurpose = 0;
-  let incomeReview = 0;
-
-  for (const txn of transactions) {
-    const cat = catById[txn.categoryId];
-    const catName = String(cat?.name || txn.categoryName || "").toLowerCase();
-    const isExpense = txn.type !== "income";
-    const isIncome = txn.type === "income";
-    const isUncategorized = !txn.categoryId || /imported|needs[._-]?category|uncategorized/i.test(catName);
-
-    if (isUncategorized) {
-      needsCategory++;
-      continue;
-    }
-    if (!cat?.taxLabel) needsTaxMapping++;
-    if (isExpense && !txn.receiptId) missingReceipt++;
-    if (isExpense && requiresExportMileageLog(catName)) needsMileage++;
-    if (requiresExportAllocation(catName)) needsAllocation++;
-    if (isExpense && requiresExportBusinessPurpose(catName)) needsBusinessPurpose++;
-    if (isIncome && txn.reviewStatus === "needs_review") incomeReview++;
-  }
-
-  const readinessRows = [
-    { label: "Need category assignment", count: needsCategory, key: "nc" },
-    { label: "Expenses missing receipts/support", count: missingReceipt, key: "rs" },
-    { label: "Need tax line mapping", count: needsTaxMapping, key: "um" },
-    { label: "Need mileage log", count: needsMileage, key: "ml" },
-    { label: "Need business-use allocation", count: needsAllocation, key: "al" },
-    { label: "Need business purpose note", count: needsBusinessPurpose, key: "bp" },
-    { label: "Income rows flagged for review", count: incomeReview, key: "ir" }
-  ].filter(r => r.count > 0);
-
-  if (readinessRows.length === 0) {
-    itemsEl.innerHTML = `<span class="export-readiness-all-clear">✅ All transactions are ready for export</span>`;
-  } else {
-    itemsEl.innerHTML = readinessRows.map(r =>
-      `<div class="export-readiness-item">
-        <span class="export-readiness-label">${escapeHtml(r.label)}</span>
-        <span class="export-readiness-count warn">${r.count}</span>
-      </div>`
-    ).join("");
-  }
-
-  section.hidden = false;
-}
-
-function updateExportReadiness(transactions) {
-  const section = document.getElementById("exportReadinessSection");
-  const itemsEl = document.getElementById("exportReadinessItems");
-  if (!section || !itemsEl || !transactions || transactions.length === 0) {
-    if (section) section.hidden = true;
-    return;
-  }
-
-  const categories = getCategories();
-  const catById = {};
   categories.forEach((category) => { catById[category.id] = category; });
 
   let needsCategory = 0;
@@ -1553,7 +1490,7 @@ function updateExportReadiness(transactions) {
     }
     return `<div class="export-readiness-item export-readiness-item--clear">
       <span class="export-readiness-label">${escapeHtml(row.label)}</span>
-      <span class="export-readiness-all-clear">✓</span>
+      <span class="export-readiness-all-clear">&#10003;</span>
     </div>`;
   }).join("");
 
@@ -2695,3 +2632,4 @@ async function submitSecureExport(taxId, startDate, endDate) {
   showExportToast(tx("exports_generated_pdf"));
   await renderExportHistory();
 }
+
