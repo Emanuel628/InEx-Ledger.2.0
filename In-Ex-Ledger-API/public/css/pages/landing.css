@@ -145,6 +145,14 @@ body {
   padding: 34px 0 80px;
 }
 
+.marketing-main section {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+
 .hero-copy,
 .hero-visual {
   min-width: 0;
@@ -435,7 +443,7 @@ body {
 .pricing-section,
 .faq-section,
 .final-cta {
-  margin-top: 68px;
+  margin-top: 84px;
 }
 
 .section-heading h2,
@@ -451,6 +459,12 @@ body {
   font-size: 16px;
 }
 
+.content-section .section-heading,
+.pricing-section .section-heading,
+.faq-section .section-heading {
+  max-width: 860px;
+}
+
 .workflow-columns,
 .feature-rail,
 .plan-summary,
@@ -462,13 +476,14 @@ body {
 
 .workflow-columns {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 36px;
 }
 
 .workflow-columns article,
 .feature-rail article,
 .plan-summary article,
 .region-columns article {
-  padding-top: 20px;
+  padding-top: 22px;
   border-top: 1px solid rgba(15, 23, 42, 0.12);
 }
 
@@ -517,6 +532,7 @@ body {
 .plain-list-grid,
 .export-checklist {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 34px;
 }
 
 .plain-list-grid ul,
@@ -562,15 +578,16 @@ body {
 
 .feature-rail {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 36px;
 }
 
 .capability-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 34px;
+  margin-top: 42px;
 }
 
 .capability-grid > div {
-  padding-top: 18px;
+  padding-top: 20px;
   border-top: 1px solid rgba(15, 23, 42, 0.1);
 }
 
@@ -580,6 +597,7 @@ body {
 
 .plan-summary {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 34px;
 }
 
 .pricing-card {
@@ -643,11 +661,11 @@ body {
 .faq-list {
   display: grid;
   gap: 12px;
-  margin-top: 28px;
+  margin-top: 34px;
 }
 
 .faq-item {
-  padding: 18px 0;
+  padding: 20px 0;
   border-top: 1px solid rgba(15, 23, 42, 0.12);
 }
 
@@ -677,7 +695,7 @@ body {
 }
 
 .final-cta {
-  padding: 28px 0 0;
+  padding: 34px 0 0;
   border-top: 1px solid rgba(15, 23, 42, 0.12);
 }
 
@@ -792,7 +810,7 @@ body {
   .pricing-section,
   .faq-section,
   .final-cta {
-    margin-top: 48px;
+    margin-top: 56px;
   }
 
   .hero-panel {
