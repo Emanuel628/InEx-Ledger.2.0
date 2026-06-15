@@ -117,12 +117,22 @@ label.is-required::after,
 
 .form-control {
   width: 100%;
+  min-width: 0;
+}
+
+/* Grid/flex form items must be allowed to shrink below their content's
+   intrinsic minimum, otherwise wide intrinsic controls (notably native
+   date inputs, which render as "Jun 15, 2026" on Safari) overflow their
+   grid track and visually collide with the adjacent field. */
+.form-field {
+  min-width: 0;
 }
 
 input,
 select,
 textarea {
   width: 100%;
+  min-width: 0;
   border: 0.5px solid var(--border2);
   border-radius: 7px;
   padding: 8px 10px;
