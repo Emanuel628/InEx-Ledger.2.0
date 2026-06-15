@@ -92,6 +92,29 @@
   background: linear-gradient(90deg, rgba(180, 35, 24, 0.2), rgba(180, 35, 24, 0.68));
 }
 
+.stat-card-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+.stat-card-ic svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.stat-card-ic.c1 { background: #e2f3ea; color: #157347; }
+.stat-card-ic.c2 { background: #e8eefc; color: #2557d6; }
+.stat-card-ic.c3 { background: #fbefd7; color: #9a6a12; }
+.stat-card-ic.c4 { background: #fbe9e6; color: #b4543e; }
+
 .stat-label {
   color: #6f7987;
   font-size: 11px;

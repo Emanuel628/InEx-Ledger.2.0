@@ -2,7 +2,10 @@
   /* Neutrals */
   --bg-page: #FFFFFF;
   --bg-subtle: #F7F9FB;
-  --border: #E3E8EF;
+  /* Tinted page canvas so white cards read as elevated surfaces (figure/ground) */
+  --bg-canvas: #EDF0F6;
+  --border: #DBE1EA;
+  --border-strong: #C7D0DD;
   --text-primary: #16263F;
   --text-secondary: #52607A;
   --text-muted: #8A94A6;
@@ -30,15 +33,18 @@
   --sp-6: 32px;
   --sp-7: 48px;
 
-  /* Type scale — the only allowed font sizes */
+  /* Type scale — a real ladder so titles, sections, and KPIs are distinct */
   --fs-xs: 12px;
   --fs-sm: 13px;
   --fs-md: 14px;
   --fs-lg: 16px;
   --fs-xl: 20px;
+  --fs-2xl: 24px;
+  --fs-3xl: 30px;
 
-  /* Shadow — exactly one, for floating elements ONLY */
+  /* Elevation — overlay for floating UI, raise for resting cards */
   --shadow-overlay: 0 8px 24px rgba(22,38,63,.14);
+  --shadow-raise: 0 1px 2px rgba(16,34,54,.06), 0 6px 16px rgba(16,34,54,.09);
 }
 
 html {
@@ -65,12 +71,12 @@ html {
   --radius-panel: var(--radius-md);
   --radius-section: var(--radius-md);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --shadow-card: 0 10px 24px rgba(16, 34, 54, 0.04);
-  --shadow-card-lg: 0 16px 36px rgba(16, 34, 54, 0.06);
-  --shadow-stat: 0 14px 30px rgba(16, 34, 54, 0.06);
+  --shadow-card: var(--shadow-raise);
+  --shadow-card-lg: 0 2px 4px rgba(16, 34, 54, 0.06), 0 12px 28px rgba(16, 34, 54, 0.10);
+  --shadow-stat: var(--shadow-raise);
   --shadow-accent: 0 20px 42px rgba(37, 87, 214, 0.18);
   --shadow-cta: 0 16px 30px rgba(37, 87, 214, 0.18);
-  --page-bg: var(--bg-page);
+  --page-bg: var(--bg-canvas);
   --page-bleed:
     radial-gradient(circle at top right, rgba(37, 87, 214, 0.08), transparent 26%),
     radial-gradient(circle at bottom left, rgba(22, 38, 63, 0.05), transparent 22%),
@@ -107,9 +113,9 @@ html {
   --text-base: var(--fs-md);
   --text-md: var(--fs-lg);
   --text-lg: var(--fs-xl);
-  --text-xl: var(--fs-xl);
-  --text-2xl: var(--fs-xl);
-  --text-3xl: var(--fs-xl);
+  --text-xl: var(--fs-2xl);
+  --text-2xl: var(--fs-2xl);
+  --text-3xl: var(--fs-3xl);
   --bp-xs: 480px;
   --bp-sm: 640px;
   --bp-md: 768px;

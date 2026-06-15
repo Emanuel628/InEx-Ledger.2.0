@@ -3,7 +3,7 @@
 .app-page,
 .messages-content,
 .analytics-content {
-  background: var(--bg-page) !important;
+  background: var(--bg-canvas) !important;
 }
 
 body,
@@ -44,7 +44,7 @@ body,
   background: var(--bg-page) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-md) !important;
-  box-shadow: 0 12px 28px rgba(16, 34, 54, 0.05) !important;
+  box-shadow: var(--shadow-raise) !important;
   padding: var(--sp-5) !important;
 }
 
@@ -72,10 +72,10 @@ body,
 .mileage-header-card h1 {
   margin: 0 !important;
   color: var(--text-primary) !important;
-  font-size: var(--fs-xl) !important;
-  font-weight: 600 !important;
-  letter-spacing: 0 !important;
-  line-height: 1.2 !important;
+  font-size: var(--fs-3xl) !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.15 !important;
 }
 
 .page-subtitle,
@@ -207,8 +207,9 @@ body,
 .category-stat-card strong {
   margin-top: var(--sp-2) !important;
   color: var(--text-primary) !important;
-  font-size: var(--fs-xl) !important;
-  font-weight: 600 !important;
+  font-size: var(--fs-2xl) !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
 }
 
 .stat-delta,

@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260612c" />
-  <link rel="stylesheet" href="/css/pages/receipts.css?v=20260612d" />
+  <link rel="stylesheet" href="/css/pages/receipts.css?v=20260615a" />
 </head>
 <body>
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
@@ -70,16 +70,19 @@
 
       <section class="receipts-summary-grid" aria-label="Receipt coverage summary">
         <button type="button" class="receipts-summary-card" data-receipt-summary-filter="all">
+          <span class="receipts-summary-icon total" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><rect x="4" y="2.5" width="12" height="15" rx="2.5"></rect><path d="M7 6.5h6M7 9.5h6M7 12.5h3.5"></path></svg></span>
           <span class="receipts-summary-label" data-i18n="receipts_summary_total_label">Total files</span>
           <strong id="receiptsSummaryTotal" class="receipts-summary-value">0</strong>
           <p class="receipts-summary-note" data-i18n="receipts_summary_total_note">Everything uploaded to this business so far.</p>
         </button>
         <button type="button" class="receipts-summary-card" data-receipt-summary-filter="linked">
+          <span class="receipts-summary-icon linked" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M8.2 11.8 11.8 8.2M7.5 9 5.8 10.7a2.6 2.6 0 0 0 3.7 3.7L11.2 12.7M12.5 11 14.2 9.3a2.6 2.6 0 0 0-3.7-3.7L8.8 7.3"></path></svg></span>
           <span class="receipts-summary-label" data-i18n="receipts_summary_linked_label">Linked</span>
           <strong id="receiptsSummaryLinked" class="receipts-summary-value">0</strong>
           <p class="receipts-summary-note" data-i18n="receipts_summary_linked_note">Already tied to a transaction.</p>
         </button>
         <button type="button" class="receipts-summary-card receipts-summary-card--attention" data-receipt-summary-filter="review">
+          <span class="receipts-summary-icon review" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M10 3.5 17 16H3l7-12.5Z"></path><path d="M10 8.5v3M10 13.6h.01"></path></svg></span>
           <span class="receipts-summary-label" data-i18n="receipts_summary_review_label">Missing</span>
           <strong id="receiptsSummaryReview" class="receipts-summary-value">0</strong>
           <p class="receipts-summary-note" data-i18n="receipts_summary_review_note">Still needs a link or file follow-up.</p>

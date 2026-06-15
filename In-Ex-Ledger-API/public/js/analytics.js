@@ -100,12 +100,12 @@ function renderDashboard(data) {
   const seTaxLabel = isCA ? t("analytics_kpi_se_tax_ca") : t("analytics_kpi_se_tax_us");
   const seTaxNote = isCA ? t("analytics_kpi_se_tax_note_ca") : t("analytics_kpi_se_tax_note_us");
   const cards = [
-    kpiCard(t("analytics_kpi_total_income"), fmt(summary.total_income, { absolute: true }), t("analytics_kpi_trailing_12")),
-    kpiCard(t("analytics_kpi_total_expenses"), fmt(summary.total_expense, { absolute: true }), t("analytics_kpi_trailing_12")),
-    kpiCard(t("analytics_kpi_net_profit"), fmt(summary.net), t("analytics_kpi_trailing_12"), summary.net >= 0 ? "" : "kpi-value--negative")
+    kpiCard(t("analytics_kpi_total_income"), fmt(summary.total_income, { absolute: true }), t("analytics_kpi_trailing_12"), "", "income"),
+    kpiCard(t("analytics_kpi_total_expenses"), fmt(summary.total_expense, { absolute: true }), t("analytics_kpi_trailing_12"), "", "expense"),
+    kpiCard(t("analytics_kpi_net_profit"), fmt(summary.net), t("analytics_kpi_trailing_12"), summary.net >= 0 ? "" : "kpi-value--negative", "net")
   ];
   if (summary.has_tax_estimates) {
-    cards.push(kpiCard(seTaxLabel, fmt(summary.se_tax_estimate ?? 0), seTaxNote));
+    cards.push(kpiCard(seTaxLabel, fmt(summary.se_tax_estimate ?? 0), seTaxNote, "", "tax"));
   }
   kpiRow.innerHTML = cards.join("");
 
@@ -269,8 +269,24 @@ function fmtCompact(value) {
   return n.toFixed(0);
 }
 
-function kpiCard(label, value, note, extraClass) {
+function kpiIcon(kind) {
+  switch (kind) {
+    case "income":
+      return '<svg viewBox="0 0 20 20" fill="none"><path d="M5 13 9 9l2.5 2.5L15 7"></path><path d="M11.5 7H15v3.5"></path></svg>';
+    case "expense":
+      return '<svg viewBox="0 0 20 20" fill="none"><path d="M5 7l4 4 2.5-2.5L15 13"></path><path d="M11.5 13H15V9.5"></path></svg>';
+    case "net":
+      return '<svg viewBox="0 0 20 20" fill="none"><path d="M3.5 16.5h13"></path><rect x="5" y="9" width="2.6" height="5"></rect><rect x="9" y="6" width="2.6" height="8"></rect><rect x="13" y="11" width="2.6" height="3"></rect></svg>';
+    case "tax":
+      return '<svg viewBox="0 0 20 20" fill="none"><rect x="4" y="3" width="12" height="14" rx="2.2"></rect><path d="M7 7h6M7 10h6M7 13h3.5"></path></svg>';
+    default:
+      return '<svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.8"></circle></svg>';
+  }
+}
+
+function kpiCard(label, value, note, extraClass, iconKind) {
   return `<div class="kpi-card">
+    ${iconKind ? `<span class="kpi-icon kpi-icon--${escapeHtml(iconKind)}" aria-hidden="true">${kpiIcon(iconKind)}</span>` : ""}
     <div class="kpi-label">${escapeHtml(label)}</div>
     <div class="kpi-value${extraClass ? ` ${escapeHtml(extraClass)}` : ""}">${escapeHtml(value)}</div>
     ${note ? `<div class="kpi-note">${escapeHtml(note)}</div>` : ""}
