@@ -1593,12 +1593,7 @@ router.get("/verify-email", async (req, res) => {
         logWarn("Verified-email device registration warning:", securitySignalErr?.message || securitySignalErr);
       }
     }
-    const redirectHash = new URLSearchParams({
-      verified: "true",
-      next: "/onboarding"
-    }).toString();
-
-    return res.redirect(`/verify-email#${redirectHash}`);
+    return res.redirect("/onboarding?verified=1");
   } catch (err) {
     logError("Verification error:", err);
     return res.status(500).send("Verification failed.");

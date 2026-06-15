@@ -153,6 +153,8 @@ function showLoginReasonMessage() {
     showLoginError(tx(EXPIRED_SESSION_MESSAGE));
   } else if (reason === "network") {
     showLoginError(tx(OFFLINE_ERROR_MESSAGE));
+  } else if (params.get("verification") === "sent") {
+    showLoginMessage(tx("verify_email_status_sent"), "is-success");
   } else if (params.get("verified") === "true") {
     showLoginMessage(tx("login_success_verified"), "is-success");
   } else if (params.get("email_changed") === "true") {

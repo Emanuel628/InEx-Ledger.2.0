@@ -3,7 +3,9 @@ const ONBOARDING_REGION_KEY = "lb_region";
 
 let screen1El = null;
 let screen2El = null;
+let screen3El = null;
 let selectedGoal = null;
+let selectedAccountType = "checking";
 let onboardingSubmitting = false;
 
 function tx(key) {
@@ -13,6 +15,7 @@ function tx(key) {
 document.addEventListener("DOMContentLoaded", async () => {
   screen1El = document.getElementById("onboardingScreen1");
   screen2El = document.getElementById("onboardingScreen2");
+  screen3El = document.getElementById("onboardingScreen3");
 
   const valid = await requireValidSessionOrRedirect();
   if (valid === false) return;
@@ -41,6 +44,13 @@ function hydrateDefaults(profile = {}) {
 
   const elProvince = document.getElementById("onboardingProvince");
   if (elProvince) elProvince.value = onboardingData.province || business.province || "";
+
+  const elAccountName = document.getElementById("onboardingAccountName");
+  if (elAccountName) {
+    elAccountName.value = onboardingData.starter_account_name || "";
+  }
+  selectedAccountType = onboardingData.starter_account_type || "checking";
+  syncAccountTypeSelection();
 
   syncProvinceField();
 }
@@ -88,21 +98,48 @@ function handleScreen1Next() {
 function goToScreen2() {
   screen1El.hidden = true;
   screen2El.hidden = false;
+  screen3El.hidden = true;
   document.getElementById("onboardingPip1")?.classList.remove("is-active");
   document.getElementById("onboardingPip2")?.classList.add("is-active");
+  document.getElementById("onboardingPip3")?.classList.remove("is-active");
   screen2El.scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
 function goToScreen1() {
   screen2El.hidden = true;
+  screen3El.hidden = true;
   screen1El.hidden = false;
   document.getElementById("onboardingPip2")?.classList.remove("is-active");
+  document.getElementById("onboardingPip3")?.classList.remove("is-active");
   document.getElementById("onboardingPip1")?.classList.add("is-active");
 }
 
+function goToScreen3() {
+  screen1El.hidden = true;
+  screen2El.hidden = true;
+  screen3El.hidden = false;
+  document.getElementById("onboardingPip1")?.classList.remove("is-active");
+  document.getElementById("onboardingPip2")?.classList.remove("is-active");
+  document.getElementById("onboardingPip3")?.classList.add("is-active");
+  screen3El.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
 function wireScreen2() {
+  const accountBackBtn = document.getElementById("onboardingAccountBackBtn");
+  if (accountBackBtn) accountBackBtn.addEventListener("click", goToScreen1);
+
+  const accountNextBtn = document.getElementById("onboardingAccountNextBtn");
+  if (accountNextBtn) accountNextBtn.addEventListener("click", handleAccountNext);
+
+  document.querySelectorAll("[data-account-type]").forEach((card) => {
+    card.addEventListener("click", () => {
+      selectedAccountType = card.dataset.accountType || "checking";
+      syncAccountTypeSelection();
+    });
+  });
+
   const backBtn = document.getElementById("onboardingBackBtn");
-  if (backBtn) backBtn.addEventListener("click", goToScreen1);
+  if (backBtn) backBtn.addEventListener("click", () => goToScreen2());
 
   const submitBtn = document.getElementById("onboardingSubmitBtn");
   if (submitBtn) submitBtn.addEventListener("click", handleSubmit);
@@ -122,9 +159,35 @@ function wireScreen2() {
   });
 }
 
+function syncAccountTypeSelection() {
+  document.querySelectorAll("[data-account-type]").forEach((card) => {
+    const isSelected = (card.dataset.accountType || "") === selectedAccountType;
+    card.classList.toggle("is-selected", isSelected);
+    card.setAttribute("aria-pressed", isSelected ? "true" : "false");
+  });
+}
+
+function handleAccountNext() {
+  const msgEl = document.getElementById("onboardingScreen2Message");
+  const accountName = document.getElementById("onboardingAccountName")?.value.trim() || "";
+
+  if (!accountName) {
+    showMsg(msgEl, "Enter a name for your first account.");
+    return;
+  }
+
+  if (!selectedAccountType) {
+    showMsg(msgEl, "Choose your first account type.");
+    return;
+  }
+
+  showMsg(msgEl, "");
+  goToScreen3();
+}
+
 async function handleSubmit() {
   if (onboardingSubmitting) return;
-  const msgEl = document.getElementById("onboardingScreen2Message");
+  const msgEl = document.getElementById("onboardingScreen3Message");
 
   if (!selectedGoal) {
     showMsg(msgEl, tx("onboarding_error_goal") || "Please choose what you want to do first.");
@@ -133,6 +196,7 @@ async function handleSubmit() {
 
   const submitBtn = document.getElementById("onboardingSubmitBtn");
   const name = document.getElementById("onboardingBusinessName")?.value.trim() || "";
+  const accountName = document.getElementById("onboardingAccountName")?.value.trim() || "";
   const region = document.getElementById("onboardingRegion")?.value || "US";
   const province = region === "CA" ? (document.getElementById("onboardingProvince")?.value || "") : "";
   const language =
@@ -154,8 +218,8 @@ async function handleSubmit() {
         province,
         start_focus: selectedGoal,
         language,
-        starter_account_type: "checking",
-        starter_account_name: ""
+        starter_account_type: selectedAccountType,
+        starter_account_name: accountName
       })
     });
     const result = response ? await response.json().catch(() => null) : null;

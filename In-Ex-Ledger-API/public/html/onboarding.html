@@ -33,11 +33,13 @@
       <span class="onboarding-pip is-active" id="onboardingPip1"></span>
       <span class="onboarding-pip-line"></span>
       <span class="onboarding-pip" id="onboardingPip2"></span>
+      <span class="onboarding-pip-line"></span>
+      <span class="onboarding-pip" id="onboardingPip3"></span>
     </div>
 
     <!-- Screen 1: Workspace basics -->
     <section id="onboardingScreen1" class="onboarding-card">
-      <p class="onboarding-step-label">Step 1 of 2</p>
+      <p class="onboarding-step-label">Step 1 of 3</p>
       <h1 class="onboarding-screen-title" data-i18n="onboarding_screen1_title">Set up your business</h1>
       <p class="onboarding-screen-sub" data-i18n="onboarding_screen1_sub">Just the essentials — tax details can wait until your first export.</p>
 
@@ -88,9 +90,46 @@
       </div>
     </section>
 
-    <!-- Screen 2: Goal selection -->
+    <!-- Screen 2: First account -->
     <section id="onboardingScreen2" class="onboarding-card" hidden>
-      <p class="onboarding-step-label">Step 2 of 2</p>
+      <p class="onboarding-step-label">Step 2 of 3</p>
+      <h1 class="onboarding-screen-title">Add your first account</h1>
+      <p class="onboarding-screen-sub">Start with the real account your business uses most. You can add more later.</p>
+
+      <div class="form-field">
+        <label for="onboardingAccountName">Account name</label>
+        <input
+          type="text"
+          id="onboardingAccountName"
+          autocomplete="off"
+          required
+          placeholder="e.g. Business Checking or Main Card"
+        />
+      </div>
+
+      <fieldset class="form-field onboarding-account-type-field">
+        <legend>Account type</legend>
+        <div class="onboarding-account-type-grid" id="onboardingAccountTypeGrid" role="group" aria-label="Choose your first account type">
+          <button type="button" class="focus-tile is-selected" data-account-type="checking" aria-pressed="true">Checking</button>
+          <button type="button" class="focus-tile" data-account-type="savings" aria-pressed="false">Savings</button>
+          <button type="button" class="focus-tile" data-account-type="credit_card" aria-pressed="false">Credit Card</button>
+          <button type="button" class="focus-tile" data-account-type="cash" aria-pressed="false">Cash</button>
+          <button type="button" class="focus-tile" data-account-type="loan" aria-pressed="false">Loan</button>
+          <button type="button" class="focus-tile" data-account-type="custom" aria-pressed="false">Custom</button>
+        </div>
+      </fieldset>
+
+      <p id="onboardingScreen2Message" class="auth-error" role="alert" aria-live="polite" hidden></p>
+
+      <div class="onboarding-actions onboarding-actions-row">
+        <button type="button" id="onboardingAccountBackBtn" class="ghost-btn">Back</button>
+        <button type="button" id="onboardingAccountNextBtn" class="auth-submit">Continue</button>
+      </div>
+    </section>
+
+    <!-- Screen 3: Goal selection -->
+    <section id="onboardingScreen3" class="onboarding-card" hidden>
+      <p class="onboarding-step-label">Step 3 of 3</p>
       <h1 class="onboarding-screen-title" data-i18n="onboarding_screen2_title">What do you want to do first?</h1>
       <p class="onboarding-screen-sub" data-i18n="onboarding_screen2_sub">We'll open the right page and you can start immediately.</p>
 
@@ -151,7 +190,7 @@
 
       </div>
 
-      <p id="onboardingScreen2Message" class="auth-error" role="alert" aria-live="polite" hidden></p>
+      <p id="onboardingScreen3Message" class="auth-error" role="alert" aria-live="polite" hidden></p>
 
       <div class="onboarding-actions onboarding-actions-row">
         <button type="button" id="onboardingBackBtn" class="ghost-btn" data-i18n="onboarding_back">? Back</button>

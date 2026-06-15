@@ -2295,6 +2295,8 @@ function initSecurityForm() {
   const requirementItems = document.querySelectorAll(".password-requirements li");
   const submitButton = document.getElementById("securitySaveButton");
   const mfaEnabledToggle = document.getElementById("mfaEnabledToggle");
+  const mfaEnrollmentPrompt = document.getElementById("mfaEnrollmentPrompt");
+  const mfaEnrollmentPromptBtn = document.getElementById("mfaEnrollmentPromptBtn");
   const mfaSetupPanel = document.getElementById("mfaSetupPanel");
   const mfaCodeField = document.getElementById("mfaCodeField");
   const mfaSetupCode = document.getElementById("mfaSetupCode");
@@ -2392,6 +2394,7 @@ function initSecurityForm() {
     if (mfaEnabledToggle) {
       mfaEnabledToggle.checked = !!mfaStatus.enabled;
     }
+    mfaEnrollmentPrompt?.classList.toggle("hidden", !!mfaStatus.enabled);
 
     if (mfaPrimaryButton) {
       if (mfaMode === "enable_verify") {
@@ -2539,6 +2542,10 @@ function initSecurityForm() {
     }
     mfaPendingToken = "";
     updateMfaUi();
+  });
+
+  mfaEnrollmentPromptBtn?.addEventListener("click", () => {
+    mfaEnabledToggle?.focus();
   });
 
   mfaPrimaryButton?.addEventListener("click", async () => {
@@ -2742,8 +2749,15 @@ function initSettingsNav() {
     }))
     .filter((entry) => entry.target);
 
+  const overviewPanel = document.getElementById("settings-overview");
+  const detailPanels = Array.from(document.querySelectorAll(".settings-panel"));
+  const allPanels = [overviewPanel, ...detailPanels].filter(Boolean);
+
   const setActiveTarget = (targetId) => {
     setActiveSettingsNavTarget(targetId);
+    allPanels.forEach((panel) => {
+      panel.hidden = panel.id !== targetId;
+    });
   };
 
   const openTargetPanel = (target) => {
@@ -2763,30 +2777,11 @@ function initSettingsNav() {
   targets.forEach(({ button, target }) => {
     button.addEventListener("click", () => {
       openTargetPanel(target);
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
       setActiveTarget(target.id);
       focusTargetField(button);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
   });
-
-  if ("IntersectionObserver" in window) {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible?.target?.id) {
-          setActiveTarget(visible.target.id);
-        }
-      },
-      {
-        rootMargin: "-20% 0px -55% 0px",
-        threshold: [0.2, 0.4, 0.6]
-      }
-    );
-
-    targets.forEach(({ target }) => observer.observe(target));
-  }
 
   const params = new URLSearchParams(window.location.search);
   const requestedTarget = String(params.get("jump") || "").trim();
@@ -2794,11 +2789,12 @@ function initSettingsNav() {
   if (requestedEntry) {
     openTargetPanel(requestedEntry.target);
     window.setTimeout(() => {
-      requestedEntry.target.scrollIntoView({ behavior: "smooth", block: "start" });
       setActiveTarget(requestedEntry.target.id);
       focusTargetField(requestedEntry.button);
     }, 120);
+    return;
   }
+  setActiveTarget("settings-overview");
 }
 
 function clearExportProfileGuide() {

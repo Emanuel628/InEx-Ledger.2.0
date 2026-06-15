@@ -1,12 +1,6 @@
 const crypto = require("crypto");
 const { pool } = require("../../db.js");
 
-const defaultAccounts = [
-  { name: "Checking", type: "checking" },
-  { name: "Cash", type: "checking" },
-  { name: "Credit Card", type: "credit_card" },
-];
-
 const defaultCategoriesUS = [
   // Income
   { name: "Sales Revenue", kind: "income", color: "green", tax_map_us: "gross_receipts_sales" },
@@ -152,18 +146,6 @@ async function seedDefaultsForBusiness(db = pool, businessId) {
   }
 
   const targetDb = db ?? pool;
-
-  const region = await resolveBusinessRegion(targetDb, businessId);
-
-  for (const account of defaultAccounts) {
-    await targetDb.query(
-      `
-      INSERT INTO accounts (id, business_id, name, type, created_at)
-      VALUES ($1, $2, $3, $4, now())
-      `,
-      [crypto.randomUUID(), businessId, account.name, account.type]
-    );
-  }
 
   await seedDefaultCategoriesForBusiness(targetDb, businessId);
 

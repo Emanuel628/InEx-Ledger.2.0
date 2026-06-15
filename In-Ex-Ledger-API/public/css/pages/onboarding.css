@@ -156,6 +156,29 @@
   margin-top: 8px;
 }
 
+.onboarding-account-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.onboarding-account-type-field {
+  border: 0;
+  padding: 0;
+  margin: 0 0 16px;
+  min-width: 0;
+}
+
+.onboarding-account-type-field legend {
+  display: block;
+  width: 100%;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .focus-tile {
   min-height: 52px;
   padding: 12px 14px;
@@ -203,6 +226,18 @@
 
 .onboarding-actions-row .auth-submit {
   flex: 1;
+}
+
+@media (max-width: 640px) {
+  .onboarding-account-type-grid,
+  .goal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .goal-card:last-child:nth-child(odd) {
+    grid-column: auto;
+    max-width: none;
+  }
 }
 
 .onboarding-tour-card {

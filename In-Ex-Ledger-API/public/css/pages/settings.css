@@ -1415,6 +1415,36 @@ select.is-export-profile-missing {
   color: var(--green);
 }
 
+.settings-panel[hidden],
+#settings-overview[hidden] {
+  display: none !important;
+}
+
+.settings-security-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(230, 140, 20, 0.22);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 250, 240, 0.98), rgba(255, 246, 230, 0.98));
+}
+
+.settings-security-prompt strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+}
+
+.settings-security-prompt p {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .security-show-password {
   display: inline-flex !important;
   align-items: center !important;

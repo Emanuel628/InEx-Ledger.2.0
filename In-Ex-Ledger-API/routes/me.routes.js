@@ -354,6 +354,12 @@ router.put("/onboarding", async (req, res) => {
   if (starterAccountType && !VALID_STARTER_ACCOUNT_TYPES.has(starterAccountType)) {
     return res.status(400).json({ error: "Choose a valid starter account type." });
   }
+  if (!starterAccountType) {
+    return res.status(400).json({ error: "Choose your first account type." });
+  }
+  if (!starterAccountName) {
+    return res.status(400).json({ error: "Enter a name for your first account." });
+  }
   if (startFocus && !VALID_START_FOCUS.has(startFocus)) {
     return res.status(400).json({ error: "Choose a valid starting workflow." });
   }
@@ -383,15 +389,12 @@ router.put("/onboarding", async (req, res) => {
       );
       const alreadyCompleted = !!currentUser.rows[0]?.onboarding_completed;
       const trialEligible = currentUser.rows[0]?.trial_eligible !== false;
-      const normalizedStarterAccountType = VALID_STARTER_ACCOUNT_TYPES.has(starterAccountType)
-        ? starterAccountType
-        : "checking";
+      const normalizedStarterAccountType = starterAccountType;
       const normalizedStartFocus = VALID_START_FOCUS.has(startFocus)
         ? startFocus
         : resolveDefaultStartFocus();
       const onboardingRecommendations = buildOnboardingRecommendations(region, normalizedStartFocus);
-      const starterName =
-        starterAccountName || buildStarterAccountName(normalizedStarterAccountType, region);
+      const starterName = starterAccountName;
       const guidedSetupActive = GUIDED_SETUP_STEPS.includes(normalizedStartFocus);
 
       await client.query(

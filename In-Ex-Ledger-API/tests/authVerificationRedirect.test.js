@@ -201,13 +201,7 @@ test("verify-email marks the user verified and redirects into an authenticated s
     );
 
     const location = String(response.headers.location || "");
-    assert.match(location, /^\/verify-email#/);
-
-    const hash = location.split("#")[1] || "";
-    const params = new URLSearchParams(hash);
-    assert.equal(params.get("verified"), "true");
-    assert.equal(params.get("next"), "/onboarding");
-    assert.equal(params.get("token"), null);
+    assert.equal(location, "/onboarding?verified=1");
     assert.ok(Array.isArray(fixture.state.refreshTokenInsert), "refresh token should be persisted");
     assert.ok(Array.isArray(fixture.state.recognizedDeviceInsert), "verified-email sign-in should register the current device");
   } finally {

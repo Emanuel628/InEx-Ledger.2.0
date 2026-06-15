@@ -16,8 +16,6 @@ function tx(key) {
   return typeof window.t === "function" ? window.t(key) : key;
 }
 const OFFLINE_ERROR_MESSAGE = "login_error_offline";
-const VERIFICATION_STATE_KEY = "pendingVerificationState";
-const SIGNUP_BOOTSTRAP_KEY = "pendingSignupBootstrapToken";
 
 function setTransientSignupValue(key, value) {
   const normalized = String(value || "").trim();
@@ -161,12 +159,7 @@ async function handleRegisterSubmit(event) {
     } catch (consentErr) {
        console.warn("Post-registration privacy settings save skipped:", consentErr)
     }
-    const verificationState = String(regBody?.verification_state || "").trim();
-    setTransientSignupValue(VERIFICATION_STATE_KEY, verificationState);
-    const signupBootstrapToken = String(regBody?.signup_bootstrap_token || "").trim();
-    setTransientSignupValue(SIGNUP_BOOTSTRAP_KEY, signupBootstrapToken);
-    localStorage.removeItem("pendingVerificationEmail");
-    window.location.href = "/verify-email";
+    window.location.href = "/login?verification=sent";
   } catch (err) {
     console.error("Register request failed:", err);
     showRegisterError(tx(OFFLINE_ERROR_MESSAGE));

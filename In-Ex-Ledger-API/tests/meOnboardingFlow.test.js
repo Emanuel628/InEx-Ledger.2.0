@@ -320,6 +320,7 @@ test("PUT /api/me/onboarding sends a first-time trial user directly to trial set
         region: "US",
         language: "en",
         starter_account_type: "checking",
+        starter_account_name: "Primary Checking",
         start_focus: "transactions"
       });
 
