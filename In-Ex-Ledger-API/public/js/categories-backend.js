@@ -140,8 +140,8 @@ function enhanceCategoriesPageShell() {
   dashboard.className = "category-dashboard";
   dashboard.setAttribute("aria-label", "Category overview");
   dashboard.innerHTML = `
-    <button type="button" class="category-stat-card" data-category-filter="all"><div><span>Total categories</span><strong id="categoryTotalCount">0</strong><small>Active categories</small></div></button>
-    <button type="button" class="category-stat-card" data-category-filter="review" id="categoryReviewStat"><div><span>Needs review</span><strong id="categoryReviewCount">0</strong><small id="categoryReviewHint">Still missing a tax line</small></div></button>
+    <button type="button" class="category-stat-card" data-category-filter="all"><span class="category-stat-icon total" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="3"></rect><path d="M6.5 7.5h7M6.5 10h7M6.5 12.5h4.5"></path></svg></span><div><span>Total categories</span><strong id="categoryTotalCount">0</strong><small>Active categories</small></div></button>
+    <button type="button" class="category-stat-card" data-category-filter="review" id="categoryReviewStat"><span class="category-stat-icon review" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.8"></circle><path d="M10 6.6v4.2M10 13.2h.01"></path></svg></span><div><span>Needs review</span><strong id="categoryReviewCount">0</strong><small id="categoryReviewHint">Still missing a tax line</small></div></button>
   `;
   header.after(dashboard);
 
