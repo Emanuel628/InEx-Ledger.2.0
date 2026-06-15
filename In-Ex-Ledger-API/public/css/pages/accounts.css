@@ -152,14 +152,15 @@
   flex: 1 1 420px;
   max-width: 420px;
   min-height: 48px;
-  padding: 0 14px;
-  border: 1px solid var(--acct-line);
+  padding: 0;
+  border: 0;
   border-radius: 14px;
-  background: rgba(255,255,255,0.84);
+  background: transparent;
+  box-shadow: none;
   color: var(--acct-muted);
 }
 .account-search-icon { display: inline-flex; align-items: center; justify-content: center; color: #6a7684; }
-.account-search-wrap input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--acct-ink); font-size: 14px; }
+.account-search-wrap input { width: 100%; min-height: 48px; padding: 0 2px; border: 0; outline: 0; background: transparent; color: var(--acct-ink); font-size: 14px; box-shadow: none; }
 
 .account-sources-panel,
 .account-form-card,

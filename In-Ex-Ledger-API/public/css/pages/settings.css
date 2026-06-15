@@ -1940,17 +1940,19 @@ select.is-export-profile-missing {
 }
 
 .settings-page .settings-shell {
-  width: min(100% - 32px, 1180px);
+  width: min(100% - 32px, 1280px);
   margin: 20px auto 0;
   min-height: auto;
-  grid-template-columns: 1fr;
-  gap: 20px;
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
 }
 
 .settings-page .settings-sidebar {
   position: sticky;
   top: 16px;
   z-index: 20;
+  align-self: start;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1982,17 +1984,17 @@ select.is-export-profile-missing {
 }
 
 .settings-page .settings-nav {
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 8px;
   margin-top: 16px;
 }
 
 .settings-page .settings-nav-item {
-  width: auto;
-  padding: 6px 12px;
+  width: 100%;
+  padding: 10px 12px;
   border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 999px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.96);
   color: var(--ink2);
   font-size: 13px;

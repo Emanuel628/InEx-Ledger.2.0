@@ -148,7 +148,7 @@ function enhanceCategoriesPageShell() {
   toolbar.className = "category-toolbar";
   toolbar.setAttribute("aria-label", "Category tools");
   toolbar.innerHTML = `
-    <label class="category-search-wrap" for="categorySearchInput"><span aria-hidden="true">&#8981;</span><input id="categorySearchInput" type="search" placeholder="Search categories" autocomplete="off" /></label>
+    <label class="category-search-wrap" for="categorySearchInput"><input id="categorySearchInput" type="search" placeholder="Search categories" autocomplete="off" /></label>
     <div class="category-toolbar-actions">
       <div class="category-filter-row">
         <button type="button" class="category-filter-chip chip is-active" data-category-filter="all">All</button>
@@ -487,6 +487,7 @@ function renderCategoryGroup(containerId, type, emptyText) {
   container.querySelectorAll("[data-category-delete]").forEach((button) => {
     button.addEventListener("click", () => handleCategoryDelete(button.getAttribute("data-category-delete") || ""));
   });
+  wireCategoryActionMenus(container);
 }
 
 function renderCategoryRow(category) {
@@ -514,8 +515,8 @@ function renderCategoryRow(category) {
         <div class="category-row-usage">${escapeHtml(usageText)}</div>
       </div>
       <div class="category-actions">
-        <button type="button" class="category-row-menu btn-icon" aria-label="Category actions">...</button>
-        <div class="category-action-menu">
+        <button type="button" class="category-row-menu btn-icon" aria-label="Category actions" aria-expanded="false" aria-haspopup="menu">...</button>
+        <div class="category-action-menu" hidden>
           <button type="button" data-category-edit="${escapeHtml(category.id)}">Edit category</button>
           <button type="button" class="category-delete" data-category-delete="${escapeHtml(category.id)}">Delete category</button>
         </div>
@@ -523,6 +524,49 @@ function renderCategoryRow(category) {
     </div>
   `;
 }
+
+function wireCategoryActionMenus(container) {
+  container.querySelectorAll(".category-row-menu").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const actions = button.closest(".category-actions");
+      if (!actions) return;
+      const isOpen = actions.classList.contains("is-open");
+
+      document.querySelectorAll(".category-actions.is-open").forEach((node) => {
+        if (node !== actions) {
+          node.classList.remove("is-open");
+          node.querySelector(".category-row-menu")?.setAttribute("aria-expanded", "false");
+          node.querySelector(".category-action-menu")?.setAttribute("hidden", "");
+        }
+      });
+
+      actions.classList.toggle("is-open", !isOpen);
+      button.setAttribute("aria-expanded", isOpen ? "false" : "true");
+      const menu = actions.querySelector(".category-action-menu");
+      if (menu) {
+        if (isOpen) {
+          menu.setAttribute("hidden", "");
+        } else {
+          menu.removeAttribute("hidden");
+        }
+      }
+    });
+  });
+}
+
+document.addEventListener("click", (event) => {
+  if (event.target.closest(".category-actions")) {
+    return;
+  }
+  document.querySelectorAll(".category-actions.is-open").forEach((node) => {
+    node.classList.remove("is-open");
+    node.querySelector(".category-row-menu")?.setAttribute("aria-expanded", "false");
+    node.querySelector(".category-action-menu")?.setAttribute("hidden", "");
+  });
+});
 
 function updateCategoryDashboard() {
   const total = categoryRecords.length;

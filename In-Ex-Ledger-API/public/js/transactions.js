@@ -3452,6 +3452,7 @@ async function fetchCategoriesForTransactions() {
       businessName: category.businessName || category.business_name || "",
       name: category.name,
       type: category.kind,
+      color: category.color || "",
       taxLabel:
         businessTaxProfile.region === "CA" ? category.tax_map_ca || "" : category.tax_map_us || ""
     }));
@@ -3566,6 +3567,7 @@ function normalizeTransaction(transaction) {
     accountName: transaction.accountName || transaction.account_name || "",
     categoryId: transaction.categoryId || transaction.category_id || "",
     categoryName: transaction.categoryName || transaction.category_name || "",
+    categoryColor: transaction.categoryColor || transaction.category_color || "",
     type: transaction.type === "income" ? "income" : "expense",
     note: transaction.note || "",
     receiptId: transaction.receiptId || transaction.receipt_id || "",
@@ -3902,6 +3904,7 @@ function renderTransactionsTable(filteredTransactions) {
     const txnId = String(txn.id);
     const category = categoriesById[txn.categoryId] || null;
     const categoryName = txn.categoryName || category?.name || "-";
+    const categoryToneClass = getCategoryToneClass(categoryName, category?.color || txn.categoryColor || "");
     const accountName = txn.accountName || accountsById[txn.accountId]?.name || "-";
     const rowRegion = String(
       getBusinessById(txn.businessId)?.region || businessTaxProfile.region || getResolvedRegion()
@@ -3986,7 +3989,7 @@ function renderTransactionsTable(filteredTransactions) {
       <td><span class="date-cell">${formatDisplayDate(txn.date)}</span></td>
       <td><div class="description-primary">${escapeHtml(txn.description || "-")}</div><div class="description-sub">${descriptionSub}</div></td>
       <td><span class="account-tag">${escapeHtml(accountName)}</span></td>
-      <td><span class="category-pill">${escapeHtml(categoryName)}</span></td>
+      <td><span class="category-pill ${escapeHtml(categoryToneClass)}">${escapeHtml(categoryName)}</span></td>
       <td>${receiptMarkup}</td>
       <td>
         <button type="button" class="status-toggle-button ${txn.cleared ? "is-cleared" : ""}" data-action="toggle-cleared" data-id="${txn.id}">
@@ -4308,6 +4311,7 @@ function getCategoryToneClass(name, color = "") {
   if (normalizedColor === "green") return "tone-green";
   if (normalizedColor === "blue") return "tone-blue";
   if (normalizedColor === "amber" || normalizedColor === "yellow") return "tone-amber";
+  if (normalizedColor === "pink" || normalizedColor === "rose") return "tone-marketing";
   if (normalizedColor === "red") return "tone-red";
   if (normalizedColor === "slate" || normalizedColor === "gray" || normalizedColor === "grey") return "tone-slate";
   if (normalizedColor === "purple" || normalizedColor === "violet") return "tone-purple";
