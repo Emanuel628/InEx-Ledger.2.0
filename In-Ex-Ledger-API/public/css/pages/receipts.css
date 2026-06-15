@@ -68,6 +68,28 @@
   box-shadow: inset 0 0 0 2px rgba(36, 109, 187, 0.22), 0 16px 30px rgba(15, 25, 35, 0.08);
 }
 
+.receipts-summary-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+.receipts-summary-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.receipts-summary-icon.total { background: #eff6ff; color: #2563eb; }
+.receipts-summary-icon.linked { background: #ecfdf5; color: #059669; }
+.receipts-summary-icon.review { background: #fff7ed; color: #d97706; }
+
 .receipts-summary-label {
   display: block;
   margin-bottom: 8px;

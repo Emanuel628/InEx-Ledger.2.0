@@ -104,6 +104,29 @@
   background: linear-gradient(90deg, rgba(37, 87, 214, 0.22), rgba(37, 87, 214, 0.74));
 }
 
+.kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+.kpi-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.kpi-icon--income { background: #ecfdf5; color: #059669; }
+.kpi-icon--expense { background: #fff7ed; color: #d97706; }
+.kpi-icon--net { background: #eff6ff; color: #2563eb; }
+.kpi-icon--tax { background: #eef2ff; color: #4f46e5; }
+
 .kpi-label {
   margin-bottom: 8px;
   color: #6f7987;
