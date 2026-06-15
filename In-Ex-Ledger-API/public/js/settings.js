@@ -825,6 +825,14 @@ async function refreshSettingsBusinessContext(payload, fallbackBusinessId = "") 
 }
 
 function openAddBusinessModal() {
+  const businessCount = Array.isArray(settingsBusinessesState) ? settingsBusinessesState.length : 0;
+  const effectiveTier = settingsSubscriptionState?.effectiveTier || "";
+  const canCreate = effectiveTier === "v1" || businessCount === 0;
+  if (!canCreate) {
+    showSettingsToast("Additional businesses require Pro. Open Billing to upgrade first.");
+    document.querySelector('[data-settings-target="settings-billing"]')?.click();
+    return;
+  }
   if (typeof openBusinessCreationModal === "function") {
     openBusinessCreationModal();
   }
@@ -1556,6 +1564,9 @@ async function initPreferences() {
 
   const replayTips = async () => {
     try {
+      if (!window.confirm("Restart the guided setup tour and jump back into the workflow?")) {
+        return;
+      }
       const response = await apiFetch("/api/me/onboarding/replay", {
         method: "POST"
       });
@@ -2466,6 +2477,14 @@ function initSecurityForm() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     setMfaMessage("");
+    updateStrength();
+    updateRequirements();
+    updateMatch();
+    updateSubmitState();
+    if (submitButton?.disabled) {
+      showSettingsToast(!currentInput.value.trim() ? "Enter your current password to continue." : t("register_password_requirements_error"));
+      return;
+    }
     if (submitButton) submitButton.disabled = true;
 
     try {

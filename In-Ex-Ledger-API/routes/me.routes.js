@@ -7,6 +7,7 @@ const { pool } = require("../db.js");
 const { requireAuth, verifyToken } = require("../middleware/auth.middleware.js");
 const { requireCsrfProtection } = require("../middleware/csrf.middleware.js");
 const { resolveBusinessIdForUser, listBusinessesForUser } = require("../api/utils/resolveBusinessIdForUser.js");
+const { seedDefaultCategoriesForBusiness } = require("../api/utils/seedDefaultsForBusiness.js");
 const { getSubscriptionSnapshotForUser } = require("../services/subscriptionService.js");
 const { COOKIE_OPTIONS, isLegacyScryptHash, verifyPassword } = require("../utils/authUtils.js");
 const { createDataApiLimiter } = require("../middleware/rate-limit.middleware.js");
@@ -417,6 +418,8 @@ router.put("/onboarding", async (req, res) => {
           businessId
         ]
       );
+
+      await seedDefaultCategoriesForBusiness(client, businessId);
 
       if (!alreadyCompleted) {
         const existingAccounts = await client.query(

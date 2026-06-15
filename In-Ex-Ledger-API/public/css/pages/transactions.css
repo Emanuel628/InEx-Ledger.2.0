@@ -1237,6 +1237,10 @@ tbody tr:last-child {
   gap: 10px 16px;
 }
 
+.desktop-view-requested .transaction-form-grid {
+  grid-template-columns: 1fr;
+}
+
 .transaction-advanced-details {
   margin-top: 14px;
   border: 1px solid var(--border2);

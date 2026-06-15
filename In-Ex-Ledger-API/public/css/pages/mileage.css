@@ -185,6 +185,10 @@
   gap: 16px;
 }
 
+.desktop-view-requested .mileage-grid {
+  grid-template-columns: 1fr;
+}
+
 .form-field--wide {
   grid-column: span 2;
 }

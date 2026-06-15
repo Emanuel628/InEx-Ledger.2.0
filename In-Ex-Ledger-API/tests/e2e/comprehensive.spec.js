@@ -561,7 +561,7 @@ test.describe("App: Categories page", () => {
     console.log("✅ Categories: add buttons visible");
   });
 
-  test("seed defaults button in DOM", async ({ page }) => {
+  test("categories defaults are seeded automatically", async ({ page }) => {
     await page.goto(`${BASE}/categories`);
     await page.waitForFunction(() => !!window.__LUNA_ME__, { timeout: 15_000 });
     await page.waitForTimeout(1000);

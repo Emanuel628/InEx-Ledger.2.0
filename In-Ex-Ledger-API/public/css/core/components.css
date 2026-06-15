@@ -450,7 +450,7 @@ h2 + p {
   position: fixed;
   left: 0;
   right: 0;
-  top: 0;
+  bottom: 0;
   z-index: 10000;
   display: flex;
   flex-wrap: wrap;
@@ -458,9 +458,13 @@ h2 + p {
   gap: 8px;
   padding: 12px 16px;
   background: var(--surface, #fff);
-  border-bottom: 1px solid var(--border, #e0e0e0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-top: 1px solid var(--border, #e0e0e0);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
   font-size: 0.875rem;
+}
+
+body.has-cookie-consent-banner {
+  padding-bottom: 96px;
 }
 
 .cookie-consent-message {

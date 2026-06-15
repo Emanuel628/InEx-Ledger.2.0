@@ -98,6 +98,7 @@ async function handleRegisterSubmit(event) {
   const email = document.getElementById("email")?.value.trim() || "";
   const password = document.getElementById("password")?.value || "";
   const confirmPassword = document.getElementById("confirm-password")?.value || "";
+  const country = document.getElementById("registerCountry")?.value || "US";
   const marketingEmailOptIn = document.getElementById("caslConsent")?.checked === true;
 
   hideRegisterError();
@@ -141,6 +142,7 @@ async function handleRegisterSubmit(event) {
     last_name: lastName,
     email,
     password,
+    country,
     tos_consent: true,
     marketing_email_opt_in: marketingEmailOptIn
   })

@@ -427,6 +427,10 @@
   margin-bottom: 22px;
 }
 
+.desktop-view-requested .invoice-form-grid {
+  grid-template-columns: 1fr;
+}
+
 .form-label {
   display: block;
   margin-bottom: 6px;

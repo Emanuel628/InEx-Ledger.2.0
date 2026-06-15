@@ -62,7 +62,7 @@ const GUIDED_SETUP_CONFIG = {
       "onboarding_guide_categories_point_1",
       "onboarding_guide_categories_point_2"
     ],
-    highlightSelector: "#seedDefaultCategoriesBtn, #addIncomeCategoryBtn, #addExpenseCategoryBtn",
+    highlightSelector: "#addIncomeCategoryBtn, #addExpenseCategoryBtn",
     launchSelector: "#addExpenseCategoryBtn, #addIncomeCategoryBtn",
     launchLabelKey: "onboarding_guide_categories_add",
     nextAction: "next",

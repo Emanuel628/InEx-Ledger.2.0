@@ -388,6 +388,74 @@ test("GET /api/review/queue returns 500 when dataset build fails", async () => {
   assert.equal(state.logErrors.length, 1);
 });
 
+test("GET /api/review/queue returns an empty payload for a fresh account", async () => {
+  const originalLoad = Module._load.bind(Module);
+
+  Module._load = function(requestName, parent, isMain) {
+    if (requestName === "../db.js" || /db\.js$/.test(requestName)) {
+      return {
+        pool: {
+          async query(sql) {
+            if (/FROM transactions(?:\s+t)?/i.test(sql)) return { rows: [], rowCount: 0 };
+            if (/FROM accounts/i.test(sql)) return { rows: [], rowCount: 0 };
+            if (/FROM categories/i.test(sql)) return { rows: [], rowCount: 0 };
+            if (/FROM receipts r/i.test(sql)) return { rows: [], rowCount: 0 };
+            if (/FROM support_artifacts/i.test(sql)) return { rows: [], rowCount: 0 };
+            if (/FROM transaction_review_states/i.test(sql)) return { rows: [], rowCount: 0 };
+            if (/FROM businesses/i.test(sql)) {
+              return { rows: [{ id: "biz_1", name: "Fresh Biz", region: "US", province: null }], rowCount: 1 };
+            }
+            if (/FROM vehicle_expense_details/i.test(sql)) return { rows: [], rowCount: 0 };
+            if (/FROM capital_assets/i.test(sql)) return { rows: [], rowCount: 0 };
+            throw new Error(`Unhandled SQL: ${sql}`);
+          }
+        }
+      };
+    }
+
+    if (requestName === "../middleware/auth.middleware.js" || /auth\.middleware\.js$/.test(requestName)) {
+      return { requireAuth(req, _res, next) { req.user = { id: "user_1" }; next(); } };
+    }
+
+    if (requestName === "../middleware/csrf.middleware.js" || /csrf\.middleware\.js$/.test(requestName)) {
+      return { requireCsrfProtection(_req, _res, next) { next(); } };
+    }
+
+    if (requestName === "../api/utils/resolveBusinessIdForUser.js" || /resolveBusinessIdForUser\.js$/.test(requestName)) {
+      return { resolveBusinessIdForUser: async () => "biz_1" };
+    }
+
+    if (requestName === "../services/exportDatasetService.js" || /exportDatasetService\.js$/.test(requestName)) {
+      return {
+        buildNormalizedExportDataset() {
+          throw new Error("dataset should not run for empty transactions");
+        }
+      };
+    }
+
+    if (requestName === "../utils/logger.js" || /logger\.js$/.test(requestName)) {
+      return { logError() {} };
+    }
+
+    return originalLoad(requestName, parent, isMain);
+  };
+
+  delete require.cache[ROUTE_PATH];
+  const router = require(ROUTE_PATH);
+  Module._load = originalLoad;
+
+  const app = express();
+  app.use(express.json());
+  app.use("/api/review", router);
+
+  const response = await request(app).get("/api/review/queue");
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.queue, []);
+  assert.equal(response.body.summary.total, 0);
+  assert.equal(response.body.metadata.businessName, "Fresh Biz");
+});
+
 test("GET /api/review/queue suppresses derived issues already marked resolved", async () => {
   const { app } = loadReviewRouterFixture({
     reviewStateRows: [

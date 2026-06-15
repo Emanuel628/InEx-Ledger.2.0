@@ -30,7 +30,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loginForm.addEventListener("submit", handleLoginSubmit);
   wireShowPasswordToggle(document);
-  wireAutofillSuppression();
   showLoginReasonMessage();
   clearLoginFields({ force: true });
   resetLoginFieldsIfNeeded();
@@ -70,19 +69,6 @@ function clearLoginFields({ force = false } = {}) {
   resetFieldValues();
   AUTOFILL_CLEAR_RETRY_DELAYS_MS.forEach((delay) => {
     window.setTimeout(resetFieldValues, delay);
-  });
-}
-
-function wireAutofillSuppression() {
-  const emailField = document.getElementById("email");
-  const passwordField = document.getElementById("password");
-  [emailField, passwordField].forEach((field) => {
-    if (!field) {
-      return;
-    }
-    field.addEventListener("focus", () => {
-      field.removeAttribute("readonly");
-    });
   });
 }
 

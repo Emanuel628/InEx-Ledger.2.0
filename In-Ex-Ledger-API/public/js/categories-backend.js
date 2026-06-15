@@ -122,7 +122,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   enhanceCategoriesPageShell();
   wireCategoryModal();
   wirePerListAddButtons();
-  wireDefaultCategorySeed();
   await loadCategories();
   await refreshReceiptsDot();
 });
@@ -370,32 +369,6 @@ function syncColorSwatches(color) {
   });
 }
 
-function wireDefaultCategorySeed() {
-  const button = document.getElementById("seedDefaultCategoriesBtn");
-  if (!button) return;
-  button.addEventListener("click", async () => {
-    const message = document.getElementById("categoryMessage");
-    button.disabled = true;
-    if (message) message.textContent = "";
-    try {
-      const response = await apiFetch("/api/categories/defaults", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-      const payload = response ? await response.json().catch(() => null) : null;
-      if (!response || !response.ok) {
-        throw new Error(payload?.error || tx("categories_error_defaults"));
-      }
-      await loadCategories();
-      showCategoriesToast((payload?.inserted_count || 0) > 0 ? tx("categories_defaults_added") : tx("categories_defaults_already_present"));
-    } catch (error) {
-      if (message) message.textContent = error?.message || tx("categories_error_defaults");
-    } finally {
-      button.disabled = false;
-    }
-  });
-}
-
 async function loadCategories() {
   categoriesLoading = categoryRecords.length === 0;
   if (categoriesLoading) renderCategoryLists();
@@ -431,7 +404,7 @@ function showCategoriesOfflineBanner(show) {
   }
   banner.hidden = !show;
   banner.textContent = show ? tx("categories_offline_warning") : "";
-  ["seedDefaultCategoriesBtn", "addIncomeCategoryBtn", "addExpenseCategoryBtn", "categoryToolbarAddBtn"].forEach((id) => {
+  ["addIncomeCategoryBtn", "addExpenseCategoryBtn", "categoryToolbarAddBtn"].forEach((id) => {
     const node = document.getElementById(id);
     if (node) node.disabled = show;
   });

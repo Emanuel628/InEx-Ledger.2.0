@@ -322,6 +322,8 @@ function applyDesktopViewport() {
     document.head.appendChild(meta);
   }
   meta.content = "width=1280";
+  document.documentElement.classList.add("desktop-view-requested");
+  document.body.classList.add("desktop-view-requested");
 }
 
 function isMobileDevice() {
@@ -2201,11 +2203,13 @@ window.LUNA_TAX = {
 
     btnAccept.addEventListener('click', function () {
       setConsentRecord('accepted');
+      document.body.classList.remove('has-cookie-consent-banner');
       banner.remove();
     });
 
     btnDecline.addEventListener('click', function () {
       setConsentRecord('declined');
+      document.body.classList.remove('has-cookie-consent-banner');
       banner.remove();
     });
 
@@ -2219,6 +2223,7 @@ window.LUNA_TAX = {
   async function initCookieBanner() {
     if (!(await needsBanner())) return;
     var banner = buildBanner();
+    document.body.classList.add('has-cookie-consent-banner');
     document.body.appendChild(banner);
 
     // Re-translate if language changes after banner is shown

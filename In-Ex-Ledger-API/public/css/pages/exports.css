@@ -177,6 +177,10 @@
   gap: 16px;
 }
 
+.desktop-view-requested .date-grid {
+  grid-template-columns: 1fr;
+}
+
 .exports-card input,
 .exports-card select,
 .secure-export-tax-input {

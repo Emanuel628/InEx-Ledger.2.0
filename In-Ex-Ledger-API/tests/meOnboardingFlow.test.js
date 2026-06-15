@@ -16,7 +16,8 @@ function loadMeRouterFixture(options = {}) {
     dbQueries: [],
     txQueries: [],
     clientReleased: false,
-    auditCalls: []
+    auditCalls: [],
+    seededCategories: []
   };
 
   const userRow = {
@@ -183,6 +184,15 @@ function loadMeRouterFixture(options = {}) {
         getSubscriptionSnapshotForUser: async () => (
           options.subscriptionSnapshot || { effectiveStatus: "active" }
         )
+      };
+    }
+
+    if (requestName === "../api/utils/seedDefaultsForBusiness.js" || /seedDefaultsForBusiness\.js$/.test(requestName)) {
+      return {
+        async seedDefaultCategoriesForBusiness(_client, businessId) {
+          state.seededCategories.push(businessId);
+          return [];
+        }
       };
     }
 

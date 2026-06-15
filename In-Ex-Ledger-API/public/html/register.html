@@ -139,6 +139,14 @@
             <select id="languageSelectRegister" name="language" data-language-select></select>
           </div>
 
+          <div class="form-field">
+            <label for="registerCountry" data-i18n="register_country_label">Country</label>
+            <select id="registerCountry" name="country" required>
+              <option value="US" data-i18n="register_country_us">United States</option>
+              <option value="CA" data-i18n="register_country_ca">Canada</option>
+            </select>
+          </div>
+
           <div class="consent-section">
             <div class="consent-field consent-field-required">
               <input type="checkbox" id="tosConsent" class="consent-checkbox" required aria-describedby="consentRequiredHint tosConsentMessage" />

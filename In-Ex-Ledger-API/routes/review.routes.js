@@ -440,6 +440,38 @@ function summarizeQueue(queue) {
   return summary;
 }
 
+function buildEmptyQueueResponse(businessId, business, startDate, endDate) {
+  return {
+    queue: [],
+    summary: summarizeQueue([]),
+    supportSummary: {
+      attachedSupportCount: 0,
+      missingReceiptCount: 0,
+      missingReceiptValue: 0,
+      needsCategoryCount: 0,
+      needsCategoryValue: 0
+    },
+    totals: {
+      includedCount: 0,
+      excludedCount: 0,
+      incomeTotal: 0,
+      expenseTotal: 0,
+      netTotal: 0,
+      deductibleExpenseTotal: 0
+    },
+    metadata: {
+      businessId,
+      businessName: business?.name || "",
+      region: business?.region || "",
+      province: business?.province || "",
+      gstHstRegistered: business?.gst_hst_registered === true,
+      gstHstMethod: business?.gst_hst_method || null,
+      startDate: startDate || "",
+      endDate: endDate || ""
+    }
+  };
+}
+
 router.get("/queue", async (req, res) => {
   try {
     const businessId = await resolveBusinessIdForUser(req.user);
@@ -554,13 +586,18 @@ router.get("/queue", async (req, res) => {
       issueStateRowsByTransaction.set(row.transaction_id, current);
     }
 
+    const business = businessResult.rows[0] || {};
+    if (!transactionResult.rows.length) {
+      return res.json(buildEmptyQueueResponse(businessId, business, startDate, endDate));
+    }
+
     const dataset = buildNormalizedExportDataset({
       transactions: transactionResult.rows,
       accounts: accountResult.rows,
       categories: categoryResult.rows,
       receipts: receiptResult.rows,
       supportArtifactMap,
-      business: businessResult.rows[0] || {},
+      business,
       vehicleClaimMap,
       capitalAssetTxMap,
       startDate: startDate || "",
