@@ -40,7 +40,21 @@ function hydrateDefaults(profile = {}) {
   if (elName) elName.value = onboardingData.business_name || business.name || "";
 
   const elRegion = document.getElementById("onboardingRegion");
-  if (elRegion) elRegion.value = onboardingData.region || business.region || "US";
+  if (elRegion) {
+    // Prefer an explicit prior choice: an onboarding draft, an existing
+    // business region, or the country the user picked at sign-up. When none of
+    // those exist, auto-detect the visitor's current region instead of
+    // defaulting everyone to the United States.
+    const rawSaved = onboardingData.region || business.region || profile.country || "";
+    const savedRegion = ["US", "CA"].includes(String(rawSaved).toUpperCase())
+      ? String(rawSaved).toUpperCase()
+      : null;
+    if (savedRegion) {
+      elRegion.value = savedRegion;
+    } else {
+      autoSelectOnboardingRegion(elRegion);
+    }
+  }
 
   const elProvince = document.getElementById("onboardingProvince");
   if (elProvince) elProvince.value = onboardingData.province || business.province || "";
@@ -53,6 +67,25 @@ function hydrateDefaults(profile = {}) {
   syncAccountTypeSelection();
 
   syncProvinceField();
+}
+
+// Auto-detect the visitor's region and pre-select it when onboarding has no
+// prior region signal. Detection is async; if the user picks a region first we
+// leave their choice untouched.
+async function autoSelectOnboardingRegion(regionSelect) {
+  if (!regionSelect || typeof window.detectUserRegion !== "function") return;
+  let userTouched = false;
+  const markTouched = () => { userTouched = true; };
+  regionSelect.addEventListener("change", markTouched, { once: true });
+  try {
+    const region = await window.detectUserRegion();
+    if (!userTouched && (region === "US" || region === "CA")) {
+      regionSelect.value = region;
+      syncProvinceField();
+    }
+  } finally {
+    regionSelect.removeEventListener("change", markTouched);
+  }
 }
 
 function wireRegionField() {

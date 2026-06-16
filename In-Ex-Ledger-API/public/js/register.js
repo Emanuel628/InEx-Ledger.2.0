@@ -60,6 +60,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   persistLanguage();
 
+  prefillRegisterCountry();
+
   form.addEventListener("submit", handleRegisterSubmit);
   wireShowPasswordToggle(document);
 
@@ -83,6 +85,27 @@ document.addEventListener("DOMContentLoaded", () => {
     updateMatchMessage();
   });
 });
+
+// Auto-select the country field to the visitor's detected region so Canadian
+// users are not silently defaulted to the United States at sign-up. Detection
+// is async; if the visitor manually picks a country first, we leave it alone.
+async function prefillRegisterCountry() {
+  const countrySelect = document.getElementById("registerCountry");
+  if (!countrySelect || typeof window.detectUserRegion !== "function") {
+    return;
+  }
+  let userTouched = false;
+  const markTouched = () => { userTouched = true; };
+  countrySelect.addEventListener("change", markTouched, { once: true });
+  try {
+    const region = await window.detectUserRegion();
+    if (!userTouched && (region === "US" || region === "CA")) {
+      countrySelect.value = region;
+    }
+  } finally {
+    countrySelect.removeEventListener("change", markTouched);
+  }
+}
 
 async function handleRegisterSubmit(event) {
   event.preventDefault();

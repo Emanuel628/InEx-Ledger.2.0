@@ -1010,8 +1010,17 @@ router.post("/register", authLimiter, async (req, res) => {
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   const displayName = firstName;
 
-  // Optional geo-tagging fields for data residency tracking (PIPEDA / Quebec Law 25)
-  const country = String(req.body?.country || "").trim().toUpperCase() || null;
+  // Optional geo-tagging fields for data residency tracking (PIPEDA / Quebec Law 25).
+  // Country is normalized to one of the two supported regions (US/CA) so it
+  // cannot be stored as an arbitrary value via direct API calls; anything else
+  // is treated as unknown (null) and resolved during onboarding.
+  const rawCountry = String(req.body?.country || "").trim().toUpperCase();
+  const country =
+    rawCountry === "CA" || rawCountry === "CAN" || rawCountry === "CANADA"
+      ? "CA"
+      : rawCountry === "US" || rawCountry === "USA" || rawCountry === "UNITED STATES"
+        ? "US"
+        : null;
   const province = String(req.body?.province || "").trim().toUpperCase() || null;
 
   // Server-side enforcement of the Terms / Privacy Policy consent that the

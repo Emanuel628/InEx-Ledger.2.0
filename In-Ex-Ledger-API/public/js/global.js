@@ -266,6 +266,53 @@ function normalizeEstimatedTaxProvince(province) {
   return String(province || "").toUpperCase();
 }
 
+// Normalizes any region/country signal to the two regions the app supports.
+function normalizeSupportedRegion(value) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (raw === "CA" || raw === "CAN" || raw === "CANADA") return "CA";
+  return "US";
+}
+
+// Best-effort guess of the visitor's region from the browser locale. Used as a
+// fallback when the server detection endpoint is unavailable (e.g. previews).
+function regionFromBrowserLocale() {
+  const language = String(navigator.language || "").toLowerCase();
+  const languages = Array.isArray(navigator.languages)
+    ? navigator.languages.join(",").toLowerCase()
+    : "";
+  return language.includes("-ca") || languages.includes("-ca") ? "CA" : "US";
+}
+
+// Shared region auto-detection used by the sign-up and onboarding flows so the
+// region/country field defaults to the visitor's current region instead of a
+// hardcoded "US". Mirrors the public landing page behavior: ask the server
+// (which can read trusted edge geo headers), then fall back to browser locale.
+async function detectUserRegion() {
+  try {
+    const res = await fetch("/api/region/detect", {
+      method: "GET",
+      credentials: "include",
+      headers: { Accept: "application/json" }
+    });
+    if (res && res.ok) {
+      const data = await res.json();
+      // The endpoint returns source: 'default' when it had no real signal; in
+      // that case prefer the browser locale before settling on US.
+      if (data && data.source && data.source !== "default") {
+        return normalizeSupportedRegion(data.region || data.country);
+      }
+      const serverRegion = normalizeSupportedRegion(data && (data.region || data.country));
+      return serverRegion === "US" ? regionFromBrowserLocale() : serverRegion;
+    }
+  } catch (_) {
+    // Network/API unavailable — fall back to the browser locale.
+  }
+  return regionFromBrowserLocale();
+}
+
+window.normalizeSupportedRegion = normalizeSupportedRegion;
+window.detectUserRegion = detectUserRegion;
+
 function formatEstimatedTaxPercent(rate, province = "") {
   const normalizedProvince = normalizeEstimatedTaxProvince(province);
   const decimals = normalizedProvince === "QC" ? 3 : 0;
