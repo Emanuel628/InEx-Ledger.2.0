@@ -519,7 +519,7 @@ router.get("/queue", async (req, res) => {
           WHERE r.business_id = $1
             AND t.deleted_at IS NULL
             ${startDate && endDate ? "AND t.date >= $2 AND t.date <= $3" : ""}
-          ORDER BY r.created_at ASC`,
+          ORDER BY r.uploaded_at ASC`,
         receiptParams
       ),
       pool.query(
