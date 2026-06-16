@@ -83,10 +83,23 @@ module.exports = async function globalSetup() {
   // Create business
   const businessId = crypto.randomUUID();
   await pool.query(
-    `INSERT INTO businesses (id, user_id, name, region, language, contact_full_name)
-     VALUES ($1, $2, $3, 'US', 'en', $4)
+    `INSERT INTO businesses (
+       id, user_id, name, region, language, contact_full_name, address,
+       business_activity_code, accounting_method, material_participation, business_type
+     )
+     VALUES ($1, $2, $3, 'US', 'en', $4, $5, $6, $7, $8, $9)
      ON CONFLICT DO NOTHING`,
-    [businessId, userId, "Acme Consulting LLC", "E2E Smoke"]
+    [
+      businessId,
+      userId,
+      "Acme Consulting LLC",
+      "E2E Smoke",
+      "123 Main St, Austin, TX 78701",
+      "541511",
+      "cash",
+      true,
+      "sole_proprietorship"
+    ]
   );
 
   // Set active business and mark onboarding complete
@@ -97,6 +110,8 @@ module.exports = async function globalSetup() {
     region: "US",
     province: "",
     language: "en",
+    business_activity_code: "541511",
+    accounting_method: "cash",
     guided_setup_active: false,
     guided_setup_step: "complete",
   });

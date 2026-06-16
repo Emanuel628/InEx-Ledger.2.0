@@ -676,14 +676,11 @@ test.describe("Stage 7 · Invoices", () => {
     if (!STATE.invoiceId) STATE.invoiceId = await getFirstInvoiceId(page);
     if (!STATE.invoiceId) { console.log("⚠ No invoice ID — skipping"); return; }
 
-    const result = await api(page, "PUT", `/api/invoices-v1/${STATE.invoiceId}`, {
+    const result = await api(page, "PATCH", `/api/invoices-v1/${STATE.invoiceId}/status`, {
       status: "sent",
     });
-    if (result.ok) {
-      console.log("✅ Invoice marked as sent");
-    } else {
-      console.warn(`⚠ Mark sent: ${result.status} ${JSON.stringify(result.data).slice(0, 80)}`);
-    }
+    expect(result.ok, `Mark sent failed: ${result.status}`).toBe(true);
+    console.log("✅ Invoice marked as sent");
 
     await page.reload();
     await waitForApp(page);
@@ -697,8 +694,19 @@ test.describe("Stage 7 · Invoices", () => {
     if (!STATE.invoiceId) STATE.invoiceId = await getFirstInvoiceId(page);
     if (!STATE.invoiceId) { console.log("⚠ No invoice ID — skipping"); return; }
 
+    const current = await api(page, "GET", `/api/invoices-v1/${STATE.invoiceId}`);
+    expect(current.ok, `Load invoice failed: ${current.status}`).toBe(true);
+    const invoice = current.data || {};
     const result = await api(page, "PUT", `/api/invoices-v1/${STATE.invoiceId}`, {
+      customer_name: invoice.customer_name,
+      customer_email: invoice.customer_email || "",
+      issue_date: invoice.issue_date,
+      due_date: invoice.due_date,
+      currency: invoice.currency || "USD",
+      tax_rate: Number(invoice.tax_rate || 0),
+      line_items: Array.isArray(invoice.line_items) ? invoice.line_items : [],
       notes: "Net 30 — thank you for your business!",
+      status: invoice.status || "sent",
     });
     expect(result.ok, `Edit invoice failed: ${result.status}`).toBe(true);
     console.log("✅ Invoice notes updated");
