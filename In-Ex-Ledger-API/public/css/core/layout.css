@@ -1079,14 +1079,12 @@ main.app-shell.sidebar-collapsed ~ .dynamic-sidebar-quick-panel {
   position: relative !important;
   overflow: hidden !important;
   isolation: isolate !important;
+  background: #16263F url("/brand/inex-mark-onnavy.svg") center / 20px 20px no-repeat !important;
 }
 
 .brand-mark::before,
 .brand-mark::after {
-  content: "" !important;
-  position: absolute !important;
-  border-radius: 999px !important;
-  pointer-events: none !important;
+  content: none !important;
 }
 
 .brand-mark::before {
@@ -1112,7 +1110,7 @@ main.app-shell.sidebar-collapsed ~ .dynamic-sidebar-quick-panel {
 }
 
 .brand-mark-topbar {
-  background: rgba(255, 255, 255, 0.15) !important;
+  background: url("/brand/inex-mark-onnavy.svg") center / 22px 22px no-repeat !important;
   color: #fff !important;
 }
 

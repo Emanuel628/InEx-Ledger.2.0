@@ -66,9 +66,14 @@ body {
 }
 
 .brand-mark-light {
-  background: linear-gradient(135deg, #0c395f, #1f7a7a);
+  background: #16263F url("/brand/inex-mark-onnavy.svg") center / 24px 24px no-repeat;
   color: #fff;
   box-shadow: 0 14px 28px rgba(18, 73, 99, 0.24);
+}
+
+.brand-mark-light::before,
+.brand-mark-light::after {
+  content: none;
 }
 
 .brand-mark::before,
