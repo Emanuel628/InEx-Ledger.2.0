@@ -91,7 +91,7 @@ html, body { max-width: 100%; overflow-x: hidden; }
   .subscription-panel,
   .subscription-plan-workbench { padding: 20px !important; }
   .subscription-page-header h1 { font-size: clamp(42px, 9vw, 70px) !important; line-height: 0.9 !important; letter-spacing: -0.07em !important; }
-  .subscription-status-panel { background: linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.96)), radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.32), transparent 42%) !important; }
+  .subscription-status-panel { background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(247, 250, 254, 0.98)) !important; color: #0f172a !important; border-color: rgba(36, 109, 187, 0.14) !important; }
   .subscription-plan-row,
   .sub-plan-card { grid-template-columns: 1fr !important; gap: 14px !important; padding: 18px !important; }
   .subscription-plan-row-price { padding: 14px; border-radius: 18px; background: rgba(248, 250, 252, 0.92); }
