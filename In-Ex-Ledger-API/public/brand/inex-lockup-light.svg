@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 72" width="300" height="72" role="img" aria-label="InEx Ledger">
+  <g transform="translate(8,8)">
+    <path d="M19 35 L19 13 M19 13 L12 20 M19 13 L26 20" fill="none" stroke="#1FA971" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M37 21 L37 43 M37 43 L30 36 M37 43 L44 36" fill="none" stroke="#2557D6" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="74" y="46" font-family="'Bricolage Grotesque','Segoe UI',sans-serif" font-size="30" font-weight="700" fill="#16263F" letter-spacing="-0.5">InEx<tspan font-weight="500" fill="#52607A"> Ledger</tspan></text>
+</svg>
