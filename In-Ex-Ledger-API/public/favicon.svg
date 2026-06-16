@@ -1,19 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="InEx Ledger icon">
-  <defs>
-    <linearGradient id="bg" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#0c395f"/>
-      <stop offset="1" stop-color="#1f7a7a"/>
-    </linearGradient>
-    <linearGradient id="stroke" x1="24" y1="12" x2="38" y2="52" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#d9f4f0"/>
-    </linearGradient>
-    <linearGradient id="chip" x1="40" y1="35" x2="50" y2="48" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#cfe9e6"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
-  <rect x="22.5" y="10" width="12" height="44" rx="6" transform="rotate(33 28.5 32)" fill="url(#stroke)"/>
-  <rect x="38" y="36" width="10" height="16" rx="4.5" fill="url(#chip)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="InEx Ledger">
+  <rect width="64" height="64" rx="14" fill="#16263F"/>
+  <path d="M22 41 L22 17 M22 17 L14 25 M22 17 L30 25" fill="none" stroke="#34D399" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M42 23 L42 47 M42 47 L34 39 M42 47 L50 39" fill="none" stroke="#6E9BF5" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

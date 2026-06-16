@@ -97,12 +97,11 @@ h3 {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: var(--landing-blue);
+  background: #16263F url("/brand/inex-mark-onnavy.svg") center / 20px 20px no-repeat;
 }
 
 .landing-logo-mark svg {
-  width: 16px;
-  height: 16px;
+  display: none;
 }
 
 .landing-links {
