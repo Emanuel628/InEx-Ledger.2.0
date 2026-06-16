@@ -316,7 +316,7 @@ router.get("/:id", async (req, res) => {
     res.setHeader("Expires", "0");
     res.setHeader("Content-Type", responseMimeType);
     res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Content-Disposition", `${dispositionType}; filename="${String(row.filename || "support-file").replace(/"/g, "")}"`);
+    res.setHeader("Content-Disposition", `${dispositionType}; filename*=UTF-8''${encodeURIComponent(row.filename || "support-file")}`);
     return res.sendFile(resolvedPath);
   } catch (err) {
     logError("GET /support-artifacts/:id error:", err);
