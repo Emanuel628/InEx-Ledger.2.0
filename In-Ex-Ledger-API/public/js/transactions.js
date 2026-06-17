@@ -98,18 +98,18 @@ const TRANSACTION_REVIEW_LABELS = {
 const TX_FLAG_PRIORITY = ["NC", "UM", "CA", "HO", "ML", "AL", "BP", "RS", "FC", "RV", "IS", "DUP"];
 
 const TX_FLAG_LABELS = {
-  NC: "Needs Category",
-  UM: "Needs Tax Mapping",
-  FC: "Needs Final Confirmation",
-  RS: "Needs Receipt",
-  IS: "Income Source Review",
-  ML: "Needs Mileage Log",
-  AL: "Needs Allocation",
-  BP: "Needs Business Purpose",
-  HO: "Needs Home Office Support",
-  CA: "Needs Capital Asset Review",
-  RV: "CPA Review",
-  DUP: "Duplicate Review"
+  NC: "transactions_flag_nc",
+  UM: "transactions_flag_um",
+  FC: "transactions_flag_fc",
+  RS: "transactions_flag_rs",
+  IS: "transactions_flag_is",
+  ML: "transactions_flag_ml",
+  AL: "transactions_flag_al",
+  BP: "transactions_flag_bp",
+  HO: "transactions_flag_ho",
+  CA: "transactions_flag_ca",
+  RV: "transactions_flag_rv",
+  DUP: "transactions_flag_dup"
 };
 
 const TX_FLAG_BADGE_CSS = {
@@ -140,31 +140,31 @@ const ISSUE_CODE_TO_TX_FLAG = {
   possible_duplicate: "DUP"
 };
 const TX_ISSUE_ACTIONS = {
-  needs_category: { label: "Assign category", fix: "edit", primary: true },
-  needs_tax_mapping: { label: "Open categories", fix: "edit_category", primary: true },
-  missing_description: { label: "Edit details", fix: "edit", primary: true },
-  needs_receipt_support: { label: "Attach receipt", fix: "receipt", primary: true },
-  needs_business_purpose: { label: "Add business purpose note", fix: "edit", primary: true },
-  needs_allocation: { label: "Set business-use %", fix: "edit", primary: true },
-  needs_mileage_log: { label: "Open mileage", fix: "open_mileage", primary: true },
-  needs_home_office_support: { label: "Add support", fix: "support", primary: true },
-  needs_capital_asset_review: { label: "Add support", fix: "support", primary: true },
-  final_confirmation_needed: { label: "Add support", fix: "support", primary: false },
-  cpa_review_required: { label: "Mark ready", fix: "mark-ready", primary: true },
-  possible_duplicate: { label: "Edit details", fix: "edit", primary: false }
+  needs_category: { label: "review_quick_assign_category", fix: "edit", primary: true },
+  needs_tax_mapping: { label: "review_quick_open_categories", fix: "edit_category", primary: true },
+  missing_description: { label: "review_quick_edit_details", fix: "edit", primary: true },
+  needs_receipt_support: { label: "review_quick_attach_receipt", fix: "receipt", primary: true },
+  needs_business_purpose: { label: "transactions_review_add_business_purpose", fix: "edit", primary: true },
+  needs_allocation: { label: "transactions_review_set_business_use", fix: "edit", primary: true },
+  needs_mileage_log: { label: "review_quick_open_mileage", fix: "open_mileage", primary: true },
+  needs_home_office_support: { label: "review_quick_add_support", fix: "support", primary: true },
+  needs_capital_asset_review: { label: "review_quick_add_support", fix: "support", primary: true },
+  final_confirmation_needed: { label: "review_quick_add_support", fix: "support", primary: false },
+  cpa_review_required: { label: "transactions_review_mark_ready", fix: "mark-ready", primary: true },
+  possible_duplicate: { label: "review_quick_edit_details", fix: "edit", primary: false }
 };
 const TRANSACTION_REVIEW_FILTER_OPTIONS = Object.freeze([
-  { key: "nc", label: "Needs category", codes: ["NC"], tone: "hard" },
-  { key: "rs", label: "Missing receipt", codes: ["RS"], tone: "hard" },
-  { key: "um", label: "Tax mapping", codes: ["UM"], tone: "hard" },
-  { key: "fc", label: "Final confirmation", codes: ["FC"], tone: "warning" },
-  { key: "ml", label: "Mileage support", codes: ["ML"], tone: "hard" },
-  { key: "al", label: "Allocation", codes: ["AL"], tone: "hard" },
-  { key: "bp", label: "Business purpose", codes: ["BP"], tone: "hard" },
-  { key: "ho", label: "Home office", codes: ["HO"], tone: "hard" },
-  { key: "ca", label: "Capital asset", codes: ["CA"], tone: "hard" },
-  { key: "rv", label: "CPA review", codes: ["RV"], tone: "warning" },
-  { key: "is", label: "Income review", codes: ["IS"], tone: "warning" }
+  { key: "nc", label: "transactions_review_filter_nc", codes: ["NC"], tone: "hard" },
+  { key: "rs", label: "transactions_review_filter_rs", codes: ["RS"], tone: "hard" },
+  { key: "um", label: "transactions_review_filter_um", codes: ["UM"], tone: "hard" },
+  { key: "fc", label: "transactions_review_filter_fc", codes: ["FC"], tone: "warning" },
+  { key: "ml", label: "transactions_review_filter_ml", codes: ["ML"], tone: "hard" },
+  { key: "al", label: "transactions_review_filter_al", codes: ["AL"], tone: "hard" },
+  { key: "bp", label: "transactions_review_filter_bp", codes: ["BP"], tone: "hard" },
+  { key: "ho", label: "transactions_review_filter_ho", codes: ["HO"], tone: "hard" },
+  { key: "ca", label: "transactions_review_filter_ca", codes: ["CA"], tone: "hard" },
+  { key: "rv", label: "transactions_review_filter_rv", codes: ["RV"], tone: "warning" },
+  { key: "is", label: "transactions_review_filter_is", codes: ["IS"], tone: "warning" }
 ]);
 
 function getTxnIssueEntries(txn) {
@@ -222,17 +222,17 @@ function buildTxnActionsFromIssueEntries(txn, issueEntries = []) {
     if (!mapped) continue;
     actions.push({ ...mapped });
     if (issueCode === "cpa_review_required") {
-      actions.push({ label: "Edit details", fix: "edit", primary: false });
+      actions.push({ label: "review_quick_edit_details", fix: "edit", primary: false });
     }
   }
 
   const actionHref = String(txn?.actionTarget?.href || "").trim();
   if (actionHref === "/categories") {
-    actions.unshift({ label: "Open categories", fix: "edit_category", primary: true });
+    actions.unshift({ label: "review_quick_open_categories", fix: "edit_category", primary: true });
   } else if (actionHref === "/receipts") {
-    actions.unshift({ label: "Attach receipt", fix: "receipt", primary: true });
+    actions.unshift({ label: "review_quick_attach_receipt", fix: "receipt", primary: true });
   } else if (actionHref === "/mileage") {
-    actions.unshift({ label: "Open mileage", fix: "open_mileage", primary: true });
+    actions.unshift({ label: "review_quick_open_mileage", fix: "open_mileage", primary: true });
   }
 
   return dedupeIssueActions(actions);
@@ -663,7 +663,7 @@ function getTxnTopFlag(flags) {
 function getTxnFlagBadgeLabel(flags) {
   const top = getTxnTopFlag(flags);
   if (!top) return null;
-  const label = TX_FLAG_LABELS[top] || top;
+  const label = txT(TX_FLAG_LABELS[top], top);
   const extra = flags.length - 1;
   return extra > 0 ? `${label} +${extra}` : label;
 }
@@ -778,29 +778,31 @@ function getOrderedVisibleReviewItems(transactions = ledgerState.transactions ||
 function getTransactionReviewSummaryCopy(snapshot, totalTransactions) {
   if (!totalTransactions) {
     return {
-      title: "No transactions in this view yet.",
-      body: "Add or import transactions first. Review flags will show up here as soon as something needs cleanup."
+      title: txT("transactions_review_empty_title", "No transactions in this view yet."),
+      body: txT("transactions_review_empty_body", "Add or import transactions first. Review flags will show up here as soon as something needs cleanup.")
     };
   }
 
   if (!snapshot.unresolvedCount) {
     return {
-      title: "Everything on this page is ready.",
-      body: "No missing categories, receipts, or support items in the current view."
+      title: txT("transactions_review_all_ready", "Everything on this page is ready."),
+      body: txT("transactions_review_all_ready_body", "No missing categories, receipts, or support items in the current view.")
     };
   }
 
-  const itemLabel = snapshot.unresolvedCount === 1 ? "transaction needs attention" : "transactions need attention";
+  const itemLabel = snapshot.unresolvedCount === 1
+    ? txT("transactions_review_item_singular", "transaction needs attention")
+    : txT("transactions_review_item_plural", "transactions need attention");
   if (snapshot.hardCount > 0) {
     return {
       title: `${snapshot.unresolvedCount} ${itemLabel}.`,
-      body: "Start with the hard blockers first. Those are the items most likely to hold up export cleanup."
+      body: txT("transactions_review_hard_body", "Start with the hard blockers first. Those are the items most likely to hold up export cleanup.")
     };
   }
 
   return {
     title: `${snapshot.unresolvedCount} ${itemLabel}.`,
-    body: "These are softer review items, but they still deserve cleanup before final export."
+    body: txT("transactions_review_soft_body", "These are softer review items, but they still deserve cleanup before final export.")
   };
 }
 
@@ -896,7 +898,7 @@ const copy = getTransactionReviewSummaryCopy(snapshot, getTransactionTotalCount(
         data-review-summary-filter="${escapeHtml(option.key)}"
         ${isDisabled ? "disabled" : ""}
       >
-        <span>${escapeHtml(option.label)}</span>
+        <span>${escapeHtml(txT(option.label, option.label))}</span>
         <strong>${escapeHtml(String(count))}</strong>
       </button>
     `;
@@ -904,7 +906,9 @@ const copy = getTransactionReviewSummaryCopy(snapshot, getTransactionTotalCount(
 
   summaryCard.hidden = false;
   fixNextButton.disabled = !snapshot.firstIssue;
-  fixNextButton.textContent = snapshot.firstIssue ? "Fix next" : "Nothing to fix";
+  fixNextButton.textContent = snapshot.firstIssue
+    ? txT("transactions_review_fix_next", "Fix next")
+    : txT("transactions_review_nothing_to_fix", "Nothing to fix");
   fixNextButton.onclick = () => {
     if (!snapshot.firstIssue) {
       return;
@@ -953,88 +957,104 @@ function buildTxnChecklistHtml(txn, flags) {
   const isExpense = txn.type !== "income";
   const isIncome = txn.type === "income";
   const items = [];
+  const line = (labelKey, fallbackLabel, body) =>
+    `<strong>${escapeHtml(txT(labelKey, fallbackLabel))}:</strong> ${body}`;
 
   const ok = (text) => ({ s: "ok", text });
   const fail = (text) => ({ s: "fail", text });
   const warn = (text) => ({ s: "warn", text });
 
   if (flags.includes("NC")) {
-    items.push(fail("<strong>Category:</strong> Not assigned"));
-    items.push(fail("<strong>Tax line:</strong> Awaiting category assignment"));
+    items.push(fail(line("transactions_checklist_category", "Category", escapeHtml(txT("transactions_checklist_not_assigned", "Not assigned")))));
+    items.push(fail(line("transactions_checklist_tax_line", "Tax line", escapeHtml(txT("transactions_checklist_tax_line_awaiting_assignment", "Awaiting category assignment")))));
   } else {
-    items.push(ok(`<strong>Category:</strong> ${escapeHtml(catName || "Assigned")}`));
+    items.push(ok(line("transactions_checklist_category", "Category", escapeHtml(catName || txT("transactions_checklist_assigned", "Assigned")))));
     if (flags.includes("UM")) {
-      items.push(fail("<strong>Tax line:</strong> Not mapped - reassign category or set tax label"));
+      items.push(fail(line("transactions_checklist_tax_line", "Tax line", escapeHtml(txT("transactions_checklist_tax_line_not_mapped", "Not mapped - reassign category or set tax label")))));
     } else {
-      items.push(ok(`<strong>Tax line:</strong> ${escapeHtml(category?.taxLabel || "Mapped")}`));
+      items.push(ok(line("transactions_checklist_tax_line", "Tax line", escapeHtml(category?.taxLabel || txT("transactions_checklist_mapped", "Mapped")))));
     }
   }
 
   if (isExpense && !flags.includes("NC")) {
     if (flags.includes("RS")) {
-      items.push(fail("<strong>Receipt/support:</strong> Missing - attach receipt or support file"));
+      items.push(fail(line("transactions_checklist_receipt_support", "Receipt/support", escapeHtml(txT("transactions_checklist_receipt_support_missing", "Missing - attach receipt or support file")))));
     } else {
-      items.push(ok(`<strong>Receipt/support:</strong> ${txn.receiptCount || 0} attached`));
+      items.push(ok(line("transactions_checklist_receipt_support", "Receipt/support", escapeHtml(txT("transactions_checklist_attached_count", "{count} attached").replace("{count}", String(txn.receiptCount || 0))))));
     }
 
     if (flags.includes("FC")) {
-      items.push(warn("<strong>Final confirmation:</strong> Add support or confirm the business treatment"));
+      items.push(warn(line("transactions_checklist_final_confirmation", "Final confirmation", escapeHtml(txT("transactions_checklist_final_confirmation_needed", "Add support or confirm the business treatment")))));
     }
 
     if (/\bmeal|\bfood\b|\bdining\b|\brestaurant\b|\btravel\b|\bairfare\b|\bhotel\b|\bentertainment\b/i.test(catNameLower)) {
       if (flags.includes("BP")) {
-        items.push(fail("<strong>Business purpose:</strong> Document needed (50% limit applies)"));
+        items.push(fail(line("transactions_checklist_business_purpose", "Business purpose", escapeHtml(txT("transactions_checklist_business_purpose_needed", "Document needed (50% limit applies)")))));
       } else {
-        items.push(ok("<strong>Business purpose:</strong> Documented"));
+        items.push(ok(line("transactions_checklist_business_purpose", "Business purpose", escapeHtml(txT("transactions_checklist_documented", "Documented")))));
       }
     }
 
     if (needsAllocationSupport) {
       if (flags.includes("AL")) {
         const pct = txn.personalUsePct != null ? Number(txn.personalUsePct) : null;
-        items.push(fail(pct != null && pct > 0
-          ? `<strong>Allocation:</strong> ${(100 - pct).toFixed(0)}% business set - verify or add worksheet`
-          : "<strong>Allocation:</strong> Business-use percentage not set"));
+        items.push(fail(line(
+          "transactions_checklist_allocation",
+          "Allocation",
+          escapeHtml(
+            pct != null && pct > 0
+              ? txT("transactions_checklist_allocation_verify", "{percent}% business set - verify or add worksheet").replace("{percent}", (100 - pct).toFixed(0))
+              : txT("transactions_checklist_business_use_not_set", "Business-use percentage not set")
+          )
+        )));
       } else {
         const pct = txn.personalUsePct != null ? Number(txn.personalUsePct) : null;
-        items.push(ok(`<strong>Allocation:</strong> ${pct != null ? `${(100 - pct).toFixed(0)}% business use` : "Set"}`));
+        items.push(ok(line(
+          "transactions_checklist_allocation",
+          "Allocation",
+          escapeHtml(
+            pct != null
+              ? txT("transactions_checklist_business_use_percent", "{percent}% business use").replace("{percent}", (100 - pct).toFixed(0))
+              : txT("transactions_checklist_set", "Set")
+          )
+        )));
       }
     }
 
     if (needsMileageSupport) {
       if (flags.includes("ML")) {
-        items.push(fail("<strong>Mileage log:</strong> Mileage log or actual-expense support missing"));
+        items.push(fail(line("transactions_checklist_mileage_log", "Mileage log", escapeHtml(txT("transactions_checklist_mileage_missing", "Mileage log or actual-expense support missing")))));
       } else {
-        items.push(ok("<strong>Mileage log:</strong> On file"));
+        items.push(ok(line("transactions_checklist_mileage_log", "Mileage log", escapeHtml(txT("transactions_checklist_on_file", "On file")))));
       }
     }
 
     if (flags.includes("HO")) {
-      items.push(fail("<strong>Home-office support:</strong> Worksheet or support file missing"));
+      items.push(fail(line("transactions_checklist_home_office_support", "Home-office support", escapeHtml(txT("transactions_checklist_home_office_missing", "Worksheet or support file missing")))));
     }
 
     if (flags.includes("CA")) {
-      items.push(fail("<strong>Capital asset review:</strong> Asset support or classification record missing"));
+      items.push(fail(line("transactions_checklist_capital_asset_review", "Capital asset review", escapeHtml(txT("transactions_checklist_capital_asset_missing", "Asset support or classification record missing")))));
     }
   }
 
   if (isIncome && !flags.includes("NC")) {
     if (flags.includes("IS")) {
-      items.push(warn("<strong>Income source support:</strong> Optional - source document not attached"));
+      items.push(warn(line("transactions_checklist_income_source_support", "Income source support", escapeHtml(txT("transactions_checklist_income_source_optional", "Optional - source document not attached")))));
     } else {
-      items.push(ok(`<strong>Income source support:</strong> ${txn.receiptCount || 0} attached`));
+      items.push(ok(line("transactions_checklist_income_source_support", "Income source support", escapeHtml(txT("transactions_checklist_attached_count", "{count} attached").replace("{count}", String(txn.receiptCount || 0))))));
     }
   }
 
   if (flags.includes("RV")) {
-    items.push(fail("<strong>CPA review:</strong> Flagged for review - mark ready when the transaction is confirmed"));
+    items.push(fail(line("transactions_checklist_cpa_review", "CPA review", escapeHtml(txT("transactions_checklist_cpa_review_flagged", "Flagged for review - mark ready when the transaction is confirmed")))));
   }
 
   if (items.length === 0) {
-    items.push(ok("<strong>All checks passed</strong> - this transaction is ready"));
+    items.push(ok(`<strong>${escapeHtml(txT("transactions_review_all_checks_passed", "All checks passed"))}</strong> - ${escapeHtml(txT("transactions_checklist_transaction_ready", "this transaction is ready"))}`));
   }
 
-  const iconMap = { ok: "✅", warn: "⚠️", fail: "❌" };
+  const iconMap = { ok: "&#10003;", warn: "&#9888;", fail: "&#10005;" };
 
   return `<ul class="tx-review-checklist">${items.map(item =>
     `<li class="tx-review-checklist-item ${item.s}">
@@ -1056,8 +1076,10 @@ function openTxReviewPopover(txnId, anchorEl) {
   const flags = computeTxnFlags(txn);
   const issueEntries = getTxnIssueEntries(txn);
   const isExpense = txn.type !== "income";
-  const title = isExpense ? "Expense Review Checklist" : "Income Review Checklist";
-  const typeLabel = isExpense ? "Expense" : "Income";
+  const title = isExpense
+    ? txT("transactions_review_popover_expense_title", "Expense Review Checklist")
+    : txT("transactions_review_popover_income_title", "Income Review Checklist");
+  const typeLabel = isExpense ? txT("transactions_type_expense", "Expense") : txT("transactions_type_income", "Income");
   const typeCss = isExpense ? "expense" : "income";
 
   const actions = issueEntries.length
@@ -1066,28 +1088,28 @@ function openTxReviewPopover(txnId, anchorEl) {
 
   if (!actions.length) {
     if (flags.includes("NC")) {
-      actions.push({ label: "Assign category", fix: "edit", primary: true });
+      actions.push({ label: "review_quick_assign_category", fix: "edit", primary: true });
     } else if (flags.includes("UM")) {
-      actions.push({ label: "Open categories", fix: "edit_category", primary: true });
+      actions.push({ label: "review_quick_open_categories", fix: "edit_category", primary: true });
     }
     if (flags.includes("RS")) {
-      actions.push({ label: "Attach receipt", fix: "receipt", primary: true });
+      actions.push({ label: "review_quick_attach_receipt", fix: "receipt", primary: true });
     }
     if (flags.includes("AL")) {
-      actions.push({ label: "Set business-use %", fix: "edit", primary: !flags.includes("RS") });
+      actions.push({ label: "transactions_review_set_business_use", fix: "edit", primary: !flags.includes("RS") });
     }
     if (flags.includes("ML")) {
-      actions.push({ label: "Open mileage", fix: "open_mileage", primary: !flags.includes("RS") && !flags.includes("AL") });
+      actions.push({ label: "review_quick_open_mileage", fix: "open_mileage", primary: !flags.includes("RS") && !flags.includes("AL") });
     }
     if (flags.some((flag) => ["FC", "BP", "HO", "CA"].includes(flag))) {
-      actions.push({ label: "Add support", fix: "support" });
+      actions.push({ label: "review_quick_add_support", fix: "support" });
     }
     if (flags.includes("RV")) {
-      actions.push({ label: "Mark ready", fix: "mark-ready", primary: true });
-      actions.push({ label: "Edit details", fix: "edit" });
+      actions.push({ label: "transactions_review_mark_ready", fix: "mark-ready", primary: true });
+      actions.push({ label: "review_quick_edit_details", fix: "edit" });
     }
     if (flags.includes("IS")) {
-      actions.push({ label: "Attach source document", fix: "receipt", primary: true });
+      actions.push({ label: "transactions_review_attach_source_document", fix: "receipt", primary: true });
     }
   }
   if (flags.length === 0) {
@@ -1095,14 +1117,16 @@ function openTxReviewPopover(txnId, anchorEl) {
   }
 
   const actionsHtml = actions.map(a => {
-    if (a.fix === "none") return `<span class="tx-review-all-clear">✅ All checks passed</span>`;
-    return `<button type="button" class="tx-review-fix-btn${a.primary ? " primary" : ""}" data-fix="${a.fix}" data-txn-id="${escapeHtml(String(txnId))}">${escapeHtml(a.label)}</button>`;
+    if (a.fix === "none") {
+      return `<span class="tx-review-all-clear">${escapeHtml(txT("transactions_review_all_checks_passed", "All checks passed"))}</span>`;
+    }
+    return `<button type="button" class="tx-review-fix-btn${a.primary ? " primary" : ""}" data-fix="${a.fix}" data-txn-id="${escapeHtml(String(txnId))}">${escapeHtml(txT(a.label, a.label))}</button>`;
   }).join("");
 
   popover.innerHTML = `
     <div class="tx-review-popover-header">
       <span class="tx-review-popover-title">${escapeHtml(title)}</span>
-      <button type="button" class="tx-review-popover-close" id="txReviewPopoverClose" aria-label="Close">&times;</button>
+      <button type="button" class="tx-review-popover-close" id="txReviewPopoverClose" aria-label="${escapeHtml(txT("common_close", "Close"))}">&times;</button>
     </div>
     <span class="tx-review-popover-type-label ${typeCss}">${escapeHtml(typeLabel)}</span>
     ${buildTxnChecklistHtml(txn, flags)}
@@ -3952,7 +3976,7 @@ function renderTransactionsTable(filteredTransactions) {
       const badgeLabel = getTxnFlagBadgeLabel(txnFlags) || getReviewStatusLabel(txn.reviewStatus);
       const badgeCss = hasFlags ? getTxnFlagBadgeCss(txnFlags) : txn.reviewStatus;
       const tooltip = hasFlags
-      ? txnFlags.map(f => TX_FLAG_LABELS[f] || f).join(" | ")
+      ? txnFlags.map(f => txT(TX_FLAG_LABELS[f], f)).join(" | ")
       : getReviewStatusLabel(txn.reviewStatus);
       
       metadataBadges.push(`<button type="button" class="tx-meta-badge tx-flag-badge ${escapeHtml(badgeCss)}" data-review-txn-id="${escapeHtml(String(txn.id))}" title="${escapeHtml(tooltip)}" aria-label="Review checklist: ${escapeHtml(badgeLabel)}">${escapeHtml(badgeLabel)}</button>`);

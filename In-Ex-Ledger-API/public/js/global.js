@@ -167,6 +167,7 @@ function renderCanonicalTopbarNavigation() {
     {
       href: "/messages",
       route: "messages",
+      i18n: "nav_messages",
       label: "Messages",
       dataAttr: ' data-nav-messages="true"',
       icon: '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4z"></path><path d="M2 4l6 5 6-5"></path></svg>',
@@ -513,6 +514,7 @@ function injectMessagesNavLink() {
     const link = document.createElement("a");
     link.href = "/messages";
     link.setAttribute("data-nav-messages", "true");
+    link.setAttribute("data-i18n", "nav_messages");
     link.innerHTML =
       '<span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4z"></path><path d="M2 4l6 5 6-5"></path></svg></span>' +
       '<span>Messages</span>' +
@@ -582,7 +584,10 @@ function applyMileageNavLabel() {
   const explicit = localStorage.getItem("lb_unit_metric");
   const region = (window.LUNA_REGION || localStorage.getItem("lb_region") || "us").toLowerCase();
   const isKm = explicit !== null ? explicit === "true" : region === "ca";
-  const label = isKm ? "Kilometres" : "Mileage";
+  const lang = typeof getCurrentLanguage === "function" ? getCurrentLanguage() : String(window.LUNA_LANGUAGE || "en");
+  const label = isKm && lang === "en"
+    ? "Kilometres"
+    : (typeof t === "function" ? t("nav_mileage") : "Mileage");
   document.querySelectorAll('[data-i18n="nav_mileage"]').forEach((el) => {
     el.textContent = label;
   });
