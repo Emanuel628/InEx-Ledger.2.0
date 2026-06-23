@@ -19,9 +19,9 @@ function hashValue(value) {
   return crypto.createHash("sha256").update(String(value || "")).digest("hex");
 }
 
-function buildDeviceFingerprint({ userId, userAgent, ipAddress }) {
+function buildDeviceFingerprint({ userId, userAgent }) {
   return hashValue(
-    `user:${userId || ""}|ua:${normalizeUserAgent(userAgent)}|ip:${normalizeIpAddress(ipAddress)}`
+    `user:${userId || ""}|ua:${normalizeUserAgent(userAgent)}`
   );
 }
 
