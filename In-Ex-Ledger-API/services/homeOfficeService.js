@@ -48,6 +48,17 @@ function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
 }
 
+// Normalize months-used input to the 0..12 range.
+// A missing/blank/non-numeric value defaults to a full year (12), but an
+// explicit 0 is preserved so the deduction prorates to $0 rather than silently
+// becoming a full-year claim.
+function normalizeMonthsUsed(value) {
+  if (value === null || value === undefined || value === "") return 12;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 12;
+  return Math.max(0, Math.min(12, n));
+}
+
 // Pure deduction math so it is easy to unit-test and reason about.
 function computeHomeOfficeDeduction(input = {}) {
   const region = normalizeRegion(input.region);
@@ -56,7 +67,7 @@ function computeHomeOfficeDeduction(input = {}) {
   const officeArea = Number.isFinite(Number(input.officeAreaSqft)) && Number(input.officeAreaSqft) >= 0
     ? Number(input.officeAreaSqft)
     : null;
-  const monthsUsed = Math.max(1, Math.min(12, Number(input.monthsUsed) || 12));
+  const monthsUsed = normalizeMonthsUsed(input.monthsUsed);
   const eligibleExpensesTotal = round2(input.eligibleExpensesTotal);
 
   const businessUsePct = totalArea && officeArea !== null
@@ -209,7 +220,7 @@ async function upsertHomeOfficeWorksheet(businessId, taxYear, data = {}) {
   const officeArea = data.office_area_sqft === null || data.office_area_sqft === undefined || data.office_area_sqft === ""
     ? null
     : Number(data.office_area_sqft);
-  const monthsUsed = Math.max(1, Math.min(12, Number(data.months_used) || 12));
+  const monthsUsed = normalizeMonthsUsed(data.months_used);
   const notes = data.notes ? String(data.notes).slice(0, 2000) : null;
 
   if (totalArea !== null && !(totalArea > 0)) {

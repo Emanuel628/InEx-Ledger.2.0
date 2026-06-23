@@ -36,6 +36,40 @@ test("actual method prorates for partial-year use", () => {
   assert.equal(result.deduction, 600); // 6000 * 20% * (6/12)
 });
 
+test("months_used of 0 prorates to a $0 deduction (not a silent full year)", () => {
+  const actual = computeHomeOfficeDeduction({
+    region: "US",
+    method: "actual",
+    totalAreaSqft: 1000,
+    officeAreaSqft: 200,
+    monthsUsed: 0,
+    eligibleExpensesTotal: 6000
+  });
+  assert.equal(actual.monthsUsed, 0);
+  assert.equal(actual.deduction, 0);
+
+  const simplified = computeHomeOfficeDeduction({
+    region: "US",
+    method: "simplified",
+    officeAreaSqft: 300,
+    monthsUsed: 0
+  });
+  assert.equal(simplified.deduction, 0);
+});
+
+test("missing or non-numeric months_used defaults to a full year", () => {
+  const base = {
+    region: "US",
+    method: "actual",
+    totalAreaSqft: 1000,
+    officeAreaSqft: 200,
+    eligibleExpensesTotal: 6000
+  };
+  assert.equal(computeHomeOfficeDeduction({ ...base }).deduction, 1200);
+  assert.equal(computeHomeOfficeDeduction({ ...base, monthsUsed: "abc" }).deduction, 1200);
+  assert.equal(computeHomeOfficeDeduction({ ...base, monthsUsed: null }).deduction, 1200);
+});
+
 test("simplified method is $5/sq ft capped at 300 sq ft", () => {
   const result = computeHomeOfficeDeduction({
     region: "US",

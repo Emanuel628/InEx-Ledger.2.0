@@ -15,7 +15,7 @@ test("transaction 100% email uses the calm 'records are safe' copy", () => {
 test("transaction 70% email is a non-pushy heads-up", () => {
   const copy = buildUsageEmailCopy("transactions", 70, { used: 35, limit: 50 });
   assert.match(copy.body, /You've used 35 of your 50 Basic transactions/);
-  assert.match(copy.body, /No action is needed yet/);
+  assert.match(copy.body, /This is just a heads-up so your recordkeeping does not get interrupted/);
 });
 
 test("receipt 70% email explains uploads may pause at the cap", () => {

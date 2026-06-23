@@ -56,11 +56,14 @@ function loadMeRouter(options = {}) {
                     rowCount: 1
                   };
                 }
-                if (/SELECT id, email, password_hash, mfa_enabled FROM users/i.test(sql)) {
+                if (/SELECT id, email,[\s\S]*?password_hash, mfa_enabled FROM users/i.test(sql)) {
                   return {
                     rows: [{
                       id: state.userId,
                       email: state.email,
+                      full_name: state.fullName ?? null,
+                      country: state.country ?? null,
+                      province: state.province ?? null,
                       password_hash: state.passwordHash,
                       mfa_enabled: state.dbMfaEnabled
                     }],
