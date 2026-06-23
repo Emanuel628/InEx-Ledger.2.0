@@ -703,6 +703,7 @@ function applyBusinessProfileForm(profile) {
 
 async function renderBusinessList() {
   const wrap = document.getElementById("businessListWrap");
+  const dangerWrap = document.getElementById("dangerBusinessListWrap");
   if (!wrap) return;
 
   try {
@@ -720,6 +721,9 @@ async function renderBusinessList() {
 
     if (!businesses.length) {
       wrap.innerHTML = `<p class="settings-helper-note">${escapeHtml(t("settings_no_businesses"))}</p>`;
+      if (dangerWrap) {
+        dangerWrap.innerHTML = "";
+      }
       return;
     }
 
@@ -749,11 +753,26 @@ async function renderBusinessList() {
         <div class="business-list-actions">
           ${biz.id !== activeId ? `<button type="button" class="settings-primary-btn business-switch-btn" data-business-switch="${escapeHtml(biz.id)}">${escapeHtml(t("settings_business_switch"))}</button>` : ""}
           <button type="button" class="settings-secondary-btn business-edit-btn" data-business-edit="${escapeHtml(biz.id)}">Edit</button>
-          <button type="button" class="danger-outline-btn business-delete-btn" data-business-delete="${escapeHtml(biz.id)}" data-business-name="${escapeHtml(businessName)}">${escapeHtml(t("settings_delete_business_btn"))}</button>
         </div>
       </div>
     `;
     }).join("");
+
+    if (dangerWrap) {
+      const deletableBusinesses = businesses.filter((biz) => biz.id !== activeId);
+      dangerWrap.innerHTML = deletableBusinesses.map((biz) => {
+        const businessName = biz.name || t("common_business");
+        return `
+        <div class="danger-row">
+          <div class="danger-copy">
+            <div class="danger-name">${escapeHtml(`Delete ${businessName}`)}</div>
+            <div class="danger-desc">Permanently removes this business and its records from your account.</div>
+          </div>
+          <button type="button" class="danger-outline-btn" data-business-delete="${escapeHtml(biz.id)}" data-business-name="${escapeHtml(businessName)}">${escapeHtml(t("settings_delete_business_btn"))}</button>
+        </div>
+      `;
+      }).join("");
+    }
 
     wrap.querySelectorAll("[data-business-switch]").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -782,7 +801,7 @@ async function renderBusinessList() {
       });
     });
 
-    wrap.querySelectorAll("[data-business-delete]").forEach((btn) => {
+    document.querySelectorAll("[data-business-delete]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const bizId = btn.getAttribute("data-business-delete");
         const bizName = btn.getAttribute("data-business-name") || t("common_business");
