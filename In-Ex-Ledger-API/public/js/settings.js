@@ -2767,10 +2767,9 @@ function initSettingsNav() {
       target: document.getElementById(button.dataset.settingsTarget || "")
     }))
     .filter((entry) => entry.target);
-
-  const overviewPanel = document.getElementById("settings-overview");
-  const detailPanels = Array.from(document.querySelectorAll(".settings-panel"));
-  const allPanels = [overviewPanel, ...detailPanels].filter(Boolean);
+  const allPanels = Array.from(new Map(
+    targets.map(({ target }) => [target.id, target])
+  ).values());
 
   const setActiveTarget = (targetId) => {
     setActiveSettingsNavTarget(targetId);
