@@ -162,9 +162,18 @@ body {
 }
 
 .show-password-toggle input {
+  flex: 0 0 auto;
+  width: 14px !important;
+  min-width: 14px;
+  max-width: 14px;
   width: 14px;
   height: 14px;
   margin: 0;
+}
+
+.show-password-toggle span {
+  display: inline-block;
+  white-space: nowrap;
 }
 
 .auth-submit {
