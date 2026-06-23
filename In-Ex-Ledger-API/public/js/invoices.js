@@ -8,6 +8,25 @@ let invoiceStatusFilter = "";
 let invoiceDefaultCurrency = "CAD";
 let invoiceRegion = "CA";
 
+function clearInvoicePanelQueryParams() {
+  const url = new URL(window.location.href);
+  let changed = false;
+
+  if (url.searchParams.has("new")) {
+    url.searchParams.delete("new");
+    changed = true;
+  }
+
+  if (url.searchParams.has("focus")) {
+    url.searchParams.delete("focus");
+    changed = true;
+  }
+
+  if (changed) {
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+}
+
 function currencyForRegion(region) {
   const normalized = String(region || "").trim().toUpperCase();
   return normalized === "US" ? "USD" : "CAD";
@@ -238,6 +257,7 @@ function focusInvoiceFromUrl(invoiceId) {
 function closeInvoicePanel() {
   document.getElementById("invoicePanel").hidden = true;
   activeInvoiceId = null;
+  clearInvoicePanelQueryParams();
 }
 
 function resetInvoiceForm() {
@@ -561,12 +581,14 @@ document.getElementById(activeSidebarId)?.classList.add("is-active");
   const focusId = params.get("focus") || "";
   if (focusId) {
     focusInvoiceFromUrl(focusId);
+    clearInvoicePanelQueryParams();
   }
 
   // Auto-open the New Invoice panel when arriving via ?new=1 (e.g. from the
   // Quick Add sidebar on the Transactions page).
   if (params.get("new") === "1") {
     openInvoicePanel(null);
+    clearInvoicePanelQueryParams();
   }
 
   document.getElementById("newInvoiceBtn")?.addEventListener("click", () => openInvoicePanel(null));
