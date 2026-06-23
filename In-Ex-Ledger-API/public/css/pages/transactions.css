@@ -2680,21 +2680,30 @@ body {
 }
 
 .scope-select-wrap {
-  min-height: 64px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(15, 25, 35, 0.08);
-  background: #fff;
-  box-shadow: 0 8px 18px rgba(15, 25, 35, 0.04);
+  min-height: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  gap: 10px;
 }
 
 .scope-select-label {
   color: #6e7987;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
 }
 
 .scope-select {
-  min-width: 160px;
-  font-size: 14px;
+  min-width: 146px;
+  min-height: 44px;
+  padding: 0 36px 0 14px;
+  border: 1px solid rgba(15, 25, 35, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(15, 25, 35, 0.04);
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -2786,16 +2795,11 @@ body {
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 10px 22px rgba(15, 25, 35, 0.04);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .stat-card::after {
-  content: "";
-  position: absolute;
-  inset: 0 auto auto 0;
-  width: 100%;
-  height: 4px;
-  background: linear-gradient(90deg, rgba(37, 87, 214, 0.22), rgba(37, 87, 214, 0.72));
+  display: none;
 }
 
 .stat-card:nth-child(1)::after {
@@ -2815,10 +2819,32 @@ body {
 }
 
 .stat-label {
-  margin-bottom: 10px;
-  color: #6f7987;
-  font-size: 11px;
-  font-weight: 700;
+  order: 1;
+  width: 100%;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 4px solid rgba(37, 87, 214, 0.28);
+  color: #556273;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+}
+
+.stat-card:nth-child(1) .stat-label {
+  border-bottom-color: rgba(21, 115, 71, 0.6);
+}
+
+.stat-card:nth-child(2) .stat-label {
+  border-bottom-color: rgba(180, 35, 24, 0.55);
+}
+
+.stat-card:nth-child(3) .stat-label {
+  border-bottom-color: rgba(37, 87, 214, 0.6);
+}
+
+.stat-card:nth-child(4) .stat-label {
+  border-bottom-color: rgba(230, 140, 20, 0.6);
 }
 
 .stat-value {
@@ -3741,12 +3767,14 @@ tr.tx-highlight {
 
 .stat-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 14px;
   padding: 18px 18px 18px 16px;
 }
 
 .stat-card-icon {
+  order: 2;
   width: 38px;
   height: 38px;
   margin-bottom: 0;
@@ -3760,14 +3788,16 @@ tr.tx-highlight {
 }
 
 .stat-card-copy {
+  order: 3;
   min-width: 0;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
 }
 
 .stat-label {
-  margin-bottom: 0;
+  margin-bottom: 12px;
 }
 
 .stat-value {

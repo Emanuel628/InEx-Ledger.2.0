@@ -571,6 +571,11 @@ document.getElementById(activeSidebarId)?.classList.add("is-active");
 
   document.getElementById("newInvoiceBtn")?.addEventListener("click", () => openInvoicePanel(null));
   document.getElementById("invoicePanelClose")?.addEventListener("click", closeInvoicePanel);
+  document.getElementById("invoicePanel")?.addEventListener("click", (e) => {
+    if (e.target?.id === "invoicePanel") {
+      closeInvoicePanel();
+    }
+  });
 
   document.getElementById("addLineItemBtn")?.addEventListener("click", () => {
     addLineItemRow({ description: "", quantity: 1, unit_price: "" });

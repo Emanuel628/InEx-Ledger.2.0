@@ -62,16 +62,11 @@
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(248, 251, 255, 0.96));
   box-shadow: var(--shadow-stat);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .mileage-summary-card::after {
-  content: "";
-  position: absolute;
-  inset: 0 auto auto 0;
-  width: 100%;
-  height: 4px;
-  background: linear-gradient(90deg, rgba(37, 87, 214, 0.22), rgba(37, 87, 214, 0.72));
+  display: none;
 }
 
 .mileage-summary-card:nth-child(1)::after {
@@ -91,15 +86,35 @@
 }
 
 .mileage-summary-label {
-  color: #6f7987;
-  font-size: 11px;
-  font-weight: 700;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 4px solid rgba(37, 87, 214, 0.28);
+  color: #556273;
+  font-size: 14px;
+  font-weight: 800;
   letter-spacing: 0.08em;
+  line-height: 1.1;
   text-transform: uppercase;
 }
 
+.mileage-summary-card:nth-child(1) .mileage-summary-label {
+  border-bottom-color: rgba(37, 87, 214, 0.6);
+}
+
+.mileage-summary-card:nth-child(2) .mileage-summary-label {
+  border-bottom-color: rgba(21, 115, 71, 0.6);
+}
+
+.mileage-summary-card:nth-child(3) .mileage-summary-label {
+  border-bottom-color: rgba(230, 140, 20, 0.6);
+}
+
+.mileage-summary-card:nth-child(4) .mileage-summary-label {
+  border-bottom-color: rgba(180, 35, 24, 0.55);
+}
+
 .mileage-summary-value {
-  margin-top: 10px;
+  margin-top: 0;
   color: #0f1d2d;
   font-size: 30px;
   font-weight: 700;
