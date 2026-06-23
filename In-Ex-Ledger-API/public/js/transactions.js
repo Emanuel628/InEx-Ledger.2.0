@@ -180,13 +180,30 @@ function deriveFlagsFromIssueEntries(issueEntries = []) {
 }
 
 function dedupeIssueActions(actions = []) {
-  const seen = new Set();
-  return actions.filter((action) => {
-    const key = `${action.fix}|${action.label}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const ordered = [];
+  const seenByFix = new Map();
+
+  for (const action of actions) {
+    const key = String(action?.fix || "").trim();
+    if (!key) {
+      ordered.push(action);
+      continue;
+    }
+
+    const existingIndex = seenByFix.get(key);
+    if (existingIndex == null) {
+      seenByFix.set(key, ordered.length);
+      ordered.push(action);
+      continue;
+    }
+
+    const existing = ordered[existingIndex];
+    if (!existing?.primary && action?.primary) {
+      ordered[existingIndex] = action;
+    }
+  }
+
+  return ordered;
 }
 
 function mapReviewQuickActionToTxnAction(quickAction) {
