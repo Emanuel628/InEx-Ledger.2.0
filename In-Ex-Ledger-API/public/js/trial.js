@@ -1,9 +1,6 @@
 function isTrialExpired() {
-  if (typeof isTrialValid === "function") {
-    return !isTrialValid();
-  }
-
-  return false;
+  const subscription = getAuthoritativeTrialSubscription();
+  return subscription?.effectiveStatus === "trial_expired";
 }
 
 function trialTx(key) {
@@ -11,8 +8,9 @@ function trialTx(key) {
 }
 
 function enforceTrial() {
-  if (isTrialExpired()) {
-    window.location.href = "subscription";
+  const currentPath = String(window.location.pathname || "").replace(/\/+$/, "") || "/";
+  if (isTrialExpired() && currentPath !== "/subscription") {
+    window.location.href = "/subscription";
   }
 }
 
