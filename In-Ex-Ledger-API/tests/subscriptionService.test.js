@@ -62,7 +62,7 @@ test("deriveEffectiveState downgrades expired trials to free", () => {
   });
 
   assert.equal(snapshot.effectiveTier, PLAN_FREE);
-  assert.equal(snapshot.effectiveStatus, "trial_expired");
+  assert.equal(snapshot.effectiveStatus, "free");
   assert.equal(snapshot.isTrialing, false);
   assert.equal(snapshot.isPaid, false);
 });
@@ -82,7 +82,7 @@ test("deriveEffectiveState preserves a trial downgrade selection after the trial
   });
 
   assert.equal(snapshot.effectiveTier, PLAN_FREE);
-  assert.equal(snapshot.effectiveStatus, "trial_expired");
+  assert.equal(snapshot.effectiveStatus, "free");
   assert.equal(snapshot.selectedPlanCode, PLAN_FREE);
   assert.equal(snapshot.isTrialDowngradedToFree, false);
 });
@@ -116,7 +116,7 @@ test("deriveEffectiveState expires trialing subscriptions when trial_started_at 
   });
 
   assert.equal(snapshot.effectiveTier, PLAN_FREE);
-  assert.equal(snapshot.effectiveStatus, "trial_expired");
+  assert.equal(snapshot.effectiveStatus, "free");
   assert.equal(snapshot.isTrialing, false);
 });
 
@@ -256,6 +256,7 @@ test("deriveEffectiveState downgrades canceled subscriptions to free once period
   });
 
   assert.equal(snapshot.effectiveTier, PLAN_FREE);
+  assert.equal(snapshot.effectiveStatus, "free");
   assert.equal(snapshot.isPaid, false);
   assert.equal(snapshot.isCanceledWithRemainingAccess, false);
 });

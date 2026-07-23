@@ -389,7 +389,7 @@ test("trial.js ignores stored subscription fallback and does not mint a syntheti
   assert.equal(context.formatTrialRemaining(), "Trial status unavailable.");
 });
 
-test("trial guard allows Basic accounts and never redirects the subscription page to itself", () => {
+test("trial guard allows Basic and expired-trial accounts into the app", () => {
   const basicContext = loadScript("public/js/trial.js", {
     window: {
       location: { href: "/transactions", pathname: "/transactions" },
@@ -406,9 +406,9 @@ test("trial guard allows Basic accounts and never redirects the subscription pag
   basicContext.enforceTrial();
   assert.equal(basicContext.window.location.href, "/transactions");
 
-  const expiredSubscriptionContext = loadScript("public/js/trial.js", {
+  const expiredTrialContext = loadScript("public/js/trial.js", {
     window: {
-      location: { href: "/subscription", pathname: "/subscription" },
+      location: { href: "/transactions", pathname: "/transactions" },
       __LUNA_ME__: {
         subscription: {
           effectiveTier: "free",
@@ -418,9 +418,9 @@ test("trial guard allows Basic accounts and never redirects the subscription pag
     }
   });
 
-  assert.equal(expiredSubscriptionContext.isTrialExpired(), true);
-  expiredSubscriptionContext.enforceTrial();
-  assert.equal(expiredSubscriptionContext.window.location.href, "/subscription");
+  assert.equal(expiredTrialContext.isTrialExpired(), false);
+  expiredTrialContext.enforceTrial();
+  assert.equal(expiredTrialContext.window.location.href, "/transactions");
 });
 
 test("accounts ghost suggestions tolerate corrupted dismissed-suggestions storage", () => {

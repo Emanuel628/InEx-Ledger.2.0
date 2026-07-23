@@ -1,6 +1,5 @@
 function isTrialExpired() {
-  const subscription = getAuthoritativeTrialSubscription();
-  return subscription?.effectiveStatus === "trial_expired";
+  return false;
 }
 
 function trialTx(key) {
