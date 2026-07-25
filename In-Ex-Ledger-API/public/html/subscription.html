@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260725d" />
   <link rel="stylesheet" href="/css/pages/settings.css?v=20260516b" />
-  <link rel="stylesheet" href="/css/pages/subscription.css?v=20260725a" />
+  <link rel="stylesheet" href="/css/pages/subscription.css?v=20260725b" />
   <link rel="stylesheet" href="/css/pages/subscription-responsive-fixes.css?v=20260725a" />
 </head>
 <body>
@@ -92,15 +92,25 @@
         <button type="button" id="subHistoryPortalBtn" class="settings-secondary-btn"><span data-i18n="html_subscription_text_open_stripe_billing_portal">Open Stripe billing portal</span></button>
       </section>
 
-      <section class="subscription-panel subscription-controls-panel hidden" id="sub-controls-section">
+      <section class="subscription-panel subscription-renewal-panel hidden" id="sub-renewal-section">
         <div class="subscription-section-title compact">
-          <span class="subscription-eyebrow"><span data-i18n="html_subscription_text_subscription_controls">Subscription controls</span></span>
-          <h2><span data-i18n="settings_cancel_subscription_title">Cancel subscription</span></h2>
-          <p id="subControlsDescription"><span data-i18n="settings_cancel_subscription_desc">Your access continues until the end of your current billing period.</span></p>
+          <span class="subscription-eyebrow"><span data-i18n="html_subscription_text_renew_pro">Renew Pro</span></span>
+          <h2><span data-i18n="html_subscription_text_choose_your_billing_cycle">Choose your billing cycle.</span></h2>
+          <p><span data-i18n="html_subscription_text_pick_monthly_or_yearly_before_stripe_checkout_opens">Pick monthly or yearly before Stripe checkout opens.</span></p>
+        </div>
+        <div class="subscription-renewal-options" role="group" aria-label="Billing cycle" data-i18n-aria-label="html_subscription_div_aria_label_billing_cycle">
+          <button type="button" class="subscription-renewal-option is-active" data-renewal-interval="monthly" aria-pressed="true">
+            <span data-i18n="html_subscription_text_monthly">Monthly</span>
+            <strong id="subRenewMonthlyPrice">$12</strong>
+          </button>
+          <button type="button" class="subscription-renewal-option" data-renewal-interval="yearly" aria-pressed="false">
+            <span data-i18n="html_subscription_text_yearly">Yearly</span>
+            <strong id="subRenewYearlyPrice">$122.40</strong>
+          </button>
         </div>
         <div class="subscription-actions-row">
-          <button type="button" id="subControlsResumeBtn" class="settings-primary-btn hidden" data-i18n="subscription_keep_pro_active">Keep Pro active</button>
-          <button type="button" id="subControlsCancelBtn" class="danger-outline-btn hidden" data-i18n="settings_cancel_subscription_btn">Cancel subscription...</button>
+          <button type="button" id="subRenewCheckoutBtn" class="settings-primary-btn" data-i18n="html_subscription_text_continue_to_secure_checkout">Continue to secure checkout</button>
+          <p id="subRenewalSummary" class="sub-renewal-summary"></p>
         </div>
       </section>
     </main>
