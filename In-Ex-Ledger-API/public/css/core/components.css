@@ -128,7 +128,7 @@ label.is-required::after,
   min-width: 0;
 }
 
-input,
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
 select,
 textarea {
   width: 100%;
