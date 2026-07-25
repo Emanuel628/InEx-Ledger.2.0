@@ -463,16 +463,27 @@ test("billing checkout ignores client currency and uses verified region currency
   }
 });
 
-test("billing cancel portal deep link redirects back to subscription after completion", async () => {
+test("legacy billing cancel portal endpoint schedules cancellation directly", async () => {
   const fixture = loadBillingRouter({
     country: "United States",
-    subscriptionSnapshots: [{
-      stripeSubscriptionId: "sub_test_cancel_123",
-      stripeCustomerId: "cus_test_123",
-      effectiveTier: "v1",
-      isPaid: true,
-      isTrialing: false
-    }]
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: "sub_test_cancel_123",
+        stripeCustomerId: "cus_test_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: false
+      },
+      {
+        stripeSubscriptionId: "sub_test_cancel_123",
+        stripeCustomerId: "cus_test_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: true
+      }
+    ]
   });
 
   try {
@@ -481,20 +492,14 @@ test("billing cancel portal deep link redirects back to subscription after compl
       .send({});
 
     assert.equal(res.status, 200);
-    assert.equal(res.body.url, "https://billing.stripe.com/p/session/test_123");
+    assert.equal(res.body.subscription.cancelAtPeriodEnd, true);
 
-    const portalRequest = fixture.state.stripeRequests.find((entry) =>
-      String(entry.url).endsWith("/billing_portal/sessions")
+    const cancelRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/subscriptions/sub_test_cancel_123") &&
+      entry.body?.get("cancel_at_period_end") === "true"
     );
 
-    assert.ok(portalRequest, "Stripe billing portal request should be created");
-    assert.equal(portalRequest.body.get("flow_data[type]"), "subscription_cancel");
-    assert.equal(portalRequest.body.get("flow_data[subscription_cancel][subscription]"), "sub_test_cancel_123");
-    assert.equal(portalRequest.body.get("flow_data[after_completion][type]"), "redirect");
-    assert.equal(
-      portalRequest.body.get("flow_data[after_completion][redirect][return_url]"),
-      "https://app.inexledger.test/subscription?portal=cancelled"
-    );
+    assert.ok(cancelRequest, "Stripe subscription should be scheduled to cancel in place");
   } finally {
     fixture.cleanup();
   }

@@ -1021,30 +1021,30 @@ router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutat
 router.post("/customer-portal/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    const subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
 
     if (!subscription?.stripeSubscriptionId) {
       return res.status(409).json({ error: "No active Stripe subscription found." });
     }
 
-    const customerId = await ensureStripeCustomer(billingBusinessId, req.user);
-    const session = await stripeRequest("/billing_portal/sessions", {
-      customer: customerId,
-      "flow_data[type]": "subscription_cancel",
-      "flow_data[subscription_cancel][subscription]": subscription.stripeSubscriptionId,
-      "flow_data[after_completion][type]": "redirect",
-      "flow_data[after_completion][redirect][return_url]": buildAppUrl("/subscription?portal=cancelled")
+    await stripeRequest(`/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`, {
+      cancel_at_period_end: true
     });
+    const stripeSub = await stripeGet(`/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`).catch(() => null);
+    if (stripeSub && !stripeSub.error) {
+      await syncStripeSubscriptionForBusiness(billingBusinessId, stripeSub);
+    }
+    const updated = await getSubscriptionSnapshotForBusiness(billingBusinessId);
 
-    logInfo("Billing cancel portal session created", {
+    logInfo("Billing cancellation scheduled from legacy cancel portal endpoint", {
       userId: req.user?.id,
       businessId: billingBusinessId,
       stripeSubscriptionId: subscription.stripeSubscriptionId
     });
-    res.status(200).json({ url: session.url });
+    res.status(200).json({ subscription: updated });
   } catch (err) {
     logError("POST /api/billing/customer-portal/cancel error:", err.message);
-    res.status(500).json({ error: "Failed to open cancellation flow." });
+    res.status(500).json({ error: "Failed to cancel subscription." });
   }
 });
 
@@ -1133,7 +1133,7 @@ router.post("/resume", requireAuth, requireCsrfProtection, billingMutationLimite
 router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    const subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
 
     if (subscription.isTrialing && !subscription.stripeSubscriptionId) {
       await setTrialPlanSelectionForBusiness(billingBusinessId, "free");
@@ -1167,7 +1167,7 @@ router.post("/cancel", requireAuth, requireCsrfProtection, billingMutationLimite
     }
 
     // Cancel at period end via Stripe
-    await stripeRequest(`/subscriptions/${subscription.stripeSubscriptionId}`, {
+    await stripeRequest(`/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`, {
       cancel_at_period_end: true
     });
 
@@ -1286,10 +1286,17 @@ function buildCheckoutIdempotencyKey({ businessId, billingInterval, currency, ad
 router.patch("/additional-businesses", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
-    const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
-    const hasActiveProAccess =
+    let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    let hasActiveProAccess =
       subscription.effectiveTier === "v1" &&
       (subscription.isPaid || subscription.isTrialing);
+
+    if (!hasActiveProAccess || (subscription.cancelAtPeriodEnd && !subscription.isTrialing) || subscription.isCanceledWithRemainingAccess) {
+      subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
+      hasActiveProAccess =
+        subscription.effectiveTier === "v1" &&
+        (subscription.isPaid || subscription.isTrialing);
+    }
 
     if (!hasActiveProAccess) {
       return res.status(403).json({
