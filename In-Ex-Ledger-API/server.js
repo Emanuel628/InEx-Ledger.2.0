@@ -93,10 +93,11 @@ const ORIGINLESS_API_WRITE_ALLOWLIST = new Set([
 
 function setStaticAssetCacheHeaders(res, filePath) {
   const normalizedPath = String(filePath || '').toLowerCase();
+  const requestQuery = res.req?.query || {};
   const isHtml = normalizedPath.endsWith('.html');
   const isVersionedStaticAsset =
     (normalizedPath.endsWith('.css') || normalizedPath.endsWith('.js') || normalizedPath.endsWith('.mjs'))
-    && new URLSearchParams(String(res.req?.originalUrl || '').split('?')[1] || '').has('v');
+    && Object.prototype.hasOwnProperty.call(requestQuery, 'v');
 
   if (isVersionedStaticAsset) {
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
@@ -458,7 +459,7 @@ app.use((req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Page not found | InEx Ledger</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="stylesheet" href="/css/app.css?v=20260508a" />
+  <link rel="stylesheet" href="/css/app.css?v=20260725d" />
 </head>
 <body>
   <main class="auth-page">
