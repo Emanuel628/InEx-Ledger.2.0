@@ -24,9 +24,25 @@ test("JavaScript assets disable browser caching", async () => {
   assertNoStore(response);
 });
 
-test("CSS assets disable browser caching", async () => {
+test("CSS assets disable browser caching without a version query", async () => {
   const response = await request(app).get("/css/app.css").expect(200);
   assertNoStore(response);
+});
+
+test("versioned JavaScript assets use long immutable caching", async () => {
+  const response = await request(app).get("/js/global.js?v=20260725a").expect(200);
+
+  assert.strictEqual(response.headers["cache-control"], "public, max-age=31536000, immutable");
+  assert.ok(!response.headers.pragma);
+  assert.ok(!response.headers.expires);
+});
+
+test("versioned CSS assets use long immutable caching", async () => {
+  const response = await request(app).get("/css/app.css?v=20260725a").expect(200);
+
+  assert.strictEqual(response.headers["cache-control"], "public, max-age=31536000, immutable");
+  assert.ok(!response.headers.pragma);
+  assert.ok(!response.headers.expires);
 });
 
 test("private app pages send noindex headers", async () => {

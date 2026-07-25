@@ -93,13 +93,17 @@ const ORIGINLESS_API_WRITE_ALLOWLIST = new Set([
 
 function setStaticAssetCacheHeaders(res, filePath) {
   const normalizedPath = String(filePath || '').toLowerCase();
-  const shouldBypassCache =
-    normalizedPath.endsWith('.html')
-    || normalizedPath.endsWith('.css')
-    || normalizedPath.endsWith('.js')
-    || normalizedPath.endsWith('.mjs');
+  const isHtml = normalizedPath.endsWith('.html');
+  const isVersionedStaticAsset =
+    (normalizedPath.endsWith('.css') || normalizedPath.endsWith('.js') || normalizedPath.endsWith('.mjs'))
+    && new URLSearchParams(String(res.req?.originalUrl || '').split('?')[1] || '').has('v');
 
-  if (!shouldBypassCache) {
+  if (isVersionedStaticAsset) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return;
+  }
+
+  if (!isHtml && !normalizedPath.endsWith('.css') && !normalizedPath.endsWith('.js') && !normalizedPath.endsWith('.mjs')) {
     return;
   }
 
