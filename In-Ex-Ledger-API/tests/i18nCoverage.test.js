@@ -9,7 +9,6 @@ const vm = require("node:vm");
 const ROOT = path.resolve(__dirname, "..");
 const PUBLIC_DIR = path.join(ROOT, "public");
 const I18N_PATH = path.join(PUBLIC_DIR, "js", "i18n.js");
-const UNTAGGED_ENGLISH_BASELINE_PATH = path.join(__dirname, "fixtures", "i18n-untagged-english-baseline.json");
 const LANGS = ["en", "es", "fr"];
 const VISIBLE_ATTRS = ["placeholder", "aria-label", "title", "alt"];
 const SKIP_TEXT_TAGS = new Set(["script", "style", "svg", "noscript", "template"]);
@@ -166,20 +165,6 @@ function createI18nOffender(file, line, value, context) {
   };
 }
 
-function loadUntaggedEnglishBaseline() {
-  const baseline = JSON.parse(fs.readFileSync(UNTAGGED_ENGLISH_BASELINE_PATH, "utf8"));
-  assert.ok(baseline && typeof baseline === "object" && !Array.isArray(baseline), "untagged English baseline should be an object");
-  return baseline;
-}
-
-function countOffendersBySignature(offenders) {
-  const counts = new Map();
-  for (const offender of offenders) {
-    counts.set(offender.signature, (counts.get(offender.signature) || 0) + 1);
-  }
-  return counts;
-}
-
 function findUntaggedEnglishInHtml(file) {
   const source = fs.readFileSync(file, "utf8");
   const offenders = [];
@@ -251,14 +236,6 @@ function findMojibakeMatches(filePath) {
   return suspicious.filter((token) => source.includes(token));
 }
 
-if (process.env.UPDATE_I18N_UNTAGGED_ENGLISH_BASELINE === "1") {
-  const counts = countOffendersBySignature(htmlFilesWithI18nRuntime().flatMap(findUntaggedEnglishInHtml));
-  const baseline = Object.fromEntries([...counts.entries()].sort(([left], [right]) => left.localeCompare(right)));
-  fs.mkdirSync(path.dirname(UNTAGGED_ENGLISH_BASELINE_PATH), { recursive: true });
-  fs.writeFileSync(UNTAGGED_ENGLISH_BASELINE_PATH, `${JSON.stringify(baseline, null, 2)}\n`);
-  process.exit(0);
-}
-
 test("frontend i18n keys referenced by public files exist in every shipped language", () => {
   const defined = extractDefinedKeys();
   const used = extractUsedKeys();
@@ -284,12 +261,7 @@ test("public i18n assets do not contain mojibake markers", () => {
 });
 
 test("i18n-enabled HTML does not ship untagged English copy", () => {
-  const baseline = loadUntaggedEnglishBaseline();
-  const currentOffenders = htmlFilesWithI18nRuntime().flatMap(findUntaggedEnglishInHtml);
-  const currentCounts = countOffendersBySignature(currentOffenders);
-  const offenders = currentOffenders
-    .filter((offender) => currentCounts.get(offender.signature) > (baseline[offender.signature] || 0))
-    .map((offender) => offender.message);
+  const offenders = htmlFilesWithI18nRuntime().flatMap(findUntaggedEnglishInHtml).map((offender) => offender.message);
 
   assert.deepEqual(
     offenders,

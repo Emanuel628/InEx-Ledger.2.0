@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>InEx Ledger - Transactions</title>
+  <title data-i18n="html_transactions_text_inex_ledger_transactions">InEx Ledger - Transactions</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/app.css?v=20260725d">
@@ -13,7 +13,7 @@
   <a href="#main-content" class="skip-link" data-i18n="a11y_skip_to_main">Skip to main content</a>
   <header class="app-topbar">
     <div class="topbar-left">
-      <a class="topbar-brand" href="transactions" aria-label="InEx Ledger home">
+      <a class="topbar-brand" href="transactions" aria-label="InEx Ledger home" data-i18n-aria-label="html_transactions_a_aria_label_inex_ledger_home">
         <span class="brand-mark brand-mark-topbar" aria-hidden="true">
           <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <rect x="2" y="2" width="5" height="5" rx="1.5" fill="currentColor" opacity="1"></rect>
@@ -22,9 +22,9 @@
             <rect x="9" y="9" width="5" height="5" rx="1.5" fill="currentColor" opacity=".35"></rect>
           </svg>
         </span>
-        <span class="topbar-brand-text">InEx Ledger</span>
+        <span class="topbar-brand-text"><span data-i18n="html_transactions_text_inex_ledger">InEx Ledger</span></span>
       </a>
-      <nav class="topbar-nav" aria-label="Primary">
+      <nav class="topbar-nav" aria-label="Primary" data-i18n-aria-label="html_transactions_nav_aria_label_primary">
         <a data-i18n="nav_transactions" href="transactions"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>Transactions</span></a>
         <a data-i18n="nav_accounts" href="accounts"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1.5"></rect><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"></path></svg></span><span>Accounts</span></a>
         <a data-i18n="nav_categories" href="categories"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 5v3l2 1.5"></path></svg></span><span>Categories</span></a>
@@ -38,12 +38,12 @@
     </div>
     <div class="user-pill">
       <span class="user-avatar">U</span>
-      <span class="user-name">InEx Ledger</span>
+      <span class="user-name"><span data-i18n="html_transactions_text_inex_ledger">InEx Ledger</span></span>
     </div>
   </header>
 
   <main id="main-content" class="app-shell">
-    <aside class="app-sidebar" aria-label="Sidebar">
+    <aside class="app-sidebar" aria-label="Sidebar" data-i18n-aria-label="html_transactions_aside_aria_label_sidebar">
       <div class="sidebar-section-label" data-i18n="sidebar_overview">Overview</div>
       <nav class="sidebar-nav">
         <a href="transactions" class="sidebar-link is-active"><span class="sidebar-icon sidebar-icon--transactions" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><rect x="2.5" y="2.5" width="13" height="15" rx="2.5"></rect><path d="M6.5 7h5M6.5 10h5M6.5 13h3.4"></path></svg></span><span class="sidebar-link-text" data-i18n="nav_transactions">Transactions</span></a>
@@ -55,9 +55,9 @@
       </nav>
       <!-- Filter links kept for JS routing but not shown in sidebar UI -->
       <nav class="sidebar-nav sidebar-filter-nav" aria-hidden="true">
-        <a href="transactions" class="sidebar-link" data-sidebar-filter="all"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span>All transactions</span></a>
-        <a href="transactions?type=income" class="sidebar-link" data-sidebar-filter="income"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg></span><span>Income</span></a>
-        <a href="transactions?type=expense" class="sidebar-link" data-sidebar-filter="expense"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 5v6M5 8l3 3 3-3"></path></svg></span><span>Expenses</span></a>
+        <a href="transactions" class="sidebar-link" data-sidebar-filter="all"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2"></rect><line x1="5" y1="6" x2="11" y2="6"></line><line x1="5" y1="9" x2="9" y2="9"></line></svg></span><span><span data-i18n="html_transactions_text_all_transactions">All transactions</span></span></a>
+        <a href="transactions?type=income" class="sidebar-link" data-sidebar-filter="income"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 11V5M5 8l3-3 3 3"></path></svg></span><span><span data-i18n="html_transactions_text_income">Income</span></span></a>
+        <a href="transactions?type=expense" class="sidebar-link" data-sidebar-filter="expense"><span class="sidebar-icon" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M8 5v6M5 8l3 3 3-3"></path></svg></span><span><span data-i18n="html_transactions_text_expenses">Expenses</span></span></a>
       </nav>
     </aside>
 
@@ -84,7 +84,7 @@
               <option value="all" data-i18n="exports_scope_all">All businesses</option>
             </select>
           </label>
-          <div class="tx-period-picker segmented" role="tablist" aria-label="Date range">
+          <div class="tx-period-picker segmented" role="tablist" aria-label="Date range" data-i18n-aria-label="html_transactions_div_aria_label_date_range">
             <button type="button" class="tx-period-chip is-active" data-period="all" role="tab" aria-selected="true" data-i18n="common_all">All</button>
             <button type="button" class="tx-period-chip" data-period="this-month" role="tab" aria-selected="false" data-i18n="analytics_this_month">This Month</button>
             <button type="button" class="tx-period-chip" data-period="ytd" role="tab" aria-selected="false">YTD</button>
@@ -109,7 +109,7 @@
           <div class="stat-card-copy">
             <div class="stat-label stat-label-income" data-i18n="transactions_kpi_total_income">Total income</div>
             <div class="stat-value stat-value-income" id="incomeYTD">$0.00</div>
-            <div class="stat-delta" id="incomeDelta">+0.0% vs last year</div>
+            <div class="stat-delta" id="incomeDelta"><span data-i18n="html_transactions_text_0_0_vs_last_year">+0.0% vs last year</span></div>
           </div>
         </article>
         <article class="stat-card">
@@ -119,7 +119,7 @@
           <div class="stat-card-copy">
             <div class="stat-label stat-label-expense" data-i18n="transactions_kpi_total_expenses">Total expenses</div>
             <div class="stat-value stat-value-expense" id="expensesYTD">$0.00</div>
-            <div class="stat-delta" id="expensesDelta">+0.0% vs last year</div>
+            <div class="stat-delta" id="expensesDelta"><span data-i18n="html_transactions_text_0_0_vs_last_year">+0.0% vs last year</span></div>
           </div>
         </article>
         <article class="stat-card">
@@ -139,7 +139,7 @@
           <div class="stat-card-copy">
             <div class="stat-label" data-i18n="transactions_count_label">Transactions</div>
             <div class="stat-value" id="transactionCountValue">0</div>
-            <div class="stat-delta" id="transactionCountDelta">0 this month</div>
+            <div class="stat-delta" id="transactionCountDelta"><span data-i18n="html_transactions_text_0_this_month">0 this month</span></div>
           </div>
         </article>
       </section>
@@ -148,7 +148,7 @@
         <div class="tax-banner-main">
           <div class="tax-banner-copy">
             <div class="tax-banner-label" id="taxBannerLabel" data-i18n="transactions_tax_context_default">Tax form context: U.S. Schedule C draft estimate</div>
-            <div class="tax-banner-label tax-banner-label-secondary"><span data-i18n="transactions_tax_estimated_owed">Estimated set-aside</span> (YTD)
+            <div class="tax-banner-label tax-banner-label-secondary"><span data-i18n="transactions_tax_estimated_owed">Estimated set-aside</span> <span data-i18n="html_transactions_text_ytd">(YTD)</span>
               <button type="button" class="tax-banner-info-btn" id="taxInfoBtn" aria-label="How is this tracked?" title="How is this tracked?" data-i18n-aria-label="transactions_tax_info_title" data-i18n-title="transactions_tax_info_title">?</button>
             </div>
             <div class="tax-banner-amount" id="taxOwed">$0.00</div>
@@ -173,7 +173,7 @@
         </div>
         <div class="upsell-actions">
           <button data-upgrade data-i18n="transactions_upsell_cta">Upgrade to Pro</button>
-          <button type="button" class="upsell-dismiss" aria-label="Dismiss">&times;</button>
+          <button type="button" class="upsell-dismiss" aria-label="Dismiss" data-i18n-aria-label="html_transactions_button_aria_label_dismiss">&times;</button>
         </div>
       </section>
 
@@ -204,10 +204,10 @@
               <select id="transactionCategoryFilter" class="toolbar-select">
                 <option value="" data-i18n="transactions_filter_all_categories">All categories</option>
               </select>
-              <select id="transactionAccountFilter" class="toolbar-select" aria-label="Filter by account">
+              <select id="transactionAccountFilter" class="toolbar-select" aria-label="Filter by account" data-i18n-aria-label="html_transactions_select_aria_label_filter_by_account">
                 <option value="" data-i18n="transactions_filter_all_accounts">All accounts</option>
               </select>
-              <select id="transactionReviewFilter" class="toolbar-select" aria-label="Filter by review status">
+              <select id="transactionReviewFilter" class="toolbar-select" aria-label="Filter by review status" data-i18n-aria-label="html_transactions_select_aria_label_filter_by_review_status">
                 <option value="" data-i18n="transactions_review_filter_all_statuses">All statuses</option>
                 <option value="any" data-i18n="transactions_review_filter_any">Any needs review</option>
                 <option value="nc" data-i18n="transactions_flag_nc">Needs Category</option>
@@ -255,7 +255,7 @@
                   <button type="button" class="txn-intent-btn income-intent" data-intent="income" data-i18n="transactions_intent_income">+ Income</button>
                   <button type="button" class="txn-intent-btn expense-intent" data-intent="expense" data-i18n="transactions_intent_expense">+ Expense</button>
                 </div>
-                <button type="button" class="drawer-close-btn" id="txDrawerClose" aria-label="Close form">&times;</button>
+                <button type="button" class="drawer-close-btn" id="txDrawerClose" aria-label="Close form" data-i18n-aria-label="html_transactions_button_aria_label_close_form">&times;</button>
               </div>
               <label for="txType" class="txn-type-label" data-i18n="label_tx_type">Transaction type</label>
               <select id="txType" required class="txn-type-select">
@@ -275,13 +275,13 @@
                 <div class="form-field">
                   <label for="account" class="form-label" data-i18n="transaction_label_account">Account</label>
                   <select id="account" class="form-control" name="account" required>
-                    <option value="">Select account</option>
+                    <option value="" data-i18n="html_transactions_text_select_account">Select account</option>
                   </select>
                 </div>
                 <div class="form-field">
                   <label for="category" class="form-label" data-i18n="transaction_label_category">Category</label>
                   <select id="category" class="form-control" name="category" required>
-                    <option value="">Select category</option>
+                    <option value="" data-i18n="html_transactions_text_select_category">Select category</option>
                   </select>
                   <input class="form-control" type="text" id="customCategoryName" data-i18n-placeholder="transactions_custom_category_placeholder" placeholder="Enter custom category name" hidden />
                 </div>
@@ -290,9 +290,9 @@
                   <input class="form-control" type="number" id="amount" name="amount" step="0.01" required />
                 </div>
                 <div class="form-field form-field-full" id="txAllocationField" hidden>
-                  <label for="txBusinessUsePct" class="form-label">Business-use %</label>
-                  <input class="form-control" type="number" id="txBusinessUsePct" min="1" max="100" step="1" placeholder="e.g. 60" />
-                  <p class="small-note">Enter the percentage of this expense used for business. The deductible amount is calculated automatically.</p>
+                  <label for="txBusinessUsePct" class="form-label"><span data-i18n="html_transactions_text_business_use">Business-use %</span></label>
+                  <input class="form-control" type="number" id="txBusinessUsePct" min="1" max="100" step="1" placeholder="e.g. 60" data-i18n-placeholder="html_transactions_input_placeholder_e_g_60" />
+                  <p class="small-note"><span data-i18n="html_transactions_text_enter_the_percentage_of_this_expense_used_for_business_the_deduc">Enter the percentage of this expense used for business. The deductible amount is calculated automatically.</span></p>
                 </div>
                 <!-- Payer / 1099 fields - shown only for income transactions -->
                 <div class="form-field income-only-field" id="payerNameField">
@@ -307,31 +307,31 @@
                     <option value="1099-NEC" data-i18n="transaction_tax_form_1099nec" data-region-show="us">1099-NEC</option>
                     <option value="1099-K" data-i18n="transaction_tax_form_1099k" data-region-show="us">1099-K</option>
                     <option value="T4A" data-i18n="transaction_tax_form_t4a" data-region-show="ca">T4A (Canada)</option>
-                    <option value="none">None / Not reported</option>
+                    <option value="none" data-i18n="html_transactions_text_none_not_reported">None / Not reported</option>
                   </select>
                 </div>
                 <div class="form-field form-field-full">
-                  <label for="transactionNote" class="form-label">Internal note</label>
-                  <input class="form-control" type="text" id="transactionNote" name="transactionNote" placeholder="Optional short note" />
+                  <label for="transactionNote" class="form-label"><span data-i18n="html_transactions_text_internal_note">Internal note</span></label>
+                  <input class="form-control" type="text" id="transactionNote" name="transactionNote" placeholder="Optional short note" data-i18n-placeholder="html_transactions_input_placeholder_optional_short_note" />
                 </div>
                 <div class="form-field form-field-full">
                   <label class="status-toggle-row" for="cleared">
                     <input type="checkbox" id="cleared" name="cleared" />
-                    <span>Mark as cleared / reconciled</span>
+                    <span><span data-i18n="html_transactions_text_mark_as_cleared_reconciled">Mark as cleared / reconciled</span></span>
                   </label>
-                  <p class="small-note">Use this once the transaction matches your bank or card statement.</p>
+                  <p class="small-note"><span data-i18n="html_transactions_text_use_this_once_the_transaction_matches_your_bank_or_card_statemen">Use this once the transaction matches your bank or card statement.</span></p>
                 </div>
                 <div class="form-field form-field-full">
-                  <label for="transactionReceiptInput" class="form-label">Attach receipt files</label>
+                  <label for="transactionReceiptInput" class="form-label"><span data-i18n="html_transactions_text_attach_receipt_files">Attach receipt files</span></label>
                   <div class="receipt-upload-inline">
-                    <button type="button" id="transactionReceiptButton" class="receipt-upload-button">Choose receipts</button>
-                    <span id="transactionReceiptName" class="receipt-upload-name">No files selected</span>
+                    <button type="button" id="transactionReceiptButton" class="receipt-upload-button"><span data-i18n="html_transactions_text_choose_receipts">Choose receipts</span></button>
+                    <span id="transactionReceiptName" class="receipt-upload-name"><span data-i18n="html_transactions_text_no_files_selected">No files selected</span></span>
                   </div>
                   <input class="receipt-upload-input" type="file" id="transactionReceiptInput" accept="image/*,.pdf,application/pdf" multiple />
-                  <p class="small-note">You can upload up to 10 files for one transaction. Long receipt? Upload multiple photos for the same transaction.</p>
+                  <p class="small-note"><span data-i18n="html_transactions_text_you_can_upload_up_to_10_files_for_one_transaction_long_receipt_u">You can upload up to 10 files for one transaction. Long receipt? Upload multiple photos for the same transaction.</span></p>
                   <div class="transaction-receipt-manage-row">
-                    <button type="button" id="transactionReceiptManageButton" class="receipt-manage-button" disabled>Manage linked receipts</button>
-                    <p class="small-note" id="transactionReceiptManageNote">Save the transaction first to link or unlink existing receipts.</p>
+                    <button type="button" id="transactionReceiptManageButton" class="receipt-manage-button" disabled><span data-i18n="html_transactions_text_manage_linked_receipts">Manage linked receipts</span></button>
+                    <p class="small-note" id="transactionReceiptManageNote"><span data-i18n="html_transactions_text_save_the_transaction_first_to_link_or_unlink_existing_receipts">Save the transaction first to link or unlink existing receipts.</span></p>
                   </div>
                 </div>
               </div>
@@ -339,9 +339,9 @@
               <details class="transaction-advanced-details" id="transactionAdvancedDetails">
                 <summary data-i18n="transaction_advanced_summary">Foreign currency, tax treatment &amp; personal use</summary>
                 <div class="transaction-form-grid transaction-advanced-grid">
-                  <div class="form-field form-field-full advanced-subgroup-label">Foreign currency</div>
+                  <div class="form-field form-field-full advanced-subgroup-label"><span data-i18n="html_transactions_text_foreign_currency">Foreign currency</span></div>
                   <div class="form-field">
-                    <label for="transactionCurrency" class="form-label">Currency</label>
+                    <label for="transactionCurrency" class="form-label"><span data-i18n="html_transactions_text_currency">Currency</span></label>
                     <select id="transactionCurrency" class="form-control">
                       <option value="USD">USD</option>
                       <option value="CAD">CAD</option>
@@ -352,91 +352,91 @@
                     </select>
                   </div>
                   <div class="form-field">
-                    <label for="transactionSourceAmount" class="form-label">Source amount</label>
-                    <input id="transactionSourceAmount" class="form-control" type="number" step="0.01" min="0" placeholder="Amount in foreign currency" />
+                    <label for="transactionSourceAmount" class="form-label"><span data-i18n="html_transactions_text_source_amount">Source amount</span></label>
+                    <input id="transactionSourceAmount" class="form-control" type="number" step="0.01" min="0" placeholder="Amount in foreign currency" data-i18n-placeholder="html_transactions_input_placeholder_amount_in_foreign_currency" />
                   </div>
                   <div class="form-field">
                     <label for="transactionExchangeRate" class="form-label form-label-inline">
-                      <span>Exchange rate</span>
+                      <span><span data-i18n="html_transactions_text_exchange_rate">Exchange rate</span></span>
                       <button
                         type="button"
                         class="edge-case-info-toggle"
                         id="transactionFxInfoToggle"
                         aria-label="Show exchange rate reference"
                         aria-controls="transactionFxReferenceBox"
-                        aria-expanded="false"
-                      >i</button>
+                        aria-expanded="false" data-i18n-aria-label="html_transactions_button_aria_label_show_exchange_rate_reference"
+                      ><span data-i18n="html_transactions_text_i">i</span></button>
                     </label>
-                    <input id="transactionExchangeRate" class="form-control" type="number" step="0.000001" min="0" placeholder="e.g. 1.35" />
+                    <input id="transactionExchangeRate" class="form-control" type="number" step="0.000001" min="0" placeholder="e.g. 1.35" data-i18n-placeholder="html_transactions_input_placeholder_e_g_1_35" />
                     <div class="fx-reference-box" id="transactionFxReferenceBox" hidden>
                       <div class="fx-reference-title-row">
-                        <strong class="fx-reference-title">Live reference rate</strong>
-                        <span class="fx-reference-value" id="transactionFxReferenceValue">No reference rate loaded.</span>
+                        <strong class="fx-reference-title"><span data-i18n="html_transactions_text_live_reference_rate">Live reference rate</span></strong>
+                        <span class="fx-reference-value" id="transactionFxReferenceValue"><span data-i18n="html_transactions_text_no_reference_rate_loaded">No reference rate loaded.</span></span>
                       </div>
                       <p class="small-note fx-reference-detail" id="transactionFxReferenceDetail" hidden></p>
                       <div class="fx-reference-actions">
-                        <button type="button" class="button-secondary fx-reference-apply" id="transactionFxApplyButton" hidden>Use rate</button>
+                        <button type="button" class="button-secondary fx-reference-apply" id="transactionFxApplyButton" hidden><span data-i18n="html_transactions_text_use_rate">Use rate</span></button>
                         <p class="small-note fx-reference-advisory" id="transactionFxReferenceAdvisory">
-                          Reference only. Confirm the final exchange rate independently before filing or reconciliation.
+                          <span data-i18n="html_transactions_text_reference_only_confirm_the_final_exchange_rate_independently_bef">Reference only. Confirm the final exchange rate independently before filing or reconciliation.</span>
                         </p>
                       </div>
                     </div>
                   </div>
                   <div class="form-field">
-                    <label for="transactionExchangeDate" class="form-label">Exchange date</label>
+                    <label for="transactionExchangeDate" class="form-label"><span data-i18n="html_transactions_text_exchange_date">Exchange date</span></label>
                     <input id="transactionExchangeDate" class="form-control" type="date" />
                   </div>
                   <div class="form-field">
-                    <label for="transactionConvertedAmount" class="form-label">Converted amount</label>
-                    <input id="transactionConvertedAmount" class="form-control" type="number" step="0.01" min="0" placeholder="Auto-calculated or override" />
+                    <label for="transactionConvertedAmount" class="form-label"><span data-i18n="html_transactions_text_converted_amount">Converted amount</span></label>
+                    <input id="transactionConvertedAmount" class="form-control" type="number" step="0.01" min="0" placeholder="Auto-calculated or override" data-i18n-placeholder="html_transactions_input_placeholder_auto_calculated_or_override" />
                   </div>
-                  <div class="form-field form-field-full advanced-subgroup-label advanced-subgroup-label--border">Tax</div>
+                  <div class="form-field form-field-full advanced-subgroup-label advanced-subgroup-label--border"><span data-i18n="html_transactions_text_tax">Tax</span></div>
                   <div class="form-field">
-                    <label for="transactionTaxTreatment" class="form-label">Tax treatment</label>
+                    <label for="transactionTaxTreatment" class="form-label"><span data-i18n="html_transactions_text_tax_treatment">Tax treatment</span></label>
                     <select id="transactionTaxTreatment" class="form-control">
-                      <option value="operating">Operating expense</option>
-                      <option value="capital">Capital item</option>
-                      <option value="split_use">Split-use / personal use</option>
-                      <option value="nondeductible">Non-deductible</option>
-                      <option value="income">Income</option>
+                      <option value="operating" data-i18n="html_transactions_text_operating_expense">Operating expense</option>
+                      <option value="capital" data-i18n="html_transactions_text_capital_item">Capital item</option>
+                      <option value="split_use" data-i18n="html_transactions_text_split_use_personal_use">Split-use / personal use</option>
+                      <option value="nondeductible" data-i18n="html_transactions_text_non_deductible">Non-deductible</option>
+                      <option value="income" data-i18n="html_transactions_text_income">Income</option>
                     </select>
                   </div>
                   <div class="form-field" id="transactionPersonalUsePctField">
-                    <label for="transactionPersonalUsePct" class="form-label">Personal-use %</label>
+                    <label for="transactionPersonalUsePct" class="form-label"><span data-i18n="html_transactions_text_personal_use">Personal-use %</span></label>
                     <input id="transactionPersonalUsePct" class="form-control" type="number" step="0.01" min="0" max="100" placeholder="0 - 100" />
                     <p class="small-note" id="transactionDeductiblePreview" hidden></p>
                   </div>
                   <div class="form-field">
-                    <label for="transactionIndirectTaxAmount" class="form-label" id="transactionIndirectTaxLabel">GST/HST/QST amount</label>
+                    <label for="transactionIndirectTaxAmount" class="form-label" id="transactionIndirectTaxLabel"><span data-i18n="html_transactions_text_gst_hst_qst_amount">GST/HST/QST amount</span></label>
                     <input id="transactionIndirectTaxAmount" class="form-control" type="number" step="0.01" min="0" />
                   </div>
                   <div class="form-field">
                     <label class="status-toggle-row" for="transactionIndirectTaxRecoverable">
                       <input type="checkbox" id="transactionIndirectTaxRecoverable" />
-                      <span>Tax recoverable</span>
+                      <span><span data-i18n="html_transactions_text_tax_recoverable">Tax recoverable</span></span>
                     </label>
-                    <p class="small-note" id="transactionIndirectTaxNote">Mark this when the indirect tax can be recovered or credited later.</p>
+                    <p class="small-note" id="transactionIndirectTaxNote"><span data-i18n="html_transactions_text_mark_this_when_the_indirect_tax_can_be_recovered_or_credited_lat">Mark this when the indirect tax can be recovered or credited later.</span></p>
                   </div>
-                  <div class="form-field form-field-full advanced-subgroup-label advanced-subgroup-label--border">Review</div>
+                  <div class="form-field form-field-full advanced-subgroup-label advanced-subgroup-label--border"><span data-i18n="html_transactions_text_review">Review</span></div>
                   <div class="form-field">
-                    <label for="transactionReviewStatus" class="form-label">Review status</label>
+                    <label for="transactionReviewStatus" class="form-label"><span data-i18n="html_transactions_text_review_status">Review status</span></label>
                     <select id="transactionReviewStatus" class="form-control">
-                      <option value="needs_review">Needs review</option>
-                      <option value="ready">Ready</option>
-                      <option value="matched">Matched</option>
-                      <option value="locked">Locked</option>
+                      <option value="needs_review" data-i18n="html_transactions_text_needs_review">Needs review</option>
+                      <option value="ready" data-i18n="html_transactions_text_ready">Ready</option>
+                      <option value="matched" data-i18n="html_transactions_text_matched">Matched</option>
+                      <option value="locked" data-i18n="html_transactions_text_locked">Locked</option>
                     </select>
-                    <p class="small-note error-text" id="transactionLockedWarning" hidden>This transaction is locked. Saving will create an adjustment record. Remove the lock to allow free edits.</p>
+                    <p class="small-note error-text" id="transactionLockedWarning" hidden><span data-i18n="html_transactions_text_this_transaction_is_locked_saving_will_create_an_adjustment_reco">This transaction is locked. Saving will create an adjustment record. Remove the lock to allow free edits.</span></p>
                   </div>
                   <div class="form-field form-field-full">
-                    <label for="transactionReviewNotes" class="form-label">Review notes</label>
-                    <textarea id="transactionReviewNotes" class="form-control" rows="3" placeholder="Add review notes, split-use reasoning, or FX details"></textarea>
+                    <label for="transactionReviewNotes" class="form-label"><span data-i18n="html_transactions_text_review_notes">Review notes</span></label>
+                    <textarea id="transactionReviewNotes" class="form-control" rows="3" placeholder="Add review notes, split-use reasoning, or FX details" data-i18n-placeholder="html_transactions_textarea_placeholder_add_review_notes_split_use_reasoning_or_fx_details"></textarea>
                   </div>
                   <div class="form-field form-field-full" data-region-show="ca">
-                    <p class="small-note">Canadian users: keep GST/HST/QST details here so your T2125 export stays clean.</p>
+                    <p class="small-note"><span data-i18n="html_transactions_text_canadian_users_keep_gst_hst_qst_details_here_so_your_t2125_expor">Canadian users: keep GST/HST/QST details here so your T2125 export stays clean.</span></p>
                   </div>
                   <div class="form-field form-field-full" data-region-show="us">
-                    <p class="small-note">U.S. users: use this section for currency, sales tax, capital items, and review notes.</p>
+                    <p class="small-note"><span data-i18n="html_transactions_text_u_s_users_use_this_section_for_currency_sales_tax_capital_items_">U.S. users: use this section for currency, sales tax, capital items, and review notes.</span></p>
                   </div>
                 </div>
               </details>
@@ -458,16 +458,16 @@
               <tr>
                 <th class="col-select">
                   <label class="table-select-all">
-                    <input type="checkbox" id="txSelectPage" aria-label="Select transactions on this page" />
-                    <span class="sr-only" id="txSelectPageLabel">Select transactions on this page</span>
+                    <input type="checkbox" id="txSelectPage" aria-label="Select transactions on this page" data-i18n-aria-label="html_transactions_input_aria_label_select_transactions_on_this_page" />
+                    <span class="sr-only" id="txSelectPageLabel"><span data-i18n="html_transactions_text_select_transactions_on_this_page">Select transactions on this page</span></span>
                   </label>
                 </th>
                 <th class="col-date" data-i18n="transactions_table_date">Date</th>
                 <th class="col-description" data-i18n="transactions_table_description">Description</th>
                 <th class="col-account" data-i18n="transactions_table_account">Account</th>
                 <th class="col-category" data-i18n="transactions_table_category">Category</th>
-                <th class="col-receipt">Receipt</th>
-                <th class="col-status">Status</th>
+                <th class="col-receipt"><span data-i18n="html_transactions_text_receipt">Receipt</span></th>
+                <th class="col-status"><span data-i18n="html_transactions_text_status">Status</span></th>
                 <th class="col-amount" data-i18n="transactions_table_amount">Amount</th>
               </tr>
             </thead>
@@ -476,15 +476,15 @@
           </table>
         </div>
         <div class="tx-pagination" id="txPagination" hidden>
-          <button type="button" class="tx-page-btn" id="txFirstPage" aria-label="First page">&laquo;</button>
-          <button type="button" class="tx-page-btn" id="txPrevPage" aria-label="Previous page">&#8249;</button>
+          <button type="button" class="tx-page-btn" id="txFirstPage" aria-label="First page" data-i18n-aria-label="html_transactions_button_aria_label_first_page">&laquo;</button>
+          <button type="button" class="tx-page-btn" id="txPrevPage" aria-label="Previous page" data-i18n-aria-label="html_transactions_button_aria_label_previous_page">&#8249;</button>
           
-          <label class="tx-page-jump" for="txPageInput" aria-label="Page number">
-            <input type="number" id="txPageInput" min="1" value="1" inputmode="numeric" /><span id="txPageTotal">of 1</span>
+          <label class="tx-page-jump" for="txPageInput" aria-label="Page number" data-i18n-aria-label="html_transactions_label_aria_label_page_number">
+            <input type="number" id="txPageInput" min="1" value="1" inputmode="numeric" /><span id="txPageTotal"><span data-i18n="html_transactions_text_of_1">of 1</span></span>
           </label>
           
-          <button type="button" class="tx-page-btn" id="txNextPage" aria-label="Next page">&#8250;</button>
-          <button type="button" class="tx-page-btn" id="txLastPage" aria-label="Last page">&raquo;</button>
+          <button type="button" class="tx-page-btn" id="txNextPage" aria-label="Next page" data-i18n-aria-label="html_transactions_button_aria_label_next_page">&#8250;</button>
+          <button type="button" class="tx-page-btn" id="txLastPage" aria-label="Last page" data-i18n-aria-label="html_transactions_button_aria_label_last_page">&raquo;</button>
         </div>
       </section>
 
@@ -493,15 +493,15 @@
       <section class="transactions-panel recurring-panel">
         <div class="transactions-toolbar recurring-toolbar">
           <div class="transactions-toolbar-copy recurring-toolbar-copy">
-            <h2 class="transactions-panel-title">Recurring templates</h2>
-            <p class="page-subtitle recurring-subtitle">Automate retainers, subscriptions, and fixed monthly expenses.</p>
+            <h2 class="transactions-panel-title"><span data-i18n="html_transactions_text_recurring_templates">Recurring templates</span></h2>
+            <p class="page-subtitle recurring-subtitle"><span data-i18n="html_transactions_text_automate_retainers_subscriptions_and_fixed_monthly_expenses">Automate retainers, subscriptions, and fixed monthly expenses.</span></p>
           </div>
           <div class="recurring-toolbar-actions">
             <button type="button" id="recurringPanelToggle" class="recurring-panel-toggle" aria-expanded="false" aria-controls="recurringPanelBody">
-              Show templates
+              <span data-i18n="html_transactions_text_show_templates">Show templates</span>
             </button>
             <button id="recurringToggle" class="toolbar-add-button recurring-add-inline" type="button" aria-expanded="false">
-              + Add recurring template
+              <span data-i18n="html_transactions_text_add_recurring_template">+ Add recurring template</span>
             </button>
           </div>
         </div>
@@ -511,60 +511,60 @@
             <form id="recurringForm" method="post">
               <div class="transaction-drawer-card recurring-drawer-card">
                 <div class="transaction-drawer-head">
-                  <h3 class="drawer-title">Recurring template</h3>
+                  <h3 class="drawer-title"><span data-i18n="html_transactions_text_recurring_template">Recurring template</span></h3>
                 </div>
 
                 <div class="transaction-form-grid">
                   <div class="form-field">
-                    <label for="recurringType" class="form-label">Type</label>
+                    <label for="recurringType" class="form-label"><span data-i18n="html_transactions_text_type">Type</span></label>
                     <select id="recurringType" class="form-control" required>
-                      <option value="expense">Expense</option>
-                      <option value="income">Income</option>
+                      <option value="expense" data-i18n="html_transactions_text_expense">Expense</option>
+                      <option value="income" data-i18n="html_transactions_text_income">Income</option>
                     </select>
                   </div>
                   <div class="form-field">
-                    <label for="recurringCadence" class="form-label">Cadence</label>
+                    <label for="recurringCadence" class="form-label"><span data-i18n="html_transactions_text_cadence">Cadence</span></label>
                     <select id="recurringCadence" class="form-control" required>
-                      <option value="weekly">Weekly</option>
-                      <option value="biweekly">Biweekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                      <option value="yearly">Yearly</option>
+                      <option value="weekly" data-i18n="html_transactions_text_weekly">Weekly</option>
+                      <option value="biweekly" data-i18n="html_transactions_text_biweekly">Biweekly</option>
+                      <option value="monthly" data-i18n="html_transactions_text_monthly">Monthly</option>
+                      <option value="quarterly" data-i18n="html_transactions_text_quarterly">Quarterly</option>
+                      <option value="yearly" data-i18n="html_transactions_text_yearly">Yearly</option>
                     </select>
                   </div>
                 <div class="form-field">
-                  <label for="recurringDescription" class="form-label">Description</label>
+                  <label for="recurringDescription" class="form-label"><span data-i18n="html_transactions_text_description">Description</span></label>
                   <input id="recurringDescription" class="form-control" type="text" required />
                 </div>
                 <div class="form-field">
-                  <label for="recurringAmount" class="form-label">Amount</label>
+                  <label for="recurringAmount" class="form-label"><span data-i18n="html_transactions_text_amount">Amount</span></label>
                   <input id="recurringAmount" class="form-control" type="number" step="0.01" required />
                 </div>
                 <div class="form-field">
-                  <label for="recurringAccount" class="form-label">Account</label>
+                  <label for="recurringAccount" class="form-label"><span data-i18n="html_transactions_text_account">Account</span></label>
                   <select id="recurringAccount" class="form-control" required>
-                    <option value="">Select account</option>
+                    <option value="" data-i18n="html_transactions_text_select_account">Select account</option>
                   </select>
                 </div>
                 <div class="form-field">
-                  <label for="recurringCategory" class="form-label">Category</label>
+                  <label for="recurringCategory" class="form-label"><span data-i18n="html_transactions_text_category">Category</span></label>
                   <select id="recurringCategory" class="form-control" required>
-                    <option value="">Select category</option>
+                    <option value="" data-i18n="html_transactions_text_select_category">Select category</option>
                   </select>
                   <input id="recurringCustomCategoryName" class="form-control" type="text" data-i18n-placeholder="transactions_custom_category_placeholder" placeholder="Enter custom category name" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" hidden />
                 </div>
                 <div class="form-field">
-                  <label for="recurringStartDate" class="form-label">Start date</label>
+                  <label for="recurringStartDate" class="form-label"><span data-i18n="html_transactions_text_start_date">Start date</span></label>
                   <input id="recurringStartDate" class="form-control" type="date" required />
                 </div>
                 <div class="form-field form-field-full">
-                  <label for="recurringNote" class="form-label">Internal note</label>
-                  <input id="recurringNote" class="form-control" type="text" placeholder="Optional note for generated entries" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" />
+                  <label for="recurringNote" class="form-label"><span data-i18n="html_transactions_text_internal_note">Internal note</span></label>
+                  <input id="recurringNote" class="form-control" type="text" placeholder="Optional note for generated entries" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" data-i18n-placeholder="html_transactions_input_placeholder_optional_note_for_generated_entries" />
                 </div>
                 <div class="form-field form-field-full">
                   <label class="status-toggle-row" for="recurringClearedDefault">
                     <input type="checkbox" id="recurringClearedDefault" />
-                    <span>Mark generated entries as cleared by default</span>
+                    <span><span data-i18n="html_transactions_text_mark_generated_entries_as_cleared_by_default">Mark generated entries as cleared by default</span></span>
                   </label>
                 </div>
               </div>
@@ -572,8 +572,8 @@
                 <p id="recurringFormMessage" class="error-text"></p>
 
                 <div class="tx-actions recurring-actions">
-                  <button type="button" id="recurringCancel" class="modal-cancel">Cancel</button>
-                  <button type="submit" id="recurringSubmit" class="drawer-submit">Save recurring template</button>
+                  <button type="button" id="recurringCancel" class="modal-cancel"><span data-i18n="html_transactions_text_cancel">Cancel</span></button>
+                  <button type="submit" id="recurringSubmit" class="drawer-submit"><span data-i18n="html_transactions_text_save_recurring_template">Save recurring template</span></button>
                 </div>
               </div>
             </form>
@@ -584,15 +584,15 @@
               <thead>
                 <tr>
                   <th class="col-select"></th>
-                  <th>Description</th>
-                  <th>Cadence</th>
-                  <th>Next run</th>
-                  <th>Status</th>
-                  <th class="col-amount">Amount</th>
+                  <th><span data-i18n="html_transactions_text_description">Description</span></th>
+                  <th><span data-i18n="html_transactions_text_cadence">Cadence</span></th>
+                  <th><span data-i18n="html_transactions_text_next_run">Next run</span></th>
+                  <th><span data-i18n="html_transactions_text_status">Status</span></th>
+                  <th class="col-amount"><span data-i18n="html_transactions_text_amount">Amount</span></th>
                 </tr>
               </thead>
               <tbody id="recurringTableBody">
-                <tr><td colspan="6" class="placeholder">Loading recurring templates...</td></tr>
+                <tr><td colspan="6" class="placeholder"><span data-i18n="html_transactions_text_loading_recurring_templates">Loading recurring templates...</span></td></tr>
               </tbody>
             </table>
           </div>
@@ -603,26 +603,26 @@
 
   <!-- Bulk delete bar (appears when 2+ rows selected) -->
   <div id="txBulkBar" class="tx-bulk-bar" hidden>
-    <span id="txBulkCount" class="tx-bulk-count">0 selected</span>
-    <button type="button" id="txBulkDeleteBtn" class="tx-bulk-delete-btn">Delete selected</button>
-    <button type="button" id="txBulkCancelBtn" class="tx-bulk-cancel-btn">Cancel</button>
+    <span id="txBulkCount" class="tx-bulk-count"><span data-i18n="html_transactions_text_0_selected">0 selected</span></span>
+    <button type="button" id="txBulkDeleteBtn" class="tx-bulk-delete-btn"><span data-i18n="html_transactions_text_delete_selected">Delete selected</span></button>
+    <button type="button" id="txBulkCancelBtn" class="tx-bulk-cancel-btn"><span data-i18n="html_transactions_text_cancel">Cancel</span></button>
   </div>
 
   <!-- Review checklist popover -->
-  <div id="txReviewPopover" class="tx-review-popover" hidden role="dialog" aria-label="Review checklist"></div>
+  <div id="txReviewPopover" class="tx-review-popover" hidden role="dialog" aria-label="Review checklist" data-i18n-aria-label="html_transactions_div_aria_label_review_checklist"></div>
 
   <!-- Row action popup -->
   <div id="txRowPopup" class="tx-row-popup" hidden>
-    <button type="button" id="txPopupEdit" class="tx-popup-btn">Edit</button>
-    <button type="button" id="txPopupMarkReviewed" class="tx-popup-btn">Confirm review</button>
-    <button type="button" id="txPopupReview" class="tx-popup-btn">Mark for review</button>
-    <button type="button" id="txPopupDelete" class="tx-popup-btn tx-popup-delete">Delete</button>
+    <button type="button" id="txPopupEdit" class="tx-popup-btn"><span data-i18n="html_transactions_text_edit">Edit</span></button>
+    <button type="button" id="txPopupMarkReviewed" class="tx-popup-btn"><span data-i18n="html_transactions_text_confirm_review">Confirm review</span></button>
+    <button type="button" id="txPopupReview" class="tx-popup-btn"><span data-i18n="html_transactions_text_mark_for_review">Mark for review</span></button>
+    <button type="button" id="txPopupDelete" class="tx-popup-btn tx-popup-delete"><span data-i18n="html_transactions_text_delete">Delete</span></button>
   </div>
 
   <div id="recurringRowPopup" class="tx-row-popup" hidden>
-    <button type="button" id="recurringPopupRun" class="tx-popup-btn tx-popup-primary">Post next</button>
-    <button type="button" id="recurringPopupStatus" class="tx-popup-btn tx-popup-primary">Pause</button>
-    <button type="button" id="recurringPopupDelete" class="tx-popup-btn tx-popup-delete">Delete</button>
+    <button type="button" id="recurringPopupRun" class="tx-popup-btn tx-popup-primary"><span data-i18n="html_transactions_text_post_next">Post next</span></button>
+    <button type="button" id="recurringPopupStatus" class="tx-popup-btn tx-popup-primary"><span data-i18n="html_transactions_text_pause">Pause</span></button>
+    <button type="button" id="recurringPopupDelete" class="tx-popup-btn tx-popup-delete"><span data-i18n="html_transactions_text_delete">Delete</span></button>
   </div>
 
   <div id="transactionModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="transactionModalTitle" aria-describedby="transactionModalBody">
@@ -639,12 +639,12 @@
 <!-- CSV Import Modal -->
 <div id="csvImportModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="csvImportModalTitle">
   <div class="transaction-modal-content csv-import-modal-content">
-    <h3 id="csvImportModalTitle" class="csv-import-title">Import from Bank CSV</h3>
-    <p class="csv-import-subtitle">Upload a CSV export from your bank. Supports BMO, TD, RBC, Scotiabank, Chase, Bank of America, Capital One, Wells Fargo, and most standard formats.</p>
+    <h3 id="csvImportModalTitle" class="csv-import-title"><span data-i18n="html_transactions_text_import_from_bank_csv">Import from Bank CSV</span></h3>
+    <p class="csv-import-subtitle"><span data-i18n="html_transactions_text_upload_a_csv_export_from_your_bank_supports_bmo_td_rbc_scotiaban">Upload a CSV export from your bank. Supports BMO, TD, RBC, Scotiabank, Chase, Bank of America, Capital One, Wells Fargo, and most standard formats.</span></p>
 
     <div id="csvImportStep1">
       <div class="csv-import-help-inline">
-        <span class="csv-import-help-copy">Need help finding your bank CSV?</span>
+        <span class="csv-import-help-copy"><span data-i18n="html_transactions_text_need_help_finding_your_bank_csv">Need help finding your bank CSV?</span></span>
         <button
           type="button"
           id="csvImportHelpToggle"
@@ -652,56 +652,56 @@
           aria-label="Help finding your bank CSV"
           aria-expanded="false"
           aria-controls="csvImportBankHelpPanel"
-          title="Help finding your bank CSV"
-        >i</button>
+          title="Help finding your bank CSV" data-i18n-title="html_transactions_button_title_help_finding_your_bank_csv" data-i18n-aria-label="html_transactions_button_aria_label_help_finding_your_bank_csv"
+        ><span data-i18n="html_transactions_text_i">i</span></button>
       </div>
       <div id="csvImportBankHelpPanel" class="bank-csv-help-panel" hidden></div>
       <div class="form-field">
-        <label for="csvImportAccount" class="form-label">Destination account</label>
+        <label for="csvImportAccount" class="form-label"><span data-i18n="html_transactions_text_destination_account">Destination account</span></label>
         <select id="csvImportAccount" class="form-control">
-          <option value="">Select account...</option>
+          <option value="" data-i18n="html_transactions_text_select_account_2">Select account...</option>
         </select>
       </div>
       <div class="form-field">
-        <label class="form-label">Date range <span class="csv-import-optional">(optional)</span></label>
+        <label class="form-label"><span data-i18n="html_transactions_text_date_range">Date range</span> <span class="csv-import-optional"><span data-i18n="html_transactions_text_optional">(optional)</span></span></label>
         <div class="csv-import-daterange">
           <input
             type="date"
             id="csvImportStartDate"
             class="form-control csv-import-date"
             aria-label="Start date (optional)"
-            placeholder="Start date"
+            placeholder="Start date" data-i18n-aria-label="html_transactions_input_aria_label_start_date_optional" data-i18n-placeholder="html_transactions_input_placeholder_start_date"
           />
-          <span class="csv-import-daterange-sep" aria-hidden="true">to</span>
+          <span class="csv-import-daterange-sep" aria-hidden="true"><span data-i18n="html_transactions_text_to">to</span></span>
           <input
             type="date"
             id="csvImportEndDate"
             class="form-control csv-import-date"
             aria-label="End date (optional)"
-            placeholder="End date"
+            placeholder="End date" data-i18n-aria-label="html_transactions_input_aria_label_end_date_optional" data-i18n-placeholder="html_transactions_input_placeholder_end_date"
           />
         </div>
         <p class="csv-import-hint">
-          Only rows whose date falls within this range will be imported. Leave both empty to import the
-          <strong>entire CSV</strong>.
+          <span data-i18n="html_transactions_text_only_rows_whose_date_falls_within_this_range_will_be_imported_le">Only rows whose date falls within this range will be imported. Leave both empty to import the</span>
+          <strong><span data-i18n="html_transactions_text_entire_csv">entire CSV</span></strong>.
         </p>
       </div>
       <div class="form-field">
-        <label for="csvImportFile" class="form-label">CSV file</label>
+        <label for="csvImportFile" class="form-label"><span data-i18n="html_transactions_text_csv_file">CSV file</span></label>
         <input type="file" id="csvImportFile" accept=".csv,text/csv" class="form-control" />
-        <p class="csv-import-hint">Your CSV needs columns for <strong>date</strong>, <strong>description</strong>, and either a single <strong>amount</strong> column or separate <strong>withdrawal</strong> and <strong>deposit</strong> columns. Duplicate rows are skipped by default, but review the import summary before posting.</p>
+        <p class="csv-import-hint"><span data-i18n="html_transactions_text_your_csv_needs_columns_for">Your CSV needs columns for</span> <strong><span data-i18n="html_transactions_text_date">date</span></strong>, <strong><span data-i18n="html_transactions_text_description_2">description</span></strong><span data-i18n="html_transactions_text_and_either_a_single">, and either a single</span> <strong><span data-i18n="html_transactions_text_amount_2">amount</span></strong> <span data-i18n="html_transactions_text_column_or_separate">column or separate</span> <strong><span data-i18n="html_transactions_text_withdrawal">withdrawal</span></strong> <span data-i18n="html_transactions_text_and">and</span> <strong><span data-i18n="html_transactions_text_deposit">deposit</span></strong> <span data-i18n="html_transactions_text_columns_duplicate_rows_are_skipped_by_default_but_review_the_imp">columns. Duplicate rows are skipped by default, but review the import summary before posting.</span></p>
       </div>
       <p id="csvImportError" class="error-text" hidden></p>
       <div class="modal-actions">
-        <button type="button" id="csvImportCancel" class="modal-cancel">Cancel</button>
-        <button type="button" id="csvImportStart" class="drawer-submit">Import</button>
+        <button type="button" id="csvImportCancel" class="modal-cancel"><span data-i18n="html_transactions_text_cancel">Cancel</span></button>
+        <button type="button" id="csvImportStart" class="drawer-submit"><span data-i18n="html_transactions_text_import">Import</span></button>
       </div>
     </div>
 
     <div id="csvImportStep2" hidden>
       <div class="csv-import-result" id="csvImportResult"></div>
       <div class="modal-actions">
-        <button type="button" id="csvImportDone" class="drawer-submit">Done</button>
+        <button type="button" id="csvImportDone" class="drawer-submit"><span data-i18n="html_transactions_text_done">Done</span></button>
       </div>
     </div>
   </div>
@@ -709,35 +709,35 @@
 
 <div id="transactionReceiptModal" class="transaction-modal hidden" role="dialog" aria-modal="true" aria-labelledby="transactionReceiptModalTitle">
   <div class="transaction-modal-content transaction-receipt-modal-content">
-    <h3 id="transactionReceiptModalTitle">Manage receipts</h3>
-    <p id="transactionReceiptModalSubtitle" class="transaction-receipt-modal-subtitle">Attach uploaded receipts, unlink them without deleting, or upload new ones for this transaction.</p>
+    <h3 id="transactionReceiptModalTitle"><span data-i18n="html_transactions_text_manage_receipts">Manage receipts</span></h3>
+    <p id="transactionReceiptModalSubtitle" class="transaction-receipt-modal-subtitle"><span data-i18n="html_transactions_text_attach_uploaded_receipts_unlink_them_without_deleting_or_upload_">Attach uploaded receipts, unlink them without deleting, or upload new ones for this transaction.</span></p>
     <div class="transaction-receipt-modal-sections">
       <section class="transaction-receipt-section">
         <div class="transaction-receipt-section-head">
-          <h4>Attached</h4>
+          <h4><span data-i18n="html_transactions_text_attached">Attached</span></h4>
           <span id="transactionReceiptAttachedCount" class="transaction-receipt-count">0</span>
         </div>
         <div id="transactionReceiptAttachedList" class="transaction-receipt-list transaction-receipt-list--attached"></div>
       </section>
       <section class="transaction-receipt-section">
         <div class="transaction-receipt-section-head">
-          <h4>Available to link</h4>
+          <h4><span data-i18n="html_transactions_text_available_to_link">Available to link</span></h4>
           <span id="transactionReceiptAvailableCount" class="transaction-receipt-count">0</span>
         </div>
         <div id="transactionReceiptAvailableList" class="transaction-receipt-list"></div>
       </section>
     </div>
     <div class="modal-actions transaction-receipt-modal-actions">
-      <button type="button" id="transactionReceiptModalClose" class="modal-cancel">Close</button>
-      <button type="button" id="transactionReceiptLinkNext" class="modal-cancel">Link next receipt</button>
-      <button type="button" id="transactionReceiptUploadMore" class="drawer-submit">Upload new receipt</button>
+      <button type="button" id="transactionReceiptModalClose" class="modal-cancel"><span data-i18n="html_transactions_text_close">Close</span></button>
+      <button type="button" id="transactionReceiptLinkNext" class="modal-cancel"><span data-i18n="html_transactions_text_link_next_receipt">Link next receipt</span></button>
+      <button type="button" id="transactionReceiptUploadMore" class="drawer-submit"><span data-i18n="html_transactions_text_upload_new_receipt">Upload new receipt</span></button>
     </div>
   </div>
 </div>
 
 <script src="../js/escape-html.js?v=20260410a"></script>
 <script src="../js/global.js?v=20260601b"></script>
-<script src="../js/i18n.js?v=20260612a"></script>
+<script src="../js/i18n.js?v=20260725a"></script>
 <script src="../js/auth.js?v=20260527c"></script>
 <script src="../js/trial.js?v=20260405c"></script>
 <script src="../js/taxReminders.js?v=20260405c"></script>
