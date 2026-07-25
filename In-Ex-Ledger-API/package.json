@@ -20,6 +20,7 @@
     "security:deps": "npm audit --omit=dev --audit-level=high",
     "log_scan": "node scripts/log_scan.js",
     "i18n:audit": "node scripts/i18n-audit.js",
+    "i18n:audit:strict": "node scripts/i18n-audit.js --fail-on-untranslated",
     "i18n:fix": "node scripts/i18n-fix.js",
     "test:csrf": "node --test tests/csrfProtection.test.js",
     "test:csrf-e2e": "node --test tests/csrfE2E.test.js",

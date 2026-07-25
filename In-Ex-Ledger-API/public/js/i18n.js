@@ -6504,6 +6504,8 @@ Object.assign(TRANSLATIONS.en, {
   "html_verify_email_text_this_step_confirms_that_you_control_the_inbox_tied_to_your_books": "This step confirms that you control the inbox tied to your books, exports, and billing notifications."
 });
 
+
+
 Object.assign(TRANSLATIONS.fr, {
   secure_export_modal_show_me: 'Montrez-moi',
   secure_export_modal_show_me_hint: 'Nous vous amenerons directement aux champs de profil d entreprise manquants et les mettrons en evidence.',
@@ -7778,4 +7780,79 @@ Object.assign(TRANSLATIONS.fr, {
   "html_verify_email_text_inex_ledger_verify_email": "InEx Ledger - Verify Email",
   "html_verify_email_text_still_nothing": "Still nothing?",
   "html_verify_email_text_this_step_confirms_that_you_control_the_inbox_tied_to_your_books": "This step confirms that you control the inbox tied to your books, exports, and billing notifications."
+});
+
+
+Object.assign(TRANSLATIONS.es, {
+  html_change_email_a_aria_label_inex_ledger_home: 'Inicio de InEx Ledger',
+  html_change_email_text_inex_ledger_change_email: 'InEx Ledger - Cambiar correo electronico',
+  html_login_a_aria_label_inex_ledger_home: 'Inicio de InEx Ledger',
+  html_login_div_aria_label_sign_in_help: 'Ayuda para iniciar sesion',
+  html_login_text_inex_ledger_sign_in: 'InEx Ledger - Iniciar sesion',
+  html_mfa_challenge_a_aria_label_inex_ledger_home: 'Inicio de InEx Ledger',
+  html_mfa_challenge_text_enter_the_6_digit_code_we_emailed_you_to_finish_signing_in: 'Ingresa el codigo de 6 digitos que te enviamos por correo para terminar de iniciar sesion.',
+  html_mfa_challenge_text_inex_ledger_verify_sign_in: 'InEx Ledger - Verificar inicio de sesion',
+  html_mfa_challenge_text_trust_this_device_for_this_account: 'Confiar en este dispositivo para esta cuenta',
+  html_mfa_challenge_text_you_may_need_to_verify_again_when_signing_into_a_different_inex_: 'Es posible que debas verificarte de nuevo al iniciar sesion en otra cuenta de InEx Ledger en este dispositivo.',
+  html_register_a_aria_label_inex_ledger_home: 'Inicio de InEx Ledger',
+  html_register_aside_aria_label_trial_details: 'Detalles de la prueba',
+  html_register_text_30_day_pro_trial_billing_confirmation_happens_after_onboarding: 'Prueba Pro de 30 dias. La confirmacion de facturacion ocurre despues de la incorporacion.',
+  html_register_text_30_day_pro_trial_middot_secure_billing_after_setup: 'Prueba Pro de 30 dias &middot; Facturacion segura despues de la configuracion',
+  html_register_text_built_for_freelancers_contractors_and_solo_operators: 'Creado para freelancers, contratistas y operadores independientes',
+  html_register_text_cancel_before_billing_starts: 'Cancela antes de que comience la facturacion.',
+  html_register_text_estimated_set_aside_tracking_updates_as_you_work: 'El seguimiento estimado de reservas se actualiza mientras trabajas',
+  html_register_text_everything_included_from_day_one: 'Todo incluido desde el primer dia.',
+  html_register_text_inex_ledger_create_account: 'InEx Ledger - Crear cuenta',
+  html_register_text_keep_basic_after_trial: 'Conserva Basic despues de la prueba.',
+  html_register_text_no_charge_today: 'Sin cargo hoy.',
+  html_register_text_one_email_one_password_you_ll_confirm_before_setup_begins: 'Un correo, una contrasena. Confirmaras antes de que comience la configuracion.',
+  html_register_text_receipts_mileage_and_export_tools_included: 'Recibos, kilometraje y herramientas de exportacion incluidos',
+  html_register_text_set_up_your_account: 'Configura tu cuenta.',
+  html_register_text_start_with_the_full_workflow_after_onboarding_confirm_billing_de: 'Comienza con el flujo completo. Despues de la incorporacion, confirma los datos de facturacion para mantener Pro listo cuando termine la prueba de 30 dias.',
+  html_register_text_track_income_and_expenses_from_day_one: 'Registra ingresos y gastos desde el primer dia',
+  html_register_ul_aria_label_password_requirements: 'Requisitos de contrasena',
+  html_verify_email_a_aria_label_inex_ledger_home: 'Inicio de InEx Ledger',
+  html_verify_email_div_aria_label_verification_note: 'Nota de verificacion',
+  html_verify_email_text_before_setup_continues: 'Antes de continuar la configuracion',
+  html_verify_email_text_if_the_email_arrives_late_the_latest_link_is_the_one_that_matter: 'Si el correo llega tarde, el enlace mas reciente es el que importa. Los enlaces anteriores pueden vencer cuando solicitas uno nuevo.',
+  html_verify_email_text_inex_ledger_verify_email: 'InEx Ledger - Verificar correo electronico',
+  html_verify_email_text_still_nothing: 'Todavia nada?',
+  html_verify_email_text_this_step_confirms_that_you_control_the_inbox_tied_to_your_books: 'Este paso confirma que controlas la bandeja vinculada a tus libros, exportaciones y notificaciones de facturacion.'
+});
+
+Object.assign(TRANSLATIONS.fr, {
+  html_change_email_a_aria_label_inex_ledger_home: 'Accueil InEx Ledger',
+  html_change_email_text_inex_ledger_change_email: 'InEx Ledger - Modifier l adresse courriel',
+  html_login_a_aria_label_inex_ledger_home: 'Accueil InEx Ledger',
+  html_login_div_aria_label_sign_in_help: 'Aide a la connexion',
+  html_login_text_inex_ledger_sign_in: 'InEx Ledger - Connexion',
+  html_mfa_challenge_a_aria_label_inex_ledger_home: 'Accueil InEx Ledger',
+  html_mfa_challenge_text_enter_the_6_digit_code_we_emailed_you_to_finish_signing_in: 'Entrez le code a 6 chiffres envoye par courriel pour terminer la connexion.',
+  html_mfa_challenge_text_inex_ledger_verify_sign_in: 'InEx Ledger - Verifier la connexion',
+  html_mfa_challenge_text_trust_this_device_for_this_account: 'Faire confiance a cet appareil pour ce compte',
+  html_mfa_challenge_text_you_may_need_to_verify_again_when_signing_into_a_different_inex_: 'Vous devrez peut-etre vous verifier de nouveau lors de la connexion a un autre compte InEx Ledger sur cet appareil.',
+  html_register_a_aria_label_inex_ledger_home: 'Accueil InEx Ledger',
+  html_register_aside_aria_label_trial_details: 'Details de l essai',
+  html_register_text_30_day_pro_trial_billing_confirmation_happens_after_onboarding: 'Essai Pro de 30 jours. La confirmation de facturation a lieu apres l integration.',
+  html_register_text_30_day_pro_trial_middot_secure_billing_after_setup: 'Essai Pro de 30 jours &middot; Facturation securisee apres la configuration',
+  html_register_text_built_for_freelancers_contractors_and_solo_operators: 'Concu pour les pigistes, entrepreneurs et travailleurs autonomes',
+  html_register_text_cancel_before_billing_starts: 'Annulez avant le debut de la facturation.',
+  html_register_text_estimated_set_aside_tracking_updates_as_you_work: 'Le suivi estime des reserves se met a jour pendant que vous travaillez',
+  html_register_text_everything_included_from_day_one: 'Tout est inclus des le premier jour.',
+  html_register_text_inex_ledger_create_account: 'InEx Ledger - Creer un compte',
+  html_register_text_keep_basic_after_trial: 'Conserver Basic apres l essai.',
+  html_register_text_no_charge_today: 'Aucun frais aujourd hui.',
+  html_register_text_one_email_one_password_you_ll_confirm_before_setup_begins: 'Un courriel, un mot de passe. Vous confirmerez avant le debut de la configuration.',
+  html_register_text_receipts_mileage_and_export_tools_included: 'Recus, kilometrage et outils d exportation inclus',
+  html_register_text_set_up_your_account: 'Configurez votre compte.',
+  html_register_text_start_with_the_full_workflow_after_onboarding_confirm_billing_de: 'Commencez avec le flux complet. Apres l integration, confirmez les details de facturation pour garder Pro pret a la fin de l essai de 30 jours.',
+  html_register_text_track_income_and_expenses_from_day_one: 'Suivez revenus et depenses des le premier jour',
+  html_register_ul_aria_label_password_requirements: 'Exigences du mot de passe',
+  html_verify_email_a_aria_label_inex_ledger_home: 'Accueil InEx Ledger',
+  html_verify_email_div_aria_label_verification_note: 'Note de verification',
+  html_verify_email_text_before_setup_continues: 'Avant de continuer la configuration',
+  html_verify_email_text_if_the_email_arrives_late_the_latest_link_is_the_one_that_matter: 'Si le courriel arrive en retard, le lien le plus recent est celui qui compte. Les anciens liens peuvent expirer lorsque vous en demandez un nouveau.',
+  html_verify_email_text_inex_ledger_verify_email: 'InEx Ledger - Verifier le courriel',
+  html_verify_email_text_still_nothing: 'Toujours rien ?',
+  html_verify_email_text_this_step_confirms_that_you_control_the_inbox_tied_to_your_books: 'Cette etape confirme que vous controlez la boite de reception liee a vos livres, exportations et avis de facturation.'
 });
