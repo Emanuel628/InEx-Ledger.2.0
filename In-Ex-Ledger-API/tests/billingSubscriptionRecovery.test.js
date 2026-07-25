@@ -8,7 +8,37 @@ const request = require("supertest");
 
 const BILLING_ROUTE_PATH = require.resolve("../routes/billing.routes.js");
 
-function loadBillingRouterFixture() {
+function loadBillingRouterFixture(options = {}) {
+  const stripeSubscription = options.stripeSubscription || {
+    id: "sub_live_123",
+    customer: "cus_live_123",
+    status: "active",
+    cancel_at_period_end: false,
+    current_period_start: Math.floor(Date.now() / 1000) - 86400,
+    current_period_end: Math.floor(Date.now() / 1000) + 86400 * 30,
+    metadata: {
+      business_id: "biz_live_123",
+      additional_businesses: "2"
+    },
+    items: { data: [] }
+  };
+  const snapshots = options.snapshots || [
+    {
+      effectiveTier: "free",
+      effectiveStatus: "free",
+      isPaid: false,
+      stripeCustomerId: "cus_live_123",
+      maxBusinessesAllowed: 1
+    },
+    {
+      effectiveTier: "v1",
+      effectiveStatus: "active",
+      isPaid: true,
+      stripeCustomerId: "cus_live_123",
+      additionalBusinesses: 2,
+      maxBusinessesAllowed: 3
+    }
+  ];
   const state = {
     syncCalls: [],
     snapshotCalls: 0
@@ -23,22 +53,26 @@ function loadBillingRouterFixture() {
         ok: true,
         async json() {
           return {
-            data: [
-              {
-                id: "sub_live_123",
-                customer: "cus_live_123",
-                status: "active",
-                cancel_at_period_end: false,
-                current_period_start: Math.floor(Date.now() / 1000) - 86400,
-                current_period_end: Math.floor(Date.now() / 1000) + 86400 * 30,
-                metadata: {
-                  business_id: "biz_live_123",
-                  additional_businesses: "2"
-                },
-                items: { data: [] }
-              }
-            ]
+            data: [stripeSubscription]
           };
+        }
+      };
+    }
+
+    if (String(url).includes("/customers/")) {
+      return {
+        ok: true,
+        async json() {
+          return { id: "cus_live_123", invoice_settings: {} };
+        }
+      };
+    }
+
+    if (String(url).includes("/invoices?customer=")) {
+      return {
+        ok: true,
+        async json() {
+          return { data: [] };
         }
       };
     }
@@ -51,23 +85,7 @@ function loadBillingRouterFixture() {
       return {
         getSubscriptionSnapshotForBusiness: async () => {
           state.snapshotCalls += 1;
-          if (state.snapshotCalls === 1) {
-            return {
-              effectiveTier: "free",
-              effectiveStatus: "free",
-              isPaid: false,
-              stripeCustomerId: "cus_live_123",
-              maxBusinessesAllowed: 1
-            };
-          }
-          return {
-            effectiveTier: "v1",
-            effectiveStatus: "active",
-            isPaid: true,
-            stripeCustomerId: "cus_live_123",
-            additionalBusinesses: 2,
-            maxBusinessesAllowed: 3
-          };
+          return snapshots[Math.min(state.snapshotCalls - 1, snapshots.length - 1)];
         },
         findBillingAnchorBusinessIdForUser: async () => "biz_live_123",
         updateStripeCustomerForBusiness: async () => {},
@@ -176,6 +194,62 @@ test("billing subscription endpoint self-heals stale free state from Stripe", as
     assert.equal(fixture.state.syncCalls[0].businessId, "biz_live_123");
     assert.equal(response.body?.subscription?.effectiveTier, "v1");
     assert.equal(response.body?.subscription?.maxBusinessesAllowed, 3);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing overview self-heals stale canceling state from active Stripe subscription", async () => {
+  const fixture = loadBillingRouterFixture({
+    stripeSubscription: {
+      id: "sub_yearly_123",
+      customer: "cus_live_123",
+      status: "active",
+      cancel_at_period_end: false,
+      current_period_start: Math.floor(Date.now() / 1000) - 86400,
+      current_period_end: Math.floor(Date.now() / 1000) + 86400 * 365,
+      metadata: {
+        business_id: "biz_live_123",
+        additional_businesses: "0",
+        billing_interval: "yearly",
+        currency: "usd"
+      },
+      items: { data: [] }
+    },
+    snapshots: [
+      {
+        effectiveTier: "v1",
+        effectiveStatus: "canceling",
+        status: "active",
+        isPaid: true,
+        cancelAtPeriodEnd: true,
+        stripeCustomerId: "cus_live_123",
+        stripeSubscriptionId: "sub_yearly_123",
+        currentPeriodEnd: new Date(Date.now() + 86400 * 30 * 1000).toISOString(),
+        maxBusinessesAllowed: 1
+      },
+      {
+        effectiveTier: "v1",
+        effectiveStatus: "active",
+        status: "active",
+        isPaid: true,
+        cancelAtPeriodEnd: false,
+        stripeCustomerId: "cus_live_123",
+        stripeSubscriptionId: "sub_yearly_123",
+        billingInterval: "yearly",
+        maxBusinessesAllowed: 1
+      }
+    ]
+  });
+
+  try {
+    const response = await request(fixture.app).get("/api/billing/overview");
+    assert.equal(response.status, 200);
+    assert.equal(fixture.state.syncCalls.length, 1);
+    assert.equal(fixture.state.syncCalls[0].subscription.id, "sub_yearly_123");
+    assert.equal(response.body?.subscription?.effectiveTier, "v1");
+    assert.equal(response.body?.subscription?.cancelAtPeriodEnd, false);
+    assert.equal(response.body?.subscription?.billingInterval, "yearly");
   } finally {
     fixture.cleanup();
   }

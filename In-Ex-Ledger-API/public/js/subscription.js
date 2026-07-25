@@ -607,6 +607,33 @@ async function openCancelPortalOrCancelSubscription() {
   cancelModal?.classList.remove("hidden");
 }
 
+async function resumeSubscription() {
+  const resumeButtons = [
+    document.getElementById("subControlsResumeBtn")
+  ].filter(Boolean);
+  resumeButtons.forEach((button) => { button.disabled = true; });
+
+  try {
+    const res = await apiFetch("/api/billing/resume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    const payload = await res?.json()?.catch(() => null);
+    if (!res || !res.ok) {
+      throw new Error(payload?.error || tx("subscription_resume_error"));
+    }
+    if (payload?.subscription && typeof applySubscriptionState === "function") {
+      applySubscriptionState(payload.subscription);
+    }
+    showSubToast(tx("subscription_resume_success"));
+    currentSubscription = await loadSubscription();
+  } catch (err) {
+    showSubToast(err.message || tx("subscription_resume_error"));
+  } finally {
+    resumeButtons.forEach((button) => { button.disabled = false; });
+  }
+}
+
 // ─── Business Delete Modal ────────────────────────────────────────────────────
 
 function setBusinessDeleteError(message = "") {
@@ -725,6 +752,10 @@ async function loadSubscription() {
   const statusBlock = document.getElementById("subStatusBlock");
   const manageBillingBtn = document.getElementById("subManageBillingBtn");
   const cancelBtn = document.getElementById("subCancelBtn");
+  const controlsSection = document.getElementById("sub-controls-section");
+  const controlsCancelBtn = document.getElementById("subControlsCancelBtn");
+  const controlsResumeBtn = document.getElementById("subControlsResumeBtn");
+  const controlsDescription = document.getElementById("subControlsDescription");
   const cancelModalBody = document.getElementById("subCancelModalBody");
 
   try {
@@ -781,6 +812,23 @@ async function loadSubscription() {
       cancelBtn.classList.toggle("hidden", !(sub.isPaid && !sub.cancelAtPeriodEnd));
     }
 
+    const canCancel = Boolean(sub.isPaid && !sub.cancelAtPeriodEnd && !sub.isCanceledWithRemainingAccess);
+    const canResume = Boolean(sub.cancelAtPeriodEnd && sub.stripeSubscriptionId && !sub.isTrialing);
+    if (controlsSection) {
+      controlsSection.classList.toggle("hidden", !(canCancel || canResume));
+    }
+    if (controlsCancelBtn) {
+      controlsCancelBtn.classList.toggle("hidden", !canCancel);
+    }
+    if (controlsResumeBtn) {
+      controlsResumeBtn.classList.toggle("hidden", !canResume);
+    }
+    if (controlsDescription) {
+      controlsDescription.textContent = canResume
+        ? tx("subscription_controls_resume_desc")
+        : tx("settings_cancel_subscription_desc");
+    }
+
     if (typeof applySubscriptionState === "function") {
       applySubscriptionState(sub);
     }
@@ -826,12 +874,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   document.getElementById("subManageBillingBtn")?.addEventListener("click", openCustomerPortal);
   document.getElementById("subHistoryPortalBtn")?.addEventListener("click", openCustomerPortal);
+  document.getElementById("subControlsResumeBtn")?.addEventListener("click", resumeSubscription);
 
   const cancelModal = document.getElementById("subCancelModal");
   const cancelModalCancel = document.getElementById("subCancelModalCancel");
   const cancelModalConfirm = document.getElementById("subCancelModalConfirm");
 
   document.getElementById("subCancelBtn")?.addEventListener("click", openCancelPortalOrCancelSubscription);
+  document.getElementById("subControlsCancelBtn")?.addEventListener("click", openCancelPortalOrCancelSubscription);
   cancelModalCancel?.addEventListener("click", () => cancelModal?.classList.add("hidden"));
   cancelModal?.addEventListener("click", (e) => { if (e.target === cancelModal) cancelModal.classList.add("hidden"); });
 

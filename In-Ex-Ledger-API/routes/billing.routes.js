@@ -500,6 +500,62 @@ async function findBlockingStripeSubscriptionForCustomer(stripeCustomerId) {
   return subscriptions.find((item) => hasBlockingStripeSubscription(item)) || null;
 }
 
+function shouldVerifyStripeSubscriptionSnapshot(subscription) {
+  if (!subscription?.stripeCustomerId && !subscription?.stripeSubscriptionId) {
+    return false;
+  }
+
+  const status = String(subscription.status || subscription.effectiveStatus || "").toLowerCase();
+  return (
+    !subscription.isPaid ||
+    subscription.cancelAtPeriodEnd ||
+    subscription.isCanceledWithRemainingAccess ||
+    ["canceled", "incomplete", "incomplete_expired"].includes(status)
+  );
+}
+
+async function findRecoverableStripeSubscription(subscription) {
+  if (subscription?.stripeCustomerId) {
+    const customerSubscription = await findBlockingStripeSubscriptionForCustomer(subscription.stripeCustomerId);
+    if (customerSubscription) {
+      return customerSubscription;
+    }
+  }
+
+  if (!subscription?.stripeSubscriptionId) {
+    return null;
+  }
+
+  const stripeSubscription = await stripeGet(
+    `/subscriptions/${encodeURIComponent(subscription.stripeSubscriptionId)}`
+  );
+  return hasBlockingStripeSubscription(stripeSubscription) ? stripeSubscription : null;
+}
+
+async function refreshStripeBackedSubscriptionSnapshot(billingBusinessId) {
+  let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+
+  if (!shouldVerifyStripeSubscriptionSnapshot(subscription)) {
+    return subscription;
+  }
+
+  try {
+    const stripeSubscription = await findRecoverableStripeSubscription(subscription);
+
+    if (stripeSubscription) {
+      await syncStripeSubscriptionForBusiness(billingBusinessId, stripeSubscription);
+      subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    }
+  } catch (syncErr) {
+    logWarn("Billing subscription self-heal sync skipped:", {
+      businessId: billingBusinessId,
+      err: syncErr.message
+    });
+  }
+
+  return subscription;
+}
+
 function buildAppUrl(path) {
   const base = (process.env.APP_BASE_URL || "").trim();
   if (!base) {
@@ -622,7 +678,7 @@ async function fetchBillingInvoicesForCustomer(stripeCustomerId, limit = 24) {
 }
 
 async function fetchBillingOverviewForBusiness(billingBusinessId) {
-  const subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+  const subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
   const stripeCustomerId = subscription?.stripeCustomerId || null;
   let paymentMethod = null;
   let invoices = [];
@@ -677,23 +733,7 @@ async function sendBillingEmail({ businessId, kind, details, actionUrl, invoiceU
 router.get("/subscription", requireAuth, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
-    let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
-
-    if (!subscription.isPaid && subscription.stripeCustomerId) {
-      try {
-        const stripeSubscription = await findBlockingStripeSubscriptionForCustomer(subscription.stripeCustomerId);
-
-        if (stripeSubscription) {
-          await syncStripeSubscriptionForBusiness(billingBusinessId, stripeSubscription);
-          subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
-        }
-      } catch (syncErr) {
-        logWarn("GET /api/billing/subscription self-heal sync skipped:", {
-          businessId: billingBusinessId,
-          err: syncErr.message
-        });
-      }
-    }
+    const subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
 
     res.json({ subscription });
   } catch (err) {
@@ -790,7 +830,7 @@ router.post("/mock-v1", requireAuth, requireCsrfProtection, async (req, res) => 
 router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
-    let subscription = await getSubscriptionSnapshotForBusiness(billingBusinessId);
+    let subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
     const additionalBusinesses = normalizeAdditionalBusinesses(req.body?.additionalBusinesses);
 
     if (isTrialReupgradeAttempt(subscription)) {
