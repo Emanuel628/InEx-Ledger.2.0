@@ -658,13 +658,20 @@ function setRenewalInterval(interval) {
 async function startRenewalCheckout() {
   const button = document.getElementById("subRenewCheckoutBtn");
   const originalText = button?.textContent || "";
+  const resumesExistingSubscription = Boolean(
+    currentSubscription?.cancelAtPeriodEnd &&
+    currentSubscription?.stripeSubscriptionId &&
+    !currentSubscription?.isTrialing
+  );
   if (button) {
     button.disabled = true;
-    button.textContent = "Opening secure checkout...";
+    button.textContent = resumesExistingSubscription ? "Updating subscription..." : "Opening secure checkout...";
   }
 
   try {
-    const res = await apiFetch("/api/billing/checkout-session", {
+    const res = await apiFetch(
+      resumesExistingSubscription ? "/api/billing/resume" : "/api/billing/checkout-session",
+      {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -672,10 +679,19 @@ async function startRenewalCheckout() {
         additionalBusinesses: getRenewalAdditionalBusinesses(),
         returnPath: "/subscription"
       })
-    });
+      }
+    );
     const payload = await res?.json()?.catch(() => null);
     if (!res || !res.ok) {
       throw new Error(payload?.error || tx("subscription_checkout_error"));
+    }
+    if (resumesExistingSubscription) {
+      if (payload?.subscription && typeof applySubscriptionState === "function") {
+        applySubscriptionState(payload.subscription);
+      }
+      showSubToast(tx("subscription_update_success"));
+      currentSubscription = await loadSubscription();
+      return;
     }
     if (payload?.url) {
       if (!isAllowedBillingRedirect(payload.url)) {
@@ -871,12 +887,18 @@ async function loadSubscription() {
 
     const canRenewWithCheckout = Boolean(
       !sub.isTrialing &&
-      (!sub.isPaid || sub.isCanceledWithRemainingAccess)
+      (!sub.isPaid || sub.isCanceledWithRemainingAccess || (sub.cancelAtPeriodEnd && sub.stripeSubscriptionId))
     );
     if (renewalSection) {
       renewalSection.classList.toggle("hidden", !canRenewWithCheckout);
       if (canRenewWithCheckout) {
         updateRenewalIntervalUi();
+        const checkoutButton = document.getElementById("subRenewCheckoutBtn");
+        if (checkoutButton) {
+          checkoutButton.textContent = sub.cancelAtPeriodEnd && sub.stripeSubscriptionId
+            ? tx("subscription_update_button")
+            : tx("html_subscription_text_continue_to_secure_checkout");
+        }
       }
     }
 

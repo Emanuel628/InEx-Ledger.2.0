@@ -13,7 +13,8 @@ function loadBillingRouter({
   existingStripeSubscription = null,
   subscriptionSnapshots = null,
   searchedStripeCustomerId = null,
-  missingSubscriptionRow = false
+  missingSubscriptionRow = false,
+  stripeSubscriptionResponse = null
 } = {}) {
   const state = {
     stripeRequests: [],
@@ -322,22 +323,23 @@ function loadBillingRouter({
 
     if (/\/subscriptions\/[^/?]+$/.test(String(url))) {
       const subscriptionId = String(url).split("/subscriptions/")[1];
+      const defaultSubscription = {
+        id: subscriptionId,
+        status: "active",
+        cancel_at_period_end: false,
+        current_period_start: Math.floor(Date.now() / 1000) - 86400,
+        current_period_end: Math.floor(Date.now() / 1000) + 86400 * 30,
+        customer: "cus_test_123",
+        metadata: {
+          billing_interval: "monthly",
+          currency: "usd",
+          additional_businesses: "0"
+        },
+        items: { data: [] }
+      };
       return {
         ok: true,
-        json: async () => ({
-          id: subscriptionId,
-          status: "active",
-          cancel_at_period_end: false,
-          current_period_start: Math.floor(Date.now() / 1000) - 86400,
-          current_period_end: Math.floor(Date.now() / 1000) + 86400 * 30,
-          customer: "cus_test_123",
-          metadata: {
-            billing_interval: "monthly",
-            currency: "usd",
-            additional_businesses: "0"
-          },
-          items: { data: [] }
-        })
+        json: async () => ({ ...defaultSubscription, ...(stripeSubscriptionResponse || {}) })
       };
     }
 
@@ -970,6 +972,77 @@ test("billing resume clears cancel_at_period_end on the existing Stripe subscrip
     );
 
     assert.ok(resumeRequest, "Stripe subscription should be resumed in place");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing resume can switch a canceling yearly subscription to monthly", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    stripeSubscriptionResponse: {
+      metadata: {
+        billing_interval: "yearly",
+        currency: "usd",
+        additional_businesses: "1"
+      },
+      items: {
+        data: [
+          {
+            id: "si_base_yearly",
+            quantity: 1,
+            price: { id: "price_year_usd" }
+          },
+          {
+            id: "si_addon_yearly",
+            quantity: 1,
+            price: { id: "price_addon_year_usd" }
+          }
+        ]
+      }
+    },
+    subscriptionSnapshots: [
+      {
+        isPaid: true,
+        isCanceledWithRemainingAccess: false,
+        isTrialing: false,
+        cancelAtPeriodEnd: true,
+        stripeSubscriptionId: "sub_resume_123",
+        billingInterval: "yearly",
+        currency: "usd",
+        additionalBusinesses: 1
+      },
+      {
+        isPaid: true,
+        isCanceledWithRemainingAccess: false,
+        isTrialing: false,
+        cancelAtPeriodEnd: false,
+        stripeSubscriptionId: "sub_resume_123",
+        billingInterval: "monthly",
+        currency: "usd",
+        additionalBusinesses: 1
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/resume")
+      .send({ billingInterval: "monthly" });
+
+    assert.equal(res.status, 200);
+
+    const resumeRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/subscriptions/sub_resume_123") &&
+      entry.body?.get("cancel_at_period_end") === "false" &&
+      entry.body?.get("items[0][id]") === "si_base_yearly"
+    );
+
+    assert.ok(resumeRequest, "Stripe subscription should be resumed with an item price update");
+    assert.equal(resumeRequest.body.get("items[0][price]"), "price_month_usd");
+    assert.equal(resumeRequest.body.get("items[1][id]"), "si_addon_yearly");
+    assert.equal(resumeRequest.body.get("items[1][price]"), "price_addon_month_usd");
+    assert.equal(resumeRequest.body.get("metadata[billing_interval]"), "monthly");
   } finally {
     fixture.cleanup();
   }
