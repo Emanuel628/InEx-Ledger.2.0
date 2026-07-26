@@ -419,9 +419,7 @@ app.use(express.static(publicDir, {
   index: false,
   setHeaders: setStaticAssetCacheHeaders
 }));
-app.get('/app-v3', (req, res) => {
-  res.redirect(302, '/app-v3/');
-});
+app.get('/app-v3', sendFrontendV3App);
 app.get('/app-v3/*', sendFrontendV3App);
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));

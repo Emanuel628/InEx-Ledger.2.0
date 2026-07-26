@@ -71,8 +71,24 @@ test("v3 API helpers point at legacy API routes instead of fake local data", () 
     "/api/mileage",
     "/api/exports",
     "/api/invoices-v1",
-    "/api/analytics"
+    "/api/analytics",
+    "/api/me/onboarding",
+    "/api/businesses",
+    "/api/privacy/settings"
   ]) {
     assert.match(libFiles, new RegExp(route.replace("/", "\\/")));
+  }
+});
+
+test("v3 public pages are mapped for direct URL routing", () => {
+  const appSource = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
+
+  for (const [page, slug] of [
+    ["Pricing", "pricing"],
+    ["Legal", "legal"],
+    ["Privacy", "privacy"],
+    ["Terms", "terms"]
+  ]) {
+    assert.match(appSource, new RegExp(`${page}: '${slug}'`));
   }
 });

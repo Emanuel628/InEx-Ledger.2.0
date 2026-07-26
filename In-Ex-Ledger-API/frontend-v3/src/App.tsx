@@ -111,6 +111,11 @@ const pageSlugByPage: Partial<Record<AppPage, string>> = {
   Settings: 'settings',
   Billing: 'billing',
   Subscription: 'subscription',
+  Landing: '',
+  Pricing: 'pricing',
+  Legal: 'legal',
+  Privacy: 'privacy',
+  Terms: 'terms',
   Sessions: 'sessions',
   ChangeEmail: 'change-email',
   Onboarding: 'onboarding',
@@ -178,7 +183,8 @@ function App() {
       .catch(() => {
         if (active) {
           setAuthUser(null)
-          setCurrentPage('Landing')
+          const requestedPage = getInitialPageFromPath()
+          setCurrentPage(requestedPage && publicPages.has(requestedPage) ? requestedPage : 'Landing')
         }
       })
       .finally(() => {
