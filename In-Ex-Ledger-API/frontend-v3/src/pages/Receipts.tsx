@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
   attachReceipt,
@@ -32,6 +33,7 @@ function Receipts(props: PageProps) {
   const [linkFilter, setLinkFilter] = useState<ReceiptLinkState | 'All'>('All')
   const [dataError, setDataError] = useState('')
   const [noticeVisible, dismissNotice] = useSessionDismissed('receipts-review')
+  useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
   const filteredReceipts = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
     return receiptRows.filter((receipt) => {

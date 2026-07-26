@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
   deleteTransaction,
@@ -58,6 +59,7 @@ function Transactions(props: PageProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const csvInputRef = useRef<HTMLInputElement | null>(null)
   const [noticeVisible, dismissNotice] = useSessionDismissed('transactions-review')
+  useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
 
   async function refreshPageData() {
     setLoadingData(true)

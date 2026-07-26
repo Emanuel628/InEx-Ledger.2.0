@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
   deleteAccount,
@@ -36,6 +37,7 @@ function Accounts(props: PageProps) {
   const [dataError, setDataError] = useState('')
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [noticeVisible, dismissNotice] = useSessionDismissed('accounts-details')
+  useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
   const filteredAccounts = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
     return accountRows.filter((account) => {

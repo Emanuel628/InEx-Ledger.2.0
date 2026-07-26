@@ -31,6 +31,12 @@ import Help from './pages/Help'
 import PlaceholderPage from './pages/PlaceholderPage'
 import { getCurrentUser, logoutUser, type AuthUser } from './lib/authApi'
 
+declare global {
+  interface Window {
+    __LUNA_ME__?: AuthUser | null
+  }
+}
+
 export type AppPage =
   | 'Transactions'
   | 'Accounts'
@@ -167,6 +173,10 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem('inex-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    window.__LUNA_ME__ = authUser
+  }, [authUser])
 
   useEffect(() => {
     let active = true

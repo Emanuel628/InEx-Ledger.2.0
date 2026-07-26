@@ -172,7 +172,7 @@ function resolveRequestedPageName(requestPath) {
     ? candidate.slice(0, -'.html'.length)
     : candidate;
 
-  return htmlPageNames.includes(pageName) ? pageName : null;
+  return htmlPageNames.includes(pageName) || V3_APP_PAGES.has(pageName) ? pageName : null;
 }
 
 function getNormalizedRequestHost(req) {
@@ -407,6 +407,14 @@ for (const pageName of htmlPageNames) {
   app.get(`/${pageName}.html`, (req, res) => {
     res.redirect(301, canonicalPath);
   });
+}
+
+for (const pageName of V3_APP_PAGES) {
+  if (htmlPageNames.includes(pageName)) {
+    continue;
+  }
+  const canonicalPath = getCanonicalPagePath(pageName);
+  app.get(canonicalPath, sendFrontendV3App);
 }
 app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/email/inbound', express.raw({ type: '*/*', limit: '256kb' }));

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Bell,
   Building2,
@@ -61,12 +61,28 @@ function AppShell({
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notifications, setNotifications] = useState(initialNotifications)
+  const topbarActionsRef = useRef<HTMLDivElement | null>(null)
   const goToPage = (page: AppPage) => {
     onNavigate(page)
     setMobileNavOpen(false)
     setUserMenuOpen(false)
     setNotificationsOpen(false)
   }
+
+  useEffect(() => {
+    if (!userMenuOpen && !notificationsOpen) return undefined
+
+    const closeTopbarMenus = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (topbarActionsRef.current?.contains(target)) return
+      setUserMenuOpen(false)
+      setNotificationsOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeTopbarMenus)
+    return () => document.removeEventListener('pointerdown', closeTopbarMenus)
+  }, [notificationsOpen, userMenuOpen])
 
   return (
     <div
@@ -154,7 +170,7 @@ function AppShell({
             <input type="search" placeholder={searchPlaceholder} />
           </div>
 
-          <div className="topbar-actions">
+          <div className="topbar-actions" ref={topbarActionsRef}>
             <button
               className="icon-button"
               type="button"

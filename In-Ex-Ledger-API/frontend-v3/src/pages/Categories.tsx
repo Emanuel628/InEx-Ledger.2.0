@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
   archiveCategory,
@@ -38,6 +39,7 @@ function Categories(props: PageProps) {
   const [dataError, setDataError] = useState('')
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [noticeVisible, dismissNotice] = useSessionDismissed('categories-review')
+  useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
   const businessRegion = props.authUser?.business?.type === 'CA' ? 'CA' : 'US'
   const filteredCategories = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()

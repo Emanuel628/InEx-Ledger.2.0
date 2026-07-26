@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import {
   blankInvoiceDraft,
   deleteInvoice,
@@ -41,6 +42,7 @@ function Invoices(props: PageProps) {
   const [pageSize, setPageSize] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
+  useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
 
   async function refreshInvoices() {
     setLoadingData(true)

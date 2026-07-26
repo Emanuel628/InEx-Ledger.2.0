@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import useOutsideActionMenu from '../hooks/useOutsideActionMenu'
 import useSessionDismissed from '../hooks/useSessionDismissed'
 import {
   blankMileageDraft,
@@ -52,6 +53,7 @@ function Mileage(props: PageProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [actionMenuId, setActionMenuId] = useState<string | null>(null)
   const [noticeVisible, dismissNotice] = useSessionDismissed('mileage-settings')
+  useOutsideActionMenu(Boolean(actionMenuId), () => setActionMenuId(null))
 
   async function refreshPageData() {
     setLoadingData(true)
