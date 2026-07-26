@@ -230,7 +230,7 @@ function Mileage(props: PageProps) {
         ) : null}
 
         <section className="mileage-focus-grid">
-          <article className="export-card mileage-quick-log decorative-card decorative-card-blue">
+          <article className="export-card mileage-quick-log">
             <div className="export-card-header">
               <div>
                 <p className="eyebrow">Quick entry</p>
@@ -255,7 +255,7 @@ function Mileage(props: PageProps) {
             <QuickEntryForm entryMode={entryMode} unitLabel={unitLabel} onSave={(draft) => saveMileageDraft(draft, null).then(refreshPageData)} />
           </article>
 
-          <article className="export-card mileage-planning-card decorative-card decorative-card-green">
+          <article className="export-card mileage-planning-card">
             <div className="export-card-header">
               <div>
                 <p className="eyebrow">Readiness</p>

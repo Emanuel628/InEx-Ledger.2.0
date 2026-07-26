@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
   FileText,
   Mail,
   MoreHorizontal,
@@ -32,7 +31,6 @@ import {
 function Invoices(props: PageProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingInvoice, setEditingInvoice] = useState<InvoiceRecord | null>(null)
-  const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
@@ -321,19 +319,6 @@ function Invoices(props: PageProps) {
             </label>
           </div>
         </section>
-
-        <section className="progressive-panels invoice-tools-panel" aria-label="Invoice tools">
-          <ProgressivePanel
-            id="tools"
-            title="Email and payment tools"
-            summary="Send, mark paid, deleted invoices"
-            expandedPanel={expandedPanel}
-            onToggle={setExpandedPanel}
-          >
-            Send invoice emails, mark sent invoices paid, void invoices that should no longer be collectible, and review
-            deleted drafts without putting those workflows on the first screen.
-          </ProgressivePanel>
-        </section>
       </main>
     </AppShell>
   )
@@ -497,35 +482,6 @@ function StatusPill({ status }: { status: InvoiceStatus }) {
             : 'status-needs-review'
 
   return <span className={`status-pill ${className}`}>{status}</span>
-}
-
-function ProgressivePanel({
-  id,
-  title,
-  summary,
-  expandedPanel,
-  onToggle,
-  children,
-}: {
-  id: string
-  title: string
-  summary: string
-  expandedPanel: string | null
-  onToggle: (id: string | null) => void
-  children: string
-}) {
-  const isExpanded = expandedPanel === id
-
-  return (
-    <article className="progressive-panel">
-      <button type="button" onClick={() => onToggle(isExpanded ? null : id)} aria-expanded={isExpanded}>
-        <span>{title}</span>
-        <strong>{summary}</strong>
-        <ChevronDown size={17} />
-      </button>
-      {isExpanded ? <p>{children}</p> : null}
-    </article>
-  )
 }
 
 function uniqueValues(values: string[]) {

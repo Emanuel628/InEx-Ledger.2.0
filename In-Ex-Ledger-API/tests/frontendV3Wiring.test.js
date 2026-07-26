@@ -195,7 +195,7 @@ test("v3 shell has an SPA-owned i18n runtime wired to business language", () => 
   assert.doesNotMatch(shellSource, /data-i18n/);
 });
 
-test("v3 header business switcher and search are wired instead of decorative", () => {
+test("v3 header business switcher and optional search are wired instead of decorative", () => {
   const shellSource = fs.readFileSync(path.join(frontendRoot, "components", "AppShell.tsx"), "utf8");
   const transactionsSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
   const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
@@ -208,8 +208,9 @@ test("v3 header business switcher and search are wired instead of decorative", (
   assert.match(shellSource, /aria-label=\{t\('shell\.business\.switch'\)\}/);
   assert.match(shellSource, /\{onSearch \? \(/);
   assert.match(shellSource, /onSearch\(event\.target\.value\)/);
-  assert.match(transactionsSource, /searchValue=\{searchTerm\}/);
-  assert.match(transactionsSource, /onSearch=\{\(value\) => updateFilter\(setSearchTerm, value\)\}/);
+  assert.doesNotMatch(transactionsSource, /searchValue=\{searchTerm\}/);
+  assert.doesNotMatch(transactionsSource, /onSearch=\{\(value\) => updateFilter\(setSearchTerm, value\)\}/);
+  assert.match(transactionsSource, /placeholder="Search transactions"[\s\S]*onChange=\{\(event\) => updateFilter\(setSearchTerm, event\.target\.value\)\}/);
   assert.match(cssSource, /\.business-dropdown/);
   assert.match(cssSource, /\.topbar-menus/);
 });
@@ -531,6 +532,32 @@ test("v3 collapsed sidebar keeps the header visible", () => {
   assert.match(cssSource, /\.sidebar-is-collapsed \.app-topbar[\s\S]*display: flex/);
   assert.match(cssSource, /\.sidebar-is-collapsed \.app-topbar[\s\S]*visibility: visible/);
   assert.match(cssSource, /\.app-topbar[\s\S]*z-index: 40/);
+});
+
+test("v3 logout resets next login to transactions instead of the prior app page", () => {
+  const source = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
+
+  assert.match(source, /setCurrentPage\('Landing'\)[\s\S]*window\.history\.replaceState\(\{\}, '', '\/'\)/);
+  assert.match(source, /return requestedPage \|\| 'Transactions'/);
+});
+
+test("v3 page polish removes redundant controls and decorations", () => {
+  const transactions = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const mileage = fs.readFileSync(path.join(frontendRoot, "pages", "Mileage.tsx"), "utf8");
+  const invoices = fs.readFileSync(path.join(frontendRoot, "pages", "Invoices.tsx"), "utf8");
+
+  assert.doesNotMatch(transactions, /onSearch=\{\(value\) => updateFilter\(setSearchTerm, value\)\}/);
+  assert.doesNotMatch(mileage, /mileage-quick-log decorative-card/);
+  assert.doesNotMatch(mileage, /mileage-planning-card decorative-card/);
+  assert.doesNotMatch(invoices, /invoice-tools-panel/);
+  assert.doesNotMatch(invoices, /Email and payment tools/);
+});
+
+test("phase 7 guardrails installs frontend v3 dependencies before i18n runtime checks", () => {
+  const workflow = fs.readFileSync(path.join(repoRoot, "..", ".github", "workflows", "phase7-guardrails.yml"), "utf8");
+
+  assert.match(workflow, /Install frontend v3 dependencies/);
+  assert.match(workflow, /working-directory: In-Ex-Ledger-API\/frontend-v3[\s\S]*run: npm install/);
 });
 
 test("legacy auth defaults avoid rapid v3 session expiry and refresh throttling", () => {

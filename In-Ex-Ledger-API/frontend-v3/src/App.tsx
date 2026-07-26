@@ -314,6 +314,9 @@ function App() {
     setAuthUser(user)
     if (!user) {
       setCurrentPage('Landing')
+      if (window.location.pathname !== '/') {
+        window.history.replaceState({}, '', '/')
+      }
       return
     }
 
