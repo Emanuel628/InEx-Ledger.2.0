@@ -158,17 +158,41 @@ test("v3 frontend dependencies are pinned", () => {
 
 test("v3 header notifications use real unread message counts without noisy local filler", () => {
   const source = fs.readFileSync(path.join(frontendRoot, "components", "AppShell.tsx"), "utf8");
+  const i18nSource = fs.readFileSync(path.join(frontendRoot, "lib", "i18n.ts"), "utf8");
 
   assert.match(source, /loadUnreadCounts/);
-  assert.match(source, /buildNotifications\(counts\)/);
-  assert.match(source, /support replies/);
-  assert.match(source, /unread emails/);
-  assert.match(source, /account notices/);
+  assert.match(source, /buildNotifications\(counts, language\)/);
+  assert.match(source, /formatCountLabel/);
+  assert.match(i18nSource, /support replies/);
+  assert.match(i18nSource, /unread emails/);
+  assert.match(i18nSource, /account notices/);
   assert.match(source, /window\.setInterval\(\(\) => void refreshNotifications\(\), 60000\)/);
   assert.doesNotMatch(source, /initialNotifications/);
   assert.doesNotMatch(source, /setNotifications\(\(items\) => items\.filter/);
   assert.doesNotMatch(source, /notification-clear/);
   assert.doesNotMatch(source, />Dismiss</);
+});
+
+test("v3 shell has an SPA-owned i18n runtime wired to business language", () => {
+  const appSource = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
+  const shellSource = fs.readFileSync(path.join(frontendRoot, "components", "AppShell.tsx"), "utf8");
+  const authSource = fs.readFileSync(path.join(frontendRoot, "lib", "authApi.ts"), "utf8");
+  const i18nSource = fs.readFileSync(path.join(frontendRoot, "lib", "i18n.ts"), "utf8");
+
+  assert.match(i18nSource, /export type AppLanguage = 'en' \| 'es' \| 'fr'/);
+  assert.match(i18nSource, /const translations = \{/);
+  assert.match(i18nSource, /getUserLanguage\(user: AuthUser \| null\)/);
+  assert.match(i18nSource, /user\?\.business\?\.language/);
+  assert.match(i18nSource, /document\.documentElement\.lang = language/);
+  assert.match(authSource, /language\?: string \| null/);
+  assert.match(authSource, /language: activeBusiness\.language \|\| null/);
+  assert.match(appSource, /getStoredLanguage/);
+  assert.match(appSource, /setStoredLanguage\(nextLanguage\)/);
+  assert.match(appSource, /translate\('app\.loading\.title', language\)/);
+  assert.match(shellSource, /const language = getUserLanguage\(authUser\)/);
+  assert.match(shellSource, /translate\(key, language\)/);
+  assert.match(shellSource, /i18nKey: 'shell\.nav\.transactions'/);
+  assert.doesNotMatch(shellSource, /data-i18n/);
 });
 
 test("v3 header business switcher and search are wired instead of decorative", () => {
@@ -181,7 +205,7 @@ test("v3 header business switcher and search are wired instead of decorative", (
   assert.match(shellSource, /getCurrentUser\(\)/);
   assert.match(shellSource, /window\.location\.reload\(\)/);
   assert.match(shellSource, /business-dropdown/);
-  assert.match(shellSource, /aria-label="Switch business"/);
+  assert.match(shellSource, /aria-label=\{t\('shell\.business\.switch'\)\}/);
   assert.match(shellSource, /\{onSearch \? \(/);
   assert.match(shellSource, /onSearch\(event\.target\.value\)/);
   assert.match(transactionsSource, /searchValue=\{searchTerm\}/);

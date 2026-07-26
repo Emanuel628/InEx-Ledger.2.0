@@ -30,6 +30,7 @@ import Onboarding from './pages/Onboarding'
 import Help from './pages/Help'
 import PlaceholderPage from './pages/PlaceholderPage'
 import { getCurrentUser, logoutUser, type AuthUser } from './lib/authApi'
+import { getStoredLanguage, getUserLanguage, setStoredLanguage, translate } from './lib/i18n'
 
 declare global {
   interface Window {
@@ -195,10 +196,17 @@ function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => (
     window.localStorage.getItem('inex-theme') === 'dark' ? 'dark' : 'light'
   ))
+  const [language, setLanguage] = useState(getStoredLanguage)
 
   useEffect(() => {
     window.localStorage.setItem('inex-theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    const nextLanguage = getUserLanguage(authUser)
+    setLanguage(nextLanguage)
+    setStoredLanguage(nextLanguage)
+  }, [authUser])
 
   useEffect(() => {
     window.__LUNA_ME__ = authUser
@@ -315,8 +323,8 @@ function App() {
     return (
       <div className="app-v3-loading" data-theme={theme} role="status" aria-live="polite">
         <div>
-          <strong>Loading InEx Ledger</strong>
-          <span>Checking your session...</span>
+          <strong>{translate('app.loading.title', language)}</strong>
+          <span>{translate('app.loading.body', language)}</span>
         </div>
       </div>
     )

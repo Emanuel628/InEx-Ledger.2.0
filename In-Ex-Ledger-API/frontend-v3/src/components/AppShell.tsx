@@ -24,19 +24,20 @@ import {
 import type { AppPage, PageProps } from '../App'
 import { getCurrentUser } from '../lib/authApi'
 import { activateBusiness, loadBusinesses, type BusinessRecord } from '../lib/businessesApi'
+import { formatCountLabel, getUserLanguage, translate, type TranslationKey } from '../lib/i18n'
 import { loadUnreadCounts } from '../lib/messagesApi'
 
 const navItems = [
-  { label: 'Transactions', icon: FileText },
-  { label: 'Accounts', icon: Landmark },
-  { label: 'Categories', icon: Tags },
-  { label: 'Receipts', icon: Receipt },
-  { label: 'Mileage', icon: Car },
-  { label: 'Exports', icon: Download },
-  { label: 'Invoices', icon: FolderTree },
-  { label: 'Analytics', icon: ChartNoAxesCombined },
-  { label: 'Messages', icon: MessageSquare },
-] satisfies { label: AppPage; icon: LucideIcon }[]
+  { label: 'Transactions', icon: FileText, i18nKey: 'shell.nav.transactions' },
+  { label: 'Accounts', icon: Landmark, i18nKey: 'shell.nav.accounts' },
+  { label: 'Categories', icon: Tags, i18nKey: 'shell.nav.categories' },
+  { label: 'Receipts', icon: Receipt, i18nKey: 'shell.nav.receipts' },
+  { label: 'Mileage', icon: Car, i18nKey: 'shell.nav.mileage' },
+  { label: 'Exports', icon: Download, i18nKey: 'shell.nav.exports' },
+  { label: 'Invoices', icon: FolderTree, i18nKey: 'shell.nav.invoices' },
+  { label: 'Analytics', icon: ChartNoAxesCombined, i18nKey: 'shell.nav.analytics' },
+  { label: 'Messages', icon: MessageSquare, i18nKey: 'shell.nav.messages' },
+] satisfies { label: AppPage; icon: LucideIcon; i18nKey: TranslationKey }[]
 
 type AppNotification = { id: string; title: string; body: string; page: AppPage }
 
@@ -65,6 +66,8 @@ function AppShell({
   overlay,
   hideTopbar = false,
 }: AppShellProps) {
+  const language = getUserLanguage(authUser)
+  const t = (key: TranslationKey) => translate(key, language)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [businessMenuOpen, setBusinessMenuOpen] = useState(false)
   const [businesses, setBusinesses] = useState<BusinessRecord[]>([])
@@ -112,7 +115,7 @@ function AppShell({
       })
       .catch((error) => {
         if (active) {
-          setBusinessError(error instanceof Error ? error.message : 'Unable to load businesses.')
+          setBusinessError(error instanceof Error ? error.message : t('shell.business.loadError'))
           setBusinesses([])
         }
       })
@@ -139,7 +142,7 @@ function AppShell({
       try {
         const counts = await loadUnreadCounts()
         if (!active) return
-        setNotifications(buildNotifications(counts))
+        setNotifications(buildNotifications(counts, language))
       } catch {
         if (active) {
           setNotifications([])
@@ -153,26 +156,26 @@ function AppShell({
       active = false
       window.clearInterval(interval)
     }
-  }, [authUser])
+  }, [authUser, language])
 
   return (
     <div
       className={`ledger-shell ${sidebarCollapsed ? 'sidebar-is-collapsed' : ''} ${mobileNavOpen ? 'mobile-nav-is-open' : ''}`}
       data-theme={theme}
     >
-      <aside className="app-sidebar" aria-label="Main navigation">
+      <aside className="app-sidebar" aria-label={t('shell.nav.main')}>
         <div className="brand-row">
           <div className="brand-mark" aria-hidden="true">
             <LogoMark />
           </div>
           <div className="brand-copy">
-            <strong>InEx Ledger</strong>
-            <span>Books without noise</span>
+            <strong>{t('shell.brand.name')}</strong>
+            <span>{t('shell.brand.tagline')}</span>
           </div>
         </div>
 
         <nav className="sidebar-nav">
-          {navItems.map(({ label, icon: Icon }) => (
+          {navItems.map(({ label, icon: Icon, i18nKey }) => (
             <button
               className={`sidebar-link ${activePage === label ? 'is-active' : ''}`}
               key={label}
@@ -182,7 +185,7 @@ function AppShell({
               }}
             >
               <Icon size={19} />
-              <span>{label}</span>
+              <span>{t(i18nKey)}</span>
             </button>
           ))}
         </nav>
@@ -190,11 +193,11 @@ function AppShell({
         <button
           className="sidebar-collapse"
           type="button"
-          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={sidebarCollapsed ? t('shell.sidebar.expand') : t('shell.sidebar.collapse')}
           onClick={() => setSidebarCollapsed((value) => !value)}
         >
           {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          <span>Collapse</span>
+          <span>{t('shell.sidebar.collapseLabel')}</span>
         </button>
       </aside>
 
@@ -202,7 +205,7 @@ function AppShell({
         <button
           className="mobile-nav-backdrop"
           type="button"
-          aria-label="Close navigation"
+          aria-label={t('shell.nav.close')}
           onClick={() => setMobileNavOpen(false)}
         />
       ) : null}
@@ -212,7 +215,7 @@ function AppShell({
           <button
             className="icon-button mobile-menu topbarless-mobile-menu"
             type="button"
-            aria-label="Open navigation"
+            aria-label={t('shell.nav.open')}
             aria-expanded={mobileNavOpen}
             onClick={() => setMobileNavOpen(true)}
           >
@@ -223,7 +226,7 @@ function AppShell({
           <button
             className="icon-button mobile-menu"
             type="button"
-            aria-label="Open navigation"
+            aria-label={t('shell.nav.open')}
             aria-expanded={mobileNavOpen}
             onClick={() => setMobileNavOpen(true)}
           >
@@ -235,7 +238,7 @@ function AppShell({
               <button
                 className="business-button"
                 type="button"
-                aria-label="Switch business"
+                aria-label={t('shell.business.switch')}
                 aria-expanded={businessMenuOpen}
                 onClick={() => {
                   setBusinessMenuOpen((value) => !value)
@@ -244,15 +247,15 @@ function AppShell({
                 }}
               >
                 <Building2 size={18} />
-                <span>{authUser?.business?.name || 'No business yet'}</span>
+                <span>{authUser?.business?.name || t('shell.business.none')}</span>
                 <ChevronDown size={16} />
               </button>
               {businessMenuOpen ? (
                 <div className="business-dropdown" role="menu">
-                  {businessLoading ? <p>Loading businesses...</p> : null}
+                  {businessLoading ? <p>{t('shell.business.loading')}</p> : null}
                   {businessError ? <p className="dropdown-error">{businessError}</p> : null}
                   {!businessLoading && !businessError && businesses.length === 0 ? (
-                    <p>No businesses found.</p>
+                    <p>{t('shell.business.empty')}</p>
                   ) : null}
                   {businesses.map((business) => (
                     <button
@@ -273,7 +276,7 @@ function AppShell({
                           onAuthChange(user)
                           window.location.reload()
                         } catch (error) {
-                          setBusinessError(error instanceof Error ? error.message : 'Unable to switch business.')
+                          setBusinessError(error instanceof Error ? error.message : t('shell.business.switchError'))
                         } finally {
                           setBusinessLoading(false)
                         }
@@ -312,7 +315,7 @@ function AppShell({
             <button
               className="icon-button"
               type="button"
-              aria-label="Notifications"
+              aria-label={t('shell.notifications.label')}
               aria-expanded={notificationsOpen}
               onClick={() => {
                 setNotificationsOpen((value) => !value)
@@ -326,7 +329,7 @@ function AppShell({
             <button
               className="user-menu"
               type="button"
-              aria-label="User menu"
+              aria-label={t('shell.user.menu')}
               aria-expanded={userMenuOpen}
               onClick={() => {
                 setUserMenuOpen((value) => !value)
@@ -334,8 +337,8 @@ function AppShell({
                 setNotificationsOpen(false)
               }}
             >
-              <div className="user-avatar">{authUser?.firstName?.charAt(0).toUpperCase() || 'U'}</div>
-              <span>{authUser?.firstName || 'User'}</span>
+              <div className="user-avatar">{authUser?.firstName?.charAt(0).toUpperCase() || t('shell.user.fallback').charAt(0)}</div>
+              <span>{authUser?.firstName || t('shell.user.fallback')}</span>
               <ChevronDown size={16} />
             </button>
             {userMenuOpen ? (
@@ -348,7 +351,7 @@ function AppShell({
                   }}
                 >
                   <SettingsIcon size={17} />
-                  <span>Settings</span>
+                  <span>{t('shell.user.settings')}</span>
                 </button>
                 <button
                   className="user-dropdown-signout"
@@ -359,15 +362,15 @@ function AppShell({
                   }}
                 >
                   <LogOut size={17} />
-                  <span>Sign out</span>
+                  <span>{t('shell.user.signOut')}</span>
                 </button>
               </div>
             ) : null}
             {notificationsOpen ? (
-              <div className="notification-menu" role="dialog" aria-label="Notifications">
+              <div className="notification-menu" role="dialog" aria-label={t('shell.notifications.label')}>
                 <div className="notification-menu-head">
-                  <strong>Notifications</strong>
-                  <button className="icon-button" type="button" aria-label="Close notifications" onClick={() => setNotificationsOpen(false)}>
+                  <strong>{t('shell.notifications.label')}</strong>
+                  <button className="icon-button" type="button" aria-label={t('shell.notifications.close')} onClick={() => setNotificationsOpen(false)}>
                     <X size={16} />
                   </button>
                 </div>
@@ -391,7 +394,7 @@ function AppShell({
                     ))}
                   </div>
                 ) : (
-                  <p className="notification-empty">No unread notifications.</p>
+                  <p className="notification-empty">{t('shell.notifications.empty')}</p>
                 )}
               </div>
             ) : null}
@@ -408,7 +411,7 @@ function AppShell({
   )
 }
 
-function buildNotifications(counts: { total?: number; messages?: number; support?: number; notifications?: number }) {
+function buildNotifications(counts: { total?: number; messages?: number; support?: number; notifications?: number }, language = getUserLanguage(null)) {
   const items: AppNotification[] = []
   const supportCount = Number(counts.support || 0)
   const noticeCount = Number(counts.notifications || 0)
@@ -417,8 +420,8 @@ function buildNotifications(counts: { total?: number; messages?: number; support
   if (supportCount > 0) {
     items.push({
       id: 'support',
-      title: supportCount === 1 ? 'Support reply' : `${supportCount} support replies`,
-      body: 'Open Messages to review support updates.',
+      title: formatCountLabel(supportCount, 'shell.notifications.supportOne', 'shell.notifications.supportMany', language),
+      body: translate('shell.notifications.supportBody', language),
       page: 'Messages',
     })
   }
@@ -426,8 +429,8 @@ function buildNotifications(counts: { total?: number; messages?: number; support
   if (messageCount > 0) {
     items.push({
       id: 'messages',
-      title: messageCount === 1 ? 'Unread email' : `${messageCount} unread emails`,
-      body: 'Open Messages to review email and invoice replies.',
+      title: formatCountLabel(messageCount, 'shell.notifications.messageOne', 'shell.notifications.messageMany', language),
+      body: translate('shell.notifications.messageBody', language),
       page: 'Messages',
     })
   }
@@ -435,8 +438,8 @@ function buildNotifications(counts: { total?: number; messages?: number; support
   if (noticeCount > 0) {
     items.push({
       id: 'account-notices',
-      title: noticeCount === 1 ? 'Account notice' : `${noticeCount} account notices`,
-      body: 'Open Messages to review account notifications.',
+      title: formatCountLabel(noticeCount, 'shell.notifications.noticeOne', 'shell.notifications.noticeMany', language),
+      body: translate('shell.notifications.noticeBody', language),
       page: 'Messages',
     })
   }

@@ -7,6 +7,7 @@ export type AuthBusiness = {
   currency: string
   tier: string
   region?: string | null
+  language?: string | null
 }
 
 export type AuthUser = {
@@ -217,6 +218,7 @@ function mapLegacyUser(user: LegacyUser | null): AuthUser | null {
       currency: activeBusiness.currency || (activeBusiness.region === 'CA' ? 'CAD' : 'USD'),
       tier,
       region: activeBusiness.region || null,
+      language: activeBusiness.language || null,
     } : null,
   }
 }
