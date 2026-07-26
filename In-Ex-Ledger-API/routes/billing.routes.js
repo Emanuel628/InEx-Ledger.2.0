@@ -48,6 +48,7 @@ const {
   metadataByPriceId: STRIPE_PRICE_METADATA_BY_ID
 } = buildStripePriceLookup();
 let resendClient = null;
+const portalConfigurationCache = new Map();
 
 class BillingValidationError extends Error {
   constructor(message) {
@@ -534,6 +535,100 @@ async function verifyStripePriceSelection(priceSelection) {
   prices.forEach((price, index) => {
     assertStripePriceMatchesBillingInterval(price, priceSelection.billingInterval, checks[index][0]);
   });
+}
+
+function getStripeProductIdFromPrice(price, label) {
+  const productId = typeof price?.product === "string" ? price.product : price?.product?.id;
+  if (!productId) {
+    throw new BillingValidationError(`${label} Stripe Price is missing a product.`);
+  }
+  return productId;
+}
+
+async function buildBillingPortalConfiguration(currency) {
+  const normalizedCurrency = normalizeCurrency(currency);
+  const cacheKey = `portal-config:${normalizedCurrency}`;
+  const cached = portalConfigurationCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const priceSpecs = [
+    {
+      label: "Monthly base",
+      interval: "monthly",
+      priceId: getConfiguredPriceId(
+        BASE_PRICE_ENV.monthly?.[normalizedCurrency],
+        "Monthly pricing is not configured yet for the selected currency."
+      )
+    },
+    {
+      label: "Yearly base",
+      interval: "yearly",
+      priceId: getConfiguredPriceId(
+        BASE_PRICE_ENV.yearly?.[normalizedCurrency],
+        "Yearly pricing is not configured yet for the selected currency."
+      )
+    },
+    {
+      label: "Monthly additional business",
+      interval: "monthly",
+      priceId: getConfiguredPriceId(
+        ADDON_PRICE_ENV.monthly?.[normalizedCurrency],
+        "Monthly additional business pricing is not configured yet for the selected currency."
+      )
+    },
+    {
+      label: "Yearly additional business",
+      interval: "yearly",
+      priceId: getConfiguredPriceId(
+        ADDON_PRICE_ENV.yearly?.[normalizedCurrency],
+        "Yearly additional business pricing is not configured yet for the selected currency."
+      )
+    }
+  ];
+
+  const prices = await Promise.all(priceSpecs.map((spec) => fetchStripePrice(spec.priceId)));
+  const products = new Map();
+  prices.forEach((price, index) => {
+    const spec = priceSpecs[index];
+    assertStripePriceMatchesBillingInterval(price, spec.interval, spec.label);
+    const productId = getStripeProductIdFromPrice(price, spec.label);
+    if (!products.has(productId)) {
+      products.set(productId, []);
+    }
+    products.get(productId).push(spec.priceId);
+  });
+
+  const payload = {
+    active: true,
+    "business_profile[headline]": "Manage InEx Ledger billing",
+    "features[customer_update][enabled]": true,
+    "features[customer_update][allowed_updates][0]": "email",
+    "features[customer_update][allowed_updates][1]": "tax_id",
+    "features[invoice_history][enabled]": true,
+    "features[payment_method_update][enabled]": true,
+    "features[subscription_cancel][enabled]": true,
+    "features[subscription_cancel][mode]": "at_period_end",
+    "features[subscription_update][enabled]": true,
+    "features[subscription_update][default_allowed_updates][0]": "price",
+    "features[subscription_update][default_allowed_updates][1]": "quantity",
+    "features[subscription_update][proration_behavior]": "create_prorations"
+  };
+
+  Array.from(products.entries()).forEach(([productId, priceIds], productIndex) => {
+    payload[`features[subscription_update][products][${productIndex}][product]`] = productId;
+    priceIds.forEach((priceId, priceIndex) => {
+      payload[`features[subscription_update][products][${productIndex}][prices][${priceIndex}]`] = priceId;
+    });
+  });
+
+  const configuration = await stripeRequest("/billing_portal/configurations", payload);
+  if (!configuration?.id) {
+    throw new Error("Stripe Billing Portal configuration was not created.");
+  }
+  portalConfigurationCache.set(cacheKey, configuration.id);
+  return configuration.id;
 }
 
 function shouldVerifyStripeSubscriptionSnapshot(subscription) {
@@ -1035,14 +1130,31 @@ router.post("/checkout-session", requireAuth, requireCsrfProtection, billingMuta
 router.post("/customer-portal", requireAuth, requireCsrfProtection, billingMutationLimiter, async (req, res) => {
   try {
     const { billingBusinessId } = await resolveBillingBusinessScope(req.user);
+    const subscription = await refreshStripeBackedSubscriptionSnapshot(billingBusinessId);
+    const billingContext = await resolveBillingContext(req);
+    const portalCurrency = resolveCheckoutCurrency(subscription, billingContext);
+    const configurationId = await buildBillingPortalConfiguration(portalCurrency);
     const customerId = await ensureStripeCustomer(billingBusinessId, req.user);
-    const session = await stripeRequest("/billing_portal/sessions", {
+    const sessionPayload = {
       customer: customerId,
+      configuration: configurationId,
       return_url: buildAppUrl("/subscription")
-    });
+    };
+
+    if (subscription?.stripeSubscriptionId) {
+      sessionPayload["flow_data[type]"] = "subscription_update";
+      sessionPayload["flow_data[subscription_update][subscription]"] = subscription.stripeSubscriptionId;
+      sessionPayload["flow_data[after_completion][type]"] = "redirect";
+      sessionPayload["flow_data[after_completion][redirect][return_url]"] = buildAppUrl("/subscription?billing=updated");
+    }
+
+    const session = await stripeRequest("/billing_portal/sessions", sessionPayload);
     logInfo("Billing portal session created", {
       userId: req.user?.id,
-      businessId: billingBusinessId
+      businessId: billingBusinessId,
+      currency: portalCurrency,
+      configurationId,
+      hasSubscriptionUpdateFlow: Boolean(subscription?.stripeSubscriptionId)
     });
     res.status(200).json({ url: session.url });
   } catch (err) {

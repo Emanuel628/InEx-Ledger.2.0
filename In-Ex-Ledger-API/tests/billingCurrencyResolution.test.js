@@ -280,14 +280,14 @@ function loadBillingRouter({
     if (String(url).includes("/prices/")) {
       const priceId = String(url).split("/prices/")[1];
       const catalog = {
-        price_month_usd: { id: "price_month_usd", unit_amount: 1200, recurring: { interval: "month" } },
-        price_month_cad: { id: "price_month_cad", unit_amount: 1700, recurring: { interval: "month" } },
-        price_year_usd: { id: "price_year_usd", unit_amount: 12240, recurring: { interval: "year" } },
-        price_year_cad: { id: "price_year_cad", unit_amount: 17500, recurring: { interval: "year" } },
-        price_addon_month_usd: { id: "price_addon_month_usd", unit_amount: 500, recurring: { interval: "month" } },
-        price_addon_month_cad: { id: "price_addon_month_cad", unit_amount: 700, recurring: { interval: "month" } },
-        price_addon_year_usd: { id: "price_addon_year_usd", unit_amount: 5100, recurring: { interval: "year" } },
-        price_addon_year_cad: { id: "price_addon_year_cad", unit_amount: 7200, recurring: { interval: "year" } },
+        price_month_usd: { id: "price_month_usd", product: "prod_base_usd", unit_amount: 1200, recurring: { interval: "month" } },
+        price_month_cad: { id: "price_month_cad", product: "prod_base_cad", unit_amount: 1700, recurring: { interval: "month" } },
+        price_year_usd: { id: "price_year_usd", product: "prod_base_usd", unit_amount: 12240, recurring: { interval: "year" } },
+        price_year_cad: { id: "price_year_cad", product: "prod_base_cad", unit_amount: 17500, recurring: { interval: "year" } },
+        price_addon_month_usd: { id: "price_addon_month_usd", product: "prod_addon_usd", unit_amount: 500, recurring: { interval: "month" } },
+        price_addon_month_cad: { id: "price_addon_month_cad", product: "prod_addon_cad", unit_amount: 700, recurring: { interval: "month" } },
+        price_addon_year_usd: { id: "price_addon_year_usd", product: "prod_addon_usd", unit_amount: 5100, recurring: { interval: "year" } },
+        price_addon_year_cad: { id: "price_addon_year_cad", product: "prod_addon_cad", unit_amount: 7200, recurring: { interval: "year" } },
         ...priceOverrides
       };
       const price = catalog[priceId];
@@ -351,6 +351,15 @@ function loadBillingRouter({
         json: async () => ({
           id: "cs_test_123",
           url: "https://checkout.stripe.com/pay/cs_test_123"
+        })
+      };
+    }
+
+    if (String(url).endsWith("/billing_portal/configurations")) {
+      return {
+        ok: true,
+        json: async () => ({
+          id: "bpc_test_123"
         })
       };
     }
@@ -532,6 +541,55 @@ test("legacy billing cancel portal endpoint schedules cancellation directly", as
     );
 
     assert.ok(cancelRequest, "Stripe subscription should be scheduled to cancel in place");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("billing portal sessions use a configuration with monthly and yearly plan choices", async () => {
+  const fixture = loadBillingRouter({
+    country: "United States",
+    subscriptionSnapshots: [
+      {
+        stripeSubscriptionId: "sub_test_update_123",
+        stripeCustomerId: "cus_test_123",
+        effectiveTier: "v1",
+        isPaid: true,
+        isTrialing: false,
+        cancelAtPeriodEnd: true,
+        billingInterval: "yearly",
+        currency: "usd"
+      }
+    ]
+  });
+
+  try {
+    const res = await request(fixture.app)
+      .post("/api/billing/customer-portal")
+      .send({});
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.url, "https://billing.stripe.com/p/session/test_123");
+
+    const configRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/billing_portal/configurations")
+    );
+    assert.ok(configRequest, "Stripe portal configuration should be created by the app");
+    assert.equal(configRequest.body.get("features[subscription_update][enabled]"), "true");
+    assert.equal(configRequest.body.get("features[subscription_update][default_allowed_updates][0]"), "price");
+    assert.equal(configRequest.body.get("features[subscription_update][products][0][product]"), "prod_base_usd");
+    assert.equal(configRequest.body.get("features[subscription_update][products][0][prices][0]"), "price_month_usd");
+    assert.equal(configRequest.body.get("features[subscription_update][products][0][prices][1]"), "price_year_usd");
+    assert.equal(configRequest.body.get("features[subscription_update][products][1][product]"), "prod_addon_usd");
+    assert.equal(configRequest.body.get("features[subscription_update][products][1][prices][0]"), "price_addon_month_usd");
+    assert.equal(configRequest.body.get("features[subscription_update][products][1][prices][1]"), "price_addon_year_usd");
+
+    const portalRequest = fixture.state.stripeRequests.find((entry) =>
+      String(entry.url).endsWith("/billing_portal/sessions")
+    );
+    assert.equal(portalRequest.body.get("configuration"), "bpc_test_123");
+    assert.equal(portalRequest.body.get("flow_data[type]"), "subscription_update");
+    assert.equal(portalRequest.body.get("flow_data[subscription_update][subscription]"), "sub_test_update_123");
   } finally {
     fixture.cleanup();
   }

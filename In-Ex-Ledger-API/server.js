@@ -511,16 +511,14 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/favicon.ico', (req, res) => {
-  res.redirect(301, '/favicon.svg');
+  res.redirect(301, '/brand/inex-mark-color.svg?v=20260726a');
 });
 
 app.get('/favicon.svg', (req, res) => {
-  res.sendFile(path.join(publicDir, 'favicon.svg'));
+  res.redirect(301, '/brand/inex-mark-color.svg?v=20260726a');
 });
 
-app.get('/', (req, res) => {
-  sendCanonicalPage('landing', req, res);
-});
+app.get('/', sendFrontendV3App);
 
 app.get('/index.html', (req, res) => {
   res.redirect(301, '/');

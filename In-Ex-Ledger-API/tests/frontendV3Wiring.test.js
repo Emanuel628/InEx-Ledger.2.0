@@ -146,6 +146,27 @@ test("v3 legacy app-v3 redirects have one server owner", () => {
   assert.doesNotMatch(source, /app\.get\('\/app-v3\/\*'/);
 });
 
+test("v3 root landing uses the React shell and current favicon", () => {
+  const serverSource = fs.readFileSync(path.join(repoRoot, "server.js"), "utf8");
+  const indexSource = fs.readFileSync(path.join(repoRoot, "frontend-v3", "index.html"), "utf8");
+
+  assert.match(serverSource, /app\.get\('\/', sendFrontendV3App\)/);
+  assert.doesNotMatch(serverSource, /app\.get\('\/', \(req, res\)[\s\S]*sendCanonicalPage\('landing'/);
+  assert.match(indexSource, /\/brand\/inex-mark-color\.svg\?v=20260726a/);
+});
+
+test("v3 row action menus are positioned against the viewport to avoid table clipping", () => {
+  const hookSource = fs.readFileSync(path.join(frontendRoot, "hooks", "useOutsideActionMenu.ts"), "utf8");
+  const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
+
+  assert.match(hookSource, /positionOpenActionMenu/);
+  assert.match(hookSource, /getBoundingClientRect/);
+  assert.match(hookSource, /--row-action-menu-left/);
+  assert.match(hookSource, /window\.addEventListener\('scroll', reposition, true\)/);
+  assert.match(cssSource, /\.row-action-menu\s*\{[\s\S]*position: fixed/);
+  assert.match(cssSource, /max-height: calc\(100vh - 24px\)/);
+});
+
 test("v3 frontend dependencies are pinned", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "frontend-v3", "package.json"), "utf8"));
   for (const section of ["dependencies", "devDependencies"]) {

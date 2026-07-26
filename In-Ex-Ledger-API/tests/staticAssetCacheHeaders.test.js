@@ -60,6 +60,15 @@ test("core app routes serve the v3 frontend shell", async () => {
   }
 });
 
+test("root landing serves the v3 frontend shell", async () => {
+  const response = await request(app).get("/").expect(200);
+
+  assert.match(response.text, /\/app-v3\/assets\//);
+  assert.match(response.text, /\/brand\/inex-mark-color\.svg\?v=20260726a/);
+  assert.ok(!response.headers["x-robots-tag"]);
+  assertNoStore(response);
+});
+
 test("legacy app-v3 page routes redirect to canonical bare app routes", async () => {
   const nested = await request(app)
     .get("/app-v3/transactions?type=income")
