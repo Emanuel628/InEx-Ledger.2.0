@@ -36,8 +36,12 @@
   height: 38px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #29d4ff, #175cff);
+}
+
+.auth-brand img {
+  width: 34px;
+  height: 34px;
+  display: block;
 }
 
 .auth-card {

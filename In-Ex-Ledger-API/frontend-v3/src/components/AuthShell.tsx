@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { BarChart3 } from 'lucide-react'
 import type { AppPage, ThemeMode } from '../App'
 
 type AuthShellProps = {
@@ -14,7 +13,7 @@ function AuthShell({ theme, onNavigate, children }: AuthShellProps) {
       <section className="auth-brand-panel">
         <button className="auth-brand" type="button" onClick={() => onNavigate('Landing')}>
           <span>
-            <BarChart3 size={22} />
+            <img src="/brand/inex-mark-color.svg" alt="" aria-hidden="true" />
           </span>
           InEx Ledger
         </button>

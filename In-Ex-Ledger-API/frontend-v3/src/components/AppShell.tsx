@@ -448,13 +448,7 @@ function buildNotifications(counts: { total?: number; messages?: number; support
 }
 
 function LogoMark() {
-  return (
-    <svg viewBox="0 0 32 32" aria-hidden="true">
-      <rect x="4" y="14" width="5" height="12" rx="1.6" />
-      <rect x="13.5" y="8" width="5" height="18" rx="1.6" />
-      <rect x="23" y="4" width="5" height="22" rx="1.6" />
-    </svg>
-  )
+  return <img src="/brand/inex-mark-onnavy.svg" alt="" aria-hidden="true" />
 }
 
 export default AppShell

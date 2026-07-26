@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { BarChart3 } from 'lucide-react'
 import type { AppPage, ThemeMode } from '../App'
 
 type PublicShellProps = {
@@ -14,7 +13,7 @@ function PublicShell({ theme, onNavigate, children }: PublicShellProps) {
       <header className="public-header">
         <button className="public-brand" type="button" onClick={() => onNavigate('Landing')}>
           <span>
-            <BarChart3 size={22} />
+            <img src="/brand/inex-mark-color.svg" alt="" aria-hidden="true" />
           </span>
           InEx Ledger
         </button>
@@ -28,7 +27,10 @@ function PublicShell({ theme, onNavigate, children }: PublicShellProps) {
 
       <footer className="public-footer">
         <div>
-          <strong>InEx Ledger</strong>
+          <strong>
+            <img src="/brand/inex-mark-color.svg" alt="" aria-hidden="true" />
+            InEx Ledger
+          </strong>
           <span>Clean books without the accounting headache.</span>
         </div>
         <nav aria-label="Legal links">
