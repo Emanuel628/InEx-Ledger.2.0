@@ -54,6 +54,7 @@ function Accounts(props: PageProps) {
   const bankCount = accountRows.filter((account) => ['Checking', 'Savings'].includes(account.type)).length
   const creditCardCount = accountRows.filter((account) => account.type === 'Credit Card').length
   const needsDetailsCount = accountRows.filter((account) => account.status === 'Needs details').length
+  const accountCurrency = resolveAccountCurrency(props.authUser?.business?.currency, props.authUser?.business?.region || props.authUser?.business?.type)
 
   async function refreshAccounts() {
     setDataError('')
@@ -154,7 +155,7 @@ function Accounts(props: PageProps) {
             <SummaryItem label="Active accounts" value={String(activeCount)} tone="net" icon={Wallet} />
             <SummaryItem label="Bank accounts" value={String(bankCount)} tone="income" icon={Landmark} />
             <SummaryItem label="Credit cards" value={String(creditCardCount)} tone="expense" icon={CreditCard} />
-            <SummaryItem label="Currency" value="USD" tone="review" icon={Wallet} />
+            <SummaryItem label="Currency" value={accountCurrency} tone="review" icon={Wallet} />
           </section>
 
           <section className="table-panel">
@@ -399,6 +400,11 @@ function AccountDrawer({
 
 function getAccountInitial(name: string) {
   return name.trim().charAt(0).toUpperCase()
+}
+
+function resolveAccountCurrency(currency?: string | null, region?: string | null) {
+  if (String(currency || '').toUpperCase() === 'CAD') return 'CAD'
+  return String(region || '').toUpperCase() === 'CA' ? 'CAD' : 'USD'
 }
 
 export default Accounts

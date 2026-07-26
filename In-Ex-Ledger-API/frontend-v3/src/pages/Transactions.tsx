@@ -50,6 +50,8 @@ import {
 } from '../lib/transactionsApi'
 import { uploadReceipt } from '../lib/receiptsApi'
 
+const TRANSACTION_PAGE_SIZE_KEY = 'inex-v3-transactions-page-size'
+
 function Transactions(props: PageProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
@@ -74,7 +76,7 @@ function Transactions(props: PageProps) {
   const [accountFilter, setAccountFilter] = useState('All')
   const [startDateFilter, setStartDateFilter] = useState('')
   const [endDateFilter, setEndDateFilter] = useState('')
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(readSavedPageSize)
   const [currentPage, setCurrentPage] = useState(1)
   const [undoCount, setUndoCount] = useState(0)
   const [undoMessage, setUndoMessage] = useState('')
@@ -140,6 +142,14 @@ function Transactions(props: PageProps) {
   const netTotal = incomeTotal - expenseTotal
   const estimatedTax = Math.max(0, netTotal) * (taxProfile?.rate ?? 0.24)
   const reviewCount = reviewQueue.summary?.total ?? transactionRows.filter((row) => row.status !== 'Cleared' || row.receipt === 'Missing').length
+
+  function updatePageSize(value: number) {
+    const normalized = [10, 20, 50].includes(value) ? value : 20
+    setPageSize(normalized)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(TRANSACTION_PAGE_SIZE_KEY, String(normalized))
+    }
+  }
 
   useEffect(() => {
     setCurrentPage(1)
@@ -368,18 +378,21 @@ function Transactions(props: PageProps) {
             </section>
           ) : null}
 
-          <section className="summary-strip" aria-label="Transaction summary">
-            <SummaryItem label="Estimated tax" value={formatMoney(estimatedTax)} tone="tax" icon={CircleDollarSign} />
-            <SummaryItem label="Net" value={formatMoney(netTotal)} tone="net" icon={CircleDollarSign} />
-            <SummaryItem label="Income" value={formatMoney(incomeTotal)} tone="income" icon={TrendingUp} />
-            <SummaryItem label="Expenses" value={formatMoney(expenseTotal)} tone="expense" icon={TrendingDown} />
-          </section>
-
-          <section className="tax-profile-note" aria-label="Estimated tax profile">
-            <Info size={17} />
-            <div>
-              <strong>{taxProfile?.label || 'Estimated tax'}</strong>
-              <span>{taxProfile?.note || 'Draft estimate for review before export.'}</span>
+          <section className="summary-with-tax-info" aria-label="Transaction summary">
+            <div className="summary-strip">
+              <SummaryItem label="Estimated tax" value={formatMoney(estimatedTax)} tone="tax" icon={CircleDollarSign} />
+              <SummaryItem label="Net" value={formatMoney(netTotal)} tone="net" icon={CircleDollarSign} />
+              <SummaryItem label="Income" value={formatMoney(incomeTotal)} tone="income" icon={TrendingUp} />
+              <SummaryItem label="Expenses" value={formatMoney(expenseTotal)} tone="expense" icon={TrendingDown} />
+            </div>
+            <div className="tax-info-hover">
+              <button className="tax-info-trigger" type="button" aria-label="Estimated tax details">
+                <Info size={16} />
+              </button>
+              <div className="tax-info-popover tax-profile-note-popover" role="tooltip">
+                <strong>{taxProfile?.label || 'Estimated tax'}</strong>
+                <span>{taxProfile?.note || 'Draft estimate for review before export.'}</span>
+              </div>
             </div>
           </section>
 
@@ -565,7 +578,7 @@ function Transactions(props: PageProps) {
                 </button>
               </div>
               <label className="secondary-button per-page-button">
-                <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
+                <select value={pageSize} onChange={(event) => updatePageSize(Number(event.target.value))}>
                   <option value={10}>10 per page</option>
                   <option value={20}>20 per page</option>
                   <option value={50}>50 per page</option>
@@ -911,6 +924,7 @@ function ReviewQueuePanel({
           item.issueLabels.length
             ? item.issueLabels
             : item.issueEntries.map((entry) => entry.label || entry.issueCode || 'Review needed'),
+          item.description,
         )
         const actionLabel = item.quickAction?.label || 'Review'
 
@@ -1100,7 +1114,7 @@ function RecurringTemplateModal({
               <option value="">Select category</option>
               {categories
                 .filter((category) => category.kind === (isIncome ? 'income' : 'expense'))
-                .map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}
+                .map((category) => <option value={category.id} key={category.id}>{category.displayLabel}</option>)}
             </select>
           </label>
           <div className="form-grid-2">
@@ -1257,7 +1271,7 @@ function TransactionDrawer({
               <option value="">Select category</option>
               {categories
                 .filter((category) => category.kind === (isIncome ? 'income' : 'expense'))
-                .map((category) => <option value={category.name} key={category.id}>{category.name}</option>)}
+                .map((category) => <option value={category.name} key={category.id}>{category.displayLabel}</option>)}
               <option value="__manage_categories__">Manage categories...</option>
             </select>
           </label>
@@ -1325,7 +1339,7 @@ function TransactionDetailsModal({
   const reviewItem = transaction.reviewIssues[0]
   const reviewLabels = normalizeReviewLabels(reviewItem?.issueLabels?.length
     ? reviewItem.issueLabels.map(reviewText).filter(Boolean)
-    : reviewItem?.issueEntries?.map((entry) => reviewText(entry.label) || reviewText(entry.issueCode) || 'Review needed') || [])
+    : reviewItem?.issueEntries?.map((entry) => reviewText(entry.label) || reviewText(entry.issueCode) || 'Review needed') || [], transaction.description)
   const reviewSummary = reviewText(reviewItem?.supportSummary)
     || reviewText(reviewItem?.reviewNotes)
     || reviewText(reviewItem?.categoryReason)
@@ -1516,20 +1530,54 @@ function reviewLabelsFor(transaction: Transaction) {
     const summaries = [issue.supportSummary, issue.reviewNotes].map(reviewText).filter(Boolean)
 
     return [...directLabels, ...entryLabels, ...summaries]
-  }))
+  }), transaction.description)
 }
 
-function normalizeReviewLabels(labels: string[]) {
+function normalizeReviewLabels(labels: string[], description = '') {
   const seen = new Set<string>()
+  const hasDescription = hasUsableDescription(description)
   return labels
     .map((label) => reviewText(label).trim())
+    .map(canonicalReviewLabel)
     .filter((label) => {
       if (!label || /^mapped$/i.test(label)) return false
-      const key = label.toLowerCase()
+      const key = reviewLabelKey(label)
+      if (key === 'description' && hasDescription) return false
       if (seen.has(key)) return false
       seen.add(key)
       return true
     })
+}
+
+function canonicalReviewLabel(label: string) {
+  if (/description|merchant|vendor|memo|payer/i.test(label) && /missing|required|needed|blank|empty|add/i.test(label)) {
+    return 'Description is missing'
+  }
+  if (/receipt|support|source document|proof/i.test(label) && /missing|required|needed|attach|upload/i.test(label)) {
+    return 'Receipt or support missing'
+  }
+  if (/category|tax mapping|tax line|deduct/i.test(label) && /missing|required|needed|map|uncategorized/i.test(label)) {
+    return 'Tax mapping needed'
+  }
+  return label
+}
+
+function reviewLabelKey(label: string) {
+  if (/^description is missing$/i.test(label)) return 'description'
+  if (/^receipt or support missing$/i.test(label)) return 'receipt_support'
+  if (/^tax mapping needed$/i.test(label)) return 'tax_mapping'
+  return label.toLowerCase()
+}
+
+function hasUsableDescription(description: string) {
+  const normalized = description.trim().toLowerCase()
+  return Boolean(normalized && normalized !== 'untitled transaction' && normalized !== '(no description)')
+}
+
+function readSavedPageSize() {
+  if (typeof window === 'undefined') return 20
+  const saved = Number(window.localStorage.getItem(TRANSACTION_PAGE_SIZE_KEY))
+  return [10, 20, 50].includes(saved) ? saved : 20
 }
 
 function reviewText(value: unknown): string {

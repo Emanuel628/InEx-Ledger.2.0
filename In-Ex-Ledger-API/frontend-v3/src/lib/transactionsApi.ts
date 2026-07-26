@@ -1,4 +1,5 @@
 import { apiRequest } from './apiClient'
+import { getTaxLineOptions } from './categoriesApi'
 
 export type TransactionStatus = 'Cleared' | 'Needs review' | 'Missing receipt' | 'Draft'
 
@@ -42,6 +43,9 @@ export type CategoryOption = {
   name: string
   kind: 'income' | 'expense'
   isActive: boolean
+  taxLine: string
+  taxLineLabel: string
+  displayLabel: string
 }
 
 export type BusinessTaxProfile = {
@@ -142,6 +146,9 @@ type LegacyCategoryOption = {
   kind?: 'income' | 'expense' | null
   type?: 'income' | 'expense' | 'Income' | 'Expense' | null
   is_active?: boolean
+  tax_map_us?: string | null
+  tax_map_ca?: string | null
+  business_region?: string | null
 }
 
 type ListResponse = {
@@ -219,7 +226,7 @@ export async function saveTransactionDraft(
     ? { id: transaction.accountId, name: transaction.account }
     : accounts.find((item) => item.name === draft.account)
   const category = transaction && transaction.category === draft.category
-    ? { id: transaction.categoryId, name: transaction.category, kind, isActive: true }
+    ? { id: transaction.categoryId, name: transaction.category, kind, isActive: true, taxLine: '', taxLineLabel: '', displayLabel: transaction.category }
     : categories.find((item) => item.name === draft.category && item.kind === kind)
     || categories.find((item) => item.name === draft.category)
   const amount = Number(draft.amount.replace(/[$,]/g, ''))
@@ -410,11 +417,17 @@ function mapRecurringTemplate(row: LegacyRecurringTemplate): RecurringTemplate {
 
 function mapCategoryOption(category: LegacyCategoryOption): CategoryOption {
   const rawKind = String(category.kind || category.type || '').toLowerCase()
+  const businessRegion = String(category.business_region || '').toUpperCase() === 'CA' ? 'CA' : 'US'
+  const taxLine = businessRegion === 'CA' ? category.tax_map_ca || '' : category.tax_map_us || ''
+  const taxLineLabel = getTaxLineOptions(businessRegion).find((option) => option.value === taxLine)?.label || taxLine || 'No tax line yet'
   return {
     id: category.id,
     name: category.name,
     kind: rawKind === 'income' ? 'income' : 'expense',
     isActive: category.is_active !== false,
+    taxLine,
+    taxLineLabel,
+    displayLabel: `${category.name} - ${taxLineLabel}`,
   }
 }
 

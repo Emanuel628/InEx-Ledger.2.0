@@ -6,6 +6,7 @@ export type AuthBusiness = {
   type: string
   currency: string
   tier: string
+  region?: string | null
 }
 
 export type AuthUser = {
@@ -14,6 +15,7 @@ export type AuthUser = {
   firstName: string
   lastName: string
   emailVerified: boolean
+  mfaEnabled: boolean
   tier: 'free' | 'pro' | 'business'
   currentBusinessId: string | null
   business: AuthBusiness | null
@@ -44,6 +46,7 @@ type LegacyUser = {
   display_name?: string
   role?: string
   email_verified?: boolean
+  mfa_enabled?: boolean
   business_id?: string | null
   active_business_id?: string | null
   active_business?: LegacyBusiness | null
@@ -204,6 +207,7 @@ function mapLegacyUser(user: LegacyUser | null): AuthUser | null {
     firstName: firstName || user.display_name || '',
     lastName: lastNameParts.join(' '),
     emailVerified: Boolean(user.email_verified),
+    mfaEnabled: Boolean(user.mfa_enabled),
     tier,
     currentBusinessId: user.active_business_id || user.business_id || activeBusiness?.id || null,
     business: activeBusiness?.id ? {
@@ -212,8 +216,30 @@ function mapLegacyUser(user: LegacyUser | null): AuthUser | null {
       type: activeBusiness.region || 'business',
       currency: activeBusiness.currency || (activeBusiness.region === 'CA' ? 'CAD' : 'USD'),
       tier,
+      region: activeBusiness.region || null,
     } : null,
   }
+}
+
+export async function loadMfaStatus() {
+  return authRequest<{ enabled?: boolean; enabled_at?: string | null; delivery?: string }>('/api/auth/mfa/status')
+}
+
+export async function requestMfaToggle(enabled: boolean) {
+  return authRequest<{ pending_verification?: boolean; mfa_token?: string; message?: string; status?: { enabled?: boolean } }>(
+    enabled ? '/api/auth/mfa/enable' : '/api/auth/mfa/disable',
+    { method: 'POST', body: JSON.stringify({}) },
+  )
+}
+
+export async function confirmMfaToggle(enabled: boolean, mfaToken: string, code: string) {
+  return authRequest<{ message?: string; status?: { enabled?: boolean } }>(
+    enabled ? '/api/auth/mfa/enable' : '/api/auth/mfa/disable',
+    {
+      method: 'POST',
+      body: JSON.stringify({ mfaToken, code }),
+    },
+  )
 }
 
 function normalizeTier(value?: string | null): AuthUser['tier'] {

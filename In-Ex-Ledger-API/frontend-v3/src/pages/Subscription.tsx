@@ -16,8 +16,17 @@ import {
   type BillingPricing,
   type BillingSubscription,
 } from '../lib/billingApi'
+import {
+  activateBusiness,
+  createBusiness,
+  deleteBusiness,
+  loadBusinesses,
+  type BusinessRecord,
+} from '../lib/businessesApi'
+import { refreshCurrentUser } from '../lib/settingsApi'
 
 type SubscriptionBusiness = { name: string; role: string; status: string }
+type SubscriptionModal = 'add-business' | 'manage-business' | null
 
 function Subscription(props: PageProps) {
   const [interval, setBillingInterval] = useState<BillingInterval>(() => {
@@ -29,10 +38,20 @@ function Subscription(props: PageProps) {
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
   const [working, setWorking] = useState(false)
+  const [businessRows, setBusinessRows] = useState<BusinessRecord[]>([])
+  const [activeBusinessId, setActiveBusinessId] = useState<string | null>(props.authUser?.currentBusinessId || null)
+  const [modal, setModal] = useState<SubscriptionModal>(null)
+  const [selectedBusiness, setSelectedBusiness] = useState<BusinessRecord | null>(null)
 
-  const businesses: SubscriptionBusiness[] = props.authUser?.business?.name
-    ? [{ name: props.authUser.business.name, role: 'Workspace owner', status: 'Active' }]
-    : []
+  const businesses: SubscriptionBusiness[] = businessRows.length
+    ? businessRows.map((business) => ({
+      name: business.name,
+      role: business.id === activeBusinessId ? 'Active workspace' : 'Workspace',
+      status: business.id === activeBusinessId ? 'Active' : 'Available',
+    }))
+    : props.authUser?.business?.name
+      ? [{ name: props.authUser.business.name, role: 'Active workspace', status: 'Active' }]
+      : []
 
   async function refreshSubscription() {
     setLoadingData(true)
@@ -60,7 +79,33 @@ function Subscription(props: PageProps) {
 
   useEffect(() => {
     void refreshSubscription()
+    void refreshBusinesses()
   }, [])
+
+  useEffect(() => {
+    document.body.classList.toggle('modal-is-open', Boolean(modal))
+
+    return () => document.body.classList.remove('modal-is-open')
+  }, [modal])
+
+  async function refreshBusinesses() {
+    try {
+      const response = await loadBusinesses()
+      setBusinessRows(response.businesses || [])
+      setActiveBusinessId(response.active_business_id || response.active_business?.id || props.authUser?.currentBusinessId || null)
+    } catch {
+      setBusinessRows([])
+      setActiveBusinessId(props.authUser?.currentBusinessId || null)
+    }
+  }
+
+  async function refreshUser() {
+    try {
+      props.onAuthChange((await refreshCurrentUser()).user)
+    } catch {
+      // Subscription actions can still update the local page even if /api/me refresh fails.
+    }
+  }
 
   const subscription = overview?.subscription
   const selectedPrice = pricing?.pricing?.[interval]
@@ -94,7 +139,17 @@ function Subscription(props: PageProps) {
       }
       await startCheckout(interval, capacity.additional)
     } catch (error) {
-      setDataError(error instanceof Error ? error.message : 'Unable to start checkout.')
+      const message = error instanceof Error ? error.message : 'Unable to start checkout.'
+      if (/existing subscription|already have an active subscription|conflict/i.test(message)) {
+        try {
+          await openBillingPortal()
+          return
+        } catch (portalError) {
+          setDataError(portalError instanceof Error ? portalError.message : message)
+        }
+      } else {
+        setDataError(message)
+      }
       setWorking(false)
     }
   }
@@ -139,6 +194,7 @@ function Subscription(props: PageProps) {
           </div>
           <div className="billing-heading-actions">
             <button className="secondary-button" type="button" onClick={() => props.onNavigate('Billing')}>Billing history</button>
+            <button className="secondary-button" type="button" disabled={working || !overview?.portalAvailable} onClick={() => void openBillingPortal().catch((error) => setDataError(error instanceof Error ? error.message : 'Unable to open Stripe billing.'))}>Open billing</button>
             <button className="secondary-button" type="button" onClick={() => props.onNavigate('Settings')}>Back to settings</button>
           </div>
         </section>
@@ -229,14 +285,14 @@ function Subscription(props: PageProps) {
               <h2>Workspace capacity</h2>
               <p>Businesses attached to this subscription.</p>
             </div>
-            <button className="secondary-button" type="button">
+            <button className="secondary-button" type="button" onClick={() => setModal('add-business')}>
               <Plus size={17} />
               Add business
             </button>
           </div>
           <div className="subscription-business-list">
             {businesses.length ? (
-              businesses.map((business) => (
+              businesses.map((business, index) => (
                 <article className="subscription-business-row" key={business.name}>
                   <div className="merchant-logo merchant-blue">{business.name.charAt(0)}</div>
                   <div>
@@ -244,7 +300,16 @@ function Subscription(props: PageProps) {
                     <p>{business.role}</p>
                   </div>
                   <span className="status-pill status-income">{business.status}</span>
-                  <button className="secondary-button compact-button" type="button">Manage</button>
+                  <button
+                    className="secondary-button compact-button"
+                    type="button"
+                    onClick={() => {
+                      setSelectedBusiness(businessRows[index] || null)
+                      setModal('manage-business')
+                    }}
+                  >
+                    Manage
+                  </button>
                 </article>
               ))
             ) : (
@@ -268,8 +333,229 @@ function Subscription(props: PageProps) {
             <button className="secondary-button danger-button" type="button" disabled={working} onClick={() => void handleCancel()}>Cancel</button>
           </section>
         ) : null}
+
+        {modal === 'add-business' ? (
+          <AddBusinessModal
+            onClose={() => setModal(null)}
+            onSave={async (input) => {
+              setWorking(true)
+              setDataError('')
+              try {
+                const response = await createBusiness(input)
+                setBusinessRows(response.businesses || [])
+                setActiveBusinessId(response.active_business_id || response.active_business?.id || null)
+                setModal(null)
+                await refreshSubscription()
+                await refreshUser()
+              } catch (error) {
+                setDataError(error instanceof Error ? error.message : 'Unable to add business.')
+                throw error
+              } finally {
+                setWorking(false)
+              }
+            }}
+            saving={working}
+          />
+        ) : null}
+
+        {modal === 'manage-business' ? (
+          <ManageBusinessModal
+            business={selectedBusiness}
+            activeBusinessId={activeBusinessId}
+            businessCount={businessRows.length || businesses.length}
+            saving={working}
+            onClose={() => {
+              setModal(null)
+              setSelectedBusiness(null)
+            }}
+            onActivate={async (businessId) => {
+              setWorking(true)
+              setDataError('')
+              try {
+                const response = await activateBusiness(businessId)
+                setBusinessRows(response.businesses || [])
+                setActiveBusinessId(response.active_business_id || response.active_business?.id || businessId)
+                setModal(null)
+                await refreshUser()
+              } catch (error) {
+                setDataError(error instanceof Error ? error.message : 'Unable to switch business.')
+                throw error
+              } finally {
+                setWorking(false)
+              }
+            }}
+            onDelete={async (businessId, password) => {
+              setWorking(true)
+              setDataError('')
+              try {
+                const response = await deleteBusiness(businessId, password)
+                setBusinessRows(response.businesses || [])
+                setActiveBusinessId(response.active_business_id || response.active_business?.id || null)
+                setModal(null)
+                await refreshSubscription()
+                await refreshUser()
+              } catch (error) {
+                setDataError(error instanceof Error ? error.message : 'Unable to delete business.')
+                throw error
+              } finally {
+                setWorking(false)
+              }
+            }}
+          />
+        ) : null}
       </main>
     </AppShell>
+  )
+}
+
+function AddBusinessModal({
+  onClose,
+  onSave,
+  saving,
+}: {
+  onClose: () => void
+  onSave: (input: { name: string; region: 'US' | 'CA'; language: string }) => Promise<void>
+  saving: boolean
+}) {
+  const [name, setName] = useState('')
+  const [region, setRegion] = useState<'US' | 'CA'>('US')
+  const [error, setError] = useState('')
+
+  async function submit() {
+    if (!name.trim()) {
+      setError('Business name is required.')
+      return
+    }
+    setError('')
+    try {
+      await onSave({ name, region, language: 'en' })
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to add business.')
+    }
+  }
+
+  return (
+    <div className="transaction-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="transaction-detail-modal subscription-action-modal" role="dialog" aria-modal="true" aria-labelledby="addBusinessTitle" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="drawer-header">
+          <div>
+            <h2 id="addBusinessTitle">Add business</h2>
+            <p>Create another business under this subscription. Extra slots are checked before saving.</p>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close add business" onClick={onClose}><X size={18} /></button>
+        </div>
+        <form className="drawer-form" onSubmit={(event) => event.preventDefault()}>
+          <label>
+            Business name
+            <input value={name} placeholder="Business name" onChange={(event) => setName(event.target.value)} />
+          </label>
+          <label>
+            Region
+            <select value={region} onChange={(event) => setRegion(event.target.value === 'CA' ? 'CA' : 'US')}>
+              <option value="US">United States</option>
+              <option value="CA">Canada</option>
+            </select>
+          </label>
+          {error ? <p className="drawer-error" role="alert">{error}</p> : null}
+        </form>
+        <div className="drawer-actions">
+          <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
+          <button className="primary-button" type="button" disabled={saving} onClick={() => void submit()}>{saving ? 'Saving...' : 'Add business'}</button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function ManageBusinessModal({
+  business,
+  activeBusinessId,
+  businessCount,
+  saving,
+  onClose,
+  onActivate,
+  onDelete,
+}: {
+  business: BusinessRecord | null
+  activeBusinessId: string | null
+  businessCount: number
+  saving: boolean
+  onClose: () => void
+  onActivate: (businessId: string) => Promise<void>
+  onDelete: (businessId: string, password: string) => Promise<void>
+}) {
+  const [password, setPassword] = useState('')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [error, setError] = useState('')
+  const canDelete = businessCount > 1
+  const isActive = business?.id === activeBusinessId
+
+  async function submitDelete() {
+    if (!business?.id) return
+    if (!canDelete) {
+      setError('You cannot delete your only business. Delete the account from Settings instead.')
+      return
+    }
+    if (!password) {
+      setError('Enter your password to delete this business.')
+      return
+    }
+    setError('')
+    try {
+      await onDelete(business.id, password)
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete business.')
+    }
+  }
+
+  async function submitActivate() {
+    if (!business?.id) return
+    setError('')
+    try {
+      await onActivate(business.id)
+    } catch (activateError) {
+      setError(activateError instanceof Error ? activateError.message : 'Unable to switch business.')
+    }
+  }
+
+  return (
+    <div className="transaction-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="transaction-detail-modal subscription-action-modal" role="dialog" aria-modal="true" aria-labelledby="manageBusinessTitle" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="drawer-header">
+          <div>
+            <h2 id="manageBusinessTitle">Manage business</h2>
+            <p>{business?.name || 'Business'}</p>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close manage business" onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="transaction-detail-body">
+          <button className="secondary-button" type="button" disabled={saving || !business?.id || isActive} onClick={() => void submitActivate()}>
+            {isActive ? 'Current business' : 'Switch to this business'}
+          </button>
+          {!confirmingDelete ? (
+            <button className="secondary-button danger-button" type="button" disabled={saving || !business?.id || !canDelete} onClick={() => setConfirmingDelete(true)}>
+              Delete business
+            </button>
+          ) : (
+            <div className="settings-danger-zone">
+              <div>
+                <strong>Delete business</strong>
+                <p>{canDelete ? 'This deletes this business and its records. Enter your password to continue.' : 'You cannot delete your only business. Delete the account from Settings instead.'}</p>
+              </div>
+              <label className="field">
+                Password
+                <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+              </label>
+              <button className="secondary-button danger-button" type="button" disabled={saving || !canDelete} onClick={() => void submitDelete()}>
+                {saving ? 'Deleting...' : 'Confirm delete'}
+              </button>
+            </div>
+          )}
+          {!canDelete ? <p className="drawer-error" role="note">Keep at least one business on this account. Delete the account from Settings if you want to remove the last one.</p> : null}
+          {error ? <p className="drawer-error" role="alert">{error}</p> : null}
+        </div>
+      </section>
+    </div>
   )
 }
 

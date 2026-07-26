@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import type { PageProps, ThemeMode } from '../App'
 import AppShell from '../components/AppShell'
+import { confirmMfaToggle, loadMfaStatus, requestMfaToggle } from '../lib/authApi'
 import {
   exportAccountData,
   loadAccountingLock,
@@ -192,7 +193,7 @@ function Settings(props: PageProps) {
             {activeSection === 'Account' ? <AccountSettings authUser={props.authUser} fullName={fullName} setFullName={setFullName} onNavigate={props.onNavigate} /> : null}
             {activeSection === 'Business' ? <BusinessSettings profile={businessProfile} updateBusiness={updateBusiness} fieldErrors={fieldErrors} /> : null}
             {activeSection === 'Billing' ? <BillingSettings onNavigate={props.onNavigate} /> : null}
-            {activeSection === 'Security' ? <SecuritySettings onNavigate={props.onNavigate} /> : null}
+            {activeSection === 'Security' ? <SecuritySettings onNavigate={props.onNavigate} authUser={props.authUser} onAuthChange={props.onAuthChange} /> : null}
             {activeSection === 'Preferences' ? <PreferenceSettings privacySettings={privacySettings} updatePrivacy={updatePrivacy} theme={props.theme} setTheme={props.setTheme} /> : null}
             {activeSection === 'Data' ? <DataSettings privacySettings={privacySettings} updatePrivacy={updatePrivacy} setError={setError} /> : null}
           </div>
@@ -419,16 +420,135 @@ function BillingSettings({ onNavigate }: { onNavigate: PageProps['onNavigate'] }
   )
 }
 
-function SecuritySettings({ onNavigate }: { onNavigate: PageProps['onNavigate'] }) {
+function SecuritySettings({
+  onNavigate,
+  authUser,
+  onAuthChange,
+}: {
+  onNavigate: PageProps['onNavigate']
+  authUser: PageProps['authUser']
+  onAuthChange: PageProps['onAuthChange']
+}) {
+  const [mfaOpen, setMfaOpen] = useState(false)
+  const [mfaEnabled, setMfaEnabled] = useState(Boolean(authUser?.mfaEnabled))
+
+  useEffect(() => {
+    setMfaEnabled(Boolean(authUser?.mfaEnabled))
+  }, [authUser?.mfaEnabled])
+
+  useEffect(() => {
+    void loadMfaStatus()
+      .then((status) => setMfaEnabled(Boolean(status.enabled)))
+      .catch(() => undefined)
+  }, [])
+
   return (
     <SettingsPanel eyebrow="Security" title="Account protection" description="Control sessions and protected account changes from one security area.">
-      <SettingsRow icon={ShieldCheck} title="Multi-factor authentication" description="MFA setup stays in the hardened legacy auth flow until rebuilt.">
-        <button className="secondary-button" type="button" onClick={() => window.location.assign('/settings#security')}>Manage MFA</button>
+      <SettingsRow icon={ShieldCheck} title="Multi-factor authentication" description="Require an emailed 6-digit code for sign-ins from new or untrusted devices.">
+        <div className="settings-row-action-stack">
+          <span className={`status-pill ${mfaEnabled ? 'status-cleared' : 'status-draft'}`}>{mfaEnabled ? 'On' : 'Off'}</span>
+          <button className="secondary-button" type="button" onClick={() => setMfaOpen(true)}>Manage MFA</button>
+        </div>
       </SettingsRow>
       <SettingsRow icon={MonitorSmartphone} title="Active sessions" description="Review signed-in devices and revoke sessions you do not recognize.">
         <button className="secondary-button" type="button" onClick={() => onNavigate('Sessions')}>Review sessions</button>
       </SettingsRow>
+      {mfaOpen ? (
+        <MfaSettingsModal
+          enabled={mfaEnabled}
+          onClose={() => setMfaOpen(false)}
+          onComplete={async (enabled) => {
+            setMfaEnabled(enabled)
+            onAuthChange((await refreshCurrentUser()).user)
+            setMfaOpen(false)
+          }}
+        />
+      ) : null}
     </SettingsPanel>
+  )
+}
+
+function MfaSettingsModal({
+  enabled,
+  onClose,
+  onComplete,
+}: {
+  enabled: boolean
+  onClose: () => void
+  onComplete: (enabled: boolean) => Promise<void>
+}) {
+  const nextEnabled = !enabled
+  const [code, setCode] = useState('')
+  const [mfaToken, setMfaToken] = useState('')
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [working, setWorking] = useState(false)
+
+  async function sendCode() {
+    setWorking(true)
+    setError('')
+    try {
+      const response = await requestMfaToggle(nextEnabled)
+      setMfaToken(response.mfa_token || '')
+      setMessage(response.message || 'Check your email for the 6-digit verification code.')
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Unable to send verification code.')
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  async function confirmCode() {
+    if (!mfaToken) {
+      await sendCode()
+      return
+    }
+    if (!/^\d{6}$/.test(code.trim())) {
+      setError('Enter the 6-digit code from your email.')
+      return
+    }
+    setWorking(true)
+    setError('')
+    try {
+      await confirmMfaToggle(nextEnabled, mfaToken, code.trim())
+      await onComplete(nextEnabled)
+    } catch (confirmError) {
+      setError(confirmError instanceof Error ? confirmError.message : 'Unable to verify MFA code.')
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  return (
+    <div className="transaction-modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <section className="transaction-detail-modal settings-mfa-modal" role="dialog" aria-modal="true" aria-labelledby="mfaSettingsTitle" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="drawer-header">
+          <div>
+            <h2 id="mfaSettingsTitle">{nextEnabled ? 'Turn on MFA' : 'Turn off MFA'}</h2>
+            <p>{mfaToken ? 'Check your email for the code and enter it below.' : 'We will email a 6-digit code before changing MFA.'}</p>
+          </div>
+          <button className="icon-button" type="button" aria-label="Close MFA settings" onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="transaction-detail-body">
+          {mfaToken ? (
+            <label className="field">
+              Verification code
+              <input inputMode="numeric" maxLength={6} value={code} placeholder="000000" onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} />
+            </label>
+          ) : null}
+          {message ? <p className="auth-success" role="status">{message}</p> : null}
+          {error ? <p className="drawer-error" role="alert">{error}</p> : null}
+        </div>
+        <div className="drawer-actions">
+          <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
+          {!mfaToken ? (
+            <button className="primary-button" type="button" disabled={working} onClick={() => void sendCode()}>{working ? 'Sending...' : 'Send verification'}</button>
+          ) : (
+            <button className="primary-button" type="button" disabled={working} onClick={() => void confirmCode()}>{working ? 'Verifying...' : nextEnabled ? 'Turn on MFA' : 'Turn off MFA'}</button>
+          )}
+        </div>
+      </section>
+    </div>
   )
 }
 

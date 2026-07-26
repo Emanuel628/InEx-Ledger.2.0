@@ -234,6 +234,17 @@
   background: rgba(78, 154, 255, 0.1);
 }
 
+.ledger-shell[data-theme="dark"] .tax-info-trigger {
+  border-color: rgba(78, 154, 255, 0.28);
+  background: var(--surface);
+  color: #78adff;
+}
+
+.ledger-shell[data-theme="dark"] .tax-info-popover {
+  border-color: rgba(78, 154, 255, 0.28);
+  background: var(--surface);
+}
+
 .ledger-shell[data-theme="dark"] .danger-button {
   border-color: rgba(255, 123, 123, 0.34);
   background: rgba(255, 123, 123, 0.1);
