@@ -22,6 +22,8 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { AppPage, PageProps } from '../App'
+import { getCurrentUser } from '../lib/authApi'
+import { activateBusiness, loadBusinesses, type BusinessRecord } from '../lib/businessesApi'
 import { loadUnreadCounts } from '../lib/messagesApi'
 
 const navItems = [
@@ -40,6 +42,8 @@ type AppNotification = { id: string; title: string; body: string; page: AppPage 
 
 type AppShellProps = PageProps & {
   searchPlaceholder: string
+  searchValue?: string
+  onSearch?: (value: string) => void
   children: ReactNode
   overlay?: ReactNode
   hideTopbar?: boolean
@@ -49,41 +53,79 @@ function AppShell({
   activePage,
   onNavigate,
   authUser,
+  onAuthChange,
   onLogout,
   sidebarCollapsed,
   setSidebarCollapsed,
   theme,
   searchPlaceholder,
+  searchValue = '',
+  onSearch,
   children,
   overlay,
   hideTopbar = false,
 }: AppShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [businessMenuOpen, setBusinessMenuOpen] = useState(false)
+  const [businesses, setBusinesses] = useState<BusinessRecord[]>([])
+  const [businessLoading, setBusinessLoading] = useState(false)
+  const [businessError, setBusinessError] = useState('')
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notifications, setNotifications] = useState<AppNotification[]>([])
-  const topbarActionsRef = useRef<HTMLDivElement | null>(null)
+  const topbarMenusRef = useRef<HTMLDivElement | null>(null)
   const goToPage = (page: AppPage) => {
     onNavigate(page)
     setMobileNavOpen(false)
+    setBusinessMenuOpen(false)
     setUserMenuOpen(false)
     setNotificationsOpen(false)
   }
 
   useEffect(() => {
-    if (!userMenuOpen && !notificationsOpen) return undefined
+    if (!businessMenuOpen && !userMenuOpen && !notificationsOpen) return undefined
 
     const closeTopbarMenus = (event: PointerEvent) => {
       const target = event.target
       if (!(target instanceof Node)) return
-      if (topbarActionsRef.current?.contains(target)) return
+      if (topbarMenusRef.current?.contains(target)) return
+      setBusinessMenuOpen(false)
       setUserMenuOpen(false)
       setNotificationsOpen(false)
     }
 
     document.addEventListener('pointerdown', closeTopbarMenus)
     return () => document.removeEventListener('pointerdown', closeTopbarMenus)
-  }, [notificationsOpen, userMenuOpen])
+  }, [businessMenuOpen, notificationsOpen, userMenuOpen])
+
+  useEffect(() => {
+    if (!businessMenuOpen || !authUser) return undefined
+
+    let active = true
+    setBusinessLoading(true)
+    setBusinessError('')
+    loadBusinesses()
+      .then((data) => {
+        if (active) {
+          setBusinesses(data.businesses || [])
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setBusinessError(error instanceof Error ? error.message : 'Unable to load businesses.')
+          setBusinesses([])
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setBusinessLoading(false)
+        }
+      })
+
+    return () => {
+      active = false
+    }
+  }, [authUser, businessMenuOpen])
 
   useEffect(() => {
     let active = true
@@ -188,18 +230,85 @@ function AppShell({
             <Menu size={20} />
           </button>
 
-          <button className="business-button" type="button">
-            <Building2 size={18} />
-            <span>{authUser?.business?.name || 'No business yet'}</span>
-            <ChevronDown size={16} />
-          </button>
+          <div className="topbar-menus" ref={topbarMenusRef}>
+            <div className="business-switcher">
+              <button
+                className="business-button"
+                type="button"
+                aria-label="Switch business"
+                aria-expanded={businessMenuOpen}
+                onClick={() => {
+                  setBusinessMenuOpen((value) => !value)
+                  setUserMenuOpen(false)
+                  setNotificationsOpen(false)
+                }}
+              >
+                <Building2 size={18} />
+                <span>{authUser?.business?.name || 'No business yet'}</span>
+                <ChevronDown size={16} />
+              </button>
+              {businessMenuOpen ? (
+                <div className="business-dropdown" role="menu">
+                  {businessLoading ? <p>Loading businesses...</p> : null}
+                  {businessError ? <p className="dropdown-error">{businessError}</p> : null}
+                  {!businessLoading && !businessError && businesses.length === 0 ? (
+                    <p>No businesses found.</p>
+                  ) : null}
+                  {businesses.map((business) => (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      key={business.id}
+                      className={business.id === authUser?.currentBusinessId ? 'is-active' : ''}
+                      onClick={async () => {
+                        if (business.id === authUser?.currentBusinessId) {
+                          setBusinessMenuOpen(false)
+                          return
+                        }
+                        setBusinessLoading(true)
+                        setBusinessError('')
+                        try {
+                          await activateBusiness(business.id)
+                          const { user } = await getCurrentUser()
+                          onAuthChange(user)
+                          window.location.reload()
+                        } catch (error) {
+                          setBusinessError(error instanceof Error ? error.message : 'Unable to switch business.')
+                        } finally {
+                          setBusinessLoading(false)
+                        }
+                      }}
+                    >
+                      <Building2 size={16} />
+                      <span>{business.name}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
 
-          <div className="topbar-search" role="search">
-            <Search size={18} />
-            <input type="search" placeholder={searchPlaceholder} />
-          </div>
+            {onSearch ? (
+              <form
+                className="topbar-search"
+                role="search"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  const data = new FormData(event.currentTarget)
+                  onSearch(String(data.get('topbar-search') || ''))
+                }}
+              >
+                <Search size={18} />
+                <input
+                  name="topbar-search"
+                  type="search"
+                  placeholder={searchPlaceholder}
+                  value={searchValue}
+                  onChange={(event) => onSearch(event.target.value)}
+                />
+              </form>
+            ) : null}
 
-          <div className="topbar-actions" ref={topbarActionsRef}>
+          <div className="topbar-actions">
             <button
               className="icon-button"
               type="button"
@@ -207,6 +316,7 @@ function AppShell({
               aria-expanded={notificationsOpen}
               onClick={() => {
                 setNotificationsOpen((value) => !value)
+                setBusinessMenuOpen(false)
                 setUserMenuOpen(false)
               }}
             >
@@ -220,6 +330,7 @@ function AppShell({
               aria-expanded={userMenuOpen}
               onClick={() => {
                 setUserMenuOpen((value) => !value)
+                setBusinessMenuOpen(false)
                 setNotificationsOpen(false)
               }}
             >
@@ -269,7 +380,6 @@ function AppShell({
                         key={notification.id}
                         onClick={() => {
                           goToPage(notification.page)
-                          setNotifications((items) => items.filter((item) => item.id !== notification.id))
                         }}
                       >
                         <span />
@@ -283,13 +393,9 @@ function AppShell({
                 ) : (
                   <p className="notification-empty">No unread notifications.</p>
                 )}
-                {notifications.length ? (
-                  <button className="notification-clear" type="button" onClick={() => setNotifications([])}>
-                    Dismiss
-                  </button>
-                ) : null}
               </div>
             ) : null}
+          </div>
           </div>
         </header>
         )}

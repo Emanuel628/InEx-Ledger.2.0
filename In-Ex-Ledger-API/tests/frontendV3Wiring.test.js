@@ -162,6 +162,28 @@ test("v3 header notifications use real unread message counts without noisy local
   assert.match(source, /account notices/);
   assert.match(source, /window\.setInterval\(\(\) => void refreshNotifications\(\), 60000\)/);
   assert.doesNotMatch(source, /initialNotifications/);
+  assert.doesNotMatch(source, /setNotifications\(\(items\) => items\.filter/);
+  assert.doesNotMatch(source, /notification-clear/);
+  assert.doesNotMatch(source, />Dismiss</);
+});
+
+test("v3 header business switcher and search are wired instead of decorative", () => {
+  const shellSource = fs.readFileSync(path.join(frontendRoot, "components", "AppShell.tsx"), "utf8");
+  const transactionsSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
+  const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
+
+  assert.match(shellSource, /loadBusinesses/);
+  assert.match(shellSource, /activateBusiness\(business\.id\)/);
+  assert.match(shellSource, /getCurrentUser\(\)/);
+  assert.match(shellSource, /window\.location\.reload\(\)/);
+  assert.match(shellSource, /business-dropdown/);
+  assert.match(shellSource, /aria-label="Switch business"/);
+  assert.match(shellSource, /\{onSearch \? \(/);
+  assert.match(shellSource, /onSearch\(event\.target\.value\)/);
+  assert.match(transactionsSource, /searchValue=\{searchTerm\}/);
+  assert.match(transactionsSource, /onSearch=\{\(value\) => updateFilter\(setSearchTerm, value\)\}/);
+  assert.match(cssSource, /\.business-dropdown/);
+  assert.match(cssSource, /\.topbar-menus/);
 });
 
 test("v3 settings normalizes business profile fields before saving", () => {

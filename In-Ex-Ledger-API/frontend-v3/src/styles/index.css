@@ -837,6 +837,65 @@ textarea:focus-visible {
   color: var(--ink);
 }
 
+.topbar-menus {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.business-switcher {
+  position: relative;
+  min-width: 0;
+}
+
+.business-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 45;
+  width: min(300px, calc(100vw - 28px));
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.business-dropdown p {
+  margin: 0;
+  padding: 9px 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.business-dropdown .dropdown-error {
+  color: var(--red);
+}
+
+.business-dropdown button {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 850;
+  text-align: left;
+}
+
+.business-dropdown button:hover,
+.business-dropdown button.is-active {
+  background: var(--surface-soft);
+}
+
 .topbar-search {
   width: min(540px, 42vw);
   min-height: 42px;
@@ -862,6 +921,7 @@ textarea:focus-visible {
 
 .topbar-actions {
   position: relative;
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -3915,6 +3975,10 @@ tbody tr:last-child td {
     display: inline-flex;
   }
 
+  .topbar-menus {
+    flex: 1;
+  }
+
   .topbar-search {
     width: min(460px, 48vw);
   }
@@ -4062,6 +4126,11 @@ tbody tr:last-child td {
 
   .app-topbar {
     padding: 0 14px;
+  }
+
+  .topbar-menus {
+    justify-content: flex-end;
+    gap: 8px;
   }
 
   .topbarless-mobile-menu {

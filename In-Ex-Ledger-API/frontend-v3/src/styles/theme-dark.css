@@ -50,6 +50,7 @@
 .ledger-shell[data-theme="dark"] :is(
   .app-topbar,
   .business-button,
+  .business-dropdown,
   .icon-button,
   .user-dropdown,
   .notification-menu,
@@ -148,6 +149,8 @@
   .table-toolbar select,
   .per-page-button,
   .top-alert button,
+  .business-dropdown button:hover,
+  .business-dropdown button.is-active,
   .user-dropdown button:hover,
   .row-action-menu button:hover,
   .notification-item,

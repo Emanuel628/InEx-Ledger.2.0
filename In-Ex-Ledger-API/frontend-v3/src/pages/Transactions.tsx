@@ -184,6 +184,8 @@ function Transactions(props: PageProps) {
     <AppShell
       {...props}
       searchPlaceholder="Search transactions, merchants, categories"
+      searchValue={searchTerm}
+      onSearch={(value) => updateFilter(setSearchTerm, value)}
       overlay={
         <>
           {drawerOpen ? (
