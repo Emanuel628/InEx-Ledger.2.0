@@ -455,8 +455,14 @@ test("billing checkout ignores client currency and uses verified region currency
 
     assert.ok(checkoutRequest, "Stripe checkout request should be created");
     assert.equal(checkoutRequest.body.get("line_items[0][price]"), "price_month_cad");
+    assert.equal(checkoutRequest.body.get("line_items[0][quantity]"), "1");
     assert.equal(checkoutRequest.body.get("line_items[1][price]"), "price_addon_month_cad");
+    assert.equal(checkoutRequest.body.get("line_items[1][quantity]"), "2");
     assert.equal(checkoutRequest.body.get("allow_promotion_codes"), "true");
+    assert.equal(checkoutRequest.body.get("metadata[billing_interval]"), "monthly");
+    assert.equal(checkoutRequest.body.get("metadata[additional_businesses]"), "2");
+    assert.equal(checkoutRequest.body.get("subscription_data[metadata][billing_interval]"), "monthly");
+    assert.equal(checkoutRequest.body.get("subscription_data[metadata][additional_businesses]"), "2");
     assert.equal(checkoutRequest.body.get("metadata[currency]"), "cad");
     assert.equal(checkoutRequest.body.get("metadata[country_code]"), "ca");
     assert.equal(checkoutRequest.body.get("metadata[currency_source]"), "ip_geolocation");

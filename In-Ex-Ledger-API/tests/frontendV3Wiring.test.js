@@ -513,6 +513,12 @@ test("v3 subscription avoids checkout conflicts for existing Stripe subscription
   assert.match(source, /sessionStorage\.setItem\('inex-preferred-billing-interval', nextInterval\)/);
   assert.match(source, /handleAdditionalBusinessUpdate/);
   assert.match(source, /updateAdditionalBusinesses\(nextValue\)/);
+  assert.match(source, /checkoutAdditionalBusinessDraft/);
+  assert.match(source, /startCheckout\(interval, checkoutAdditionalBusinesses\)/);
+  assert.match(source, /Extra business slots in checkout/);
+  assert.match(source, /isAdditionalBusinessPaymentRequired/);
+  assert.match(source, /onBuySlots/);
+  assert.match(source, /ApiRequestError/);
   assert.match(source, /Extra slots/);
   assert.match(apiSource, /\/api\/billing\/additional-businesses/);
   assert.match(apiSource, /method: 'PATCH'/);

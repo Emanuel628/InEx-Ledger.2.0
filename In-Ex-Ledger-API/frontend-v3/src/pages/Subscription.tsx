@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Building2, Check, CreditCard, ExternalLink, Plus, ShieldAlert, X } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import { ApiRequestError } from '../lib/apiClient'
 import {
   cancelSubscription,
   formatSubscriptionDate,
@@ -41,6 +42,7 @@ function Subscription(props: PageProps) {
   const [modal, setModal] = useState<SubscriptionModal>(null)
   const [selectedBusiness, setSelectedBusiness] = useState<BusinessRecord | null>(null)
   const [additionalBusinessDraft, setAdditionalBusinessDraft] = useState('0')
+  const [checkoutAdditionalBusinessDraft, setCheckoutAdditionalBusinessDraft] = useState('0')
 
   const businesses: SubscriptionBusiness[] = businessRows.length
     ? businessRows.map((business) => ({
@@ -63,6 +65,7 @@ function Subscription(props: PageProps) {
       setOverview(nextOverview)
       setPricing(nextPricing)
       setAdditionalBusinessDraft(String(Number(nextOverview.subscription?.additionalBusinesses || 0)))
+      setCheckoutAdditionalBusinessDraft(String(Number(nextOverview.subscription?.additionalBusinesses || 0)))
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to load subscription.')
       setOverview(null)
@@ -103,7 +106,9 @@ function Subscription(props: PageProps) {
 
   const subscription = overview?.subscription
   const selectedPrice = pricing?.pricing?.[interval]
-  const price = selectedPrice ? formatSubscriptionMoney(selectedPrice.base, pricing.currency) : interval === 'monthly' ? '$12/mo' : '$122.40/yr'
+  const checkoutAdditionalBusinesses = normalizeSlotDraft(checkoutAdditionalBusinessDraft)
+  const checkoutTotal = selectedPrice ? selectedPrice.base + (selectedPrice.addon * checkoutAdditionalBusinesses) : null
+  const price = checkoutTotal !== null && pricing ? formatSubscriptionMoney(checkoutTotal, pricing.currency) : interval === 'monthly' ? '$12/mo' : '$122.40/yr'
   const note = interval === 'monthly' ? 'Billed monthly. Cancel or change later in Stripe.' : 'Billed yearly with the annual discount.'
   const planName = subscription?.effectiveTierName || 'Basic'
   const statusLabel = getSubscriptionStatus(subscription)
@@ -131,7 +136,7 @@ function Subscription(props: PageProps) {
         await openBillingPortal()
         return
       }
-      await startCheckout(interval, capacity.additional)
+      await startCheckout(interval, checkoutAdditionalBusinesses)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start checkout.'
       if (/existing subscription|already have an active subscription|conflict/i.test(message)) {
@@ -194,6 +199,7 @@ function Subscription(props: PageProps) {
       const updated = await updateAdditionalBusinesses(nextValue)
       setOverview((current) => current ? { ...current, subscription: updated } : current)
       setAdditionalBusinessDraft(String(Number(updated.additionalBusinesses || nextValue)))
+      setCheckoutAdditionalBusinessDraft(String(Number(updated.additionalBusinesses || nextValue)))
       await refreshBusinesses()
       await refreshUser()
     } catch (error) {
@@ -251,8 +257,24 @@ function Subscription(props: PageProps) {
             </div>
             <div className="subscription-price-line">
               <strong>{price}</strong>
-              <span>{note}</span>
+              <span>{checkoutAdditionalBusinesses && !canResume ? `${note} Includes ${checkoutAdditionalBusinesses} extra business slot${checkoutAdditionalBusinesses === 1 ? '' : 's'} in checkout.` : note}</span>
             </div>
+            {!isProActive ? (
+              <div className="subscription-addon-control checkout-addon-control">
+                <label>
+                  Extra business slots in checkout
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={checkoutAdditionalBusinessDraft}
+                    onChange={(event) => setCheckoutAdditionalBusinessDraft(event.target.value)}
+                  />
+                </label>
+                <p>One business is included. Add slots here if you want multiple businesses available after checkout.</p>
+              </div>
+            ) : null}
             {canResume ? (
               <button className="primary-button" type="button" disabled={working} onClick={() => void handleResume()}>
                 <CreditCard size={18} />
@@ -384,12 +406,40 @@ function Subscription(props: PageProps) {
                 await refreshSubscription()
                 await refreshUser()
               } catch (error) {
-                setDataError(error instanceof Error ? error.message : 'Unable to add business.')
+                if (isAdditionalBusinessPaymentRequired(error)) {
+                  setDataError('Add at least one extra business slot before creating another business.')
+                } else {
+                  setDataError(error instanceof Error ? error.message : 'Unable to add business.')
+                }
                 throw error
               } finally {
                 setWorking(false)
               }
             }}
+            onBuySlots={async (neededSlots) => {
+              const targetAdditionalBusinesses = Math.max(capacity.additional + neededSlots, checkoutAdditionalBusinesses, 1)
+              setCheckoutAdditionalBusinessDraft(String(targetAdditionalBusinesses))
+              if (canResume) {
+                await resumeSubscription(interval)
+                setAdditionalBusinessDraft(String(targetAdditionalBusinesses))
+                await updateAdditionalBusinesses(targetAdditionalBusinesses)
+                await refreshSubscription()
+                await refreshBusinesses()
+                await refreshUser()
+                return
+              }
+              if (isProActive && !canResume && !needsBillingPortal) {
+                setAdditionalBusinessDraft(String(targetAdditionalBusinesses))
+                await updateAdditionalBusinesses(targetAdditionalBusinesses)
+                await refreshSubscription()
+                await refreshBusinesses()
+                await refreshUser()
+                return
+              }
+              await startCheckout(interval, targetAdditionalBusinesses)
+            }}
+            currentBusinessCount={capacity.active}
+            maxBusinessesAllowed={capacity.max}
             saving={working}
           />
         ) : null}
@@ -447,15 +497,24 @@ function Subscription(props: PageProps) {
 function AddBusinessModal({
   onClose,
   onSave,
+  onBuySlots,
+  currentBusinessCount,
+  maxBusinessesAllowed,
   saving,
 }: {
   onClose: () => void
   onSave: (input: { name: string; region: 'US' | 'CA'; language: string }) => Promise<void>
+  onBuySlots: (neededSlots: number) => Promise<void>
+  currentBusinessCount: number
+  maxBusinessesAllowed: number
   saving: boolean
 }) {
   const [name, setName] = useState('')
   const [region, setRegion] = useState<'US' | 'CA'>('US')
   const [error, setError] = useState('')
+  const [needsSlotPayment, setNeedsSlotPayment] = useState(false)
+  const [buyingSlots, setBuyingSlots] = useState(false)
+  const neededSlots = Math.max(1, currentBusinessCount + 1 - maxBusinessesAllowed)
 
   async function submit() {
     if (!name.trim()) {
@@ -463,10 +522,28 @@ function AddBusinessModal({
       return
     }
     setError('')
+    setNeedsSlotPayment(false)
     try {
       await onSave({ name, region, language: 'en' })
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Unable to add business.')
+      if (isAdditionalBusinessPaymentRequired(saveError)) {
+        setNeedsSlotPayment(true)
+        setError(`You need ${neededSlots} extra business slot${neededSlots === 1 ? '' : 's'} before adding this business.`)
+      } else {
+        setError(saveError instanceof Error ? saveError.message : 'Unable to add business.')
+      }
+    }
+  }
+
+  async function buySlots() {
+    setBuyingSlots(true)
+    setError('')
+    try {
+      await onBuySlots(neededSlots)
+    } catch (slotError) {
+      setError(slotError instanceof Error ? slotError.message : 'Unable to buy business slots.')
+    } finally {
+      setBuyingSlots(false)
     }
   }
 
@@ -493,6 +570,12 @@ function AddBusinessModal({
             </select>
           </label>
           {error ? <p className="drawer-error" role="alert">{error}</p> : null}
+          {needsSlotPayment ? (
+            <button className="primary-button" type="button" disabled={saving || buyingSlots} onClick={() => void buySlots()}>
+              <CreditCard size={18} />
+              {buyingSlots ? 'Opening checkout...' : `Buy ${neededSlots} extra slot${neededSlots === 1 ? '' : 's'}`}
+            </button>
+          ) : null}
         </form>
         <div className="drawer-actions">
           <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
@@ -599,6 +682,19 @@ function readPreferredBillingInterval(): BillingInterval {
   if (typeof window === 'undefined') return 'monthly'
   const saved = window.sessionStorage.getItem('inex-preferred-billing-interval')
   return saved === 'yearly' ? 'yearly' : 'monthly'
+}
+
+function normalizeSlotDraft(value: string) {
+  const number = Number(value)
+  if (!Number.isInteger(number) || number < 0) return 0
+  return Math.min(100, number)
+}
+
+function isAdditionalBusinessPaymentRequired(error: unknown) {
+  return error instanceof ApiRequestError && (
+    error.status === 402 ||
+    error.code === 'additional_business_payment_required'
+  )
 }
 
 function formatIntervalPrice(pricing: BillingPricing | null, interval: BillingInterval) {
