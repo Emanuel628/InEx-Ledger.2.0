@@ -138,22 +138,29 @@ function getCanonicalPagePath(pageName) {
   return pageName === 'landing' ? '/' : `/${pageName}`;
 }
 
+/** Map deprecated /app-v3 page URLs to bare canonical paths. Assets stay under /app-v3/assets. */
 function getLegacyV3RedirectPath(req) {
-  const requestPath = String(req.path || '').toLowerCase().replace(/\/+$/, '');
-  if (requestPath === '/app-v3' || requestPath === '/app-v3/') {
-    return '/';
+  const requestPath = String(req.path || '').toLowerCase().replace(/\/+$/, '') || '/';
+  if (requestPath === '/app-v3') {
+    return '/transactions';
   }
 
-  if (!requestPath.startsWith('/app-v3/') || requestPath.startsWith('/app-v3/assets/')) {
+  if (!requestPath.startsWith('/app-v3/') || requestPath.startsWith('/app-v3/assets')) {
     return null;
   }
 
-  const requestedPageName = resolveRequestedPageName(requestPath.slice('/app-v3'.length));
-  if (!requestedPageName) {
-    return null;
+  const rest = requestPath.slice('/app-v3/'.length);
+  if (!rest) {
+    return '/transactions';
   }
 
-  return getCanonicalPagePath(requestedPageName);
+  const requestedPageName = resolveRequestedPageName(`/${rest}`);
+  if (requestedPageName) {
+    return getCanonicalPagePath(requestedPageName);
+  }
+
+  // Unknown /app-v3/* page slug: still strip the prefix rather than 404 under the dual host.
+  return `/${rest}`;
 }
 
 function resolveCanonicalAppOrigin() {
@@ -273,27 +280,6 @@ function sendFrontendV3App(_req, res, next) {
   return res.sendFile(indexPath);
 }
 
-/** Map deprecated /app-v3 page URLs to bare canonical paths. Assets stay under /app-v3/assets. */
-function redirectAppV3PageToCanonical(req, res, next) {
-  const requestPath = String(req.path || '');
-  if (requestPath === '/app-v3' || requestPath === '/app-v3/') {
-    return res.redirect(301, '/transactions');
-  }
-  if (!requestPath.startsWith('/app-v3/')) {
-    return next();
-  }
-  if (requestPath.startsWith('/app-v3/assets/')) {
-    return next();
-  }
-  const rest = requestPath.slice('/app-v3/'.length).replace(/\/+$/, '');
-  if (!rest) {
-    return res.redirect(301, '/transactions');
-  }
-  const target = `/${rest}`;
-  const suffix = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
-  return res.redirect(301, `${target}${suffix}`);
-}
-
 /* =========================================================
    CORS & SECURITY CONFIGURATION
    ========================================================= */
@@ -377,14 +363,12 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api/')) {
-
     const legacyV3RedirectPath = getLegacyV3RedirectPath(req);
     if (legacyV3RedirectPath) {
       const queryIndex = String(req.originalUrl || '').indexOf('?');
       const query = queryIndex >= 0 ? String(req.originalUrl).slice(queryIndex) : '';
       return res.redirect(301, `${legacyV3RedirectPath}${query}`);
     }
-
 
     if (req.path === '/app-v3' || req.path.startsWith('/app-v3/')) {
       res.setHeader('X-Robots-Tag', 'noindex, nofollow');
@@ -475,22 +459,7 @@ app.use(express.static(publicDir, {
   index: false,
   setHeaders: setStaticAssetCacheHeaders
 }));
-
-// Deprecated dual URLs: page hosts under /app-v3 redirect to bare paths. Assets stay static above.
-app.get('/app-v3', redirectAppV3PageToCanonical);
-app.get('/app-v3/*', redirectAppV3PageToCanonical);
-
-app.get('/app-v3', (req, res) => {
-  res.redirect(301, '/');
-});
-app.get('/app-v3/*', (req, res, next) => {
-  const redirectPath = getLegacyV3RedirectPath(req);
-  if (!redirectPath) {
-    return next();
-  }
-  res.redirect(301, redirectPath);
-});
-
+// /app-v3 page hosts are redirected in middleware above; static still serves /app-v3/assets.
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 app.use('/api', (req, res, next) => {
