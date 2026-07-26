@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
+  AlertTriangle,
   Calendar,
   ChevronDown,
   Download,
@@ -11,26 +12,47 @@ import {
 } from 'lucide-react'
 import type { PageProps } from '../App'
 import AppShell from '../components/AppShell'
+import { loadAnalytics, type AnalyticsSummary } from '../lib/analyticsApi'
 
-const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
-const incomePoints = [42, 55, 50, 58, 66, 53, 62, 67, 82, 63, 71, 84]
-const expensePoints = [18, 23, 20, 22, 25, 18, 23, 24, 30, 22, 24, 28]
-
-const categoryRows = [
-  { name: 'Software Services', amount: '$68,420', pct: '47.9%', width: '92%' },
-  { name: 'Consulting', amount: '$36,180', pct: '25.3%', width: '64%' },
-  { name: 'Subscriptions', amount: '$18,650', pct: '13.0%', width: '36%' },
-  { name: 'Other Income', amount: '$19,610', pct: '13.8%', width: '42%' },
-]
-
-const cashFlowRows = [
-  { month: 'Jul 2026', net: '$12,400', risk: 'Low', tone: 'income' },
-  { month: 'Aug 2026', net: '$8,200', risk: 'Moderate', tone: 'review' },
-  { month: 'Sep 2026', net: '$4,100', risk: 'High', tone: 'expense' },
-]
+const emptyAnalytics: AnalyticsSummary = {
+  income: 0,
+  expenses: 0,
+  net: 0,
+  taxSetAside: null,
+  currentMonthTitle: 'This month',
+  currentMonthLabel: '',
+  currentIncome: 0,
+  currentExpenses: 0,
+  currentNet: 0,
+  monthProgressPct: 0,
+  months: [],
+  incomePoints: [],
+  expensePoints: [],
+  topIncome: [],
+  topExpenses: [],
+  cashFlow: [],
+}
 
 function Analytics(props: PageProps) {
   const [expandedPanel, setExpandedPanel] = useState<string | null>(null)
+  const [analytics, setAnalytics] = useState<AnalyticsSummary>(emptyAnalytics)
+  const [categoryMode, setCategoryMode] = useState<'Income' | 'Expenses'>('Income')
+  const [loadingData, setLoadingData] = useState(true)
+  const [dataError, setDataError] = useState('')
+
+  useEffect(() => {
+    setLoadingData(true)
+    setDataError('')
+    loadAnalytics()
+      .then(setAnalytics)
+      .catch((error) => {
+        setAnalytics(emptyAnalytics)
+        setDataError(error instanceof Error ? error.message : 'Unable to load analytics.')
+      })
+      .finally(() => setLoadingData(false))
+  }, [])
+
+  const categoryRows = categoryMode === 'Income' ? analytics.topIncome : analytics.topExpenses
 
   return (
     <AppShell {...props} searchPlaceholder="Search analytics, categories, reports">
@@ -55,11 +77,21 @@ function Analytics(props: PageProps) {
         </section>
 
         <section className="summary-strip" aria-label="Analytics summary">
-          <SummaryItem label="Income" value="$142,860" tone="income" icon={TrendingUp} />
-          <SummaryItem label="Expenses" value="$68,430" tone="expense" icon={TrendingDown} />
-          <SummaryItem label="Net profit" value="$74,430" tone="net" icon={Wallet} />
-          <SummaryItem label="Tax set-aside" value="$18,600" tone="review" icon={ShieldCheck} />
+          <SummaryItem label="Income" value={formatMoney(analytics.income)} tone="income" icon={TrendingUp} />
+          <SummaryItem label="Expenses" value={formatMoney(analytics.expenses)} tone="expense" icon={TrendingDown} />
+          <SummaryItem label="Net profit" value={formatMoney(analytics.net)} tone="net" icon={Wallet} />
+          <SummaryItem label="Tax set-aside" value={analytics.taxSetAside === null ? 'Upgrade' : formatMoney(analytics.taxSetAside)} tone="review" icon={ShieldCheck} />
         </section>
+
+        {dataError ? (
+          <section className="top-alert" role="alert">
+            <AlertTriangle size={18} />
+            <div>
+              <strong>{dataError}</strong>
+              <span>Refresh the page or check the connected account data.</span>
+            </div>
+          </section>
+        ) : null}
 
         <section className="analytics-primary-grid">
           <article className="export-card analytics-chart-card">
@@ -70,24 +102,24 @@ function Analytics(props: PageProps) {
                 <span><i className="legend-expense" /> Expenses</span>
               </div>
             </div>
-            <TrendChart />
+            <TrendChart months={analytics.months} incomePoints={analytics.incomePoints} expensePoints={analytics.expensePoints} />
           </article>
 
           <article className="export-card analytics-month-card">
             <div className="analytics-card-head">
-              <h2>This month</h2>
-              <span className="analytics-muted">25 of 31 days</span>
+              <h2>{analytics.currentMonthTitle}</h2>
+              <span className="analytics-muted">{analytics.currentMonthLabel || 'No activity yet'}</span>
             </div>
             <div className="month-progress">
-              <div className="progress-ring">81%</div>
+              <div className="progress-ring">{analytics.monthProgressPct}%</div>
               <div className="progress-copy">
                 <span>Month progress</span>
-                <div><i style={{ width: '81%' }} /></div>
+                <div><i style={{ width: `${analytics.monthProgressPct}%` }} /></div>
               </div>
             </div>
-            <div className="month-stat income"><span>Income</span><strong>$18,420</strong></div>
-            <div className="month-stat expense"><span>Expenses</span><strong>$7,420</strong></div>
-            <div className="month-stat net"><span>Net</span><strong>$11,000</strong></div>
+            <div className="month-stat income"><span>Income</span><strong>{formatMoney(analytics.currentIncome)}</strong></div>
+            <div className="month-stat expense"><span>Expenses</span><strong>{formatMoney(analytics.currentExpenses)}</strong></div>
+            <div className="month-stat net"><span>Net</span><strong>{formatMoney(analytics.currentNet)}</strong></div>
           </article>
         </section>
 
@@ -96,19 +128,19 @@ function Analytics(props: PageProps) {
             <div className="analytics-card-head">
               <h2>Top categories</h2>
               <div className="analytics-segmented">
-                <button className="is-selected" type="button">Income</button>
-                <button type="button">Expenses</button>
+                <button className={categoryMode === 'Income' ? 'is-selected' : ''} type="button" onClick={() => setCategoryMode('Income')}>Income</button>
+                <button className={categoryMode === 'Expenses' ? 'is-selected' : ''} type="button" onClick={() => setCategoryMode('Expenses')}>Expenses</button>
               </div>
             </div>
             <div className="category-bars">
-              {categoryRows.map((row) => (
+              {categoryRows.length ? categoryRows.map((row) => (
                 <div className="category-bar-row" key={row.name}>
                   <span>{row.name}</span>
-                  <div><i style={{ width: row.width }} /></div>
-                  <strong>{row.amount}</strong>
-                  <em>{row.pct}</em>
+                  <div><i style={{ width: `${Math.max(4, row.pct)}%` }} /></div>
+                  <strong>{formatMoney(row.amount)}</strong>
+                  <em>{row.pct}%</em>
                 </div>
-              ))}
+              )) : <div className="empty-table-state">{loadingData ? 'Loading categories...' : 'No category activity yet.'}</div>}
             </div>
           </article>
 
@@ -118,13 +150,13 @@ function Analytics(props: PageProps) {
               <span className="analytics-muted">Next 3 months</span>
             </div>
             <div className="cash-flow-table">
-              {cashFlowRows.map((row) => (
+              {analytics.cashFlow.length ? analytics.cashFlow.map((row) => (
                 <div className="cash-flow-row" key={row.month}>
                   <span>{row.month}</span>
-                  <strong className={row.tone}>{row.net}</strong>
+                  <strong className={row.tone}>{formatMoney(row.net)}</strong>
                   <em className={row.tone}>{row.risk}</em>
                 </div>
-              ))}
+              )) : <div className="empty-table-state">{loadingData ? 'Loading outlook...' : 'No cash-flow projection yet.'}</div>}
             </div>
           </article>
         </section>
@@ -163,29 +195,40 @@ function Analytics(props: PageProps) {
   )
 }
 
-function TrendChart() {
+function TrendChart({
+  months,
+  incomePoints,
+  expensePoints,
+}: {
+  months: string[]
+  incomePoints: number[]
+  expensePoints: number[]
+}) {
   const width = 760
   const height = 260
   const padding = 34
-  const max = 90
-  const xStep = (width - padding * 2) / (months.length - 1)
+  const safeMonths = months.length ? months : ['No data']
+  const max = Math.max(1, ...incomePoints, ...expensePoints)
+  const xStep = safeMonths.length > 1 ? (width - padding * 2) / (safeMonths.length - 1) : 0
   const y = (value: number) => height - padding - (value / max) * (height - padding * 2)
   const points = (values: number[]) => values.map((value, index) => `${padding + index * xStep},${y(value)}`).join(' ')
+  const safeIncome = incomePoints.length ? incomePoints : [0]
+  const safeExpenses = expensePoints.length ? expensePoints : [0]
 
   return (
     <svg className="analytics-trend-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Income and expense trend">
       {[0, 1, 2, 3].map((tick) => (
         <line key={tick} x1={padding} x2={width - padding} y1={padding + tick * 52} y2={padding + tick * 52} />
       ))}
-      <polyline className="trend-expense" points={points(expensePoints)} />
-      <polyline className="trend-income" points={points(incomePoints)} />
-      {incomePoints.map((point, index) => (
-        <circle className="dot-income" cx={padding + index * xStep} cy={y(point)} r="4" key={`income-${months[index]}`} />
+      <polyline className="trend-expense" points={points(safeExpenses)} />
+      <polyline className="trend-income" points={points(safeIncome)} />
+      {safeIncome.map((point, index) => (
+        <circle className="dot-income" cx={padding + index * xStep} cy={y(point)} r="4" key={`income-${safeMonths[index]}`} />
       ))}
-      {expensePoints.map((point, index) => (
-        <circle className="dot-expense" cx={padding + index * xStep} cy={y(point)} r="4" key={`expense-${months[index]}`} />
+      {safeExpenses.map((point, index) => (
+        <circle className="dot-expense" cx={padding + index * xStep} cy={y(point)} r="4" key={`expense-${safeMonths[index]}`} />
       ))}
-      {months.map((month, index) => (
+      {safeMonths.map((month, index) => (
         <text x={padding + index * xStep} y={height - 8} key={month}>{month}</text>
       ))}
     </svg>
@@ -233,6 +276,14 @@ function ProgressivePanel({
       {isExpanded ? <p>{children}</p> : null}
     </article>
   )
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  })
 }
 
 export default Analytics
