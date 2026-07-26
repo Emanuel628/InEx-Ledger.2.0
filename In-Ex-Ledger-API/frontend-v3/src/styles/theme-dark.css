@@ -214,6 +214,16 @@
   color: #ffe1a3;
 }
 
+.ledger-shell[data-theme="dark"] .settings-field.is-invalid {
+  border-color: rgba(255, 123, 123, 0.34);
+  background: rgba(255, 123, 123, 0.1);
+}
+
+.ledger-shell[data-theme="dark"] .settings-field.is-invalid :is(input, select) {
+  border-color: rgba(255, 123, 123, 0.5);
+  box-shadow: 0 0 0 3px rgba(255, 123, 123, 0.12);
+}
+
 .ledger-shell[data-theme="dark"] .settings-danger-zone {
   border-color: rgba(255, 123, 123, 0.3);
   background: rgba(255, 123, 123, 0.1);

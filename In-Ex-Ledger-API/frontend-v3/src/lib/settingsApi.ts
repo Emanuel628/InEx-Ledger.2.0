@@ -68,24 +68,29 @@ export async function loadBusinessProfile(businessId: string) {
 }
 
 export async function saveBusinessProfile(businessId: string, profile: BusinessProfile) {
+  const body: Record<string, unknown> = {
+    name: profile.name,
+    region: profile.region,
+    language: profile.language || 'en',
+    fiscal_year_start: profile.fiscal_year_start || null,
+    province: profile.region === 'CA' ? profile.province || null : null,
+    business_type: profile.business_type || null,
+    address: profile.address || null,
+    contact_full_name: profile.contact_full_name || '',
+    operating_name: profile.operating_name || null,
+    business_activity_code: profile.business_activity_code || null,
+    accounting_method: profile.accounting_method || null,
+    gst_hst_registered: profile.region === 'CA' ? Boolean(profile.gst_hst_registered) : false,
+    gst_hst_method: profile.gst_hst_method || null,
+  }
+
+  if (profile.region === 'US') {
+    body.material_participation = Boolean(profile.material_participation)
+  }
+
   return apiRequest<BusinessProfile>(`/api/businesses/${businessId}/profile`, {
     method: 'PUT',
-    body: JSON.stringify({
-      name: profile.name,
-      region: profile.region,
-      language: profile.language || 'en',
-      fiscal_year_start: profile.fiscal_year_start || null,
-      province: profile.region === 'CA' ? profile.province || null : null,
-      business_type: profile.business_type || null,
-      address: profile.address || null,
-      contact_full_name: profile.contact_full_name || '',
-      operating_name: profile.operating_name || null,
-      business_activity_code: profile.business_activity_code || null,
-      accounting_method: profile.accounting_method || null,
-      material_participation: profile.region === 'US' ? Boolean(profile.material_participation) : null,
-      gst_hst_registered: profile.region === 'CA' ? Boolean(profile.gst_hst_registered) : false,
-      gst_hst_method: profile.gst_hst_method || null,
-    }),
+    body: JSON.stringify(body),
   })
 }
 

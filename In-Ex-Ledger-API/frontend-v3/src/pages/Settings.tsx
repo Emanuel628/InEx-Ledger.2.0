@@ -38,6 +38,7 @@ import {
 } from '../lib/settingsApi'
 
 type SettingsSection = 'Account' | 'Business' | 'Billing' | 'Security' | 'Preferences' | 'Data'
+type SelectOption = string | { value: string; label: string }
 
 const settingsSections = [
   { label: 'Account', note: 'Profile and email', icon: UserRound },
@@ -48,6 +49,29 @@ const settingsSections = [
   { label: 'Data', note: 'Exports and deletion', icon: Database },
 ] satisfies { label: SettingsSection; note: string; icon: LucideIcon }[]
 
+const languageOptions = [
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'fr', label: 'French' },
+]
+
+const provinceOptions = [
+  { value: '', label: 'Select province or territory' },
+  { value: 'AB', label: 'Alberta' },
+  { value: 'BC', label: 'British Columbia' },
+  { value: 'MB', label: 'Manitoba' },
+  { value: 'NB', label: 'New Brunswick' },
+  { value: 'NL', label: 'Newfoundland and Labrador' },
+  { value: 'NS', label: 'Nova Scotia' },
+  { value: 'NT', label: 'Northwest Territories' },
+  { value: 'NU', label: 'Nunavut' },
+  { value: 'ON', label: 'Ontario' },
+  { value: 'PE', label: 'Prince Edward Island' },
+  { value: 'QC', label: 'Quebec' },
+  { value: 'SK', label: 'Saskatchewan' },
+  { value: 'YT', label: 'Yukon' },
+]
+
 function Settings(props: PageProps) {
   const [activeSection, setActiveSection] = useState<SettingsSection>('Account')
   const [fullName, setFullName] = useState('')
@@ -55,6 +79,7 @@ function Settings(props: PageProps) {
   const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -86,12 +111,18 @@ function Settings(props: PageProps) {
     setSaving(true)
     setError('')
     setStatusMessage('')
+    setFieldErrors({})
     try {
       if (activeSection === 'Account') {
         const { user } = await saveProfile(fullName)
         props.onAuthChange(user)
       }
       if (activeSection === 'Business' && businessProfile) {
+        const validationErrors = validateBusinessProfile(businessProfile)
+        if (Object.keys(validationErrors).length) {
+          setFieldErrors(validationErrors)
+          throw new Error('Review the highlighted business fields.')
+        }
         const saved = await saveBusinessProfile(businessProfile.id, businessProfile)
         setBusinessProfile(saved)
         props.onAuthChange((await refreshCurrentUser()).user)
@@ -109,6 +140,12 @@ function Settings(props: PageProps) {
 
   function updateBusiness<K extends keyof BusinessProfile>(key: K, value: BusinessProfile[K]) {
     setBusinessProfile((current) => current ? { ...current, [key]: value } : current)
+    setFieldErrors((current) => {
+      if (!current[String(key)]) return current
+      const next = { ...current }
+      delete next[String(key)]
+      return next
+    })
   }
 
   function updatePrivacy<K extends keyof PrivacySettings>(key: K, value: PrivacySettings[K]) {
@@ -153,7 +190,7 @@ function Settings(props: PageProps) {
 
           <div className="settings-content">
             {activeSection === 'Account' ? <AccountSettings authUser={props.authUser} fullName={fullName} setFullName={setFullName} onNavigate={props.onNavigate} /> : null}
-            {activeSection === 'Business' ? <BusinessSettings profile={businessProfile} updateBusiness={updateBusiness} /> : null}
+            {activeSection === 'Business' ? <BusinessSettings profile={businessProfile} updateBusiness={updateBusiness} fieldErrors={fieldErrors} /> : null}
             {activeSection === 'Billing' ? <BillingSettings onNavigate={props.onNavigate} /> : null}
             {activeSection === 'Security' ? <SecuritySettings onNavigate={props.onNavigate} /> : null}
             {activeSection === 'Preferences' ? <PreferenceSettings privacySettings={privacySettings} updatePrivacy={updatePrivacy} theme={props.theme} setTheme={props.setTheme} /> : null}
@@ -213,12 +250,20 @@ function AccountSettings({
 function BusinessSettings({
   profile,
   updateBusiness,
+  fieldErrors,
 }: {
   profile: BusinessProfile | null
   updateBusiness: <K extends keyof BusinessProfile>(key: K, value: BusinessProfile[K]) => void
+  fieldErrors: Record<string, string>
 }) {
   if (!profile) {
     return <SettingsPanel eyebrow="Business" title="Business profile" description="Business details load after onboarding."><div className="empty-table-state">No business profile loaded.</div></SettingsPanel>
+  }
+
+  const visibleErrors = {
+    ...fieldErrors,
+    ...(profile.region === 'CA' && !profile.province ? { province: fieldErrors.province || 'Select the Canadian province or territory for this business.' } : {}),
+    ...(profile.region === 'CA' && !/^\d{2}-\d{2}$/.test(profile.fiscal_year_start || '') ? { fiscal_year_start: fieldErrors.fiscal_year_start || 'Use MM-DD format, for example 01-01.' } : {}),
   }
 
   return (
@@ -227,9 +272,23 @@ function BusinessSettings({
         <Field label="Business name" value={profile.name || ''} onChange={(value) => updateBusiness('name', value)} placeholder="Business name" />
         <Field label="Contact name" value={profile.contact_full_name || ''} onChange={(value) => updateBusiness('contact_full_name', value)} placeholder="Contact name" />
         <SelectField label="Region" value={profile.region || 'US'} options={['US', 'CA']} onChange={(value) => updateBusiness('region', value as BusinessProfile['region'])} />
-        <SelectField label="Language" value={profile.language || 'en'} options={['en', 'es', 'fr']} onChange={(value) => updateBusiness('language', value)} />
-        {profile.region === 'CA' ? <SelectField label="Province" value={profile.province || ''} options={['', 'AB', 'BC', 'MB', 'NB', 'NL', 'NS', 'NT', 'NU', 'ON', 'PE', 'QC', 'SK', 'YT']} onChange={(value) => updateBusiness('province', value)} /> : null}
-        <Field label="Fiscal year start" value={profile.fiscal_year_start || ''} onChange={(value) => updateBusiness('fiscal_year_start', value)} type="date" />
+        <SelectField label="Language" value={profile.language || 'en'} options={languageOptions} onChange={(value) => updateBusiness('language', value)} />
+        {profile.region === 'CA' ? (
+          <SelectField
+            label="Province"
+            value={profile.province || ''}
+            options={provinceOptions}
+            error={visibleErrors.province}
+            onChange={(value) => updateBusiness('province', value)}
+          />
+        ) : null}
+        <Field
+          label="Fiscal year start"
+          value={profile.fiscal_year_start || ''}
+          onChange={(value) => updateBusiness('fiscal_year_start', normalizeFiscalYearInput(value))}
+          placeholder="MM-DD"
+          error={visibleErrors.fiscal_year_start}
+        />
         <Field label="Operating name" value={profile.operating_name || ''} onChange={(value) => updateBusiness('operating_name', value)} placeholder="Optional DBA" />
         <Field label="Business activity code" value={profile.business_activity_code || ''} onChange={(value) => updateBusiness('business_activity_code', value)} placeholder="6-digit NAICS code" />
         <SelectField label="Accounting method" value={profile.accounting_method || ''} options={['', 'cash', 'accrual']} onChange={(value) => updateBusiness('accounting_method', value)} />
@@ -480,6 +539,7 @@ function Field({
   placeholder,
   type = 'text',
   readOnly = false,
+  error,
 }: {
   label: string
   value?: string
@@ -487,24 +547,28 @@ function Field({
   placeholder?: string
   type?: string
   readOnly?: boolean
+  error?: string
 }) {
   return (
-    <label className="settings-field">
+    <label className={`settings-field ${error ? 'is-invalid' : ''}`}>
       <span>{label}</span>
       <input type={type} value={value || ''} readOnly={readOnly} placeholder={placeholder} onChange={(event) => onChange?.(event.target.value)} />
+      {error ? <small className="settings-field-error">{error}</small> : null}
     </label>
   )
 }
 
-function SelectField({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+function SelectField({ label, value, options, error, onChange }: { label: string; value: string; options: SelectOption[]; error?: string; onChange: (value: string) => void }) {
   return (
-    <label className="settings-field">
+    <label className={`settings-field ${error ? 'is-invalid' : ''}`}>
       <span>{label}</span>
       <select value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => (
-          <option key={option || 'blank'} value={option}>{option || 'Not set'}</option>
-        ))}
+        {options.map((option) => {
+          const normalized = typeof option === 'string' ? { value: option, label: option || 'Not set' } : option
+          return <option key={normalized.value || 'blank'} value={normalized.value}>{normalized.label}</option>
+        })}
       </select>
+      {error ? <small className="settings-field-error">{error}</small> : null}
     </label>
   )
 }
@@ -524,6 +588,26 @@ function formatSettingsDate(date: string) {
     return date
   }
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function normalizeFiscalYearInput(value: string) {
+  const cleaned = value.replace(/[^\d-]/g, '').slice(0, 5)
+  if (/^\d{2}$/.test(cleaned)) return `${cleaned}-`
+  return cleaned
+}
+
+function validateBusinessProfile(profile: BusinessProfile) {
+  const errors: Record<string, string> = {}
+  if (profile.region === 'CA' && !profile.province) {
+    errors.province = 'Select the Canadian province or territory for this business.'
+  }
+  if (profile.region === 'CA' && !/^\d{2}-\d{2}$/.test(profile.fiscal_year_start || '')) {
+    errors.fiscal_year_start = 'Use MM-DD format, for example 01-01.'
+  }
+  if (profile.region === 'US' && typeof profile.material_participation !== 'boolean') {
+    errors.material_participation = 'Choose yes or no.'
+  }
+  return errors
 }
 
 export default Settings

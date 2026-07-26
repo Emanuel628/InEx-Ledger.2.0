@@ -8,6 +8,7 @@ import {
   formatSubscriptionMoney,
   loadBillingOverview,
   loadBillingPricing,
+  openBillingPortal,
   resumeSubscription,
   startCheckout,
   type BillingInterval,
@@ -69,6 +70,8 @@ function Subscription(props: PageProps) {
   const statusLabel = getSubscriptionStatus(subscription)
   const isProActive = subscription?.effectiveTier === 'v1' && (subscription.isPaid || subscription.isTrialing)
   const canResume = Boolean(subscription?.cancelAtPeriodEnd || subscription?.isCanceledWithRemainingAccess)
+  const shouldManageExistingSubscription = Boolean(isProActive && !canResume)
+  const needsBillingPortal = ['past_due', 'unpaid'].includes(String(subscription?.effectiveStatus || subscription?.status || '').toLowerCase())
 
   const capacity = useMemo(() => {
     const max = Number(subscription?.maxBusinessesAllowed || 1)
@@ -81,6 +84,14 @@ function Subscription(props: PageProps) {
     setWorking(true)
     setDataError('')
     try {
+      if (canResume) {
+        await handleResume()
+        return
+      }
+      if (shouldManageExistingSubscription || needsBillingPortal) {
+        await openBillingPortal()
+        return
+      }
       await startCheckout(interval, capacity.additional)
     } catch (error) {
       setDataError(error instanceof Error ? error.message : 'Unable to start checkout.')
@@ -170,6 +181,11 @@ function Subscription(props: PageProps) {
               <button className="primary-button" type="button" disabled={working} onClick={() => void handleResume()}>
                 <CreditCard size={18} />
                 {working ? 'Working' : 'Keep Pro active'}
+              </button>
+            ) : shouldManageExistingSubscription || needsBillingPortal ? (
+              <button className="primary-button" type="button" disabled={working || loadingData || !overview?.portalAvailable} onClick={() => void handleCheckout()}>
+                <CreditCard size={18} />
+                {working ? 'Opening billing' : 'Open Stripe billing'}
               </button>
             ) : (
               <button className="primary-button" type="button" disabled={working || loadingData} onClick={() => void handleCheckout()}>

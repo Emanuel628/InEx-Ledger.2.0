@@ -149,7 +149,7 @@ function getInitialPageFromPath(): AppPage | null {
 
 function getPathForPage(page: AppPage) {
   const slug = pageSlugByPage[page]
-  return slug ? `/${slug}` : null
+  return slug ? `/app-v3/${slug}` : '/app-v3'
 }
 
 function chooseAuthenticatedPage(user: AuthUser) {
@@ -208,6 +208,20 @@ function App() {
     }
   }, [])
 
+  useEffect(() => {
+    const handlePopState = () => {
+      const requestedPage = getInitialPageFromPath()
+      if (!authUser && requestedPage && !publicPages.has(requestedPage)) {
+        setCurrentPage('Landing')
+        return
+      }
+      setCurrentPage(requestedPage || (authUser ? chooseAuthenticatedPage(authUser) : 'Landing'))
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [authUser])
+
   const navigate = (page: AppPage) => {
     const legacyAuthRoute = legacyAuthRoutes[page]
     if (legacyAuthRoute) {
@@ -222,7 +236,7 @@ function App() {
 
     setCurrentPage(page)
     const path = getPathForPage(page)
-    if (path && window.location.pathname !== path) {
+    if (window.location.pathname !== path) {
       window.history.pushState({}, '', path)
     }
   }

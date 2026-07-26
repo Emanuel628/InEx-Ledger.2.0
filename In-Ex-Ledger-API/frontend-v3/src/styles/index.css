@@ -1015,6 +1015,25 @@ textarea:focus-visible {
   color: var(--ink);
 }
 
+.settings-field.is-invalid {
+  padding: 10px;
+  border: 1px solid rgba(216, 59, 59, 0.28);
+  border-radius: 14px;
+  background: rgba(216, 59, 59, 0.06);
+}
+
+.settings-field.is-invalid :is(input, select) {
+  border-color: rgba(216, 59, 59, 0.48);
+  box-shadow: 0 0 0 3px rgba(216, 59, 59, 0.12);
+}
+
+.settings-field-error {
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .settings-row,
 .settings-status-card,
 .settings-danger-zone {

@@ -110,6 +110,46 @@ test("v3 API client preserves multipart bodies and retries stale CSRF once", () 
   assert.match(source, /CSRF token missing or invalid\./);
 });
 
+test("v3 app routes stay under app-v3 and browser back drives page state", () => {
+  const source = fs.readFileSync(path.join(frontendRoot, "App.tsx"), "utf8");
+
+  assert.match(source, /return slug \? `\/app-v3\/\$\{slug\}` : '\/app-v3'/);
+  assert.match(source, /window\.addEventListener\('popstate', handlePopState\)/);
+  assert.match(source, /setCurrentPage\(requestedPage \|\| \(authUser \? chooseAuthenticatedPage\(authUser\) : 'Landing'\)\)/);
+});
+
+test("v3 header notifications use real unread message counts without noisy local filler", () => {
+  const source = fs.readFileSync(path.join(frontendRoot, "components", "AppShell.tsx"), "utf8");
+
+  assert.match(source, /loadUnreadCounts/);
+  assert.match(source, /buildNotifications\(counts\)/);
+  assert.match(source, /support replies/);
+  assert.match(source, /unread emails/);
+  assert.match(source, /account notices/);
+  assert.match(source, /window\.setInterval\(\(\) => void refreshNotifications\(\), 60000\)/);
+  assert.doesNotMatch(source, /initialNotifications/);
+});
+
+test("v3 settings normalizes business profile fields before saving", () => {
+  const settingsApiSource = fs.readFileSync(path.join(frontendRoot, "lib", "settingsApi.ts"), "utf8");
+  const settingsSource = fs.readFileSync(path.join(frontendRoot, "pages", "Settings.tsx"), "utf8");
+  const cssSource = fs.readFileSync(path.join(frontendRoot, "styles", "index.css"), "utf8");
+
+  assert.match(settingsApiSource, /if \(profile\.region === 'US'\) \{/);
+  assert.match(settingsApiSource, /body\.material_participation = Boolean\(profile\.material_participation\)/);
+  assert.doesNotMatch(settingsApiSource, /material_participation: profile\.region === 'US' \? Boolean\(profile\.material_participation\) : null/);
+  assert.match(settingsSource, /English/);
+  assert.match(settingsSource, /French/);
+  assert.match(settingsSource, /Newfoundland and Labrador/);
+  assert.match(settingsSource, /Northwest Territories/);
+  assert.match(settingsSource, /Prince Edward Island/);
+  assert.match(settingsSource, /placeholder="MM-DD"/);
+  assert.match(settingsSource, /validateBusinessProfile/);
+  assert.match(settingsSource, /settings-field-error/);
+  assert.doesNotMatch(settingsSource, /type="date"[\s\S]*Fiscal year start/);
+  assert.match(cssSource, /\.settings-field\.is-invalid/);
+});
+
 test("v3 transactions CSV import requires legacy account and date range fields", () => {
   const apiSource = fs.readFileSync(path.join(frontendRoot, "lib", "transactionsApi.ts"), "utf8");
   const pageSource = fs.readFileSync(path.join(frontendRoot, "pages", "Transactions.tsx"), "utf8");
@@ -254,4 +294,14 @@ test("v3 business settings expose the live accounting lock and hide the old busi
   assert.match(settingsSource, /Clear lock/);
   assert.doesNotMatch(settingsSource, /Businesses on this account/);
   assert.match(apiSource, /\/api\/business\/accounting-lock/);
+});
+
+test("v3 subscription avoids checkout conflicts for existing Stripe subscriptions", () => {
+  const source = fs.readFileSync(path.join(frontendRoot, "pages", "Subscription.tsx"), "utf8");
+
+  assert.match(source, /openBillingPortal/);
+  assert.match(source, /shouldManageExistingSubscription/);
+  assert.match(source, /needsBillingPortal/);
+  assert.match(source, /await openBillingPortal\(\)/);
+  assert.match(source, /Open Stripe billing/);
 });

@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { AppPage, PageProps } from '../App'
+import { loadUnreadCounts } from '../lib/messagesApi'
 
 const navItems = [
   { label: 'Transactions', icon: FileText },
@@ -35,7 +36,7 @@ const navItems = [
   { label: 'Messages', icon: MessageSquare },
 ] satisfies { label: AppPage; icon: LucideIcon }[]
 
-const initialNotifications: { id: number; title: string; body: string; page: AppPage }[] = []
+type AppNotification = { id: string; title: string; body: string; page: AppPage }
 
 type AppShellProps = PageProps & {
   searchPlaceholder: string
@@ -60,7 +61,7 @@ function AppShell({
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const [notifications, setNotifications] = useState(initialNotifications)
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
   const topbarActionsRef = useRef<HTMLDivElement | null>(null)
   const goToPage = (page: AppPage) => {
     onNavigate(page)
@@ -83,6 +84,34 @@ function AppShell({
     document.addEventListener('pointerdown', closeTopbarMenus)
     return () => document.removeEventListener('pointerdown', closeTopbarMenus)
   }, [notificationsOpen, userMenuOpen])
+
+  useEffect(() => {
+    let active = true
+
+    async function refreshNotifications() {
+      if (!authUser) {
+        setNotifications([])
+        return
+      }
+
+      try {
+        const counts = await loadUnreadCounts()
+        if (!active) return
+        setNotifications(buildNotifications(counts))
+      } catch {
+        if (active) {
+          setNotifications([])
+        }
+      }
+    }
+
+    void refreshNotifications()
+    const interval = window.setInterval(() => void refreshNotifications(), 60000)
+    return () => {
+      active = false
+      window.clearInterval(interval)
+    }
+  }, [authUser])
 
   return (
     <div
@@ -256,7 +285,7 @@ function AppShell({
                 )}
                 {notifications.length ? (
                   <button className="notification-clear" type="button" onClick={() => setNotifications([])}>
-                    Mark all as read
+                    Dismiss
                   </button>
                 ) : null}
               </div>
@@ -271,6 +300,42 @@ function AppShell({
       {overlay}
     </div>
   )
+}
+
+function buildNotifications(counts: { total?: number; messages?: number; support?: number; notifications?: number }) {
+  const items: AppNotification[] = []
+  const supportCount = Number(counts.support || 0)
+  const noticeCount = Number(counts.notifications || 0)
+  const messageCount = Number(counts.messages || 0)
+
+  if (supportCount > 0) {
+    items.push({
+      id: 'support',
+      title: supportCount === 1 ? 'Support reply' : `${supportCount} support replies`,
+      body: 'Open Messages to review support updates.',
+      page: 'Messages',
+    })
+  }
+
+  if (messageCount > 0) {
+    items.push({
+      id: 'messages',
+      title: messageCount === 1 ? 'Unread email' : `${messageCount} unread emails`,
+      body: 'Open Messages to review email and invoice replies.',
+      page: 'Messages',
+    })
+  }
+
+  if (noticeCount > 0) {
+    items.push({
+      id: 'account-notices',
+      title: noticeCount === 1 ? 'Account notice' : `${noticeCount} account notices`,
+      body: 'Open Messages to review account notifications.',
+      page: 'Messages',
+    })
+  }
+
+  return items
 }
 
 function LogoMark() {
